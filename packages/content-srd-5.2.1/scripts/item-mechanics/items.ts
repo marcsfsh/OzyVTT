@@ -322,8 +322,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   /**
-   * Charges recharge fully on a Long Rest: 1d3 at dawn has no partial-recovery shape. The
-   * "Beast with a Swim Speed" target restriction stays prose.
+   * Dominate Beast at DC 15 on 3 charges, 1d3 back at dawn. The "Beast with a Swim Speed" target restriction stays
+   * prose.
    */
   "trident-of-fish-command": {
     charges: { regain: "1d3" },
@@ -869,20 +869,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ==== Wands, staffs, rods, rings and the spell scroll ===========================================
   //
-  // Recurring limits:
-  //   - One use spends exactly one charge, so only one-charge properties are authored.
-  //   - "Regains 1d6 + 1 expended charges daily at dawn" is `charges.regain`, rolled on a Long Rest, and "if you
-  //     expend the last charge, roll 1d20" is `charges.lastChargeRoll`. Charges count per carried copy.
-  //   - Use pools are capped at 20.
+  // How these read:
+  //   - A use spends one charge, or `useCost` of them (a Staff of Fire's Fireball: 3), from a pool counted per carried
+  //     copy. "Regains 1d6 + 1 expended charges daily at dawn" is `charges.regain`, and "if you expend the last
+  //     charge, roll 1d20" is `charges.lastChargeRoll`, with `charges.lastCharge` saying what a 1 does.
   //   - A staff wielded as a Quarterstaff and the Rod of Lordly Might carry their base's weapon block
   //     (`build-magic-items.ts`), so "+N to attack and damage rolls made with it" is scoped to them, and a hit property
   //     is an action that rides the item's own melee hits (`ridesHit: melee-this-weapon`).
-  //   - An item action's to-hit is ability-derived; a printed flat attack bonus cannot be said.
-  //   - `castAction` takes a cast's damage and attack from the spell record's `damage`/`attackRoll`
-  //     columns, which describe the spell's text as a whole: healing spells become Force
-  //     damage, Magic Missile rolls one dart, Web always deals its fire damage, and Faerie Fire,
-  //     Protection from Evil and Good and Ray of Enfeeblement gain an attack roll. Those casts are not
-  //     authored.
+  //   - An item action's to-hit comes from an ability, or from the item where it prints one (`attack.bonus`).
   //   - `spell-attack-bonus` lands on the bearer's spell attacks while the item is held.
 
   // ---- Rings -----------------------------------------------------------------------------------
@@ -1603,6 +1597,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   /**
    * The +2 Quarterstaff, the AC, save and spell attack bonuses, and the spells at their printed charge costs on 20
    * charges; a 20 on the last charge's d20 gives back 1d8 + 2, and a 1 leaves a +2 Quarterstaff with no other magic.
+   * Retributive Strike, whose damage counts the charges left and whose breaker may travel to another plane, is the
+   * GM's.
    */
   "staff-of-power": {
     modifiers: [
@@ -2125,13 +2121,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //   - Check advantage fires only on checks the server rolls with a matching narrow: Hide carries
   //     `{dex, stealth}`, while Search/Study/Influence carry only an ability. "Advantage on Dexterity
   //     (Stealth) checks" is authorable; qualified clauses ("that rely on sight") are not.
-  //   - `speed`, `darkvision` and `sense` reach nothing from an item (the overlay refuses them).
-  //   - A save cannot be narrowed to what it is against, so "Advantage on saves against spells" or
-  //     "to avoid the Poisoned condition" would apply to every save.
-  //   - No `per` value means "never recharges", so consumable charges (beads, crumbling scarabs,
-  //     talismans destroyed on the last charge) cannot be authored.
-  //   - Spell records describe the spell's text as a whole (see the wands section), and there
-  //     is no healing in the spell model.
+  //   - Charges that never come back are `per: "never"`, and the last one ends the item as `charges.lastCharge`
+  //     says (a scarab crumbles, a talisman is destroyed).
   //   - `spell-save-dc` raises every save-bearing action on the sheet, including other items' printed
   //     DCs as well as the wearer's spell save DC.
   //   - `ability-score` and `hit-points-per-level` are refused on items.
@@ -2502,7 +2493,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       }
     ]
   },
-  // `necklace-of-prayer-beads` - the bead composition is per copy, and Cure Wounds has no healing.
+  // `necklace-of-prayer-beads` - the GM picks each bead's kind per copy, and a row holds no count for each kind.
   // A Magic action regains 2d4 + 2 Hit Points once a dawn, and saves to avoid or end Poisoned have Advantage.
   "periapt-of-health": {
     modifiers: [poisonedSaves()],
@@ -2748,7 +2739,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `robe-of-useful-items` - per-copy patches that become objects and creatures.
+  // `robe-of-useful-items` - per-copy patches, picked or rolled on a d100 table, that become objects and creatures.
 
   // The wings last up to an hour and then can't be used for 1d12 hours, so the wait runs 1d12 + 1 hours from the
   // use. Ending them early doesn't start the wait sooner. Falling when they disappear is the GM's.
@@ -2774,26 +2765,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ==== Carried wondrous items (slot wondrous), potions and oils ==================================
   //
-  // Recurring limits:
-  //   - A consumed item is `consumedOnUse`: each use of its actions takes one from the stack. An item with
-  //     several charges that it spends as it goes (beads, dust pinches) still has no `per` value to say so.
-  //   - `itemAction` keeps `attack`, `save`, `damage`, `healing`, `uses`, `grants`, `area` and
-  //     `replacesAttack`; `onHit` and the rest are dropped, so an item action cannot apply an on-hit condition.
-  //   - An item's `effects` ignore `duration`, so "Resistance for 1 hour" would be permanent.
-  //   - Spell records describe the spell's text as a whole (see the wands section), and there
-  //     is no temporary-HP rider.
-  //   - One use spends one charge, and pools are capped at 20.
+  // How these read:
+  //   - A consumed item is `consumedOnUse`: each use of its actions takes one from the stack. What an item spends as it
+  //     goes (beads, pinches) is a pool that never comes back (`per: "never"`), counted from `charges.starting` when
+  //     the copy is added.
   //   - `ability-score` is refused on items.
-  //   - Item actions only resolve inside an encounter. Outside one, the loose route rolls them and spends the
-  //     charge, as `action.use` says.
+  //   - Outside a fight, an item action that rolls against creatures and names none goes the loose route, which
+  //     rolls it and spends the charge, as `action.use` says.
   //
   // A charged item may be authored for its charge alone (count and recharge exact) when the GM can
   // already produce what the charge buys: the elemental summons, `bag-of-tricks`, `gem-of-seeing`,
   // `pipes-of-the-sewers`, `cubic-gate` and `iron-bands`. Not when the sheet would then be wrong
   // (`pearl-of-power`). "Regains 1dN at dawn" is `charges.regain`, rolled on a Long Rest.
   //
-  // Trap items (`bag-of-devouring`, `potion-of-poison`, `dust-of-sneezing-and-choking`) are not
-  // authored: a button naming the real effect would spoil the trap.
+  // Trap items (`bag-of-devouring`, `dust-of-sneezing-and-choking`) are not authored: a button naming the real effect
+  // would spoil the trap. A Potion of Poison is the GM's to name.
 
   // ---- Carried wondrous items (alphabetical, absences inline) ----------------------------------
 
