@@ -60,6 +60,24 @@ export type SampleRemovalResult = MutationResult & {
 };
 export type SceneCreateResult = MutationResult & { sceneId?: string };
 
+/** A way the roller may still change a roll it sees, sent back as `answer` with its next look: a Bardic Inspiration
+ *  die, Indomitable's reroll, Stroke of Luck. */
+export type RollAnswerOffer = Readonly<{
+  /** What the answer names: the action's id, or `effect:<id>` for an effect that carries one. */
+  id: string;
+  name: string;
+  /** What it does, for its button: "+1d8", "Reroll +9", "Reroll with Advantage", "The d20 becomes 20". */
+  does: string;
+  /** What using it spends ("a use", "the Reaction and a use"), or null. */
+  cost: string | null;
+  /** The die may be added or taken off (Boon of Fate); `subtract` on the answer takes it off. */
+  either?: true;
+  /** It rerolls the d20, so a typed roll's answer carries the face the physical reroll shows. */
+  rerolls?: true;
+}>;
+/** An answer a roll took, as its result says it: "Bardic Inspiration +5", "Indomitable: rerolled". */
+export type RollAnswered = Readonly<{ name: string; change: string }>;
+
 /** Server-computed outcome of resolving a definition action (rolls already recorded in the roll history). */
 export type ActionResolutionAttack = Readonly<{
   targetId: string;
@@ -76,6 +94,10 @@ export type ActionResolutionAttack = Readonly<{
   /** Dice an effect adds to the roll, in `total` (Bless +1d4, Bane -1d4). A preview leaves `total` null: they roll
    *  when the attack is confirmed. */
   bonusDice?: ReadonlyArray<Readonly<{ label: string; dice: string; total: number | null }>>;
+  /** What answered the roll after it was seen, already in `total` and `outcome`. */
+  answered?: readonly RollAnswered[];
+  /** On a preview, the answers the attacker may still give it. */
+  answers?: readonly RollAnswerOffer[];
 }>;
 /** Every source behind an attack's advantage/disadvantage, so the table can see the math (ADR-0020). */
 export type ActionRollMode = Readonly<{
@@ -112,9 +134,27 @@ export type HitOffer = Readonly<{
   slotLevels?: readonly number[];
   /** What the engine could not check, so the attacker vouches for it ("No map to check for an ally within 5 feet"). */
   unverified?: string;
+  /** The save it opens on the target and what a failure deals, as sentences ("The target makes a Charisma saving
+   *  throw. A failure deals 8d10 Psychic."). */
+  save?: string;
+  /** Effects to pick with it (Brutal Strike's Forceful Blow, a Cunning Strike's Trip), each with what it costs. */
+  effects?: ReadonlyArray<HitOfferEffect>;
+  /** How many different effects one hit may carry. */
+  effectsChoose?: number;
+  /** It is chosen with one effect or not at all (Open Hand Technique). */
+  effectRequired?: true;
+  /** It rolls the weapon's own dice again rather than adding any (Savage Attacker); `dice` names them. */
+  rerolls?: true;
 }>;
+/** One effect a hit offer carries: its id, its name and what it costs ("-1d6"). */
+export type HitOfferEffect = Readonly<{ id: string; name: string; cost?: string }>;
 /** One extra chosen at confirm, and how. */
-export type HitOptionChoice = Readonly<{ id: string; damageType?: string; slotLevel?: number }>;
+export type HitOptionChoice = Readonly<{
+  id: string;
+  damageType?: string;
+  slotLevel?: number;
+  effects?: readonly string[];
+}>;
 /** The damage an action with no attack roll and no save owes one target (Magic Missile, a smite resolved alone). */
 export type DamageTarget = Readonly<{
   targetId: string;
@@ -137,6 +177,9 @@ export type ActionResolution = Readonly<{
   rollMode?: ActionRollMode;
   /** Flat typed damage added by active effects (Rage +2 melee), included in damageTotal. */
   bonusDamage?: ReadonlyArray<{ amount: number; type: string; source: string }>;
+  /** A melee hit can knock its target out (SRD Knocking Out a Creature): on a preview, offered; on a confirm, chosen,
+   *  so the damage it owes leaves the target at 1 Hit Point and Unconscious if it would drop it to 0. */
+  knockOut?: "offered" | "chosen";
   /** Source-linked effects the hit applied to targets (Bite: Grappled + Restrained). */
   effectsApplied?: ReadonlyArray<{
     targetId: string;
@@ -162,7 +205,9 @@ export type ActionResolution = Readonly<{
   /** On a previewed hit, the push its weapon mastery offers (SRD "up to 10 feet"); the confirm says how far with `pushFeet`. */
   push?: Readonly<{ targetName: string; maxFeet: number }> | null;
   /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer. */
-  reactionPrompts?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; actionName: string }>>;
+  reactionPrompts?: ReadonlyArray<
+    Readonly<{ actorId: string; actorName: string; actionName: string; holdsDamage?: true }>
+  >;
   /** An extra attack this swing opened (Cleave's swing at a second creature), for the result card to offer. */
   opens?: Readonly<{ actionId: string; actionName: string }>;
   /** The attack would hit, and the target's reaction (Parry, Shield) may still turn it into a miss. Nothing past the
@@ -230,6 +275,8 @@ export type DeathSaveResult = MutationResult & {
     /** The d20 mode when it had Advantage or Disadvantage; absent for a plain roll. */ rollMode?:
       "advantage" | "disadvantage" | "normal";
     /** What gave the death save Advantage or Disadvantage. */ rollModeSources?: ActionRollMode;
+    /** What answered the roll, already in its numbers. */ answered?: readonly RollAnswered[];
+    /** On a preview, the answers the dying character may still give it. */ answers?: readonly RollAnswerOffer[];
   }>;
 };
 /** A check the server rolled. A blind roll's numbers stay with the GM: the roller gets `hiddenFromRoller` alone. */
@@ -247,6 +294,10 @@ export type CheckRollOutcome = Readonly<{
   reliableTalent?: true;
   /** The d20 was typed from a physical die. */
   typed?: true;
+  /** What answered the check, already in its numbers. */
+  answered?: readonly RollAnswered[];
+  /** The answers the roller may still give it (`check.answer`). */
+  answers?: readonly RollAnswerOffer[];
   rollId: string;
 }>;
 export type CheckRollResult = MutationResult & { check?: CheckRollOutcome; hiddenFromRoller?: boolean };
@@ -275,6 +326,10 @@ export type SaveAnswerResult = MutationResult & {
     /** Advantage/disadvantage sources that shaped the save roll (Restrained, Dodge). */ rollMode?: ActionRollMode;
     /** The typed breakdown behind `appliedDamage`; absent when the save applied no damage. */ parts?: DamageApplication["parts"];
     /** Flat reduction taken off before Resistance. */ flatReduction?: number;
+    /** What answered the save, already in its numbers. */ answered?: readonly RollAnswered[];
+    /** On a preview, the answers the saving creature may still give it. */ answers?: readonly RollAnswerOffer[];
+    /** The confirm waits on another creature's answer to the roll (Countercharm). */ awaitingAnswer?: true;
+    /** The damage waits on the target's own reaction to taking it (Stone's Endurance). */ damageHeld?: true;
   };
 };
 /** A loose saving throw (none was owed): its total and d20, or the condition that failed it without a roll. */
@@ -352,6 +407,11 @@ export const ActionAvailabilitySchema = z.strictObject({
     .int()
     .nullable()
     .describe("Normal range band; shots beyond it up to rangeFeet roll at disadvantage"),
+  targetRangeFeet: z
+    .number()
+    .int()
+    .optional()
+    .describe("How far its targets may be when it says so without an attack (Lay on Hands' touch is 5)"),
   attackCount: z.number().int().nullable(),
   saveAbility: z.string().nullable(),
   saveDc: z.number().int().nullable().describe("Save DC including item riders"),
@@ -576,6 +636,20 @@ const ActorDerivedSheetSchema = z.strictObject({
     )
     .describe(
       "The weapon kinds the character chose under Weapon Mastery, in the order chosen, whether or not it carries one. Empty for a sheet that records no such choice (an import)."
+    ),
+  /** The class table's printed columns no use counts, each class at its own level. */
+  classColumns: z
+    .array(
+      z.strictObject({
+        classId: z.string(),
+        className: z.string().describe("The class as the sheet names it"),
+        id: z.string().describe("The column's id, e.g. bardic-inspiration"),
+        name: z.string().describe('The column as the class table prints it, e.g. "Bardic Die"'),
+        value: z.string().describe('Its value at the character\'s level in that class, e.g. "d8", "3d6", "+2"')
+      })
+    )
+    .describe(
+      "The columns a class table prints that no use counts (the Bardic Die, Martial Arts, Sneak Attack, Rage Damage, Eldritch Invocations, Weapon Mastery), each class at the character's level in it. A column wired to a pool (Rages, Focus Points, Sorcery Points) is a use instead. Empty for a sheet with no class the catalog knows."
     )
 });
 export type ActorDerivedSheet = Wire<z.infer<typeof ActorDerivedSheetSchema>>;
@@ -693,7 +767,12 @@ export const ActorMovementReplySchema = z.strictObject({
   /** Prone: it can only crawl, each foot costing an extra foot (two in Difficult Terrain). */
   crawling: z.boolean().optional(),
   /** It drags a creature it grapples that isn't Tiny or two sizes smaller, each foot costing an extra foot. */
-  dragging: z.boolean().optional()
+  dragging: z.boolean().optional(),
+  /** It may end a move in another creature's space (Air Form, a swarm), so no creature bars its way; a creature's
+   *  space still costs as Difficult Terrain. */
+  passesCreatures: z.boolean().optional(),
+  /** The swarms on the map the asker can see. Any creature may cross a swarm's space, as Difficult Terrain. */
+  swarmIds: z.array(z.uuid()).max(200).optional()
 });
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;

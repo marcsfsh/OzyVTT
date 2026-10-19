@@ -780,7 +780,9 @@
             ],
             "adds": {
               "abilityModifier": "wis"
-            }
+            },
+            "damageTypes": ["necrotic", "radiant"],
+            "targets": { "count": 1, "rangeFeet": 30, "seen": true, "who": "others" }
           },
           {
             "id": "divine-spark-heal",
@@ -811,7 +813,8 @@
             ],
             "adds": {
               "abilityModifier": "wis"
-            }
+            },
+            "targets": { "count": 1, "rangeFeet": 30, "seen": true, "who": "others" }
           },
           {
             "id": "turn-undead",
@@ -826,7 +829,8 @@
               "failureDuration": { "type": "rounds", "rounds": 10 },
               "endsOnDamage": true
             },
-            "damage": []
+            "damage": [],
+            "targets": { "rangeFeet": 30, "creatureTypes": ["undead"] }
           }
         ],
         "uses": {

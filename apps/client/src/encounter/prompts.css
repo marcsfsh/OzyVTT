@@ -275,6 +275,31 @@
   color: var(--text-dim);
   font-size: var(--fs-xs);
 }
+/* Answers a shown roll may take, on their own wrapping row under Confirm. */
+.roll-answers {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.save-prompt-confirm .roll-answer {
+  border-color: color-mix(in srgb, var(--violet) 45%, var(--line));
+  background: color-mix(in srgb, var(--surface-3) 78%, var(--violet));
+  color: var(--violet-hi);
+}
+.save-prompt-confirm .roll-answer:hover:not(:disabled) {
+  border-color: var(--violet);
+}
+.roll-answered {
+  color: var(--violet-hi);
+  font-size: var(--fs-sm);
+}
+.roll-waiting {
+  flex-basis: 100%;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 /* What the target's defences did, on its own line under the rolled result. */
 .save-prompt-defences {
   flex-basis: 100%;

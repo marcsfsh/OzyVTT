@@ -10,12 +10,14 @@ import { z } from "zod";
 import {
   AbilitySchema,
   ActionSchema,
+  DamageFormulaSchema,
   DiceFormulaSchema,
   HealingFormulaSchema,
   EffectGrantSchema,
   GrantWhenSchema,
   HitDieSchema,
   HoursSchema,
+  HitRiderSchema,
   ModifierSchema,
   PickBudgetScalingSchema,
   SaveFailureEffectSchema,
@@ -203,11 +205,31 @@ export const FeatureSaveSchema = z
     "A save a feature forces. `ability` is what the target rolls; `dc` is how the number is derived; the outcome fields are a stat block's."
   );
 
+/** A hit rider on a feature: the DC of its saves is derived like a feature save's ("8 plus your Dexterity modifier and
+ *  Proficiency Bonus"), and how many effects one hit carries may grow with level (Improved Cunning Strike's two). */
+export const FeatureHitRiderSchema = HitRiderSchema.omit({ saveDc: true })
+  .extend({
+    saveDc: FeatureSaveDcSchema.optional(),
+    effectsChooseByLevel: z
+      .array(z.object({ level: ContentLevelSchema, choose: z.number().int().min(1).max(3) }).strict())
+      .max(4)
+      .optional()
+      .describe("How many effects one hit may carry from a class level on; the highest matching level wins")
+  })
+  .strict();
+
 /** A rollable action a feature adds (Second Wind, Breath Weapon): `ActionSchema` with derived attack/save. */
-export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true })
+export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true, ridesHit: true })
   .extend({
     attack: FeatureAttackSchema.optional(),
     save: FeatureSaveSchema.optional(),
+    ridesHit: FeatureHitRiderSchema.optional(),
+    /** It spends none of its feature's uses, where another of the feature's actions does (ending Quivering Palm's
+     *  vibrations, which the 4 Focus Points paid for when they started). */
+    spendsNoUses: z
+      .literal(true)
+      .optional()
+      .describe("It spends none of its feature's uses, where another of the feature's actions does"),
     /** Damage that grows with level. It replaces `damage` at the highest matching level (Sneak Attack, Divine Smite). */
     damageByLevel: z
       .array(
@@ -237,7 +259,8 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
       ),
     /** What the built action adds to its first damage part and its healing, read off the character when it is built:
      *  a multiple of its level ("1d10 plus your Fighter level", "five times your Cleric level") and an ability
-     *  modifier ("add your Wisdom modifier"). */
+     *  modifier ("add your Wisdom modifier"). A reroll answer takes the level multiple as its bonus (Indomitable), and
+     *  a reaction that reduces damage adds all of it to its roll (Deflect Attacks). */
     adds: z
       .object({
         classLevel: z.number().int().min(1).max(10).optional(),
@@ -264,6 +287,23 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
       .describe(
         "The granted effect's `damage-bonus` amounts become the named printed class column at the character's level (Rage Damage), and the action's text says the number"
       ),
+    /** The die an answer to a roll rolls, growing with level (the Bardic Inspiration die: d6, a d8 at level 5, a d10 at
+     *  10, a d12 at 15). It replaces the amount of the action's `answer`, and of the answer its grant carries, at the
+     *  highest matching level. */
+    answerAmountByLevel: z
+      .array(z.object({ level: ContentLevelSchema, amount: DamageFormulaSchema }).strict())
+      .max(20)
+      .optional()
+      .describe(
+        "The die an answer to a roll rolls, growing with level (the Bardic Inspiration die). The highest matching level replaces the amount of the action's answer and of its grant's answer"
+      ),
+    /** A reaction that changes with level. It replaces `reaction` at the highest matching level (Deflect Energy lets
+     *  Deflect Attacks meet every damage type at Monk 13). */
+    reactionByLevel: z
+      .array(z.object({ level: ContentLevelSchema, reaction: ActionSchema.shape.reaction.unwrap() }).strict())
+      .max(20)
+      .optional()
+      .describe("A reaction that changes with level. The highest matching level replaces `reaction`"),
     /** A compound plan that grows with level. It replaces `multiattack` at the highest matching level (Flurry of
      *  Blows' third strike at Monk 10). */
     multiattackByLevel: z
@@ -390,8 +430,8 @@ export const featureRiders = {
 export const PickBudgetKeySchema = z
   .string()
   .regex(
-    /^[a-z0-9-]+(:[a-z0-9-]+)?$/,
-    'A pick budget names an offer key ("class-cantrips") or a feature\'s own pick ("feature:expertise").'
+    /^[a-z0-9-]+(:[a-z0-9-]+(\/[2-9])?)?$/,
+    'A pick budget names an offer key ("class-cantrips") or a feature\'s own pick ("feature:expertise", and "feature:magic-initiate-cleric/2" for its second).'
   )
   .max(80);
 

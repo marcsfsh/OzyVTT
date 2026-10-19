@@ -1,4 +1,13 @@
-import type { AbilityId, Actor, DamageApplication, GameState, PendingSave } from "@vtt/domain";
+import type {
+  AbilityId,
+  Actor,
+  DamageApplication,
+  GameState,
+  HeldRoll,
+  PendingSave,
+  RollAnswered,
+  RollAnswerOffer
+} from "@vtt/domain";
 import {
   abilityModifier as scoreModifier,
   aggregateRollMode,
@@ -22,9 +31,21 @@ import { withoutSameHazard } from "./hazards.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 import { requireGm, type Initiator } from "./authorization.js";
 import { holdsFeature } from "./class-features.js";
-import { holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
+import { heldRollFor, holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
+import {
+  answeredLines,
+  answerKeyOf,
+  answersFromOthers,
+  answersOffered,
+  applyRollAnswer,
+  askAnswer,
+  withAnswers,
+  type AnswerDeps,
+  type AnswerTarget
+} from "./roll-answers.js";
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
+import { openDamageWindow } from "./damage-window.js";
 import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
@@ -49,6 +70,7 @@ import {
 } from "./equipment-derivation.js";
 import { countZoneDamage } from "./spell-zone-state.js";
 import { sizeAtMost, sizeRank } from "./resolution/context.js";
+import { lightSensitivities, sightRules } from "./vision/rules.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -84,6 +106,13 @@ export type SaveOutcome = Readonly<{
   autoSucceeded?: string;
   /** Advantage/disadvantage sources that shaped the rolled save (Restrained, Dodge); absent for a plain d20. */
   rollMode?: AggregatedRollMode;
+  /** What answered the roll, already in its numbers, and on a preview what may still answer it. */
+  answered?: readonly RollAnswered[];
+  answers?: readonly RollAnswerOffer[];
+  /** The confirm waits on another creature's answer to the roll (Countercharm); nothing is applied yet. */
+  awaitingAnswer?: true;
+  /** The damage waits on the target's reaction to taking it (Stone's Endurance); the answer lands it. */
+  damageHeld?: true;
 }>;
 
 /** Advantage/disadvantage sources for a save: Restrained gives disadvantage on DEX saves (SRD), and every
@@ -350,6 +379,8 @@ export function createPendingSaves(
     failurePush?: ForcedPush;
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize?: PendingSave["advantageAtSize"];
+    /** The spell the save is against, for what answers a save against a spell. */
+    spell?: PendingSave["spell"];
     newSaveId: () => string;
     createdAt: number;
   }>
@@ -384,6 +415,7 @@ export function createPendingSaves(
     ...(input.drain ? { drain: { ...input.drain } } : {}),
     ...(input.failurePush ? { failurePush: { ...input.failurePush } } : {}),
     ...(input.advantageAtSize ? { advantageAtSize: input.advantageAtSize } : {}),
+    ...(input.spell ? { spell: { ...input.spell } } : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt.
@@ -466,6 +498,8 @@ export function applyFailureEffect(
       ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {}),
       ...(onFail.magical ? { magical: true as const } : {}),
       ...(onFail.armorClassBonus !== undefined ? { armorClassBonus: onFail.armorClassBonus } : {}),
+      // The light it sheds while it lasts (Faerie Fire's Dim Light).
+      ...(onFail.light ? { light: { ...onFail.light } } : {}),
       // What it does while it lasts (Bane's -1d4).
       modifiers: [...onFail.modifiers]
     }),
@@ -568,8 +602,43 @@ export function shownRollMode(
   };
 }
 
-/** How a pending save is answered beyond its method: a typed d20 (`face`), or a reroll of the held die. */
-export type SaveAnswerOptions = Readonly<{ face?: number; reroll?: boolean }>;
+/** How a pending save is answered beyond its method: a typed d20 (`face`), a reroll of the held die, or an answer to
+ *  the held roll (`roll-answers.ts`). */
+export type SaveAnswerOptions = Readonly<{
+  face?: number;
+  reroll?: boolean;
+  /** `by` names another creature answering (Countercharm, through its Reaction prompt); absent, the saving one. */
+  answer?: Readonly<{ id: string; subtract?: boolean; face?: number; by?: string }>;
+  /** The confirm of a save that waited on others' answers, finished once they have answered. */
+  settling?: true;
+}>;
+
+/** What lasts only until its bearer's next saving throw (Staggering Blow's Disadvantage) is spent by it; the rest of
+ *  the effect (its no Opportunity Attacks) stays until its own end. */
+export const UNTIL_OWN_SAVE_TAG = "until-own-save";
+
+function spendUntilOwnSave(state: GameState, target: Actor): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const effect of target.effects.filter((candidate) => candidate.tags.includes(UNTIL_OWN_SAVE_TAG))) {
+    const rest = effect.tags.filter((tag) => tag !== UNTIL_OWN_SAVE_TAG);
+    if (rest.length === 0) {
+      events.push(...endEffectIfPresent(state, target.id, effect.id));
+      continue;
+    }
+    target.effects = target.effects.map((candidate) =>
+      candidate.id === effect.id
+        ? {
+            ...candidate,
+            tags: rest,
+            modifiers: candidate.modifiers.filter(
+              (modifier) => modifier.type !== "roll-mode" || modifier.roll !== "save"
+            )
+          }
+        : candidate
+    );
+  }
+  return events;
+}
 
 /** Answers a pending save (a roll, a typed d20, or the GM's typed total) and auto-applies it: fail takes full damage
  *  and the condition; success takes half if the action says so. The structured-save exception to propose-then-apply
@@ -598,12 +667,23 @@ export function answerSave(
   if (damageOverride !== undefined && scope.role !== "gm" && state.builderPolicy.typedRolls !== "open")
     throw new CommandRejectedError("At this table the server rolls the dice. Ask the GM to change the damage.");
   const heldKey = `save:${saveId}`;
+  // A confirmed save waiting on another creature's answer moves only through that answer.
+  if (pending.confirmed && options.settling !== true && options.answer?.by === undefined)
+    throw new CommandRejectedError(`${target.name}'s save waits on an answer to the roll. The GM can close it.`);
 
   let total: number;
   let natural: number | null = null;
   let autoFailed: string | null = null;
   let autoSucceeded: string | null = null;
   let rollMode: AggregatedRollMode | undefined;
+  // What answered the rolled save (`roll-answers.ts`), and what may still answer it on a preview.
+  let answerSucceeds = false;
+  let answered: RollAnswered[] = [];
+  let offered: RollAnswerOffer[] = [];
+  const answerEvents: EffectNarration[] = [];
+  // A confirm that waits on another creature's answer to the roll applies nothing yet.
+  let awaitingAnswer = false;
+  if (options.answer && method !== "roll") throw new CommandRejectedError("Answer a save the dice decide.");
   const targetDefinition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
   const magicResistance = pending.magical ? magicResistanceOf(targetDefinition) : null;
   if (method === "manual") {
@@ -641,6 +721,10 @@ export function answerSave(
     if (pending.advantageAtSize && sizeRank(target.size) >= sizeRank(pending.advantageAtSize))
       sources.advantage.push({ source: "size", label: `${pending.actionName}: its size` });
     sources.advantage.push(...traitSaveClaims(state, target, definition, deps));
+    // Sunlight Weakness: Disadvantage on D20 Tests while it stands in sunlight.
+    const sightContent = { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
+    for (const name of lightSensitivities(state, target, "save", sightRules(state, sightContent), sightContent))
+      sources.disadvantage.push({ source: "light-sensitivity", label: `${name} (in the light)` });
     const ward = holyWardClaim(state, target, pending.sourceActorId, {
       resolveDefinition: deps.resolveDefinition,
       ...(deps.catalog ? { catalog: deps.catalog } : {})
@@ -650,20 +734,25 @@ export function answerSave(
     // A player's choice is never read: the rules count Advantage and Disadvantage, and only the GM may force a mode.
     const forced = scope.role === "gm" ? explicitRollMode : undefined;
     const mode = forced ?? aggregated.mode;
+    if (options.answer && (commit || options.reroll || options.face !== undefined))
+      throw new CommandRejectedError("Answer the save on a look of its own, before you confirm it.");
+    if (options.answer && !heldRollFor(state, heldKey))
+      throw new CommandRejectedError("Roll first: an answer meets a roll that was made.");
     // Bless's d4 rolls into the save itself, and is held with its d20s.
-    const test = rollHeldTest(
-      state,
-      heldKey,
-      target,
-      scope,
-      mode,
-      modifier,
-      saveRiderDiceTerms(derivation, pending.ability),
-      options,
-      deps.random
-    );
+    const throwSave = (choice: Pick<SaveAnswerOptions, "face" | "reroll">) =>
+      rollHeldTest(
+        state,
+        heldKey,
+        target,
+        scope,
+        mode,
+        modifier,
+        saveRiderDiceTerms(derivation, pending.ability),
+        choice,
+        deps.random
+      );
+    let test = throwSave(options.answer ? {} : options);
     rollMode = test.typed ? undefined : shownRollMode(aggregated, forced);
-    natural = test.natural;
     const rollId = deps.newRollId();
     // A second look at held dice records nothing new; the dice already sit in the history.
     if (test.fresh)
@@ -679,8 +768,9 @@ export function answerSave(
         createdAt: deps.now(),
         typed: test.typed
       });
-    if (commit) releaseHeldRoll(state, heldKey);
-    else
+    // What answered the save on an earlier look counts in this one, the confirm included.
+    const answeredBefore = heldRollFor(state, heldKey);
+    if (!commit)
       holdRoll(state, {
         key: heldKey,
         actorId: target.id,
@@ -689,10 +779,91 @@ export function answerSave(
         rollId: test.fresh ? rollId : (state.heldRolls.find((entry) => entry.key === heldKey)?.rollId ?? null),
         typed: test.typed
       });
-    total = test.resolution.total;
+    const shown = (held: HeldRoll | undefined) => withAnswers(held, test.natural, test.resolution.total);
+    const answerTarget = (held: HeldRoll | undefined): AnswerTarget => ({
+      kind: "save",
+      roller: target,
+      key: heldKey,
+      natural: shown(held).natural,
+      total: shown(held).total,
+      threshold: pending.dc,
+      mode,
+      ability: pending.ability,
+      stakes: {
+        conditions: conditionsAtStake(state, pending),
+        ...(pending.spell ? { spell: pending.spell } : {}),
+        sourceActorId: pending.sourceActorId
+      },
+      purpose: "save",
+      label: `${pending.ability.toUpperCase()} save`,
+      visibility: target.visibility === "gm-only" ? "gm-only" : "public"
+    });
+    if (options.answer) {
+      const bearer =
+        options.answer.by === undefined ? target : state.actors.find((actor) => actor.id === options.answer!.by);
+      if (!bearer) throw new CommandRejectedError("The creature answering the save is no longer here.");
+      answerEvents.push(
+        ...applyRollAnswer(
+          state,
+          answerTarget(heldRollFor(state, heldKey)),
+          bearer,
+          options.answer,
+          answerDepsOf(deps, commandId)
+        )
+      );
+      // A reroll answer changed the held dice; this look reads them.
+      test = throwSave({});
+    }
+    let held = commit ? answeredBefore : heldRollFor(state, heldKey);
+    // Another creature may answer the confirmed roll first (Countercharm, a sphinx's Burst of Ingenuity), one at a
+    // time in turn order: the confirm waits on its prompt, and the answer finishes it.
+    if (commit && !legendaryResistance && state.combat.active) {
+      const asked = pending.confirmed?.asked ?? [];
+      const next = answersFromOthers(state, answerTarget(held), answerDepsOf(deps, commandId), new Set(asked))[0];
+      if (next) {
+        holdRoll(state, {
+          key: heldKey,
+          actorId: target.id,
+          faces: test.faces,
+          others: otherDiceOf(test.resolution),
+          rollId: held?.rollId ?? (test.fresh ? rollId : null),
+          typed: test.typed
+        });
+        held = heldRollFor(state, heldKey);
+        const confirmed = {
+          ...(forced !== undefined ? { rollMode: forced } : {}),
+          ...(damageOverride !== undefined ? { damageOverride } : {}),
+          asked: [...asked, answerKeyOf(next)]
+        };
+        state.combat = {
+          ...state.combat,
+          pendingSaves: state.combat.pendingSaves.map((entry) =>
+            entry.id === saveId ? { ...entry, confirmed } : entry
+          )
+        };
+        answerEvents.push(
+          askAnswer(
+            state,
+            next,
+            { rollKind: "save", roller: target, targetActorId: null, saveId, asked: confirmed.asked },
+            { newId: deps.newRollId, now: deps.now, commandId }
+          )
+        );
+        awaitingAnswer = true;
+      }
+    }
+    if (commit && !awaitingAnswer) releaseHeldRoll(state, heldKey);
+    const read = shown(held);
+    natural = read.natural;
+    total = read.total;
+    answerSucceeds = read.succeed;
+    answered = answeredLines(held);
+    if (!commit) offered = answersOffered(state, answerTarget(held), answerDepsOf(deps, commandId));
   }
+  // Waiting on an answer, the confirm reads as a look: nothing lands until the answer finishes it.
+  const applying = commit && !awaitingAnswer;
 
-  let success = autoSucceeded !== null || (autoFailed === null && total >= pending.dc);
+  let success = autoSucceeded !== null || (autoFailed === null && total >= pending.dc) || answerSucceeds;
   // SRD Legendary Resistance: on a failed save the creature can choose to succeed. The GM commits with
   // the flag; the pool rides actionUses["legendary-resistance"] and a Long Rest re-arms it.
   let legendaryNote: string | null = null;
@@ -753,7 +924,7 @@ export function answerSave(
   // Preview (commit=false): the roll is recorded so everyone sees it, but nothing is applied and the
   // save stays open until the answerer confirms. The damage is weighed through the target's defences, so the
   // prompt shows what Confirm will land.
-  if (!commit) {
+  if (!applying) {
     const weighed =
       outcomeDamage > 0
         ? previewDamage(
@@ -779,13 +950,16 @@ export function answerSave(
         ...(natural !== null ? { natural } : {}),
         ...(rollMode ? { rollMode } : {}),
         ...(weighed && weighed.parts.length > 0 ? { parts: weighed.parts } : {}),
-        ...(weighed?.flatReduction ? { flatReduction: weighed.flatReduction } : {})
+        ...(weighed?.flatReduction ? { flatReduction: weighed.flatReduction } : {}),
+        ...(answered.length > 0 ? { answered } : {}),
+        ...(offered.length > 0 ? { answers: offered } : {}),
+        ...(awaitingAnswer ? { awaitingAnswer: true as const } : {})
       },
-      events: []
+      events: answerEvents
     };
   }
 
-  const events: EffectNarration[] = [];
+  const events: EffectNarration[] = [...answerEvents, ...spendUntilOwnSave(state, target)];
   if (legendaryNote !== null) events.push({ kind: "effect", text: legendaryNote, actorId: target.id });
   if (autoFailed !== null)
     events.push({
@@ -802,7 +976,39 @@ export function answerSave(
   let appliedDamage = 0;
   let application: DamageApplication | null = null;
   let conditionApplied = false;
-  if (outcomeDamage > 0) {
+  // Harm drains only on a failed save; a Life Drain whose save halves the damage drains either way.
+  const drain = pending.drain && (!success || pending.drain.failedSaveOnly !== true) ? pending.drain : undefined;
+  // Damage the target may answer before it lands (Stone's Endurance, Superior Hunter's Defense) waits on a prompt that
+  // holds it, and the answer lands it (reactions.ts). Damage a spell area counts (Guardian of Faith) lands at once.
+  const held =
+    outcomeDamage > 0 && outcomeParts !== null && pending.zoneId === undefined
+      ? openDamageWindow(
+          state,
+          {
+            source: state.actors.find((actor) => actor.id === pending.sourceActorId) ?? null,
+            sourceName: pending.sourceName,
+            target,
+            parts: outcomeParts,
+            critical: false,
+            hit: false,
+            hitKinds: [],
+            ...(drain ? { drain } : {}),
+            asked: []
+          },
+          {
+            resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
+            ...(deps.catalog ? { catalog: deps.catalog } : {}),
+            random: deps.random,
+            newId: deps.newRollId,
+            now: deps.now,
+            sessionId: deps.sessionId,
+            role: deps.role,
+            commandId,
+            ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+          }
+        )
+      : null;
+  if (outcomeDamage > 0 && held === null) {
     const outcome = applyDamageDetailed(
       state,
       target.id,
@@ -810,8 +1016,7 @@ export function answerSave(
         amount: outcomeDamage,
         ...(outcomeParts !== null ? { parts: outcomeParts } : {}),
         sourceActorId: pending.sourceActorId,
-        // Harm drains only on a failed save; a Life Drain whose save halves the damage drains either way.
-        ...(pending.drain && (!success || pending.drain.failedSaveOnly !== true) ? { drain: pending.drain } : {})
+        ...(drain ? { drain } : {})
       },
       { role: "gm" },
       {
@@ -925,9 +1130,32 @@ export function answerSave(
             parts: application.parts,
             ...(application.flatReduction ? { flatReduction: application.flatReduction } : {})
           }
-        : {})
+        : {}),
+      ...(answered.length > 0 ? { answered } : {}),
+      ...(held ? { damageHeld: true as const } : {})
     },
     events
+  };
+}
+
+/** What an answer to a save needs from the save's own dependencies. */
+export function answerDepsOf(
+  deps: Pick<
+    SaveAnswerDependencies,
+    "resolveDefinition" | "catalog" | "random" | "newRollId" | "sessionId" | "role" | "now" | "distanceFeet"
+  >,
+  commandId: string
+): AnswerDeps {
+  return {
+    resolveDefinition: deps.resolveDefinition,
+    ...(deps.catalog ? { catalog: deps.catalog } : {}),
+    random: deps.random,
+    newRollId: deps.newRollId,
+    sessionId: deps.sessionId,
+    role: deps.role,
+    now: deps.now,
+    commandId,
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
   };
 }
 

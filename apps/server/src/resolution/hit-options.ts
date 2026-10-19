@@ -1,52 +1,130 @@
-import type { HitOffer } from "@vtt/domain";
-import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
-import { DamageTypeSchema, DiceFormulaSchema } from "@vtt/schemas";
+import type { HitOffer, HitOptionChoice } from "@vtt/domain";
+import { isMeleeWeapon, parseDiceFormula, resolveDice } from "@vtt/rules-5e";
+import { catalogIdOf, DamageTypeSchema, DiceFormulaSchema, type HitRiderEffect } from "@vtt/schemas";
+import { ABILITY_NAMES } from "../ability-checks.js";
+import { builtinBaseId } from "../builtin-actions.js";
 import { holdsFeature } from "../class-features.js";
 import { isIncapacitated } from "../condition-rules.js";
 import { areAllies } from "../creature-sides.js";
 import { addEffect, applyCondition, makeEffect, type EffectNarration } from "../effects.js";
+import { sourceItemOf } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
-import { upcastAction } from "../item-actions.js";
+import { upcastAction, UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { SMITE_OF_PROTECTION_TAG } from "../paladin-auras.js";
 import { effectiveModeFor, overrideCovers, overrideWaives } from "../rules-families.js";
+import { useCostOf } from "../use-cost.js";
 import { recordRoll, sizeAtMost, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
 import { beginConcentration } from "./concentration.js";
-import { criticalExpression } from "./damage.js";
-import { commitEconomy, evaluateActionEconomy, planEconomy } from "./economy.js";
+import { criticalExpression, SAVAGE_ATTACKER, savageAttackerReady } from "./damage.js";
+import { commitEconomy, evaluateActionEconomy, planEconomy, spendSlot } from "./economy.js";
+import { applyHitOutcome, forceMove, grantHalfSpeedMove, openRiderSave, rollPlain } from "./hit-rider-outcomes.js";
 import { hitRiderOf, type HitRider } from "./hit-riders.js";
+import { dealsDamage } from "./on-hit.js";
+import { spendHitPointDie } from "./hit-point-die.js";
+import { OUTLINED_TAG } from "./attack.js";
 
 /**
  * Extras a hit can carry, which the attacker chooses on the attack's preview and spends with the hit (SRD Sneak
- * Attack, the smites, Divine Strike, Primal Strike, a monster's charge). Their dice join the hit's damage, so a
+ * Attack, the smites, Stunning Strike, Brutal Strike, a monster's charge). Their dice join the hit's damage, so a
  * crit doubles them ("If the attack involves other damage dice, such as from the Rogue's Sneak Attack feature, you
- * also roll those dice twice") and the target's defences meet them as part of the one hit. On a miss nothing is
- * spent.
+ * also roll those dice twice") and the target's defences meet them as part of the one hit. A rider with a save opens
+ * it on the hit's target, its dice riding the save. On a miss nothing is spent.
  */
 
 const landed = (ctx: ResolveContext) =>
   ctx.attack !== null &&
   (ctx.attack.outcome === "hit" || ctx.attack.outcome === "crit" || ctx.attack.outcome === "unknown");
 
+/** SRD Monk weapons: "Simple Melee weapons and Martial Melee weapons that have the Light property". */
+function monkWeapon(ctx: ResolveContext): boolean {
+  const weapon = ctx.attacker.inventory.find((item) => item.id === ctx.riderItemId)?.weapon;
+  if (!weapon || !isMeleeWeapon(weapon.properties ?? [], weapon.rangeFeet, weapon.melee)) return false;
+  return weapon.category === "simple" || (weapon.properties ?? []).includes("light");
+}
+
+/** An Unarmed Strike Flurry of Blows grants: it spends a strike the Bonus Action opened. */
+function fromFlurry(ctx: ResolveContext): boolean {
+  const open = ctx.state.combat.turn.bonusActionInstance;
+  const planned = ctx.plan.bonusInstance;
+  return (
+    open !== null &&
+    planned !== null &&
+    open.actorId === ctx.attacker.id &&
+    planned !== open &&
+    !ctx.plan.markBonus &&
+    ctx.siblings.some(
+      (sibling) =>
+        sibling.activation === "bonus-action" &&
+        (sibling.multiattack ?? []).some((component) => component.actionId === UNARMED_STRIKE_ACTION_ID)
+    )
+  );
+}
+
+/** The pact weapon (SRD Pact of the Blade): the weapon of the kind the Warlock picked for it. Any other weapon may be a
+ *  magic weapon the Warlock bonded instead, which the attacker vouches for. */
+function pactWeapon(ctx: ResolveContext): true | string {
+  const picked = ctx.deps.definition?.character?.choices?.find(
+    (choice) => choice.kind === "weapon" && choice.payload?.featureId === "pact-of-the-blade"
+  )?.id;
+  const item = ctx.attacker.inventory.find((row) => row.id === ctx.riderItemId);
+  if (picked !== undefined && item && (catalogIdOf(item) === picked || item.baseId === picked)) return true;
+  return `Only with ${ctx.attacker.name}'s pact weapon.`;
+}
+
 /** Whether this hit can carry the rider: true, false, or what the engine couldn't check for the attacker to vouch for. */
-function qualifies(ctx: ResolveContext, rider: HitRider): true | false | string {
+function qualifies(ctx: ResolveContext, rider: HitRider, action: DefinitionAction): true | false | string {
   const kinds = ctx.riderFilters.attackKinds ?? [];
   const attack = ctx.action.attack!;
   const weapon = kinds.includes("weapon");
-  if (rider.rides === "weapon" && !weapon) return false;
-  if (
-    rider.rides === "melee-weapon-or-unarmed" &&
-    !kinds.includes("unarmed") &&
-    !(weapon && attack.reachFeet !== undefined)
-  )
-    return false;
-  if (rider.rides === "finesse-or-ranged-weapon") {
-    const finesse = (ctx.riderFilters.weaponProperties ?? []).includes("finesse");
-    const rangedWeapon = attack.reachFeet === undefined && attack.rangeFeet !== undefined;
-    if (!weapon || (!finesse && !rangedWeapon)) return false;
+  const unarmed = kinds.includes("unarmed") || builtinBaseId(ctx.action.id) === UNARMED_STRIKE_ACTION_ID;
+  let verdict: true | string = true;
+  switch (rider.rides) {
+    case "attack-roll":
+      break;
+    case "weapon":
+      if (!weapon) return false;
+      break;
+    case "melee-weapon-or-unarmed":
+      if (!unarmed && !(weapon && attack.reachFeet !== undefined)) return false;
+      break;
+    case "finesse-or-ranged-weapon": {
+      const finesse = (ctx.riderFilters.weaponProperties ?? []).includes("finesse");
+      const rangedWeapon = attack.reachFeet === undefined && attack.rangeFeet !== undefined;
+      if (!weapon || (!finesse && !rangedWeapon)) return false;
+      break;
+    }
+    case "monk-weapon-or-unarmed":
+      if (!unarmed && !(weapon && monkWeapon(ctx))) return false;
+      break;
+    case "unarmed":
+      if (!unarmed) return false;
+      break;
+    case "flurry-of-blows":
+      if (!unarmed || !fromFlurry(ctx)) return false;
+      break;
+    case "strength-attack":
+      if ((!weapon && !unarmed) || ctx.riderFilters.ability !== "str") return false;
+      break;
+    case "pact-weapon":
+      if (!weapon) return false;
+      verdict = pactWeapon(ctx);
+      break;
+    case "this-weapon":
+    case "melee-this-weapon":
+      if (!weapon || sourceItemOf(action, ctx.derivation, ctx.attacker.inventory) !== ctx.riderItemId) return false;
+      if (rider.rides === "melee-this-weapon" && !kinds.includes("melee")) return false;
+      break;
   }
   if (rider.ownTurn && ctx.state.combat.turnActorId !== ctx.attacker.id) return false;
-  return rider.sneakAttack ? sneakAttackQualifies(ctx) : true;
+  if (rider.declaredBeforeRoll && ctx.forgoneAdvantageBy !== action.id) return false;
+  if (rider.maxTargetSize && !sizeAtMost(ctx.targets[0].size, rider.maxTargetSize)) return false;
+  if (rider.sneakAttack) {
+    const sneak = sneakAttackQualifies(ctx);
+    if (sneak === false) return false;
+    if (typeof sneak === "string") verdict = sneak;
+  }
+  return verdict;
 }
 
 /** SRD Sneak Attack: Advantage, or an ally within 5 feet of the target who isn't Incapacitated, without Disadvantage. */
@@ -87,23 +165,50 @@ function openSlots(ctx: ResolveContext, action: DefinitionAction): number[] {
     .sort((left, right) => left - right);
 }
 
-const capitalised = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
-
-/** What choosing it spends, in the card's words. */
-function costOf(action: DefinitionAction, slotLevel: number | undefined): string | null {
-  const costs = [
-    ...(action.spellSlot && slotLevel !== undefined ? [`a level ${slotLevel} spell slot`] : []),
-    ...(action.uses ? [action.uses.per === "turn" ? "once per turn" : `a use of ${action.name}`] : []),
-    ...(action.activation === "bonus-action" ? ["your Bonus Action"] : [])
-  ];
-  return costs.length > 0 ? costs.join(" and ") : null;
+/** The Pact Magic slot a rider spends (Eldritch Smite), or null with none left. */
+function openPactSlot(ctx: ResolveContext): number | null {
+  const pact = ctx.attacker.pactSlots;
+  return pact && pact.remaining > 0 ? pact.level : null;
 }
 
-/** Whether the rider's own economy allows it now: its uses, its slot, and a Bonus Action the hit didn't take. */
-function affordable(ctx: ResolveContext, action: DefinitionAction): boolean {
+const capitalised = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
+const titled = (slug: string) =>
+  slug
+    .split("-")
+    .filter(Boolean)
+    .map((word) => capitalised(word))
+    .join(" ");
+
+/** What choosing it spends, in the card's words. */
+function costOf(action: DefinitionAction, rider: HitRider, slotLevel: number | undefined): string | null {
+  const uses = action.uses;
+  const spent = useCostOf(action);
+  const costs = [
+    ...(action.spellSlot && slotLevel !== undefined ? [`a level ${slotLevel} spell slot`] : []),
+    ...(rider.pactSlotDie ? ["a Pact Magic slot"] : []),
+    ...(uses && !rider.declaredBeforeRoll
+      ? [
+          uses.per === "turn"
+            ? "once per turn"
+            : uses.pool && uses.pool !== action.id
+              ? `${spent} ${spent === 1 ? "use" : "uses"} of ${titled(uses.pool)}`
+              : `a use of ${action.name}`
+        ]
+      : []),
+    ...(rider.oncePerTurn ? ["once per turn"] : []),
+    ...(action.activation === "bonus-action" ? ["your Bonus Action"] : [])
+  ];
+  return costs.length > 0 ? [...new Set(costs)].join(" and ") : null;
+}
+
+/** Whether the rider's own economy allows it now: its uses, its slot, and a Bonus Action the hit didn't take. A
+ *  declared rider was paid for when it was tapped. */
+function affordable(ctx: ResolveContext, action: DefinitionAction, rider: HitRider): boolean {
+  if (rider.declaredBeforeRoll) return true;
   if (action.activation === "bonus-action" && ctx.plan.markBonus) return false;
   const slots = openSlots(ctx, action);
   if (action.spellSlot && slots.length === 0) return false;
+  if (rider.pactSlotDie && openPactSlot(ctx) === null) return false;
   const evaluation = evaluateActionEconomy(
     ctx.state,
     ctx.attacker,
@@ -127,6 +232,32 @@ function chargeOf(ctx: ResolveContext) {
     : undefined;
 }
 
+/** The effects a rider offers this hit: the ones its bearer holds the feature and item for, against a target small
+ *  enough. */
+function offeredEffects(ctx: ResolveContext, rider: HitRider): HitRiderEffect[] {
+  const target = ctx.targets[0];
+  return (rider.effects ?? []).filter(
+    (effect) =>
+      (effect.requiresFeature === undefined ||
+        holdsFeature(ctx.deps.definition, effect.requiresFeature, titled(effect.requiresFeature))) &&
+      (effect.requiresItem === undefined ||
+        ctx.attacker.inventory.some((item) => item.quantity > 0 && catalogIdOf(item) === effect.requiresItem)) &&
+      (effect.maxTargetSize === undefined || sizeAtMost(target.size, effect.maxTargetSize))
+  );
+}
+
+/** The rider's dice, in the type the hit or the pick makes them. */
+function diceOf(ctx: ResolveContext, action: DefinitionAction, rider: HitRider, slotLevel: number | undefined): string {
+  const pact = rider.pactSlotDie ? openPactSlot(ctx) : null;
+  const dice =
+    pact !== null && rider.pactSlotDie
+      ? [`${pact + 1}${rider.pactSlotDie.slice(1)}`]
+      : riderAction(ctx, action, slotLevel).damage.map((part) => part.formula);
+  if (dice.length === 0) return "";
+  const types = rider.damageTypes ?? (rider.weaponType ? [ctx.action.damage[0]?.type ?? "untyped"] : null);
+  return `${dice.join(" + ")} ${types ? types.map(capitalised).join(" or ") : capitalised(action.damage[0]?.type ?? "")}`.trim();
+}
+
 /** The extras a previewed hit may carry, for the card to offer. Empty unless the attack would land. */
 export function hitOffersOf(ctx: ResolveContext): HitOffer[] {
   if (!landed(ctx) || ctx.targets.length !== 1) return [];
@@ -140,23 +271,57 @@ export function hitOffersOf(ctx: ResolveContext): HitOffer[] {
       cost: null,
       unverified: `Only if ${ctx.attacker.name} moved ${charge.feet ?? 20}+ feet straight toward the target immediately before the hit.`
     });
+  // Savage Attacker rolls the weapon's own dice twice rather than adding any.
+  if (savageAttackerReady(ctx))
+    offers.push({
+      id: SAVAGE_ATTACKER,
+      name: "Savage Attacker",
+      dice: ctx.action.damage[0]!.formula.replace(/\s*[+-]\s*\d+$/, ""),
+      cost: "once per turn",
+      rerolls: true
+    });
   for (const action of ctx.siblings) {
     const rider = hitRiderOf(action);
     if (!rider || action.id === ctx.action.id) continue;
-    const verdict = qualifies(ctx, rider);
-    if (verdict === false || !affordable(ctx, action)) continue;
+    const verdict = qualifies(ctx, rider, action);
+    if (verdict === false || !affordable(ctx, action, rider)) continue;
+    const effects = offeredEffects(ctx, rider);
+    if (rider.effectRequired && effects.length === 0) continue;
     const slotLevels = openSlots(ctx, action);
-    const dice = riderAction(ctx, action, slotLevels[0]).damage.map((part) => part.formula);
-    if (dice.length === 0) continue;
-    const types = rider.damageTypes ?? (rider.weaponType ? [ctx.action.damage[0]?.type ?? "untyped"] : null);
+
+    const dice = diceOf(ctx, action, rider, slotLevels[0]);
+    // A rider that only rolls dice needs dice; one that does something else (a save, an effect) is offered anyway.
+    if (dice === "" && !action.save && !rider.applies && effects.length === 0) continue;
+    const notes = [
+      typeof verdict === "string" ? verdict : null,
+      rider.dealsDamage ? "Only if the hit deals damage." : null
+    ]
+      .filter((note): note is string => note !== null)
+      .join(" ");
     offers.push({
       id: action.id,
       name: action.name,
-      dice: `${dice.join(" + ")} ${types ? types.map(capitalised).join(" or ") : capitalised(action.damage[0]?.type ?? "")}`.trim(),
-      cost: costOf(action, slotLevels[0]),
+      dice: action.save ? "" : dice,
+      ...(action.save
+        ? {
+            save: `The target makes a ${ABILITY_NAMES[action.save.ability]} saving throw.${dice !== "" ? ` A failure deals ${dice}.` : ""}`
+          }
+        : {}),
+      cost: costOf(action, rider, slotLevels[0]),
       ...(rider.damageTypes ? { damageTypes: rider.damageTypes } : {}),
       ...(slotLevels.length > 0 ? { slotLevels } : {}),
-      ...(typeof verdict === "string" ? { unverified: verdict } : {})
+      ...(notes !== "" ? { unverified: notes } : {}),
+      ...(effects.length > 0
+        ? {
+            effects: effects.map((effect) => ({
+              id: effect.id,
+              name: effect.name,
+              ...(effect.forgoesDice ? { cost: `-${effect.forgoesDice}d6` } : {})
+            })),
+            effectsChoose: rider.effectsChoose ?? 1
+          }
+        : {}),
+      ...(rider.effectRequired ? { effectRequired: true as const } : {})
     });
   }
   return offers;
@@ -171,7 +336,52 @@ function refuse(ctx: ResolveContext, message: string): void {
   ctx.warnings.push(message);
 }
 
-/** Rolls the chosen extras into the hit's damage. Their costs are spent after the hit's own (`spendHitOptions`). */
+/** The effects picked for a rider, checked against what it offers and how many one hit carries. */
+function pickedEffects(
+  ctx: ResolveContext,
+  rider: HitRider,
+  action: DefinitionAction,
+  choice: HitOptionChoice
+): HitRiderEffect[] {
+  const offered = offeredEffects(ctx, rider);
+  const picked = [...new Set(choice.effects ?? [])].flatMap((id) => {
+    const effect = offered.find((candidate) => candidate.id === id);
+    if (effect) return [effect];
+    const named = rider.effects?.find((candidate) => candidate.id === id)?.name ?? id;
+    refuse(ctx, `${action.name} can't add ${named} to this hit.`);
+    return [];
+  });
+  const most = rider.effectsChoose ?? 1;
+  if (picked.length > most) {
+    refuse(ctx, `${action.name} adds ${most === 1 ? "one effect" : `up to ${most} effects`} to a hit.`);
+    return picked.slice(0, most);
+  }
+  if (rider.effectRequired && picked.length === 0 && offered.length > 0)
+    refuse(ctx, `Choose one of ${action.name}'s effects for this hit.`);
+  return picked;
+}
+
+/** The rider's dice less the dice its effects forgo (a Cunning Strike's die cost), taken off the first part. */
+function lessForgone(
+  damage: DefinitionAction["damage"],
+  forgone: number,
+  action: DefinitionAction,
+  ctx: ResolveContext
+): DefinitionAction["damage"] {
+  if (forgone === 0 || damage.length === 0) return damage;
+  const [first, ...rest] = damage;
+  const match = /^(\d+)d(\d+)(.*)$/.exec(first.formula.replace(/\s+/g, ""));
+  if (!match) return damage;
+  const count = Number(match[1]) - forgone;
+  if (count < 0) {
+    refuse(ctx, `${action.name} has ${match[1]}d${match[2]} to forgo, and the effects cost ${forgone}d${match[2]}.`);
+    return [];
+  }
+  return count === 0 ? rest : [{ ...first, formula: `${count}d${match[2]}${match[3]}` }, ...rest];
+}
+
+/** Rolls the chosen extras into the hit's damage and opens their saves. Their costs are spent after the hit's own
+ *  (`spendHitOptions`). */
 export function rollHitOptions(ctx: ResolveContext): void {
   const chosen = ctx.input.hitOptions ?? [];
   if (chosen.length === 0 || !landed(ctx) || ctx.targets.length !== 1) return;
@@ -182,23 +392,24 @@ export function rollHitOptions(ctx: ResolveContext): void {
     recordRoll(ctx, rolled, "damage");
     ctx.damage.push({ formula: rolled.expression.source, type, total: rolled.total, source });
   };
+  // "And deal damage to it" is judged on the hit as it stands, before any extra joins it.
+  const hitDealsDamage = dealsDamage(ctx);
+  // Riders on one pool are alternatives (a Staff of Striking's 1, 2 or 3 charges), so one hit takes one of them.
+  const byPool = new Map<string, string>();
   for (const choice of chosen) {
+    const action = ctx.siblings.find((candidate) => candidate.id === choice.id);
+    const pool = action?.uses?.pool;
+    if (!action || !pool) continue;
+    const other = byPool.get(pool);
+    if (other !== undefined)
+      refuse(ctx, `${other} and ${action.name} spend the same uses, so a hit takes one of them.`);
+    byPool.set(pool, action.name);
+  }
+  for (const choice of chosen) {
+    // Rolled with the weapon's own dice (`rollWeaponDamage`).
+    if (choice.id === SAVAGE_ATTACKER) continue;
     if (choice.id === "charge") {
-      const charge = chargeOf(ctx);
-      if (!charge) {
-        refuse(ctx, `${ctx.action.name} has no charge against ${target.name}.`);
-        continue;
-      }
-      for (const part of charge.damage) roll(part.formula, part.type, "Charge");
-      for (const conditionId of charge.conditions ?? []) {
-        if (applyCondition(target, conditionId, { immunities: ctx.deps }) === "applied")
-          ctx.effectsApplied.push({
-            targetId: target.id,
-            targetName: target.name,
-            name: "Charge",
-            conditionIds: [conditionId]
-          });
-      }
+      rollCharge(ctx, roll);
       continue;
     }
     const action = ctx.siblings.find((candidate) => candidate.id === choice.id);
@@ -207,7 +418,7 @@ export function rollHitOptions(ctx: ResolveContext): void {
       refuse(ctx, `${ctx.attacker.name} has no ${choice.id} to add to this hit.`);
       continue;
     }
-    const verdict = qualifies(ctx, rider);
+    const verdict = qualifies(ctx, rider, action);
     if (verdict === false)
       refuse(
         ctx,
@@ -216,51 +427,184 @@ export function rollHitOptions(ctx: ResolveContext): void {
           : `${action.name} can't ride this attack.`
       );
     else if (typeof verdict === "string") ctx.warnings.push(`${action.name}: ${verdict} The attacker confirmed it.`);
-    const slotLevel = action.spellSlot ? (choice.slotLevel ?? openSlots(ctx, action)[0]) : undefined;
-    const cast = riderAction(ctx, action, slotLevel);
-    const pick = choice.damageType && rider.damageTypes?.includes(choice.damageType) ? choice.damageType : undefined;
-    for (const part of cast.damage) {
-      const type = rider.weaponType
-        ? (ctx.action.damage[0]?.type ?? part.type)
-        : (pick ?? rider.damageTypes?.[0] ?? part.type);
-      roll(part.formula, type, action.name);
+    if (rider.dealsDamage && !hitDealsDamage) {
+      ctx.warnings.push(`${action.name}: the hit dealt ${target.name} no damage, so it adds nothing.`);
+      continue;
     }
+    const effects = pickedEffects(ctx, rider, action, choice);
+    const slotLevel = action.spellSlot ? (choice.slotLevel ?? openSlots(ctx, action)[0]) : undefined;
+    const pactSlot = rider.pactSlotDie ? openPactSlot(ctx) : null;
+    if (rider.pactSlotDie && pactSlot === null) {
+      refuse(ctx, `${ctx.attacker.name} has no Pact Magic slot left for ${action.name}.`);
+      continue;
+    }
+    // Its own economy (uses, once per turn, slot, Bonus Action) refuses it before anything it does lands; it is
+    // planned again and spent once the hit's own is in (`spendHitOptions`), and its notes are said then. A declared
+    // rider was paid for when it was tapped.
+    if (!rider.declaredBeforeRoll) riderEconomy(ctx, action, slotLevel, []);
+    const cast = riderAction(ctx, action, slotLevel);
+    const forgone = effects.reduce((sum, effect) => sum + (effect.forgoesDice ?? 0), 0);
+    const parts =
+      pactSlot !== null && rider.pactSlotDie
+        ? [{ formula: `${pactSlot + 1}${rider.pactSlotDie.slice(1)}`, type: cast.damage[0]?.type ?? "force" }]
+        : lessForgone(cast.damage, forgone, action, ctx);
+    const pick =
+      choice.damageType && rider.damageTypes?.includes(choice.damageType as never) ? choice.damageType : undefined;
+    const typeOf = (part: DefinitionAction["damage"][number]) =>
+      rider.weaponType ? (ctx.action.damage[0]?.type ?? part.type) : (pick ?? rider.damageTypes?.[0] ?? part.type);
     const creatureType = ctx.riderFilters.targetCreatureType;
+    const spared = creatureType !== undefined && (rider.sparesCreatureTypes ?? []).includes(creatureType);
+    if (action.save) {
+      // The rider's save carries its dice: rolled now, dealt on a failure, none on a success.
+      const failureDamage = spared ? [] : parts.map((part) => rollPlain(ctx, part.formula, typeOf(part), action.name));
+      if (spared)
+        ctx.warnings.push(`${action.name}: ${target.name} is a ${capitalised(creatureType)} and takes no damage.`);
+      openRiderSave(ctx, target, action, {
+        name: action.name,
+        ability: action.save.ability,
+        dc: action.save.dc,
+        failureConditions: action.save.failureConditions,
+        ...(action.save.failureDuration ? { failureDuration: action.save.failureDuration } : {}),
+        ...(action.save.repeatSave ? { repeatSave: true as const } : {}),
+        ...(action.save.endsOnDamage ? { endsOnDamage: true as const } : {}),
+        ...(action.save.failureEffect ? { failureEffect: action.save.failureEffect } : {}),
+        ...(action.save.successEffect ? { successEffect: action.save.successEffect } : {}),
+        ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
+        failureDamage
+      });
+    } else if (!spared) for (const part of parts) roll(part.formula, typeOf(part), action.name);
     if (rider.versus && creatureType !== undefined && rider.versus.creatureTypes.includes(creatureType))
       roll(rider.versus.formula, cast.damage[0]?.type ?? "radiant", `${action.name} (${capitalised(creatureType)})`);
-    if (rider.marks) {
-      // A Concentration smite starts the caster's Concentration as any cast does, and its mark is held by it.
-      const spell = action.spellId ? ctx.deps.catalog?.spellRecord?.(action.spellId) : undefined;
-      const castId = spell?.concentration ? `${ctx.input.commandId}:${action.id}` : undefined;
-      if (spell && castId) beginConcentration(ctx, spell, castId, slotLevel ?? spell.level);
-      const ended: EffectNarration[] = [];
-      const effect = addEffect(
-        ctx.state,
-        target.id,
-        makeEffect({
-          id: `${ctx.input.commandId}:${action.id}:${target.id}`,
-          name: rider.marks.name,
-          tags: [rider.marks.tag],
-          sourceActorId: ctx.attacker.id,
-          sourceName: ctx.attacker.name,
-          sourceActionId: action.id,
-          startedRound: ctx.state.combat.round,
-          duration: { type: "rounds", remaining: rider.marks.rounds },
-          concentration: true,
-          ...(castId !== undefined ? { castId } : {}),
-          modifiers: [{ type: "roll-mode", roll: "incoming-attack", mode: "advantage" }]
-        }),
-        ended,
-        ctx.deps
-      );
-      for (const event of ended) ctx.tableNarration.push(tableLineOf(ctx, event));
-      ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds: [] });
-    }
+    if (rider.applies) applyHitOutcome(ctx, target, action, rider.applies, "applies");
+    if (rider.marks) markOn(ctx, target, action, rider.marks, slotLevel);
     if (rider.lingers) lingerOn(ctx, target, action, cast, rider.lingers);
     if (action.spellId === "divine-smite") smiteOfProtection(ctx);
+    for (const effect of effects) applyEffect(ctx, target, action, rider, effect);
     if (rider.reminder) ctx.warnings.push(rider.reminder);
-    ctx.hitRiders.push({ action, ...(slotLevel !== undefined ? { slotLevel } : {}) });
+    ctx.hitRiders.push({
+      action,
+      ...(slotLevel !== undefined ? { slotLevel } : {}),
+      ...(pactSlot !== null ? { pactSlot } : {})
+    });
   }
+}
+
+/** The rider's own economy at this hit, refused under the table's rules mode like any action's. */
+function riderEconomy(
+  ctx: ResolveContext,
+  action: DefinitionAction,
+  slotLevel: number | undefined,
+  warnings: string[]
+) {
+  return planEconomy(
+    ctx.state,
+    ctx.attacker,
+    action,
+    {
+      actorId: ctx.attacker.id,
+      targetIds: [],
+      commandId: ctx.input.commandId,
+      ...(ctx.input.override ? { override: ctx.input.override } : {}),
+      ...(slotLevel !== undefined ? { slotLevel } : {})
+    },
+    ctx.deps.definition,
+    warnings,
+    undefined,
+    ctx.siblings,
+    true
+  );
+}
+
+/** A monster's charge: its dice join the hit's, and what it imposes lands. */
+function rollCharge(ctx: ResolveContext, roll: (formula: string, type: string, source: string) => void): void {
+  const target = ctx.targets[0];
+  const charge = chargeOf(ctx);
+  if (!charge) {
+    refuse(ctx, `${ctx.action.name} has no charge against ${target.name}.`);
+    return;
+  }
+  for (const part of charge.damage) roll(part.formula, part.type, "Charge");
+  for (const conditionId of charge.conditions ?? []) {
+    if (applyCondition(target, conditionId, { immunities: ctx.deps }) === "applied")
+      ctx.effectsApplied.push({
+        targetId: target.id,
+        targetName: target.name,
+        name: "Charge",
+        conditionIds: [conditionId]
+      });
+  }
+}
+
+/** One picked effect: its save at the rider's DC, its effect, its push, the move it gives, the Invisible it keeps. */
+function applyEffect(
+  ctx: ResolveContext,
+  target: ResolveContext["targets"][number],
+  action: DefinitionAction,
+  rider: HitRider,
+  effect: HitRiderEffect
+): void {
+  const name = `${action.name}: ${effect.name}`;
+  if (effect.save) {
+    const dc = rider.saveDc ?? action.save?.dc;
+    if (dc === undefined) ctx.warnings.push(`${name}: no save DC is recorded, so the GM sets it.`);
+    else
+      openRiderSave(ctx, target, action, {
+        name,
+        ability: effect.save.ability,
+        dc,
+        failureConditions: effect.save.failureConditions,
+        ...(effect.save.failureDuration ? { failureDuration: effect.save.failureDuration } : {}),
+        ...(effect.save.repeatSave ? { repeatSave: true as const } : {}),
+        ...(effect.save.endsOnDamage ? { endsOnDamage: true as const } : {}),
+        ...(effect.save.failureEffect ? { failureEffect: effect.save.failureEffect } : {}),
+        ...(effect.save.failurePush ? { failurePush: effect.save.failurePush } : {})
+      });
+  }
+  if (effect.applies) applyHitOutcome(ctx, target, action, effect.applies, effect.id);
+  if (effect.push && (effect.push.maxTargetSize === undefined || sizeAtMost(target.size, effect.push.maxTargetSize)))
+    forceMove(ctx, target, name, effect.push);
+  if (effect.grantsHalfSpeedMove) grantHalfSpeedMove(ctx, name);
+  if (effect.keepsHidden) ctx.keepsHidden = true;
+  if (effect.spendsHitPointDie) spendHitPointDie(ctx, name);
+}
+
+/** A lasting effect on the target held by the attacker's Concentration (Shining Smite): the next attack roll against
+ *  it has Advantage while it lasts. */
+function markOn(
+  ctx: ResolveContext,
+  target: ResolveContext["targets"][number],
+  action: DefinitionAction,
+  marks: NonNullable<HitRider["marks"]>,
+  slotLevel: number | undefined
+): void {
+  // A Concentration smite starts the caster's Concentration as any cast does, and its mark is held by it.
+  const spell = action.spellId ? ctx.deps.catalog?.spellRecord?.(action.spellId) : undefined;
+  const castId = spell?.concentration ? `${ctx.input.commandId}:${action.id}` : undefined;
+  if (spell && castId) beginConcentration(ctx, spell, castId, slotLevel ?? spell.level);
+  const ended: EffectNarration[] = [];
+  const effect = addEffect(
+    ctx.state,
+    target.id,
+    makeEffect({
+      id: `${ctx.input.commandId}:${action.id}:${target.id}`,
+      name: marks.name,
+      tags: [marks.tag, ...(marks.outlined ? [OUTLINED_TAG] : [])],
+      sourceActorId: ctx.attacker.id,
+      sourceName: ctx.attacker.name,
+      sourceActionId: action.id,
+      startedRound: ctx.state.combat.round,
+      duration: { type: "rounds", remaining: marks.rounds },
+      concentration: true,
+      ...(castId !== undefined ? { castId } : {}),
+      // The light the mark sheds (Shining Smite's 5 feet of Bright Light).
+      ...(marks.light ? { light: { ...marks.light } } : {}),
+      modifiers: [{ type: "roll-mode", roll: "incoming-attack", mode: "advantage" }]
+    }),
+    ended,
+    ctx.deps
+  );
+  for (const event of ended) ctx.tableNarration.push(tableLineOf(ctx, event));
+  ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds: [] });
 }
 
 /** SRD Smite of Protection: "Whenever you cast Divine Smite, you and your allies have Half Cover while in your Aura of
@@ -331,26 +675,13 @@ function lingerOn(
   ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds: [] });
 }
 
-/** Spends what each chosen extra costs (its uses, its slot, its Bonus Action), once the hit's own economy is in. */
+/** Spends what each chosen extra costs (its uses, its slot, its Bonus Action), once the hit's own economy is in. A
+ *  declared rider was paid for when it was tapped. */
 export function spendHitOptions(ctx: ResolveContext): void {
-  for (const { action, slotLevel } of ctx.hitRiders) {
-    const economy = planEconomy(
-      ctx.state,
-      ctx.attacker,
-      action,
-      {
-        actorId: ctx.attacker.id,
-        targetIds: [],
-        commandId: ctx.input.commandId,
-        ...(ctx.input.override ? { override: ctx.input.override } : {}),
-        ...(slotLevel !== undefined ? { slotLevel } : {})
-      },
-      ctx.deps.definition,
-      ctx.warnings,
-      undefined,
-      ctx.siblings,
-      true
-    );
+  for (const { action, slotLevel, pactSlot } of ctx.hitRiders) {
+    if (pactSlot !== undefined) spendSlot(ctx.attacker, { level: pactSlot, pact: true });
+    if (hitRiderOf(action)?.declaredBeforeRoll) continue;
+    const economy = riderEconomy(ctx, action, slotLevel, ctx.warnings);
     commitEconomy({
       state: ctx.state,
       attacker: ctx.attacker,

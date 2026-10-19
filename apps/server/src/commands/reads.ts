@@ -22,6 +22,7 @@ import {
   BuilderOffersSchema,
   CharacterNextLevelSchema,
   ContentActionsSchema,
+  ContentMonsterActionsSchema,
   ScenePreviewSchema,
   VisionPreviewSchema
 } from "@vtt/domain/commands";
@@ -31,6 +32,7 @@ import { partyViewerIds } from "../vision/audience.js";
 import { flatPolygon } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
 import { movementStatus } from "../movement-rules.js";
+import { spaceSharingFor } from "../space-sharing.js";
 import { previewScene } from "../scene-preview.js";
 import { nextLevelOf } from "../next-level.js";
 import { GameNotFoundError } from "./failures.js";
@@ -111,15 +113,30 @@ export const gameReads = [
     event: "content:monster-actions",
     route: contentRoutes.getContentMonsterActions,
     gmOnly: "Only the GM can browse stat blocks.",
-    schema: ContentActionsSchema,
+    schema: ContentMonsterActionsSchema,
+    httpInput: ({ params, query }) => ({
+      definitionId: params.definitionId,
+      ...(typeof query.actorId === "string" ? { actorId: query.actorId } : {})
+    }),
     malformed: "The action lookup is malformed.",
     run: (principal, input, kit) => {
-      const { definitionId } = input as z.output<typeof ContentActionsSchema>;
+      const { definitionId, actorId } = input as z.output<typeof ContentMonsterActionsSchema>;
       const catalog = kit.catalogFor(principal);
       const imported = storedDefinition(kit.read(), definitionId);
+      // A combatant built from the stat block acts with what it carries too (a wand, a potion, a magic weapon), as
+      // its own sheet's list has it; it reads the play-time stat block, so one on the table stays runnable.
+      const combatant = actorId
+        ? kit.read().actors.find((candidate) => candidate.id === actorId && candidate.definitionId === definitionId)
+        : undefined;
+      const played = combatant ? kit.resolveDefinition(definitionId) : undefined;
       // Browse uses the catalog's own lookup (honours draft/published/deleted), and leaves the play-time resolver out.
-      const definition = imported ?? catalog.monster(definitionId);
-      const actions = imported ? actionSummariesOf(imported.actions) : catalog.monsterActionSummaries(definitionId);
+      const definition = played ?? imported ?? catalog.monster(definitionId);
+      const actions =
+        combatant && played
+          ? actionSummariesOf([...effectiveActions(played, combatant, kit.equipmentCatalog())])
+          : imported
+            ? actionSummariesOf(imported.actions)
+            : catalog.monsterActionSummaries(definitionId);
       if (!actions) throw new GameNotFoundError("That stat block is not in the bundled content.");
       // SRD generic actions (Dodge, Dash, Help, ...) follow the stat block's own; a declared id shadows its builtin.
       const builtins = builtinActionsFor(definition)
@@ -196,7 +213,15 @@ export const gameReads = [
         ),
         // Derived numbers are computed only after the authorization gate above, which is why they ride a
         // request and is never on the broadcast projection (see `actor-derived.ts`).
-        derived: deriveActorSheet(actor, definition, derivation, kit.catalogFor(principal).skillSummaries(), catalog),
+        // The class table's columns read the classes the sheet already has, as play does.
+        derived: deriveActorSheet(
+          actor,
+          definition,
+          derivation,
+          kit.catalogFor(principal).skillSummaries(),
+          catalog,
+          (id) => kit.playCatalog().classRecord(id)
+        ),
         // Read against what the sheet already has, as `actor.rechoose` checks them.
         rechoices: rechoicesOf(actor, definition, kit.playCatalog()),
         // Read against the sheet's content and the table's builder policy, as the swap and the spellbook check them,
@@ -237,10 +262,17 @@ export const gameReads = [
       );
       if (!state.actors.some((candidate) => candidate.id === actorId))
         throw new GameNotFoundError("That combatant no longer exists.");
-      return movementStatus(state, actorId, {
-        resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
-        catalog: kit.equipmentCatalog()
-      });
+      const initiator = initiatorOf(principal);
+      // The preview charges what the server will: a creature that shares spaces passes others, and anyone may cross a
+      // swarm. A player hears only of swarms their characters can see.
+      const hidden = initiator.role === "gm" ? () => false : kit.hiddenFor(initiator, state);
+      return {
+        ...movementStatus(state, actorId, {
+          resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
+          catalog: kit.equipmentCatalog()
+        }),
+        ...spaceSharingFor(state, actorId, (definitionId) => kit.resolveDefinition(definitionId), hidden)
+      };
     }
   },
 

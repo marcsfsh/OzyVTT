@@ -7,6 +7,9 @@ import { command } from "../lib/command";
 /** One limited-use pool as the server counts it: its key, its name, its largest limit and when it comes back. */
 export type Pool = Readonly<{ id: string; name: string; limit: number; per: string; afterHours?: string }>;
 
+/** An action that spends a pool and does something the server applies, by its id and name. */
+export type Spender = Readonly<{ id: string; name: string }>;
+
 const titleOf = (slug: string) =>
   slug
     .split("-")
@@ -83,7 +86,8 @@ export function UseRow({
   detail,
   cost,
   actions = true,
-  onUse
+  onUse,
+  spenders = []
 }: Readonly<{
   actorId: string;
   role: "gm" | "player";
@@ -95,13 +99,16 @@ export function UseRow({
   detail?: string | null;
   /** False on the Play tab, which shows what is left without the controls. */
   actions?: boolean;
-  /** Uses the pool through its own action, which the server applies (Second Wind heals); otherwise Use only counts. */
-  onUse?: () => void;
+  /** Uses the pool through one of its actions, which the server applies (Second Wind heals); otherwise Use only counts.
+   *  Several spenders get a button each, by name. */
+  onUse?: (actionId: string) => void;
+  spenders?: readonly Spender[];
 }>) {
   const [amount, setAmount] = useState(1);
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
   const left = Math.max(0, pool.limit - spent);
+  const through = onUse !== undefined && spenders.length > 0;
   const move = (event: "actor:spend-uses" | "actor:restore-uses") => {
     setBusy(true);
     void command(event, { actorId, poolId: pool.id, amount }).then((result) => {
@@ -125,7 +132,7 @@ export function UseRow({
       <UseBoxes left={left} limit={pool.limit} label={`${pool.name}: ${left} of ${pool.limit} left`} />
       {actions && (
         <span className="cs-use-actions" role="group" aria-label={`Use or give back ${pool.name}`}>
-          {pool.limit > 1 && !onUse && (
+          {pool.limit > 1 && !through && (
             <Stepper
               value={Math.min(amount, Math.max(1, role === "gm" ? pool.limit : left))}
               onChange={setAmount}
@@ -135,14 +142,28 @@ export function UseRow({
               aria-label={`How many of ${pool.name}`}
             />
           )}
-          <Button
-            size="sm"
-            disabled={busy || left === 0}
-            aria-label={`Use ${pool.name}`}
-            onClick={() => (onUse ? onUse() : move("actor:spend-uses"))}
-          >
-            Use
-          </Button>
+          {through && spenders.length > 1 ? (
+            spenders.map((spender) => (
+              <Button
+                key={spender.id}
+                size="sm"
+                disabled={busy || left === 0}
+                aria-label={`Use ${pool.name}: ${spender.name}`}
+                onClick={() => onUse(spender.id)}
+              >
+                {spender.name}
+              </Button>
+            ))
+          ) : (
+            <Button
+              size="sm"
+              disabled={busy || left === 0}
+              aria-label={`Use ${pool.name}`}
+              onClick={() => (through ? onUse(spenders[0]!.id) : move("actor:spend-uses"))}
+            >
+              Use
+            </Button>
+          )}
           {role === "gm" && (
             <Button
               size="sm"
@@ -178,8 +199,8 @@ export function UseList({
   details?: ReadonlyMap<string, string>;
   costs?: ReadonlyMap<string, string>;
   actions?: boolean;
-  /** The pools used through their own action, by pool: the action's id. */
-  acting?: ReadonlyMap<string, string>;
+  /** The pools used through their own actions, by pool: the actions that spend it. */
+  acting?: ReadonlyMap<string, readonly Spender[]>;
   onUse?: (actionId: string) => void;
 }>) {
   if (pools.length === 0) return null;
@@ -201,7 +222,7 @@ export function UseList({
             detail={details?.get(pool.id) ?? null}
             cost={costs?.get(pool.id) ?? null}
             actions={actions}
-            {...(onUse && acting?.has(pool.id) ? { onUse: () => onUse(acting.get(pool.id)!) } : {})}
+            {...(onUse && acting?.has(pool.id) ? { onUse, spenders: acting.get(pool.id)! } : {})}
           />
         ))}
       </ul>

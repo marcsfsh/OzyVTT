@@ -66,7 +66,9 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
   const attackBonus =
     sumRiders(riders, "attack-bonus") +
     (action.spellId !== undefined && action.attack ? sumRiders(riders, "spell-attack-bonus") : 0);
-  const damageBonus = sumRiders(riders, "damage-bonus");
+  // What rides a hit adds dice to the weapon's damage, which carries the weapon's own bonus once (a Staff of
+  // Striking's charge is 1d6 Force, not 1d6 + 3).
+  const damageBonus = action.ridesHit ? 0 : sumRiders(riders, "damage-bonus");
   const critDice = riders.reduce(
     (total, rider) => (rider.modifier.type === "critical-bonus-dice" ? total + (rider.modifier.count ?? 0) : total),
     0

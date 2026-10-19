@@ -53,24 +53,43 @@ function checkRiderClaims(
   });
 }
 
-/** Conditions that give Disadvantage on every ability check. Frightened applies only while the source of fear is in
- *  sight; with no vision system it applies whenever active, as it does for attack rolls. */
+/** Conditions that give Disadvantage on every ability check. Frightened applies only while the source of fear is
+ *  within line of sight (`CheckSight.frightened`), and whenever active when the caller can't tell. */
 const CHECK_DISADVANTAGE_CONDITIONS = ["poisoned", "frightened"] as const;
 
+/** What sight decides about a check, worked out by the caller from the map (`checkSightFor` in `vision/rules.ts`). */
+export type CheckSight = Readonly<{
+  /** Frightened's Disadvantage applies now: its source is within line of sight, or no one can tell. */
+  frightened?: boolean;
+  /** Its traits that give its checks Disadvantage where it stands (Sunlight Sensitivity), by name. */
+  lightSensitivities?: readonly string[];
+  /** How obscured the creature a Perception check is made to find is to the roller, after its senses. */
+  findingObscured?: "none" | "light" | "heavy" | null;
+  /** The roller perceives that creature with Blindsight, which needs no sight. */
+  findingByBlindsight?: boolean;
+}>;
+
 /** The Advantage and Disadvantage the rules give `actor`'s ability checks with this ability (and skill): check riders
- *  (`checkRiderClaims`, Hex's ability among them) and Poisoned and Frightened. Initiative, a Dexterity check, reads it
- *  too. */
+ *  (`checkRiderClaims`, Hex's ability among them), Poisoned and Frightened, and a trait that dislikes the light it
+ *  stands in. Initiative, a Dexterity check, reads it too. */
 export function abilityCheckClaims(
   actor: Actor,
   derivation: EquipmentDerivation,
   narrow: Readonly<{ ability?: RiderAbility; skill?: string }>,
   warded: readonly string[] = [],
-  stakes: readonly string[] = []
+  stakes: readonly string[] = [],
+  sight: CheckSight = {}
 ): RollModeClaims {
   const claims = checkRiderClaims(derivation, narrow, stakes);
   for (const condition of CHECK_DISADVANTAGE_CONDITIONS)
-    if (actor.conditions.some((held) => held.id === condition) && !warded.includes(condition))
+    if (
+      actor.conditions.some((held) => held.id === condition) &&
+      !warded.includes(condition) &&
+      (condition !== "frightened" || sight.frightened !== false)
+    )
       claims.disadvantage.push({ source: `condition-${condition}`, label: conditionLabel(condition) });
+  for (const name of sight.lightSensitivities ?? [])
+    claims.disadvantage.push({ source: "light-sensitivity", label: `${name} (in the light)` });
   return claims;
 }
 
@@ -153,6 +172,10 @@ export type CheckPlan = Readonly<{
   reliableTalent: boolean;
   /** Dice effects add to the check (" + 1d4"), as formula terms. */
   diceTerms: string;
+  /** Why the check fails whatever it rolls: it needs sight the roller hasn't (SRD Blinded: "You automatically fail any
+   *  ability check that requires sight"; Heavily Obscured: "You have the Blinded condition while trying to see
+   *  something in a Heavily Obscured space"). */
+  autoFails?: string;
 }>;
 
 export type CheckContext = Readonly<{
@@ -165,6 +188,8 @@ export type CheckContext = Readonly<{
   /** Conditions the check would end (escaping a grapple: Grappled), which a `versus-condition` rider reads (Powerful
    *  Build). */
   stakes?: readonly string[];
+  /** What sight decides about it (Frightened's line of sight, the light, how obscured `finding` is). */
+  sight?: CheckSight;
 }>;
 
 /** The flat part of a skill check (SRD Skills, Expertise, Jack of All Trades): a GM-typed total, else the stat block's
@@ -248,7 +273,22 @@ function plainCheckPlan(
             (toolProficient ? (definition?.proficiencyBonus ?? 0) : 0),
           proficient: toolProficient
         };
-  const claims = abilityCheckClaims(actor, derivation, narrow, context.warded, context.stakes);
+  const claims = abilityCheckClaims(actor, derivation, narrow, context.warded, context.stakes, context.sight);
+  // A Wisdom (Perception) check to find a creature relies on sight: Disadvantage when it is Lightly Obscured to the
+  // roller, and a failure whatever the roll when the roller is Blinded or it is Heavily Obscured.
+  const lookingFor = context.finding !== undefined && subject.ability === "wis" && subject.skill === "perception";
+  const sight = context.sight ?? {};
+  if (lookingFor && sight.findingObscured === "light" && !sight.findingByBlindsight)
+    claims.disadvantage.push({ source: "lightly-obscured", label: `${context.finding!.name} is Lightly Obscured` });
+  const blinded = actor.conditions.some((held) => held.id === "blinded");
+  const autoFails =
+    !lookingFor || sight.findingByBlindsight
+      ? undefined
+      : blinded
+        ? `${actor.name} is Blinded, and finding ${context.finding!.name} takes sight.`
+        : sight.findingObscured === "heavy"
+          ? `${context.finding!.name} is Heavily Obscured to ${actor.name}.`
+          : undefined;
   // SRD Tools: "If you have proficiency in the skill that's also used with that check, you have Advantage".
   if (
     subject.tool !== undefined &&
@@ -276,7 +316,8 @@ function plainCheckPlan(
     rollMode: aggregateRollMode(claims.advantage, claims.disadvantage),
     proficient,
     reliableTalent: proficient && holdsFeature(definition, "reliable-talent", "Reliable Talent"),
-    diceTerms: diceRiderTerms(diceRiders([...standing, ...atCheck], "check-bonus"))
+    diceTerms: diceRiderTerms(diceRiders([...standing, ...atCheck], "check-bonus")),
+    ...(autoFails !== undefined ? { autoFails } : {})
   };
 }
 

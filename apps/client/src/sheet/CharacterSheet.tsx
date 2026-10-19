@@ -33,12 +33,14 @@ import { useMediaQuery } from "../lib/useMediaQuery";
 import { TokenLibrary } from "../tokens/TokenLibrary";
 import { ChecksTab } from "./ChecksTab";
 import { FeaturesTab, NextLevel } from "./FeaturesTab";
+import { experienceOf } from "./Experience";
 import { GearTab } from "./GearTab";
 import { GmTools } from "./GmTools";
 import { HitPointDice } from "./HitPointDice";
+import { HeroicGift, hasGift } from "./HeroicGift";
 import { HpCard } from "./HitPoints";
 import { IdentityEditor } from "./IdentityEditor";
-import { LatestRoll, useSessionRoll } from "./LatestRoll";
+import { CheckAnswers, LatestRoll, useSessionRoll } from "./LatestRoll";
 import { LevelBox } from "./LevelBox";
 import { NotesTab } from "./NotesTab";
 import { PlayFight } from "./PlayFight";
@@ -218,6 +220,7 @@ export function CharacterSheet({
   const level = characterLevel(definition);
   const canLevel = mayLevel(role, state, actor) && onLevel !== undefined && level !== null;
   const levelUpTo = levelUpTarget(level, state);
+  const experience = experienceOf(actor);
   // What the next level brings, asked only of a viewer who may take it there.
   const next = useNextLevel(actor.id, canLevel && levelUpTo !== null, `${level}:${definitionId ?? ""}`);
   const inspired = heroicInspirationOf(actor);
@@ -270,7 +273,7 @@ export function CharacterSheet({
   const openLog = state ? () => (layout === "wide" ? setDocked(true) : setDiceOpen(true)) : null;
   const lastRoll = session ? (
     <LatestRoll roll={session} role={role} rolls={rolls} canReroll={canReroll} onOpenLog={openLog} />
-  ) : canReroll ? (
+  ) : canReroll || (rolls.lastCheck?.answers?.length ?? 0) > 0 ? (
     // Without the roll history (a sheet with no state) the server judges the reroll.
     <LatestRollReroll role={role} rolls={rolls} />
   ) : null;
@@ -418,6 +421,31 @@ export function CharacterSheet({
       edit={edit}
       onFeedback={say}
       onUse={(actionId) => controller.sendThroughServer(actionId)}
+      experience={
+        experience !== undefined && level !== null
+          ? {
+              points: experience,
+              level,
+              ...(canLevel && levelUpTo === level + 1 ? { onLevelUp: onLevel! } : {})
+            }
+          : undefined
+      }
+      {...(controller.inFight
+        ? {}
+        : {
+            rest: {
+              rechoices,
+              afterLongRest: role === "gm" || actor.restStep?.after === "long-rest" || Boolean(actor.preparation),
+              afterAnyRest: role === "gm" || Boolean(actor.restStep) || Boolean(actor.preparation),
+              busy,
+              onRechoose: (choice, option) =>
+                void edit("actor:rechoose", { actorId: actor.id, offer: choice.offer, id: option.id }).then(
+                  (result) => {
+                    if (result.ok) say(`${choice.label}: ${option.name}.`);
+                  }
+                )
+            }
+          })}
       next={
         canLevel && levelUpTo !== null ? (
           <NextLevel level={levelUpTo} lines={next?.lines ?? []} onLevelUp={onLevel!} />
@@ -481,6 +509,7 @@ export function CharacterSheet({
       tabIndex={0}
     >
       {missing}
+      {hasGift(actor) && <HeroicGift actor={actor} state={state} onFeedback={say} />}
       {aimedHere && definition && controller.liveCombat && role === "player" && (
         <PlayerActionRunner
           actorId={actor.id}
@@ -785,6 +814,7 @@ function LatestRollReroll({
       <Button size="sm" disabled={rolls.rolling} onClick={() => void rolls.rerollCheck()}>
         {role === "gm" ? "Reroll" : "Reroll · Heroic Inspiration"}
       </Button>
+      <CheckAnswers rolls={rolls} />
     </div>
   );
 }

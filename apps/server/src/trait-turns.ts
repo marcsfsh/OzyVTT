@@ -10,6 +10,8 @@ import { applyDamageDetailed, damageAdjustmentDetail, healActor } from "./hit-po
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import { applyFailureEffect, createPendingSaves } from "./saving-throws.js";
 import { creatureTypeOf } from "./statblock-facts.js";
+import type { SightContent } from "./vision/senses.js";
+import { sightRules } from "./vision/rules.js";
 import {
   AURA_IMMUNE_TAG,
   REGENERATING_AT_ZERO_TAG,
@@ -59,8 +61,33 @@ export function traitsAtTurnStart(state: GameState, actorId: string, deps: Trait
   goBerserk(state, actor, definition, deps, events);
   for (const aura of traitMechanicsOf(definition))
     if (aura.kind === "aura" && aura.trigger === "bearer-turn-start") grappleDamage(state, actor, aura, deps, events);
+  burnInSunlight(state, actor, definition, deps, events);
   aurasStartedIn(state, actor, deps, events);
   return events;
+}
+
+const sightContentOf = (deps: TraitTurnDeps): SightContent => ({
+  definition: deps.resolveDefinition,
+  ...(deps.catalog ? { catalog: deps.catalog } : {})
+});
+
+/** A vampire's Sunlight: "The vampire takes 20 Radiant damage if it starts its turn in sunlight", read from where it
+ *  stands with dynamic vision on (with it off, the light is the GM's). */
+function burnInSunlight(
+  state: GameState,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  deps: TraitTurnDeps,
+  events: EffectNarration[]
+): void {
+  const burning = traitMechanicsOf(definition).filter(
+    (trait) => trait.kind === "light-sensitivity" && trait.damageAtTurnStart !== undefined
+  );
+  if (burning.length === 0 || actor.hp.current <= 0) return;
+  if (sightRules(state, sightContentOf(deps), deps.distanceFeet).lightAt(actor.id)?.sunlight !== true) return;
+  for (const trait of burning)
+    if (trait.kind === "light-sensitivity" && trait.damageAtTurnStart)
+      events.push(...dealTraitDamage(state, actor, actor, trait.name, [{ ...trait.damageAtTurnStart }], deps));
 }
 
 /** The end of `actorId`'s turn: its auras that burn what is near it. */
@@ -304,6 +331,9 @@ function aurasStartedIn(state: GameState, actor: Actor, deps: TraitTurnDeps, eve
     for (const aura of traitMechanicsOf(definitionOf(bearer, deps))) {
       if (aura.kind !== "aura" || aura.trigger !== "turn-start-inside" || !aura.save) continue;
       if (!auraActive(bearer, aura) || !(reached(state, bearer, aura, deps) ?? []).some((one) => one.id === actor.id))
+        continue;
+      // A gaze that works only on a creature that sees its bearer (Vile Appearance).
+      if (aura.seenOnly && !sightRules(state, sightContentOf(deps), deps.distanceFeet).canSee(actor.id, bearer.id))
         continue;
       const key = traitActionId(aura.name);
       if (

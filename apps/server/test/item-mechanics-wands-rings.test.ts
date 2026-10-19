@@ -510,7 +510,7 @@ describe("the staffs that cast at their printed charge costs", () => {
     expect(derivation.armorClass).toBe(2);
     expect(saveTotalFor(definition, state.actors[0], "dex", derivation)).toBe(4);
     const casts = effectiveActions(definition, state.actors[0], catalog).filter((entry) =>
-      entry.id.startsWith("item-staff-of-power-")
+      entry.id.startsWith("item-staff-of-power-cast-")
     );
     expect(casts.map((entry) => [entry.id, entry.useCost ?? 1, entry.uses?.limit])).toContainEqual([
       "item-staff-of-power-cast-fireball",
@@ -518,6 +518,13 @@ describe("the staffs that cast at their printed charge costs", () => {
       20
     ]);
     expect(casts).toHaveLength(9);
+    // It swings as a magic Quarterstaff too, in one hand or two.
+    expect(
+      effectiveActions(definition, state.actors[0], catalog)
+        .filter((entry) => entry.id.startsWith("item-staff-of-power") && !entry.id.includes("-cast-"))
+        .map((entry) => entry.id)
+        .sort()
+    ).toEqual(["item-staff-of-power", "item-staff-of-power-two-handed"]);
   });
 
   it("leaves Staff of the Magi its at-will casts and Ring of Shooting Stars its two cantrips and its own action", () => {
@@ -537,7 +544,7 @@ describe("the staffs that cast at their printed charge costs", () => {
     // The zero-charge casts spend nothing; the rest share the 50 charges.
     expect(
       effectiveActions(definition, magi.actors[0], catalog)
-        .filter((entry) => entry.id.startsWith("item-staff-of-the-magi-") && entry.uses === undefined)
+        .filter((entry) => entry.id.startsWith("item-staff-of-the-magi-cast-") && entry.uses === undefined)
         .map((entry) => entry.id)
         .sort()
     ).toEqual([

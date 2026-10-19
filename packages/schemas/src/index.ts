@@ -45,6 +45,79 @@ export const HealingFormulaSchema = z
   .regex(/^(?:\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?|\d+)$/i, "Use dice such as 2d8 + 3, or a number.");
 export const AbilitySchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 export type AbilityId = z.infer<typeof AbilitySchema>;
+
+/** The rolls an answer can change: the three D20 Tests (a check includes Initiative), a death save, and a damage
+ *  roll. */
+export const RollAnswerRollSchema = z.enum(["attack", "save", "check", "death-save", "damage"]);
+export type RollAnswerRoll = z.infer<typeof RollAnswerRollSchema>;
+
+/**
+ * What an answer does to the roll it answers:
+ * - add / subtract: roll `amount` and add it to the total, or take it off (Bardic Inspiration, Cutting Words).
+ *   `keepUseOnFailure`: the use comes back when the roll still fails (Peerless Skill, Tactical Mind).
+ * - add-or-subtract: the answerer picks the sign when it answers (Boon of Fate).
+ * - reroll: throw the d20s again and use the new roll (Indomitable). `one` rerolls only the die that counts (the
+ *   halfling's Luck), `bonus` adds to the new roll, `advantage` rerolls it with Advantage (Countercharm).
+ * - set-d20: the d20 that counts becomes `face` (Stroke of Luck).
+ * - succeed: a failed save succeeds (Ring of Evasion). hit: a missed attack hits (Boon of Combat Prowess).
+ */
+export const RollAnswerEffectSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("add"),
+      amount: DamageFormulaSchema,
+      keepUseOnFailure: z.literal(true).optional()
+    })
+    .strict(),
+  z.object({ kind: z.literal("subtract"), amount: DamageFormulaSchema }).strict(),
+  z.object({ kind: z.literal("add-or-subtract"), amount: DamageFormulaSchema }).strict(),
+  z
+    .object({
+      kind: z.literal("reroll"),
+      one: z.literal(true).optional(),
+      bonus: z.number().int().min(1).max(30).optional(),
+      advantage: z.literal(true).optional()
+    })
+    .strict(),
+  z.object({ kind: z.literal("set-d20"), face: z.number().int().min(1).max(20) }).strict(),
+  z.object({ kind: z.literal("succeed") }).strict(),
+  z.object({ kind: z.literal("hit") }).strict()
+]);
+export type RollAnswerEffect = z.infer<typeof RollAnswerEffectSchema>;
+
+/**
+ * A way to change a roll after it is seen and before its outcome lands (SRD "after seeing the roll"): what rolls it
+ * answers, whose (the bearer's own, another creature's within `rangeFeet`, or either), when (after a failure, a success,
+ * either, or a d20 showing 1), what it does, and for a save what the save must be against. Its cost is the action's own:
+ * its uses and, on a Reaction, the Reaction. An effect that carries one (a Bardic Inspiration die) ends when it is used.
+ * `versus` passes when any of its lists matches: a save against an effect that imposes one of `conditions`, a spell of
+ * one of `spellSchools` (`singleTarget`: aimed at the bearer alone), or a source of one of `creatureTypes`.
+ */
+export const RollAnswerSchema = z
+  .object({
+    rolls: z.array(RollAnswerRollSchema).min(1).max(5),
+    whose: z.enum(["own", "other", "any"]).default("own"),
+    rangeFeet: z.number().int().min(5).max(1000).optional(),
+    when: z.enum(["failure", "success", "any", "natural-one"]).default("failure"),
+    /** Not while the bearer is Incapacitated (a Luck Blade's luck). */
+    notWhileIncapacitated: z.literal(true).optional(),
+    abilities: z.array(AbilitySchema).min(1).max(6).optional(),
+    versus: z
+      .object({
+        conditions: z.array(ConditionIdSchema).min(1).max(4).optional(),
+        spellSchools: z.array(RiderSlugSchema).min(1).max(8).optional(),
+        creatureTypes: z.array(RiderSlugSchema).min(1).max(8).optional(),
+        singleTarget: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    effect: RollAnswerEffectSchema
+  })
+  .strict()
+  .describe(
+    "A way to change a roll after it is seen and before it counts: the rolls it answers, whose roll (own, other or any, within rangeFeet), when (failure, success, any or natural-one), what it does (add, subtract, add-or-subtract, reroll, set-d20, succeed, hit), and what a save must be against. It costs the action's own uses, and its Reaction when the action is one."
+  );
+export type RollAnswer = z.infer<typeof RollAnswerSchema>;
 /** The SRD's 13 damage types. Riders name one of these, so a misspelled type is refused, and no
  * gate or defence that matches nothing is published. */
 export const DamageTypeSchema = z.enum([
@@ -63,6 +136,36 @@ export const DamageTypeSchema = z.enum([
   "thunder"
 ]);
 export type DamageType = z.infer<typeof DamageTypeSchema>;
+
+/**
+ * What a melee hit on an effect's bearer costs the attacker (SRD Fire Shield: "Whenever a creature within 5 feet of
+ * you hits you with a melee attack roll, the shield erupts"; Holy Aura's light blinding a Fiend or an Undead): damage it
+ * takes, and a save it makes or has the conditions until the end of its next turn. Only an attacker within
+ * `withinFeet`, and of `creatureTypes` when set, is answered.
+ */
+export const StruckSchema = z
+  .object({
+    withinFeet: z.number().int().min(5).max(120).optional(),
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(8).optional(),
+    damage: z
+      .array(z.object({ formula: DamageFormulaSchema, type: DamageTypeSchema }).strict())
+      .min(1)
+      .max(3)
+      .optional(),
+    save: z
+      .object({
+        ability: AbilitySchema,
+        dc: z.number().int().min(1).max(40),
+        conditions: z.array(ConditionIdSchema).min(1).max(3)
+      })
+      .strict()
+      .optional()
+  })
+  .strict()
+  .describe(
+    "What a melee hit on the bearer costs the attacker: damage, and a save against conditions that last until the end of the attacker's next turn, for an attacker within withinFeet and of creatureTypes"
+  );
+export type Struck = z.infer<typeof StruckSchema>;
 /** The SRD's 15 conditions, closed in riders for the same reason. Exhaustion is a condition, levels and all. */
 export const ConditionSchema = z.enum([
   "blinded",
@@ -201,6 +304,9 @@ export const RiderTriggerSchema = z
     z.object({ type: z.literal("on-attack-roll") }).strict(),
     z.object({ type: z.literal("on-hit") }).strict(),
     z.object({ type: z.literal("on-critical-hit") }).strict(),
+    /** The attack roll's d20 shows a 20 ("When you roll a 20 on an attack roll made with this weapon"), whatever else
+     *  widens the Critical Hit range. */
+    z.object({ type: z.literal("on-natural-20") }).strict(),
     z.object({ type: z.literal("on-damage-roll") }).strict(),
     z.object({ type: z.literal("on-saving-throw") }).strict(),
     z.object({ type: z.literal("on-ability-check") }).strict(),
@@ -295,10 +401,33 @@ export const RiderTriggerSchema = z
       .describe("Filter. Narrows to targets currently under any of these conditions."),
     /** On an effect, its riders fire only for the creature that put the effect on its bearer, never for the bearer:
      * Hunter's Mark's extra damage when its caster hits the marked creature. */
-    z.object({ type: z.literal("by-effect-source") }).strict()
+    z.object({ type: z.literal("by-effect-source") }).strict(),
+    /** The bearer can see the other creature in the roll (Dodge: "if you can see the attacker"), as the server's sight
+     *  answers it. */
+    z
+      .object({ type: z.literal("sees-other") })
+      .strict()
+      .describe(
+        'Filter. On an attack roll, the bearer can see the other creature in it, as the server\'s sight answers it (Dodge: "attack rolls against you have Disadvantage if you can see the attacker").'
+      ),
+    /** The other creature in the roll can see the bearer (Faerie Fire: "if the attacker can see it"). */
+    z
+      .object({ type: z.literal("seen-by-other") })
+      .strict()
+      .describe(
+        'Filter. On an attack roll, the other creature in it can see the bearer (Faerie Fire: "Attack rolls against an affected creature have Advantage if the attacker can see it").'
+      ),
+    /** The other creature in the roll perceives the bearer with none of these senses (Blur: an attacker that perceives
+     *  you with Blindsight or Truesight is immune). */
+    z
+      .object({ type: z.literal("other-lacks-sense"), senses: z.array(RiderSlugSchema).min(1).max(4) })
+      .strict()
+      .describe(
+        "Filter. On an attack roll, the other creature in it perceives the bearer with none of these senses within their range (Blur: an attacker that perceives you with Blindsight or Truesight is immune)."
+      )
   ])
   .describe(
-    "When a rider applies. Twenty-eight named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
+    "When a rider applies. Thirty-three named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
   );
 export type RiderTrigger = z.infer<typeof RiderTriggerSchema>;
 export type RiderTriggerKind = "static-gate" | "dynamic-gate" | "moment" | "filter";
@@ -317,6 +446,7 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "on-attack-roll": "moment",
   "on-hit": "moment",
   "on-critical-hit": "moment",
+  "on-natural-20": "moment",
   "on-damage-roll": "moment",
   "on-saving-throw": "moment",
   "on-ability-check": "moment",
@@ -333,7 +463,10 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "versus-creature-type": "filter",
   "versus-size": "filter",
   "versus-condition": "filter",
-  "by-effect-source": "filter"
+  "by-effect-source": "filter",
+  "sees-other": "filter",
+  "seen-by-other": "filter",
+  "other-lacks-sense": "filter"
 });
 
 /** The moments the damage roll collects (`rollRiderDamage`). A damage rider gated on any other moment would never
@@ -341,6 +474,7 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
 export const DAMAGE_ROLL_MOMENTS: readonly RiderTrigger["type"][] = Object.freeze([
   "on-hit",
   "on-critical-hit",
+  "on-natural-20",
   "on-damage-roll"
 ]);
 
@@ -524,11 +658,20 @@ export const ModifierSchema = z
       .describe(
         "AC = 10 + DEX + this ability while wearing no armor (Barbarian, Monk, and any homebrew that wants it)."
       ),
+    /** Read live by dynamic vision (`vision/senses.ts`): the best range wins, and `extends` adds its feet to the
+     *  bearer's other Darkvision (Goggles of Night: "increases its range by 60 feet"). */
     z
-      .object({ type: z.literal("darkvision"), feet: z.number().int().min(0).max(240), ...riderGate })
+      .object({
+        type: z.literal("darkvision"),
+        feet: z.number().int().min(0).max(240),
+        extends: z.literal(true).optional(),
+        ...riderGate
+      })
       .strict()
-      .describe("Grant or extend darkvision."),
-    /** Display-level, like `darkvision`, until a senses model exists. */
+      .describe(
+        "Grant or extend Darkvision, read live by dynamic vision. The best range wins; with `extends`, the feet are added to the bearer's other Darkvision, or are its range when it has none (Goggles of Night)."
+      ),
+    /** A special sense in feet, read live by dynamic vision (`vision/senses.ts`). */
     z
       .object({
         type: z.literal("sense"),
@@ -538,7 +681,7 @@ export const ModifierSchema = z
       })
       .strict()
       .describe(
-        "The missing sibling of `darkvision`: any named sense in feet. Display-level, like `darkvision`, until a senses model exists."
+        "A special sense in feet, read live by dynamic vision: `blindsight`, `tremorsense` and `truesight` as the Rules Glossary defines them, `see-invisibility` (sees Invisible creatures as if they were visible), `devils-sight` (sees normally in Dim Light and Darkness, magical or not) and `x-ray` (sees through walls). Any other name is shown on the sheet and read by nothing."
       ),
     /** More magic items attuned at once than the SRD's three (Use Magic Device: four). Read when an item is attuned. */
     z
@@ -640,7 +783,7 @@ export const ModifierSchema = z
       })
       .strict()
       .describe(
-        'Extra typed damage, in one of the 13 SRD damage types. An attack\'s `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry a type. Two independent ways to say how much, and a rider may use either or both: `formula` is dice ("an extra 1d6 fire"), and `abilityModifier` adds the bearer\'s modifier in that ability as a flat number resolved at the roll ("add your Charisma modifier to the damage"): a printed wording that no authored constant can express, because the amount depends on the character. Agonizing Blast is `abilityModifier: "cha"` plus a `spell-id-is` gate. A rider with neither is refused at publish, so none is stored to silently add nothing, and so is one gated on a moment the damage roll never collects (only `on-hit`, `on-critical-hit` and `on-damage-roll` are). `doubleOnCritical` defaults true because a Critical Hit rolls the attack\'s other damage dice twice too (SRD 5.2.1 "Critical Hits": "If the attack involves other damage dice, such as from the Rogue\'s Sneak Attack feature, you also roll those dice twice"); set it false only where a rule says otherwise. An ability modifier is never doubled at all.'
+        'Extra typed damage, in one of the 13 SRD damage types. An attack\'s `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry a type. Two independent ways to say how much, and a rider may use either or both: `formula` is dice ("an extra 1d6 fire"), and `abilityModifier` adds the bearer\'s modifier in that ability as a flat number resolved at the roll ("add your Charisma modifier to the damage"): a printed wording that no authored constant can express, because the amount depends on the character. Agonizing Blast is `abilityModifier: "cha"` plus a `spell-id-is` gate. A rider with neither is refused at publish, so none is stored to silently add nothing, and so is one gated on a moment the damage roll never collects (only `on-hit`, `on-critical-hit`, `on-natural-20` and `on-damage-roll` are). `doubleOnCritical` defaults true because a Critical Hit rolls the attack\'s other damage dice twice too (SRD 5.2.1 "Critical Hits": "If the attack involves other damage dice, such as from the Rogue\'s Sneak Attack feature, you also roll those dice twice"); set it false only where a rule says otherwise. An ability modifier is never doubled at all.'
       ),
     /** Score a critical hit on this natural roll or higher (19-20 keen weapons). */
     z
@@ -719,14 +862,14 @@ export const ModifierSchema = z
       )
   ])
   .describe(
-    "The rider vocabulary: what a feature, a feat, a chosen option, a magic item and a live effect contribute to the rules engine, one union for every carrier and read by one evaluator against one context, so a bonus means the same thing wherever it is authored. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a signed integer, so a curse is this same vocabulary with a negative number, and every branch carries the `when`/`scope` gate. Carriers refuse what they cannot honour: an item refuses `hit-points-per-level`, `ability-score` (both bake into the sheet and cannot be un-granted when the item comes off) and `attunement-slots` (it would decide its own attunement), and an effect refuses every number stored on the sheet or the actor (`attunement-slots`, `ability-score`, `hit-points-per-level`, `armor-class`, `initiative`, `unarmored-defense`, `darkvision`, `sense`, `spell-slot`), which an effect that ends could never give back."
+    "The rider vocabulary: what a feature, a feat, a chosen option, a magic item and a live effect contribute to the rules engine, one union for every carrier and read by one evaluator against one context, so a bonus means the same thing wherever it is authored. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a signed integer, so a curse is this same vocabulary with a negative number, and every branch carries the `when`/`scope` gate. Carriers refuse what they cannot honour: an item refuses `hit-points-per-level`, `ability-score` (both bake into the sheet and cannot be un-granted when the item comes off) and `attunement-slots` (it would decide its own attunement), and an effect refuses every number stored on the sheet or the actor (`attunement-slots`, `ability-score`, `hit-points-per-level`, `armor-class`, `initiative`, `unarmored-defense`, `spell-slot`), which an effect that ends could never give back. Senses are read live, so an effect may carry them (True Seeing, the Darkvision spell)."
   );
 export type Modifier = z.infer<typeof ModifierSchema>;
 
 /**
  * Modifiers an effect may not carry: each is a number stored on the sheet or the actor (hit points, AC, initiative,
- * slot maxima, senses), written when the character is built or its inventory changes, so an effect that ends could
- * never give it back.
+ * slot maxima), written when the character is built or its inventory changes, so an effect that ends could never give
+ * it back. Senses aren't among them: dynamic vision reads them live from every carrier.
  */
 export const EFFECT_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze([
   "attunement-slots",
@@ -735,10 +878,38 @@ export const EFFECT_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object
   "armor-class",
   "initiative",
   "unarmored-defense",
-  "darkvision",
-  "sense",
   "spell-slot"
 ]);
+
+/** The light its bearer sheds while an effect lasts (Produce Flame's flame, Faerie Fire's outline, Holy Nimbus's
+ *  sunlight): Bright Light out to `brightFeet` and Dim Light for `dimFeet` more. With `sunlight`, the Bright Light is
+ *  sunlight, which Sunlight Sensitivity reads. */
+export const CarriedLightSchema = z
+  .object({
+    brightFeet: z.number().int().min(0).max(240),
+    dimFeet: z.number().int().min(0).max(240),
+    sunlight: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "The light its bearer sheds while the effect lasts: Bright Light out to `brightFeet` and Dim Light for `dimFeet` more. With `sunlight`, the Bright Light is sunlight."
+  );
+export type CarriedLight = z.infer<typeof CarriedLightSchema>;
+
+/** A sense an effect gives its bearer for creatures of some types (Divine Sense, Detect Evil and Good): it knows where
+ *  each one within `feet` is and its creature type, unseen or not. With `blockedByWalls`, a wall between them hides
+ *  one ("blocked by 1 foot of stone"). */
+export const DetectsSchema = z
+  .object({
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(14),
+    feet: z.number().int().min(5).max(240),
+    blockedByWalls: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "Creatures of these types within `feet` of the bearer whose place and type it knows, seen or not (Divine Sense); with `blockedByWalls`, not through a wall. Shown only to the bearer's player, on a scene with dynamic vision."
+  );
+export type Detects = z.infer<typeof DetectsSchema>;
 
 /** An effect's modifiers: the shared vocabulary, minus what an effect cannot give back when it ends. */
 export const EffectModifiersSchema = z
@@ -968,7 +1139,18 @@ export const EffectInstanceSchema = z
         lastRound: z.number().int().positive()
       })
       .strict()
-      .optional()
+      .optional(),
+    /** A roll its bearer may answer with it, which ends it (a Bardic Inspiration die). */
+    answer: RollAnswerSchema.optional(),
+    /** What a melee hit on its bearer costs the attacker (Fire Shield's 2d8). */
+    struck: StruckSchema.optional(),
+    /** The light its bearer sheds while it lasts (Produce Flame's flame, Faerie Fire's outline), read by dynamic
+     *  vision as a light the bearer's token carries. */
+    light: CarriedLightSchema.optional(),
+    /** A Hide's Dexterity (Stealth) total: "the DC for a creature to find you with a Wisdom (Perception) check". */
+    findDc: z.number().int().min(1).max(60).optional(),
+    /** The creatures it lets its bearer sense (Divine Sense), shown to the bearer's player alone. */
+    detects: DetectsSchema.optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -1104,8 +1286,22 @@ export const InventoryItemSchema = z
     /** Pieces fired from this row in the running fight that can be picked up after it (half come back). The
      *  server keeps it. */
     ammunitionFired: z.number().int().min(0).max(10_000).optional(),
+    /** A light source in hand is burning (a Torch, a Lamp, a Flame Tongue's flames). Dynamic vision lights its bearer
+     *  while it is lit and equipped. The server keeps it. */
+    lit: z.boolean().optional(),
+    /** A Hooded Lantern's hood is down: Dim Light in 5 feet only. */
+    hoodLowered: z.literal(true).optional(),
+    /** Where a Bullseye Lantern's Cone points, in degrees from the right of the map, clockwise. */
+    facingDegrees: z.number().min(0).max(360).optional(),
+    /** The game hour (`rest.clockHours`) a lit Torch, Candle or flask of Oil burns out at. */
+    burnsOutAtHour: z.number().int().min(0).max(10_000_000).optional(),
+    /** Hours of burning left in a light that was put out before it burned down. */
+    burnHoursLeft: z.number().int().min(0).max(24).optional(),
     /** Display-only marker so the sheet can offer Attune without the catalog; never the riders. */
-    magic: ItemMagicMarkerSchema.optional()
+    magic: ItemMagicMarkerSchema.optional(),
+    /** A copy whose magic is spent for now: a manual or tome after its study (`character.study-item`), until it
+     *  regains it in a century. The server keeps it. */
+    dormant: z.boolean().optional()
   })
   .strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
@@ -1288,6 +1484,12 @@ export const ActorSchema = z.object({
   /** SRD Heroic Inspiration: held or not (never more than one). Spent to reroll one die; the GM gives it, and a Human
    * gains it on finishing a Long Rest. */
   heroicInspiration: z.boolean().default(false),
+  /** A second Heroic Inspiration gained while holding one (SRD: "the excess is lost unless you give it to a player
+   *  character who lacks it"): its player gives it or lets it go. Player characters only. */
+  heroicInspirationToGive: z.boolean().optional(),
+  /** A player character's Experience Points, which the GM awards (`actor.award-experience`). Absent until the first
+   *  award, when it starts at the least XP the character's level needs. */
+  experiencePoints: z.number().int().min(0).max(10_000_000).optional(),
   /** Picks re-made on a rest, keyed by offer key; no rebuild needed. `per` is the rest after which it may be re-made;
    * it stands until the character chooses again. */
   choiceOverrides: z
@@ -1444,8 +1646,14 @@ export const EffectGrantSchema = z
       ])
       .describe("How long the effect lasts."),
     modifiers: EffectModifiersSchema.default([]).describe(
-      "What the effect does while it lasts, gates included, in the shared rider vocabulary. Refused here: every modifier the sheet or the actor stores (ability-score, hit-points-per-level, armor-class, initiative, unarmored-defense, darkvision, sense, spell-slot), which an effect that ends could not give back."
+      "What the effect does while it lasts, gates included, in the shared rider vocabulary. Refused here: every modifier the sheet or the actor stores (ability-score, hit-points-per-level, armor-class, initiative, unarmored-defense, spell-slot), which an effect that ends could not give back."
     ),
+    /** The light its bearer sheds while it lasts (Produce Flame, Fire Shield, Sacred Weapon). */
+    light: CarriedLightSchema.optional().describe(
+      "The light its bearer sheds while it lasts, carried with its token (Produce Flame's flame, Holy Nimbus's sunlight)"
+    ),
+    /** The creatures it lets its bearer sense while it lasts (Divine Sense). */
+    detects: DetectsSchema.optional(),
     onEnd: z.array(EffectOnEndSchema).max(2).default([]),
     /** The granted effect ends when the actor loses every other effect with this tag (Frenzy's marker ends with the Rage). */
     endsWithTag: EffectTagSchema.optional().describe(
@@ -1508,7 +1716,16 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
    *  (Mage Armor: 13). */
   baseArmorClass: z.number().int().min(11).max(20).optional(),
   /** The recipient's AC is at least this while it lasts (Barkskin: 17). */
-  armorClassFloor: z.number().int().min(10).max(25).optional()
+  armorClassFloor: z.number().int().min(10).max(25).optional(),
+  /** A roll the recipient may answer with it, which ends it (Bardic Inspiration: add the die to a failed D20 Test). */
+  answer: RollAnswerSchema.optional(),
+  /** What a melee hit on the recipient costs the attacker while it lasts (Fire Shield's 2d8). */
+  struck: StruckSchema.optional(),
+  /** The recipient may hold only one effect with these tags at a time ("A creature can have only one Bardic
+   *  Inspiration die at a time"): a grant to a creature that holds one is refused. */
+  onlyOne: z.literal(true).optional(),
+  /** Only another creature may receive it ("inspire another creature"). */
+  notSelf: z.literal(true).optional()
 }).strict();
 
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
@@ -1635,7 +1852,14 @@ export const SaveOutcomeFields = {
     .min(1)
     .max(40)
     .optional()
-    .describe("A failure that grapples: the grapple's escape DC. Its other conditions last until the grapple ends"),
+    .describe(
+      "A failure that grapples: the grapple's escape DC. Its other conditions last until the grapple ends. On a failure that restrains without grappling (a Net, a Rope of Entanglement), the DC its creature escapes it with"
+    ),
+  /** The escape is a Strength (Athletics) check alone (a Net: "a DC 10 Strength (Athletics) check"). */
+  escapeAthletics: z
+    .literal(true)
+    .optional()
+    .describe("The escape is a Strength (Athletics) check alone, not Athletics or Acrobatics"),
   /** The failure's conditions end early if the target takes any damage (Turn Undead, Hypnotic Pattern). */
   endsOnDamage: z
     .literal(true)
@@ -1702,15 +1926,82 @@ export const ActionAreaSchema = z
   .strict();
 export type ActionArea = z.infer<typeof ActionAreaSchema>;
 
+/**
+ * What a spell or an action does to light and sight while it lasts (SRD Rules Glossary: Bright Light, Dim Light,
+ * Heavily Obscured; the Darkness and Daylight spells). It lasts as long as what keeps it: the caster's Concentration,
+ * the lasting effect its cast leaves, or `rounds`, else until it is cast again or the GM removes it.
+ */
+export const SightEffectSchema = z
+  .object({
+    /** A light it makes: carried by its user (`caster`: Produce Flame), by each creature it targets (`targets`, its user
+     *  when it names none: Light), filling the area it places (`area`: Moonbeam's Cylinder, Daylight's Sphere), or
+     *  `count` lights set at its user's feet to be moved (`point`: Dancing Lights). */
+    light: z
+      .object({
+        on: z.enum(["caster", "targets", "area", "point"]),
+        brightFeet: z.number().int().min(0).max(240),
+        dimFeet: z.number().int().min(0).max(240),
+        sunlight: z.literal(true).optional(),
+        count: z.number().int().min(1).max(4).optional()
+      })
+      .strict()
+      .optional(),
+    /** An area of obscurement or magical Darkness: the area it places on the map, or with `aroundSelfFeet` an
+     *  Emanation round its user that moves with it (a darkmantle's Darkness Aura). */
+    area: z
+      .object({
+        kind: z.enum(["lightly-obscured", "heavily-obscured", "magical-darkness"]),
+        aroundSelfFeet: z.number().int().min(5).max(120).optional(),
+        /** Its user sees through it ("Heavily Obscured for creatures other than you": Insect Cloud). */
+        sparesUser: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    /** Spell-made light (`light`), magical Darkness (`darkness`) or fog and clouds (`fog`: Gust of Wind) of a spell of
+     *  `upToLevel` or lower that its area overlaps is dispelled (Darkness: light of level 2 or lower; Daylight: Darkness
+     *  of level 3 or lower). With no level, any (Sunburst). */
+    dispels: z
+      .object({
+        kind: z.enum(["light", "darkness", "fog"]),
+        upToLevel: z.number().int().min(0).max(9).optional()
+      })
+      .strict()
+      .optional(),
+    /** How many rounds it lasts when nothing else keeps it (an octopus's ink: 1 minute). */
+    rounds: z.number().int().min(1).max(100).optional(),
+    /** Using it again puts out what the last use made instead of making more (a magmin "sets itself ablaze or
+     *  extinguishes its flames"). */
+    toggles: z.literal(true).optional(),
+    /** Usable only while its user stands in Dim Light or Darkness (Merge with Shadows), read with dynamic vision on. */
+    inDimLightOrDarkness: z.literal(true).optional(),
+    /** Its save reaches only a creature that can see its user (a ghost's Horrific Visage: "each creature ... that can
+     *  see the ghost") or its area (Hypnotic Pattern: "who can see the pattern"); the server's sight decides. */
+    seenBy: z.enum(["user", "area"]).optional()
+  })
+  .strict()
+  .describe(
+    "What it does to light and sight while it lasts: a light it makes (on its user, its targets, its area or set down), an area of obscurement or magical Darkness, the spell light or Darkness it dispels, and whether it works only in Dim Light or Darkness."
+  );
+export type SightEffect = z.infer<typeof SightEffectSchema>;
+
 const ReactionRangeFeet = z.number().int().min(5).max(1000).optional();
+
+/** The attack kinds a damage reaction can be limited to ("an attack roll made with a Ranged or Thrown weapon"). */
+const ReactionAttackKindSchema = z.enum(["melee", "ranged", "melee-weapon", "ranged-weapon", "thrown", "spell"]);
 
 /**
  * A reaction the engine offers as a prompt when its trigger happens (ADR-0020); only meaningful on activation
  * "reaction". The response is what answering "use" does:
  * - half-damage (Uncanny Dodge): halve the hit's damage.
+ * - reduce-damage (Deflect Attacks, Stone's Endurance): roll `formula` and take it off the damage, on a hit
+ *   (`hit-by-attack`, limited to `damageTypes` it includes and `attackKinds` it was made as) or on any damage the
+ *   reactor is about to take (`takes-damage`, from a hit or a failed save).
+ * - resist-type (Superior Hunter's Defense): Resistance to the damage's type until the end of the current turn, the
+ *   triggering damage included.
  * - ac-bonus (Parry, Shield): add `amount` to AC against the attack before it lands, possibly turning the hit into a
  *   miss. `melee` limits it to melee attacks; `untilNextTurn` keeps the bonus until the reactor's next turn starts.
- * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action against the creature that dealt the damage.
+ * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action against the creature that dealt the damage, or
+ *   the sibling action `usesAction` names (a rust monster's Antennae).
  * - melee-attack (Retaliation): make one melee attack against that creature instead.
  * - counter (Counterspell): a creature the reactor can see casts a spell with components; the cast waits, and "use"
  *   makes the caster roll an `ability` saving throw against the reactor's spell save DC, its spell lost on a failure.
@@ -1718,6 +2009,16 @@ const ReactionRangeFeet = z.number().int().min(5).max(1000).optional();
  */
 export const ActionReactionSchema = z.discriminatedUnion("response", [
   z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict(),
+  z
+    .object({
+      trigger: z.enum(["hit-by-attack", "takes-damage"]),
+      response: z.literal("reduce-damage"),
+      formula: DamageFormulaSchema,
+      damageTypes: z.array(DamageTypeSchema).min(1).max(13).optional(),
+      attackKinds: z.array(ReactionAttackKindSchema).min(1).max(6).optional()
+    })
+    .strict(),
+  z.object({ trigger: z.literal("takes-damage"), response: z.literal("resist-type") }).strict(),
   z
     .object({
       trigger: z.literal("hit-by-attack"),
@@ -1731,7 +2032,13 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
     .object({
       trigger: z.literal("damaged-by-creature"),
       response: z.literal("strike-back"),
-      rangeFeet: ReactionRangeFeet
+      rangeFeet: ReactionRangeFeet,
+      /** The sibling action it uses instead of itself ("The rust monster uses Antennae"). */
+      usesAction: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(120)
+        .optional()
     })
     .strict(),
   z
@@ -1764,7 +2071,9 @@ export const SaveFailureEffectSchema = z
     /** What it adds to AC while it lasts; Slow's -2 is a penalty. Kept apart from `modifiers`, as on an effect. */
     armorClassBonus: z.number().int().min(-10).max(10).optional(),
     /** It ends when a spell restores the bearer's hit points ("The wound closes after ... a spell restores Hit Points"). */
-    endsOnSpellHealing: z.literal(true).optional()
+    endsOnSpellHealing: z.literal(true).optional(),
+    /** The light the creature sheds while it lasts (Faerie Fire: "Each creature ... sheds Dim Light"). */
+    light: CarriedLightSchema.optional()
   })
   .strict();
 
@@ -1836,13 +2145,218 @@ export const OnHitRiderSchema = z
      *  or until the grapple ends when the rider grapples. */
     duration: SaveFailureDurationSchema.optional().describe(
       "How long the conditions last (a lich's touch: until the start of its next turn); absent, until ended or until the grapple ends"
-    )
+    ),
+    /** What the effect does besides conditions, as effect tags the engine reads: `no-healing` (a bearded devil's
+     *  Beard), `no-reactions` (a balor's Lightning Blade), `no-opportunity-attacks`, `speed-halved`. */
+    tags: z
+      .array(EffectTagSchema)
+      .max(6)
+      .optional()
+      .describe(
+        "Effect tags the hit leaves, which the engine reads: no-healing, no-reactions, no-bonus-actions, dazed (one of moving, an action or a Bonus Action on its turn), no-opportunity-attacks, speed-halved, until-own-attack (spent by the bearer's next attack roll), until-attacked (spent by the next attack roll against it)"
+      ),
+    /** The effect lands on the attacker instead of the target (a pirate captain's Advantage on its next attack). Its
+     *  `until-source-turn-end` duration then means the end of this turn. */
+    self: z.literal(true).optional(),
+    /** Modifiers the effect carries while it lasts: a Speed cut (a frost giant's Great Bow), Disadvantage on the
+     *  target's next attack roll (an ettin's Morningstar, with the `until-own-attack` tag). */
+    modifiers: EffectModifiersSchema.optional(),
+    /** The hit pulls the target straight toward the attacker (a balor's Flame Whip, a merrow's Harpoon). */
+    pull: ForcedPushSchema.optional(),
+    /** The hit opens a save on the target against the attacker's DC (Giant Slayer: a Giant makes a DC 15 Strength
+     *  save or falls Prone; a Sword of Wounding stops healing). Its failure leaves the rider's own effect. */
+    save: z
+      .object({
+        ability: AbilitySchema,
+        dc: z.number().int().min(1).max(40),
+        /** Damage a failure deals, none on a success (a Dagger of Venom's 2d10 Poison). */
+        failureDamage: z
+          .array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict())
+          .max(2)
+          .optional(),
+        repeatSave: z.literal(true).optional(),
+        endsOnDamage: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    /** It fires only when the attack roll's d20 shows a 20 (Sword of Sharpness: "When you roll a 20"), whatever else
+     *  makes the hit a Critical Hit. */
+    naturalTwenty: z.literal(true).optional(),
+    /** It fires only against these creature types (Giant Slayer: a Giant), read from the target's stat block. */
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
+    /** It spends the coat the bearer put on the weapon: an effect on the attacker with this tag (a Dagger of Venom's
+     *  poison), ended by this hit. Without one it doesn't fire. */
+    spendsEffectTag: EffectTagSchema.optional(),
+    /** What the engine leaves to the GM, said with the hit: a curse that acts at rests, a creature killed outright. */
+    reminder: z.string().min(1).max(400).optional()
   })
   .strict()
   .describe(
-    "On-hit riders: conditions applied to the target as one source-linked effect (a crocodile's Bite applies Grappled + Restrained with escape DC 15). Prone and Exhaustion stand alone."
+    "On-hit riders: conditions, tags and modifiers applied to the target as one source-linked effect (a crocodile's Bite applies Grappled + Restrained with escape DC 15), a pull, or a save the hit opens. Prone and Exhaustion stand alone."
   );
 export type OnHitRider = z.infer<typeof OnHitRiderSchema>;
+
+/** What a hit rider leaves on the target with no save: a named effect with conditions, tags and modifiers. */
+export const HitOutcomeSchema = z
+  .object({
+    name: z.string().min(1).max(60),
+    conditions: z.array(SaveConditionSchema).max(3).optional(),
+    tags: z.array(EffectTagSchema).max(6).default([]),
+    modifiers: EffectModifiersSchema.default([]),
+    /** Absent: until ended (Quivering Palm's vibrations, which last days). */
+    duration: SaveFailureDurationSchema.optional(),
+    /** A creature has one at a time, the most recent (Hamstring Blow): a new one replaces any other. */
+    onePerTarget: z.literal(true).optional(),
+    /** Its source keeps one at a time (Quivering Palm): marking a second creature ends the first's. */
+    onePerSource: z.literal(true).optional()
+  })
+  .strict();
+export type HitOutcome = z.infer<typeof HitOutcomeSchema>;
+
+/** A save a hit rider opens on the hit's target, at the rider's DC, and what its failure leaves. */
+export const HitRiderSaveSchema = z
+  .object({
+    ability: AbilitySchema,
+    failureConditions: z.array(SaveConditionSchema).max(3).default([]),
+    failureDuration: SaveFailureDurationSchema.optional(),
+    repeatSave: z.literal(true).optional(),
+    endsOnDamage: z.literal(true).optional(),
+    failurePush: ForcedPushSchema.optional(),
+    failureEffect: SaveFailureEffectSchema.optional()
+  })
+  .strict();
+
+/** One effect a hit rider offers (Brutal Strike's Forceful Blow, a Cunning Strike's Trip, Open Hand's Topple). */
+export const HitRiderEffectSchema = z
+  .object({
+    id: RiderSlugSchema,
+    name: z.string().min(1).max(60),
+    /** Sneak Attack dice it forgoes (a Cunning Strike effect's die cost), taken off before the dice roll. */
+    forgoesDice: z.number().int().min(1).max(10).optional(),
+    /** A feature the bearer must hold for it (Devious Strikes' Daze, Improved Brutal Strike's Staggering Blow). */
+    requiresFeature: RiderSlugSchema.optional(),
+    /** An item the bearer must carry, by catalog id (Poison: a Poisoner's Kit). */
+    requiresItem: RiderSlugSchema.optional(),
+    /** Only against a target of at most this size (Trip: Large or smaller). */
+    maxTargetSize: SizeSchema.optional(),
+    save: HitRiderSaveSchema.optional(),
+    applies: HitOutcomeSchema.optional(),
+    /** Pushes the target straight away with no save (Forceful Blow's 15 feet). */
+    push: ForcedPushSchema.optional(),
+    /** The attacker may then move up to half its Speed without provoking Opportunity Attacks (Withdraw, Forceful
+     *  Blow's move toward the target). */
+    grantsHalfSpeedMove: z.literal(true).optional(),
+    /** The Hide action's Invisible condition stays through this attack (Supreme Sneak's Stealth Attack). */
+    keepsHidden: z.literal(true).optional(),
+    /** The attacker spends one of its Hit Point Dice and regains the roll plus its Constitution modifier, minimum 1
+     *  (Lifedrinker). */
+    spendsHitPointDie: z.literal(true).optional()
+  })
+  .strict();
+export type HitRiderEffect = z.infer<typeof HitRiderEffectSchema>;
+
+/**
+ * What makes an action ride a hit (ADR-0020): it is chosen on an attack's preview and never taken alone. Its damage
+ * joins the hit's (so a Critical Hit doubles it), or rides its save when it has one (Hurl Through Hell's 8d10 on a
+ * failure). `rides` names the hits it can ride; the gates and costs below are checked on the server.
+ */
+export const HitRiderSchema = z
+  .object({
+    rides: z.enum([
+      "attack-roll",
+      "weapon",
+      "melee-weapon-or-unarmed",
+      "finesse-or-ranged-weapon",
+      "monk-weapon-or-unarmed",
+      "unarmed",
+      "flurry-of-blows",
+      "strength-attack",
+      "pact-weapon",
+      "this-weapon",
+      "melee-this-weapon"
+    ]),
+    /** "Once per turn", any creature's turn, counted beside its own uses (Stunning Strike spends a Focus Point too). */
+    oncePerTurn: z.literal(true).optional(),
+    /** Only on the bearer's own turn ("once on each of your turns"). */
+    ownTurn: z.literal(true).optional(),
+    /** Tapped before the roll (Brutal Strike): the tap marks the bearer, and the next qualifying attack roll it makes
+     *  gives up its Advantage. Only that roll's hit can carry it. */
+    declaredBeforeRoll: z.literal(true).optional(),
+    /** Sneak Attack's test: Advantage, or an ally within 5 feet of the target who isn't Incapacitated, and no
+     *  Disadvantage. */
+    sneakAttack: z.literal(true).optional(),
+    /** "And deal damage to it": the hit must deal the target damage after its defences. */
+    dealsDamage: z.literal(true).optional(),
+    /** Only against a target of at most this size (Hill's Tumble: Large or smaller). */
+    maxTargetSize: SizeSchema.optional(),
+    /** Its damage takes the weapon's type (Sneak Attack, Brutal Strike). */
+    weaponType: z.literal(true).optional(),
+    /** The types its damage may take, picked when it is chosen (Divine Strike: Necrotic or Radiant). */
+    damageTypes: z.array(DamageTypeSchema).min(2).max(6).optional(),
+    /** More dice against these creature types (Divine Smite: 1d8 more against a Fiend or an Undead). */
+    versus: z
+      .object({ creatureTypes: z.array(RiderSlugSchema).min(1).max(6), formula: DiceFormulaSchema })
+      .strict()
+      .optional(),
+    /** Its damage spares creatures of these types (Hurl Through Hell: a Fiend takes none). */
+    sparesCreatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
+    /** The DC of its saves and its effects' saves (8 + Dexterity + Proficiency Bonus for a Cunning Strike). */
+    saveDc: z.number().int().min(1).max(40).optional(),
+    /** Effects to pick when it is chosen (Brutal Strike, Cunning Strike, Open Hand Technique). */
+    effects: z.array(HitRiderEffectSchema).min(1).max(10).optional(),
+    /** How many different effects one hit may carry; absent, one. */
+    effectsChoose: z.number().int().min(1).max(3).optional(),
+    /** It must carry one effect to be chosen at all (Open Hand Technique); absent, the effects are optional. */
+    effectRequired: z.literal(true).optional(),
+    /** What it leaves on the target with no save (Frost's Chill's slow, Quivering Palm's vibrations). */
+    applies: HitOutcomeSchema.optional(),
+    /** It spends a Pact Magic slot and rolls this die once more per slot level (Eldritch Smite's 1d8 + 1d8 per
+     *  level). */
+    pactSlotDie: z
+      .string()
+      .regex(/^1d(?:4|6|8|10|12)$/)
+      .optional(),
+    /** What the table finishes by hand, said with the hit. */
+    reminder: z.string().min(1).max(400).optional()
+  })
+  .strict()
+  .describe(
+    "What makes an action ride a hit: chosen on an attack's preview, never taken alone. `rides` names the hits it can ride; once per turn, own turn, Sneak Attack's test, a target size and dealing damage are checked on the server. Its damage joins the hit's, or rides its save when the action has one. `effects` are picked with it (a Cunning Strike's Trip forgoes a Sneak Attack die), with saves at `saveDc`."
+  );
+export type HitRider = z.infer<typeof HitRiderSchema>;
+
+/**
+ * Who an action without a spell may target, checked on the server like a spell's targets (SRD "Targets"): how many,
+ * how far, and which creatures. A target outside the rules is refused with a sentence. `countAbility` is "a number
+ * of creatures equal to your Charisma modifier (minimum of one creature)".
+ */
+export const ActionTargetsSchema = z
+  .object({
+    count: z.number().int().min(1).max(20).optional(),
+    countAbility: AbilitySchema.optional(),
+    /** How far from the user a target may be; 5 is touch. */
+    rangeFeet: z.number().int().min(5).max(1000).optional(),
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(8).optional(),
+    notCreatureTypes: z.array(RiderSlugSchema).min(1).max(8).optional(),
+    maxSize: SizeSchema.optional(),
+    /** "A creature you can see": read from the user's sight while dynamic vision is on. */
+    seen: z.literal(true).optional(),
+    /** "A creature Grappled by it" (a swallow, Paralyzing Tentacles). */
+    grappledBySource: z.literal(true).optional(),
+    /** Only a creature with one of these conditions (a Trample's Prone, Death Glare's Frightened). */
+    conditions: z.array(ConditionSchema).min(1).max(4).optional(),
+    /** Only a creature whose space this creature shares or is in (a Vortex, a Whelm). */
+    inSpace: z.literal(true).optional(),
+    /** "Each enemy", "an ally", or "another creature" (not the user itself). */
+    who: z.enum(["enemies", "allies", "others"]).optional(),
+    /** Only a creature this creature's own effect with this tag marks (Quivering Palm's vibrations). */
+    markedBy: EffectTagSchema.optional()
+  })
+  .strict()
+  .describe(
+    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions, in the user's space, enemies, allies or others, or a creature the user marked."
+  );
+export type ActionTargets = z.infer<typeof ActionTargetsSchema>;
 
 /** One place in a Multiattack's plan: an action taken `count` times, or any of `or` in its place. */
 export const MultiattackComponentSchema = z
@@ -2043,9 +2557,13 @@ export const ActionSchema = z
     /** On-hit conditions applied to the target as one source-linked effect (Bite: Grappled + Restrained, escape DC 15). */
     onHit: z
       .array(OnHitRiderSchema)
-      .max(2)
+      .max(4)
       .optional()
       .describe("Conditions applied to the target as one source-linked effect"),
+    /** It rides a hit: chosen on an attack's preview, never taken alone (Sneak Attack, Stunning Strike). */
+    ridesHit: HitRiderSchema.optional(),
+    /** Who it may target, checked on the server (Lay on Hands' touch, Turn Undead's Undead within 30 feet). */
+    targets: ActionTargetsSchema.optional(),
     /** A miss still deals half the hit's damage, rounded down (Acid Arrow: "half as much of the initial damage only"). */
     missDamage: z.literal("half").optional(),
     /** What its damage drains as it lands (a wraith's Life Drain, Vampiric Touch). */
@@ -2090,6 +2608,8 @@ export const ActionSchema = z
       .describe(
         'Which spell this action is a casting of. Identity only (every number the action rolls is already on the action itself), so it changes no arithmetic. It exists because the `spell-id-is` rider filter needs something to match: "when you cast Eldritch Blast" cannot be said with `spell-school-is` or `spell-level-is`, which name categories. Absent = not a spell, and every `spell-id-is` gate fails closed'
       ),
+    /** A roll this action answers after it is seen (Indomitable's reroll, Cutting Words); see `RollAnswerSchema`. */
+    answer: RollAnswerSchema.optional(),
     /** Declared reaction the engine can offer as a pending prompt; see `ActionReactionSchema`. */
     reaction: ActionReactionSchema.optional().describe(
       'A declared reaction the engine offers as a pending prompt when its trigger happens: half-damage (Uncanny Dodge), ac-bonus (Parry, Shield), strike-back (Hellish Rebuke) or melee-attack (Retaliation). Only meaningful on activation "reaction"'
@@ -2125,6 +2645,8 @@ export const ActionSchema = z
     /** The area it covers, for the map template. Filled from the description where the action enters the system
      *  (the content build, a homebrew save, an import), so play never reads the prose. */
     area: ActionAreaSchema.optional(),
+    /** What it does to light and sight while it lasts (a darkmantle's Darkness Aura, an octopus's ink). */
+    sight: SightEffectSchema.optional(),
     /** The spells it casts, each its own cast action in play (a Spellcasting list, a Misty Step); see `CastsSpellsSchema`. */
     castsSpells: CastsSpellsSchema.optional(),
     /** Damage a hit adds or swaps in under a printed condition ("plus 2 (1d4) Slashing damage if the attack roll had
@@ -2516,6 +3038,8 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       /** Only creatures of these types ("any Beast or Humanoid", a sea hag's Vile Appearance). */
       creatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
       notWhileIncapacitated: z.literal(true).optional(),
+      /** Only a creature that can see the bearer is affected ("and can see the hag's true form"). */
+      seenOnly: z.literal(true).optional(),
       damage: TraitDamageSchema.optional(),
       save: TraitSaveSchema.optional(),
       /** The fire it sets (a fire elemental's Emanation): "start burning" (SRD Burning). */
@@ -2534,12 +3058,47 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
     })
     .strict(),
   z.object({ kind: z.literal("melee-hit-damage"), name: TraitNameSchema, damage: TraitDamageSchema }).strict(),
+  /** "The [creature] sheds Bright Light in a 10-foot radius and Dim Light for an additional 10 feet" (Illumination):
+   *  a light its token carries. */
+  z
+    .object({
+      kind: z.literal("light"),
+      name: TraitNameSchema,
+      brightFeet: z.number().int().min(0).max(240),
+      dimFeet: z.number().int().min(0).max(240)
+    })
+    .strict(),
+  /** Sunlight Sensitivity, Sunlight Weakness, a vampire's sunlight, Light Sensitivity: while it stands in `light`
+   *  (sunlight, or any Bright Light), its `rolls` have Disadvantage, and a vampire takes `damageAtTurnStart` as its
+   *  turn starts there. */
+  z
+    .object({
+      kind: z.literal("light-sensitivity"),
+      name: TraitNameSchema,
+      light: z.enum(["sunlight", "bright"]),
+      rolls: z
+        .array(z.enum(["attack", "check", "save"]))
+        .min(1)
+        .max(3),
+      damageAtTurnStart: z
+        .object({ amount: z.number().int().min(1).max(100), type: DamageTypeSchema })
+        .strict()
+        .optional()
+    })
+    .strict(),
   z
     .object({
       kind: z.literal("berserk"),
       name: TraitNameSchema,
       /** The d6 face, or higher, that sends it berserk. */
       on: z.number().int().min(1).max(6)
+    })
+    .strict(),
+  /** "The stalker has the Invisible condition": the creature joins the roster with it. */
+  z
+    .object({
+      kind: z.literal("invisible"),
+      name: TraitNameSchema
     })
     .strict()
 ]);

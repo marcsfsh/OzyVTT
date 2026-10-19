@@ -7,6 +7,7 @@ import type {
   RuleMode
 } from "@vtt/domain";
 import { abilityCheckClaims } from "./ability-checks.js";
+import { holdsFeature } from "./class-features.js";
 import { wardedConditions } from "./paladin-auras.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -28,6 +29,7 @@ import { zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.j
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
 import { lapseLongCasts } from "./resolution/long-casting.js";
+import { checkSightFor } from "./vision/rules.js";
 
 type StartEncounterInput = Readonly<{
   mapAssetId: string;
@@ -110,7 +112,12 @@ export function initiativeRollFor(
   const warded = deps.resolveDefinition
     ? wardedConditions(state, actor, { resolveDefinition: deps.resolveDefinition })
     : [];
-  const asCheck = abilityCheckClaims(actor, derivation, { ability: "dex" }, warded);
+  // Frightened only while its source is within line of sight, and the light it stands in (Sunlight Sensitivity).
+  const sight = checkSightFor(state, actor, {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
+  const asCheck = abilityCheckClaims(actor, derivation, { ability: "dex" }, warded, [], sight);
   for (const side of ["advantage", "disadvantage"] as const)
     for (const claim of asCheck[side])
       if (!claims[side].some((held) => held.label === claim.label)) claims[side].push(claim);
@@ -553,6 +560,13 @@ function settleGatherIfComplete(state: GameState) {
 
 /** Dependencies for start-of-turn recharge rolls and ongoing damage and end-of-turn repeat saves; optional so scene
  *  bookkeeping can advance turns without them. */
+/** Whether a creature takes a Reaction on every turn, not once a round (a marilith's Reactive trait). */
+function reactsEveryTurn(state: GameState, actorId: string, deps: TurnAdvanceDeps | undefined): boolean {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor?.definitionId || !deps) return false;
+  return holdsFeature(deps.resolveDefinition(actor.definitionId), "reactive", "Reactive");
+}
+
 export type TurnAdvanceDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   /** The item catalog, so an item's recharge pool re-arms like a stat block's. */
@@ -694,7 +708,10 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     turnActorId: nextActorId,
     // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD).
     turn: { ...EMPTY_TURN },
-    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId),
+    // A marilith's Reactive: "The marilith can take one Reaction on every turn of combat."
+    reactionsUsed: state.combat.reactionsUsed.filter(
+      (actorId) => actorId !== nextActorId && !reactsEveryTurn(state, actorId, deps)
+    ),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, nextActorId)
   };
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).

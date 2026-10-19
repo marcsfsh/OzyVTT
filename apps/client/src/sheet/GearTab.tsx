@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { catalogIdOf, type ContentActionSummary, type ContentEquipmentSummary } from "@vtt/domain";
+import { ABILITY_NAMES } from "@vtt/rules-5e";
 import type { InventoryItem } from "@vtt/schemas";
 import { Button, GmOnlyTag, IconChevronLeft, IconChevronRight, Input, NumberField, Select, Stepper } from "@vtt/ui";
 import {
@@ -145,8 +146,9 @@ export function GearTab({
   // The server upserts by id: a copy on the same base grows the stack, one on another base (or another scroll's
   // spell) is its own row. The server checks the pick and copies the base's stats.
   const addFromCatalog = (entry: ContentEquipmentSummary, baseId?: string, spellId?: string) => {
+    // A studied book's spent copy is its own row: a new copy has its magic.
     const existing = inventory
-      .filter((item) => catalogIdOf(item) === entry.id)
+      .filter((item) => catalogIdOf(item) === entry.id && !item.dormant)
       .find(
         (item) =>
           (!entry.appliesTo || baseId === undefined || item.baseId === undefined || item.baseId === baseId) &&
@@ -203,7 +205,8 @@ export function GearTab({
               {[
                 itemLine(item),
                 item.ammunitionLeft !== undefined ? `${item.ammunitionLeft} left` : null,
-                item.ammunitionFired ? `${item.ammunitionFired} fired` : null
+                item.ammunitionFired ? `${item.ammunitionFired} fired` : null,
+                item.dormant ? "Magic spent" : null
               ]
                 .filter(Boolean)
                 .join(" · ")}
@@ -230,6 +233,7 @@ export function GearTab({
         const summary = summaryOf(open);
         const mastery = facts.get(`item-${open.id}`)?.mastery ?? null;
         const choices = summary?.damageTypeChoice;
+        const study = summary?.study;
         return (
           <ItemCard
             item={open}
@@ -262,6 +266,16 @@ export function GearTab({
             {role === "player" && open.chosenDamageType && (
               <p className="cs-sub">Resists {titleCase(open.chosenDamageType)}.</p>
             )}
+            {open.dormant ? (
+              <p className="cs-sub">Its magic is spent. It regains it in a century.</p>
+            ) : (
+              study && (
+                <p className="cs-sub">
+                  {study.hours} hours of study over {study.days} days or fewer raise {ABILITY_NAMES[study.ability]} by{" "}
+                  {study.amount}, to at most {study.maximum}.{role === "player" ? " Your GM marks the study done." : ""}
+                </p>
+              )
+            )}
             <div className="cs-chiprow">
               <button
                 type="button"
@@ -292,6 +306,14 @@ export function GearTab({
                 onChange={(quantity) => save({ ...open, quantity })}
               />
             </div>
+            {summary?.light && !summary.light.always && (
+              <LightControls
+                item={open}
+                light={summary.light}
+                busy={busy}
+                onChange={(change) => void edit("item:set-light", { actorId: actor.id, itemId: open.id, ...change })}
+              />
+            )}
             {!open.spellId && summary?.spellScroll && (
               <Button size="sm" variant="secondary" disabled={busy} onClick={() => setScrollRowId(open.id)}>
                 Choose its spell
@@ -302,7 +324,7 @@ export function GearTab({
                 Choose what it is
               </Button>
             )}
-            {role === "gm" && (choices || others.length > 0) && (
+            {role === "gm" && (choices || others.length > 0 || (study && !open.dormant)) && (
               <div className="cs-gmbox cs-item-gm" aria-label="GM tools for this item">
                 <span className="cs-section-head">
                   <span className="cs-eyebrow">GM tools</span>
@@ -328,6 +350,17 @@ export function GearTab({
                       </option>
                     ))}
                   </Select>
+                )}
+                {/* The hours are downtime the GM gives, so the GM says when they are done. */}
+                {study && !open.dormant && (
+                  <Button
+                    size="sm"
+                    className="cs-gm-control"
+                    disabled={busy}
+                    onClick={() => void edit("character:study-item", { actorId: actor.id, itemId: open.id })}
+                  >
+                    Mark it studied
+                  </Button>
                 )}
                 {others.length > 0 && (
                   <GiveTo
@@ -619,5 +652,71 @@ function GiveTo({
         Give
       </Button>
     </form>
+  );
+}
+
+/** Where a Bullseye Lantern's Cone points, as the map shows it: 0 is to the right, turning clockwise. */
+const AIMS = [
+  { degrees: 0, label: "Right" },
+  { degrees: 45, label: "Down and right" },
+  { degrees: 90, label: "Down" },
+  { degrees: 135, label: "Down and left" },
+  { degrees: 180, label: "Left" },
+  { degrees: 225, label: "Up and left" },
+  { degrees: 270, label: "Up" },
+  { degrees: 315, label: "Up and right" }
+] as const;
+
+/** A light source on its row: light it or put it out (it must be in hand, and lighting it takes a Tinderbox or another
+ *  flame, which the server checks), lower its hood, and aim its Cone. */
+function LightControls({
+  item,
+  light,
+  busy,
+  onChange
+}: Readonly<{
+  item: InventoryItem;
+  light: NonNullable<ContentEquipmentSummary["light"]>;
+  busy: boolean;
+  onChange: (change: Readonly<{ lit?: boolean; hoodLowered?: boolean; facingDegrees?: number }>) => void;
+}>) {
+  if (!item.equipped) return <p className="cs-sub">Equip it to light it.</p>;
+  return (
+    <div className="cs-chiprow" role="group" aria-label={`Light of the ${item.name}`}>
+      <button
+        type="button"
+        className={`cs-toggle interactive${item.lit ? " is-on" : ""}`}
+        aria-pressed={item.lit === true}
+        disabled={busy}
+        onClick={() => onChange({ lit: item.lit !== true })}
+      >
+        {item.lit ? "Lit" : "Light it"}
+      </button>
+      {light.hooded && (
+        <button
+          type="button"
+          className={`cs-toggle interactive${item.hoodLowered ? " is-on" : ""}`}
+          aria-pressed={item.hoodLowered === true}
+          disabled={busy}
+          onClick={() => onChange({ hoodLowered: item.hoodLowered !== true })}
+        >
+          {item.hoodLowered ? "Hood down" : "Lower the hood"}
+        </button>
+      )}
+      {light.cone && (
+        <Select
+          aria-label={`Aim the ${item.name}`}
+          disabled={busy}
+          value={String(item.facingDegrees ?? 0)}
+          onChange={(event) => onChange({ facingDegrees: Number(event.target.value) })}
+        >
+          {AIMS.map((aim) => (
+            <option key={aim.degrees} value={aim.degrees}>
+              Aimed {aim.label.toLowerCase()}
+            </option>
+          ))}
+        </Select>
+      )}
+    </div>
   );
 }

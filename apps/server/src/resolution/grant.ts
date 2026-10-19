@@ -22,10 +22,12 @@ import {
 } from "../effects.js";
 import { refreshBaseArmorClass } from "../actor-roster.js";
 import { deriveEquipment } from "../equipment-derivation.js";
+import { CommandRejectedError } from "../game-store.js";
 import { currentSpeedFeet } from "../speed.js";
 import { spellEffectDuration, spellOf } from "./concentration.js";
 import type { DefinitionAction, LiveActor, ResolveContext } from "./context.js";
 import { moveMark } from "./marks.js";
+import { effectNameOf } from "../effect-names.js";
 
 /** Reckless Attack's Advantage is on attack rolls using Strength. A sheet built before that gate was authored carries
  *  the roll mode ungated, so it is narrowed as it lands. */
@@ -94,6 +96,13 @@ function turnStartTemporaryHitPoints(
 function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   const { state, action, attacker, input, deps, warnings } = ctx;
   const grant = action.grants!;
+  // "Inspire another creature"; "A creature can have only one Bardic Inspiration die at a time."
+  if (grant.notSelf && recipient.id === attacker.id)
+    throw new CommandRejectedError(`${grant.name ?? action.name} goes to another creature. Pick someone else.`);
+  if (grant.onlyOne && recipient.effects.some((effect) => grant.tags.some((tag) => effect.tags.includes(tag))))
+    throw new CommandRejectedError(
+      `${recipient.name} already has ${grant.name ?? action.name}, and a creature can have only one at a time.`
+    );
   // A concentration grant may end the granter's previous concentration; surfaced as a warning line.
   const replaced: EffectNarration[] = [];
   const recipientDefinition =
@@ -176,10 +185,10 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       name:
         ctx.builtin?.grantName?.(ctx) ??
         ((hexAbility ?? enhancedAbility)
-          ? `${grant.name ?? action.name} (${ABILITY_NAMES[(hexAbility ?? enhancedAbility)!]})`
+          ? `${grant.name ?? effectNameOf(action.name)} (${ABILITY_NAMES[(hexAbility ?? enhancedAbility)!]})`
           : chosenType
-            ? `${grant.name ?? action.name} (${chosenType[0]!.toUpperCase()}${chosenType.slice(1)})`
-            : (grant.name ?? action.name)),
+            ? `${grant.name ?? effectNameOf(action.name)} (${chosenType[0]!.toUpperCase()}${chosenType.slice(1)})`
+            : (grant.name ?? effectNameOf(action.name))),
       tags: rage ? [...rage.tags] : grant.tags,
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -195,10 +204,13 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
               attacker.id,
               spell && castLevel !== null ? { spell, castLevel } : null
             ),
-      // A spell's effect outlasts its caster's fall; only Concentration ends it early.
-      endsWhenSourceDefeated: action.spellId === undefined,
+      // A spell's effect outlasts its caster's fall; only Concentration ends it early. A die given to another creature
+      // (Bardic Inspiration) is its own once given.
+      endsWhenSourceDefeated: action.spellId === undefined && grant.answer === undefined,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
       modifiers: [...modifiers, ...hexDisadvantage, ...enhancedAdvantage, ...chosenResistance],
+      ...(grant.answer ? { answer: structuredClone(grant.answer) } : {}),
+      ...(grant.struck ? { struck: structuredClone(grant.struck) } : {}),
       // Greater Invisibility's Invisible condition, which ends with the effect.
       ...(grant.conditions ? { linkedConditionIds: [...grant.conditions] } : {}),
       onEnd: grant.onEnd,
@@ -215,6 +227,10 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       ...(baseArmorClass !== undefined ? { baseArmorClass } : {}),
       ...(armorClassFloor !== undefined ? { armorClassFloor } : {}),
       ...(speedMultiplier !== undefined ? { speedMultiplier } : {}),
+      // The light its bearer sheds while it lasts (Shining Smite's 5 feet of Bright Light).
+      ...(grant.light ? { light: { ...grant.light } } : {}),
+      // The creatures it lets its bearer sense (Divine Sense), drawn for its player alone (`vision/detect.ts`).
+      ...(grant.detects ? { detects: { ...grant.detects, creatureTypes: [...grant.detects.creatureTypes] } } : {}),
       ...(steadyAim ? { speedZero: true } : {}),
       ...grantedMovement,
       // Heroism: immune to Frightened, and Temporary Hit Points at the start of each of the bearer's turns.
@@ -297,7 +313,7 @@ export function grantOutsideFight(
     actor.id,
     makeEffect({
       id: `${commandId}:grant`,
-      name: grant.name ?? action.name,
+      name: grant.name ?? effectNameOf(action.name),
       tags: grant.tags,
       sourceActorId: actor.id,
       sourceName: actor.name,

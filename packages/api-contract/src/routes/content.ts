@@ -17,7 +17,7 @@ import {
   ContentSpellSummarySchema,
   ContentSubclassSummarySchema
 } from "@vtt/domain";
-import { ContentActionsSchema } from "@vtt/domain/commands";
+import { ContentActionsSchema, ContentMonsterActionsQuerySchema } from "@vtt/domain/commands";
 import { ActorDefinitionSchema } from "@vtt/schemas";
 import { CONTENT_PATHS } from "../index.js";
 import { named } from "./components.js";
@@ -140,9 +140,10 @@ export const getContentMonsterActions = defineRoute({
   tag: "Reference content",
   summary: "Read a stat block's actions",
   description:
-    "A stat block's actions flattened for running them, then the generic actions it may take. A definition imported into the game shadows a bundled one with the same id. GM-grade only.",
+    "A stat block's actions flattened for running them, then the generic actions it may take. A definition imported into the game shadows a bundled one with the same id. With `actorId` naming a combatant built from it, the combatant's actions as it has them now, with what its carried items give (a wand's ray, a potion, a magic weapon's swing). GM-grade only.",
   access: gmGrade("game:read"),
   params: ContentActionsSchema,
+  query: ContentMonsterActionsQuerySchema,
   responses: {
     200: ok(ContentMonsterActionsDataSchema, "The actions."),
     400: refused(),

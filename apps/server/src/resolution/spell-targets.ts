@@ -1,3 +1,4 @@
+import { wordsOfCreation } from "./action-targets.js";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { GameState } from "@vtt/domain";
@@ -75,9 +76,11 @@ export function spellTargetViolations(
   const picked = !input.areaPlaced;
   const nameOf = (actorId: string) => state.actors.find((candidate) => candidate.id === actorId)?.name ?? "The target";
 
+  const words = wordsOfCreation(attacker, spell.id, unique, input.resolveDefinition, distanceFeet, nameOf);
+  if (words.violation) violations.push(words.violation);
   const targets = effect?.targets;
   if (targets && action.darts === undefined && (!action.area || effect?.picksInArea)) {
-    const limit = targets.count + (targets.perSlot ?? 0) * Math.max(0, castLevel - spell.level);
+    const limit = targets.count + (targets.perSlot ?? 0) * Math.max(0, castLevel - spell.level) + words.extra;
     if (unique.length > limit)
       violations.push({
         rule: "target.too-many",

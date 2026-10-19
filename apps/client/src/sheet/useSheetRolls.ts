@@ -21,7 +21,8 @@ const ABILITY_WORDS: Readonly<Record<AbilityId, string>> = {
 export function checkLine(outcome: CheckRollOutcome): string {
   const verdict = outcome.success === null ? "" : ` vs DC ${outcome.dc} · ${outcome.success ? "success" : "failure"}`;
   const talent = outcome.reliableTalent ? " · Reliable Talent" : "";
-  return `${outcome.label}: ${outcome.total} (d20 ${outcome.natural}${outcome.typed ? ", typed" : ""})${verdict}${modeWords(outcome.rollMode)}${talent}.`;
+  const answered = (outcome.answered ?? []).map((line) => ` · ${line.name}: ${line.change}`).join("");
+  return `${outcome.label}: ${outcome.total} (d20 ${outcome.natural}${outcome.typed ? ", typed" : ""})${verdict}${modeWords(outcome.rollMode)}${talent}${answered}.`;
 }
 
 /** The constant a formula adds after its dice ("2d6 + 3" gives 3), so a typed sum of the dice can take it. */
@@ -118,6 +119,20 @@ export function useSheetRolls(
     else if (result.check) said(checkLine(result.check));
   };
 
+  /** Answers the check this sheet rolled last (Bardic Inspiration, Tactical Mind, Stroke of Luck). */
+  const answerCheck = async (answer: Readonly<{ id: string; subtract?: boolean; face?: number }>) => {
+    setRolling(true);
+    const result = await command("check:answer", { actorId, answer: { ...answer } });
+    setRolling(false);
+    if (!result.ok) {
+      onFeedback(result.message ?? "The answer was refused.");
+      return;
+    }
+    setLastCheck(result.check ?? null);
+    noteSheetRolls(result.check?.rollId);
+    if (result.check) (result.check.success !== null ? onFeedback : said)(checkLine(result.check));
+  };
+
   /** A saving throw from the sheet: it answers the matching save the character owes, or rolls a loose one. */
   const rollSave = async (ability: AbilityId) => {
     const name = `${ABILITY_WORDS[ability]} save`;
@@ -195,6 +210,7 @@ export function useSheetRolls(
     lastCheck,
     rollCheck,
     rerollCheck,
+    answerCheck,
     rollSave,
     rollD20,
     rollFlat,

@@ -29,6 +29,9 @@ import type { ContentView } from "../content-library.js";
 import { CommandRejectedError } from "../game-store.js";
 import { recordRoll } from "../roll-history.js";
 import { sendsSheetScores, sheetAbilityScores, sheetSourceOf } from "../sheet-abilities.js";
+import { proficiencyEditOf } from "../sheet-proficiency-edits.js";
+import { withStoredStudies } from "../study-ledger.js";
+import { checkPlayerLevelChange } from "../level-up-picks.js";
 import type { HitDie } from "@vtt/rules-5e";
 import { GameInputError } from "./failures.js";
 import { initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
@@ -142,13 +145,18 @@ export const characterCommands = [
           // Validated inside the command against the stored policy; the caller's catalog keeps GM-only
           // homebrew out of a player's build.
           const catalog = kit.catalogFor(principal);
-          const { input, thrown } = settleBuilderDice(state, request, {
-            gm: isGmGrade(principal),
-            sessionId: sessionIdOf(principal),
-            previous: undefined,
-            hitDieOf: hitDieIn(catalog),
-            random: (sides) => kit.context.random(sides)
-          });
+          // A new character has studied nothing yet.
+          const { input, thrown } = settleBuilderDice(
+            state,
+            { ...request, choices: withStoredStudies(request.choices, []) },
+            {
+              gm: isGmGrade(principal),
+              sessionId: sessionIdOf(principal),
+              previous: undefined,
+              hitDieOf: hitDieIn(catalog),
+              random: (sides) => kit.context.random(sides)
+            }
+          );
           const definition = buildCharacterDefinition(input, catalog, state.builderPolicy);
           importActorDefinition(state, definition, actorId, "public", kit.equipmentCatalog());
           claimForCreator(state, actorId, principal);
@@ -236,7 +244,7 @@ export const characterCommands = [
     type: "character.rebuild",
     operationId: "rebuildCharacter",
     description:
-      "Rebuilds one character at a new level, up or down, or respecs it outright: the same build input `POST /game/characters` takes, minus the name (kept from the live actor), re-run through the identical validation. The GM may rebuild anyone; a player only their own claimed character, and only while the table's builder is open. Rolled hit points recorded in the choice ledger are reused where the level still goes to the class they were rolled for, so a level-down/level-up round trip restores the same maximum; with `hp.mode` roll the server throws only the levels with no recorded roll. A level in a new class (`classLevels`) needs 13 in the primary ability of that class and of every current one, with the scores as they stand when it is taken; a build may leave out a class only by levelling below the level it was taken at. Spent uses, Hit Dice and spell slots stay spent against the new maxima, and a character at 0 hit points stays at 0. Refused while the character is in a live (or paused) fight.",
+      "Rebuilds one character at a new level, up or down, or respecs it outright: the same build input `POST /game/characters` takes, minus the name (kept from the live actor), re-run through the identical validation. The GM may rebuild anyone; a player only their own claimed character, and only while the table's builder is open. A player's rebuild is a level up or down: a level up adds the new level's picks and replaces only the earlier ones a feature lets that level replace (one cantrip for each Bard level, one invocation for each Warlock level), a level down only takes picks off, and the species, background, ability scores, earlier hit points and every other earlier pick stay as they were (refused with code level_up_limit); a respec is the GM's. Rolled hit points recorded in the choice ledger are reused where the level still goes to the class they were rolled for, so a level-down/level-up round trip restores the same maximum; with `hp.mode` roll the server throws only the levels with no recorded roll. A level in a new class (`classLevels`) needs 13 in the primary ability of that class and of every current one, with the scores as they stand when it is taken; a build may leave out a class only by levelling below the level it was taken at. Spent uses, Hit Dice and spell slots stay spent against the new maxima, and a character at 0 hit points stays at 0. Refused while the character is in a live (or paused) fight.",
     summary:
       "Rebuild one character at a new level (up or down) or respec it, re-running the whole build from the choice ledger: the GM for anyone, a player for their own claimed character when the table's builder is open.",
     schema: CharacterRebuildSchema,
@@ -256,10 +264,17 @@ export const characterCommands = [
         const catalog = kit.catalogFor(principal);
         const { actorId: _actorId, ...build } = request;
         const previous = actor.definitionId ? storedDefinition(state, actor.definitionId) : undefined;
+        // The sheet's hand edit isn't one of the builder's picks, so the wizard never sends it back.
+        const handEdit = proficiencyEditOf(previous?.character?.choices ?? []);
+        // Nor are the books it has studied, which only the GM's study command records.
+        const choices = withStoredStudies(
+          handEdit && !proficiencyEditOf(build.choices) ? [...build.choices, handEdit] : build.choices,
+          previous?.character?.choices
+        );
         // The name stays the live actor's: a rebuild changes what a character can do, and who they are stays the same.
         const { input, thrown } = settleBuilderDice(
           state,
-          { ...build, name: actor.name },
+          { ...build, choices, name: actor.name },
           {
             gm: isGmGrade(principal),
             sessionId: sessionIdOf(principal),
@@ -273,6 +288,8 @@ export const characterCommands = [
             random: (sides) => kit.context.random(sides)
           }
         );
+        // A player's level up changes only what the level allows; a respec is the GM's.
+        if (!isGmGrade(principal)) checkPlayerLevelChange(previous, input, catalog, state.builderPolicy);
         const definition = buildCharacterDefinition(input, catalog, state.builderPolicy);
         rebuildActorDefinition(state, actorId, definition, kit.equipmentCatalog());
         recordHitPointRoll(state, {

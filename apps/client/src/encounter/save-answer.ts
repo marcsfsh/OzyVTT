@@ -22,6 +22,8 @@ export function saveAnswerPayload(
     reroll?: boolean;
     legendaryResistance?: boolean;
     damageOverride?: number;
+    /** An answer to the shown die (Bardic Inspiration, Indomitable), applied to the held roll. */
+    answer?: Readonly<{ id: string; subtract?: boolean; face?: number }>;
   }>
 ): SaveAnswerPayload {
   return {
@@ -33,7 +35,8 @@ export function saveAnswerPayload(
     ...(input.face !== undefined ? { face: input.face } : {}),
     ...(input.dieMode ? { rollMode: input.dieMode } : {}),
     ...(input.reroll ? { reroll: true } : {}),
-    ...(input.damageOverride !== undefined ? { damageOverride: input.damageOverride } : {})
+    ...(input.damageOverride !== undefined ? { damageOverride: input.damageOverride } : {}),
+    ...(input.answer ? { answer: { ...input.answer } } : {})
   };
 }
 
