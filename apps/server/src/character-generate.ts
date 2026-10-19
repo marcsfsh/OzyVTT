@@ -16,6 +16,7 @@ import {
   computeServerOffers,
   levelGatesFit,
   levelOfPick,
+  KIT_ITEM_KIND,
   MAX_CLASSES,
   SPELLCASTING_ABILITY_KIND,
   withinOfferSpellWindow,
@@ -561,6 +562,15 @@ function equipmentRows(survey: ServerOfferSurvey, random: DiceRandom): Character
     const gear = options.filter((option) => option.items.length > 0);
     const option = drawOne(gear.length > 0 ? gear : options, random);
     rows.push({ level: 1, ...(classId ? { classId } : {}), kind: "equipment", id: option.id });
+    // The item the kit lets its taker pick (the Bard's instrument).
+    for (const item of option.items)
+      if (item.pickFrom)
+        rows.push({
+          level: 1,
+          ...(classId ? { classId } : {}),
+          kind: KIT_ITEM_KIND,
+          id: drawOne(item.pickFrom, random)
+        });
   };
   choose(survey.classRecord.startingEquipment, survey.classRecord.id);
   choose(survey.background.startingEquipment, null);

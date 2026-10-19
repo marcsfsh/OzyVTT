@@ -546,6 +546,8 @@ type PlacedChoices = Readonly<{
 }>;
 
 export const CLASS_CANTRIP_BUDGET: NamedPickBudget = "class-cantrips";
+/** The ledger row naming the item a starting kit lets its taker pick (the Bard's instrument). */
+export const KIT_ITEM_KIND = "kit-item";
 /** The pick of the ability a species' or a feat's spells are cast with (Elven Lineage, Magic Initiate). */
 export const SPELLCASTING_ABILITY_KIND = "spellcasting-ability";
 export const CLASS_SPELL_BUDGET: NamedPickBudget = "class-spells";
@@ -1388,6 +1390,7 @@ function placeChoices(
   // sheet's hand edit and its studied books are the sheet's own records.
   const separateKinds = new Set([
     "equipment",
+    KIT_ITEM_KIND,
     "size",
     "hp-roll",
     "ability-scores",

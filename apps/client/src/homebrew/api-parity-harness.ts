@@ -1361,6 +1361,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: zero SRD authors"
   },
   {
+    at: "startingEquipment[].items[].pickFrom",
+    types: ["class", "background"],
+    reason:
+      "the items a kit entry lets its taker pick (the Bard's instrument of choice): the kit editor writes items without a pick list yet",
+    status: "gap"
+  },
+  {
     at: "multiclassProficiencies.**",
     types: ["class"],
     reason:

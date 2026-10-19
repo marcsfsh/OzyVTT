@@ -7,12 +7,13 @@ import type {
   CatalogChoiceOption
 } from "@vtt/domain";
 import type { CharacterChoice } from "@vtt/schemas";
-import { featurePicks } from "@vtt/content-srd-5.2.1";
+import { featurePicks, type ClassReference } from "@vtt/content-srd-5.2.1";
 import {
   CLASS_CANTRIP_BUDGET,
   CLASS_SPELL_BUDGET,
   classBudgetKey,
   classSpellOptions,
+  KIT_ITEM_KIND,
   levelOfPick,
   SPELLCASTING_ABILITY_KIND,
   surveyDraft,
@@ -241,7 +242,7 @@ function offersFor(survey: DraftSurvey, library: ContentView, picks: Picks): Bui
   const cards: Array<{ card: Card; source: ChoiceOffer | null }> = [];
   for (const offer of inDisplayOrder(survey.offers))
     for (const card of cardsOf(offer, survey)) cards.push({ card, source: offer });
-  for (const card of fixedCards(survey)) cards.push({ card, source: null });
+  for (const card of fixedCards(survey, picks)) cards.push({ card, source: null });
   // Within the species step the trait picks come first, then the languages and size lists.
   const rank = ({ card }: { card: Card }) =>
     STEP_ORDER.indexOf(card.step) * 2 + (card.step === "species" && card.featureId === null ? 1 : 0);
@@ -371,6 +372,10 @@ function nameOf(kind: string, id: string, survey: DraftSurvey): string {
   return named ?? titleCase(id);
 }
 
+/** An equipment id's name, as the catalog prints it. */
+const nameOfItem = (survey: DraftSurvey, id: string): string =>
+  survey.catalogs.equipment.find((item) => item.id === id)?.name ?? titleCase(id);
+
 const titleCase = (slug: string): string =>
   slug
     .split("-")
@@ -378,7 +383,7 @@ const titleCase = (slug: string): string =>
     .join(" ");
 
 /** The picks the class tables and the starting gear ask for, which the build reads outside its offers. */
-function fixedCards(survey: DraftSurvey): Card[] {
+function fixedCards(survey: DraftSurvey, picks: Picks): Card[] {
   const { classRecord, background, species } = survey;
   const cards: Card[] = [];
   const card = (
@@ -462,6 +467,28 @@ function fixedCards(survey: DraftSurvey): Card[] {
       options: background.startingEquipment.map((option) => ({ id: option.id, name: option.label })),
       classId: null
     });
+  // The item a chosen kit lets its taker pick ("Musical Instrument of your choice").
+  const kitItems = (
+    source: "class-equipment" | "background-equipment",
+    options: ClassReference["startingEquipment"],
+    owner: string,
+    classId: string | null
+  ) => {
+    const chosen = options.find((option) => option.id === picks[source]?.[0]);
+    for (const item of chosen?.items ?? [])
+      if (item.pickFrom)
+        card({
+          key: `${source}-item`,
+          step: "equipment",
+          kind: KIT_ITEM_KIND,
+          label: `${owner} starting equipment · ${item.name.replace(/\s*\(.*\)$/, "")}`,
+          capacity: 1,
+          options: item.pickFrom.map((id) => ({ id, name: nameOfItem(survey, id) })),
+          classId
+        });
+  };
+  if (classRecord) kitItems("class-equipment", classRecord.startingEquipment, classRecord.name, classRecord.id);
+  if (background) kitItems("background-equipment", background.startingEquipment, background.name, null);
   return cards;
 }
 

@@ -40,6 +40,7 @@ import {
   SPELLCASTING_ABILITY_KIND,
   spellSlotsOf,
   surveyForBuild,
+  KIT_ITEM_KIND,
   type BuildClass,
   type ChoiceOffer,
   type CharacterFeatureOrigin
@@ -1593,13 +1594,25 @@ export function buildCharacterDefinition(
       reject(`Choose exactly one ${source} equipment option (${options.map((option) => option.id).join(", ")}).`);
     const chosen = options.find((option) => option.id === matches[0].id)!;
     goldPieces += chosen.goldPieces;
+    // The item the kit lets its taker pick ("Musical Instrument of your choice"), recorded in its own row.
+    const kitPicks = input.choices
+      .filter(
+        (row) => row.kind === KIT_ITEM_KIND && (row.classId ?? null) === (source === "class" ? classRecord.id : null)
+      )
+      .map((row) => row.id);
     // A kit item that is one of this source's tool choices is the tool chosen there ("Gaming Set (same as above)").
     const chosenTools = [...(offers.find((offer) => offer.key === `${source}-tools`)?.taken ?? [])];
     const picked = chosen.items.map((item) => {
+      const pick = item.pickFrom ? kitPicks.findIndex((id) => item.pickFrom!.includes(id)) : -1;
+      if (pick >= 0) {
+        const id = kitPicks.splice(pick, 1)[0]!;
+        return { ...item, id, name: library.equipmentRecord(id)?.name ?? item.name };
+      }
       if (!toolChoices.includes(item.id) || chosenTools.length === 0 || chosenTools.includes(item.id)) return item;
       const tool = chosenTools.shift()!;
       return { ...item, id: tool, name: library.equipmentRecord(tool)?.name ?? item.name };
     });
+    if (kitPicks.length > 0) reject(`"${kitPicks[0]}" isn't an item ${chosen.label} lets you pick.`);
     // An equipment pack is the things it holds, each its own row ("10 Torches" a stack of ten).
     const items = picked.flatMap((item) => {
       const contents = library.equipmentRecord(item.id)?.contents;

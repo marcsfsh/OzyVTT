@@ -898,7 +898,10 @@ export const StartingEquipmentOptionSchema = z
           .object({
             id: ContentIdSchema,
             name: z.string().min(1).max(120),
-            quantity: z.number().int().min(1).max(99).default(1)
+            quantity: z.number().int().min(1).max(99).default(1),
+            /** The item is one of these, picked as the kit is taken (the Bard's "Musical Instrument of your choice");
+             *  `id` is the one it gives when no pick is recorded. */
+            pickFrom: z.array(ContentIdSchema).min(2).max(40).optional()
           })
           .strict()
       )

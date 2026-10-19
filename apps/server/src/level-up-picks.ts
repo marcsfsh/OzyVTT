@@ -7,6 +7,7 @@ import {
   CLASS_SPELL_BUDGET,
   classBudgetKey,
   classSequenceOf,
+  KIT_ITEM_KIND,
   surveyForBuild,
   type ServerOfferSurvey
 } from "./character-offers.js";
@@ -102,7 +103,11 @@ const scoresKey = (request: CharacterCreateRequestInput) =>
 const detailRows = (choices: readonly CharacterChoice[]) =>
   choices
     .filter(
-      (row) => (row.kind === "asi-or-feat" && row.id === "asi") || row.kind === "equipment" || row.kind === "size"
+      (row) =>
+        (row.kind === "asi-or-feat" && row.id === "asi") ||
+        row.kind === "equipment" ||
+        row.kind === KIT_ITEM_KIND ||
+        row.kind === "size"
     )
     .map((row) =>
       JSON.stringify([row.kind, row.id, row.kind === "asi-or-feat" ? (row.payload?.increases ?? null) : null])
