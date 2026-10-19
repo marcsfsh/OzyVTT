@@ -463,6 +463,7 @@ const SAVE_LIFETIME_KEYS = [
   "onlyCreatureTypes",
   "sparesAffected",
   "failureKills.**",
+  "failureMaxSize",
   "repeatDamageAgain",
   "repeatUnseenSource",
   "endsOutOfSight",
@@ -657,6 +658,27 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   })),
   {
+    at: "actions[].save.heldBy.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the object that holds a creature a failure restrains (a Net, a giant spider's web) with its Armor Class and Hit Points - read from the stat block's text or authored in the gear and item overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.heldBy.**",
+    types: ["spell"],
+    reason:
+      "the object that holds a creature a spell's failure restrains, read from the spell's text as the catalog is built; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "walls.**",
+    types: ["spell"],
+    reason:
+      "the walls a spell raises, cuts or destroys and what it does to a door (Wall of Force, Knock) - a reviewed table in the content build; the spell form has no control for them",
+    status: "gap"
+  },
+  {
     at: "actions[].raisesCorpse.**",
     types: ACTION_CARRIERS,
     reason:
@@ -716,6 +738,65 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     reason:
       'a Multiattack\'s other plan ("or it makes two Hurl Flame attacks") - read from stat-block prose like the plan',
     status: "gap"
+  },
+  {
+    at: "actions[].swallow.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a stat block's Swallow (how many it holds, the size it swallows, its acid and its regurgitation), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].pull.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action that pulls its targets toward its user (a roper's Reel), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].inflicts.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what an action does to its targets with no roll (a tarrasque's shock wave: Prone and lost Concentration), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].afterHurtingBloodied",
+    types: "*",
+    reason:
+      "an action offered only right after its user damages a Bloodied creature (a gnoll's Rampage), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].largeFillsHold",
+    types: "*",
+    reason: "one SRD author (a water elemental's Whelm: one Large creature or up to two smaller ones)",
+    status: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].useNumber",
+    types: "*",
+    reason: "one SRD author (a sphinx of valor's three roars in their order)",
+    status: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].magical",
+    types: ACTION_CARRIERS,
+    reason:
+      "that an action's saves are against magic (a sphinx's magical roar), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].holdsAtOnce",
+    types: "*",
+    reason: "one SRD author (a shambling mound's Engulf, one creature at a time)",
+    status: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].multiattackAlternativesAfter",
+    types: "*",
+    reason: "one SRD author (a clay golem's three Slams after Hasten), read from its Multiattack's prose",
+    status: "permanent: lone SRD record"
   },
   {
     at: "actions[].multiattackReplacements[].**",
@@ -822,6 +903,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ACTION_CARRIERS,
     reason:
       "a stat block's damage under a printed condition (Bloodied swarms, a charge), read from the hit clause as the catalog is built; no control on the action row yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].attack.advantageWhen",
+    types: ["monster"],
+    reason:
+      "the Advantage a stat block's attack prints for itself (against a creature it grapples, one missing Hit Points, or in the first round), read from its text as the catalog is built; no control on the action row yet",
     status: "gap"
   },
   {
@@ -934,6 +1022,19 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: "*",
     reason: "the action that leaves a form early, added by the form itself as it is taken; zero hand authors",
     status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].partOf",
+    types: "*",
+    reason:
+      "the printed entry a cast belongs to (a Spellcasting list's spell), set as the catalog makes a stat block's casts; zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].endsUntilItActs",
+    types: "*",
+    reason: "one SRD author (a will-o'-wisp's Consume Life, which ends its Vanish)",
+    status: "permanent: lone SRD record"
   },
   {
     at: "actions[].formOnly",
@@ -1277,6 +1378,62 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "^study.**",
     types: ["equipment"],
     reason: "a manual's or tome's study, the score it raises for good once the GM marks it done; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^variants[].**",
+    types: ["equipment"],
+    reason:
+      "the kinds one record covers (an Ioun Stone's stones) or the forms its holder picks (a Rod of Lordly Might's buttons), each with riders of its own - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^variantChoice.**",
+    types: ["equipment"],
+    reason:
+      "who picks a copy's kind, and what changing a form costs - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^weaponChanges.**",
+    types: ["equipment"],
+    reason:
+      "what a magic weapon changes about its bound base (a Dwarven Thrower's Thrown 20/60, an Energy Bow's Force) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^bonusActionAttack",
+    types: ["equipment"],
+    reason:
+      "an attack with the weapon as a Bonus Action (Scimitar of Speed) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^contents[].**",
+    types: ["equipment"],
+    reason:
+      "what an equipment pack holds, unpacked where a character comes by it (an Explorer's Pack's 10 Torches) - authored in the gear source; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^magicSaveAura.**",
+    types: ["equipment"],
+    reason:
+      "an aura of Advantage on saves against magic for the bearer and its allies (Holy Avenger) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].attackBonus",
+    types: ["equipment"],
+    reason:
+      "a cast's printed bonus to hit (Circlet of Blasting's +5) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].activation",
+    types: ["equipment"],
+    reason:
+      "what casting from the item takes in place of the spell's casting time (a prayer bead's Bonus Action) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {

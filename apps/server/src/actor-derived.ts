@@ -9,7 +9,14 @@ import type {
 } from "@vtt/domain";
 import { aggregateRollMode, collectRiders, sumRiders } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
-import { checkPlan, passivePerception, toolAbility, toolProficiencies, type CheckNames } from "./ability-checks.js";
+import {
+  checkPlan,
+  passivePerception,
+  toolAbility,
+  toolProficiencies,
+  toolUses,
+  type CheckNames
+} from "./ability-checks.js";
 import { checkSituations } from "./check-situations.js";
 import {
   checkRiderBonus,
@@ -102,7 +109,15 @@ export function deriveActorSheet(
     if (!record || !ability) return [];
     const plan = checkPlan(actor, definition, derivation, { ability, tool: id }, { names });
     return [
-      { id, name: record.name, ability, bonus: plan.modifier, mode: plan.rollMode, reliableTalent: plan.reliableTalent }
+      {
+        id,
+        name: record.name,
+        ability,
+        bonus: plan.modifier,
+        mode: plan.rollMode,
+        reliableTalent: plan.reliableTalent,
+        uses: toolUses(record.description).map((use) => ({ ...use }))
+      }
     ];
   });
 
@@ -116,7 +131,9 @@ export function deriveActorSheet(
     // character's Dex modifier plus feats, a stat block's printed bonus).
     // Initiative is a Dexterity check, so a bonus to ability checks reaches it too (a Stone of Good Luck).
     initiative:
-      (definition?.initiativeBonus ?? 0) + derivation.initiative + checkRiderBonus(derivation, { ability: "dex" }),
+      (definition?.initiativeBonus ?? 0) +
+      derivation.initiative +
+      checkRiderBonus(derivation, { ability: "dex" }, definition?.abilityScores),
     abilities,
     skills: derivedSkills,
     tools,
@@ -136,6 +153,8 @@ export function deriveActorSheet(
     ),
     // The SRD's three, plus what an `attunement-slots` rider adds (Use Magic Device).
     attunementSlots: 3 + derivation.attunementSlots,
+    // The character's own load: what its own rows weigh, which its sheet already shows.
+    carrying: derivation.carrying ? { ...derivation.carrying } : null,
     weaponMasteries: weaponMasteriesOf(definition, catalog?.equipmentRecord),
     classColumns: classColumnsOf(definition, classRecord),
     situations: checkSituations(derivation)

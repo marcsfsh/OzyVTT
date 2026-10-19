@@ -62,7 +62,9 @@ function childCast(
     activation: parent.activation,
     description: (spell?.description ?? `${parent.name}: ${entry.name}.`).slice(0, 12000),
     damage: [],
-    ...(uses ? { uses } : {})
+    ...(uses ? { uses } : {}),
+    // The stat block prints it inside its list, as SRD 5.2.1 does.
+    partOf: parent.id
   };
   return { ...base, ...castOf(entry, casts, spell, definition, base) };
 }

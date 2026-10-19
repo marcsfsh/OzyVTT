@@ -12,11 +12,13 @@ import {
   spacePassage,
   spaceHeightCells,
   spansOverlap,
+  slipsThroughStep,
   wallCrossing
 } from "@vtt/rules-5e";
 import { isIncapacitated } from "./condition-rules.js";
+import { sizeAtMost } from "./resolution/context.js";
 import { areAllies } from "./creature-sides.js";
-import { holdsFeature } from "./class-features.js";
+import { opensItsSpace } from "./space-sharing.js";
 import { CommandRejectedError } from "./game-store.js";
 import { gridToImage, imageToGrid } from "./grid-calibration.js";
 import { layerSlice, normalizedRect, type LayerMapGeometry, type PaintRectInput } from "./map-layers.js";
@@ -24,10 +26,7 @@ import { mapDistance } from "./movement-narration.js";
 import { revealedRegion } from "./fog.js";
 import { intersectRegions, subtractRect, unionRect, type Rect } from "./rect-region.js";
 import type { TokenMapGeometry } from "./token-placement.js";
-import { blocksMovement } from "./vision/sight.js";
-
-const SIZE_ORDER = ["tiny", "small", "medium", "large", "huge", "gargantuan"] as const;
-const sizeRank = (size: string | undefined) => SIZE_ORDER.indexOf((size ?? "medium") as (typeof SIZE_ORDER)[number]);
+import { blocksMovement, wallPieces } from "./vision/sight.js";
 
 /** Difficult terrain (SRD 5.2.1): the GM paints it per scene; entering a cell whose centre lies in it costs
  *  double. Stored as disjoint rects, so marking an area twice costs nothing and clearing can cut any shape. */
@@ -94,10 +93,18 @@ export type MovementCostOptions = Readonly<{
   perceives?: (actorId: string) => boolean;
   /** The mover may stop in other creatures' spaces (an air elemental's Air Form), so none bars its way. */
   passesCreatures?: boolean;
-  /** The mover may pass through the spaces of creatures up to this size (Trampling Charge's Medium or smaller). */
-  passesUpTo?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
-  /** The mover passes through walls as through Difficult Terrain (a ghost's Incorporeal Movement). */
+  /** The mover may pass through the spaces of creatures this size or smaller (a gelatinous cube's Engulf). */
+  passesCreaturesUpTo?: string;
+  /** The path keeps to the straight line drawn, so a move through creatures enters the spaces along it rather than
+   *  going round them. */
+  alongLine?: boolean;
+  /** The mover passes through walls as through Difficult Terrain (a ghost's Incorporeal Movement, a Tunneler). */
   throughWalls?: boolean;
+  /** The mover passes through walls at no extra cost (Earth Glide, burrowing). A spell's wall stops it all the same. */
+  throughWallsFree?: boolean;
+  /** How narrow an opening the mover passes with no extra movement: any gap (`point`: Amorphous, "as narrow as 1
+   *  inch"), or one a Tiny creature fits (`tiny`: a swarm). */
+  opening?: "point" | "tiny";
   /** Difficult Terrain costs the mover nothing extra (Freedom of Movement). */
   ignoresDifficult?: boolean;
   /** Whether the mover's Speed is halved with its centre at this point (Spirit Guardians' Emanation). */
@@ -117,13 +124,19 @@ export type MovementCostOptions = Readonly<{
 }>;
 
 /** The movement-blocking walls of the live scene (walls, closed doors, windows) in grid units, while its dynamic
- *  vision is on; none otherwise. */
-export function movementWalls(state: GameState, calibration: NonNullable<TokenMapGeometry["calibration"]>) {
+ *  vision is on; none otherwise. With `spellMadeOnly`, the walls a spell or an item raised (Wall of Force), which no
+ *  creature passes however it moves. */
+export function movementWalls(
+  state: GameState,
+  calibration: NonNullable<TokenMapGeometry["calibration"]>,
+  spellMadeOnly = false
+) {
   const vision = state.combat.vision;
   if (!vision.enabled) return [];
   return vision.walls
-    .filter(blocksMovement)
-    .map((wall) => ({ a: imageToGrid(calibration, wall.a), b: imageToGrid(calibration, wall.b) }));
+    .filter((wall) => blocksMovement(wall) && (!spellMadeOnly || wall.source !== undefined))
+    .flatMap(wallPieces)
+    .map((piece) => ({ a: imageToGrid(calibration, piece.a), b: imageToGrid(calibration, piece.b) }));
 }
 
 /**
@@ -183,17 +196,16 @@ export function movementCost(
       moverSize: mover.size,
       occupantSize: occupant.size
     });
-    // A mover that can stop in a creature's space, or a swarm's space ("and vice versa"), is never barred; it is still
-    // another creature's space, so it costs as Difficult Terrain.
+    // A mover that can stop in a creature's space, or a swarm's or a gelatinous cube's space, is never barred; it is
+    // still another creature's space, so it costs as Difficult Terrain.
     const swarm =
       occupant.definitionId !== null &&
       occupant.definitionId !== undefined &&
-      holdsFeature(options.resolveDefinition?.(occupant.definitionId), "swarm", "Swarm");
+      opensItsSpace(options.resolveDefinition?.(occupant.definitionId));
     const passes =
       options.passesCreatures === true ||
-      swarm ||
-      (options.passesUpTo !== undefined && sizeRank(occupant.size) <= sizeRank(options.passesUpTo));
-    const passage = printed === "blocked" && passes ? "difficult" : printed;
+      (options.passesCreaturesUpTo !== undefined && sizeAtMost(occupant.size, options.passesCreaturesUpTo));
+    const passage = printed === "blocked" && (passes || swarm) ? "difficult" : printed;
     if (passage === "open") continue;
     const cells = passage === "blocked" ? closedCells : difficultCells;
     const origin = footprintOrigin(imageToGrid(calibration, token.position), token.sizeCells);
@@ -203,11 +215,26 @@ export function movementCost(
   const terrain = state.combat.terrain.difficult;
   const walls = movementWalls(state, calibration);
   const crosses = wallCrossing(walls);
+  // A spell's wall stops even a mover that passes walls (Wall of Force: "Nothing can physically pass through").
+  const passesWalls = options.throughWalls === true || options.throughWallsFree === true;
+  const fixedWalls = passesWalls ? movementWalls(state, calibration, true) : [];
+  const fixedCrosses = wallCrossing(fixedWalls);
   const halvedAt = options.halvedAt;
   const costlyGroundAt = aloft ? undefined : options.costlyGroundAt;
+  const fromCell = footprintOrigin(imageToGrid(calibration, from), sizeCells);
+  const toCell = footprintOrigin(imageToGrid(calibration, to), sizeCells);
+  const lineLength = Math.hypot(toCell.column - fromCell.column, toCell.row - fromCell.row);
+  const nearLine = (cell: { column: number; row: number }) =>
+    lineLength === 0 ||
+    Math.abs(
+      (cell.column - fromCell.column) * (toCell.row - fromCell.row) -
+        (cell.row - fromCell.row) * (toCell.column - fromCell.column)
+    ) /
+      lineLength <=
+      0.75;
   const path = movementPath({
-    from: footprintOrigin(imageToGrid(calibration, from), sizeCells),
-    to: footprintOrigin(imageToGrid(calibration, to), sizeCells),
+    from: fromCell,
+    to: toCell,
     sizeCells,
     isDifficult: (column, row) =>
       options.ignoresDifficult !== true &&
@@ -223,8 +250,11 @@ export function movementCost(
       return center.x >= 0 && center.y >= 0 && center.x <= geometry.width && center.y <= geometry.height;
     },
     isStepOpen: (stepFrom, stepTo) =>
-      (options.throughWalls === true ||
-        footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls) !== "blocked") &&
+      (options.alongLine !== true || nearLine(stepTo)) &&
+      (passesWalls
+        ? footprintStepPassage(stepFrom, stepTo, sizeCells, fixedCrosses, fixedWalls) !== "blocked"
+        : footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls) !== "blocked" ||
+          (options.opening !== undefined && slipsThroughStep(stepFrom, stepTo, sizeCells, crosses, options.opening))) &&
       // A spell's barrier holds back even a mover that passes walls.
       options.barredStep?.(
         gridToImage(calibration, footprintCenter(stepFrom, sizeCells)),
@@ -234,7 +264,9 @@ export function movementCost(
     // A footprint that fits only as a creature one size smaller squeezes through, as through Difficult Terrain, and
     // so does a wall an incorporeal mover passes.
     isStepSqueezed: (stepFrom, stepTo) => {
-      if (options.ignoresDifficult === true) return false;
+      // Through a gap it slips through, or through earth and stone it glides in, a step costs nothing extra.
+      if (options.ignoresDifficult === true || options.throughWallsFree === true) return false;
+      if (options.opening && slipsThroughStep(stepFrom, stepTo, sizeCells, crosses, options.opening)) return false;
       const passage = footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls);
       return passage === "squeeze" || (options.throughWalls === true && passage === "blocked");
     },
@@ -284,7 +316,8 @@ function straightThroughWall(state: GameState, from: Point, to: Point): boolean 
   const grid = (point: Point) => ({ column: point.x, row: point.y });
   return vision.walls
     .filter(blocksMovement)
-    .some((wall) => segmentsMeet(grid(from), grid(to), grid(wall.a), grid(wall.b)));
+    .flatMap(wallPieces)
+    .some((piece) => segmentsMeet(grid(from), grid(to), grid(piece.a), grid(piece.b)));
 }
 
 /** Points along a straight move, every 2.5 feet or so, start and end included. */

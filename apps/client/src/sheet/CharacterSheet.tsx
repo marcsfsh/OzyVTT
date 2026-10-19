@@ -389,6 +389,7 @@ export function CharacterSheet({
         serverActions={serverActions}
         facts={facts}
         attunementSlots={derived?.attunementSlots ?? 3}
+        carrying={derived?.carrying ?? null}
         inFight={controller.inFight}
         actionBlocked={controller.itemBlocked}
         onUseAction={controller.itemAction}

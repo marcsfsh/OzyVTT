@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { catalogIdOf, type ContentActionSummary, type ContentEquipmentSummary } from "@vtt/domain";
+import { catalogIdOf, rowUsesKey, type ContentActionSummary, type ContentEquipmentSummary } from "@vtt/domain";
 import { ABILITY_NAMES } from "@vtt/rules-5e";
 import type { InventoryItem } from "@vtt/schemas";
 import { Button, GmOnlyTag, IconChevronLeft, IconChevronRight, Input, NumberField, Select, Stepper } from "@vtt/ui";
@@ -24,6 +24,18 @@ const COINS = ["pp", "gp", "ep", "sp", "cp"] as const;
 type Coins = Record<(typeof COINS)[number], number>;
 
 const words = (slug: string) => slug.split("-").map(titleCase).join(" ");
+
+/** One printed attunement prerequisite in words, as the server checks it: "a Paladin", "a Spellcaster", "a creature
+ *  attuned to a Belt of Dwarvenkind". */
+export function prerequisiteWords(prerequisite: string): string {
+  const named = (slug: string) =>
+    slug
+      .split("-")
+      .map((word) => (word === "of" || word === "the" ? word : titleCase(word)))
+      .join(" ");
+  const attunedTo = /^creature-attuned-to-an?-(.+)$/.exec(prerequisite)?.[1];
+  return attunedTo !== undefined ? `a creature attuned to a ${named(attunedTo)}` : `a ${named(prerequisite)}`;
+}
 
 /** The server's rows an item gives: its swing (and two-handed and Light forms), a wand's casts, a potion's drink. */
 const itemActions = (item: InventoryItem, serverActions: readonly ContentActionSummary[]) =>
@@ -83,6 +95,7 @@ export function GearTab({
   serverActions,
   facts,
   attunementSlots = 3,
+  carrying = null,
   inFight,
   others = [],
   actionBlocked = null,
@@ -98,6 +111,8 @@ export function GearTab({
   facts: ReadonlyMap<string, RowFacts>;
   /** 3, or 4 with Use Magic Device; the server enforces it. */
   attunementSlots?: number;
+  /** What the character carries against its carrying capacity, as the server weighs it. */
+  carrying?: Readonly<{ pounds: number; capacity: number }> | null;
   /** In a running fight fired ammunition comes back when the fight ends, so there is nothing to pick up yet. */
   inFight: boolean;
   /** The characters the GM can hand an item to. */
@@ -126,6 +141,11 @@ export function GearTab({
   const attuned = inventory.filter((item) => item.attuned && item.quantity > 0);
   const fired = inventory.reduce((sum, item) => sum + (item.ammunitionFired ?? 0), 0);
   const summaryOf = (item: InventoryItem) => catalog.find((entry) => entry.id === catalogIdOf(item));
+  // The uses left in the copy in hand (a Healer's Kit's ten), which the server counts on the row.
+  const usesOf = (item: InventoryItem) => {
+    const limit = summaryOf(item)?.uses?.limit;
+    return limit === undefined ? null : { left: Math.max(0, limit - (spent[rowUsesKey(item)] ?? 0)), limit };
+  };
   const nameOf = (item: InventoryItem) => {
     const base = item.baseId ? catalog.find((entry) => entry.id === item.baseId) : undefined;
     const baseName = item.baseId
@@ -136,7 +156,12 @@ export function GearTab({
     const spellName = item.spellId
       ? (spells.find((spell) => spell.id === item.spellId)?.name ?? words(item.spellId))
       : null;
-    return `${item.name}${baseName ? ` (${baseName})` : ""}${spellName ? ` (${spellName})` : ""}`;
+    const variantName = item.variantId
+      ? (summaryOf(item)?.variants?.find((variant) => variant.id === item.variantId)?.name ?? words(item.variantId))
+      : null;
+    return `${item.name}${baseName ? ` (${baseName})` : ""}${spellName ? ` (${spellName})` : ""}${
+      variantName ? ` (${variantName})` : ""
+    }`;
   };
   const save = (item: InventoryItem) => void edit("character:set-inventory", { actorId: actor.id, item });
 
@@ -181,6 +206,7 @@ export function GearTab({
     const rows = itemActions(item, serverActions);
     const mastery = facts.get(`item-${item.id}`)?.mastery ?? null;
     const charges = chargesOf(rows, spent);
+    const uses = usesOf(item);
     return (
       <li key={item.id}>
         <button
@@ -206,6 +232,7 @@ export function GearTab({
                 itemLine(item),
                 item.ammunitionLeft !== undefined ? `${item.ammunitionLeft} left` : null,
                 item.ammunitionFired ? `${item.ammunitionFired} fired` : null,
+                uses ? `${uses.left} of ${uses.limit} uses left` : null,
                 item.dormant ? "Magic spent" : null
               ]
                 .filter(Boolean)
@@ -234,6 +261,9 @@ export function GearTab({
         const mastery = facts.get(`item-${open.id}`)?.mastery ?? null;
         const choices = summary?.damageTypeChoice;
         const study = summary?.study;
+        const kinds = summary?.variants && summary.variantChoice?.by !== "holder" ? summary.variants : null;
+        const forms = summary?.variants && summary.variantChoice?.by === "holder" ? summary.variants : null;
+        const prerequisites = summary?.attunement?.required ? summary.attunement.restrictedTo : [];
         return (
           <ItemCard
             item={open}
@@ -263,6 +293,20 @@ export function GearTab({
             {open.ammunitionLeft !== undefined && (
               <p className="cs-sub">{open.ammunitionLeft} left in the open bundle.</p>
             )}
+            {(() => {
+              const uses = usesOf(open);
+              return (
+                uses && (
+                  <p className="cs-item-charges">
+                    <UseBoxes left={uses.left} limit={uses.limit} label={`${uses.left} of ${uses.limit} uses left`} />
+                    <span className="cs-sub">
+                      {uses.left} of {uses.limit} uses left
+                      {open.quantity > 1 ? " in this one. The next starts full." : ". Spending the last uses it up."}
+                    </span>
+                  </p>
+                )
+              );
+            })()}
             {role === "player" && open.chosenDamageType && (
               <p className="cs-sub">Resists {titleCase(open.chosenDamageType)}.</p>
             )}
@@ -306,6 +350,44 @@ export function GearTab({
                 onChange={(quantity) => save({ ...open, quantity })}
               />
             </div>
+            {(open.magic?.attunementRequired || open.attuned) && (
+              <p className="cs-sub">
+                {prerequisites.length > 0
+                  ? `Requires attunement by ${prerequisites.map(prerequisiteWords).join(" or ")}. `
+                  : ""}
+                {role === "player" ? "Attune or end it during a Short Rest." : "You can attune anyone at any time."}
+              </p>
+            )}
+            {forms && (
+              <div className="cs-item-forms" role="group" aria-label={`Form of ${open.name}`}>
+                <span className="cs-eyebrow">Form</span>
+                <div className="cs-chiprow">
+                  {[{ id: null, name: "Its own" }, ...forms].map((form) => {
+                    const current = (open.variantId ?? null) === form.id;
+                    return (
+                      <button
+                        key={form.id ?? "own"}
+                        type="button"
+                        className={`cs-toggle interactive${current ? " is-on" : ""}`}
+                        aria-pressed={current}
+                        disabled={busy || current || !open.equipped}
+                        onClick={() =>
+                          void edit("item:set-form", { actorId: actor.id, itemId: open.id, variantId: form.id })
+                        }
+                      >
+                        {form.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="cs-sub">
+                  {open.equipped ? "" : `Hold it to change its form. `}
+                  {summary?.variantChoice?.activation === "bonus-action"
+                    ? "Changing it takes a Bonus Action in a fight."
+                    : ""}
+                </span>
+              </div>
+            )}
             {summary?.light && !summary.light.always && (
               <LightControls
                 item={open}
@@ -324,7 +406,12 @@ export function GearTab({
                 Choose what it is
               </Button>
             )}
-            {role === "gm" && (choices || others.length > 0 || (study && !open.dormant)) && (
+            {role === "player" && kinds && open.variantId && (
+              <p className="cs-sub">
+                It is {kinds.find((kind) => kind.id === open.variantId)?.name ?? words(open.variantId)}.
+              </p>
+            )}
+            {role === "gm" && (choices || kinds || others.length > 0 || (study && !open.dormant)) && (
               <div className="cs-gmbox cs-item-gm" aria-label="GM tools for this item">
                 <span className="cs-section-head">
                   <span className="cs-eyebrow">GM tools</span>
@@ -347,6 +434,27 @@ export function GearTab({
                     {choices.map((type) => (
                       <option key={type} value={type}>
                         Resists {titleCase(type)}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+                {/* What a found copy is (an Ioun Stone's stone) is the GM's to say; the player learns it on attuning. */}
+                {kinds && (
+                  <Select
+                    className="cs-gm-select"
+                    aria-label={`Kind of ${open.name}`}
+                    disabled={busy}
+                    value={open.variantId ?? ""}
+                    onChange={(event) => {
+                      const { variantId: _old, ...rest } = open;
+                      const picked = kinds.find((kind) => kind.id === event.target.value);
+                      save(picked ? { ...rest, variantId: picked.id } : rest);
+                    }}
+                  >
+                    <option value="">Kind: not chosen</option>
+                    {kinds.map((kind) => (
+                      <option key={kind.id} value={kind.id}>
+                        {kind.name}
                       </option>
                     ))}
                   </Select>
@@ -556,8 +664,18 @@ export function GearTab({
         </section>
       )}
       <section className="cs-group" aria-label="In the pack">
-        <span className="cs-eyebrow">In the pack</span>
+        <span className="cs-section-head">
+          <span className="cs-eyebrow">In the pack</span>
+          {carrying && (
+            <span className={`cs-count${carrying.pounds > carrying.capacity ? " is-over" : ""}`}>
+              {carrying.pounds} of {carrying.capacity} lb.
+            </span>
+          )}
+        </span>
         {pack.length > 0 ? <ul className="cs-items">{pack.map(row)}</ul> : <p className="cs-sub">The pack is empty.</p>}
+        {carrying && carrying.pounds > carrying.capacity && (
+          <p className="cs-sub">That is more than {actor.name} can carry, so their Speed is at most 5 feet.</p>
+        )}
       </section>
       {/* SRD Ammunition: a minute after shooting, half the pieces fired can be picked up again. */}
       {fired > 0 && !inFight && (

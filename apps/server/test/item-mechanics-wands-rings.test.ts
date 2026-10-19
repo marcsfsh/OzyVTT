@@ -300,7 +300,15 @@ describe("an item action with a printed DC, a condition read off its prose, and 
     const action = effectiveActions(definition, actor, catalog).find(
       (entry) => entry.id === "item-rod-of-rulership-command-obedience"
     )!;
-    expect(action.save).toEqual({ ability: "wis", dc: 15, successDamage: "none", failureConditions: ["charmed"] });
+    // Charmed for 8 hours, ended early by harm from its user's side.
+    expect(action.save).toEqual({
+      ability: "wis",
+      dc: 15,
+      successDamage: "none",
+      failureConditions: ["charmed"],
+      failureDuration: { type: "minutes", minutes: 480 },
+      endsOnSourceSideDamage: true
+    });
     expect(action.uses).toEqual({ limit: 1, per: "long-rest" });
 
     resolveDefinitionAction(
@@ -419,10 +427,10 @@ describe("a held item's bonus to spell attack rolls", () => {
       ["talisman-of-ultimate-evil", 2]
     ] as const)
       expect(view.equipmentRecord(id)!.modifiers, id).toContainEqual({ type: "spell-attack-bonus", amount });
-    // Ring of Warmth stays prose.
+    // A ring that prints no such bonus gets none: the Ring of Warmth only takes 2d8 off Cold damage.
     const warmth = view.equipmentRecord("ring-of-warmth")!;
     expect(warmth.category).toBe("ring");
-    expect(warmth.modifiers).toEqual([]);
+    expect(warmth.modifiers.map((modifier) => modifier.type)).toEqual(["damage-reduction"]);
   });
 
   it("lands on its holder's spell attacks and on no weapon swing", () => {

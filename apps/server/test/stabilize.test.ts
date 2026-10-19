@@ -7,6 +7,7 @@ import { loadActorFixture } from "@vtt/test-fixtures";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { stabilizeCreature, type StabilizeDeps } from "../src/stabilize.js";
 import { bootServer } from "./boot-server.js";
+import { catalog } from "./equipment-table.js";
 
 // SRD 5.2.1 Stabilizing a Character: "You can take the Help action to try to stabilize a creature with 0 Hit Points,
 // which requires a successful DC 10 Wisdom (Medicine) check." Healer's Kit: "stabilize an Unconscious creature that
@@ -167,6 +168,21 @@ describe("a Healer's Kit and Spare the Dying stabilize without a check", () => {
     expect(() => stabilizeCreature(without, aid("healers-kit"), { role: "gm" }, deps(without))).toThrow(
       /has no Healer's Kit/
     );
+  });
+
+  it("spends a kit's ten uses before the kit is used up", () => {
+    const state = game({
+      helper: { inventory: [{ id: "healers-kit", name: "Healer's Kit", quantity: 2, equipped: false }] }
+    });
+    const first = stabilizeCreature(state, aid("healers-kit"), { role: "gm" }, { ...deps(state), catalog });
+    expect(first.events[0]?.text).toBe("Ilse stabilized Bryn with a Healer's Kit (9 uses left in it).");
+    expect(state.actors[0].actionUses["healers-kit-uses"]).toBe(1);
+    for (let use = 2; use <= 10; use += 1) {
+      bryn(state).deathSaves = { successes: 0, failures: 0, stable: false };
+      stabilizeCreature(state, aid("healers-kit"), { role: "gm" }, { ...deps(state), catalog });
+    }
+    expect(state.actors[0].inventory.map((row) => [row.id, row.quantity])).toEqual([["healers-kit", 1]]);
+    expect(state.actors[0].actionUses["healers-kit-uses"]).toBeUndefined();
   });
 
   it("finds a second carried kit by the record it copies, and uses that one", () => {

@@ -10,6 +10,7 @@ import {
   MAGE_ARMOR_TAG,
   BARKSKIN_TAG,
   endConditionsImmuneTo,
+  endEffect,
   RESISTS_CHOSEN_TYPE_TAG,
   makeEffect,
   PERSISTENT_RAGE_TAG,
@@ -26,7 +27,7 @@ import { deriveEquipment } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
 import { currentSpeedFeet } from "../speed.js";
 import { spellEffectDuration, spellOf } from "./concentration.js";
-import { recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
+import { recordRoll, tableLineOf, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 import { moveMark } from "./marks.js";
 import { boundWeaponOf, grantExtras, optionFor, optionParts, withOptionName } from "./grant-extras.js";
 import { suppressConditions } from "../suppressed-conditions.js";
@@ -92,7 +93,23 @@ export function applyGrant(ctx: ResolveContext): void {
   if (grant.onHit && (attack === null || (attack.outcome !== "hit" && attack.outcome !== "crit"))) return;
   const recipients =
     grant.target === "targets" ? targets : grant.target === "target" ? targets.slice(0, 1) : [attacker];
+  if (grant.toggles && endToggled(ctx, recipients)) return;
   for (const recipient of recipients) grantTo(ctx, recipient);
+}
+
+/** "From the Material Plane to the Ethereal Plane or vice versa": a toggling grant taken again while what it gave
+ *  lasts ends it on each recipient instead. True when it did. */
+function endToggled(ctx: ResolveContext, recipients: readonly LiveActor[]): boolean {
+  const { state, action, attacker } = ctx;
+  const given = recipients.flatMap((recipient) =>
+    recipient.effects
+      .filter((effect) => effect.sourceActorId === attacker.id && effect.sourceActionId === action.id)
+      .map((effect) => ({ recipient, effect }))
+  );
+  if (given.length === 0) return false;
+  for (const { recipient, effect } of given)
+    for (const event of endEffect(state, recipient.id, effect.id)) ctx.tableNarration.push(tableLineOf(ctx, event));
+  return true;
 }
 
 /** The Temporary Hit Points a grant gives at the start of each of the bearer's turns: a number, or the granter's

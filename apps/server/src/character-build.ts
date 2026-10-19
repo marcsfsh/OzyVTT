@@ -47,7 +47,7 @@ import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
 import {
   castAreaOf,
-  isLongCastingTime,
+  spellActivationOf,
   laterSpellAction,
   ritualSpellActionId,
   spellCastMechanics,
@@ -218,6 +218,12 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "healing-received-maximized": "at-its-moment", // resolution/heal.ts, on the creature healed
   "healing-dice-maximized": "at-its-moment", // resolution/heal.ts, on the healer
   "healing-bonus": "at-its-moment", // resolution/heal.ts, on the healer
+  "ability-score-minimum": "standing", // live-abilities.ts raises the score every rule reads, from items and effects
+  "speed-minimum": "standing", // speed.ts, a floor under the movement budget
+  "carrying-capacity-larger": "standing", // carrying.ts, read with what the creature carries
+  "ignores-cover": "at-its-moment", // resolution/attack.ts sets the target's cover aside on the attack roll
+  "base-armor-class": "standing", // actor-roster.ts storedArmorClass offers it like Unarmored Defense
+  "no-critical-hits": "at-its-moment", // resolution/attack.ts turns a Critical Hit on the bearer into a hit
   sense: "vision" // vision/senses.ts reads it live for dynamic vision, from every carrier
 };
 
@@ -434,7 +440,7 @@ function cantripActionFor(
   return {
     id: spellActionId(spell.id),
     name: spell.name,
-    activation: activationOf(spell.castingTime),
+    activation: spellActivationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
     ...castAreaOf(spell, mechanics),
@@ -442,16 +448,6 @@ function cantripActionFor(
     // `spell-id-is` riders (Agonizing Blast) match on this field alone.
     spellId: spell.id
   } as ActorAction;
-}
-
-/** The action economy a casting time names ("Action", "Bonus Action", "Reaction, which you take when..."). A casting
- *  time of a minute or more takes the Magic action on each turn of it (SRD "Longer Casting Times"), so it is an action
- *  too, refused while Incapacitated. */
-function activationOf(castingTime: string): ActorAction["activation"] {
-  if (/bonus/i.test(castingTime)) return "bonus-action";
-  if (/reaction/i.test(castingTime)) return "reaction";
-  if (/^(?:1 )?action\b/i.test(castingTime.trim()) || isLongCastingTime(castingTime)) return "action";
-  return "other";
 }
 
 type CasterNumbers = Readonly<{ attackBonus: number; saveDc: number; characterLevel: number; modifier: number }>;
@@ -475,7 +471,7 @@ function leveledSpellActionFor(
   return {
     id: freeCast ? `${spellActionId(spell.id)}-free` : spellActionId(spell.id),
     name: freeCast ? `${spell.name} (no slot)` : spell.name,
-    activation: activationOf(spell.castingTime),
+    activation: spellActivationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
     ...castAreaOf(spell, mechanics),
@@ -1494,10 +1490,20 @@ export function buildCharacterDefinition(
     goldPieces += chosen.goldPieces;
     // A kit item that is one of this source's tool choices is the tool chosen there ("Gaming Set (same as above)").
     const chosenTools = [...(offers.find((offer) => offer.key === `${source}-tools`)?.taken ?? [])];
-    const items = chosen.items.map((item) => {
+    const picked = chosen.items.map((item) => {
       if (!toolChoices.includes(item.id) || chosenTools.length === 0 || chosenTools.includes(item.id)) return item;
       const tool = chosenTools.shift()!;
       return { ...item, id: tool, name: library.equipmentRecord(tool)?.name ?? item.name };
+    });
+    // An equipment pack is the things it holds, each its own row ("10 Torches" a stack of ten).
+    const items = picked.flatMap((item) => {
+      const contents = library.equipmentRecord(item.id)?.contents;
+      if (!contents) return [item];
+      return contents.map((content) => ({
+        id: content.id,
+        name: library.equipmentRecord(content.id)?.name ?? content.id,
+        quantity: content.quantity * item.quantity
+      }));
     });
     for (const item of items) {
       const existing = inventory.find((candidate) => candidate.id === item.id);

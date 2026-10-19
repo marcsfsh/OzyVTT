@@ -152,7 +152,7 @@ export function initiativeRollFor(
   if (incapacitated) claims.disadvantage.push({ source: "incapacitated", label: conditionLabel(incapacitated) });
   const penalty = exhaustionPenalty(actor);
   // A bonus to ability checks reaches a Dexterity check (a Stone of Good Luck's +1), which Initiative is.
-  const checkBonus = checkRiderBonus(derivation, { ability: "dex" });
+  const checkBonus = checkRiderBonus(derivation, { ability: "dex" }, definition?.abilityScores);
   // So do the dice a rider adds to or takes off an ability check.
   const dice = diceRiders(
     [

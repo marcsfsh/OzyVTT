@@ -422,6 +422,36 @@ export function ChecksTab({
               </button>
             ))}
           </div>
+          {/* What each tool's Utilize line does, at its printed DC. In a fight it is the Utilize action. */}
+          {tools.some((tool) => (tool.uses ?? []).length > 0) && (
+            <ul className="cs-tool-uses" aria-label="Tool uses">
+              {tools.flatMap((tool) =>
+                (tool.uses ?? []).map((use) => (
+                  <li key={`${tool.id}-${use.label}`}>
+                    <span>
+                      {use.label} <em>{tool.name}</em>
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={rolls.rolling}
+                      aria-label={`Roll ${use.label} with ${tool.name}, DC ${use.dc}`}
+                      onClick={() =>
+                        void rolls.rollCheck(
+                          { ability: tool.ability, tool: tool.id },
+                          `${use.label} (${tool.name})`,
+                          undefined,
+                          use.dc
+                        )
+                      }
+                    >
+                      DC {use.dc}
+                    </Button>
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
         </>
       )}
       {quarry.map((creature) => (

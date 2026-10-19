@@ -45,6 +45,8 @@ import type {
   SceneCreateResult,
   StabilizeResult,
   LightAddResult,
+  DoorUseResult,
+  ObjectAttackResult,
   VisionPreviewResult,
   ScenePreviewResult,
   WallAddResult
@@ -158,6 +160,7 @@ import type {
   SetActorAttitudeSchema,
   SetActorHealthDisplaySchema,
   SetActorSheetPreviewSchema,
+  SetActorLairSchema,
   SetActorSizeSchema,
   SetActorVisibilitySchema,
   SetConditionSchema,
@@ -189,6 +192,11 @@ import type {
   TurnReactionSchema,
   TurnUseSchema,
   DoorSetOpenSchema,
+  DoorSetStateSchema,
+  DoorUseSchema,
+  ObjectAttackSchema,
+  ObjectDamageSchema,
+  ObjectSetSchema,
   LightAddSchema,
   LightMoveSchema,
   LightRemoveSchema,
@@ -204,6 +212,7 @@ import type {
   VisionSetAmbientSchema,
   VisionAreaAddSchema,
   VisionAreaRemoveSchema,
+  ItemSetFormSchema,
   ItemSetLightSchema,
   VisionSetEnabledSchema,
   WallAddSchema,
@@ -472,6 +481,11 @@ export interface ClientToServerEvents {
   /** GM shares (or un-shares) an archived character's sheet with players as a read-only keepsake. Default hidden. */
   "actor:set-sheet-preview": (
     payload: CommandPayload<typeof SetActorSheetPreviewSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM marks a legendary creature as fighting in its lair, with the lair's counts, or out of it. */
+  "actor:set-lair": (
+    payload: CommandPayload<typeof SetActorLairSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:set-speed": (
@@ -969,6 +983,23 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof DoorSetOpenSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "door:set-state": (
+    payload: CommandPayload<typeof DoorSetStateSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "door:use": (payload: CommandPayload<typeof DoorUseSchema>, acknowledgement: (result: DoorUseResult) => void) => void;
+  "object:set": (
+    payload: CommandPayload<typeof ObjectSetSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "object:damage": (
+    payload: CommandPayload<typeof ObjectDamageSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "object:attack": (
+    payload: CommandPayload<typeof ObjectAttackSchema>,
+    acknowledgement: (result: ObjectAttackResult) => void
+  ) => void;
   "light:add": (
     payload: CommandPayload<typeof LightAddSchema>,
     acknowledgement: (result: LightAddResult) => void
@@ -991,6 +1022,10 @@ export interface ClientToServerEvents {
   ) => void;
   "item:set-light": (
     payload: CommandPayload<typeof ItemSetLightSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "item:set-form": (
+    payload: CommandPayload<typeof ItemSetFormSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:add": (

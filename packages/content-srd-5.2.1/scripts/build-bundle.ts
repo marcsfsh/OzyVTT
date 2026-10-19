@@ -34,6 +34,7 @@ import {
 import { outDir, sourcePath } from "./paths.js";
 import {
   failureDurationOf,
+  heldByFromTraits,
   hitPointLossOf,
   SPELL_SAVE_OVERRIDE_IDS,
   spellSaveOutcomeFor,
@@ -45,15 +46,21 @@ import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
 import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } from "./spell-effects.js";
 import { costlyMaterialsFor } from "./spell-materials.js";
 import { spellSightFor } from "./spell-sight.js";
+import { spellWallsFor } from "./spell-walls.js";
 import { spellDeathFor, spellDeathSaveFor } from "./spell-death.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { UPCAST_DURATION_IDS, upcastDurationsFor } from "./spell-durations.js";
 import { printedHitDamage, printedSaveDamage, withoutSourceTags } from "./monster-damage.js";
 import { traitMechanicsOf } from "./trait-mechanics.js";
 import { deathTraitMechanicsOf, monsterDeathFor } from "./death-traits.js";
-import { withSpellcasting } from "./monster-spells.js";
+import { withSpellcasting } from "../src/monster-spellcasting.js";
 import { fixedFields, MONSTER_ACTION_FIXES } from "./monster-action-fixes.js";
 import { formOnlyOf, lycanthropeCurseOf, shapeShiftOf } from "./monster-forms.js";
+import { PRINTED_NAME_KEYS, printedName, statBlockActionText, statBlockTraitText } from "./monster-text.js";
+import { lairCountsOf, STATBLOCK_SLUGS, statBlockHeaderOf } from "./monster-statblock.js";
+import { HIT_NOTE_KEYS, withHitNotes } from "./monster-hit-notes.js";
+import { swallowOf } from "./monster-swallow.js";
+import { SEQUENCE_SLUGS, withSequences } from "./monster-sequences.js";
 import { SUMMON_STAT_BLOCKS } from "./summon-stat-blocks.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
@@ -262,6 +269,15 @@ for (const trait of traits) {
   traitsByCreature.set(trait.fields.parent, list);
 }
 
+/** What a creature's trait says holds the creature its action restrains (the erinyes' Magic Rope). */
+function heldByFromTraitsOf(creaturePk: string, description: string) {
+  const held = heldByFromTraits(
+    description,
+    (traitsByCreature.get(creaturePk) ?? []).map((trait) => trait.fields.desc)
+  );
+  return held ? { heldBy: held } : {};
+}
+
 const slugOf = (pk: string) => pk.replace(/^srd-2024_/, "");
 const idSafe = (value: string) =>
   value
@@ -338,6 +354,7 @@ type OnHitRider = {
   pull?: { feet: number; upTo?: true };
   self?: true;
   reminder?: string;
+  hazard?: "burning";
 };
 /** "takes 5 (2d4) Necrotic damage at the start of each of the stirge's turns" (the source's) or "... of its turns". */
 function riderOngoingDamage(text: string): OngoingDamage | undefined {
@@ -510,6 +527,24 @@ function effectRiders(desc: string, maxTargetSize: OnHitRider["maxTargetSize"], 
       modifiers: [{ type: "roll-mode", roll: "attack", mode: "advantage" }],
       duration: { type: "until-source-turn-end" }
     });
+  // "If the target is a creature or a flammable object, it starts burning" (a fire elemental's Burn): the object is the
+  // GM's.
+  if (
+    /\bIf the target is a creature or a flammable object(?: that isn[\u2019']t being worn or carried)?, it starts burning\b/.test(
+      desc
+    )
+  )
+    found.push({ conditions: [], name: "Burning", hazard: "burning" });
+  // "Until the grapple ends, the target has the Restrained condition and can't teleport" (a tarrasque's Bite).
+  if (/\bUntil the grapple ends, the target has the [A-Z][a-z]+ condition and can[\u2019']t teleport\b/.test(desc)) {
+    const grapple = riders.find((rider) => rider.conditions.some((condition) => condition.id === "grappled"));
+    if (grapple) grapple.tags = [...(grapple.tags ?? []), "no-teleport"];
+  }
+  // "Ability checks made to escape this grapple have Disadvantage" (a mimic's Pseudopod): on the grapple's effect.
+  if (/\bAbility checks made to escape this grapple have Disadvantage\b/.test(desc)) {
+    const grapple = riders.find((rider) => rider.conditions.some((condition) => condition.id === "grappled"));
+    if (grapple) grapple.tags = [...(grapple.tags ?? []), "escape-disadvantage"];
+  }
   // A mummy's curse: no healing is the engine's; what it does at rests and over days, the GM's. Its death to dust is the
   // hit's own (`drain.killsAtZero`).
   const cursed = /\bit is cursed\. (While cursed, the target can[\u2019']t regain Hit Points[^.]*\.)/.exec(desc);
@@ -535,6 +570,9 @@ const SAVE_TARGET_TYPES = ["Humanoid", "Beast", "Undead", "Fiend", "Giant", "Dra
  * clause the reader doesn't know whole (willing, "Charmed or Grappled", 0 Hit Points) stays the GM's.
  */
 function withSaveTargets(desc: string): Pick<ActorAction, "targets"> {
+  // "Each creature whose space the centaur enters", "each creature whose space the cube enters for the first time
+  // during this move": the creatures its move went through.
+  if (/\bwhose space the [a-z' -]+? enters\b/i.test(desc)) return { targets: { entered: true } };
   const clause = /Saving Throw: DC \d+, ((?:one|each) [^.(]*)/.exec(desc)?.[1]?.trim();
   if (!clause) return {};
   if (/\bin an? \d+-foot\b|\bdestination\b|\bwhose space\b|\bwilling\b| or Grappled\b|\bHit Points\b/.test(clause))
@@ -598,8 +636,132 @@ const COMMANDING_SAVES: Readonly<Record<string, { name: string; tags: string[]; 
 
 const ACTION_ENRICHMENTS: Record<
   string,
-  Partial<Pick<ActorAction, "targetRules" | "reaction" | "answer" | "sight" | "grants" | "summons">>
+  Partial<
+    Pick<
+      ActorAction,
+      | "targetRules"
+      | "targets"
+      | "reaction"
+      | "answer"
+      | "sight"
+      | "grants"
+      | "healing"
+      | "summons"
+      | "endsUntilItActs"
+      | "pull"
+      | "holdsAtOnce"
+      | "move"
+      | "damage"
+      | "area"
+      | "inflicts"
+      | "afterHurtingBloodied"
+      | "largeFillsHold"
+      | "teleport"
+    >
+  >
 > = {
+  // "The giant or one creature of its choice that can see or hear it gains 16 (2d10 + 5) Temporary Hit Points and has
+  // Advantage on attack rolls until the start of the giant's next turn."
+  "frost-giant/war-cry-recharge-5-6": {
+    targets: { count: 1 },
+    healing: { formula: "2d10 + 5", temporary: true },
+    grants: {
+      name: "War Cry",
+      tags: ["war-cry"],
+      target: "target",
+      duration: { type: "until-source-next-turn" },
+      modifiers: [{ type: "roll-mode", roll: "attack", mode: "advantage", when: [{ type: "on-attack-roll" }] }],
+      onEnd: [],
+      voidWhileIncapacitated: false,
+      concentration: false
+    }
+  },
+  // "The unicorn targets itself or one creature it can see within 60 feet of itself. The target gains 10 (3d6) Temporary
+  // Hit Points, and its AC increases by 2 until the end of the unicorn's next turn."
+  "unicorn/shimmering-shield": {
+    targets: { count: 1, rangeFeet: 60, seen: true },
+    healing: { formula: "3d6", temporary: true },
+    grants: {
+      name: "Shimmering Shield",
+      tags: ["shimmering-shield"],
+      target: "target",
+      duration: { type: "until-source-turn-end" },
+      armorClassBonus: 2,
+      modifiers: [],
+      onEnd: [],
+      voidWhileIncapacitated: false,
+      concentration: false
+    }
+  },
+  // "The balor teleports itself or a willing demon within 10 feet of itself up to 60 feet to an unoccupied space the
+  // balor can see."
+  "balor/teleport": { teleport: { feet: 60, orAnother: true }, targets: { count: 1, rangeFeet: 10, typeTag: "demon" } },
+  // "The spider teleports from the Material Plane to the Ethereal Plane or vice versa."
+  "phase-spider/ethereal-jaunt": {
+    grants: {
+      name: "Ethereal",
+      tags: ["off-plane"],
+      target: "self",
+      toggles: true,
+      duration: { type: "manual" },
+      modifiers: [],
+      onEnd: [],
+      voidWhileIncapacitated: false,
+      concentration: false
+    }
+  },
+  // "The nightmare and up to three willing creatures within 5 feet of it teleport to the Ethereal Plane from the
+  // Material Plane or vice versa."
+  "nightmare/ethereal-stride": {
+    targets: { count: 4, rangeFeet: 5 },
+    grants: {
+      name: "Ethereal",
+      tags: ["off-plane"],
+      target: "targets",
+      toggles: true,
+      duration: { type: "manual" },
+      modifiers: [],
+      onEnd: [],
+      voidWhileIncapacitated: false,
+      concentration: false
+    }
+  },
+  // "The roper pulls each creature Grappled by it up to 30 feet straight toward it."
+  "roper/reel": { targets: { grappledBySource: true }, pull: { feet: 30, upTo: true } },
+  // "The ettercap pulls one creature within 30 feet of itself that is Restrained by its Web Strand up to 25 feet
+  // straight toward itself."
+  "ettercap/reel": {
+    targets: { count: 1, rangeFeet: 30, heldByAction: "web-strand" },
+    pull: { feet: 25, upTo: true }
+  },
+  // "The shambling mound can have only one creature Grappled by this action at a time."
+  "shambling-mound/engulf": { holdsAtOnce: 1 },
+  // Ooze Cube: "The cube can hold one Large creature or up to four Medium or Small creatures inside itself at a time."
+  "gelatinous-cube/engulf": { holdsAtOnce: 4, largeFillsHold: true },
+  // "The elemental can grapple one Large creature or up to two Medium or smaller creatures at a time with Whelm."
+  "water-elemental/whelm": { holdsAtOnce: 2, largeFillsHold: true },
+  // "The tarrasque moves up to its Speed. At the end of this movement, the tarrasque creates an instantaneous shock
+  // wave in a 60-foot Emanation originating from itself. Creatures in that area lose Concentration and, if Medium or
+  // smaller, have the Prone condition."
+  "tarrasque/world-shaking-movement": {
+    move: { speed: "full", provokes: true, first: true },
+    inflicts: { conditions: ["prone"], maxTargetSize: "medium", breaksConcentration: true }
+  },
+  // "The lich teleports up to 60 feet to an unoccupied space it can see, and each creature within 10 feet of the space
+  // it left takes 11 (2d10) Necrotic damage."
+  "lich/deathly-teleport": {
+    damage: [{ formula: "2d10", type: "necrotic" }],
+    area: { shape: "emanation", sizeFeet: 10, widthFeet: null }
+  },
+  // "Immediately after dealing damage to a creature that is already Bloodied".
+  "gnoll-warrior/rampage-1-day": { afterHurtingBloodied: true },
+  "giant-hyena/rampage-1-day": { afterHurtingBloodied: true },
+  // "One living creature the wisp can see within 5 feet that has 0 Hit Points", and Vanish "ends early immediately
+  // after the wisp makes an attack roll or uses Consume Life".
+  "will-o-wisp/consume-life": {
+    targets: { count: 1, rangeFeet: 5, seen: true, notCreatureTypes: ["construct", "undead"], atZeroHitPoints: true },
+    endsUntilItActs: true
+  },
   "treant/animate-trees": {
     summons: {
       creatures: [
@@ -700,11 +862,32 @@ const ACTION_ENRICHMENTS: Record<
 
 const PRINTED_NAME = "[A-Z][A-Za-z'\u2019-]*(?: [A-Z][A-Za-z'\u2019-]*)*";
 
+/** What a linked action takes from the action it makes or uses: its attack or save and what they deal and leave. */
+function withActionOf(next: ActorAction, source: ActorAction): ActorAction {
+  const { attack, save, damage, onHit, conditionalDamage, reminder, area, targetRules, targets } = source;
+  return {
+    ...next,
+    ...(attack ? { attack } : {}),
+    ...(save ? { save } : {}),
+    damage,
+    ...(onHit ? { onHit } : {}),
+    ...(conditionalDamage ? { conditionalDamage } : {}),
+    ...(reminder ? { reminder } : {}),
+    ...(area && !next.area ? { area } : {}),
+    ...(targetRules ? { targetRules } : {}),
+    ...(targets && !next.targets ? { targets } : {})
+  };
+}
+
+/** Whether an action deals or rolls anything of its own. */
+const actsOnItsOwn = (action: ActorAction) => action.attack || action.save || action.damage.length > 0;
+
 /**
  * What one action says about another, read across the stat block: a grapple that keeps an attack off its target
- * ("While Grappled, ... can't be targeted by the tyrannosaurus's Tail"), and a legendary action that makes one attack
- * or uses another action ("it makes one Rend attack", "The kraken uses Lightning Strike"), which resolves as that
- * action, so the swing spends the pool. "One Claw or Tail attack" stays the GM's pick.
+ * ("While Grappled, ... can't be targeted by the tyrannosaurus's Tail"), and a legendary action or a Bonus Action that
+ * makes one attack or uses another action ("it makes one Rend attack", "The kraken uses Lightning Strike"), which
+ * resolves as that action, so the swing spends the pool. One that makes one of two attacks ("one Claw or Tail
+ * attack") prints inside it a choice for each, which the turn list offers (`partOf`).
  */
 function linkedActions(actions: ActorAction[], idOf: (name: string) => string | undefined): ActorAction[] {
   const byId = new Map(actions.map((action) => [action.id, action]));
@@ -716,33 +899,36 @@ function linkedActions(actions: ActorAction[], idOf: (name: string) => string | 
     const id = match ? idOf(match[1]) : undefined;
     if (id) keptOffGrappled.add(id);
   }
-  return actions.map((action) => {
+  return actions.flatMap((action) => {
     let next = action;
     if (keptOffGrappled.has(next.id) && !next.targetRules?.includes("not-grappled-by-source"))
       next = { ...next, targetRules: [...(next.targetRules ?? []), "not-grappled-by-source"] };
-    if (next.legendary && !next.attack && !next.save && next.damage.length === 0) {
-      const body = next.description.replace(/^Legendary Action[^.]*\.\s*/, "");
-      const named =
-        new RegExp(`\\bmakes one (${PRINTED_NAME}) attack\\b`).exec(body) ??
-        new RegExp(`\\buses (${PRINTED_NAME})(?=[.,]| and\\b)`).exec(body);
-      const source = named ? byId.get(idOf(named[1]) ?? "") : undefined;
-      if (source && (source.attack || source.save || source.damage.length > 0)) {
-        const { attack, save, damage, onHit, conditionalDamage, reminder, area, targetRules, targets } = source;
-        next = {
-          ...next,
-          ...(attack ? { attack } : {}),
-          ...(save ? { save } : {}),
-          damage,
-          ...(onHit ? { onHit } : {}),
-          ...(conditionalDamage ? { conditionalDamage } : {}),
-          ...(reminder ? { reminder } : {}),
-          ...(area && !next.area ? { area } : {}),
-          ...(targetRules ? { targetRules } : {}),
-          ...(targets && !next.targets ? { targets } : {})
-        };
-      }
-    }
-    return next;
+    const links = (next.legendary || next.activation === "bonus-action") && !actsOnItsOwn(next);
+    if (!links) return [next];
+    const body = next.description.replace(/^Legendary Action[^.]*\.\s*/, "");
+    // "The mummy makes one Rotting Fist or Channel Negative Energy attack": a choice for each attack.
+    const choice = new RegExp(`\\bmakes one (${PRINTED_NAME}) or (${PRINTED_NAME}) attack\\b`).exec(body);
+    const choices = choice
+      ? [choice[1]!, choice[2]!].flatMap((name) => {
+          const source = byId.get(idOf(name) ?? "");
+          return source && actsOnItsOwn(source) ? [source] : [];
+        })
+      : [];
+    if (choices.length === 2)
+      return [
+        next,
+        ...choices.map((source) => ({
+          ...withActionOf(next, source),
+          id: `${next.id}-${source.id}`.slice(0, 120),
+          name: `${next.name}: ${source.name}`.slice(0, 120),
+          partOf: next.id
+        }))
+      ];
+    const named =
+      new RegExp(`\\bmakes one (${PRINTED_NAME}) attack\\b`).exec(body) ??
+      (next.legendary ? new RegExp(`\\buses (${PRINTED_NAME})(?=[.,]| and\\b)`).exec(body) : null);
+    const source = named ? byId.get(idOf(named[1]) ?? "") : undefined;
+    return [source && actsOnItsOwn(source) ? withActionOf(next, source) : next];
   });
 }
 
@@ -986,6 +1172,15 @@ for (const pk of [...Object.keys(CORRECTIONS), ...EXCLUSIONS]) {
   if (!creatures.some((creature) => creature.pk === pk))
     throw new Error(`Correction/exclusion targets unknown creature ${pk} - check for a typo or an upstream rename.`);
 }
+for (const slug of STATBLOCK_SLUGS)
+  if (!creatures.some((creature) => creature.pk === `srd-2024_${slug}`))
+    throw new Error(`A stat block header fact targets unknown creature ${slug} - check for a typo.`);
+for (const [slug, name] of PRINTED_NAME_KEYS) {
+  const named = (row: Fixture<{ parent: string; name: string }>) =>
+    row.fields.parent === `srd-2024_${slug}` && row.fields.name.trim() === name;
+  if (!actions.some(named) && !traits.some(named))
+    throw new Error(`A printed name targets ${slug}'s ${name}, which it doesn't have - check for a typo.`);
+}
 for (const pk of Object.keys(SPELL_CORRECTIONS)) {
   if (!spells.some((spell) => spell.pk === pk))
     throw new Error(`Spell correction targets unknown spell ${pk} - check for a typo or an upstream rename.`);
@@ -1039,6 +1234,8 @@ const SRD_SPELL_IDS: ReadonlySet<string> = new Set(
   spells.filter((spell) => spell.fields.document === "srd-2024").map((spell) => slugOf(spell.pk))
 );
 
+/** The hit notes the build used, so one naming no action fails the build out loud. */
+const notedHits = new Set<string>();
 /** The reviewed fixes the build used, so one naming no action fails the build out loud. */
 const fixedActions = new Set<string>();
 
@@ -1126,7 +1323,7 @@ const monsters: ActorDefinition[] = creatures
       const fatal = monsterDeathFor(slug, idSafe(slugOf(action.pk).replace(`${slug}_`, "")));
       const reminder = fatal.damage
         ? undefined
-        : (fix?.reminder ?? loss?.reminder ?? restriction?.reminder ?? (stale ? null : later) ?? undefined);
+        : (fix?.reminder ?? loss?.reminder ?? (stale ? null : later) ?? undefined);
       const fromRows = row
         ? [
             ...(row.damage_die_count && row.damage_die_type
@@ -1168,6 +1365,19 @@ const monsters: ActorDefinition[] = creatures
             }
           : null;
       const actionId = idSafe(slugOf(action.pk).replace(`${slug}_`, ""));
+      // "(with Advantage if the target is Grappled by the ankheg)", "... doesn't have all its Hit Points)", "...
+      // during the first round of each combat)".
+      const advantage =
+        /\(with Advantage (if the target is Grappled by the|if the target doesn[\u2019']t have all its Hit Points|during the first round of each combat)/.exec(
+          action.fields.desc
+        )?.[1];
+      const advantageWhen = !advantage
+        ? undefined
+        : advantage.startsWith("if the target is Grappled")
+          ? ("target-grappled-by-self" as const)
+          : advantage.startsWith("during")
+            ? ("first-round" as const)
+            : ("target-hurt" as const);
       // ADR-0020 structured mechanics, all confident-pattern-only with prose fallback.
       // A Multiattack's plan, the plans it can be instead and what can replace its attacks, read from its text against
       // the stat block's other actions.
@@ -1199,7 +1409,10 @@ const monsters: ActorDefinition[] = creatures
       for (const part of damage) if (part.type === "untyped") report.untypedDamage.push(action.pk);
       const built = withProseFacts({
         id: actionId,
-        name: `${ACTION_NAME_CORRECTIONS[action.pk] ?? action.fields.name}${usesSuffix(action.fields)}`.slice(0, 120),
+        name: `${ACTION_NAME_CORRECTIONS[action.pk] ?? printedName(slug, action.fields.name)}${usesSuffix(action.fields)}`.slice(
+          0,
+          120
+        ),
         activation:
           action.fields.action_type === "ACTION"
             ? ("action" as const)
@@ -1208,14 +1421,20 @@ const monsters: ActorDefinition[] = creatures
               : action.fields.action_type === "REACTION"
                 ? ("reaction" as const)
                 : ("other" as const),
-        description: withoutSourceTags(`${legendaryPrefix}${action.fields.desc}`).slice(0, 12000),
-        ...(attack ? { attack } : {}),
+        description: withoutSourceTags(statBlockActionText(actionId, `${legendaryPrefix}${action.fields.desc}`)).slice(
+          0,
+          12000
+        ),
+        ...(attack ? { attack: { ...attack, ...(advantageWhen ? { advantageWhen } : {}) } } : {}),
         ...(save
           ? {
               save: {
                 ability: ABILITY_BY_NAME[save[1] as keyof typeof ABILITY_BY_NAME],
                 dc: Number.parseInt(save[2], 10),
                 ...saveOutcome!,
+                ...(saveOutcome?.heldBy === undefined && saveOutcome?.failureConditions.includes("restrained")
+                  ? heldByFromTraitsOf(creature.pk, action.fields.desc)
+                  : {}),
                 ...(loss
                   ? {
                       failureEffect: loss.failureEffect,
@@ -1246,7 +1465,10 @@ const monsters: ActorDefinition[] = creatures
         ...(reminder ? { reminder: reminder.slice(0, 600) } : {}),
         ...(multiattack ? { multiattack: multiattack.plan } : {}),
         ...(multiattack && multiattack.alternatives.length > 0
-          ? { multiattackAlternatives: multiattack.alternatives }
+          ? {
+              multiattackAlternatives: multiattack.alternatives,
+              ...(multiattack.alternativesAfter ? { multiattackAlternativesAfter: multiattack.alternativesAfter } : {})
+            }
           : {}),
         ...(multiattack && multiattack.replacements.length > 0
           ? { multiattackReplacements: multiattack.replacements }
@@ -1276,11 +1498,28 @@ const monsters: ActorDefinition[] = creatures
       // A reviewed fix may finish the save the reader read (how a creature is pulled out of a gelatinous cube).
       if (actionFix?.save && built.save) built.save = { ...built.save, ...structuredClone(actionFix.save) };
       if (actionFix?.reminder === null) delete built.reminder;
+      // A Swallow: how many it holds and what holding them does; a save's failure swallows, and the engine runs the
+      // swallowed creature's conditions, cover and acid, so the reminder that restated them goes.
+      const swallowing = swallowOf(action.fields.name, action.fields.desc, siblingIdOf);
+      if (swallowing) {
+        built.swallow = swallowing.swallow;
+        if (swallowing.targets) built.targets = swallowing.targets;
+        if (built.save)
+          built.save = {
+            ...built.save,
+            failureEffect: {
+              name: "Swallowed",
+              tags: ["swallowed", ...swallowing.tags],
+              modifiers: []
+            }
+          };
+        delete built.reminder;
+      }
       return built;
     });
     // The spells its actions cast, each a cast action in play; only spells the SRD spell list holds.
     const actions = withSpellcasting(
-      linkedActions(creatureActions, siblingIdOf),
+      withSequences(slug, linkedActions(withHitNotes(slug, creatureActions, notedHits), siblingIdOf)),
       {
         abilityScores: {
           str: fields.ability_score_strength,
@@ -1310,9 +1549,8 @@ const monsters: ActorDefinition[] = creatures
     const conditionImmunities = splitTypedList(fields.condition_immunities_display, KNOWN_CONDITION_IDS);
     if (damageResistances.length > 0 || damageImmunities.length > 0 || damageVulnerabilities.length > 0)
       report.typedDefenses += 1;
-    // Legendary resources (SRD 2024): every legendary SRD creature prints "Legendary Action Uses: 3"
-    // (the "(4 in Lair)" bump stays prose: lairs aren't modeled). Legendary Resistance parses the
-    // non-lair N from the trait name; the "(or N+1/Day in Lair)" variant likewise stays prose.
+    // Legendary resources (SRD 2024): every legendary SRD creature prints "Legendary Action Uses: 3", and Legendary
+    // Resistance's N is in the trait's name. The counts in a lair come from the SRD text (`lairCountsOf`).
     const hasLegendaryActions = sortedActions.some((action) => action.fields.action_type === "LEGENDARY_ACTION");
     const resistanceTrait = (traitsByCreature.get(creature.pk) ?? [])
       .map((trait) => trait.fields.name.match(/^Legendary Resistance \((\d+)\/Day/))
@@ -1321,14 +1559,19 @@ const monsters: ActorDefinition[] = creatures
       hasLegendaryActions || resistanceTrait
         ? {
             ...(hasLegendaryActions ? { actionsPerRound: 3 } : {}),
-            ...(resistanceTrait ? { resistancesPerDay: Number.parseInt(resistanceTrait[1], 10) } : {})
+            ...(resistanceTrait ? { resistancesPerDay: Number.parseInt(resistanceTrait[1], 10) } : {}),
+            // "Legendary Action Uses: 3 (4 in Lair)" and "3/Day, or 4/Day in Lair": the counts in its lair.
+            ...lairCountsOf(
+              (traitsByCreature.get(creature.pk) ?? []).map((trait) => trait.fields.name),
+              hasLegendaryActions ? 3 : undefined
+            )
           }
         : null;
     if (legendaryResource) report.legendaryCreatures += 1;
     // Upstream order is the stat block's own.
     const traitTexts = (traitsByCreature.get(creature.pk) ?? []).map((trait) => ({
-      name: trait.fields.name,
-      description: withoutSourceTags(trait.fields.desc)
+      name: printedName(slug, trait.fields.name),
+      description: withoutSourceTags(statBlockTraitText(trait.fields.desc))
     }));
     const traitMechanics = [...traitMechanicsOf(traitTexts), ...deathTraitMechanicsOf(traitTexts, actions)];
     report.traitMechanics += traitMechanics.length;
@@ -1374,6 +1617,9 @@ const monsters: ActorDefinition[] = creatures
           experiencePoints: fields.experience_points_integer ?? experienceForChallenge(challenge),
           skills: skillBonuses(fields),
           type: fields.type,
+          // "Medium or Small", the tags after the type and a swarm's creatures, and an NPC's Gear, as printed.
+          ...(MEDIUM_OR_SMALL_PER_SRD.includes(slug) ? { sizes: ["medium", "small"] } : {}),
+          ...statBlockHeaderOf(slug),
           alignment: fields.alignment,
           armorDetail: fields.armor_detail || null,
           speeds: {
@@ -1407,6 +1653,13 @@ const monsters: ActorDefinition[] = creatures
     };
   });
 
+for (const slug of SEQUENCE_SLUGS)
+  if (!monsters.some((monster) => monster.source.externalId === slug && monster.actions.some((a) => a.useNumber)))
+    throw new Error(
+      `A sequence names ${slug}, whose action it no longer finds - check for a typo or an upstream rename.`
+    );
+for (const key of HIT_NOTE_KEYS)
+  if (!notedHits.has(key)) throw new Error(`A hit note names ${key}, which no stat block has - check for a typo.`);
 for (const key of Object.keys(MONSTER_ACTION_FIXES))
   if (!fixedActions.has(key))
     throw new Error(`Monster action fix ${key} names no action - check for a typo or an upstream rename.`);
@@ -1541,6 +1794,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
     area: spellAreaFor(slugOf(spell.pk), fields.desc),
     effect,
     ...(spellSightFor(slugOf(spell.pk)) ? { sight: spellSightFor(slugOf(spell.pk)) } : {}),
+    ...(spellWallsFor(slugOf(spell.pk)) ? { walls: spellWallsFor(slugOf(spell.pk)) } : {}),
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
     higherLevel: fields.higher_level || null,

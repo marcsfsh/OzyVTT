@@ -9,6 +9,7 @@ import { spellCastOf } from "./pending.js";
 import { forceMove, openRiderSave, rollPlain } from "./hit-rider-outcomes.js";
 import { effectNameOf } from "../effect-names.js";
 import { applyKillingHit } from "./kill.js";
+import { HAZARDS } from "../hazards.js";
 
 /** Whether this hit deals its target any damage after the target's defences: what Slow and Vex need. */
 export function dealsDamage(ctx: ResolveContext): boolean {
@@ -73,6 +74,7 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
       return;
     }
     if (rider.pull) forceMove(ctx, target, action.name, rider.pull, true);
+    if (rider.hazard === "burning") setBurning(ctx, index);
     if (rider.save) {
       openOnHitSave(ctx, rider, index);
       return;
@@ -150,6 +152,37 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
   });
 }
 
+/** A hit that sets its target burning (SRD Burning): the fire burns on whatever becomes of its source, and a creature
+ *  already burning burns once. */
+function setBurning(ctx: ResolveContext, index: number): void {
+  const { state, action, attacker, targets, input, deps } = ctx;
+  const target = targets[0];
+  const burning = HAZARDS.burning;
+  if (target.effects.some((effect) => effect.tags.includes(burning.tag))) return;
+  const gained: EffectNarration[] = [];
+  const effect = addEffect(
+    state,
+    target.id,
+    makeEffect({
+      id: `${input.commandId}:burn:${target.id}:${index}`,
+      name: burning.name,
+      tags: [burning.tag],
+      sourceActorId: attacker.id,
+      sourceName: attacker.name,
+      sourceActionId: `${action.id}:${index}`,
+      startedRound: state.combat.round,
+      duration: { type: "manual" },
+      linkedConditionIds: [],
+      modifiers: [],
+      ...(burning.ongoingDamage ? { ongoingDamage: burning.ongoingDamage } : {})
+    }),
+    gained,
+    deps
+  );
+  for (const event of gained) ctx.tableNarration.push(tableLineOf(ctx, event));
+  ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds: [] });
+}
+
 /** Ends the coat on the attacker that this hit spends (a Dagger of Venom's poison). False when none is on. */
 function spendCoat(ctx: ResolveContext, tag: string): boolean {
   const coat = ctx.attacker.effects.find((effect) => effect.tags.includes(tag));
@@ -186,7 +219,8 @@ function openOnHitSave(
       ...(tags.length > 0 || modifiers.length > 0
         ? { failureEffect: { name: rider.name ?? action.name, tags: [...tags], modifiers: [...modifiers] } }
         : {}),
-      ...(failureDamage.length > 0 ? { failureDamage } : {})
+      ...(failureDamage.length > 0 ? { failureDamage } : {}),
+      ...(save.halfOnSuccess ? { halfOnSuccess: true as const } : {})
     }
   );
 }

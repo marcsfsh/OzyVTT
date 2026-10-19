@@ -10,7 +10,10 @@ import {
   templateOfArea,
   type AnnotationActor
 } from "../annotations.js";
+import type { GameState } from "@vtt/domain";
 import { pointInRects } from "@vtt/rules-5e";
+import type { ActorDefinition } from "@vtt/schemas";
+import type { TokenMapGeometry } from "../token-placement.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { requireStartOrdered } from "../simultaneous-effects.js";
 import {
@@ -35,11 +38,11 @@ import { startFall } from "../falling.js";
 import { failedTeleport } from "../granted-moves.js";
 import { holdMove } from "../held-moves.js";
 import { walkThroughZones } from "../zone-stops.js";
-import { meetAlongPath, meetingGrantOf } from "../path-meetings.js";
 import { landJump } from "../jumping.js";
 import { carryRiders, mountOf, mountOrDismount, ridersOf, RIDING_TAG } from "../mounts.js";
 import { timeStopOutOfRange } from "../time-stop.js";
 import { applyMovementRules, dragAlong, dragCostsExtra, grappledBy } from "../movement-rules.js";
+import { swallowedBy } from "../swallow.js";
 import {
   creatureDistance,
   DISTANCE_TOLERANCE_FEET,
@@ -51,6 +54,10 @@ import {
 } from "../movement-narration.js";
 import { releaseGrapplesOutOfRange, type EffectNarration } from "../effects.js";
 import { endZoneAndItsSpell, placeZone, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
+import { spaceEntryAfterMove } from "../space-entry.js";
+import { passesCreatures } from "../space-sharing.js";
+import { fireFormBurns } from "../wall-passage.js";
+import { teleportOutOfCage } from "../forcecage.js";
 import { zoneContentOf } from "../spell-zone-state.js";
 import { policeBarrier, shellsForcedBy, teleportBarredAt } from "../zone-barriers.js";
 import { zoneMovementOptions } from "../zone-ground.js";
@@ -66,6 +73,25 @@ import { defineCommand } from "./pipeline.js";
 
 function annotationActorOf(principal: GamePrincipal): AnnotationActor {
   return { sessionId: sessionIdOf(principal), role: isGmGrade(principal) ? "gm" : "player" };
+}
+
+/** The way a move went for the spaces it entered, when the movement rules didn't measure it: a creature that may stop
+ *  in others' spaces (Air Form) goes through them, and any creature may go into a swarm's or a gelatinous cube's. */
+function entryPathOf(
+  state: GameState,
+  geometry: TokenMapGeometry,
+  actorId: string,
+  from: Readonly<{ x: number; y: number }>,
+  to: Readonly<{ x: number; y: number }>,
+  deps: Readonly<{ resolveDefinition: (definitionId: string) => ActorDefinition | undefined }>
+): ReadonlyArray<Readonly<{ x: number; y: number }>> {
+  const definitionId = state.actors.find((actor) => actor.id === actorId)?.definitionId;
+  const passes = definitionId ? passesCreatures(deps.resolveDefinition(definitionId)) : false;
+  const cost = movementCost(state, geometry, actorId, from, to, {
+    resolveDefinition: deps.resolveDefinition,
+    ...(passes ? { passesCreatures: true } : {})
+  });
+  return cost?.path && cost.path.length > 1 ? cost.path : [from, to];
 }
 
 /** The live encounter map and its geometry; `refusal` when no fight is running. */
@@ -166,18 +192,16 @@ export const mapCommands = [
         // Taking a placed token off the map mid-fight would move it for free.
         if (position === null && from !== null && !isGmGrade(principal) && state.combat.active)
           throw new CommandRejectedError("Only the GM takes a token off the map during a fight.");
-        // A grappler drags what it holds (SRD Grappled: "Movable"); teleporting or being moved by force doesn't.
+        // A grappler drags what it holds (SRD Grappled: "Movable"), and a swallower carries what is inside it;
+        // teleporting or being moved by force doesn't.
         const dragged =
           from !== null &&
           position !== null &&
           (mode === "walk" || mode === "fly" || mode === "swim" || mode === "climb" || mode === "burrow")
-            ? grappledBy(state, actorId).filter(
+            ? [...grappledBy(state, actorId), ...swallowedBy(state, actorId).map(({ prey }) => prey.id)].filter(
                 (heldId) => state.combat.tokens.find((token) => token.actorId === heldId)?.position
               )
             : [];
-        // A move an action grants that meets the creatures it passes through (Trampling Charge), before it is spent.
-        const moverNow = state.actors.find((actor) => actor.id === actorId);
-        const meeting = moverNow && state.combat.active ? meetingGrantOf(state, moverNow) : null;
         moveEncounterToken(state, actorId, position, geometry);
         // The height it ends at, and what holds it up there; back in the tray it is on the ground.
         const toAltitude = position === null ? 0 : (request.altitudeFeet ?? fromAltitude);
@@ -204,8 +228,12 @@ export const mapCommands = [
           dragging: {
             // Its riders move with it too, and their space is no obstacle.
             actorIds: [...dragged, ...ridersOf(state, actorId)],
-            costsExtra: dragCostsExtra(state, actorId, dragged, (definitionId) =>
-              kit.resolveDefinitionIn(state, definitionId)
+            // What it swallowed is inside it, and costs it nothing to carry.
+            costsExtra: dragCostsExtra(
+              state,
+              actorId,
+              dragged.filter((heldId) => grappledBy(state, actorId).includes(heldId)),
+              (definitionId) => kit.resolveDefinitionIn(state, definitionId)
             )
           },
           creatureDistance: (enemy, moverPoint, altitudeFeet) => {
@@ -306,6 +334,20 @@ export const mapCommands = [
               landing
             );
         }
+        // A teleport out of a Forcecage takes a Charisma save first; a failure keeps the creature in and wastes it.
+        const landed = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
+        if (mode === "teleport" && from !== null && landed !== null && !outcome.teleportFails) {
+          const caged = teleportOutOfCage(state, actorId, from, landed, {
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+            catalog: kit.equipmentCatalog(),
+            rollDie: (sides) => kit.context.random(sides)
+          });
+          if (caged) landing.push(...caged.events);
+          if (caged?.held) {
+            moveEncounterToken(state, actorId, from, geometry);
+            setAltitude(state, actorId, fromAltitude, wasAirborne);
+          }
+        }
         movementWarning = outcome.warning;
         movementOverridden = outcome.overridden;
         opportunityPrompts.push(...outcome.prompts);
@@ -332,9 +374,11 @@ export const mapCommands = [
           // A creature's own move goes as far as the first area whose save, failed, stops it, and waits there on the
           // save; a move already waiting on its Opportunity Attacks meets the areas past them as it goes on.
           const ownMove = mode !== "teleport" && mode !== "forced" && state.combat.heldMove?.actorId !== actorId;
+          let stoppedAt: number | null = null;
           if (ownMove) {
             const walk = walkThroughZones(state, actorId, path, zoneDeps);
             zoneEvents.push(...walk.events);
+            stoppedAt = walk.stop;
             if (walk.stop !== null) {
               const stopAt = path[walk.stop]!;
               const airborne = airborneAfter(mode, toAltitude, wasAirborne);
@@ -355,13 +399,38 @@ export const mapCommands = [
             zoneEvents.push(
               ...zonesAfterMove(state, { moverId: actorId, path, teleported: mode === "teleport" }, zoneDeps)
             );
-          if (mode !== "teleport") zoneEvents.push(...shellsForcedBy(state, actorId, path, zoneDeps));
-          // The creatures whose spaces its own move enters: an action's save met once (Engulf, Trampling Charge), a
-          // trait's damage the first time on a turn (Fire Form).
-          const reached = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? arrived;
-          if (mode !== "teleport" && mode !== "forced")
+          // A move stopped by an area's save has gone only as far as the stop.
+          const travelled = (way: ReadonlyArray<Readonly<{ x: number; y: number }>>) =>
+            stoppedAt === null ? way : path.slice(0, stoppedAt + 1);
+          zoneEvents.push(
+            ...(mode === "teleport" ? [] : shellsForcedBy(state, actorId, path, zoneDeps)),
+            // The creatures whose spaces it passed into (a gelatinous cube's).
+            ...spaceEntryAfterMove(
+              state,
+              {
+                moverId: actorId,
+                path:
+                  mode === "teleport"
+                    ? path
+                    : travelled(outcome.path ?? entryPathOf(state, geometry, actorId, from, arrived, zoneDeps)),
+                teleported: mode === "teleport"
+              },
+              zoneDeps
+            )
+          );
+          // Fire Form burns each creature whose space the elemental's own way entered, once a turn.
+          const mover = state.actors.find((actor) => actor.id === actorId);
+          if (mover && outcome.path && mode !== "teleport" && mode !== "forced" && geometry.calibration)
             zoneEvents.push(
-              ...meetAlongPath(state, actorId, from, reached, zoneDeps, outcome.granted !== undefined ? meeting : null)
+              ...fireFormBurns(state, mover, travelled(outcome.path), {
+                resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+                catalog: kit.equipmentCatalog(),
+                newId: kit.context.newId,
+                now: () => new Date().toISOString(),
+                commandId,
+                rollDie: (sides) => kit.context.random(sides),
+                squarePx: geometry.calibration.cellSizePx
+              })
             );
         }
         // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.

@@ -1,6 +1,7 @@
 import type { SpellMaterial, SpellReference } from "@vtt/content-srd-5.2.1";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { catalogIdOf, type ActorDefinition, type Currency, type InventoryItem } from "@vtt/schemas";
+import { animatedRowIds } from "../animated-items.js";
 import { CANT_SPEAK_TAG, HANDS_BOUND_TAG } from "../effects.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { isItemActionId, laterRowOf } from "../item-actions.js";
@@ -94,8 +95,13 @@ function focusRows(inventory: readonly InventoryItem[], kinds: readonly string[]
 function boundHands(attacker: LiveActor): Readonly<{ free: boolean; shield: boolean; why: string }> {
   const binding = attacker.effects.find((effect) => effect.tags.includes(HANDS_BOUND_TAG));
   if (binding) return { free: false, shield: false, why: `${binding.name} binds both hands` };
+  // An animated Shield hovers beside its user and fills no hand.
+  const animated = animatedRowIds(attacker);
   const shields = attacker.inventory.filter(
-    (row) => equipped(row) && effectiveSlot({ slot: row.magic?.slot, category: row.category }) === "shield"
+    (row) =>
+      equipped(row) &&
+      !animated.has(row.id) &&
+      effectiveSlot({ slot: row.magic?.slot, category: row.category }) === "shield"
   );
   return {
     free: shields.length < 2,

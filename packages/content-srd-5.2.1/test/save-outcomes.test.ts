@@ -228,11 +228,13 @@ describe("save outcomes in the shipped content", () => {
     expect(monsterAction("behir", "swallow")).toMatchObject({
       save: {
         failureConditions: ["blinded", "restrained"],
-        ongoingDamage: { damage: [{ formula: "6d6", type: "acid" }], at: "source-turn-start" }
+        ongoingDamage: { damage: [{ formula: "6d6", type: "acid" }], at: "source-turn-start" },
+        failureEffect: { name: "Swallowed", tags: ["swallowed"] }
       },
-      reminder:
-        "While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir."
+      swallow: { capacity: 1, regurgitate: { damage: 30, dc: 14, withinFeet: 10 } }
     });
+    // The engine runs the swallowed creature's conditions and cover, so no reminder is left.
+    expect(monsterAction("behir", "swallow")).not.toHaveProperty("reminder");
     expect(monsterAction("remorhaz", "swallow").save?.ongoingDamage?.damage).toEqual([
       { formula: "3d6", type: "acid" },
       { formula: "3d6", type: "fire" }
@@ -323,8 +325,15 @@ describe("what a stat block's failure does beyond its first conditions", () => {
       failureDuration: { type: "rounds", rounds: 10 },
       failureEffect: { name: "Weakening Breath" }
     });
-    expect(weakening.save?.failureEffect?.modifiers).toHaveLength(3);
-    expect(weakening.reminder).toMatch(/subtracts 1d10 from its damage rolls/);
+    // "Subtracts 5 (1d10) from its damage rolls."
+    expect(weakening.save?.failureEffect?.modifiers).toHaveLength(4);
+    expect(weakening.save?.failureEffect?.modifiers).toContainEqual({
+      type: "damage-bonus",
+      amount: 0,
+      dice: "-1d10",
+      when: [{ type: "on-damage-roll" }]
+    });
+    expect(weakening).not.toHaveProperty("reminder");
   });
 
   it("keeps the words a source tag stood beside", () => {

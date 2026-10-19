@@ -83,7 +83,9 @@ export function applyHitPointBand(
       sourceName: pending.sourceName,
       startedRound: state.combat.round,
       duration: effectDurationOf(state, band.duration, target.id, pending.sourceActorId),
-      linkedConditionIds: [...band.conditions]
+      linkedConditionIds: [...band.conditions],
+      ...(band.endsOnDamage ? { endsOnDamage: true } : {}),
+      ...(band.endedBy ? { endedBy: structuredClone(band.endedBy) } : {})
     }),
     events,
     deps

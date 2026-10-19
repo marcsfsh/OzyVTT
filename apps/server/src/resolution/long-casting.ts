@@ -2,7 +2,7 @@ import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
 import { addEffect, makeEffect, type EffectNarration } from "../effects.js";
 import { CommandRejectedError } from "../game-store.js";
-import { isItemActionId, laterRowOf, ritualSpellActionId } from "../item-actions.js";
+import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
 import { tableLineOf, type DefinitionAction, type ResolveContext, type ResolveInput } from "./context.js";
 import { commitEconomy } from "./economy.js";
 
@@ -46,16 +46,16 @@ export type LongCastStep = Readonly<{
   rounds: number;
 }>;
 
-/** The step a tap of this action takes, or null for a cast that resolves at once: outside a fight, an item's cast
- *  (its scroll or charges keep their own rules), a readied cast, a replay of one already paid for, and anything
- *  shorter than a minute. */
+/** The step a tap of this action takes, or null for a cast that resolves at once: outside a fight, a readied cast, a
+ *  replay of one already paid for, and anything shorter than a minute. An item's cast takes its turns too, and its
+ *  charges or its scroll are spent on the last ("If the casting is interrupted, the scroll isn't lost"). */
 export function longCastStepOf(
   state: GameState,
   action: DefinitionAction,
   input: ResolveInput,
   spell: SpellReference | undefined
 ): LongCastStep | null {
-  if (!state.combat.active || !spell || action.spellId === undefined || isItemActionId(action.id)) return null;
+  if (!state.combat.active || !spell || action.spellId === undefined) return null;
   // A feature that casts it as a Magic action (Pact of the Chain's Find Familiar) takes that action alone.
   if (action.castsAtOnce) return null;
   // The first turn going ahead once no Counterspell stopped it: its action was spent when it was cast.

@@ -41,9 +41,14 @@ import type {
   ResolveDependencies,
   ResolveInput
 } from "./resolution/context.js";
+import { tableLineOf } from "./resolution/context.js";
+import { breakEnclosure } from "./enclosures.js";
 import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
+import { planThisTurn } from "./resolution/multiattack-after.js";
+import { pullOnAction, swallowOnAction } from "./resolution/swallowing.js";
+import { inflictOnTargets } from "./resolution/inflicts.js";
 import { applyGrant } from "./resolution/grant.js";
 import { spendStudy, studyAMiss } from "./resolution/studied.js";
 import { applyShapeShift, checkShapeShift } from "./resolution/shape-shift.js";
@@ -88,6 +93,7 @@ import {
 } from "./resolution/concentration.js";
 import { parkForCounterspell } from "./resolution/counter.js";
 import { placeCastSight } from "./resolution/cast-sight.js";
+import { applyCastWalls, checkWallTarget } from "./resolution/cast-walls.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
@@ -159,6 +165,7 @@ export function resolveDefinitionAction(
   if (input.damageAnswer && !look)
     throw new CommandRejectedError("Answer the damage on a look at it, before it is dealt.");
   checkOverchannel(ctx);
+  checkWallTarget(ctx);
   ctx.builtin?.check?.(ctx);
   // A form the action can't give is refused before anything is spent.
   checkShapeShift(ctx);
@@ -198,9 +205,8 @@ export function resolveDefinitionAction(
     commitEconomy(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
-  // The action's move taken before the rest of it: its cost is spent and the move granted, and the rest waits. A move
-  // that is the whole action (Trampling Charge) works the same way: its save meets the creatures it passes through.
-  if (input.moveFirst === true || ctx.action.move?.entersSpaces !== undefined) {
+  // The action's move taken before the rest of it: its cost is spent and the move granted, and the rest waits.
+  if (input.moveFirst === true) {
     commitEconomy(ctx);
     applyMovementGrants(ctx);
     return { ...resolutionOf(ctx), save: null };
@@ -247,6 +253,15 @@ export function resolveDefinitionAction(
     releaseHideAndReady(ctx);
     spendUntilItActs(ctx);
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
+  }
+  // Disintegrate aimed at a creature in a sphere of force destroys the sphere and harms nothing inside.
+  const shattered = input.commit === false ? null : breakEnclosure(state, ctx.action, ctx.targets, ctx.deps.catalog);
+  if (shattered) {
+    for (const event of shattered) ctx.tableNarration.push(tableLineOf(ctx, event));
+    commitEconomy(ctx);
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null };
   }
   rollAttack(ctx);
   checkKnockOut(ctx);
@@ -305,11 +320,15 @@ export function resolveDefinitionAction(
   applyMovementGrants(ctx);
   applyTimeStop(ctx);
   applyGrant(ctx);
+  swallowOnAction(ctx);
+  pullOnAction(ctx);
+  inflictOnTargets(ctx);
   applySummons(ctx);
   applyShapeShift(ctx);
   layOutProvisions(ctx);
   orbLeap(ctx);
   placeCastSight(ctx);
+  applyCastWalls(ctx);
   refuseThePrayedFor(ctx);
   applyHealing(ctx);
   prayerShortRest(ctx);
@@ -584,8 +603,9 @@ export function actionAvailability(
       usesPool: action.uses?.pool ?? null,
       useCost: action.useCost ?? null,
       requiresEffectTag: action.requiresEffectTag ?? null,
+      // The plan it makes this turn (a clay golem's three Slams after Hasten).
       multiattack: action.multiattack
-        ? action.multiattack.map((component) => ({
+        ? planThisTurn(state, attacker.id, action).multiattack!.map((component) => ({
             actionId: component.actionId,
             count: component.count,
             ...(component.or ? { or: [...component.or] } : {})
@@ -637,8 +657,6 @@ function tapTargeting(
   usesUpItem: boolean,
   spell: SpellReference | undefined
 ): "none" | "single" | "multi" | null {
-  // A move that is the whole action (Trampling Charge) meets whom it passes through, and aims at no one.
-  if (action.move?.entersSpaces) return "none";
   // A shape-shift on its user (Wild Shape, a werewolf's Shape-Shift), and leaving a form, aim at no one.
   if (action.endsForm || (action.shapeShift && !action.shapeShift.onTargets && !action.save)) return "none";
   if (action.attack || action.grants?.target === "target" || action.targets?.count === 1) return "single";
@@ -647,6 +665,10 @@ function tapTargeting(
   // A touch that ends a condition picks who it touches (Lesser Restoration).
   if (action.endsConditions) return "single";
   if (action.spellId !== undefined) {
+    // A cast that acts only on a door or a wall (Knock, Arcane Lock, Stone Shape, Passwall) is aimed at one on the map.
+    const walls = spell?.walls;
+    if (walls && (walls.cuts || (walls.door && walls.door !== "open-or-close" && walls.door !== "close")))
+      return "single";
     const named = spell?.effect?.targets;
     return named === undefined ? "none" : named.count > 1 || named.perSlot !== undefined ? "multi" : "single";
   }

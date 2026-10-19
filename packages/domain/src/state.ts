@@ -12,6 +12,7 @@ import {
   EffectModifiersSchema,
   HealthDisplaySchema,
   HitPointBandSchema,
+  ObjectStatsSchema,
   SaveFailureDurationSchema
 } from "@vtt/schemas";
 
@@ -260,6 +261,8 @@ const PendingSaveEffectSchema = z
     /** "Until the end of the current turn" for a save made at the start of the bearer's own turn (Stinking Cloud),
      *  where "until the end of its next turn" would run a turn longer. */
     currentTurn: z.literal(true).optional(),
+    /** What holds the creature (a Net, a giant spider's web), which can be attacked; destroying it ends the effect. */
+    heldBy: EffectInstanceSchema.shape.heldBy,
     /** An action the bearer may take to end it (Irresistible Dance's "collect itself"). */
     endAction: EffectInstanceSchema.shape.endAction,
     /** The option the caster picked for the failure (Bestow Curse's curse). */
@@ -329,6 +332,12 @@ export const PendingSaveSchema = z
     failureNote: z.string().min(1).max(300).optional(),
     /** A failure also breaks the creature's Concentration (Sleet Storm). */
     breaksConcentration: z.literal(true).optional(),
+    /** A swallower's save against the damage from inside it: a failure lets out every creature it swallowed, Prone
+     *  within this many feet of it. */
+    regurgitates: z
+      .object({ withinFeet: z.number().int().min(5).max(60) })
+      .strict()
+      .optional(),
     /** The spell area that raised it (`SpellZone`), which counts the damage it deals toward its cap. Never projected. */
     zoneId: z.string().min(1).max(120).optional(),
     /** A save the bearer repeats at the end of its turn: a success ends this effect. Stripped from player projections. */
@@ -1062,19 +1071,6 @@ export type PendingRuleAsk = z.infer<typeof PendingRuleAskSchema>;
 /** A point on the battlemap, in image pixels. */
 const VisionPointSchema = z.object({ x: z.number().min(0).max(100000), y: z.number().min(0).max(100000) }).strict();
 
-/** A wall in image pixels (ADR-0023). A wall blocks sight, light and movement; a door does too while it is closed; a
- * window blocks movement only. `open` is a door's alone. */
-export const VisionWallSchema = z
-  .object({
-    id: z.uuid(),
-    kind: z.enum(["wall", "door", "window"]),
-    a: VisionPointSchema,
-    b: VisionPointSchema,
-    open: z.boolean().optional()
-  })
-  .strict();
-export type VisionWall = z.infer<typeof VisionWallSchema>;
-
 /** What made a light or an area on the map (a spell, a feature), so it lasts as long as what keeps it: the cast's
  * Concentration (`castId`) or an effect (`effectId`, on any creature). `spellId` and `level` let a later spell dispel
  * it (Darkness dispels spell light of level 2 or lower). GM-only, like the rest of the vision layer. */
@@ -1096,6 +1092,89 @@ export const VisionSourceSchema = z
   })
   .strict();
 export type VisionSource = z.infer<typeof VisionSourceSchema>;
+
+/** What keeps a door shut (SRD 5.2.1 Lock, Iron Spikes, Knock): a `lock` picked with Thieves' Tools (`dc` is the
+ *  Dexterity (Sleight of Hand) check, 15 for the SRD Lock; `forceDc` the Strength check that breaks it, absent when no
+ *  check does) and opened by those who hold its key; a door `stuck`, `barred` or `jammed` shut with a spike, forced
+ *  with a Strength (Athletics) check against `dc` (15 when the GM sets none); `sealed` by Stone Shape, which no check
+ *  opens. */
+export const DoorFasteningSchema = z
+  .object({
+    kind: z.enum(["lock", "stuck", "barred", "jammed", "sealed"]),
+    dc: z.number().int().min(1).max(40).optional(),
+    forceDc: z.number().int().min(1).max(40).optional(),
+    keyHolderIds: z.array(z.uuid()).max(20).optional()
+  })
+  .strict();
+export type DoorFastening = z.infer<typeof DoorFasteningSchema>;
+
+/** A door's state beyond open or closed: what holds it shut, an Arcane Lock with the creatures it lets through and how
+ *  long Knock suppresses it, and whether it is a secret door that players see as wall. GM-only: a player learns a door
+ *  is locked by trying it. */
+export const DoorStateSchema = z
+  .object({
+    fastenings: z.array(DoorFasteningSchema).max(6).default([]),
+    arcaneLock: z
+      .object({
+        casterId: z.uuid(),
+        allowedIds: z.array(z.uuid()).max(20).default([]),
+        /** Knock suppresses it for 10 minutes: through this round of the fight, and to this game-clock minute. */
+        suppressed: z
+          .object({
+            untilRound: z.number().int().positive().optional(),
+            untilMinute: z.number().int().min(0).max(1_000_000_000).optional()
+          })
+          .strict()
+          .optional()
+      })
+      .strict()
+      .optional(),
+    hidden: z.literal(true).optional()
+  })
+  .strict();
+export type DoorState = z.infer<typeof DoorStateSchema>;
+
+/** A gap cut in a wall (Passwall's passage, a tunnel): the part from `from` to `to` along it, as fractions of its length
+ *  from `a`, lets sight and movement through. With a `source` it closes again when that ends. */
+export const WallOpeningSchema = z
+  .object({
+    from: z.number().min(0).max(1),
+    to: z.number().min(0).max(1),
+    source: VisionSourceSchema.optional()
+  })
+  .strict();
+export type WallOpening = z.infer<typeof WallOpeningSchema>;
+
+/** A wall in image pixels (ADR-0023). A wall blocks sight, light and movement; a door does too while it is closed; a
+ * window blocks movement only. `open` and `door` are a door's alone. `object` makes it something that can be attacked
+ * and broken (a wooden door, a panel of Wall of Ice), gone at 0 Hit Points. A wall a spell or an item made carries its
+ * `source` and lasts while that does. */
+export const VisionWallSchema = z
+  .object({
+    id: z.uuid(),
+    kind: z.enum(["wall", "door", "window"]),
+    a: VisionPointSchema,
+    b: VisionPointSchema,
+    open: z.boolean().optional(),
+    door: DoorStateSchema.optional(),
+    object: ObjectStatsSchema.optional(),
+    openings: z.array(WallOpeningSchema).max(8).optional(),
+    source: VisionSourceSchema.optional(),
+    /** Bars that no creature passes and sight, attacks and spells go between (Forcecage's cage): a window that gives no
+     *  cover and stops no area. */
+    bars: z.literal(true).optional(),
+    /** A spell's wall that stays for good once what keeps it has lasted this long (Wall of Stone held for its full 10
+     *  minutes): through this round of the fight, or to this game-clock minute. */
+    permanentAfter: z
+      .object({
+        round: z.number().int().positive().optional(),
+        minute: z.number().int().min(0).max(1_000_000_000).optional()
+      })
+      .strict()
+      .optional()
+  })
+  .strict();
+export type VisionWall = z.infer<typeof VisionWallSchema>;
 
 /** A light: placed on the map (`position`), carried by a token (`actorId`), or at the centre of a spell's placed area
  * as the area moves (`annotationId`: Moonbeam's Cylinder), exactly one of them. Radii are in feet as the SRD prints
@@ -1261,6 +1340,8 @@ export const SpellZoneSchema = z
     area: ActionAreaSchema.nullable().default(null),
     /** Where its caster stood at the cast, for an Emanation that stays there (Globe of Invulnerability). */
     anchor: z.object({ x: z.number(), y: z.number() }).strict().optional(),
+    /** The creatures inside it when it was made, which its barrier lets through (Tiny Hut). */
+    insiders: z.array(z.uuid()).max(200).optional(),
     /** What an item's or a creature's area acts with (spread Caltrops' save and damage), kept here since what left it
      *  may be gone; a spell's area reads its spell instead. */
     rule: z

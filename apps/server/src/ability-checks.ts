@@ -172,6 +172,17 @@ export function toolAbility(description: string | null | undefined): AbilityId |
   return (Object.keys(ABILITY_NAMES) as AbilityId[]).find((ability) => ABILITY_NAMES[ability].toLowerCase() === word)!;
 }
 
+/** What a tool's Utilize line lets it do, each with its printed DC ("Utilize: Pick a lock (DC 15), or disarm a trap
+ *  (DC 15)"). Empty when the record prints none. */
+export function toolUses(description: string | null | undefined): Readonly<{ label: string; dc: number }>[] {
+  const line = /Utilize:\s*(.*?\(DC \d+\))\./s.exec(description ?? "")?.[1];
+  if (!line) return [];
+  return [...line.matchAll(/\s*(.+?)\s*\(DC (\d+)\)(?:,\s*(?:or\s+)?|$)/g)].map((use) => {
+    const label = use[1]!.trim();
+    return { label: label.charAt(0).toUpperCase() + label.slice(1), dc: Number(use[2]) };
+  });
+}
+
 /** Tool proficiencies the sheet records and its items grant. */
 export function toolProficiencies(definition: ActorDefinition | undefined, derivation: EquipmentDerivation): string[] {
   return [...new Set([...(definition?.proficiencies?.tools ?? []), ...(derivation.context.proficientTools ?? [])])];

@@ -48,7 +48,8 @@ describe("a pool that comes back after a time", () => {
 
   it("starts a Horn of Valhalla's 7 days when it is spent from the sheet", () => {
     const table = tableOf({ [IDS.wizard]: wizardInput() }, false);
-    write(table, IDS.wizard, catalogRow("horn-of-valhalla"));
+    // The GM says the horn found is the silver one.
+    write(table, IDS.wizard, catalogRow("horn-of-valhalla", { variantId: "silver" }), "gm");
     const { line } = spendUses(
       table.state,
       IDS.wizard,

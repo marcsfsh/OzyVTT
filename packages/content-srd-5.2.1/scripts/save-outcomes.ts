@@ -10,6 +10,7 @@ import {
   type DamageType,
   type EndedBy,
   type ForcedPush,
+  type ObjectPrint,
   type OngoingDamage,
   type SaveCondition,
   type SaveFailureDuration
@@ -52,7 +53,59 @@ export type SaveOutcome = {
   autoSuccess?: { creatureTypes?: string[]; sleepless?: true };
   failureEndsForm?: true;
   breaksConcentration?: true;
+  heldBy?: ObjectPrint;
 };
+
+/** The damage types a stat block lists after "Vulnerability to" or "Immunity to" ("Bludgeoning, Poison, and Psychic"),
+ *  less Poison and Psychic, which every object ignores anyway. */
+function objectDefences(clause: string, label: string): DamageType[] {
+  const listed = new RegExp(`${label} to ([A-Za-z, ]+?) damage`).exec(clause)?.[1] ?? "";
+  return listed
+    .split(/,\s*(?:and\s+)?|\s+and\s+/)
+    .map((word) => DamageTypeSchema.safeParse(word.trim().toLowerCase()))
+    .flatMap((parsed) =>
+      parsed.success && parsed.data !== "poison" && parsed.data !== "psychic" ? [parsed.data] : []
+    );
+}
+
+/** What holds the creature a failure restrains when a trait prints its statistics: "until the rope is destroyed", with
+ *  the erinyes' Magic Rope: "The rope has AC 20, HP 90, and Immunity to Poison and Psychic damage." */
+export function heldByFromTraits(clause: string, traits: readonly string[]): ObjectPrint | undefined {
+  const named = /until the (\w+) is destroyed\b/.exec(clause)?.[1];
+  if (!named) return undefined;
+  for (const text of traits) {
+    const printed = new RegExp(`The ${named} has AC (\\d+), HP (\\d+)`).exec(text);
+    if (!printed) continue;
+    const immunities = objectDefences(text, "Immunity");
+    return {
+      name: `${named[0]!.toUpperCase()}${named.slice(1)}`,
+      armorClass: Number.parseInt(printed[1]!, 10),
+      hitPoints: Number.parseInt(printed[2]!, 10),
+      ...(immunities.length > 0 ? { immunities } : {})
+    };
+  }
+  return undefined;
+}
+
+/** What holds the creature a failure restrains, when the clause prints its statistics: "Restrained condition until the
+ *  web is destroyed (AC 10; HP 5; Vulnerability to Fire damage; Immunity to Poison and Psychic damage)". */
+export function heldByOf(clause: string): ObjectPrint | undefined {
+  const printed = /until the (\w+) is destroyed \(AC (\d+); HP (\d+)((?:; [^)]*)?)\)/.exec(clause);
+  if (!printed) return undefined;
+  const name = printed[1]!;
+  const rest = printed[4] ?? "";
+  const immunities = objectDefences(rest, "Immunity");
+  const vulnerabilities = objectDefences(rest, "Vulnerability");
+  const resistances = objectDefences(rest, "Resistance");
+  return {
+    name: `${name[0]!.toUpperCase()}${name.slice(1)}`,
+    armorClass: Number.parseInt(printed[2]!, 10),
+    hitPoints: Number.parseInt(printed[3]!, 10),
+    ...(immunities.length > 0 ? { immunities } : {}),
+    ...(resistances.length > 0 ? { resistances } : {}),
+    ...(vulnerabilities.length > 0 ? { vulnerabilities } : {})
+  };
+}
 
 /** What a failed repeat leaves in place of the first failure ("Second Failure"). */
 export type SecondFailure = {
@@ -293,6 +346,7 @@ export function statBlockSaveOutcome(description: string): SaveOutcome {
   const lifetime = failureLifetime(failure, namedConditions(failure));
   const reach =
     lifetime.escapeDc !== undefined ? description.slice(0, Math.max(0, start)).match(/\bwithin (\d+) feet\b/) : null;
+  const heldBy = lifetime.failureConditions.includes("restrained") ? heldByOf(failure) : undefined;
   const second = secondFailureOf(description);
   // "Until the end of its next turn, at which point it repeats the save", "repeats the save at the end of its next turn".
   const once =
@@ -315,6 +369,7 @@ export function statBlockSaveOutcome(description: string): SaveOutcome {
     successDamage: success ? "half" : "none",
     ...lifetime,
     ...(reach ? { rangeFeet: Number.parseInt(reach[1]!, 10) } : {}),
+    ...(heldBy ? { heldBy } : {}),
     ...(once && lifetime.repeatSave !== true ? { repeatOnce: true as const } : {}),
     ...(second ? { secondFailure: second } : {}),
     ...(exhaustion ? { failureExhaustion: Number.parseInt(exhaustion[1]!, 10) } : {}),
@@ -357,11 +412,17 @@ const STRENGTH_TESTS = [
 
 /** What a failure leaves besides conditions, as one effect named for its action. */
 export type FailureRestrictions = Readonly<{
-  failureEffect: { name: string; tags: string[]; modifiers: typeof STRENGTH_TESTS };
+  failureEffect: { name: string; tags: string[]; modifiers: Array<(typeof STRENGTH_TESTS)[number] | DamagePenalty> };
   failureDuration?: SaveFailureDuration;
   repeatSave?: true;
-  /** What the engine leaves to the GM. */
-  reminder?: string;
+}>;
+
+/** "Subtracts 3 (1d6) from its damage rolls": the die taken off each of the bearer's damage rolls. */
+type DamagePenalty = Readonly<{
+  type: "damage-bonus";
+  amount: 0;
+  dice: string;
+  when: Array<{ type: "on-damage-roll" }>;
 }>;
 
 /**
@@ -369,7 +430,7 @@ export type FailureRestrictions = Readonly<{
  * copper dragon's Slowing Breath ("can't take Reactions; its Speed is halved; and it can take either an action or a
  * Bonus Action on its turn, not both. This effect lasts until the end of its next turn") and a gold dragon's Weakening
  * Breath ("Disadvantage on Strength-based D20 Test ... It repeats the save at the end of each of its turns ... After 1
- * minute, it succeeds automatically"). The damage penalty Weakening Breath adds is said in `reminder`. Null when the
+ * minute, it succeeds automatically"), whose die off the target's damage rolls is a damage modifier. Null when the
  * clause prints none of these.
  */
 export function failureRestrictionsOf(description: string, name: string): FailureRestrictions | null {
@@ -384,22 +445,29 @@ export function failureRestrictionsOf(description: string, name: string): Failur
     ...(/\bits Speed is halved\b/.test(clause) ? ["speed-halved"] : []),
     ...(/\bcan take either an action or a Bonus Action on its turn, not both\b/.test(clause) ? ["action-or-bonus"] : [])
   ];
-  const modifiers = /\bDisadvantage on Strength-based D20 Tests?\b/.test(clause) ? STRENGTH_TESTS : [];
+  const penalty = /\bsubtracts \d+ \((\d+d\d+)\) from its damage rolls\b/.exec(clause);
+  const modifiers = [
+    ...(/\bDisadvantage on Strength-based D20 Tests?\b/.test(clause) ? STRENGTH_TESTS : []),
+    ...(penalty
+      ? [
+          {
+            type: "damage-bonus" as const,
+            amount: 0 as const,
+            dice: `-${penalty[1]}`,
+            when: [{ type: "on-damage-roll" as const }]
+          }
+        ]
+      : [])
+  ];
   if (tags.length === 0 && modifiers.length === 0) return null;
   const duration = /\bThis effect lasts until the end of its next turn\b/.test(clause)
     ? ({ type: "until-bearer-turn-end" } as const)
     : failureDurationOf(clause);
-  const penalty = /\bsubtracts \d+ \((\d+d\d+)\) from its damage rolls\b/.exec(clause);
   return {
     failureEffect: { name, tags, modifiers },
     ...(duration ? { failureDuration: duration } : {}),
     ...(repeatsEachTurn(clause) || /\bIt repeats the save at the end of each of its turns\b/.test(clause)
       ? { repeatSave: true as const }
-      : {}),
-    ...(penalty
-      ? {
-          reminder: `While ${name} lasts, the target subtracts ${penalty[1]} from its damage rolls. Take it off by hand.`
-        }
       : {})
   };
 }

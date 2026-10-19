@@ -58,7 +58,9 @@ import { mistyEscape, regainedHitPoints, restorationAtDeath, tallyTurnDamage } f
 import { holdsFeature } from "./class-features.js";
 import { rollSaveAtOnce } from "./saving-throws.js";
 import { offerDamageReaction } from "./damage-reactions.js";
-import { releaseSwallowedBy } from "./swallow.js";
+import { releaseSwallowedBy, tallyDamageFromInside } from "./swallow.js";
+import { markBloodiedHit } from "./bloodied-hits.js";
+import { damageTypeTraits } from "./damage-traits.js";
 import { openRepeatSavesOnDamage } from "./save-stages.js";
 import { berserkerCurse } from "./berserker-axe.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
@@ -485,7 +487,7 @@ function fallToZero(
         text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
         actorId: actor.id
       });
-    events.push(...dropHeldItems(actor));
+    events.push(...dropHeldItems(actor, deps));
   } else {
     defeated = true;
     // A swallower that dies lets out what it swallowed (SRD: "can escape from the corpse").
@@ -796,6 +798,8 @@ export function applyDamageDetailed(
   // What its stat block does as the damage lands: Acid or Fire stops a troll's Regeneration, and Undead Fortitude may
   // leave a zombie at 1 Hit Point.
   if (totalAdjusted > 0) events.push(...stopRegeneration(state, actor, definition, parts));
+  // What a damage type does to the stat block it lands on (Acid Absorption, Aversion to Fire, Freeze).
+  events.push(...damageTypeTraits(state, actor, definition, parts));
   if (!isPlayerCharacter && !knockedOut && !wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deps)
     undeadFortitude(
       state,
@@ -912,6 +916,10 @@ export function applyDamageDetailed(
   // A Fiend Warlock near the fall, or the one who dealt it, gains Temporary Hit Points.
   if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deps)
     events.push(...blessOnTheKill(state, actor, input.sourceActorId, deps));
+  // A swallower counts the damage the creatures inside it deal this turn.
+  tallyDamageFromInside(state, actor.id, input.sourceActorId, totalAdjusted);
+  // Damage on a creature already Bloodied opens its dealer's Rampage.
+  markBloodiedHit(state, input.sourceActorId, hpBefore, actor.hp.maximum, totalAdjusted);
   // A hydra's heads and a troll's limbs count the damage of each turn.
   events.push(
     ...tallyTurnDamage(state, actor, definition, parts, totalAdjusted, (cause) => {

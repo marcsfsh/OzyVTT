@@ -39,6 +39,7 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
   "on-healing": "Healing a creature",
   "attack-kind-is": "A kind of attack",
   "weapon-property-is": "A weapon property",
+  "weapon-is": "One kind of weapon",
   "damage-type-is": "A damage type",
   "ability-is": "One ability",
   "skill-is": "One skill",
@@ -47,6 +48,8 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
   "spell-id-is": "One specific spell",
   "versus-size": "A target's size",
   "versus-condition": "A target's condition",
+  "versus-magic": "Against a spell or magic",
+  "versus-spell": "Against a spell",
   "versus-creature-type": "A target's kind",
   "by-effect-source": "The creature that put this effect on",
   "source-creature-type-is": "The other creature's kind",
@@ -104,6 +107,8 @@ function blankTrigger(type: string): Draft {
       return { type, kinds: [] };
     case "weapon-property-is":
       return { type, properties: [] };
+    case "weapon-is":
+      return { type, ids: [] };
     case "damage-type-is":
       return { type, damageTypes: [] };
     case "ability-is":
@@ -266,6 +271,14 @@ export const whenField = (): FieldDef => ({
       kind: "tags",
       visibleWhen: hasType("while-proficient-with"),
       placeholder: "longsword"
+    },
+    {
+      key: "ids",
+      label: "Weapons",
+      kind: "tags",
+      visibleWhen: hasType("weapon-is"),
+      placeholder: "longbow",
+      help: "A magic weapon counts as the weapon it is made from."
     },
     {
       key: "tags",

@@ -30,6 +30,7 @@ import {
   waitingSteps,
   type TurnStep
 } from "./simultaneous-effects.js";
+import { disgorge, regurgitationSaves } from "./swallow.js";
 
 type Actor = GameState["actors"][number];
 type Effect = Actor["effects"][number];
@@ -87,6 +88,9 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
   clearTurnSteps(state);
   // A Bloodied troll loses a limb (Loathsome Limbs), and a hydra's lost-head count starts again.
   events.push(...deathTraitsAtTurnEnd(state, actorId, dice));
+  // "If the behir takes 30 damage or more on a single turn from the swallowed creature, the behir must succeed on a
+  // DC 14 Constitution saving throw at the end of that turn".
+  events.push(...regurgitationSaves(state, { ...deps, resolveDefinition: deps.resolveDefinition }));
 }
 
 /**
@@ -288,6 +292,8 @@ function ongoingSteps(state: GameState, actorId: string, boundary: "start" | "en
       if ((bearers ? bearer.id : effect.sourceActorId) !== actorId) continue;
       const source = state.actors.find((candidate) => candidate.id === effect.sourceActorId);
       if (!bearers && (!source || source.hp.current <= 0)) continue;
+      // "At the end of the frog's next turn": not the turn it swallowed on.
+      if (ongoing.disgorges && effect.startedRound === state.combat.round) continue;
       steps.push({
         key: `ongoing:${bearer.id}:${effect.id}`,
         name: effect.name,
@@ -319,6 +325,8 @@ function ongoingDamageNow(
   }
   const events = dealOngoingDamage(state, bearer, effect, deps);
   const stillOn = bearer.effects.some((candidate) => candidate.id === effect.id);
+  // A swallowed creature still alive is regurgitated after the damage (a giant toad's Swallow).
+  if (ongoing.disgorges && stillOn && !isDead(bearer)) return [...events, ...disgorge(state, bearer, effect.id)];
   if (ongoing.saveToEnd && stillOn && deps.newId)
     events.push(
       openEndingSave(state, bearer, effect, ongoing.saveToEnd, "makes", {

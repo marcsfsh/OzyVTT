@@ -43,7 +43,10 @@ describe("SRD monster attack damage matches the stat block", () => {
       monster.actions
         .filter((action) => action.legendary && action.attack && !/Attack Roll:/.test(action.description))
         .flatMap((action) => {
-          const named = /makes one ([A-Z][A-Za-z' ]*?) attack/.exec(action.description)?.[1];
+          // A choice printed inside its entry ("Necrotic Strike: Rotting Fist") is named for its attack.
+          const named = action.partOf
+            ? action.name.slice(action.name.indexOf(": ") + 2)
+            : /makes one ([A-Z][A-Za-z' ]*?) attack/.exec(action.description)?.[1];
           const source = monster.actions.find((candidate) => candidate.name.replace(/\s*\(.*\)$/, "") === named);
           return source &&
             JSON.stringify(source.attack) === JSON.stringify(action.attack) &&
@@ -121,11 +124,11 @@ describe("SRD monster save damage is what the failure deals at once", () => {
       expect(action(monster, "swallow").save?.ongoingDamage?.at).toBe("source-turn-start");
     }
     expect(action("kraken", "swallow").damage).toEqual([{ formula: "3d8 + 10", type: "piercing" }]);
-    // A failure that depends on the target's hit points deals and imposes nothing on its own.
+    // A failure that depends on the target's hit points: Unconscious at 20 or fewer, else the Psychic damage.
     const nightmare = action("incubus", "nightmare-recharge-6");
-    expect(nightmare.damage).toEqual([]);
-    expect(nightmare.save?.failureConditions).toEqual([]);
-    expect(nightmare.reminder).toMatch(/20 Hit Points or fewer/);
+    expect(nightmare.damage).toEqual([{ formula: "4d8", type: "psychic" }]);
+    expect(nightmare.save?.failureByHitPoints).toMatchObject([{ atOrBelow: 20, conditions: ["unconscious"] }]);
+    expect(nightmare).not.toHaveProperty("reminder");
     // One that kills or drops the target by its hit points does it, and deals its damage to a target above them.
     expect(action("solar", "slaying-bow")).toMatchObject({
       damage: [
@@ -139,10 +142,13 @@ describe("SRD monster save damage is what the failure deals at once", () => {
       save: { failureByHitPoints: [{ atOrBelow: 20, dropsToZero: true }] }
     });
     expect(action("sea-hag", "death-glare").reminder).toBeUndefined();
-    // The first roar's save, and the third roar's thunder left to the GM.
-    const roar = action("sphinx-of-valor", "roar");
-    expect(roar.damage).toEqual([]);
-    expect(roar.save).toMatchObject({ ability: "wis", failureConditions: ["frightened"] });
+    // Each roar is its own step, the third with its thunder.
+    expect(action("sphinx-of-valor", "roar").save).toBeUndefined();
+    expect(action("sphinx-of-valor", "roar-first-roar").save).toMatchObject({
+      ability: "wis",
+      failureConditions: ["frightened"]
+    });
+    expect(action("sphinx-of-valor", "roar-third-roar").damage).toEqual([{ formula: "8d10", type: "thunder" }]);
     // The Otyugh's save comes after a Long Rest.
     expect(action("otyugh", "bite").save).toBeUndefined();
   });
@@ -156,8 +162,8 @@ describe("SRD monster save damage is what the failure deals at once", () => {
         .flatMap((action) => {
           const failure = /Failure:\s*(.+?)(?:\s*Success:|$)/s.exec(action.description)![1];
           const first = failure.split(/(?<=\.)\s/)[0] ?? "";
-          if (/^If the (?:target|creature) has \d+ Hit Points/.test(first) || action.reminder?.startsWith("Roar runs"))
-            return [];
+          // A step of a printed sequence (a sphinx's roars) carries its own failure, printed further on.
+          if (/^If the (?:target|creature) has \d+ Hit Points/.test(first) || action.useNumber !== undefined) return [];
           // A type each use picks (a half-dragon's breath, of its Draconic Origin's type) is printed with no type.
           if (action.damageTypes !== undefined) return [];
           const want = [...first.matchAll(/\d+ \((\d+d\d+(?:\s*[+-]\s*\d+)?)\) ([A-Za-z]+) damage/g)].map(

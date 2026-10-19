@@ -275,7 +275,11 @@ export function TerrainGroup({
 
 const WALL_TOOLS: ReadonlyArray<{ id: VisionTool; label: string; title: string }> = [
   { id: "vision-wall", label: "Wall", title: "Drag a wall. Sight and light stop at it, and so does movement." },
-  { id: "vision-door", label: "Door", title: "Drag a door. It starts closed, and a tap opens or closes it." },
+  {
+    id: "vision-door",
+    label: "Door",
+    title: "Drag a door. It starts closed, and a tap on its handle opens its menu."
+  },
   { id: "vision-window", label: "Window", title: "Drag a window. Sight goes through it, and movement stops at it." },
   { id: "vision-erase", label: "Remove", title: "Tap a wall, door, window or light to remove it." }
 ];

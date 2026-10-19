@@ -6,6 +6,7 @@ import {
   AnnotationVisibilitySchema,
   AskableCommandSchema,
   BuilderAbilityMethodSchema,
+  DoorStateSchema,
   EncounterTokenPositionSchema,
   PartyVisibilitySchema,
   RollVisibilitySchema,
@@ -24,6 +25,7 @@ import {
   EffectModifiersSchema,
   InventoryItemSchema,
   MAX_FAVOURITE_OPTIONS,
+  ObjectStatsSchema,
   OptionIdSchema,
   ProficienciesSchema
 } from "@vtt/schemas";
@@ -259,6 +261,15 @@ export const SetActorSheetPreviewSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** GM switch: a legendary creature fights in its lair, with the lair's legendary counts (SRD 5.2.1). */
+export const SetActorLairSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    inLair: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const HpAmountSchema = z
   .object({
     commandId: z.uuid(),
@@ -486,6 +497,8 @@ export const ActionResolveSchema = z
     /** GM only: the spell area a cast that ends spells is aimed at (Dispel Magic on a Moonbeam), from
      *  `combat.spellZones`. */
     zoneId: z.string().min(1).max(120).optional(),
+    /** The door or wall on the live map a cast is aimed at (Knock, Arcane Lock, Mage Hand opening a door). */
+    wallId: z.uuid().optional(),
     /** false previews the attack roll only (no damage/riders/economy). The server holds the previewed d20, so a second
      *  preview of the same attack shows the same die, and the confirm (`commit: true`) uses it. Non-attack actions
      *  ignore it. */
@@ -1269,6 +1282,24 @@ export const ItemSetLightSchema = z
     (change) => change.lit !== undefined || change.hoodLowered !== undefined || change.facingDegrees !== undefined,
     { message: "Say whether to light it, hood it or aim it." }
   );
+/** Its holder puts a carried item in one of its forms (a Rod of Lordly Might's flame blade), or back in its own form
+ *  with null. */
+export const ItemSetFormSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    variantId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const VisionResetExploredSchema = z
   .object({
     commandId: z.uuid(),
@@ -1318,6 +1349,70 @@ export const DoorSetOpenSchema = z
     wallId: z.uuid(),
     open: z.boolean(),
     sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM sets what keeps a door shut (locked, stuck, barred, jammed, sealed), its Arcane Lock and whether it is a
+ *  secret door; null clears them all. */
+export const DoorSetStateSchema = z
+  .object({
+    commandId: z.uuid(),
+    wallId: z.uuid(),
+    door: DoorStateSchema.nullable(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A creature beside a door picks its lock, forces it or jams it shut. */
+export const DoorUseSchema = z
+  .object({
+    commandId: z.uuid(),
+    wallId: z.uuid(),
+    actorId: z.uuid(),
+    /** Pick its lock (Thieves' Tools), force it, jam it with an Iron Spike, pry it open (Carpenter's or Smith's
+     *  Tools) or seal it (Carpenter's Tools). */
+    how: z.enum(["pick", "force", "jam", "pry", "seal"]),
+    /** Another character helping with a Portable Ram (Advantage on the check). */
+    helperId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Where an object is: a wall or door of the live map, or what holds a creature (its effect). */
+export const ObjectRefSchema = z.union([
+  z.object({ wallId: z.uuid() }).strict(),
+  z.object({ actorId: z.uuid(), effectId: z.string().min(1).max(120) }).strict()
+]);
+/** The GM gives a wall or door statistics as an object, or clears them (null). */
+export const ObjectSetSchema = z
+  .object({
+    commandId: z.uuid(),
+    wallId: z.uuid(),
+    object: ObjectStatsSchema.nullable(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM deals typed damage to an object (a Fireball's fire on a door, a Wall of Ice panel). */
+export const ObjectDamageSchema = z
+  .object({
+    commandId: z.uuid(),
+    target: ObjectRefSchema,
+    parts: z
+      .array(z.object({ amount: z.number().int().min(0).max(10000), type: DamageTypeSchema }).strict())
+      .min(1)
+      .max(8),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A creature attacks an object with one of its attacks. */
+export const ObjectAttackSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    actionId: z.string().min(1).max(120),
+    target: ObjectRefSchema,
+    rollMode: z.enum(["advantage", "disadvantage", "normal"]).nullable().optional(),
+    override: RulesOverrideSchema.nullable().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

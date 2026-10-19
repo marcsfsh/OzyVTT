@@ -3959,17 +3959,24 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
   it("the SRD bundle carries legendary resources (adult red dragon golden check + coverage floors)", () => {
     const monsters = loadMonsterDefinitions();
     const dragon = monsters.find((monster) => monster.source.externalId === "adult-red-dragon")!;
-    expect(dragon.legendary).toEqual({ actionsPerRound: 3, resistancesPerDay: 3 });
+    // "Legendary Action Uses: 3 (4 in Lair)" and "Legendary Resistance (3/Day, or 4/Day in Lair)".
+    expect(dragon.legendary).toEqual({
+      actionsPerRound: 3,
+      resistancesPerDay: 3,
+      actionsInLair: 4,
+      resistancesInLair: 4
+    });
     // "The dragon can't take this action again until the start of its next turn."
     expect(dragon.actions.find((action) => action.id === "commanding-presence")!.legendary).toEqual({
       cost: 1,
       oncePerRound: true
     });
-    // SRD 5.2.1: all 30 legendary creatures print "Legendary Action Uses: 3" (the lair bump stays
-    // prose); 32 creatures carry Legendary Resistance; every legendary action row costs 1.
+    // SRD 5.2.1: all 30 legendary creatures print "Legendary Action Uses: 3" (4 in a lair); 32 creatures carry
+    // Legendary Resistance; every printed legendary action costs 1, and the choices printed inside one cost the same.
     expect(monsters.filter((monster) => monster.legendary?.actionsPerRound === 3).length).toBe(30);
     expect(monsters.filter((monster) => monster.legendary?.resistancesPerDay !== undefined).length).toBe(32);
-    expect(monsters.flatMap((monster) => monster.actions).filter((action) => action.legendary).length).toBe(82);
+    const legendary = monsters.flatMap((monster) => monster.actions).filter((action) => action.legendary);
+    expect(legendary.filter((action) => action.partOf === undefined).length).toBe(82);
   });
 });
 

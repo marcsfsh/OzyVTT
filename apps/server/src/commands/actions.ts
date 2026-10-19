@@ -39,6 +39,8 @@ import { castSlotLevel, untrainedArmorCast } from "../resolution/economy.js";
 import { areaAtLevel } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
 import { spellWardedTargets } from "../zone-barriers.js";
+import { deflectingWall, zoneCover } from "../zone-walls.js";
+import { enclosedFrom } from "../enclosures.js";
 import { areaMoveOf, moveArea, planAreaMove, type AreaMove } from "../zone-moves.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
@@ -345,6 +347,17 @@ export const actionCommands = [
             (entry) => `${entry.ward} keeps ${spellCast.name} from affecting ${kit.actorName(entry.actorId)}.`
           );
         }
+        // A sphere of force lets no area in or out (Resilient Sphere); a single target across one is refused later.
+        if (template && resolvedTargetIds.length > 0) {
+          const enclosed = enclosedFrom(draft, actorId, resolvedTargetIds);
+          resolvedTargetIds = resolvedTargetIds.filter((id) => !enclosed.some((entry) => entry.actorId === id));
+          wardNotes = [
+            ...wardNotes,
+            ...enclosed.map(
+              (entry) => `${entry.sphere} keeps ${action.name} from affecting ${kit.actorName(entry.actorId)}.`
+            )
+          ];
+        }
         // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, measured edge to edge.
         const measured = (actorIdA: string, actorIdB: string): number | null =>
           geometry ? (tokenCreatureDistance(draft, geometry, actorIdA, actorIdB)?.value ?? null) : null;
@@ -439,6 +452,15 @@ export const actionCommands = [
             ...(request.gear !== undefined ? { gear: request.gear } : {}),
             ...(request.option !== undefined ? { option: request.option } : {}),
             ...(template || templates ? { areaPlaced: true } : {}),
+            // The template as the map draws it, for the walls a cast raises on it (Wall of Force).
+            ...(placed && geometry?.calibration
+              ? {
+                  placedArea: (({ origin, target }) => ({ shape: placed.shape, origin, target }))(
+                    shapeGeometry(geometry.calibration, placed.shape, placed.origin, placed.target)
+                  )
+                }
+              : {}),
+            ...(request.wallId !== undefined ? { wallId: request.wallId } : {}),
             ...(request.ready === true ? { ready: true } : {}),
             ...(request.moveFirst === true ? { moveFirst: true } : {}),
             // The rest of an action whose move was taken first was paid for then.
@@ -468,7 +490,16 @@ export const actionCommands = [
                 draft,
                 summonRequest,
                 kit.summonDeps(draft, draft.combat.mapAssetId === mapAssetId ? geometry : null)
-              )
+              ),
+            // The spell walls between two creatures that cover one or turn a shot (Blade Barrier, Wind Wall).
+            ...(geometry?.calibration
+              ? {
+                  zoneCover: (fromId: string, targetId: string) =>
+                    zoneCover(draft, fromId, targetId, kit.zoneDeps(draft, geometry)),
+                  deflectedBy: (fromId: string, targetId: string) =>
+                    deflectingWall(draft, fromId, targetId, kit.zoneDeps(draft, geometry))
+                }
+              : {})
           }
         );
         // A committed use counts toward the sheet's most-used options; a preview counts with its confirm.
@@ -705,10 +736,11 @@ export const actionCommands = [
       if (!found) throw new CommandRejectedError("That action is not on the stat block.");
       const listed = withChosenCost(found, chosenSpend);
 
-      // Outside a fight a creature's own spell is cast as it is in one, with no turn to spend: its grant,
-      // Concentration, saves and area happen, and a heal says who regained what. A cast that only helps lands on its
-      // caster when no one is named (Mage Armor on oneself). One that rolls against creatures and names none (a Fire
-      // Bolt tapped on the sheet) has no one to resolve against, so it rolls loose below, as an item's cast does.
+      // Outside a fight a spell is cast as it is in one, from a sheet or an item, with no turn to spend: its grant,
+      // Concentration, saves and area happen, and a heal says who regained what. So does an item's use that leaves an
+      // effect on its user (Winged Boots). A cast that only helps lands on its caster when no one is named (Mage Armor
+      // on oneself). One that rolls against creatures and names none (a Fire Bolt tapped on the sheet) has no one to
+      // resolve against, so it rolls loose below.
       const rollsOnTargets = listed.attack !== undefined || listed.save !== undefined || listed.damage.length > 0;
       const aimed =
         listed.grants?.target === "target" ||
@@ -718,10 +750,10 @@ export const actionCommands = [
       const named = targetIds && targetIds.length > 0 ? targetIds : !rollsOnTargets && aimed ? [actorId] : [];
       // A shape-shift outside a fight (Wild Shape to scout, a werewolf's change) takes its form the same way.
       const shapeShifts = listed.shapeShift !== undefined || listed.endsForm === true;
+      const itemGrant = isItemActionId(listed.id) && listed.grants !== undefined;
       if (
         !snapshot.combat.active &&
-        !isItemActionId(listed.id) &&
-        (castSpellOf(listed, kit.equipmentCatalog().spellRecord) !== null || shapeShifts) &&
+        (castSpellOf(listed, kit.equipmentCatalog().spellRecord) !== null || shapeShifts || itemGrant) &&
         (named.length > 0 || !rollsOnTargets || shapeShifts)
       ) {
         const result = await dispatch("action.resolve", {

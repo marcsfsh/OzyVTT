@@ -17,7 +17,6 @@ import {
 } from "../rules-families.js";
 import {
   isItemActionId,
-  isLongCastingTime,
   laterRowOf,
   laterSpellActionId,
   upcastAction,
@@ -32,9 +31,10 @@ import { areEnemies } from "../creature-sides.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
 import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
-import { scrollOfAction } from "../scrolls.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { reachBarredBy } from "../zone-barriers.js";
+import { swallowCover } from "../swallow.js";
+import { enclosureBlocks } from "../enclosures.js";
 import { builtinHandlerFor } from "./builtins.js";
 import {
   resolveHiddenCheck,
@@ -45,6 +45,7 @@ import {
   type ResolveInput
 } from "./context.js";
 import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
+import { actionTargetViolations } from "./action-targets.js";
 
 /** The attacker and targets, refused unless the action has something structured to resolve against them. */
 function combatantsOf(
@@ -58,14 +59,16 @@ function combatantsOf(
   // Casting a spell is something done even when it rolls nothing (Light, Guidance): it spends its casting time and is
   // told to the table. What a spell lets its caster do later is no new cast.
   const castsASpell = action.spellId !== undefined && !(spell !== undefined && laterRowOf(spell, action.id));
-  // Outside a fight a creature's own cast still starts what it starts (a grant, Concentration, a save, an area), with
-  // no turn to spend; an item's use stays on the loose route, which spends its charges.
+  // Outside a fight a cast still starts what it starts (a grant, Concentration, a save, an area), with no turn to
+  // spend, whether the creature or its item casts it, and so does an item's use that leaves an effect on its user
+  // (Winged Boots' flight, a Ring of Invisibility).
   const outsideFight = !state.combat.active;
   // A shape-shift is something a creature does outside a fight too (Wild Shape to scout, a werewolf's change).
   const shapeShifts = action.shapeShift !== undefined || action.endsForm === true;
+  const itemGrant = isItemActionId(action.id) && action.grants !== undefined;
   // So is helping an ally with a check (picking a lock, calming a horse), which needs no turn.
   const helps = action.id === "help-check";
-  if (outsideFight && !(castsASpell && !isItemActionId(action.id)) && !shapeShifts && !helps)
+  if (outsideFight && !castsASpell && !shapeShifts && !itemGrant && !helps)
     throw new CommandRejectedError("Start an encounter before resolving actions.");
   const inFight = (actorId: string) =>
     outsideFight
@@ -102,8 +105,6 @@ function combatantsOf(
     if (!action.move) throw new CommandRejectedError(`${action.name} makes no move of its own to take first.`);
     return { attacker, targets };
   }
-  // A move that is the whole action (Engulf, Trampling Charge) meets whom it passes through, and names no one first.
-  if (action.move?.entersSpaces) return { attacker, targets: [] };
   if (action.attack && targets.length !== 1)
     throw new CommandRejectedError("An attack roll resolves against exactly one target.");
   // A grant aimed at the action's target (Help) needs exactly one recipient; one for each target (Bless), at least one.
@@ -147,12 +148,18 @@ function combatantsOf(
     input.builtin === true ||
     // A light or a cloud is something done, with no creature under it (a magmin's flames, a darkmantle's aura).
     action.sight !== undefined ||
+    // A door or a wall is what it acts on (Knock, Passwall, Disintegrate aimed at a wall of force).
+    (spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined)) ||
     // So is bringing creatures onto the map (a Horn of Valhalla's Berserkers).
     action.summons !== undefined ||
     // Taking a form, or leaving it, is the user's own (Wild Shape, a werewolf's Shape-Shift).
     (shapeShifts && action.shapeShift?.onTargets !== true && action.save === undefined);
-  // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
-  const touchesSomeone = action.endsConditions !== undefined || action.healing?.perUse === true;
+  // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone, and so is a swallow.
+  const touchesSomeone =
+    action.endsConditions !== undefined ||
+    action.healing?.perUse === true ||
+    action.swallow?.conditions !== undefined ||
+    action.pull !== undefined;
   if (targets.length === 0 && (touchesSomeone || (!structuredWithoutTargets && action.grants?.target !== "target")))
     throw new CommandRejectedError("Choose at least one target.");
   if (
@@ -174,7 +181,11 @@ function combatantsOf(
     action.teleport === undefined &&
     action.summons === undefined &&
     action.raisesCorpse === undefined &&
-    input.builtin !== true
+    action.swallow?.conditions === undefined &&
+    action.pull === undefined &&
+    action.inflicts === undefined &&
+    input.builtin !== true &&
+    !(spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined))
   )
     throw new CommandRejectedError("That action has no structured effect to resolve. Run it from its description.");
   return { attacker, targets };
@@ -218,7 +229,16 @@ export function openResolve(
   const combatants = combatantsOf(state, reaching, input, deps.catalog, spell, hiddenFromInitiator);
   const { attacker } = combatants;
   const warnings: string[] = [];
-  const targets = input.areaPlaced ? onlyTargetTypes(combatants.targets, spell, deps, warnings) : combatants.targets;
+  const caught = input.areaPlaced ? onlyTargetTypes(combatants.targets, spell, deps, warnings) : combatants.targets;
+  // A swallowed creature has Total Cover from an area outside its swallower, and is left out of it.
+  const targets =
+    caught.length > 1
+      ? caught.filter((target) => {
+          if (swallowCover(state, combatants.attacker.id, target.id) === null) return true;
+          warnings.push(`${target.name} is swallowed and has Total Cover from ${declared.name}, so it is left out.`);
+          return false;
+        })
+      : caught;
   // A spell cast with a higher slot rolls that slot's dice and makes its rays (before the economy opens the action's
   // instance); a paid replay names the slot it was cast with.
   const castLevel = input.economyPaid ? input.slotLevel : castLevelOf(state, attacker, reaching, input.slotLevel);
@@ -272,10 +292,22 @@ export function openResolve(
       : null;
   // With dynamic vision on, the walls and creatures between them cover the target too (`mapCover`); an area's
   // creatures were caught by what its point of origin reaches, so a placed area reads no cover from the caster.
-  const fromMap = (target: LiveActor) => (input.areaPlaced === true ? null : mapCover(state, attacker.id, target.id));
+  // A spell wall between them that doesn't block the way covers the target as its text says (Blade Barrier).
+  const fromMap = (target: LiveActor) =>
+    input.areaPlaced === true
+      ? null
+      : bestCover(mapCover(state, attacker.id, target.id), deps.zoneCover?.(attacker.id, target.id));
+  // Pulling a creature out of a gelatinous cube reaches into it, so the cover it has inside doesn't bar End an Effect.
+  const reachesInside = input.builtin === true && builtinBaseId(action.id) === "end-an-effect";
   const attackCover =
     targets.length === 1
-      ? (input.cover ?? bestCover(coverFor(null, targets[0]), fromMap(targets[0]), auraCover(targets[0])))
+      ? (input.cover ??
+        bestCover(
+          coverFor(null, targets[0]),
+          fromMap(targets[0]),
+          auraCover(targets[0]),
+          reachesInside ? null : swallowCover(state, attacker.id, targets[0].id)
+        ))
       : (input.cover ?? null);
   // An area's other targets still take it, so a marked creature among several is the GM's to remove.
   if (targets.length > 1)
@@ -295,6 +327,19 @@ export function openResolve(
     ...(deps.catalog ? { catalog: deps.catalog } : {})
   };
   const sightBlocks: Array<readonly [RuleId, string]> = [];
+  // An action taken move first names its targets only once it has moved, so its own targeting rules are checked then
+  // (a gelatinous cube's Engulf takes only the creatures it moved through).
+  if (input.owedPaid === true)
+    for (const violation of actionTargetViolations({
+      state,
+      attacker,
+      action,
+      targetIds: input.targetIds,
+      definition: deps.definition,
+      resolveDefinition: deps.resolveDefinition,
+      distanceFeet: deps.distanceFeet
+    }))
+      sightBlocks.push([violation.rule, violation.message]);
   // SRD Hide: "you must be out of any enemy's line of sight". With dynamic vision on the engine knows who sees whom;
   // only an enemy the hider sees counts ("if you can see a creature, you can discern whether it can see you"), so
   // the refusal never gives away one the player doesn't know of.
@@ -334,6 +379,9 @@ export function openResolve(
   // A melee attack can't reach through a barrier that holds its attacker back (Antilife Shell).
   const shell = reachBarredBy(state, attacker, action, targets, deps);
   if (shell) sightBlocks.push(["range.out-of-reach", shell]);
+  // Nothing passes a sphere of force, in or out (Resilient Sphere, Bead of Force).
+  const sphere = enclosureBlocks(attacker, action, targets, deps.catalog);
+  if (sphere) sightBlocks.push(["cover.total", sphere]);
   for (const [rule, message] of sightBlocks) {
     const mode = effectiveModeFor(state.combat, rule);
     if (mode === "freeform") continue;
@@ -397,15 +445,7 @@ export function openResolve(
     keepsHidden: false
   };
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
-  if (!input.economyPaid)
-    warnings.push(
-      ...laterActionReminders(
-        spell,
-        action,
-        scrollOfAction(action, attacker.inventory, deps.catalog) !== null,
-        state.combat.active
-      )
-    );
+  if (!input.economyPaid) warnings.push(...laterActionReminders(spell, action));
   return ctx;
 }
 
@@ -439,27 +479,14 @@ export function withChosenDamageType(action: DefinitionAction, chosen: string | 
 }
 
 /** The GM's reminder on casting a spell that does more later (SRD text): what the caster may do on later turns, and
- *  what the GM spots for an area the server doesn't watch (an area with a zone it does). A creature's own long cast
- *  runs over its turns (`long-casting.ts`); an item's in a fight is the GM's to time, and a scroll read for a long
- *  casting time "isn't lost" if the casting is interrupted. */
-function laterActionReminders(
-  spell: SpellReference | undefined,
-  action: DefinitionAction,
-  fromScroll: boolean,
-  inFight: boolean
-): string[] {
+ *  what the GM spots for an area the server doesn't watch (an area with a zone it does). A long cast runs over its
+ *  caster's turns (`long-casting.ts`), an item's or a scroll's as much as a creature's own. */
+function laterActionReminders(spell: SpellReference | undefined, action: DefinitionAction): string[] {
   const later = spell?.effect?.laterActions ?? [];
   if (!spell || later.some((row) => laterSpellActionId(spell.id, row.name) === action.id)) return [];
-  return [
-    ...(inFight && isItemActionId(action.id) && isLongCastingTime(spell.castingTime)
-      ? [
-          `${spell.name} takes ${spell.castingTime} to cast. Until then, the caster takes the Magic action on each turn and keeps Concentration. If that breaks, the spell fails and ${fromScroll ? "the scroll isn't lost, so give it back on the sheet" : "its charges aren't spent, so restore them on the sheet"}.`
-        ]
-      : []),
-    ...later
-      .filter((row) => row.zone === undefined)
-      .map((row) => `${spell.name}: ${row.when} Use "${spell.name}: ${row.name}" for it.`)
-  ];
+  return later
+    .filter((row) => row.zone === undefined)
+    .map((row) => `${spell.name}: ${row.when} Use "${spell.name}: ${row.name}" for it.`);
 }
 
 /** The plan of a resolve whose economy was already spent: it changes nothing, and casts at the slot it was made with. */

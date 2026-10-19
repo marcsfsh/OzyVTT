@@ -257,9 +257,9 @@ describe("SRD 5.2.1 monster bundle", () => {
     const ratBite = byId("rat").actions.find((action) => action.id === "bite");
     expect(ratBite?.attack).toEqual({ bonus: 2, reachFeet: 5 });
     expect(ratBite?.damage).toEqual([{ formula: "1", type: "piercing" }]);
-    // ankheg: dice primary plus acid rider, parenthetical advantage clause skipped.
+    // ankheg: dice primary plus acid rider, and the parenthetical Advantage against a creature it grapples.
     const ankhegBite = byId("ankheg").actions.find((action) => action.id === "bite");
-    expect(ankhegBite?.attack).toEqual({ bonus: 5, reachFeet: 5 });
+    expect(ankhegBite?.attack).toEqual({ bonus: 5, reachFeet: 5, advantageWhen: "target-grappled-by-self" });
     expect(ankhegBite?.damage).toEqual([
       { formula: "2d6 + 3", type: "slashing" },
       { formula: "1d6", type: "acid" }

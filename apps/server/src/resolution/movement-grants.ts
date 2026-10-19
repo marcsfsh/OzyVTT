@@ -46,14 +46,13 @@ export function applyMovementGrants(ctx: ResolveContext): void {
       ...(move.mode ? { mode: move.mode } : {}),
       provokes: move.provokes,
       ...(move.straight ? { straight: true as const } : {}),
-      // A move that is the action (Trampling Charge) owes nothing after it: its save meets whom it passes through.
-      ...(input.moveFirst === true && !move.entersSpaces ? { owedActionId: action.id } : {}),
-      ...(move.entersSpaces ? { meets: { actionId: action.id, size: move.entersSpaces.size } } : {})
+      ...(move.throughCreatures ? { throughCreatures: move.throughCreatures } : {}),
+      ...(input.moveFirst === true ? { owedActionId: action.id } : {})
     });
     const verb =
       move.mode === "fly" ? "fly" : move.mode === "swim" ? "swim" : move.mode === "burrow" ? "burrow" : "move";
     say(
-      `${attacker.name} may ${verb} ${feet} ft${move.provokes ? "" : " without provoking Opportunity Attacks"}${move.straight ? " straight toward an enemy" : ""}${move.entersSpaces ? `, and each creature whose space it enters meets ${action.name}` : input.moveFirst === true ? `, then finish ${action.name}` : ""}.`
+      `${attacker.name} may ${verb} ${feet} ft${move.provokes ? "" : " without provoking Opportunity Attacks"}${move.straight ? " straight toward an enemy" : ""}${input.moveFirst === true ? `, then finish ${action.name}` : ""}.`
     );
   }
   if (input.moveFirst === true) return;
@@ -71,8 +70,11 @@ export function applyMovementGrants(ctx: ResolveContext): void {
   const spell = action.spellId ? deps.catalog?.spellRecord?.(action.spellId) : undefined;
   const teleport = action.teleport ?? spell?.effect?.teleport;
   if (teleport) {
-    grantTeleport(state, attacker, { id: `${input.commandId}:teleport`, name: action.name, teleport });
-    say(`${attacker.name} may teleport up to ${teleport.feet} ft to an unoccupied space it can see.`);
+    // "The balor teleports itself or a willing demon within 10 feet of itself": the creature it names instead.
+    const other = teleport.orAnother ? ctx.targets.find((target) => target.id !== attacker.id) : undefined;
+    const traveler = other ?? attacker;
+    grantTeleport(state, traveler, { id: `${input.commandId}:teleport`, name: action.name, teleport });
+    say(`${traveler.name} may teleport up to ${teleport.feet} ft to an unoccupied space ${attacker.name} can see.`);
   }
   // "Whenever you activate your Second Wind with a Bonus Action, you can move up to half your Speed without
   // provoking Opportunity Attacks."

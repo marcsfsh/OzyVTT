@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 15 GameState fields · 160 commands · 336 HTTP paths
+- 15 GameState fields · 167 commands · 343 HTTP paths
 
 ## GameState shape
 
@@ -36,7 +36,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 one table entry under `apps/server/src/commands/`. Both transports register from that table, and
 the OpenAPI document generates the command's operation from it. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `item`, `light`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `summon`, `survival`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `item`, `light`, `object`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `summon`, `survival`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
 
 | Command | Scope |
 | --- | --- |
@@ -66,6 +66,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `actor.set-health-display` | `actor:write` |
 | `actor.set-heroic-inspiration` | `actor:write` |
 | `actor.set-hp` | `actor:write` |
+| `actor.set-lair` | `actor:write` |
 | `actor.set-sheet-preview` | `actor:write` |
 | `actor.set-size` | `actor:write` |
 | `actor.set-speed` | `actor:write` |
@@ -116,6 +117,8 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `death-save.roll` | `combat:write` |
 | `dice.roll` | `roll:create` |
 | `door.set-open` | `combat:write` |
+| `door.set-state` | `scene:write` |
+| `door.use` | `combat:write` |
 | `effect.add` | `combat:write` |
 | `effect.end` | `combat:write` |
 | `encounter.add-combatant` | `combat:write` |
@@ -137,10 +140,14 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `initiative.roll-self` | `combat:write` |
 | `initiative.set` | `combat:write` |
 | `initiative.swap` | `combat:write` |
+| `item.set-form` | `combat:write` |
 | `item.set-light` | `combat:write` |
 | `light.add` | `scene:write` |
 | `light.move` | `scene:write` |
 | `light.remove` | `scene:write` |
+| `object.attack` | `combat:write` |
+| `object.damage` | `combat:write` |
+| `object.set` | `scene:write` |
 | `reaction.answer` | `combat:write` |
 | `reaction.dismiss` | `combat:write` |
 | `replay.launch` | `combat:write` |
@@ -336,8 +343,10 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/inventory/give`
 - `POST /api/v1/game/actors/{actorId}/inventory/recover-ammunition`
 - `POST /api/v1/game/actors/{actorId}/inventory/study`
+- `POST /api/v1/game/actors/{actorId}/items/{itemId}/form`
 - `POST /api/v1/game/actors/{actorId}/items/{itemId}/light`
 - `POST /api/v1/game/actors/{actorId}/known-forms`
+- `POST /api/v1/game/actors/{actorId}/lair`
 - `POST /api/v1/game/actors/{actorId}/long-rest-request`
 - `POST /api/v1/game/actors/{actorId}/long-rest-request/answer`
 - `POST /api/v1/game/actors/{actorId}/mount`
@@ -392,6 +401,8 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/damage/resolve`
 - `POST /api/v1/game/definitions/import`
 - `POST /api/v1/game/doors/{wallId}/open`
+- `POST /api/v1/game/doors/{wallId}/state`
+- `POST /api/v1/game/doors/{wallId}/use`
 - `POST /api/v1/game/encounter/combatants`
 - `POST /api/v1/game/encounter/combatants/{actorId}/remove`
 - `POST /api/v1/game/encounter/end`
@@ -416,6 +427,8 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `DELETE /api/v1/game/lights/{lightId}`
 - `POST /api/v1/game/lights/{lightId}/move`
 - `GET /api/v1/game/log`
+- `POST /api/v1/game/objects/attack`
+- `POST /api/v1/game/objects/damage`
 - `POST /api/v1/game/reactions/{reactionId}/answer`
 - `POST /api/v1/game/reactions/{reactionId}/dismiss`
 - `POST /api/v1/game/rests/party`
@@ -472,6 +485,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/walls`
 - `DELETE /api/v1/game/walls/{wallId}`
 - `POST /api/v1/game/walls/{wallId}/move`
+- `POST /api/v1/game/walls/{wallId}/object`
 - `POST /api/v1/game/walls/clear`
 - `GET POST /api/v1/gm/integration-credentials`
 - `GET /api/v1/gm/integration-credentials/{id}/audit`

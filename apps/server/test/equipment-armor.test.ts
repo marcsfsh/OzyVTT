@@ -336,6 +336,8 @@ describe("attunement", () => {
       }
     } as unknown as ActorDefinition;
     importActorDefinition(state, definition, ROGUE, "public", catalog);
+    // Attuning takes a Short Rest, and the rogue is in one.
+    state.rest = { ...state.rest, shortRest: { actorIds: [ROGUE], done: [] } };
     const resolve = (id: string) => state.definitions.find((entry) => entry.id === id)?.definition;
     const attune = (id: string) => {
       const record = library.equipmentRecord(id)!;

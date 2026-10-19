@@ -988,7 +988,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           label: "Only by",
           kind: "tags",
           placeholder: "cleric",
-          help: "A class or species. It's shown on the sheet and never enforced, because handing a player a restricted item on purpose is a normal table event.",
+          help: "A class, a species, spellcaster, or creature-attuned-to-a- followed by an item's id. Any one is enough. It's shown on the sheet, and a player can't attune a character that meets none. You can still attune anyone.",
           visibleWhen: (draft) => draft.isMagic === true && getAt(draft, "attunement.required") === true
         },
         {
@@ -1438,7 +1438,21 @@ const MONSTER_SCHEMA: HomebrewSchema = {
         { key: "token.footprint.width", label: "Token width", kind: "stepper", min: 1, max: 4, unit: "squares" },
         { key: "token.footprint.height", label: "Token height", kind: "stepper", min: 1, max: 4, unit: "squares" },
         { key: "legendary.actionsPerRound", label: "Legendary actions per round", kind: "number", min: 1, max: 5 },
-        { key: "legendary.resistancesPerDay", label: "Legendary resistances per day", kind: "number", min: 1, max: 6 }
+        { key: "legendary.resistancesPerDay", label: "Legendary resistances per day", kind: "number", min: 1, max: 6 },
+        {
+          key: "legendary.actionsInLair",
+          label: "Legendary actions per round in its lair",
+          kind: "number",
+          min: 1,
+          max: 5
+        },
+        {
+          key: "legendary.resistancesInLair",
+          label: "Legendary resistances per day in its lair",
+          kind: "number",
+          min: 1,
+          max: 6
+        }
       ]
     }
   ]

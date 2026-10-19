@@ -75,6 +75,7 @@ import { CharacterDraftStore } from "./character-drafts.js";
 import { turnReminder } from "./turn-reminder.js";
 import { hiddenFrom, hideRollsOfHidden, rememberExplored } from "./vision/audience.js";
 import { pruneEndedSight } from "./vision/cast-sight.js";
+import { pruneEndedWalls } from "./spell-walls.js";
 import { pruneEndedZones } from "./spell-zones.js";
 import { burnOutLights } from "./item-light.js";
 import { keepDeathRecords } from "./death.js";
@@ -129,6 +130,7 @@ export function createServer(options: CreateServerOptions) {
         // A spell's light, fog and area go with the cast that kept them, and a Torch burns down on the game clock.
         pruneEndedZones(state);
         pruneEndedSight(state);
+        pruneEndedWalls(state);
         burnOutLights(state, sightContent().catalog);
       } catch (error) {
         console.error("ending lights failed:", error instanceof Error ? error.message : error);

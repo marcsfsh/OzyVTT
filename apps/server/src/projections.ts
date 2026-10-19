@@ -245,6 +245,8 @@ const PENDING_SAVE_FIELDS = {
   // What a failure does at each Hit Point band names the thresholds, the stat block's text; it is narrated as it lands.
   failureByHitPoints: "never",
   failureBanishes: "never",
+  // What a swallower's failure lets out is narrated when it lands.
+  regurgitates: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
   gmApplies: "player",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
@@ -288,6 +290,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   ongoingDamage: "never",
   currentTurn: "player",
   magical: "never",
+  // What holds the creature a failure restrains (a Net's AC and Hit Points) reaches players by name on the effect.
+  heldBy: "never",
   // The DC of the action that ends it is the caster's number; the option it carries shows in its name.
   endAction: "never",
   optionId: "never",
@@ -615,6 +619,9 @@ function playerEffect(
     light: _light,
     findDc: _findDc,
     detects: _detects,
+    // What holds the creature reaches players by name, so anyone can attack it; its Armor Class and the Hit Points
+    // it has left are the GM's.
+    heldBy,
     // A form's stat block, the definition it replaced and its terms are the GM's; its name reaches the table, as the
     // effect's own name says it. What size the bearer has is on the actor.
     form,
@@ -622,7 +629,11 @@ function playerEffect(
     ownSize: _ownSize,
     ...rest
   } = effect;
-  const visible = { ...rest, ...(form ? { form: { name: form.name } } : {}) };
+  const visible = {
+    ...rest,
+    ...(heldBy ? { heldBy: { name: heldBy.name } } : {}),
+    ...(form ? { form: { name: form.name } } : {})
+  };
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
   // A readied spell's Metamagic picks are the engine's to apply at its release.
   const held = readiedSpell ? (({ shaping: _shaping, ...kept }) => kept)(readiedSpell) : undefined;
@@ -779,10 +790,16 @@ const PARTY_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filte
 
 /** Copies the listed fields. Optional ones that are unset are left out. */
 /** A carried row for a player. The GM's pick of a resistance type stays the GM's until the bearer attunes, when
- *  the item's properties are learned (and the resistance starts to apply). */
+ *  the item's properties are learned (and the resistance starts to apply); so does which kind an item that needs
+ *  attunement is (an Ioun Stone's). */
 function playerInventoryRow(item: Actor["inventory"][number]): Actor["inventory"][number] {
-  const { chosenDamageType, ...row } = item;
-  return chosenDamageType !== undefined && item.attuned ? { ...row, chosenDamageType } : row;
+  const { chosenDamageType, variantId, ...row } = item;
+  const learned = item.attuned || item.magic?.attunementRequired !== true;
+  return {
+    ...row,
+    ...(chosenDamageType !== undefined && item.attuned ? { chosenDamageType } : {}),
+    ...(variantId !== undefined && learned ? { variantId } : {})
+  };
 }
 
 function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): Pick<Actor, K> {

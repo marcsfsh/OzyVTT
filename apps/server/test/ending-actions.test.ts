@@ -7,7 +7,6 @@ import { builtinAction } from "../src/builtin-actions.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { RulesBlockedError } from "../src/game-store.js";
 import { answerSave } from "../src/saving-throws.js";
-import { meetAlongPath, meetingGrantOf } from "../src/path-meetings.js";
 import { actorOf, answer, cast, caster } from "./spell-lifetimes-kit.js";
 import { FOE } from "./spell-casters.js";
 
@@ -205,42 +204,10 @@ describe("ending an effect by the action its text prints", () => {
   it("pulls a creature out of a gelatinous cube on an Athletics check, and the puller takes the acid", () => {
     const built = table("gelatinous-cube");
     use(built, "engulf", [3, 3, 3]);
-    // Engulf's save meets the creatures whose spaces the cube's move enters: here the hero's.
-    const cell = (column: number) => ({ x: 25 + 50 * column, y: 25 });
-    built.state.combat.tokens = built.state.combat.tokens.map((token) => ({
-      ...token,
-      position: token.actorId === IDS.monster ? cell(0) : token.actorId === IDS.hero ? cell(3) : cell(9),
-      sizeCells: 1
-    }));
-    const cube = built.state.actors.find((actor) => actor.id === IDS.monster)!;
-    meetAlongPath(
-      built.state,
-      IDS.monster,
-      cell(0),
-      cell(5),
-      {
-        geometry: {
-          width: 900,
-          height: 600,
-          calibration: {
-            kind: "square",
-            origin: { x: 0, y: 0 },
-            cellSizePx: 50,
-            rotationRadians: 0,
-            distancePerCell: 5
-          }
-        },
-        resolveDefinition: resolveDefinition(built),
-        rollDie: () => 3,
-        newId: nextId,
-        now: NOW
-      },
-      meetingGrantOf(built.state, cube)
-    );
     failHerosSave(built);
     // "Is suffocating": the engulfed hero holds its breath, and breathes again once pulled free.
     expect(hero(built).effects).toMatchObject([
-      { tags: ["escape-athletics", "cant-speak", "smothering"], escapeDc: 12 },
+      { tags: ["escape-athletics", "cant-speak", "smothering", "swallowed"], escapeDc: 12 },
       { name: "Holding Breath" }
     ]);
     const before = ally(built).hp.current;

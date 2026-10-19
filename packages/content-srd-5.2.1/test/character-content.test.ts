@@ -1907,7 +1907,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
       ]).feature.modifiers
     ).toHaveLength(8);
     expect(feat([{ type: "healing-received-maximized" }]).feature.modifiers).toHaveLength(1);
-    expect(ModifierSchema.options).toHaveLength(37);
+    expect(ModifierSchema.options).toHaveLength(43);
   });
 
   it("15. an item that grants a feat", () => {
@@ -1929,10 +1929,9 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
 
   // ---- the refusals, verified by injection ------------------------------------------------------
 
-  it("refuses hit points, ability scores and attunement slots on an ITEM carrier only: a feat keeps all three", () => {
+  it("refuses hit points per level and attunement slots on an ITEM carrier only: a feat keeps both", () => {
     for (const modifier of [
       { type: "hit-points-per-level", amount: 1 },
-      { type: "ability-score", ability: "str", amount: 2 },
       // An item that raised the attunement limit would decide its own attunement.
       { type: "attunement-slots", amount: 1 }
     ]) {
@@ -1945,12 +1944,18 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
       });
       expect(refused.success, modifier.type).toBe(false);
       expect(!refused.success && JSON.stringify(refused.error.issues), modifier.type).toContain(
-        "cannot change hit points, an ability score or the attunement limit"
+        "can't change hit points per level or the attunement limit"
       );
       // The same rider on a feat is fine: a feat is never un-granted, so baking it in is correct.
       expect(feat([modifier]).feature.modifiers, modifier.type).toHaveLength(1);
       expect(ModifierSchema.safeParse(modifier).success, modifier.type).toBe(true);
     }
+    // An item's ability score is read live while it is worn, so an item may carry one.
+    const belt = { type: "ability-score", ability: "str", amount: 2 } as const;
+    expect(
+      EquipmentReferenceSchema.safeParse({ id: "hb-y", name: "Y", category: "wondrous", ...bare, modifiers: [belt] })
+        .success
+    ).toBe(true);
     // A flat `hit-points` maximum is not in the vocabulary at all, so every carrier refuses it.
     expect(ModifierSchema.safeParse({ type: "hit-points", amount: 5 }).success).toBe(false);
   });

@@ -6,7 +6,8 @@ Accepted on 2026-10-17. Amends ADR-0022: its consequence that "a _public_ token 
 visually covered but still present in the player payload" no longer holds. A creature wholly under
 manual fog is now left out of what players receive, the same way as one out of sight.
 
-Amended on 2026-10-19 by "Light, obscurement and the rules that read sight" below.
+Amended on 2026-10-19 by "Light, obscurement and the rules that read sight" below, and again by
+"Doors, objects and the walls spells make".
 
 ## Context and decision drivers
 
@@ -166,9 +167,9 @@ about 40 ms in the dark (7 ms in bright light), and a player's vision block is a
     price of not drawing where the carrier stands.
   - A rule that a hidden creature would trigger for a visible one (Pack Tactics, an aura, an ally for
     Sneak Attack, Disadvantage beside it) doesn't apply. The GM can still set the roll mode.
-- Not modelled yet: locked doors, and opening a door as the turn's object interaction. The light
-  spells, the Bullseye Lantern's Cone, senses from effects, magical Darkness, obscured areas and Dim
-  Light's Disadvantage on Perception came with the amendment below.
+- Not modelled yet: opening a door as the turn's object interaction. The light spells, the Bullseye
+  Lantern's Cone, senses from effects, magical Darkness, obscured areas and Dim Light's Disadvantage
+  on Perception came with the first amendment below, and locked doors with the second.
 
 ## Amendment (2026-10-19): light, obscurement and the rules that read sight
 
@@ -240,6 +241,51 @@ every creature whether it sees every other takes about 13 ms. A player's vision 
 KB. The first numbers in this record were taken on an idle machine; the cached paths are what a
 turn mostly runs.
 
+## Amendment (2026-10-19): doors, objects and the walls spells make
+
+**Doors that stay shut.** A door may carry `door`: its `fastenings` (a `lock` with the DC to pick it,
+an optional DC to break it by force and the creatures that hold its key; `stuck`, `barred` or
+`jammed` with the Strength (Athletics) DC that forces it, 15 when none is set; `sealed` by Stone
+Shape, which no check opens), an `arcaneLock` with its caster, the creatures it lets through and how
+long Knock holds it off, and `hidden` for a secret door. `door.set-open` refuses a player a door held
+shut against their character and says what holds it ("The door is locked."), so a player learns of
+a lock by trying the door, as at a table. A secret door, or one out of reach, gets the answer a
+missing door gets.
+
+**Objects.** A wall or a door may carry `object`: an Armor Class, Hit Points, a damage threshold
+and its immunities, resistances and vulnerabilities (SRD Breaking Objects). A door with none is a
+Medium wooden door, AC 15 and 18 Hit Points. What holds a creature (a Net, a web, a rope) is an
+object on the effect that holds it (`heldBy`). An object always shrugs off Poison and Psychic
+damage, a Siege Monster's damage to it doubles, and at 0 Hit Points a wall or door is gone and a
+held creature goes free.
+
+**Walls made by spells.** A spell's `walls` raise walls on the template its cast placed: Wall of
+Force (it stops movement, and sight passes), Wall of Stone and Wall of Ice in 10-foot panels that are objects,
+and Forcecage's bars, which stop movement and no line, so they give no cover and stop no area. A
+creature in the new wall's space is moved out of it. Each wall carries its `source` and goes with
+the Concentration or effect that keeps it (`pruneEndedWalls`), unless the spell made it lasting (Wall
+of Stone held for its full duration). A cast's `wallId` aims Knock, Arcane Lock, Mage Hand,
+Thaumaturgy, Elementalism, Stone Shape, Passwall or Disintegrate at a door or a wall, checked for
+range and, where the spell says so, sight. A gap cut in a wall (`openings`) lets sight and movement
+through and closes with its spell. A creature that passes walls (Incorporeal Movement, Earth Glide,
+Tunneler) is still stopped by one a spell raised.
+
+**What players get.** No part of `door` or `object` reaches a player or the table screen. A secret
+door is sent as a `wall`, a wall with gaps as the parts that stand (each with an id derived from
+the wall's), and what holds a creature only as its name.
+
+**Commands.** `door.set-state` and `object.set` are the GM's (`scene:write`), with an optional
+`sceneId`. `door.use` and `object.attack` are `combat:write`: the GM's for any creature, a player's
+for their own character, which must be beside the door to work on it. The server rolls every check
+and attack. `object.damage` is the GM's alone.
+
+**On the map.** A door's handle opens its menu: open or close the door and, with the player's
+character or the GM's acting creature, pick, force, pry, jam or seal it. The GM's handle shows a
+door held shut and a secret one, the GM sees the hit points of each wall or door that is an object,
+and the menu edits the lock, the bar, the secret and the statistics. While an attack or a spell is
+being aimed, a tap on a wall or a door makes it the target. A token's menu names what holds the
+creature and aims a live attack at it.
+
 ## Mobile, security, and visibility impact
 
 The GM's tools are one more labelled group in the map toolbar, **Vision**: the switch, the light
@@ -248,7 +294,7 @@ all walls" and "Forget what the party has seen". The Light group also paints are
 with the kind to paint) and turns bright ambient light into sunlight; Remove takes an area away. A
 player's light sources are lit, hooded and aimed in the item's detail on the sheet's Gear tab. It
 works at 390 px with touch. A door's handle has
-a 44-pixel touch ring, which a player taps to open the door beside their character. The client
+a 44-pixel touch ring, which opens the door's menu (see the second amendment). The client
 paints the server's polygons as a second mask in `FogOverlay`: solid for players and the table
 screen, dimmed for the GM. What is in sight but not in Bright Light keeps a light shade, and a
 sensed creature is a dashed ring named with its creature type.
