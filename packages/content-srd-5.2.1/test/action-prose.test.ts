@@ -208,6 +208,13 @@ describe("reading a Multiattack", () => {
       sheet("Claws", "Tail", "Hurl Flame")
     );
     expect(barbed?.alternatives).toEqual([[{ actionId: "hurl-flame", count: 2 }]]);
+    expect(barbed).not.toHaveProperty("alternativesAfter");
+    expect(
+      multiattackOfProse(
+        "The golem makes two Slam attacks, or it makes three Slam attacks if it used Hasten this turn.",
+        sheet("Slam", "Hasten")
+      )
+    ).toMatchObject({ alternatives: [[{ actionId: "slam", count: 3 }]], alternativesAfter: "hasten" });
     expect(
       multiattackOfProse(
         "The lion makes two Rend attacks. It can replace one attack with a use of Roar.",

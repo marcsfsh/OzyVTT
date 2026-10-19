@@ -51,7 +51,8 @@ import { holdsFeature, spellClassOf } from "../class-features.js";
 import { launchesProjectile } from "../zone-walls.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { creatureTypeOf, swimSpeedFeet } from "../statblock-facts.js";
-import { auraOfAuthority } from "../statblock-traits.js";
+import { auraOfAuthority, traitOf } from "../statblock-traits.js";
+import { attachedAdvantage } from "../attachments.js";
 import { hitRiderOf } from "./hit-riders.js";
 import { wardedConditions } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
@@ -477,8 +478,28 @@ function traitClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeCl
   // Points."
   if (target.hp.current < target.hp.maximum && holdsFeature(deps.definition, "blood-frenzy", "Blood Frenzy"))
     sources.advantage.push({ source: "blood-frenzy", label: "Blood Frenzy (target is hurt)" });
+  // What the attack's own printing gives it (SRD 5.2.1: "with Advantage if the target is Grappled by the ankheg").
+  const printed = ctx.action.attack?.advantageWhen;
+  if (
+    printed === "target-grappled-by-self" &&
+    target.effects.some(
+      (effect) => effect.sourceActorId === attacker.id && effect.linkedConditionIds.includes("grappled")
+    )
+  )
+    sources.advantage.push({ source: "printed", label: `${ctx.action.name} (target Grappled by ${attacker.name})` });
+  if (printed === "target-hurt" && target.hp.current < target.hp.maximum)
+    sources.advantage.push({ source: "printed", label: `${ctx.action.name} (target is hurt)` });
+  if (printed === "first-round" && state.combat.active && state.combat.round === 1)
+    sources.advantage.push({ source: "printed", label: `${ctx.action.name} (first round)` });
   const authority = auraOfAuthority(state, attacker, deps);
   if (authority) sources.advantage.push(authority);
+  // "While attached to a target, the darkmantle can attack only the target but has Advantage on its attack rolls."
+  if (attachedAdvantage(state, attacker.id, target.id))
+    sources.advantage.push({ source: "attached", label: `${attacker.name} attached to ${target.name}` });
+  // SRD Blurred Form (a steam mephit): "Attack rolls against the mephit are made with Disadvantage unless the mephit
+  // has the Incapacitated condition."
+  const blurred = traitOf(target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined, "blurred");
+  if (blurred && !isIncapacitated(target)) sources.disadvantage.push({ source: "blurred", label: blurred.name });
   if (!deps.distanceFeet || !holdsFeature(deps.definition, "pack-tactics", "Pack Tactics")) return;
   for (const entry of state.combat.initiative) {
     const ally = state.actors.find((candidate) => candidate.id === entry.actorId);
@@ -986,7 +1007,12 @@ export function spendUntilAttacked(ctx: ResolveContext): void {
 export function spendUntilItActs(ctx: ResolveContext): void {
   const { state, action, attacker, attack, input, damage, effectsEnded } = ctx;
   if (input.commit === false) return;
-  const acted = attack !== null || action.spellId !== undefined || action.spellSlot !== undefined || damage.length > 0;
+  const acted =
+    attack !== null ||
+    action.spellId !== undefined ||
+    action.spellSlot !== undefined ||
+    damage.length > 0 ||
+    action.endsUntilItActs === true;
   if (!acted) return;
   dropInvisibilityOnActing(ctx);
   for (const effect of attacker.effects.filter(

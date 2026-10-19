@@ -13,6 +13,8 @@ import type {
 } from "@vtt/domain";
 import { d20Die } from "@vtt/rules-5e";
 import { storedDefinition } from "../actor-roster.js";
+import { withMonsterSpells } from "../monster-spells.js";
+import type { ActorDefinition } from "@vtt/schemas";
 import type { CharacterDraftStore } from "../character-drafts.js";
 import type { Initiator } from "../authorization.js";
 import type { CombatLogStore } from "../combat-log.js";
@@ -204,10 +206,21 @@ export function createKit(context: CommandContext) {
   /** Play-time definition lookup: imported stat blocks first; `monsterForInstance` ignores homebrew status so
    *  a soft-deleted creature's live tokens keep working. A stored sheet is read with the ability scores its creature's
    *  worn items and effects give it now (`live-abilities.ts`). */
+  // An imported stat block's spells become cast actions as the catalog's do, read once for each stored definition.
+  const casts = new WeakMap<ActorDefinition, ActorDefinition>();
+  const withCasts = (definition: ActorDefinition) => {
+    const known = casts.get(definition);
+    if (known) return known;
+    const expanded = withMonsterSpells(definition, (spellId) =>
+      contentLibrary.forAudience("play").spellRecord(spellId)
+    );
+    casts.set(definition, expanded);
+    return expanded;
+  };
   const resolveDefinitionIn = (state: GameState, definitionId: string) => {
     const stored = storedDefinition(state, definitionId);
     return stored
-      ? liveDefinitionIn(state, definitionId, stored, equipmentCatalogOf(playCatalog()))
+      ? liveDefinitionIn(state, definitionId, withCasts(stored), equipmentCatalogOf(playCatalog()))
       : contentLibrary.monsterForInstance(definitionId);
   };
 

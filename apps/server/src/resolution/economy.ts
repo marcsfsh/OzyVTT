@@ -44,9 +44,13 @@ import { carriesSpellbook, hasClassFeature } from "../ritual-adept.js";
 import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
 import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
+import { planThisTurn, usedMarkOf } from "./multiattack-after.js";
 import { END_EFFECT_ACTION_ID, hasEndingOption, NO_ENDING_OPTION } from "../ending-actions.js";
 import { castMarks, markMoveOf } from "./marks.js";
 import { actionTargetViolations } from "./action-targets.js";
+import { swallowViolations } from "../swallow.js";
+import { bloodiedHitViolation } from "../bloodied-hits.js";
+import { attachmentViolations } from "../attachments.js";
 import { hitRiderOf } from "./hit-riders.js";
 import { hiddenFrom } from "../vision/audience.js";
 import { withoutSourceName } from "../hidden-source.js";
@@ -63,6 +67,7 @@ import {
   shapingOf,
   type ShapingPlan
 } from "./metamagic.js";
+import { legendaryActionsPerRound } from "../lair.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
 
@@ -106,6 +111,8 @@ export type EconomyPlan = Readonly<{
   surge: boolean;
   /** The turn's uses key of a feature used once per turn beside a pool of its own (Stunning Strike), or null. */
   oncePerTurn?: string | null;
+  /** The turn's mark that this action was used, which a sibling Multiattack waits on (`multiattack-after.ts`). */
+  usedMark?: string | null;
   /** The consumed materials and coins the cast uses up (SRD Components). */
   componentSpends?: readonly ComponentSpend[];
   /** The Sorcery Points the cast's Metamagic spends and what it marks on the turn (`metamagic.ts`). */
@@ -180,6 +187,10 @@ export function evaluateActionEconomy(
     shaping?: readonly CastShaping[];
   }> = {}
 ): EconomyEvaluation {
+  // A Multiattack whose other plan waits on an action used this turn (a clay golem's Hasten) plans as it stands now.
+  const usedMark = usedMarkOf(state, attacker.id, action, siblings);
+  action = planThisTurn(state, attacker.id, action);
+  siblings = siblings.map((sibling) => planThisTurn(state, attacker.id, sibling));
   const evaluation: Evaluation = {
     state,
     attacker,
@@ -233,6 +244,12 @@ export function evaluateActionEconomy(
   // Who a non-spell action may target: its count, range and creatures (`ActionSchema.targets`).
   evaluation.violations.push(
     ...actionTargetViolations({ state, attacker, action, targetIds, definition, resolveDefinition, distanceFeet }),
+    // How many it can hold swallowed, and what it can't do while it holds one (a giant toad's Bite).
+    ...swallowViolations(state, attacker, action, siblings, targetIds),
+    // What a creature attached to another can't do while it holds on (a stirge's Proboscis).
+    ...attachmentViolations(state, attacker, action, targetIds),
+    // A Rampage waits on damage to a creature already Bloodied.
+    ...[bloodiedHitViolation(state, attacker, action)].filter((violation) => violation !== null),
     ...raiseViolations({ state, attacker, action, targetIds })
   );
   if (spell) checkMarkMove(evaluation, spell);
@@ -321,6 +338,7 @@ export function evaluateActionEconomy(
       magicAction: evaluation.onOwnTurn && isMagicAction(action),
       surge,
       oncePerTurn,
+      usedMark,
       ...(components.spends.length > 0 ? { componentSpends: components.spends } : {}),
       ...(shaped?.plan ? { shaping: shaped.plan } : {}),
       ...(newCast && spell.level >= 1 ? { leveledCast: true } : {})
@@ -801,10 +819,19 @@ function checkLimitedUse({ state, attacker, action, siblings, violations }: Eval
   if (action.grants?.tags.includes(RAGING_TAG) && hasEffectTag(attacker, RAGING_TAG)) return null;
   const uses = action.uses;
   const key = uses.pool ?? action.id;
+  // A cast in the plan its pool's own action opened (the second Fireball of a pit fiend's Hellfire Spellcasting) shares
+  // the use that opened it.
+  if (paidByOpenPlan(state, attacker, action, key)) return null;
   // The counter is keyed on the pool, so the gate is the pool's size (see `useLimitFor`).
   const limit = useLimitFor(siblings, action);
   const spent =
     uses.per === "turn" ? (state.combat.turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
+  // "Whenever it roars, the roar has a different effect": a use that comes in its order since the last rest.
+  if (action.useNumber !== undefined && spent + 1 !== action.useNumber && spent < limit)
+    violations.push({
+      rule: "feature.no-uses-remaining",
+      message: `${action.name} comes as use ${action.useNumber} of ${limit}, and ${attacker.name} has spent ${spent}.`
+    });
   // Some activations spend several (Lay on Hands' 5-point cure, or the points its user chose).
   const cost = useCostOf(action);
   if (spent + cost > limit)
@@ -813,6 +840,16 @@ function checkLimitedUse({ state, attacker, action, siblings, violations }: Eval
       message: spent >= limit ? noUsesRemaining(action, limit) : notEnoughUses(action.name, limit - spent, cost)
     });
   return { key, per: uses.per, amount: cost };
+}
+
+/** Whether this turn's open action is the plan of the pool's own action (a Hellfire Spellcasting's two casts), with a
+ *  place or a replacement left for this one. */
+function paidByOpenPlan(state: GameState, attacker: LiveActor, action: DefinitionAction, pool: string): boolean {
+  const open = state.combat.turn.actionInstance;
+  if (!open || open.actorId !== attacker.id || open.parentId !== pool || state.combat.turnActorId !== attacker.id)
+    return false;
+  if (placeFor(open.components, action.id) !== null) return true;
+  return Object.entries(open.replacements ?? {}).some(([key, left]) => left > 0 && key.split("|").includes(action.id));
 }
 
 /** Why a limited-use action is refused, in and out of a fight. */
@@ -1285,7 +1322,7 @@ function checkLegendary(
 ): EconomyPlan["spendLegendary"] {
   if (!action.legendary) return null;
   const cost = action.legendary.cost;
-  const perRound = definition?.legendary?.actionsPerRound ?? 3;
+  const perRound = legendaryActionsPerRound(attacker, definition);
   const spent = state.combat.legendaryUsed[attacker.id] ?? 0;
   if (onOwnTurn)
     violations.push({
@@ -1757,13 +1794,12 @@ export function commitEconomy({
   // A consumed material is used up as the cast happens ("which the spell consumes").
   if (plan.componentSpends) spendComponents(attacker, plan.componentSpends);
   commitShaping(state, attacker, plan.shaping, plan.leveledCast === true);
-  if (plan.oncePerTurn) {
-    const key = plan.oncePerTurn;
-    state.combat = {
-      ...state.combat,
-      turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
-    };
-  }
+  for (const key of [plan.oncePerTurn, plan.usedMark])
+    if (key)
+      state.combat = {
+        ...state.combat,
+        turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
+      };
   if (plan.spendUse) commitUse(state, attacker, plan.spendUse);
 }
 

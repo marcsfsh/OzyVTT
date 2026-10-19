@@ -8,7 +8,14 @@ import { effectiveSkillTier } from "../equipment-derivation.js";
 import { endUsedHelp, useHelp } from "../help-assist.js";
 import { checkSightFor, couldSpot } from "../vision/rules.js";
 import { builtinBaseId, END_EFFECT_ID } from "../builtin-actions.js";
-import { addEffect, endEffect, ESCAPE_ATHLETICS_TAG, makeEffect, WAKEABLE_TAG } from "../effects.js";
+import {
+  addEffect,
+  endEffect,
+  ESCAPE_ATHLETICS_TAG,
+  ESCAPE_DISADVANTAGE_TAG,
+  makeEffect,
+  WAKEABLE_TAG
+} from "../effects.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { putOutFire } from "../hazards.js";
 import { endingOptions } from "../ending-actions.js";
@@ -62,7 +69,9 @@ export function rollCheck(
   dc: number | null,
   label?: string,
   stakes: readonly string[] = [],
-  versus?: CheckVersus
+  versus?: CheckVersus,
+  /** A Disadvantage the check's own rule gives it, by name (escaping a mimic's grip). */
+  disadvantage?: string
 ): boolean | null {
   // A Help an earlier check used ends before this one is planned.
   const helpEnded = endUsedHelp(ctx.state, ctx.attacker);
@@ -90,8 +99,16 @@ export function rollCheck(
     )
   });
   const forced = label === undefined ? (ctx.input.rollMode ?? undefined) : undefined;
-  const mode = forced ?? plan.rollMode.mode;
-  ctx.rollMode = shownRollMode(plan.rollMode, forced);
+  const rollMode =
+    disadvantage === undefined
+      ? plan.rollMode
+      : {
+          mode: plan.rollMode.advantage.length > 0 ? ("normal" as const) : ("disadvantage" as const),
+          advantage: plan.rollMode.advantage,
+          disadvantage: [...plan.rollMode.disadvantage, disadvantage]
+        };
+  const mode = forced ?? rollMode.mode;
+  ctx.rollMode = shownRollMode(rollMode, forced);
   const roll = totalCheck(plan, d20FacesFor(mode, [], ctx.deps.random), mode, ctx.deps.random);
   recordRoll(ctx, roll.resolution, "check", undefined, { total: roll.total });
   // An ally's Help with this skill is used by this check.
@@ -307,7 +324,8 @@ function escapeGrapple(ctx: ResolveContext): void {
       : acrobatics;
   const subject = input.skill === "athletics" ? athletics : input.skill === "acrobatics" ? acrobatics : better;
   // What the escape would end, for a rider that helps against it (Powerful Build: "to end the Grappled condition").
-  if (rollCheck(ctx, subject, escapable.escapeDc, undefined, escapable.linkedConditionIds)) {
+  const hindered = escapable.tags.includes(ESCAPE_DISADVANTAGE_TAG) ? `${escapable.name} (hard to escape)` : undefined;
+  if (rollCheck(ctx, subject, escapable.escapeDc, undefined, escapable.linkedConditionIds, undefined, hindered)) {
     endEffect(state, attacker.id, escapable.id);
     ctx.effectsEnded.push(endedEffect(attacker, escapable));
   }

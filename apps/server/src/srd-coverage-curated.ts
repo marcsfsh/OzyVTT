@@ -471,8 +471,8 @@ const changesForm = reference(
 );
 /** A trait that regains Hit Points from damage of one type, which the creature is also immune to. */
 const absorbs = (type: string) =>
-  reference(
-    `hit-points.ts applies the stat block's Immunity to ${type} damage. The Hit Points it regains from that damage are the GM's to add.`
+  enforced(
+    `Each time ${type} damage lands on it, the creature regains Hit Points equal to the ${type} damage dealt (damage-traits.ts), beside the stat block's own defences against it (hit-points.ts).`
   );
 
 export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
@@ -491,7 +491,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Aura of Authority": enforced(
     "statblock-traits.ts gives the hobgoblin and its allies within 10 feet Advantage on attack rolls and saving throws while it isn't Incapacitated."
   ),
-  "Aversion to Fire": reference("The Disadvantage after it takes Fire damage is the GM's to apply."),
+  "Aversion to Fire": enforced(
+    "Fire damage that lands gives the golem Disadvantage on attack rolls and ability checks until the end of its next turn (damage-traits.ts)."
+  ),
   "Barbed Hide": enforced(
     "trait-turns.ts deals 1d10 Piercing damage at the start of the devil's turns to each creature it grapples or that grapples it."
   ),
@@ -506,7 +508,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "resolution/attack.ts and saving-throws.ts give the Bloodied berserker Advantage on attack rolls and saving throws."
   ),
   "Bloodied Fury": enforced("resolution/attack.ts gives the Bloodied creature Advantage on attack rolls."),
-  "Blurred Form": reference("The Disadvantage on attack rolls against the mephit is the GM's to apply."),
+  "Blurred Form": enforced(
+    "Attack rolls against the mephit have Disadvantage unless it is Incapacitated (resolution/attack.ts)."
+  ),
   Bound: reference("The amulet and the damage it shares are the GM's to run."),
   "Celestial Restoration": revives,
   Compression: squeezes,
@@ -529,7 +533,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   "Eldritch Restoration": revives,
   "Elemental Restoration": revives,
-  Ephemeral: reference("What it can carry is the GM's to rule."),
+  Ephemeral: enforced("inventory.ts refuses any item given to the wisp to wear or carry."),
   "Ethereal Sight": senses,
   Evasion: enforced(
     "saving-throws.ts takes no damage on a successful Dexterity save for half damage and half on a failure, while the assassin isn't Incapacitated."
@@ -547,7 +551,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "movement-rules.ts lets the elemental end a move in a creature's space and terrain.ts lets it through any gap in the walls an inch wide, which the map's drag preview (movePreview.ts) charges the same way. A move of its own deals 1d10 Fire damage to each creature whose space it enters, once a turn per creature (wall-passage.ts)."
   ),
   Flyby: enforced("movement-rules.ts opens no Opportunity Attack when it flies out of an enemy's reach."),
-  Freeze: reference("The slower Speed after Cold damage is the GM's to apply."),
+  Freeze: enforced(
+    "Cold damage that lands lowers the elemental's Speed by 20 feet until the end of its next turn (damage-traits.ts)."
+  ),
   Gibbering: enforced(
     "trait-turns.ts opens the Wisdom save for each creature that starts its turn within 20 feet, and on a failure random-outcomes.ts rolls the d8: doing nothing takes its actions, Bonus Action, Reaction and Speed for the turn, wandering its actions and Bonus Action, and the random attack is said to the table."
   ),
@@ -573,7 +579,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Iron Scent": senses,
   Jumper: enforced("jumping.ts measures its jumps with Dexterity in place of Strength."),
   "Legendary Resistance": enforced(
-    "saving-throws.ts lets the GM turn a failed save into a success, as many times a day as the stat block prints. A Long Rest restores them; the extra use in the lair is the GM's."
+    "saving-throws.ts lets the GM turn a failed save into a success, as many times a day as the stat block prints, or its lair count while the GM marks it fighting in its lair (lair.ts). A Long Rest restores them."
   ),
   "Light Sensitivity": enforced(
     "resolution/attack.ts gives the cloaker Disadvantage on attack rolls while it stands in Bright Light (vision/rules.ts). With dynamic vision off, the light is the GM's."
@@ -601,7 +607,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Multiple Heads": enforced(
     "death-traits.ts kills one head on each turn the hydra takes 25 damage or more, and the hydra with its last. At the end of its turn it grows two heads for each one lost since its last turn and regains 20 Hit Points, unless it took Fire damage since then. Its Multiattack makes one Bite per living head (effective-actions.ts)."
   ),
-  "Ooze Cube": reference("Entering the cube, and pulling a creature out, are the GM's to run with its Engulf."),
+  "Ooze Cube": enforced(
+    "Any creature may move into the cube's space, and one that does makes the Engulf save with Disadvantage (space-entry.ts). Engulf holds one Large or four smaller creatures inside, with Total Cover from outside, and a creature within 5 feet can pull one out with an action and the Athletics check, taking the acid."
+  ),
   "Pack Tactics": enforced(
     "resolution/attack.ts gives Advantage when an ally of the attacker that isn't Incapacitated is within 5 feet of the target."
   ),
@@ -793,7 +801,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Insect Cloud fills a 30-foot Emanation that is Heavily Obscured for everyone but its holder for 10 minutes (vision/cast-sight.ts). Giant Insect costs 4 charges and brings the insect (summons.ts), and Insect Plague costs 5. A strong wind dispersing the cloud is the GM's."
   ),
   "action:Aboleth/dominate-mind": guided(
-    "The DC 16 Wisdom save and Charmed are applied, and a failure puts the target under the aboleth's command and on its side (summons.ts), so its player can't move it or act for it. The repeat save when it takes damage, the end when the aboleth dies, and the 60 feet the control reaches are the GM's."
+    "The DC 16 Wisdom save and Charmed are applied, and a failure puts the target under the aboleth's command and on its side (summons.ts), so its player can't move it or act for it; it repeats the save whenever it takes damage, and the Charm ends when the aboleth dies (save-stages.ts). That the control reaches only 60 feet, and the save after each day spent a mile away, are the GM's."
   ),
   "action:Treant/animate-trees": enforced(
     "Two trees animate within 60 feet from the Treant stat block with Intelligence and Charisma 1 and no Animate Trees, under the treant's command and on its side, acting right after it (summons.ts). They stop after a day, at 0 Hit Points, when the treant dies or more than 120 feet from it. Which trees stand where is the GM's."
@@ -844,23 +852,23 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:cape-of-the-mountebank": guided(
     "The cast of Dimension Door, once a dawn, teleports the wearer on the map (granted-moves.ts). The smoke cloud is the GM's."
   ),
-  "action:Giant Hyena/rampage-1-day": guided(
-    "It can be taken move first: the use is spent and a move of half its Speed granted (granted-moves.ts). The Bite it then makes, and the Bloodied creature it needs to have damaged, are the GM's."
+  "action:Giant Hyena/rampage-1-day": enforced(
+    "It is offered only right after the hyena damages a creature that was already Bloodied (bloodied-hits.ts). Taken move first, the use is spent and a move of half its Speed granted (granted-moves.ts), and then it makes its Bite."
   ),
-  "action:Gnoll Warrior/rampage-1-day": guided(
-    "It can be taken move first: the use is spent and a move of half its Speed granted (granted-moves.ts). The Rend it then makes, and the Bloodied creature it needs to have damaged, are the GM's."
+  "action:Gnoll Warrior/rampage-1-day": enforced(
+    "It is offered only right after the gnoll damages a creature that was already Bloodied (bloodied-hits.ts). Taken move first, the use is spent and a move of half its Speed granted (granted-moves.ts), and then it makes its Rend."
   ),
   "action:Roc/swoop-recharge-5-6": guided(
     "The recharge is spent and a flight of half its Fly Speed granted that provokes no Opportunity Attacks (granted-moves.ts). Dropping the grappled creature is the GM's, who makes it fall (actor.fall)."
   ),
-  "action:Tarrasque/onslaught": guided(
-    "It can be taken move first: the legendary use is spent and a move of half its Speed granted (granted-moves.ts). The Claw or Tail attack it then makes is the GM's to take."
+  "action:Tarrasque/onslaught": enforced(
+    "Its Claw and its Tail are each a choice printed inside it: taken move first, the legendary use is spent and a move of half its Speed granted (granted-moves.ts), and then it makes that attack."
   ),
-  "action:Tarrasque/world-shaking-movement": guided(
-    "The legendary use is spent, a move of its Speed granted (granted-moves.ts) and its Emanation offered. Ending Concentration and knocking Medium or smaller creatures Prone in it are the GM's."
+  "action:Tarrasque/world-shaking-movement": enforced(
+    "Taken move first, the legendary use is spent and a move of its Speed granted (granted-moves.ts); then each creature in the 60-foot Emanation loses Concentration, and the Medium or smaller ones fall Prone (resolution/inflicts.ts)."
   ),
-  "action:Lich/deathly-teleport": guided(
-    "The legendary use is spent and a 60-foot teleport granted (granted-moves.ts). Who stood within 10 feet of the space it left, for the Necrotic damage, is the GM's to pick."
+  "action:Lich/deathly-teleport": enforced(
+    "The legendary use is spent and a 60-foot teleport granted (granted-moves.ts), and each creature in the 10-foot Emanation placed on the space it leaves takes 2d10 Necrotic damage."
   ),
   "action:Hydra/multiattack": enforced(
     "effective-actions.ts makes the Multiattack one Bite per living head, which death-traits.ts counts as heads die and grow back (Multiple Heads)."
@@ -874,20 +882,59 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Wraith/create-specter": enforced(
     "resolution/revival.ts takes a Humanoid corpse within 10 feet dead no longer than 1 minute, and refuses an eighth specter. Its spirit rises as a Specter under the wraith's command and on its side in the corpse's space, acting right after the wraith (summons.ts), and the corpse leaves the fight."
   ),
+  "action:Behir/swallow": enforced(
+    "A failed save swallows a creature the behir grapples (swallow.ts): the grapple ends, and the swallowed creature has the printed conditions and Total Cover from everything outside the behir (resolution/validate.ts), takes the acid as printed and moves with it. It holds one at a time. 30 damage from inside in one turn makes it save at DC 14 as that turn ends or let them all out Prone where they stand, and its death lets them climb out."
+  ),
+  "action:Kraken/swallow": enforced(
+    "A failed save swallows a creature the kraken grapples (swallow.ts): the grapple ends, and the swallowed creature has the printed conditions and Total Cover from everything outside the kraken (resolution/validate.ts), takes the acid as printed and moves with it. It holds four at a time. A Huge or larger creature that fails takes the Piercing damage alone. 50 damage from inside in one turn makes it save at DC 25 as that turn ends or let them all out Prone where they stand, and its death lets them climb out."
+  ),
+  "action:Purple Worm/swallow": enforced(
+    "A failed save swallows a creature the purple worm grapples (swallow.ts): the grapple ends, and the swallowed creature has the printed conditions and Total Cover from everything outside the purple worm (resolution/validate.ts), takes the acid as printed and moves with it. It holds three at a time. 30 damage from inside in one turn makes it save at DC 21 as that turn ends or let them all out Prone where they stand, and its death lets them climb out."
+  ),
+  "action:Remorhaz/swallow": enforced(
+    "A failed save swallows a creature the remorhaz grapples (swallow.ts): the grapple ends, and the swallowed creature has the printed conditions and Total Cover from everything outside the remorhaz (resolution/validate.ts), takes the acid as printed and moves with it. It holds two at a time. 30 damage from inside in one turn makes it save at DC 15 as that turn ends or let them all out Prone where they stand, and its death lets them climb out."
+  ),
+  "action:Tarrasque/swallow": enforced(
+    "A failed save swallows a creature the tarrasque grapples (swallow.ts): the grapple ends, and the swallowed creature has the printed conditions and Total Cover from everything outside the tarrasque (resolution/validate.ts), takes the acid as printed and moves with it. It holds six at a time. A swallowed creature can't teleport. 60 damage from inside in one turn makes it save at DC 20 as that turn ends or let them all out Prone where they stand, and its death lets them climb out."
+  ),
+  "action:Giant Toad/swallow": enforced(
+    "The action swallows a Medium or smaller creature the toad grapples, with no save (swallow.ts): the grapple ends, it is Blinded and Restrained with Total Cover from outside the toad, takes 3d6 Acid as each of the toad's turns ends and moves with it. The toad holds one at a time, can't Bite meanwhile, and its death lets it climb out."
+  ),
+  "action:Giant Frog/swallow": enforced(
+    "The action swallows a Small or smaller creature the frog grapples, with no save (swallow.ts): the grapple ends, it is Blinded and Restrained with Total Cover from outside the frog, and the frog can't Bite meanwhile. As the frog's next turn ends it takes 2d4 Acid and, alive, is disgorged Prone; the frog's death lets it climb out."
+  ),
+  "action:Shambling Mound/engulf": guided(
+    "A failed save Grapples, Blinds and Restrains a Medium or smaller creature within 5 feet, with the Lightning at the start of its turns; the mound carries it at no extra cost (movement-rules.ts) and holds one at a time (swallow.ts). Moving its token into the mound's space is the GM's."
+  ),
+  "action:Roper/reel": enforced(
+    "Each creature the roper grapples is pulled up to 30 feet straight toward it, stopping beside it (resolution/swallowing.ts, forced-movement.ts)."
+  ),
+  "action:Ettercap/reel": enforced(
+    "Only a creature within 30 feet Restrained by the ettercap's own Web Strand is pulled, up to 25 feet straight toward it (resolution/action-targets.ts, forced-movement.ts)."
+  ),
   "action:Gibbering Mouther/bite": enforced(
     "The hit's damage, and Prone on a Medium or smaller target, are applied. A creature it drops to 0 Hit Points dies outright with nothing left of its body (hit-points.ts)."
   ),
   "action:Mummy Lord/whirlwind-of-sand": guided(
     "The Reaction gives a 60-foot teleport (granted-moves.ts). The +2 AC against the triggering attack and the creatures it blinds are the GM's."
   ),
-  "action:Balor/teleport": guided(
-    "A 60-foot teleport is granted (granted-moves.ts). Teleporting a willing demon within 10 feet instead is the GM's."
+  "action:Balor/teleport": enforced(
+    "A 60-foot teleport is granted to the balor, or to the one demon within 10 feet it names instead (resolution/movement-grants.ts, resolution/action-targets.ts). Whether that demon is willing is its player's or the GM's."
+  ),
+  "action:Phase Spider/ethereal-jaunt": guided(
+    "The spider leaves the map for the Ethereal Plane, out of reach of the creatures on the plane, and the next Ethereal Jaunt brings it back to the space it left or the nearest unoccupied one (off-plane.ts). Moving while ethereal, to come back elsewhere, is the GM's."
+  ),
+  "action:Nightmare/ethereal-stride": guided(
+    "The nightmare and up to three creatures within 5 feet leave the map for the Ethereal Plane, and the next Ethereal Stride brings them back to the spaces they left (off-plane.ts). Moving while ethereal, and whether a creature taken along is willing, are the GM's."
   ),
   "action:Dryad/tree-stride": guided(
     "A teleport of up to 65 feet is granted (granted-moves.ts). Whether a Large tree stands at each end is the GM's, since trees aren't on the map."
   ),
-  "action:Centaur Trooper/trampling-charge-recharge-5-6": guided(
-    "It can be taken move first: a move of its Speed that provokes no Opportunity Attacks is granted (granted-moves.ts), and the Strength save, damage and Prone apply to the creatures the GM picks. Passing through Medium or smaller creatures' spaces needs the GM's go-ahead on the map."
+  "action:Centaur Trooper/trampling-charge-recharge-5-6": enforced(
+    "Taken move first, it grants a move of its Speed that provokes no Opportunity Attacks and goes straight through the spaces of Medium or smaller creatures (granted-moves.ts, movement-rules.ts). The Strength save, damage and Prone then reach only the creatures whose spaces it entered (resolution/action-targets.ts)."
+  ),
+  "action:Gelatinous Cube/engulf": guided(
+    "Taken move first, it grants a move of its Speed that provokes no Opportunity Attacks and goes straight through the spaces of Large or smaller creatures (movement-rules.ts); the save reaches only the creatures it entered. A failure Restrains the creature inside the cube, where it can't speak, holds its breath, has Total Cover from outside and moves with the cube (swallow.ts); the cube holds one Large or four smaller creatures, and the acid comes at the start of its turns. The Athletics escape and the pull from outside, with the puller's acid, are actions, and a creature that walks into the cube makes the save with Disadvantage (space-entry.ts). Moving a creature out of the cube on a success, or failing it when there is no room, is the GM's."
   ),
   "action:Weretiger/prowl-tiger-or-hybrid-form-only": guided(
     "It works only in the tiger and hybrid forms (transform/rules.ts), and a move of its Speed that provokes no Opportunity Attacks is granted (granted-moves.ts). The Hide at the end of it is the GM's."

@@ -8,18 +8,28 @@ import { altitudesAlong, heightRefusal, sharesHeight } from "./altitude.js";
 import {
   activeMoveGrant,
   activeTeleportGrant,
+  recordEntered,
   spendMoveGrant,
   spendTeleportGrant,
   type MoveGrant
 } from "./granted-moves.js";
 import { holdsFeature } from "./class-features.js";
+import { creaturesEntered } from "./space-entry.js";
+import { sizeAtMost } from "./resolution/context.js";
+import { opensItsSpace } from "./space-sharing.js";
 import { HIDDEN_SOURCE } from "./hidden-source.js";
 import { ridesWith } from "./mounts.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
 import { burrowsThroughWalls, openingPassage, stopsOnlyInEnemySpace } from "./wall-passage.js";
 import { effectiveActions } from "./effective-actions.js";
-import { NO_OPPORTUNITY_ATTACKS_TAG, NO_REACTIONS_TAG, READIED_TAG, releaseReadied } from "./effects.js";
+import {
+  NO_OPPORTUNITY_ATTACKS_TAG,
+  NO_REACTIONS_TAG,
+  NO_TELEPORT_TAG,
+  READIED_TAG,
+  releaseReadied
+} from "./effects.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
 import { jumpLimits, leapRider } from "./jumping.js";
@@ -249,6 +259,8 @@ export function grappledBy(state: GameState, grapplerId: string): readonly strin
 }
 
 const SIZE_RANK: Readonly<Record<string, number>> = { tiny: 0, small: 1, medium: 2, large: 3, huge: 4, gargantuan: 5 };
+/** On a grapple whose creature its grappler carries at no extra cost (a shambling mound's Engulf). */
+export const CARRIED_FREE_TAG = "carried-free";
 
 /** SRD Grappled: "The grappler can drag or carry you when it moves, but every foot of movement costs it 1 extra foot
  *  unless you are Tiny or two or more sizes smaller than it." A bugbear's Abduct: it "needn't spend extra movement to
@@ -264,9 +276,15 @@ export function dragCostsExtra(
   if (holdsFeature(definition, "abduct", "Abduct")) return false;
   const rank = (actorId: string) =>
     SIZE_RANK[state.actors.find((actor) => actor.id === actorId)?.size ?? "medium"] ?? SIZE_RANK.medium!;
+  // "When the shambling mound moves, the Grappled target moves with it, costing it no extra movement."
+  const carriedFree = (actorId: string) =>
+    state.actors
+      .find((actor) => actor.id === actorId)
+      ?.effects.some((effect) => effect.sourceActorId === grapplerId && effect.tags.includes(CARRIED_FREE_TAG)) ===
+    true;
   return grappledIds.some((actorId) => {
     const size = state.actors.find((actor) => actor.id === actorId)?.size ?? "medium";
-    return size !== "tiny" && rank(grapplerId) - rank(actorId) < 2;
+    return size !== "tiny" && rank(grapplerId) - rank(actorId) < 2 && !carriedFree(actorId);
   });
 }
 
@@ -355,7 +373,8 @@ const sharesSpace = (state: GameState, actorId: string, input: MovementRulesInpu
   const definition = actor?.definitionId ? input.resolveDefinition(actor.definitionId) : undefined;
   // A form that can enter a creature's space and stop there (a vampire's mist, Gaseous Form's cloud).
   if (!swarmOnly && actor && formEffectOf(actor)?.form?.sharesSpaces) return true;
-  return (swarmOnly ? ["Swarm"] : SHARES_SPACE).some((name) => holdsFeature(definition, name, name));
+  if (swarmOnly) return opensItsSpace(definition);
+  return SHARES_SPACE.some((name) => holdsFeature(definition, name, name));
 };
 
 /** A spell's force that neither blocks a space nor is blocked (Spiritual Weapon's force, an Arcane Eye). */
@@ -363,8 +382,15 @@ const intangible = (state: GameState, actorId: string): boolean =>
   state.actors.find((actor) => actor.id === actorId)?.summon?.intangible === true;
 
 /** SRD: "You can't willingly end a move in a space occupied by another creature." Hidden creatures don't count, so
- *  the refusal can't give one away; neither do the creatures the mover drags. */
-function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Point, everyone = false): boolean {
+ *  the refusal can't give one away; neither do the creatures the mover drags, nor those of a size it may move into
+ *  (`engulfing`: a gelatinous cube's Engulf, whose creatures it then holds inside). */
+function endsInOccupiedSpace(
+  state: GameState,
+  input: MovementRulesInput,
+  to: Point,
+  everyone = false,
+  engulfing?: string
+): boolean {
   if (!input.calibration || intangible(state, input.actorId)) return false;
   const moverActor = state.actors.find((actor) => actor.id === input.actorId);
   // Air Form and Water Form as the stalker and the water elemental print them: "can enter an enemy's space and stop
@@ -383,6 +409,7 @@ function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Po
     if (moverToken && !sharesHeight(moverToken, token, feetPerCell, input.toAltitudeFeet ?? 0)) return false;
     if (sharesSpace(state, token.actorId, input, true) || intangible(state, token.actorId)) return false;
     const occupant = state.actors.find((actor) => actor.id === token.actorId);
+    if (engulfing !== undefined && sizeAtMost(occupant?.size, engulfing)) return false;
     if (enemiesOnly && moverActor && occupant && areEnemies(moverActor, occupant, input.resolveDefinition))
       return false;
     if (!everyone && occupant?.visibility === "gm-only") return false;
@@ -421,6 +448,17 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   if (!mover || from === null || to === null || mode === "forced") return done();
   const fromAltitude = input.fromAltitudeFeet ?? 0;
   const toAltitude = input.toAltitudeFeet ?? fromAltitude;
+  // A creature held so that it can't teleport (a tarrasque's Bite) is refused one, a granted one too.
+  const holder =
+    mode === "teleport" ? mover.effects.find((effect) => effect.tags.includes(NO_TELEPORT_TAG)) : undefined;
+  if (holder)
+    police(
+      state,
+      input,
+      "movement.teleport",
+      `${mover.name} can't teleport while ${holder.sourceName ?? "something"} holds it.`,
+      outcome
+    );
   // A granted teleport the move keeps to the terms of is taken now, by anyone, with nothing more to ask.
   if (mode === "teleport") {
     const teleport = activeTeleportGrant(state, mover);
@@ -460,7 +498,10 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   // feature that grants it is theirs to rule on).
   if (mode === "teleport" && input.byPlayer && !activeTeleportGrant(state, mover))
     police(state, input, "movement.teleport", `${mover.name} can teleport only with the GM's go-ahead.`, outcome);
-  if ((counted || input.byPlayer || grant) && endsInOccupiedSpace(state, input, to))
+  // A cube's Engulf may stop on the creatures it moves through: they are inside it, or leave it as their save says.
+  const engulfing =
+    grant?.throughCreatures && opensItsSpace(moverDefinitionOf(mover, input)) ? grant.throughCreatures : undefined;
+  if ((counted || input.byPlayer || grant) && endsInOccupiedSpace(state, input, to, false, engulfing))
     police(state, input, "movement.occupied", `${mover.name} can't end its move in another creature's space.`, outcome);
   // SRD 5.2.1 Frightened: "You can't willingly move closer to the source of fear."
   const feared = (counted || input.byPlayer || grant) && approachesFear(state, input, mover, from, to);
@@ -483,6 +524,13 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   // A granted move is charged to its grant, and provokes unless it says otherwise.
   if (grant) {
     spendMoveGrant(mover, grant.effectId, grant.chargeFeet);
+    // The creatures a move through them entered are what its action then targets (a cube's Engulf).
+    if (grant.throughCreatures)
+      recordEntered(
+        mover,
+        grant.effectId,
+        creaturesEntered(state, actorId, grant.path, input.dragging?.actorIds ?? [])
+      );
     if (grant.jump && grant.costFeet > 0) {
       const used = state.combat.turn.movementUsedFeet;
       const budget = movementCounts(state, actorId)
@@ -823,7 +871,12 @@ function fittingMoveGrant(
   let cost: MovementCost | null;
   if (grant.jump) cost = straightCost(input, from, to, fromAltitude, toAltitude);
   else {
-    const { options, extraPerStep } = costOptions(state, input, mover, travel, fromAltitude, toAltitude);
+    const costed = costOptions(state, input, mover, travel, fromAltitude, toAltitude);
+    const { extraPerStep } = costed;
+    // "The cube can move through the spaces of Large or smaller creatures."
+    const options = grant.throughCreatures
+      ? { ...costed.options, passesCreaturesUpTo: grant.throughCreatures, alongLine: true }
+      : costed.options;
     cost = input.cost
       ? input.cost(from, to, options)
       : straightCost(input, from, to, fromAltitude, toAltitude, extraPerStep);

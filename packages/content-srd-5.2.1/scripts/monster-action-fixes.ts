@@ -30,8 +30,10 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
       // "An engulfed target can try to escape by taking an action to make a DC 12 Strength (Athletics) check."
       escapeDc: 12,
       escapeAthletics: true,
-      // "Can't cast spells with a Verbal component", and "is suffocating": it holds its breath while engulfed.
-      failureEffect: { name: "Engulfed", tags: ["cant-speak", "smothering"], modifiers: [] },
+      // "Can't cast spells with a Verbal component", and "is suffocating": it holds its breath while engulfed. Inside
+      // the cube it moves with it and has Total Cover from outside (Ooze Cube), as a swallowed creature does.
+      failureEffect: { name: "Engulfed", tags: ["cant-speak", "smothering", "swallowed"], modifiers: [] },
+      endsWhenSourceDies: true,
       // "As an action, a creature within 5 feet of the cube can pull a creature ... out of the cube by succeeding on a
       // DC 12 Strength (Athletics) check, and the puller takes 10 (3d6) Acid damage."
       endedBy: {
@@ -43,11 +45,13 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
       }
     },
     reminder:
-      "The cube moves up to its Speed first; an engulfed creature moves with it and has Total Cover from attacks outside the cube."
+      "A creature that succeeds moves to an unoccupied space within 5 feet of the cube, or fails if there is none; one that escapes enters the nearest unoccupied space. A creature that enters the cube's space is subjected to Engulf with Disadvantage."
   },
   "water-elemental/whelm": {
     why: "a creature outside can pull the whelmed one free, and the whelmed one holds its breath, which the save's text prints",
     save: {
+      // "If the target is a Large or smaller creature, it has the Grappled condition."
+      failureMaxSize: "large",
       // "Is suffocating unless it can breathe water" while the grapple lasts.
       failureEffect: { name: "Whelmed", tags: ["smothering"], modifiers: [] },
       // "As an action, a creature within 5 feet of the elemental can pull a creature out of it by succeeding on a DC 14
@@ -58,7 +62,9 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
         near: "source",
         check: { ability: "str", skill: "athletics", dc: 14 }
       }
-    }
+    },
+    // The Restrained and the held breath it restated are run.
+    reminder: null
   },
   "darkmantle/crush": {
     why: "the attachment, and detaching it with an action and an Athletics check, are printed in the hit's text",
@@ -66,7 +72,9 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
       {
         conditions: [],
         name: "Attached",
-        tags: ["attached"],
+        // "While attached to a target, the darkmantle can attack only the target but has Advantage on its attack
+        // rolls."
+        tags: ["attached", "source-attacks-only-bearer"],
         endsWhenSourceDies: true,
         // "A creature can take an action to try to detach the darkmantle from itself, doing so with a successful DC 13
         // Strength (Athletics) check."
@@ -74,7 +82,40 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
       }
     ],
     reminder:
-      "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target, which is Blinded and suffocating (hold its breath) while the darkmantle is attached."
+      "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target, which is Blinded and suffocating (hold its breath) while the darkmantle is attached. While attached, the darkmantle's Speed is 0 and it moves with the target, and it detaches itself with 5 feet of its movement."
+  },
+  "stirge/proboscis": {
+    why: "while attached the stirge can't use its Proboscis again, which the hit's text prints",
+    onHit: [
+      {
+        conditions: [],
+        name: "Attached",
+        // "While attached, the stirge can't make Proboscis attacks."
+        tags: ["attached", "source-no-repeat"],
+        ongoingDamage: { damage: [{ formula: "2d4", type: "necrotic" }], at: "source-turn-start" },
+        // "The target or a creature within 5 feet of it can detach the stirge as an action."
+        endedBy: { name: "Detach", by: "either" }
+      }
+    ],
+    reminder: "The stirge detaches itself by spending 5 feet of its movement."
+  },
+  "cloaker/attach": {
+    why: "while attached the cloaker can Attach only to its target, and it is pulled off with an action and a check",
+    onHit: [
+      {
+        conditions: [{ id: "blinded" }],
+        name: "Attached",
+        maxTargetSize: "large",
+        // "The cloaker can't make Attach attacks against other targets."
+        tags: ["attached", "source-target-only"],
+        endsWhenSourceDies: true,
+        // "The target or a creature within 5 feet of it can take an action to try to detach the cloaker, doing so by
+        // succeeding on a DC 14 Strength (Athletics) check."
+        endedBy: { name: "Detach the cloaker", by: "either", check: { ability: "str", skill: "athletics", dc: 14 } }
+      }
+    ],
+    reminder:
+      "While attached, the cloaker halves the damage it takes (round down), and the target takes the same amount; the cloaker detaches itself by spending 5 feet of movement."
   },
   "otyugh/bite": {
     why: "the save comes after each Long Rest, and its failure lowers the Hit Point maximum until the poison ends",
@@ -130,6 +171,44 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
         atRest: { noBenefit: "short" }
       }
     ],
+    reminder: null
+  },
+  "invisible-stalker/vortex": {
+    why: "the grapple also keeps the target from casting spells with a Verbal component",
+    // "Until the grapple ends, the target can't cast spells with a Verbal component."
+    save: { failureEffect: { name: "Vortex", tags: ["cant-speak"], modifiers: [] } },
+    reminder: null
+  },
+  "incubus/nightmare-recharge-6": {
+    why: "the failure acts by the target's Hit Points, which the reader leaves to the GM",
+    // "If the target has 20 Hit Points or fewer, it has the Unconscious condition for 1 hour, until it takes damage, or
+    // until a creature within 5 feet of it takes an action to wake it. Otherwise, the target takes 18 (4d8) Psychic
+    // damage."
+    damage: [{ formula: "4d8", type: "psychic" }],
+    save: {
+      failureByHitPoints: [
+        {
+          atOrBelow: 20,
+          conditions: ["unconscious"],
+          duration: { type: "minutes", minutes: 60 },
+          endsOnDamage: true,
+          endedBy: { name: "Wake", by: "others" }
+        }
+      ]
+    },
+    reminder: null
+  },
+  "djinni/create-whirlwind": {
+    why: "the thunder on each of the Restrained target's turns is printed after the failure's own sentence",
+    // "At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage."
+    save: { ongoingDamage: { damage: [{ formula: "6d6", type: "thunder" }], at: "bearer-turn-start" } },
+    reminder:
+      "The whirlwind lasts while the djinni concentrates on it. The djinni can move it up to 20 feet at the start of each of its turns, and the Restrained creatures move with it; a creature it enters, or that enters it, makes the save once a turn."
+  },
+  "shambling-mound/engulf": {
+    why: "the mound carries what it engulfs at no cost, which the save's text prints",
+    // "When the shambling mound moves, the Grappled target moves with it, costing it no extra movement."
+    save: { failureEffect: { name: "Engulfed", tags: ["carried-free"], modifiers: [] } },
     reminder: null
   },
   "rust-monster/antennae": {

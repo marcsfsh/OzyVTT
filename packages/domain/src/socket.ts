@@ -160,6 +160,7 @@ import type {
   SetActorAttitudeSchema,
   SetActorHealthDisplaySchema,
   SetActorSheetPreviewSchema,
+  SetActorLairSchema,
   SetActorSizeSchema,
   SetActorVisibilitySchema,
   SetConditionSchema,
@@ -479,6 +480,11 @@ export interface ClientToServerEvents {
   /** GM shares (or un-shares) an archived character's sheet with players as a read-only keepsake. Default hidden. */
   "actor:set-sheet-preview": (
     payload: CommandPayload<typeof SetActorSheetPreviewSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM marks a legendary creature as fighting in its lair, with the lair's counts, or out of it. */
+  "actor:set-lair": (
+    payload: CommandPayload<typeof SetActorLairSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:set-speed": (

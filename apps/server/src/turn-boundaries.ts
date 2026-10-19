@@ -14,6 +14,7 @@ import { sceneSight, type SceneSight } from "./vision/sight.js";
 import { traitsAtTurnEnd, traitsAtTurnStart } from "./trait-turns.js";
 import { deathTraitsAtTurnEnd } from "./death-traits.js";
 import { riseAtTurnStart } from "./risen.js";
+import { disgorge, regurgitationSaves } from "./swallow.js";
 
 type Actor = GameState["actors"][number];
 type Effect = Actor["effects"][number];
@@ -65,6 +66,9 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
   events.push(...deathTraitsAtTurnEnd(state, actorId, dice));
   // "Takes 10 (3d6) Acid damage at the end of each of the toad's turns."
   dealOngoingAt(state, actorId, "end", events, dice);
+  // "If the behir takes 30 damage or more on a single turn from the swallowed creature, the behir must succeed on a
+  // DC 14 Constitution saving throw at the end of that turn".
+  events.push(...regurgitationSaves(state, { ...deps, resolveDefinition: deps.resolveDefinition }));
 }
 
 /** Whether one creature sees another on the live map, worked out only when a rule asks; true when vision is off, so a
@@ -173,8 +177,14 @@ function dealOngoingAt(
       if (!bearer.effects.some((candidate) => candidate.id === effect.id) || beyondHarm(bearer)) continue;
       const source = state.actors.find((candidate) => candidate.id === effect.sourceActorId);
       if (!bearers && (!source || source.hp.current <= 0)) continue;
+      // "At the end of the frog's next turn": not the turn it swallowed on.
+      if (ongoing.disgorges && effect.startedRound === state.combat.round) continue;
       events.push(...dealOngoingDamage(state, bearer, effect, deps));
       const stillOn = bearer.effects.some((candidate) => candidate.id === effect.id);
+      if (ongoing.disgorges && stillOn && !isDead(bearer)) {
+        events.push(...disgorge(state, bearer, effect.id));
+        continue;
+      }
       if (ongoing.saveToEnd && stillOn && deps.newId)
         events.push(
           openEndingSave(state, bearer, effect, ongoing.saveToEnd, "makes", {

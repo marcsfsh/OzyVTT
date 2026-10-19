@@ -1710,7 +1710,10 @@ export const EffectInstanceSchema = z
         turnActorId: z.uuid().nullable(),
         owedActionId: z.string().min(1).max(120).optional(),
         awayFromActorId: z.uuid().optional(),
-        towardActorId: z.uuid().optional()
+        towardActorId: z.uuid().optional(),
+        /** It passes through the spaces of creatures this size or smaller, and these are the ones it has entered. */
+        throughCreatures: SizeSchema.optional(),
+        entered: z.array(z.uuid()).max(50).optional()
       })
       .strict()
       .optional(),
@@ -1766,7 +1769,9 @@ export const EffectInstanceSchema = z
       saveToEnd: z
         .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
         .strict()
-        .optional()
+        .optional(),
+      /** Once it deals its damage, the effect ends and a bearer still alive is let out Prone (a giant frog's swallow). */
+      disgorges: z.literal(true).optional()
     })
       .strict()
       .optional(),
@@ -2421,11 +2426,15 @@ export const ActorSchema = z.object({
     .optional(),
   /** Walking speed in feet (seeded from the definition, GM-editable). Absent = unknown, so movement rules skip. */
   speedFeet: z.number().int().min(0).max(500).optional(),
-  /** Legendary actions per round and Legendary Resistance per day (SRD 2024). GM knowledge, stripped from player projections. */
+  /** Legendary actions per round and Legendary Resistance per day (SRD 2024), at the lair's counts while `inLair` (the GM's
+   *  switch), with the counts in its lair beside them. GM knowledge, stripped from player projections. */
   legendary: z
     .object({
       actionsPerRound: z.number().int().min(1).max(5).optional(),
-      resistancesPerDay: z.number().int().min(1).max(6).optional()
+      resistancesPerDay: z.number().int().min(1).max(6).optional(),
+      actionsInLair: z.number().int().min(1).max(5).optional(),
+      resistancesInLair: z.number().int().min(1).max(6).optional(),
+      inLair: z.literal(true).optional()
     })
     .strict()
     .optional(),
@@ -2663,6 +2672,9 @@ export type GrantOption = z.infer<typeof GrantOptionSchema>;
  *  when its attack hits (Guiding Bolt's light), and add to AC while it lasts (Shield of Faith). */
 export const ActionGrantSchema = EffectGrantSchema.extend({
   target: z.enum(["self", "target", "targets"]).default("self"),
+  /** Taken again while what it gave lasts, it ends that instead (a phase spider's Ethereal Jaunt: "from the Material
+   *  Plane to the Ethereal Plane or vice versa"). */
+  toggles: z.literal(true).optional(),
   onHit: z.boolean().optional(),
   /** Kept apart from `modifiers`, whose `armor-class` is written onto the sheet, like a reaction's lasting bonus. */
   armorClassBonus: z.number().int().min(1).max(10).optional(),
@@ -2875,7 +2887,11 @@ export const HitPointBandSchema = z
     dies: z.literal(true).optional(),
     dropsToZero: z.literal(true).optional(),
     conditions: z.array(SaveConditionSchema).min(1).max(4).optional(),
-    duration: SaveFailureDurationSchema.optional()
+    duration: SaveFailureDurationSchema.optional(),
+    /** The band's conditions end when the target takes damage, and the action named ends them too (an incubus's
+     *  Nightmare: "until it takes damage, or until a creature within 5 feet of it takes an action to wake it"). */
+    endsOnDamage: z.literal(true).optional(),
+    endedBy: EndedBySchema.optional()
   })
   .strict();
 export type HitPointBand = z.infer<typeof HitPointBandSchema>;
@@ -3095,6 +3111,11 @@ export const SaveOutcomeFields = {
   /** A creature that still bears this action's failure is left out ("each creature that isn't currently affected by
    *  this breath"). */
   sparesAffected: z.literal(true).optional().describe("A creature still under this action's failure makes no new save"),
+  /** A creature larger than this takes the failure's damage alone, without its conditions or effect (a water
+   *  elemental's Whelm: "If the target is a Large or smaller creature, it has the Grappled condition"). */
+  failureMaxSize: SizeSchema.optional().describe(
+    "A creature larger than this takes the failure's damage alone, without its conditions or effect"
+  ),
   /** A failure kills the target outright, and the source may regain hit points from it (a will-o'-wisp's Consume
    *  Life: "The target dies, and the wisp regains 10 (3d6) Hit Points"). */
   failureKills: z
@@ -3470,6 +3491,14 @@ export const OnHitRiderSchema = z
     /** It spends the coat the bearer put on the weapon: an effect on the attacker with this tag (a Dagger of Venom's
      *  poison), ended by this hit. Without one it doesn't fire. */
     spendsEffectTag: EffectTagSchema.optional(),
+    /** The hit sets the target burning (SRD Burning: 1d4 Fire at the start of each of its turns until it is put out),
+     *  as a fire elemental's Burn does. */
+    hazard: z
+      .literal("burning")
+      .optional()
+      .describe(
+        "The hit sets the target burning (SRD Burning): 1d4 Fire at the start of each of its turns until it is put out"
+      ),
     /** What the engine leaves to the GM, said with the hit: a curse that acts at rests, a creature killed outright. */
     reminder: z.string().min(1).max(400).optional(),
     /** An action that ends the effect ("The target or a creature within 5 feet of it can detach the stirge as an
@@ -3660,11 +3689,24 @@ export const ActionTargetsSchema = z
      *  yourself", a Ring of Jumping's Jump). */
     who: z.enum(["enemies", "allies", "others", "self"]).optional(),
     /** Only a creature this creature's own effect with this tag marks (Quivering Palm's vibrations). */
-    markedBy: EffectTagSchema.optional()
+    markedBy: EffectTagSchema.optional(),
+    /** Only a creature at 0 Hit Points (a will-o'-wisp's Consume Life). */
+    atZeroHitPoints: z.literal(true).optional(),
+    /** Only a creature whose space its user entered on the move the action gave it ("each creature whose space the cube
+     *  enters for the first time during this move"). */
+    entered: z.literal(true).optional(),
+    /** Only a creature whose stat block prints this type tag ("a willing demon": a Fiend (Demon)). */
+    typeTag: z.string().min(1).max(40).optional(),
+    /** Only a creature under this creature's effect from that action (one Restrained by an ettercap's Web Strand). */
+    heldByAction: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120)
+      .optional()
   })
   .strict()
   .describe(
-    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions, in the user's space, enemies, allies, others or only the user itself, or a creature the user marked."
+    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions, in the user's space, enemies, allies, others or only the user itself, a creature the user marked, or one at 0 Hit Points."
   );
 export type ActionTargets = z.infer<typeof ActionTargetsSchema>;
 
@@ -3904,7 +3946,10 @@ export const ActionMoveSchema = z
     mode: z.enum(["walk", "fly", "swim", "climb", "burrow"]).optional(),
     provokes: z.boolean().default(true),
     straight: z.literal(true).optional(),
-    first: z.literal(true).optional()
+    first: z.literal(true).optional(),
+    /** The largest creature whose space it may pass through (a gelatinous cube's Engulf: "can move through the spaces
+     *  of Large or smaller creatures"); the creatures whose spaces it enters are what the action then targets. */
+    throughCreatures: SizeSchema.optional()
   })
   .strict();
 export type ActionMove = z.infer<typeof ActionMoveSchema>;
@@ -3916,10 +3961,55 @@ export const ActionTeleportSchema = z
   .object({
     feet: z.number().int().min(5).max(10000),
     unseen: z.literal(true).optional(),
-    failDamage: DiceFormulaSchema.optional()
+    failDamage: DiceFormulaSchema.optional(),
+    /** It may teleport the one willing creature its targets name instead of its user (a balor's "itself or a willing
+     *  demon within 10 feet of itself"). */
+    orAnother: z.literal(true).optional()
   })
   .strict();
 export type ActionTeleport = z.infer<typeof ActionTeleportSchema>;
+
+/**
+ * A swallow (SRD 5.2.1 behir, purple worm, giant toad): a creature taken inside the user. A save's failure swallows
+ * (its failure effect carries the `swallowed` tag); an action with no save swallows its target outright with
+ * `conditions`. Either way the grapple on the target ends, and the swallowed creature has Total Cover from everything
+ * outside the swallower.
+ * - `capacity`: how many it can hold at once ("it can have up to three creatures swallowed at a time").
+ * - `maxSize`: only a creature this size or smaller is swallowed; a larger one takes the failure's damage alone (a
+ *   kraken's "If the target is Large or smaller, it is swallowed").
+ * - `ongoingDamage`: what an outright swallow deals while it lasts (a giant toad's Acid at the end of each of its
+ *   turns); `disgorges`: after it deals that damage once, a survivor is let out Prone (a giant frog's).
+ * - `blocks`: its own actions it can't use while it holds a creature swallowed (a giant toad's Bite).
+ * - `regurgitate`: "If the behir takes 30 damage or more on a single turn from the swallowed creature, the behir must
+ *   succeed on a DC 14 Constitution saving throw at the end of that turn or regurgitate the creature, which falls in a
+ *   space within 10 feet of the behir and has the Prone condition."
+ */
+export const SwallowSchema = z
+  .object({
+    capacity: z.number().int().min(1).max(10),
+    maxSize: SizeSchema.optional(),
+    conditions: z.array(ConditionIdSchema).min(1).max(3).optional(),
+    ongoingDamage: OngoingDamageSchema.optional(),
+    disgorges: z.literal(true).optional(),
+    blocks: z
+      .array(z.string().regex(/^[a-z0-9-]+$/))
+      .min(1)
+      .max(4)
+      .optional(),
+    regurgitate: z
+      .object({
+        damage: z.number().int().min(1).max(500),
+        dc: z.number().int().min(1).max(40),
+        withinFeet: z.number().int().min(5).max(60)
+      })
+      .strict()
+      .optional()
+  })
+  .strict()
+  .describe(
+    "A swallow: how many creatures the user holds at once, the largest it swallows, the conditions and damage of one with no save, the actions it can't use meanwhile, and the damage from inside that makes it save or let them out"
+  );
+export type Swallow = z.infer<typeof SwallowSchema>;
 
 /** One stat block a summon can bring onto the map, and how many of it come. */
 export const SummonCreatureSchema = z
@@ -4142,7 +4232,16 @@ export const ActionSchema = z
         /** Attack rolls this action grants (Extra Attack 2, Eldritch Blast beams). Absent = 1. */
         count: z.number().int().min(1).max(10).optional(),
         /** Extra weapon dice on a critical hit beyond crit doubling (Savage Attacks). Applies to the first damage part. */
-        criticalBonusDice: z.number().int().min(1).max(4).optional()
+        criticalBonusDice: z.number().int().min(1).max(4).optional(),
+        /** The roll has Advantage when the printing says so: against a creature its user grapples ("with Advantage if
+         *  the target is Grappled by the ankheg"), against one missing Hit Points (a shark's Bite), or in the first round
+         *  of a fight (a doppelganger's Slam). */
+        advantageWhen: z
+          .enum(["target-grappled-by-self", "target-hurt", "first-round"])
+          .optional()
+          .describe(
+            "When the roll has Advantage as printed: against a creature its user grapples, against one missing Hit Points, or in a fight's first round"
+          )
       })
       .optional()
       .describe("A printed to-hit bonus; the stat block knows its own numbers"),
@@ -4240,6 +4339,16 @@ export const ActionSchema = z
     /** Other plans a Multiattack can be, beside `multiattack` ("or it makes two Hurl Flame attacks"), chosen by the first
      *  attack taken. */
     multiattackAlternatives: z.array(z.array(MultiattackComponentSchema).min(1).max(6)).min(1).max(2).optional(),
+    /** The action its creature must have used this turn for `multiattackAlternatives` to open, which are then its plan
+     *  ("or it makes three Slam attacks if it used Hasten this turn"); any other turn it has `multiattack` alone. */
+    multiattackAlternativesAfter: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120)
+      .optional()
+      .describe(
+        "The action its creature must have used this turn for the other plans to open, which are then its plan (a clay golem's three Slams after Hasten)"
+      ),
     /** What can take the place of a Multiattack's attacks ("It can replace one attack with a use of Roar"): one of
      *  `actionIds` replaces `attacks` of them, once, or for any attack (`any`), or only the one `of` names ("the Claw
      *  attack"). */
@@ -4381,6 +4490,36 @@ export const ActionSchema = z
     /** A teleport the action grants ("teleports up to 60 feet to an unoccupied space it can see"), see
      *  `ActionTeleportSchema`. */
     teleport: ActionTeleportSchema.optional(),
+    /** It swallows its target (a behir's, a giant toad's), see `SwallowSchema`. */
+    swallow: SwallowSchema.optional(),
+    /** Each target is pulled straight toward the user as it resolves, stopping beside it (a roper's Reel: "pulls each
+     *  creature Grappled by it up to 30 feet straight toward it"). */
+    pull: ForcedPushSchema.optional(),
+    /** How many creatures its effect can hold at once (a shambling mound's Engulf: "only one creature Grappled by this
+     *  action at a time"). */
+    holdsAtOnce: z.number().int().min(1).max(10).optional(),
+    /** A Large or larger creature it holds fills all of `holdsAtOnce` (a water elemental's Whelm: "one Large creature
+     *  or up to two Medium or smaller creatures"). */
+    largeFillsHold: z.literal(true).optional(),
+    /** Which use of its pool it is, in order (a sphinx's Second Roar is its Roar's second use since a Long Rest). */
+    useNumber: z.number().int().min(1).max(10).optional(),
+    /** Its saves are against magic (a sphinx's "magical roar"), which Magic Resistance meets with Advantage. */
+    magical: z.literal(true).optional(),
+    /** What it does to each target with no roll: conditions, on creatures of `maxTargetSize` or smaller, standing
+     *  until ended or for `duration`; and a lost Concentration (a tarrasque's shock wave: "Creatures in that area lose
+     *  Concentration and, if Medium or smaller, have the Prone condition"). */
+    inflicts: z
+      .object({
+        conditions: z.array(ConditionIdSchema).min(1).max(3).optional(),
+        maxTargetSize: SizeSchema.optional(),
+        duration: SaveFailureDurationSchema.optional(),
+        breaksConcentration: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    /** It can be used only right after its user damaged a creature that was already Bloodied, this turn (a gnoll's
+     *  Rampage). */
+    afterHurtingBloodied: z.literal(true).optional(),
     /** The creatures it brings onto the map (Summon Dragon, a Bowl of Commanding Water Elementals), see `SummonSchema`. */
     summons: SummonSchema.optional(),
     /** Its spell is cast with this action alone, whatever the spell's casting time (Pact of the Chain: "cast it as a
@@ -4395,6 +4534,22 @@ export const ActionSchema = z
     sight: SightEffectSchema.optional(),
     /** The spells it casts, each its own cast action in play (a Spellcasting list, a Misty Step); see `CastsSpellsSchema`. */
     castsSpells: CastsSpellsSchema.optional(),
+    /** The printed entry it belongs to (a spell of a Spellcasting list, Protective Magic's Counterspell): the stat block
+     *  prints it inside that entry, and the turn list offers it on its own. */
+    partOf: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120)
+      .optional()
+      .describe(
+        "The id of the printed entry it belongs to (a spell of a Spellcasting list): the stat block prints it inside that entry, and the turn list offers it on its own"
+      ),
+    /** Using it ends what lasts until its user acts, as an attack roll does (a will-o'-wisp's Vanish "ends early
+     *  immediately after the wisp makes an attack roll or uses Consume Life"). */
+    endsUntilItActs: z
+      .literal(true)
+      .optional()
+      .describe("Using it ends what lasts until its user acts, as an attack roll does (Consume Life ends Vanish)"),
     /** Damage a hit adds or swaps in under a printed condition ("plus 2 (1d4) Slashing damage if the attack roll had
      *  Advantage", "or 2 (1d4) Piercing damage if the swarm is Bloodied"). The engine applies what it can see; a
      *  charge, which it can't, is offered on the hit for the attacker to confirm. */
@@ -4405,9 +4560,9 @@ export const ActionSchema = z
             when: z.enum(["advantage", "self-bloodied", "target-bloodied", "target-grappled-by-self", "charge"]),
             /** `instead` replaces the first damage part; `plus` adds to the hit. */
             mode: z.enum(["instead", "plus"]),
+            /** None for a charge that only knocks its target down (an elephant's Gore). */
             damage: z
               .array(z.object({ formula: DamageFormulaSchema, type: z.string().min(1).max(40) }).strict())
-              .min(1)
               .max(2),
             /** A charge's run-up, in feet. */
             feet: z.number().int().min(5).max(120).optional(),
@@ -4884,6 +5039,27 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       name: TraitNameSchema
     })
     .strict(),
+  /** "Whenever the golem is subjected to Acid damage, it takes no damage and instead regains a number of Hit Points equal
+   *  to the Acid damage dealt" (Acid Absorption): the damage type it heals by. */
+  z.object({ kind: z.literal("absorbs"), name: TraitNameSchema, damageType: DamageTypeSchema }).strict(),
+  /** "If the golem takes Fire damage, it has Disadvantage on attack rolls and ability checks until the end of its next
+   *  turn" (Aversion to Fire), "its Speed decreases by 20 feet" (Freeze): what taking that damage type leaves on it. */
+  z
+    .object({
+      kind: z.literal("damage-weakens"),
+      name: TraitNameSchema,
+      damageType: DamageTypeSchema,
+      modifiers: EffectModifiersSchema
+    })
+    .strict(),
+  /** "Attack rolls against the mephit are made with Disadvantage unless the mephit has the Incapacitated condition"
+   *  (Blurred Form). */
+  z.object({ kind: z.literal("blurred"), name: TraitNameSchema }).strict(),
+  /** "Other creatures can enter that space, but a creature that does so is subjected to the cube's Engulf and has
+   *  Disadvantage on the saving throw" (Ooze Cube): the action whose save a creature entering its space makes. */
+  z
+    .object({ kind: z.literal("engulfs-entrants"), name: TraitNameSchema, actionId: z.string().min(1).max(120) })
+    .strict(),
   /** A vampire's Misty Escape: dropped to 0 Hit Points, it turns to mist and lives on at 0 unless it stands in
    *  sunlight, where it can't shape-shift and is destroyed. */
   z.object({ kind: z.literal("misty-escape"), name: TraitNameSchema }).strict(),
@@ -5087,12 +5263,15 @@ export const ActorDefinitionSchema = z
     legendary: z
       .object({
         actionsPerRound: z.number().int().min(1).max(5).optional(),
-        resistancesPerDay: z.number().int().min(1).max(6).optional()
+        resistancesPerDay: z.number().int().min(1).max(6).optional(),
+        /** The counts it has fought in its lair ("Legendary Action Uses: 3 (4 in Lair)", "3/Day, or 4/Day in Lair"). */
+        actionsInLair: z.number().int().min(1).max(5).optional(),
+        resistancesInLair: z.number().int().min(1).max(6).optional()
       })
       .strict()
       .optional()
       .describe(
-        "SRD 2024 legendary resources: actions spent on other creatures' turns, and Legendary Resistance uses that re-arm on a Long Rest"
+        "SRD 2024 legendary resources: actions spent on other creatures' turns, and Legendary Resistance uses that re-arm on a Long Rest, with the counts in its lair when it has one"
       ),
     /** What its traits do that the engine runs (Regeneration, auras, Death Burst), read from their text. */
     traitMechanics: z.array(TraitMechanicSchema).max(12).optional(),

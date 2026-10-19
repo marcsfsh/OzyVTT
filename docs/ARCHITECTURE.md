@@ -288,8 +288,11 @@ of a hidden thing. When in doubt, leave it out.
   it, or leaves a mover the attack dropped, Grappled or knocked Prone where it stood and gives back the
   rest of its movement (`held-moves.ts`). The map's drag preview runs the same function,
   and a mirror test checks the two agree. The `actor:movement` reply tells the preview whether the
-  mover shares spaces (Air Form, a swarm) and which swarms its viewer can see (`space-sharing.ts`),
-  so it charges those spaces as the server does. Players and the table screen get only the terrain the
+  mover shares spaces (Air Form, a swarm) and which creatures' spaces anyone may enter (a swarm's, a
+  gelatinous cube's) its viewer can see (`space-sharing.ts`), so it charges those spaces as the server
+  does. A move that enters another creature's space can set something off (`space-entry.ts`): Fire Form
+  burns that creature, and walking into a gelatinous cube makes its Engulf save. An action whose move
+  goes through creatures (a cube's Engulf) keeps to the line drawn and targets only those it entered. Players and the table screen get only the terrain the
   fog reveals, and with vision on only what the party has seen. A spell's area changes the ground while it
   lasts (`zone-ground.ts`): Web, Entangle or Ice Storm's hail make its cells Difficult Terrain, Plant Growth
   and Wall of Thorns cost 4 feet for every foot, Conjure Minor Elementals' only for the caster's enemies, and
@@ -391,7 +394,12 @@ start of a turn deals any ongoing damage, and the end opens any repeat saves
 (`turn-boundaries.ts`). What a stat block's traits do, read from their text when the bundle is built
 (`ActorDefinition.traitMechanics`), runs at those boundaries and as damage lands: Regeneration, auras,
 Undead Fortitude, a Death Burst (`trait-turns.ts`, `statblock-traits.ts`). A stat block's spells
-(`castsSpells`) become cast actions as the catalog loads (`monster-spells.ts`). A spell that leaves an area acting later (Moonbeam, Spirit Guardians, a
+(`castsSpells`) become cast actions as the catalog loads (`monster-spells.ts`), which the stat block prints inside the
+list they belong to (`partOf`); a stat block the GM imports or writes has its Spellcasting read the same way
+(`statblock-spellcasting.ts`). A legendary creature the GM marks as fighting in its lair (`actor.set-lair`) has the
+lair's legendary action uses and Legendary Resistance (`lair.ts`). A swallow (`ActionSchema.swallow`) takes a grappled
+creature inside its swallower, which carries it, gives it Total Cover from everything outside, and saves to hold on
+when the damage from inside in one turn reaches its stat block's number (`swallow.ts`). A spell that leaves an area acting later (Moonbeam, Spirit Guardians, a
 wall of fire) opens a zone on the template the cast placed, or around its caster, which the server
 runs as tokens move, as the area moves and at each turn's end and start (`spell-zones.ts`); what
 such a spell lets its caster do on later turns is offered while it lasts, at the level it was cast

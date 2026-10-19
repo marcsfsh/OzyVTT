@@ -218,6 +218,35 @@ describe("a stat block's spells as cast actions", () => {
   });
 });
 
+describe("a pit fiend's Hellfire Spellcasting", () => {
+  it("casts two Fireballs for one recharge, either of which can be a Hold Monster or a Wall of Fire", () => {
+    const hellfire = actionOf("pit-fiend", "hellfire-spellcasting");
+    expect(hellfire.multiattack).toEqual([{ actionId: "hellfire-spellcasting-fireball-level-5", count: 2 }]);
+    expect(actionOf("pit-fiend", "hellfire-spellcasting-fireball-level-5")).toMatchObject({
+      name: "Fireball (level 5)",
+      damage: [{ formula: "10d6", type: "fire" }],
+      save: { ability: "dex", dc: 21 }
+    });
+    const state = fight("pit-fiend");
+    const fiend = state.actors.find((actor) => actor.id === IDS.foe)!;
+    cast(state, "pit-fiend", hellfire, []);
+    expect(fiend.actionUses).toEqual({ "hellfire-spellcasting": 1 });
+    cast(state, "pit-fiend", actionOf("pit-fiend", "hellfire-spellcasting-fireball-level-5"), [IDS.hero]);
+    cast(state, "pit-fiend", actionOf("pit-fiend", "hellfire-spellcasting-hold-monster-level-7"), [IDS.ally]);
+    // Both casts shared the one use, and the plan is spent.
+    expect(fiend.actionUses).toEqual({ "hellfire-spellcasting": 1 });
+    expect(() =>
+      cast(state, "pit-fiend", actionOf("pit-fiend", "hellfire-spellcasting-fireball-level-5"), [IDS.hero])
+    ).toThrow(RulesBlockedError);
+    // Until it recharges, neither the action nor one of its casts on its own is allowed.
+    nextTurn(state);
+    expect(() => cast(state, "pit-fiend", hellfire, [])).toThrow(RulesBlockedError);
+    expect(() =>
+      cast(state, "pit-fiend", actionOf("pit-fiend", "hellfire-spellcasting-wall-of-fire"), [IDS.hero])
+    ).toThrow(RulesBlockedError);
+  });
+});
+
 describe("a stat block's Invisibility", () => {
   it("makes the Imp Invisible until its Sting's attack roll ends the spell", () => {
     const state = fight("imp");

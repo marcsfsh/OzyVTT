@@ -16,8 +16,9 @@ import {
   wallCrossing
 } from "@vtt/rules-5e";
 import { isIncapacitated } from "./condition-rules.js";
+import { sizeAtMost } from "./resolution/context.js";
 import { areAllies } from "./creature-sides.js";
-import { holdsFeature } from "./class-features.js";
+import { opensItsSpace } from "./space-sharing.js";
 import { CommandRejectedError } from "./game-store.js";
 import { gridToImage, imageToGrid } from "./grid-calibration.js";
 import { layerSlice, normalizedRect, type LayerMapGeometry, type PaintRectInput } from "./map-layers.js";
@@ -92,6 +93,11 @@ export type MovementCostOptions = Readonly<{
   perceives?: (actorId: string) => boolean;
   /** The mover may stop in other creatures' spaces (an air elemental's Air Form), so none bars its way. */
   passesCreatures?: boolean;
+  /** The mover may pass through the spaces of creatures this size or smaller (a gelatinous cube's Engulf). */
+  passesCreaturesUpTo?: string;
+  /** The path keeps to the straight line drawn, so a move through creatures enters the spaces along it rather than
+   *  going round them. */
+  alongLine?: boolean;
   /** The mover passes through walls as through Difficult Terrain (a ghost's Incorporeal Movement, a Tunneler). */
   throughWalls?: boolean;
   /** The mover passes through walls at no extra cost (Earth Glide, burrowing). A spell's wall stops it all the same. */
@@ -187,13 +193,16 @@ export function movementCost(
       moverSize: mover.size,
       occupantSize: occupant.size
     });
-    // A mover that can stop in a creature's space, or a swarm's space ("and vice versa"), is never barred; it is still
-    // another creature's space, so it costs as Difficult Terrain.
+    // A mover that can stop in a creature's space, or a swarm's or a gelatinous cube's space, is never barred; it is
+    // still another creature's space, so it costs as Difficult Terrain.
     const swarm =
       occupant.definitionId !== null &&
       occupant.definitionId !== undefined &&
-      holdsFeature(options.resolveDefinition?.(occupant.definitionId), "swarm", "Swarm");
-    const passage = printed === "blocked" && (options.passesCreatures || swarm) ? "difficult" : printed;
+      opensItsSpace(options.resolveDefinition?.(occupant.definitionId));
+    const passes =
+      options.passesCreatures === true ||
+      (options.passesCreaturesUpTo !== undefined && sizeAtMost(occupant.size, options.passesCreaturesUpTo));
+    const passage = printed === "blocked" && (passes || swarm) ? "difficult" : printed;
     if (passage === "open") continue;
     const cells = passage === "blocked" ? closedCells : difficultCells;
     const origin = footprintOrigin(imageToGrid(calibration, token.position), token.sizeCells);
@@ -209,9 +218,20 @@ export function movementCost(
   const fixedCrosses = wallCrossing(fixedWalls);
   const halvedAt = options.halvedAt;
   const costlyGroundAt = aloft ? undefined : options.costlyGroundAt;
+  const fromCell = footprintOrigin(imageToGrid(calibration, from), sizeCells);
+  const toCell = footprintOrigin(imageToGrid(calibration, to), sizeCells);
+  const lineLength = Math.hypot(toCell.column - fromCell.column, toCell.row - fromCell.row);
+  const nearLine = (cell: { column: number; row: number }) =>
+    lineLength === 0 ||
+    Math.abs(
+      (cell.column - fromCell.column) * (toCell.row - fromCell.row) -
+        (cell.row - fromCell.row) * (toCell.column - fromCell.column)
+    ) /
+      lineLength <=
+      0.75;
   const path = movementPath({
-    from: footprintOrigin(imageToGrid(calibration, from), sizeCells),
-    to: footprintOrigin(imageToGrid(calibration, to), sizeCells),
+    from: fromCell,
+    to: toCell,
     sizeCells,
     isDifficult: (column, row) =>
       options.ignoresDifficult !== true &&
@@ -227,6 +247,7 @@ export function movementCost(
       return center.x >= 0 && center.y >= 0 && center.x <= geometry.width && center.y <= geometry.height;
     },
     isStepOpen: (stepFrom, stepTo) =>
+      (options.alongLine !== true || nearLine(stepTo)) &&
       (passesWalls
         ? footprintStepPassage(stepFrom, stepTo, sizeCells, fixedCrosses, fixedWalls) !== "blocked"
         : footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls) !== "blocked" ||

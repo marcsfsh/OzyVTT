@@ -9,6 +9,7 @@ import { keepAmmunitionCount } from "./ammunition.js";
 import { keepLightState } from "./item-light.js";
 import { endConditionsImmuneTo, endEffect, MAGE_ARMOR_TAG, type EffectNarration } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
+import { holdsFeature } from "./class-features.js";
 import { itemRowOfAction, rollStartingCharges } from "./item-charges.js";
 import { liveHitPointBonus } from "./live-abilities.js";
 import { scrollSpellProblem } from "./scrolls.js";
@@ -383,6 +384,12 @@ function keepDormant(stored: InventoryItem | undefined, item: InventoryItem): In
   return stored?.dormant ? { ...rest, dormant: true } : rest;
 }
 
+/** SRD Ephemeral (a will-o'-wisp): "The wisp can't wear or carry anything." */
+function refuseToCarry(actor: Actor, definition: ActorDefinition | undefined): void {
+  if (holdsFeature(definition, "ephemeral", "Ephemeral"))
+    throw new CommandRejectedError(`${actor.name} can't wear or carry anything.`);
+}
+
 export function setInventoryItem(
   state: GameState,
   actorId: string,
@@ -392,6 +399,8 @@ export function setInventoryItem(
 ): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  if (item.quantity > 0 && !actor.inventory.some((entry) => entry.id === item.id))
+    refuseToCarry(actor, actor.definitionId ? resolveDefinition(actor.definitionId) : undefined);
   // A row naming itself as its own record is the plain form.
   if (item.recordId === item.id) {
     const { recordId: _same, ...plain } = item;
@@ -611,6 +620,7 @@ export function giveItem(
   const to = state.actors.find((candidate) => candidate.id === toActorId);
   if (!from || !to) throw new CommandRejectedError("That combatant no longer exists.");
   if (from.id === to.id) throw new CommandRejectedError("Choose another character to give it to.");
+  refuseToCarry(to, to.definitionId ? resolveDefinition(to.definitionId) : undefined);
   const row = from.inventory.find((entry) => entry.id === itemId);
   if (!row) throw new CommandRejectedError("That item is no longer in the pack.");
   if (to.inventory.length >= MAX_ITEMS)

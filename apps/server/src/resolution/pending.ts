@@ -12,7 +12,7 @@ import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
 import { HIDDEN_SOURCE } from "../hidden-source.js";
 import { rollDice } from "@vtt/rules-5e";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
-import { recordRoll, tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
+import { recordRoll, sizeAtMost, tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
 import { optionFor, optionParts, withOptionName } from "./grant-extras.js";
 import { bestCover, coverBonusOf, coverFor, mapCover } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
@@ -270,7 +270,7 @@ type MagicalSource = Pick<ResolveContext, "action" | "attacker" | "riderItemId">
 
 /** A spell's save, or a magic item's (a wand's), is one against magic: Magic Resistance meets it with Advantage. */
 export function isMagicalAction(ctx: MagicalSource): boolean {
-  if (ctx.action.spellId !== undefined) return true;
+  if (ctx.action.spellId !== undefined || ctx.action.magical === true) return true;
   const item = ctx.riderItemId === null ? undefined : ctx.attacker.inventory.find((row) => row.id === ctx.riderItemId);
   return item !== undefined && ctx.deps.catalog?.equipmentRecord(catalogIdOf(item))?.isMagic === true;
 }
@@ -654,18 +654,31 @@ export function parkActionSave(ctx: ResolveContext): void {
   // side from the source.
   const fightingOf = (target: (typeof targets)[number]) =>
     action.save!.advantageIfFighting === true && fightingSides(ctx, target) ? FIGHTING_ADVANTAGE : "";
-  // One prompt group for each cover bonus, pick, Advantage and success without a roll.
+  // "If the target is Large or smaller, it is swallowed" (a kraken), "If the target is a Large or smaller creature, it
+  // has the Grappled condition" (a whelm): a larger one fails into the damage alone.
+  const failureMaxSize = action.save.failureMaxSize ?? action.swallow?.maxSize;
+  const swallowsOf = (target: (typeof targets)[number]) =>
+    failureMaxSize === undefined || sizeAtMost(target.size, failureMaxSize);
+  // One prompt group for each cover bonus, pick, Advantage, success without a roll, and swallow.
   const groups = new Map<
     string,
-    { saveBonus: number; option: GrantOption | null; advantageFrom: string; autoSucceeds: string; targetIds: string[] }
+    {
+      saveBonus: number;
+      option: GrantOption | null;
+      advantageFrom: string;
+      autoSucceeds: string;
+      swallows: boolean;
+      targetIds: string[];
+    }
   >();
   for (const target of saving) {
     const saveBonus = saveBonusOf(target);
     const option = optionOf(target);
     const advantageFrom = fightingOf(target);
     const autoSucceeds = autoSuccessOf(ctx, target);
-    const key = `${saveBonus}|${option?.id ?? ""}|${advantageFrom}|${autoSucceeds}`;
-    const group = groups.get(key) ?? { saveBonus, option, advantageFrom, autoSucceeds, targetIds: [] };
+    const swallows = swallowsOf(target);
+    const key = `${saveBonus}|${option?.id ?? ""}|${advantageFrom}|${autoSucceeds}|${swallows}`;
+    const group = groups.get(key) ?? { saveBonus, option, advantageFrom, autoSucceeds, swallows, targetIds: [] };
     group.targetIds.push(target.id);
     groups.set(key, group);
   }
@@ -686,8 +699,8 @@ export function parkActionSave(ctx: ResolveContext): void {
     ...(action.save.failureEndsForm ? { endsForm: true as const } : {}),
     ...fatal
   };
-  for (const { saveBonus, option, advantageFrom, autoSucceeds, targetIds } of groups.values()) {
-    const onFailEffect = onFailFor(option);
+  for (const { saveBonus, option, advantageFrom, autoSucceeds, swallows, targetIds } of groups.values()) {
+    const onFailEffect = swallows ? onFailFor(option) : undefined;
     createPendingSaves(state, {
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -700,7 +713,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       saveBonus,
       halfOnSuccess: action.save.successDamage === "half" || potentCantrip(ctx),
       // A pick's own Prone stays bare, as the action's does (Command's Grovel).
-      conditionIds: [...conditionIds, ...barePicks(option)],
+      conditionIds: swallows ? [...conditionIds, ...barePicks(option)] : [],
       ...(onFailEffect ? { onFailEffect } : {}),
       ...(Object.keys(extra).length > 0 ? { extra } : {}),
       ...(action.drain ? { drain: action.drain } : {}),

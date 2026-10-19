@@ -33,6 +33,7 @@ import { sceneSight } from "../vision/sight.js";
 import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { reachBarredBy } from "../zone-barriers.js";
+import { swallowCover } from "../swallow.js";
 import { enclosureBlocks } from "../enclosures.js";
 import { builtinHandlerFor } from "./builtins.js";
 import {
@@ -44,6 +45,7 @@ import {
   type ResolveInput
 } from "./context.js";
 import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
+import { actionTargetViolations } from "./action-targets.js";
 
 /** The attacker and targets, refused unless the action has something structured to resolve against them. */
 function combatantsOf(
@@ -150,8 +152,12 @@ function combatantsOf(
     action.summons !== undefined ||
     // Taking a form, or leaving it, is the user's own (Wild Shape, a werewolf's Shape-Shift).
     (shapeShifts && action.shapeShift?.onTargets !== true && action.save === undefined);
-  // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
-  const touchesSomeone = action.endsConditions !== undefined || action.healing?.perUse === true;
+  // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone, and so is a swallow.
+  const touchesSomeone =
+    action.endsConditions !== undefined ||
+    action.healing?.perUse === true ||
+    action.swallow?.conditions !== undefined ||
+    action.pull !== undefined;
   if (targets.length === 0 && (touchesSomeone || (!structuredWithoutTargets && action.grants?.target !== "target")))
     throw new CommandRejectedError("Choose at least one target.");
   if (
@@ -173,6 +179,9 @@ function combatantsOf(
     action.teleport === undefined &&
     action.summons === undefined &&
     action.raisesCorpse === undefined &&
+    action.swallow?.conditions === undefined &&
+    action.pull === undefined &&
+    action.inflicts === undefined &&
     input.builtin !== true &&
     !(spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined))
   )
@@ -218,7 +227,16 @@ export function openResolve(
   const combatants = combatantsOf(state, reaching, input, deps.catalog, spell, hiddenFromInitiator);
   const { attacker } = combatants;
   const warnings: string[] = [];
-  const targets = input.areaPlaced ? onlyTargetTypes(combatants.targets, spell, deps, warnings) : combatants.targets;
+  const caught = input.areaPlaced ? onlyTargetTypes(combatants.targets, spell, deps, warnings) : combatants.targets;
+  // A swallowed creature has Total Cover from an area outside its swallower, and is left out of it.
+  const targets =
+    caught.length > 1
+      ? caught.filter((target) => {
+          if (swallowCover(state, combatants.attacker.id, target.id) === null) return true;
+          warnings.push(`${target.name} is swallowed and has Total Cover from ${declared.name}, so it is left out.`);
+          return false;
+        })
+      : caught;
   // A spell cast with a higher slot rolls that slot's dice and makes its rays (before the economy opens the action's
   // instance); a paid replay names the slot it was cast with.
   const castLevel = input.economyPaid ? input.slotLevel : castLevelOf(state, attacker, reaching, input.slotLevel);
@@ -277,9 +295,17 @@ export function openResolve(
     input.areaPlaced === true
       ? null
       : bestCover(mapCover(state, attacker.id, target.id), deps.zoneCover?.(attacker.id, target.id));
+  // Pulling a creature out of a gelatinous cube reaches into it, so the cover it has inside doesn't bar End an Effect.
+  const reachesInside = input.builtin === true && builtinBaseId(action.id) === "end-an-effect";
   const attackCover =
     targets.length === 1
-      ? (input.cover ?? bestCover(coverFor(null, targets[0]), fromMap(targets[0]), auraCover(targets[0])))
+      ? (input.cover ??
+        bestCover(
+          coverFor(null, targets[0]),
+          fromMap(targets[0]),
+          auraCover(targets[0]),
+          reachesInside ? null : swallowCover(state, attacker.id, targets[0].id)
+        ))
       : (input.cover ?? null);
   // An area's other targets still take it, so a marked creature among several is the GM's to remove.
   if (targets.length > 1)
@@ -299,6 +325,19 @@ export function openResolve(
     ...(deps.catalog ? { catalog: deps.catalog } : {})
   };
   const sightBlocks: Array<readonly [RuleId, string]> = [];
+  // An action taken move first names its targets only once it has moved, so its own targeting rules are checked then
+  // (a gelatinous cube's Engulf takes only the creatures it moved through).
+  if (input.owedPaid === true)
+    for (const violation of actionTargetViolations({
+      state,
+      attacker,
+      action,
+      targetIds: input.targetIds,
+      definition: deps.definition,
+      resolveDefinition: deps.resolveDefinition,
+      distanceFeet: deps.distanceFeet
+    }))
+      sightBlocks.push([violation.rule, violation.message]);
   // SRD Hide: "you must be out of any enemy's line of sight". With dynamic vision on the engine knows who sees whom;
   // only an enemy the hider sees counts ("if you can see a creature, you can discern whether it can see you"), so
   // the refusal never gives away one the player doesn't know of.

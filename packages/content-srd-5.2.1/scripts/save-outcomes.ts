@@ -412,11 +412,17 @@ const STRENGTH_TESTS = [
 
 /** What a failure leaves besides conditions, as one effect named for its action. */
 export type FailureRestrictions = Readonly<{
-  failureEffect: { name: string; tags: string[]; modifiers: typeof STRENGTH_TESTS };
+  failureEffect: { name: string; tags: string[]; modifiers: Array<(typeof STRENGTH_TESTS)[number] | DamagePenalty> };
   failureDuration?: SaveFailureDuration;
   repeatSave?: true;
-  /** What the engine leaves to the GM. */
-  reminder?: string;
+}>;
+
+/** "Subtracts 3 (1d6) from its damage rolls": the die taken off each of the bearer's damage rolls. */
+type DamagePenalty = Readonly<{
+  type: "damage-bonus";
+  amount: 0;
+  dice: string;
+  when: Array<{ type: "on-damage-roll" }>;
 }>;
 
 /**
@@ -424,7 +430,7 @@ export type FailureRestrictions = Readonly<{
  * copper dragon's Slowing Breath ("can't take Reactions; its Speed is halved; and it can take either an action or a
  * Bonus Action on its turn, not both. This effect lasts until the end of its next turn") and a gold dragon's Weakening
  * Breath ("Disadvantage on Strength-based D20 Test ... It repeats the save at the end of each of its turns ... After 1
- * minute, it succeeds automatically"). The damage penalty Weakening Breath adds is said in `reminder`. Null when the
+ * minute, it succeeds automatically"), whose die off the target's damage rolls is a damage modifier. Null when the
  * clause prints none of these.
  */
 export function failureRestrictionsOf(description: string, name: string): FailureRestrictions | null {
@@ -439,22 +445,29 @@ export function failureRestrictionsOf(description: string, name: string): Failur
     ...(/\bits Speed is halved\b/.test(clause) ? ["speed-halved"] : []),
     ...(/\bcan take either an action or a Bonus Action on its turn, not both\b/.test(clause) ? ["action-or-bonus"] : [])
   ];
-  const modifiers = /\bDisadvantage on Strength-based D20 Tests?\b/.test(clause) ? STRENGTH_TESTS : [];
+  const penalty = /\bsubtracts \d+ \((\d+d\d+)\) from its damage rolls\b/.exec(clause);
+  const modifiers = [
+    ...(/\bDisadvantage on Strength-based D20 Tests?\b/.test(clause) ? STRENGTH_TESTS : []),
+    ...(penalty
+      ? [
+          {
+            type: "damage-bonus" as const,
+            amount: 0 as const,
+            dice: `-${penalty[1]}`,
+            when: [{ type: "on-damage-roll" as const }]
+          }
+        ]
+      : [])
+  ];
   if (tags.length === 0 && modifiers.length === 0) return null;
   const duration = /\bThis effect lasts until the end of its next turn\b/.test(clause)
     ? ({ type: "until-bearer-turn-end" } as const)
     : failureDurationOf(clause);
-  const penalty = /\bsubtracts \d+ \((\d+d\d+)\) from its damage rolls\b/.exec(clause);
   return {
     failureEffect: { name, tags, modifiers },
     ...(duration ? { failureDuration: duration } : {}),
     ...(repeatsEachTurn(clause) || /\bIt repeats the save at the end of each of its turns\b/.test(clause)
       ? { repeatSave: true as const }
-      : {}),
-    ...(penalty
-      ? {
-          reminder: `While ${name} lasts, the target subtracts ${penalty[1]} from its damage rolls. Take it off by hand.`
-        }
       : {})
   };
 }

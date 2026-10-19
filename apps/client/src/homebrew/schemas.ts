@@ -1438,7 +1438,21 @@ const MONSTER_SCHEMA: HomebrewSchema = {
         { key: "token.footprint.width", label: "Token width", kind: "stepper", min: 1, max: 4, unit: "squares" },
         { key: "token.footprint.height", label: "Token height", kind: "stepper", min: 1, max: 4, unit: "squares" },
         { key: "legendary.actionsPerRound", label: "Legendary actions per round", kind: "number", min: 1, max: 5 },
-        { key: "legendary.resistancesPerDay", label: "Legendary resistances per day", kind: "number", min: 1, max: 6 }
+        { key: "legendary.resistancesPerDay", label: "Legendary resistances per day", kind: "number", min: 1, max: 6 },
+        {
+          key: "legendary.actionsInLair",
+          label: "Legendary actions per round in its lair",
+          kind: "number",
+          min: 1,
+          max: 5
+        },
+        {
+          key: "legendary.resistancesInLair",
+          label: "Legendary resistances per day in its lair",
+          kind: "number",
+          min: 1,
+          max: 6
+        }
       ]
     }
   ]

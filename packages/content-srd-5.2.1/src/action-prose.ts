@@ -70,6 +70,8 @@ export type MultiattackReplacement = { actionIds: string[]; attacks: number; any
 export type MultiattackOfProse = {
   plan: MultiattackComponent[];
   alternatives: MultiattackComponent[][];
+  /** The action used this turn the alternatives wait on ("if it used Hasten this turn"). */
+  alternativesAfter?: string;
   replacements: MultiattackReplacement[];
 };
 
@@ -101,6 +103,8 @@ const CLAUSES: ReadonlyArray<Readonly<{ pattern: RegExp; kind: "pool" | "either"
   }
 ];
 const SEPARATOR = /\s*(?:,\s*)?(?:and\s+)?(?:it\s+)?/y;
+/** "If it used Hasten this turn": the action an alternative plan waits on. */
+const USED_THIS_TURN = new RegExp(`\\s+if it used (${NAME}) this turn$`);
 
 const countOf = (word: string) => COUNT_WORDS[word.toLowerCase()] ?? Number.parseInt(word, 10);
 const namesOf = (list: string) => list.split(/\s*,\s*(?:or\s+|and\s+)?|\s+or\s+|\s+and\s+/).filter(Boolean);
@@ -184,12 +188,15 @@ export function multiattackOfProse(
   const sentences = description.trim().split(/(?<=\.)\s+/);
   const main = /^The [^.]*? (makes .+?)\.$/.exec(sentences[0] ?? "")?.[1];
   if (!main) return null;
-  // An alternative plan starts at "or (it) makes" / "or uses"; a condition on it ("if it used Hasten this turn") is the
-  // GM's to judge.
+  // An alternative plan starts at "or (it) makes" / "or uses"; one that waits on an action used this turn ("if it used
+  // Hasten this turn") names it, and any other condition on it is the GM's to judge.
   const [first, ...others] = main.split(/,?\s+or\s+(?:it\s+)?(?=makes\s|uses\s)/);
   const plan = planOf(first, idOf);
   if (!plan) return null;
+  let alternativesAfter: string | undefined;
   const alternatives = others.flatMap((text) => {
+    const after = USED_THIS_TURN.exec(text);
+    if (after) alternativesAfter = idOf(after[1]!) ?? alternativesAfter;
     const alternative = planOf(text.replace(/\s+if it\b.*$/i, ""), idOf);
     return alternative ? [alternative] : [];
   });
@@ -197,7 +204,7 @@ export function multiattackOfProse(
     const replacement = replacementOf(sentence, idOf);
     return replacement ? [replacement] : [];
   });
-  return { plan, alternatives, replacements };
+  return { plan, alternatives, ...(alternativesAfter ? { alternativesAfter } : {}), replacements };
 }
 
 /**
@@ -240,7 +247,18 @@ export function drainOfProse(description: string, name?: string): DamageDrain | 
  *  giant". Null when the text prints none. */
 export function hitPushOfProse(description: string): ForcedPush | null {
   const push = /\bthe target is pushed (up to )?(\d+) feet (?:straight )?away from\b/.exec(description);
-  return push ? { feet: Number.parseInt(push[2]!, 10), ...(push[1] ? { upTo: true as const } : {}) } : null;
+  if (push) return { feet: Number.parseInt(push[2]!, 10), ...(push[1] ? { upTo: true as const } : {}) };
+  // "If the target is a Medium or smaller creature, the satyr pushes the target up to 10 feet straight away from itself."
+  const pushes =
+    /\b(?:If the target is an? (Tiny|Small|Medium|Large|Huge) or smaller creature, )?the [a-z -]+? pushes the target (up to )?(\d+) feet straight away from itself\b/.exec(
+      description
+    );
+  if (!pushes) return null;
+  return {
+    feet: Number.parseInt(pushes[3]!, 10),
+    ...(pushes[2] ? { upTo: true as const } : {}),
+    ...(pushes[1] ? { maxTargetSize: pushes[1].toLowerCase() as NonNullable<ForcedPush["maxTargetSize"]> } : {})
+  };
 }
 
 const SPEED_MODES = { fly: "fly", swim: "swim", climb: "climb", burrow: "burrow" } as const;
@@ -266,12 +284,17 @@ export function moveOfProse(description: string): ActionMove | null {
   const rest = found[5] ?? "";
   const first =
     ATTACK_OR_SAVE.test(description.slice(found.index)) && !ATTACK_OR_SAVE.test(description.slice(0, found.index));
+  // "The cube can move through the spaces of Large or smaller creatures".
+  const through = /\bcan move through the spaces of (Tiny|Small|Medium|Large|Huge) or smaller creatures/i
+    .exec(description)?.[1]
+    ?.toLowerCase() as "tiny" | "small" | "medium" | "large" | "huge" | undefined;
   return {
     speed: found[2] ? "half" : "full",
     ...(mode ? { mode } : {}),
     provokes: !/without provoking Opportunity Attacks/i.test(rest),
     ...(/straight toward/i.test(rest) ? { straight: true as const } : {}),
-    ...(first ? { first: true as const } : {})
+    ...(first ? { first: true as const } : {}),
+    ...(through ? { throughCreatures: through } : {})
   };
 }
 

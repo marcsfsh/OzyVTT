@@ -332,6 +332,12 @@ export const PendingSaveSchema = z
     failureNote: z.string().min(1).max(300).optional(),
     /** A failure also breaks the creature's Concentration (Sleet Storm). */
     breaksConcentration: z.literal(true).optional(),
+    /** A swallower's save against the damage from inside it: a failure lets out every creature it swallowed, Prone
+     *  within this many feet of it. */
+    regurgitates: z
+      .object({ withinFeet: z.number().int().min(5).max(60) })
+      .strict()
+      .optional(),
     /** The spell area that raised it (`SpellZone`), which counts the damage it deals toward its cap. Never projected. */
     zoneId: z.string().min(1).max(120).optional(),
     /** A save the bearer repeats at the end of its turn: a success ends this effect. Stripped from player projections. */

@@ -463,6 +463,7 @@ const SAVE_LIFETIME_KEYS = [
   "onlyCreatureTypes",
   "sparesAffected",
   "failureKills.**",
+  "failureMaxSize",
   "repeatDamageAgain",
   "repeatUnseenSource",
   "endsOutOfSight",
@@ -739,6 +740,65 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].swallow.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a stat block's Swallow (how many it holds, the size it swallows, its acid and its regurgitation), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].pull.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action that pulls its targets toward its user (a roper's Reel), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].inflicts.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "what an action does to its targets with no roll (a tarrasque's shock wave: Prone and lost Concentration), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].afterHurtingBloodied",
+    types: "*",
+    reason:
+      "an action offered only right after its user damages a Bloodied creature (a gnoll's Rampage), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].largeFillsHold",
+    types: "*",
+    reason: "one SRD author (a water elemental's Whelm: one Large creature or up to two smaller ones)",
+    status: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].useNumber",
+    types: "*",
+    reason: "one SRD author (a sphinx of valor's three roars in their order)",
+    status: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].magical",
+    types: ACTION_CARRIERS,
+    reason:
+      "that an action's saves are against magic (a sphinx's magical roar), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].holdsAtOnce",
+    types: "*",
+    reason: "one SRD author (a shambling mound's Engulf, one creature at a time)",
+    status: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].multiattackAlternativesAfter",
+    types: "*",
+    reason: "one SRD author (a clay golem's three Slams after Hasten), read from its Multiattack's prose",
+    status: "permanent: lone SRD record"
+  },
+  {
     at: "actions[].multiattackReplacements[].**",
     types: ACTION_CARRIERS,
     reason:
@@ -843,6 +903,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ACTION_CARRIERS,
     reason:
       "a stat block's damage under a printed condition (Bloodied swarms, a charge), read from the hit clause as the catalog is built; no control on the action row yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].attack.advantageWhen",
+    types: ["monster"],
+    reason:
+      "the Advantage a stat block's attack prints for itself (against a creature it grapples, one missing Hit Points, or in the first round), read from its text as the catalog is built; no control on the action row yet",
     status: "gap"
   },
   {
@@ -955,6 +1022,19 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: "*",
     reason: "the action that leaves a form early, added by the form itself as it is taken; zero hand authors",
     status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].partOf",
+    types: "*",
+    reason:
+      "the printed entry a cast belongs to (a Spellcasting list's spell), set as the catalog makes a stat block's casts; zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].endsUntilItActs",
+    types: "*",
+    reason: "one SRD author (a will-o'-wisp's Consume Life, which ends its Vanish)",
+    status: "permanent: lone SRD record"
   },
   {
     at: "actions[].formOnly",

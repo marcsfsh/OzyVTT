@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadMonsterDefinitions, loadSpells } from "../src/index.js";
-import { spellIdOfName } from "../scripts/monster-spells.js";
+import { spellIdOfName } from "../src/monster-spellcasting.js";
 
 // The spells SRD stat blocks cast, read from their Spellcasting lists and their other casting actions at build time.
 
@@ -10,11 +10,11 @@ const actionOf = (slug: string, actionId: string) =>
   monsters.find((monster) => monster.source.externalId === slug)?.actions.find((action) => action.id === actionId);
 
 describe("monster spellcasting in the bundle", () => {
-  it("reads every Spellcasting list but the pit fiend's Hellfire, and names only spells the SRD holds", () => {
+  it("reads every Spellcasting list, and names only spells the SRD holds", () => {
     const lists = monsters.flatMap((monster) =>
       monster.actions.filter((action) => /spellcasting/i.test(action.name) && !action.castsSpells)
     );
-    expect(lists.map((action) => action.id)).toEqual(["hellfire-spellcasting"]);
+    expect(lists.map((action) => action.id)).toEqual([]);
     const named = monsters.flatMap((monster) =>
       monster.actions.flatMap((action) => action.castsSpells?.spells.map((entry) => entry.spellId) ?? [])
     );

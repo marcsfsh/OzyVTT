@@ -9,6 +9,7 @@ import { hiddenFrom } from "../vision/audience.js";
 import { sceneSight } from "../vision/sight.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { creatureTypeOf } from "../statblock-facts.js";
+import { enteredOnMoveOf } from "../granted-moves.js";
 import type { RuleId } from "../rules-families.js";
 import { endedEffect, sizeAtMost, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
@@ -65,6 +66,8 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
   const rules = action.targets;
   if (!rules) return violations;
   const sight = rules.seen ? sceneSight(state, resolveDefinition ? { definition: resolveDefinition } : {}) : null;
+  // Taken move first, it reaches only the creatures its move entered; taken where it stands, the GM picks them.
+  const entered = rules.entered ? enteredOnMoveOf(attacker, action.id) : null;
   for (const target of targets) {
     const name = nameOf(target);
     const self = target.id === attacker.id;
@@ -106,6 +109,31 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
         rule: "target.not-allowed",
         message: `${action.name} targets a ${rules.conditions.map(conditionLabel).join(" or ")} creature, and ${name} isn't.`
       });
+    if (
+      rules.heldByAction &&
+      !target.effects.some(
+        (effect) => effect.sourceActorId === attacker.id && effect.sourceActionId === rules.heldByAction
+      )
+    )
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} targets a creature ${attacker.name} holds with ${heldName(rules.heldByAction)}, and ${name} isn't held.`
+      });
+    if (rules.typeTag && !typeTagsOf(targetDefinition).includes(rules.typeTag.toLowerCase()))
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} targets a ${rules.typeTag}, and ${name} isn't one.`
+      });
+    if (entered !== null && !entered.includes(target.id))
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} targets the creatures whose spaces ${attacker.name} entered on its move, and ${name} isn't one.`
+      });
+    if (rules.atZeroHitPoints && target.hp.current > 0)
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} targets a creature at 0 Hit Points, and ${name} isn't.`
+      });
     if (rules.markedBy && !markedBy(target, attacker, rules.markedBy))
       violations.push({
         rule: "target.not-allowed",
@@ -130,6 +158,21 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
   }
   return violations;
 }
+
+/** The type tags a stat block prints ("Fiend (Demon)": demon), lower case. */
+function typeTagsOf(definition: ActorDefinition | undefined): string[] {
+  const tags = (definition?.extensions["open5e.srd-2024"] as { typeTags?: unknown } | undefined)?.typeTags;
+  return Array.isArray(tags)
+    ? tags.filter((tag): tag is string => typeof tag === "string").map((tag) => tag.toLowerCase())
+    : [];
+}
+
+/** An action's printed name from its id ("web-strand": "Web Strand"). */
+const heldName = (actionId: string) =>
+  actionId
+    .split("-")
+    .map((word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`)
+    .join(" ");
 
 const grappledBy = (target: LiveActor, source: LiveActor) =>
   target.effects.some((effect) => effect.sourceActorId === source.id && effect.linkedConditionIds.includes("grappled"));

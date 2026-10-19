@@ -186,7 +186,9 @@
   },
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "traitMechanics": [
    {
@@ -523,7 +525,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -534,6 +538,9 @@
      "stealth": 7
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -818,7 +825,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -829,6 +838,9 @@
      "stealth": 5
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -1152,7 +1164,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -1165,6 +1179,9 @@
      "stealth": 5
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -1361,7 +1378,7 @@
     "id": "thunderclap",
     "name": "Thunderclap",
     "activation": "other",
-    "description": "Legendary Action. Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere Sphere centered on a point the dragon can see within 90 feet. Failure: 10 (3d6) Thunder damage, and the target has the Deafened condition until the end of its next turn.",
+    "description": "Legendary Action. Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere centered on a point the dragon can see within 90 feet. Failure: 10 (3d6) Thunder damage, and the target has the Deafened condition until the end of its next turn.",
     "save": {
      "ability": "con",
      "dc": 17,
@@ -1485,7 +1502,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -1497,6 +1516,9 @@
      "stealth": 5
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -1819,7 +1841,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -1831,6 +1855,9 @@
      "stealth": 6
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -2117,6 +2144,16 @@
           ]
          }
         ]
+       },
+       {
+        "type": "damage-bonus",
+        "amount": 0,
+        "dice": "-1d6",
+        "when": [
+         {
+          "type": "on-damage-roll"
+         }
+        ]
        }
       ]
      },
@@ -2127,7 +2164,6 @@
      "repeatSave": true
     },
     "damage": [],
-    "reminder": "While Weakening Breath lasts, the target subtracts 1d6 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 60,
@@ -2197,7 +2233,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -2210,6 +2248,9 @@
      "stealth": 8
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -2333,7 +2374,7 @@
     "id": "noxious-miasma",
     "name": "Noxious Miasma",
     "activation": "other",
-    "description": "Legendary Action. Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere Sphere centered on a point the dragon can see within 90 feet. Failure: 7 (2d6) Poison damage, and the target takes a -2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
+    "description": "Legendary Action. Constitution Saving Throw: DC 17, each creature in a 20-foot-radius Sphere centered on a point the dragon can see within 90 feet. Failure: 7 (2d6) Poison damage, and the target takes a -2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
      "dc": 17,
@@ -2487,7 +2528,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -2500,6 +2543,9 @@
      "stealth": 6
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -2774,7 +2820,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -2785,6 +2833,9 @@
      "stealth": 6
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -3104,7 +3155,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -3116,6 +3169,9 @@
      "stealth": 5
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -3187,7 +3243,7 @@
     "id": "freezing-burst",
     "name": "Freezing Burst",
     "activation": "other",
-    "description": "Legendary Action. Constitution Saving Throw: DC 14, each creature in a 30-foot-radius Sphere Sphere centered on a point the dragon can see within 120 feet. Failure: 7 (2d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
+    "description": "Legendary Action. Constitution Saving Throw: DC 14, each creature in a 30-foot-radius Sphere centered on a point the dragon can see within 120 feet. Failure: 7 (2d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
      "dc": 14,
@@ -3339,7 +3395,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -3350,6 +3408,9 @@
      "stealth": 5
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -3611,7 +3672,20 @@
       "formula": "1d8 + 4",
       "type": "slashing"
      }
-    ]
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 30,
+      "maxTargetSize": "large",
+      "damage": [],
+      "conditions": [
+       "prone"
+      ]
+     }
+    ],
+    "reminder": "After a charge that knocks the target Prone, the allosaurus can make one Bite attack against it; take it from the turn list."
    }
   ],
   "token": {
@@ -3629,6 +3703,9 @@
      "perception": 5
     },
     "type": "beast",
+    "typeTags": [
+     "Dinosaur"
+    ],
     "alignment": "unaligned",
     "armorDetail": "natural armor",
     "speeds": {
@@ -3908,7 +3985,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 4
+   "resistancesPerDay": 4,
+   "actionsInLair": 4,
+   "resistancesInLair": 5
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -3919,6 +3998,9 @@
      "stealth": 9
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -4210,7 +4292,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 4
+   "resistancesPerDay": 4,
+   "actionsInLair": 4,
+   "resistancesInLair": 5
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -4221,6 +4305,9 @@
      "stealth": 7
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -4551,7 +4638,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 4
+   "resistancesPerDay": 4,
+   "actionsInLair": 4,
+   "resistancesInLair": 5
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -4564,6 +4653,9 @@
      "stealth": 6
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -4760,7 +4852,7 @@
     "id": "thunderclap",
     "name": "Thunderclap",
     "activation": "other",
-    "description": "Legendary Action. Constitution Saving Throw: DC 22, each creature in a 20-foot-radius Sphere Sphere centered on a point the dragon can see within 120 feet. Failure: 13 (3d8) Thunder damage, and the target has the Deafened condition until the end of its next turn.",
+    "description": "Legendary Action. Constitution Saving Throw: DC 22, each creature in a 20-foot-radius Sphere centered on a point the dragon can see within 120 feet. Failure: 13 (3d8) Thunder damage, and the target has the Deafened condition until the end of its next turn.",
     "save": {
      "ability": "con",
      "dc": 22,
@@ -4896,7 +4988,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 4
+   "resistancesPerDay": 4,
+   "actionsInLair": 4,
+   "resistancesInLair": 5
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -4908,6 +5002,9 @@
      "stealth": 7
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -5236,7 +5333,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 4
+   "resistancesPerDay": 4,
+   "actionsInLair": 4,
+   "resistancesInLair": 5
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -5248,6 +5347,9 @@
      "stealth": 8
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -5534,6 +5636,16 @@
           ]
          }
         ]
+       },
+       {
+        "type": "damage-bonus",
+        "amount": 0,
+        "dice": "-1d10",
+        "when": [
+         {
+          "type": "on-damage-roll"
+         }
+        ]
        }
       ]
      },
@@ -5544,7 +5656,6 @@
      "repeatSave": true
     },
     "damage": [],
-    "reminder": "While Weakening Breath lasts, the target subtracts 1d10 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 90,
@@ -5620,7 +5731,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 4
+   "resistancesPerDay": 4,
+   "actionsInLair": 4,
+   "resistancesInLair": 5
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -5633,6 +5746,9 @@
      "stealth": 9
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -5756,7 +5872,7 @@
     "id": "noxious-miasma",
     "name": "Noxious Miasma",
     "activation": "other",
-    "description": "Legendary Action. Constitution Saving Throw: DC 21, each creature in a 30-foot-radius Sphere Sphere centered on a point the dragon can see within 90 feet. Failure: 17 (5d6) Poison damage, and the target takes a -2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
+    "description": "Legendary Action. Constitution Saving Throw: DC 21, each creature in a 30-foot-radius Sphere centered on a point the dragon can see within 90 feet. Failure: 17 (5d6) Poison damage, and the target takes a -2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
      "dc": 21,
@@ -5916,7 +6032,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 4
+   "resistancesPerDay": 4,
+   "actionsInLair": 4,
+   "resistancesInLair": 5
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -5929,6 +6047,9 @@
      "stealth": 8
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -6216,7 +6337,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 4
+   "resistancesPerDay": 4,
+   "actionsInLair": 4,
+   "resistancesInLair": 5
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -6227,6 +6350,9 @@
      "stealth": 7
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -6564,7 +6690,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 4
+   "resistancesPerDay": 4,
+   "actionsInLair": 4,
+   "resistancesInLair": 5
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -6576,6 +6704,9 @@
      "stealth": 7
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -6647,7 +6778,7 @@
     "id": "freezing-burst",
     "name": "Freezing Burst",
     "activation": "other",
-    "description": "Legendary Action. Constitution Saving Throw: DC 20, each creature in a 30-foot-radius Sphere Sphere centered on a point the dragon can see within 120 feet. Failure: 14 (4d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
+    "description": "Legendary Action. Constitution Saving Throw: DC 20, each creature in a 30-foot-radius Sphere centered on a point the dragon can see within 120 feet. Failure: 14 (4d6) Cold damage, and the target's Speed is 0 until the end of the target's next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
     "save": {
      "ability": "con",
      "dc": 20,
@@ -6799,7 +6930,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 4
+   "resistancesPerDay": 4,
+   "actionsInLair": 4,
+   "resistancesInLair": 5
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -6810,6 +6943,9 @@
      "stealth": 6
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -7143,7 +7279,8 @@
       },
       "insteadOfDamage": true
      }
-    ]
+    ],
+    "reminder": "The rug smothers one creature at a time. While it grapples the target, the target is suffocating, and the rug halves the damage it takes (round down) while the target takes the same amount."
    }
   ],
   "token": {
@@ -7240,7 +7377,8 @@
     "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the ankheg), reach 5 ft. 10 (2d6 + 3) Slashing damage plus 3 (1d6) Acid damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 13).",
     "attack": {
      "bonus": 5,
-     "reachFeet": 5
+     "reachFeet": 5,
+     "advantageWhen": "target-grappled-by-self"
     },
     "damage": [
      {
@@ -7426,6 +7564,9 @@
     "experiencePoints": 700,
     "skills": {},
     "type": "beast",
+    "typeTags": [
+     "Dinosaur"
+    ],
     "alignment": "unaligned",
     "armorDetail": "natural armor",
     "speeds": {
@@ -7657,6 +7798,9 @@
      "stealth": 5
     },
     "type": "beast",
+    "typeTags": [
+     "Dinosaur"
+    ],
     "alignment": "unaligned",
     "armorDetail": "natural armor",
     "speeds": {
@@ -7798,7 +7942,8 @@
        "name": "Counterspell"
       }
      ]
-    }
+    },
+    "partOf": "protective-magic"
    },
    {
     "id": "arcane-burst",
@@ -7931,6 +8076,14 @@
      "perception": 6
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "typeTags": [
+     "Wizard"
+    ],
+    "gear": "Wand",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -8092,6 +8245,11 @@
      "stealth": 10
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Light Crossbow, Shortsword, Studded Leather Armor",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -8768,7 +8926,13 @@
     "description": "The balor teleports itself or a willing demon within 10 feet of itself up to 60 feet to an unoccupied space the balor can see.",
     "damage": [],
     "teleport": {
-     "feet": 60
+     "feet": 60,
+     "orAnother": true
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 10,
+     "typeTag": "demon"
     }
    },
    {
@@ -8906,6 +9070,9 @@
      "perception": 9
     },
     "type": "fiend",
+    "typeTags": [
+     "Demon"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -9031,6 +9198,11 @@
     "experiencePoints": 25,
     "skills": {},
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Leather Armor, Light Crossbow, Scimitar",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -9169,6 +9341,11 @@
      "deception": 4
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Pistol, Scimitar, Studded Leather Armor",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -9310,7 +9487,8 @@
       "formula": "5d6",
       "type": "fire"
      }
-    ]
+    ],
+    "reminder": "A flammable object the target hit that isn't worn or carried starts burning; objects are the GM's to burn."
    }
   ],
   "token": {
@@ -9360,6 +9538,9 @@
      "perception": 8
     },
     "type": "fiend",
+    "typeTags": [
+     "Devil"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -9775,6 +9956,9 @@
     "experiencePoints": 700,
     "skills": {},
     "type": "fiend",
+    "typeTags": [
+     "Devil"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -9879,14 +10063,28 @@
        }
       ],
       "at": "source-turn-start"
+     },
+     "failureEffect": {
+      "name": "Swallowed",
+      "tags": [
+       "swallowed"
+      ],
+      "modifiers": []
      }
     },
     "damage": [],
-    "reminder": "While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir.",
     "targets": {
      "count": 1,
      "maxSize": "large",
      "grappledBySource": true
+    },
+    "swallow": {
+     "capacity": 1,
+     "regurgitate": {
+      "damage": 30,
+      "dc": 14,
+      "withinFeet": 10
+     }
     }
    },
    {
@@ -10077,6 +10275,11 @@
     "experiencePoints": 450,
     "skills": {},
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Greataxe, Hide Armor",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -10328,6 +10531,9 @@
      "stealth": 4
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -10409,7 +10615,8 @@
       "formula": "4d6 + 3",
       "type": "acid"
      }
-    ]
+    ],
+    "reminder": "Nonmagical armor the target wears takes a cumulative -1 penalty to the AC it offers, and is destroyed when the penalty reduces its AC to 10. Mending removes the penalty. Change the armor by hand."
    },
    {
     "id": "black-pudding-split",
@@ -10830,6 +11037,9 @@
      "stealth": 2
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -11105,6 +11315,9 @@
      "insight": 6
     },
     "type": "fiend",
+    "typeTags": [
+     "Devil"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -11277,6 +11490,9 @@
      "stealth": 2
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -11440,6 +11656,9 @@
      "stealth": 2
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -11707,7 +11926,8 @@
     "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the bugbear), reach 10 ft. 12 (2d8 + 3) Piercing damage.",
     "attack": {
      "bonus": 5,
-     "reachFeet": 10
+     "reachFeet": 10,
+     "advantageWhen": "target-grappled-by-self"
     },
     "damage": [
      {
@@ -11733,6 +11953,10 @@
      "survival": 3
     },
     "type": "fey",
+    "typeTags": [
+     "Goblinoid"
+    ],
+    "gear": "Chain Shirt, Javelins (6), Morningstar",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -11835,7 +12059,8 @@
      "bonus": 4,
      "reachFeet": 10,
      "rangeFeet": 60,
-     "rangeNormalFeet": 20
+     "rangeNormalFeet": 20,
+     "advantageWhen": "target-grappled-by-self"
     },
     "damage": [
      {
@@ -11861,6 +12086,10 @@
      "survival": 2
     },
     "type": "fey",
+    "typeTags": [
+     "Goblinoid"
+    ],
+    "gear": "Hide Armor, Light Hammers (3)",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -12290,6 +12519,9 @@
       "type": "bludgeoning"
      }
     ],
+    "targets": {
+     "entered": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -12298,7 +12530,8 @@
     "move": {
      "speed": "full",
      "provokes": false,
-     "first": true
+     "first": true,
+     "throughCreatures": "medium"
     }
    },
    {
@@ -12351,6 +12584,7 @@
      "perception": 3
     },
     "type": "fey",
+    "gear": "Breastplate, Longbow, Pike",
     "alignment": "neutral good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -12523,6 +12757,9 @@
     "experiencePoints": 3900,
     "skills": {},
     "type": "fiend",
+    "typeTags": [
+     "Devil"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -12990,7 +13227,8 @@
        "count": 3
       }
      ]
-    ]
+    ],
+    "multiattackAlternativesAfter": "hasten-recharge-5-6"
    },
    {
     "id": "slam",
@@ -13038,6 +13276,11 @@
    "poisoned"
   ],
   "traitMechanics": [
+   {
+    "kind": "absorbs",
+    "name": "Acid Absorption",
+    "damageType": "acid"
+   },
    {
     "kind": "berserk",
     "name": "Berserk",
@@ -13192,9 +13435,24 @@
        }
       ],
       "name": "Attached",
-      "maxTargetSize": "large"
+      "maxTargetSize": "large",
+      "tags": [
+       "attached",
+       "source-target-only"
+      ],
+      "endsWhenSourceDies": true,
+      "endedBy": {
+       "name": "Detach the cloaker",
+       "by": "either",
+       "check": {
+        "ability": "str",
+        "skill": "athletics",
+        "dc": 14
+       }
+      }
      }
-    ]
+    ],
+    "reminder": "While attached, the cloaker halves the damage it takes (round down), and the target takes the same amount; the cloaker detaches itself by spending 5 feet of movement."
    },
    {
     "id": "phantasms-recharge-after-a-short-or-long-rest",
@@ -13693,6 +13951,11 @@
     "experiencePoints": 10,
     "skills": {},
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Club",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -13973,6 +14236,9 @@
      "stealth": 3
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -14528,6 +14794,11 @@
      "religion": 2
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Leather Armor, Sickle",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -14685,6 +14956,11 @@
      "religion": 2
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Holy Symbol, Leather Armor",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -14764,7 +15040,8 @@
       "conditions": [],
       "name": "Attached",
       "tags": [
-       "attached"
+       "attached",
+       "source-attacks-only-bearer"
       ],
       "endsWhenSourceDies": true,
       "endedBy": {
@@ -14778,7 +15055,7 @@
       }
      }
     ],
-    "reminder": "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target, which is Blinded and suffocating (hold its breath) while the darkmantle is attached."
+    "reminder": "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target, which is Blinded and suffocating (hold its breath) while the darkmantle is attached. While attached, the darkmantle's Speed is 0 and it moves with the target, and it detaches itself with 5 feet of its movement."
    },
    {
     "id": "darkness-aura",
@@ -15251,6 +15528,9 @@
      "perception": 9
     },
     "type": "celestial",
+    "typeTags": [
+     "Angel"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -15496,7 +15776,7 @@
     "id": "create-whirlwind",
     "name": "Create Whirlwind",
     "activation": "action",
-    "description": "The djinni conjures a whirlwind at a point it can see within 120 feet. The whirlwind fills a 20-foot-radius, 60-foot-high Cylinder Cylinder centered on that point. The whirlwind lasts until the djinni's Concentration on it ends. The djinni can move the whirlwind up to 20 feet at the start of each of its turns. Whenever the whirlwind enters a creature's space or a creature enters the whirlwind, that creature is subjected to the following effect. Strength Saving Throw: DC 17 (a creature makes this save only once per turn, and the djinni is unaffected). Failure: While in the whirlwind, the target has the Restrained condition and moves with the whirlwind. At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage. At the end of each of its turns, the target repeats the save, ending the effect on itself on a success.",
+    "description": "The djinni conjures a whirlwind at a point it can see within 120 feet. The whirlwind fills a 20-foot-radius, 60-foot-high Cylinder centered on that point. The whirlwind lasts until the djinni's Concentration on it ends. The djinni can move the whirlwind up to 20 feet at the start of each of its turns. Whenever the whirlwind enters a creature's space or a creature enters the whirlwind, that creature is subjected to the following effect. Strength Saving Throw: DC 17 (a creature makes this save only once per turn, and the djinni is unaffected). Failure: While in the whirlwind, the target has the Restrained condition and moves with the whirlwind. At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage. At the end of each of its turns, the target repeats the save, ending the effect on itself on a success.",
     "save": {
      "ability": "str",
      "dc": 17,
@@ -15504,10 +15784,19 @@
      "failureConditions": [
       "restrained"
      ],
-     "repeatSave": true
+     "repeatSave": true,
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "6d6",
+        "type": "thunder"
+       }
+      ],
+      "at": "bearer-turn-start"
+     }
     },
     "damage": [],
-    "reminder": "At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage.",
+    "reminder": "The whirlwind lasts while the djinni concentrates on it. The djinni can move it up to 20 feet at the start of each of its turns, and the Restrained creatures move with it; a creature it enters, or that enters it, makes the save once a turn.",
     "area": {
      "shape": "cylinder",
      "sizeFeet": 20,
@@ -15614,6 +15903,9 @@
     "experiencePoints": 7200,
     "skills": {},
     "type": "elemental",
+    "typeTags": [
+     "Genie"
+    ],
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -15738,7 +16030,8 @@
     "description": "Melee Attack Roll: +6 (with Advantage during the first round of each combat), reach 5 ft. 11 (2d6 + 4) Bludgeoning damage.",
     "attack": {
      "bonus": 6,
-     "reachFeet": 5
+     "reachFeet": 5,
+     "advantageWhen": "first-round"
     },
     "damage": [
      {
@@ -15781,7 +16074,7 @@
     "id": "read-thoughts",
     "name": "Read Thoughts",
     "activation": "action",
-    "description": "The doppelganger casts Detect Thoughts, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 12).\n\n- **At Will:** Detect Thoughts",
+    "description": "The doppelganger casts Detect Thoughts, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 12).",
     "damage": [],
     "castsSpells": {
      "ability": "cha",
@@ -16215,6 +16508,9 @@
     "experiencePoints": 50,
     "skills": {},
     "type": "fiend",
+    "typeTags": [
+     "Demon"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -16587,6 +16883,14 @@
      "perception": 5
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "typeTags": [
+     "Druid"
+    ],
+    "gear": "Studded Leather Armor",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -17404,6 +17708,9 @@
     "experiencePoints": 7200,
     "skills": {},
     "type": "elemental",
+    "typeTags": [
+     "Genie"
+    ],
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -17529,6 +17836,18 @@
      {
       "formula": "2d8 + 6",
       "type": "piercing"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "huge",
+      "damage": [],
+      "conditions": [
+       "prone"
+      ]
      }
     ]
    }
@@ -17767,7 +18086,7 @@
    },
    {
     "id": "entangling-rope",
-    "name": "Entangling Rope",
+    "name": "Entangling Rope (Requires Magic Rope)",
     "activation": "action",
     "description": "Strength Saving Throw: DC 16, one creature the erinyes can see within 120 feet. Failure: 14 (4d6) Force damage, and the target has the Restrained condition until the rope is destroyed, the erinyes uses a Bonus Action to release the target, or the erinyes uses Entangling Rope again.",
     "save": {
@@ -17829,6 +18148,9 @@
      "persuasion": 8
     },
     "type": "fiend",
+    "typeTags": [
+     "Devil"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -17925,7 +18247,16 @@
     "name": "Reel",
     "activation": "bonus-action",
     "description": "The ettercap pulls one creature within 30 feet of itself that is Restrained by its Web Strand up to 25 feet straight toward itself.",
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 30,
+     "heldByAction": "web-strand"
+    },
+    "pull": {
+     "feet": 25,
+     "upTo": true
+    }
    },
    {
     "id": "bite",
@@ -18194,6 +18525,7 @@
      "perception": 4
     },
     "type": "giant",
+    "gear": "Battleaxe, Morningstar",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -18282,6 +18614,13 @@
       "formula": "2d6 + 3",
       "type": "fire"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Burning",
+      "hazard": "burning"
+     }
     ]
    }
   ],
@@ -18366,7 +18705,7 @@
     "traits": [
      {
       "name": "Fire Aura",
-      "description": "At the end of each of the elemental's turns, each creature in a 10-foot Emanation originating from the elemental takes 5 (1d10) Fire damage. Creatures and flammable objects in the Emanation start Hitazard burning."
+      "description": "At the end of each of the elemental's turns, each creature in a 10-foot Emanation originating from the elemental takes 5 (1d10) Fire damage. Creatures and flammable objects in the Emanation start burning."
      },
      {
       "name": "Fire Form",
@@ -18626,6 +18965,33 @@
   ],
   "traitMechanics": [
    {
+    "kind": "damage-weakens",
+    "name": "Aversion to Fire",
+    "damageType": "fire",
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "attack",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     },
+     {
+      "type": "roll-mode",
+      "roll": "check",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-ability-check"
+       }
+      ]
+     }
+    ]
+   },
+   {
     "kind": "berserk",
     "name": "Berserk",
     "on": 6,
@@ -18633,6 +18999,11 @@
      "dc": 15,
      "withinFeet": 60
     }
+   },
+   {
+    "kind": "absorbs",
+    "name": "Lightning Absorption",
+    "damageType": "lightning"
    }
   ],
   "extensions": {
@@ -18952,6 +19323,38 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "targets": {
+     "count": 1
+    },
+    "healing": {
+     "formula": "2d10 + 5",
+     "temporary": true
+    },
+    "grants": {
+     "name": "War Cry",
+     "tags": [
+      "war-cry"
+     ],
+     "target": "target",
+     "duration": {
+      "type": "until-source-next-turn"
+     },
+     "modifiers": [
+      {
+       "type": "roll-mode",
+       "roll": "attack",
+       "mode": "advantage",
+       "when": [
+        {
+         "type": "on-attack-roll"
+        }
+       ]
+      }
+     ],
+     "onEnd": [],
+     "voidWhileIncapacitated": false,
+     "concentration": false
     }
    },
    {
@@ -19228,7 +19631,7 @@
     "id": "engulf",
     "name": "Engulf",
     "activation": "action",
-    "description": "The cube moves up to its Speed without provoking Opportunity Attacks. The cube can move through the spaces of Large or smaller creatures if it has room inside itself to contain them (see the Ooze Cube Cube trait). Dexterity Saving Throw: DC 12, each creature whose space the cube enters for the first time during this move. Failure: 10 (3d6) Acid damage, and the target is engulfed. An engulfed target is suffocating, can't cast spells with a Verbal component, has the Restrained condition, and takes 10 (3d6) Acid damage at the start of each of the cube's turns. When the cube moves, the engulfed target moves with it. An engulfed target can try to escape by taking an action to make a DC 12 Strength (Athletics) check. On a successful check, the target escapes and enters the nearest unoccupied space. Success: Half damage, and the target moves to an unoccupied space within 5 feet of the cube. If there is no unoccupied space, the target fails the save instead.",
+    "description": "The cube moves up to its Speed without provoking Opportunity Attacks. The cube can move through the spaces of Large or smaller creatures if it has room inside itself to contain them (see the Ooze Cube trait). Dexterity Saving Throw: DC 12, each creature whose space the cube enters for the first time during this move. Failure: 10 (3d6) Acid damage, and the target is engulfed. An engulfed target is suffocating, can't cast spells with a Verbal component, has the Restrained condition, and takes 10 (3d6) Acid damage at the start of each of the cube's turns. When the cube moves, the engulfed target moves with it. An engulfed target can try to escape by taking an action to make a DC 12 Strength (Athletics) check. On a successful check, the target escapes and enters the nearest unoccupied space. Success: Half damage, and the target moves to an unoccupied space within 5 feet of the cube. If there is no unoccupied space, the target fails the save instead.",
     "save": {
      "ability": "dex",
      "dc": 12,
@@ -19251,10 +19654,12 @@
       "name": "Engulfed",
       "tags": [
        "cant-speak",
-       "smothering"
+       "smothering",
+       "swallowed"
       ],
       "modifiers": []
      },
+     "endsWhenSourceDies": true,
      "endedBy": {
       "name": "Pull free",
       "by": "others",
@@ -19278,11 +19683,17 @@
       "type": "acid"
      }
     ],
-    "reminder": "The cube moves up to its Speed first; an engulfed creature moves with it and has Total Cover from attacks outside the cube.",
+    "reminder": "A creature that succeeds moves to an unoccupied space within 5 feet of the cube, or fails if there is none; one that escapes enters the nearest unoccupied space. A creature that enters the cube's space is subjected to Engulf with Disadvantage.",
+    "targets": {
+     "entered": true
+    },
+    "holdsAtOnce": 4,
+    "largeFillsHold": true,
     "move": {
      "speed": "full",
      "provokes": false,
-     "first": true
+     "first": true,
+     "throughCreatures": "large"
     }
    }
   ],
@@ -19303,6 +19714,13 @@
    "exhaustion",
    "frightened",
    "prone"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "engulfs-entrants",
+    "name": "Ooze Cube",
+    "actionId": "engulf"
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -19633,7 +20051,7 @@
     "id": "etherealness",
     "name": "Etherealness",
     "activation": "action",
-    "description": "The ghost casts the Etherealness spell, requiring no spell components and using Charisma as the spellcasting ability. The ghost is visible on the Material Plane while on the Border Ethereal and vice versa, but it can't affect or be affected by anything on the other plane.\n\n- **At Will:** Etherealness",
+    "description": "The ghost casts the Etherealness spell, requiring no spell components and using Charisma as the spellcasting ability. The ghost is visible on the Material Plane while on the Border Ethereal and vice versa, but it can't affect or be affected by anything on the other plane.",
     "damage": [],
     "castsSpells": {
      "ability": "cha",
@@ -19947,7 +20365,7 @@
     "id": "boulder-toss",
     "name": "Boulder Toss (Recharge 6)",
     "activation": "action",
-    "description": "The ape hurls a boulder at a point it can see within 90 feet. Dexterity Saving Throw: DC 17, each creature in a 5-foot-radius Sphere Sphere centered on that point. Failure: 24 (7d6) Bludgeoning damage. If the target is a Large or smaller creature, it has the Prone condition. Success: Half damage only.",
+    "description": "The ape hurls a boulder at a point it can see within 90 feet. Dexterity Saving Throw: DC 17, each creature in a 5-foot-radius Sphere centered on that point. Failure: 24 (7d6) Bludgeoning damage. If the target is a Large or smaller creature, it has the Prone condition. Success: Half damage only.",
     "save": {
      "ability": "dex",
      "dc": 17,
@@ -21223,7 +21641,32 @@
     "name": "Swallow",
     "activation": "action",
     "description": "The frog swallows a Small or smaller target it is grappling. While swallowed, the target isn't Grappled but has the Blinded and Restrained conditions, and it has Total Cover against attacks and other effects outside the frog. While swallowing the target, the frog can't use Bite, and if the frog dies, the swallowed target is no longer Restrained and can escape from the corpse using 5 feet of movement, exiting with the Prone condition. At the end of the frog's next turn, the swallowed target takes 5 (2d4) Acid damage. If that damage doesn't kill it, the frog disgorges it, causing it to exit Prone.",
-    "damage": []
+    "damage": [],
+    "swallow": {
+     "capacity": 1,
+     "conditions": [
+      "blinded",
+      "restrained"
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "2d4",
+        "type": "acid"
+       }
+      ],
+      "at": "source-turn-end"
+     },
+     "disgorges": true,
+     "blocks": [
+      "bite"
+     ]
+    },
+    "targets": {
+     "count": 1,
+     "maxSize": "small",
+     "grappledBySource": true
+    }
    }
   ],
   "token": {
@@ -21443,15 +21886,25 @@
     "name": "Rampage (1/Day)",
     "activation": "bonus-action",
     "description": "Immediately after dealing damage to a creature that was already Bloodied, the hyena can move up to half its Speed, and it makes one Bite attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d6 + 3",
+      "type": "piercing"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "long-rest"
     },
+    "afterHurtingBloodied": true,
     "move": {
      "speed": "half",
      "provokes": true,
      "first": true
+    },
+    "attack": {
+     "bonus": 5,
+     "reachFeet": 5
     }
    }
   ],
@@ -22281,7 +22734,8 @@
     "description": "Melee Attack Roll: +9 (with Advantage if the target doesn't have all its Hit Points), reach 5 ft. 22 (3d10 + 6) Piercing damage.",
     "attack": {
      "bonus": 9,
-     "reachFeet": 5
+     "reachFeet": 5,
+     "advantageWhen": "target-hurt"
     },
     "damage": [
      {
@@ -22548,7 +23002,31 @@
     "name": "Swallow",
     "activation": "action",
     "description": "The toad swallows a Medium or smaller target it is grappling. While swallowed, the target isn't Grappled but has the Blinded and Restrained conditions, and it has Total Cover against attacks and other effects outside the toad. In addition, the target takes 10 (3d6) Acid damage at the end of each of the toad's turns. The toad can have only one target swallowed at a time, and it can't use Bite while it has a swallowed target. If the toad dies, a swallowed creature is no longer Restrained and can escape from the corpse using 5 feet of movement, exiting with the Prone condition.",
-    "damage": []
+    "damage": [],
+    "swallow": {
+     "capacity": 1,
+     "conditions": [
+      "blinded",
+      "restrained"
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "3d6",
+        "type": "acid"
+       }
+      ],
+      "at": "source-turn-end"
+     },
+     "blocks": [
+      "bite"
+     ]
+    },
+    "targets": {
+     "count": 1,
+     "maxSize": "medium",
+     "grappledBySource": true
+    }
    }
   ],
   "token": {
@@ -23177,7 +23655,7 @@
     "id": "blinding-spittle",
     "name": "Blinding Spittle (Recharge 5-6)",
     "activation": "action",
-    "description": "Dexterity Saving Throw: DC 10, each creature in a 10-foot-radius Sphere Sphere centered on a point within 30 feet. Failure: 7 (2d6) Radiant damage, and the target has the Blinded condition until the end of the mouther's next turn.",
+    "description": "Dexterity Saving Throw: DC 10, each creature in a 10-foot-radius Sphere centered on a point within 30 feet. Failure: 7 (2d6) Radiant damage, and the target has the Blinded condition until the end of the mouther's next turn.",
     "save": {
      "ability": "dex",
      "dc": 10,
@@ -23466,6 +23944,9 @@
      "perception": 7
     },
     "type": "fiend",
+    "typeTags": [
+     "Demon"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -23630,6 +24111,11 @@
      "performance": 5
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Shield, Spears (3), Studded Leather Armor",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -23694,15 +24180,25 @@
     "name": "Rampage (1/Day)",
     "activation": "bonus-action",
     "description": "Immediately after dealing damage to a creature that is already Bloodied, the gnoll moves up to half its Speed, and it makes one Rend attack.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "1d6 + 2",
+      "type": "piercing"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "long-rest"
     },
+    "afterHurtingBloodied": true,
     "move": {
      "speed": "half",
      "provokes": true,
      "first": true
+    },
+    "attack": {
+     "bonus": 4,
+     "reachFeet": 5
     }
    },
    {
@@ -24022,6 +24518,10 @@
      "stealth": 6
     },
     "type": "fey",
+    "typeTags": [
+     "Goblinoid"
+    ],
+    "gear": "Chain Shirt, Scimitar, Shield, Shortbow",
     "alignment": "chaotic neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -24124,6 +24624,10 @@
      "stealth": 6
     },
     "type": "fey",
+    "typeTags": [
+     "Goblinoid"
+    ],
+    "gear": "Daggers (3)",
     "alignment": "chaotic neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -24265,6 +24769,10 @@
      "stealth": 6
     },
     "type": "fey",
+    "typeTags": [
+     "Goblinoid"
+    ],
+    "gear": "Leather Armor, Scimitar, Shield, Shortbow",
     "alignment": "chaotic neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -24445,6 +24953,16 @@
           ]
          }
         ]
+       },
+       {
+        "type": "damage-bonus",
+        "amount": 0,
+        "dice": "-1d4",
+        "when": [
+         {
+          "type": "on-damage-roll"
+         }
+        ]
        }
       ]
      },
@@ -24455,7 +24973,6 @@
      "repeatSave": true
     },
     "damage": [],
-    "reminder": "While Weakening Breath lasts, the target subtracts 1d4 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 15,
@@ -24482,6 +24999,9 @@
      "stealth": 4
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -24562,6 +25082,18 @@
      {
       "formula": "2d12 + 5",
       "type": "piercing"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "large",
+      "damage": [],
+      "conditions": [
+       "prone"
+      ]
      }
     ]
    },
@@ -24712,7 +25244,8 @@
       "formula": "2d8 + 1",
       "type": "acid"
      }
-    ]
+    ],
+    "reminder": "Nonmagical armor the target wears takes a cumulative -1 penalty to the AC it offers, and is destroyed when the penalty reduces its AC to 10. Mending removes the penalty. Change the armor by hand."
    }
   ],
   "token": {
@@ -24889,6 +25422,9 @@
      "stealth": 3
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -25507,6 +26043,11 @@
      "perception": 2
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Chain Shirt, Shield, Spear",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -25633,6 +26174,11 @@
      "perception": 4
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Breastplate, Javelins (6), Longsword, Shield",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -26520,6 +27066,9 @@
     "experiencePoints": 3900,
     "skills": {},
     "type": "fiend",
+    "typeTags": [
+     "Demon"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -27029,6 +27578,10 @@
     "experiencePoints": 700,
     "skills": {},
     "type": "fey",
+    "typeTags": [
+     "Goblinoid"
+    ],
+    "gear": "Greatsword, Half Plate Armor, Longbow",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -27146,6 +27699,10 @@
     "experiencePoints": 100,
     "skills": {},
     "type": "fey",
+    "typeTags": [
+     "Goblinoid"
+    ],
+    "gear": "Half Plate Armor, Longbow, Longsword, Shield",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -27384,7 +27941,8 @@
       "formula": "5d8 + 4",
       "type": "fire"
      }
-    ]
+    ],
+    "reminder": "A flammable object the target hit that isn't worn or carried starts burning; objects are the GM's to burn."
    },
    {
     "id": "infernal-tail",
@@ -27465,6 +28023,9 @@
     "experiencePoints": 7200,
     "skills": {},
     "type": "fiend",
+    "typeTags": [
+     "Devil"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -27542,7 +28103,8 @@
     "description": "Melee Attack Roll: +6 (with Advantage if the target doesn't have all its Hit Points), reach 5 ft. 14 (3d6 + 4) Piercing damage.",
     "attack": {
      "bonus": 6,
-     "reachFeet": 5
+     "reachFeet": 5,
+     "advantageWhen": "target-hurt"
     },
     "damage": [
      {
@@ -27884,7 +28446,7 @@
     "id": "ice-spear",
     "name": "Ice Spear",
     "activation": "action",
-    "description": "Melee or Ranged Attack Roll: +10, reach 5 ft. or range 30/120 ft. 14 (2d8 + 5) Piercing damage plus 10 (3d6) Cold damage. Until the end of its next turn, the target can't take a Bonus Action or Reaction, its Speed decreases by 10 feet, and it can move or take one action on its turn, not both. HitomThe spear magically returns to the devil's hand immediately after a ranged attack.",
+    "description": "Melee or Ranged Attack Roll: +10, reach 5 ft. or range 30/120 ft. 14 (2d8 + 5) Piercing damage plus 10 (3d6) Cold damage. Until the end of its next turn, the target can't take a Bonus Action or Reaction, its Speed decreases by 10 feet, and it can move or take one action on its turn, not both. Hit or Miss: The spear magically returns to the devil's hand immediately after a ranged attack.",
     "attack": {
      "bonus": 10,
      "reachFeet": 5,
@@ -27946,7 +28508,7 @@
     "id": "ice-wall",
     "name": "Ice Wall (Recharge 6)",
     "activation": "action",
-    "description": "The devil casts Wall of Ice (level 8 version), requiring no spell components and using Intelligence as the spellcasting ability (spell save DC 17).\n\n- **At Will:**",
+    "description": "The devil casts Wall of Ice (level 8 version), requiring no spell components and using Intelligence as the spellcasting ability (spell save DC 17).",
     "damage": [],
     "uses": {
      "limit": 1,
@@ -28006,6 +28568,9 @@
      "persuasion": 9
     },
     "type": "fiend",
+    "typeTags": [
+     "Devil"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -28128,7 +28693,7 @@
     "id": "fog-cloud",
     "name": "Fog Cloud (1/Day)",
     "activation": "action",
-    "description": "The mephit casts Fog Cloud, requiring no spell components and using Charisma as the spellcasting ability.\n\n- **At Will:**\n- **1/Day Each:** Fog Cloud",
+    "description": "The mephit casts Fog Cloud, requiring no spell components and using Charisma as the spellcasting ability.",
     "damage": [],
     "uses": {
      "limit": 1,
@@ -28327,7 +28892,7 @@
     "id": "invisibility",
     "name": "Invisibility",
     "activation": "action",
-    "description": "The imp casts Invisibility on itself, requiring no spell components and using Charisma as the spellcasting ability.\n\n- **At Will:** Invisibility",
+    "description": "The imp casts Invisibility on itself, requiring no spell components and using Charisma as the spellcasting ability.",
     "damage": [],
     "castsSpells": {
      "ability": "cha",
@@ -28376,6 +28941,9 @@
      "stealth": 5
     },
     "type": "fiend",
+    "typeTags": [
+     "Devil"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -28464,10 +29032,31 @@
      "ability": "wis",
      "dc": 15,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureByHitPoints": [
+      {
+       "atOrBelow": 20,
+       "conditions": [
+        "unconscious"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "endsOnDamage": true,
+       "endedBy": {
+        "name": "Wake",
+        "by": "others"
+       }
+      }
+     ]
     },
-    "damage": [],
-    "reminder": "On a failed save: a target with 20 Hit Points or fewer has the Unconscious condition for 1 hour (until it takes damage or is woken); any other target takes 18 (4d8) Psychic damage.",
+    "damage": [
+     {
+      "formula": "4d8",
+      "type": "psychic"
+     }
+    ],
     "targets": {
      "count": 1,
      "rangeFeet": 60,
@@ -28701,6 +29290,13 @@
        }
       ],
       "at": "source-turn-start"
+     },
+     "failureEffect": {
+      "name": "Vortex",
+      "tags": [
+       "cant-speak"
+      ],
+      "modifiers": []
      }
     },
     "damage": [
@@ -28709,7 +29305,6 @@
       "type": "thunder"
      }
     ],
-    "reminder": "Until the grapple ends, the target can't cast spells with a Verbal component.",
     "targets": {
      "count": 1,
      "maxSize": "large",
@@ -28922,6 +29517,13 @@
    "paralyzed",
    "petrified",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "absorbs",
+    "name": "Fire Absorption",
+    "damageType": "fire"
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -29280,6 +29882,11 @@
     "experiencePoints": 700,
     "skills": {},
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Greatsword, Heavy Crossbow, Plate Armor",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -29382,6 +29989,7 @@
     "experiencePoints": 25,
     "skills": {},
     "type": "dragon",
+    "gear": "Daggers (3)",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -29623,6 +30231,13 @@
        }
       ],
       "at": "bearer-turn-start"
+     },
+     "failureEffect": {
+      "name": "Swallowed",
+      "tags": [
+       "swallowed"
+      ],
+      "modifiers": []
      }
     },
     "damage": [
@@ -29631,10 +30246,18 @@
       "type": "piercing"
      }
     ],
-    "reminder": "A swallowed creature has the Restrained condition, has Total Cover against attacks and other effects outside the kraken.",
     "targets": {
      "count": 1,
      "grappledBySource": true
+    },
+    "swallow": {
+     "capacity": 4,
+     "maxSize": "large",
+     "regurgitate": {
+      "damage": 50,
+      "dc": 25,
+      "withinFeet": 10
+     }
     }
    }
   ],
@@ -29657,7 +30280,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 4
+   "resistancesPerDay": 4,
+   "actionsInLair": 4,
+   "resistancesInLair": 5
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -29668,6 +30293,9 @@
      "perception": 11
     },
     "type": "monstrosity",
+    "typeTags": [
+     "Titan"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -29996,6 +30624,9 @@
     "experiencePoints": 10,
     "skills": {},
     "type": "fiend",
+    "typeTags": [
+     "Devil"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -30067,9 +30698,19 @@
     "name": "Deathly Teleport",
     "activation": "other",
     "description": "Legendary Action. The lich teleports up to 60 feet to an unoccupied space it can see, and each creature within 10 feet of the space it left takes 11 (2d10) Necrotic damage.",
-    "damage": [],
+    "damage": [
+     {
+      "formula": "2d10",
+      "type": "necrotic"
+     }
+    ],
     "legendary": {
      "cost": 1
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 10,
+     "widthFeet": null
     },
     "teleport": {
      "feet": 60
@@ -30122,7 +30763,8 @@
        "name": "Counterspell"
       }
      ]
-    }
+    },
+    "partOf": "protective-magic"
    },
    {
     "id": "disrupt-life",
@@ -30341,7 +30983,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 4
+   "resistancesPerDay": 4,
+   "actionsInLair": 4,
+   "resistancesInLair": 5
   },
   "traitMechanics": [
    {
@@ -30360,6 +31004,10 @@
      "perception": 9
     },
     "type": "undead",
+    "typeTags": [
+     "Wizard"
+    ],
+    "gear": "Component Pouch",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -30749,7 +31397,8 @@
        "name": "Counterspell"
       }
      ]
-    }
+    },
+    "partOf": "protective-magic"
    },
    {
     "id": "arcane-burst",
@@ -30849,6 +31498,14 @@
      "perception": 4
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "typeTags": [
+     "Wizard"
+    ],
+    "gear": "Wand",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -31094,6 +31751,13 @@
       "formula": "2d4 + 2",
       "type": "fire"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Burning",
+      "hazard": "burning"
+     }
     ]
    }
   ],
@@ -31249,6 +31913,18 @@
      {
       "formula": "2d10 + 7",
       "type": "piercing"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "huge",
+      "damage": [],
+      "conditions": [
+       "prone"
+      ]
      }
     ]
    }
@@ -31577,6 +32253,9 @@
      "perception": 8
     },
     "type": "fiend",
+    "typeTags": [
+     "Demon"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -31945,7 +32624,7 @@
     "id": "ocean-spear",
     "name": "Ocean Spear",
     "activation": "action",
-    "description": "Melee or Ranged Attack Roll: +2, reach 5 ft. or range 20/60 ft. 3 (1d6) Piercing damage plus 2 (1d4) Cold damage. If the target is a creature, its Speed decreases by 10 feet until the end of its next turn. HitomThe spear magically returns to the merfolk's hand immediately after a ranged attack.",
+    "description": "Melee or Ranged Attack Roll: +2, reach 5 ft. or range 20/60 ft. 3 (1d6) Piercing damage plus 2 (1d4) Cold damage. If the target is a creature, its Speed decreases by 10 feet until the end of its next turn. Hit or Miss: The spear magically returns to the merfolk's hand immediately after a ranged attack.",
     "attack": {
      "bonus": 2,
      "reachFeet": 5,
@@ -32233,7 +32912,8 @@
     "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the mimic), reach 5 ft. 7 (1d8 + 3) Piercing damage—or 12 (2d8 + 3) Piercing damage if the target is Grappled by the mimic—plus 4 (1d8) Acid damage.",
     "attack": {
      "bonus": 5,
-     "reachFeet": 5
+     "reachFeet": 5,
+     "advantageWhen": "target-grappled-by-self"
     },
     "damage": [
      {
@@ -32311,7 +32991,10 @@
        }
       ],
       "escapeDc": 13,
-      "maxTargetSize": "large"
+      "maxTargetSize": "large",
+      "tags": [
+       "escape-disadvantage"
+      ]
      }
     ]
    }
@@ -32871,6 +33554,10 @@
     "experiencePoints": 700,
     "skills": {},
     "type": "undead",
+    "sizes": [
+     "medium",
+     "small"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -33008,6 +33695,65 @@
     "legendary": {
      "cost": 1
     }
+   },
+   {
+    "id": "necrotic-strike-rotting-fist",
+    "name": "Necrotic Strike: Rotting Fist",
+    "activation": "other",
+    "description": "Legendary Action. The mummy makes one Rotting Fist or Channel Negative Energy attack.",
+    "damage": [
+     {
+      "formula": "2d10 + 4",
+      "type": "bludgeoning"
+     },
+     {
+      "formula": "3d6",
+      "type": "necrotic"
+     }
+    ],
+    "legendary": {
+     "cost": 1
+    },
+    "attack": {
+     "bonus": 9,
+     "reachFeet": 5
+    },
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Cursed",
+      "tags": [
+       "no-healing",
+       "curse"
+      ],
+      "atRest": {
+       "at": "day",
+       "maximumLoss": "3d6",
+       "noBenefit": "long"
+      }
+     }
+    ],
+    "partOf": "necrotic-strike"
+   },
+   {
+    "id": "necrotic-strike-channel-negative-energy",
+    "name": "Necrotic Strike: Channel Negative Energy",
+    "activation": "other",
+    "description": "Legendary Action. The mummy makes one Rotting Fist or Channel Negative Energy attack.",
+    "damage": [
+     {
+      "formula": "6d6 + 4",
+      "type": "necrotic"
+     }
+    ],
+    "legendary": {
+     "cost": 1
+    },
+    "attack": {
+     "bonus": 9,
+     "rangeFeet": 60
+    },
+    "partOf": "necrotic-strike"
    },
    {
     "id": "rotting-fist",
@@ -33188,7 +33934,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "traitMechanics": [
    {
@@ -33206,6 +33954,13 @@
      "religion": 5
     },
     "type": "undead",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "typeTags": [
+     "Cleric"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -33400,6 +34155,9 @@
     "experiencePoints": 10000,
     "skills": {},
     "type": "fiend",
+    "typeTags": [
+     "Demon"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -33573,7 +34331,7 @@
     "id": "nightmare-haunting",
     "name": "Nightmare Haunting (1/Day)",
     "activation": "action",
-    "description": "While on the Ethereal Plane, the hag casts Dream, using the same spellcasting ability as Spellcasting. Only the hag can serve as the spell's messenger, and the target must be a creature the hag can see on the Material Plane. The spell fails and is wasted if the target is under the effect of the Protection from Evil and Good spell or within a Magic Circle spell. If the target takes damage from the Dream spell, the target's Hit Point maximum decreases by an amount equal to that damage. If the spell kills the target, its soul is trapped in the hag's soul bag, and the target can't be raised from the dead until its soul is released.\n\n- **At Will:**\n- **1/Day Each:** Dream, Protection from Evil and Good, Magic Circle",
+    "description": "While on the Ethereal Plane, the hag casts Dream, using the same spellcasting ability as Spellcasting. Only the hag can serve as the spell's messenger, and the target must be a creature the hag can see on the Material Plane. The spell fails and is wasted if the target is under the effect of the Protection from Evil and Good spell or within a Magic Circle spell. If the target takes damage from the Dream spell, the target's Hit Point maximum decreases by an amount equal to that damage. If the spell kills the target, its soul is trapped in the hag's soul bag, and the target can't be raised from the dead until its soul is released.",
     "damage": [],
     "uses": {
      "limit": 1,
@@ -33714,7 +34472,26 @@
     "name": "Ethereal Stride",
     "activation": "action",
     "description": "The nightmare and up to three willing creatures within 5 feet of it teleport to the Ethereal Plane from the Material Plane or vice versa.",
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 4,
+     "rangeFeet": 5
+    },
+    "grants": {
+     "name": "Ethereal",
+     "tags": [
+      "off-plane"
+     ],
+     "target": "targets",
+     "toggles": true,
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
    }
   ],
   "token": {
@@ -33856,6 +34633,11 @@
      "persuasion": 5
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Breastplate, Rapier",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -34215,6 +34997,7 @@
     "experiencePoints": 450,
     "skills": {},
     "type": "giant",
+    "gear": "Greatclub, Javelins (3)",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -34527,7 +35310,7 @@
     "id": "spellcasting",
     "name": "Spellcasting",
     "activation": "action",
-    "description": "The oni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 13):\n\n- **At Will:**\n- **1/Day Each:** Charm Person, Darkness, Gaseous Form, Sleep",
+    "description": "The oni casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 13):\n\n- **1/Day Each:** Charm Person, Darkness, Gaseous Form, Sleep",
     "damage": [],
     "castsSpells": {
      "ability": "cha",
@@ -35244,7 +36027,22 @@
     "name": "Ethereal Jaunt",
     "activation": "bonus-action",
     "description": "The spider teleports from the Material Plane to the Ethereal Plane or vice versa.",
-    "damage": []
+    "damage": [],
+    "grants": {
+     "name": "Ethereal",
+     "tags": [
+      "off-plane"
+     ],
+     "target": "self",
+     "toggles": true,
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
    },
    {
     "id": "multiattack",
@@ -35277,7 +36075,8 @@
       "formula": "2d8",
       "type": "poison"
      }
-    ]
+    ],
+    "reminder": "A target this damage drops to 0 Hit Points becomes Stable instead, and has the Poisoned condition for 1 hour, with the Paralyzed condition while Poisoned. Apply both by hand."
    }
   ],
   "token": {
@@ -35376,7 +36175,8 @@
     "description": "Melee Attack Roll: +5 (with Advantage if the target doesn't have all its Hit Points), reach 5 ft. 1 Piercing damage.",
     "attack": {
      "bonus": 5,
-     "reachFeet": 5
+     "reachFeet": 5,
+     "advantageWhen": "target-hurt"
     },
     "damage": [
      {
@@ -35541,6 +36341,11 @@
     "experiencePoints": 200,
     "skills": {},
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Daggers (6), Leather Armor",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -35722,6 +36527,11 @@
      "perception": 5
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Pistol, Rapier",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -35887,13 +36697,56 @@
     "id": "hellfire-spellcasting",
     "name": "Hellfire Spellcasting (Recharge 4-6)",
     "activation": "action",
-    "description": "The pit fiend casts Fireball (level 5 version) twice, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21). It can replace one Fireball with Hold Monster (level 7 version) or Wall of Fire.\n\n- **At Will:**",
+    "description": "The pit fiend casts Fireball (level 5 version) twice, requiring no Material components and using Charisma as the spellcasting ability (spell save DC 21). It can replace one Fireball with Hold Monster (level 7 version) or Wall of Fire.",
     "damage": [],
     "uses": {
      "limit": 1,
      "per": "recharge",
      "recharge": 4
-    }
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "waives": [
+      "material"
+     ],
+     "spells": [
+      {
+       "id": "hellfire-spellcasting-fireball-level-5",
+       "spellId": "fireball",
+       "name": "Fireball",
+       "atLevel": 5
+      },
+      {
+       "id": "hellfire-spellcasting-hold-monster-level-7",
+       "spellId": "hold-monster",
+       "name": "Hold Monster",
+       "atLevel": 7
+      },
+      {
+       "id": "hellfire-spellcasting-wall-of-fire",
+       "spellId": "wall-of-fire",
+       "name": "Wall of Fire"
+      }
+     ]
+    },
+    "multiattack": [
+     {
+      "actionId": "hellfire-spellcasting-fireball-level-5",
+      "count": 2
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "hellfire-spellcasting-hold-monster-level-7",
+       "hellfire-spellcasting-wall-of-fire"
+      ],
+      "attacks": 1,
+      "of": "hellfire-spellcasting-fireball-level-5"
+     }
+    ]
    }
   ],
   "token": {
@@ -35952,6 +36805,9 @@
      "persuasion": 19
     },
     "type": "fiend",
+    "typeTags": [
+     "Devil"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -36116,7 +36972,7 @@
     "id": "holy-burst",
     "name": "Holy Burst",
     "activation": "action",
-    "description": "Dexterity Saving Throw: DC 20, each enemy in a 20-foot-radius Sphere Sphere centered on a point the planetar can see within 120 feet. Failure: 24 (7d6) Radiant damage. Success: Half damage.",
+    "description": "Dexterity Saving Throw: DC 20, each enemy in a 20-foot-radius Sphere centered on a point the planetar can see within 120 feet. Failure: 24 (7d6) Radiant damage. Success: Half damage.",
     "save": {
      "ability": "dex",
      "dc": 20,
@@ -36207,6 +37063,9 @@
      "perception": 11
     },
     "type": "celestial",
+    "typeTags": [
+     "Angel"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -36314,6 +37173,9 @@
      "stealth": 4
     },
     "type": "beast",
+    "typeTags": [
+     "Dinosaur"
+    ],
     "alignment": "unaligned",
     "armorDetail": "natural armor",
     "speeds": {
@@ -36715,6 +37577,14 @@
      "religion": 5
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "typeTags": [
+     "Cleric"
+    ],
+    "gear": "Chain Shirt, Holy Symbol, Mace",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -36884,6 +37754,14 @@
      "religion": 2
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "typeTags": [
+     "Cleric"
+    ],
+    "gear": "Chain Shirt, Holy Symbol, Mace",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -37117,6 +37995,9 @@
      "perception": 1
     },
     "type": "beast",
+    "typeTags": [
+     "Dinosaur"
+    ],
     "alignment": "unaligned",
     "armorDetail": "natural armor",
     "speeds": {
@@ -37219,14 +38100,28 @@
        }
       ],
       "at": "source-turn-start"
+     },
+     "failureEffect": {
+      "name": "Swallowed",
+      "tags": [
+       "swallowed"
+      ],
+      "modifiers": []
      }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the worm.",
     "targets": {
      "count": 1,
      "maxSize": "large",
      "grappledBySource": true
+    },
+    "swallow": {
+     "capacity": 3,
+     "regurgitate": {
+      "damage": 30,
+      "dc": 21,
+      "withinFeet": 5
+     }
     }
    },
    {
@@ -37509,6 +38404,9 @@
      "stealth": 5
     },
     "type": "fiend",
+    "typeTags": [
+     "Demon"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -38090,6 +38988,9 @@
      "stealth": 2
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -38313,14 +39214,28 @@
        }
       ],
       "at": "source-turn-start"
+     },
+     "failureEffect": {
+      "name": "Swallowed",
+      "tags": [
+       "swallowed"
+      ],
+      "modifiers": []
      }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions, it has Total Cover against attacks and other effects outside the remorhaz.",
     "targets": {
      "count": 1,
      "maxSize": "large",
      "grappledBySource": true
+    },
+    "swallow": {
+     "capacity": 2,
+     "regurgitate": {
+      "damage": 30,
+      "dc": 15,
+      "withinFeet": 5
+     }
     }
    }
   ],
@@ -38843,7 +39758,14 @@
     "name": "Reel",
     "activation": "action",
     "description": "The roper pulls each creature Grappled by it up to 30 feet straight toward it.",
-    "damage": []
+    "damage": [],
+    "targets": {
+     "grappledBySource": true
+    },
+    "pull": {
+     "feet": 30,
+     "upTo": true
+    }
    }
   ],
   "token": {
@@ -38992,7 +39914,7 @@
     "id": "destroy-metal",
     "name": "Destroy Metal",
     "activation": "action",
-    "description": "The rust monster touches a nonmagical metal object within 5 feet of itself that isn't being worn or carried. The touch destroys a 1-foot Cube Cube of the object.",
+    "description": "The rust monster touches a nonmagical metal object within 5 feet of itself that isn't being worn or carried. The touch destroys a 1-foot Cube of the object.",
     "damage": [],
     "area": {
      "shape": "cube",
@@ -39360,7 +40282,7 @@
     "id": "flame-spear",
     "name": "Flame Spear",
     "activation": "action",
-    "description": "Melee or Ranged Attack Roll: +7, reach 5 ft. or range 20/60 ft. 13 (2d8 + 4) Piercing damage plus 7 (2d6) Fire damage. HitomThe spear magically returns to the salamander's hand immediately after a ranged attack.",
+    "description": "Melee or Ranged Attack Roll: +7, reach 5 ft. or range 20/60 ft. 13 (2d8 + 4) Piercing damage plus 7 (2d6) Fire damage. Hit or Miss: The spear magically returns to the salamander's hand immediately after a ranged attack.",
     "attack": {
      "bonus": 7,
      "reachFeet": 5,
@@ -39523,7 +40445,12 @@
       "formula": "1d4 + 3",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "onHitPush": {
+     "feet": 10,
+     "upTo": true,
+     "maxTargetSize": "medium"
+    }
    },
    {
     "id": "mockery",
@@ -39793,6 +40720,11 @@
      "survival": 5
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Leather Armor, Longbow, Shortsword",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -40352,15 +41284,22 @@
       ],
       "at": "bearer-turn-start"
      },
-     "rangeFeet": 5
+     "rangeFeet": 5,
+     "failureEffect": {
+      "name": "Engulfed",
+      "tags": [
+       "carried-free"
+      ],
+      "modifiers": []
+     }
     },
     "damage": [],
-    "reminder": "Until the grapple ends, the target has the Blinded and Restrained conditions.",
     "targets": {
      "count": 1,
      "maxSize": "medium",
      "rangeFeet": 5
-    }
+    },
+    "holdsAtOnce": 1
    }
   ],
   "token": {
@@ -40380,6 +41319,13 @@
   "conditionImmunities": [
    "deafened",
    "exhaustion"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "absorbs",
+    "name": "Lightning Absorption",
+    "damageType": "lightning"
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -40796,6 +41742,9 @@
      "stealth": 2
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -40912,6 +41861,7 @@
     "experiencePoints": 50,
     "skills": {},
     "type": "undead",
+    "gear": "Shortbow, Shortsword",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -41063,7 +42013,7 @@
     "id": "flying-sword",
     "name": "Flying Sword",
     "activation": "action",
-    "description": "Melee or Ranged Attack Roll: +15, reach 10 ft. or range 120 ft. 22 (4d6 + 8) Slashing damage plus 36 (8d8) Radiant damage. HitomThe sword magically returns to the solar's hand or hovers within 5 feet of the solar immediately after a ranged attack.",
+    "description": "Melee or Ranged Attack Roll: +15, reach 10 ft. or range 120 ft. 22 (4d6 + 8) Slashing damage plus 36 (8d8) Radiant damage. Hit or Miss: The sword magically returns to the solar's hand or hovers within 5 feet of the solar immediately after a ranged attack.",
     "attack": {
      "bonus": 15,
      "reachFeet": 10,
@@ -41225,6 +42175,9 @@
      "perception": 14
     },
     "type": "celestial",
+    "typeTags": [
+     "Angel"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -41642,7 +42595,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -41757,7 +42712,12 @@
      },
      {
       "actionId": "roar",
-      "count": 1
+      "count": 1,
+      "or": [
+       "roar-first-roar",
+       "roar-second-roar",
+       "roar-third-roar"
+      ]
      }
     ]
    },
@@ -41805,20 +42765,7 @@
     "name": "Roar (3/Day)",
     "activation": "action",
     "description": "The sphinx emits a magical roar. Whenever it roars, the roar has a different effect, as detailed below (the sequence resets when it takes a Long Rest): - First Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Frightened condition for 1 minute. - Second Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. - Third Roar: Constitution Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: 44 (8d10) Thunder damage, and the target has the Prone condition. Success: Half damage only.",
-    "save": {
-     "ability": "wis",
-     "dc": 20,
-     "successDamage": "half",
-     "failureConditions": [
-      "frightened"
-     ],
-     "failureDuration": {
-      "type": "rounds",
-      "rounds": 10
-     }
-    },
     "damage": [],
-    "reminder": "Roar runs its First Roar (Frightened for 1 minute). The Second Roar (Paralyzed) and Third Roar (Con save, 44 (8d10) Thunder damage and Prone, half on a success) are applied by hand.",
     "uses": {
      "limit": 3,
      "per": "long-rest"
@@ -41828,6 +42775,113 @@
      "sizeFeet": 500,
      "widthFeet": null
     }
+   },
+   {
+    "id": "roar-first-roar",
+    "name": "Roar: First Roar",
+    "activation": "action",
+    "description": "The sphinx emits a magical roar. Whenever it roars, the roar has a different effect, as detailed below (the sequence resets when it takes a Long Rest): - First Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Frightened condition for 1 minute. - Second Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. - Third Roar: Constitution Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: 44 (8d10) Thunder damage, and the target has the Prone condition. Success: Half damage only.",
+    "save": {
+     "ability": "wis",
+     "dc": 20,
+     "successDamage": "none",
+     "failureConditions": [
+      "frightened"
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     }
+    },
+    "damage": [],
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 500,
+     "widthFeet": null
+    },
+    "targets": {
+     "who": "enemies"
+    },
+    "magical": true,
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "roar"
+    },
+    "useNumber": 1,
+    "partOf": "roar"
+   },
+   {
+    "id": "roar-second-roar",
+    "name": "Roar: Second Roar",
+    "activation": "action",
+    "description": "The sphinx emits a magical roar. Whenever it roars, the roar has a different effect, as detailed below (the sequence resets when it takes a Long Rest): - First Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Frightened condition for 1 minute. - Second Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. - Third Roar: Constitution Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: 44 (8d10) Thunder damage, and the target has the Prone condition. Success: Half damage only.",
+    "save": {
+     "ability": "wis",
+     "dc": 20,
+     "successDamage": "none",
+     "failureConditions": [
+      "paralyzed"
+     ],
+     "repeatSave": true,
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     }
+    },
+    "damage": [],
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 500,
+     "widthFeet": null
+    },
+    "targets": {
+     "who": "enemies"
+    },
+    "magical": true,
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "roar"
+    },
+    "useNumber": 2,
+    "partOf": "roar"
+   },
+   {
+    "id": "roar-third-roar",
+    "name": "Roar: Third Roar",
+    "activation": "action",
+    "description": "The sphinx emits a magical roar. Whenever it roars, the roar has a different effect, as detailed below (the sequence resets when it takes a Long Rest): - First Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Frightened condition for 1 minute. - Second Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. - Third Roar: Constitution Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: 44 (8d10) Thunder damage, and the target has the Prone condition. Success: Half damage only.",
+    "save": {
+     "ability": "con",
+     "dc": 20,
+     "successDamage": "half",
+     "failureConditions": [
+      "prone"
+     ]
+    },
+    "damage": [
+     {
+      "formula": "8d10",
+      "type": "thunder"
+     }
+    ],
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 500,
+     "widthFeet": null
+    },
+    "targets": {
+     "who": "enemies"
+    },
+    "magical": true,
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "roar"
+    },
+    "useNumber": 3,
+    "partOf": "roar"
    },
    {
     "id": "spellcasting",
@@ -41907,7 +42961,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "extensions": {
    "open5e.srd-2024": {
@@ -42669,6 +43725,11 @@
      "stealth": 6
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Hand Crossbow, Shortsword, Thieves' Tools",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -42794,6 +43855,10 @@
   ],
   "traitMechanics": [
    {
+    "kind": "blurred",
+    "name": "Blurred Form"
+   },
+   {
     "kind": "death-burst",
     "name": "Death Burst",
     "rangeFeet": 5,
@@ -42908,6 +43973,10 @@
      {
       "conditions": [],
       "name": "Attached",
+      "tags": [
+       "attached",
+       "source-no-repeat"
+      ],
       "ongoingDamage": {
        "damage": [
         {
@@ -42922,7 +43991,8 @@
        "by": "either"
       }
      }
-    ]
+    ],
+    "reminder": "The stirge detaches itself by spending 5 feet of its movement."
    }
   ],
   "token": {
@@ -43411,7 +44481,7 @@
     "id": "lightning-storm",
     "name": "Lightning Storm (Recharge 5-6)",
     "activation": "action",
-    "description": "Dexterity Saving Throw: DC 18, each creature in a 10-foot-radius, 40-foot-high Cylinder Cylinder originating from a point the giant can see within 500 feet. Failure: 55 (10d10) Lightning damage. Success: Half damage.",
+    "description": "Dexterity Saving Throw: DC 18, each creature in a 10-foot-radius, 40-foot-high Cylinder originating from a point the giant can see within 500 feet. Failure: 55 (10d10) Lightning damage. Success: Half damage.",
     "save": {
      "ability": "dex",
      "dc": 18,
@@ -43814,6 +44884,10 @@
     "experiencePoints": 50,
     "skills": {},
     "type": "beast",
+    "swarm": {
+     "size": "tiny",
+     "of": "Beasts"
+    },
     "alignment": "unaligned",
     "armorDetail": "natural armor",
     "speeds": {
@@ -43949,6 +45023,10 @@
     "experiencePoints": 700,
     "skills": {},
     "type": "undead",
+    "swarm": {
+     "size": "tiny",
+     "of": "Undead"
+    },
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -44057,6 +45135,10 @@
     "experiencePoints": 100,
     "skills": {},
     "type": "beast",
+    "swarm": {
+     "size": "tiny",
+     "of": "Beasts"
+    },
     "alignment": "unaligned",
     "armorDetail": "natural armor",
     "speeds": {
@@ -44134,7 +45216,8 @@
     "description": "Melee Attack Roll: +5 (with Advantage if the target doesn't have all its Hit Points), reach 5 ft. 8 (2d4 + 3) Piercing damage, or 5 (1d4 + 3) Piercing damage if the swarm is Bloodied.",
     "attack": {
      "bonus": 5,
-     "reachFeet": 5
+     "reachFeet": 5,
+     "advantageWhen": "target-hurt"
     },
     "damage": [
      {
@@ -44169,6 +45252,10 @@
     "experiencePoints": 200,
     "skills": {},
     "type": "beast",
+    "swarm": {
+     "size": "tiny",
+     "of": "Beasts"
+    },
     "alignment": "unaligned",
     "armorDetail": "natural armor",
     "speeds": {
@@ -44281,6 +45368,10 @@
     "experiencePoints": 50,
     "skills": {},
     "type": "beast",
+    "swarm": {
+     "size": "tiny",
+     "of": "Beasts"
+    },
     "alignment": "unaligned",
     "armorDetail": "natural armor",
     "speeds": {
@@ -44418,6 +45509,10 @@
      "perception": 5
     },
     "type": "beast",
+    "swarm": {
+     "size": "tiny",
+     "of": "Beasts"
+    },
     "alignment": "unaligned",
     "armorDetail": "natural armor",
     "speeds": {
@@ -44528,6 +45623,10 @@
     "experiencePoints": 450,
     "skills": {},
     "type": "beast",
+    "swarm": {
+     "size": "tiny",
+     "of": "Beasts"
+    },
     "alignment": "unaligned",
     "armorDetail": "natural armor",
     "speeds": {
@@ -44630,6 +45729,66 @@
     }
    },
    {
+    "id": "onslaught-claw",
+    "name": "Onslaught: Claw",
+    "activation": "other",
+    "description": "Legendary Action. The tarrasque moves up to half its Speed, and it makes one Claw or Tail attack.",
+    "damage": [
+     {
+      "formula": "4d8 + 10",
+      "type": "slashing"
+     }
+    ],
+    "legendary": {
+     "cost": 1
+    },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
+    "attack": {
+     "bonus": 19,
+     "reachFeet": 15
+    },
+    "partOf": "onslaught"
+   },
+   {
+    "id": "onslaught-tail",
+    "name": "Onslaught: Tail",
+    "activation": "other",
+    "description": "Legendary Action. The tarrasque moves up to half its Speed, and it makes one Claw or Tail attack.",
+    "damage": [
+     {
+      "formula": "3d8 + 10",
+      "type": "bludgeoning"
+     }
+    ],
+    "legendary": {
+     "cost": 1
+    },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
+    "attack": {
+     "bonus": 19,
+     "reachFeet": 30
+    },
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "maxTargetSize": "huge"
+     }
+    ],
+    "partOf": "onslaught"
+   },
+   {
     "id": "swallow",
     "name": "Swallow",
     "activation": "bonus-action",
@@ -44650,14 +45809,29 @@
        }
       ],
       "at": "source-turn-start"
+     },
+     "failureEffect": {
+      "name": "Swallowed",
+      "tags": [
+       "swallowed",
+       "no-teleport"
+      ],
+      "modifiers": []
      }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions and can't teleport, it has Total Cover against attacks and other effects outside the tarrasque.",
     "targets": {
      "count": 1,
      "maxSize": "large",
      "grappledBySource": true
+    },
+    "swallow": {
+     "capacity": 6,
+     "regurgitate": {
+      "damage": 60,
+      "dc": 20,
+      "withinFeet": 10
+     }
     }
    },
    {
@@ -44685,7 +45859,10 @@
         "id": "restrained"
        }
       ],
-      "escapeDc": 20
+      "escapeDc": 20,
+      "tags": [
+       "no-teleport"
+      ]
      }
     ]
    },
@@ -44699,14 +45876,22 @@
      "cost": 1,
      "oncePerRound": true
     },
+    "move": {
+     "speed": "full",
+     "provokes": true,
+     "first": true
+    },
+    "inflicts": {
+     "conditions": [
+      "prone"
+     ],
+     "maxTargetSize": "medium",
+     "breaksConcentration": true
+    },
     "area": {
      "shape": "emanation",
      "sizeFeet": 60,
      "widthFeet": null
-    },
-    "move": {
-     "speed": "full",
-     "provokes": true
     }
    },
    {
@@ -44816,6 +46001,9 @@
      "perception": 9
     },
     "type": "monstrosity",
+    "typeTags": [
+     "Titan"
+    ],
     "alignment": "unaligned",
     "armorDetail": "natural armor",
     "speeds": {
@@ -45052,6 +46240,11 @@
     "experiencePoints": 100,
     "skills": {},
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Heavy Crossbow, Leather Armor, Mace",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -45146,7 +46339,12 @@
       "formula": "2d8 + 3",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "onHitPush": {
+     "feet": 10,
+     "upTo": true,
+     "maxTargetSize": "large"
+    }
    },
    {
     "id": "heavy-crossbow",
@@ -45179,6 +46377,11 @@
     "experiencePoints": 1100,
     "skills": {},
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Chain Mail, Heavy Crossbow, Warhammer",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -45464,6 +46667,9 @@
     "experiencePoints": 1800,
     "skills": {},
     "type": "beast",
+    "typeTags": [
+     "Dinosaur"
+    ],
     "alignment": "unaligned",
     "armorDetail": "natural armor",
     "speeds": {
@@ -45873,6 +47079,9 @@
      "perception": 4
     },
     "type": "beast",
+    "typeTags": [
+     "Dinosaur"
+    ],
     "alignment": "unaligned",
     "armorDetail": "natural armor",
     "speeds": {
@@ -46031,6 +47240,30 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
+    "healing": {
+     "formula": "3d6",
+     "temporary": true
+    },
+    "grants": {
+     "name": "Shimmering Shield",
+     "tags": [
+      "shimmering-shield"
+     ],
+     "target": "target",
+     "duration": {
+      "type": "until-source-turn-end"
+     },
+     "armorClassBonus": 2,
+     "modifiers": [],
+     "onEnd": [],
+     "voidWhileIncapacitated": false,
+     "concentration": false
     }
    },
    {
@@ -46245,7 +47478,7 @@
    },
    {
     "id": "multiattack",
-    "name": "Multiattack",
+    "name": "Multiattack (Vampire Form Only)",
     "activation": "action",
     "description": "The vampire makes two Grave Strike attacks and uses Bite.",
     "damage": [],
@@ -46387,7 +47620,7 @@
    },
    {
     "id": "grave-strike",
-    "name": "Grave Strike",
+    "name": "Grave Strike (Vampire Form Only)",
     "activation": "action",
     "description": "Melee Attack Roll: +9, reach 5 ft. 8 (1d8 + 4) Bludgeoning damage plus 7 (2d6) Necrotic damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 14) from one of two hands.",
     "attack": {
@@ -46421,7 +47654,7 @@
    },
    {
     "id": "bite-bat-or-vampire-form-only",
-    "name": "Bite",
+    "name": "Bite (Bat or Vampire Form Only)",
     "activation": "action",
     "description": "Constitution Saving Throw: DC 17, one creature within 5 feet that is willing or that has the Grappled, Incapacitated, or Restrained condition. Failure: 6 (1d4 + 4) Piercing damage plus 13 (3d8) Necrotic damage. The target's Hit Point maximum decreases by an amount equal to the Necrotic damage taken, and the vampire regains Hit Points equal to that amount. A Humanoid reduced to 0 Hit Points by this damage and then buried rises the following sunset as a Vampire Spawn under the vampire's control.",
     "save": {
@@ -46463,7 +47696,9 @@
   ],
   "legendary": {
    "actionsPerRound": 3,
-   "resistancesPerDay": 3
+   "resistancesPerDay": 3,
+   "actionsInLair": 4,
+   "resistancesInLair": 4
   },
   "traitMechanics": [
    {
@@ -46493,6 +47728,10 @@
      "stealth": 9
     },
     "type": "undead",
+    "sizes": [
+     "medium",
+     "small"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -46611,7 +47850,8 @@
       "formula": "3d4",
       "type": "necrotic"
      }
-    ]
+    ],
+    "reminder": "A target this damage drops to 0 Hit Points becomes Stable instead, and has the Poisoned condition for 1 hour, with the Paralyzed condition while Poisoned. Apply both by hand."
    }
   ],
   "token": {
@@ -46634,6 +47874,11 @@
      "stealth": 7
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Daggers (10)",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -46813,6 +48058,10 @@
      "stealth": 6
     },
     "type": "undead",
+    "sizes": [
+     "medium",
+     "small"
+    ],
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -47214,6 +48463,9 @@
     "experiencePoints": 2300,
     "skills": {},
     "type": "fiend",
+    "typeTags": [
+     "Demon"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -47500,6 +48752,18 @@
       "formula": "1d6 + 4",
       "type": "bludgeoning"
      }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "large",
+      "damage": [],
+      "conditions": [
+       "prone"
+      ]
+     }
     ]
    }
   ],
@@ -47616,6 +48880,11 @@
     "experiencePoints": 25,
     "skills": {},
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Chain Shirt, Spear",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -47759,6 +49028,11 @@
      "perception": 2
     },
     "type": "humanoid",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "gear": "Greatsword, Heavy Crossbow, Splint Armor",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -47880,6 +49154,7 @@
       ],
       "at": "source-turn-start"
      },
+     "failureMaxSize": "large",
      "failureEffect": {
       "name": "Whelmed",
       "tags": [
@@ -47904,7 +49179,6 @@
       "type": "bludgeoning"
      }
     ],
-    "reminder": "Until the grapple ends, the target has the Restrained condition, is suffocating unless it can breathe water.",
     "targets": {
      "inSpace": true
     },
@@ -47912,7 +49186,9 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 4
-    }
+    },
+    "holdsAtOnce": 2,
+    "largeFillsHold": true
    }
   ],
   "token": {
@@ -47938,6 +49214,19 @@
    "prone",
    "restrained",
    "unconscious"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "damage-weakens",
+    "name": "Freeze",
+    "damageType": "cold",
+    "modifiers": [
+     {
+      "type": "speed",
+      "amount": -20
+     }
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -48162,7 +49451,7 @@
    },
    {
     "id": "bite",
-    "name": "Bite",
+    "name": "Bite (Bear or Hybrid Form Only)",
     "activation": "action",
     "description": "Melee Attack Roll: +7, reach 5 ft. 17 (2d12 + 4) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 14. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Werebear under the DM's control and has 10 Hit Points. Success: The target is immune to this werebear's curse for 24 hours.",
     "attack": {
@@ -48199,7 +49488,7 @@
    },
    {
     "id": "handaxe",
-    "name": "Handaxe",
+    "name": "Handaxe (Humanoid or Hybrid Form Only)",
     "activation": "action",
     "description": "Melee or Ranged Attack Roll: +7, reach 5 ft or range 20/60 ft. 14 (3d6 + 4) Slashing damage.",
     "attack": {
@@ -48221,7 +49510,7 @@
    },
    {
     "id": "rend",
-    "name": "Rend",
+    "name": "Rend (Bear or Hybrid Form Only)",
     "activation": "action",
     "description": "Melee Attack Roll: +7, reach 5 ft. 13 (2d8 + 4) Slashing damage.",
     "attack": {
@@ -48255,6 +49544,14 @@
      "perception": 7
     },
     "type": "monstrosity",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "typeTags": [
+     "Lycanthrope"
+    ],
+    "gear": "Handaxes (4)",
     "alignment": "neutral good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -48368,7 +49665,7 @@
    },
    {
     "id": "gore",
-    "name": "Gore",
+    "name": "Gore (Boar or Hybrid Form Only)",
     "activation": "action",
     "description": "Melee Attack Roll: +5, reach 5 ft. 12 (2d8 + 3) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 12. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Wereboar under the DM's control and has 10 Hit Points. Success: The target is immune to this wereboar's curse for 24 hours.",
     "attack": {
@@ -48405,7 +49702,7 @@
    },
    {
     "id": "javelin",
-    "name": "Javelin",
+    "name": "Javelin (Humanoid or Hybrid Form Only)",
     "activation": "action",
     "description": "Melee or Ranged Attack Roll: +5, reach 5 ft. or range 30/120 ft. 13 (3d6 + 3) Piercing damage.",
     "attack": {
@@ -48427,7 +49724,7 @@
    },
    {
     "id": "tusk",
-    "name": "Tusk",
+    "name": "Tusk (Boar or Hybrid Form Only)",
     "activation": "action",
     "description": "Melee Attack Roll: +5, reach 5 ft. 10 (2d6 + 3) Piercing damage. If the target is a Medium or smaller creature and the wereboar moved 20+ feet straight toward it immediately before the hit, the target takes an extra 7 (2d6) Piercing damage and has the Prone condition.",
     "attack": {
@@ -48478,6 +49775,14 @@
      "perception": 2
     },
     "type": "monstrosity",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "typeTags": [
+     "Lycanthrope"
+    ],
+    "gear": "Javelins (6)",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -48589,7 +49894,7 @@
    },
    {
     "id": "bite",
-    "name": "Bite ",
+    "name": "Bite (Rat or Hybrid Form Only)",
     "activation": "action",
     "description": "Melee Attack Roll: +5, reach 5 ft. 8 (2d4 + 3) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 11. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Wererat under the DM's control and has 10 Hit Points. Success: The target is immune to this wererat's curse for 24 hours.",
     "attack": {
@@ -48642,7 +49947,7 @@
    },
    {
     "id": "hand-crossbow",
-    "name": "Hand Crossbow",
+    "name": "Hand Crossbow (Humanoid or Hybrid Form Only)",
     "activation": "action",
     "description": "Ranged Attack Roll: +5, range 30/120 ft. 6 (1d6 + 3) Piercing damage.",
     "attack": {
@@ -48678,6 +49983,14 @@
      "stealth": 5
     },
     "type": "monstrosity",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "typeTags": [
+     "Lycanthrope"
+    ],
+    "gear": "Hand Crossbow",
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -48780,7 +50093,7 @@
    },
    {
     "id": "bite",
-    "name": "Bite",
+    "name": "Bite (Tiger or Hybrid Form Only)",
     "activation": "action",
     "description": "Melee Attack Roll: +5, reach 5 ft. 12 (2d8 + 3) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 13. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Weretiger under the DM's control and has 10 Hit Points. Success: The target is immune to this weretiger's curse for 24 hours.",
     "attack": {
@@ -48859,7 +50172,7 @@
    },
    {
     "id": "longbow",
-    "name": "Longbow",
+    "name": "Longbow (Humanoid or Hybrid Form Only)",
     "activation": "action",
     "description": "Ranged Attack Roll: +4, range 150/600 ft. 11 (2d8 + 2) Piercing damage.",
     "attack": {
@@ -48895,6 +50208,14 @@
      "stealth": 4
     },
     "type": "monstrosity",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "typeTags": [
+     "Lycanthrope"
+    ],
+    "gear": "Longbow",
     "alignment": "neutral",
     "armorDetail": "natural armor",
     "speeds": {
@@ -49008,7 +50329,7 @@
    },
    {
     "id": "bite",
-    "name": "Bite",
+    "name": "Bite (Wolf or Hybrid Form Only)",
     "activation": "action",
     "description": "Melee Attack Roll: +5, reach 5 ft. 12 (2d8 + 3) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 12. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Werewolf under the DM's control and has 10 Hit Points. Success: The target is immune to this werewolf's curse for 24 hours.",
     "attack": {
@@ -49061,7 +50382,7 @@
    },
    {
     "id": "longbow",
-    "name": "Longbow",
+    "name": "Longbow (Humanoid or Hybrid Form Only)",
     "activation": "action",
     "description": "Ranged Attack Roll: +4, range 150/600 ft. 11 (2d8 + 2) Piercing damage.",
     "attack": {
@@ -49097,6 +50418,14 @@
      "stealth": 4
     },
     "type": "monstrosity",
+    "sizes": [
+     "medium",
+     "small"
+    ],
+    "typeTags": [
+     "Lycanthrope"
+    ],
+    "gear": "Longbow",
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -49244,6 +50573,9 @@
      "stealth": 2
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -49439,6 +50771,7 @@
      "stealth": 4
     },
     "type": "undead",
+    "gear": "Studded Leather Armor",
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -49519,7 +50852,18 @@
       "sourceRegains": "3d6"
      }
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5,
+     "seen": true,
+     "notCreatureTypes": [
+      "construct",
+      "undead"
+     ],
+     "atZeroHitPoints": true
+    },
+    "endsUntilItActs": true
    },
    {
     "id": "shock",
@@ -50120,6 +51464,10 @@
     "experiencePoints": 1800,
     "skills": {},
     "type": "undead",
+    "sizes": [
+     "medium",
+     "small"
+    ],
     "alignment": "neutral evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -50570,6 +51918,9 @@
      "stealth": 5
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -50718,6 +52069,9 @@
      "stealth": 4
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -50904,6 +52258,9 @@
      "stealth": 3
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -51076,6 +52433,9 @@
      "stealth": 3
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -51259,6 +52619,9 @@
      "stealth": 4
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "chaotic good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -51448,6 +52811,16 @@
           ]
          }
         ]
+       },
+       {
+        "type": "damage-bonus",
+        "amount": 0,
+        "dice": "-1d6",
+        "when": [
+         {
+          "type": "on-damage-roll"
+         }
+        ]
        }
       ]
      },
@@ -51458,7 +52831,6 @@
      "repeatSave": true
     },
     "damage": [],
-    "reminder": "While Weakening Breath lasts, the target subtracts 1d6 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 30,
@@ -51487,6 +52859,9 @@
      "stealth": 6
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -51639,6 +53014,9 @@
      "stealth": 4
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "lawful evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -51787,6 +53165,9 @@
      "stealth": 4
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
@@ -51969,6 +53350,9 @@
      "stealth": 4
     },
     "type": "dragon",
+    "typeTags": [
+     "Metallic"
+    ],
     "alignment": "lawful good",
     "armorDetail": "natural armor",
     "speeds": {
@@ -52112,6 +53496,9 @@
      "stealth": 3
     },
     "type": "dragon",
+    "typeTags": [
+     "Chromatic"
+    ],
     "alignment": "chaotic evil",
     "armorDetail": "natural armor",
     "speeds": {
