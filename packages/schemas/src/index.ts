@@ -4463,6 +4463,13 @@ export const ActionSchema = z
       )
       .max(8)
       .default([]),
+    /** Each die of its damage that rolls its highest face adds another such die, up to `most` dice in all (Sorcerous
+     *  Burst: an 8 on a d8 adds a d8, up to the caster's spellcasting ability modifier). */
+    explodingDice: z
+      .object({ most: z.number().int().min(0).max(10) })
+      .strict()
+      .optional()
+      .describe("Each damage die that rolls its highest face adds another, up to this many in all"),
     /** Hit points each target regains, rolled once and applied when the action resolves (Cure Wounds). */
     healing: z
       .object({

@@ -26102,6 +26102,7 @@
     "psychic",
     "thunder"
    ],
+   "explodingDice": true,
    "healing": null
   },
   "classes": [

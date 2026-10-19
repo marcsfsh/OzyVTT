@@ -261,6 +261,10 @@ export const SpellEffectSchema = z
     damage: SpellDamageSchema,
     /** The damage types the caster picks from on each cast (Chromatic Orb); the damage carries the first. */
     damageTypes: z.array(DamageTypeSchema).min(2).max(10).optional(),
+    /** Each of its damage dice that rolls its highest face adds another such die, up to the caster's spellcasting
+     *  ability modifier in dice for the cast (Sorcerous Burst: "If you roll an 8 on a d8 for this spell, you can roll
+     *  another d8"). */
+    explodingDice: z.literal(true).optional(),
     /** The spell's save is not made when it is cast but later (Spirit Guardians, Web) or never by its target
      *  (Haste, Sanctuary): the cast prompts none. `laterActions` carries one the engine can roll. */
     noCastSave: z.literal(true).optional(),

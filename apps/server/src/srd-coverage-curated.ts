@@ -1925,8 +1925,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Giant Octopus/ink-cloud": guided(
     "The Reaction fills its 10-foot Cube with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). Offering it when the octopus takes damage underwater is the GM's."
   ),
-  "spell:sorcerous-burst": guided(
-    "The attack and the chosen damage type are applied. Rolling another d8 on each 8 is the GM's."
+  "spell:sorcerous-burst": enforced(
+    "The attack and the chosen damage type are applied, with the cantrip's dice at the caster's level, and each 8 rolled on its d8s adds another d8, the added dice exploding too, up to the caster's spellcasting ability modifier in added dice (resolution/damage.ts)."
   ),
   "spell:spirit-guardians": enforced(
     "spell-zones.ts asks for the save when a creature enters the Emanation or ends its turn there, and charges an affected creature double for each step it moves inside (terrain.ts). The creatures the caster designates are its allies."
