@@ -127,7 +127,8 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
         sourceActionId: `${action.id}:${index}`,
         startedRound: state.combat.round,
         duration,
-        endsWhenSourceDefeated: grapple,
+        // "Cursed for 24 hours or until the incubus dies".
+        endsWhenSourceDefeated: grapple || rider.endsWhenSourceDies === true,
         linkedConditionIds: conditionIds,
         modifiers: [...modifiers],
         escapeDc: rider.escapeDc ?? null,
@@ -135,7 +136,11 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
         // A stirge attached, a rug smothering: what it deals each turn while it holds on, and it lets go as it dies.
         ...(rider.ongoingDamage ? { ongoingDamage: rider.ongoingDamage, endsWhenSourceDefeated: true } : {}),
         // A spell's hit (Ray of Sickness): the spell and its level, which Dispel Magic weighs.
-        ...(cast ? { spell: { id: cast.spell.id, level: cast.level } } : {})
+        ...(cast ? { spell: { id: cast.spell.id, level: cast.level } } : {}),
+        // The action that ends it ("The target or a creature within 5 feet of it can detach the stirge").
+        ...(rider.endedBy ? { endedBy: structuredClone(rider.endedBy) } : {}),
+        // What it does as its bearer rests or days pass (a mummy's curse).
+        ...(rider.atRest ? { atRest: structuredClone(rider.atRest) } : {})
       }),
       gained,
       deps

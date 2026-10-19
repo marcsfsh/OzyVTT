@@ -8,29 +8,19 @@ import { storedArmorClass } from "./actor-roster.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 
 /**
- * What a creature holds in its hands, and what taking things up and putting them down costs in a fight (SRD 5.2.1
- * Unconscious, Armor, Utilize).
+ * What putting armor on and taking it off costs in a fight, and what a dropped item takes from its holder's Armor Class
+ * (SRD 5.2.1 Armor, Utilize, Unconscious).
  */
 
-/** Rows held in hand rather than worn: a weapon, a staff, rod or wand, anything the record says is held. */
-function held(row: InventoryItem): boolean {
-  if (!row.equipped || row.quantity <= 0 || row.armor !== undefined) return false;
-  return (
-    row.weapon !== undefined || row.magic?.slot === "held" || ["staff", "rod", "wand"].includes(row.category ?? "")
-  );
-}
-
-/** SRD Unconscious: "You drop whatever you're holding." Its weapons and held items are no longer in hand, and what
- *  they gave its Armor Class (a Staff of Power's +2) goes with them when its sheet and the catalog are at hand. */
-export function dropHeldItems(
+/** What a dropped staff or weapon gave its holder's Armor Class (a Staff of Power's +2) leaves with it, when its sheet
+ *  and the catalog are at hand. */
+export function refreshArmorClass(
   actor: Actor,
   source?: Readonly<{
     resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
     catalog?: EquipmentCatalog;
   }>
 ): void {
-  if (!actor.inventory.some(held)) return;
-  actor.inventory = actor.inventory.map((row) => (held(row) ? { ...row, equipped: false } : row));
   const definition = actor.definitionId ? source?.resolveDefinition?.(actor.definitionId) : undefined;
   if (definition && source?.catalog) actor.armorClass = storedArmorClass(actor, definition, source.catalog);
 }

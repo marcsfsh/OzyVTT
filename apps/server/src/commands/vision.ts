@@ -36,6 +36,7 @@ import {
   setVisionEnabled
 } from "../vision/edit.js";
 import { playerViewerIds } from "../vision/audience.js";
+import { heldShutAgainst, isHiddenDoor } from "../doors.js";
 import { initiatorOf, isGmGrade, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -284,11 +285,19 @@ export const visionCommands = [
       const { duplicate } = await execute((state) => {
         if (player) {
           const mine = playerViewerIds(state, player.sessionId);
-          // Out of reach and unknown look the same, so a door the player hasn't found isn't confirmed.
-          const reachable = mine.find((actorId) => doorWithinReach(state, wallId, [actorId]));
-          if (reachable === undefined)
+          const door = state.combat.vision.walls.find((wall) => wall.id === wallId);
+          // Out of reach, unknown and secret look the same, so a door the player hasn't found isn't confirmed.
+          const reachable =
+            door && !isHiddenDoor(door) ? mine.filter((actorId) => doorWithinReach(state, wallId, [actorId])) : [];
+          if (reachable.length === 0)
             throw new GameAccessDeniedError("Move your character next to the door to open or close it.");
-          opener = reachable;
+          // A locked, stuck, barred or jammed door opens only for a creature it doesn't hold shut against: one with
+          // the key, or one an Arcane Lock names.
+          const free = open
+            ? reachable.find((actorId) => heldShutAgainst(state, door!, actorId) === null)
+            : reachable[0];
+          if (free === undefined) throw new CommandRejectedError(heldShutAgainst(state, door!, reachable[0]!)!);
+          opener = free;
         }
         setDoorOpen(state, sceneId, wallId, open);
       });

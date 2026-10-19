@@ -129,6 +129,7 @@ export function deriveActorSheet(
     // Initiative is not reconciled onto the actor, so the live value is computed here; `actor.initiative`
     // still holds the instantiation-time number. `initiativeBonus` already includes Dexterity (a built
     // character's Dex modifier plus feats, a stat block's printed bonus).
+    // Initiative is a Dexterity check, so a bonus to ability checks reaches it too (a Stone of Good Luck).
     initiative:
       (definition?.initiativeBonus ?? 0) +
       derivation.initiative +

@@ -48,6 +48,7 @@ import { itemActionRest, TWO_HANDED_SUFFIX, UNARMED_STRIKE_ACTION_ID } from "../
 import { VEXED_TAG } from "../weapon-mastery.js";
 import { areAllies, areEnemies } from "../creature-sides.js";
 import { holdsFeature, spellClassOf } from "../class-features.js";
+import { launchesProjectile } from "../zone-walls.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { creatureTypeOf, swimSpeedFeet } from "../statblock-facts.js";
 import { auraOfAuthority } from "../statblock-traits.js";
@@ -753,6 +754,10 @@ export function rollAttack(ctx: ResolveContext): void {
   ].find((rider) => rider.modifier.type === "no-critical-hits");
   const answersHeld = () =>
     input.commit === false && input.holdKey !== undefined ? heldRollFor(state, input.holdKey) : answeredBefore;
+  // SRD Wind Wall: ordinary projectiles launched at a target behind the wall "miss automatically".
+  const deflectedBy = launchesProjectile(action, attacker, ctx.riderItemId)
+    ? (deps.deflectedBy?.(attacker.id, target.id) ?? null)
+    : null;
   /** The roll as its die, its bonus and its answers make it, against the target's AC. */
   const judge = () => {
     const read = withAnswers(answersHeld(), thrown.naturalRoll, thrown.total + diceTotal);
@@ -772,7 +777,8 @@ export function rollAttack(ctx: ResolveContext): void {
             ? "hit"
             : "miss";
     // SRD Greater Magic Resistance: "the attack rolls of spells automatically miss it".
-    const resisted = action.spellId !== undefined && magicResistanceOf(targetDefinition) === "succeeds";
+    const resisted =
+      (action.spellId !== undefined && magicResistanceOf(targetDefinition) === "succeeds") || deflectedBy !== null;
     if (resisted) {
       outcome = "miss";
       crit = false;
@@ -822,7 +828,8 @@ export function rollAttack(ctx: ResolveContext): void {
   ctx.crit = judged.crit;
   if (critImmune && judged.outcome === "hit" && thrown.naturalRoll >= 20)
     warnings.push(`${critImmune.label}: the Critical Hit against ${target.name} is a normal hit.`);
-  if (judged.resisted && deps.initiatorRole !== "player")
+  if (deflectedBy !== null) warnings.push(`${deflectedBy} deflects the shot, and it misses ${target.name}.`);
+  else if (judged.resisted && deps.initiatorRole !== "player")
     warnings.push(`${target.name}'s Greater Magic Resistance: spell attack rolls automatically miss it.`);
   const held = answersHeld();
   ctx.attackAnswerBonus = judged.read.bonus;

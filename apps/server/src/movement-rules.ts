@@ -17,6 +17,7 @@ import { HIDDEN_SOURCE } from "./hidden-source.js";
 import { ridesWith } from "./mounts.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
+import { burrowsThroughWalls, openingPassage, stopsOnlyInEnemySpace } from "./wall-passage.js";
 import { effectiveActions } from "./effective-actions.js";
 import { NO_OPPORTUNITY_ATTACKS_TAG, NO_REACTIONS_TAG, READIED_TAG, releaseReadied } from "./effects.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
@@ -115,6 +116,8 @@ export type MovementRulesOutcome = Readonly<{
   /** The mover waits here, at the edge of the reach it leaves, while the Opportunity Attacks it provoked are answered
    *  (`held-moves.ts`); `refundFeet` is what the rest of the way cost, given back if it never goes on. */
   heldAt?: Readonly<{ position: Point; altitudeFeet: number; promptIds: readonly string[]; refundFeet: number }>;
+  /** The way a walk, a flight, a climb, a swim or a burrow went, step by step, as its cost measured it. */
+  path?: readonly Point[];
 }>;
 
 /**
@@ -210,6 +213,8 @@ export function movementStatus(
       : {}),
     ...grantsOf(state, actor),
     ...(incorporeal(definition) ? { throughWalls: true } : {}),
+    ...(openingPassage(definition) ? { opening: openingPassage(definition)! } : {}),
+    ...(burrowsThroughWalls(definition) ? { burrowsThroughWalls: burrowsThroughWalls(definition)! } : {}),
     ...(actor && freeOfDifficultTerrain(actor) ? { ignoresDifficultTerrain: true } : {})
   };
 }
@@ -360,7 +365,12 @@ const intangible = (state: GameState, actorId: string): boolean =>
 /** SRD: "You can't willingly end a move in a space occupied by another creature." Hidden creatures don't count, so
  *  the refusal can't give one away; neither do the creatures the mover drags. */
 function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Point, everyone = false): boolean {
-  if (!input.calibration || sharesSpace(state, input.actorId, input) || intangible(state, input.actorId)) return false;
+  if (!input.calibration || intangible(state, input.actorId)) return false;
+  const moverActor = state.actors.find((actor) => actor.id === input.actorId);
+  // Air Form and Water Form as the stalker and the water elemental print them: "can enter an enemy's space and stop
+  // there", so only an enemy's space is one it may end in.
+  const enemiesOnly = moverActor !== undefined && stopsOnlyInEnemySpace(moverDefinitionOf(moverActor, input));
+  if (sharesSpace(state, input.actorId, input) && !enemiesOnly) return false;
   const moverToken = state.combat.tokens.find((token) => token.actorId === input.actorId);
   const mine = cellsAt(input.calibration, to, moverToken?.sizeCells ?? 1);
   const feetPerCell = input.calibration.distancePerCell;
@@ -372,7 +382,10 @@ function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Po
     // A creature above or below the mover's space at the end isn't in it (a flier over a goblin).
     if (moverToken && !sharesHeight(moverToken, token, feetPerCell, input.toAltitudeFeet ?? 0)) return false;
     if (sharesSpace(state, token.actorId, input, true) || intangible(state, token.actorId)) return false;
-    if (!everyone && state.actors.find((actor) => actor.id === token.actorId)?.visibility === "gm-only") return false;
+    const occupant = state.actors.find((actor) => actor.id === token.actorId);
+    if (enemiesOnly && moverActor && occupant && areEnemies(moverActor, occupant, input.resolveDefinition))
+      return false;
+    if (!everyone && occupant?.visibility === "gm-only") return false;
     if (!everyone && input.perceives && !input.perceives(token.actorId)) return false;
     for (const cell of cellsAt(input.calibration!, token.position, token.sizeCells ?? 1))
       if (mine.has(cell)) return true;
@@ -391,6 +404,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   let landsOnDifficult = false;
   let failDamage: string | undefined;
   let heldAt: MovementRulesOutcome["heldAt"];
+  const travelled: { path?: readonly Point[] } = {};
   const done = (crawled = false): MovementRulesOutcome => ({
     warning: outcome.warnings.length > 0 ? outcome.warnings.join(" ") : null,
     overridden: outcome.overridden,
@@ -400,7 +414,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     ...(granted ? { granted } : {}),
     ...(landsOnDifficult ? { landsOnDifficult: true as const } : {}),
     ...(failDamage ? { teleportFails: failDamage } : {}),
-    ...(heldAt ? { heldAt } : {})
+    ...(heldAt ? { heldAt } : {}),
+    ...(travelled.path ? { path: travelled.path } : {})
   });
   // Forced movement is the GM's (the command refuses a player's), and spends nothing.
   if (!mover || from === null || to === null || mode === "forced") return done();
@@ -580,6 +595,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   // The readied move spends the Reaction and uses up the ready, and a spell it held with it.
   if (readied) spendReadied(state, mover.id);
   const path = charge?.path && charge.path.length > 1 ? charge.path : [from, to];
+  travelled.path = path;
   const held = openOpportunityAttacks(state, input, mover, path, prompts);
   if (held) {
     // What the rest of the way cost, for a mover the attack stops: its own movement, not a readied move's.
@@ -735,7 +751,14 @@ function costOptions(
       resolveDefinition: input.resolveDefinition,
       ...(input.perceives ? { perceives: input.perceives } : {}),
       ...(sharesSpace(state, input.actorId, input) || incorporeal(moverDefinition) ? { passesCreatures: true } : {}),
-      ...(incorporeal(moverDefinition) ? { throughWalls: true } : {}),
+      // A ghost through walls as Difficult Terrain; a burrower through earth and stone: freely (Earth Glide), or at
+      // half its Burrow Speed (Tunneler).
+      ...(incorporeal(moverDefinition) || (travel === "burrow" && burrowsThroughWalls(moverDefinition) === "half")
+        ? { throughWalls: true }
+        : {}),
+      ...(travel === "burrow" && burrowsThroughWalls(moverDefinition) === "free" ? { throughWallsFree: true } : {}),
+      // Amorphous, Compression and the elementals' forms slip through any gap; a swarm through one a Tiny creature fits.
+      ...(openingPassage(moverDefinition) ? { opening: openingPassage(moverDefinition)! } : {}),
       ...(freeOfDifficultTerrain(mover) ? { ignoresDifficult: true } : {}),
       ...(fromAltitude !== 0 || toAltitude !== 0 ? { altitude: { fromFeet: fromAltitude, toFeet: toAltitude } } : {})
     }

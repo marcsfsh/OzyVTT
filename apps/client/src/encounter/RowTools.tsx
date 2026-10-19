@@ -60,8 +60,36 @@ export function RowTools({
           conditions={actor.conditions}
           effects={actor.effects}
           viewer="gm"
+          sources={state.combat.initiative
+            .filter((entry) => entry.actorId !== actor.id)
+            .map((entry) => ({
+              id: entry.actorId,
+              name: state.actors.find((candidate) => candidate.id === entry.actorId)?.name ?? "Unknown"
+            }))}
           onFeedback={onFeedback}
         />
+        {/* SRD Influence: a monster's attitude gives Influence checks Advantage (Friendly) or Disadvantage (Hostile). */}
+        {actor.kind !== "player-character" && (
+          <Field label="Attitude toward the party" htmlFor={`attitude-${actor.id}`}>
+            <Select
+              id={`attitude-${actor.id}`}
+              value={actor.attitude ?? "indifferent"}
+              disabled={busy}
+              onChange={(event) => {
+                const attitude = event.target.value as "friendly" | "indifferent" | "hostile";
+                void run(
+                  () =>
+                    command("actor:set-attitude", { actorId: actor.id, attitude, expectedRevision: state.revision }),
+                  `${actor.name} is ${attitude[0].toUpperCase()}${attitude.slice(1)}.`
+                );
+              }}
+            >
+              <option value="indifferent">Indifferent</option>
+              <option value="friendly">Friendly</option>
+              <option value="hostile">Hostile</option>
+            </Select>
+          </Field>
+        )}
         <EffectChips actorId={actor.id} effects={actor.effects} canEnd onFeedback={onFeedback} />
         <CoverControl actor={actor} onFeedback={onFeedback} />
         {/* The GM settles ties the dice leave: this combatant can go just before anyone sharing its score. */}
@@ -150,6 +178,30 @@ export function RowTools({
           >
             {state.combat.reactionsUsed.includes(actor.id) ? "Restore reaction" : "Spend reaction"}
           </Button>
+          {/* SRD Suffocation: out of air (a dive, an engulfing), it holds its breath until it can breathe again. */}
+          {(() => {
+            const holding = actor.effects.some((effect) => effect.breath !== undefined);
+            return (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    () =>
+                      command("actor:hold-breath", {
+                        actorId: actor.id,
+                        holding: !holding,
+                        expectedRevision: state.revision
+                      }),
+                    holding ? `${actor.name} breathes again.` : `${actor.name} holds its breath.`
+                  )
+                }
+              >
+                {holding ? "Breathe again" : "Hold breath"}
+              </Button>
+            );
+          })()}
           <Button
             type="button"
             variant="secondary"

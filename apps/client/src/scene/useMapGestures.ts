@@ -91,7 +91,9 @@ export function useMapGestures({
   readOnly = false,
   armedActorId = null,
   onPlaceArmed,
-  onMapMenu
+  onMapMenu,
+  onDoorMenu,
+  onWallAim
 }: Readonly<{
   role: "gm" | "player";
   tool: MapTool;
@@ -126,6 +128,10 @@ export function useMapGestures({
   onPlaceArmed?: (point: Point) => void;
   /** A right-click or a long press on an empty spot: the menu of what can go there. */
   onMapMenu?: (menu: Readonly<{ point: Point; x: number; y: number }>) => void;
+  /** A tap on a door's handle: its menu, at the pointer. */
+  onDoorMenu?: (menu: Readonly<{ wallId: string; x: number; y: number }>) => void;
+  /** A tap on a door or a wall while an action is aimed: that wall is its target. */
+  onWallAim?: (wallId: string) => void;
 }>) {
   const { camera, setCamera, boxFraction } = view;
   const { busyActorId, setMessage } = commands;
@@ -322,12 +328,21 @@ export function useMapGestures({
       setGesture({ kind: activeTargeting.template.shape, origin: point, current: point });
       return;
     }
-    // A door's handle opens or closes it (the GM's any, a player's beside their character, which the server checks).
+    // While an action is aimed, a door or a wall takes the tap as its target: an attack on it, or a spell such as Knock.
+    const aimedWall = activeTargeting && onWallAim ? target.closest("[data-wall-target], [data-door-id]") : null;
+    if (tool === "select" && aimedWall) {
+      event.preventDefault();
+      onWallAim!(aimedWall.getAttribute("data-wall-target") ?? aimedWall.getAttribute("data-door-id")!);
+      return;
+    }
+    // A door's handle opens its menu (open or close it, work on it); without one it opens or closes it. The server
+    // checks who may.
     const door = target.closest("[data-door-id]");
     if (tool === "select" && door) {
       event.preventDefault();
       const doorId = door.getAttribute("data-door-id")!;
-      void commands.setDoorOpen(doorId, door.getAttribute("data-door-open") !== "true");
+      if (onDoorMenu) onDoorMenu({ wallId: doorId, x: event.clientX, y: event.clientY });
+      else void commands.setDoorOpen(doorId, door.getAttribute("data-door-open") !== "true");
       return;
     }
     if (role === "gm" && isVisionTool(tool)) {

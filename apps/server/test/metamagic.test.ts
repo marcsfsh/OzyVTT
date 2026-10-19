@@ -9,8 +9,8 @@ import { addEffect, CANT_SPEAK_TAG, makeEffect } from "../src/effects.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { openRepeatSaves } from "../src/save-stages.js";
 import { answerSave, saveRollSources, type SaveAnswerDependencies } from "../src/saving-throws.js";
-import { openRepeatSaves } from "../src/turn-boundaries.js";
 import { asiRows } from "./asi-rows.js";
 import { ALLY, build, fight, FOE, FOE2, HERO, wizardInput, type Fight } from "./spell-casters.js";
 
@@ -346,7 +346,10 @@ describe("Heightened Spell: one target has Disadvantage on saves against the spe
     const held = actorOf(table.state, FOE).effects.find((effect) => effect.repeatSave)!;
     expect(held.repeatSave).toMatchObject({ disadvantageFrom: "Heightened Spell" });
     // The Goblin's turn ends: it repeats the save.
-    openRepeatSaves(table.state, FOE, { newId: () => crypto.randomUUID(), now: () => "2026-10-19T00:00:00.000Z" });
+    openRepeatSaves(table.state, FOE, "turn-end", {
+      newId: () => crypto.randomUUID(),
+      now: () => "2026-10-19T00:00:00.000Z"
+    });
     const repeat = answer(table.state, FOE, [19, 2]);
     expect(repeat.outcome.rollMode?.disadvantage).toContain("Heightened Spell");
     expect(repeat.outcome.success).toBe(false);

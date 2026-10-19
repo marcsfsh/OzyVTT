@@ -617,7 +617,15 @@ describe("the staffs that cast at their printed charge costs", () => {
       failureConditions: ["charmed"],
       endsOnSourceSideDamage: true
     });
-    expect(dcOf("fear")).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: ["frightened"] });
+    expect(dcOf("fear")).toEqual({
+      ability: "wis",
+      dc: 13,
+      successDamage: "none",
+      failureConditions: ["frightened"],
+      // Fear's own failure: the creature drops what it is holding.
+      failureEffect: { name: "Fear", tags: ["drops-held"], modifiers: [] },
+      repeatUnseenSource: true
+    });
     // Speak with Animals forces no save, so a `saveDc` would have no reader.
     expect(dcOf("speak-with-animals")).toBeUndefined();
     expect(

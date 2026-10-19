@@ -10,7 +10,7 @@ import { refreshSize, revertForm } from "./transform/forms.js";
 import { DESCENDS_SAFELY_TAG, descendSafely } from "./altitude.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import { restoreSuppressed } from "./suppressed-conditions.js";
-import { dropHeldItems } from "./held-items.js";
+import { refreshArmorClass } from "./held-items.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
  *  end, which clears linked conditions and fires onEnd grants. Returns narration events and writes nothing to
@@ -53,10 +53,14 @@ export const OUTLINED_TO_SOURCE_TAG = "outlined-to-source";
 /** Its Invisible condition ends once its bearer makes an attack roll, deals damage or casts a spell, and the effect
  *  goes on (Mislead). */
 export const INVISIBLE_UNTIL_IT_ACTS_TAG = "invisible-until-it-acts";
+/** On its turn the bearer can take an action or a Bonus Action, not both (a copper dragon's Slowing Breath). */
+export const ACTION_OR_BONUS_TAG = "action-or-bonus";
 /** The bearer can't make Opportunity Attacks while this lasts (Shocking Grasp). */
 export const NO_OPPORTUNITY_ATTACKS_TAG = "no-opportunity-attacks";
 /** The bearer can't regain Hit Points while this lasts (Chill Touch). */
 export const NO_HEALING_TAG = "no-healing";
+/** The bearer can't regain Hit Points unless it is underwater (an aboleth's Mucus Cloud curse). */
+export const NO_HEALING_ON_LAND_TAG = "no-healing-on-land";
 /** Slow on its target: on its turns an action or a Bonus Action (only one), one attack with the Attack action, and a
  *  chance that a spell with a Somatic component fails. */
 export const SLOWED_TAG = "slowed";
@@ -175,7 +179,7 @@ export type ConditionImmunitySource = Readonly<{
 
 /** SRD condition immunity: innate, granted by what the actor carries when a catalog is supplied, Petrified's own
  *  immunity to the Poisoned condition, or a Paladin's aura it stands in. */
-function immuneToCondition(actor: Actor, conditionId: string, source?: ConditionImmunitySource): boolean {
+export function immuneToCondition(actor: Actor, conditionId: string, source?: ConditionImmunitySource): boolean {
   if (actor.conditionImmunities.includes(conditionId)) return true;
   // An effect's own immunity while it lasts (Heroism: Frightened).
   if (actor.effects.some((effect) => effect.conditionImmunities?.includes(conditionId))) return true;
@@ -252,8 +256,6 @@ export function applyCondition(
   const selfApplied =
     options.selfApplied === true && (!existing || existing.selfApplied === true) ? { selfApplied: true as const } : {};
   writeCondition(actor, { id: conditionId, ...level, ...selfApplied, ...standalone });
-  // SRD Unconscious: "You drop whatever you're holding."
-  if (conditionId === "unconscious" && !existing) dropHeldItems(actor, options.immunities);
   if (conditionId === "unconscious" && !hasCondition(actor, "prone")) applyCondition(actor, "prone", options);
   if (conditionId === "petrified") removeConditionDirect(actor, "poisoned");
   return "applied";
@@ -263,10 +265,25 @@ export function removeConditionDirect(actor: Actor, conditionId: string) {
   actor.conditions = actor.conditions.filter((condition) => condition.id !== conditionId);
 }
 
-/** One fewer Exhaustion level, and none from level 1 (a Long Rest; coming back from death). */
+/** The tag on what keeps its bearer from breathing while it lasts ("is suffocating": engulfed, whelmed). */
+export const SMOTHERING_TAG = "smothering";
+
+/** Goodberry's berries: the inventory row the cast fills, and the tag on the caster's effect that keeps them. */
+export const GOODBERRY_ID = "goodberry";
+export const GOODBERRY_TAG = "goodberry";
+
+/** The Exhaustion levels hunger and thirst hold in place (SRD Malnutrition, Dehydration: "can't be removed until the
+ *  creature eats [drinks] the full amount ... required for a day"). */
+export function heldExhaustion(actor: Actor): number {
+  return (actor.nourishment?.hungerLevels ?? 0) + (actor.nourishment?.thirstLevels ?? 0);
+}
+
+/** One fewer Exhaustion level, and none from level 1 (a Long Rest; coming back from death), unless hunger or thirst
+ *  holds every level left. */
 export function reduceExhaustion(actor: Actor): void {
   const exhaustion = actor.conditions.find((condition) => condition.id === "exhaustion");
   if (!exhaustion) return;
+  if ((exhaustion.level ?? 1) <= heldExhaustion(actor)) return;
   if ((exhaustion.level ?? 1) <= 1) removeConditionDirect(actor, "exhaustion");
   else
     actor.conditions = actor.conditions.map((condition) =>
@@ -278,19 +295,45 @@ export function hasEffectTag(actor: Actor, tag: string): boolean {
   return actor.effects.some((effect) => effect.tags.includes(tag));
 }
 
+/** What is carried in a hand rather than worn: a row with weapon stats, a wand, a staff or a rod. */
+const HELD_CATEGORIES: ReadonlySet<string> = new Set(["weapon", "wand", "staff", "rod"]);
+
+/**
+ * SRD Unconscious ("you drop whatever you're holding") and Fear ("drops whatever it is holding"): the creature's held
+ * rows stay carried but are no longer in hand, so taking one up again is an object interaction (equipping it). Worn
+ * armor and a strapped Shield stay on. What a held item gave its Armor Class goes with it when `source` has the sheet
+ * and the catalog.
+ */
+export function dropHeldItems(actor: Actor, source?: ConditionImmunitySource): EffectNarration[] {
+  const held = actor.inventory.filter(
+    (row) =>
+      row.equipped &&
+      row.armor === undefined &&
+      (row.weapon !== undefined || HELD_CATEGORIES.has(row.category ?? "") || row.magic?.slot === "held")
+  );
+  if (held.length === 0) return [];
+  actor.inventory = actor.inventory.map((row) => (held.includes(row) ? { ...row, equipped: false } : row));
+  refreshArmorClass(actor, source);
+  const names = held.map((row) => row.name);
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  return [{ kind: "condition", text: `${actor.name} drops ${list}.`, actorId: actor.id }];
+}
+
 /**
  * What gaining a condition does beyond itself, shared by every path that can impose one (a GM chip, a failed save,
  * an on-hit rider, an effect's linked conditions): an Incapacitated creature's grapples release and its
- * Concentration breaks (SRD Incapacitated, Grappling), and its Rage ends; Exhaustion 6 is death. 0 HP is handled
- * by the damage path, which ends everything the creature sustains.
+ * Concentration breaks (SRD Incapacitated, Grappling), and its Rage ends; an Unconscious one drops what it holds;
+ * Exhaustion 6 is death. 0 HP is handled by the damage path, which ends everything the creature sustains.
  */
 export function conditionGained(
   state: GameState,
   actor: Actor,
   conditionId: string,
-  previousExhaustion = 0
+  previousExhaustion = 0,
+  source?: ConditionImmunitySource
 ): EffectNarration[] {
   const events: EffectNarration[] = [];
+  if (conditionId === "unconscious") events.push(...dropHeldItems(actor, source));
   if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
     events.push(...releaseGrapplesHeldBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));
@@ -356,6 +399,10 @@ export function addEffect(
       throw new CommandRejectedError("That combatant already has too many active effects.");
     actor.effects = [...actor.effects, effect];
   }
+  // A creature that can breathe water now (the Water Breathing spell) stops holding its breath.
+  if (effect.tags.includes("water-breathing"))
+    for (const held of actor.effects.filter((candidate) => candidate.breath !== undefined))
+      endEffectInternal(state, actor, held.id, events ?? []);
   for (const conditionId of effect.linkedConditionIds) {
     const present = actor.conditions.find((condition) => condition.id === conditionId);
     if (present) {
@@ -371,10 +418,40 @@ export function addEffect(
     writeCondition(actor, { id: conditionId, ...level });
     if (conditionId === "unconscious" && !hasCondition(actor, "prone")) applyCondition(actor, "prone", { immunities });
     if (conditionId === "petrified") removeConditionDirect(actor, "poisoned");
-    const gained = conditionGained(state, actor, conditionId);
+    const gained = conditionGained(state, actor, conditionId, 0, immunities);
     events?.push(...gained);
   }
   return effect;
+}
+
+/** Puts `replacement` in place of one effect (a failed repeat save's next stage: Petrified instead of Restrained). The
+ *  old effect's conditions the new one doesn't hold end; nothing else of an ending happens, so the Concentration and the
+ *  area of the cast it belongs to stay. */
+export function swapEffect(
+  state: GameState,
+  actorId: string,
+  effectId: string,
+  replacement: EffectInstance,
+  events: EffectNarration[],
+  immunities?: ConditionImmunitySource
+): EffectInstance | null {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const old = actor?.effects.find((candidate) => candidate.id === effectId);
+  if (!actor || !old) return null;
+  actor.effects = actor.effects.filter((candidate) => candidate.id !== effectId);
+  for (const conditionId of old.linkedConditionIds) {
+    if (replacement.linkedConditionIds.includes(conditionId) || linkedByAnEffect(actor, conditionId)) continue;
+    const entry = actor.conditions.find((condition) => condition.id === conditionId);
+    if (!entry) continue;
+    if (entry.standalone) {
+      const { standalone: _held, ...rest } = entry;
+      writeCondition(actor, rest);
+      continue;
+    }
+    removeConditionDirect(actor, conditionId);
+    events.push({ kind: "condition", text: `${actor.name} is no longer ${conditionLabel(conditionId)}.`, actorId });
+  }
+  return addEffect(state, actorId, replacement, events, immunities);
 }
 
 /** SRD Immunity: "it doesn't affect you in any way". Ends each of `conditionIds` the creature has, now that `cause`
@@ -489,6 +566,28 @@ function endEffectInternal(
     events.push({
       kind: "condition",
       text: `${actor.name} is no longer ${conditionLabel(conditionId)}.`,
+      actorId: actor.id
+    });
+  }
+  // What smothered the creature (an engulfing, a whelm) lets go: it breathes again.
+  if (effect.tags.includes(SMOTHERING_TAG))
+    for (const held of actor.effects.filter((candidate) => candidate.breath !== undefined))
+      endEffectInternal(state, actor, held.id, events, sweeping);
+  // SRD Goodberry: "Uneaten berries disappear when the spell ends."
+  if (effect.tags.includes(GOODBERRY_TAG) && actor.inventory.some((row) => (row.recordId ?? row.id) === GOODBERRY_ID)) {
+    actor.inventory = actor.inventory.filter((row) => (row.recordId ?? row.id) !== GOODBERRY_ID);
+    events.push({ kind: "effect", text: `${actor.name}'s uneaten Goodberries disappear.`, actorId: actor.id });
+  }
+  // SRD Suffocation: "When a creature can breathe again, it removes all levels of Exhaustion it gained from
+  // suffocating."
+  if (effect.breath && effect.breath.exhaustionGained > 0) {
+    const left = Math.max(0, exhaustionLevel(actor) - effect.breath.exhaustionGained);
+    if (left === 0) removeConditionDirect(actor, "exhaustion");
+    else
+      writeCondition(actor, { ...actor.conditions.find((condition) => condition.id === "exhaustion")!, level: left });
+    events.push({
+      kind: "condition",
+      text: `${actor.name} breathes again, and the Exhaustion suffocating gave it goes.`,
       actorId: actor.id
     });
   }
@@ -861,16 +960,22 @@ export const LONG_REST_MINUTES = 8 * 60;
  *  has already moved those hours for everyone (`clockMoved`, a party rest), what of its own would run out in them ends
  *  here. What lasts longer waits for the GM to pass the hours, so they never count twice; "until ended" ones (a curse, a
  *  disease) stay. */
-export function endEffectsAtLongRest(state: GameState, actorId: string, clockMoved = false): EffectNarration[] {
+export function endEffectsAtLongRest(
+  state: GameState,
+  actorId: string,
+  clockMoved = false,
+  holdsMaximum = false
+): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const events: EffectNarration[] = [...endConcentrationSustainedBy(state, actorId)];
   if (!clockMoved) events.push(...ageEffects(state, new Set([actorId]), LONG_REST_MINUTES, false));
-  // SRD Long Rest: "If your Hit Point maximum was reduced, it returns to normal." A gain kept until ended (one from
-  // before gains counted game time) is spent by the rest's end too.
+  // SRD Long Rest: "If your Hit Point maximum was reduced, it returns to normal", unless a curse holds it down (a
+  // mummy's: "its Hit Point maximum doesn't return to normal when finishing a Long Rest"). A gain kept until ended
+  // (one from before gains counted game time) is spent by the rest's end too.
   for (const effect of [...actor.effects])
     if (
-      effect.hitPointMaximumLoss !== undefined ||
+      (effect.hitPointMaximumLoss !== undefined && !holdsMaximum && effect.atRest === undefined) ||
       (effect.hitPointMaximumGain !== undefined && effect.duration.type === "manual")
     )
       endEffectInternal(state, actor, effect.id, events, true);

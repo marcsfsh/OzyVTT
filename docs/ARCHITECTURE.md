@@ -150,6 +150,8 @@ audience. There are five:
   (`Actor.control`) reaches that player with its stat block, exact Hit Points and the orders it takes
   (`commanded`, `orders`); who summoned it and what keeps it stay the GM's. That player acts for it, and
   sees through it when it lends its sight (`playerViewerIds`).
+  A creature's `attitude`, which the GM sets for Influence, never reaches a player; a character's food and water
+  for the day (`nourishment`) goes wherever its sheet resources go.
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
   room that may hold non-players. It follows the live scene, before and during its fight, unless
   the GM paused it. Only public actors with a position become tokens; annotations
@@ -351,7 +353,23 @@ of a hidden thing. When in doubt, leave it out.
   where it cast the spell, ends it.
 - Squeezing and passing walls: a footprint that fits a gap only as a creature one size smaller squeezes
   through it as through Difficult Terrain (`footprintStepPassage`), and Incorporeal Movement passes walls
-  and creatures the same way.
+  and creatures the same way. A stat block's traits widen that (`wall-passage.ts`): Amorphous, Compression
+  and the elementals' forms slip through a gap an inch wide and a swarm through one a Tiny creature fits, at
+  no extra cost (`slipsThroughStep`); Earth Glide burrows through walls freely and Tunneler at double cost.
+  A wall a spell raised stops every one of them. The `actor:movement` reply carries the opening and the
+  burrowing, so the drag preview charges the same path.
+- Doors and objects (ADR-0023's second amendment): a door may be held shut (`VisionWall.door`: a lock with
+  its key holders, stuck, barred, jammed with a spike, sealed by Stone Shape, an Arcane Lock), and
+  `door.set-open` refuses a player one held shut against their character. `door.use` picks, forces, pries,
+  jams or seals a door beside the acting creature, the server rolling the check (`doors.ts`); `door.set-state`
+  is the GM's. A wall or door may be an object with AC and Hit Points (`VisionWall.object`), as is what holds a
+  creature (`EffectInstance.heldBy`: a Net, a web, a rope). `object.attack` rolls an attack against one
+  (`object-strikes.ts`), `object.damage` is the GM's, and at 0 Hit Points a wall or door is gone and a held
+  creature is freed (`objects.ts`). A spell's `walls` raise walls on its placed template, which go with what
+  keeps the spell (`spell-walls.ts`, `pruneEndedWalls`), or act on the door or wall a cast's `wallId` names
+  (`resolution/cast-walls.ts`). Players get no door state and no object numbers: a secret door goes as a wall,
+  and a wall with a gap cut in it as the parts that stand (`vision/audience.ts`). On the map a door's handle
+  opens its menu (`DoorMenu.tsx`), and while an action is aimed a tap on a wall or door makes it the target.
 - Legendary actions are taken right after another creature's turn (`legendary.after-a-turn`): a turn
   change records the creature whose turn ended (`turn.afterActorId`), and the window stays open, one
   action a legendary creature, until the creature whose turn it is does something.
@@ -384,7 +402,12 @@ A zone may act only on the creature types it names (Forbiddance), tell the GM wh
 its spell the first time it acts and burst over its area (Glyph of Warding, drawn for the GM and its
 caster alone), or raise a barrier at its edge (`zone-barriers.ts`): a step across it closes the path
 for the creatures it holds back (Antilife Shell, Magic Circle), a melee attack without a Reach weapon
-can't reach through Antilife Shell, and no creature teleports into Forbiddance. What an area gives the
+can't reach through Antilife Shell, no creature teleports into Forbiddance, and only the creatures inside
+Tiny Hut at its cast pass its dome. A spell's area can cover the creatures behind it or turn shots across it
+(`zone-walls.ts`): Blade Barrier gives Three-Quarters Cover, and an arrow, a bolt or a thrown weapon across
+Wind Wall misses. A sphere of force around one creature (Resilient Sphere, Bead of Force) lets no attack,
+spell or area across it either way, and Disintegrate aimed at it breaks it (`enclosures.ts`). A teleport out
+of a Forcecage takes its Charisma save first (`forcecage.ts`). What an area gives the
 creatures in it (Holy Aura's Advantage on saves, Pass without Trace's +10 to Stealth, Silence's Deafened)
 is an effect each one holds while it stands inside (`zone-auras.ts`): the pipeline settles who holds it
 after every command, as its own write when anything changed. A later action that moves a spell's area
@@ -410,6 +433,9 @@ dispelled with no Concentration. An effect can also last until its bearer's next
 (`until-rest`), which that rest ends. A creature's own Long Rest (the GM approving a request) ends what
 would run out in its 8 hours and leaves longer effects for the GM to pass those hours, so they count
 once. The clock also runs a Stable creature's 1d4 hours to 1 Hit Point and a knocked-out creature's hour.
+While the GM tracks food and water (`rest.survival`), each midnight it crosses ends a day for every
+character, which eats and drinks what it carries and meets the hunger and thirst rules (`survival.ts`).
+A creature out of air counts its held breath down on the clock as it does at its turns' ends (`breath.ts`).
 
 Death is a record on the creature (`Actor.death`, `death.ts`). After every command the server stamps when a
 creature died: the fight's round while its fight runs, then the game clock. A rule that kills also says what killed
@@ -526,8 +552,9 @@ write to the sheet unpack it into its stacks (`character-build.ts`, `setInventor
 with `per: "never"` (a Healer's Kit's ten) are counted per carried row under `rowUsesKey`, and spending the last
 takes one copy from the stack (`stabilize.ts`). Bindings (Chain, Rope, Manacles) are actions that grant their
 target an effect with an `endAction` check, the escape at its printed DC. In a fight a player can't don or doff
-body armor, which takes minutes, and a Shield takes the Utilize action on their turn (`held-items.ts`); an
-Unconscious creature drops what it holds, so its weapons and held items are no longer equipped. `carrying.ts`
+body armor, which takes minutes, and a Shield takes the Utilize action on their turn (`held-items.ts`). An
+Unconscious creature, or one a failed Fear save makes drop them, keeps its held rows carried but out of its hands
+(`dropHeldItems` in `effects.ts`), and what one gave its Armor Class (a Staff of Power's +2) goes with it. `carrying.ts`
 weighs what a character carries, coins included, against its Strength times its size's figure (a
 `carrying-capacity-larger` rider counts it one size up), and `speed.ts` holds its Speed to 5 feet beyond that. The
 sheet offers each tool's Utilize uses as checks at the DCs its record prints (`toolUses` in `ability-checks.ts`).

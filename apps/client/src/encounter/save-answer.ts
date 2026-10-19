@@ -10,7 +10,8 @@ export type SaveAnswerPayload = Omit<Parameters<ClientToServerEvents["save:answe
 export function saveAnswerPayload(
   input: Readonly<{
     saveId: string;
-    method: "roll" | "manual";
+    /** "fail": the creature chooses to fail without a roll. */
+    method: "roll" | "manual" | "fail";
     commit: boolean;
     /** The GM's ruled save total: required by the server for `method: "manual"`, absent for a roll. */
     total?: number;

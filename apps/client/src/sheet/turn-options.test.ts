@@ -47,6 +47,6 @@ describe("an item's rows in the turn list", () => {
   });
 
   it("leaves out a row with nothing the server resolves", () => {
-    expect(optionsWith([row({ id: "item-rope-knot", name: "Tie a knot", targeting: null })])).toEqual([]);
+    expect(optionsWith([row({ id: "item-rope-knot", name: "Tie a knot" })])).toEqual([]);
   });
 });

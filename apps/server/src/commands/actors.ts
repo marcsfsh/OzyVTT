@@ -19,6 +19,7 @@ import {
   ActorSetSpeedSchema,
   ActorSetArmorClassSchema,
   SetActorArchivedSchema,
+  SetActorAttitudeSchema,
   SetActorHealthDisplaySchema,
   SetActorSheetPreviewSchema,
   SetActorSizeSchema,
@@ -310,6 +311,35 @@ export const actorCommands = [
             armorClass === null
               ? `${kit.actorName(actorId)}'s Armor Class follows their gear again.`
               : `The GM set ${kit.actorName(actorId)}'s Armor Class to ${armorClass}.`,
+          actorIds: [actorId],
+          gmOnly: true
+        });
+    }
+  }),
+
+  defineCommand({
+    type: "actor.set-attitude",
+    operationId: "setActorAttitude",
+    description:
+      "Sets a monster's or NPC's attitude toward the party (GM-grade only): Friendly, Indifferent (the default) or Hostile (SRD Influence). An Influence check, or a Charisma check naming the creature, has Advantage against a Friendly one and Disadvantage against a Hostile one. The attitude never reaches a player.",
+    summary: "Set a monster's or NPC's attitude for Influence checks (GM).",
+    schema: SetActorAttitudeSchema,
+    malformed: "The attitude command is malformed.",
+    gmOnly: "Only the GM sets a creature's attitude.",
+    async run({ request, execute }, kit) {
+      const { actorId, attitude } = request;
+      const { duplicate } = await execute((state) => {
+        const actor = state.actors.find((item) => item.id === actorId);
+        if (!actor) throw new CommandRejectedError("That creature no longer exists.");
+        if (actor.kind === "player-character")
+          throw new CommandRejectedError("A player character's attitude is its player's to play.");
+        if (attitude === "indifferent") delete actor.attitude;
+        else actor.attitude = attitude;
+      });
+      if (!duplicate)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: `The GM set ${kit.actorName(actorId)}'s attitude to ${attitude[0].toUpperCase()}${attitude.slice(1)}.`,
           actorIds: [actorId],
           gmOnly: true
         });

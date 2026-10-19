@@ -10,7 +10,7 @@ import { effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { setInventoryItem } from "../src/inventory.js";
 import { answerSave, createPendingSaves, saveTotalFor } from "../src/saving-throws.js";
-import { startEncounter } from "../src/encounter.js";
+import { initiativeRollFor, startEncounter } from "../src/encounter.js";
 import { builtinAction } from "../src/builtin-actions.js";
 import { looseRollPlan, spendLooseUses } from "../src/tap-routing.js";
 
@@ -379,6 +379,36 @@ describe("the Stone of Good Luck: both halves reach the roll", () => {
     );
     expect(hide.check!.total).toBe(13); // d20 10 + Dex 2 + the stone's 1
   });
+
+  it("reaches Initiative, a Dexterity check, on the roll and on the sheet", () => {
+    const definition = definitionOf();
+    const content = { resolveDefinition: () => definition, catalog };
+    const bare = stateWith([]);
+    const lucky = stateWith([carried("stone-of-good-luck-luckstone", "Stone of Good Luck")]);
+    expect(initiativeRollFor(bare, IDS.hero, false, content).checkBonus).toBe(0);
+    expect(initiativeRollFor(lucky, IDS.hero, false, content).checkBonus).toBe(1);
+    const sheetOf = (state: GameState) =>
+      deriveActorSheet(
+        state.actors[0],
+        definition,
+        deriveEquipment(state.actors[0], definition, catalog),
+        skillCatalog
+      );
+    expect(sheetOf(lucky).initiative).toBe(sheetOf(bare).initiative + 1);
+    // The roll adds it: d20 10, the stored Dexterity +2, the stone's +1.
+    startEncounter(
+      lucky,
+      { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero }, { actorId: IDS.foe, score: 1 }] },
+      () => 10,
+      GEOMETRY,
+      () => definition,
+      0,
+      catalog
+    );
+    expect(lucky.combat.initiative.find((entry) => entry.actorId === IDS.hero)?.score).toBe(
+      10 + (lucky.actors[0].initiative ?? 0) + 1
+    );
+  });
 });
 
 describe("what the carried items' buttons do outside an encounter", () => {
@@ -630,7 +660,9 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
       successDamage: "none",
       failureConditions: ["restrained"],
       // "a DC 15 Strength (Athletics) or Dexterity (Acrobatics) check" escapes it.
-      escapeDc: 15
+      escapeDc: 15,
+      // "The rope has AC 20 and 20 Hit Points": breaking it frees the target.
+      heldBy: { name: "Rope", armorClass: 20, hitPoints: 20 }
     });
     expect(action.uses).toBeUndefined(); // unlimited is the printed item
     expect(action.damage).toEqual([]);
@@ -758,10 +790,11 @@ describe("the absences that were measured and must stay absent", () => {
     expect(regeneration.modifiers).toEqual([]);
   });
 
-  it("the Horn of Blasting carries no action, and a Bead of Force is used up as it is thrown", () => {
-    // The bead is destroyed on use: it is a consumable, one fewer in the stack each throw.
+  it("the Bead of Force is used up as it is thrown, and the Horn of Blasting carries no action", () => {
+    // Each bead is one of a stack, taken off as it is thrown.
     const bead = view.equipmentRecord("bead-of-force")!;
-    expect([bead.consumedOnUse, bead.actions.map((action) => action.id)]).toEqual([true, ["throw"]]);
+    expect(bead.consumedOnUse).toBe(true);
+    expect(bead.actions.map((action) => action.id)).toEqual(["throw"]);
     // The horn is absent for its 20% explosion chance.
     const horn = view.equipmentRecord("horn-of-blasting")!;
     expect(horn.description).toContain("20 percent chance of causing the horn to explode");

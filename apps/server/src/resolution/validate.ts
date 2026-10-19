@@ -33,6 +33,7 @@ import { sceneSight } from "../vision/sight.js";
 import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { reachBarredBy } from "../zone-barriers.js";
+import { enclosureBlocks } from "../enclosures.js";
 import { builtinHandlerFor } from "./builtins.js";
 import {
   resolveHiddenCheck,
@@ -143,6 +144,8 @@ function combatantsOf(
     input.builtin === true ||
     // A light or a cloud is something done, with no creature under it (a magmin's flames, a darkmantle's aura).
     action.sight !== undefined ||
+    // A door or a wall is what it acts on (Knock, Passwall, Disintegrate aimed at a wall of force).
+    (spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined)) ||
     // So is bringing creatures onto the map (a Horn of Valhalla's Berserkers).
     action.summons !== undefined ||
     // Taking a form, or leaving it, is the user's own (Wild Shape, a werewolf's Shape-Shift).
@@ -170,7 +173,8 @@ function combatantsOf(
     action.teleport === undefined &&
     action.summons === undefined &&
     action.raisesCorpse === undefined &&
-    input.builtin !== true
+    input.builtin !== true &&
+    !(spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined))
   )
     throw new CommandRejectedError("That action has no structured effect to resolve. Run it from its description.");
   return { attacker, targets };
@@ -268,7 +272,11 @@ export function openResolve(
       : null;
   // With dynamic vision on, the walls and creatures between them cover the target too (`mapCover`); an area's
   // creatures were caught by what its point of origin reaches, so a placed area reads no cover from the caster.
-  const fromMap = (target: LiveActor) => (input.areaPlaced === true ? null : mapCover(state, attacker.id, target.id));
+  // A spell wall between them that doesn't block the way covers the target as its text says (Blade Barrier).
+  const fromMap = (target: LiveActor) =>
+    input.areaPlaced === true
+      ? null
+      : bestCover(mapCover(state, attacker.id, target.id), deps.zoneCover?.(attacker.id, target.id));
   const attackCover =
     targets.length === 1
       ? (input.cover ?? bestCover(coverFor(null, targets[0]), fromMap(targets[0]), auraCover(targets[0])))
@@ -330,6 +338,9 @@ export function openResolve(
   // A melee attack can't reach through a barrier that holds its attacker back (Antilife Shell).
   const shell = reachBarredBy(state, attacker, action, targets, deps);
   if (shell) sightBlocks.push(["range.out-of-reach", shell]);
+  // Nothing passes a sphere of force, in or out (Resilient Sphere, Bead of Force).
+  const sphere = enclosureBlocks(attacker, action, targets, deps.catalog);
+  if (sphere) sightBlocks.push(["cover.total", sphere]);
   for (const [rule, message] of sightBlocks) {
     const mode = effectiveModeFor(state.combat, rule);
     if (mode === "freeform") continue;

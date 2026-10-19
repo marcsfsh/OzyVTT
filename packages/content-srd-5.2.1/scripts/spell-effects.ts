@@ -346,6 +346,8 @@ const NO_CAST_SAVE: ReadonlySet<string> = new Set([
   "sleet-storm",
   "spirit-guardians",
   "stinking-cloud",
+  // Only a creature the wall would enclose saves, which is the GM's to see; the line itself asks no one.
+  "wall-of-stone",
   "web",
   "zone-of-truth"
 ]);
@@ -500,10 +502,10 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN} Its space is Difficult Terrain.`,
+      when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN} Its space is Difficult Terrain, and the wall gives Three-Quarters Cover.`,
       save: save("dex"),
       damage: [{ formula: "6d10", type: "force" }],
-      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT }
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT, cover: "three-quarters" }
     }
   ],
   // "Until the spell ends, you can take a Magic action to call down lightning in that way again."
@@ -542,7 +544,15 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "save",
       activation: "other",
       when: "A creature that enters the spirit's space or starts its turn within 5 feet of it makes the save, if the spirit has no creature Restrained; the Restrained target repeats it at the start of each of its turns, taking 4d8 on a failure.",
-      save: { ability: "dex", successDamage: "none", failureConditions: ["restrained"] },
+      // "At the start of each of its turns, the Restrained target repeats the save. On a failed save, the target takes
+      // 4d8 damage of the spirit's type. On a successful save, the target isn't Restrained by the spirit."
+      save: {
+        ability: "dex",
+        successDamage: "none",
+        failureConditions: ["restrained"],
+        repeatAtTurnStart: true,
+        repeatFailureDamage: [{ formula: "4d8", type: "lightning" }]
+      },
       damage: [{ formula: "8d8", type: "lightning" }],
       // A Large spirit: its space and 5 feet around it reach 10 feet from its point. The caster's chosen element is
       // its damage type.
@@ -695,6 +705,16 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       wardsSpells: 5
     })
   ],
+  // "A 10-foot Emanation springs into existence around you and remains stationary": the creatures inside it at the cast
+  // move through it freely, "all other creatures and objects are barred from passing through it", and "spells of level
+  // 3 or lower can't be cast through it". Its light and its one-way sight are the GM's.
+  "tiny-hut": [
+    lasting(
+      "hut",
+      "Only the creatures inside the dome when it was made can pass through it, and spells of level 3 or lower cast from outside can't reach inside.",
+      { on: [], around: "caster", feet: 10, stays: true, wardsSpells: 3, bars: { way: "both", insiders: true } }
+    )
+  ],
   // Explosive Rune: a creature that sets the glyph off (stepping on it) makes it erupt in a "20-foot-radius Sphere
   // centered on the glyph", and "once a glyph is triggered, this spell ends". The glyph is nearly imperceptible.
   "glyph-of-warding": [
@@ -823,6 +843,16 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [],
       area: { shape: "cylinder", sizeFeet: 5, widthFeet: null },
       movesArea: { feet: 60 }
+    }
+  ],
+  // "As a Magic action on your later turns, you can control the hand thus again": it opens or closes an unlocked door.
+  "mage-hand": [
+    {
+      name: "control",
+      activation: "action",
+      when: "As a Magic action on your later turns, you control the hand again, opening or closing an unlocked door within 30 feet.",
+      damage: [],
+      laterTurnsOnly: true
     }
   ],
   // A creature of a chosen type "can't willingly enter the Cylinder by nonmagical means". Every type the spell names is
@@ -976,6 +1006,15 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [{ formula: "7d8", type: "slashing" }],
       zone: { ...ENTER_OR_END_ONCE, terrain: { cost: 4, kind: "plants" } }
     }
+  ],
+  // "Arrows, bolts, and other ordinary projectiles launched at targets behind the wall are deflected upward and miss
+  // automatically"; "Small or smaller flying creatures or objects can't pass through the wall."
+  "wind-wall": [
+    lasting(
+      "wall",
+      "Arrows, bolts and other ordinary projectiles shot or thrown across the wall miss, and Small or smaller flying creatures can't pass through it.",
+      { on: [], deflects: true, bars: { way: "both", sizes: ["tiny", "small"], flying: true } }
+    )
   ],
   web: [
     {
@@ -1488,6 +1527,24 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     conditions: ["invisible"]
   }),
+  // "Grants up to ten willing creatures of your choice within range the ability to breathe underwater until the spell
+  // ends": a creature holding its breath breathes again.
+  "water-breathing": spellGrant({
+    name: "Water Breathing",
+    tags: ["water-breathing"],
+    target: "targets",
+    duration: { type: "manual" }
+  }),
+  // "Any creature who targets the warded creature with an attack roll or a damaging spell must succeed on a Wisdom
+  // saving throw or either choose a new target or lose the attack or spell", and it ends "if the warded creature
+  // makes an attack roll, casts a spell, or deals damage".
+  sanctuary: spellGrant({
+    name: "Sanctuary",
+    tags: ["sanctuary", "until-it-acts"],
+    target: "target",
+    duration: rounds(10),
+    ward: { ability: "wis" }
+  }),
   // "The target's base AC becomes 13 plus its Dexterity modifier", a way to work out AC that riders add to.
   "mage-armor": spellGrant({
     name: "Mage Armor",
@@ -1950,6 +2007,9 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
       { type: "roll-mode", roll: "check", mode: "disadvantage" }
     ]
   },
+  // "A shimmering sphere encloses a Large or smaller creature or object": nothing passes its wall, in or out, and
+  // Disintegrate destroys it (`enclosures.ts`). Rolling the sphere along is the GM's.
+  "resilient-sphere": { name: "Resilient Sphere", tags: ["enclosed"], modifiers: [] },
   // "Become cursed for the duration" with the curse the caster picks, which Remove Curse ends: Disadvantage on one
   // ability's checks and saves, Disadvantage on attack rolls against the caster, the Wisdom save each turn (the GM's to
   // ask), or an extra 1d8 Necrotic when the caster's attack hits it.
@@ -2084,6 +2144,12 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   sleep: { name: "Sleep", tags: ["wakeable"], modifiers: [] },
   // "A Remove Curse, Greater Restoration, or Wish spell ends this spell."
   geas: { name: "Geas", tags: ["curse"], modifiers: [] },
+  // "You create a phantasmal object, creature, or other phenomenon ... perceivable only to the target for the duration."
+  "phantasmal-force": { name: "Phantasmal Force", tags: [], modifiers: [] },
+  // "Each target ... drops whatever it is holding and has the Frightened condition for the duration."
+  fear: { name: "Fear", tags: ["drops-held"], modifiers: [] },
+  // "Can't take Bonus Actions or Reactions, and it rolls 1d10 at the start of each of its turns" (`random-outcomes.ts`).
+  confusion: { name: "Confusion", tags: ["confused", "no-bonus-actions", "no-reactions"], modifiers: [] },
   // "Disadvantage on the next attack roll it makes before the end of its next turn": its own roll spends it.
   "vicious-mockery": {
     name: "Vicious Mockery",
@@ -2095,6 +2161,14 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
 
 /** What a successful save against the cast still leaves on the creature (SRD 5.2.1 text). */
 const SAVE_SUCCESS_EFFECTS: Readonly<Record<string, FailureEffect>> = {
+  // "On a successful save, its Speed is 0 until the start of your next turn."
+  "flesh-to-stone": {
+    name: "Flesh to Stone",
+    tags: [],
+    speedZero: true,
+    duration: { type: "until-source-next-turn" },
+    modifiers: []
+  },
   // "On a successful save, the target has Disadvantage on the next attack roll it makes until the start of your next
   // turn."
   "ray-of-enfeeblement": {
@@ -2330,14 +2404,22 @@ const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   // The hound and the 5 feet it bites in.
   "faithful-hound": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "flaming-sphere": { shape: "sphere", sizeFeet: 5, widthFeet: null },
+  // The cage, "up to 20 feet on a side".
+  forcecage: { shape: "cube", sizeFeet: 20, widthFeet: null },
   "guardian-of-faith": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  // "Up to 90 feet long, 30 feet high, and 1 inch thick"; the globe is the GM's to draw.
+  "prismatic-wall": { shape: "line", sizeFeet: 90, widthFeet: 5 },
   // "Spreading to a radius of 300 feet": the creatures under the cloud.
   "storm-of-vengeance": { shape: "cylinder", sizeFeet: 300, widthFeet: null },
   // "Up to 300 feet long, 300 feet high, and 50 feet thick."
   tsunami: { shape: "line", sizeFeet: 300, widthFeet: 50 },
   "wall-of-fire": { shape: "line", sizeFeet: 60, widthFeet: 5 },
+  // "A flat surface made up of ten 10-foot-by-10-foot panels" in a row; the dome and the globe are the GM's to draw.
+  "wall-of-force": { shape: "line", sizeFeet: 100, widthFeet: 5 },
   // Ten 10-foot panels in a row; the text's "radius of up to 10 feet" names the dome, which the GM draws.
   "wall-of-ice": { shape: "line", sizeFeet: 100, widthFeet: 5 },
+  // "Ten 10-foot-by-10-foot panels", in a row.
+  "wall-of-stone": { shape: "line", sizeFeet: 100, widthFeet: 5 },
   "wall-of-thorns": { shape: "line", sizeFeet: 60, widthFeet: 5 },
   // "Up to 50 feet long, 15 feet high, and 1 foot thick."
   "wind-wall": { shape: "line", sizeFeet: 50, widthFeet: 5 }

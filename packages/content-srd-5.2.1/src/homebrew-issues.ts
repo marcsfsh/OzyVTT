@@ -197,6 +197,27 @@ const LABELS: Readonly<Record<string, string>> = {
   coins: "coins",
   waives: "components it goes without",
   targetTypes: "creature types it affects",
+  repeatOnce: "one repeated save",
+  repeatAtTurnStart: "save repeated as its turn starts",
+  repeatOnDamage: "save repeated on damage",
+  repeatByAction: "save repeated by an action",
+  repeatFailureDamage: "damage of a failed repeat",
+  repeatTally: "successes and failures counted",
+  secondFailure: "second failure",
+  failureExhaustion: "Exhaustion a failure adds",
+  advantageIfFighting: "Advantage in a fight with the source",
+  immuneOnSuccess: "immunity after a success",
+  endsWhenSourceDies: "end when the source dies",
+  onlyCreatureTypes: "creature types that save",
+  sparesAffected: "creatures already affected left out",
+  failureKills: "a failure that kills",
+  sourceRegains: "hit points the source regains",
+  repeatDamageAgain: "damage again on a failed repeat",
+  repeatUnseenSource: "save repeated out of the source's sight",
+  endsOutOfSight: "end out of the source's sight",
+  autoSuccess: "creatures that succeed without rolling",
+  sleepless: "creatures that don't sleep",
+  successEffect: "what a success leaves",
   chainFeet: "distance between targets",
   summons: "creatures it summons",
   summonScaling: "how it scales with the spell's level",
@@ -377,9 +398,9 @@ const CUSTOM_REWRITES: ReadonlyArray<readonly [RegExp, (owner: string | null, la
     () => "Vulnerability to the other choices needs a cursed item whose resistance the GM chooses."
   ],
   [
-    /^An item cannot change hit points, an ability score/,
+    /^An item can't change hit points per level or the attunement limit/,
     () =>
-      "An item can't change Hit Points, an ability score or the attunement limit. Use a bonus to Armor Class, saving throws, ability checks or the spell save DC."
+      "An item can't change Hit Points per level or the attunement limit. Use a bonus to Armor Class, saving throws, ability checks or the spell save DC."
   ],
   [
     /^`while-character-is` needs at least one class or species/,

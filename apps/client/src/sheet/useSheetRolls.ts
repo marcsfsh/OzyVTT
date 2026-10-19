@@ -22,7 +22,9 @@ export function checkLine(outcome: CheckRollOutcome): string {
   const verdict = outcome.success === null ? "" : ` vs DC ${outcome.dc} · ${outcome.success ? "success" : "failure"}`;
   const talent = outcome.reliableTalent ? " · Reliable Talent" : "";
   const answered = (outcome.answered ?? []).map((line) => ` · ${line.name}: ${line.change}`).join("");
-  return `${outcome.label}: ${outcome.total} (d20 ${outcome.natural}${outcome.typed ? ", typed" : ""})${verdict}${modeWords(outcome.rollMode)}${talent}${answered}.`;
+  // A check that needed a sense the roller lacks fails whatever the die shows; the reason says so.
+  const why = outcome.autoFailed ? ` · ${outcome.autoFailed.replace(/\.$/, "")}` : "";
+  return `${outcome.label}: ${outcome.total} (d20 ${outcome.natural}${outcome.typed ? ", typed" : ""})${verdict}${modeWords(outcome.rollMode)}${talent}${answered}${why}.`;
 }
 
 /** The constant a formula adds after its dice ("2d6 + 3" gives 3), so a typed sum of the dice can take it. */

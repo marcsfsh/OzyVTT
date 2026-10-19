@@ -6,6 +6,7 @@ import {
   AnnotationVisibilitySchema,
   AskableCommandSchema,
   BuilderAbilityMethodSchema,
+  DoorStateSchema,
   EncounterTokenPositionSchema,
   PartyVisibilitySchema,
   RollVisibilitySchema,
@@ -24,6 +25,7 @@ import {
   EffectModifiersSchema,
   InventoryItemSchema,
   MAX_FAVOURITE_OPTIONS,
+  ObjectStatsSchema,
   OptionIdSchema,
   ProficienciesSchema
 } from "@vtt/schemas";
@@ -131,6 +133,16 @@ export const InitiativeSwapSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     withActorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** SRD Initiative: "the players decide the order among tied characters". A player puts their own character
+ *  directly ahead of another character tied on the same score. */
+export const InitiativeOrderTieSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    beforeActorId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -311,6 +323,9 @@ export const SetConditionSchema = z
       .max(60),
     active: z.boolean(),
     level: z.number().int().min(1).max(6).optional(),
+    /** GM only, for Charmed or Frightened: the charmer or the source of fear, which the rules then read (a charmed
+     *  creature can't harm its charmer; a frightened one can't move closer to its source). */
+    sourceActorId: z.uuid().optional(),
     /** Bypass a rules rejection (standing from Prone costs half Speed, on your own turn; a condition someone else
      *  imposed is theirs to end); audited. */ override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -457,6 +472,8 @@ export const ActionResolveSchema = z
     /** GM only: the spell area a cast that ends spells is aimed at (Dispel Magic on a Moonbeam), from
      *  `combat.spellZones`. */
     zoneId: z.string().min(1).max(120).optional(),
+    /** The door or wall on the live map a cast is aimed at (Knock, Arcane Lock, Mage Hand opening a door). */
+    wallId: z.uuid().optional(),
     /** false previews the attack roll only (no damage/riders/economy). The server holds the previewed d20, so a second
      *  preview of the same attack shows the same die, and the confirm (`commit: true`) uses it. Non-attack actions
      *  ignore it. */
@@ -573,8 +590,8 @@ export const SaveAnswerSchema = z
     commandId: z.uuid(),
     saveId: z.uuid(),
     /** "roll": the server throws the d20 (or takes `face`) and adds the save's modifier. "manual": GM only, `total` is
-     *  the final total as the GM rules it. */
-    method: z.enum(["roll", "manual"]),
+     *  the final total as the GM rules it. "fail": the creature chooses to fail without rolling (SRD Saving Throw). */
+    method: z.enum(["roll", "manual", "fail"]),
     /** GM only, with `method: "manual"`: the final total, used as given. */
     total: z.number().int().min(-20).max(60).optional(),
     /** A typed d20 for `method: "roll"`: the face a physical die shows (the one that counts). A player may type one only
@@ -848,9 +865,13 @@ export const CheckRollSchema = z
     face: z.number().int().min(1).max(20).optional(),
     /** The GM's choice of roll mode. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
-    /** The creature a Wisdom (Perception or Survival) check is made to find: the roller's Hunter's Mark on it gives
-     *  Advantage. */
+    /** The creature the check is about: one a Wisdom (Perception or Survival) check is made to find (the roller's
+     *  Hunter's Mark on it gives Advantage), or one a Charisma check interacts with (its charmer, its attitude and
+     *  Perfume give Advantage or Disadvantage). */
     findActorId: z.uuid().optional(),
+    /** What the check relies on, when the GM says: a Blinded roller fails one that needs sight, a Deafened one one
+     *  that needs hearing. */
+    sense: z.enum(["sight", "hearing"]).optional(),
     /** The situations the roller says the check fits, from the sheet's list (a Book's topic, prying with a Crowbar). */
     situations: z.array(z.string().trim().min(3).max(80)).max(6).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -895,6 +916,9 @@ export const RollCallStartSchema = z
     /** A check the players roll blind: they see neither its result nor its DC. A save is never blind: its outcome
      *  lands on the character. */
     blind: z.boolean().optional(),
+    /** What a check relies on: a Blinded character fails one that needs sight, a Deafened one one that needs
+     *  hearing. */
+    sense: z.enum(["sight", "hearing"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -904,9 +928,12 @@ export const RollCallStartSchema = z
   .refine((payload) => payload.kind === "check" || payload.blind !== true, {
     error: "A saving throw can't be rolled blind: its outcome lands on the character."
   })
-  .refine((payload) => payload.kind === "check" || (payload.skill === undefined && payload.tool === undefined), {
-    error: "A saving throw takes no skill or tool."
-  })
+  .refine(
+    (payload) =>
+      payload.kind === "check" ||
+      (payload.skill === undefined && payload.tool === undefined && payload.sense === undefined),
+    { error: "A saving throw takes no skill, tool or sense." }
+  )
   .refine((payload) => new Set(payload.actorIds).size === payload.actorIds.length, {
     error: "Name each character once."
   });
@@ -1032,6 +1059,15 @@ export const SetHealthDisplaySchema = z
     commandId: z.uuid(),
     style: z.enum(["band", "bar", "ring", "aura"]),
     audience: z.enum(["gm", "all"]),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** SRD Influence: a monster's or NPC's attitude toward the party (GM). Indifferent is the default. */
+export const SetActorAttitudeSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    attitude: z.enum(["friendly", "indifferent", "hostile"]),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1258,6 +1294,70 @@ export const DoorSetOpenSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** The GM sets what keeps a door shut (locked, stuck, barred, jammed, sealed), its Arcane Lock and whether it is a
+ *  secret door; null clears them all. */
+export const DoorSetStateSchema = z
+  .object({
+    commandId: z.uuid(),
+    wallId: z.uuid(),
+    door: DoorStateSchema.nullable(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A creature beside a door picks its lock, forces it or jams it shut. */
+export const DoorUseSchema = z
+  .object({
+    commandId: z.uuid(),
+    wallId: z.uuid(),
+    actorId: z.uuid(),
+    /** Pick its lock (Thieves' Tools), force it, jam it with an Iron Spike, pry it open (Carpenter's or Smith's
+     *  Tools) or seal it (Carpenter's Tools). */
+    how: z.enum(["pick", "force", "jam", "pry", "seal"]),
+    /** Another character helping with a Portable Ram (Advantage on the check). */
+    helperId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Where an object is: a wall or door of the live map, or what holds a creature (its effect). */
+export const ObjectRefSchema = z.union([
+  z.object({ wallId: z.uuid() }).strict(),
+  z.object({ actorId: z.uuid(), effectId: z.string().min(1).max(120) }).strict()
+]);
+/** The GM gives a wall or door statistics as an object, or clears them (null). */
+export const ObjectSetSchema = z
+  .object({
+    commandId: z.uuid(),
+    wallId: z.uuid(),
+    object: ObjectStatsSchema.nullable(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM deals typed damage to an object (a Fireball's fire on a door, a Wall of Ice panel). */
+export const ObjectDamageSchema = z
+  .object({
+    commandId: z.uuid(),
+    target: ObjectRefSchema,
+    parts: z
+      .array(z.object({ amount: z.number().int().min(0).max(10000), type: DamageTypeSchema }).strict())
+      .min(1)
+      .max(8),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A creature attacks an object with one of its attacks. */
+export const ObjectAttackSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    actionId: z.string().min(1).max(120),
+    target: ObjectRefSchema,
+    rollMode: z.enum(["advantage", "disadvantage", "normal"]).nullable().optional(),
+    override: RulesOverrideSchema.nullable().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** A light placed on the map (`position`) or carried by a token (`actorId`). */
 export const LightAddSchema = z
   .object({
@@ -1426,6 +1526,34 @@ export const RestFinishSchema = z
   })
   .strict();
 /** The GM moves game time forward, which the 16-hour rule between Long Rests reads. */
+/** The GM starts or stops tracking food and water (SRD Malnutrition, Dehydration). */
+export const SurvivalSetTrackingSchema = z
+  .object({
+    commandId: z.uuid(),
+    enabled: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A character eats or drinks: a meal, a ration or a Goodberry; its fill at a source, or from its Waterskins. */
+export const ActorNourishSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    food: z.enum(["meal", "ration", "goodberry"]).optional(),
+    water: z.enum(["fill", "waterskin"]).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((request) => request.food !== undefined || request.water !== undefined, "Say what it eats or drinks.");
+/** The GM starts or ends a creature's held breath (SRD Suffocation). */
+export const ActorHoldBreathSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    holding: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const TimePassSchema = z
   .object({
     commandId: z.uuid(),

@@ -56,8 +56,8 @@ type SpellLater = NonNullable<NonNullable<SpellReference["effect"]>["laterAction
 
 /** A later action applies when it deals damage, makes an attack or imposes conditions on a failed save; with a `zone`
  *  the server raises it as creatures enter or start or end a turn in the area (`spell-zones.ts`). An area also applies
- *  when it charges the ground it makes difficult (`zone-ground.ts`), bars or wards (`zone-barriers.ts`), alerts its
- *  caster, or gives the creatures inside what it holds (`zone-auras.ts`). */
+ *  when it charges the ground it makes difficult (`zone-ground.ts`), bars or wards (`zone-barriers.ts`), covers or turns
+ *  shots (`zone-walls.ts`), alerts its caster, or gives the creatures inside what it holds (`zone-auras.ts`). */
 const laterApplies = (later: SpellLater) =>
   later.damage.length > 0 ||
   later.attackRange !== undefined ||
@@ -65,6 +65,8 @@ const laterApplies = (later: SpellLater) =>
   later.save?.speedZero === true ||
   later.zone?.terrain !== undefined ||
   later.zone?.bars !== undefined ||
+  later.zone?.cover !== undefined ||
+  later.zone?.deflects === true ||
   later.zone?.wardsSpells !== undefined ||
   later.zone?.alerts === true ||
   later.zone?.holds !== undefined;
@@ -103,8 +105,10 @@ export function spellState(spell: SpellReference): CoverageState {
       spell.save.failurePush !== undefined);
   // The light it sheds or the fog or Darkness it fills, which dynamic vision reads.
   const sight = spell.sight;
+  // The walls it raises, cuts or destroys and the doors it opens or locks on the map (`spell-walls.ts`).
   return applies ||
     saveApplies ||
+    spell.walls !== undefined ||
     sight?.light !== undefined ||
     sight?.area !== undefined ||
     sight?.dispels !== undefined
@@ -411,7 +415,8 @@ const CLASSIFICATION = [
   "- **Spells:** a cast resolves in `action-resolution.ts` and the steps in `resolution/`, at the caster's own",
   "  numbers. A spell is enforced when its cast applies its attack, save, damage, healing or lasting effect, ends",
   "  spells or curses (`resolution/dispel.ts`), or when the area it leaves applies them as creatures enter it or",
-  "  start or end a turn there (`spell-zones.ts`).",
+  "  start or end a turn there (`spell-zones.ts`), or when it raises, cuts or breaks the map's walls or works its",
+  "  doors (`spell-walls.ts`).",
   "  Guided when the app spends the slot and holds the Concentration, the area or a save while a person applies",
   "  what the spell does. A spell whose cast leaves a rider to the table (Storm of Vengeance's later turns) is",
   "  curated as guided, with a note.",

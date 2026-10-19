@@ -177,13 +177,16 @@ describe("the curated claims hold in the engine", () => {
     expect(currentSpeedFeet(tired, deriveEquipment(tired, undefined, undefined))).toBe(15);
   });
 
-  it("Deafened is guided: nothing in the engine reads it", () => {
-    expect(state(CONDITION_COVERAGE.deafened!)).toBe("guided");
+  it("Deafened fails a check that needs hearing and changes no other roll", () => {
+    expect(state(CONDITION_COVERAGE.deafened!)).toBe("enforced");
     const deafened = creature([{ id: "deafened" }]);
     const derivation = deriveEquipment(deafened, undefined, undefined);
     expect(speedZeroed(deafened)).toBe(false);
     expect(autoFailsPhysicalSaves(deafened)).toBeNull();
     expect(abilityCheckClaims(deafened, derivation, { ability: "wis" }).disadvantage).toEqual([]);
+    const listening = { ability: "wis", skill: "perception", sense: "hearing" } as const;
+    expect(checkPlan(deafened, sheet(), derivation, listening).autoFails).toMatch(/Deafened/);
+    expect(checkPlan(deafened, sheet(), derivation, { ability: "wis", skill: "perception" }).autoFails).toBeUndefined();
   });
 
   it("Advantage and Disadvantage on the same roll cancel", () => {

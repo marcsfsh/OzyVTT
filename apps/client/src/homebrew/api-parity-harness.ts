@@ -448,7 +448,27 @@ const SAVE_LIFETIME_KEYS = [
   "failureHazard",
   "failurePush.**",
   "advantageAtSize",
-  "escapeAthletics"
+  "escapeAthletics",
+  "repeatOnce",
+  "repeatAtTurnStart",
+  "repeatOnDamage.**",
+  "repeatByAction",
+  "repeatFailureDamage[].**",
+  "repeatTally",
+  "secondFailure.**",
+  "failureExhaustion",
+  "advantageIfFighting",
+  "immuneOnSuccess",
+  "endsWhenSourceDies",
+  "onlyCreatureTypes",
+  "sparesAffected",
+  "failureKills.**",
+  "repeatDamageAgain",
+  "repeatUnseenSource",
+  "endsOutOfSight",
+  "autoSuccess.**",
+  "endedBy.**",
+  "atRest.**"
 ] as const;
 
 /** The save-block keys that make a failure act by the target's Hit Points or send it home (`SaveOutcomeFields`). */
@@ -636,6 +656,27 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
       "what a failed save does by the target's Hit Points and the creature types it sends home (Divine Word) - authored in the content scripts",
     status: "gap"
   })),
+  {
+    at: "actions[].save.heldBy.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the object that holds a creature a failure restrains (a Net, a giant spider's web) with its Armor Class and Hit Points - read from the stat block's text or authored in the gear and item overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.heldBy.**",
+    types: ["spell"],
+    reason:
+      "the object that holds a creature a spell's failure restrains, read from the spell's text as the catalog is built; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "walls.**",
+    types: ["spell"],
+    reason:
+      "the walls a spell raises, cuts or destroys and what it does to a door (Wall of Force, Knock) - a reviewed table in the content build; the spell form has no control for them",
+    status: "gap"
+  },
   {
     at: "actions[].raisesCorpse.**",
     types: ACTION_CARRIERS,

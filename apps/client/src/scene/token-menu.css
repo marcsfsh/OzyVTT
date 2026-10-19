@@ -123,3 +123,13 @@
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
+/* The door menu's GM lines: what holds the door and its statistics, which players never see, in the GM-only hue. */
+.door-menu-summary {
+  color: var(--violet-hi);
+}
+.door-editor {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
