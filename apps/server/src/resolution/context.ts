@@ -73,6 +73,8 @@ export type ResolveInput = Readonly<{
   attackKinds?: readonly AttackKind[];
   /** Push mastery's chosen distance (0 declines); absent pushes the most the mastery allows. */
   pushFeet?: number;
+  /** An Evoker's Overchannel: the spell's damage dice deal their maximum (`resolution/overchannel.ts`). */
+  overchannel?: boolean;
   /** The slot a spell is cast with; absent, its own level, else the lowest above it with a slot left. */
   slotLevel?: number;
   /** The damage type picked for an action whose caster chooses one (`ActorAction.damageTypes`); absent, its first. */
@@ -95,6 +97,10 @@ export type ResolveInput = Readonly<{
   areaPlaced?: boolean;
   /** Ready the spell for later: its slot is spent and it is held with Concentration (SRD Ready). */
   ready?: boolean;
+  /** Take the action's own move now and the rest of it later (`movement-grants.ts`): the cost is spent, no target. */
+  moveFirst?: boolean;
+  /** The rest of an action whose move was taken first: its cost was spent then, so it is neither checked nor spent. */
+  owedPaid?: boolean;
   /** The spell area a cast that ends spells is aimed at (Dispel Magic on a Spirit Guardians); the GM's to name. */
   zoneId?: string;
   /** The caster stands where no sound can be made (Silence's sphere), measured on the map by the server. */

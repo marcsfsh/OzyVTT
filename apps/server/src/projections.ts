@@ -288,6 +288,8 @@ const PENDING_REACTION_FIELDS = {
   weighed: "player",
   acBonus: "player",
   rollsAttack: "player",
+  // How far the falling creature falls: its height, which is as public as the token it answers for.
+  fallFeet: "player",
   // The reactor's own slots, which its owner already reads on the sheet; only the reactor's owner gets the prompt.
   slotLevels: "player",
   createdAt: "player",
@@ -508,6 +510,10 @@ function playerEffect(
     hitPointMaximumGain: _hitPointMaximumGain,
     temporaryHitPointsEachTurn: _temporaryHitPointsEachTurn,
     conditionImmunities: _conditionImmunities,
+    // A granted move names the turn it belongs to and the creature it must flee, which can be hidden; its own
+    // character's grant reaches a player through `actor:movement`.
+    grantedMove: _grantedMove,
+    grantedTeleport: _grantedTeleport,
     // Whether a Concentration spell ends once no creature keeps it is the engine's bookkeeping.
     endsWhenUnaffected: _endsWhenUnaffected,
     // A long casting's targets and slot are the caster's plan; its name says what is being cast.
@@ -623,6 +629,7 @@ const PLAYER_ACTOR_FIELDS = {
   healthDisplay: "derived",
   replaySceneId: "derived",
   actionUses: "derived",
+  readyAt: "derived",
   heroicInspiration: "derived",
   heroicInspirationToGive: "derived",
   experiencePoints: "derived",
@@ -635,6 +642,7 @@ const PLAYER_ACTOR_FIELDS = {
   spellbook: "derived",
   knownForms: "derived",
   preparation: "derived",
+  restStep: "derived",
   inventory: "derived",
   currency: "derived",
   notes: "never",
@@ -693,10 +701,12 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * the claim picker, and nothing more of its sheet.
  * | definition (the imported sheet)         |  Y   |  -  |       -        |     Y      |          Y          |
  * | actionUses, hitDice, heroicInspiration  |  Y   |  -  |       -        |     -      |          Y          |
+ * | readyAt (a timed pool's return)         |  Y   |  -  |       -        |     -      |          Y          |
  * | experiencePoints                        |  Y   |  -  |       -        |     -      |          Y          |
  * | heroicInspirationToGive (a gift to make)|  Y   |  -  |       -        |     -      |          -          |
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
+ * | restStep (what a finished rest opened)  |  Y   |  -  |       -        |     -      |          Y          |
  * | spellbook (a Wizard's beyond the sheet) |  Y   |  -  |       -        |     -      |          Y          |
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
  * | favouriteOptionIds, optionUseCounts     |  Y   |  -  |       -        |     -      |          -          |
@@ -760,6 +770,7 @@ export function projectPlayerView(
         const {
           ownerSessionId,
           actionUses,
+          readyAt,
           heroicInspiration,
           heroicInspirationToGive,
           experiencePoints,
@@ -771,6 +782,7 @@ export function projectPlayerView(
           spellbook,
           knownForms,
           preparation,
+          restStep,
           inventory,
           currency,
           replaySceneId,
@@ -813,6 +825,10 @@ export function projectPlayerView(
           ...(species !== null ? { species } : {}),
           ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
           ...(resourcesVisible ? { actionUses: { ...actionUses }, heroicInspiration } : {}),
+          // When a pool spent for a time comes back: the owner's own sheet resource, as its spent count is.
+          ...(resourcesVisible
+            ? { readyAt: Object.fromEntries(Object.entries(readyAt).map(([key, value]) => [key, { ...value }])) }
+            : {}),
           // XP is a sheet resource, gated like the uses.
           ...(resourcesVisible && experiencePoints !== undefined ? { experiencePoints } : {}),
           // A gift to make is the owner's decision alone.
@@ -841,6 +857,10 @@ export function projectPlayerView(
                 spellbook: spellbook.map((entry) => ({ ...entry })),
                 ...(knownForms ? { knownForms: { ids: [...knownForms.ids], swapOpen: knownForms.swapOpen } } : {}),
                 preparation: preparation === null ? null : { ...preparation },
+                restStep:
+                  restStep === null
+                    ? null
+                    : { after: restStep.after, ...(restStep.swaps ? { swaps: { ...restStep.swaps } } : {}) },
                 inventory: inventory.map(playerInventoryRow),
                 currency: { ...currency }
               }

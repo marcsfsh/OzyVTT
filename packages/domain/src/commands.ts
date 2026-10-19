@@ -420,6 +420,10 @@ export const ActionResolveSchema = z
     /** Ready this spell for later (SRD Ready): its slot is spent and it is held with Concentration until
      *  the start of the caster's next turn; casting it off-turn then releases it with the Reaction. */
     ready: z.boolean().optional(),
+    /** Take the action's own move before the rest of it ("The dragon moves up to half its Speed, and it makes one
+     *  Rend attack"): the action's cost is spent and the move granted now, with no target; the action taken again
+     *  afterwards makes the rest at no further cost. */
+    moveFirst: z.boolean().optional(),
     /** GM only: the spell area a cast that ends spells is aimed at (Dispel Magic on a Moonbeam), from
      *  `combat.spellZones`. */
     zoneId: z.string().min(1).max(120).optional(),
@@ -468,6 +472,9 @@ export const ActionResolveSchema = z
     /** Knocking out a creature (SRD): a melee hit that drops the target to 0 leaves it at 1 Hit Point and Unconscious
      *  instead. Refused on any other attack. */
     knockOut: z.boolean().optional(),
+    /** An Evoker's Overchannel (Wizard 14): a Wizard spell cast with a level 1 to 5 slot deals its maximum damage, the
+     *  caster taking Necrotic damage for each use after the first before a Long Rest. Refused for anything else. */
+    overchannel: z.boolean().optional(),
     shaping: CastShapingListSchema.optional(),
     /** The form a shape-shift takes (Wild Shape's known form, Polymorph's Beast, a werewolf's wolf): a bestiary id, a
      *  printed form's id, or `true` for the true form. Refused when it isn't one the action allows. */
@@ -1236,6 +1243,12 @@ export const ActorRechooseSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(80),
+    /** For a pick of several (Weapon Mastery), the answer `id` takes the place of. */
+    replacing: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1263,6 +1276,24 @@ const PoolAmountFields = {
 export const ActorSpendUsesSchema = z.object(PoolAmountFields).strict();
 /** Give back spent uses of a pool (GM). */
 export const ActorRestoreUsesSchema = z.object(PoolAmountFields).strict();
+/** Turns one resource into another, or recovers one, by a feature's rule (Font of Magic, Arcane Recovery): the slot it
+ *  spends or makes (`level`, `pact` for a Pact Magic slot), the slots it recovers (`levels`), or how many uses or points
+ *  (`count`). The server checks each against the feature. */
+export const ActorConvertSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    conversionId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(60),
+    level: z.number().int().min(1).max(9).optional(),
+    pact: z.boolean().optional(),
+    levels: z.array(z.number().int().min(1).max(9)).min(1).max(9).optional(),
+    count: z.number().int().min(1).max(20).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** A player asks the GM for a Long Rest for their character, or takes the ask back (`withdraw`). */
 export const RestAskSchema = z
   .object({
@@ -1319,10 +1350,20 @@ export const TimePassSchema = z
     hours: z.number().int().min(0).max(720).default(0),
     /** Minutes on top of the hours, so a group can skip the minute or the 10 minutes a spell lasts. */
     minutes: z.number().int().min(0).max(59).default(0),
+    /** The party travels for that time at this pace (SRD 5.2.1 Travel Pace): the log says how far it went. */
+    pace: z.enum(["fast", "normal", "slow"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
   .refine((request) => request.hours > 0 || request.minutes > 0, "Choose at least 1 minute.");
+/** The hour of the day dawn comes on the game clock, or null for a Long Rest to stand in for the day. */
+export const TimeSetDawnSchema = z
+  .object({
+    commandId: z.uuid(),
+    hour: z.number().int().min(0).max(23).nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetSlotSchema = z
   .object({
     commandId: z.uuid(),
@@ -1348,6 +1389,8 @@ export const CharacterFinishPreparingSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
+    /** Closes the step a finished rest opened (recoveries and re-choices); without it, the Long Rest's prepare step. */
+    rest: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1691,7 +1734,7 @@ export const DiceRollSchema = z
   .strict();
 /** How a token move travels (SRD Movement): on foot or by one of the special speeds, which spend movement; by
  *  teleportation, which spends none and provokes no Opportunity Attack; or moved by force (the GM's), neither. */
-export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "teleport", "forced"]);
+export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "jump", "teleport", "forced"]);
 export type MoveMode = z.infer<typeof MoveModeSchema>;
 
 export const TokenMoveSchema = z
@@ -1701,8 +1744,48 @@ export const TokenMoveSchema = z
     position: EncounterTokenPositionSchema.nullable(),
     /** Absent: walking. A player may teleport only with the GM's go-ahead, and only the GM moves a creature by force. */
     mode: MoveModeSchema.optional(),
+    /** Feet above the ground the move ends at; absent keeps the height it has. Rising or descending costs movement as
+     *  distance does, and only flying, climbing, jumping, teleporting or a forced move changes it. */
+    altitudeFeet: z.number().int().min(0).max(10000).optional(),
     sceneId: z.uuid().optional(),
     /** GM-grade bypass of a movement-rule rejection (speed budget); audited like every override. */
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** GM-set height of a token, free of movement: on a surface (a ledge, a balcony, a wall), or in the air flying or
+ *  levitating. 0 puts it on the ground. */
+export const TokenSetAltitudeSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    altitudeFeet: z.number().int().min(0).max(10000),
+    /** What holds it up in the air; null or absent: it stands or clings on a surface. */
+    airborne: z.enum(["fly", "levitate"]).nullable().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM makes a creature fall (SRD Falling): from its height, or `feet` given, onto the ground or a lower ledge. */
+export const ActorFallSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    /** How far it falls; absent, from the height it is at. */
+    feet: z.number().int().min(1).max(10000).optional(),
+    /** It falls into water or another liquid, which can halve the damage. */
+    intoWater: z.boolean().optional(),
+    /** The height it lands at; the ground when absent. */
+    landingAltitudeFeet: z.number().int().min(0).max(10000).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A creature climbs onto a mount (`mountId`) or off the one it rides (`mountId: null`), SRD 5.2.1 Mounted Combat. */
+export const ActorMountSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    mountId: z.uuid().nullable(),
+    /** GM-grade bypass of a movement-rule rejection (the half Speed it costs, a mount too small or too far). */
     override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })

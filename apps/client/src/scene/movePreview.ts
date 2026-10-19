@@ -1,11 +1,15 @@
 import type { ActorMovementReply, EncounterToken, GmActor, PlayerActor } from "@vtt/domain";
 import {
+  climbCells,
+  costWithClimb,
   footprintCenter,
   footprintOrigin,
-  footprintStepBlocked,
+  footprintStepPassage,
   movementPath,
   pointInRects,
+  spaceHeightCells,
   spacePassage,
+  spansOverlap,
   wallCrossing
 } from "@vtt/rules-5e";
 import { gridToImagePreview, imageToGridPreview, type GridCalibration } from "./gridPreview";
@@ -26,7 +30,7 @@ export function movementWallsOf(
 }
 
 /** How a drag travels, as `token.move` takes it. */
-export type MoveMode = "walk" | "fly" | "swim" | "climb" | "burrow" | "teleport" | "forced";
+export type MoveMode = "walk" | "fly" | "swim" | "climb" | "burrow" | "jump" | "teleport" | "forced";
 
 export type MovePreview = Readonly<{
   /** Footprint centres from start to end, in image pixels. */
@@ -60,7 +64,8 @@ export const alliesByKind = (mover: MapActor, occupant: MapActor) => {
  * A creature that shares spaces (Air Form, a swarm) and any creature crossing a swarm pay Difficult Terrain where they
  * would be barred, as the server's movement reply says (`passesCreatures`, `swarmIds`).
  * With dynamic vision on, the walls the view has bar the way as the server's do. A spell's area that halves the
- * mover's Speed (Spirit Guardians) is charged by the server alone.
+ * mover's Speed (Spirit Guardians) or changes the ground (Web's Difficult Terrain, Plant Growth's 4 feet for every
+ * foot) is charged by the server alone.
  */
 export function previewMove(
   input: Readonly<{
@@ -80,8 +85,16 @@ export function previewMove(
     carried?: readonly string[];
     /** Teleporting or moved by force: a straight line that spends nothing. */
     free?: boolean;
+    /** A jump: a straight line over what lies between, a foot of movement for each foot. */
+    straight?: boolean;
+    /** The mover passes through walls and creatures as through Difficult Terrain (Incorporeal Movement). */
+    throughWalls?: boolean;
+    /** Difficult Terrain costs the mover nothing extra (Freedom of Movement). */
+    ignoresDifficult?: boolean;
     /** Walls that bar the way while the scene's dynamic vision is on (`movementWallsOf`). */
     walls?: readonly MoveWall[];
+    /** The mover's height as it sets off and where the move ends, in feet; on the ground when absent. */
+    altitude?: Readonly<{ fromFeet: number; toFeet: number }>;
     /** The mover may end a move in another creature's space, so none bars its way (the movement reply's). */
     passesCreatures?: boolean;
     /** The swarms on the map, whose spaces any creature may cross (the movement reply's). */
@@ -95,13 +108,21 @@ export function previewMove(
   const to = footprintOrigin(imageToGridPreview(calibration, input.to), sizeCells);
   const centerOf = (cell: Readonly<{ column: number; row: number }>) =>
     gridToImagePreview(calibration, footprintCenter(cell, sizeCells));
-  if (input.free) {
-    const cells = Math.max(Math.abs(to.column - from.column), Math.abs(to.row - from.row));
+  // Height, as the server counts it: rising or falling costs by the diagonal rule, a creature wholly above or below
+  // the mover's way is no obstacle, and a mover off the ground the whole way passes over painted terrain.
+  const feetPerCell = calibration.distancePerCell;
+  const fromFeet = input.altitude?.fromFeet ?? 0;
+  const toFeet = input.altitude?.toFeet ?? fromFeet;
+  const climb = climbCells(fromFeet, toFeet, feetPerCell);
+  const lowFeet = Math.min(fromFeet, toFeet);
+  const highFeet = Math.max(fromFeet, toFeet) + spaceHeightCells(sizeCells) * feetPerCell;
+  if (input.free || input.straight) {
+    const cells = Math.max(Math.abs(to.column - from.column), Math.abs(to.row - from.row), climb);
     return {
       path: [centerOf(from), centerOf(to)],
-      feet: cells * calibration.distancePerCell,
+      feet: cells * feetPerCell,
       difficultFeet: 0,
-      free: true
+      ...(input.free ? { free: true as const } : {})
     };
   }
   const isAlly = input.isAlly ?? alliesByKind;
@@ -111,6 +132,9 @@ export function previewMove(
     if (token.actorId === moverId || !token.position || input.carried?.includes(token.actorId)) continue;
     const occupant = actorsById.get(token.actorId);
     if (!mover || !occupant || occupant.visibility === "gm-only") continue;
+    const occupantLow = token.altitudeFeet ?? 0;
+    if (!spansOverlap(lowFeet, highFeet, occupantLow, occupantLow + spaceHeightCells(token.sizeCells) * feetPerCell))
+      continue;
     const printed = spacePassage({
       ally: isAlly(mover, occupant),
       incapacitated: occupant.conditions.some((condition) => INCAPACITATING.has(condition.id)),
@@ -121,38 +145,48 @@ export function previewMove(
     const passage =
       printed === "blocked" && (input.passesCreatures || input.swarmIds?.includes(occupant.id)) ? "difficult" : printed;
     if (passage === "open") continue;
-    const cells = passage === "blocked" ? closedCells : difficultCells;
+    const cells = passage === "blocked" && !input.throughWalls ? closedCells : difficultCells;
     const origin = footprintOrigin(imageToGridPreview(calibration, token.position), token.sizeCells);
     for (let column = 0; column < token.sizeCells; column++)
       for (let row = 0; row < token.sizeCells; row++) cells.add(`${origin.column + column},${origin.row + row}`);
   }
   const center = (column: number, row: number) =>
     gridToImagePreview(calibration, { column: column + 0.5, row: row + 0.5 });
-  const crosses = wallCrossing(
-    (input.walls ?? []).map((wall) => ({
-      a: imageToGridPreview(calibration, wall.a),
-      b: imageToGridPreview(calibration, wall.b)
-    }))
-  );
+  const gridWalls = (input.walls ?? []).map((wall) => ({
+    a: imageToGridPreview(calibration, wall.a),
+    b: imageToGridPreview(calibration, wall.b)
+  }));
+  const crosses = wallCrossing(gridWalls);
   const path = movementPath({
     from,
     to,
     sizeCells,
-    isDifficult: (column, row) => difficultCells.has(`${column},${row}`) || pointInRects(center(column, row), terrain),
+    isDifficult: (column, row) =>
+      input.ignoresDifficult !== true &&
+      (difficultCells.has(`${column},${row}`) || (lowFeet <= 0 && pointInRects(center(column, row), terrain))),
     isOpen: (column, row) => {
       if (closedCells.has(`${column},${row}`)) return false;
       const point = center(column, row);
       return point.x >= 0 && point.y >= 0 && point.x <= size.width && point.y <= size.height;
     },
-    isStepOpen: (stepFrom, stepTo) => !footprintStepBlocked(stepFrom, stepTo, sizeCells, crosses),
+    isStepOpen: (stepFrom, stepTo) =>
+      input.throughWalls === true ||
+      footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, gridWalls) !== "blocked",
+    // A footprint that fits only as a creature one size smaller squeezes through, as through Difficult Terrain, and
+    // so does a wall an incorporeal mover passes.
+    isStepSqueezed: (stepFrom, stepTo) => {
+      if (input.ignoresDifficult === true) return false;
+      const passage = footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, gridWalls);
+      return passage === "squeeze" || (input.throughWalls === true && passage === "blocked");
+    },
     extraPerStep: input.extraPerStep ?? 0
   });
   if (!path) return null;
   if (path.blocked) return { path: [centerOf(from), centerOf(to)], feet: 0, difficultFeet: 0, blocked: true };
   return {
     path: path.steps.map(centerOf),
-    feet: path.costCells * calibration.distancePerCell,
-    difficultFeet: path.difficultSteps * calibration.distancePerCell
+    feet: costWithClimb(path.costCells, path.steps.length - 1, climb, input.extraPerStep ?? 0) * feetPerCell,
+    difficultFeet: path.difficultSteps * feetPerCell
   };
 }
 
@@ -170,9 +204,22 @@ export function moveLabel(
   mode: MoveMode = "walk"
 ): { text: string; over: boolean } {
   if (preview.blocked) return { text: "No way through", over: true };
+  // A teleport an action granted this turn (Misty Step) goes as far as it says.
+  const teleport = mode === "teleport" ? budget?.teleport : undefined;
+  if (preview.free && teleport)
+    return preview.feet <= teleport.feet
+      ? { text: `${teleport.name} ${preview.feet} ft`, over: false }
+      : { text: `${teleport.name} ${preview.feet} ft · ${preview.feet - teleport.feet} ft too far`, over: true };
   if (preview.free) return { text: `${mode === "teleport" ? "Teleport" : "Moved"} ${preview.feet} ft`, over: false };
   const cost =
     preview.difficultFeet > 0 ? `${preview.feet} ft (${preview.difficultFeet} ft difficult)` : `${preview.feet} ft`;
+  // A move an action granted this turn (Pounce) is taken with that grant when it fits, as the server takes it.
+  const grant = budget?.granted;
+  const grantFits =
+    grant !== undefined &&
+    (grant.jump === true ? mode === "jump" : mode !== "jump" && (grant.mode === undefined || grant.mode === mode)) &&
+    preview.feet <= grant.feet;
+  if (grantFits) return { text: `${cost} · ${grant.name}`, over: false };
   const total = budgetFor(budget, mode);
   if (!budget?.counted || total === null) return { text: cost, over: false };
   const left = total - budget.usedFeet - preview.feet;
@@ -184,7 +231,7 @@ export function moveLabel(
 /** Feet added to every foot of a counted move: crawling while Prone, climbing or swimming without the speed, and
  *  dragging a grappled creature (the server says which apply). */
 export function extraPerStepFor(budget: ActorMovementReply | null, mode: MoveMode): number {
-  if (!budget || mode === "teleport" || mode === "forced") return 0;
+  if (!budget || mode === "teleport" || mode === "forced" || mode === "jump") return 0;
   const slowed = budget.crawling === true || budget.modes?.find((entry) => entry.mode === mode)?.extraCost === true;
   return (slowed ? 1 : 0) + (budget.dragging ? 1 : 0);
 }

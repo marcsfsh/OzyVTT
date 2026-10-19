@@ -175,6 +175,9 @@ export function formChoice(
     resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
     catalog: EquipmentCatalog | undefined;
     actionName: string;
+    /** A player picks only from the SRD bestiary: a stat block the GM made stays the GM's, and the sheet would show
+     *  it once taken. */
+    srdOnly?: boolean;
   }>
 ): Readonly<{ name: string; statBlockId?: string; printed?: PrintedForm }> | null {
   // One printed form is the one it gives (Gaseous Form's misty cloud).
@@ -189,7 +192,8 @@ export function formChoice(
   }
   const statBlock = context.resolveDefinition(choice);
   const summary = context.catalog?.monsterSummaries?.().find((row) => row.id === choice);
-  if (!statBlock) throw new CommandRejectedError("That form isn't in the bestiary.");
+  if (!statBlock || (context.srdOnly && summary?.source !== "srd"))
+    throw new CommandRejectedError("That form isn't in the bestiary.");
   const facts = statblockFacts(statBlock);
   const row = {
     type: summary?.type ?? facts.creatureType ?? "",

@@ -3,6 +3,7 @@ import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition, CastShaping } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
+import { RIDING_TAG } from "../mounts.js";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { wardingAura } from "../paladin-auras.js";
 import { areAllies } from "../creature-sides.js";
@@ -632,10 +633,13 @@ export function untrainedArmorCast(
 }
 
 /** SRD: a Two-Handed weapon "requires two hands when you attack with it", and a Shield is strapped to one arm. Read
- *  from the row, since a magic shield's slot travels on its marker. The Lance's "unless mounted" is the GM's call. */
+ *  from the row, since a magic shield's slot travels on its marker. A Lance is "Two-Handed (unless mounted)": one hand
+ *  holds it while its wielder rides (`mounts.ts`). */
 function checkHands({ attacker, action, violations }: Evaluation): void {
   const item = swingItemOf(attacker, action);
   if (!item) return;
+  const mounted = attacker.effects.some((effect) => effect.tags.includes(RIDING_TAG));
+  if (mounted && (item.recordId ?? item.id) === "lance") return;
   const twoHands =
     item.weapon?.properties?.includes("two-handed") === true ||
     itemActionRest(action.id) === `${item.id}-${TWO_HANDED_SUFFIX}`;
@@ -762,7 +766,11 @@ export function noUsesRemaining(action: DefinitionAction, limit: number): string
       ? `spent · recharges on ${uses.recharge}+ at the start of its turn`
       : uses.per === "own-turn"
         ? `spent · back at the start of its next turn`
-        : `${limit}/${USE_SCOPE_LABELS[uses.per]}`
+        : uses.per === "never"
+          ? `all ${limit} spent · they don't come back`
+          : uses.per === "time"
+            ? `spent · back after ${uses.afterHours} hours of game time`
+            : `${limit}/${USE_SCOPE_LABELS[uses.per]}`
   }).`;
 }
 
@@ -1222,7 +1230,13 @@ function checkLegendary(
   if (onOwnTurn)
     violations.push({
       rule: "legendary.own-turn",
-      message: `Legendary actions are taken on other creatures' turns, and this is ${attacker.name}'s own.`
+      message: `Legendary actions are taken right after other creatures' turns, and this is ${attacker.name}'s own.`
+    });
+  // "Immediately after another creature's turn": the window a turn's end opens, one action a window.
+  if (!onOwnTurn && state.combat.active && !legendaryWindowOpen(state, attacker.id))
+    violations.push({
+      rule: "legendary.after-a-turn",
+      message: `${attacker.name} takes a legendary action right after another creature's turn ends, one each time, before the next creature acts.`
     });
   if (spent + cost > perRound)
     violations.push({
@@ -1237,6 +1251,23 @@ function checkLegendary(
       message: `${attacker.name} can't take ${action.name} again until the start of its next turn.`
     });
   return { cost, ...(onceKey !== null ? { onceKey } : {}) };
+}
+
+/** Whether a creature may take a legendary action now: a turn other than its own has just ended, it hasn't taken one
+ *  since, and the creature whose turn it is now hasn't done anything yet. */
+export function legendaryWindowOpen(state: GameState, actorId: string): boolean {
+  const turn = state.combat.turn;
+  if (turn.afterActorId === undefined || turn.afterActorId === actorId) return false;
+  if (turn.legendaryTakenBy?.includes(actorId)) return false;
+  const current = state.combat.turnActorId;
+  return !(
+    turn.actionUsed ||
+    turn.bonusActionUsed ||
+    turn.movementUsedFeet > 0 ||
+    turn.attackRolled === true ||
+    turn.actionInstance !== null ||
+    Object.keys(turn.turnUses).some((key) => key.startsWith(`${current}:`))
+  );
 }
 
 /** Where `combat.legendaryUsed` marks a legendary action taken once until the creature's next turn, beside the
@@ -1638,6 +1669,10 @@ export function commitEconomy({
         ...state.combat.legendaryUsed,
         [attacker.id]: (state.combat.legendaryUsed[attacker.id] ?? 0) + plan.spendLegendary.cost,
         ...(plan.spendLegendary.onceKey !== undefined ? { [plan.spendLegendary.onceKey]: 1 } : {})
+      },
+      turn: {
+        ...state.combat.turn,
+        legendaryTakenBy: [...new Set([...(state.combat.turn.legendaryTakenBy ?? []), attacker.id])]
       }
     };
   }

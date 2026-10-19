@@ -35,7 +35,8 @@ import {
   RestAskSchema,
   RestMarkDoneSchema,
   RestPartySchema,
-  TimePassSchema
+  TimePassSchema,
+  TimeSetDawnSchema
 } from "@vtt/domain/commands";
 import { ToastProvider } from "@vtt/ui";
 import { socket } from "../socket";
@@ -89,6 +90,22 @@ describe("the GM's rest panel", () => {
     const [event, payload] = emitted().at(-1)!;
     expect(event).toBe("rest:party");
     expect(RestPartySchema.parse({ ...payload, ...COMMAND })).toMatchObject({ kind: "long", actorIds: [TORVA] });
+  });
+
+  it("passes time on the road at the pace the GM picks", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <PartyRest state={gmView({ clockHours: 38 })} />
+      </ToastProvider>
+    );
+    await user.click(screen.getByRole("button", { name: "Rest" }));
+    const dialog = screen.getByRole("dialog", { name: "Rest" });
+    await user.click(within(dialog).getByRole("button", { name: "Normal" }));
+    await user.click(within(dialog).getByRole("button", { name: "Travel 8 hours" }));
+    const [event, payload] = emitted().at(-1)!;
+    expect(event).toBe("time:pass");
+    expect(TimePassSchema.parse({ ...payload, ...COMMAND })).toMatchObject({ hours: 8, pace: "normal" });
   });
 
   it("shows the clock's minutes and passes hours and minutes together", async () => {
@@ -201,7 +218,23 @@ describe("the GM's rest panel", () => {
     );
     await user.click(screen.getByRole("button", { name: "Rest" }));
     expect(await screen.findByRole("button", { name: "Set the date" })).toBeTruthy();
-    expect(screen.getByText("09:00")).toBeTruthy();
+    expect(screen.getByText("09:00", { selector: "p" })).toBeTruthy();
+  });
+
+  it("sets the hour dawn comes, or leaves it to each Long Rest", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <PartyRest state={gmView({ dawnHour: null })} />
+      </ToastProvider>
+    );
+    await user.click(screen.getByRole("button", { name: "Rest" }));
+    const dawn = screen.getByLabelText("Dawn");
+    expect((dawn as HTMLSelectElement).value).toBe("");
+    await user.selectOptions(dawn, "06:00");
+    const [event, payload] = emitted().at(-1)!;
+    expect(event).toBe("time:set-dawn");
+    expect(TimeSetDawnSchema.parse({ ...payload, ...COMMAND })).toMatchObject({ hour: 6 });
   });
 });
 

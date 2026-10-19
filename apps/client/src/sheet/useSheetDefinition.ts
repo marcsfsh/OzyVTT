@@ -3,6 +3,7 @@ import type {
   ActorDefinition,
   ActorDerivedSheet,
   ContentActionSummary,
+  ConversionOffer,
   GmActor,
   PlayerActor,
   Rechoice,
@@ -166,6 +167,8 @@ export function useSheetDefinition(
   const [rechoices, setRechoices] = useState<readonly Rechoice[]>([]);
   /** What a prepared caster may swap in after a Long Rest, and a Wizard's spellbook, from the same read. */
   const [spellChoices, setSpellChoices] = useState<SpellChoices | null>(null);
+  /** What the character's features turn into what, and recover, with why not now, from the same read. */
+  const [conversions, setConversions] = useState<readonly ConversionOffer[]>([]);
   const loadoutSignature = [
     (actor.inventory ?? [])
       .map(
@@ -186,7 +189,12 @@ export function useSheetDefinition(
     // A pick re-made into the ledger rebuilds the sheet: its actions and re-choices are read again.
     (ownDefinition?.character?.choices ?? []).map((row) => `${row.kind}:${row.id}`).join(","),
     // A spell added to a Wizard's spellbook changes what can be prepared from it.
-    (actor.spellbook ?? []).map((entry) => entry.id).join(",")
+    (actor.spellbook ?? []).map((entry) => entry.id).join(","),
+    // What is spent, and the step a rest opened, decide which conversions can be used now.
+    JSON.stringify(actor.actionUses ?? {}),
+    (actor.spellSlots ?? []).map((slot) => `${slot.level}:${slot.remaining}`).join(","),
+    actor.pactSlots ? `${actor.pactSlots.level}:${actor.pactSlots.remaining}` : "",
+    actor.restStep?.after ?? ""
   ].join("|");
   useEffect(() => {
     if (!definitionId) {
@@ -196,6 +204,7 @@ export function useSheetDefinition(
       setDerived(null);
       setRechoices([]);
       setSpellChoices(null);
+      setConversions([]);
       return;
     }
     let live = true;
@@ -212,6 +221,7 @@ export function useSheetDefinition(
       if (result.derived) setDerived(result.derived);
       setRechoices(result.rechoices ?? []);
       setSpellChoices(result.spellChoices ?? null);
+      setConversions(result.conversions ?? []);
     });
     return () => {
       live = false;
@@ -234,5 +244,16 @@ export function useSheetDefinition(
     sheetCache.set(definitionId, next);
     setFetched(next);
   };
-  return { definitionId, definition, serverActions, facts, common, derived, rechoices, spellChoices, showEdited };
+  return {
+    definitionId,
+    definition,
+    serverActions,
+    facts,
+    common,
+    derived,
+    rechoices,
+    spellChoices,
+    conversions,
+    showEdited
+  };
 }

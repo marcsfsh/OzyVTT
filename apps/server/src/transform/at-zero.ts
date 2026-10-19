@@ -42,7 +42,7 @@ export function escapeAtZero(
   deps: AtZeroDeps,
   events: EffectNarration[]
 ): boolean {
-  const action = definition?.actions.find((entry) => entry.shapeShift?.escapesAtZero);
+  const action = (definition?.actions ?? []).find((entry) => entry.shapeShift?.escapesAtZero);
   const shift = action?.shapeShift;
   const escape = shift?.escapesAtZero;
   const printed = shift?.printed?.find((entry) => entry.id === escape?.form);

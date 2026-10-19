@@ -15,6 +15,8 @@ import { answerSave, createPendingSaves, saveRollSources } from "../src/saving-t
 import { checkPlan } from "../src/ability-checks.js";
 import { evaluateActionEconomy } from "../src/resolution/economy.js";
 import { UNARMED_STRIKE_ACTION_ID } from "../src/item-actions.js";
+import { applyDamageDetailed, RELENTLESS_RAGE_KEY } from "../src/hit-points.js";
+import { applyRest } from "../src/rests.js";
 import { currentSpeedFeet } from "../src/speed.js";
 
 // Barbarian, Fighter and Monk mechanics, asserted as numbers a player can act on: sheet AC, the DC a
@@ -1789,6 +1791,11 @@ describe("Incapacitated: feature activations are refused too", () => {
       legendary: { cost: 1 }
     };
     const check = () => evaluateActionEconomy(built.state, foe, tail, [IDS.hero], undefined).violations;
+    // Right after a turn ends, before the next creature acts (SRD 5.2.1 Legendary Actions).
+    built.state.combat = {
+      ...built.state.combat,
+      turn: { ...built.state.combat.turn, afterActorId: built.state.combat.turnActorId! }
+    };
     expect(check()).toEqual([]);
     setCondition(built.state, IDS.foe, "stunned", true, undefined, { role: "gm" });
     expect(check().map((violation) => violation.rule)).toEqual(["condition.incapacitated"]);
@@ -1930,6 +1937,58 @@ describe("Monk: Stunning Strike stuns until the start of the Monk's next turn", 
   });
 });
 
+// SRD Relentless Rage: "If you drop to 0 Hit Points while your Rage is active and don't die outright, you can make a
+// DC 10 Constitution saving throw. If you succeed, your Hit Points instead change to a number equal to twice your
+// Barbarian level. Each time you use this feature after the first, the DC increases by 5. When you finish a Short or
+// Long Rest, the DC resets to 10."
+describe("Barbarian: Relentless Rage", () => {
+  const drop = (built: Built, face: number) =>
+    applyDamageDetailed(
+      built.state,
+      IDS.hero,
+      { amount: built.hero.hp.current + 5 },
+      { role: "gm" },
+      { resolveDefinition: () => built.definition, catalog, rollDie: () => face }
+    ).events.map((event) => event.text);
+
+  it("keeps a raging level-11 Barbarian up at 22 HP, then asks DC 15, and a Short Rest resets it", () => {
+    const built = onTheTable(build(barbarianInput(11)));
+    built.hero.kind = "player-character";
+    use(built, "rage");
+    // CON save +6 (Con 15, proficient at +4): a 15 makes 21 against DC 10.
+    expect(drop(built, 15).join(" ")).toMatch(/Relentless Rage: CON save 21 \(d20 15\) vs DC 10: up at 22 HP/);
+    expect(built.hero.hp.current).toBe(22);
+    // The second time the DC is 15: an 8 makes 14, and the Barbarian falls.
+    expect(drop(built, 8).join(" ")).toMatch(/vs DC 15: it falls/);
+    expect(built.hero.hp.current).toBe(0);
+
+    built.hero.hp = { ...built.hero.hp, current: 10 };
+    built.hero.deathSaves = null;
+    built.state.combat = { ...built.state.combat, active: false, initiative: [] };
+    applyRest(built.state, IDS.hero, "short", () => built.definition, catalog);
+    expect(built.hero.actionUses[RELENTLESS_RAGE_KEY]).toBeUndefined();
+  });
+
+  it("gives no save outside a Rage, nor to a Barbarian killed outright", () => {
+    const built = onTheTable(build(barbarianInput(11)));
+    built.hero.kind = "player-character";
+    expect(drop(built, 20).join(" ")).not.toMatch(/Relentless Rage/);
+    expect(built.hero.hp.current).toBe(0);
+    const outright = onTheTable(build(barbarianInput(11)));
+    outright.hero.kind = "player-character";
+    use(outright, "rage");
+    applyDamageDetailed(
+      outright.state,
+      IDS.hero,
+      { amount: outright.hero.hp.current + outright.hero.hp.maximum },
+      { role: "gm" },
+      { resolveDefinition: () => outright.definition, catalog, rollDie: () => 20 }
+    );
+    expect(outright.hero.actionUses[RELENTLESS_RAGE_KEY]).toBeUndefined();
+    expect(outright.hero.hp.current).toBe(0);
+  });
+});
+
 /** The GM answering a pending save with a thrown die, for the effects a save spends. */
 const answerWith = (built: Built, saveId: string, faces: number[]) =>
   answerSave(
@@ -1978,6 +2037,18 @@ describe("Barbarian: Brutal Strike gives up Advantage before the roll and rides 
     // The roll spent the declaration, and the turn's use is spent too.
     expect(built.hero.effects.some((effect) => effect.tags.includes("forgoes-advantage"))).toBe(false);
     expect(() => use(built, "brutal-strike")).toThrowError(/no uses remaining/);
+  });
+
+  it("gives Forceful Blow's half Speed of movement toward the target, provoking no Opportunity Attacks", () => {
+    const built = onTheTable(build(barbarianInput(9)));
+    use(built, "reckless-attack");
+    use(built, "brutal-strike");
+    swing(built, "item-greataxe", [15, 8, 6], { hitOptions: [{ id: "brutal-strike", effects: ["forceful-blow"] }] });
+    const speed = currentSpeedFeet(built.hero, deriveEquipment(built.hero, built.definition, catalog)) ?? 0;
+    expect(built.hero.effects.find((effect) => effect.grantedMove !== undefined)).toMatchObject({
+      name: "Brutal Strike: Forceful Blow",
+      grantedMove: { feet: Math.floor(speed / 10) * 5, provokes: false, towardActorId: IDS.foe }
+    });
   });
 
   it("is refused without Reckless Attack", () => {

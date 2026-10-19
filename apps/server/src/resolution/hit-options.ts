@@ -575,7 +575,8 @@ function applyEffect(
   if (effect.applies) applyHitOutcome(ctx, target, action, effect.applies, effect.id);
   if (effect.push && (effect.push.maxTargetSize === undefined || sizeAtMost(target.size, effect.push.maxTargetSize)))
     forceMove(ctx, target, name, effect.push);
-  if (effect.grantsHalfSpeedMove) grantHalfSpeedMove(ctx, name);
+  // A move after a push follows the pushed creature (Forceful Blow: "straight toward the target").
+  if (effect.grantsHalfSpeedMove) grantHalfSpeedMove(ctx, name, effect.push ? target.id : undefined);
   if (effect.keepsHidden) ctx.keepsHidden = true;
   if (effect.spendsHitPointDie) spendHitPointDie(ctx, name);
 }

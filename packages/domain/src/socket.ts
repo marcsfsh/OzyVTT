@@ -37,6 +37,7 @@ import type {
   LooseSaveOutcome,
   MutationResult,
   SpellbookResult,
+  ConversionResult,
   ReactionAnswerResult,
   RulesBlocked,
   SaveAnswerResult,
@@ -73,6 +74,7 @@ import type {
   ActorSpendHitDiceSchema,
   ActorSpendUsesSchema,
   ActorRestoreUsesSchema,
+  ActorConvertSchema,
   AddCombatantSchema,
   RemoveCombatantSchema,
   SpellZoneEndSchema,
@@ -168,7 +170,11 @@ import type {
   TableSetStagingDefaultsSchema,
   TempHpSchema,
   TimePassSchema,
+  TimeSetDawnSchema,
   TokenMoveSchema,
+  TokenSetAltitudeSchema,
+  ActorFallSchema,
+  ActorMountSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
   TurnUseSchema,
@@ -604,6 +610,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof ActorRestoreUsesSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** Turn one resource into another, or recover one, by a feature's rule (the character's player or the GM). */
+  "actor:convert": (
+    payload: CommandPayload<typeof ActorConvertSchema>,
+    acknowledgement: (result: ConversionResult) => void
+  ) => void;
   /** A player asks the GM for a Long Rest for their character, or takes the ask back. */
   "rest:ask": (
     payload: CommandPayload<typeof RestAskSchema>,
@@ -632,6 +643,11 @@ export interface ClientToServerEvents {
   /** GM-only: move game time forward. */
   "time:pass": (
     payload: CommandPayload<typeof TimePassSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: set the hour dawn comes, or let a Long Rest stand in for it. */
+  "time:set-dawn": (
+    payload: CommandPayload<typeof TimeSetDawnSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-slot": (
@@ -790,6 +806,21 @@ export interface ClientToServerEvents {
   "token:move": (
     payload: CommandPayload<typeof TokenMoveSchema>,
     acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** GM makes a creature fall: the server rolls the damage once any reaction to it is answered. */
+  "actor:fall": (
+    payload: CommandPayload<typeof ActorFallSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A creature climbs onto a mount or off the one it rides. */
+  "actor:mount": (
+    payload: CommandPayload<typeof ActorMountSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** GM sets how high a creature is, free of movement. */
+  "token:set-altitude": (
+    payload: CommandPayload<typeof TokenSetAltitudeSchema>,
+    acknowledgement: (result: MutationResult) => void
   ) => void;
   "scene:create": (
     payload: CommandPayload<typeof SceneCreateSchema>,

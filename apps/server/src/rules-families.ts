@@ -22,8 +22,12 @@ const RULE_FAMILIES = {
   // Flying or burrowing without the speed, and a path that hostile creatures shut.
   "movement.no-speed": "movement",
   "movement.blocked-path": "movement",
+  // Height changes by flying, climbing, jumping or teleporting, and a creature in the air moves by flying.
+  "movement.altitude": "movement",
+  "movement.jump": "movement",
   // Frightened: "You can't willingly move closer to the source of fear."
   "movement.toward-fear": "movement",
+  "movement.mount": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",
@@ -47,8 +51,9 @@ const RULE_FAMILIES = {
   "form.no-actions": "economy",
   "form.no-attacks": "economy",
   "form.wrong-form": "economy",
-  // "Legendary actions are taken on other creatures' turns" is a timing/economy rule...
+  // "Legendary actions are taken right after other creatures' turns" is a timing/economy rule...
   "legendary.own-turn": "economy",
+  "legendary.after-a-turn": "economy",
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.
   "attack.light-needs-attack": "economy",
   "attack.cleave-needs-hit": "economy",

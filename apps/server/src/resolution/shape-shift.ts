@@ -43,7 +43,8 @@ function checkedChoice(ctx: ResolveContext, target: LiveActor) {
     targetDefinition: trueDefinitionOf(ctx, target),
     resolveDefinition: ctx.deps.resolveDefinition,
     catalog: ctx.deps.catalog,
-    actionName: ctx.action.name
+    actionName: ctx.action.name,
+    srdOnly: ctx.deps.initiatorRole === "player"
   });
 }
 

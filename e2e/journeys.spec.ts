@@ -17,6 +17,8 @@ import {
   fillIn,
   joinAndClaim,
   openGmSection,
+  pageScale,
+  pinch,
   pinchDuringDrag,
   positionOf,
   press,
@@ -217,6 +219,34 @@ test("a player joins and claims a character", async ({ open }) => {
   await press(player.getByRole("button", { name: "Join as Player" }));
   await expect(player.getByRole("tab", { name: "My character", selected: true })).toBeVisible();
   await expect(player.getByRole("region", { name: `${PARTY[0]} character sheet` })).toBeVisible();
+});
+
+test("a stray pinch on a phone leaves the page at its size, and a finger still scrolls", async ({
+  open,
+  hasTouch,
+  request
+}) => {
+  test.skip(!hasTouch, "A laptop has no touch screen to pinch.");
+  await ensureGmPassword(request);
+  const gm = await open("/");
+  await signInAsGm(gm);
+  await openGmSection(gm, "Roster");
+  const roster = gm.locator(".party-roster-body");
+  await expect(roster.getByRole("heading", { name: PARTY[0] })).toBeVisible();
+
+  await drag(gm, roster, { x: 0, y: -240 });
+  await expect.poll(() => roster.evaluate((list) => list.scrollTop)).toBeGreaterThan(0);
+  await pinch(gm, roster);
+  expect(await pageScale(gm)).toBe(1);
+  await expectPageFits(gm);
+
+  // This device can let two fingers zoom the page.
+  await gm.goto("/settings/device");
+  const allow = gm.getByRole("switch", { name: "Let pinch zoom the page" });
+  await press(allow);
+  await expect(allow).toHaveAttribute("aria-checked", "true");
+  await pinch(gm, gm.getByRole("heading", { name: "Device", level: 2 }));
+  await expect.poll(() => pageScale(gm)).toBeGreaterThan(1);
 });
 
 test("the GM runs a fight on a new scene and the player moves their token", async ({ open, hasTouch }) => {

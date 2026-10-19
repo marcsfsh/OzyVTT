@@ -27,6 +27,11 @@ import {
   spendUntilOwnAttack
 } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
+import { recallSpellSlot } from "./resolution/spell-recall.js";
+import { rollForAnAnswer } from "./resolution/divinations.js";
+import { prayerShortRest, refuseThePrayedFor } from "./resolution/prayer-of-healing.js";
+import { strikeADuplicate } from "./resolution/mirror-image.js";
+import { checkOverchannel, overchannelBacklash } from "./resolution/overchannel.js";
 import type {
   DefinitionAction,
   EndedEffect,
@@ -40,6 +45,8 @@ import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/
 import { applyGrant } from "./resolution/grant.js";
 import { applyShapeShift, checkShapeShift } from "./resolution/shape-shift.js";
 import { formsOffer } from "./transform/offer.js";
+import { applyMovementGrants } from "./resolution/movement-grants.js";
+import { applyTimeStop } from "./time-stop.js";
 import { applySpellEndings } from "./resolution/dispel.js";
 import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
@@ -64,7 +71,13 @@ import {
   parkHeldObjectSave,
   parkReaction
 } from "./resolution/pending.js";
-import { markCastTurn, markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
+import {
+  markCastTurn,
+  markSpellUp,
+  openActionZone,
+  openSpellZone,
+  startConcentration
+} from "./resolution/concentration.js";
 import { parkForCounterspell } from "./resolution/counter.js";
 import { placeCastSight } from "./resolution/cast-sight.js";
 import { applyRageRules } from "./resolution/rage.js";
@@ -105,6 +118,7 @@ export function resolveDefinitionAction(
   const ctx = openResolve(state, shapedAction(declared, shaping), input, deps);
   // Checked against the spell as printed, Transmuted Spell's type and Extended Spell's durations land on what it does.
   ctx.action = shapedOutcome(ctx.action, printed, shaping, ctx.plan.castLevel);
+  checkOverchannel(ctx);
   ctx.builtin?.check?.(ctx);
   // A form the action can't give is refused before anything is spent.
   checkShapeShift(ctx);
@@ -122,10 +136,24 @@ export function resolveDefinitionAction(
     commitEconomy(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
+  // The action's move taken before the rest of it: its cost is spent and the move granted, and the rest waits.
+  if (input.moveFirst === true) {
+    commitEconomy(ctx);
+    applyMovementGrants(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   // A failed check to read a scroll spends the cast and the scroll, and nothing else happens.
   if (readScroll(ctx)) {
     commitEconomy(ctx);
     useUpConsumable(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // Spread Caltrops or a set trap acts on whoever meets it later, so nothing is rolled now.
+  if (openActionZone(ctx)) {
+    commitEconomy(ctx);
+    useUpConsumable(ctx);
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
   // A spell that Slow's chance makes fail spends its slot and its action, and nothing else happens.
@@ -161,6 +189,7 @@ export function resolveDefinitionAction(
   // a miss: the attack is spent, and the answer finishes it.
   if (parkForRollAnswer(ctx) || parkForAcReaction(ctx)) {
     commitEconomy(ctx);
+    recallSpellSlot(ctx);
     rollLastCharge(ctx);
     spendAmmunition(ctx);
     useUpConsumable(ctx);
@@ -172,6 +201,8 @@ export function resolveDefinitionAction(
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
 
+  // A duplicate of Mirror Image may take the settled hit.
+  if (input.commit !== false) strikeADuplicate(ctx);
   spendSundering(ctx);
   rollWeaponDamage(ctx);
   ctx.masterySwing = masterySwingOf(ctx);
@@ -192,10 +223,14 @@ export function resolveDefinitionAction(
   markSpellUp(ctx);
   markCastTurn(ctx);
   openSpellZone(ctx);
+  applyMovementGrants(ctx);
+  applyTimeStop(ctx);
   applyGrant(ctx);
   applyShapeShift(ctx);
   placeCastSight(ctx);
+  refuseThePrayedFor(ctx);
   applyHealing(ctx);
+  prayerShortRest(ctx);
   applyConditionCures(ctx);
   applySpellEndings(ctx);
   stabilizeOnCast(ctx);
@@ -209,6 +244,9 @@ export function resolveDefinitionAction(
   applyRageRules(ctx);
 
   commitEconomy(ctx);
+  recallSpellSlot(ctx);
+  rollForAnAnswer(ctx);
+  overchannelBacklash(ctx);
   spendHitOptions(ctx);
   spendDamageUses(ctx);
   rollLastCharge(ctx);
@@ -451,6 +489,9 @@ function tapTargeting(
   }
   const structured =
     action.grants !== undefined ||
+    action.move !== undefined ||
+    action.teleport !== undefined ||
+    action.leap !== undefined ||
     action.multiattack !== undefined ||
     action.uses !== undefined ||
     action.spellSlot !== undefined ||

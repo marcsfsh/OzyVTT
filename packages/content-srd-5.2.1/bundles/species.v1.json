@@ -1871,7 +1871,8 @@
                   "name": "Cloud's Jaunt",
                   "activation": "bonus-action",
                   "description": "Magically teleport up to 30 feet to an unoccupied space you can see.",
-                  "damage": []
+                  "damage": [],
+                  "teleport": { "feet": 30 }
                 }
               ],
               "uses": {

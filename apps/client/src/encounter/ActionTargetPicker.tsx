@@ -55,7 +55,8 @@ export function ActionTargetPicker({
   busy,
   onRoll,
   onInvalidFace,
-  insideNow
+  insideNow,
+  onMoveFirst
 }: Readonly<{
   picking: TargetingSession;
   targets: ReadonlyArray<Pick<TargetRow, "id" | "label"> & Partial<TargetRow>>;
@@ -67,6 +68,8 @@ export function ActionTargetPicker({
   onInvalidFace?: (message: string) => void;
   /** For an area: who it covers where it is placed, of the creatures this viewer can see. The server decides. */
   insideNow?: readonly TargetRow[];
+  /** Take the action's own move first (Pounce), when it has one that comes before the rest. */
+  onMoveFirst?: () => void;
 }>) {
   const { mayType } = useRollPreference();
   // On a phone the panel under the map is short, so the picker scrolls up to show its first rows.
@@ -259,6 +262,11 @@ export function ActionTargetPicker({
           <Button type="button" variant="secondary" disabled={busy} onClick={() => clearTargeting()}>
             Cancel
           </Button>
+          {picking.action.moveFirst && onMoveFirst && (
+            <Button type="button" variant="secondary" disabled={busy} onClick={onMoveFirst}>
+              Move first
+            </Button>
+          )}
           <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>
             {verb} {name}
           </button>

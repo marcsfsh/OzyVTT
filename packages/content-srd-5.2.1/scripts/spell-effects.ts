@@ -89,6 +89,10 @@ const DAMAGE_CHOICES: Readonly<Record<string, readonly DamageType[]>> = {
   "conjure-elemental": ["lightning", "thunder", "fire", "cold"],
   // Radiant for a good or neutral caster, Necrotic for an evil one.
   "spirit-guardians": ["radiant", "necrotic"],
+  // "Radiant or Necrotic damage (your choice when you cast this spell)".
+  forbiddance: ["radiant", "necrotic"],
+  // The explosive rune's "Acid, Cold, Fire, Lightning, or Thunder damage (your choice when you create the glyph)".
+  "glyph-of-warding": ["thunder", "acid", "cold", "fire", "lightning"],
   // The Resistance the touched creature gains: "one damage type of your choice".
   "protection-from-energy": ["acid", "cold", "fire", "lightning", "thunder"]
 };
@@ -147,6 +151,7 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   "enhance-ability": { count: 1, perSlot: 1 },
   enlargereduce: { count: 1 },
   eyebite: { count: 1 },
+  // "Choose up to five falling creatures within range."
   "feather-fall": { count: 5 },
   "finger-of-death": { count: 1 },
   "flesh-to-stone": { count: 1 },
@@ -355,6 +360,16 @@ const save = (ability: "str" | "dex" | "con" | "int" | "wis" | "cha") => ({
 const ONCE_PER_TURN = "A creature makes this save only once per turn.";
 /** Entering the area or ending a turn in it, once per turn: the shape most lingering areas print. */
 const ENTER_OR_END_ONCE: Zone = { on: ["enter", "end-turn"], oncePerTurn: true };
+/** "The area is Difficult Terrain" for every creature. */
+const DIFFICULT: NonNullable<Zone["terrain"]> = { cost: 2 };
+/** A row for an area that only lasts on the map (its ground, its barrier), with nothing to roll. */
+const lasting = (name: string, when: string, zone: Zone): Later => ({
+  name,
+  activation: "other",
+  when,
+  damage: [],
+  zone
+});
 
 /**
  * What a spell lets its caster do after the cast (SRD 5.2.1 text): the attacks a summoned thing or a held flame
@@ -398,6 +413,42 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       }
     }
   ],
+  // "An alarm alerts you whenever a creature touches or enters the warded area", sparing the creatures you designate:
+  // your allies.
+  alarm: [
+    {
+      name: "alarm",
+      activation: "other",
+      when: "Whenever a creature other than your allies enters the warded area, the alarm alerts you.",
+      damage: [],
+      zone: { on: ["enter"], alerts: true, affects: "enemies" }
+    }
+  ],
+  // "The aura prevents creatures other than Constructs and Undead from passing or reaching through it."
+  "antilife-shell": [
+    lasting("barrier", "Creatures other than Constructs and Undead can't pass or reach through the Emanation.", {
+      on: [],
+      around: "caster",
+      feet: 10,
+      bars: { way: "both", except: ["construct", "undead"], reach: true }
+    })
+  ],
+  // "While in the aura, you and your allies have Resistance to Necrotic damage", and "if an ally with 0 Hit Points
+  // starts its turn in the aura, that ally regains 1 Hit Point."
+  "aura-of-life": [
+    lasting(
+      "aura",
+      "You and your allies in the aura have Resistance to Necrotic damage; an ally at 0 Hit Points that starts its turn there regains 1 Hit Point.",
+      {
+        on: ["start-turn"],
+        around: "caster",
+        feet: 30,
+        affects: "allies",
+        holds: { modifiers: [{ type: "damage-resistance", damageTypes: ["necrotic"] }] },
+        revives: 1
+      }
+    )
+  ],
   "arcane-sword": [
     {
       name: "attack",
@@ -412,20 +463,20 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters the area or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature that enters the area or ends its turn there makes the save. ${ONCE_PER_TURN} The area is Difficult Terrain.`,
       save: { ability: "str", successDamage: "none", failureConditions: ["restrained"] },
       damage: [{ formula: "3d6", type: "bludgeoning" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT }
     }
   ],
   "blade-barrier": [
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN} Its space is Difficult Terrain.`,
       save: save("dex"),
       damage: [{ formula: "6d10", type: "force" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT }
     }
   ],
   // "Until the spell ends, you can take a Magic action to call down lightning in that way again."
@@ -446,7 +497,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The Sphere moves 10 feet away from you at the start of each of your turns.`,
       save: save("con"),
       damage: [{ formula: "5d8", type: "poison" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, drifts: 10 }
     }
   ],
   "conjure-animals": [
@@ -482,6 +533,15 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [{ formula: "3d12", type: "psychic", addsModifier: true }]
     }
   ],
+  // "The ground in the Emanation is Difficult Terrain for your enemies."
+  "conjure-minor-elementals": [
+    lasting("ground", "The ground in the Emanation is Difficult Terrain for your enemies.", {
+      on: [],
+      around: "caster",
+      feet: 15,
+      terrain: { cost: 2, for: "enemies" }
+    })
+  ],
   "conjure-woodland-beings": [
     {
       name: "save",
@@ -513,6 +573,26 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       area: { shape: "cone", sizeFeet: 15, widthFeet: null }
     }
   ],
+  // "The ground there is Difficult Terrain", and "at the end of each of your turns for the duration, each creature on
+  // the ground in the area makes a Dexterity saving throw. On a failed save, a creature has the Prone condition, and
+  // its Concentration is broken."
+  earthquake: [
+    {
+      name: "tremor",
+      activation: "other",
+      when: "At the end of each of your turns, each creature on the ground in the area makes the save: Prone and its Concentration broken on a failure. The ground is Difficult Terrain.",
+      save: { ability: "dex", successDamage: "none", failureConditions: ["prone"], breaksConcentration: true },
+      damage: [],
+      zone: { on: ["caster-turn-end"], terrain: DIFFICULT }
+    }
+  ],
+  // "For the duration, these plants turn the ground in the area into Difficult Terrain."
+  entangle: [
+    lasting("ground", "The plants turn the ground in the area into Difficult Terrain.", {
+      on: [],
+      terrain: { cost: 2, kind: "plants" }
+    })
+  ],
   "faithful-hound": [
     {
       name: "bite",
@@ -521,6 +601,22 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       save: { ability: "dex", successDamage: "none", failureConditions: [] },
       damage: [{ formula: "4d8", type: "force" }],
       zone: { on: ["caster-turn-start"], around: "point", feet: 5, affects: "enemies" }
+    }
+  ],
+  // "When a creature of a chosen type enters the spell's area for the first time on a turn or ends its turn there, the
+  // creature takes 5d10 Radiant or Necrotic damage", and "creatures can't teleport into the area". Every type the
+  // spell names is chosen.
+  forbiddance: [
+    {
+      name: "ward",
+      activation: "other",
+      when: "An Aberration, Celestial, Elemental, Fey, Fiend or Undead that enters the area for the first time on a turn or ends its turn there takes the damage. No creature can teleport into the area.",
+      damage: [{ formula: "5d10", type: "radiant" }],
+      zone: {
+        ...ENTER_OR_END_ONCE,
+        types: ["aberration", "celestial", "elemental", "fey", "fiend", "undead"],
+        noTeleport: true
+      }
     }
   ],
   "flame-blade": [
@@ -546,17 +642,42 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "bonus-action",
       when: "As a Bonus Action, you can roll the sphere up to 30 feet; a creature whose space you move it into makes the save, and the sphere stops for the turn.",
       save: save("dex"),
-      damage: [{ formula: "2d6", type: "fire" }]
+      damage: [{ formula: "2d6", type: "fire" }],
+      area: { shape: "sphere", sizeFeet: 5, widthFeet: null },
+      movesArea: { feet: 30 }
     }
   ],
   grease: [
     {
       name: "save",
       activation: "other",
-      when: "A creature that enters the area or ends its turn there must also succeed on the save or fall Prone.",
+      when: "A creature that enters the area or ends its turn there must also succeed on the save or fall Prone. The grease is Difficult Terrain.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["prone"] },
       damage: [],
-      zone: { on: ["enter", "end-turn"] }
+      zone: { on: ["enter", "end-turn"], terrain: DIFFICULT }
+    }
+  ],
+  // "An immobile, shimmering barrier appears in a 10 foot Emanation around you", and "any spell of level 5 or lower cast
+  // from outside the barrier can't affect anything within it".
+  "globe-of-invulnerability": [
+    lasting("barrier", "A spell of level 5 or lower cast from outside the barrier can't affect anything within it.", {
+      on: [],
+      around: "caster",
+      feet: 10,
+      stays: true,
+      wardsSpells: 5
+    })
+  ],
+  // Explosive Rune: a creature that sets the glyph off (stepping on it) makes it erupt in a "20-foot-radius Sphere
+  // centered on the glyph", and "once a glyph is triggered, this spell ends". The glyph is nearly imperceptible.
+  "glyph-of-warding": [
+    {
+      name: "explosive rune",
+      activation: "other",
+      when: "A creature that steps onto the glyph sets it off: each creature in the 20-foot-radius Sphere makes the save, and the spell ends.",
+      save: save("dex"),
+      damage: [{ formula: "5d8", type: "thunder" }],
+      zone: { on: ["enter", "spell-end"], around: "point", feet: 5, once: true, hidden: true }
     }
   ],
   "guardian-of-faith": [
@@ -581,6 +702,29 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       laterTurnsOnly: true
     }
   ],
+  // "Creatures of your choice have Advantage on all saving throws, and other creatures have Disadvantage on attack
+  // rolls against them. In addition, when a Fiend or an Undead hits an affected creature with a melee attack roll, the
+  // attacker must succeed on a Constitution saving throw or have the Blinded condition until the end of its next turn."
+  // The creatures chosen are the caster and its allies.
+  "holy-aura": [
+    lasting(
+      "aura",
+      "You and your allies in the aura have Advantage on saving throws, and attack rolls against them have Disadvantage; a Fiend or an Undead that hits one with a melee attack makes a Constitution save or is Blinded.",
+      {
+        on: [],
+        around: "caster",
+        feet: 30,
+        affects: "allies",
+        holds: {
+          modifiers: [
+            { type: "roll-mode", roll: "save", mode: "advantage" },
+            { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
+          ],
+          struck: { creatureTypes: ["fiend", "undead"], save: { ability: "con", conditions: ["blinded"] } }
+        }
+      }
+    )
+  ],
   "heat-metal": [
     {
       name: "heat again",
@@ -601,6 +745,18 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       movesGrant: true
     }
   ],
+  // "Hailstones turn ground in the Cylinder into Difficult Terrain until the end of your next turn."
+  "ice-storm": [
+    lasting(
+      "ground",
+      "Hailstones turn the ground in the Cylinder into Difficult Terrain until the end of your next turn.",
+      {
+        on: [],
+        terrain: { cost: 2, kind: "ice" },
+        untilCasterNextTurnEnd: true
+      }
+    )
+  ],
   "incendiary-cloud": [
     {
       name: "save",
@@ -608,17 +764,17 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The cloud moves 10 feet away from you at the start of each of your turns.`,
       save: save("dex"),
       damage: [{ formula: "10d8", type: "fire" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, drifts: 10 }
     }
   ],
   "insect-plague": [
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters the area for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature that enters the area for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN} The area is Difficult Terrain.`,
       save: save("con"),
       damage: [{ formula: "4d10", type: "piercing" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT }
     }
   ],
   moonbeam: [
@@ -630,7 +786,33 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       save: { ...save("con"), failureEndsForm: true },
       damage: [{ formula: "2d10", type: "radiant" }],
       zone: ENTER_OR_END_ONCE
+    },
+    // "On each of your later turns, you can take a Magic action to move the Cylinder up to 60 feet."
+    {
+      name: "move",
+      activation: "action",
+      when: "On your later turns, a Magic action moves the Cylinder up to 60 feet; a creature it moves onto makes the save.",
+      laterTurnsOnly: true,
+      damage: [],
+      area: { shape: "cylinder", sizeFeet: 5, widthFeet: null },
+      movesArea: { feet: 60 }
     }
+  ],
+  // A creature of a chosen type "can't willingly enter the Cylinder by nonmagical means". Every type the spell names is
+  // chosen, and the circle faces outward.
+  "magic-circle": [
+    lasting("barrier", "Celestials, Elementals, Fey, Fiends and Undead can't willingly enter the Cylinder.", {
+      on: [],
+      bars: { way: "in", types: ["celestial", "elemental", "fey", "fiend", "undead"] }
+    })
+  ],
+  // Overgrowth: "A creature moving through that area must spend 4 feet of movement for every 1 foot it moves." The
+  // plants stay overgrown, so the area stays until the GM ends it.
+  "plant-growth": [
+    lasting("ground", "A creature moving through the overgrown area spends 4 feet of movement for every foot.", {
+      on: [],
+      terrain: { cost: 4, kind: "plants" }
+    })
   ],
   "produce-flame": [
     {
@@ -641,23 +823,49 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [{ formula: "1d8", type: "fire" }]
     }
   ],
+  // "While in the aura, you and each creature you choose have a +10 bonus to Dexterity (Stealth) checks": the caster
+  // and its allies.
+  "pass-without-trace": [
+    lasting("aura", "You and your allies in the aura have a +10 bonus to Dexterity (Stealth) checks.", {
+      on: [],
+      around: "caster",
+      feet: 30,
+      affects: "allies",
+      holds: {
+        modifiers: [
+          {
+            type: "check-bonus",
+            amount: 10,
+            when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["stealth"] }]
+          }
+        ]
+      }
+    })
+  ],
+  // "Creatures have the Deafened condition while entirely inside it."
+  silence: [
+    lasting("aura", "A creature inside the Sphere has the Deafened condition.", {
+      on: [],
+      holds: { conditions: ["deafened"] }
+    })
+  ],
   "sleet-storm": [
     {
       name: "save",
       activation: "other",
-      when: "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration.",
-      save: { ability: "dex", successDamage: "none", failureConditions: ["prone"] },
+      when: "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration. The ground is Difficult Terrain.",
+      save: { ability: "dex", successDamage: "none", failureConditions: ["prone"], breaksConcentration: true },
       damage: [],
-      zone: { on: ["enter", "start-turn"] }
+      zone: { on: ["enter", "start-turn"], terrain: { cost: 2, kind: "ice" } }
     }
   ],
   "spike-growth": [
     {
       name: "spikes",
       activation: "other",
-      when: "A creature that moves into or within the area takes the damage for every 5 feet it travels.",
+      when: "A creature that moves into or within the area takes the damage for every 5 feet it travels. The area is Difficult Terrain.",
       damage: [{ formula: "2d4", type: "piercing" }],
-      zone: { on: ["travel"] }
+      zone: { on: ["travel"], terrain: { cost: 2, kind: "plants" } }
     }
   ],
   "spirit-guardians": [
@@ -736,20 +944,20 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters a space in the wall for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature that enters a space in the wall for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN} Moving through the wall costs 4 feet for every foot.`,
       save: save("dex"),
       damage: [{ formula: "7d8", type: "slashing" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, terrain: { cost: 4, kind: "plants" } }
     }
   ],
   web: [
     {
       name: "save",
       activation: "other",
-      when: "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action.",
+      when: "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action. The webs are Difficult Terrain.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["restrained"] },
       damage: [],
-      zone: { on: ["enter", "start-turn"] }
+      zone: { on: ["enter", "start-turn"], terrain: { cost: 2, kind: "webs" } }
     }
   ],
   "zone-of-truth": [
@@ -764,12 +972,24 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   ]
 };
 
-/** Reaction spells the table offers as prompts: what triggers each and what casting it does. Counterspell and Feather
- *  Fall answer triggers the engine doesn't see (a spell being cast, a fall), so they stay with the GM. */
+/** Spells whose cast teleports the caster on the map, taken at once with no GM ask (`granted-moves.ts`). Teleport,
+ *  Plane Shift and Word of Recall go somewhere off the map, which stays with the GM. */
+const CAST_TELEPORTS: Readonly<Record<string, NonNullable<SpellEffect["teleport"]>>> = {
+  // "You teleport up to 30 feet to an unoccupied space you can see."
+  "misty-step": { feet: 30 },
+  // "You teleport to a location within range": seen or not. "If you ... would arrive in a space occupied by a
+  // creature ... you ... each take 4d6 Force damage, and the teleportation fails."
+  "dimension-door": { feet: 500, unseen: true, failDamage: "4d6" }
+};
+
+/** Reaction spells the table offers as prompts: what triggers each and what casting it does. Counterspell answers a
+ *  trigger the engine doesn't see (a spell being cast), so it stays with the GM. */
 const CAST_REACTIONS: Readonly<Record<string, NonNullable<SpellEffect["reaction"]>>> = {
   // +5 AC until the start of the caster's next turn, including against the triggering attack.
   shield: { trigger: "hit-by-attack", response: "ac-bonus", amount: 5, untilNextTurn: true },
   "hellish-rebuke": { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 60 },
+  // "When you or a creature you can see within 60 feet of you falls": the cast lands on the falling creature.
+  "feather-fall": { trigger: "falls", response: "cast-on-faller", rangeFeet: 60 },
   // "When you see a creature within 60 feet of yourself casting a spell with Verbal, Somatic, or Material components":
   // the caster makes a Constitution saving throw.
   counterspell: { trigger: "casts-spell", response: "counter", ability: "con", rangeFeet: 60 }
@@ -792,6 +1012,9 @@ const PICKS_IN_AREA: ReadonlySet<string> = new Set([
 ]);
 /** "Three bolts then leap from that target to as many as three other targets ... within 30 feet of the first target." */
 const CHAIN_FEET: Readonly<Record<string, number>> = { "chain-lightning": 30 };
+/** "Using a Higher-Level Spell Slot": the feet an area grows for each slot level above the spell's (Fog Cloud's radius by
+ *  20 feet, Confusion's by 5, Create or Destroy Water's Cube by 5). */
+const AREA_PER_SLOT: Readonly<Record<string, number>> = { "fog-cloud": 20, confusion: 5, "create-or-destroy-water": 5 };
 
 /** What a cast's hit lands on its target besides its damage (SRD 5.2.1 text). */
 const CAST_ON_HIT: Readonly<Record<string, readonly OnHitRider[]>> = {
@@ -1047,6 +1270,13 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
   }),
   // "Any creature has Disadvantage on attack rolls against you. An attacker is immune to this effect if it perceives
   // you with Blindsight or Truesight."
+  // Three duplicates for a minute, counted on the tag; the server rolls their d6s on each hit (`mirror-image.ts`).
+  "mirror-image": spellGrant({
+    name: "Mirror Image",
+    tags: ["mirror-image", "mirror-image-3"],
+    target: "self",
+    duration: rounds(10)
+  }),
   blur: spellGrant({
     name: "Blur",
     tags: ["blur"],
@@ -1146,6 +1376,47 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     baseArmorClass: 13
   }),
+  // "If a creature lands before the spell ends, the creature takes no damage from the fall, and the spell ends for
+  // that creature." The engine lands a creature that carries it without damage (`falling.ts`).
+  "feather-fall": spellGrant({
+    name: "Feather Fall",
+    tags: ["feather-fall"],
+    target: "targets",
+    duration: rounds(10)
+  }),
+  // "Once on each of its turns until the spell ends, that creature can jump up to 30 feet by spending 10 feet of
+  // movement": a jump the movement rules take once a turn (`jumping.ts`).
+  jump: spellGrant({
+    name: "Jump",
+    tags: ["jump"],
+    target: "targets",
+    duration: rounds(10),
+    modifiers: [{ type: "movement", rule: "leap", feet: 30, costFeet: 10 }]
+  }),
+  // "You step into the border regions of the Ethereal Plane": off the map, unseen and untouchable from this plane,
+  // until the caster ends it (8 hours); it returns to the space it left or the nearest unoccupied one.
+  etherealness: spellGrant({
+    name: "Etherealness",
+    tags: ["off-plane"],
+    target: "self",
+    duration: { type: "manual" }
+  }),
+  // "You banish a creature ... into a labyrinthine demiplane": off the map while the caster concentrates; its escape
+  // check is the GM's.
+  maze: spellGrant({
+    name: "Maze",
+    tags: ["off-plane"],
+    target: "target",
+    duration: rounds(100)
+  }),
+  // "Roll 1d6 at the end of each of your turns": the server rolls it, and on a 4 or more the caster is off the map
+  // until the start of its next turn (`off-plane.ts`).
+  blink: spellGrant({
+    name: "Blink",
+    tags: ["blink"],
+    target: "self",
+    duration: rounds(10)
+  }),
   // "Gains a Fly Speed of 60 feet and can hover."
   fly: spellGrant({
     name: "Fly",
@@ -1222,6 +1493,24 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
         when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
       }
     ]
+  },
+  // "Rises vertically up to 20 feet and remains suspended there for the duration", moving only "as if it were
+  // climbing"; when it ends the target "floats gently to the ground" (`falling.ts` raises and lowers it).
+  levitate: { name: "Levitate", tags: ["levitating"], modifiers: [] },
+  // "Transported to a harmless demiplane for the duration ... When the spell ends, the target reappears in the space it
+  // left or in the nearest unoccupied space": it leaves the map until the effect ends (`off-plane.ts`). An
+  // extraplanar target that stays gone for the full minute is the GM's.
+  banishment: { name: "Banished", tags: ["off-plane"], modifiers: [] },
+  // Imprisoned "until the spell is dispelled": off the map until the GM ends it. Its form, and the trigger that frees
+  // it, are the GM's.
+  imprisonment: { name: "Imprisoned", tags: ["off-plane"], modifiers: [] },
+  // "Must immediately use its Reaction, if available, to move as far away from you as it can, using the safest route":
+  // the server spends the Reaction and gives the creature a move of its Speed that must end farther away.
+  "dissonant-whispers": {
+    name: "Dissonant Whispers",
+    tags: ["flees-with-reaction"],
+    duration: rounds(1),
+    modifiers: []
   },
   // "Can't cast spells or take the Magic action", until a repeated save every 30 days or a spell ends it.
   befuddlement: { name: "Befuddlement", tags: ["no-spells"], modifiers: [] },
@@ -1449,9 +1738,15 @@ const PERSISTS_WITHOUT_TARGETS: ReadonlySet<string> = new Set(["earthquake", "en
  *  the GM's to draw), and a sphere, guardian, pack or cloud as the circle it covers around its point. */
 const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   "blade-barrier": { shape: "line", sizeFeet: 100, widthFeet: 5 },
+  // The bolt's point and the 5 feet around it: "Each creature within 5 feet of that point".
+  "call-lightning": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "conjure-animals": { shape: "sphere", sizeFeet: 10, widthFeet: null },
   // The Large spirit and the 5 feet it reaches around it.
   "conjure-elemental": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  // "A 100-foot-radius circle centered on that point."
+  earthquake: { shape: "cylinder", sizeFeet: 100, widthFeet: null },
+  // "Up to 40,000 square feet of floor space": a 200-foot square.
+  forbiddance: { shape: "cube", sizeFeet: 200, widthFeet: null },
   // The hound and the 5 feet it bites in.
   "faithful-hound": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "flaming-sphere": { shape: "sphere", sizeFeet: 5, widthFeet: null },
@@ -1496,6 +1791,7 @@ export function spellEffectFor(
   const drain = CAST_DRAINS[id];
   const cures = CAST_CURES[id];
   const burst = CAST_BURSTS[id];
+  const teleport = CAST_TELEPORTS[id];
   const dispel = CAST_DISPELS[id];
   const selfSave = CAST_SELF_SAVES[id];
   const shapeShift = CAST_SHAPE_SHIFTS[id];
@@ -1520,6 +1816,7 @@ export function spellEffectFor(
     ...(grant ? { grant: structuredClone(grant) } : {}),
     ...(failureEffect ? { failureEffect: structuredClone(failureEffect) } : {}),
     ...(reaction ? { reaction } : {}),
+    ...(teleport ? { teleport: { ...teleport } } : {}),
     ...(selfSave ? { selfSave: { ...selfSave } } : {}),
     ...(dispel ? { dispel: { ...dispel } } : {}),
     ...(CAST_ENDS_CURSES.has(id) ? { endsCurses: true as const } : {}),
@@ -1533,7 +1830,8 @@ export function spellEffectFor(
     ...(CHAIN_FEET[id] !== undefined ? { chainFeet: CHAIN_FEET[id] } : {}),
     ...(shapeShift ? { shapeShift: structuredClone(shapeShift) } : {}),
     ...(effectOptions ? { effectOptions: structuredClone(effectOptions) } : {}),
-    ...(UNWILLING_ONLY.has(id) ? { unwillingOnly: true as const } : {})
+    ...(UNWILLING_ONLY.has(id) ? { unwillingOnly: true as const } : {}),
+    ...(AREA_PER_SLOT[id] !== undefined ? { areaPerSlot: AREA_PER_SLOT[id] } : {})
   };
 }
 
@@ -1605,6 +1903,7 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_TARGETS),
   ...Object.keys(UPCAST_CORRECTIONS),
   ...Object.keys(CAST_REACTIONS),
+  ...Object.keys(CAST_TELEPORTS),
   ...Object.keys(CAST_GRANTS),
   ...Object.keys(CAST_ON_HIT),
   ...Object.keys(CAST_MISS_DAMAGE),
@@ -1624,5 +1923,6 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...RANGE_DOUBLES,
   ...SILENCES_AREA,
   ...PICKS_IN_AREA,
-  ...Object.keys(CHAIN_FEET)
+  ...Object.keys(CHAIN_FEET),
+  ...Object.keys(AREA_PER_SLOT)
 ];

@@ -195,12 +195,12 @@ export const resolverOf = (state: GameState) => (definitionId: string) =>
 /**
  * A fight: `hero` (a built character) first in the turn order, then each bestiary creature in `monsters` (id ->
  * bestiary id), all on one calibrated map with 50-pixel cells and tokens placed in a row. `combat: false` leaves the
- * fight unstarted.
+ * fight unstarted; `initiatorRole` says who sends each resolve (the GM when absent).
  */
 export function table(
   hero: ActorDefinition | null,
   monsters: Readonly<Record<string, string>> = {},
-  options: Readonly<{ combat?: boolean; distance?: number }> = {}
+  options: Readonly<{ combat?: boolean; distance?: number; initiatorRole?: "gm" | "player" }> = {}
 ): Table {
   const state = GameStateSchema.parse({ schemaVersion: 1 });
   if (hero) importActorDefinition(state, hero, HERO, "public", catalog);
@@ -256,7 +256,8 @@ export function table(
           ...(definition ? { definition } : {}),
           catalog,
           resolveDefinition: resolve,
-          distanceFeet: () => options.distance ?? 5
+          distanceFeet: () => options.distance ?? 5,
+          ...(options.initiatorRole ? { initiatorRole: options.initiatorRole } : {})
         }
       );
     },

@@ -5,7 +5,8 @@ export const rogue: ClassMechanicsModule = {
   features: {
     // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": made in the Level flow until a
     // rest offers it.
-    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "level-up", amount: 2 }] },
+    // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": both, in the rest's step.
+    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "long-rest", amount: 2 }] },
     /**
      * Once per turn (`per: "turn"`, counted in `turnUses`). It rides a hit: the server offers it on an attack's
      * preview when the hit qualifies (Finesse or Ranged weapon; Advantage, or an ally beside the target and no
@@ -202,6 +203,14 @@ export const rogue: ClassMechanicsModule = {
       // The fourth attunement is read when an item is attuned; the charge and Spell Scroll clauses stay prose.
       "use-magic-device": {
         modifiers: [{ type: "attunement-slots", amount: 1 }]
+      },
+      // "You gain a Climb Speed equal to your Speed" and "can determine your jump distance using your Dexterity
+      // rather than your Strength", which the movement rules read (`jumping.ts`).
+      "second-story-work": {
+        modifiers: [
+          { type: "special-speed", movement: "climb", equalToSpeed: true },
+          { type: "movement", rule: "jump-by-dexterity" }
+        ]
       },
       // Adds the Bonus Action activation; the Sleight of Hand check is rolled from the skill block.
       "fast-hands": {

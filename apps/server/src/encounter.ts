@@ -6,6 +6,11 @@ import type {
   RuleExceptions,
   RuleMode
 } from "@vtt/domain";
+import { dropStaleGrants } from "./granted-moves.js";
+import { proneInSharedSpace } from "./occupied-space.js";
+import { blinkAway } from "./off-plane.js";
+import { timeStopGoesOn } from "./time-stop.js";
+import { familyModeFor } from "./rules-families.js";
 import { abilityCheckClaims } from "./ability-checks.js";
 import { holdsFeature } from "./class-features.js";
 import { wardedConditions } from "./paladin-auras.js";
@@ -21,10 +26,11 @@ import {
   expireEffectsAtTurnStart,
   type EffectNarration
 } from "./effects.js";
+import { closeInitiativeWindow, rolledInitiative } from "./initiative-hooks.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
 import { releaseSwallowedBy } from "./swallow.js";
 import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
-import { zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
+import { zoneHeld, zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
 import { lapseLongCasts } from "./resolution/long-casting.js";
@@ -223,7 +229,7 @@ export function startEncounter(
   now: number = Date.now(),
   catalog?: EquipmentCatalog,
   onRoll?: InitiativeRollSink
-) {
+): EffectNarration[] {
   if (state.combat.active) throw new CommandRejectedError("End the active encounter before starting another one.");
   if (input.entries.length === 0 || input.entries.length > 200)
     throw new CommandRejectedError("Choose 1 to 200 combatants before starting the encounter.");
@@ -273,6 +279,7 @@ export function startEncounter(
     return { actorId: actor.id, score: roll.total, tieBreaker, ...flags };
   });
   const sorted = ordered(state, initiative);
+  const lasting = lastingOnMap(state, input.mapAssetId);
   // Spread, never a fresh literal, so fields added to CombatState are not dropped. Fog rides the spread:
   // it is prepped before the fight and persists after it.
   state.combat = {
@@ -289,8 +296,8 @@ export function startEncounter(
       }),
       tokenGeometry
     ).map((token) => ({ ...token, position: placedPositions.get(token.actorId) ?? token.position })),
-    annotations: [],
-    spellZones: [],
+    annotations: lasting.annotations,
+    spellZones: lasting.zones,
     turn: { ...EMPTY_TURN },
     rulesMode: input.rulesMode ?? state.combat.rulesMode,
     ruleExceptions: input.ruleExceptions ?? state.combat.ruleExceptions,
@@ -303,6 +310,7 @@ export function startEncounter(
     // Asks parked in the last fight concern a situation that no longer exists.
     pendingRuleAsks: [],
     pendingInitiative,
+    initiativeWindow: [],
     // A fresh fight starts live; the handler captures this start state as the rewind baseline.
     historyCursor: null,
     historyDirty: false
@@ -310,6 +318,8 @@ export function startEncounter(
   if (resolveDefinition) clearPerEncounterUses(state, actorIds, resolveDefinition, catalog);
   // Rolling Initiative stops a Short Rest; the GM's rest panel shows who left it.
   leaveShortRest(state, actorIds, "rolled Initiative");
+  // What happens "when you roll Initiative": Superior Inspiration's regain, Persistent Rage's window.
+  return rolledInitiative(state, actorIds, { resolveDefinition, catalog });
 }
 
 /**
@@ -376,7 +386,7 @@ export function addCombatant(
   now: number = Date.now(),
   onRoll?: InitiativeRollSink,
   deps: InitiativeRollDeps = {}
-) {
+): EffectNarration[] {
   if (!state.combat.active) throw new CommandRejectedError("Start the encounter before adding a combatant to it.");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -408,6 +418,29 @@ export function addCombatant(
   };
   if (deps.resolveDefinition) clearPerEncounterUses(state, new Set([actorId]), deps.resolveDefinition, deps.catalog);
   leaveShortRest(state, new Set([actorId]), "rolled Initiative");
+  return rolledInitiative(state, [actorId], deps);
+}
+
+/**
+ * What a fight starting on this map keeps of the scene: the spell areas still held (a Glyph of Warding, a Fog Cloud cast
+ * before it) and the shapes they and the spells' lights and fog stand on. Every other drawing is cleared, and a fight on
+ * another map keeps nothing.
+ */
+function lastingOnMap(
+  state: GameState,
+  mapAssetId: string
+): Readonly<{ zones: GameState["combat"]["spellZones"]; annotations: GameState["combat"]["annotations"] }> {
+  if (state.combat.mapAssetId !== mapAssetId) return { zones: [], annotations: [] };
+  const zones = state.combat.spellZones
+    .filter((zone) => !zone.bursting && zoneHeld(state, zone))
+    .map((zone) => ({ ...zone, entered: [], affected: [] }));
+  const vision = state.combat.vision;
+  const kept = new Set<string>([
+    ...zones.flatMap((zone) => (zone.annotationId === null ? [] : [zone.annotationId])),
+    ...vision.lights.flatMap((light) => (light.annotationId === undefined ? [] : [light.annotationId])),
+    ...vision.areas.flatMap((area) => (area.shape.type === "template" ? [area.shape.annotationId] : []))
+  ]);
+  return { zones, annotations: state.combat.annotations.filter((annotation) => kept.has(annotation.id)) };
 }
 
 export function endEncounter(state: GameState) {
@@ -425,8 +458,11 @@ export function endEncounter(state: GameState) {
     turnActorId: null,
     turn: { ...EMPTY_TURN },
     underwater: false,
-    // The fight's spell areas end with it; Concentration on them is the caster's to keep or drop.
-    spellZones: [],
+    // A spell area outlasts the fight while what keeps it does (the caster's Concentration, or the effect of a longer
+    // spell, which `endEncounterEffects` has already ended if a minute or less of it was left).
+    spellZones: state.combat.spellZones
+      .filter((zone) => !zone.bursting && zoneHeld(state, zone))
+      .map((zone) => ({ ...zone, entered: [], affected: [] })),
     reactionsUsed: [],
     legendaryUsed: {},
     pendingSaves: [],
@@ -434,6 +470,7 @@ export function endEncounter(state: GameState) {
     pendingDamage: [],
     pendingRuleAsks: [],
     pendingInitiative: [],
+    initiativeWindow: [],
     historyCursor: null,
     historyDirty: false
   };
@@ -672,10 +709,20 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   while (steps < length && isDefeated(state, state.combat.initiative[(currentIndex + steps) % length].actorId))
     steps += 1;
   if (steps === length) steps = 1;
-  const wraps = currentIndex + steps >= length;
+  // Time Stop: the caster takes its turns in a row while no time passes for anyone else.
+  const stopped = timeStopGoesOn(state);
+  const wraps = !stopped && currentIndex + steps >= length;
   // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
   const ending: EffectNarration[] = [];
   const outgoingId = state.combat.turnActorId;
+  // Its first turn over, a creature has done what it does when it rolled Initiative.
+  closeInitiativeWindow(state, outgoingId);
+  // "If you somehow end a turn in a space with another creature, you have the Prone condition" (SRD 5.2.1).
+  const calibration = deps?.geometry?.calibration;
+  if (outgoingId && calibration && deps && familyModeFor(state.combat, "movement") !== "freeform")
+    proneInSharedSpace(state, outgoingId, calibration, deps.resolveDefinition, ending);
+  // Blink: "Roll 1d6 at the end of each of your turns".
+  if (outgoingId && deps?.newId) blinkAway(state, outgoingId, deps.rollDie, deps.newId, ending);
   endOfTurn(
     state,
     outgoingId,
@@ -690,22 +737,27 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   events?.push(...ending);
   // A new round sorts the whole order again, which settles any mid-round score change.
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
-  const nextActorId = wraps
-    ? (order.find((entry) => !isDefeated(state, entry.actorId)) ?? order[0]).actorId
-    : order[currentIndex + steps].actorId;
+  const nextActorId = stopped
+    ? outgoingId!
+    : wraps
+      ? (order.find((entry) => !isDefeated(state, entry.actorId)) ?? order[0]).actorId
+      : order[currentIndex + steps].actorId;
   state.combat = {
     ...state.combat,
     initiative: order,
     round: wraps ? state.combat.round + 1 : state.combat.round,
     turnActorId: nextActorId,
-    // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD).
-    turn: { ...EMPTY_TURN },
+    // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD). The turn
+    // that just ended opens the window for legendary actions, until the incoming creature does something.
+    turn: { ...EMPTY_TURN, ...(outgoingId && !stopped ? { afterActorId: outgoingId } : {}) },
     // A marilith's Reactive: "The marilith can take one Reaction on every turn of combat."
     reactionsUsed: state.combat.reactionsUsed.filter(
       (actorId) => actorId !== nextActorId && !reactsEveryTurn(state, actorId, deps)
     ),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, nextActorId)
   };
+  // A move or teleport granted for the turn that ended lapses with it.
+  dropStaleGrants(state);
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
   events?.push(...expiry);
@@ -739,4 +791,5 @@ export function previousInitiativeTurn(state: GameState) {
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== previousActorId),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, previousActorId)
   };
+  dropStaleGrants(state);
 }

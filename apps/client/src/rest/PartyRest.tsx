@@ -1,13 +1,22 @@
 import { useState } from "react";
 import { gameTimeSpanLabel, isDead, longRestWait, rosterActors, type GmActor, type GmView } from "@vtt/domain";
-import { Badge, Button, Modal, Stepper, useToast } from "@vtt/ui";
+import { Badge, Button, Field, Modal, SegmentedControl, Select, Stepper, useToast } from "@vtt/ui";
 import { pathForSection } from "../codex/routes";
 import { command } from "../lib/command";
 import { navigate } from "../router";
 import { gameDate, useGmCalendar } from "./game-date";
 import "./rest.css";
 
-const NO_REST = { clockHours: 0, clockMinutes: 0, requests: [] as readonly string[], shortRest: null };
+const NO_REST = {
+  clockHours: 0,
+  clockMinutes: 0,
+  requests: [] as readonly string[],
+  dawnHour: null as number | null,
+  shortRest: null
+};
+
+/** "06:00" for an hour of the day. */
+const hourLabel = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
 
 /** The minutes the GM can add to the hours passed, from a single minute (10 rounds) up to most of an hour. */
 const MINUTE_STEPS = [0, 1, 5, 10, 15, 20, 30, 45] as const;
@@ -38,6 +47,8 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hours, setHours] = useState(8);
+  // Passing time on the road (SRD Travel Pace): the server logs how far the party went.
+  const [pace, setPace] = useState<"stay" | "slow" | "normal" | "fast">("stay");
   const [minuteStep, setMinuteStep] = useState(0);
   const [unpicked, setUnpicked] = useState<ReadonlySet<string>>(new Set());
   const { toast } = useToast();
@@ -162,6 +173,24 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
               </p>
             )}
             <div className="party-rest-row">
+              <SegmentedControl
+                size="sm"
+                ariaLabel="Travel pace"
+                options={[
+                  { value: "stay", label: "Stay", title: "The party stays where it is" },
+                  { value: "slow", label: "Slow", title: "2 miles an hour, Advantage on Perception and Survival" },
+                  { value: "normal", label: "Normal", title: "3 miles an hour, Disadvantage on Stealth" },
+                  {
+                    value: "fast",
+                    label: "Fast",
+                    title: "4 miles an hour, Disadvantage on Perception, Survival and Stealth"
+                  }
+                ]}
+                value={pace}
+                onChange={(value) => setPace(value as typeof pace)}
+              />
+            </div>
+            <div className="party-rest-row">
               <Stepper
                 value={hours}
                 onChange={setHours}
@@ -182,15 +211,47 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
               />
               <Button
                 disabled={busy || span === null}
-                onClick={() => void send(() => command("time:pass", { hours, minutes }), `${span} passed.`)}
+                onClick={() =>
+                  void send(
+                    () => command("time:pass", { hours, minutes, ...(pace !== "stay" ? { pace } : {}) }),
+                    `${span} passed.`
+                  )
+                }
               >
-                {span ? `Pass ${span}` : "Pass time"}
+                {span ? `${pace === "stay" ? "Pass" : "Travel"} ${span}` : "Pass time"}
               </Button>
             </div>
             <p className="party-rest-hint">
               Time that passes here moves the Codex calendar too, and counts down spells and effects: a minute is 10
               rounds. A fight&apos;s rounds don&apos;t move the clock. A Long Rest can start 16 hours after a
               character&apos;s last one ends.
+            </p>
+            <Field label="Dawn" htmlFor="party-rest-dawn">
+              <Select
+                id="party-rest-dawn"
+                value={rest.dawnHour === null || rest.dawnHour === undefined ? "" : String(rest.dawnHour)}
+                disabled={busy}
+                onChange={(event) => {
+                  const hour = event.target.value === "" ? null : Number(event.target.value);
+                  void send(
+                    () => command("time:set-dawn", { hour }),
+                    hour === null
+                      ? "Items regain their dawn charges at a Long Rest."
+                      : `Dawn comes at ${hourLabel(hour)}.`
+                  );
+                }}
+              >
+                <option value="">At each Long Rest</option>
+                {Array.from({ length: 24 }, (_, hour) => (
+                  <option key={hour} value={hour}>
+                    {hourLabel(hour)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <p className="party-rest-hint">
+              What a magic item regains at dawn comes back when the clock passes this hour. Left at each Long Rest, a
+              Long Rest gives it back.
             </p>
           </section>
 

@@ -121,15 +121,13 @@ describe("Potions of Growth and Diminution", () => {
 
   it("Growth: one size larger for 10 minutes, with Advantage on Strength saves", () => {
     const fight = table(goliathFighter(1), { [FOE]: "ogre" });
-    fight
-      .actor(HERO)
-      .inventory.push({
-        id: "potion-of-growth",
-        name: "Potion of Growth",
-        quantity: 1,
-        equipped: false,
-        attuned: false
-      });
+    fight.actor(HERO).inventory.push({
+      id: "potion-of-growth",
+      name: "Potion of Growth",
+      quantity: 1,
+      equipped: false,
+      attuned: false
+    });
     drink(fight, "potion-of-growth");
     const hero = fight.actor(HERO);
     expect(hero.size).toBe("large");

@@ -1,3 +1,4 @@
+import { potentRangeFeet } from "./class-features.js";
 import type { Actor } from "@vtt/domain";
 import { MAX_ACTION_USES, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
@@ -23,7 +24,11 @@ export function effectiveActions(
   const declared = definition?.actions ?? [];
   // A spell's later action rolls at the level the spell is up at (Spiritual Weapon from a level 3 spell slot).
   const taken = declared.map((action) =>
-    withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition)
+    withPotentRange(
+      withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition),
+      definition,
+      catalog
+    )
   );
   // A Wizard's Ritual Adept casts a ritual from its book that the sheet doesn't list.
   const rituals = spellbookRituals(definition, actor, catalog);
@@ -48,6 +53,21 @@ function withEldritchSpear(action: ActorAction, definition: ActorDefinition | un
   const level = character?.classes.find((entry) => entry.id === "warlock")?.level ?? 0;
   if (picked !== action.spellId || level === 0) return action;
   return { ...action, attack: { ...action.attack!, rangeFeet: rangeFeet + 30 * level } };
+}
+
+/** SRD Improved Elemental Fury, Improved Potent Spellcasting (Druid 15): "When you cast a Druid cantrip with a range of
+ *  10 feet or greater, the spell's range increases by 300 feet." Applied to the spell attack's range; a cantrip with
+ *  no attack has it added where its targets are checked (`resolution/spell-targets.ts`). */
+function withPotentRange(
+  action: ActorAction,
+  definition: ActorDefinition | undefined,
+  catalog: EquipmentCatalog | undefined
+): ActorAction {
+  const rangeFeet = action.attack?.rangeFeet;
+  if (rangeFeet === undefined || rangeFeet < 10 || action.spellId === undefined) return action;
+  const spell = catalog?.spellRecord?.(action.spellId);
+  if (potentRangeFeet(definition, spell) === 0) return action;
+  return { ...action, attack: { ...action.attack!, rangeFeet: rangeFeet + 300 } };
 }
 
 /** A later action of a spell its caster has up at a higher level, rolled at that level; anything else unchanged. */

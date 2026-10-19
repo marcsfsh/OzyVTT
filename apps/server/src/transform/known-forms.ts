@@ -34,7 +34,9 @@ export function setKnownForms(
   const eligible = new Set(learnableForms(definition, deps.catalog).map((option) => option.id));
   for (const id of formIds) {
     if (eligible.has(id)) continue;
-    const name = deps.resolveDefinition(id)?.name ?? "That form";
+    // Only an SRD stat block is named back: a GM's own stays unnamed to whoever guessed its id.
+    const srd = deps.catalog?.monsterSummaries?.().find((summary) => summary.id === id && summary.source === "srd");
+    const name = srd?.name ?? "That form";
     throw new CommandRejectedError(
       `${name} isn't an eligible form: a Beast of ${challengeLabel(row.maxChallenge)} or lower${row.fly ? "" : " with no Fly Speed"}.`
     );

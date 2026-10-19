@@ -53,12 +53,19 @@ const most = (states: readonly CoverageState[]): CoverageState =>
 type SpellLater = NonNullable<NonNullable<SpellReference["effect"]>["laterActions"]>[number];
 
 /** A later action applies when it deals damage, makes an attack or imposes conditions on a failed save; with a `zone`
- *  the server raises it as creatures enter or start or end a turn in the area (`spell-zones.ts`). */
+ *  the server raises it as creatures enter or start or end a turn in the area (`spell-zones.ts`). An area also applies
+ *  when it charges the ground it makes difficult (`zone-ground.ts`), bars or wards (`zone-barriers.ts`), alerts its
+ *  caster, or gives the creatures inside what it holds (`zone-auras.ts`). */
 const laterApplies = (later: SpellLater) =>
   later.damage.length > 0 ||
   later.attackRange !== undefined ||
   (later.save?.failureConditions.length ?? 0) > 0 ||
-  later.save?.speedZero === true;
+  later.save?.speedZero === true ||
+  later.zone?.terrain !== undefined ||
+  later.zone?.bars !== undefined ||
+  later.zone?.wardsSpells !== undefined ||
+  later.zone?.alerts === true ||
+  later.zone?.holds !== undefined;
 
 /** A spell is enforced when a cast applies its numbers or leaves its effect on the targets, or the area it leaves
  *  applies them later. Every other spell is guided: each is a cast action (`character-build.ts`, `monster-spells.ts`)
@@ -116,11 +123,13 @@ type ResolvingFields = Pick<
   | "endsForm"
   | "effectOptions"
 > &
+  Partial<Pick<ActorAction, "move" | "teleport" | "leap">> &
   Readonly<{ attack?: unknown; save?: unknown; damageByLevel?: unknown }>;
 
 /** An action resolves when it rolls an attack or a save, deals damage, heals, grants an effect, ends conditions,
- *  runs a structured Multiattack, places light or an area of obscurement on the map, is offered as a reaction prompt
- *  or answers a roll (`roll-answers.ts`). One with none of these only spends its use and its place in the turn. */
+ *  runs a structured Multiattack, places light or an area of obscurement on the map, is offered as a reaction prompt,
+ *  answers a roll (`roll-answers.ts`), or grants a move, a jump or a teleport the movement rules charge
+ *  (`granted-moves.ts`). One with none of these only spends its use and its place in the turn. */
 const actionResolves = (action: ResolvingFields) =>
   action.sight?.light !== undefined ||
   action.sight?.area !== undefined ||
@@ -139,7 +148,10 @@ const actionResolves = (action: ResolvingFields) =>
   action.answer !== undefined ||
   action.shapeShift !== undefined ||
   action.endsForm !== undefined ||
-  action.effectOptions !== undefined;
+  action.effectOptions !== undefined ||
+  action.move !== undefined ||
+  action.teleport !== undefined ||
+  action.leap !== undefined;
 
 /**
  * A stat block action is enforced when its attack, save, damage, healing, grant or structured Multiattack resolves,

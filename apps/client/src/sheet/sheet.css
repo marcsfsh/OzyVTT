@@ -997,6 +997,13 @@ button.cs-lastroll-open {
   align-items: center;
   gap: var(--space-2);
 }
+/* A recovery's slot levels, one stepper each, wrapping on a phone. */
+.cs-recover {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
 .cs-death {
   border-color: var(--danger);
   box-shadow: var(--glow-danger);
@@ -1518,6 +1525,14 @@ button.cs-lastroll-open {
   background: var(--grad-sun);
   box-shadow: none;
 }
+/* A player's spent pip shows the slot and takes no tap. */
+.cs-pip.is-spent {
+  display: inline-block;
+  cursor: default;
+}
+.cs-pip.is-spent::after {
+  content: none;
+}
 .cs-slotpips .cs-count {
   margin-left: var(--space-1);
 }
@@ -2024,9 +2039,8 @@ button.cs-circle::after {
 }
 /* Wild Shape's known forms and the Beasts it may learn, picked on the Features tab. */
 .cs-known-forms-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
+  display: grid;
+  gap: var(--space-1);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -2043,10 +2057,22 @@ button.cs-circle::after {
 .cs-known-form {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: var(--space-2);
-  min-height: 44px;
+  min-height: var(--tap-min);
   font-size: var(--fs-sm);
   overflow-wrap: anywhere;
+}
+.cs-known-form > input {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+}
+.cs-known-form > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: start;
 }
 .cs-known-form.is-picked {
   color: var(--cyan-hi);

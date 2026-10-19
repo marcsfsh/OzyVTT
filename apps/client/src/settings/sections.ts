@@ -157,6 +157,12 @@ export const SETTING = entries({
     hint: "With I roll my dice, you type what your own dice show.",
     words: "physical dice auto roll manual"
   },
+  pinchZoom: {
+    section: "device",
+    label: "Pinch zoom",
+    hint: "Two fingers on a touch screen zoom the whole page while this is on, and maps zoom with two fingers either way.",
+    words: "zoom pinch magnify enlarge double tap accessibility phone tablet"
+  },
   arrangeScenes: {
     section: "device",
     audience: "gm",

@@ -3,6 +3,7 @@ import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry, templateOfArea } from "../annotations.js";
 import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
+import { areaOriginHeight, creatureAtPoint, withinAreaHeight } from "../altitude.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { withSeenTargets } from "../resolution/seen-targets.js";
 import { builtinActionFor } from "../builtin-actions.js";
@@ -12,7 +13,8 @@ import { ActionResolveSchema, ActionUseSchema, DiceRollSchema } from "@vtt/domai
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { heldRollFor, requireTypedDie } from "../held-rolls.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
-import { tokenCreatureDistance } from "../movement-narration.js";
+import { activeMoveGrant } from "../granted-moves.js";
+import { mapDistance, tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { effectiveModeFor, overrideWaives, rulesInForce } from "../rules-families.js";
@@ -30,7 +32,10 @@ import { rollSettledCheck } from "../check-rolls.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { SCROLL_UNREADABLE, scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "../scrolls.js";
 import { castSlotLevel, untrainedArmorCast } from "../resolution/economy.js";
+import { areaAtLevel } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
+import { spellWardedTargets } from "../zone-barriers.js";
+import { areaMoveOf, moveArea, planAreaMove, type AreaMove } from "../zone-moves.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
 import { applyLooseHealing, looseHealTargets, partyMember } from "../loose-healing.js";
@@ -115,6 +120,11 @@ export const actionCommands = [
       let restBroken: EffectNarration[] = [];
       let castingOnward = false;
       let clock = { fromHours: 0, toHours: 0 };
+      // A spell's area this action moved, what it did as it came to rest, and a rules note its move let through.
+      let areaEvents: EffectNarration[] = [];
+      let areaMoveNote: string | null = null;
+      // The creatures a barrier against spells kept the cast from, for the GM.
+      let wardNotes: string[] = [];
       const { state, duplicate } = await execute((draft) => {
         // Access first (the action kind is for the per-table policy hook, ADR-0021): a missing creature and someone
         // else's get one answer, so a player can't probe which ids exist.
@@ -145,6 +155,9 @@ export const actionCommands = [
               : null;
         let resolvedTargetIds: readonly string[];
         let originAtCaster = false;
+        let areaMove: AreaMove | null = null;
+        // An item's action that leaves an area to act later (spread Caltrops) catches no one as it is used.
+        const leavesArea = action.zone !== undefined && action.spellId === undefined;
         // The template as the action's area makes it, which the table's drawn shape records.
         let placed: Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }> | null =
           null;
@@ -153,8 +166,11 @@ export const actionCommands = [
           if (draft.combat.mapAssetId !== mapAssetId)
             throw new CommandRejectedError("The active encounter changed. Try again.");
           const calibration = geometry!.calibration!;
-          // The action's own area decides the shape and the size; the drag only places and points it.
-          placed = action.area ? templateOfArea(calibration, template, action.area) : template;
+          // The action's own area decides the shape and the size, grown with a cast's slot (Fog Cloud); the drag only
+          // places and points it.
+          const casting = castSpellOf(action, kit.equipmentCatalog().spellRecord);
+          const area = action.area && casting ? areaAtLevel(action.area, casting, request.slotLevel) : action.area;
+          placed = area ? templateOfArea(calibration, template, area) : template;
           // Snap the template the same way the drawn annotation will, then find who is under it.
           const snapped = shapeGeometry(calibration, placed.shape, placed.origin, placed.target);
           const spell = action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined;
@@ -171,6 +187,24 @@ export const actionCommands = [
               (id !== actorId || !casterOutside) &&
               (!draft.combat.active || draft.combat.initiative.some((entry) => entry.actorId === id))
           );
+          // Height: an area reaches up and down only as far as its shape does (a flier above a Fireball is spared).
+          resolvedTargetIds = withinAreaHeight(
+            draft,
+            resolvedTargetIds,
+            action.area ?? { shape: placed.shape, sizeFeet: snapped.sizeFeet, widthFeet: null },
+            areaOriginHeight(
+              draft,
+              actorId,
+              casterOutside,
+              creatureAtPoint(draft, calibration, snapped.origin),
+              calibration.distancePerCell
+            ),
+            (id) => {
+              const at = draft.combat.tokens.find((token) => token.actorId === id)?.position;
+              return at ? (mapDistance(geometry!, snapped.origin, at)?.value ?? null) : null;
+            },
+            calibration.distancePerCell
+          );
           // An area catches everyone under it, seen or not. Whether it holds anyone is judged on what the caster's
           // player can see, so an empty refusal never tells them a hidden creature is there. A spell that leaves its
           // area behind (Moonbeam, Web, a wall), or does nothing to whoever is in it (Minor Illusion's image), may be
@@ -182,12 +216,36 @@ export const actionCommands = [
             action.healing !== undefined ||
             action.grants !== undefined ||
             action.endsConditions !== undefined;
-          if (!resolvedTargetIds.some((id) => !unseen.has(id)) && !(spell && (zoneRowOf(spell) || !catches)))
+          if (
+            !resolvedTargetIds.some((id) => !unseen.has(id)) &&
+            !(spell && (zoneRowOf(spell) || !catches)) &&
+            !leavesArea
+          )
             throw new CommandRejectedError(
               isPlayer ? "No creatures you can see are inside that area." : "No combatants are inside that area."
             );
+          // Caltrops spread under a creature catch it only as it moves in.
+          if (leavesArea) resolvedTargetIds = [];
+          // What moves the spell's area (Moonbeam's move, Flaming Sphere's ram) places that area there instead, and
+          // its save falls on the creatures the area moves onto.
+          const moving = areaMoveOf(action, kit.equipmentCatalog());
+          if (moving) {
+            areaMove = planAreaMove(
+              draft,
+              {
+                casterId: actorId,
+                spell: moving.spell,
+                feet: moving.feet,
+                placed,
+                override: isPlayer ? null : (override ?? null),
+                widthFeet: action.area?.widthFeet ?? null
+              },
+              geometry!
+            );
+            resolvedTargetIds = action.save ? areaMove.movedOnto : [];
+          }
         } else {
-          resolvedTargetIds = targetIds ?? [];
+          resolvedTargetIds = leavesArea ? [] : (targetIds ?? []);
           // A player may target only public combatants they can see: resolving against a hidden actor would leak
           // its name/AC/outcome through the ack (and in direct mode damage it). The refusal is the one a missing
           // creature gets, at the same point, so it says nothing of what is hidden.
@@ -211,6 +269,20 @@ export const actionCommands = [
             )
               throw new CommandRejectedError(OUTSIDE_FIGHT_TARGETS);
           }
+        }
+        // A barrier against spells (Globe of Invulnerability) leaves the creatures in it out of a lower spell cast from
+        // outside it: the spell can target them and has no effect on them.
+        const spellCast = castSpellOf(action, kit.equipmentCatalog().spellRecord);
+        if (spellCast && geometry?.calibration && resolvedTargetIds.length > 0) {
+          const warded = spellWardedTargets(
+            draft,
+            { casterId: actorId, castLevel: request.slotLevel ?? spellCast.level, targetIds: resolvedTargetIds },
+            kit.zoneDeps(draft, geometry)
+          );
+          resolvedTargetIds = resolvedTargetIds.filter((id) => !warded.some((entry) => entry.actorId === id));
+          wardNotes = warded.map(
+            (entry) => `${entry.ward} keeps ${spellCast.name} from affecting ${kit.actorName(entry.actorId)}.`
+          );
         }
         // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, measured edge to edge.
         const distanceFeet = (actorIdA: string, actorIdB: string): number | null =>
@@ -256,6 +328,7 @@ export const actionCommands = [
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),
             ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),
             ...(request.knockOut === true ? { knockOut: true } : {}),
+            ...(request.overchannel === true ? { overchannel: true } : {}),
             ...(request.shaping && request.shaping.length > 0 ? { shaping: request.shaping } : {}),
             // The form a shape-shift takes and what else it picks (its gear, Enlarge or Reduce).
             ...(request.form !== undefined ? { form: request.form } : {}),
@@ -264,6 +337,11 @@ export const actionCommands = [
             ...(request.option !== undefined ? { option: request.option } : {}),
             ...(template ? { areaPlaced: true } : {}),
             ...(request.ready === true ? { ready: true } : {}),
+            ...(request.moveFirst === true ? { moveFirst: true } : {}),
+            // The rest of an action whose move was taken first was paid for then.
+            ...(request.moveFirst !== true && activeMoveGrant(draft, attacker)?.owedActionId === action.id
+              ? { owedPaid: true }
+              : {}),
             // Spell areas are the GM's to see, so only the GM aims a cast at one.
             ...(request.zoneId !== undefined && !isPlayer ? { zoneId: request.zoneId } : {}),
             ...(action.spellId !== undefined && standsInSilence(draft, actorId, geometry, kit.equipmentCatalog())
@@ -293,15 +371,22 @@ export const actionCommands = [
         castingOnward = attacker.effects.some((effect) => effect.longCast?.actionId === action.id);
         const hours = spell && !draft.combat.active ? Math.floor(castingMinutesOf(spell, action.id) / 60) : 0;
         clock = { fromHours: draft.rest.clockHours, toHours: draft.rest.clockHours };
+        let clockEvents: EffectNarration[] = [];
         if (!resolution.preview && hours > 0) {
-          passTime(draft, hours);
+          clockEvents = passTime(draft, hours, 0, {
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+            catalog: kit.equipmentCatalog(),
+            random: (sides) => kit.context.random(sides)
+          });
           clock = { ...clock, toHours: draft.rest.clockHours };
         }
         // Casting a spell other than a cantrip stops a Short Rest, as it does on the loose route.
-        restBroken =
-          spell && spell.level > 0 && !draft.combat.active
+        restBroken = [
+          ...clockEvents,
+          ...(spell && spell.level > 0 && !draft.combat.active
             ? leaveShortRest(draft, new Set([actorId]), `cast ${spell.name}`)
-            : [];
+            : [])
+        ];
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
         // by default, or applied directly), so the player never mutates a creature they don't own.
         if (isPlayer)
@@ -324,7 +409,21 @@ export const actionCommands = [
         // Record the blast as a shape; id=commandId keeps re-delivery idempotent. A cone or line starts at its caster,
         // so one from a caster hidden from the table is drawn for the GM alone: it would point at where it hides.
         const fromHiddenCaster = originAtCaster && kit.hiddenFromTable(draft)(actorId);
-        if (placed)
+        // A nearly imperceptible glyph is drawn for the GM and its caster's player alone.
+        const unseenArea = spell ? zoneRowOf(spell)?.zone?.hidden === true : action.zone?.hidden === true;
+        if (placed && areaMove) {
+          areaMoveNote = areaMove.note;
+          areaEvents = moveArea(
+            draft,
+            areaMove,
+            placed,
+            { sessionId: gmSessionId, role: "gm" },
+            {
+              ...kit.zoneDeps(draft, geometry),
+              geometry: geometry!
+            }
+          );
+        } else if (placed)
           addAnnotation(
             draft,
             {
@@ -333,7 +432,8 @@ export const actionCommands = [
               shape: placed.shape,
               origin: placed.origin,
               target: placed.target,
-              visibility: fromHiddenCaster ? "gm-only" : "public",
+              visibility: fromHiddenCaster ? "gm-only" : unseenArea ? "gm-actor" : "public",
+              ...(unseenArea && !fromHiddenCaster ? { visibleToActorId: actorId } : {}),
               reachesPastMap: action.area !== undefined,
               actor: { sessionId: gmSessionId, role: "gm" },
               now: Date.now()
@@ -388,6 +488,16 @@ export const actionCommands = [
         }
         kit.narrateResolution(resolution, actorId);
         kit.publishNarrations(restBroken);
+        kit.publishNarrations(areaEvents);
+        for (const note of wardNotes)
+          kit.context.appendLog({ kind: "action", text: note, actorIds: [actorId], gmOnly: true });
+        if (areaMoveNote)
+          kit.context.appendLog({
+            kind: "action",
+            text: `Rules note: ${areaMoveNote}`,
+            actorIds: [actorId],
+            gmOnly: true
+          });
         for (const { outcome, targetId, sourceActorId, label } of playerDamageApplied) {
           // Narrated like actor:apply-damage. Both actors ride actorIds so the line is gm-only if either is hidden.
           const detail = damageAdjustmentDetail(outcome.application);

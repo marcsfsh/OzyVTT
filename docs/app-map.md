@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 145 commands · 321 HTTP paths
+- 14 GameState fields · 150 commands · 326 HTTP paths
 
 ## GameState shape
 
@@ -44,9 +44,12 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `actor.add-from-definition` | `actor:write` |
 | `actor.apply-damage` | `actor:write` |
 | `actor.award-experience` | `actor:write` |
+| `actor.convert` | `actor:write` |
+| `actor.fall` | `combat:write` |
 | `actor.give-heroic-inspiration` | `actor:write` |
 | `actor.heal` | `actor:write` |
 | `actor.import-definition` | `actor:write` |
+| `actor.mount` | `combat:write` |
 | `actor.rechoose` | `actor:write` |
 | `actor.remove` | `actor:write` |
 | `actor.remove-samples` | `actor:write` |
@@ -170,7 +173,9 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `terrain.paint` | `scene:write` |
 | `terrain.reset` | `scene:write` |
 | `time.pass` | `combat:write` |
+| `time.set-dawn` | `combat:write` |
 | `token.move` | `combat:write` |
+| `token.set-altitude` | `combat:write` |
 | `turn.end` | `combat:write` |
 | `turn.use` | `combat:write` |
 | `turn.use-legendary` | `combat:write` |
@@ -299,11 +304,13 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/check/answer`
 - `POST /api/v1/game/actors/{actorId}/check/reroll`
 - `POST /api/v1/game/actors/{actorId}/conditions`
+- `POST /api/v1/game/actors/{actorId}/convert`
 - `POST /api/v1/game/actors/{actorId}/currency`
 - `POST /api/v1/game/actors/{actorId}/damage`
 - `POST /api/v1/game/actors/{actorId}/death-save`
 - `POST /api/v1/game/actors/{actorId}/effects`
 - `POST /api/v1/game/actors/{actorId}/effects/{effectId}/end`
+- `POST /api/v1/game/actors/{actorId}/fall`
 - `POST /api/v1/game/actors/{actorId}/favourites`
 - `POST /api/v1/game/actors/{actorId}/finish-preparing`
 - `POST /api/v1/game/actors/{actorId}/heal`
@@ -320,6 +327,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/known-forms`
 - `POST /api/v1/game/actors/{actorId}/long-rest-request`
 - `POST /api/v1/game/actors/{actorId}/long-rest-request/answer`
+- `POST /api/v1/game/actors/{actorId}/mount`
 - `GET /api/v1/game/actors/{actorId}/movement`
 - `GET /api/v1/game/actors/{actorId}/next-level`
 - `POST /api/v1/game/actors/{actorId}/prepared-spell`
@@ -426,7 +434,9 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/table/staging-defaults`
 - `POST /api/v1/game/terrain/paint`
 - `POST /api/v1/game/terrain/reset`
+- `POST /api/v1/game/time/dawn`
 - `POST /api/v1/game/time/pass`
+- `POST /api/v1/game/tokens/{actorId}/altitude`
 - `POST /api/v1/game/tokens/{actorId}/move`
 - `POST /api/v1/game/turn/end`
 - `POST /api/v1/game/turn/legendary`

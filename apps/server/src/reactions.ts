@@ -19,6 +19,15 @@ import { answerAbilityCheck, rollSettledCheck } from "./check-rolls.js";
 import { withOneUsedUp } from "./consumables.js";
 import { deriveEquipment } from "./equipment-derivation.js";
 import { scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "./scrolls.js";
+import {
+  classLevelOf,
+  dropFall,
+  FEATHER_FALL_TAG,
+  landFallWhenAnswered,
+  landFeatherFall,
+  reduceFall,
+  type FallDeps
+} from "./falling.js";
 import { answerCounter as answerCounterPrompt } from "./counter-answers.js";
 import { openDamageWindow, reducedParts, resistedTypeOf, respondToDamage } from "./damage-window.js";
 import { recordRoll, rolledTerms } from "./roll-history.js";
@@ -178,9 +187,73 @@ export function answerReaction(
     case "hit-by-attack":
     case "takes-damage":
       return answerParkedDamage(answer);
+    case "falls":
+      return answerFall(answer);
     case "roll-answer":
       return answerRoll(answer, attackOptions.subtract === true);
   }
+}
+
+/** The deps a fall lands with, from the answer's. */
+const fallDepsOf = ({ deps, commandId }: Answer): FallDeps => ({
+  resolveDefinition: deps.resolveDefinition,
+  ...(deps.catalog ? { catalog: deps.catalog } : {}),
+  random: deps.random,
+  newId: deps.newRollId,
+  now: deps.now,
+  commandId,
+  ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+});
+
+/**
+ * A fall's reaction (SRD Feather Fall, Slow Fall): "use" casts Feather Fall at the falling creature, which then lands
+ * unharmed, or takes the Slow Fall's reduction off the fall's damage. Once every prompt the fall opened is answered,
+ * the fall lands.
+ */
+function answerFall(answer: Answer): ReactionOutcome {
+  const { state, commandId, pending, reactor, use, scope, deps, base, clearPrompt } = answer;
+  const fallId = pending.triggerCommandId;
+  let resolution: ActionResolution | undefined;
+  if (use) {
+    const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
+    const declared = effectiveActions(definition, reactor, deps.catalog).find(
+      (candidate) => candidate.id === pending.actionId
+    );
+    const reaction = declared?.reaction;
+    if (!declared || reaction?.trigger !== "falls") {
+      clearPrompt(false);
+      throw new CommandRejectedError(`${reactor.name} no longer has ${pending.actionName}.`);
+    }
+    if (reaction.response === "reduce-fall-damage") {
+      reduceFall(state, fallId, reaction.perLevel * classLevelOf(definition, reaction.classId));
+      clearPrompt(true);
+    } else {
+      // The cast spends its slot and the Reaction, and its Feather Fall lands on the falling creature.
+      const fallerId = pending.targetActorId ?? reactor.id;
+      resolution = resolveDefinitionAction(
+        state,
+        { ...declared, activation: "reaction" },
+        { actorId: reactor.id, targetIds: [fallerId], commandId, rollMode: null, override: null, commit: true },
+        {
+          random: deps.random,
+          newRollId: deps.newRollId,
+          gmSessionId: deps.gmSessionId,
+          initiatorRole: scope.role,
+          ...(scope.role === "player" ? { initiatorSessionId: scope.sessionId } : {}),
+          now: deps.now,
+          definition,
+          resolveDefinition: deps.resolveDefinition,
+          catalog: deps.catalog
+        }
+      );
+      const faller = state.actors.find((actor) => actor.id === fallerId);
+      if (faller && !faller.effects.some((effect) => effect.tags.includes(FEATHER_FALL_TAG)))
+        landFeatherFall(state, fallerId, reactor.id, reactor.name, `${commandId}:feather-fall`);
+      clearPrompt(true);
+    }
+  } else clearPrompt(false);
+  const events = landFallWhenAnswered(state, fallId, fallDepsOf(answer));
+  return { ...base, used: use, appliedDamage: 0, events, ...(resolution ? { resolution } : {}) };
 }
 
 /** Damage an answer applies, through the typed pipeline and attributed to the creature that dealt it. */
@@ -938,11 +1011,19 @@ function answerDamageRoll(answer: Answer, roller: LiveActor, choice: Readonly<{ 
 /** Drop a reaction prompt without applying its damage (GM housekeeping, e.g. the damage was applied manually). */
 export function dismissReaction(state: GameState, reactionId: string, scope: Initiator) {
   requireGm(scope, "Only the GM can dismiss a reaction prompt.");
-  if (!state.combat.pendingReactions.some((entry) => entry.id === reactionId))
-    throw new CommandRejectedError("That reaction prompt was already answered or dismissed.");
+  const dismissed = state.combat.pendingReactions.find((entry) => entry.id === reactionId);
+  if (!dismissed) throw new CommandRejectedError("That reaction prompt was already answered or dismissed.");
   state.combat = {
     ...state.combat,
     pendingReactions: state.combat.pendingReactions.filter((entry) => entry.id !== reactionId)
   };
   releaseHeldRoll(state, reactionHoldKey(reactionId));
+  // A fall the GM settled by hand: its last prompt gone, the fall is dropped where its creature stands.
+  if (
+    dismissed.kind === "falls" &&
+    !state.combat.pendingReactions.some(
+      (entry) => entry.kind === "falls" && entry.triggerCommandId === dismissed.triggerCommandId
+    )
+  )
+    dropFall(state, dismissed.triggerCommandId);
 }

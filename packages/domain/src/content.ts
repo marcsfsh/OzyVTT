@@ -867,10 +867,12 @@ export type ContentActionSummary = Readonly<{
   area: ContentActionArea | null;
   attackCount: number | null;
   usesLimit: number | null;
-  usesPer: "turn" | "own-turn" | "encounter" | "long-rest" | "short-rest" | "recharge" | null;
+  usesPer: "turn" | "own-turn" | "encounter" | "long-rest" | "short-rest" | "recharge" | "never" | "time" | null;
   /** d6 threshold for usesPer "recharge" ("Recharge 5-6" → 5); rolled automatically at the start of the owner's turn. */ usesRecharge:
     number | null;
   usesPool: string | null;
+  /** For usesPer "time": the hours of game time after the first use before the pool comes back ("1d12", "168"). */
+  usesAfterHours?: string;
   /** Uses one activation spends when it is more than one, or `chosen` when the user picks it (Lay on Hands). */ useCost?:
     number | "chosen";
   requiresEffectTag: string | null;
@@ -887,6 +889,8 @@ export type ContentActionSummary = Readonly<{
   /** How many creatures one use heals when it can be more than one (Prayer of Healing's five). */ healTargets?: number;
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
   /** "Can't take this action again until the start of its next turn." */ legendaryOncePerRound?: true;
+  /** Its own move comes before the rest of it ("moves up to half its Speed, and it makes one Rend attack"), so it can
+   *  be taken move first: `action.resolve`'s `moveFirst`. */ moveFirst?: true;
   /** Taken as one attack of the Attack action (an Unarmed Strike, a Breath Weapon), so it spends one the action has left. */ replacesAttack?: true;
   /** Added to a hit and never taken alone (Sneak Attack, a smite): chosen on an attack's result. */ ridesAHit?: true;
   /** Darts the action makes, each assigned to a target (Magic Missile); see `ActorAction.darts`. */ darts?: number;

@@ -13,7 +13,8 @@ export const paladin: ClassMechanicsModule = {
   features: {
     // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": made in the Level flow until a
     // rest offers it.
-    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "level-up", amount: 2 }] },
+    // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": both, in the rest's step.
+    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "long-rest", amount: 2 }] },
 
     /** The Fighting Style feat catalog plus the inline Blessed Warrior option (consumers union the two). */
     "fighting-style": {
@@ -36,7 +37,7 @@ export const paladin: ClassMechanicsModule = {
 
     /**
      * A pool of five times the Paladin level, back on a Long Rest. Healing spends the points its user picks and
-     * restores that many; curing a poison spends 5 and restores none. Restoring Touch's other conditions stay prose.
+     * restores that many; curing a poison spends 5 and restores none.
      */
     "lay-on-hands": {
       uses: {
@@ -69,6 +70,34 @@ export const paladin: ClassMechanicsModule = {
           useCost: 5,
           endsConditions: ["poisoned"],
           targets: { count: 1, rangeFeet: 5 }
+        }
+      ]
+    },
+
+    /**
+     * Restoring Touch (Paladin 14): 5 points of the Lay on Hands pool end one of six more conditions. Each use ends
+     * the one its user picks, so ending two takes two uses; the printed feature ends them all in one Lay on Hands.
+     */
+    "restoring-touch": {
+      uses: {
+        scaling: {
+          type: "by-level",
+          table: Array.from({ length: 20 }, (_, index) => ({ level: index + 1, limit: 5 * (index + 1) }))
+        },
+        per: "long-rest",
+        pool: "lay-on-hands"
+      },
+      actions: [
+        {
+          id: "lay-on-hands-restoring-touch",
+          name: "Lay on Hands: Restoring Touch",
+          activation: "bonus-action",
+          description:
+            "As a Bonus Action, touch a creature and expend 5 Hit Points from the pool of healing to remove one of these conditions from it: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. Those points don't also restore Hit Points to the creature.",
+          damage: [],
+          useCost: 5,
+          endsConditions: ["blinded", "charmed", "deafened", "frightened", "paralyzed", "stunned"],
+          endsOneCondition: true
         }
       ]
     },

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
   ActionAreaSchema,
+  ActionSchema,
+  AreaTriggerSchema,
   ActorDefinitionSchema,
   DamageDrainSchema,
   ForcedPushSchema,
@@ -101,7 +103,13 @@ export const EncounterTokenSchema = z
     gridSizePx: z.number().positive().max(4096).nullable().default(null),
     gridRotationRadians: z.number().min(-Math.PI).max(Math.PI).nullable().default(null),
     /** Footprint in cells per side; even sizes snap to grid intersections, odd ones to cell centers. */
-    sizeCells: z.number().int().min(1).max(4).default(1)
+    sizeCells: z.number().int().min(1).max(4).default(1),
+    /** Feet above the ground (SRD Flying, Climbing): on a ledge, up a wall or in the air. Absent on the ground. As
+     *  public as the token's position. */
+    altitudeFeet: z.number().int().min(1).max(10000).optional(),
+    /** What holds it up in the air: flying, which the Flying rule can end with a fall, or a levitation, which lowers
+     *  it gently when it ends. Absent on a surface: the ground, a ledge, a wall it climbs. */
+    airborne: z.enum(["fly", "levitate"]).optional()
   })
   .strict();
 export type EncounterTokenPosition = z.infer<typeof EncounterTokenPositionSchema>;
@@ -584,7 +592,7 @@ export const ParkedCastSchema = z
     use: z
       .object({
         key: z.string().min(1).max(120),
-        per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge"]),
+        per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge", "never", "time"]),
         amount: z.number().int().min(1).max(100)
       })
       .strict()
@@ -645,7 +653,8 @@ export const PendingReactionSchema = z
     /** What opened the window: an attack that hit the reactor, an enemy leaving its reach (opportunity attack), an
      *  attack that would hit before its damage (`attack-would-hit`), a creature damaging the reactor, a creature casting
      *  a spell the reactor may counter (`casts-spell`), a roll another creature may answer (`roll-answer`: Cutting
-     *  Words, Countercharm), or damage the reactor is about to take from any source (`takes-damage`). */
+     *  Words, Countercharm), damage the reactor is about to take from any source (`takes-damage`), or a creature
+     *  falling (`falls`). */
     kind: z
       .enum([
         "hit-by-attack",
@@ -654,9 +663,12 @@ export const PendingReactionSchema = z
         "damaged-by-creature",
         "casts-spell",
         "roll-answer",
-        "takes-damage"
+        "takes-damage",
+        "falls"
       ])
       .default("hit-by-attack"),
+    /** falls: how far the falling creature (`targetActorId`) is falling, in feet. */
+    fallFeet: z.number().int().min(0).max(10000).optional(),
     actorId: z.uuid(),
     actionId: z
       .string()
@@ -719,6 +731,25 @@ export const PendingReactionSchema = z
   })
   .strict();
 export type PendingReaction = z.infer<typeof PendingReactionSchema>;
+
+/** A fall held while the reactions it opened (Feather Fall, Slow Fall) wait for their answers (SRD Falling). Its
+ *  damage is rolled once they are answered. GM-only. */
+export const PendingFallSchema = z
+  .object({
+    /** The id the fall's prompts carry as their `triggerCommandId`. */
+    id: z.uuid(),
+    actorId: z.uuid(),
+    feet: z.number().int().min(0).max(10000),
+    /** It falls into water or another liquid, which can halve the damage. */
+    intoWater: z.boolean().default(false),
+    /** The height it lands at: 0 is the ground. */
+    landingAltitudeFeet: z.number().int().min(0).max(10000).default(0),
+    /** Damage taken off the fall by the answers given so far (Slow Fall). */
+    reduction: z.number().int().min(0).max(1000).default(0),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type PendingFall = z.infer<typeof PendingFallSchema>;
 
 /** A player's hit awaiting the GM's Apply (proposal mode, the default), so players never change HP on a creature
  * they don't own. GM-only: never projected to players or the viewer. */
@@ -1044,6 +1075,9 @@ export const SpellZoneSchema = z
     casterId: z.uuid(),
     /** The Concentration cast it ends with; null for a spell that lasts `rounds` from `startedRound`, or until ended. */
     castId: z.string().min(1).max(120).nullable(),
+    /** The effect on its caster that keeps a spell with no Concentration (Glyph of Warding, Guardian of Faith): the
+     *  area lasts while that effect does, in a fight and on the game clock outside one. */
+    effectId: z.string().min(1).max(120).optional(),
     rounds: z.number().int().min(1).max(100).nullable().default(null),
     startedRound: z.number().int().positive(),
     /** The slot level it was cast at, which its damage rolls at. */
@@ -1053,6 +1087,14 @@ export const SpellZoneSchema = z
     annotationId: z.string().min(1).max(120).nullable(),
     /** The template the GM places it with: the spell's own area. Null for an Emanation, which is its caster's. */
     area: ActionAreaSchema.nullable().default(null),
+    /** Where its caster stood at the cast, for an Emanation that stays there (Globe of Invulnerability). */
+    anchor: z.object({ x: z.number(), y: z.number() }).strict().optional(),
+    /** What an item's or a creature's area acts with (spread Caltrops' save and damage), kept here since what left it
+     *  may be gone; a spell's area reads its spell instead. */
+    rule: z
+      .object({ trigger: AreaTriggerSchema, save: ActionSchema.shape.save, damage: ActionSchema.shape.damage })
+      .strict()
+      .optional(),
     /** Damage dealt so far, against a cap the spell prints (Guardian of Faith's 60). */
     damageDealt: z.number().int().nonnegative().max(100000).default(0),
     /** The damage type the caster chose at the cast (Conjure Elemental's element, Transmuted Spell's); absent, the
@@ -1139,6 +1181,11 @@ const sceneCombatShape = {
         .optional(),
       /** The turn's actor has made its one death save (SRD: at the start of its turn). Never projected. */
       deathSaveRolled: z.boolean().optional(),
+      /** The creature whose turn ended just before this one, which opened the window for legendary actions
+       *  (SRD 5.2.1: "Immediately after another creature's turn"); absent on a fight's first turn. `legendaryTakenBy`:
+       *  the creatures that took their one legendary action in that window. Engine bookkeeping, never projected. */
+      afterActorId: z.uuid().optional(),
+      legendaryTakenBy: z.array(z.uuid()).max(50).optional(),
       /** The turn's actor has made an attack roll on its turn (SRD Reckless Attack is decided with the first). Engine
        *  bookkeeping, never projected. */
       attackRolled: z.boolean().optional(),
@@ -1262,7 +1309,11 @@ const sceneCombatShape = {
   /** A player sees only their own (see PendingRuleAskSchema). */
   pendingRuleAsks: z.array(PendingRuleAskSchema).max(10).default([]),
   /** Claimed-PC actorIds whose owner still owes an initiative roll. */
-  pendingInitiative: z.array(z.uuid()).max(200).default([])
+  pendingInitiative: z.array(z.uuid()).max(200).default([]),
+  /** Combatants that rolled Initiative this fight and haven't ended their first turn: a feature that acts "when you
+   *  roll Initiative" and is the creature's to choose (Persistent Rage) may be used until then. Engine bookkeeping,
+   *  never projected. */
+  initiativeWindow: z.array(z.uuid()).max(200).default([])
 };
 
 /** A parked scene's frozen combat: same fields and invariants as the live combat, minus the map (the Scene owns that). */
@@ -1309,6 +1360,52 @@ export const CombatStateSchema = z
     /** Prepared scenes the GM parks and resumes. The active scene's own `combat` stays empty; its live copy is the top-level fields. */
     scenes: z.array(SceneSchema).max(20).default([]),
     activeSceneId: z.uuid().nullable().default(null),
+    /** Falls waiting on the reactions they opened, on the live table only. GM-only (see PendingFallSchema). */
+    pendingFalls: z.array(PendingFallSchema).max(20).default([]),
+    /** A move stopped at the edge of the reach it leaves while the Opportunity Attacks it provoked are answered
+     *  (`held-moves.ts`): where it waits, where it was going, the prompts it waits on, the movement the rest of the way
+     *  cost, and the creatures it drags. Live table only; GM-only. */
+    heldMove: z
+      .object({
+        actorId: z.uuid(),
+        at: EncounterTokenPositionSchema,
+        to: EncounterTokenPositionSchema,
+        toAltitudeFeet: z.number().int().min(1).max(10000).optional(),
+        airborne: z.enum(["fly", "levitate"]).optional(),
+        promptIds: z.array(z.uuid()).max(20),
+        refundFeet: z.number().min(0).max(100000),
+        dragged: z.array(z.uuid()).max(20)
+      })
+      .strict()
+      .nullable()
+      .default(null),
+    /** Time Stop (SRD 5.2.1): the caster takes `turnsLeft` more turns in a row, until it affects another creature or
+     *  moves more than 1,000 feet from `at`, where it cast the spell. Live table only; GM-only. */
+    timeStop: z
+      .object({
+        actorId: z.uuid(),
+        turnsLeft: z.number().int().min(0).max(5),
+        at: EncounterTokenPositionSchema.nullable()
+      })
+      .strict()
+      .nullable()
+      .default(null),
+    /** Creatures gone from the fight's plane (Banishment, Blink's Ethereal turns), with the space each left and its
+     *  height there, so it comes back to that space or the nearest unoccupied one (`off-plane.ts`). Live table only;
+     *  GM-only, since a creature the party never saw leave would be placed by it. */
+    offPlane: z
+      .array(
+        z
+          .object({
+            actorId: z.uuid(),
+            position: EncounterTokenPositionSchema,
+            altitudeFeet: z.number().int().min(1).max(10000).optional(),
+            airborne: z.enum(["fly", "levitate"]).optional()
+          })
+          .strict()
+      )
+      .max(50)
+      .default([]),
     /** Turn time-travel (live fight only): `historyCursor` is the snapshot index being viewed (null = live);
      * `historyDirty` means state changed while rewound, so moving on needs GM confirmation. */
     historyCursor: z.number().int().nonnegative().nullable().default(null),
@@ -1443,6 +1540,9 @@ export const RestStateSchema = z
     clockMinutes: z.number().int().min(0).max(59).default(0),
     /** Characters whose players asked for a Long Rest, oldest first. */
     requests: z.array(z.uuid()).max(50).default([]),
+    /** The hour of the day dawn comes, when the GM keeps the clock: what "regains at dawn" (a wand's charges) comes
+     *  back as the clock passes it. Null: at each Long Rest. GM-set. */
+    dawnHour: z.number().int().min(0).max(23).nullable().default(null),
     shortRest: PartyShortRestSchema.nullable().default(null)
   })
   .strict();

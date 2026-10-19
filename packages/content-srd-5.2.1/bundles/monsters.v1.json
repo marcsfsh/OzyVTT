@@ -411,6 +411,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
     "attack": {
      "bonus": 11,
      "reachFeet": 10
@@ -570,6 +575,11 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "move": {
+     "speed": "half",
+     "mode": "fly",
+     "provokes": true
     },
     "castsSpells": {
      "ability": "cha",
@@ -913,6 +923,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
     "attack": {
      "bonus": 11,
      "reachFeet": 10
@@ -1229,6 +1244,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
     },
     "attack": {
      "bonus": 12,
@@ -1637,6 +1657,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
     "attack": {
      "bonus": 11,
      "reachFeet": 10
@@ -1954,6 +1979,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
     "attack": {
      "bonus": 14,
      "reachFeet": 10
@@ -2265,6 +2295,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
     "attack": {
      "bonus": 11,
      "reachFeet": 10
@@ -2551,6 +2586,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
     "attack": {
      "bonus": 14,
      "reachFeet": 10
@@ -2831,6 +2871,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
     "attack": {
      "bonus": 13,
      "reachFeet": 10
@@ -3057,6 +3102,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
     },
     "attack": {
      "bonus": 11,
@@ -3641,6 +3691,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
     "attack": {
      "bonus": 15,
      "reachFeet": 15
@@ -3806,6 +3861,11 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "move": {
+     "speed": "half",
+     "mode": "fly",
+     "provokes": true
     },
     "castsSpells": {
      "ability": "cha",
@@ -4157,6 +4217,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
     "attack": {
      "bonus": 14,
      "reachFeet": 15
@@ -4479,6 +4544,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
     },
     "attack": {
      "bonus": 16,
@@ -4899,6 +4969,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
     "attack": {
      "bonus": 15,
      "reachFeet": 15
@@ -5222,6 +5297,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
     "attack": {
      "bonus": 17,
      "reachFeet": 15
@@ -5539,6 +5619,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
     "attack": {
      "bonus": 15,
      "reachFeet": 15
@@ -5832,6 +5917,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
     "attack": {
      "bonus": 17,
      "reachFeet": 15
@@ -6124,6 +6214,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
+    },
     "attack": {
      "bonus": 17,
      "reachFeet": 15
@@ -6368,6 +6463,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
     },
     "attack": {
      "bonus": 14,
@@ -8429,7 +8529,10 @@
     "name": "Teleport",
     "activation": "bonus-action",
     "description": "The balor teleports itself or a willing demon within 10 feet of itself up to 60 feet to an unoccupied space the balor can see.",
-    "damage": []
+    "damage": [],
+    "teleport": {
+     "feet": 60
+    }
    },
    {
     "id": "flame-whip",
@@ -10198,6 +10301,9 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 4
+    },
+    "teleport": {
+     "feet": 40
     }
    }
   ],
@@ -11547,7 +11653,11 @@
     "name": "Leap",
     "activation": "bonus-action",
     "description": "The bulette jumps up to 30 feet by spending 10 feet of movement.",
-    "damage": []
+    "damage": [],
+    "leap": {
+     "feet": 30,
+     "costFeet": 10
+    }
    },
    {
     "id": "multiattack",
@@ -11905,6 +12015,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "move": {
+     "speed": "full",
+     "provokes": false,
+     "first": true
     }
    },
    {
@@ -16204,7 +16319,10 @@
     "name": "Tree Stride",
     "activation": "bonus-action",
     "description": "If within 5 feet of a Large or bigger tree, the dryad teleports to an unoccupied space within 5 feet of a second Large or bigger tree that is within 60 feet of the previous tree.",
-    "damage": []
+    "damage": [],
+    "teleport": {
+     "feet": 65
+    }
    },
    {
     "id": "vine-lash",
@@ -18748,7 +18866,12 @@
       "type": "acid"
      }
     ],
-    "reminder": "An engulfed target is suffocating, can't cast spells with a Verbal component, has the Restrained condition."
+    "reminder": "An engulfed target is suffocating, can't cast spells with a Verbal component, has the Restrained condition.",
+    "move": {
+     "speed": "full",
+     "provokes": false,
+     "first": true
+    }
    }
   ],
   "token": {
@@ -19371,7 +19494,11 @@
     "name": "Leap",
     "activation": "bonus-action",
     "description": "The ape jumps up to 30 feet by spending 10 feet of movement.",
-    "damage": []
+    "damage": [],
+    "leap": {
+     "feet": 30,
+     "costFeet": 10
+    }
    },
    {
     "id": "multiattack",
@@ -20906,6 +21033,11 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
     }
    }
   ],
@@ -21101,6 +21233,11 @@
      "shape": "cube",
      "sizeFeet": 10,
      "widthFeet": null
+    },
+    "move": {
+     "speed": "full",
+     "mode": "swim",
+     "provokes": true
     }
    },
    {
@@ -21596,7 +21733,12 @@
     "name": "Bubble Dash",
     "activation": "bonus-action",
     "description": "While underwater, the seahorse moves up to half its Swim Speed without provoking Opportunity Attacks.",
-    "damage": []
+    "damage": [],
+    "move": {
+     "speed": "half",
+     "mode": "swim",
+     "provokes": false
+    }
    },
    {
     "id": "ram",
@@ -23121,6 +23263,11 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
     }
    },
    {
@@ -25264,7 +25411,11 @@
     "name": "Leap",
     "activation": "bonus-action",
     "description": "The half-dragon jumps up to 30 feet by spending 10 feet of movement.",
-    "damage": []
+    "damage": [],
+    "leap": {
+     "feet": 30,
+     "costFeet": 10
+    }
    },
    {
     "id": "multiattack",
@@ -25756,7 +25907,11 @@
     "name": "Leap",
     "activation": "bonus-action",
     "description": "The hezrou jumps up to 30 feet by spending 10 feet of movement.",
-    "damage": []
+    "damage": [],
+    "leap": {
+     "feet": 30,
+     "costFeet": 10
+    }
    },
    {
     "id": "multiattack",
@@ -28823,6 +28978,10 @@
      "shape": "emanation",
      "sizeFeet": 15,
      "widthFeet": null
+    },
+    "move": {
+     "speed": "full",
+     "provokes": true
     }
    },
    {
@@ -29012,7 +29171,11 @@
     "name": "Leap",
     "activation": "bonus-action",
     "description": "The lamia jumps up to 30 feet by spending 10 feet of movement.",
-    "damage": []
+    "damage": [],
+    "leap": {
+     "feet": 30,
+     "costFeet": 10
+    }
    },
    {
     "id": "multiattack",
@@ -29325,6 +29488,9 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "teleport": {
+     "feet": 60
     }
    },
    {
@@ -30735,6 +30901,9 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "teleport": {
+     "feet": 120
     }
    },
    {
@@ -32212,6 +32381,9 @@
      "trigger": "hit-by-attack",
      "response": "ac-bonus",
      "amount": 2
+    },
+    "teleport": {
+     "feet": 60
     }
    },
    {
@@ -32558,7 +32730,10 @@
     "name": "Teleport",
     "activation": "action",
     "description": "The nalfeshnee teleports up to 120 feet to an unoccupied space it can see.",
-    "damage": []
+    "damage": [],
+    "teleport": {
+     "feet": 120
+    }
    }
   ],
   "token": {
@@ -33243,6 +33418,11 @@
      "shape": "cube",
      "sizeFeet": 5,
      "widthFeet": null
+    },
+    "move": {
+     "speed": "full",
+     "mode": "swim",
+     "provokes": true
     }
    },
    {
@@ -37791,6 +37971,11 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "move": {
+     "speed": "half",
+     "mode": "fly",
+     "provokes": false
     }
    },
    {
@@ -38340,7 +38525,13 @@
     "name": "Aquatic Charge",
     "activation": "bonus-action",
     "description": "The sahuagin swims up to its Swim Speed straight toward an enemy it can see.",
-    "damage": []
+    "damage": [],
+    "move": {
+     "speed": "full",
+     "mode": "swim",
+     "provokes": true,
+     "straight": true
+    }
    },
    {
     "id": "multiattack",
@@ -39160,7 +39351,12 @@
     "name": "Bubble Dash",
     "activation": "action",
     "description": "While underwater, the seahorse moves up to its Swim Speed without provoking Opportunity Attacks.",
-    "damage": []
+    "damage": [],
+    "move": {
+     "speed": "full",
+     "mode": "swim",
+     "provokes": false
+    }
    }
   ],
   "token": {
@@ -40208,6 +40404,9 @@
      "shape": "emanation",
      "sizeFeet": 10,
      "widthFeet": null
+    },
+    "teleport": {
+     "feet": 60
     }
    },
    {
@@ -43690,6 +43889,11 @@
     "damage": [],
     "legendary": {
      "cost": 1
+    },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
     }
    },
    {
@@ -43766,6 +43970,10 @@
      "shape": "emanation",
      "sizeFeet": 60,
      "widthFeet": null
+    },
+    "move": {
+     "speed": "full",
+     "provokes": true
     }
    },
    {
@@ -44560,7 +44768,12 @@
     "name": "Charge",
     "activation": "bonus-action",
     "description": "The troll moves up to half its Speed straight toward an enemy it can see.",
-    "damage": []
+    "damage": [],
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "straight": true
+    }
    },
    {
     "id": "multiattack",
@@ -44966,6 +45179,11 @@
     "legendary": {
      "cost": 1
     },
+    "move": {
+     "speed": "half",
+     "provokes": false,
+     "first": true
+    },
     "attack": {
      "bonus": 7,
      "reachFeet": 5
@@ -45236,6 +45454,11 @@
     ],
     "legendary": {
      "cost": 1
+    },
+    "move": {
+     "speed": "half",
+     "provokes": true,
+     "first": true
     },
     "attack": {
      "bonus": 9,
@@ -47754,7 +47977,11 @@
     "formOnly": [
      "tiger",
      "hybrid"
-    ]
+    ],
+    "move": {
+     "speed": "full",
+     "provokes": false
+    }
    },
    {
     "id": "bite",
@@ -49300,7 +49527,12 @@
     "name": "Charge",
     "activation": "bonus-action",
     "description": "The xorn moves up to its Speed or Burrow Speed straight toward an enemy it can sense.",
-    "damage": []
+    "damage": [],
+    "move": {
+     "speed": "full",
+     "provokes": true,
+     "straight": true
+    }
    },
    {
     "id": "multiattack",

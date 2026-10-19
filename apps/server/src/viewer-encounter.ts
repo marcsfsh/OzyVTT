@@ -92,7 +92,9 @@ export function projectViewerEncounterScene(
           // Ids parallel the labels so the shared screen picks the same glyphs as the table; public actors only.
           conditionIds: actor.conditions.map((condition) => condition.id),
           ...(actor.tokenAssetId ? { tokenAssetId: actor.tokenAssetId } : {}),
-          ...(displayStyle ? { healthDisplay: { style: displayStyle } } : {})
+          ...(displayStyle ? { healthDisplay: { style: displayStyle } } : {}),
+          // Height is where the token is, as public as its position.
+          ...(token.altitudeFeet ? { altitudeFeet: token.altitudeFeet } : {})
         }
       ];
     }),

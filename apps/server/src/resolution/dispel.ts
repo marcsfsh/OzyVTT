@@ -62,6 +62,10 @@ function dispel(ctx: ResolveContext, printed: number, target: LiveActor | undefi
   const zone =
     input.zoneId !== undefined ? state.combat.spellZones.find((candidate) => candidate.id === input.zoneId) : undefined;
   if (input.zoneId !== undefined && !zone) ctx.warnings.push("That spell's area has already ended.");
+  if (zone?.rule) {
+    ctx.warnings.push(`${zone.name} is no spell, so ${action.name} leaves it.`);
+    return;
+  }
   if (zone) {
     if (ends(ctx, zone.level, automatic, zone.name)) narrate(ctx, endSpellZone(state, zone));
     return;

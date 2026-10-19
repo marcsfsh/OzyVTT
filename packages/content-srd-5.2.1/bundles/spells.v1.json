@@ -363,6 +363,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "alarm",
+     "activation": "other",
+     "when": "Whenever a creature other than your allies enters the warded area, the alarm alerts you.",
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter"
+      ],
+      "alerts": true,
+      "affects": "enemies"
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -958,6 +973,27 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "barrier",
+     "activation": "other",
+     "when": "Creatures other than Constructs and Undead can't pass or reach through the Emanation.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 10,
+      "bars": {
+       "way": "both",
+       "except": [
+        "construct",
+        "undead"
+       ],
+       "reach": true
+      }
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -1560,6 +1596,33 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "aura",
+     "activation": "other",
+     "when": "You and your allies in the aura have Resistance to Necrotic damage; an ally at 0 Hit Points that starts its turn there regains 1 Hit Point.",
+     "damage": [],
+     "zone": {
+      "on": [
+       "start-turn"
+      ],
+      "around": "caster",
+      "feet": 30,
+      "affects": "allies",
+      "holds": {
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "necrotic"
+         ]
+        }
+       ]
+      },
+      "revives": 1
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -1817,6 +1880,13 @@
     "perSlot": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Banished",
+    "tags": [
+     "off-plane"
+    ],
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -2229,7 +2299,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that enters the area or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "when": "A creature that enters the area or ends its turn there makes the save. A creature makes this save only once per turn. The area is Difficult Terrain.",
      "save": {
       "ability": "str",
       "successDamage": "none",
@@ -2248,7 +2318,10 @@
        "enter",
        "end-turn"
       ],
-      "oncePerTurn": true
+      "oncePerTurn": true,
+      "terrain": {
+       "cost": 2
+      }
      }
     }
    ],
@@ -2317,7 +2390,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that enters the wall's space or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "when": "A creature that enters the wall's space or ends its turn there makes the save. A creature makes this save only once per turn. Its space is Difficult Terrain.",
      "save": {
       "ability": "dex",
       "successDamage": "half",
@@ -2334,7 +2407,10 @@
        "enter",
        "end-turn"
       ],
-      "oncePerTurn": true
+      "oncePerTurn": true,
+      "terrain": {
+       "cost": 2
+      }
      }
     }
    ],
@@ -2738,7 +2814,22 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Blink",
+    "tags": [
+     "blink"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -2982,7 +3073,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 5,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [
@@ -3909,7 +4004,8 @@
        "enter",
        "end-turn"
       ],
-      "oncePerTurn": true
+      "oncePerTurn": true,
+      "drifts": 10
      }
     }
    ],
@@ -4460,7 +4556,8 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "areaPerSlot": 5
   },
   "classes": [
    "bard",
@@ -4979,6 +5076,23 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "ground",
+     "activation": "other",
+     "when": "The ground in the Emanation is Difficult Terrain for your enemies.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 15,
+      "terrain": {
+       "cost": 2,
+       "for": "enemies"
+      }
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -5634,7 +5748,8 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "areaPerSlot": 5
   },
   "classes": [
    "cleric",
@@ -6700,7 +6815,12 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "teleport": {
+    "feet": 500,
+    "unseen": true,
+    "failDamage": "4d6"
+   }
   },
   "classes": [
    "bard",
@@ -7042,6 +7162,17 @@
     "count": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Dissonant Whispers",
+    "tags": [
+     "flees-with-reaction"
+    ],
+    "duration": {
+     "type": "rounds",
+     "rounds": 1
+    },
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -7951,10 +8082,11 @@
   },
   "save": {
    "ability": "dex",
-   "successDamage": "half",
+   "successDamage": "none",
    "failureConditions": [
     "prone"
-   ]
+   ],
+   "breaksConcentration": true
   },
   "target": {
    "type": "creature",
@@ -7965,10 +8097,38 @@
    "size": 100,
    "unit": "feet"
   },
-  "area": null,
+  "area": {
+   "shape": "cylinder",
+   "sizeFeet": 100,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "tremor",
+     "activation": "other",
+     "when": "At the end of each of your turns, each creature on the ground in the area makes the save: Prone and its Concentration broken on a failure. The ground is Difficult Terrain.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": [
+       "prone"
+      ],
+      "breaksConcentration": true
+     },
+     "damage": [],
+     "zone": {
+      "on": [
+       "caster-turn-end"
+      ],
+      "terrain": {
+       "cost": 2
+      }
+     }
+    }
+   ],
    "healing": null,
    "persistsWithoutTargets": true
   },
@@ -8553,6 +8713,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "ground",
+     "activation": "other",
+     "when": "The plants turn the ground in the area into Difficult Terrain.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "terrain": {
+       "cost": 2,
+       "kind": "plants"
+      }
+     }
+    }
+   ],
    "healing": null,
    "persistsWithoutTargets": true
   },
@@ -8655,7 +8830,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Etherealness",
+    "tags": [
+     "off-plane"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -9216,7 +9405,27 @@
    "targets": {
     "count": 5
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Feather Fall",
+    "tags": [
+     "feather-fall"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   },
+   "reaction": {
+    "trigger": "falls",
+    "response": "cast-on-faller",
+    "rangeFeet": 60
+   }
   },
   "classes": [
    "bard",
@@ -10142,7 +10351,15 @@
        "formula": "2d6",
        "type": "fire"
       }
-     ]
+     ],
+     "area": {
+      "shape": "sphere",
+      "sizeFeet": 5,
+      "widthFeet": null
+     },
+     "movesArea": {
+      "feet": 30
+     }
     }
    ],
    "healing": null
@@ -10466,7 +10683,8 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "areaPerSlot": 20
   },
   "sight": {
    "area": {
@@ -10577,10 +10795,47 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 200,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
+   "damageTypes": [
+    "radiant",
+    "necrotic"
+   ],
+   "laterActions": [
+    {
+     "name": "ward",
+     "activation": "other",
+     "when": "An Aberration, Celestial, Elemental, Fey, Fiend or Undead that enters the area for the first time on a turn or ends its turn there takes the damage. No creature can teleport into the area.",
+     "damage": [
+      {
+       "formula": "5d10",
+       "type": "radiant"
+      }
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "types": [
+       "aberration",
+       "celestial",
+       "elemental",
+       "fey",
+       "fiend",
+       "undead"
+      ],
+      "noTeleport": true
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -11503,6 +11758,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "barrier",
+     "activation": "other",
+     "when": "A spell of level 5 or lower cast from outside the barrier can't affect anything within it.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 10,
+      "stays": true,
+      "wardsSpells": 5
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -11583,6 +11853,41 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "damageTypes": [
+    "thunder",
+    "acid",
+    "cold",
+    "fire",
+    "lightning"
+   ],
+   "laterActions": [
+    {
+     "name": "explosive rune",
+     "activation": "other",
+     "when": "A creature that steps onto the glyph sets it off: each creature in the 20-foot-radius Sphere makes the save, and the spell ends.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "5d8",
+       "type": "thunder"
+      }
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "spell-end"
+      ],
+      "around": "point",
+      "feet": 5,
+      "once": true,
+      "hidden": true
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -11729,7 +12034,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that enters the area or ends its turn there must also succeed on the save or fall Prone.",
+     "when": "A creature that enters the area or ends its turn there must also succeed on the save or fall Prone. The grease is Difficult Terrain.",
      "save": {
       "ability": "dex",
       "successDamage": "none",
@@ -11742,7 +12047,10 @@
       "on": [
        "enter",
        "end-turn"
-      ]
+      ],
+      "terrain": {
+       "cost": 2
+      }
      }
     }
    ],
@@ -13664,6 +13972,51 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "aura",
+     "activation": "other",
+     "when": "You and your allies in the aura have Advantage on saving throws, and attack rolls against them have Disadvantage; a Fiend or an Undead that hits one with a melee attack makes a Constitution save or is Blinded.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 30,
+      "affects": "allies",
+      "holds": {
+       "modifiers": [
+        {
+         "type": "roll-mode",
+         "roll": "save",
+         "mode": "advantage"
+        },
+        {
+         "type": "roll-mode",
+         "roll": "incoming-attack",
+         "mode": "disadvantage",
+         "when": [
+          {
+           "type": "on-attack-roll"
+          }
+         ]
+        }
+       ],
+       "struck": {
+        "creatureTypes": [
+         "fiend",
+         "undead"
+        ],
+        "save": {
+         "ability": "con",
+         "conditions": [
+          "blinded"
+         ]
+        }
+       }
+      }
+     }
+    }
+   ],
    "healing": null,
    "picksInArea": true
   },
@@ -14069,6 +14422,22 @@
      "type": "cold"
     }
    ],
+   "laterActions": [
+    {
+     "name": "ground",
+     "activation": "other",
+     "when": "Hailstones turn the ground in the Cylinder into Difficult Terrain until the end of your next turn.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "terrain": {
+       "cost": 2,
+       "kind": "ice"
+      },
+      "untilCasterNextTurnEnd": true
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -14284,6 +14653,13 @@
     "count": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Imprisoned",
+    "tags": [
+     "off-plane"
+    ],
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -14371,7 +14747,8 @@
        "enter",
        "end-turn"
       ],
-      "oncePerTurn": true
+      "oncePerTurn": true,
+      "drifts": 10
      }
     }
    ],
@@ -14560,7 +14937,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that enters the area for the first time on a turn or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "when": "A creature that enters the area for the first time on a turn or ends its turn there makes the save. A creature makes this save only once per turn. The area is Difficult Terrain.",
      "save": {
       "ability": "con",
       "successDamage": "half",
@@ -14577,7 +14954,10 @@
        "enter",
        "end-turn"
       ],
-      "oncePerTurn": true
+      "oncePerTurn": true,
+      "terrain": {
+       "cost": 2
+      }
      }
     }
    ],
@@ -14890,7 +15270,29 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "movement",
+      "rule": "leap",
+      "feet": 30,
+      "costFeet": 10
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Jump",
+    "tags": [
+     "jump"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "druid",
@@ -15171,6 +15573,13 @@
     "count": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Levitate",
+    "tags": [
+     "levitating"
+    ],
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -15814,6 +16223,27 @@
    "attacks": 0,
    "damage": [],
    "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "barrier",
+     "activation": "other",
+     "when": "Celestials, Elementals, Fey, Fiends and Undead can't willingly enter the Cylinder.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "bars": {
+       "way": "in",
+       "types": [
+        "celestial",
+        "elemental",
+        "fey",
+        "fiend",
+        "undead"
+       ]
+      }
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -16716,6 +17146,21 @@
     "count": 1
    },
    "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Maze",
+    "tags": [
+     "off-plane"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "rounds",
+     "rounds": 100
+    }
+   },
    "seenTargets": true
   },
   "classes": [
@@ -17244,7 +17689,23 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Mirror Image",
+    "tags": [
+     "mirror-image",
+     "mirror-image-3"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "bard",
@@ -17341,7 +17802,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "teleport": {
+    "feet": 30
+   }
   },
   "classes": [
    "sorcerer",
@@ -17512,6 +17976,21 @@
        "end-turn"
       ],
       "oncePerTurn": true
+     }
+    },
+    {
+     "name": "move",
+     "activation": "action",
+     "when": "On your later turns, a Magic action moves the Cylinder up to 60 feet; a creature it moves onto makes the save.",
+     "laterTurnsOnly": true,
+     "damage": [],
+     "area": {
+      "shape": "cylinder",
+      "sizeFeet": 5,
+      "widthFeet": null
+     },
+     "movesArea": {
+      "feet": 60
      }
     }
    ],
@@ -17728,6 +18207,39 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "aura",
+     "activation": "other",
+     "when": "You and your allies in the aura have a +10 bonus to Dexterity (Stealth) checks.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 30,
+      "affects": "allies",
+      "holds": {
+       "modifiers": [
+        {
+         "type": "check-bonus",
+         "amount": 10,
+         "when": [
+          {
+           "type": "on-ability-check"
+          },
+          {
+           "type": "skill-is",
+           "skills": [
+            "stealth"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    }
+   ],
    "healing": null,
    "picksInArea": true
   },
@@ -18271,6 +18783,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "ground",
+     "activation": "other",
+     "when": "A creature moving through the overgrown area spends 4 feet of movement for every foot.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "terrain": {
+       "cost": 4,
+       "kind": "plants"
+      }
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -21637,6 +22164,22 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "aura",
+     "activation": "other",
+     "when": "A creature inside the Sphere has the Deafened condition.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "holds": {
+       "conditions": [
+        "deafened"
+       ]
+      }
+     }
+    }
+   ],
    "healing": null,
    "silencesArea": true
   },
@@ -21864,7 +22407,8 @@
    "successDamage": "none",
    "failureConditions": [
     "prone"
-   ]
+   ],
+   "breaksConcentration": true
   },
   "target": {
    "type": "creature",
@@ -21884,20 +22428,25 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration.",
+     "when": "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration. The ground is Difficult Terrain.",
      "save": {
       "ability": "dex",
       "successDamage": "none",
       "failureConditions": [
        "prone"
-      ]
+      ],
+      "breaksConcentration": true
      },
      "damage": [],
      "zone": {
       "on": [
        "enter",
        "start-turn"
-      ]
+      ],
+      "terrain": {
+       "cost": 2,
+       "kind": "ice"
+      }
      }
     }
    ],
@@ -22477,7 +23026,7 @@
     {
      "name": "spikes",
      "activation": "other",
-     "when": "A creature that moves into or within the area takes the damage for every 5 feet it travels.",
+     "when": "A creature that moves into or within the area takes the damage for every 5 feet it travels. The area is Difficult Terrain.",
      "damage": [
       {
        "formula": "2d4",
@@ -22487,7 +23036,11 @@
      "zone": {
       "on": [
        "travel"
-      ]
+      ],
+      "terrain": {
+       "cost": 2,
+       "kind": "plants"
+      }
      }
     }
    ],
@@ -25231,7 +25784,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that enters a space in the wall for the first time on a turn or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "when": "A creature that enters a space in the wall for the first time on a turn or ends its turn there makes the save. A creature makes this save only once per turn. Moving through the wall costs 4 feet for every foot.",
      "save": {
       "ability": "dex",
       "successDamage": "half",
@@ -25248,7 +25801,11 @@
        "enter",
        "end-turn"
       ],
-      "oncePerTurn": true
+      "oncePerTurn": true,
+      "terrain": {
+       "cost": 4,
+       "kind": "plants"
+      }
      }
     }
    ],
@@ -25503,7 +26060,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action.",
+     "when": "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action. The webs are Difficult Terrain.",
      "save": {
       "ability": "dex",
       "successDamage": "none",
@@ -25516,7 +26073,11 @@
       "on": [
        "enter",
        "start-turn"
-      ]
+      ],
+      "terrain": {
+       "cost": 2,
+       "kind": "webs"
+      }
      }
     }
    ],

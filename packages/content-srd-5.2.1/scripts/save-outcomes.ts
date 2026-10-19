@@ -30,6 +30,7 @@ export type SaveOutcome = {
   failurePush?: ForcedPush;
   advantageAtSize?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
   failureEndsForm?: true;
+  breaksConcentration?: true;
 };
 
 /** The push a failure clause prints: "is pushed 10 feet away from you", "pushed up to 30 feet straight away from the
@@ -313,6 +314,10 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   "vitriolic-sphere": {
     ongoingDamage: { damage: [{ formula: "5d4", type: "acid" }], at: "bearer-turn-end" }
   },
+  // "On a failed save, a creature has the Prone condition, and its Concentration is broken"; the tremor deals no damage.
+  earthquake: { successDamage: "none", breaksConcentration: true },
+  // "Have the Prone condition and lose Concentration".
+  "sleet-storm": { breaksConcentration: true },
   // "Make a DC 15 Intelligence saving throw" yourself: "you take 6d6 Psychic damage and have the Incapacitated condition
   // until you finish a Long Rest" (`spell-effects.ts` makes it the caster's own save).
   "contact-other-plane": { failureDuration: { type: "until-rest", rest: "long" } },

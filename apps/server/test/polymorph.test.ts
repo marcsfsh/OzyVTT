@@ -26,6 +26,17 @@ const concentrating = (fight: ReturnType<typeof table>) =>
   fight.actor(HERO).effects.some((effect) => effect.tags.includes("concentrating"));
 
 describe("Polymorph", () => {
+  it("lets a player pick only an SRD Beast: a stat block the GM made isn't offered to them", () => {
+    for (const role of ["player", "gm"] as const) {
+      const fight = table(druid(7), { [FOE]: "ogre" }, { initiatorRole: role });
+      const secret = { ...resolverOf(fight.state)("wolf")!, name: "Shadow Wolf" };
+      fight.state.definitions.push({ id: "hb-shadow-wolf-0a1b2c", definition: secret });
+      const cast = () => fight.resolve(HERO, "spell-polymorph", { targetIds: [FOE], form: "hb-shadow-wolf-0a1b2c" });
+      if (role === "player") expect(cast).toThrowError("That form isn't in the bestiary.");
+      else expect(cast).not.toThrow();
+    }
+  });
+
   it("turns an ogre that fails its save into a Brown Bear with the bear's Hit Points as Temporary Hit Points", () => {
     const fight = table(druid(7), { [FOE]: "ogre" });
     const hp = { ...fight.actor(FOE).hp };

@@ -27,6 +27,7 @@ export function TokenContextMenu({
   reactionUsed,
   placed,
   moveModes,
+  height,
   onOpenSheet,
   onReturnToTray,
   onClose
@@ -40,6 +41,8 @@ export function TokenContextMenu({
   placed: boolean;
   /** How the creature whose move counts now travels on its next drag. */
   moveModes?: ReactNode;
+  /** How high the creature is, and the way to change it. */
+  height?: ReactNode;
   onOpenSheet: () => void;
   onReturnToTray: () => void;
   onClose: () => void;
@@ -85,6 +88,7 @@ export function TokenContextMenu({
         reactionUsed={reactionUsed}
         placed={placed}
         moveModes={moveModes}
+        height={height}
         onOpenSheet={() => {
           onOpenSheet();
           onClose();
@@ -112,6 +116,7 @@ export function TokenControls({
   reactionUsed,
   placed,
   moveModes,
+  height,
   onOpenSheet,
   onReturnToTray,
   onPickImage
@@ -122,6 +127,7 @@ export function TokenControls({
   reactionUsed: boolean;
   placed: boolean;
   moveModes?: ReactNode;
+  height?: ReactNode;
   onOpenSheet: () => void;
   onReturnToTray: () => void;
   onPickImage: () => void;
@@ -184,6 +190,7 @@ export function TokenControls({
   return (
     <>
       {moveModes}
+      {height}
       {role === "gm" && <HpAdjust actor={actor} controls={["damage", "heal"]} onFeedback={setFeedback} />}
       {role === "gm" && (
         <label className="token-context-size">
