@@ -398,7 +398,23 @@ export function SpellsTab({
         </button>
       );
     if (!castable) return null;
-    if (row.state === "book") return <span className="cs-spell-where">In the book</span>;
+    if (row.state === "book") {
+      // A Wizard's Ritual Adept casts a ritual from the book unprepared; the server lists that cast while it may.
+      const ritualId = `spell-${row.id}-ritual`;
+      if (row.ritual && serverActions.some((action) => action.id === ritualId))
+        return (
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={busy}
+            aria-label={`Cast ${row.name} as a Ritual`}
+            onClick={() => castSpellAction(ritualId)}
+          >
+            Ritual
+          </Button>
+        );
+      return <span className="cs-spell-where">In the book</span>;
+    }
     if (row.state === "unprepared" && keepsList) {
       if (row.spell?.ritualActionId)
         return (

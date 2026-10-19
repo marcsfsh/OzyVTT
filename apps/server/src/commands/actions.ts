@@ -1,4 +1,4 @@
-import type { AnnotationPoint, AnnotationShapeKind, GameState, RollRecord } from "@vtt/domain";
+import type { ActionResolution, AnnotationPoint, AnnotationShapeKind, GameState, RollRecord } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry, templateOfArea } from "../annotations.js";
@@ -15,7 +15,7 @@ import { damageAdjustmentDetail } from "../hit-points.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
-import { effectiveModeFor, overrideWaives } from "../rules-families.js";
+import { effectiveModeFor, overrideWaives, rulesInForce } from "../rules-families.js";
 import { looseRollPlan, routeForTap, slotsModeFor, spendLooseUses } from "../tap-routing.js";
 import { conditionChoicesOf, isItemActionId, upcastAction } from "../item-actions.js";
 import { BURNING_TAG, PUT_OUT_FIRE_ACTION_ID, putOutFire } from "../hazards.js";
@@ -29,12 +29,16 @@ import { checkPlan } from "../ability-checks.js";
 import { rollSettledCheck } from "../check-rolls.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { SCROLL_UNREADABLE, scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "../scrolls.js";
-import { castSlotLevel } from "../resolution/economy.js";
+import { castSlotLevel, untrainedArmorCast } from "../resolution/economy.js";
 import { zoneRowOf } from "../spell-zones.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
-import { applyLooseHealing, looseHealTargets } from "../loose-healing.js";
+import { applyLooseHealing, looseHealTargets, partyMember } from "../loose-healing.js";
 import { countOptionUse } from "../option-uses.js";
+import { castLine, castSpellOf } from "../cast-narration.js";
+import { castingMinutesOf } from "../resolution/long-casting.js";
+import { passTime } from "../rests.js";
+import { standsInSilence } from "../silence.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -42,6 +46,10 @@ import { defineCommand } from "./pipeline.js";
 
 /** The fight's own ammunition rule, also held to outside one. */
 const NO_AMMUNITION = "attack.no-ammunition";
+const UNTRAINED_ARMOR = "spell.untrained-armor";
+
+/** Who a player's cast outside a fight may name, said the same way whether the creature is hidden or gone. */
+export const OUTSIDE_FIGHT_TARGETS = "Choose members of the party or creatures you can see.";
 
 export const actionCommands = [
   defineCommand({
@@ -102,6 +110,11 @@ export const actionCommands = [
       // A player's confirmed hit (or darts) in "direct" mode applies server-side inside the mutation; captured for
       // narration.
       let playerDamageApplied: readonly AppliedDamage[] = [];
+      // The spell this resolve casts and whom at, for the table's "casts" line.
+      let cast = null as Readonly<{ name: string; targetIds: readonly string[] }> | null;
+      let restBroken: EffectNarration[] = [];
+      let castingOnward = false;
+      let clock = { fromHours: 0, toHours: 0 };
       const { state, duplicate } = await execute((draft) => {
         // Access first (the action kind is for the per-table policy hook, ADR-0021): a missing creature and someone
         // else's get one answer, so a player can't probe which ids exist.
@@ -154,13 +167,22 @@ export const actionCommands = [
             placed.shape,
             action.area?.widthFeet ?? null
           ).filter(
-            (id) => (id !== actorId || !casterOutside) && draft.combat.initiative.some((entry) => entry.actorId === id)
+            (id) =>
+              (id !== actorId || !casterOutside) &&
+              (!draft.combat.active || draft.combat.initiative.some((entry) => entry.actorId === id))
           );
           // An area catches everyone under it, seen or not. Whether it holds anyone is judged on what the caster's
           // player can see, so an empty refusal never tells them a hidden creature is there. A spell that leaves its
-          // area behind (Moonbeam, Web, a wall) may be placed where no one stands yet.
+          // area behind (Moonbeam, Web, a wall), or does nothing to whoever is in it (Minor Illusion's image), may be
+          // placed where no one stands.
           const unseen = isPlayer ? hiddenFromPlayer(draft) : new Set<string>();
-          if (!resolvedTargetIds.some((id) => !unseen.has(id)) && !(spell && zoneRowOf(spell)))
+          const catches =
+            action.save !== undefined ||
+            action.damage.length > 0 ||
+            action.healing !== undefined ||
+            action.grants !== undefined ||
+            action.endsConditions !== undefined;
+          if (!resolvedTargetIds.some((id) => !unseen.has(id)) && !(spell && (zoneRowOf(spell) || !catches)))
             throw new CommandRejectedError(
               isPlayer ? "No creatures you can see are inside that area." : "No combatants are inside that area."
             );
@@ -173,6 +195,21 @@ export const actionCommands = [
             const unseen = hiddenFromPlayer(draft);
             if (resolvedTargetIds.some((targetId) => unseen.has(targetId)))
               throw new CommandRejectedError("Every target must be in this encounter.");
+          }
+          // Outside a fight a player casts on the party or on a creature they can see.
+          if (isPlayer && !draft.combat.active) {
+            const unseen = hiddenFromPlayer(draft);
+            if (
+              resolvedTargetIds.some(
+                (targetId) =>
+                  unseen.has(targetId) &&
+                  !partyMember(
+                    draft.actors.find((actor) => actor.id === targetId),
+                    initiator.sessionId
+                  )
+              )
+            )
+              throw new CommandRejectedError(OUTSIDE_FIGHT_TARGETS);
           }
         }
         // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, measured edge to edge.
@@ -220,7 +257,10 @@ export const actionCommands = [
             ...(template ? { areaPlaced: true } : {}),
             ...(request.ready === true ? { ready: true } : {}),
             // Spell areas are the GM's to see, so only the GM aims a cast at one.
-            ...(request.zoneId !== undefined && !isPlayer ? { zoneId: request.zoneId } : {})
+            ...(request.zoneId !== undefined && !isPlayer ? { zoneId: request.zoneId } : {}),
+            ...(action.spellId !== undefined && standsInSilence(draft, actorId, geometry, kit.equipmentCatalog())
+              ? { silenced: true }
+              : {})
           },
           {
             random: (sides) => kit.context.random(sides),
@@ -238,6 +278,22 @@ export const actionCommands = [
         );
         // A committed use counts toward the sheet's most-used options; a preview counts with its confirm.
         if (!resolution.preview) countOptionUse(draft, actorId, actionId);
+        const spell = castSpellOf(action, kit.equipmentCatalog().spellRecord);
+        cast = spell ? { name: spell.name, targetIds: resolvedTargetIds } : null;
+        // A casting under way on later turns, and outside a fight the hours a long one takes (SRD Longer Casting
+        // Times): the cast completes at once and the game clock moves by its whole hours.
+        castingOnward = attacker.effects.some((effect) => effect.longCast?.actionId === action.id);
+        const hours = spell && !draft.combat.active ? Math.floor(castingMinutesOf(spell, action.id) / 60) : 0;
+        clock = { fromHours: draft.rest.clockHours, toHours: draft.rest.clockHours };
+        if (!resolution.preview && hours > 0) {
+          passTime(draft, hours);
+          clock = { ...clock, toHours: draft.rest.clockHours };
+        }
+        // Casting a spell other than a cantrip stops a Short Rest, as it does on the loose route.
+        restBroken =
+          spell && spell.level > 0 && !draft.combat.active
+            ? leaveShortRest(draft, new Set([actorId]), `cast ${spell.name}`)
+            : [];
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
         // by default, or applied directly), so the player never mutates a creature they don't own.
         if (isPlayer)
@@ -284,12 +340,26 @@ export const actionCommands = [
       kit.publishRolls(state, commandId);
       if (!resolution.preview) {
         const hidden = kit.actorHidden(actorId);
-        kit.context.broadcastTableEvent({
-          kind: "action",
-          text: `${kit.actorName(actorId)} used ${resolution.actionName}.`,
-          actorIds: [actorId],
-          gmOnly: hidden
-        });
+        const told: { text: string; actorIds: string[] } = cast
+          ? castLine(
+              { id: actorId, name: kit.actorName(actorId) },
+              cast.name,
+              cast.targetIds.map((id) => ({ id, name: kit.actorName(id) })),
+              kit.hiddenFromTable(state)
+            )
+          : { text: `${kit.actorName(actorId)} used ${resolution.actionName}.`, actorIds: [actorId] };
+        // A casting still under way says so in its own line; the cast is told when it completes.
+        if (!castingOnward)
+          kit.context.broadcastTableEvent({ kind: "action", text: told.text, actorIds: told.actorIds, gmOnly: hidden });
+        if (clock.toHours > clock.fromHours) {
+          kit.context.onTimePassed?.(clock);
+          const hours = clock.toHours - clock.fromHours;
+          kit.context.appendLog({
+            kind: "encounter",
+            text: `${hours} ${hours === 1 ? "hour passes" : "hours pass"} while ${kit.actorName(actorId)} casts ${cast?.name ?? resolution.actionName}.`,
+            gmOnly: hidden
+          });
+        }
         // Rules-engine narration (ADR-0020): overrides are audited, warnings reach the GM, applied effects reach the table.
         if (resolution.overridden)
           kit.context.appendLog({
@@ -309,6 +379,7 @@ export const actionCommands = [
           });
         }
         kit.narrateResolution(resolution, actorId);
+        kit.publishNarrations(restBroken);
         for (const { outcome, targetId, sourceActorId, label } of playerDamageApplied) {
           // Narrated like actor:apply-damage. Both actors ride actorIds so the line is gm-only if either is hidden.
           const detail = damageAdjustmentDetail(outcome.application);
@@ -326,9 +397,9 @@ export const actionCommands = [
     type: "action.use",
     operationId: "useAction",
     description:
-      "Uses an action and lets the server decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt, because taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running, or with this creature not in the turn order, the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), uses up a potion, flask or Spell Scroll and the shot's ammunition, reads a scroll only if the reader can (a spell above the reader's levels rolls its check first, and a failure loses the scroll with nothing else rolled), touches no combat state, and acks `route: \"loose\"` with the roll ids, and for a heal who regained what (`healing`). An action with nothing to roll is still used, with a feed line. A heal (a potion, a healing spell, Second Wind, Lay on Hands) lands on `targetIds` through the fight's hit point rules (the dead stay dead), its user when none are named: a player heals their own character or another member of the party, the GM anyone; damage never moves on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
+      "Uses an action and lets the server decide what that means. In the fight on this creature's turn it delegates to the full structured resolution and acks `route: \"resolved\"`. Off turn it is refused with the overridable, askable rules block `economy.not-your-turn` (reactions and legendary actions are exempt, because taking those off turn is the point); under an `economy` exception of advise/off it resolves, with a GM-only warning line under advise. With no fight running, a creature's own spell (an item's cast aside) resolves through the same structured path with no turn to spend, so its grant, Concentration, saves and slot apply, and acks `route: \"resolved\"` with the `resolution` (and `healing` for a heal); a cast that only helps lands on its caster when `targetIds` names no one, and one that rolls against creatures and names none rolls loose. Casting in armor the caster isn't trained with is refused there too (`spell.untrained-armor`). Otherwise with no fight running, or with this creature not in the turn order, the server rolls the action's own attack die (and, only with `includeDamage`, its damage parts) as attributed rolls, spends what the action costs (an item's charges or a feature's per-rest uses, and any spell slot an item cast consumes; refused when none remain; an item's last charge rolls its d20 for the GM), uses up a potion, flask or Spell Scroll and the shot's ammunition, reads a scroll only if the reader can (a spell above the reader's levels rolls its check first, and a failure loses the scroll with nothing else rolled), touches no combat state, and acks `route: \"loose\"` with the roll ids, and for a heal who regained what (`healing`). An action with nothing to roll is still used, with a feed line. A heal (a potion, a healing spell, Second Wind, Lay on Hands) lands on `targetIds` through the fight's hit point rules (the dead stay dead), its user when none are named: a player heals their own character or another member of the party, the GM anyone; damage never moves on the loose route. GM-grade for any combatant, including a monster's sheet; a player session only for their own claimed character.",
     summary:
-      "Use an action and let the server route it: resolved in the fight on your turn, refused off turn, loose dice outside a fight, where a heal lands on whoever it is given to (GM anyone; a player their own claimed character).",
+      "Use an action and let the server route it: resolved in the fight on your turn, refused off turn, outside a fight resolved for a spell's cast and loose dice otherwise, where a heal lands on whoever it is given to (GM anyone; a player their own claimed character).",
     schema: ActionUseSchema,
     malformed: "The action command is malformed.",
     // The server picks structured resolve, blocked or loose roll and says so in the reply.
@@ -378,6 +449,39 @@ export const actionCommands = [
       const found = available.find((candidate) => candidate.id === actionId) ?? builtinActionFor(definition, actionId);
       if (!found) throw new CommandRejectedError("That action is not on the stat block.");
       const listed = withChosenCost(found, chosenSpend);
+
+      // Outside a fight a creature's own spell is cast as it is in one, with no turn to spend: its grant,
+      // Concentration, saves and area happen, and a heal says who regained what. A cast that only helps lands on its
+      // caster when no one is named (Mage Armor on oneself). One that rolls against creatures and names none (a Fire
+      // Bolt tapped on the sheet) has no one to resolve against, so it rolls loose below, as an item's cast does.
+      const rollsOnTargets = listed.attack !== undefined || listed.save !== undefined || listed.damage.length > 0;
+      const aimed =
+        listed.grants?.target === "target" ||
+        listed.grants?.target === "targets" ||
+        (listed.healing !== undefined && listed.healing.self !== true) ||
+        listed.endsConditions !== undefined;
+      const named = targetIds && targetIds.length > 0 ? targetIds : !rollsOnTargets && aimed ? [actorId] : [];
+      if (
+        !snapshot.combat.active &&
+        !isItemActionId(listed.id) &&
+        castSpellOf(listed, kit.equipmentCatalog().spellRecord) !== null &&
+        (named.length > 0 || !rollsOnTargets)
+      ) {
+        const result = await dispatch("action.resolve", {
+          commandId,
+          actorId,
+          actionId,
+          ...(named.length > 0 ? { targetIds: named } : {}),
+          ...(rollMode ? { rollMode } : {}),
+          ...(override ? { override } : {}),
+          ...(slotLevel === undefined ? {} : { slotLevel }),
+          ...(chosenSpend === undefined ? {} : { spend: chosenSpend }),
+          ...(damageType === undefined ? {} : { damageType }),
+          ...(expectedRevision === undefined ? {} : { expectedRevision })
+        });
+        const healing = (result.resolution as ActionResolution | undefined)?.healing;
+        return { ...result, route: "resolved", ...(healing ? { healing } : {}) };
+      }
       // A spell cast with a higher slot rolls that slot's dice, on the loose route as in the fight.
       const castLevel = listed.spellSlot ? castSlotLevel(actor, listed.spellSlot.level, slotLevel) : undefined;
       const spell = listed.spellId ? kit.equipmentCatalog().spellRecord?.(listed.spellId) : undefined;
@@ -484,6 +588,14 @@ export const actionCommands = [
             }
           }).events;
         }
+        // SRD Armor Training: no spells in armor the caster isn't trained with, an item's cast included.
+        const armorBlock = untrainedArmorCast(live, action, definition, kit.equipmentCatalog());
+        if (armorBlock !== null) {
+          const mode = effectiveModeFor(rulesInForce(draft), UNTRAINED_ARMOR);
+          if (mode === "strict" && !overrideWaives(override, UNTRAINED_ARMOR))
+            throw new RulesBlockedError(UNTRAINED_ARMOR, armorBlock);
+          if (mode !== "freeform") rulesNote = armorBlock;
+        }
         spend = spendLooseUses(live, action, available, castLevel, slotsModeFor(draft), definition);
         // Casting a spell other than a cantrip stops a Short Rest.
         if (spell && spell.level > 0)
@@ -585,9 +697,12 @@ export const actionCommands = [
             : cost > 1
               ? ` (${cost} spent, ${spend.usesLeft} left)`
               : ` (${spend.usesLeft} ${spend.usesLeft === 1 ? "use" : "uses"} left)`;
+        const casting = castSpellOf(action, kit.equipmentCatalog().spellRecord);
         kit.context.appendLog({
           kind: "action",
-          text: `${kit.actorName(actorId)} uses ${action.name}${left}.`,
+          text: casting
+            ? `${kit.actorName(actorId)} casts ${casting.name}${left}.`
+            : `${kit.actorName(actorId)} uses ${action.name}${left}.`,
           actorId,
           actorIds: [actorId],
           gmOnly: kit.actorHidden(actorId)

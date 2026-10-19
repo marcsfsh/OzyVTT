@@ -50,6 +50,21 @@ function reactionLine(outcome: ReactionOutcome): { kind: "reaction" | "damage"; 
           : `${outcome.actorName} declined ${outcome.actionName}, and ${landed}.`
       };
     }
+    case "casts-spell": {
+      const caster = outcome.other?.name ?? outcome.sourceName;
+      if (outcome.countered)
+        return {
+          kind: "reaction",
+          text: `${outcome.actorName} used ${outcome.actionName}, and ${caster}'s spell fails.`
+        };
+      const ahead = resolution ? `, and ${caster}'s ${resolution.actionName} goes ahead` : "";
+      return {
+        kind: "reaction",
+        text: outcome.used
+          ? `${outcome.actorName} used ${outcome.actionName}${ahead || `, and ${caster} keeps casting`}.`
+          : `${outcome.actorName} let ${caster}'s spell go${ahead}.`
+      };
+    }
     case "leaves-reach":
     case "damaged-by-creature": {
       if (!outcome.used || !resolution) return null;
@@ -92,7 +107,7 @@ export const reactionCommands = [
     type: "reaction.answer",
     operationId: "answerReaction",
     description:
-      "Answers a pending reaction prompt; `use: true` spends the reaction, `use: false` declines it. What else happens depends on the prompt's `kind`. `hit-by-attack` (Uncanny Dodge): the hit's parked damage applies either way, each typed part halved first on use. `attack-would-hit` (Parry, Shield): the attack waiting at its roll finishes either way with the same die, against AC raised by the reaction on use, and a hit's damage applies. `leaves-reach` (an opportunity attack) and `damaged-by-creature` (Hellish Rebuke, Retaliation): use strikes the creature with one melee attack with a weapon or an Unarmed Strike (another action is refused), previewable with `commit: false`, the confirm carrying the `hitOptions` its preview offered (Sneak Attack), and damage that lands applies. Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
+      "Answers a pending reaction prompt; `use: true` spends the reaction, `use: false` declines it. What else happens depends on the prompt's `kind`. `hit-by-attack` (Uncanny Dodge): the hit's parked damage applies either way, each typed part halved first on use. `attack-would-hit` (Parry, Shield): the attack waiting at its roll finishes either way with the same die, against AC raised by the reaction on use, and a hit's damage applies. `leaves-reach` (an opportunity attack) and `damaged-by-creature` (Hellish Rebuke, Retaliation): use strikes the creature with one melee attack with a weapon or an Unarmed Strike (another action is refused), previewable with `commit: false`, the confirm carrying the `hitOptions` its preview offered (Sneak Attack), and damage that lands applies. `casts-spell` (Counterspell): the cast waits before anything of it happens; use spends the reaction and a slot, and the caster rolls the saving throw against the reactor's spell save DC, a failure losing the spell with its slot unspent; once every prompt on the cast is answered without stopping it, the cast goes ahead and spends its slot. `slotLevel` casts a reaction spell with a higher slot, which upcasts it (Hellish Rebuke's dice). Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
     summary: "Answer a pending reaction prompt: use it (spend the reaction) or decline it.",
     schema: ReactionAnswerSchema,
     malformed: "The reaction answer is malformed.",
@@ -107,7 +122,8 @@ export const reactionCommands = [
         attackNatural,
         reroll,
         pushFeet,
-        hitOptions
+        hitOptions,
+        slotLevel
       } = request;
       const initiator = initiatorOf(principal);
       // The rules count a player's Advantage and Disadvantage; only the GM may force a mode.
@@ -146,7 +162,8 @@ export const reactionCommands = [
             ...(attackNatural !== undefined ? { attackNatural } : {}),
             ...(reroll === true ? { reroll: true } : {}),
             ...(pushFeet !== undefined ? { pushFeet } : {}),
-            ...(hitOptions ? { hitOptions } : {})
+            ...(hitOptions ? { hitOptions } : {}),
+            ...(slotLevel !== undefined ? { slotLevel } : {})
           }
         );
         // The reaction taken counts toward the sheet's most-used options: the strike's own action, or the prompt's.
@@ -160,6 +177,8 @@ export const reactionCommands = [
       });
       if (duplicate || !outcome) return;
       kit.publishRolls(state, commandId);
+      // A cast that went ahead rolled under its own command, as it would have with no Counterspell.
+      if (outcome.castCommandId && outcome.resolution) kit.publishRolls(state, outcome.castCommandId);
       const line = reactionLine(outcome);
       if (line) {
         // Either creature hidden keeps the line with the GM: it names both.
@@ -171,7 +190,7 @@ export const reactionCommands = [
       if (outcome.resolution && !outcome.resolution.preview)
         kit.narrateResolution(
           outcome.resolution,
-          outcome.kind === "attack-would-hit" ? outcome.other!.id : outcome.actorId
+          outcome.kind === "attack-would-hit" || outcome.kind === "casts-spell" ? outcome.other!.id : outcome.actorId
         );
       kit.publishNarrations(outcome.events);
       const resolution =
@@ -181,7 +200,9 @@ export const reactionCommands = [
               outcome.other?.name ?? null,
               outcome.other ? kit.hiddenFor(initiator, state)(outcome.other.id) : true
             )
-          : outcome.resolution;
+          : outcome.kind === "casts-spell" && !isGmGrade(principal)
+            ? undefined
+            : outcome.resolution;
       return {
         outcome: {
           used: outcome.used,
@@ -198,7 +219,7 @@ export const reactionCommands = [
     type: "reaction.dismiss",
     operationId: "dismissReaction",
     description:
-      "Dismisses a pending reaction prompt without applying anything it holds (GM-grade only): parked damage is dropped, and so is an attack waiting on a Parry or Shield. It is for when the GM settled it by hand.",
+      "Dismisses a pending reaction prompt without applying anything it holds (GM-grade only): parked damage is dropped, and so are an attack waiting on a Parry or Shield and a spell waiting on a Counterspell. It is for when the GM settled it by hand.",
     summary: "Dismiss a pending reaction prompt without applying what it holds (GM).",
     schema: ReactionDismissSchema,
     malformed: "The dismissal is malformed.",

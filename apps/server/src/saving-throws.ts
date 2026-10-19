@@ -285,6 +285,8 @@ export function rollSaveAtOnce(
     catalog?: EquipmentCatalog;
     distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
     rollDie: RandomSource;
+    /** Against a spell, which Magic Resistance meets with Advantage. */
+    magical?: boolean;
   }>
 ): Readonly<{ natural: number; total: number; rollMode: AggregatedRollMode }> {
   const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
@@ -292,6 +294,8 @@ export function rollSaveAtOnce(
   const modifier =
     saveTotalFor(definition, actor, ability, derivation) + (auraOfProtection(state, actor, deps)?.amount ?? 0);
   const sources = saveRollSources(actor, ability, derivation);
+  if (deps.magical === true && magicResistanceOf(definition) !== null)
+    sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
   const rollMode = aggregateRollMode(sources.advantage, sources.disadvantage);
   const resolution = resolveDice(
     parseDiceFormula(d20TestFormula(rollMode.mode, modifier) + saveRiderDiceTerms(derivation, ability)),
@@ -335,7 +339,7 @@ export function createPendingSaves(
     /** The GM's call for a roll these saves answer. */
     callId?: string;
     /** What else each save carries: what a success leaves, a line for a failure, the spell area that raised it. */
-    extra?: Pick<PendingSave, "onSuccessEffect" | "failureNote" | "breaksConcentration" | "zoneId">;
+    extra?: Pick<PendingSave, "onSuccessEffect" | "failureNote" | "breaksConcentration" | "zoneId" | "gmApplies">;
     /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
     magical?: boolean;
     /** A success makes the target immune to this trait of its source for the fight (a ghast's Stench). */
@@ -374,6 +378,7 @@ export function createPendingSaves(
     ...(input.extra?.failureNote ? { failureNote: input.extra.failureNote } : {}),
     ...(input.extra?.breaksConcentration ? { breaksConcentration: true as const } : {}),
     ...(input.extra?.zoneId !== undefined ? { zoneId: input.extra.zoneId } : {}),
+    ...(input.extra?.gmApplies ? { gmApplies: true as const } : {}),
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
     ...(input.drain ? { drain: { ...input.drain } } : {}),

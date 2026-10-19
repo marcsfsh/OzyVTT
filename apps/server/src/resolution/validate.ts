@@ -5,12 +5,12 @@ import { withShotAmmunitionOnly } from "../ammunition.js";
 import { consumableRowFor } from "../consumables.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
-import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
+import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives, rulesInForce } from "../rules-families.js";
 import {
+  isItemActionId,
   isLongCastingTime,
   laterRowOf,
   laterSpellActionId,
-  ritualSpellActionId,
   upcastAction,
   withSpellAttackReach,
   withSpellEffects
@@ -22,6 +22,7 @@ import { areEnemies } from "../creature-sides.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
 import { scrollOfAction } from "../scrolls.js";
+import { creatureTypeOf } from "../statblock-facts.js";
 import { builtinHandlerFor } from "./builtins.js";
 import {
   resolveHiddenCheck,
@@ -41,15 +42,30 @@ function combatantsOf(
   catalog: ResolveDependencies["catalog"],
   spell: SpellReference | undefined
 ): { attacker: LiveActor; targets: LiveActor[] } {
-  if (!state.combat.active) throw new CommandRejectedError("Start an encounter before resolving actions.");
-  const inFight = (actorId: string) => state.combat.initiative.some((entry) => entry.actorId === actorId);
+  // Casting a spell is something done even when it rolls nothing (Light, Guidance): it spends its casting time and is
+  // told to the table. What a spell lets its caster do later is no new cast.
+  const castsASpell = action.spellId !== undefined && !(spell !== undefined && laterRowOf(spell, action.id));
+  // Outside a fight a creature's own cast still starts what it starts (a grant, Concentration, a save, an area), with
+  // no turn to spend; an item's use stays on the loose route, which spends its charges.
+  const outsideFight = !state.combat.active;
+  if (outsideFight && !(castsASpell && !isItemActionId(action.id)))
+    throw new CommandRejectedError("Start an encounter before resolving actions.");
+  const inFight = (actorId: string) =>
+    outsideFight
+      ? state.actors.some((actor) => actor.id === actorId)
+      : state.combat.initiative.some((entry) => entry.actorId === actorId);
   const attacker = state.actors.find((item) => item.id === input.actorId);
   if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
   if (!inFight(input.actorId)) throw new CommandRejectedError("That combatant is not in this encounter.");
   // A target named twice is one target (a second dart is the only reason to name it again).
   const targets = [...new Set(input.targetIds)].map((targetId) => {
     const target = state.actors.find((item) => item.id === targetId);
-    if (!target || !inFight(targetId)) throw new CommandRejectedError("Every target must be in this encounter.");
+    if (!target || !inFight(targetId))
+      throw new CommandRejectedError(
+        outsideFight
+          ? "Choose members of the party or creatures you can see."
+          : "Every target must be in this encounter."
+      );
     return target;
   });
   // A readied spell is cast now and aimed when its trigger comes (SRD Ready), so it names no target yet.
@@ -69,16 +85,21 @@ function combatantsOf(
     action.spellSlot !== undefined ||
     action.legendary !== undefined ||
     consumableRowFor(action, attacker.inventory, catalog) !== null;
-  // Casting a spell that lasts and acts again later (Produce Flame, a lingering area) is something done, even with no
-  // creature under it yet.
-  const startsALastingSpell =
-    spell !== undefined && (spell.effect?.laterActions ?? []).length > 0 && laterRowOf(spell, action.id) === undefined;
+  // A spell that lasts and acts again later (Produce Flame, a lingering area) starts with no creature under it yet.
+  const startsALastingSpell = castsASpell && (spell?.effect?.laterActions ?? []).length > 0;
+  const rollsOnTargets =
+    action.attack !== undefined ||
+    action.save !== undefined ||
+    action.damage.length > 0 ||
+    (action.healing !== undefined && action.healing.self !== true) ||
+    action.endsConditions !== undefined;
   const structuredWithoutTargets =
     (action.grants !== undefined && action.grants.target !== "target") ||
     action.healing?.self === true ||
     action.multiattack !== undefined ||
     spendsALimitedUse ||
     startsALastingSpell ||
+    (castsASpell && !rollsOnTargets) ||
     input.builtin === true;
   // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
   const touchesSomeone = action.endsConditions !== undefined || action.healing?.perUse === true;
@@ -94,7 +115,7 @@ function combatantsOf(
     action.dispel === undefined &&
     action.endsCurses === undefined &&
     !spendsALimitedUse &&
-    !startsALastingSpell &&
+    !castsASpell &&
     input.builtin !== true
   )
     throw new CommandRejectedError("That action has no structured effect to resolve. Run it from its description.");
@@ -136,7 +157,10 @@ export function openResolve(
   const hiddenFromInitiator = resolveHiddenCheck(state, deps, true);
   const spell = declared.spellId ? deps.catalog?.spellRecord?.(declared.spellId) : undefined;
   const reaching = withSpellEffects(withSpellAttackReach(declared, spell), spell);
-  const { attacker, targets } = combatantsOf(state, reaching, input, deps.catalog, spell);
+  const combatants = combatantsOf(state, reaching, input, deps.catalog, spell);
+  const { attacker } = combatants;
+  const warnings: string[] = [];
+  const targets = input.areaPlaced ? onlyTargetTypes(combatants.targets, spell, deps, warnings) : combatants.targets;
   // A spell cast with a higher slot rolls that slot's dice and makes its rays (before the economy opens the action's
   // instance); a paid replay names the slot it was cast with.
   const castLevel = input.economyPaid ? input.slotLevel : castLevelOf(state, attacker, reaching, input.slotLevel);
@@ -145,7 +169,6 @@ export function openResolve(
       ? upcastAction(reaching, spell, castLevel)
       : reaching;
   const action = withChosenDamageType(upcast, input.damageType ?? null);
-  const warnings: string[] = [];
   const derived = deriveEquipment(attacker, deps.definition, deps.catalog);
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
   const riderItemId = sourceItemOf(action, derived, attacker.inventory);
@@ -156,7 +179,7 @@ export function openResolve(
       `${action.name} makes ${action.darts} darts; ${input.targetIds.length} were assigned.`
     );
   const economy = input.economyPaid
-    ? { plan: paidPlan(state), overridden: null }
+    ? { plan: paidPlan(state, input.slotLevel), overridden: null }
     : planEconomy(
         state,
         attacker,
@@ -176,7 +199,7 @@ export function openResolve(
   // GM-adjudicated cover (SRD Cover, no line-of-sight engine): the GM's choice for this resolve, else the cover the
   // GM marked the target with, whoever attacks. Total cover can't be targeted; half/three-quarters add to AC and
   // Dexterity saves.
-  const coverMode = effectiveModeFor(state.combat, "cover.total");
+  const coverMode = effectiveModeFor(rulesInForce(state), "cover.total");
   // A Paladin's Smite of Protection gives Half Cover to the creatures in its aura.
   const auraCover = (target: LiveActor) =>
     deps.resolveDefinition
@@ -270,9 +293,35 @@ export function openResolve(
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
   if (!input.economyPaid)
     warnings.push(
-      ...laterActionReminders(spell, action, scrollOfAction(action, attacker.inventory, deps.catalog) !== null)
+      ...laterActionReminders(
+        spell,
+        action,
+        scrollOfAction(action, attacker.inventory, deps.catalog) !== null,
+        state.combat.active
+      )
     );
   return ctx;
+}
+
+/** An area's catch, less the creatures of a type the spell doesn't affect ("Each Humanoid in a 20-foot-radius
+ *  Sphere"), each named to the GM. A type the stat block doesn't print stays in. */
+function onlyTargetTypes(
+  targets: LiveActor[],
+  spell: SpellReference | undefined,
+  deps: ResolveDependencies,
+  warnings: string[]
+): LiveActor[] {
+  const types = spell?.effect?.targetTypes;
+  if (!types || !deps.resolveDefinition) return targets;
+  return targets.filter((target) => {
+    const definition = target.definitionId ? deps.resolveDefinition!(target.definitionId) : undefined;
+    const type = creatureTypeOf(target, definition);
+    if (type === null || types.includes(type)) return true;
+    warnings.push(
+      `${target.name} isn't affected by ${spell!.name}, which affects only ${types.join(" or ")} creatures.`
+    );
+    return false;
+  });
 }
 
 /** An action whose caster picks the damage type (Chromatic Orb) deals the one picked, every part of it. */
@@ -284,34 +333,31 @@ export function withChosenDamageType(action: DefinitionAction, chosen: string | 
 }
 
 /** The GM's reminder on casting a spell that does more later (SRD text): what the caster may do on later turns, and
- *  what the GM spots for an area the server doesn't watch (an area with a zone it does). A scroll read for a long
- *  casting time spends no slot, and "if the casting is interrupted, the scroll isn't lost". */
+ *  what the GM spots for an area the server doesn't watch (an area with a zone it does). A creature's own long cast
+ *  runs over its turns (`long-casting.ts`); an item's in a fight is the GM's to time, and a scroll read for a long
+ *  casting time "isn't lost" if the casting is interrupted. */
 function laterActionReminders(
   spell: SpellReference | undefined,
   action: DefinitionAction,
-  fromScroll: boolean
+  fromScroll: boolean,
+  inFight: boolean
 ): string[] {
   const later = spell?.effect?.laterActions ?? [];
   if (!spell || later.some((row) => laterSpellActionId(spell.id, row.name) === action.id)) return [];
   return [
-    // SRD Rituals: 10 minutes longer than the spell's casting time, and no slot.
-    ...(action.id === ritualSpellActionId(spell.id)
+    ...(inFight && isItemActionId(action.id) && isLongCastingTime(spell.castingTime)
       ? [
-          `${spell.name} as a Ritual takes 10 minutes longer than its ${spell.castingTime}. The caster takes the Magic action on each turn and keeps Concentration, and no slot is spent.`
+          `${spell.name} takes ${spell.castingTime} to cast. Until then, the caster takes the Magic action on each turn and keeps Concentration. If that breaks, the spell fails and ${fromScroll ? "the scroll isn't lost, so give it back on the sheet" : "its charges aren't spent, so restore them on the sheet"}.`
         ]
-      : isLongCastingTime(spell.castingTime)
-        ? [
-            `${spell.name} takes ${spell.castingTime} to cast. Until then, the caster takes the Magic action on each turn and keeps Concentration. If that breaks, the spell fails and ${fromScroll ? "the scroll isn't lost, so give it back on the sheet" : "its slot isn't spent, so restore it on the sheet"}.`
-          ]
-        : []),
+      : []),
     ...later
       .filter((row) => row.zone === undefined)
       .map((row) => `${spell.name}: ${row.when} Use "${spell.name}: ${row.name}" for it.`)
   ];
 }
 
-/** The plan of a resolve whose economy was already spent: it changes nothing. */
-function paidPlan(state: GameState): EconomyPlan {
+/** The plan of a resolve whose economy was already spent: it changes nothing, and casts at the slot it was made with. */
+function paidPlan(state: GameState, slotLevel: number | undefined): EconomyPlan {
   return {
     markAction: false,
     markBonus: false,
@@ -321,7 +367,7 @@ function paidPlan(state: GameState): EconomyPlan {
     spendUse: null,
     spendLegendary: null,
     spendSpellSlot: null,
-    castLevel: null,
+    castLevel: slotLevel ?? null,
     extraAction: null,
     magicAction: false,
     surge: false

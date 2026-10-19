@@ -208,8 +208,13 @@ export function castAction(
     { attackBonus, saveDc: clampDc(saveDc), bearersDc, modifier: scoreModifierOf(definition, ability) },
     { roll: upcast }
   );
-  // A healing area heals the creatures the caster picks (up to its count), so it is picked with no template.
-  return { ...base, ...(spell.area && !mechanics.healing ? { area: spell.area } : {}), ...mechanics };
+  return { ...base, ...castAreaOf(spell, mechanics), ...mechanics };
+}
+
+/** The template a cast places: the spell's area, unless the caster picks its targets in that area (Mass Cure Wounds'
+ *  six, Slow's six, Sleep's creatures of the caster's choice), which the cast then picks one by one. */
+export function castAreaOf(spell: SpellReference, mechanics: Pick<ActorAction, "healing">): Pick<ActorAction, "area"> {
+  return spell.area && !mechanics.healing && !spell.effect?.picksInArea ? { area: spell.area } : {};
 }
 
 /** A cast's grant, its "spellcasting ability modifier" fixed at the caster's for this spell. */

@@ -5,6 +5,7 @@ import {
   type ActionResolution,
   type GameState
 } from "@vtt/domain";
+import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { ActorDefinition, SaveCondition } from "@vtt/schemas";
 import { conditionChoicesOf } from "./item-actions.js";
 import { BUILTIN_TARGETING } from "./builtin-actions.js";
@@ -39,6 +40,7 @@ import { applySpellEndings } from "./resolution/dispel.js";
 import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
+import { stabilizeOnCast } from "./resolution/stabilize.js";
 import {
   recordAttackRoll,
   recordCleaveOpening,
@@ -57,12 +59,14 @@ import {
   parkReaction
 } from "./resolution/pending.js";
 import { markCastTurn, markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
+import { parkForCounterspell } from "./resolution/counter.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
 import { holdReadiedSpell } from "./resolution/ready.js";
 import { healLimit } from "./loose-healing.js";
 import { passiveOf, unavailableReason } from "./availability-reasons.js";
+import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-casting.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -79,9 +83,24 @@ export function resolveDefinitionAction(
   input: ResolveInput,
   deps: ResolveDependencies
 ): ActionResolution {
-  const ctx = openResolve(state, action, input, deps);
+  // A spell of a minute or more cast in a fight takes the action on each of its caster's turns, and resolves on the
+  // last with the targets and slot picked on the first.
+  const longCast = longCastStepOf(
+    state,
+    action,
+    input,
+    action.spellId ? deps.catalog?.spellRecord?.(action.spellId) : undefined
+  );
+  const ctx = openResolve(state, action, longCast?.input ?? input, deps);
   ctx.builtin?.check?.(ctx);
   ctx.builtin?.apply?.(ctx);
+  if (longCast && longCast.phase !== "finish") {
+    stepLongCast(ctx, longCast);
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  if (longCast) finishLongCast(ctx);
   // A readied spell is cast now and held: its slot and the action are spent, and nothing else happens yet.
   if (input.ready === true) {
     holdReadiedSpell(ctx);
@@ -98,6 +117,14 @@ export function resolveDefinitionAction(
   if (slowedSpellFails(ctx)) {
     commitEconomy(ctx);
     return { ...resolutionOf(ctx), save: null };
+  }
+  // A cast a Counterspell may stop waits before anything of it happens: its action is spent and it was seen cast, but
+  // its slot, its limited use and the materials it consumes wait to see whether it goes ahead.
+  if (parkForCounterspell(ctx)) {
+    commitEconomy({ ...ctx, plan: { ...ctx.plan, spendSpellSlot: null, spendUse: null, componentSpends: [] } });
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
   rollAttack(ctx);
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
@@ -149,6 +176,7 @@ export function resolveDefinitionAction(
   applyHealing(ctx);
   applyConditionCures(ctx);
   applySpellEndings(ctx);
+  stabilizeOnCast(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
@@ -353,7 +381,7 @@ export function actionAvailability(
       // A builtin says what the stat block's action list says of it (Help picks one creature, Dodge none).
       targeting: builtin
         ? (BUILTIN_TARGETING[action.id] ?? "none")
-        : tapTargeting(action, consumableRowFor(action, attacker.inventory, catalog) !== null),
+        : tapTargeting(action, consumableRowFor(action, attacker.inventory, catalog) !== null, spell),
       // A spell cast from an item picks as the spell's own cast does: darts by target, the type to deal.
       darts: action.darts ?? null,
       damageTypes: action.damageTypes ? [...action.damageTypes] : null,
@@ -369,11 +397,22 @@ export function actionAvailability(
 /** Who a tap of this action picks, as the resolver will take it: one creature for an attack, a grant aimed at a
  *  target or a heal (a potion: the drinker); several for a save, damage with no attack roll, a grant on each
  *  creature it targets (a scroll of Bless) or a divided heal; none for what acts on its user (a self heal, Rage, a
- *  scroll of Detect Magic). Null for an action with nothing structured to resolve. */
-function tapTargeting(action: DefinitionAction, usesUpItem: boolean): "none" | "single" | "multi" | null {
+ *  scroll of Detect Magic). A spell that rolls nothing picks the creatures it names (Guidance's one), else none (Light).
+ *  Null for an action with nothing structured to resolve. */
+function tapTargeting(
+  action: DefinitionAction,
+  usesUpItem: boolean,
+  spell: SpellReference | undefined
+): "none" | "single" | "multi" | null {
   if (action.attack || action.grants?.target === "target") return "single";
   if (action.save || action.damage.length > 0 || action.grants?.target === "targets") return "multi";
   if (action.healing) return action.healing.self ? "none" : action.healing.divided ? "multi" : "single";
+  // A touch that ends a condition picks who it touches (Lesser Restoration).
+  if (action.endsConditions) return "single";
+  if (action.spellId !== undefined) {
+    const named = spell?.effect?.targets;
+    return named === undefined ? "none" : named.count > 1 || named.perSlot !== undefined ? "multi" : "single";
+  }
   const structured =
     action.grants !== undefined ||
     action.multiattack !== undefined ||

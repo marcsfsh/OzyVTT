@@ -30,7 +30,8 @@ export type PlayerHp =
   { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
 /** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side
  * (viewer safety). Its ongoing damage stays with the GM, since the dice are the stat block's, and so does its magic
- * mark, which only Magic Resistance reads, and the amounts and immunities a spell's level or caster set. `yours` marks one the
+ * mark, which only Magic Resistance reads, the amounts and immunities a spell's level or caster set, and a long casting's
+ * targets and slot. `yours` marks one the
  * viewing player's own character is the source of (their grapple, their Concentration), which they may end. */
 export type PlayerEffect = Omit<
   EffectInstance,
@@ -45,6 +46,7 @@ export type PlayerEffect = Omit<
   | "temporaryHitPointsEachTurn"
   | "conditionImmunities"
   | "endsWhenUnaffected"
+  | "longCast"
 > & {
   yours?: true;
 };
@@ -135,7 +137,7 @@ export type PlayerPendingSave = Omit<
 /** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names
  *  the attacker's action and how it was rolled. `attackRoll` is the held attack's total, present only when that roll
  *  is in the player's own dice log; `lastsUntilNextTurn` says the reactor's reaction lasts (Shield). */
-export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId" | "parkedAttack"> & {
+export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId" | "parkedAttack" | "parkedCast"> & {
   attackRoll?: number;
   lastsUntilNextTurn?: true;
 };

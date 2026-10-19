@@ -270,6 +270,19 @@ export function stabilizeCreature(
   return { stabilized: true, woke: false, check: null, events, overridden };
 }
 
+/** A spell's cast that makes a dying creature Stable (Spare the Dying): its 1d4 hours to 1 Hit Point start counting on
+ *  the game clock. Null when the creature isn't dying (it has Hit Points, is dead or is already Stable). */
+export function stabilizeBySpell(
+  state: GameState,
+  target: LiveActor,
+  random: RandomSource,
+  id: string
+): EffectNarration[] | null {
+  if (isDead(target) || target.hp.current > 0 || target.deathSaves === null || target.deathSaves.stable) return null;
+  target.deathSaves = { ...STABLE };
+  return startStableRecovery(state, target, random, id);
+}
+
 /** Makes a dying creature Stable (its counters reset, its Unconscious kept, and its 1d4 hours to 1 Hit Point counting
  *  on the game clock), or ends a knock-out. */
 function settle(

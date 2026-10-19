@@ -51,6 +51,11 @@ function reactionWords(reaction: PlayerPendingReaction, actor: PlayerActor) {
         title: `${reaction.sourceName} damaged you`,
         detail: `${plainActionName(reaction.actionName)} strikes back with your Reaction.`
       };
+    case "casts-spell":
+      return {
+        title: `${reaction.sourceName} is casting a spell`,
+        detail: `${plainActionName(reaction.actionName)} can stop it with your Reaction. The spell waits on your answer.`
+      };
     default:
       return {
         title: `${reaction.sourceName}'s hit deals ${reaction.proposedDamage} damage to ${actor.name}`,

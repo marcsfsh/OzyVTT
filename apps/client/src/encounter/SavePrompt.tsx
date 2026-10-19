@@ -214,6 +214,8 @@ export function SavePrompt({
         </strong>{" "}
         vs {save.actionName} ({save.sourceName})
       </span>
+      {/* The server rolls this save but applies nothing of it: the spell's text says what a failure does. */}
+      {save.gmApplies && <span className="save-prompt-gm">The GM applies what this save does.</span>}
       {save.proposedDamage > 0 && (viewer === "gm" || mayType) && (
         <label className="save-damage-amend">
           <span>Damage on a failure{save.halfOnSuccess ? ", half on a success" : ""}</span>

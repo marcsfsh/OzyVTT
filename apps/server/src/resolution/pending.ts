@@ -6,7 +6,7 @@ import { conditionLabel } from "../condition-rules.js";
 import { addEffect, ESCAPE_ATHLETICS_TAG, makeEffect, NO_ACTIONS_TAG } from "../effects.js";
 import { HAZARDS } from "../hazards.js";
 import { halvedDamageParts, previewDamage } from "../hit-points.js";
-import { offerableReaction } from "../reaction-offers.js";
+import { offerableReaction, slotChoiceOf } from "../reaction-offers.js";
 import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
 import { HIDDEN_SOURCE } from "../hidden-source.js";
 import { rollDice } from "@vtt/rules-5e";
@@ -146,6 +146,7 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
           // The extras chosen for the hit ride the replay, spent only if it still hits.
           hitOptions: (input.hitOptions ?? []).map((choice) => ({ ...choice }))
         },
+        ...slotChoiceOf(target, offer.action),
         createdAt: Date.parse(deps.now())
       }
     ]
@@ -353,6 +354,20 @@ export function parkActionSave(ctx: ResolveContext): void {
   if (saving.length === 0) return;
   const parts = rider ? [] : damagePartsOf(ctx);
   const onSuccessEffect = successEffectFor(ctx, cast);
+  // A spell's save whose outcome the engine applies nothing of (Levitate, Polymorph): the card and the GM's result say
+  // the GM applies it, so it never reads as if the server had.
+  const gmApplies =
+    action.spellId !== undefined &&
+    parts.every((part) => part.amount <= 0) &&
+    action.damage.length === 0 &&
+    conditionIds.length === 0 &&
+    !onFailEffect &&
+    !onSuccessEffect &&
+    !action.save.failurePush;
+  if (gmApplies)
+    ctx.warnings.push(
+      `The server applies nothing of ${action.name}'s save. Apply what a failure or a success does from the spell's text.`
+    );
   // Cover adds to Dexterity saving throws (SRD Cover), each target's own: the GM's choice for this resolve, else the
   // cover the GM marked it with, unless the save ignores it (Sacred Flame). Carried on the prompt.
   const saveBonusOf = (target: (typeof targets)[number]) =>
@@ -384,7 +399,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       halfOnSuccess: action.save.successDamage === "half",
       conditionIds,
       ...(onFailEffect ? { onFailEffect } : {}),
-      ...(onSuccessEffect ? { extra: { onSuccessEffect } } : {}),
+      ...(onSuccessEffect ? { extra: { onSuccessEffect } } : gmApplies ? { extra: { gmApplies: true as const } } : {}),
       ...(action.drain ? { drain: action.drain } : {}),
       ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
       ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),

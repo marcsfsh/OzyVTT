@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { ActorDefinitionSchema } from "@vtt/schemas";
+import { effectiveActions } from "../src/effective-actions.js";
 import { endEncounter } from "../src/encounter.js";
 import { applyRest } from "../src/rests.js";
 import { finishPreparing, openPreparation, setPreparedSpell } from "../src/spellcasting.js";
 import { spendLooseUses } from "../src/tap-routing.js";
-import { build, catalog, fight, HERO, wizardInput, WIZARD_SPELLS } from "./spell-casters.js";
+import { build, catalog, clericInput, fight, HERO, wizardInput, WIZARD_SPELLS } from "./spell-casters.js";
 
 // SRD 5.2.1 Spells: a caster casts the level 1+ spells it has prepared, and a Cleric, Druid or Wizard changes that list
 // when it finishes a Long Rest (a Paladin or Ranger swaps one), within its prepared cap.
 
 const wizard = build(wizardInput(WIZARD_SPELLS));
 const resolveDefinition = () => wizard;
+const cleric = build(clericInput(["detect-magic", "cure-wounds"]));
 
 describe("casting a spell that isn't prepared", () => {
   it("is refused while the table polices spellcasting, and advised otherwise", () => {
@@ -88,7 +90,7 @@ describe("the prepare step a Long Rest opens", () => {
 
 describe("casting a spell as a Ritual (SRD Rituals)", () => {
   it("spends no slot, takes the Magic action each turn, and needs the spell prepared", () => {
-    const { hero, state, action } = fight(wizard, { combat: false });
+    const { hero, action } = fight(wizard, { combat: false });
     const ritual = action("spell-alarm-ritual");
     expect(ritual).toMatchObject({ name: "Alarm (ritual)", activation: "action", spellId: "alarm" });
     expect(ritual.spellSlot).toBeUndefined();
@@ -98,7 +100,47 @@ describe("casting a spell as a Ritual (SRD Rituals)", () => {
     const before = JSON.stringify(hero.spellSlots);
     expect(spendLooseUses(hero, ritual, [], undefined, "strict", wizard)).toEqual({ usesLeft: null, spent: false });
     expect(JSON.stringify(hero.spellSlots)).toBe(before);
+  });
+
+  it("lets a Wizard cast a spellbook Ritual unprepared, read from the book (Ritual Adept)", () => {
+    const { hero, state, action, resolve } = fight(wizard, { combat: false });
     setPreparedSpell(state, HERO, "alarm", false, resolveDefinition);
-    expect(() => spendLooseUses(hero, ritual, [], undefined, "strict", wizard)).toThrowError(/hasn't prepared Alarm/);
+    expect(hero.preparedSpellIds).not.toContain("alarm");
+    expect(hero.inventory.some((item) => item.id === "spellbook")).toBe(true);
+    expect(spendLooseUses(hero, action("spell-alarm-ritual"), [], undefined, "strict", wizard)).toEqual({
+      usesLeft: null,
+      spent: false
+    });
+    expect(resolve("spell-alarm-ritual", { targetIds: [] }).actionName).toBe("Alarm (ritual)");
+    // "You must read from the book to cast a spell in this way."
+    hero.inventory = hero.inventory.filter((item) => item.id !== "spellbook");
+    expect(() => resolve("spell-alarm-ritual", { targetIds: [] })).toThrowError(
+      "Ansel hasn't prepared Alarm, and casting it as a Ritual unprepared needs the spellbook to read from."
+    );
+  });
+
+  it("gives a ritual recorded in the book beyond the sheet a Ritual cast, while the book is carried", () => {
+    const { hero, resolve } = fight(wizard, { combat: false });
+    hero.spellbook = [{ id: "detect-magic", copied: true }];
+    expect(
+      effectiveActions(wizard, hero, catalog).find((entry) => entry.id === "spell-detect-magic-ritual")
+    ).toMatchObject({
+      name: "Detect Magic (ritual)",
+      spellId: "detect-magic"
+    });
+    expect(resolve("spell-detect-magic-ritual", { targetIds: [] }).actionName).toBe("Detect Magic (ritual)");
+    expect(hero.effects.some((effect) => effect.concentration && effect.name.includes("Detect Magic"))).toBe(true);
+    hero.inventory = hero.inventory.filter((item) => item.id !== "spellbook");
+    expect(effectiveActions(wizard, hero, catalog).some((entry) => entry.id === "spell-detect-magic-ritual")).toBe(
+      false
+    );
+  });
+
+  it("needs the spell prepared for a caster without Ritual Adept", () => {
+    const { hero, state, action } = fight(cleric, { combat: false });
+    setPreparedSpell(state, HERO, "detect-magic", false, () => cleric);
+    expect(() =>
+      spendLooseUses(hero, action("spell-detect-magic-ritual"), [], undefined, "strict", cleric)
+    ).toThrowError(/hasn't prepared Detect Magic/);
   });
 });

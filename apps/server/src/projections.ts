@@ -222,7 +222,9 @@ const PENDING_SAVE_FIELDS = {
   drain: "never",
   failurePush: "never",
   // The save's own roll mode is read when it is answered.
-  advantageAtSize: "never"
+  advantageAtSize: "never",
+  // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
+  gmApplies: "player"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
@@ -268,11 +270,15 @@ const PENDING_REACTION_FIELDS = {
   weighed: "player",
   acBonus: "player",
   rollsAttack: "player",
+  // The reactor's own slots, which its owner already reads on the sheet; only the reactor's owner gets the prompt.
+  slotLevels: "player",
   createdAt: "player",
   sourceName: "derived",
   sourceActorId: "never",
   // Names the attacker's action and how it rolled, which the reactor's player has no need of.
   parkedAttack: "never",
+  // The cast a Counterspell decides: its action, targets and slot are the caster's, not the reactor's.
+  parkedCast: "never",
   // Sent as `attackRoll`, and only when the roll it came from is in the player's dice log.
   attackTotal: "derived"
 } as const satisfies Record<keyof PendingReaction, FieldAudience>;
@@ -457,6 +463,8 @@ function playerEffect(
     conditionImmunities: _conditionImmunities,
     // Whether a Concentration spell ends once no creature keeps it is the engine's bookkeeping.
     endsWhenUnaffected: _endsWhenUnaffected,
+    // A long casting's targets and slot are the caster's plan; its name says what is being cast.
+    longCast: _longCast,
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);

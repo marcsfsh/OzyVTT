@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { resolveDefinitionAction } from "../src/action-resolution.js";
+import { nextInitiativeTurn } from "../src/encounter.js";
 import { upcastAction } from "../src/item-actions.js";
 import { settlePlayerDamage } from "../src/player-damage.js";
 import {
   build,
+  catalog,
   fighterInput,
   fight,
   FOE,
@@ -33,6 +36,53 @@ describe("one spell slot per turn", () => {
     heroTurnAgain(state);
     resolve("spell-magic-missile", {});
     expect(hero.spellSlots!.find((slot) => slot.level === 1)!.remaining).toBe(3);
+  });
+
+  it("counts a Reaction's cast on the caster's own turn, and an item's cast that spends a slot", () => {
+    const { state, resolve, hero, definition } = fight(wizard);
+    strictSlots(state);
+    resolve("spell-magic-missile", {});
+    // Shield cast as a Reaction later on the same turn would spend a second slot.
+    expect(() => resolve("spell-shield", { targetIds: [] })).toThrowError(/only one is allowed per turn/);
+    heroTurnAgain(state);
+    // An item's cast that spends its bearer's slot (`consumesSpellSlot`) is a slot cast like any other.
+    const wand = {
+      id: "item-wand-cast-magic-missile",
+      name: "Cast Magic Missile (Wand)",
+      activation: "action" as const,
+      description: "Cast Magic Missile.",
+      damage: [{ formula: "1d4 + 1", type: "force" }],
+      darts: 3,
+      spellId: "magic-missile",
+      spellSlot: { level: 1 }
+    };
+    resolve("spell-misty-step", { targetIds: [] });
+    expect(() =>
+      resolveDefinitionAction(
+        state,
+        wand,
+        { actorId: HERO, targetIds: [FOE], commandId: "cmd-wand" },
+        {
+          random: () => 3,
+          newRollId: () => "40000000-0000-4000-8000-000000000996",
+          gmSessionId: "30000000-0000-4000-8000-00000000000a",
+          now: () => "2026-10-16T00:00:00.000Z",
+          definition,
+          catalog
+        }
+      )
+    ).toThrowError(/only one is allowed per turn/);
+    expect(hero.spellSlots!.find((slot) => slot.level === 1)!.remaining).toBeGreaterThan(0);
+  });
+
+  it("counts a Reaction's cast on another creature's turn against that turn", () => {
+    const { state, resolve } = fight(wizard);
+    strictSlots(state);
+    // The goblin's turn: the wizard's Shield spends a slot on it, so a second slot cast that turn is refused.
+    nextInitiativeTurn(state);
+    expect(state.combat.turnActorId).toBe(FOE);
+    resolve("spell-shield", { targetIds: [] });
+    expect(state.combat.turn.spellSlotCasters).toContain(HERO);
   });
 
   it("only warns while the table leaves spell slots on Advise", () => {

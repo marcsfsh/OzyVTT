@@ -1,5 +1,13 @@
 import { endEffect, READIED_TAG, releaseReadied } from "../effects.js";
+import { laterRowOf } from "../item-actions.js";
 import { endedEffect, type ResolveContext } from "./context.js";
+
+/** The resolve casts a spell with a Verbal component: a new cast, not what the spell lets its caster do later. */
+function castsAloud(ctx: ResolveContext): boolean {
+  const spellId = ctx.action.spellId;
+  const spell = spellId ? ctx.deps.catalog?.spellRecord?.(spellId) : undefined;
+  return spell !== undefined && spell.components.verbal && laterRowOf(spell, ctx.action.id) === undefined;
+}
 
 /** Counts a ray of a released readied spell off its held rays: "held" while rays are left to make, so the ready
  *  stays; "last" for its last ray, which lets it go; null for anything else. */
@@ -30,8 +38,9 @@ export function releaseHideAndReady(ctx: ResolveContext): void {
     endEffect(state, attacker.id, effect.id);
     effectsEnded.push(endedEffect(attacker, effect));
   };
-  // SRD Hide: the attack still had Invisible's advantage, then the hidden effect ends.
-  if (action.attack !== undefined || action.save !== undefined) end("hidden");
+  // SRD Hide: the attack still had Invisible's advantage, then the hidden effect ends. Casting a spell with a Verbal
+  // component ends it too.
+  if (action.attack !== undefined || action.save !== undefined || castsAloud(ctx)) end("hidden");
   // A released spell of several rays (Scorching Ray) keeps its ready until its last ray, all on the one Reaction.
   const ray = readiedRay(ctx);
   if (ray === "held") return;

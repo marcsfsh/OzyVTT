@@ -1,7 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { abilityModifier } from "@vtt/rules-5e";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
-import { spellCastMechanics, upcastAction } from "./item-actions.js";
+import { castAreaOf, spellCastMechanics, upcastAction } from "./item-actions.js";
 
 type CastsSpells = NonNullable<ActorAction["castsSpells"]>;
 type Entry = CastsSpells["spells"][number];
@@ -87,8 +87,11 @@ function castOf(
     ...action,
     ...mechanics,
     spellId: spell.id,
-    // A healing area heals the creatures the caster picks, so it is picked with no template.
-    ...(spell.area && !mechanics.healing ? { area: spell.area } : {})
+    ...castAreaOf(spell, mechanics),
+    // A reaction spell's trigger rides a reaction's cast (Protective Magic's Counterspell), so the table offers it.
+    ...(spell.effect?.reaction && action.activation === "reaction"
+      ? { reaction: structuredClone(spell.effect.reaction) }
+      : {})
   };
   const level = entry.atLevel ?? spell.level;
   const {

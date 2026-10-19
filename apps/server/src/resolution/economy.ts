@@ -1,5 +1,4 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
-import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
@@ -30,9 +29,11 @@ import {
   overrideReason,
   overrideWaives,
   rememberOverride,
+  rulesInForce,
   type RuleId
 } from "../rules-families.js";
-import { laterRowOf, laterSpellActionId, ritualSpellActionId } from "../item-actions.js";
+import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
+import { carriesSpellbook, hasClassFeature } from "../ritual-adept.js";
 import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
 import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
@@ -41,6 +42,8 @@ import { hitRiderOf } from "./hit-riders.js";
 import { hiddenFrom } from "../vision/audience.js";
 import { withoutSourceName } from "../hidden-source.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
+import { readComponents, spendComponents, type ComponentSpend } from "./components.js";
+import { spellTargetViolations } from "./spell-targets.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
 
@@ -78,6 +81,8 @@ export type EconomyPlan = Readonly<{
   surge: boolean;
   /** The turn's uses key of a feature used once per turn beside a pool of its own (Stunning Strike), or null. */
   oncePerTurn?: string | null;
+  /** The consumed materials and coins the cast uses up (SRD Components). */
+  componentSpends?: readonly ComponentSpend[];
 }>;
 
 type EconomyEvaluation = Readonly<{
@@ -137,7 +142,10 @@ export function evaluateActionEconomy(
   /** The spell the action casts, for the slot, preparation and targeting checks. */
   spell?: SpellReference,
   /** Any combatant's stat block, for the side a creature fights on (Help distracts an enemy). */
-  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined,
+  /** What the map says of the cast: the caster stands where no sound can be made (Silence), and the targets are a
+   *  placed template's catch. */
+  cast: Readonly<{ silenced?: boolean; areaPlaced?: boolean }> = {}
 ): EconomyEvaluation {
   const evaluation: Evaluation = {
     state,
@@ -182,7 +190,36 @@ export function evaluateActionEconomy(
   if (spell) checkMarkMove(evaluation, spell);
   if (spell) checkSpellUp(evaluation, spell);
   if (spell) checkLaterTurn(evaluation, spell);
-  if (spell) checkSpellTargets(evaluation, spell, spendSpellSlot?.level ?? continued ?? spell.level, distanceFeet);
+  if (spell)
+    evaluation.violations.push(
+      ...spellTargetViolations({
+        state,
+        attacker,
+        action,
+        spell,
+        targetIds,
+        castLevel: spendSpellSlot?.level ?? continued ?? spell.level,
+        areaPlaced: cast.areaPlaced === true,
+        characterLevel: (definition?.character?.classes ?? []).reduce((sum, entry) => sum + entry.level, 0),
+        distanceFeet,
+        resolveDefinition,
+        catalog
+      })
+    );
+  // A later ray of a spell already cast this action is no new cast, so it needs no components again.
+  const components =
+    continued === null
+      ? readComponents({
+          attacker,
+          action,
+          spell: spell ?? (action.spellId ? catalog?.spellRecord?.(action.spellId) : undefined),
+          definition,
+          catalog,
+          ...(cast.silenced ? { silenced: true } : {}),
+          targetCount: new Set(targetIds).size
+        })
+      : { gaps: [], spends: [] };
+  evaluation.violations.push(...components.gaps);
   const opensSpell = spendSpellSlot !== null && slots.markAction && slots.instance?.components[action.id] !== undefined;
   return {
     violations: evaluation.violations,
@@ -196,7 +233,8 @@ export function evaluateActionEconomy(
       castLevel: spendSpellSlot?.level ?? continued,
       magicAction: evaluation.onOwnTurn && isMagicAction(action),
       surge,
-      oncePerTurn
+      oncePerTurn,
+      ...(components.spends.length > 0 ? { componentSpends: components.spends } : {})
     },
     proseMultiattack: evaluation.proseMultiattack,
     notes: evaluation.notes
@@ -491,15 +529,25 @@ function checkArmorTraining(
   definition: ActorDefinition | undefined,
   catalog: EquipmentCatalog | undefined
 ) {
-  if (action.spellId === undefined && action.spellSlot === undefined) return;
+  const message = untrainedArmorCast(attacker, action, definition, catalog);
+  if (message !== null) violations.push({ rule: "spell.untrained-armor", message });
+}
+
+/** Why this action can't be cast in the armor its caster wears, or null; read by the loose route too, so an item's
+ *  cast outside a fight meets the same rule. */
+export function untrainedArmorCast(
+  attacker: LiveActor,
+  action: Pick<DefinitionAction, "spellId" | "spellSlot">,
+  definition: ActorDefinition | undefined,
+  catalog: EquipmentCatalog | undefined
+): string | null {
+  if (action.spellId === undefined && action.spellSlot === undefined) return null;
   const { untrainedArmor } = catalog
     ? deriveEquipment(attacker, definition, catalog)
     : armorTrainingGaps(attacker.inventory, definition);
-  if (untrainedArmor)
-    violations.push({
-      rule: "spell.untrained-armor",
-      message: `${attacker.name} can't cast spells while wearing ${untrainedArmor.name} without training in it.`
-    });
+  return untrainedArmor
+    ? `${attacker.name} can't cast spells while wearing ${untrainedArmor.name} without training in it.`
+    : null;
 }
 
 /** SRD: a Two-Handed weapon "requires two hands when you attack with it", and a Shield is strapped to one arm. Read
@@ -778,6 +826,8 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
     bonusInstance: state.combat.turn.bonusActionInstance,
     extraAction: null
   };
+  // Outside a fight there is no turn: a cast spends no action, Bonus Action or Reaction.
+  if (!state.combat.active) return unchanged;
   // An open compound Bonus Action (Flurry of Blows) spends its own strikes first and costs no further slot.
   const bonusOpen = state.combat.turn.bonusActionInstance;
   if (onOwnTurn && bonusOpen && bonusOpen.actorId === attacker.id && !action.multiattack) {
@@ -1073,7 +1123,7 @@ function checkSpellSlot({ state, attacker, action, slotLevel, violations }: Eval
     });
   }
   // SRD: "On a turn, you can expend only one spell slot to cast a spell", whoever's turn it is.
-  if (state.combat.turn.spellSlotCasters?.includes(attacker.id))
+  if (state.combat.active && state.combat.turn.spellSlotCasters?.includes(attacker.id))
     violations.push({
       rule: "slots.one-per-turn",
       message: `${attacker.name} has already cast a spell with a spell slot this turn, and only one is allowed per turn.`
@@ -1085,18 +1135,26 @@ function checkSpellSlot({ state, attacker, action, slotLevel, violations }: Eval
  *  null. Cantrips, always-prepared spells, anything not on the sheet's list (an item's cast) and a sheet that keeps
  *  no prepared list (an import with no prepared cap) need nothing. */
 export function unpreparedSpell(
-  actor: Pick<LiveActor, "name" | "preparedSpellIds">,
+  actor: Pick<LiveActor, "name" | "preparedSpellIds"> & Partial<Pick<LiveActor, "inventory">>,
   action: Pick<DefinitionAction, "id" | "spellSlot" | "spellId">,
   definition: ActorDefinition | undefined
 ): string | null {
   if (action.spellId === undefined) return null;
   // A slot cast, or a Ritual ("To cast a spell as a Ritual, a spellcaster must have it prepared").
-  if (!action.spellSlot && action.id !== ritualSpellActionId(action.spellId)) return null;
+  const ritual = action.id === ritualSpellActionId(action.spellId);
+  if (!action.spellSlot && !ritual) return null;
   const spell = definition?.spellcasting?.spells.find((entry) => entry.id === action.spellId);
   if (!spell || spell.level === 0 || spell.alwaysPrepared || actor.preparedSpellIds.includes(spell.id)) return null;
   const classes = definition!.spellcasting!.classes ?? [];
   const casting = classes.length === 1 ? classes[0] : classes.find((entry) => entry.classId === spell.classId);
   if (casting?.prepared === undefined) return null;
+  // The Wizard's Ritual Adept: "You can cast any spell as a Ritual if that spell has the Ritual tag and the spell is
+  // in your spellbook. You needn't have the spell prepared, but you must read from the book to cast a spell in this
+  // way." A Wizard's spells on the sheet are its spellbook.
+  if (ritual && casting.classId === "wizard" && hasClassFeature(definition, "ritual-adept", "wizard"))
+    return carriesSpellbook({ inventory: actor.inventory ?? [] })
+      ? null
+      : `${actor.name} hasn't prepared ${spell.name}, and casting it as a Ritual unprepared needs the spellbook to read from.`;
   return `${actor.name} hasn't prepared ${spell.name}.`;
 }
 
@@ -1255,48 +1313,6 @@ function checkTargeting(
   }
 }
 
-/**
- * A spell's own targeting (SRD Spells, "Range" and "Targets"): a save or healing spell reaches the creatures it names
- * only within its range (a Touch spell within 5 feet), and no more of them than it targets at this slot. An attack's
- * range is the attack's; an area's targets are whoever the template covers; a later action's trigger is wherever the
- * creature is.
- */
-function checkSpellTargets(
-  { state, attacker, action, targetIds, violations }: Evaluation,
-  spell: SpellReference,
-  castLevel: number,
-  distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined
-): void {
-  if (
-    action.area ||
-    (spell.effect?.laterActions ?? []).some((row) => laterSpellActionId(spell.id, row.name) === action.id)
-  )
-    return;
-  const targets = spell.effect?.targets;
-  const unique = [...new Set(targetIds)];
-  if (targets && action.darts === undefined) {
-    const limit = targets.count + (targets.perSlot ?? 0) * Math.max(0, castLevel - spell.level);
-    if (unique.length > limit)
-      violations.push({
-        rule: "target.too-many",
-        message: `${spell.name} targets ${limit === 1 ? "one creature" : `up to ${limit} creatures`}${castLevel > spell.level ? ` with a level ${castLevel} slot` : ""}; ${unique.length} were chosen.`
-      });
-  }
-  if (action.attack !== undefined || !distanceFeet) return;
-  const range = spellRangeFeet(spell.range) ?? (/^touch\b/i.test(spell.range.text ?? "") ? 5 : null);
-  if (range === null) return;
-  for (const targetId of unique) {
-    if (targetId === attacker.id) continue;
-    const distance = distanceFeet(attacker.id, targetId);
-    if (distance === null || distance <= range + DISTANCE_TOLERANCE_FEET) continue;
-    const targetName = state.actors.find((candidate) => candidate.id === targetId)?.name ?? "The target";
-    violations.push({
-      rule: "range.out-of-range",
-      message: `${targetName} is ${Math.round(distance * 10) / 10} ft away, beyond ${spell.name}'s ${range === 5 ? "touch" : `${range} ft range`}.`
-    });
-  }
-}
-
 /** Range/reach (SRD): checked only when distance is measurable. A thrown weapon is legal in either
  *  envelope; long-range disadvantage lives in the attack roll's sources. */
 function checkRange(
@@ -1366,13 +1382,18 @@ export function planEconomy(
     asHitRider,
     catalog,
     spell,
-    resolveDefinition
+    resolveDefinition,
+    {
+      ...(input.silenced === true ? { silenced: true } : {}),
+      ...(input.areaPlaced === true ? { areaPlaced: true } : {})
+    }
   );
   warnings.push(...notes);
 
   // The mode is per rule family: a violation whose family is Off is not a violation for this table.
+  const rules = rulesInForce(state);
   const policed = [...violations, ...softViolations].filter(
-    (violation) => effectiveModeFor(state.combat, violation.rule) !== "freeform"
+    (violation) => effectiveModeFor(rules, violation.rule) !== "freeform"
   );
   if (policed.length === 0) return { plan, overridden: null };
   // This command's override, or a GM override earlier this turn, covers its families; other families still
@@ -1380,7 +1401,7 @@ export function planEconomy(
   const waived = policed.find((violation) => overrideWaives(input.override, violation.rule));
   const covered = (rule: RuleId) => overrideWaives(input.override, rule) || overrideCovers(state.combat.turn, rule);
   const blocking = violations.filter(
-    (violation) => !covered(violation.rule) && effectiveModeFor(state.combat, violation.rule) === "strict"
+    (violation) => !covered(violation.rule) && effectiveModeFor(rules, violation.rule) === "strict"
   );
   if (blocking.length > 0) throw new RulesBlockedError(blocking[0].rule, blocking[0].message);
   warnings.push(...policed.filter((violation) => !covered(violation.rule)).map((violation) => violation.message));
@@ -1460,8 +1481,8 @@ export function commitEconomy({
       }
     };
   }
-  // Cleared on turn advance.
-  if (overridden) rememberOverride(state, overridden.rule, input.override);
+  // Cleared on turn advance; outside a fight the override covers this command alone.
+  if (overridden && state.combat.active) rememberOverride(state, overridden.rule, input.override);
   if (plan.spendLegendary) {
     state.combat = {
       ...state.combat,
@@ -1475,12 +1496,14 @@ export function commitEconomy({
   if (plan.spendSpellSlot) {
     spendSlot(attacker, plan.spendSpellSlot);
     const casters = state.combat.turn.spellSlotCasters ?? [];
-    if (!casters.includes(attacker.id))
+    if (state.combat.active && !casters.includes(attacker.id))
       state.combat = {
         ...state.combat,
         turn: { ...state.combat.turn, spellSlotCasters: [...casters, attacker.id] }
       };
   }
+  // A consumed material is used up as the cast happens ("which the spell consumes").
+  if (plan.componentSpends) spendComponents(attacker, plan.componentSpends);
   if (plan.oncePerTurn) {
     const key = plan.oncePerTurn;
     state.combat = {
@@ -1488,24 +1511,24 @@ export function commitEconomy({
       turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
     };
   }
-  if (plan.spendUse) {
-    if (plan.spendUse.per === "turn") {
-      const key = `${attacker.id}:${plan.spendUse.key}`;
-      state.combat = {
-        ...state.combat,
-        turn: {
-          ...state.combat.turn,
-          turnUses: {
-            ...state.combat.turn.turnUses,
-            [key]: (state.combat.turn.turnUses[key] ?? 0) + plan.spendUse.amount
-          }
-        }
-      };
-    } else {
-      attacker.actionUses = {
-        ...attacker.actionUses,
-        [plan.spendUse.key]: (attacker.actionUses[plan.spendUse.key] ?? 0) + plan.spendUse.amount
-      };
-    }
+  if (plan.spendUse) commitUse(state, attacker, plan.spendUse);
+}
+
+/** Records `amount` uses of a limited use: this turn's for a per-turn use, else the creature's own count. */
+export function commitUse(state: GameState, attacker: LiveActor, spendUse: NonNullable<EconomyPlan["spendUse"]>): void {
+  if (spendUse.per === "turn") {
+    const key = `${attacker.id}:${spendUse.key}`;
+    state.combat = {
+      ...state.combat,
+      turn: {
+        ...state.combat.turn,
+        turnUses: { ...state.combat.turn.turnUses, [key]: (state.combat.turn.turnUses[key] ?? 0) + spendUse.amount }
+      }
+    };
+    return;
   }
+  attacker.actionUses = {
+    ...attacker.actionUses,
+    [spendUse.key]: (attacker.actionUses[spendUse.key] ?? 0) + spendUse.amount
+  };
 }

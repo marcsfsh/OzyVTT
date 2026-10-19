@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ActorDefinition, ContentSpellSummary, GmActor, SpellChoices } from "@vtt/domain";
+import type { ActorDefinition, ContentActionSummary, ContentSpellSummary, GmActor, SpellChoices } from "@vtt/domain";
 
 vi.mock("../socket", () => ({
   socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn(), connected: true, timeout: () => ({ emit: vi.fn() }) }
@@ -24,7 +24,8 @@ const SPELLS = [
   spell("spiritual-weapon", "Spiritual Weapon", 2),
   spell("magic-missile", "Magic Missile", 1),
   spell("web", "Web", 2),
-  spell("misty-step", "Misty Step", 2)
+  spell("misty-step", "Misty Step", 2),
+  { ...spell("detect-magic", "Detect Magic", 1), ritual: true } as ContentSpellSummary
 ];
 vi.mock("../encounter/spells", async (original) => ({
   ...(await original<typeof import("../encounter/spells")>()),
@@ -67,7 +68,13 @@ const caster = (spells: ReadonlyArray<readonly [string, string, number, string]>
 const mount = (
   definition: ActorDefinition,
   choices: SpellChoices,
-  extra: Partial<{ canPrepare: boolean; gm: boolean; actor: Record<string, unknown> }> = {}
+  extra: Partial<{
+    canPrepare: boolean;
+    gm: boolean;
+    actor: Record<string, unknown>;
+    serverActions: ContentActionSummary[];
+    cast: (actionId: string) => void;
+  }> = {}
 ) => {
   const edit = vi.fn(async () => ({ ok: true, inBook: true }));
   render(
@@ -92,7 +99,8 @@ const mount = (
       rolls={{ rollFlat: vi.fn() } as unknown as SheetRolls}
       onFeedback={() => {}}
       routeSpell={() => false}
-      castSpellAction={vi.fn()}
+      castSpellAction={extra.cast ?? vi.fn()}
+      serverActions={extra.serverActions ?? []}
       canPrepare={extra.canPrepare ?? true}
       spellChoices={choices}
     />
@@ -162,6 +170,20 @@ const WIZARD_CHOICES: SpellChoices = {
 };
 
 describe("a Wizard's spellbook", () => {
+  it("casts a ritual from the book as a Ritual when the server lists that cast (Ritual Adept)", async () => {
+    const user = userEvent.setup();
+    const cast = vi.fn();
+    const ritual = { id: "spell-detect-magic-ritual", name: "Detect Magic (ritual)" } as ContentActionSummary;
+    mount(
+      WIZARD,
+      { ...WIZARD_CHOICES, spellbook: { ...WIZARD_CHOICES.spellbook!, spellIds: ["magic-missile", "detect-magic"] } },
+      { canPrepare: false, serverActions: [ritual], cast }
+    );
+    await user.click(screen.getByRole("button", { name: "Spellbook" }));
+    await user.click(screen.getByRole("button", { name: "Cast Detect Magic as a Ritual" }));
+    expect(cast).toHaveBeenCalledWith("spell-detect-magic-ritual");
+  });
+
   it("lists what is in the book beyond the sheet, and adds one of the levels' spells free", async () => {
     const user = userEvent.setup();
     const edit = mount(WIZARD, WIZARD_CHOICES);

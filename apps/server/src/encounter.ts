@@ -26,6 +26,7 @@ import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
 import { zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
+import { lapseLongCasts } from "./resolution/long-casting.js";
 
 type StartEncounterInput = Readonly<{
   mapAssetId: string;
@@ -667,6 +668,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     ending,
     deps?.newId ? { ...deps, newId: deps.newId, now: deps.now ?? (() => new Date().toISOString()) } : undefined
   );
+  // A spell cast over several turns lapses on a turn that went without its action.
+  lapseLongCasts(state, outgoingId, ending);
   // A spell area the creature ends its turn in acts on it (Moonbeam, Spirit Guardians).
   const zones = zoneDepsOf(deps);
   if (zones) ending.push(...zonesAtTurnEnd(state, outgoingId, zones));

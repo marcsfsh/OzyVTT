@@ -91,6 +91,8 @@ export type ResolveInput = Readonly<{
   ready?: boolean;
   /** The spell area a cast that ends spells is aimed at (Dispel Magic on a Spirit Guardians); the GM's to name. */
   zoneId?: string;
+  /** The caster stands where no sound can be made (Silence's sphere), measured on the map by the server. */
+  silenced?: boolean;
 }>;
 
 export type ResolveDependencies = Readonly<{

@@ -954,7 +954,21 @@ export const EffectInstanceSchema = z
      *  (Mage Armor's 13). The best of its ways counts, and AC bonuses add to it. */
     baseArmorClass: z.number().int().min(11).max(20).optional(),
     /** The bearer's AC is at least this while it lasts (Barkskin's 17). */
-    armorClassFloor: z.number().int().min(10).max(25).optional()
+    armorClassFloor: z.number().int().min(10).max(25).optional(),
+    /** A spell its bearer is casting over a minute or more in a fight (SRD Longer Casting Times): the cast it finishes,
+     *  with the targets and slot level picked when it began, the turns' actions it still needs, and the round of the
+     *  last one, so a turn without one lets it lapse. */
+    longCast: z
+      .object({
+        actionId: z.string().min(1).max(120),
+        targetIds: z.array(z.uuid()).max(40),
+        slotLevel: z.number().int().min(1).max(9).nullable(),
+        areaPlaced: z.boolean().default(false),
+        turnsLeft: z.number().int().min(0).max(15000),
+        lastRound: z.number().int().positive()
+      })
+      .strict()
+      .optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -1667,7 +1681,9 @@ const ReactionRangeFeet = z.number().int().min(5).max(1000).optional();
  *   miss. `melee` limits it to melee attacks; `untilNextTurn` keeps the bonus until the reactor's next turn starts.
  * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action against the creature that dealt the damage.
  * - melee-attack (Retaliation): make one melee attack against that creature instead.
- * `rangeFeet` skips the prompt when the map shows the damaging creature farther away.
+ * - counter (Counterspell): a creature the reactor can see casts a spell with components; the cast waits, and "use"
+ *   makes the caster roll an `ability` saving throw against the reactor's spell save DC, its spell lost on a failure.
+ * `rangeFeet` skips the prompt when the map shows the damaging or casting creature farther away.
  */
 export const ActionReactionSchema = z.discriminatedUnion("response", [
   z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict(),
@@ -1691,6 +1707,14 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
     .object({
       trigger: z.literal("damaged-by-creature"),
       response: z.literal("melee-attack"),
+      rangeFeet: ReactionRangeFeet
+    })
+    .strict(),
+  z
+    .object({
+      trigger: z.literal("casts-spell"),
+      response: z.literal("counter"),
+      ability: AbilitySchema,
       rangeFeet: ReactionRangeFeet
     })
     .strict()
@@ -1816,6 +1840,12 @@ export const CastsSpellsSchema = z
     saveDc: z.number().int().min(1).max(40),
     attackBonus: z.number().int().min(-10).max(30),
     self: z.literal(true).optional(),
+    /** The components its casts go without ("requiring no Material components"; "no spell components" is all three). */
+    waives: z
+      .array(z.enum(["verbal", "somatic", "material"]))
+      .min(1)
+      .max(3)
+      .optional(),
     spells: z
       .array(
         z

@@ -172,7 +172,15 @@ const LABELS: Readonly<Record<string, string>> = {
   endsOnSourceSideDamage: "end on damage from the source's side",
   persistsWithoutTargets: "lasts with no creature under it",
   holdsOne: "one creature held at a time",
-  grows: "damage that grows each turn"
+  grows: "damage that grows each turn",
+  costly: "priced or consumed materials",
+  itemIds: "items",
+  matches: "names it matches",
+  perTarget: "one for each target",
+  coins: "coins",
+  waives: "components it goes without",
+  targetTypes: "creature types it affects",
+  chainFeet: "distance between targets"
 };
 /** A key whose words depend on what holds it: a weapon's category is its weapon kind, as the editor labels it. */
 const NESTED_LABELS: Readonly<Record<string, string>> = { "weapon.category": "weapon kind" };

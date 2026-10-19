@@ -1008,6 +1008,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "components.costly[].**",
+    types: ["spell"],
+    reason:
+      "a spell's priced or consumed materials, read from the material text as the catalog is built; the spell form has no rows control for them",
+    status: "gap"
+  },
+  {
     at: "^add",
     types: ["spell-list"],
     reason: "written whole by the bespoke SpellListContents editor: no FieldDef the probe can see",

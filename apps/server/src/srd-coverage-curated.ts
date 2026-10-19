@@ -13,6 +13,12 @@ export type CuratedCoverage = Readonly<{ state: CoverageState; note: string }>;
 
 const enforced = (note: string): CuratedCoverage => ({ state: "enforced", note });
 const guided = (note: string): CuratedCoverage => ({ state: "guided", note });
+/** A spell whose cast the server makes (its action, components and the table's line), with what it does left to a
+ *  person. */
+const castOnly = (rest: string): CuratedCoverage =>
+  guided(
+    `The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. ${rest}`
+  );
 const reference = (note: string): CuratedCoverage => ({ state: "reference", note });
 
 export const CONDITION_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
@@ -124,7 +130,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   ),
   campaign: reference("A definition; there is nothing to apply."),
   cantrip: enforced(
-    "A cantrip is cast with no slot, and its damage grows at the character levels its row prints (cantripTierAt in the content package)."
+    "Every cantrip a sheet or stat block knows is a cast action with no slot (character-build.ts, monster-spells.ts), and its damage grows at the character levels its row prints (cantripTierAt in the content package)."
   ),
   "carrying-capacity": reference("Weight carried isn't checked against Strength."),
   "challenge-rating": guided(
@@ -268,7 +274,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "rests.ts needs 1 Hit Point and 16 hours since the last one. It restores Hit Points, Hit Point Dice, spell slots and uses, removes a level of Exhaustion and ends what lasts until a Long Rest. The party's Long Rest moves the game clock 8 hours, which counts down every effect (game-time.ts)."
   ),
   magic: enforced(
-    "resolution/economy.ts spends the action when a spell or an item's action is used. A casting time longer than an action is a reminder to the GM (resolution/validate.ts)."
+    "resolution/economy.ts spends the action when a spell or an item's action is used. A creature's own spell of a minute or more takes the action on each of its turns in a fight and resolves on the last (resolution/long-casting.ts); outside a fight it completes at once and moves the game clock by its whole hours. An item's long cast in a fight is a reminder to the GM (resolution/validate.ts)."
   ),
   "magical-effect": enforced(
     "resolution/pending.ts marks a save against a spell or a magic item as magical, which Magic Resistance reads."
@@ -308,7 +314,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   resistance: enforced("hit-points.ts halves damage of a resisted type, rounded down, once per instance of damage."),
   restrained: condition("restrained"),
   ritual: enforced(
-    "character-build.ts gives each prepared Ritual spell a cast with no slot. Its 10 extra minutes are a reminder to the GM."
+    "character-build.ts gives each Ritual spell on a sheet a cast with no slot, which resolution/economy.ts refuses unprepared except a Wizard's from the spellbook it carries (ritual-adept.ts). resolution/long-casting.ts adds the 10 minutes: in a fight the cast takes the action on each turn until it completes."
   ),
   "round-down": enforced("The server rounds down wherever a rule divides (halved damage, half Speed, DCs)."),
   save: enforced("Another name for a saving throw; see that row."),
@@ -330,11 +336,15 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   speed: enforced(
     "movement-rules.ts charges each move against the creature's Speed for the turn, and each special speed has its own budget."
   ),
-  spell: reference("A definition. Each spell's own row under Spells says what the app does with it."),
+  spell: enforced(
+    "Every spell a sheet or stat block knows is a cast action that spends its casting time and slot (resolution/economy.ts) and is told to the table as cast (cast-narration.ts). Each spell's own row under Spells says what else the app does with it."
+  ),
   "spell-attack": enforced(
     "resolution/attack.ts rolls it with the caster's spell attack bonus, Advantage and Disadvantage included."
   ),
-  "spellcasting-focus": reference("Spell components and focuses aren't tracked."),
+  "spellcasting-focus": enforced(
+    "resolution/components.ts checks a cast's components: a Verbal one needs a caster who can speak outside Silence, a Somatic one a free hand (a Shield or bound hands fill one), and a Material one a Component Pouch, the focus the class names or the material itself. A priced material must be carried, and a consumed one is used up. A stat block's cast is held to its Verbal component unless its text says it needs none; its hands and materials are the GM's."
+  ),
   sphere: areaShape("a Sphere is a circle of its radius, and the point it starts from is in it."),
   stable: enforced(
     "stabilize.ts stops death saves after three successes, first aid or Spare the Dying. effects.ts rolls the 1d4 hours on the game clock after which the creature regains 1 Hit Point, and damage before then starts its dying again."
@@ -352,7 +362,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   "swim-speed": enforced(
     "speed.ts gives a creature with a Swim Speed its own budget for swimming, with no extra cost."
   ),
-  target: reference("A definition; there is nothing to apply."),
+  target: enforced(
+    "resolution/spell-targets.ts holds a spell to the number of targets it names (more with a higher slot), the creature type it affects, the ones the caster can see when dynamic vision is on, its range, and for creatures of the caster's choice in an area, to those inside it."
+  ),
   telepathy: reference("Telepathy is the table's to run."),
   teleportation: enforced(
     "movement-rules.ts moves a teleporting creature with no movement spent and no Opportunity Attack. A player's teleport needs the GM's go-ahead."
@@ -569,8 +581,19 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
  * `feature:`, `item:` or `action:<monster>/<action id>`.
  */
 export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
+  // Cantrips with nothing to roll: the cast is the server's, what it does is the table's.
+  "spell:light": castOnly("The light and the object it shines from are the GM's."),
+  "spell:mage-hand": castOnly("The hand and what it does are the GM's."),
+  "spell:mending": castOnly("The repair is the GM's."),
+  "spell:message": castOnly("The whisper and its reply are the table's."),
+  "spell:prestidigitation": castOnly("Its minor tricks are the GM's."),
+  "spell:shillelagh": castOnly("The weapon's spellcasting ability, larger damage die and Force damage are the GM's."),
+  "spell:thaumaturgy": castOnly("Its wonders are the GM's."),
+  "spell:true-strike": castOnly(
+    "The weapon attack with the spellcasting ability, and its Radiant damage, are the GM's."
+  ),
   "spell:spare-the-dying": enforced(
-    "stabilize.ts makes a creature at 0 Hit Points within 15 feet Stable with no check, once the caster knows the cantrip."
+    "The cast makes a creature at 0 Hit Points Stable with no check (resolution/stabilize.ts), within 15 feet, 30 at level 5, 60 at level 11 and 120 at level 17 (resolution/spell-targets.ts)."
   ),
   "item:healers-kit": enforced(
     "stabilize.ts spends one use of the kit to make a creature at 0 Hit Points Stable with no check, and the last use takes the kit."
@@ -927,7 +950,22 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The save and its 4d10 Psychic damage are applied, and a failure leaves Disadvantage on the target's ability checks and attack rolls, with the save repeated at the end of each of its turns until it succeeds (resolution/pending.ts). The 4d10 damage on each failed repeat is the GM's."
   ),
   "spell:power-word-heal": enforced(
-    "resolution/heal.ts restores all the target's Hit Points and ends Charmed, Frightened, Paralyzed, Poisoned and Stunned. Standing up from Prone with its Reaction is the creature's choice."
+    "resolution/heal.ts restores all the target's Hit Points and ends Charmed, Frightened, Paralyzed, Poisoned and Stunned, for one creature (resolution/spell-targets.ts). Standing up from Prone with its Reaction is the creature's choice."
+  ),
+  "spell:heal": enforced(
+    "resolution/heal.ts restores 70 Hit Points, 10 more for each slot level above 6, and ends Blinded, Deafened and Poisoned, for one creature (resolution/spell-targets.ts)."
+  ),
+  "spell:counterspell": enforced(
+    "resolution/counter.ts holds a cast with components while each creature that sees its caster within 60 feet and has Counterspell, a slot and its Reaction answers. counter-answers.ts rolls the caster's Constitution save against the reactor's DC: a failure ends the spell with no effect and leaves its slot unspent, and a success lets it go ahead."
+  ),
+  "spell:mass-cure-wounds": enforced(
+    "resolution/heal.ts restores 5d8 plus the modifier to up to six creatures the caster picks, and resolution/spell-targets.ts keeps them within one 30-foot Sphere centered within 60 feet."
+  ),
+  "spell:hold-person": enforced(
+    "A failed save imposes Paralyzed, repeated at the end of each of the target's turns. resolution/spell-targets.ts takes one Humanoid, one more for each slot level above 2."
+  ),
+  "spell:mass-suggestion": enforced(
+    "A failed save imposes Charmed on up to twelve creatures (resolution/spell-targets.ts). What the suggestion makes them do is the GM's."
   ),
   "spell:power-word-stun": enforced(
     "A target with 150 Hit Points or fewer is Stunned and repeats the save at the end of each of its turns; a tougher one's Speed is 0 until the start of the caster's next turn (resolution/pending.ts)."
@@ -945,7 +983,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/dispel.ts ends every effect marked a curse on the target (Hex, Bestow Curse, Geas), and breaks its Attunement to a cursed item so the item can be removed; the item's own curse stays. A curse the app doesn't track is the GM's."
   ),
   "spell:regenerate": guided(
-    "The 4d8 + 15 Hit Points are applied. The 1 Hit Point at the start of each of the target's turns is the GM's."
+    "The 4d8 + 15 Hit Points are applied to one creature (resolution/spell-targets.ts). The 1 Hit Point at the start of each of the target's turns, and regrowing severed parts, are the GM's."
   ),
   "spell:sleep": guided(
     "A failed save imposes Incapacitated until the end of the target's next turn, and damage ends it. The second save, and Unconscious on its failure, are the GM's."

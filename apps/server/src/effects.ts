@@ -41,6 +41,12 @@ export const NO_HEALING_TAG = "no-healing";
 export const SLOWED_TAG = "slowed";
 /** The bearer can't cast spells or take the Magic action while this lasts (Befuddlement). */
 export const NO_SPELLS_TAG = "no-spells";
+/** The bearer can't speak while this lasts (a gag, Gaseous Form's cloud), so it can't cast a spell with a Verbal
+ *  component. */
+export const CANT_SPEAK_TAG = "cant-speak";
+/** The bearer's hands are bound (Manacles, a creature's hold on its arms), so it can't make a spell's gestures or reach
+ *  its materials. */
+export const HANDS_BOUND_TAG = "hands-bound";
 /** Barkskin: the bearer's AC is 17 while it is lower, raised when the spell lands. */
 export const BARKSKIN_TAG = "barkskin";
 /** Death Ward: the first drop to 0 Hit Points leaves the bearer at 1 instead, and ends it. */

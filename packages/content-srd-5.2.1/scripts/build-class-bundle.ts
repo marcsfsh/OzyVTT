@@ -315,7 +315,8 @@ const CONFIG: Record<string, ClassConfig> = {
       ability: "cha",
       prepares: "prepared",
       ritual: true,
-      focus: "arcane-focus",
+      // "You can use a Musical Instrument as a Spellcasting Focus for your Bard spells."
+      focus: "musical-instrument",
       multiclassProgression: "full",
       spellListId: "bard"
     },

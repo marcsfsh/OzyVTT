@@ -86,6 +86,12 @@ const RULE_FAMILIES = {
   "attack.cleave-too-far": "targeting",
   // A spell aimed at more creatures than it can target (Hold Person at two Humanoids from a level 2 spell slot).
   "target.too-many": "targeting",
+  // A spell aimed at a creature of a type it can't target (Hold Person at a Beast).
+  "target.wrong-type": "targeting",
+  // "A creature you can see": the map's vision says the caster can't see it.
+  "target.unseen": "targeting",
+  // A target picked among those in a spell's area that the area doesn't cover.
+  "target.outside-area": "targeting",
   // The hit an extra is added to can't carry it (no Advantage or ally for Sneak Attack, a ranged smite).
   "attack.hit-option-unqualified": "targeting",
   // Being Charmed by your target is a targeting restriction.
@@ -95,7 +101,11 @@ const RULE_FAMILIES = {
   "slots.below-spell-level": "slots",
   "slots.one-per-turn": "slots",
   // Casting a spell the character hasn't prepared is spellcasting bookkeeping too.
-  "slots.not-prepared": "slots"
+  "slots.not-prepared": "slots",
+  // Spell components (SRD Components) are their own family, so a table can stop checking hands and pouches alone.
+  "spell.no-verbal": "components",
+  "spell.no-free-hand": "components",
+  "spell.no-material": "components"
 } as const satisfies Record<string, RuleFamily>;
 
 export type RuleId = keyof typeof RULE_FAMILIES;
@@ -109,6 +119,16 @@ export function familyOf(rule: RuleId): RuleFamily {
 /** The mode in force for one family: its exception if the GM set one, otherwise this fight's dial. */
 export function familyModeFor(combat: Pick<CombatState, "rulesMode" | "ruleExceptions">, family: RuleFamily): RuleMode {
   return combat.ruleExceptions[family] ?? combat.rulesMode;
+}
+
+/** The rules in force: the fight's dial and exceptions while one runs, else the table's standing policy, which the
+ *  next fight starts from. */
+export function rulesInForce(
+  state: Pick<GameState, "combat" | "rulesPolicy">
+): Pick<CombatState, "rulesMode" | "ruleExceptions"> {
+  return state.combat.active
+    ? state.combat
+    : { rulesMode: state.rulesPolicy.dial, ruleExceptions: state.rulesPolicy.exceptions };
 }
 
 /** The mode in force for one rule id. The single reader: never read `combat.rulesMode` at a rule site. */

@@ -1137,7 +1137,7 @@
    "ability": "cha",
    "prepares": "prepared",
    "ritual": true,
-   "focus": "arcane-focus",
+   "focus": "musical-instrument",
    "multiclassProgression": "full",
    "spellListId": "bard"
   },

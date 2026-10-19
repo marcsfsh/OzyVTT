@@ -22,12 +22,12 @@ const IDS = {
 } as const;
 const GM = { role: "gm" } as const;
 
-const HOLD_PERSON: ActorAction = {
-  id: "spell-hold-person",
-  name: "Hold Person",
+const HOLD_MONSTER: ActorAction = {
+  id: "spell-hold-monster",
+  name: "Hold Monster",
   activation: "action",
   description: "Wisdom Saving Throw.",
-  spellId: "hold-person",
+  spellId: "hold-monster",
   save: {
     ability: "wis",
     dc: 15,
@@ -64,7 +64,7 @@ const hero = {
   armorClass: 12,
   extensions: {},
   token: { disposition: "friendly", footprint: { width: 1, height: 1 } },
-  actions: [HOLD_PERSON, FIRE_BOLT, SHOVE_SAVE]
+  actions: [HOLD_MONSTER, FIRE_BOLT, SHOVE_SAVE]
 } as unknown as ActorDefinition;
 const monsters = new Map(loadMonsterDefinitions().map((entry) => [entry.source.externalId!, entry]));
 const monster = (slug: string) => monsters.get(slug)!;
@@ -192,7 +192,7 @@ const pendingOn = (state: GameState, id: string) =>
 describe("Magic Resistance and Greater Magic Resistance", () => {
   it("gives Advantage on a save against a spell, and says why", () => {
     const state = game("glabrezu");
-    heroUses(state, HOLD_PERSON);
+    heroUses(state, HOLD_MONSTER);
     const [pending] = pendingOn(state, IDS.foe);
     expect(pending?.magical).toBe(true);
     // Two d20s for Advantage: the 18 counts.
@@ -214,7 +214,7 @@ describe("Magic Resistance and Greater Magic Resistance", () => {
 
   it("helps the save a spell's effect has its target repeat", () => {
     const state = game("glabrezu");
-    heroUses(state, HOLD_PERSON);
+    heroUses(state, HOLD_MONSTER);
     const [pending] = pendingOn(state, IDS.foe);
     answerSave(state, nextId(), pending!.id, "manual", 1, true, GM, saveDeps([]));
     expect(actor(state, IDS.foe).effects[0]?.magical).toBe(true);
@@ -232,7 +232,7 @@ describe("Magic Resistance and Greater Magic Resistance", () => {
 
   it("lets a rakshasa succeed on a save against a spell without a roll", () => {
     const state = game("rakshasa");
-    heroUses(state, HOLD_PERSON);
+    heroUses(state, HOLD_MONSTER);
     const [pending] = pendingOn(state, IDS.foe);
     const answered = answerSave(state, nextId(), pending!.id, "roll", undefined, true, GM, saveDeps([]));
     expect(answered.outcome).toMatchObject({ success: true, autoSucceeded: "Greater Magic Resistance" });
