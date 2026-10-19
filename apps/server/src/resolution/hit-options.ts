@@ -447,9 +447,15 @@ function lessForgone(
 
 /** Rolls the chosen extras into the hit's damage and opens their saves. Their costs are spent after the hit's own
  *  (`spendHitOptions`). */
-export function rollHitOptions(ctx: ResolveContext): void {
+export function rollHitOptions(ctx: ResolveContext, diceOnly = false): void {
   const chosen = ctx.input.hitOptions ?? [];
   if (chosen.length === 0 || !landed(ctx) || ctx.targets.length !== 1) return;
+  // A look at the damage (`held-damage.ts`) throws the extras' dice and nothing else: the confirm checks and spends
+  // them, and reads the same dice back.
+  if (diceOnly) {
+    lookAtExtraDice(ctx, chosen);
+    return;
+  }
   const target = ctx.targets[0];
   const roll = (formula: string, type: string, source: string) => {
     const expression = parseDiceFormula(formula);
@@ -555,6 +561,47 @@ export function rollHitOptions(ctx: ResolveContext): void {
       ...(slotLevel !== undefined ? { slotLevel } : {}),
       ...(pactSlot !== null ? { pactSlot } : {})
     });
+  }
+}
+
+/** The dice the chosen extras throw, in the order `rollHitOptions` throws them, for a look at the damage: an extra this
+ *  hit can't carry is left for the confirm to refuse. */
+function lookAtExtraDice(ctx: ResolveContext, chosen: readonly HitOptionChoice[]): void {
+  const roll = (formula: string, type: string, source: string) => {
+    const expression = parseDiceFormula(formula);
+    const rolled = resolveDice(ctx.crit ? criticalExpression(expression) : expression, ctx.deps.random);
+    ctx.damage.push({ formula: rolled.expression.source, type, total: rolled.total, source });
+  };
+  const hitDealsDamage = dealsDamage(ctx);
+  for (const choice of chosen) {
+    if (choice.id === "charge") {
+      for (const part of chargeOf(ctx)?.damage ?? []) roll(part.formula, part.type, "Charge");
+      continue;
+    }
+    const action = ctx.siblings.find((candidate) => candidate.id === choice.id);
+    const rider = action ? hitRiderOf(action) : undefined;
+    if (!action || !rider || qualifies(ctx, rider, action) === false) continue;
+    if (rider.dealsDamage && !hitDealsDamage) continue;
+    const effects = pickedEffects(ctx, rider, action, choice);
+    const slotLevel = action.spellSlot ? (choice.slotLevel ?? openSlots(ctx, action)[0]) : undefined;
+    const pactSlot = rider.pactSlotDie ? openPactSlot(ctx) : null;
+    const cast = riderAction(ctx, action, slotLevel);
+    const forgone = effects.reduce((sum, effect) => sum + (effect.forgoesDice ?? 0), 0);
+    const parts =
+      pactSlot !== null && rider.pactSlotDie
+        ? [{ formula: `${pactSlot + 1}${rider.pactSlotDie.slice(1)}`, type: cast.damage[0]?.type ?? "force" }]
+        : lessForgone(cast.damage, forgone, action, ctx);
+    const pick =
+      choice.damageType && rider.damageTypes?.includes(choice.damageType as never) ? choice.damageType : undefined;
+    const typeOf = (part: DefinitionAction["damage"][number]) =>
+      rider.weaponType ? (ctx.action.damage[0]?.type ?? part.type) : (pick ?? rider.damageTypes?.[0] ?? part.type);
+    const creatureType = ctx.riderFilters.targetCreatureType;
+    const spared = creatureType !== undefined && (rider.sparesCreatureTypes ?? []).includes(creatureType);
+    if (action.save) {
+      if (!spared) for (const part of parts) rollPlain(ctx, part.formula, typeOf(part), action.name);
+    } else if (!spared) for (const part of parts) roll(part.formula, typeOf(part), action.name);
+    if (rider.versus && creatureType !== undefined && rider.versus.creatureTypes.includes(creatureType))
+      roll(rider.versus.formula, cast.damage[0]?.type ?? "radiant", `${action.name} (${capitalised(creatureType)})`);
   }
 }
 

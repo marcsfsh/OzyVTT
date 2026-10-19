@@ -265,6 +265,39 @@ describe("Rogue: Sneak Attack rides a qualifying hit", () => {
     ).toBeUndefined();
   });
 
+  it("throws its dice on a look at the damage, where Heroic Inspiration rerolls one, and the confirm deals them", () => {
+    // Rogue 5: Sneak Attack 3d6 beside the Shortsword's 1d6.
+    const built = table(rogueInput(5));
+    built.hero.heroicInspiration = true;
+    const attack = (input: Record<string, unknown>, faces: number[]) =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "item-shortsword")!,
+        {
+          actorId: IDS.hero,
+          targetIds: [IDS.foe],
+          commandId: nextCommandId(),
+          rollMode: "advantage",
+          holdKey: `attack:${IDS.hero}`,
+          hitOptions: [{ id: "sneak-attack" }],
+          ...input
+        },
+        deps(built, faces)
+      );
+    attack({ commit: false }, [15, 2]);
+    const look = attack({ commit: false, damageLook: true }, [2, 1, 1, 1]);
+    expect((look.heldDamage?.dice ?? []).map((die) => die.face)).toEqual([2, 1, 1, 1]);
+    expect(look.damage.find((part) => part.source === "Sneak Attack")?.total).toBe(3);
+    const answered = attack(
+      { commit: false, damageLook: true, damageAnswer: { id: "heroic-inspiration", dice: [1] } },
+      [6]
+    );
+    expect((answered.heldDamage?.dice ?? []).map((die) => die.face)).toEqual([2, 6, 1, 1]);
+    expect(built.hero.heroicInspiration).toBe(false);
+    const hit = attack({}, [3, 3, 3, 3]);
+    expect(hit.damage.find((part) => part.source === "Sneak Attack")?.total).toBe(8);
+  });
+
   it("doubles its dice on a critical hit", () => {
     const built = table(rogueInput(5));
     const crit = swing(built, "item-dagger", [20, 2, 1, 2, 3, 4, 5, 6, 1, 2, 3], {

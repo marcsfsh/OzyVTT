@@ -313,7 +313,8 @@ export function AttackPreview({
       ...(forced ? { rollMode: forced } : {}),
       // Only a confirming call carries the push and extras; previews ignore them.
       ...(options.commit && pushFeet !== undefined ? { pushFeet } : {}),
-      ...(options.commit && hitOptions.length > 0 ? { hitOptions } : {}),
+      // A look at the damage throws the chosen extras' dice too, so Heroic Inspiration can reroll one of them.
+      ...((options.commit || options.damageLook) && hitOptions.length > 0 ? { hitOptions } : {}),
       ...(options.commit && knockOutOffered && knockOut ? { knockOut: true } : {})
     });
   return (

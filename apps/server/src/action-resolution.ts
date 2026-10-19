@@ -321,9 +321,9 @@ export function resolveDefinitionAction(
   spendSundering(ctx);
   // The dice a look held are dealt now, as they were looked at; without a look the server throws them.
   const heldLook = heldDamageFor(state, ctx.attacker.id, ctx.action.id);
-  rollDamage(ctx, tape, heldLook?.dice ?? []);
+  // The extras a hit carries throw their dice through the tape too, so a look at them deals what was looked at.
+  rollDamage(ctx, tape, heldLook?.dice ?? [], () => rollHitOptions(ctx));
   releaseHeldDamage(state, ctx.attacker.id);
-  rollHitOptions(ctx);
   // What the stat block leaves to the GM (damage on later turns) is said where the GM reads the result.
   if (ctx.action.reminder) ctx.warnings.push(ctx.action.reminder);
 
@@ -398,7 +398,8 @@ export function resolveDefinitionAction(
 function rollDamage(
   ctx: ResolveContext,
   tape: DamageTape,
-  held: Parameters<DamageTape["start"]>[0]
+  held: Parameters<DamageTape["start"]>[0],
+  extras: () => void = () => {}
 ): ReturnType<DamageTape["stop"]> {
   tape.start(held);
   tape.own(true);
@@ -409,6 +410,7 @@ function rollDamage(
   ctx.bonusDamage.push(...masteryMissDamage(ctx.masterySwing));
   rollRiderDamage(ctx);
   ctx.builtin?.hitDamage?.(ctx);
+  extras();
   return tape.stop();
 }
 
@@ -427,7 +429,7 @@ function lookAtDamage(ctx: ResolveContext, tape: DamageTape): ActionResolution {
   }
   ctx.silentRolls = true;
   const healing = rollsHealingDice(action) ? lookAtHealing(ctx, tape, held?.dice ?? []) : null;
-  const dice = healing?.dice ?? rollDamage(ctx, tape, held?.dice ?? []);
+  const dice = healing?.dice ?? rollDamage(ctx, tape, held?.dice ?? [], () => rollHitOptions(ctx, true));
   ctx.silentRolls = false;
   const kept = holdDamage(state, { actorId: attacker.id, actionId: action.id, dice, answers: held?.answers ?? [] });
   const { damage, bonusDamage } = ctx;
