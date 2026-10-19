@@ -3978,7 +3978,19 @@ export const AreaTriggerSchema = z
     towardCaster: z.literal(true).optional(),
     /** A spell of this level or lower cast from outside it can't affect anything within, one level higher for each slot
      *  level the spell is cast above its own (Globe of Invulnerability's 5). */
-    wardsSpells: z.number().int().min(0).max(9).optional()
+    wardsSpells: z.number().int().min(0).max(9).optional(),
+    /** Its area is the edge of the circle it is placed as, 5 feet thick: a ringed wall (Wall of Fire, Blade Barrier).
+     *  The ground inside the ring is out of it. */
+    ring: z.literal(true).optional(),
+    /** A creature that ends its turn within `feet` of this side of it is affected as one inside it is (Wall of Fire's
+     *  burning side): the left or right of a straight wall as it was drawn, the inside or outside of a ring. */
+    band: z
+      .object({
+        feet: z.number().int().min(5).max(30),
+        side: z.enum(["left", "right", "inside", "outside"])
+      })
+      .strict()
+      .optional()
   })
   .strict();
 export type AreaTrigger = z.infer<typeof AreaTriggerSchema>;

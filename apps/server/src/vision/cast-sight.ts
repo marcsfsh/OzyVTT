@@ -57,6 +57,8 @@ export type CastSightInput = Readonly<{
   areaPlaced: boolean;
   /** The area's line width, for a Line template. */
   widthFeet?: number | null;
+  /** A ringed wall's thickness: the area is the circle's edge alone (Wall of Fire's ring). */
+  ringFeet?: number;
 }>;
 
 /**
@@ -147,7 +149,12 @@ export function applyCastSight(state: GameState, input: CastSightInput): EffectN
     if (area.aroundSelfFeet !== undefined)
       shape = { type: "emanation", actorId: casterId, radiusFeet: area.aroundSelfFeet };
     else if (input.areaPlaced)
-      shape = { type: "template", annotationId: commandId, widthFeet: input.widthFeet ?? null };
+      shape = {
+        type: "template",
+        annotationId: commandId,
+        widthFeet: input.widthFeet ?? null,
+        ...(input.ringFeet !== undefined ? { ringFeet: input.ringFeet } : {})
+      };
     if (shape) {
       const made: VisionArea = {
         id: derivedUuid(commandId, "area"),

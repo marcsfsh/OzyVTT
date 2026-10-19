@@ -375,6 +375,36 @@ const lasting = (name: string, when: string, zone: Zone): Later => ({
   zone
 });
 
+/** Wall of Fire's forms: a straight wall burning on its left or right as drawn, or a ring 20 feet across burning
+ *  inside or outside, each 5d8 Fire damage to a creature entering the wall or ending its turn in it or within 10 feet
+ *  of the burning side. */
+function wallOfFireForms(): Later[] {
+  const ring = { shape: "cylinder" as const, sizeFeet: 10, widthFeet: null, heightFeet: 20 };
+  const form = (
+    name: string,
+    option: Readonly<{ id: string; name: string }>,
+    side: "left" | "right" | "inside" | "outside"
+  ): Later => {
+    const ringed = side === "inside" || side === "outside";
+    const burning = ringed ? `${side} the ring within 10 feet of it` : `within 10 feet of its ${side} side`;
+    return {
+      name,
+      activation: "other",
+      when: `A creature that enters the wall for the first time on a turn or ends its turn inside it takes the damage, as does one that ends its turn ${burning}.`,
+      damage: [{ formula: "5d8", type: "fire" }],
+      ...(ringed ? { area: ring } : {}),
+      zone: { on: ["enter", "end-turn"], band: { feet: 10, side }, ...(ringed ? { ring: true as const } : {}) },
+      option
+    };
+  };
+  return [
+    form("burn", { id: "left", name: "Straight, burning on the left" }, "left"),
+    form("burn right", { id: "right", name: "Straight, burning on the right" }, "right"),
+    form("burn inside", { id: "ring-inside", name: "Ring, burning inside" }, "inside"),
+    form("burn outside", { id: "ring-outside", name: "Ring, burning outside" }, "outside")
+  ];
+}
+
 /**
  * What a spell lets its caster do after the cast (SRD 5.2.1 text): the attacks a summoned thing or a held flame
  * makes on later turns, and the saves or damage an area deals when a creature enters it or starts or ends its turn
@@ -498,6 +528,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT }
     }
   ],
+  // "A straight wall up to 100 feet long ... or a ringed wall up to 60 feet in diameter": the form is the cast's option.
   "blade-barrier": [
     {
       name: "save",
@@ -505,7 +536,18 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN} Its space is Difficult Terrain, and the wall gives Three-Quarters Cover.`,
       save: save("dex"),
       damage: [{ formula: "6d10", type: "force" }],
-      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT, cover: "three-quarters" }
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT, cover: "three-quarters" },
+      option: { id: "straight", name: "Straight wall" }
+    },
+    {
+      name: "ring save",
+      activation: "other",
+      when: `A creature that enters the ringed wall's space or ends its turn there makes the save. ${ONCE_PER_TURN} Its space is Difficult Terrain, and the wall gives Three-Quarters Cover.`,
+      save: save("dex"),
+      damage: [{ formula: "6d10", type: "force" }],
+      area: { shape: "cylinder", sizeFeet: 30, widthFeet: null, heightFeet: 20 },
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT, cover: "three-quarters", ring: true },
+      option: { id: "ring", name: "Ringed wall" }
     }
   ],
   // "Until the spell ends, you can take a Magic action to call down lightning in that way again."
@@ -1010,15 +1052,10 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       drain: { damageType: "necrotic", heals: "half" }
     }
   ],
-  "wall-of-fire": [
-    {
-      name: "burn",
-      activation: "other",
-      when: "A creature that enters the wall for the first time on a turn or ends its turn inside it takes the damage, as does one that ends its turn within 10 feet of the burning side.",
-      damage: [{ formula: "5d8", type: "fire" }],
-      zone: { on: ["enter", "end-turn"] }
-    }
-  ],
+  // "A straight wall up to 60 feet long ... or a ringed wall up to 20 feet in diameter", and "one side of the wall,
+  // selected by you when you cast this spell, deals 5d8 Fire damage to each creature that ends its turn within 10 feet
+  // of that side or inside the wall": each form and burning side is an option of the cast.
+  "wall-of-fire": wallOfFireForms(),
   "wall-of-thorns": [
     {
       name: "save",

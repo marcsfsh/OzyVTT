@@ -37,7 +37,8 @@ import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { SCROLL_UNREADABLE, scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "../scrolls.js";
 import { castSlotLevel, untrainedArmorCast } from "../resolution/economy.js";
 import { areaAtLevel } from "../spell-zone-state.js";
-import { zoneRowOf } from "../spell-zones.js";
+import { pickedZoneRow, zoneRowOf } from "../spell-zones.js";
+import { ringTest } from "../zone-shapes.js";
 import { spellWardedTargets } from "../zone-barriers.js";
 import { deflectingWall, zoneCover } from "../zone-walls.js";
 import { enclosedFrom } from "../enclosures.js";
@@ -215,7 +216,10 @@ export const actionCommands = [
           // The action's own area decides the shape and the size, grown with a cast's slot (Fog Cloud); the drag only
           // places and points it.
           const casting = castSpellOf(action, kit.equipmentCatalog().spellRecord);
-          const area = action.area && casting ? areaAtLevel(action.area, casting, request.slotLevel) : action.area;
+          // The form the cast picked is placed as its own area (Wall of Fire's ring).
+          const form = casting ? pickedZoneRow(casting, request.option) : undefined;
+          const ownArea = form?.area ?? action.area;
+          const area = ownArea && casting ? areaAtLevel(ownArea, casting, request.slotLevel) : ownArea;
           placed = area ? templateOfArea(calibration, template, area) : template;
           // Snap the template the same way the drawn annotation will, then find who is under it.
           const snapped = shapeGeometry(calibration, placed.shape, placed.origin, placed.target);
@@ -251,6 +255,14 @@ export const actionCommands = [
             },
             calibration.distancePerCell
           );
+          // A ringed wall catches the creatures on its edge, not those it rings.
+          if (form?.zone?.ring && placed.shape === "circle") {
+            const onRing = ringTest(calibration, snapped);
+            resolvedTargetIds = resolvedTargetIds.filter((id) => {
+              const token = draft.combat.tokens.find((candidate) => candidate.actorId === id);
+              return token?.position ? onRing(token.position, token.sizeCells) : false;
+            });
+          }
           // "Each creature on the ground in the area" (Earthquake): one in the air above it is spared.
           if (spell && zoneRowOf(spell)?.zone?.grounded)
             resolvedTargetIds = resolvedTargetIds.filter(
@@ -559,7 +571,9 @@ export const actionCommands = [
         // so one from a caster hidden from the table is drawn for the GM alone: it would point at where it hides.
         const fromHiddenCaster = originAtCaster && kit.hiddenFromTable(draft)(actorId);
         // A nearly imperceptible glyph is drawn for the GM and its caster's player alone.
-        const unseenArea = spell ? zoneRowOf(spell)?.zone?.hidden === true : action.zone?.hidden === true;
+        const unseenArea = spell
+          ? (pickedZoneRow(spell, request.option) ?? zoneRowOf(spell))?.zone?.hidden === true
+          : action.zone?.hidden === true;
         if (placed && areaMove) {
           areaMoveNote = areaMove.note;
           areaEvents = moveArea(

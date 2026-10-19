@@ -10,7 +10,7 @@ import { areAllies, areEnemies } from "./creature-sides.js";
 import { CONCENTRATING_TAG, endEffectIfPresent, type EffectNarration } from "./effects.js";
 import { itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
 import { applyDamageDetailed, damageAdjustmentDetail, healActor } from "./hit-points.js";
-import { laterSpellAction, upcastAction } from "./item-actions.js";
+import { laterRowOf, laterSpellAction, upcastAction } from "./item-actions.js";
 import { creatureDistance, DISTANCE_TOLERANCE_FEET, mapDistance } from "./movement-narration.js";
 import { CommandRejectedError } from "./game-store.js";
 import { failureEffectFor } from "./resolution/pending.js";
@@ -19,6 +19,7 @@ import { countZoneDamage, endZone, removeZone, zoneContentOf, type ZoneContent }
 import type { TokenMapGeometry } from "./token-placement.js";
 import { withArticle } from "@vtt/domain";
 import { altitudeOf, heightSpan } from "./altitude.js";
+import { bandTest, ringTest } from "./zone-shapes.js";
 
 type Actor = GameState["actors"][number];
 type Point = Readonly<{ x: number; y: number }>;
@@ -53,9 +54,48 @@ type Meeting =
   | "is caught in the blast of"
   | "is caught in";
 
-/** The later action whose zone this spell leaves, if any. */
-export function zoneRowOf(spell: SpellReference) {
-  return (spell.effect?.laterActions ?? []).find((row) => row.zone !== undefined);
+/** The later action whose zone this spell leaves, if any: the one its cast picked among the spell's options (Wall of
+ *  Fire's ring), else the first. */
+export function zoneRowOf(spell: SpellReference, optionId?: string) {
+  const rows = (spell.effect?.laterActions ?? []).filter((row) => row.zone !== undefined);
+  return (optionId !== undefined ? rows.find((row) => row.option?.id === optionId) : undefined) ?? rows[0];
+}
+
+/** The options a spell's cast picks its zone by (Wall of Fire's forms, a Symbol's glyphs), each with the area the
+ *  cast is placed as when it differs from the spell's own (a ring). Empty for a spell with none. */
+export function zoneOptionsOf(
+  spell: SpellReference
+): Array<Readonly<{ id: string; name: string; area?: NonNullable<SpellReference["area"]> }>> {
+  return (spell.effect?.laterActions ?? []).flatMap((row) =>
+    row.zone && row.option
+      ? [{ id: row.option.id, name: row.option.name, ...(row.area ? { area: row.area } : {}) }]
+      : []
+  );
+}
+
+/** What a use offers its user to pick, as the sheet lists it: the effects it picks one of (Enlarge or Reduce), or for a
+ *  spell's cast the forms of the area it leaves (Wall of Fire's ring). */
+export function castOptionsOf(
+  action: Pick<ActorAction, "id" | "effectOptions" | "spellId">,
+  spell: SpellReference | undefined
+): Readonly<{ options?: ReturnType<typeof zoneOptionsOf> }> {
+  if (action.effectOptions)
+    return { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) };
+  if (!spell || action.spellId !== spell.id || laterRowOf(spell, action.id)) return {};
+  const options = zoneOptionsOf(spell);
+  return options.length > 0 ? { options } : {};
+}
+
+/** The zone row a cast's option names, refusing one the spell doesn't offer. Undefined for a spell with no options or
+ *  a cast that names none. */
+export function pickedZoneRow(spell: SpellReference, optionId: string | undefined) {
+  const options = zoneOptionsOf(spell);
+  if (options.length === 0 || optionId === undefined) return undefined;
+  if (!options.some((option) => option.id === optionId))
+    throw new CommandRejectedError(
+      `${spell.name} offers ${options.map((option) => option.name).join(" or ")}. Choose one of them.`
+    );
+  return zoneRowOf(spell, optionId);
 }
 
 /** Whether a zone still stands: its caster holds the Concentration it belongs to, or still carries the effect a spell
@@ -154,13 +194,40 @@ export function insideTest(
   if (trigger.around === "point") return within({ ...cell, position: area.geometry.origin }, trigger.feet ?? 5);
   const shape = area.shape;
   const heights = areaHeights(source.area);
+  // A ringed wall stands on its circle's edge alone.
+  const onRing = trigger.ring && shape === "circle" ? ringTest(calibration, area.geometry) : null;
   return (position, sizeCells, altitudeFeet = 0) => {
     if (heights) {
       const span = heightSpan({ altitudeFeet, sizeCells }, calibration.distancePerCell);
       if (span.high <= heights.low || span.low >= heights.high) return false;
     }
+    if (onRing) return onRing(position, sizeCells);
     return footprintInTemplate(calibration, area.geometry, shape, source.area?.widthFeet ?? null, position, sizeCells);
   };
+}
+
+/** The ground within reach of a wall's burning side (Wall of Fire: "each creature that ends its turn within 10 feet of
+ *  that side or inside the wall"), as a test like `insideTest`'s; null for a zone with no such side or no placed area. */
+function burningSideTest(
+  state: GameState,
+  zone: SpellZone,
+  trigger: ZoneTrigger,
+  source: Pick<ZoneContent, "area">,
+  geometry: TokenMapGeometry | null
+): ((position: Point, sizeCells: number) => boolean) | null {
+  const calibration = geometry?.calibration ?? null;
+  const area = zone.annotationId
+    ? state.combat.annotations.find((annotation) => annotation.id === zone.annotationId)
+    : undefined;
+  if (!calibration || !trigger.band || !area || area.shape === null || trigger.around !== undefined) return null;
+  return bandTest(
+    calibration,
+    area.geometry,
+    area.shape,
+    source.area?.widthFeet ?? null,
+    trigger.band,
+    trigger.ring === true
+  );
 }
 
 /** The heights a placed area spans, from the ground it was placed on: a Sphere its radius above and below its centre,
@@ -759,7 +826,13 @@ function zonesWhereItStands(
     const creature = exposed(state, zone, trigger, deps).find((candidate) => candidate.id === actorId);
     const token = creature ? tokenOf(state, creature.id) : undefined;
     const inside = insideTest(state, zone, trigger, content, deps.geometry);
-    if (!creature || !token || !inside || !inside(token.position!, token.sizeCells, altitudeOf(token))) continue;
+    // A turn that ends beside a wall's burning side counts as one ending inside it.
+    const beside = when === "end-turn" ? burningSideTest(state, zone, trigger, content, deps.geometry) : null;
+    const reached =
+      token !== undefined &&
+      ((inside !== null && inside(token.position!, token.sizeCells, altitudeOf(token))) ||
+        (beside !== null && beside(token.position!, token.sizeCells)));
+    if (!creature || !token || !reached) continue;
     // SRD Aura of Life: "When an ally with 0 Hit Points starts its turn in the aura, that ally regains 1 Hit Point."
     if (when === "start-turn" && trigger.revives && creature.hp.current <= 0) {
       events.push(

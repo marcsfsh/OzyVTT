@@ -9,7 +9,7 @@ import { itemRowOfAction } from "../item-charges.js";
 import { castThisTurnKey } from "../lasting-spells.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { areaAtLevel, endZone } from "../spell-zone-state.js";
-import { zoneRowOf } from "../spell-zones.js";
+import { pickedZoneRow, zoneRowOf } from "../spell-zones.js";
 import { tableLineOf, type ResolveContext } from "./context.js";
 import { shapedZone, shapingOf } from "./metamagic.js";
 import { castWithoutConcentration } from "./summon.js";
@@ -169,10 +169,14 @@ export function markSpellUp(ctx: ResolveContext): void {
   ctx.effectsApplied.push({ targetId: attacker.id, targetName: attacker.name, name: spell.name, conditionIds: [] });
 }
 
-/** The area a cast's zone stands on: the action's own (an item that doubles Web's), else the spell's, grown with the
- *  slot it was cast at. */
-function placedAreaOf(ctx: ResolveContext, spell: SpellReference): SpellZone["area"] {
-  const area = ctx.action.area ?? spell.area;
+/** The area a cast's zone stands on: the picked form's (a ringed wall), the action's own (an item that doubles Web's),
+ *  else the spell's, grown with the slot it was cast at. */
+function placedAreaOf(
+  ctx: ResolveContext,
+  spell: SpellReference,
+  row: NonNullable<ReturnType<typeof zoneRowOf>>
+): SpellZone["area"] {
+  const area = (row.option ? row.area : undefined) ?? ctx.action.area ?? spell.area;
   return area ? areaAtLevel(area, spell, castLevelOf(ctx, spell)) : null;
 }
 
@@ -218,7 +222,8 @@ function insidersAtCast(ctx: ResolveContext, feet: number): string[] {
 
 export function openSpellZone(ctx: ResolveContext): void {
   const spell = spellOf(ctx);
-  const row = spell ? zoneRowOf(spell) : undefined;
+  // The form or glyph the cast picked (Wall of Fire's ring, a Symbol's effect), else the first.
+  const row = spell ? (pickedZoneRow(spell, ctx.input.option) ?? zoneRowOf(spell)) : undefined;
   if (!spell || !row?.zone || isLaterAction(ctx, spell)) return;
   const { state, attacker, input, targets } = ctx;
   const aroundCaster = row.zone.around === "caster";
@@ -241,7 +246,7 @@ export function openSpellZone(ctx: ResolveContext): void {
     dc: zoneDc(ctx, spell, row.name),
     annotationId: !aroundCaster && input.areaPlaced === true ? input.commandId : null,
     // The template it is placed with: an item's own area (a doubled Web), grown with the slot (Fog Cloud).
-    area: aroundCaster ? null : placedAreaOf(ctx, spell),
+    area: aroundCaster ? null : placedAreaOf(ctx, spell, row),
     damageDealt: 0,
     // The damage type the caster chose for it (Conjure Elemental's element), or Transmuted Spell's.
     ...(input.damageType && (spell.effect?.damageTypes ?? []).includes(input.damageType as never)

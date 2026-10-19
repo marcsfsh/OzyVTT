@@ -1246,7 +1246,9 @@ export const VisionAreaSchema = z
         .object({
           type: z.literal("template"),
           annotationId: z.uuid(),
-          widthFeet: z.number().positive().max(1000).nullable().default(null)
+          widthFeet: z.number().positive().max(1000).nullable().default(null),
+          /** A ringed wall: only the circle's outer edge this many feet thick (Wall of Fire's ring). */
+          ringFeet: z.number().positive().max(100).optional()
         })
         .strict(),
       z

@@ -6,7 +6,7 @@ import { gridToImage, imageToGrid, type GridPoint, type SquareGridCalibration } 
 const EPSILON = 1e-6;
 
 /** The grid-space centers of every cell a token's footprint covers (odd footprints center on a cell, even on an intersection: mirrors token-placement). */
-function footprintCellCenters(
+export function footprintCellCenters(
   calibration: SquareGridCalibration,
   position: AnnotationPoint,
   sizeCells: number

@@ -10,6 +10,7 @@ import {
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { ActorDefinition, SaveCondition } from "@vtt/schemas";
 import { conditionChoicesOf } from "./item-actions.js";
+import { castOptionsOf } from "./spell-zones.js";
 import { BUILTIN_TARGETING } from "./builtin-actions.js";
 import { builtinCheckSkills, helpToolsOf } from "./resolution/builtins.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
@@ -579,9 +580,7 @@ export function actionAvailability(
         ? { areaPerSlot: { feet: spell.effect.areaPerSlot, level: spell.level } }
         : {}),
       ...(forms !== undefined ? { forms } : {}),
-      ...(action.effectOptions
-        ? { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) }
-        : {}),
+      ...castOptionsOf(action, spell),
       usesRemaining,
       componentsRemaining,
       ...(builtin ? { builtin: true } : {}),

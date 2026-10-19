@@ -166,6 +166,19 @@ export const SpellLaterActionSchema = z
         fromCaster: z.literal(true).optional()
       })
       .strict()
+      .optional(),
+    /** The cast leaves this row's zone only when its caster picks this option as it casts (Wall of Fire's ring, a
+     *  Symbol's glyph); a cast that picks none leaves the first such row's. With an `area`, the cast is placed as that
+     *  area. */
+    option: z
+      .object({
+        id: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(60),
+        name: z.string().min(1).max(60)
+      })
+      .strict()
       .optional()
   })
   .strict();
@@ -226,7 +239,7 @@ export const SpellEffectSchema = z
     /** The spell's save is not made when it is cast but later (Spirit Guardians, Web) or never by its target
      *  (Haste, Sanctuary): the cast prompts none. `laterActions` carries one the engine can roll. */
     noCastSave: z.literal(true).optional(),
-    laterActions: z.array(SpellLaterActionSchema).min(1).max(3).optional(),
+    laterActions: z.array(SpellLaterActionSchema).min(1).max(8).optional(),
     /** Missiles one cast makes, each at a creature of the caster's choice (Magic Missile's three darts). */
     darts: z.number().int().min(2).max(20).optional(),
     /** How many creatures one cast targets (Bless: up to three), plus `perSlot` more for each slot level above the
