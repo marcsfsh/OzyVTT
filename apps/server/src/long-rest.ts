@@ -54,8 +54,8 @@ export function openLongRest(state: GameState, actorIds: readonly string[]): voi
 
 /**
  * Something stopped the Long Rest of these members (they rolled Initiative, took damage, cast a spell above a cantrip,
- * or the GM says they exerted themselves). Each waits interrupted until it resumes; one that rested an hour first gets a
- * Short Rest's benefits now (`apply`) and may spend Hit Point Dice while it waits.
+ * or the GM rules an hour of walking or exertion). Each waits interrupted until it resumes; one that rested an hour
+ * first gets a Short Rest's benefits now (`apply`) and may spend Hit Point Dice while it waits.
  */
 export function interruptLongRest(
   state: GameState,
@@ -115,7 +115,7 @@ export function resumeLongRest(state: GameState, actorId: string, scope: Initiat
   return `${actor.name} goes back to resting. The Long Rest now takes ${8 + interruptions} hours.`;
 }
 
-/** The GM says a member exerted itself for an hour (walking, a fight's aftermath): its Long Rest is interrupted. */
+/** The GM rules that a member spent an hour walking or in other physical exertion: its Long Rest is interrupted. */
 export function interruptByGm(
   state: GameState,
   actorId: string,
@@ -127,7 +127,7 @@ export function interruptByGm(
   const name = state.actors.find((candidate) => candidate.id === actorId)?.name ?? "That character";
   if (!member) throw new CommandRejectedError(`${name} isn't in a Long Rest.`);
   if (member.interrupted) throw new CommandRejectedError(`${name}'s Long Rest is interrupted already.`);
-  return interruptLongRest(state, new Set([actorId]), "exerted itself", apply);
+  return interruptLongRest(state, new Set([actorId]), "spent an hour in physical exertion", apply);
 }
 
 /** The minutes from the rest's start each member still resting needs: 8 hours and 1 more per interruption. */
