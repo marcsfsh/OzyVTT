@@ -54,7 +54,7 @@ describe("bindings", () => {
     fight(table, IDS.fighter);
     expect(() => resolveAt(table, IDS.fighter, "item-chain-bind", [], { targetIds: [IDS.foe] })).toThrow(/Grappled/);
     setCondition(table.state, IDS.foe, "grappled", true, undefined, { role: "gm" });
-    resolveAt(table, IDS.fighter, "item-chain-bind", [], { targetIds: [IDS.foe] });
+    resolveAt(table, IDS.fighter, "item-chain-bind", [10, 10], { targetIds: [IDS.foe] });
     const foe = table.actor(IDS.foe);
     expect(foe.conditions.map((condition) => condition.id)).toContain("restrained");
     expect(foe.effects.find((effect) => effect.name === "Bound by a Chain")?.endAction).toMatchObject({
@@ -70,8 +70,8 @@ describe("bindings", () => {
     write(table, IDS.fighter, catalogRow("manacles"));
     fight(table, IDS.fighter);
     setCondition(table.state, IDS.foe, "restrained", true, undefined, { role: "gm" });
-    resolveAt(table, IDS.fighter, "item-manacles-bind", [], { targetIds: [IDS.foe] });
-    const bound = table.actor(IDS.foe).effects.find((effect) => effect.name === "Bound by Manacles")!;
+    resolveAt(table, IDS.fighter, "item-manacles-bind", [15], { targetIds: [IDS.foe] });
+    const bound = table.actor(IDS.foe).effects.find((effect) => effect.name.startsWith("Bound by Manacles"))!;
     expect(bound.modifiers).toEqual([
       { type: "roll-mode", roll: "attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
     ]);

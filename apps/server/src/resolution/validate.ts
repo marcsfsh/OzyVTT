@@ -3,7 +3,7 @@ import { isOffPlane } from "../off-plane.js";
 import type { GameState } from "@vtt/domain";
 import { checkChoices } from "./grant-extras.js";
 import { effectiveActions } from "../effective-actions.js";
-import { withShotAmmunitionOnly } from "../ammunition.js";
+import { withShotAmmunitionOnly, withShotHitRiders } from "../ammunition.js";
 import { consumableRowFor } from "../consumables.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
@@ -65,7 +65,8 @@ function combatantsOf(
   const outsideFight = !state.combat.active;
   // A shape-shift is something a creature does outside a fight too (Wild Shape to scout, a werewolf's change).
   const shapeShifts = action.shapeShift !== undefined || action.endsForm === true;
-  const itemGrant = isItemActionId(action.id) && action.grants !== undefined;
+  const itemGrant =
+    isItemActionId(action.id) && (action.grants !== undefined || action.rebindsRow !== undefined);
   // So is helping an ally with a check (picking a lock, calming a horse), which needs no turn.
   const helps = action.id === "help-check";
   if (outsideFight && !castsASpell && !shapeShifts && !itemGrant && !helps)
@@ -152,6 +153,9 @@ function combatantsOf(
     (spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined)) ||
     // So is bringing creatures onto the map (a Horn of Valhalla's Berserkers).
     action.summons !== undefined ||
+    // An item's command releases whoever it holds (Iron Bands), and an oil remakes a carried row.
+    action.endsItemEffects === true ||
+    action.rebindsRow !== undefined ||
     // Taking a form, or leaving it, is the user's own (Wild Shape, a werewolf's Shape-Shift).
     (shapeShifts && action.shapeShift?.onTargets !== true && action.save === undefined);
   // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone, and so is a swallow.
@@ -184,6 +188,8 @@ function combatantsOf(
     action.swallow?.conditions === undefined &&
     action.pull === undefined &&
     action.inflicts === undefined &&
+    action.endsItemEffects !== true &&
+    action.rebindsRow === undefined &&
     input.builtin !== true &&
     !(spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined))
   )
@@ -424,7 +430,8 @@ export function openResolve(
   const builtin = input.builtin ? builtinHandlerFor(action.id) : undefined;
   const ctx: ResolveContext = {
     state,
-    action,
+    // A shot carries what a hit with the piece it draws does (Ammunition of Slaying).
+    action: withShotHitRiders(action, attacker, riderItemId, deps.catalog),
     input,
     deps,
     hiddenFromTable,

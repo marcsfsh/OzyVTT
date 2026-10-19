@@ -898,6 +898,7 @@ export function ageEffects(
       // A cascade earlier in the sweep may have ended it already.
       const current = actor.effects.find((candidate) => candidate.id === effect.id);
       if (!current) continue;
+      if (countDown) regrowHolder(actor, current, minutes);
       const left = remainingAfter(current.duration, minutes);
       if (left === null) continue;
       if (left <= 0) {
@@ -912,6 +913,23 @@ export function ageEffects(
     }
   }
   return events;
+}
+
+/** An object holding the bearer that regrows as time passes (a Rope of Entanglement: "It regains 1 Hit Point every 5
+ *  minutes as long as it has at least 1 Hit Point"). */
+function regrowHolder(actor: Actor, effect: EffectInstance, minutes: number): void {
+  const holder = effect.heldBy;
+  if (!holder?.regainsEvery || holder.hitPoints.current < 1) return;
+  const current = Math.min(
+    holder.hitPoints.maximum,
+    holder.hitPoints.current + Math.floor(minutes / holder.regainsEvery)
+  );
+  if (current === holder.hitPoints.current) return;
+  actor.effects = actor.effects.map((candidate) =>
+    candidate.id === effect.id
+      ? { ...candidate, heldBy: { ...holder, hitPoints: { ...holder.hitPoints, current } } }
+      : candidate
+  );
 }
 
 /** A creature just made Stable starts its 1d4 hours on the game clock, rolled now (SRD Damage and Healing: "A Stable

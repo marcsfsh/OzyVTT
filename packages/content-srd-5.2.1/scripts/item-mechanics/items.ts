@@ -22,6 +22,24 @@ function versusTypes(formula: string, creatureTypes: string[], damageType?: Dama
   };
 }
 
+/** The creature types Ammunition of Slaying's d100 table names, each a kind of the item. */
+const SLAYING_TYPES: ReadonlyArray<readonly [string, string]> = [
+  ["aberration", "Aberration Slaying"],
+  ["beast", "Beast Slaying"],
+  ["celestial", "Celestial Slaying"],
+  ["construct", "Construct Slaying"],
+  ["dragon", "Dragon Slaying"],
+  ["elemental", "Elemental Slaying"],
+  ["humanoid", "Humanoid Slaying"],
+  ["fey", "Fey Slaying"],
+  ["fiend", "Fiend Slaying"],
+  ["giant", "Giant Slaying"],
+  ["monstrosity", "Monstrosity Slaying"],
+  ["ooze", "Ooze Slaying"],
+  ["plant", "Plant Slaying"],
+  ["undead", "Undead Slaying"]
+];
+
 const RESISTANCE_TABLE = [
   "acid",
   "cold",
@@ -320,7 +338,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // attack using this weapon, it deals an extra 1d8 Force damage, or an extra 2d8 Force damage if the target is a
   // Giant." It flies back to its thrower's hand, so a throw leaves it in hand.
   "dwarven-thrower": {
-    weaponChanges: { addProperties: ["thrown"], rangeFeet: 20, longRangeFeet: 60 },
+    weaponChanges: { addProperties: ["thrown"], rangeFeet: 20, longRangeFeet: 60, returns: true },
     modifiers: [
       { type: "attack-bonus", amount: 3 },
       { type: "damage-bonus", amount: 3 },
@@ -430,7 +448,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // put out on the row. A Bonus Action turns it into a 6-inch rod or a 10-foot pole: Acrobatic Assist holds as a
   // Quarterstaff and as a pole, and the Quarterstaff alone deflects and is thrown 30/120, flying back to its hand.
   "quarterstaff-of-the-acrobat": {
-    weaponChanges: { addProperties: ["thrown"], rangeFeet: 30, longRangeFeet: 120 },
+    weaponChanges: { addProperties: ["thrown"], rangeFeet: 30, longRangeFeet: 120, returns: true },
     variantChoice: { by: "holder", activation: "bonus-action" },
     variants: [
       { id: "rod", name: "6-inch rod", weapon: null, replacesRiders: true, suspendsActions: true },
@@ -820,7 +838,30 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Prose-only items:
   //   `arrow-catching-shield` - an AC bonus cannot be limited to ranged attacks (its Reaction is authored above).
   //   `dancing-sword` - a sword that attacks from its own space needs an object token that strikes.
-  //   `ammunition-of-slaying` - a piece's own hit riders don't ride the shot its launcher makes.
+
+  // The GM says which creature type a found piece slays (its kind). A shot that draws it carries its hit: a creature of
+  // that type it damages makes the DC 17 Constitution save, taking 6d10 Force on a failure and half on a success. Its
+  // magic is then spent, so a piece picked up after the fight is plain ammunition (`ammunition.ts`).
+  "ammunition-of-slaying": {
+    variantChoice: { by: "gm" },
+    variants: SLAYING_TYPES.map(([id, name]) => ({
+      id,
+      name,
+      onHit: [
+        {
+          name: "Ammunition of Slaying",
+          conditions: [],
+          creatureTypes: [id],
+          save: {
+            ability: "con",
+            dc: 17,
+            failureDamage: [{ formula: "6d10", type: "force" }],
+            halfOnSuccess: true
+          }
+        }
+      ]
+    }))
+  },
 
   // ==== Wands, staffs, rods, rings and the spell scroll ===========================================
   //
@@ -2672,7 +2713,17 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `apparatus-of-the-crab`: a vehicle, outside the rider model.
   // `bag-of-beans` - a GM-rolled table (temp HP and an ability score among its rows).
   // `bag-of-devouring` - a trap with a percentage pull and instant death.
-  // `bag-of-holding` - no capacity/container model (also `handy-haversack`, `efficient-quiver`, `portable-hole`).
+  // Up to 500 pounds, weighing 5 pounds whatever it holds; taking a thing out is a Utilize action. Overloaded, or put in
+  // another extradimensional space, it is destroyed with what it holds (the gate to the Astral Plane is the GM's).
+  "bag-of-holding": {
+    container: {
+      capacityLb: 500,
+      weighsLb: 5,
+      retrieval: "utilize",
+      overloadDestroys: true,
+      extradimensional: true
+    }
+  },
 
   // Three pulls a day, one action per bag colour: the server rolls the d8 on that colour's table and the creature joins
   // the map within 20 feet, acting right after its user, until the next dawn (a Long Rest) or 0 Hit Points.
@@ -3031,7 +3082,19 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       }
     ]
   },
-  // `efficient-quiver` - a container.
+  // Three compartments, never more than 2 pounds, drawn from as a quiver or a scabbard is. "Similar objects" are the
+  // GM's: the shortest takes ammunition, the other two weapons.
+  "efficient-quiver": {
+    container: {
+      compartments: [
+        { id: "shortest", name: "Shortest compartment", count: 60, holds: "ammunition" },
+        { id: "midsize", name: "Midsize compartment", count: 18, holds: "weapons" },
+        { id: "longest", name: "Longest compartment", count: 6, holds: "weapons" }
+      ],
+      weighsLb: 2,
+      drawsAmmunition: true
+    }
+  },
   // Opened, an Efreeti appears within 30 feet and the server rolls the d10: on a 1 it attacks its user and leaves after 5
   // rounds; on 2 to 9 it obeys for 1 hour; on a 10 it grants a Wish (the GM's) and leaves within the hour. That the
   // first roll sets every later opening, the 24 hours between openings and the bottle losing its magic are the
@@ -3437,7 +3500,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `handy-haversack` - a container.
+  // Two 200-pound side pouches and a 500-pound central one, always 5 pounds; taking a thing out is a Utilize action or a
+  // Bonus Action. Overloaded, or put in another extradimensional space, it is destroyed with what it holds.
+  "handy-haversack": {
+    container: {
+      compartments: [
+        { id: "central", name: "Central pouch", capacityLb: 500 },
+        { id: "left", name: "Left side pouch", capacityLb: 200 },
+        { id: "right", name: "Right side pouch", capacityLb: 200 }
+      ],
+      weighsLb: 5,
+      retrieval: "utilize-or-bonus-action",
+      overloadDestroys: true,
+      extradimensional: true
+    }
+  },
   // `hat-of-many-spells` - a cast gated on an Arcana check outcome with a wild-magic table.
   // `horn-of-blasting` - authorable except its 20% chance to explode and damage the user; authoring
   //     only the blast would make it strictly better than printed.
@@ -3600,8 +3677,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /**
    * Its to-hit is printed as Dexterity + Proficiency Bonus, which is exactly the derived form. A hit Restrains a Huge or
-   * smaller creature until released, escaped with a DC 20 Strength (Athletics) check. Not modeled: the bands being
-   * destroyed when broken, the 24-hour lockout after a failed check, and the release command.
+   * smaller creature until its user's Bonus Action command releases it, or a creature touching the bands breaks them
+   * with a DC 20 Strength (Athletics) check, which destroys them; a failed check fails that creature's later tries for
+   * 24 hours.
    */
   "iron-bands": {
     actions: [
@@ -3614,7 +3692,28 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         attack: { ability: "dex", proficient: true, rangeFeet: 60 },
         uses: { limit: 1, per: "long-rest", pool: "iron-bands-charges" },
         targets: { count: 1, maxSize: "huge", seen: true },
-        onHit: [{ name: "Iron Bands", conditions: [{ id: "restrained" }], escapeDc: 20, tags: ["escape-athletics"] }]
+        onHit: [
+          {
+            name: "Iron Bands",
+            conditions: [{ id: "restrained" }],
+            endedBy: {
+              name: "Break the Iron Bands",
+              by: "either",
+              check: { ability: "str", skill: "athletics", dc: 20 },
+              lockoutHours: 24,
+              destroysItem: true
+            }
+          }
+        ]
+      },
+      {
+        id: "release",
+        name: "Release the Bands' Target",
+        activation: "bonus-action",
+        description:
+          "Issue the command that releases the creature the bands Restrain. The bands contract into a sphere once more.",
+        damage: [],
+        endsItemEffects: true
       }
     ]
   },
@@ -3712,7 +3811,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `portable-hole` - a container.
+  // What is put in it weighs next to nothing; opening it on a surface, the creatures inside and climbing out are the
+  // GM's (off-plane). Put in another extradimensional space, it is destroyed with what it holds.
+  "portable-hole": {
+    container: { weighsLb: 0, extradimensional: true }
+  },
   // Knotted, it "grants Advantage on ability checks made to climb using the rope", a situation the roller names. Its
   // animated end and its own Hit Points are the GM's.
   "rope-of-climbing": {
@@ -3726,7 +3829,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Unlimited, as printed. The rope's own Armor Class and Hit Points are not modeled.
+  // Unlimited, as printed. The rope that holds the target is an object with AC 20 and 20 Hit Points (objects.ts), and its
+  // user's Bonus Action command lets the target go.
   "rope-of-entanglement": {
     actions: [
       {
@@ -3742,9 +3846,17 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           failureConditions: ["restrained"],
           escapeDc: 15,
           // "The rope has AC 20 and 20 Hit Points": attacking it to 0 frees the target.
-          heldBy: { name: "Rope", armorClass: 20, hitPoints: 20 }
+          heldBy: { name: "Rope", armorClass: 20, hitPoints: 20, immunities: ["poison", "psychic"], regainsEvery: 5 }
         },
         targets: { count: 1, rangeFeet: 20, seen: true }
+      },
+      {
+        id: "release",
+        name: "Release the Rope's Target",
+        activation: "bonus-action",
+        description: "Repeat the command to release the creature the rope Restrains. The rope coils up in your hand.",
+        damage: [],
+        endsItemEffects: true
       }
     ]
   },
@@ -3943,6 +4055,28 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         damage: [],
         endsConditions: ["blinded", "deafened", "paralyzed", "poisoned"],
         targets: { count: 1, rangeFeet: 5 }
+      }
+    ]
+  },
+
+  // A minute's work turns a nonmagical Slashing or Piercing Melee weapon into a +3 Weapon, or twenty such pieces of
+  // ammunition into +3 Ammunition, on the row it is applied to.
+  "oil-of-sharpness": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "apply",
+        name: "Apply Oil of Sharpness",
+        activation: "action",
+        description:
+          "Spend 1 minute coating a nonmagical Melee weapon or twenty pieces of nonmagical ammunition that deal Slashing or Piercing damage: the weapon becomes a +3 Weapon, or the ammunition +3 Ammunition.",
+        damage: [],
+        rebindsRow: {
+          weapon: "weapon-3",
+          ammunition: "ammunition-3",
+          pieces: 20,
+          damageTypes: ["slashing", "piercing"]
+        }
       }
     ]
   },

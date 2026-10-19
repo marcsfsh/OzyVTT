@@ -28,6 +28,8 @@ import { spendBonusAction } from "./item-light.js";
 import { withVariantPick } from "./item-variants.js";
 import { attunementRefusal } from "./attunement.js";
 import { donInFight } from "./held-items.js";
+import { nestedIn, placeInContainer, type Placement } from "./containers.js";
+import { chargeHandling } from "./object-interactions.js";
 
 const MAX_ITEMS = 200;
 /** SRD: "a creature can't be attuned to more than three magic items at a time"; Use Magic Device raises it. */
@@ -470,6 +472,15 @@ export function setInventoryItem(
     state.rest.clockHours
   );
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
+  // Where it sits: loose, or in a container that holds it.
+  const placement = placeInContainer(
+    actor,
+    item,
+    actor.inventory.find((entry) => entry.id === item.id),
+    deps.catalog,
+    deps.role
+  );
+  item = placement.item;
   enforceCurse(actor, item, deps);
   enforceEquipRules(actor, item, definition, deps);
   // Armor goes on and comes off on the clock: body armor not at all in a fight, a Shield with the Utilize action.
@@ -480,6 +491,16 @@ export function setInventoryItem(
     item,
     deps.catalog?.equipmentRecord(catalogIdOf(item))?.slot ?? item.magic?.slot,
     deps.role
+  );
+  // Drawing a weapon, or taking a thing out of a container, is an object interaction in a fight.
+  chargeHandling(
+    state,
+    actor,
+    actor.inventory.find((entry) => entry.id === item.id),
+    item,
+    deps.role,
+    deps.catalog,
+    definition
   );
   // When attunement may start or end is a player's rule; the GM attunes anyone at any time.
   if (deps.role === "player") {
@@ -504,7 +525,10 @@ export function setInventoryItem(
       actor.actionUses = Object.fromEntries(
         Object.entries(actor.actionUses).filter(([key]) => !spentKeys.includes(key))
       );
-    actor.inventory = actor.inventory.filter((entry) => entry.id !== item.id);
+    // What it held spills out, loose.
+    actor.inventory = actor.inventory
+      .filter((entry) => entry.id !== item.id)
+      .map((entry) => (entry.containerId === item.id ? looseRow(entry) : entry));
   } else {
     const index = actor.inventory.findIndex((entry) => entry.id === item.id);
     if (index >= 0)
@@ -517,14 +541,34 @@ export function setInventoryItem(
       if (deps.random) rollStartingCharges(actor, item, definition, deps.catalog, deps.random);
     }
   }
+  const destroyed = destroyRows(state, actor, placement);
   reconcileEquipment(actor, definition, deps);
   if (definition) moveHitPointMaximum(actor, liveHitPointBonus(actor, definition, deps.catalog) - hitPointsBefore);
   return [
+    ...destroyed,
     ...immuneConditionsEnd(actor, definition, deps),
     ...donningEndsMageArmor(state, actor),
     ...endBindingsOfGoneRows(state, actor),
     ...(before ? endGrantsOfPutAway(state, actor, before, deps) : [])
   ];
+}
+
+/** A row taken out of a container that is gone. */
+function looseRow(row: InventoryItem): InventoryItem {
+  const { containerId: _container, compartment: _compartment, ...loose } = row;
+  return loose;
+}
+
+/** What a write destroyed (an overloaded Bag of Holding, two extradimensional spaces): those rows and all they held
+ *  leave the pack. */
+function destroyRows(state: GameState, actor: Actor, placement: Placement): EffectNarration[] {
+  if (placement.destroys.length === 0) return [];
+  const gone = new Set(placement.destroys.flatMap((id) => [id, ...nestedIn(actor.inventory, id).map((row) => row.id)]));
+  actor.inventory = actor.inventory.filter((row) => !gone.has(row.id));
+  return [
+    { kind: "effect" as const, text: placement.why ?? "", actorId: actor.id },
+    ...endBindingsOfGoneRows(state, actor)
+  ].filter((event) => event.text !== "");
 }
 
 /** A Hit Point maximum that a changed Constitution raises or lowers: current Hit Points move with a gain, and stay

@@ -319,6 +319,8 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       // Its size while it lasts (Large Form), from the size it had before any change.
       ...(grant.sizeChange ? { sizeChange: { ...grant.sizeChange }, ownSize: ownSizeOf(recipient) } : {}),
       ...grantExtras(ctx, grant, recipient, option),
+      // Every other way out the grant prints (bursting a Chain), beside its own end action.
+      ...(grant.endedBy ? { endedBy: structuredClone(grant.endedBy) } : {}),
       ...(bound?.fields ?? {})
     }),
     replaced,

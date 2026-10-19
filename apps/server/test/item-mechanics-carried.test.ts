@@ -661,8 +661,8 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
       failureConditions: ["restrained"],
       // "a DC 15 Strength (Athletics) or Dexterity (Acrobatics) check" escapes it.
       escapeDc: 15,
-      // "The rope has AC 20 and 20 Hit Points": breaking it frees the target.
-      heldBy: { name: "Rope", armorClass: 20, hitPoints: 20 }
+      // "The rope has AC 20, HP 20, and Immunity to Poison and Psychic damage. It regains 1 Hit Point every 5 minutes".
+      heldBy: { name: "Rope", armorClass: 20, hitPoints: 20, immunities: ["poison", "psychic"], regainsEvery: 5 }
     });
     expect(action.uses).toBeUndefined(); // unlimited is the printed item
     expect(action.damage).toEqual([]);
@@ -732,6 +732,7 @@ describe("what no carried item can carry", () => {
     expect(consumables.length).toBeGreaterThan(0);
     expect(consumables.filter(carries).map((row) => row.id)).toEqual([
       "elixir-of-health",
+      "oil-of-sharpness",
       "potion-of-animal-friendship",
       "potion-of-climbing",
       "potion-of-diminution",

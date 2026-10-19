@@ -58,6 +58,9 @@ import { applyTimeStop } from "./time-stop.js";
 import { applySpellEndings } from "./resolution/dispel.js";
 import { applySummons } from "./resolution/summon.js";
 import { readScroll } from "./resolution/scroll.js";
+import { failsCheckFirst } from "./resolution/check-first.js";
+import { releaseItemEffects } from "./resolution/endings.js";
+import { rebindRow } from "./resolution/rebind.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
 import { stabilizeOnCast } from "./resolution/stabilize.js";
@@ -219,6 +222,12 @@ export function resolveDefinitionAction(
     useUpConsumable(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
+  // A check the action needs first (binding with a Chain): a failure spends the action and does nothing else.
+  if (failsCheckFirst(ctx)) {
+    commitEconomy(ctx);
+    releaseHideAndReady(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   // Spread Caltrops or a set trap acts on whoever meets it later, so nothing is rolled now.
   if (openActionZone(ctx)) {
     commitEconomy(ctx);
@@ -322,6 +331,8 @@ export function resolveDefinitionAction(
   applyMovementGrants(ctx);
   applyTimeStop(ctx);
   applyGrant(ctx);
+  releaseItemEffects(ctx);
+  rebindRow(ctx);
   swallowOnAction(ctx);
   pullOnAction(ctx);
   inflictOnTargets(ctx);
