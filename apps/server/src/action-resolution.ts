@@ -11,8 +11,8 @@ import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { ActorDefinition, SaveCondition } from "@vtt/schemas";
 import { conditionChoicesOf } from "./item-actions.js";
 import { BUILTIN_TARGETING } from "./builtin-actions.js";
-import { builtinCheckSkills } from "./resolution/builtins.js";
-import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { builtinCheckSkills, helpToolsOf } from "./resolution/builtins.js";
+import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { hitRiderOf } from "./resolution/hit-riders.js";
 import { masteryMissDamage } from "./weapon-mastery.js";
 import { spendAmmunition } from "./resolution/ammunition.js";
@@ -611,8 +611,18 @@ export function actionAvailability(
       ...(summonChoicesOf(action.summons) ? { summonChoices: summonChoicesOf(action.summons)! } : {}),
       // An option, one for each target, or the weapon a grant binds to (Fire Shield, Bestow Curse, Magic Weapon).
       ...(actionChoicesOf(action) ? { choices: structuredClone(actionChoicesOf(action)!) } : {}),
-      // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.
-      ...(builtin && builtinCheckSkills(action.id).length > 0 ? { checkSkills: builtinCheckSkills(action.id) } : {})
+      // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks; Help with a Check helps
+      // with a skill or one of its user's tools.
+      ...(builtin && builtinCheckSkills(action.id).length > 0
+        ? {
+            checkSkills: [
+              ...builtinCheckSkills(action.id),
+              ...(action.id === "help-check"
+                ? helpToolsOf(definition, deriveEquipment(attacker, definition, catalog), catalog)
+                : [])
+            ]
+          }
+        : {})
     };
   });
 }

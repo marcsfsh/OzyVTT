@@ -7,7 +7,8 @@ import { signed, titleCase } from "../encounter/format";
 import { modeLabel } from "../encounter/roll-mode-notes";
 import { RollModeNotes, RollModeTag } from "../encounter/RollModeTag";
 import type { SrdExtension } from "../encounter/sheet-extension";
-import { ABILITY_WORDS, exhaustionLevel, type SheetActor } from "./sheet-model";
+import { HelpAnAlly } from "./HelpAnAlly";
+import { ABILITY_WORDS, exhaustionLevel, type SheetActor, type SheetState } from "./sheet-model";
 import type { Quarry } from "./useSheetController";
 import type { SheetEdit } from "./useSheetEdit";
 import type { SheetRolls } from "./useSheetRolls";
@@ -315,8 +316,9 @@ function ProficiencyEditor({
 
 /**
  * The checks: each ability's check and saving throw, the skills in two columns with the ability each uses, the tools,
- * the quarry of a Hunter's Mark, and the senses. A tap rolls on the server, which works out the bonus and any
- * Advantage or Disadvantage, so a button can't disagree with the roll. On a laptop this is the sheet's left column.
+ * the quarry of a Hunter's Mark, outside a fight the help it can give an ally's check, and the senses. A tap rolls on
+ * the server, which works out the bonus and any Advantage or Disadvantage, so a button can't disagree with the roll.
+ * On a laptop this is the sheet's left column.
  */
 export function ChecksTab({
   actor,
@@ -327,7 +329,9 @@ export function ChecksTab({
   quarry,
   busy,
   edit,
-  onEdited
+  onEdited,
+  helping,
+  onFeedback
 }: Readonly<{
   actor: SheetActor;
   definition: ActorDefinition;
@@ -338,6 +342,9 @@ export function ChecksTab({
   busy: boolean;
   edit: SheetEdit;
   onEdited: (next: ActorDefinition) => void;
+  /** Outside a fight, the table whose party members the character may help with a check. */
+  helping?: SheetState | undefined;
+  onFeedback?: (text: string) => void;
 }>) {
   const skills = useSkillRows(definition, derived);
   const [editing, setEditing] = useState(false);
@@ -437,6 +444,17 @@ export function ChecksTab({
           })}
         </div>
       ))}
+      {helping && onFeedback && (
+        <HelpAnAlly
+          actor={actor}
+          state={helping}
+          choices={[
+            ...skills.filter((skill) => skill.tier !== undefined).map(({ id, name }) => ({ id, name })),
+            ...tools.map(({ id, name }) => ({ id, name }))
+          ]}
+          onFeedback={onFeedback}
+        />
+      )}
       <SensesAndDefences definition={definition} extension={extension} derived={derived} />
     </div>
   );

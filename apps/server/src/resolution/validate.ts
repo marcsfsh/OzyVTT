@@ -63,7 +63,9 @@ function combatantsOf(
   const outsideFight = !state.combat.active;
   // A shape-shift is something a creature does outside a fight too (Wild Shape to scout, a werewolf's change).
   const shapeShifts = action.shapeShift !== undefined || action.endsForm === true;
-  if (outsideFight && !(castsASpell && !isItemActionId(action.id)) && !shapeShifts)
+  // So is helping an ally with a check (picking a lock, calming a horse), which needs no turn.
+  const helps = action.id === "help-check";
+  if (outsideFight && !(castsASpell && !isItemActionId(action.id)) && !shapeShifts && !helps)
     throw new CommandRejectedError("Start an encounter before resolving actions.");
   const inFight = (actorId: string) =>
     outsideFight

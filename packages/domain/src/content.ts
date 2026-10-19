@@ -943,9 +943,9 @@ export type ContentActionSummary = Readonly<{
    *  `conditionId`. */ conditionChoices?: readonly string[];
   /** The creature and creature type its user picks when it summons (Find Familiar's forms); `action.resolve`'s
    *  `summon`. */ summonChoices?: SummonChoices;
-  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple);
-   *  `action.resolve`'s `skill`. */ checkSkills?: ReadonlyArray<
-    Readonly<{ id: string; ability: z.infer<typeof AbilitySchema> }>
+  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple),
+   *  and the tools Help with a Check may help with, by name; `action.resolve`'s `skill`. */ checkSkills?: ReadonlyArray<
+    Readonly<{ id: string; ability: z.infer<typeof AbilitySchema>; name?: string }>
   >;
   /** The cast chooses an ability (Hex); `action.resolve`'s `ability`. */ choosesAbility?: boolean;
   /** An option, one for each target, or a carried weapon it asks for (`actionChoicesOf`). */ choices?: ActionChoices;

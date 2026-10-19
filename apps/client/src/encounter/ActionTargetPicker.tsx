@@ -211,7 +211,7 @@ export function ActionTargetPicker({
             {picking.action.id === "escape-grapple" && <option value="">The better one</option>}
             {picking.action.checkSkills.map((skill) => (
               <option key={skill.id} value={skill.id}>
-                {skillName(skill.id)} ({ABILITY_WORDS[skill.ability]})
+                {skill.name ?? skillName(skill.id)} ({ABILITY_WORDS[skill.ability]})
               </option>
             ))}
           </Select>

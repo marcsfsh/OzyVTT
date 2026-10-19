@@ -546,8 +546,11 @@ export const ActionAvailabilitySchema = z.strictObject({
     .describe(
       "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), and `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`)"
     ),
-  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple). */
-  checkSkills: z.array(z.strictObject({ id: z.string(), ability: AbilityIdSchema })).optional(),
+  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple), and
+   *  the tools its user may help with through Help with a Check, which carry their name. */
+  checkSkills: z
+    .array(z.strictObject({ id: z.string(), ability: AbilityIdSchema, name: z.string().optional() }))
+    .optional(),
   /** The weapon mastery property this character uses with this swing (Graze on Borin's Greatsword): present only when
    *  the character chose the weapon's kind under Weapon Mastery. */
   mastery: z
