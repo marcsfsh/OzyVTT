@@ -824,7 +824,10 @@ export function projectPlayerView(
                 preparedSpellIds: [...preparedSpellIds],
                 spellbook: spellbook.map((entry) => ({ ...entry })),
                 preparation: preparation === null ? null : { ...preparation },
-                restStep: restStep === null ? null : { ...restStep },
+                restStep:
+                  restStep === null
+                    ? null
+                    : { after: restStep.after, ...(restStep.swaps ? { swaps: { ...restStep.swaps } } : {}) },
                 inventory: inventory.map(playerInventoryRow),
                 currency: { ...currency }
               }

@@ -118,7 +118,7 @@ export function setPreparedSpell(
     if (actor.preparation === null)
       throw new CommandRejectedError("You change your prepared spells when you finish a Long Rest.");
     if (prepared && actor.preparation.changesLeft === 0)
-      throw new CommandRejectedError("You've changed as many prepared spells as this Long Rest allows.");
+      throw new CommandRejectedError("You've changed as many prepared spells as this rest allows.");
   }
   if (prepared) {
     const cap = preparedCap(definition, spell.classId);

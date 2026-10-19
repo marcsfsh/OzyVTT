@@ -12,10 +12,15 @@ import type { ContentView } from "./content-library.js";
 type ReplaceableOption = Readonly<{
   id: string;
   name?: string;
-  grants?: Readonly<{ spells?: readonly unknown[] }>;
+  grants?: Readonly<{ spells?: readonly unknown[] } & Record<string, unknown>>;
+  modifiers?: readonly unknown[];
+  actions?: readonly unknown[];
+  effects?: readonly unknown[];
   requires?: Readonly<{ offer: string; id: string }>;
 }>;
 type ReplaceableChoice = Readonly<{
+  kind?: string;
+  choose?: number;
   from?: readonly string[];
   fromCatalog?: string;
   options?: ReadonlyArray<ReplaceableOption>;
@@ -28,6 +33,7 @@ type ReplaceableRecord = Readonly<{
   replaces?: ReadonlyArray<Readonly<{ offer: string; when: string; amount: number }>>;
   choice?: ReplaceableChoice;
   choices?: ReadonlyArray<ReplaceableChoice>;
+  extraPicks?: ReadonlyArray<Readonly<{ offer: string }>>;
 }>;
 
 /** One offer this character may re-choose on a rest, with the answers that are legal for it. */
@@ -43,6 +49,10 @@ export type ReplaceableOffer = Readonly<{
   /** The build reads this answer (its options grant spells, or another pick depends on it), so a re-choice is
    *  written to the ledger and the sheet rebuilt, and is never kept as an override. */
   rebuilds: boolean;
+  /** A pick of several answers (Weapon Mastery's weapon kinds): each re-choice swaps one held answer for another, up
+   *  to `swaps` of them a rest. Always written to the ledger. */
+  multi: boolean;
+  swaps: number;
 }>;
 
 /** Every option a choice offers, from whichever sources it names. */
@@ -62,6 +72,27 @@ function optionsOf(choice: ReplaceableChoice, catalogs: CatalogChoiceCatalogs): 
   }
 }
 
+/** An option a rest-time override can stand in for: one whose only mechanics are the damage defences
+ *  `choiceOverrideDefenses` reads at damage time (Fiendish Resilience). Anything else the build reads off the chosen
+ *  option (a modifier, an action, its being on the sheet), so changing it rebuilds. */
+const DEFENCE_GRANTS = new Set(["damageResistances", "damageImmunities", "when"]);
+function overridable(choice: ReplaceableChoice): boolean {
+  const options = choice.options ?? [];
+  return (
+    options.length > 0 &&
+    options.every(
+      (option) =>
+        (option.modifiers?.length ?? 0) === 0 &&
+        (option.actions?.length ?? 0) === 0 &&
+        (option.effects?.length ?? 0) === 0 &&
+        Object.entries(option.grants ?? {}).every(
+          ([key, value]) => DEFENCE_GRANTS.has(key) || (Array.isArray(value) && value.length === 0)
+        ) &&
+        Object.values(option.grants ?? {}).some((value) => Array.isArray(value) && value.length > 0)
+    )
+  );
+}
+
 /** Whether another pick this character holds is gated on `offer`'s answer (Nature's Ward and the later land spells
  *  read the land). */
 function hasDependents(carriers: readonly ReplaceableRecord[], offer: string): boolean {
@@ -72,17 +103,57 @@ function hasDependents(carriers: readonly ReplaceableRecord[], offer: string): b
   );
 }
 
+/** A class's cantrips as a rest-time pick of several, keyed `class-cantrips:<classId>`: any cantrip on its list. */
+function classCantripOffer(
+  ref: Readonly<{ kind: string; sourceId: string }>,
+  clause: Readonly<{ when: string; amount: number }>,
+  library: ContentView
+): ReplaceableOffer | null {
+  if (ref.kind !== "class" || (clause.when !== "short-rest" && clause.when !== "long-rest")) return null;
+  const record = library.classRecord(ref.sourceId);
+  const listId = record?.spellcasting?.spellListId ?? ref.sourceId;
+  let cantrips: Array<{ id: string; name: string }> = [];
+  try {
+    cantrips = resolveCatalogChoice(`${listId}-spells`, library.catalogChoiceCatalogs()).filter(
+      (option) => option.level === 0
+    );
+  } catch (error) {
+    if (!(error instanceof CatalogChoiceError)) throw error;
+  }
+  if (cantrips.length === 0) return null;
+  return {
+    offer: `class-cantrips:${ref.sourceId}`,
+    per: clause.when,
+    label: `${record?.name ?? ref.sourceId} cantrips`,
+    options: cantrips.map((option) => option.id),
+    optionNames: Object.fromEntries(cantrips.map((option) => [option.id, option.name])),
+    rebuilds: true,
+    multi: true,
+    swaps: clause.amount
+  };
+}
+
 /** Every rest-time re-choice this built character has. Empty for monsters, PDF imports, and content without `replaces`. */
 export function replaceableOffers(definition: ActorDefinition | undefined, library: ContentView): ReplaceableOffer[] {
   const carriers = definition?.character?.features ?? [];
-  const records = carriers
-    .map((ref) => library.featureRecord(ref) as ReplaceableRecord | undefined)
-    .filter((record): record is ReplaceableRecord => record !== undefined);
+  const held = carriers
+    .map((ref) => ({ ref, record: library.featureRecord(ref) as ReplaceableRecord | undefined }))
+    .filter(
+      (entry): entry is { ref: (typeof carriers)[number]; record: ReplaceableRecord } => entry.record !== undefined
+    );
+  const records = held.map((entry) => entry.record);
   const offers: ReplaceableOffer[] = [];
-  for (const record of records) {
+  for (const { ref, record } of held) {
     for (const clause of record.replaces ?? []) {
       // Only rest clauses become runtime state; build-time replacement belongs to the ledger.
       if (clause.when !== "short-rest" && clause.when !== "long-rest") continue;
+      // A class's cantrips swapped on a rest (a Wizard's "Whenever you finish a Long Rest, you can replace one of
+      // your cantrips from this feature with another Wizard cantrip").
+      if (clause.offer === "class-cantrips") {
+        const swap = classCantripOffer(ref, clause, library);
+        if (swap && !offers.some((existing) => existing.offer === swap.offer)) offers.push(swap);
+        continue;
+      }
       if (offers.some((existing) => existing.offer === clause.offer)) continue;
       // The options are the offer's own list: a re-choice can't reach past what the original pick could choose.
       const target =
@@ -92,6 +163,10 @@ export function replaceableOffers(definition: ActorDefinition | undefined, libra
       const choice = target?.choice ?? target?.choices?.[0];
       if (!choice) continue; // a clause naming an offer with no option list re-chooses nothing
       const options = optionsOf(choice, library.catalogChoiceCatalogs());
+      const multi =
+        (choice.choose ?? 1) > 1 ||
+        choice.kind === "weapon-mastery" ||
+        (target!.extraPicks ?? []).some((grant) => grant.offer === clause.offer);
       offers.push({
         offer: clause.offer,
         per: clause.when,
@@ -99,8 +174,12 @@ export function replaceableOffers(definition: ActorDefinition | undefined, libra
         options: options.map((option) => option.id),
         optionNames: Object.fromEntries(options.map((option) => [option.id, option.name])),
         rebuilds:
+          multi ||
+          !overridable(choice) ||
           (choice.options ?? []).some((option) => (option.grants?.spells?.length ?? 0) > 0) ||
-          hasDependents(records, clause.offer)
+          hasDependents(records, clause.offer),
+        multi,
+        swaps: clause.amount
       });
     }
   }

@@ -213,6 +213,10 @@ export function applyRest(
     // SRD Tireless: "Whenever you finish a Short Rest, your Exhaustion level, if any, also decreases by 1."
     if (holdsFeature(definition, "tireless", "Tireless")) reduceExhaustion(actor);
     events.push(...endEffectsAtRest(state, actorId, "short"));
+    // SRD Memorize Spell (Wizard 5): "Whenever you finish a Short Rest, you can study your spellbook and replace one of
+    // the level 1+ Wizard spells you have prepared ... with another level 1+ spell from the book": one change.
+    if (actor.preparation === null && holdsFeature(definition, "memorize-spell", "Memorize Spell"))
+      actor.preparation = { changesLeft: 1 };
     // What a feature does "when you finish a Short Rest" (Arcane Recovery, a re-choice) is made in the step this opens.
     actor.restStep = { after: "short-rest" };
     return events;

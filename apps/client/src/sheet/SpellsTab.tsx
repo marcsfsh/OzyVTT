@@ -486,14 +486,17 @@ export function SpellsTab({
         <section className="cs-card cs-caution" role="group" aria-label="Change prepared spells">
           <strong>Change your prepared spells</strong>
           <p className="cs-sub">
-            The Long Rest opened this step.
+            {actor.restStep?.after === "short-rest"
+              ? "The Short Rest opened this step: Memorize Spell swaps one prepared spell."
+              : "The Long Rest opened this step."}
             {keepsList && cap > 0 ? ` ${counted} of ${cap} are prepared; turn one off to prepare another.` : ""}
             {actor.preparation?.changesLeft != null
               ? ` ${actor.preparation.changesLeft} ${actor.preparation.changesLeft === 1 ? "change is" : "changes are"} left.`
               : ""}
           </p>
           {rechoices
-            .filter((choice) => choice.per === "long-rest")
+            // A pick of several is swapped in the rest step on the Features tab; none waits on a Short Rest here.
+            .filter((choice) => choice.per === "long-rest" && !choice.held && actor.restStep?.after !== "short-rest")
             .map((choice) => (
               <label key={choice.offer} className="cs-field">
                 <span className="cs-eyebrow">{choice.label}</span>

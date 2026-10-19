@@ -308,7 +308,7 @@ export const actorHealthCommands = [
     malformed: "The re-choose command is malformed.",
     // What may be re-chosen comes from content, never the request.
     async run({ principal, request, execute }, kit) {
-      const { actorId, offer, id } = request;
+      const { actorId, offer, id, replacing } = request;
       const initiator = initiatorOf(principal);
       let line = "";
       const { duplicate } = await execute((state) => {
@@ -346,6 +346,17 @@ export const actorHealthCommands = [
               `${actor.name} chooses ${match.label} again after finishing a ${match.per === "long-rest" ? "Long Rest" : "Short or Long Rest"}.`
             );
         }
+        // A pick of several changes one held answer at a time, as many a rest as the feature says ("change one of
+        // those weapon choices"); the GM changes any number.
+        if (match.multi && replacing === undefined)
+          throw new CommandRejectedError(`Say which of ${actor.name}'s ${match.label} picks to change.`);
+        if (!match.multi && replacing !== undefined)
+          throw new CommandRejectedError(`${match.label} is one pick. Send no answer to replace.`);
+        const swapped = actor.restStep?.swaps?.[offer] ?? 0;
+        if (match.multi && initiator.role !== "gm" && swapped >= match.swaps)
+          throw new CommandRejectedError(
+            `${actor.name} has changed ${match.swaps === 1 ? "one" : match.swaps} of ${match.label} this rest already.`
+          );
         if (!match.rebuilds) {
           // Stored as `choiceOverrides` on the actor (not the choices ledger) and cleared by the matching rest.
           actor.choiceOverrides = { ...actor.choiceOverrides, [offer]: { id, per: match.per } };
@@ -355,15 +366,24 @@ export const actorHealthCommands = [
         // The build reads this answer (the land's spells and Nature's Ward), so it goes into the ledger.
         if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
           throw new CommandRejectedError(`${match.label} is chosen after a rest. End the fight first.`);
-        rechooseInLedger(state, actorId, offer, id, {
-          library: kit.playCatalog(),
-          policy: state.builderPolicy,
-          catalog: kit.equipmentCatalog()
-        });
+        rechooseInLedger(
+          state,
+          actorId,
+          offer,
+          id,
+          { library: kit.playCatalog(), policy: state.builderPolicy, catalog: kit.equipmentCatalog() },
+          replacing
+        );
+        const rested = state.actors.find((candidate) => candidate.id === actorId);
+        if (match.multi && rested?.restStep)
+          rested.restStep = { ...rested.restStep, swaps: { ...rested.restStep.swaps, [offer]: swapped + 1 } };
         // An override from before the answer moved into the ledger would only shadow it.
         const { [offer]: _stale, ...others } = actor.choiceOverrides;
         actor.choiceOverrides = others;
-        line = `${kit.actorName(actorId)} chose ${chosen} for ${match.label}.`;
+        line =
+          replacing !== undefined
+            ? `${kit.actorName(actorId)} changed ${match.optionNames[replacing] ?? replacing} for ${chosen} (${match.label}).`
+            : `${kit.actorName(actorId)} chose ${chosen} for ${match.label}.`;
       });
       if (!duplicate)
         kit.context.appendLog({

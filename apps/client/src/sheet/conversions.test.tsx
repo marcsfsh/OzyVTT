@@ -160,4 +160,44 @@ describe("the step a finished rest opens", () => {
     expect(step.getByRole("combobox", { name: "Weapon Mastery" })).toBeTruthy();
     expect(step.queryByText("Arcane Recovery")).toBeNull();
   });
+
+  it("swaps one held Weapon Mastery for another, naming the one it replaces", () => {
+    const edit = vi.fn(() => Promise.resolve({ ok: true }));
+    const swaps: Rechoice = {
+      offer: "feature:weapon-mastery",
+      label: "Weapon Mastery",
+      per: "long-rest",
+      options: [
+        { id: "greataxe", name: "Greataxe" },
+        { id: "handaxe", name: "Handaxe" },
+        { id: "maul", name: "Maul" }
+      ],
+      chosen: null,
+      held: ["greataxe", "handaxe"],
+      swaps: 1
+    };
+    render(
+      <RestStep
+        actorId={ACTOR}
+        after="long-rest"
+        offers={[]}
+        rechoices={[swaps]}
+        busy={false}
+        edit={edit as unknown as SheetEdit}
+        onFeedback={() => {}}
+      />
+    );
+    const step = within(screen.getByRole("group", { name: "After the Long Rest" }));
+    expect(step.getByText("Change one after a Long Rest.")).toBeTruthy();
+    const greataxe = step.getByRole("combobox", { name: "Weapon Mastery: Greataxe" });
+    // The other held answer is no option to swap in.
+    expect(within(greataxe).queryByRole("option", { name: "Handaxe" })).toBeNull();
+    fireEvent.change(greataxe, { target: { value: "maul" } });
+    expect(edit).toHaveBeenLastCalledWith("actor:rechoose", {
+      actorId: ACTOR,
+      offer: "feature:weapon-mastery",
+      id: "maul",
+      replacing: "greataxe"
+    });
+  });
 });

@@ -1395,28 +1395,26 @@ const wizardInput = (): CharacterCreateRequestInput => ({
   ] as CharacterCreateRequestInput["choices"]
 });
 
-describe("Wizard: Signature Spells becomes two free castings that a Short Rest gives back", () => {
-  it("spends both, refuses the third, and re-arms on a Short Rest", () => {
+describe("Wizard: Signature Spells casts each spell once free, and a Short Rest gives them back", () => {
+  it("casts Fireball free once, refuses a second while Counterspell's stays open, and re-arms on a Short Rest", () => {
     const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
-    // "you can cast each of them once at level 3 without expending a spell slot ... until you finish a
-    // Short or Long Rest": two uses, recovered on a Short Rest.
-    // One pool for both spells' free castings; the per-spell split stays in the text.
-    for (const id of ["spell-fireball-free", "spell-counterspell-free"])
-      expect(actionOf(built, id).uses).toMatchObject({ limit: 2, per: "short-rest", pool: "signature-spells" });
+    // "you can cast each of them once at level 3 without expending a spell slot. Once you do so, you can't cast that
+    // spell in this way again until you finish a Short or Long Rest": a counter for each spell.
+    for (const spell of ["fireball", "counterspell"])
+      expect(actionOf(built, `spell-${spell}-free`).uses).toMatchObject({
+        limit: 1,
+        per: "short-rest",
+        pool: `signature-spells-${spell}`
+      });
 
-    for (const [commandId, id] of [
-      ["50000000-0000-4000-8000-000000000130", "spell-fireball-free"],
-      ["50000000-0000-4000-8000-000000000131", "spell-counterspell-free"]
-    ] as const) {
-      resolveDefinitionAction(
-        built.state,
-        actionOf(built, id),
-        { actorId: IDS.hero, targetIds: [], commandId },
-        // Fireball rolls its 8d6 even with no one in the area.
-        deps(built, Array<number>(8).fill(3))
-      );
-    }
-    expect(built.hero.actionUses["signature-spells"]).toBe(2);
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, "spell-fireball-free"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000130" },
+      // Fireball rolls its 8d6 even with no one in the area.
+      deps(built, Array<number>(8).fill(3))
+    );
+    expect(built.hero.actionUses["signature-spells-fireball"]).toBe(1);
     expect(() =>
       resolveDefinitionAction(
         built.state,
@@ -1425,14 +1423,36 @@ describe("Wizard: Signature Spells becomes two free castings that a Short Rest g
         deps(built, [])
       )
     ).toThrow();
-    expect(built.hero.actionUses["signature-spells"]).toBe(2); // the refusal spent nothing
+    expect(built.hero.actionUses["signature-spells-fireball"]).toBe(1); // the refusal spent nothing
+    expect(built.hero.actionUses["signature-spells-counterspell"]).toBeUndefined();
 
-    // A Short Rest gives them back. Overchannel, once per Long Rest, is the control and must not come back.
+    // A Short Rest gives it back. Overchannel, once per Long Rest, is the control and must not come back.
     built.hero.actionUses = { ...built.hero.actionUses, overchannel: 1 };
     endEncounter(built.state);
     applyRest(built.state, IDS.hero, "short", () => built.definition, built.catalog);
-    expect(built.hero.actionUses["signature-spells"]).toBeUndefined();
+    expect(built.hero.actionUses["signature-spells-fireball"]).toBeUndefined();
     expect(built.hero.actionUses["overchannel"]).toBe(1);
+  });
+
+  // SRD Spell Mastery: "You can cast them at their lowest level without expending a spell slot".
+  it("casts Spell Mastery's picks at will at their own level, with no slot and no counter", () => {
+    const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
+    for (const spell of ["magic-missile", "acid-arrow"]) {
+      const free = actionOf(built, `spell-${spell}-free`);
+      expect(free.uses).toBeUndefined();
+      expect(free.spellSlot).toBeUndefined();
+    }
+    const slots = JSON.stringify(built.hero.spellSlots);
+    const uses = JSON.stringify(built.hero.actionUses);
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, "spell-magic-missile-free"),
+      { actorId: IDS.hero, targetIds: [IDS.foe, IDS.foe, IDS.foe], commandId: "50000000-0000-4000-8000-000000000140" },
+      deps(built, Array<number>(3).fill(2))
+    );
+    // Nothing is spent, so the next turn can cast it again.
+    expect(JSON.stringify(built.hero.spellSlots)).toBe(slots);
+    expect(JSON.stringify(built.hero.actionUses)).toBe(uses);
   });
 
   it("holds the counters and picks the hand-authored record already carried", () => {

@@ -242,7 +242,7 @@ const ALL_SKILLS = [
 // with prerequisites checked by the build. `repeatable`: an ASI may be taken at several levels, and the server
 // rejects a repeated option id unless the choice allows it (a feat that is not repeatable is still refused).
 const asiChoice = { kind: "asi-or-feat", choose: 1, fromCatalog: "feats", repeatable: true };
-const weaponMastery = (n: number) => ({ kind: "weapon-mastery", choose: n, fromCatalog: "weapons" });
+const weaponMastery = (n: number, fromCatalog = "weapons") => ({ kind: "weapon-mastery", choose: n, fromCatalog });
 
 /**
  * Short class copy written for this product (no SRD text): the vendored transcription omits the
@@ -305,7 +305,8 @@ const CONFIG: Record<string, ClassConfig> = {
       "Weapon Mastery": { id: "weapon-mastery", name: "Weapon Mastery", display: true }
     },
     choices: {
-      "weapon-mastery": weaponMastery(2),
+      // "Simple or Martial Melee weapons of your choice".
+      "weapon-mastery": weaponMastery(2, "melee-weapons"),
       "ability-score-improvement": asiChoice,
       "barbarian-subclass": { kind: "subclass", choose: 1, fromCatalog: "barbarian-subclasses" }
     }
@@ -413,7 +414,8 @@ const CONFIG: Record<string, ClassConfig> = {
     columns: { "Sneak Attack": { id: "sneak-attack", name: "Sneak Attack", dice: true, display: true } },
     choices: {
       expertise: { kind: "expertise", choose: 2, fromCatalog: "skills" },
-      "weapon-mastery": weaponMastery(2),
+      // "Weapons of your choice with which you have proficiency": Simple ones, and Martial ones with Finesse or Light.
+      "weapon-mastery": weaponMastery(2, "simple-weapons-or-martial-finesse-weapons-or-martial-light-weapons"),
       "ability-score-improvement": asiChoice,
       "rogue-subclass": { kind: "subclass", choose: 1, fromCatalog: "rogue-subclasses" }
     }

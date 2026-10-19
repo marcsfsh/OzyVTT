@@ -9,7 +9,8 @@ export const ranger: ClassMechanicsModule = {
      */
     // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": made in the Level flow until a
     // rest offers it.
-    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "level-up", amount: 2 }] },
+    // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": both, in the rest's step.
+    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "long-rest", amount: 2 }] },
     "favored-enemy": {
       uses: { scaling: { type: "class-resource", id: "favored-enemy" }, per: "long-rest" },
       grants: { spells: [{ id: "hunters-mark", level: 1, alwaysPrepared: true, withoutSlot: "free" }] }
@@ -115,10 +116,11 @@ export const ranger: ClassMechanicsModule = {
     hunter: {
       /**
        * A pick with prose-only options. Colossus Slayer needs a gate on the target's HP and once-per-turn
-       * on a modifier; Horde Breaker's extra attack must target a different creature. Replacing the
-       * choice on a rest stays prose.
+       * on a modifier; Horde Breaker's extra attack must target a different creature. "Whenever you finish a
+       * Short or Long Rest, you can replace the chosen option with the other one."
        */
       "hunters-prey": {
+        replaces: [{ offer: "feature:hunters-prey", when: "short-rest", amount: 1 }],
         choice: {
           kind: "hunters-prey",
           choose: 1,
@@ -165,7 +167,9 @@ export const ranger: ClassMechanicsModule = {
 
       // Escape the Horde's Disadvantage is read on every Opportunity Attack against the Ranger. Multiattack
       // Defense is marked on the Ranger by the engine after a hit (`resolution/struck.ts`).
+      // "Whenever you finish a Short or Long Rest, you can replace the chosen option with the other one."
       "defensive-tactics": {
+        replaces: [{ offer: "feature:defensive-tactics", when: "short-rest", amount: 1 }],
         choice: {
           kind: "defensive-tactics",
           choose: 1,

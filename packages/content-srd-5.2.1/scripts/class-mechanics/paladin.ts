@@ -13,7 +13,8 @@ export const paladin: ClassMechanicsModule = {
   features: {
     // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": made in the Level flow until a
     // rest offers it.
-    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "level-up", amount: 2 }] },
+    // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": both, in the rest's step.
+    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "long-rest", amount: 2 }] },
 
     /** The Fighting Style feat catalog plus the inline Blessed Warrior option (consumers union the two). */
     "fighting-style": {

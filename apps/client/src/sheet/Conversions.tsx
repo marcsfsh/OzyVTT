@@ -192,6 +192,8 @@ function RechoiceField({
   edit: SheetEdit;
   onFeedback: (text: string) => void;
 }>) {
+  if (choice.held)
+    return <HeldSwaps actorId={actorId} choice={choice} busy={busy} edit={edit} onFeedback={onFeedback} />;
   return (
     <label className="cs-field">
       <span className="cs-eyebrow">{choice.label}</span>
@@ -215,6 +217,56 @@ function RechoiceField({
         ))}
       </Select>
     </label>
+  );
+}
+
+/** A pick of several (Weapon Mastery's weapon kinds): each answer held has its own select, and changing one swaps it
+ *  for the answer picked, as many a rest as the feature allows. */
+function HeldSwaps({
+  actorId,
+  choice,
+  busy,
+  edit,
+  onFeedback
+}: Readonly<{
+  actorId: string;
+  choice: Rechoice;
+  busy: boolean;
+  edit: SheetEdit;
+  onFeedback: (text: string) => void;
+}>) {
+  const held = choice.held ?? [];
+  const nameOf = (id: string) => choice.options.find((option) => option.id === id)?.name ?? id;
+  return (
+    <fieldset className="cs-field">
+      <legend className="cs-eyebrow">{choice.label}</legend>
+      <span className="cs-sub">
+        {choice.swaps === 1 ? "Change one after a Long Rest." : "Change any of them after a Long Rest."}
+      </span>
+      {held.map((current) => (
+        <Select
+          key={current}
+          aria-label={`${choice.label}: ${nameOf(current)}`}
+          value={current}
+          disabled={busy}
+          onChange={(event) => {
+            const id = event.target.value;
+            if (id === current) return;
+            void edit("actor:rechoose", { actorId, offer: choice.offer, id, replacing: current }).then((result) => {
+              if (result.ok) onFeedback(`${choice.label}: ${nameOf(id)} in place of ${nameOf(current)}.`);
+            });
+          }}
+        >
+          {choice.options
+            .filter((option) => option.id === current || !held.includes(option.id))
+            .map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
+        </Select>
+      ))}
+    </fieldset>
   );
 }
 

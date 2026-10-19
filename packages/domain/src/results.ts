@@ -661,7 +661,11 @@ const RechoiceSchema = z.strictObject({
   label: z.string(),
   per: z.enum(["short-rest", "long-rest"]),
   options: z.array(z.strictObject({ id: z.string(), name: z.string() })),
-  chosen: z.string().nullable()
+  chosen: z.string().nullable(),
+  /** A pick of several (Weapon Mastery's weapon kinds): the answers in force, each swapped by `replacing` it. */
+  held: z.array(z.string()).optional(),
+  /** How many of `held` one rest lets the character swap: Weapon Mastery's "change one of those" is 1. */
+  swaps: z.number().int().min(1).optional()
 });
 export type Rechoice = Wire<z.infer<typeof RechoiceSchema>>;
 /** What a prepared caster may change about its spells (SRD Spell Preparation by Class): for each class that changes its

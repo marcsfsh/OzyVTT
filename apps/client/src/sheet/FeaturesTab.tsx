@@ -114,6 +114,17 @@ function RestChoices({
       <span className="cs-eyebrow">Rests</span>
       {rechoices.map((choice) => {
         const open = choice.per === "short-rest" ? afterAnyRest : afterLongRest;
+        // A pick of several (Weapon Mastery) is changed one answer at a time in the step its rest opens.
+        if (choice.held)
+          return (
+            <p key={choice.offer} className="cs-field">
+              <span className="cs-use-name">{choice.label}</span>
+              <span className="cs-sub">{REST_WORDS[choice.per]}</span>
+              <span>
+                {choice.held.map((id) => choice.options.find((option) => option.id === id)?.name ?? id).join(", ")}
+              </span>
+            </p>
+          );
         return (
           <label key={choice.offer} className="cs-field">
             <span className="cs-use-name">{choice.label}</span>

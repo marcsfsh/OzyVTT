@@ -1185,6 +1185,12 @@ export const ActorRechooseSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(80),
+    /** For a pick of several (Weapon Mastery), the answer `id` takes the place of. */
+    replacing: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

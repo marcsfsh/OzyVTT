@@ -1569,7 +1569,11 @@ export const ActorSchema = z.object({
    *  slots or points (Arcane Recovery, Sorcerous Restoration), or re-make a pick. Closed by its player's Done or by
    *  rolling Initiative. Null when closed. Owner-only. */
   restStep: z
-    .object({ after: z.enum(["short-rest", "long-rest"]) })
+    .object({
+      after: z.enum(["short-rest", "long-rest"]),
+      /** Answers swapped in this step, by offer key, for a pick that lets only so many change each rest. */
+      swaps: z.record(z.string(), z.number().int().min(0).max(20)).optional()
+    })
     .strict()
     .nullable()
     .default(null),
