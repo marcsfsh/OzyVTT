@@ -300,6 +300,51 @@ describe("the GM rests the party", () => {
   });
 });
 
+/** Torva with a prepared Cure Wounds and a level 1 slot, the cast that interrupts a rest. */
+function castingGame(): GameState {
+  const caster = {
+    spellSlots: [{ level: 1, remaining: 2 }],
+    preparedSpellIds: ["cure-wounds"]
+  };
+  const state = game(caster);
+  state.definitions = [
+    {
+      id: "import-torva",
+      definition: ActorDefinitionSchema.parse({
+        ...torva,
+        actions: [
+          ...torva.actions,
+          {
+            id: "spell-cure-wounds",
+            name: "Cure Wounds",
+            activation: "action",
+            description: "A creature you touch regains Hit Points.",
+            damage: [],
+            healing: { formula: "2d8 + 3" },
+            spellId: "cure-wounds",
+            spellSlot: { level: 1 }
+          }
+        ],
+        spellcasting: {
+          ability: "wis",
+          slots: [{ level: 1, max: 2 }],
+          spells: [
+            {
+              id: "cure-wounds",
+              name: "Cure Wounds",
+              level: 1,
+              prepared: true,
+              alwaysPrepared: false,
+              actionId: "spell-cure-wounds"
+            }
+          ]
+        }
+      })
+    }
+  ];
+  return state;
+}
+
 describe("over the API", () => {
   const cleanups: Array<() => Promise<void>> = [];
   afterEach(async () => {
@@ -369,46 +414,7 @@ describe("over the API", () => {
 
   it("casting a spell other than a cantrip ends the caster's Short Rest", async () => {
     // SRD Short Rest: "A Short Rest is stopped by ... Casting a spell other than a cantrip".
-    const caster = {
-      spellSlots: [{ level: 1, remaining: 2 }],
-      preparedSpellIds: ["cure-wounds"]
-    };
-    const state = game(caster);
-    state.definitions = [
-      {
-        id: "import-torva",
-        definition: ActorDefinitionSchema.parse({
-          ...torva,
-          actions: [
-            ...torva.actions,
-            {
-              id: "spell-cure-wounds",
-              name: "Cure Wounds",
-              activation: "action",
-              description: "A creature you touch regains Hit Points.",
-              damage: [],
-              healing: { formula: "2d8 + 3" },
-              spellId: "cure-wounds",
-              spellSlot: { level: 1 }
-            }
-          ],
-          spellcasting: {
-            ability: "wis",
-            slots: [{ level: 1, max: 2 }],
-            spells: [
-              {
-                id: "cure-wounds",
-                name: "Cure Wounds",
-                level: 1,
-                prepared: true,
-                alwaysPrepared: false,
-                actionId: "spell-cure-wounds"
-              }
-            ]
-          }
-        })
-      }
-    ];
+    const state = castingGame();
     const { base, gmToken, post, server, close } = await bootServer(state);
     cleanups.push(close);
     const party = await post(GAME_PATHS.restParty, gmToken, {
@@ -427,6 +433,32 @@ describe("over the API", () => {
     const log = await (await fetch(base + GAME_PATHS.log, { headers: { authorization: `Bearer ${gmToken}` } })).json();
     expect((log.data.entries as ReadonlyArray<{ text: string }>).map((entry) => entry.text)).toContain(
       "Torva cast Cure Wounds, which ends their Short Rest without its benefits."
+    );
+  });
+
+  it("casting a spell other than a cantrip interrupts the caster's Long Rest", async () => {
+    // SRD Long Rest: "A Long Rest is stopped by ... Casting a spell other than a cantrip".
+    const { base, gmToken, post, server, close } = await bootServer(castingGame());
+    cleanups.push(close);
+    const party = await post(GAME_PATHS.restParty, gmToken, {
+      commandId: randomUUID(),
+      kind: "long",
+      actorIds: [TORVA, BRYN]
+    });
+    expect(party.status).toBe(200);
+    const cast = await post(GAME_PATHS.actionUse, gmToken, {
+      commandId: randomUUID(),
+      actorId: TORVA,
+      actionId: "spell-cure-wounds"
+    });
+    expect(cast.status).toBe(200);
+    expect(server.store.snapshot.rest.longRest?.members).toEqual([
+      { actorId: TORVA, interruptions: 0, interrupted: true, shortRestEarned: false },
+      { actorId: BRYN, interruptions: 0, interrupted: false, shortRestEarned: false }
+    ]);
+    const log = await (await fetch(base + GAME_PATHS.log, { headers: { authorization: `Bearer ${gmToken}` } })).json();
+    expect((log.data.entries as ReadonlyArray<{ text: string }>).map((entry) => entry.text)).toContain(
+      "Torva cast Cure Wounds, which interrupts Torva's Long Rest."
     );
   });
 });
