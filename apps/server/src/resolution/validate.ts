@@ -33,6 +33,7 @@ import { sceneSight } from "../vision/sight.js";
 import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
 import { reachBarredBy } from "../zone-barriers.js";
 import { bearsCastOf, levitatedBy, takenWithCast } from "../lasting-spells.js";
+import { checkStoredRelease } from "../stored-casts.js";
 import { swallowCover } from "../swallow.js";
 import { enclosureBlocks } from "../enclosures.js";
 import { builtinHandlerFor } from "./builtins.js";
@@ -283,6 +284,8 @@ export function openResolve(
         throw new CommandRejectedError(
           `${hiddenFromInitiator(target.id) ? "That creature" : target.name} isn't under ${attacker.name}'s ${spell.name}, so ${action.name} can't take it.`
         );
+  // Contingency's spell takes effect on its caster alone, while the statuette is carried.
+  checkStoredRelease(attacker, action.id, input.targetIds);
   // An option or a weapon the action doesn't offer is refused before anything rolls.
   checkChoices(action, input, attacker, deps.catalog);
   const derived = deriveEquipment(attacker, deps.definition, deps.catalog);

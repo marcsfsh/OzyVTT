@@ -10838,7 +10838,34 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "hold-out",
+    "name": "Hold Out to a Spell",
+    "activation": "other",
+    "description": "Touch the ring to a spell as it is cast: the next spell of level 1 through 5 cast at you or by you within a minute is stored in the ring if there is room, and lost if there isn't.",
+    "damage": [],
+    "grants": {
+     "name": "Ring of Spell Storing held out",
+     "tags": [
+      "ring-held-out"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "storeAwaits": {
+      "via": "ring",
+      "maxLevel": 5
+     }
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },

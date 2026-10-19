@@ -1801,6 +1801,25 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
   }),
   // "Until the spell ends, the target can take a Magic action to exhale", the type chosen at the cast: the touched
   // creature's own action, at the caster's numbers.
+  // "Choose a spell of level 5 or lower that you can cast, that has a casting time of an action, and that can target
+  // you. You cast that spell, called the contingent spell, as part of casting Contingency." The next such spell its
+  // caster casts within a minute is held for the 10 days (`stored-casts.ts`); casting Contingency again replaces it.
+  contingency: spellGrant({
+    name: "Contingency",
+    tags: ["contingency"],
+    target: "self",
+    duration: { type: "minutes", minutes: 14_400 },
+    storeAwaits: { via: "contingency", maxLevel: 5 }
+  }),
+  // "Spell Glyph. You can store a prepared spell of level 3 or lower in the glyph by casting it as part of creating the
+  // glyph", up to the slot's level: the next such spell its caster casts within a minute makes the glyph a spell glyph.
+  "glyph-of-warding": spellGrant({
+    name: "Glyph of Warding",
+    tags: ["glyph-of-warding"],
+    target: "self",
+    duration: rounds(10),
+    storeAwaits: { via: "glyph", maxLevel: 3 }
+  }),
   // "Until the spell ends, the target can revert to cloud form": each target keeps the spell, and its action to become
   // a cloud again, for the spell's duration.
   "wind-walk": spellGrant({

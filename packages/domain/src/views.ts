@@ -57,6 +57,8 @@ export type PlayerEffect = Omit<
   | "optionId"
   | "bonusActions"
   | "grantedSpellAction"
+  | "storedCast"
+  | "storeAwaits"
   | "endAction"
   | "usedOnTurn"
   | "shrinksEachLongRest"

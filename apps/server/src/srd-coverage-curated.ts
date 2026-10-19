@@ -631,7 +631,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   "Soul Bag": reference("The bag and its statistics are the GM's to run."),
   "Speak with Beasts and Plants": senses,
-  "Spell Storing": reference("Storing and casting the spell is the GM's to run."),
+  "Spell Storing": enforced(
+    "stored-casts.ts stores a spell of the printed level or lower that the creature commanding it casts on it from within 5 feet, losing any spell stored before; the spell has no other effect. The guardian's sheet then casts it once at the caster's spell save DC, attack bonus and modifier, with no components."
+  ),
   "Spider Climb": enforced(
     "speed.ts moves it at its Climb Speed with no extra cost and no check, and a climb may change its height on the map (altitude.ts). Which surfaces it climbs is the GM's, as walls have no height."
   ),
@@ -721,6 +723,12 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "spell:ensnaring-strike": enforced(
     "The hit's target makes the Strength save, with Advantage if Large or larger, or is Restrained while the caster concentrates, taking 1d6 Piercing, 1d6 more a slot level, at the start of each of its turns (resolution/pending.ts, turn-boundaries.ts). It, or a creature within reach of it with End an Effect, breaks free with a Strength (Athletics) check against the spell save DC (ending-actions.ts)."
+  ),
+  "spell:contingency": enforced(
+    "The cast takes 10 minutes and needs the 1,500 GP statuette (resolution/components.ts). The next spell of level 5 or lower with a casting time of an action that can target its caster, cast within the minute, is held for the 10 days at its slot and its caster's numbers, both slots spent (stored-casts.ts); casting Contingency again replaces it. When the trigger happens its sheet releases it on the caster alone with no action, which ends Contingency, and the release is refused once the statuette isn't carried. Judging whether the described trigger has happened is the caster's player's or the GM's."
+  ),
+  "item:ring-of-spell-storing": enforced(
+    "Held out (no action), the ring takes the next spell of level 1 through 5 cast at its wearer or by it within a minute, at its caster's slot level, spell save DC, attack bonus and modifier, if the levels it holds stay at 5 or fewer; a spell that doesn't fit is lost. The attuned wearer casts each held spell from its sheet at those numbers, freeing its space (stored-casts.ts). The GM sets what a found ring holds on its row; a player sees the held spells once attuned (projections.ts)."
   ),
   "spell:arcane-hand": enforced(
     "The hand appears within 120 feet with AC 20 and the caster's Hit Point maximum, and the spell ends when it drops to 0 (summons.ts). The cast and each later Bonus Action move it up to 60 feet and cause one effect, the cast's at no further cost (lasting-spells.ts): Clenched Fist's attack (5d8 Force, 2d8 more a slot level above 5) and the saves reach from the hand (summon-strikes.ts); Forceful Hand pushes a Huge or smaller creature that fails its Strength save 5 feet plus five times the spellcasting modifier, the hand following (saving-throws.ts); Grasping Hand grapples a Huge or smaller creature that fails its Dexterity save, escaped against the spell save DC, and only that creature can be crushed (4d6 plus the modifier, 2d6 more a slot level above 5); Interposing Hand gives the caster Half Cover from or through its space, which is Difficult Terrain for the caster's enemies (cover.ts, zone-ground.ts)."
@@ -1867,7 +1875,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The 10-foot Emanation stays where its caster stood (spell-zones.ts). zone-barriers.ts keeps a spell of level 5 or lower cast from outside from affecting the creatures within, one level higher for each slot level above 6."
   ),
   "spell:glyph-of-warding": guided(
-    "The explosive rune lasts until it goes off, in a fight or out of one, drawn for the GM and the caster's player alone. The first creature that steps onto it sets it off: each creature in the 20-foot Sphere makes the Dexterity save against 5d8 damage of the type chosen at the cast, and the spell ends (spell-zones.ts). Other triggers, noticing the glyph and the spell glyph are the GM's."
+    "The glyph lasts until it goes off, in a fight or out of one, drawn for the GM and the caster's player alone. As an explosive rune, the first creature that steps onto it sets it off: each creature in the 20-foot Sphere makes the Dexterity save against 5d8 damage of the type chosen at the cast, 1d8 more a slot level above 3, and the spell ends (spell-zones.ts). A spell of the glyph's level or lower that its caster casts within the minute is stored in it instead, and when the glyph is set off it takes effect at its caster's numbers on that creature, or on the creatures within its area around that creature (stored-casts.ts, stored-cast-release.ts). Refining the trigger (creature kinds, passwords, an opened book) and noticing the glyph with a Wisdom (Perception) check are the GM's."
   ),
   "spell:grease": enforced(
     "spell-zones.ts asks for the Dexterity save when a creature enters the square or ends its turn there, and a failure leaves it Prone. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the square Difficult Terrain."

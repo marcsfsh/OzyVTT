@@ -611,6 +611,9 @@ function playerEffect(
     optionId: _optionId,
     bonusActions: _bonusActions,
     grantedSpellAction: _grantedSpellAction,
+    // A held spell's numbers and its caster are the GM's; the owner's sheet reads the action that releases it.
+    storedCast: _storedCast,
+    storeAwaits: _storeAwaits,
     endAction: _endAction,
     usedOnTurn: _usedOnTurn,
     shrinksEachLongRest: _shrinksEachLongRest,
@@ -797,12 +800,14 @@ const PARTY_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filte
  *  the item's properties are learned (and the resistance starts to apply); so does which kind an item that needs
  *  attunement is (an Ioun Stone's). */
 function playerInventoryRow(item: Actor["inventory"][number]): Actor["inventory"][number] {
-  const { chosenDamageType, variantId, ...row } = item;
+  const { chosenDamageType, variantId, storedCasts, ...row } = item;
   const learned = item.attuned || item.magic?.attunementRequired !== true;
   return {
     ...row,
     ...(chosenDamageType !== undefined && item.attuned ? { chosenDamageType } : {}),
-    ...(variantId !== undefined && learned ? { variantId } : {})
+    ...(variantId !== undefined && learned ? { variantId } : {}),
+    // The spells a Ring of Spell Storing holds are known to the creature attuned to it, which casts them.
+    ...(storedCasts !== undefined && item.attuned ? { storedCasts } : {})
   };
 }
 

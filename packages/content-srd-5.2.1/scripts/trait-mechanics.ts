@@ -387,7 +387,14 @@ function engulfsEntrants(trait: Trait): TraitMechanic | null {
     : null;
 }
 
+/** "A spellcaster who wears the guardian's amulet can cause the guardian to store one spell of level 4 or lower." */
+function spellStoring(trait: Trait): TraitMechanic | null {
+  const match = /\bcan cause the [\w -]+? to store one spell of level (\d) or lower\b/.exec(trait.description);
+  return match ? { kind: "spell-storing", name: trait.name, maxLevel: Number(match[1]) } : null;
+}
+
 const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
+  spellStoring,
   regeneration,
   undeadFortitude,
   turnEndAura,

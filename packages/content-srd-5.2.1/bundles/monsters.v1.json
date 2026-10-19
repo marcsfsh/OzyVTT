@@ -41483,6 +41483,11 @@
     "name": "Regeneration",
     "hitPoints": 10,
     "needsHitPoints": true
+   },
+   {
+    "kind": "spell-storing",
+    "name": "Spell Storing",
+    "maxLevel": 4
    }
   ],
   "extensions": {

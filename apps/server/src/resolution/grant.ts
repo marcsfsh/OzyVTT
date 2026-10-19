@@ -1,3 +1,4 @@
+import { openStoreWindow } from "../stored-casts.js";
 import { CHOSEN_ABILITY_TAG, ENHANCED_ABILITY_TAG, type GameState } from "@vtt/domain";
 import { abilityModifier, rollDice } from "@vtt/rules-5e";
 import type { DamageType, EffectInstance, Modifier } from "@vtt/schemas";
@@ -258,8 +259,9 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       tags: [...new Set([...(rage ? rage.tags : grant.tags), ...parts.tags])].slice(0, 8),
       sourceActorId: attacker.id,
       sourceName: attacker.name,
-      // A cast that also shape-shifts its targets (Wind Walk) keeps its grant beside the form it gives.
-      sourceActionId: action.shapeShift ? `${action.id}:grant` : action.id,
+      // A cast that also shape-shifts its targets (Wind Walk) or keeps its spell up on its caster (Glyph of Warding)
+      // keeps its grant beside the form or the spell's own effect.
+      sourceActionId: action.shapeShift || grant.storeAwaits ? `${action.id}:grant` : action.id,
       startedRound: rage?.startedRound ?? state.combat.round,
       duration: rage?.duration
         ? rage.duration
@@ -326,6 +328,8 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
     deps
   );
   if (effect.sizeChange) refreshSize(state, recipient);
+  // Contingency, a spell glyph or a Ring of Spell Storing held out waits for the spell it will hold.
+  if (grant.storeAwaits) openStoreWindow(ctx, recipient, effect, grant.storeAwaits, castLevel);
   warnings.push(...replaced.map((event) => event.text));
   // A new way to work out AC counts at once.
   if (baseArmorClass !== undefined && recipientDefinition)

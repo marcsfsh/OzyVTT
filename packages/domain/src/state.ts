@@ -13,7 +13,8 @@ import {
   HealthDisplaySchema,
   HitPointBandSchema,
   ObjectStatsSchema,
-  SaveFailureDurationSchema
+  SaveFailureDurationSchema,
+  StoredCastSchema
 } from "@vtt/schemas";
 
 /** An imported stat block persisted with the campaign: the inert definition plus the id actors reference via `definitionId`. */
@@ -1357,6 +1358,10 @@ export const SpellZoneSchema = z
     damageType: z.string().min(1).max(40).optional(),
     /** The creature Heightened Spell gave Disadvantage on its saves against the spell. */
     heightened: z.uuid().optional(),
+    /** A spell glyph's stored spell, released on the creature that sets it off (Glyph of Warding). */
+    storedCast: StoredCastSchema.optional(),
+    /** The creature that set it off, for a spell glyph bursting with its stored spell. */
+    setOffBy: z.uuid().optional(),
     /** Dice its damage has gained so far (Delayed Blast Fireball: 1d6 whenever its caster's turn ends). */
     grown: z.number().int().nonnegative().max(100).optional(),
     /** It acts when its spell ends (Delayed Blast Fireball's bead), so ending it leaves it `bursting` until the server

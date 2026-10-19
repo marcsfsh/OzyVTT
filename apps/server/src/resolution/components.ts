@@ -1,3 +1,4 @@
+import { isStoredCast } from "../stored-casts.js";
 import type { SpellMaterial, SpellReference } from "@vtt/content-srd-5.2.1";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { catalogIdOf, type ActorDefinition, type Currency, type InventoryItem } from "@vtt/schemas";
@@ -155,6 +156,9 @@ export function readComponents(
   const scroll = scrollOfAction(action, attacker.inventory, catalog) !== null;
   // "Requires no components unless the item's description notes otherwise"; a scroll is read without Material ones.
   if (isItemActionId(action.id) && !scroll) return NONE;
+  // A held spell paid its components when it was stored (Contingency, a ring, a guardian's "requiring no spell
+  // components").
+  if (isStoredCast(action.id)) return NONE;
   const waived = waivedBy(definition, action);
   const subtle = input.subtle === true;
   const needs = (component: Component) =>

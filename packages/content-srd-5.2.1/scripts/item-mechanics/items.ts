@@ -1147,7 +1147,27 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `ring-of-spell-storing` - needs per-copy storage and the original caster's numbers.
+  // "Any creature can cast a spell of level 1 through 5 into the ring by touching the ring as the spell is cast": held
+  // out, the next spell cast at its wearer or by it within a minute is stored on the copy (`stored-casts.ts`), and the
+  // attuned wearer casts each at its caster's numbers.
+  "ring-of-spell-storing": {
+    actions: [
+      {
+        id: "hold-out",
+        name: "Hold Out to a Spell",
+        activation: "other",
+        description:
+          "Touch the ring to a spell as it is cast: the next spell of level 1 through 5 cast at you or by you within a minute is stored in the ring if there is room, and lost if there isn't.",
+        damage: [],
+        grants: {
+          name: "Ring of Spell Storing held out",
+          tags: ["ring-held-out"],
+          duration: { type: "rounds", rounds: 10 },
+          storeAwaits: { via: "ring", maxLevel: 5 }
+        }
+      }
+    ]
+  },
   // "You have Advantage on saving throws against spells." Turning a spell back on its caster is the GM's.
   "ring-of-spell-turning": {
     modifiers: [

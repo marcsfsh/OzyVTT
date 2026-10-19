@@ -11,6 +11,7 @@ import { needsPlaneSettling, settlePlanes } from "../off-plane.js";
 import { heldMoveReady, settleHeldMove } from "../held-moves.js";
 import { movementCost } from "../terrain.js";
 import { burstEndedZones } from "../spell-zones.js";
+import { releaseGlyphSpells } from "../stored-cast-release.js";
 import { planNextTurn } from "../combat-history.js";
 import { nextInitiativeTurn } from "../encounter.js";
 import { holdsSummons, needsSummonSettling, settleSummons, summonHoldingTurnLeaves } from "../summons.js";
@@ -274,8 +275,16 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     if (!before.combat.spellZones.some((zone) => zone.bursting) || before.combat.historyCursor !== null) return;
     const geometry = await kit.liveGeometry();
     let events: EffectNarration[] = [];
+    const distance = await kit.creatureDistance();
     const result = await context.store.execute({ id: context.newId(), type: "spell-zone.burst" }, (draft) => {
-      events = burstEndedZones(draft, kit.zoneDeps(draft, geometry));
+      // A spell glyph's stored spell takes effect on the creature that set it off; an explosive rune bursts.
+      events = [
+        ...releaseGlyphSpells(draft, {
+          ...kit.zoneDeps(draft, geometry),
+          distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
+        }),
+        ...burstEndedZones(draft, kit.zoneDeps(draft, geometry))
+      ];
     });
     await context.publishGameState(result.state);
     kit.publishNarrations(events);

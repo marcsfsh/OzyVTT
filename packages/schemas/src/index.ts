@@ -1540,6 +1540,35 @@ export const GrantedSpellActionSchema = z
     damageType: DamageTypeSchema.optional()
   })
   .strict();
+/**
+ * A spell cast and held for later, at its original caster's numbers (SRD 5.2.1 Contingency, Glyph of Warding's spell
+ * glyph, Ring of Spell Storing, a shield guardian's Spell Storing): the spell, the level it was cast at, the caster's
+ * spell save DC, attack bonus and spellcasting ability modifier, and who cast it. `via` says what holds it.
+ */
+export const StoredCastSchema = z
+  .object({
+    spellId: RiderSlugSchema,
+    level: z.number().int().min(0).max(9),
+    saveDc: z.number().int().min(1).max(40),
+    attackBonus: z.number().int().min(-10).max(30),
+    modifier: z.number().int().min(-5).max(15),
+    casterId: z.string().min(1).max(120),
+    casterName: z.string().min(1).max(120),
+    via: z.enum(["contingency", "glyph", "ring", "guardian"])
+  })
+  .strict();
+export type StoredCast = z.infer<typeof StoredCastSchema>;
+/** What waits for the next spell its bearer casts, or one cast at it, to hold it (`StoredCastSchema`): Contingency's
+ *  contingent spell, a spell glyph's spell, a Ring of Spell Storing held out to a spell. `maxLevel` is the highest level
+ *  it takes. */
+export const StoreAwaitsSchema = z
+  .object({
+    via: z.enum(["contingency", "glyph", "ring"]),
+    maxLevel: z.number().int().min(0).max(9),
+    /** The bearer's effect that holds the spell once it is stored (Contingency's own). */
+    holderEffectId: z.string().min(1).max(120).optional()
+  })
+  .strict();
 /** An action an effect's bearer may take to end it: a save or a check at a DC. */
 export const EffectEndActionSchema = z
   .object({
@@ -1917,6 +1946,11 @@ export const EffectInstanceSchema = z
     /** A spell's later action its bearer may take while this lasts, at the numbers it was cast with (Dragon's Breath:
      *  the touched creature exhales, with the damage type picked at the cast). */
     grantedSpellAction: GrantedSpellActionSchema.optional(),
+    /** A spell it holds for later at its caster's numbers (Contingency's contingent spell, a shield guardian's stored
+     *  spell), released as an action of its bearer's (`stored-casts.ts`). */
+    storedCast: StoredCastSchema.optional(),
+    /** It waits for a spell to hold (Contingency, a spell glyph, a Ring of Spell Storing held out). */
+    storeAwaits: StoreAwaitsSchema.optional(),
     /** An action the bearer may take to end this: a save (Irresistible Dance: "take an action to collect itself") or
      *  a check (Maze's DC 20 Intelligence (Investigation)). */
     endAction: EffectEndActionSchema.optional(),
@@ -2098,6 +2132,8 @@ export const InventoryItemSchema = z
       .optional(),
     weapon: ItemWeaponSchema.optional(),
     armor: ItemArmorSchema.optional(),
+    /** The spells cast into this copy, at their casters' numbers (a Ring of Spell Storing's up to 5 levels). */
+    storedCasts: z.array(StoredCastSchema).max(5).optional(),
     /** The type the GM picked for an item whose record lets the GM choose its resistance (Ring of Resistance). Only
      *  the GM sets it; the server checks it against the record's `damageTypeChoice`. */
     chosenDamageType: DamageTypeSchema.optional(),
@@ -2762,6 +2798,9 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   /** The spell's later action, by name, that the recipient may take while it lasts at the cast's numbers (Dragon's
    *  Breath: "exhale"); the caster's own sheet doesn't offer it. */
   grantsLaterAction: z.string().min(1).max(60).optional(),
+  /** The effect waits for a spell to hold (Contingency's contingent spell, a spell glyph's, a Ring of Spell Storing
+   *  held out), which `stored-casts.ts` stores. */
+  storeAwaits: StoreAwaitsSchema.optional(),
   /** An action the recipient may take to end it: a save at the caster's spell save DC (`dc: "spellcasting"`) or a
    *  printed DC (Irresistible Dance: a Wisdom save as an action; Maze: DC 20 Intelligence (Investigation)). */
   endAction: EffectEndActionSchema.extend({
@@ -5240,6 +5279,16 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
         .string()
         .regex(/^[a-z0-9-]+$/)
         .max(80)
+    })
+    .strict(),
+  /** A shield guardian's Spell Storing: its commander, wearing its amulet, casts a spell of `maxLevel` or lower on it
+   *  from within 5 feet, and the spell is stored in place of any other; the guardian casts it at the caster's numbers,
+   *  with no components, once. */
+  z
+    .object({
+      kind: z.literal("spell-storing"),
+      name: TraitNameSchema,
+      maxLevel: z.number().int().min(1).max(9)
     })
     .strict()
 ]);

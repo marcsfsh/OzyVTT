@@ -56,6 +56,7 @@ import { formsOffer } from "./transform/offer.js";
 import { applyMovementGrants } from "./resolution/movement-grants.js";
 import { applyTimeStop } from "./time-stop.js";
 import { liftOnAction } from "./resolution/later-steps.js";
+import { spendStoredCast, storeOnCast } from "./stored-casts.js";
 import { applySpellEndings } from "./resolution/dispel.js";
 import { applySummons } from "./resolution/summon.js";
 import { readScroll } from "./resolution/scroll.js";
@@ -206,6 +207,13 @@ export function resolveDefinitionAction(
     commitEconomy(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
+  // A spell cast into what waits to hold it (Contingency, a spell glyph, a Ring of Spell Storing, a shield guardian)
+  // spends its slot and components and does nothing else now.
+  if (storeOnCast(ctx)) {
+    commitEconomy(ctx);
+    releaseHideAndReady(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   // The action's move taken before the rest of it: its cost is spent and the move granted, and the rest waits.
   if (input.moveFirst === true) {
     commitEconomy(ctx);
@@ -351,6 +359,7 @@ export function resolveDefinitionAction(
 
   commitEconomy(ctx);
   recallSpellSlot(ctx);
+  spendStoredCast(ctx);
   afterDivineWish(ctx);
   rollForAnAnswer(ctx);
   overchannelBacklash(ctx);
