@@ -8,6 +8,7 @@ import { damagePartsOf } from "./damage.js";
 import { spellCastOf } from "./pending.js";
 import { forceMove, openRiderSave, rollPlain } from "./hit-rider-outcomes.js";
 import { effectNameOf } from "../effect-names.js";
+import { applyKillingHit } from "./kill.js";
 
 /** Whether this hit deals its target any damage after the target's defences: what Slow and Vex need. */
 export function dealsDamage(ctx: ResolveContext): boolean {
@@ -66,6 +67,11 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
     }
     if (rider.spendsEffectTag && !spendCoat(ctx, rider.spendsEffectTag)) return;
     if (rider.reminder) warnings.push(`${action.name}: ${rider.reminder}`);
+    // A hit that can kill outright (Nine Lives Stealer, a Vorpal Sword) is its own outcome.
+    if (rider.kills) {
+      applyKillingHit(ctx, rider, index);
+      return;
+    }
     if (rider.pull) forceMove(ctx, target, action.name, rider.pull, true);
     if (rider.save) {
       openOnHitSave(ctx, rider, index);

@@ -1897,6 +1897,19 @@ export const ForcedPushSchema = z
   .strict();
 export type ForcedPush = z.infer<typeof ForcedPushSchema>;
 
+/** One band of a failure that acts by the target's Hit Points: at `atOrBelow` Hit Points or fewer the target dies
+ *  (`dies`), drops to 0 Hit Points (`dropsToZero`), or has `conditions` for `duration`. */
+export const HitPointBandSchema = z
+  .object({
+    atOrBelow: z.number().int().min(0).max(1000),
+    dies: z.literal(true).optional(),
+    dropsToZero: z.literal(true).optional(),
+    conditions: z.array(SaveConditionSchema).min(1).max(4).optional(),
+    duration: SaveFailureDurationSchema.optional()
+  })
+  .strict();
+export type HitPointBand = z.infer<typeof HitPointBandSchema>;
+
 /**
  * What a saving throw does, as data: the damage a success takes ("half" for Fireball, "none" for Sacred
  * Flame) and the condition a failure imposes. Every save block (stat-block action, feature action, spell)
@@ -1998,7 +2011,26 @@ export const SaveOutcomeFields = {
   failurePush: ForcedPushSchema.optional(),
   /** A creature this size or larger has Advantage on the save (Ensnaring Strike: "A Large or larger creature has
    *  Advantage on this save"). */
-  advantageAtSize: SizeSchema.optional()
+  advantageAtSize: SizeSchema.optional(),
+  /** A failure that acts by the target's Hit Points as it fails (Divine Word, a solar's Slaying Bow, a sea hag's Death
+   *  Glare): the lowest band that holds them replaces the failure's damage and conditions; above every band the
+   *  failure is as printed. */
+  failureByHitPoints: z
+    .array(HitPointBandSchema)
+    .min(1)
+    .max(4)
+    .optional()
+    .describe(
+      "A failure that acts by the target's Hit Points: the lowest band at or above them replaces the failure's damage and conditions (it dies, drops to 0 Hit Points, or takes the band's conditions); above every band the failure is as printed"
+    ),
+  /** A creature of these types that fails is sent back to its home plane whatever its Hit Points, and can't return for
+   *  24 hours (Divine Word: a Celestial, Elemental, Fey or Fiend). */
+  failureBanishes: z
+    .array(RiderSlugSchema)
+    .min(1)
+    .max(6)
+    .optional()
+    .describe("A creature of these types that fails is sent back to its home plane for 24 hours")
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */
@@ -2218,7 +2250,30 @@ export const DamageDrainSchema = z
     /** How much of the damage taken the dealer regains as hit points. */
     heals: z.enum(["all", "half"]).optional(),
     /** Only a failed save drains (Harm, a wight's Life Drain). */
-    failedSaveOnly: z.literal(true).optional()
+    failedSaveOnly: z.literal(true).optional(),
+    /** A creature the damage reduces to 0 Hit Points dies outright ("The target dies if it is reduced to 0 Hit Points by
+     *  this attack"), named by `cause`; with `bodyGone` nothing is left of its body (Disintegrate's dust, a mummy's
+     *  Rotting Fist), so only a revival that makes a new body brings it back. */
+    killsAtZero: z
+      .object({
+        cause: z.string().min(1).max(80).optional(),
+        bodyGone: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    /** A creature of `creatureTypes` the damage kills rises as `monsterId` on the dealer's side at the start of the
+     *  dealer's next turn (Finger of Death: "A Humanoid killed by this spell rises at the start of your next turn as a
+     *  Zombie"). */
+    slainRise: z
+      .object({
+        monsterId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(31),
+        creatureTypes: z.array(RiderSlugSchema).min(1).max(4).optional()
+      })
+      .strict()
+      .optional()
   })
   .strict();
 export type DamageDrain = z.infer<typeof DamageDrainSchema>;
@@ -2291,7 +2346,25 @@ export const OnHitRiderSchema = z
      *  poison), ended by this hit. Without one it doesn't fire. */
     spendsEffectTag: EffectTagSchema.optional(),
     /** What the engine leaves to the GM, said with the hit: a curse that acts at rests, a creature killed outright. */
-    reminder: z.string().min(1).max(400).optional()
+    reminder: z.string().min(1).max(400).optional(),
+    /** The hit can kill outright (Nine Lives Stealer, Mace of Disruption, Mace of Smiting, Vorpal Sword): only against a
+     *  target with fewer than `hitPointsUnder` Hit Points as it is hit, or `afterHitAtOrBelow` or fewer once the hit's
+     *  damage lands, and never against `exceptCreatureTypes`. With the rider's `save` a failure kills and a success
+     *  leaves the rider's conditions; without one the target dies. `beheads`: a Vorpal Sword's cut, which a creature
+     *  immune to Slashing, without a head or too big takes as 30 more Slashing damage instead, as one does that spends
+     *  a Legendary Resistance. */
+    kills: z
+      .object({
+        hitPointsUnder: z.number().int().min(1).max(1000).optional(),
+        afterHitAtOrBelow: z.number().int().min(0).max(1000).optional(),
+        exceptCreatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
+        beheads: z.literal(true).optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "The hit can kill outright: below `hitPointsUnder` as it is hit, at or below `afterHitAtOrBelow` once its damage lands, never against `exceptCreatureTypes`. With the rider's save a failure kills and a success leaves its conditions; `beheads` is a Vorpal Sword's cut"
+      )
   })
   .strict()
   .describe(
@@ -2701,6 +2774,23 @@ export const ActionSchema = z
     drain: DamageDrainSchema.optional(),
     /** A hit also pushes the target straight away from the attacker (a fire giant's Hammer Throw). */
     onHitPush: ForcedPushSchema.optional(),
+    /** It raises its target, a corpse dead no longer than `withinMinutes`, as `monsterId` on its user's side, in the
+     *  corpse's space; its user controls at most `most` at a time (a wraith's Create Specter). Who it may target is
+     *  `targets`. */
+    raisesCorpse: z
+      .object({
+        monsterId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(31),
+        withinMinutes: z.number().int().min(1).max(14_400),
+        most: z.number().int().min(1).max(20).optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "It raises its target corpse, dead no longer than `withinMinutes`, as `monsterId` on its user's side, at most `most` under its control at a time"
+      ),
     /** What bursts after its attack, hit or miss, against the user's save DC (Ice Knife's explosion). */
     burst: BurstSchema.extend({ dc: z.number().int().min(1).max(40) })
       .strict()
@@ -3240,6 +3330,47 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
     .object({
       kind: z.literal("invisible"),
       name: TraitNameSchema
+    })
+    .strict(),
+  /** A vampire's Misty Escape: dropped to 0 Hit Points, it turns to mist and lives on at 0 unless it stands in
+   *  sunlight, where it can't shape-shift and is destroyed. */
+  z.object({ kind: z.literal("misty-escape"), name: TraitNameSchema }).strict(),
+  /** A creature that comes back after it dies (Diabolical Restoration, a lich's Spirit Jar): `bodyGoes` when its body
+   *  disappears as it dies. Where and when it returns are the GM's. */
+  z.object({ kind: z.literal("restoration"), name: TraitNameSchema, bodyGoes: z.literal(true).optional() }).strict(),
+  /** A hydra's Multiple Heads: it starts with `heads`, loses one each turn it takes `damagePerHead` or more, dies with
+   *  the last, and at the end of its turn grows two for each lost since its last turn, regaining `regrowHitPoints`,
+   *  unless it took one of `stoppedBy` since then. Its Multiattack makes one `attackId` attack per head, and each head
+   *  beyond one gives it an Opportunity Attack Reaction (`reactiveHeads`). */
+  z
+    .object({
+      kind: z.literal("multiple-heads"),
+      name: TraitNameSchema,
+      heads: z.number().int().min(1).max(20),
+      damagePerHead: z.number().int().min(1).max(200),
+      regrowHitPoints: z.number().int().min(0).max(200),
+      stoppedBy: z.array(DamageTypeSchema).max(4),
+      attackId: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(80)
+        .optional(),
+      reactiveHeads: z.literal(true).optional()
+    })
+    .strict(),
+  /** A troll's Loathsome Limbs: ending a turn Bloodied after taking `slashing` or more Slashing damage that turn, it
+   *  loses a limb (`uses` a day), which joins the fight as `limbMonsterId`; it has an Exhaustion level per lost limb
+   *  until it next regains Hit Points. */
+  z
+    .object({
+      kind: z.literal("severed-limbs"),
+      name: TraitNameSchema,
+      uses: z.number().int().min(1).max(10),
+      slashing: z.number().int().min(1).max(200),
+      limbMonsterId: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(80)
     })
     .strict()
 ]);

@@ -270,6 +270,9 @@ export const SpellEffectSchema = z
     /** The cast touches a corpse and keeps it from decay, so the days it lasts don't count against a revival's time
      *  limit (Gentle Repose). */
     reposes: z.literal(true).optional(),
+    /** A target with this many Hit Points or fewer dies, with no damage and no save; one with more takes the cast's
+     *  damage (Power Word Kill's 100). */
+    killsAtHitPoints: z.number().int().min(1).max(1000).optional(),
     /** A cantrip whose range doubles at character levels 5, 11 and 17 (Spare the Dying's 15 feet). */
     rangeDoubles: z.literal(true).optional(),
     /** No sound can be made in the area its cast places (Silence), so a creature standing there can't cast a spell

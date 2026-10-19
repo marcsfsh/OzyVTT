@@ -6797,7 +6797,13 @@
     "count": 1
    },
    "healing": null,
-   "seenTargets": true
+   "seenTargets": true,
+   "drain": {
+    "killsAtZero": {
+     "cause": "Disintegrate",
+     "bodyGone": true
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -7367,7 +7373,52 @@
   "save": {
    "ability": "cha",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "failureByHitPoints": [
+    {
+     "atOrBelow": 20,
+     "dies": true
+    },
+    {
+     "atOrBelow": 30,
+     "conditions": [
+      "blinded",
+      "deafened",
+      "stunned"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 60
+     }
+    },
+    {
+     "atOrBelow": 40,
+     "conditions": [
+      "blinded",
+      "deafened"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 100
+     }
+    },
+    {
+     "atOrBelow": 50,
+     "conditions": [
+      "deafened"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 10
+     }
+    }
+   ],
+   "failureBanishes": [
+    "celestial",
+    "elemental",
+    "fey",
+    "fiend"
+   ]
   },
   "target": {
    "type": "creature",
@@ -9448,7 +9499,15 @@
     "count": 1
    },
    "healing": null,
-   "seenTargets": true
+   "seenTargets": true,
+   "drain": {
+    "slainRise": {
+     "monsterId": "zombie",
+     "creatureTypes": [
+      "humanoid"
+     ]
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -18420,12 +18479,18 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "12d12",
+     "type": "psychic"
+    }
+   ],
    "targets": {
     "count": 1
    },
    "healing": null,
-   "seenTargets": true
+   "seenTargets": true,
+   "killsAtHitPoints": 100
   },
   "classes": [
    "bard",

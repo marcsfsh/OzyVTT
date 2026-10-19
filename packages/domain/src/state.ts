@@ -9,6 +9,7 @@ import {
   EffectInstanceSchema,
   EffectModifiersSchema,
   HealthDisplaySchema,
+  HitPointBandSchema,
   SaveFailureDurationSchema
 } from "@vtt/schemas";
 
@@ -317,6 +318,20 @@ export const PendingSaveSchema = z
     failurePush: ForcedPushSchema.optional(),
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
+    /** A failure that acts by the target's Hit Points as it fails (Divine Word, Slaying Bow). GM bookkeeping, never
+     *  projected: the result says what landed. */
+    failureByHitPoints: z.array(HitPointBandSchema).min(1).max(4).optional(),
+    /** A creature of these types that fails leaves for its home plane for 24 hours (Divine Word). GM bookkeeping. */
+    failureBanishes: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(6)
+      .optional(),
     /** What gives the save Disadvantage, as the roll names it (Heightened Spell). GM bookkeeping, never projected. */
     disadvantageFrom: z.string().min(1).max(60).optional(),
     /** Nothing the server applies rides the save's outcome (Levitate, Polymorph): the GM applies what it does. The save

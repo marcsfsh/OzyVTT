@@ -47,7 +47,7 @@ import { withoutSourceName } from "../hidden-source.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 import { readComponents, spendComponents, type ComponentSpend } from "./components.js";
 import { spellTargetViolations } from "./spell-targets.js";
-import { NO_CASTING_TAG, revivalViolations } from "./revival.js";
+import { NO_CASTING_TAG, raiseViolations, revivalViolations } from "./revival.js";
 import {
   castInstanceOf,
   commitShaping,
@@ -216,7 +216,8 @@ export function evaluateActionEconomy(
   checkTargeting(evaluation, distanceFeet);
   // Who a non-spell action may target: its count, range and creatures (`ActionSchema.targets`).
   evaluation.violations.push(
-    ...actionTargetViolations({ state, attacker, action, targetIds, definition, resolveDefinition, distanceFeet })
+    ...actionTargetViolations({ state, attacker, action, targetIds, definition, resolveDefinition, distanceFeet }),
+    ...raiseViolations({ state, attacker, action, targetIds })
   );
   if (spell) checkMarkMove(evaluation, spell);
   if (spell) checkSpellUp(evaluation, spell);

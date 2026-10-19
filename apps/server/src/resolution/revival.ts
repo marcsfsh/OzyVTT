@@ -9,7 +9,9 @@ import type { RuleId } from "../rules-families.js";
 import { endCursesOn } from "../spell-endings.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { spellOf } from "./concentration.js";
-import { tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
+import { tableLineOf, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
+import { raiseCreature, raisedBy } from "../risen.js";
+import { removeCombatant } from "../encounter.js";
 
 /**
  * Casts that bring the dead back (SRD Revivify, Raise Dead, Resurrection, True Resurrection, Reincarnate) and keep a
@@ -196,4 +198,80 @@ function taxCaster(ctx: ResolveContext, spellName: string): EffectNarration[] {
       actorId: caster.id
     }
   ];
+}
+
+/** The corpses an action that raises them can't take (a wraith's Create Specter: "a Humanoid corpse ... that has been
+ *  dead for no longer than 1 minute"), and one more than its user may control ("no more than seven specters under its
+ *  control at a time"). */
+export function raiseViolations(
+  input: Readonly<{ state: GameState; attacker: LiveActor; action: DefinitionAction; targetIds: readonly string[] }>
+): Violation[] {
+  const { state, attacker, action } = input;
+  const raises = action.raisesCorpse;
+  if (!raises) return [];
+  const violations: Violation[] = [];
+  const refuse = (message: string) => violations.push({ rule: "target.revival", message });
+  const unique = [...new Set(input.targetIds)];
+  for (const targetId of unique) {
+    const target = state.actors.find((candidate) => candidate.id === targetId);
+    if (!target) continue;
+    if (!isDead(target)) {
+      refuse(`${target.name} isn't dead, so ${action.name} has no corpse to raise.`);
+      continue;
+    }
+    if (target.death?.bodyGone) refuse(`Nothing is left of ${target.name}'s body for ${action.name} to raise.`);
+    const rounds = roundsDead(state, target);
+    if (rounds !== null && rounds > raises.withinMinutes * ROUNDS_PER_MINUTE)
+      refuse(
+        `${target.name} died ${timeWords(rounds)} ago, and ${action.name} raises a corpse dead no longer than ${limitWords(raises.withinMinutes)}.`
+      );
+  }
+  const already = raisedBy(state, attacker.id, raises.monsterId);
+  if (raises.most !== undefined && already + unique.length > raises.most)
+    refuse(
+      `${attacker.name} already controls ${already} raised by ${action.name}, and can control no more than ${raises.most}.`
+    );
+  return violations;
+}
+
+/** A wraith's Create Specter: "The target's spirit rises as a Specter in the space of its corpse ... The specter is
+ *  under the wraith's control." The corpse leaves the fight. */
+export function raiseOnAction(ctx: ResolveContext): void {
+  const raises = ctx.action.raisesCorpse;
+  if (!raises || ctx.input.commit === false || !ctx.deps.resolveDefinition) return;
+  for (const corpse of ctx.targets) {
+    if (!isDead(corpse)) continue;
+    let raised: ReturnType<typeof raiseCreature>;
+    try {
+      raised = raiseCreature(
+        ctx.state,
+        { monsterId: raises.monsterId, maker: ctx.attacker, at: corpse, after: ctx.attacker.id },
+        {
+          resolveDefinition: ctx.deps.resolveDefinition,
+          newId: () => crypto.randomUUID(),
+          ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {})
+        }
+      );
+    } catch {
+      // A full roster leaves it to the GM.
+      raised = null;
+    }
+    if (!raised) {
+      ctx.warnings.push(`${ctx.action.name}: add the ${raises.monsterId.replace(/-/g, " ")} to the fight by hand.`);
+      continue;
+    }
+    ctx.tableNarration.push(
+      tableLineOf(ctx, {
+        kind: "effect",
+        text: `${corpse.name}'s spirit rises as ${raised.name}, under ${ctx.attacker.name}'s control.`,
+        actorId: raised.actorId
+      })
+    );
+    if (
+      ctx.state.combat.initiative.some((entry) => entry.actorId === corpse.id) &&
+      ctx.state.combat.turnActorId !== corpse.id
+    )
+      for (const event of removeCombatant(ctx.state, corpse.id, ctx.deps.resolveDefinition))
+        ctx.tableNarration.push(tableLineOf(ctx, event));
+  }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GameStateSchema, type GameState } from "@vtt/domain";
+import { GameStateSchema, isDead, type GameState } from "@vtt/domain";
 import { InventoryItemSchema, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
 import { loadEquipment, loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
@@ -247,24 +247,84 @@ describe("what only a rolled 20 does", () => {
     expect(plain.foe.conditions).toEqual([]);
   });
 
-  it("tells the GM a Vorpal Sword's 20 takes a head", () => {
+  it("cuts off a creature's head with a Vorpal Sword's 20, and nothing on a 19", () => {
     const built = table(bound("vorpal", "Vorpal Sword", "longsword"));
-    expect(swing(built, "item-vorpal", [20, 4, 4]).warnings?.join(" ")).toMatch(/cuts off one of the creature's heads/);
+    const hit = swing(built, "item-vorpal", [20, 4, 4]);
+    expect(hit.tableNarration?.map((line) => line.text)).toContain("Vorpal Sword cuts off Foe's head.");
+    expect(isDead(built.foe)).toBe(true);
     const plain = table(bound("vorpal", "Vorpal Sword", "longsword"));
-    expect(swing(plain, "item-vorpal", [19, 4]).warnings?.join(" ") ?? "").not.toMatch(/heads/);
+    swing(plain, "item-vorpal", [19, 4]);
+    expect(isDead(plain.foe)).toBe(false);
   });
 
-  it("adds a Mace of Smiting's 14 against a Construct on a 20, and names what destroys it", () => {
+  it("deals a Vorpal Sword's 30 Slashing more to a creature with no head, or one that spends Legendary Resistance", () => {
+    const ooze = table(bound("vorpal", "Vorpal Sword", "longsword"), "black-pudding");
+    const hit = swing(ooze, "item-vorpal", [20, 4, 4, 4, 4, 4, 4, 4, 4]);
+    expect(hit.bonusDamage).toContainEqual({ amount: 30, type: "slashing", source: "Vorpal Sword (no head)" });
+    expect(isDead(ooze.foe)).toBe(false);
+    const dragon = table(bound("vorpal", "Vorpal Sword", "longsword"), "adult-red-dragon");
+    dragon.foe.size = "large";
+    dragon.foe.legendary = { resistancesPerDay: 3 };
+    const resisted = swing(dragon, "item-vorpal", [20, 4, 4, 4, 4, 4, 4]);
+    expect(resisted.bonusDamage?.map((part) => part.source)).toContain(
+      "Vorpal Sword (Legendary Resistance, 2 of 3 left)"
+    );
+    expect(dragon.foe.actionUses["legendary-resistance"]).toBe(1);
+    expect(isDead(dragon.foe)).toBe(false);
+  });
+
+  it("adds a Mace of Smiting's 14 against a Construct on a 20, and destroys one it leaves at 25 Hit Points or fewer", () => {
     const built = table(bound("smiting", "Mace of Smiting", "mace"), "iron-golem");
     const hit = swing(built, "item-smiting", [20, 3, 3]);
     const smiting = (hit.bonusDamage ?? []).filter((part) => part.source === "Mace of Smiting");
     // The +2 against a Construct, then the 7 and the 7 more a Construct takes on a 20.
     expect(smiting.map((part) => part.amount)).toEqual([2, 7, 7]);
-    expect(hit.warnings?.join(" ")).toMatch(/A Construct with 25 Hit Points or fewer after this damage is destroyed/);
+    expect(isDead(built.foe)).toBe(false);
+    const worn = table(bound("smiting", "Mace of Smiting", "mace"), "iron-golem");
+    worn.foe.hp = { ...worn.foe.hp, current: 40 };
+    const crushed = swing(worn, "item-smiting", [20, 3, 3]);
+    expect(isDead(worn.foe)).toBe(true);
+    expect(crushed.tableNarration?.map((line) => line.text)).toContain("Foe dies (Mace of Smiting).");
     const ogre = table(bound("smiting", "Mace of Smiting", "mace"));
+    ogre.foe.hp = { ...ogre.foe.hp, current: 20 };
     const plain = swing(ogre, "item-smiting", [20, 3, 3]);
     expect((plain.bonusDamage ?? []).filter((part) => part.source === "Mace of Smiting")).toHaveLength(1);
-    expect(plain.warnings?.join(" ") ?? "").not.toMatch(/destroyed/);
+    expect(isDead(ogre.foe)).toBe(false);
+  });
+
+  it("asks a creature under 100 Hit Points struck by Nine Lives Stealer's 20 for a save that slays it", () => {
+    const built = table(bound("stealer", "Nine Lives Stealer", "longsword"));
+    built.foe.hp = { ...built.foe.hp, current: 90 };
+    swing(built, "item-stealer", [20, 4, 4]);
+    expect(built.state.combat.pendingSaves).toMatchObject([{ ability: "con", dc: 15 }]);
+    answer(built, 5);
+    expect(isDead(built.foe)).toBe(true);
+    const sturdy = table(bound("stealer", "Nine Lives Stealer", "longsword"));
+    swing(sturdy, "item-stealer", [20, 4, 4]);
+    expect(sturdy.state.combat.pendingSaves).toEqual([]);
+    const undead = table(bound("stealer", "Nine Lives Stealer", "longsword"), "zombie");
+    undead.foe.hp = { ...undead.foe.hp, current: 50 };
+    const immune = swing(undead, "item-stealer", [20, 4, 4]);
+    expect(undead.state.combat.pendingSaves).toEqual([]);
+    expect(immune.tableNarration?.map((line) => line.text).join(" ")).toMatch(/untouched by Nine Lives Stealer/);
+  });
+
+  it("asks a Fiend or Undead a Mace of Disruption leaves at 25 Hit Points or fewer to save or be destroyed", () => {
+    const built = table(bound("disruption", "Mace of Disruption", "mace"), "zombie");
+    built.foe.hp = { ...built.foe.hp, current: 20 };
+    swing(built, "item-disruption", [15, 3, 3, 3]);
+    expect(built.state.combat.pendingSaves).toMatchObject([{ ability: "wis", dc: 15 }]);
+    answer(built, 5);
+    expect(isDead(built.foe)).toBe(true);
+    const brave = table(bound("disruption", "Mace of Disruption", "mace"), "zombie");
+    brave.foe.hp = { ...brave.foe.hp, current: 20 };
+    swing(brave, "item-disruption", [15, 3, 3, 3]);
+    answer(brave, 20);
+    expect(isDead(brave.foe)).toBe(false);
+    expect(brave.foe.conditions.map((condition) => condition.id)).toContain("frightened");
+    const hale = table(bound("disruption", "Mace of Disruption", "mace"), "zombie");
+    swing(hale, "item-disruption", [15, 3, 3, 3]);
+    expect(hale.state.combat.pendingSaves).toEqual([]);
   });
 });
 

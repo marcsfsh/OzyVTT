@@ -19,6 +19,7 @@ import { openDamageWindow, type DamageWindowDeps } from "../damage-window.js";
 import { answerKeyOf, answersFromOthers, askAnswer } from "../roll-answers.js";
 import { heightenedTarget, shieldedFromSave } from "./metamagic.js";
 import { effectNameOf } from "../effect-names.js";
+import { fatalFailureOf } from "../fatal-saves.js";
 import { sightRules } from "../vision/rules.js";
 import { sceneSight } from "../vision/sight.js";
 
@@ -488,6 +489,7 @@ export function parkActionSave(ctx: ResolveContext): void {
   const onSuccessEffect = successEffectFor(ctx, cast);
   // A spell's save whose outcome the engine applies nothing of (Command, Polymorph): the card and the GM's result say
   // the GM applies it, so it never reads as if the server had.
+  const fatal = fatalFailureOf(action.save);
   const gmApplies =
     action.spellId !== undefined &&
     parts.every((part) => part.amount <= 0) &&
@@ -495,7 +497,8 @@ export function parkActionSave(ctx: ResolveContext): void {
     conditionIds.length === 0 &&
     !onFailEffect &&
     !onSuccessEffect &&
-    !action.save.failurePush;
+    !action.save.failurePush &&
+    fatal === null;
   if (gmApplies)
     ctx.warnings.push(
       `The server applies nothing of ${action.name}'s save. Apply what a failure or a success does from the spell's text.`
@@ -546,7 +549,10 @@ export function parkActionSave(ctx: ResolveContext): void {
       halfOnSuccess: action.save.successDamage === "half",
       conditionIds,
       ...(onFailEffect ? { onFailEffect } : {}),
-      ...(onSuccessEffect ? { extra: { onSuccessEffect } } : gmApplies ? { extra: { gmApplies: true as const } } : {}),
+      extra: {
+        ...(onSuccessEffect ? { onSuccessEffect } : gmApplies ? { gmApplies: true as const } : {}),
+        ...fatal
+      },
       ...(action.drain ? { drain: action.drain } : {}),
       ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
       ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),

@@ -31,6 +31,20 @@ describe("the death and revival rows of the spell bundle", () => {
     expect(effectOf("reincarnate")?.revives).toMatchObject({ rollsSpecies: true });
   });
 
+  it("reads the spells that kill outright, and the one whose dead rise", () => {
+    expect(effectOf("disintegrate")?.drain).toEqual({ killsAtZero: { cause: "Disintegrate", bodyGone: true } });
+    expect(effectOf("power-word-kill")).toMatchObject({
+      killsAtHitPoints: 100,
+      damage: [{ formula: "12d12", type: "psychic" }]
+    });
+    expect(effectOf("finger-of-death")?.drain).toEqual({
+      slainRise: { monsterId: "zombie", creatureTypes: ["humanoid"] }
+    });
+    const divineWord = spells.find((record) => record.id === "divine-word")!.save;
+    expect(divineWord?.failureByHitPoints?.map((band) => band.atOrBelow)).toEqual([20, 30, 40, 50]);
+    expect(divineWord?.failureBanishes).toEqual(["celestial", "elemental", "fey", "fiend"]);
+  });
+
   it("gives Gentle Repose one corpse and the effect that keeps it", () => {
     expect(effectOf("gentle-repose")).toMatchObject({
       reposes: true,
