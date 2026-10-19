@@ -2144,6 +2144,16 @@
           ]
          }
         ]
+       },
+       {
+        "type": "damage-bonus",
+        "amount": 0,
+        "dice": "-1d6",
+        "when": [
+         {
+          "type": "on-damage-roll"
+         }
+        ]
        }
       ]
      },
@@ -2154,7 +2164,6 @@
      "repeatSave": true
     },
     "damage": [],
-    "reminder": "While Weakening Breath lasts, the target subtracts 1d6 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 60,
@@ -5627,6 +5636,16 @@
           ]
          }
         ]
+       },
+       {
+        "type": "damage-bonus",
+        "amount": 0,
+        "dice": "-1d10",
+        "when": [
+         {
+          "type": "on-damage-roll"
+         }
+        ]
        }
       ]
      },
@@ -5637,7 +5656,6 @@
      "repeatSave": true
     },
     "damage": [],
-    "reminder": "While Weakening Breath lasts, the target subtracts 1d10 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 90,
@@ -15721,10 +15739,19 @@
      "failureConditions": [
       "restrained"
      ],
-     "repeatSave": true
+     "repeatSave": true,
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "6d6",
+        "type": "thunder"
+       }
+      ],
+      "at": "bearer-turn-start"
+     }
     },
     "damage": [],
-    "reminder": "At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage.",
+    "reminder": "The whirlwind lasts while the djinni concentrates on it. The djinni can move it up to 20 feet at the start of each of its turns, and the Restrained creatures move with it; a creature it enters, or that enters it, makes the save once a turn.",
     "area": {
      "shape": "cylinder",
      "sizeFeet": 20,
@@ -19194,6 +19221,38 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "targets": {
+     "count": 1
+    },
+    "healing": {
+     "formula": "2d10 + 5",
+     "temporary": true
+    },
+    "grants": {
+     "name": "War Cry",
+     "tags": [
+      "war-cry"
+     ],
+     "target": "target",
+     "duration": {
+      "type": "until-source-next-turn"
+     },
+     "modifiers": [
+      {
+       "type": "roll-mode",
+       "roll": "attack",
+       "mode": "advantage",
+       "when": [
+        {
+         "type": "on-attack-roll"
+        }
+       ]
+      }
+     ],
+     "onEnd": [],
+     "voidWhileIncapacitated": false,
+     "concentration": false
     }
    },
    {
@@ -24700,6 +24759,16 @@
           ]
          }
         ]
+       },
+       {
+        "type": "damage-bonus",
+        "amount": 0,
+        "dice": "-1d4",
+        "when": [
+         {
+          "type": "on-damage-roll"
+         }
+        ]
        }
       ]
      },
@@ -24710,7 +24779,6 @@
      "repeatSave": true
     },
     "damage": [],
-    "reminder": "While Weakening Breath lasts, the target subtracts 1d4 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 15,
@@ -28770,10 +28838,31 @@
      "ability": "wis",
      "dc": 15,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureByHitPoints": [
+      {
+       "atOrBelow": 20,
+       "conditions": [
+        "unconscious"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "endsOnDamage": true,
+       "endedBy": {
+        "name": "Wake",
+        "by": "others"
+       }
+      }
+     ]
     },
-    "damage": [],
-    "reminder": "On a failed save: a target with 20 Hit Points or fewer has the Unconscious condition for 1 hour (until it takes damage or is woken); any other target takes 18 (4d8) Psychic damage.",
+    "damage": [
+     {
+      "formula": "4d8",
+      "type": "psychic"
+     }
+    ],
     "targets": {
      "count": 1,
      "rangeFeet": 60,
@@ -29007,6 +29096,13 @@
        }
       ],
       "at": "source-turn-start"
+     },
+     "failureEffect": {
+      "name": "Vortex",
+      "tags": [
+       "cant-speak"
+      ],
+      "modifiers": []
      }
     },
     "damage": [
@@ -29015,7 +29111,6 @@
       "type": "thunder"
      }
     ],
-    "reminder": "Until the grapple ends, the target can't cast spells with a Verbal component.",
     "targets": {
      "count": 1,
      "maxSize": "large",
@@ -46587,6 +46682,30 @@
     "legendary": {
      "cost": 1,
      "oncePerRound": true
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
+    "healing": {
+     "formula": "3d6",
+     "temporary": true
+    },
+    "grants": {
+     "name": "Shimmering Shield",
+     "tags": [
+      "shimmering-shield"
+     ],
+     "target": "target",
+     "duration": {
+      "type": "until-source-turn-end"
+     },
+     "armorClassBonus": 2,
+     "modifiers": [],
+     "onEnd": [],
+     "voidWhileIncapacitated": false,
+     "concentration": false
     }
    },
    {
@@ -50160,7 +50279,18 @@
       "sourceRegains": "3d6"
      }
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5,
+     "seen": true,
+     "notCreatureTypes": [
+      "construct",
+      "undead"
+     ],
+     "atZeroHitPoints": true
+    },
+    "endsUntilItActs": true
    },
    {
     "id": "shock",
@@ -52108,6 +52238,16 @@
           ]
          }
         ]
+       },
+       {
+        "type": "damage-bonus",
+        "amount": 0,
+        "dice": "-1d6",
+        "when": [
+         {
+          "type": "on-damage-roll"
+         }
+        ]
        }
       ]
      },
@@ -52118,7 +52258,6 @@
      "repeatSave": true
     },
     "damage": [],
-    "reminder": "While Weakening Breath lasts, the target subtracts 1d6 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 30,

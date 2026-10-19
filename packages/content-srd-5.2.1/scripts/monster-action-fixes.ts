@@ -132,6 +132,38 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
     ],
     reminder: null
   },
+  "invisible-stalker/vortex": {
+    why: "the grapple also keeps the target from casting spells with a Verbal component",
+    // "Until the grapple ends, the target can't cast spells with a Verbal component."
+    save: { failureEffect: { name: "Vortex", tags: ["cant-speak"], modifiers: [] } },
+    reminder: null
+  },
+  "incubus/nightmare-recharge-6": {
+    why: "the failure acts by the target's Hit Points, which the reader leaves to the GM",
+    // "If the target has 20 Hit Points or fewer, it has the Unconscious condition for 1 hour, until it takes damage, or
+    // until a creature within 5 feet of it takes an action to wake it. Otherwise, the target takes 18 (4d8) Psychic
+    // damage."
+    damage: [{ formula: "4d8", type: "psychic" }],
+    save: {
+      failureByHitPoints: [
+        {
+          atOrBelow: 20,
+          conditions: ["unconscious"],
+          duration: { type: "minutes", minutes: 60 },
+          endsOnDamage: true,
+          endedBy: { name: "Wake", by: "others" }
+        }
+      ]
+    },
+    reminder: null
+  },
+  "djinni/create-whirlwind": {
+    why: "the thunder on each of the Restrained target's turns is printed after the failure's own sentence",
+    // "At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage."
+    save: { ongoingDamage: { damage: [{ formula: "6d6", type: "thunder" }], at: "bearer-turn-start" } },
+    reminder:
+      "The whirlwind lasts while the djinni concentrates on it. The djinni can move it up to 20 feet at the start of each of its turns, and the Restrained creatures move with it; a creature it enters, or that enters it, makes the save once a turn."
+  },
   "rust-monster/antennae": {
     why: "the penalty is on one carried armor or weapon, which items don't track",
     reminder:

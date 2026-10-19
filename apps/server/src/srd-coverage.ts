@@ -169,18 +169,23 @@ type ResolvingFields = Pick<
   Partial<Pick<ActorAction, "move" | "teleport" | "leap">> &
   Readonly<{ attack?: unknown; save?: Readonly<Record<string, unknown>>; damageByLevel?: unknown }>;
 
-/** A save applies when its failure leaves something (conditions, an effect, Speed 0, a push, a hazard, damage on later
- *  turns, a band by Hit Points, a grapple, a lost Concentration or form) or its success does. The damage it rolls is the
- *  action's own. One whose failure leaves nothing only opens. */
+/** A save applies when its failure leaves something (conditions or a choice of them, an effect, Speed 0, a push, a
+ *  hazard, damage on later turns, a band by Hit Points, a grapple, Exhaustion, death, what a rest brings, a lost
+ *  Concentration or form) or its success does. The damage it rolls is the action's own. One whose failure leaves
+ *  nothing only opens. */
 const saveApplies = (save: Readonly<Record<string, unknown>> | undefined) =>
   save !== undefined &&
   ((Array.isArray(save.failureConditions) && save.failureConditions.length > 0) ||
     [
+      "conditionChoices",
       "failureEffect",
       "successEffect",
       "failurePush",
       "failureByHitPoints",
       "failureBanishes",
+      "failureExhaustion",
+      "failureKills",
+      "atRest",
       "ongoingDamage",
       "failureHazard",
       "escapeDc"

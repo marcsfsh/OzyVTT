@@ -950,6 +950,12 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].endsUntilItActs",
+    types: "*",
+    reason: "one SRD author (a will-o'-wisp's Consume Life, which ends its Vanish)",
+    status: "permanent: lone SRD record"
+  },
+  {
     at: "actions[].formOnly",
     types: "*",
     reason:

@@ -620,8 +620,52 @@ const COMMANDING_SAVES: Readonly<Record<string, { name: string; tags: string[]; 
 
 const ACTION_ENRICHMENTS: Record<
   string,
-  Partial<Pick<ActorAction, "targetRules" | "reaction" | "answer" | "sight" | "grants" | "summons">>
+  Partial<
+    Pick<
+      ActorAction,
+      "targetRules" | "targets" | "reaction" | "answer" | "sight" | "grants" | "healing" | "summons" | "endsUntilItActs"
+    >
+  >
 > = {
+  // "The giant or one creature of its choice that can see or hear it gains 16 (2d10 + 5) Temporary Hit Points and has
+  // Advantage on attack rolls until the start of the giant's next turn."
+  "frost-giant/war-cry-recharge-5-6": {
+    targets: { count: 1 },
+    healing: { formula: "2d10 + 5", temporary: true },
+    grants: {
+      name: "War Cry",
+      tags: ["war-cry"],
+      target: "target",
+      duration: { type: "until-source-next-turn" },
+      modifiers: [{ type: "roll-mode", roll: "attack", mode: "advantage", when: [{ type: "on-attack-roll" }] }],
+      onEnd: [],
+      voidWhileIncapacitated: false,
+      concentration: false
+    }
+  },
+  // "The unicorn targets itself or one creature it can see within 60 feet of itself. The target gains 10 (3d6) Temporary
+  // Hit Points, and its AC increases by 2 until the end of the unicorn's next turn."
+  "unicorn/shimmering-shield": {
+    targets: { count: 1, rangeFeet: 60, seen: true },
+    healing: { formula: "3d6", temporary: true },
+    grants: {
+      name: "Shimmering Shield",
+      tags: ["shimmering-shield"],
+      target: "target",
+      duration: { type: "until-source-turn-end" },
+      armorClassBonus: 2,
+      modifiers: [],
+      onEnd: [],
+      voidWhileIncapacitated: false,
+      concentration: false
+    }
+  },
+  // "One living creature the wisp can see within 5 feet that has 0 Hit Points", and Vanish "ends early immediately
+  // after the wisp makes an attack roll or uses Consume Life".
+  "will-o-wisp/consume-life": {
+    targets: { count: 1, rangeFeet: 5, seen: true, notCreatureTypes: ["construct", "undead"], atZeroHitPoints: true },
+    endsUntilItActs: true
+  },
   "treant/animate-trees": {
     summons: {
       creatures: [
@@ -1143,7 +1187,7 @@ const monsters: ActorDefinition[] = creatures
       const fatal = monsterDeathFor(slug, idSafe(slugOf(action.pk).replace(`${slug}_`, "")));
       const reminder = fatal.damage
         ? undefined
-        : (fix?.reminder ?? loss?.reminder ?? restriction?.reminder ?? (stale ? null : later) ?? undefined);
+        : (fix?.reminder ?? loss?.reminder ?? (stale ? null : later) ?? undefined);
       const fromRows = row
         ? [
             ...(row.damage_die_count && row.damage_die_type

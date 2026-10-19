@@ -104,6 +104,11 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
         rule: "target.not-allowed",
         message: `${action.name} targets a ${rules.conditions.map(conditionLabel).join(" or ")} creature, and ${name} isn't.`
       });
+    if (rules.atZeroHitPoints && target.hp.current > 0)
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} targets a creature at 0 Hit Points, and ${name} isn't.`
+      });
     if (rules.markedBy && !markedBy(target, attacker, rules.markedBy))
       violations.push({
         rule: "target.not-allowed",

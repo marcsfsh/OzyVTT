@@ -323,8 +323,15 @@ describe("what a stat block's failure does beyond its first conditions", () => {
       failureDuration: { type: "rounds", rounds: 10 },
       failureEffect: { name: "Weakening Breath" }
     });
-    expect(weakening.save?.failureEffect?.modifiers).toHaveLength(3);
-    expect(weakening.reminder).toMatch(/subtracts 1d10 from its damage rolls/);
+    // "Subtracts 5 (1d10) from its damage rolls."
+    expect(weakening.save?.failureEffect?.modifiers).toHaveLength(4);
+    expect(weakening.save?.failureEffect?.modifiers).toContainEqual({
+      type: "damage-bonus",
+      amount: 0,
+      dice: "-1d10",
+      when: [{ type: "on-damage-roll" }]
+    });
+    expect(weakening).not.toHaveProperty("reminder");
   });
 
   it("keeps the words a source tag stood beside", () => {

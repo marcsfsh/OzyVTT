@@ -2744,7 +2744,11 @@ export const HitPointBandSchema = z
     dies: z.literal(true).optional(),
     dropsToZero: z.literal(true).optional(),
     conditions: z.array(SaveConditionSchema).min(1).max(4).optional(),
-    duration: SaveFailureDurationSchema.optional()
+    duration: SaveFailureDurationSchema.optional(),
+    /** The band's conditions end when the target takes damage, and the action named ends them too (an incubus's
+     *  Nightmare: "until it takes damage, or until a creature within 5 feet of it takes an action to wake it"). */
+    endsOnDamage: z.literal(true).optional(),
+    endedBy: EndedBySchema.optional()
   })
   .strict();
 export type HitPointBand = z.infer<typeof HitPointBandSchema>;
@@ -3529,11 +3533,13 @@ export const ActionTargetsSchema = z
     /** "Each enemy", "an ally", or "another creature" (not the user itself). */
     who: z.enum(["enemies", "allies", "others"]).optional(),
     /** Only a creature this creature's own effect with this tag marks (Quivering Palm's vibrations). */
-    markedBy: EffectTagSchema.optional()
+    markedBy: EffectTagSchema.optional(),
+    /** Only a creature at 0 Hit Points (a will-o'-wisp's Consume Life). */
+    atZeroHitPoints: z.literal(true).optional()
   })
   .strict()
   .describe(
-    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions, in the user's space, enemies, allies or others, or a creature the user marked."
+    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions, in the user's space, enemies, allies or others, a creature the user marked, or one at 0 Hit Points."
   );
 export type ActionTargets = z.infer<typeof ActionTargetsSchema>;
 
@@ -4272,6 +4278,12 @@ export const ActionSchema = z
       .describe(
         "The id of the printed entry it belongs to (a spell of a Spellcasting list): the stat block prints it inside that entry, and the turn list offers it on its own"
       ),
+    /** Using it ends what lasts until its user acts, as an attack roll does (a will-o'-wisp's Vanish "ends early
+     *  immediately after the wisp makes an attack roll or uses Consume Life"). */
+    endsUntilItActs: z
+      .literal(true)
+      .optional()
+      .describe("Using it ends what lasts until its user acts, as an attack roll does (Consume Life ends Vanish)"),
     /** Damage a hit adds or swaps in under a printed condition ("plus 2 (1d4) Slashing damage if the attack roll had
      *  Advantage", "or 2 (1d4) Piercing damage if the swarm is Bloodied"). The engine applies what it can see; a
      *  charge, which it can't, is offered on the hit for the attacker to confirm. */

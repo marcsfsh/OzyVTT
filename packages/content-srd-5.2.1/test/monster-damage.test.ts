@@ -121,11 +121,11 @@ describe("SRD monster save damage is what the failure deals at once", () => {
       expect(action(monster, "swallow").save?.ongoingDamage?.at).toBe("source-turn-start");
     }
     expect(action("kraken", "swallow").damage).toEqual([{ formula: "3d8 + 10", type: "piercing" }]);
-    // A failure that depends on the target's hit points deals and imposes nothing on its own.
+    // A failure that depends on the target's hit points: Unconscious at 20 or fewer, else the Psychic damage.
     const nightmare = action("incubus", "nightmare-recharge-6");
-    expect(nightmare.damage).toEqual([]);
-    expect(nightmare.save?.failureConditions).toEqual([]);
-    expect(nightmare.reminder).toMatch(/20 Hit Points or fewer/);
+    expect(nightmare.damage).toEqual([{ formula: "4d8", type: "psychic" }]);
+    expect(nightmare.save?.failureByHitPoints).toMatchObject([{ atOrBelow: 20, conditions: ["unconscious"] }]);
+    expect(nightmare).not.toHaveProperty("reminder");
     // One that kills or drops the target by its hit points does it, and deals its damage to a target above them.
     expect(action("solar", "slaying-bow")).toMatchObject({
       damage: [

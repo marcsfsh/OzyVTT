@@ -143,6 +143,8 @@ const LABELS: Readonly<Record<string, string>> = {
   partOf: "entry it is printed in",
   advantageWhen: "when the attack has Advantage",
   hazard: "hazard it starts",
+  atZeroHitPoints: "creatures at 0 Hit Points only",
+  endsUntilItActs: "ends what lasts until its user acts",
   multiattack: "Multiattack",
   count: "number of attacks",
   bonus: "bonus",

@@ -297,12 +297,15 @@ describe("a failure with no condition", () => {
 
   it("weakens a creature that fails a gold dragon's Weakening Breath, and spares one already weakened", () => {
     const built = table("adult-gold-dragon");
-    const first = use(built, "weakening-breath");
-    expect(first.warnings?.join(" ")).toMatch(/subtracts 1d6 from its damage rolls/);
+    use(built, "weakening-breath");
     answer(built, 5);
     expect(hero(built).effects).toMatchObject([
       { name: "Weakening Breath", duration: { type: "rounds", remaining: 10 }, repeatSave: { ability: "str", dc: 21 } }
     ]);
+    // "Subtracts 3 (1d6) from its damage rolls."
+    expect(hero(built).effects[0]!.modifiers).toContainEqual(
+      expect.objectContaining({ type: "damage-bonus", dice: "-1d6" })
+    );
     const derivation = deriveEquipment(hero(built), heroDefinition, undefined);
     expect(
       derivation.carriers.some((carrier) => carrier.modifiers.some((modifier) => modifier.type === "roll-mode"))

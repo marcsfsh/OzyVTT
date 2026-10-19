@@ -950,7 +950,12 @@ export function spendUntilAttacked(ctx: ResolveContext): void {
 export function spendUntilItActs(ctx: ResolveContext): void {
   const { state, action, attacker, attack, input, damage, effectsEnded } = ctx;
   if (input.commit === false) return;
-  const acted = attack !== null || action.spellId !== undefined || action.spellSlot !== undefined || damage.length > 0;
+  const acted =
+    attack !== null ||
+    action.spellId !== undefined ||
+    action.spellSlot !== undefined ||
+    damage.length > 0 ||
+    action.endsUntilItActs === true;
   if (!acted) return;
   dropInvisibilityOnActing(ctx);
   for (const effect of attacker.effects.filter(
