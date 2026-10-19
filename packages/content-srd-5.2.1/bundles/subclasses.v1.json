@@ -698,7 +698,39 @@
       "name": "Cutting Words",
       "activation": "reaction",
       "description": "When a creature you can see within 60 feet makes a damage roll or succeeds on an ability check or attack roll, take a Reaction to expend one use of your Bardic Inspiration; roll your Bardic Inspiration die and subtract the number rolled from the creature's roll, reducing the damage or potentially turning the success into a failure.",
-      "damage": []
+      "damage": [],
+      "answer": {
+       "rolls": [
+        "attack",
+        "check",
+        "damage"
+       ],
+       "whose": "other",
+       "rangeFeet": 60,
+       "when": "success",
+       "effect": {
+        "kind": "subtract",
+        "amount": "1d6"
+       }
+      },
+      "answerAmountByLevel": [
+       {
+        "level": 1,
+        "amount": "1d6"
+       },
+       {
+        "level": 5,
+        "amount": "1d8"
+       },
+       {
+        "level": 10,
+        "amount": "1d10"
+       },
+       {
+        "level": 15,
+        "amount": "1d12"
+       }
+      ]
      }
     ],
     "uses": {
@@ -733,7 +765,37 @@
       "name": "Peerless Skill",
       "activation": "other",
       "description": "When you make an ability check or attack roll and fail, expend one use of Bardic Inspiration; roll the Bardic Inspiration die and add the number rolled to the d20, potentially turning a failure into a success. On a failure, the Bardic Inspiration isn't expended.",
-      "damage": []
+      "damage": [],
+      "answer": {
+       "rolls": [
+        "check",
+        "attack"
+       ],
+       "when": "failure",
+       "effect": {
+        "kind": "add",
+        "amount": "1d6",
+        "keepUseOnFailure": true
+       }
+      },
+      "answerAmountByLevel": [
+       {
+        "level": 1,
+        "amount": "1d6"
+       },
+       {
+        "level": 5,
+        "amount": "1d8"
+       },
+       {
+        "level": 10,
+        "amount": "1d10"
+       },
+       {
+        "level": 15,
+        "amount": "1d12"
+       }
+      ]
      }
     ],
     "uses": {
@@ -1189,7 +1251,28 @@
       "minimum": 1
      },
      "per": "long-rest"
-    }
+    },
+    "actions": [
+     {
+      "id": "dark-ones-own-luck",
+      "name": "Dark One's Own Luck",
+      "activation": "other",
+      "description": "When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before any of its effects occur, no more than once per roll.",
+      "damage": [],
+      "answer": {
+       "rolls": [
+        "check",
+        "save",
+        "death-save"
+       ],
+       "when": "any",
+       "effect": {
+        "kind": "add",
+        "amount": "1d10"
+       }
+      }
+     }
+    ]
    },
    {
     "id": "fiendish-resilience",
@@ -1523,7 +1606,20 @@
     "id": "superior-hunters-defense",
     "name": "Superior Hunter's Defense",
     "level": 15,
-    "description": "When you take damage, you can take a Reaction to give yourself Resistance to that damage and any other damage of the same type until the end of the current turn."
+    "description": "When you take damage, you can take a Reaction to give yourself Resistance to that damage and any other damage of the same type until the end of the current turn.",
+    "actions": [
+     {
+      "id": "superior-hunters-defense",
+      "name": "Superior Hunter's Defense",
+      "activation": "reaction",
+      "description": "When you take damage, take a Reaction to give yourself Resistance to that damage and any other damage of the same type until the end of the current turn.",
+      "damage": [],
+      "reaction": {
+       "trigger": "takes-damage",
+       "response": "resist-type"
+      }
+     }
+    ]
    }
   ]
  },
