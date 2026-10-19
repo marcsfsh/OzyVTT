@@ -1829,7 +1829,35 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `bead-of-force` - destroyed on use.
+  // Thrown up to 60 feet, it bursts in a 10-foot-radius Sphere: a DC 15 Dexterity save or 5d4 Force damage, and a
+  // creature that fails is shut in a sphere of force for 1 minute that no attack or effect passes (`enclosures.ts`).
+  // Pushing out the creatures that saved, and rolling the sphere along, are the GM's.
+  "bead-of-force": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "throw",
+        name: "Throw Bead of Force",
+        activation: "action",
+        description:
+          "Throw the bead up to 60 feet. It explodes in a 10-foot-radius Sphere: each creature in it makes a DC 15 Dexterity saving throw or takes 5d4 Force damage. A sphere of transparent force then encloses the area for 1 minute, trapping each creature that failed and is completely inside. No attack or other effect can pass through its wall.",
+        save: {
+          ability: "dex",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: [],
+          failureEffect: {
+            name: "Bead of Force",
+            tags: ["enclosed"],
+            duration: { type: "rounds", rounds: 10 },
+            modifiers: []
+          }
+        },
+        damage: [{ formula: "5d4", type: "force" }],
+        area: { shape: "sphere", sizeFeet: 10, widthFeet: null }
+      }
+    ]
+  },
   // `bead-of-nourishment` - no hunger model.
 
   /**

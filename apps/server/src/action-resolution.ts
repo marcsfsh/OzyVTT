@@ -39,6 +39,8 @@ import type {
   ResolveDependencies,
   ResolveInput
 } from "./resolution/context.js";
+import { tableLineOf } from "./resolution/context.js";
+import { breakEnclosure } from "./enclosures.js";
 import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
@@ -166,6 +168,15 @@ export function resolveDefinitionAction(
     releaseHideAndReady(ctx);
     spendUntilItActs(ctx);
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
+  }
+  // Disintegrate aimed at a creature in a sphere of force destroys the sphere and harms nothing inside.
+  const shattered = input.commit === false ? null : breakEnclosure(state, ctx.action, ctx.targets, deps.catalog);
+  if (shattered) {
+    for (const event of shattered) ctx.tableNarration.push(tableLineOf(ctx, event));
+    commitEconomy(ctx);
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null };
   }
   rollAttack(ctx);
   checkKnockOut(ctx);

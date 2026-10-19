@@ -36,6 +36,7 @@ import { areaAtLevel } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
 import { spellWardedTargets } from "../zone-barriers.js";
 import { deflectingWall, zoneCover } from "../zone-walls.js";
+import { enclosedFrom } from "../enclosures.js";
 import { areaMoveOf, moveArea, planAreaMove, type AreaMove } from "../zone-moves.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
@@ -284,6 +285,17 @@ export const actionCommands = [
           wardNotes = warded.map(
             (entry) => `${entry.ward} keeps ${spellCast.name} from affecting ${kit.actorName(entry.actorId)}.`
           );
+        }
+        // A sphere of force lets no area in or out (Resilient Sphere); a single target across one is refused later.
+        if (template && resolvedTargetIds.length > 0) {
+          const enclosed = enclosedFrom(draft, actorId, resolvedTargetIds);
+          resolvedTargetIds = resolvedTargetIds.filter((id) => !enclosed.some((entry) => entry.actorId === id));
+          wardNotes = [
+            ...wardNotes,
+            ...enclosed.map(
+              (entry) => `${entry.sphere} keeps ${action.name} from affecting ${kit.actorName(entry.actorId)}.`
+            )
+          ];
         }
         // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, measured edge to edge.
         const distanceFeet = (actorIdA: string, actorIdB: string): number | null =>

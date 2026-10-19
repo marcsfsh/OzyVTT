@@ -1511,6 +1511,9 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
       { type: "roll-mode", roll: "check", mode: "disadvantage" }
     ]
   },
+  // "A shimmering sphere encloses a Large or smaller creature or object": nothing passes its wall, in or out, and
+  // Disintegrate destroys it (`enclosures.ts`). Rolling the sphere along is the GM's.
+  "resilient-sphere": { name: "Resilient Sphere", tags: ["enclosed"], modifiers: [] },
   // "Become cursed for the duration": the curse the caster picks is the GM's to apply, and Remove Curse ends it.
   "bestow-curse": { name: "Bestow Curse", tags: ["curse"], modifiers: [] },
   // "A Remove Curse, Greater Restoration, or Wish spell ends this spell."

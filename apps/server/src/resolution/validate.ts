@@ -34,6 +34,7 @@ import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
 import { scrollOfAction } from "../scrolls.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { reachBarredBy } from "../zone-barriers.js";
+import { enclosureBlocks } from "../enclosures.js";
 import { builtinHandlerFor } from "./builtins.js";
 import {
   resolveHiddenCheck,
@@ -325,6 +326,9 @@ export function openResolve(
   // A melee attack can't reach through a barrier that holds its attacker back (Antilife Shell).
   const shell = reachBarredBy(state, attacker, action, targets, deps);
   if (shell) sightBlocks.push(["range.out-of-reach", shell]);
+  // Nothing passes a sphere of force, in or out (Resilient Sphere, Bead of Force).
+  const sphere = enclosureBlocks(attacker, action, targets, deps.catalog);
+  if (sphere) sightBlocks.push(["cover.total", sphere]);
   for (const [rule, message] of sightBlocks) {
     const mode = effectiveModeFor(state.combat, rule);
     if (mode === "freeform") continue;
