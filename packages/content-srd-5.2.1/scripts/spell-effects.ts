@@ -9,6 +9,7 @@ import { DamageTypeSchema, type ActionArea, type DamageType, type OnHitRider } f
 import { areaOfProse } from "../src/action-prose.js";
 import type { SpellEffect, SpellLaterAction, SpellReference } from "../src/schemas.js";
 import { healingOfText, spellAttackRangeOf, type SpellRange } from "../src/spell-effect.js";
+import { spellSummonFieldsFor, SPELL_SUMMON_REVIEWED_IDS } from "./spell-summons.js";
 
 /** Spells whose printed damage is not dealt by the cast to its targets, and why. They cast with no damage and the
  *  GM applies the rest from the text, or a later action does (`LATER_ACTIONS`). */
@@ -1390,7 +1391,9 @@ export function spellEffectFor(
     ...(RANGE_DOUBLES.has(id) ? { rangeDoubles: true as const } : {}),
     ...(SILENCES_AREA.has(id) ? { silencesArea: true as const } : {}),
     ...(PICKS_IN_AREA.has(id) ? { picksInArea: true as const } : {}),
-    ...(CHAIN_FEET[id] !== undefined ? { chainFeet: CHAIN_FEET[id] } : {})
+    ...(CHAIN_FEET[id] !== undefined ? { chainFeet: CHAIN_FEET[id] } : {}),
+    // The creatures it brings and the commands it gives (`spell-summons.ts`).
+    ...spellSummonFieldsFor(id)
   };
 }
 
@@ -1482,5 +1485,6 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...RANGE_DOUBLES,
   ...SILENCES_AREA,
   ...PICKS_IN_AREA,
-  ...Object.keys(CHAIN_FEET)
+  ...Object.keys(CHAIN_FEET),
+  ...SPELL_SUMMON_REVIEWED_IDS
 ];

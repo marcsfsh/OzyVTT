@@ -33,6 +33,7 @@ import { zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.j
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
 import { lapseLongCasts } from "./resolution/long-casting.js";
+import { summonTurnEnd, summonTurnStart, takesNoTurns } from "./summon-turns.js";
 import { checkSightFor } from "./vision/rules.js";
 
 type StartEncounterInput = Readonly<{
@@ -186,13 +187,35 @@ function rollInitiative(
 
 function ordered(state: GameState, entries: readonly InitiativeEntry[]) {
   const names = new Map(state.actors.map((actor) => [actor.id, actor.name]));
-  return [...entries].sort(
-    (left, right) =>
-      right.score - left.score ||
-      right.tieBreaker - left.tieBreaker ||
-      (names.get(left.actorId) ?? "").localeCompare(names.get(right.actorId) ?? "") ||
-      left.actorId.localeCompare(right.actorId)
+  return followersAfterLeaders(
+    [...entries].sort(
+      (left, right) =>
+        right.score - left.score ||
+        right.tieBreaker - left.tieBreaker ||
+        (names.get(left.actorId) ?? "").localeCompare(names.get(right.actorId) ?? "") ||
+        left.actorId.localeCompare(right.actorId)
+    )
   );
+}
+
+/** An order with each entry that `follows` another moved to right after it and the others that follow it, keeping
+ *  every other entry where it was (a summoned creature "takes its turn immediately after yours"). One whose leader is
+ *  gone keeps its place. */
+function followersAfterLeaders(entries: readonly InitiativeEntry[]): InitiativeEntry[] {
+  const present = new Set(entries.map((entry) => entry.actorId));
+  const follows = (entry: InitiativeEntry) => entry.follows !== undefined && present.has(entry.follows);
+  if (!entries.some(follows)) return [...entries];
+  const placed = new Set<string>();
+  const result: InitiativeEntry[] = [];
+  const place = (entry: InitiativeEntry) => {
+    if (placed.has(entry.actorId)) return;
+    placed.add(entry.actorId);
+    result.push(entry);
+    for (const follower of entries) if (follower.follows === entry.actorId && follows(follower)) place(follower);
+  };
+  for (const entry of entries) if (!follows(entry)) place(entry);
+  for (const entry of entries) place(entry);
+  return result;
 }
 
 /**
@@ -206,7 +229,8 @@ function reorderMidRound(state: GameState, entries: readonly InitiativeEntry[]) 
   const current = initiative.findIndex((entry) => entry.actorId === turnActorId);
   if (!active || gathering || current < 0) return ordered(state, entries);
   const acted = new Set(initiative.slice(0, current).map((entry) => entry.actorId));
-  return [
+  // One that joins right after a creature whose turn has passed waits for that creature's next turn.
+  return followersAfterLeaders([
     ...ordered(
       state,
       entries.filter((entry) => acted.has(entry.actorId))
@@ -216,7 +240,33 @@ function reorderMidRound(state: GameState, entries: readonly InitiativeEntry[]) 
       state,
       entries.filter((entry) => !acted.has(entry.actorId) && entry.actorId !== turnActorId)
     )
-  ];
+  ]);
+}
+
+/** A creature joins the order mid-fight or while it is staged (a summoned creature), in its place by count and after
+ *  the creature it `follows`, as the order would put it now. */
+export function joinInitiative(state: GameState, entry: InitiativeEntry) {
+  if (state.combat.initiative.some((existing) => existing.actorId === entry.actorId))
+    throw new CommandRejectedError("That combatant is already in the encounter.");
+  if (state.combat.initiative.length >= 200)
+    throw new CommandRejectedError("This encounter already has 200 combatants.");
+  state.combat = {
+    ...state.combat,
+    initiative: reorderMidRound(state, [...state.combat.initiative, entry])
+  };
+}
+
+/** A creature's initiative roll by the rules (`initiativeRollFor`), for one that joins rolling its own. */
+export function rollJoiningInitiative(
+  state: GameState,
+  actorId: string,
+  rollD20: () => number,
+  deps: InitiativeRollDeps = {},
+  onRoll?: InitiativeRollSink
+): number {
+  const roll = rollInitiative(state, actorId, false, rollD20, deps);
+  onRoll?.({ actorId, ...roll });
+  return roll.total;
 }
 
 export function startEncounter(
@@ -673,9 +723,10 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   if (currentIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
   // A defeated creature takes no more turns: the order passes over it to the next one still in the fight.
   const length = state.combat.initiative.length;
+  // So does a summoned thing with no turns of its own (Spiritual Weapon's force).
+  const passedOver = (actorId: string) => isDefeated(state, actorId) || takesNoTurns(state, actorId);
   let steps = 1;
-  while (steps < length && isDefeated(state, state.combat.initiative[(currentIndex + steps) % length].actorId))
-    steps += 1;
+  while (steps < length && passedOver(state.combat.initiative[(currentIndex + steps) % length].actorId)) steps += 1;
   if (steps === length) steps = 1;
   // Time Stop: the caster takes its turns in a row while no time passes for anyone else.
   const stopped = timeStopGoesOn(state);
@@ -697,6 +748,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   );
   // A spell cast over several turns lapses on a turn that went without its action.
   lapseLongCasts(state, outgoingId, ending);
+  // A summoned creature that did nothing its summoner asked takes the Dodge action, and its orders are used up.
+  summonTurnEnd(state, outgoingId, ending);
   // A spell area the creature ends its turn in acts on it (Moonbeam, Spirit Guardians).
   const zones = zoneDepsOf(deps);
   if (zones) ending.push(...zonesAtTurnEnd(state, outgoingId, zones));
@@ -706,7 +759,7 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   const nextActorId = stopped
     ? outgoingId!
     : wraps
-      ? (order.find((entry) => !isDefeated(state, entry.actorId)) ?? order[0]).actorId
+      ? (order.find((entry) => !passedOver(entry.actorId)) ?? order[0]).actorId
       : order[currentIndex + steps].actorId;
   state.combat = {
     ...state.combat,
@@ -727,6 +780,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
   events?.push(...expiry);
+  // A summoned creature its summoner didn't command with a Bonus Action takes the Dodge action (Animate Dead).
+  summonTurnStart(state, nextActorId, events);
   if (!deps) return;
   // Then what lands at the start of its turn: a swallow's acid, Searing Smite's fire.
   const starting: EffectNarration[] = [];

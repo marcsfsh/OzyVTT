@@ -288,6 +288,7 @@ export function spellCastMechanics(
       | "endsOneCondition"
       | "dispel"
       | "endsCurses"
+      | "summons"
     >
   > {
   // No cast model: the save still applies, and the rest is the GM's.
@@ -358,7 +359,16 @@ export function spellCastMechanics(
       : {}),
     // The spells it ends on its target (Dispel Magic), and the curses (Remove Curse).
     ...(effect.dispel ? { dispel: { ...effect.dispel } } : {}),
-    ...(effect.endsCurses ? { endsCurses: true as const } : {})
+    ...(effect.endsCurses ? { endsCurses: true as const } : {}),
+    // The creatures it brings, with the caster's numbers a spell-printed stat block reads (Summon Dragon's Rend).
+    ...(effect.summons
+      ? {
+          summons: {
+            ...structuredClone(effect.summons),
+            numbers: { attackBonus: numbers.attackBonus, saveDc: numbers.saveDc, modifier: numbers.modifier }
+          }
+        }
+      : {})
   };
 }
 

@@ -41,6 +41,7 @@ import { castLine, castSpellOf } from "../cast-narration.js";
 import { castingMinutesOf } from "../resolution/long-casting.js";
 import { passTime } from "../rests.js";
 import { standsInSilence } from "../silence.js";
+import { bringSummons } from "../summons.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -277,6 +278,7 @@ export const actionCommands = [
             ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),
             ...(request.knockOut === true ? { knockOut: true } : {}),
             ...(request.shaping && request.shaping.length > 0 ? { shaping: request.shaping } : {}),
+            ...(request.summon ? { summon: request.summon } : {}),
             ...(template ? { areaPlaced: true } : {}),
             ...(request.ready === true ? { ready: true } : {}),
             ...(request.moveFirst === true ? { moveFirst: true } : {}),
@@ -301,7 +303,13 @@ export const actionCommands = [
             distanceFeet,
             resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
             catalog: kit.equipmentCatalog(),
-            pushToken
+            pushToken,
+            summon: (summonRequest) =>
+              bringSummons(
+                draft,
+                summonRequest,
+                kit.summonDeps(draft, draft.combat.mapAssetId === mapAssetId ? geometry : null)
+              )
           }
         );
         // A committed use counts toward the sheet's most-used options; a preview counts with its confirm.

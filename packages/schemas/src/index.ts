@@ -1507,6 +1507,77 @@ export const MAX_FAVOURITE_OPTIONS = 8;
 export const MAX_COUNTED_OPTIONS = 32;
 export const MAX_OPTION_USE_COUNT = 100_000;
 
+/**
+ * A creature something brought onto the map (SRD 5.2.1 summoned creatures), and what keeps it there. The engine takes
+ * it off the map and the roster when that ends (`summons.ts`). GM knowledge: a player is told only that it commands it.
+ */
+export const SummonedSchema = z
+  .object({
+    /** The creature that brought it. */
+    by: z.uuid(),
+    /** What brought it: the action's id and name, and the spell and the level it was cast at. */
+    actionId: z.string().min(1).max(120),
+    name: z.string().min(1).max(120),
+    spell: z
+      .object({
+        id: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80),
+        level: z.number().int().min(0).max(9)
+      })
+      .strict()
+      .optional(),
+    /** The effect whose end ends it: its user's Concentration on the spell, or the spell's own effect on its user.
+     *  Absent: it stays until it drops to 0 Hit Points or is dismissed (a familiar). */
+    keptBy: z.string().min(1).max(120).optional(),
+    /** It is gone when it takes any damage (Phantom Steed), when its user dies (Find Steed), or when it is farther
+     *  than `leashFeet` from its user (Unseen Servant). */
+    endsOnDamage: z.literal(true).optional(),
+    endsOnUserDeath: z.literal(true).optional(),
+    leashFeet: z.number().int().min(5).max(5280).optional(),
+    /** It takes no turns, can't be harmed and doesn't block a space (Arcane Eye, Spiritual Weapon's force). */
+    intangible: z.literal(true).optional(),
+    /** It takes no turns of its own; its user moves it (Spiritual Weapon's force, Arcane Hand), this far with each
+     *  command, or twice its user's Speed. */
+    noTurns: z.literal(true).optional(),
+    commandMove: z.union([z.number().int().min(5).max(500), z.literal("twice-user-speed")]).optional(),
+    /** Its commander's player sees what it sees: always (Arcane Eye), or after a Bonus Action (a familiar). */
+    sight: z.enum(["always", "bonus-action"]).optional(),
+    /** How its user dismisses it (a Bonus Action for an elemental from a bowl, a Magic action for a familiar). */
+    dismiss: z.enum(["bonus-action", "action"]).optional()
+  })
+  .strict();
+export type Summoned = z.infer<typeof SummonedSchema>;
+
+/**
+ * Who commands a creature, and the side it fights on while that lasts: its summoner, or a creature that dominates it
+ * (Dominate Person, an aboleth's Dominate Mind). The commander's player acts for it (`authorization.ts`). GM knowledge:
+ * a player is told only that it commands it.
+ */
+export const CreatureControlSchema = z
+  .object({
+    /** The creature that commands it. */
+    by: z.uuid(),
+    /** The side it fights on: its commander's when the command began. */
+    side: z.enum(["party", "foes"]),
+    /** The effect whose end ends the command (the Charmed that Dominate Person imposed, Animate Dead's 24 hours).
+     *  Absent: it lasts as long as the creature is summoned. */
+    keptBy: z.string().min(1).max(120).optional(),
+    /** Commanding it takes its commander's Bonus Action (Animate Dead) or a Magic action (Mage Hand), and `commanded`
+     *  says its commander has commanded it since its last turn. */
+    commandedWith: z.enum(["bonus-action", "action"]).optional(),
+    commanded: z.literal(true).optional(),
+    /** Uncommanded, it takes the Dodge action (see `SummonSchema.dodgesUncommanded`). */
+    dodgesUncommanded: z.literal(true).optional(),
+    /** It can't attack, but takes other actions (a familiar). */
+    noAttacks: z.literal(true).optional(),
+    /** Its commander commands it only within this many feet (Animate Dead: 60), with the Bonus Action that does. */
+    commandFeet: z.number().int().min(5).max(5280).optional()
+  })
+  .strict();
+export type CreatureControl = z.infer<typeof CreatureControlSchema>;
+
 export const ActorSchema = z.object({
   id: z.uuid(),
   name: z.string().min(1).max(120),
@@ -1613,6 +1684,11 @@ export const ActorSchema = z.object({
   firstClaimedAt: z.number().int().nonnegative().optional(),
   /** One of the sample party a fresh table starts with. The roster labels it and can remove the set. GM-only. */
   sample: z.literal(true).optional(),
+  /** What brought this creature onto the map and keeps it there (see SummonedSchema). GM-only. */
+  summon: SummonedSchema.optional(),
+  /** Who commands this creature and on which side it fights (see CreatureControlSchema). GM-only; the commander's
+   *  player is told it commands it. */
+  control: CreatureControlSchema.optional(),
   /** Live spell-slot pools by level, restored by rests; null = not a modeled spellcaster. Owner-only in projections. */
   spellSlots: z.array(SpellSlotSchema).max(9).nullable().default(null),
   /** Warlock Pact Magic pool (one level, uniform slots); null = none. Owner-only in projections. */
@@ -2515,6 +2591,175 @@ export const ActionTeleportSchema = z
   .strict();
 export type ActionTeleport = z.infer<typeof ActionTeleportSchema>;
 
+/** One stat block a summon can bring onto the map, and how many of it come. */
+export const SummonCreatureSchema = z
+  .object({
+    /** The stat block, by its monster id: a bundled one, or one this table made. */
+    monsterId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(200),
+    /** How many of it come at once (a silver Horn of Valhalla's two Berserkers). */
+    count: z.number().int().min(1).max(20).default(1),
+    /** How many more come for each spell slot level above `minLevel`, or above the spell's own (Animate Dead: 2). */
+    perSlot: z.number().int().min(1).max(4).optional(),
+    /** It is offered only from this spell slot level up (Create Undead's Ghasts from a level 8 slot). */
+    minLevel: z.number().int().min(1).max(9).optional(),
+    /** The faces of the summon's `die` that bring it (a gray Bag of Tricks' 1 brings a Weasel). */
+    faces: z
+      .object({ from: z.number().int().min(1).max(100), to: z.number().int().min(1).max(100) })
+      .strict()
+      .optional(),
+    /** The form of a scaled stat block it takes (Giant Insect's spider), from the stat block's `summonScaling.forms`. */
+    form: RiderSlugSchema.optional(),
+    /** How much of an `upToModifier` budget one counts for (Animate Objects: a Large object counts as two). */
+    share: z.number().int().min(1).max(4).optional(),
+    /** How it differs from its stat block ("uses the Riding Horse stat block, except it has a Speed of 100 feet"; a
+     *  treant's trees have Intelligence and Charisma scores of 1 and lack Animate Trees). */
+    except: z
+      .object({
+        name: z.string().min(1).max(120).optional(),
+        speedFeet: z.number().int().min(0).max(500).optional(),
+        abilityScores: z
+          .object({
+            str: z.number().int().min(1).max(30).optional(),
+            dex: z.number().int().min(1).max(30).optional(),
+            con: z.number().int().min(1).max(30).optional(),
+            int: z.number().int().min(1).max(30).optional(),
+            wis: z.number().int().min(1).max(30).optional(),
+            cha: z.number().int().min(1).max(30).optional()
+          })
+          .strict()
+          .optional(),
+        withoutActions: z
+          .array(z.string().regex(/^[a-z0-9-]+$/))
+          .min(1)
+          .max(6)
+          .optional()
+      })
+      .strict()
+      .optional()
+  })
+  .strict();
+export type SummonCreature = z.infer<typeof SummonCreatureSchema>;
+
+/**
+ * The creatures an action brings onto the map (SRD 5.2.1 summoned creatures: Summon Dragon, Animate Dead, a Bowl of
+ * Commanding Water Elementals). Each comes from a stat block, scaled by the cast's level when its stat block says how
+ * (`summonScaling`), in an unoccupied space within `rangeFeet` of its user, and stands on its user's side under its
+ * user's command unless `allegiance` says otherwise. It leaves the map when its time is up, at 0 Hit Points, or when
+ * its user dismisses it.
+ */
+export const SummonSchema = z
+  .object({
+    /** The stat blocks it may bring. With several, its user picks (Find Familiar's forms), or the server rolls `die`. */
+    creatures: z.array(SummonCreatureSchema).min(1).max(24),
+    /** The die the server rolls to pick one of `creatures` by its `faces` (a Bag of Tricks' d8). */
+    die: z.number().int().min(2).max(100).optional(),
+    /** Its user picks any stat block of this creature type up to this Challenge Rating as well ("or another Beast that
+     *  has a Challenge Rating of 0"). */
+    orAny: z
+      .object({ creatureType: RiderSlugSchema, maxChallenge: z.number().min(0).max(30) })
+      .strict()
+      .optional(),
+    /** Up to its user's spellcasting ability modifier come, each counting its `share` (Animate Objects). */
+    upToModifier: z.literal(true).optional(),
+    /** How far from its user it may appear; absent, beside its user. */
+    rangeFeet: z.number().int().min(5).max(1000).optional(),
+    /** It rises from a dead creature its user targets, in that creature's space, one for each corpse (Animate Dead). */
+    fromCorpse: z
+      .object({
+        creatureTypes: z.array(RiderSlugSchema).min(1).max(4).optional(),
+        maxSize: SizeSchema.optional(),
+        /** The creature died no more than this many rounds ago (a wraith's Create Specter: 1 minute). */
+        withinRounds: z.number().int().min(1).max(100).optional()
+      })
+      .strict()
+      .optional(),
+    /** When it acts: right after its user's turn on the same Initiative count, on its own Initiative roll, or never (a
+     *  spell's floating force, which only marks where the spell acts from). */
+    turn: z.enum(["after-user", "own", "none"]).default("after-user"),
+    /** Commanding it takes its user's Bonus Action (Animate Dead, Arcane Eye) or a Magic action (Mage Hand). Absent: it
+     *  obeys with no action from its user. */
+    commandedWith: z.enum(["bonus-action", "action"]).optional(),
+    /** Its user commands it only within this many feet (Animate Dead: 60, Animate Objects: 500). */
+    commandFeet: z.number().int().min(5).max(5280).optional(),
+    /** How far a command moves one with no turns of its own (an Unseen Servant's 15 feet, an Arcane Eye's 30), or twice
+     *  its user's Speed (Mislead's double). */
+    commandMove: z.union([z.number().int().min(5).max(500), z.literal("twice-user-speed")]).optional(),
+    /** Cast on creatures this spell made, it renews its command over up to this many of them (`perSlot` more for each
+     *  slot level above the spell's) instead of making new ones (Animate Dead: four). */
+    reasserts: z
+      .object({ count: z.number().int().min(1).max(20), perSlot: z.number().int().min(1).max(4).optional() })
+      .strict()
+      .optional(),
+    /** One its user doesn't command takes the Dodge action: one commanded with a Bonus Action that wasn't commanded
+     *  since its last turn, or one that used no action on its turn ("If you don't issue any, it takes the Dodge
+     *  action"). */
+    dodgesUncommanded: z.literal(true).optional(),
+    /** How long it stays: while its spell lasts (its Concentration or its own duration), for these minutes, until its
+     *  user's next Long Rest, or until it drops to 0 Hit Points or is dismissed. Absent: its spell's time, or untimed
+     *  for an action that casts none. */
+    lasts: z
+      .discriminatedUnion("type", [
+        z.object({ type: z.literal("spell") }).strict(),
+        z
+          .object({
+            type: z.literal("minutes"),
+            minutes: z.number().int().min(1).max(MAX_EFFECT_MINUTES),
+            /** Its user must keep Concentration for it (a Ring of Djinni Summoning: "for as long as you maintain
+             *  Concentration, up to 1 hour"). */
+            concentration: z.literal(true).optional()
+          })
+          .strict(),
+        z.object({ type: z.literal("until-long-rest") }).strict(),
+        z.object({ type: z.literal("untimed") }).strict()
+      ])
+      .optional(),
+    /** When its time is up it stays on the map and stops obeying (Animate Dead's 24 hours of control). */
+    freedAtEnd: z.literal(true).optional(),
+    /** It is gone early when it takes any damage (Phantom Steed), when its user dies (Find Steed), or when it is
+     *  farther than `leashFeet` from its user (Unseen Servant). */
+    endsOnDamage: z.literal(true).optional(),
+    endsOnUserDeath: z.literal(true).optional(),
+    leashFeet: z.number().int().min(5).max(5280).optional(),
+    /** Who commands it: its user, no one (a Wand of Wonder's Rhinoceros), or no one and it turns on its user (a Horn of
+     *  Valhalla blown without the training it asks). */
+    allegiance: z.enum(["user", "none", "hostile"]).default("user"),
+    /** It can't attack, but takes other actions as normal (a familiar). */
+    noAttacks: z.literal(true).optional(),
+    /** Its user can have only one from this source; a new one replaces the old (Find Steed, Find Familiar). */
+    onlyOne: z.literal(true).optional(),
+    /** The creature type its user picks for it, in place of its stat block's (a familiar is a Celestial, Fey or Fiend). */
+    creatureTypes: z.array(RiderSlugSchema).min(2).max(6).optional(),
+    /** It can't be harmed or blocked and has no turns of its own (Arcane Eye, Faithful Hound, Mislead's double). */
+    intangible: z.literal(true).optional(),
+    /** Its user's player sees what it sees: always (Arcane Eye), or after a Bonus Action until the start of its user's
+     *  next turn (a familiar). */
+    sight: z.enum(["always", "bonus-action"]).optional(),
+    /** How its user dismisses it, which ends it: a Bonus Action (an elemental from a bowl) or a Magic action (a
+     *  familiar). Absent: only its time, its Hit Points or the GM end it. */
+    dismiss: z.enum(["bonus-action", "action"]).optional(),
+    /** Its user gains Resistance, until it is gone, to one damage type its stat block resists, picked at the summon
+     *  (a Draconic Spirit's Shared Resistances). */
+    sharedResistance: z.literal(true).optional(),
+    /** Its user's spell attack bonus, spell save DC and spellcasting ability modifier, which a scaled stat block reads
+     *  (`summonScaling`). The engine fills them when it makes a cast action. */
+    numbers: z
+      .object({
+        attackBonus: z.number().int().min(-10).max(30),
+        saveDc: z.number().int().min(1).max(40),
+        modifier: z.number().int().min(-5).max(10)
+      })
+      .strict()
+      .optional()
+  })
+  .strict()
+  .describe(
+    "The creatures an action brings onto the map: each from a stat block (scaled by the cast's level when the stat block says how), in an unoccupied space within `rangeFeet` of its user, on its user's side and under its user's command unless `allegiance` says otherwise; it leaves when its time is up, at 0 Hit Points, or when dismissed."
+  );
+export type Summon = z.infer<typeof SummonSchema>;
+
 /** Mechanics fields are optional (ADR-0020): absent means prose only. Descriptions stay the display source of truth. */
 export const ActionSchema = z
   .object({
@@ -2754,6 +2999,8 @@ export const ActionSchema = z
     /** A teleport the action grants ("teleports up to 60 feet to an unoccupied space it can see"), see
      *  `ActionTeleportSchema`. */
     teleport: ActionTeleportSchema.optional(),
+    /** The creatures it brings onto the map (Summon Dragon, a Bowl of Commanding Water Elementals), see `SummonSchema`. */
+    summons: SummonSchema.optional(),
     /** A jump the action allows this turn ("jumps up to 30 feet by spending 10 feet of movement"). */
     leap: z
       .object({ feet: z.number().int().min(5).max(120), costFeet: z.number().int().min(0).max(60) })
@@ -3218,6 +3465,99 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
 ]);
 export type TraitMechanic = z.infer<typeof TraitMechanicSchema>;
 
+const ActionIdSchema = z.string().regex(/^[a-z0-9-]+$/);
+
+/** One form a scaled stat block can take, picked at the summon (Giant Insect's spider, an Otherworldly Steed's Fey). */
+export const SummonFormSchema = z
+  .object({
+    id: RiderSlugSchema,
+    name: z.string().min(1).max(60),
+    /** The stat block's `formActions` this form keeps (the spider's Web Bolt). */
+    actions: z.array(ActionIdSchema).max(6).optional(),
+    /** Its creature type, in place of the stat block's (an Otherworldly Steed is a Celestial, Fey or Fiend). */
+    creatureType: RiderSlugSchema.optional(),
+    /** The damage type of its attacks, in place of the printed one (a Fey steed's Psychic Slam). */
+    damageType: DamageTypeSchema.optional(),
+    /** Its size and Hit Points, in place of the printed ones (a Huge Animated Object's 40). */
+    size: SizeSchema.optional(),
+    hitPoints: z.number().int().min(1).max(1000).optional(),
+    /** An attack's damage in this form (a Huge Animated Object's Slam: 2d12 + 3 and its summoner's spellcasting
+     *  modifier). */
+    damage: z
+      .array(
+        z
+          .object({ actionId: ActionIdSchema, formula: DamageFormulaSchema, addsModifier: z.literal(true).optional() })
+          .strict()
+      )
+      .max(4)
+      .optional(),
+    /** Special speeds this form has (the wasp's Fly 40). */
+    speeds: z
+      .object({
+        fly: z.number().int().min(5).max(500).optional(),
+        climb: z.number().int().min(5).max(500).optional(),
+        swim: z.number().int().min(5).max(500).optional()
+      })
+      .strict()
+      .optional()
+  })
+  .strict();
+export type SummonForm = z.infer<typeof SummonFormSchema>;
+
+/**
+ * How a stat block a spell prints scales with the spell and its caster (SRD 5.2.1 Summon Dragon's Draconic Spirit,
+ * Giant Insect, Find Steed's Otherworldly Steed, Animate Objects' Animated Object): its printed numbers are for
+ * `baseLevel`. Its attacks roll with its summoner's spell attack modifier, its saves use its summoner's spell save DC,
+ * and its Proficiency Bonus is its summoner's.
+ */
+export const SummonScalingSchema = z
+  .object({
+    baseLevel: z.number().int().min(1).max(9),
+    /** What its Armor Class and Hit Points gain for each spell level above `baseLevel` ("14 + the spell's level"). */
+    armorClassPerLevel: z.number().int().min(0).max(5).optional(),
+    hitPointsPerLevel: z.number().int().min(0).max(100).optional(),
+    /** Actions whose first damage roll, or healing, gains for each spell level above `baseLevel`: a flat `plus` ("1d6 +
+     *  4 + the spell's level") or `dice` of the roll's own die (an Animated Object's Slam: 1d4 more). */
+    perLevel: z
+      .array(
+        z
+          .object({
+            actionId: ActionIdSchema,
+            plus: z.number().int().min(1).max(10).optional(),
+            dice: z.number().int().min(1).max(4).optional()
+          })
+          .strict()
+      )
+      .max(6)
+      .optional(),
+    /** Multiattack parts that make half the spell's level of attacks, rounded down (a Draconic Spirit's Rends). */
+    halfLevelAttacks: z.array(ActionIdSchema).max(3).optional(),
+    /** Special speeds it has only from a spell level up (an Otherworldly Steed flies at 60 feet from level 4). */
+    speedsFrom: z
+      .array(
+        z
+          .object({
+            level: z.number().int().min(1).max(9),
+            mode: z.enum(["fly", "climb", "swim"]),
+            feet: z.number().int().min(5).max(500)
+          })
+          .strict()
+      )
+      .max(3)
+      .optional(),
+    /** Actions only some forms have; each form keeps the ones it names. */
+    formActions: z.array(ActionIdSchema).max(8).optional(),
+    forms: z.array(SummonFormSchema).min(2).max(6).optional(),
+    /** Actions whose damage type its summoner picks at the summon among the types the stat block resists (a Draconic
+     *  Spirit's Breath Weapon). */
+    chosenDamageType: z.array(ActionIdSchema).max(3).optional()
+  })
+  .strict()
+  .describe(
+    "How a stat block a spell prints scales with the spell's level and its summoner: its numbers are for `baseLevel`, its attacks roll with its summoner's spell attack modifier and its saves use its summoner's spell save DC."
+  );
+export type SummonScaling = z.infer<typeof SummonScalingSchema>;
+
 export const ActorDefinitionSchema = z
   .object({
     schemaId: z.enum(["vtt.actor-character", "vtt.actor-monster"]),
@@ -3291,6 +3631,8 @@ export const ActorDefinitionSchema = z
       ),
     /** What its traits do that the engine runs (Regeneration, auras, Death Burst), read from their text. */
     traitMechanics: z.array(TraitMechanicSchema).max(12).optional(),
+    /** A stat block a spell prints, which scales with the spell's level and its summoner (see SummonScalingSchema). */
+    summonScaling: SummonScalingSchema.optional(),
     /** Character identity (class/level/race/background/feats); character definitions only. */
     character: CharacterIdentitySchema.optional().describe(
       "The character half of an ActorDefinition (class/level/species/background/feats and the choice-provenance ledger). A monster leaves it absent: the character builder writes it, never a homebrew author"

@@ -70,6 +70,8 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     effects: PlayerEffect[];
     claimStatus: "available" | "mine" | "claimed";
     presence: PresenceStatus | null;
+    /** A creature your own character commands (a summoned spirit, a dominated ogre): you act for it, and get its stat
+     *  block (`definition`), exact `hp`, `actionUses` and `pools`. Never on another player's. */ commanded?: true;
     /** "Fighter 5 / Rogue 2", derived server-side; on another player's claimed character (the party tier decides),
      *  and on an unclaimed character for the claim picker. */ classLine?: string;
     /** "Dwarf", for the claim picker; only on an unclaimed character, which any player could claim and read in full. */ species?: string;

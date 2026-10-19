@@ -41,6 +41,7 @@ import { applyGrant } from "./resolution/grant.js";
 import { applyMovementGrants } from "./resolution/movement-grants.js";
 import { applyTimeStop } from "./time-stop.js";
 import { applySpellEndings } from "./resolution/dispel.js";
+import { applySummons } from "./resolution/summon.js";
 import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
@@ -199,6 +200,7 @@ export function resolveDefinitionAction(
   applyMovementGrants(ctx);
   applyTimeStop(ctx);
   applyGrant(ctx);
+  applySummons(ctx);
   placeCastSight(ctx);
   applyHealing(ctx);
   applyConditionCures(ctx);
@@ -312,6 +314,7 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
     ...(ctx.healing ? { healing: ctx.healing } : {}),
     ...(ctx.opens ? { opens: ctx.opens } : {}),
     ...(damageTargets ? { damageTargets } : {}),
+    ...(ctx.summoned && ctx.summoned.length > 0 ? { summoned: ctx.summoned } : {}),
     ...(knocksOut(ctx) ? { knockOut: "chosen" as const } : {})
   };
 }

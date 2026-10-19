@@ -18,6 +18,7 @@ import type {
   PresenceStatus,
   RollRecord
 } from "@vtt/domain";
+import { commandedBySession } from "./authorization.js";
 import { actionPools } from "./effective-actions.js";
 import { HASTED_TAG } from "./effects.js";
 import { healthBandOf } from "./hit-points.js";
@@ -328,9 +329,13 @@ function withSensed(vision: PlayerVision, sensed: readonly PlayerSensedCreature[
   return { ...vision, sensed: sensed.map((creature) => ({ ...creature })) };
 }
 
+/** A creature this player acts for: their own character, or one their character commands (a summon, a dominated
+ *  creature), whose saves, reactions and asks are theirs to answer. */
 function ownedBy(state: GameState, actorId: string, playerSessionId: string | undefined): boolean {
-  const owner = state.actors.find((actor) => actor.id === actorId)?.ownerSessionId ?? null;
-  return owner !== null && owner === playerSessionId;
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return false;
+  const owner = actor.ownerSessionId;
+  return (owner !== null && owner === playerSessionId) || commandedBySession(state, actor, playerSessionId);
 }
 
 /** The combat a player sees. A creature none of their characters perceive (dynamic vision) or that stands wholly under
@@ -636,6 +641,9 @@ const PLAYER_ACTOR_FIELDS = {
   sample: "never",
   archived: "never",
   sheetPreview: "never",
+  // Who summoned a creature and what keeps it is the GM's; its commander's player is told only that it commands it.
+  summon: "never",
+  control: "derived",
   // The owner's own turn-card pins and use counts: never another player's, whatever the party tier.
   favouriteOptionIds: "derived",
   optionUseCounts: "derived"
@@ -721,6 +729,12 @@ export function projectPlayerView(
       .filter((actor) => playerSessionId !== undefined && actor.ownerSessionId === playerSessionId)
       .map((actor) => actor.id)
   );
+  // The creatures their characters command (a summoned spirit, a dominated ogre): theirs to act for, so they get its
+  // stat block, exact Hit Points and uses, and the effects it holds on others are theirs to end.
+  const commandedIds = new Set(
+    state.actors.filter((actor) => commandedBySession(state, actor, playerSessionId)).map((actor) => actor.id)
+  );
+  const actsFor = new Set([...yourActorIds, ...commandedIds]);
   return {
     revision: state.revision,
     // The tier actually applied, so the client can tell "no sheet" from "sheet withheld".
@@ -789,10 +803,35 @@ export function projectPlayerView(
             : undefined;
         const classLine = (theirs && cardVisible) || available ? classLineOf(storedSheet) : null;
         const species = available ? (storedSheet?.character?.race?.name ?? null) : null;
+        const commanded = commandedIds.has(source.id);
+        // The stat block of a creature this player commands: a bundled one, or the scaled copy a summon stored.
+        const commandedSheet =
+          commanded && source.definitionId
+            ? (state.definitions.find((entry) => entry.id === source.definitionId)?.definition ??
+              content.definition?.(source.definitionId))
+            : undefined;
+        if (commanded)
+          return {
+            ...pickFields(source, PARTY_FIELDS),
+            hp: {
+              kind: "exact" as const,
+              current: source.hp.current,
+              maximum: source.hp.maximum,
+              temporary: source.hp.temporary
+            },
+            effects: source.effects.map((effect) => playerEffect(effect, publicActorIds, actsFor)),
+            // A commanded creature is never a player character, so no one claims it.
+            claimStatus: "available" as const,
+            presence: null,
+            commanded: true as const,
+            ...(commandedSheet ? { definition: commandedSheet, pools: actionPools(commandedSheet.actions) } : {}),
+            actionUses: { ...actionUses },
+            ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
+          };
         return {
           ...pickFields(source, source.kind === "player-character" ? PARTY_FIELDS : TABLE_FIELDS),
           hp: playerHp(source),
-          effects: source.effects.map((effect) => playerEffect(effect, publicActorIds, yourActorIds)),
+          effects: source.effects.map((effect) => playerEffect(effect, publicActorIds, actsFor)),
           claimStatus:
             ownerSessionId === null ? ("available" as const) : mine ? ("mine" as const) : ("claimed" as const),
           presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),

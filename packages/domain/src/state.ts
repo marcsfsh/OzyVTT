@@ -83,7 +83,10 @@ export const InitiativeEntrySchema = z.object({
   score: z.number().int().min(-1000).max(1000),
   tieBreaker: z.number().int().min(-1000).max(1000).default(0),
   /** Surprised when the fight began (SRD Surprise), kept so a later roll of this entry has Disadvantage too. */
-  surprised: z.boolean().optional()
+  surprised: z.boolean().optional(),
+  /** It takes its turn right after this creature's, on the same count (a summoned creature "shares your Initiative
+   *  count, but it takes its turn immediately after yours"), wherever that creature's turn moves. GM-only. */
+  follows: z.uuid().optional()
 });
 export type InitiativeEntry = z.infer<typeof InitiativeEntrySchema>;
 

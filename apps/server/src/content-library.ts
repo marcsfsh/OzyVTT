@@ -35,6 +35,7 @@ import {
   loadFeats,
   loadLanguages,
   loadMonsterDefinitions,
+  loadSummonStatBlocks,
   loadNames,
   loadSkills,
   loadSpecies,
@@ -223,7 +224,7 @@ export class ContentLibrary {
   /** Play-time only and audience-free: resolves any homebrew monster row (even draft or deleted) so a live
    *  actor keeps its actions mid-fight. Never use it for browse. */
   monsterForInstance(definitionId: string): ActorDefinition | undefined {
-    const bundled = SRD_ONLY_CATALOG.monstersById.get(definitionId);
+    const bundled = SRD_ONLY_CATALOG.monstersById.get(definitionId) ?? summonStatBlocks().get(definitionId);
     if (bundled) return bundled;
     const homebrew = this.homebrew?.monsterForInstance(definitionId);
     // Its spells as cast actions, as the catalog gives a bundled stat block's.
@@ -795,6 +796,18 @@ type CatalogData = ReturnType<typeof buildCatalogData>;
 
 /** The SRD-only catalog, built once at import. */
 const SRD_ONLY_CATALOG: CatalogData = buildCatalogData(EMPTY_HOMEBREW_SLICE);
+
+let summonBlocks: ReadonlyMap<string, ActorDefinition> | null = null;
+/** The stat blocks the SRD prints inside its summoning spells, by id: resolved in play, never browsed (`summons.ts`
+ *  brings them onto the map, scaled to the cast). */
+function summonStatBlocks(): ReadonlyMap<string, ActorDefinition> {
+  summonBlocks ??= new Map(
+    loadSummonStatBlocks().flatMap((definition) =>
+      definition.source.externalId ? [[definition.source.externalId, definition] as const] : []
+    )
+  );
+  return summonBlocks;
+}
 
 /** A thin per-audience wrapper over built catalog data; audiences that merge to the same data share it. */
 /** The glossary is bundled SRD text alone (no homebrew), so one copy serves every view. */

@@ -49,6 +49,7 @@ import { UPCAST_DURATION_IDS, upcastDurationsFor } from "./spell-durations.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
 import { traitMechanicsOf } from "./trait-mechanics.js";
 import { withSpellcasting } from "./monster-spells.js";
+import { SUMMON_STAT_BLOCKS } from "./summon-stat-blocks.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -1735,6 +1736,7 @@ const validateBundle = (label: string, schema: z.ZodType, value: unknown) => {
     process.exit(1);
   }
 };
+validateBundle("summoned stat blocks", z.array(ActorDefinitionSchema), SUMMON_STAT_BLOCKS);
 validateBundle("conditions", z.array(ConditionReferenceSchema), conditionRecords);
 validateBundle("spells", z.array(SpellReferenceSchema), spellRecords);
 validateBundle("weapons", z.array(WeaponReferenceSchema), weaponRecords);
@@ -1747,6 +1749,9 @@ validateBundle("attribution", ContentAttributionSchema, attribution);
 
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "monsters.v1.json"), `${JSON.stringify(monsters, null, 1)}\n`);
+// The stat blocks SRD 5.2.1 prints inside its summoning spells, which the source leaves out: kept apart from the
+// bestiary, since they have no Challenge Rating and come onto the map only through their spells.
+writeFileSync(join(outDir, "summons.v1.json"), `${JSON.stringify(SUMMON_STAT_BLOCKS, null, 1)}\n`);
 writeFileSync(join(outDir, "conditions.v1.json"), `${JSON.stringify(conditionRecords, null, 1)}\n`);
 writeFileSync(join(outDir, "spells.v1.json"), `${JSON.stringify(spellRecords, null, 1)}\n`);
 writeFileSync(join(outDir, "weapons.v1.json"), `${JSON.stringify(weaponRecords, null, 1)}\n`);

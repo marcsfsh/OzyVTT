@@ -43,6 +43,9 @@ const RULE_FAMILIES = {
   "condition.imposed": "economy",
   // A raging Barbarian can't cast spells (SRD Rage).
   "condition.raging": "economy",
+  // A familiar can't attack; a summoned creature's commands cost its summoner an action, a Bonus Action or range.
+  "summon.cant-attack": "economy",
+  "summon.command": "economy",
   // An effect that takes away Reactions (Slow).
   "condition.no-reactions": "economy",
   "condition.no-spells": "economy",
