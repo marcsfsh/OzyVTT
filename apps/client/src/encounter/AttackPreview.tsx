@@ -131,7 +131,7 @@ export function HitOfferChoices({
                 )
               }
             >
-              {offer.name} +{offer.dice}
+              {offer.rerolls ? `${offer.name} · ${offer.dice} twice` : `${offer.name} +${offer.dice}`}
             </button>
             {pick && offer.damageTypes && (
               <span className="hit-offer-picks" role="group" aria-label={`${offer.name} damage type`}>

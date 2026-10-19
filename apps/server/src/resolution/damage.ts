@@ -7,6 +7,7 @@ import {
   type RiderCarrier,
   type RiderMoment
 } from "@vtt/rules-5e";
+import { holdsFeature } from "../class-features.js";
 import { endEffect } from "../effects.js";
 import { abilityModifier, endedEffect, recordRoll, type ResolveContext } from "./context.js";
 
@@ -100,13 +101,57 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
     }
     return;
   }
+  const savage = savageAttack(ctx);
   parts.forEach((part, index) => {
     const expression = parseDiceFormula(part.formula);
     const extraCritDice = index === 0 ? (action.attack?.criticalBonusDice ?? 0) : 0;
-    const rolled = resolveDice(ctx.crit ? criticalExpression(expression, extraCritDice) : expression, deps.random);
+    const rolledExpression = ctx.crit ? criticalExpression(expression, extraCritDice) : expression;
+    let rolled = resolveDice(rolledExpression, deps.random);
     recordRoll(ctx, rolled, "damage");
+    // The weapon's own dice are rolled again and the higher roll is used: no attacker would choose the lower.
+    if (savage && index === 0) {
+      const again = resolveDice(rolledExpression, deps.random);
+      recordRoll(ctx, again, "damage", "Savage Attacker");
+      if (again.total > rolled.total) rolled = again;
+    }
     damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
   });
+}
+
+/** The hit option that rolls a weapon's damage dice twice (SRD Savage Attacker). */
+export const SAVAGE_ATTACKER = "savage-attacker";
+
+/**
+ * SRD Savage Attacker: "Once per turn when you hit a target with a weapon, you can roll the weapon's damage dice twice
+ * and use either roll against the target." Whether this weapon hit may use it: its attacker holds the feat and has not
+ * used it this turn.
+ */
+export function savageAttackerReady(ctx: ResolveContext): boolean {
+  const { state, attacker, attack, deps } = ctx;
+  if (attack === null || (attack.outcome !== "hit" && attack.outcome !== "crit")) return false;
+  if (!(ctx.riderFilters.attackKinds ?? []).includes("weapon") || ctx.action.damage.length === 0) return false;
+  const definition =
+    deps.definition ?? (attacker.definitionId ? deps.resolveDefinition?.(attacker.definitionId) : undefined);
+  if (!holdsFeature(definition, SAVAGE_ATTACKER, "Savage Attacker")) return false;
+  return !state.combat.active || (state.combat.turn.turnUses[`${attacker.id}:${SAVAGE_ATTACKER}`] ?? 0) === 0;
+}
+
+/** Whether the attacker chose Savage Attacker for this hit and may use it; spends the turn's use when it does. */
+function savageAttack(ctx: ResolveContext): boolean {
+  if (!(ctx.input.hitOptions ?? []).some((choice) => choice.id === SAVAGE_ATTACKER)) return false;
+  if (!savageAttackerReady(ctx)) {
+    ctx.warnings.push(`${ctx.attacker.name} can't use Savage Attacker on this hit.`);
+    return false;
+  }
+  const { state, attacker } = ctx;
+  if (state.combat.active) {
+    const key = `${attacker.id}:${SAVAGE_ATTACKER}`;
+    state.combat = {
+      ...state.combat,
+      turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
+    };
+  }
+  return true;
 }
 
 const missed = (attack: ActionResolutionAttack | null) =>

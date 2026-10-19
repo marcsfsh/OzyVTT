@@ -519,3 +519,55 @@ describe("an effect that strikes back at a melee hit", () => {
     ]);
   });
 });
+
+describe("a marilith's Reactive", () => {
+  const advance = (game: GameState) =>
+    nextInitiativeTurn(game, [], { resolveDefinition: lookup(game), rollDie: () => 1 });
+
+  it("gives it a fresh Reaction at the start of every turn, where a goblin waits for its own", () => {
+    const game = table(monster("Hero", []));
+    game.definitions = game.definitions.map((entry) =>
+      entry.id === "def-goblin" ? { ...entry, definition: view.monster("marilith")! } : entry
+    );
+    game.combat = { ...game.combat, reactionsUsed: [IDS.goblin] };
+    advance(game);
+    expect(game.combat.turnActorId).toBe(IDS.hero);
+    expect(game.combat.reactionsUsed).toEqual([]);
+    const plain = table(monster("Hero", []));
+    plain.combat = { ...plain.combat, reactionsUsed: [IDS.goblin] };
+    advance(plain);
+    expect(plain.combat.reactionsUsed).toEqual([IDS.goblin]);
+  });
+});
+
+describe("a rust monster's Reflexive Antennae", () => {
+  it("uses Antennae on the creature that damaged it, opening its DC 11 Dexterity save", () => {
+    const game = table(monster("Hero", []));
+    game.definitions = game.definitions.map((entry) =>
+      entry.id === "def-goblin" ? { ...entry, definition: view.monster("rust-monster")! } : entry
+    );
+    applyDamageDetailed(
+      game,
+      IDS.goblin,
+      { amount: 5, parts: [{ amount: 5, type: "slashing" }], sourceActorId: IDS.hero, sourceName: "Hero" },
+      GM,
+      {
+        resolveDefinition: lookup(game),
+        newId: nextId,
+        now: () => NOW,
+        commandId: nextId(),
+        catalog,
+        distanceFeet: () => 5
+      }
+    );
+    expect(game.combat.pendingReactions[0]).toMatchObject({
+      kind: "damaged-by-creature",
+      actorId: IDS.goblin,
+      actionName: "Reflexive Antennae",
+      targetActorId: IDS.hero
+    });
+    answer(game, true);
+    expect(game.combat.pendingSaves).toMatchObject([{ targetActorId: IDS.hero, ability: "dex", dc: 11 }]);
+    expect(game.combat.reactionsUsed).toContain(IDS.goblin);
+  });
+});

@@ -362,6 +362,13 @@ function answerStrike(
     chosen = { ...(picked ?? fallbackMelee ?? builtinAction("unarmed-strike")!), activation: "reaction" };
     isBuiltin = picked ? !available.includes(picked) : fallbackMelee === undefined;
   }
+  // A reaction that uses another of its actions (a rust monster's Reflexive Antennae uses Antennae) spends its Reaction.
+  const uses =
+    strikesWithItself && declared?.reaction?.response === "strike-back" ? declared.reaction.usesAction : undefined;
+  if (uses) {
+    const sibling = available.find((candidate) => candidate.id === uses);
+    chosen = sibling ? { ...sibling, activation: "reaction" } : undefined;
+  }
   if (!chosen) throw new CommandRejectedError(`${reactor.name} no longer has ${pending.actionName}.`);
   const commit = chosen.attack === undefined ? true : (options.commit ?? true);
   // No distance function: the engine moves a token before the SRD's "right before it leaves reach", so range-checking

@@ -1735,7 +1735,8 @@ const ReactionAttackKindSchema = z.enum(["melee", "ranged", "melee-weapon", "ran
  *   triggering damage included.
  * - ac-bonus (Parry, Shield): add `amount` to AC against the attack before it lands, possibly turning the hit into a
  *   miss. `melee` limits it to melee attacks; `untilNextTurn` keeps the bonus until the reactor's next turn starts.
- * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action against the creature that dealt the damage.
+ * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action against the creature that dealt the damage, or
+ *   the sibling action `usesAction` names (a rust monster's Antennae).
  * - melee-attack (Retaliation): make one melee attack against that creature instead.
  * `rangeFeet` skips the prompt when the map shows the damaging creature farther away.
  */
@@ -1764,7 +1765,13 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
     .object({
       trigger: z.literal("damaged-by-creature"),
       response: z.literal("strike-back"),
-      rangeFeet: ReactionRangeFeet
+      rangeFeet: ReactionRangeFeet,
+      /** The sibling action it uses instead of itself ("The rust monster uses Antennae"). */
+      usesAction: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(120)
+        .optional()
     })
     .strict(),
   z

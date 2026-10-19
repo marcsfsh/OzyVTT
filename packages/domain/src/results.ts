@@ -132,6 +132,8 @@ export type HitOffer = Readonly<{
   slotLevels?: readonly number[];
   /** What the engine could not check, so the attacker vouches for it ("No map to check for an ally within 5 feet"). */
   unverified?: string;
+  /** It rolls the weapon's own dice again rather than adding any (Savage Attacker); `dice` names them. */
+  rerolls?: true;
 }>;
 /** One extra chosen at confirm, and how. */
 export type HitOptionChoice = Readonly<{ id: string; damageType?: string; slotLevel?: number }>;

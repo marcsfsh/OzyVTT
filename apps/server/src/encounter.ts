@@ -7,6 +7,7 @@ import type {
   RuleMode
 } from "@vtt/domain";
 import { abilityCheckClaims } from "./ability-checks.js";
+import { holdsFeature } from "./class-features.js";
 import { wardedConditions } from "./paladin-auras.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -546,6 +547,13 @@ function settleGatherIfComplete(state: GameState) {
 
 /** Dependencies for start-of-turn recharge rolls and ongoing damage and end-of-turn repeat saves; optional so scene
  *  bookkeeping can advance turns without them. */
+/** Whether a creature takes a Reaction on every turn, not once a round (a marilith's Reactive trait). */
+function reactsEveryTurn(state: GameState, actorId: string, deps: TurnAdvanceDeps | undefined): boolean {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor?.definitionId || !deps) return false;
+  return holdsFeature(deps.resolveDefinition(actor.definitionId), "reactive", "Reactive");
+}
+
 export type TurnAdvanceDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   /** The item catalog, so an item's recharge pool re-arms like a stat block's. */
@@ -683,7 +691,10 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     turnActorId: nextActorId,
     // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD).
     turn: { ...EMPTY_TURN },
-    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId),
+    // A marilith's Reactive: "The marilith can take one Reaction on every turn of combat."
+    reactionsUsed: state.combat.reactionsUsed.filter(
+      (actorId) => actorId !== nextActorId && !reactsEveryTurn(state, actorId, deps)
+    ),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, nextActorId)
   };
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).

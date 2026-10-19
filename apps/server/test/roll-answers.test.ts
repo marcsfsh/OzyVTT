@@ -467,9 +467,10 @@ describe("a natural 1 rerolled (the halfling's Luck)", () => {
     const game = table(halfling);
     const saveId = oweSave(game);
     expect(save(game, saveId, [1, 18], false, {}, "disadvantage").outcome).toMatchObject({ natural: 1 });
-    expect(
-      save(game, saveId, [12], false, { answer: { id: "halfling-luck" } }, "disadvantage").outcome
-    ).toMatchObject({ natural: 12, total: 12 });
+    expect(save(game, saveId, [12], false, { answer: { id: "halfling-luck" } }, "disadvantage").outcome).toMatchObject({
+      natural: 12,
+      total: 12
+    });
   });
 });
 
@@ -763,5 +764,33 @@ describe("the answers the SRD records carry once built", () => {
       when: "natural-one",
       effect: { kind: "reroll", one: true }
     });
+  });
+});
+
+describe("Savage Attacker", () => {
+  const savage = definition("Brute", [SWORD], {
+    extensions: { "test.traits": { traits: [{ name: "Savage Attacker" }] } }
+  });
+
+  const chosen = { commit: true, hitOptions: [{ id: "savage-attacker" }] };
+
+  it("is offered on a hit, rolls the weapon's dice twice and uses the higher roll, once a turn", () => {
+    const game = table(savage);
+    expect(swing(game, [15], { commit: false }).hitOffers).toEqual([
+      { id: "savage-attacker", name: "Savage Attacker", dice: "1d8", cost: "once per turn", rerolls: true }
+    ]);
+    expect(swing(game, [3, 7], chosen).damageTotal).toBe(9);
+    game.combat = { ...game.combat, turn: { ...game.combat.turn, actionUsed: false, actionInstance: null } };
+    expect(swing(game, [15], { commit: false }).hitOffers ?? []).toEqual([]);
+    expect(swing(game, [3], chosen).damageTotal).toBe(5);
+  });
+
+  it("keeps the first roll when it is the higher, and rolls once when not chosen", () => {
+    expect(swing(table(savage), [15, 6, 2], chosen).damageTotal).toBe(8);
+    expect(swing(table(savage), [15, 3], { commit: true }).damageTotal).toBe(5);
+  });
+
+  it("isn't offered to an attacker without the feat", () => {
+    expect(swing(table(definition("Hero", [SWORD])), [15], { commit: false }).hitOffers ?? []).toEqual([]);
   });
 });

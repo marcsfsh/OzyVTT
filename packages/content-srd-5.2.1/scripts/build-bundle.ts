@@ -424,6 +424,8 @@ const PROTECTIVE_MAGIC: Pick<ActorAction, "reaction"> = {
  * - protective-magic: its Shield, offered when an attack would hit.
  * - burst-of-ingenuity: "The sphinx or another creature within 30 feet makes an ability check or a saving throw ...
  *   The sphinx adds 2 to the roll", an answer to the roll.
+ * - reflexive-antennae: "An attack roll hits the rust monster ... The rust monster uses Antennae", offered when a
+ *   creature within 5 feet damages it.
  * - deflect-missile: "hit by a ranged attack roll and takes Bludgeoning, Piercing, or Slashing damage from it ...
  *   reduces the damage it takes from the attack by 11 (1d10 + 6)"; the redirect after reducing it to 0 stays prose.
  */
@@ -439,6 +441,9 @@ const ACTION_ENRICHMENTS: Record<string, Pick<ActorAction, "targetRules" | "reac
       when: "any",
       effect: { kind: "add", amount: "2" }
     }
+  },
+  "rust-monster/reflexive-antennae": {
+    reaction: { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 5, usesAction: "antennae" }
   },
   "stone-giant/deflect-missile": {
     reaction: {
