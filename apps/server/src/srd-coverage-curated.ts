@@ -789,13 +789,13 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The GM says which token a found one is (item-records.ts). The Bird token is used up for a Roc that can't attack and obeys its user until it is dismissed with a Magic action or drops to 0 Hit Points (summons.ts). The Anchor, Fan, Swan Boat, Tree and Whip are the GM's."
   ),
   "item:figurine-of-wondrous-power": guided(
-    "The GM says which figurine a found one is (item-records.ts): its creature appears within 60 feet for its time, acts right after its user and defends itself when uncommanded, and a Magic action turns it back (summons.ts); clock-pools.ts holds it for its days. The Silver Raven, the goats' own waits and powers and the Obsidian Steed ignoring orders are the GM's."
+    "The GM says which figurine a found one is (item-records.ts): its creature appears within 60 feet for its time, acts right after its user and defends itself when uncommanded, and a Magic action turns it back (summons.ts). Its days of waiting start when it reverts (clock-pools.ts), each Golden Lion and each Ivory Goat on its own; the Goat of Traveling spends an hour or part of one each time from its 24 and waits only once they are spent. The Goat of Terror can't attack, the Onyx Dog has Blindsight 60 feet, the Silver Raven offers Animal Messenger, and the Obsidian Steed's d10 shows 1 one time in ten, leaving it under no one's command. The Goat of Terror's horns and fear, the steed refusing to revert and its ride to Hades are the GM's."
   ),
   "item:ring-of-djinni-summoning": enforced(
-    "The djinni appears within 120 feet while its wearer keeps Concentration, up to 1 hour, defending itself when uncommanded (summons.ts); clock-pools.ts holds the ring for 24 hours. The ring losing its magic when the djinni dies is the GM's."
+    "The djinni appears within 120 feet while its wearer keeps Concentration, up to 1 hour, defending itself when uncommanded (summons.ts); clock-pools.ts holds the ring for 24 hours from when it departs, and the ring loses its magic if the djinni dies (item-spent.ts)."
   ),
-  "item:staff-of-the-python": guided(
-    "Thrown within 10 feet, it becomes a Giant Constrictor Snake that acts right after its user, commanded within 60 feet and defending itself otherwise; a Bonus Action turns it back (summons.ts, summon-orders.ts). The hour before it works again, and the staff shattering when the snake dies, are the GM's."
+  "item:staff-of-the-python": enforced(
+    "Thrown within 10 feet, it becomes a Giant Constrictor Snake that acts right after its user, commanded within 60 feet and defending itself otherwise; a Bonus Action turns it back (summons.ts, summon-orders.ts), and the staff then waits an hour (clock-pools.ts). The snake dying shatters the staff (item-spent.ts)."
   ),
   "item:staff-of-swarming-insects": enforced(
     "Insect Cloud fills a 30-foot Emanation that is Heavily Obscured for everyone but its holder for 10 minutes (vision/cast-sight.ts). Giant Insect costs 4 charges and brings the insect (summons.ts), and Insect Plague costs 5. A strong wind dispersing the cloud is the GM's."
@@ -1509,8 +1509,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:potion-of-poison": guided(
     "Drinking it deals its 4d6 Poison damage to the drinker. The DC 13 Constitution save against an hour of Poisoned, and its disguise, are the GM's: the GM names the row."
   ),
-  "item:boots-of-speed": guided(
-    "A Bonus Action doubles its wearer's Speed (speed.ts) and gives Opportunity Attacks against it Disadvantage, for 10 minutes once a Long Rest. The minutes left when it ends early are the GM's to count."
+  "item:boots-of-speed": enforced(
+    "A Bonus Action doubles its wearer's Speed (speed.ts) and gives Opportunity Attacks against it Disadvantage. Its 10 minutes a Long Rest are 100 rounds: a click lasts all that is left, and ending it early gives the rest back (use-cost.ts, effects.ts)."
   ),
   "item:thunderous-greatclub": guided(
     "Its wearer's Strength is at least 20 (live-abilities.ts), a hit deals 1d8 Thunder more, Clap of Thunder's 30-foot Cone asks for the DC 15 Strength save against Prone, and Earthquake's once-a-day DC 20 Dexterity save against Prone is applied. Earthquake's Concentration save, its fissure and the damage to objects are the GM's."

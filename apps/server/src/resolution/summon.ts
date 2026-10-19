@@ -2,6 +2,7 @@ import { abilityModifier } from "@vtt/rules-5e";
 import { resolveSpellcasting, type Summon } from "@vtt/schemas";
 import { addEffect, CONCENTRATING_TAG, makeEffect, type EffectNarration } from "../effects.js";
 import { laterRowOf } from "../item-actions.js";
+import { itemRowOfAction, rollRegain } from "../item-charges.js";
 import type { SummonerNumbers } from "../summon-stat-blocks.js";
 import { spellEffectDuration, spellOf } from "./concentration.js";
 import { tableLineOf, type ResolveContext } from "./context.js";
@@ -87,6 +88,21 @@ export function applySummons(ctx: ResolveContext): void {
   if (!spell && summon.lasts?.type === "minutes" && summon.lasts.concentration)
     beginItemConcentration(ctx, summon.lasts.minutes);
   const level = spell ? (ctx.plan.castLevel ?? spell.level) : null;
+  // A use that waits from when its creature leaves (a figurine reverting): the hours are rolled now and start then.
+  const uses = action.uses;
+  // A use paid in hours (a Goat of Traveling) lasts the hours it spent, and gives back what it leaves unspent.
+  const paidHours = action.timePool === "hours" && ctx.plan.spendUse ? ctx.plan.spendUse.amount : null;
+  const waitAfter =
+    summon.waitsFromEnd && uses?.per === "time" && uses.afterHours
+      ? {
+          key: uses.pool ?? action.id,
+          name: action.name,
+          hours: Math.max(1, rollRegain(uses.afterHours, deps.random)),
+          ...(paidHours !== null ? { hoursPaid: paidHours, hoursPool: uses.limit } : {})
+        }
+      : undefined;
+  // The item that brought it, which its death ends (the Staff of the Python shatters).
+  const row = summon.itemEndsAtZero ? itemRowOfAction(action.id, attacker.inventory) : null;
   const outcome = deps.summon({
     userId: attacker.id,
     summon,
@@ -104,7 +120,10 @@ export function applySummons(ctx: ResolveContext): void {
     commandId: input.commandId,
     corpseIds: summon.fromCorpse ? ctx.targets.map((target) => target.id) : [],
     choice: input.summon ?? {},
-    numbers: summonerNumbers(ctx, summon)
+    numbers: summonerNumbers(ctx, summon),
+    ...(waitAfter ? { waitAfter } : {}),
+    ...(paidHours !== null ? { lastsMinutes: paidHours * 60 } : {}),
+    ...(row && summon.itemEndsAtZero ? { itemEnd: { itemId: row.id, outcome: summon.itemEndsAtZero } } : {})
   });
   for (const event of outcome.events) ctx.tableNarration.push(tableLineOf(ctx, event));
   ctx.summoned = outcome.created.map((entry) => ({ actorId: entry.id, name: entry.name }));

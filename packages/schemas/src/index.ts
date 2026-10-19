@@ -1898,6 +1898,12 @@ export const EffectInstanceSchema = z
     endAction: EffectEndActionSchema.optional(),
     /** The turn a once-a-turn part of this last applied (`round:actorId`), so it applies once a turn (Resistance). */
     usedOnTurn: z.string().max(160).optional(),
+    /** The pool of rounds it was paid from (Boots of Speed's 10 minutes): the rounds it has left when it ends early go
+     *  back to that pool of its source. */
+    refundsUses: z
+      .object({ key: z.string().min(1).max(120) })
+      .strict()
+      .optional(),
     /** Its attack, save, check and Initiative penalties move one toward 0 as each of the bearer's Long Rests ends, and
      *  it ends when none is left: a penalty that eases with rest, as Raise Dead's ordeal does in death.ts. */
     shrinksEachLongRest: z.literal(true).optional(),
@@ -2293,7 +2299,32 @@ export const SummonedSchema = z
     strikesFrom: StrikesFromSchema.optional(),
     /** The cast whose Concentration ends when it is gone (Arcane Hand at 0 Hit Points, Project Image's copy when it
      *  takes damage). */
-    endsSpell: z.string().min(1).max(120).optional()
+    endsSpell: z.string().min(1).max(120).optional(),
+    /** The use whose wait starts when it leaves: its user's pool, and the hours rolled as it came (a figurine's 5
+     *  days). */
+    waitAfter: z
+      .object({
+        key: z.string().min(1).max(120),
+        name: z.string().min(1).max(120),
+        hours: z.number().int().min(1).max(100_000),
+        /** Its use paid `hoursPaid` hours from a pool of `hoursPool` (a Goat of Traveling's 24): what it leaves unspent
+         *  comes back, each hour or part of one it stayed costing 1, and the wait starts only once the pool is spent. */
+        hoursPaid: z.number().int().min(1).max(100).optional(),
+        hoursPool: z.number().int().min(1).max(100).optional()
+      })
+      .strict()
+      .optional(),
+    /** The carried row that brought it, and what its death at 0 Hit Points does to that item. */
+    itemEnd: z
+      .object({
+        itemId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80),
+        outcome: z.enum(["destroyed", "nonmagical"])
+      })
+      .strict()
+      .optional()
   })
   .strict();
 export type Summoned = z.infer<typeof SummonedSchema>;
@@ -4124,7 +4155,13 @@ export const SummonCreatureSchema = z
           .max(6)
           .optional(),
         /** Conditions it is immune to beside its stat block's (a Horn of Valhalla's spirits: Charmed and Frightened). */
-        conditionImmunities: z.array(ConditionIdSchema).min(1).max(6).optional()
+        conditionImmunities: z.array(ConditionIdSchema).min(1).max(6).optional(),
+        /** Senses it has beside its stat block's, as a stat block prints them (an Onyx Dog's "blindsight 60 ft."). */
+        senses: z
+          .array(z.string().regex(/^(?:darkvision|blindsight|tremorsense|truesight) \d{1,4} ft\.$/))
+          .min(1)
+          .max(4)
+          .optional()
       })
       .strict()
       .optional()
@@ -4249,6 +4286,22 @@ export const SummonSchema = z
     strikesFrom: StrikesFromSchema.optional(),
     /** When it is gone before its time (0 Hit Points, damage), its spell ends too (Arcane Hand, Project Image). */
     endsSpell: z.literal(true).optional(),
+    /** The use's wait (`uses.afterHours`) starts when what it brought leaves, not as it is used ("When the creature
+     *  becomes a figurine again, its property can't be used again until ..."; a djinni's 24 hours after it departs). */
+    waitsFromEnd: z
+      .literal(true)
+      .optional()
+      .describe(
+        "The use's wait (uses.afterHours) starts when what it brought leaves, not as it is used (a figurine's days after it reverts)"
+      ),
+    /** When it dies at 0 Hit Points, the item that brought it is destroyed (the Staff of the Python shatters) or loses
+     *  its magic (a Ring of Djinni Summoning). */
+    itemEndsAtZero: z
+      .enum(["destroyed", "nonmagical"])
+      .optional()
+      .describe(
+        "When it dies at 0 Hit Points, the item that brought it is destroyed (the Staff of the Python) or loses its magic (a Ring of Djinni Summoning)"
+      ),
     /** Its user's spell attack bonus, spell save DC and spellcasting ability modifier, which a scaled stat block reads
      *  (`summonScaling`). The engine fills them when it makes a cast action. */
     numbers: z
@@ -4373,6 +4426,14 @@ export const ActionSchema = z
     /** How many of its uses one activation spends: a fixed number (Lay on Hands' 5 points to cure a poison), or
      *  `chosen`, picked by the user each time (Lay on Hands' healing). Absent: one. */
     useCost: z.union([z.number().int().min(2).max(MAX_ACTION_USES), z.literal("chosen")]).optional(),
+    /** Its uses are time in this unit: a use spends all that is left and lasts that long, and what is left when it ends
+     *  early comes back (Boots of Speed's 10 minutes as 100 rounds, a Goat of Traveling's 24 hours). */
+    timePool: z
+      .enum(["rounds", "hours"])
+      .optional()
+      .describe(
+        "Its uses are time in this unit: a use spends all that is left and lasts that long, and what is left when it ends early comes back (Boots of Speed's 100 rounds, a Goat of Traveling's 24 hours)"
+      ),
     /** Conditions this action ends on each target (Lay on Hands: Poisoned). */
     endsConditions: z.array(ConditionIdSchema).min(1).max(6).optional(),
     /** It ends one of `endsConditions`, the one its user picks (Lesser Restoration); absent, it ends each one present. */

@@ -42,7 +42,7 @@ import {
 import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
 import { carriesSpellbook, hasClassFeature } from "../ritual-adept.js";
 import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
-import { notEnoughUses, useCostOf } from "../use-cost.js";
+import { activationCost, notEnoughUses } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { planThisTurn, usedMarkOf } from "./multiattack-after.js";
 import { END_EFFECT_ACTION_ID, hasEndingOption, NO_ENDING_OPTION } from "../ending-actions.js";
@@ -833,7 +833,7 @@ function checkLimitedUse({ state, attacker, action, siblings, violations }: Eval
       message: `${action.name} comes as use ${action.useNumber} of ${limit}, and ${attacker.name} has spent ${spent}.`
     });
   // Some activations spend several (Lay on Hands' 5-point cure, or the points its user chose).
-  const cost = useCostOf(action);
+  const cost = activationCost(action, spent, limit);
   if (spent + cost > limit)
     violations.push({
       rule: "feature.no-uses-remaining",

@@ -492,6 +492,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].timePool",
+    types: ACTION_CARRIERS,
+    reason:
+      "uses that are time, a use spending all that is left (Boots of Speed's rounds, a Goat of Traveling's hours) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].endsConditions",
     types: ACTION_CARRIERS,
     reason:

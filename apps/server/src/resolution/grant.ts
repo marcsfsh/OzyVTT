@@ -226,6 +226,14 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   const rolledHours = grant.hoursRolled
     ? Math.max(1, resolveDice(parseDiceFormula(grant.hoursRolled), ctx.deps.random).total)
     : null;
+  // A use paid from a pool of time lasts what it spent (Boots of Speed's rounds left), and gives back what is left when
+  // it is ended early.
+  const paid = action.timePool && ctx.plan.spendUse ? ctx.plan.spendUse : null;
+  const timed: EffectInstance["duration"] | null = paid
+    ? action.timePool === "hours"
+      ? { type: "minutes", remaining: paid.amount * 60 }
+      : { type: "rounds", remaining: paid.amount }
+    : null;
   const spell = spellOf(ctx);
   const castLevel = spell ? (ctx.plan.castLevel ?? spell.level) : null;
   // The choice made as it is granted (Fire Shield's warm or chill), and the weapon it binds to (Magic Weapon).
@@ -266,7 +274,9 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
           ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
           : rolledHours !== null
             ? { type: "minutes", remaining: rolledHours * 60 }
-            : grantDuration(
+            : timed
+              ? timed
+              : grantDuration(
                 state,
                 grant.duration,
                 attacker.id,
@@ -319,7 +329,8 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       // Its size while it lasts (Large Form), from the size it had before any change.
       ...(grant.sizeChange ? { sizeChange: { ...grant.sizeChange }, ownSize: ownSizeOf(recipient) } : {}),
       ...grantExtras(ctx, grant, recipient, option),
-      ...(bound?.fields ?? {})
+      ...(bound?.fields ?? {}),
+      ...(paid ? { refundsUses: { key: paid.key } } : {})
     }),
     replaced,
     deps

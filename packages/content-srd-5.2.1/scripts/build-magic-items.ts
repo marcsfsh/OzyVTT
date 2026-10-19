@@ -47,23 +47,6 @@ interface Entry {
   readonly line: number;
 }
 
-const entries: Entry[] = [];
-for (let index = azIndex; index < lines.length; index++) {
-  if (!lines[index].startsWith("#### ")) continue;
-  let cursor = index + 1;
-  while (cursor < lines.length && lines[cursor].trim() === "") cursor++;
-  const typeLine = (lines[cursor] ?? "").trim();
-  const body: string[] = [];
-  for (
-    let scan = cursor + 1;
-    scan < lines.length && !lines[scan].startsWith("#### ") && !lines[scan].startsWith("## ");
-    scan++
-  ) {
-    body.push(lines[scan]);
-  }
-  entries.push({ name: lines[index].slice(5).trim(), typeLine, body: body.join("\n").trim(), line: index + 1 });
-}
-
 /**
  * Items are told apart from the two embedded creature stat blocks by the category word. Italics
  * can't do it: every entry in the run has an italic second line.
@@ -81,12 +64,40 @@ const CATEGORY_WORDS = [
 ] as const;
 type CategoryWord = (typeof CATEGORY_WORDS)[number];
 
-/** The two creature stat blocks in the run. Named and counted: a silent filter hides a parse bug. */
-const NOT_ITEMS = ["Giant Fly", "Avatar of Death"] as const;
-
 const unItalic = (value: string) => value.replace(/^_/, "").replace(/_$/, "");
 const categoryOf = (typeLine: string): CategoryWord | undefined =>
   CATEGORY_WORDS.find((word) => unItalic(typeLine).startsWith(word));
+
+/** A stat block set inside an item's text ends where the item's next part begins, bolded with its rarity: the Figurine
+ *  of Wondrous Power's "**Golden Lions (Rare).**" after its Giant Fly. */
+const RESUMES_ITEM = /^\*\*[^*_]+ \((?:Common|Uncommon|Rare|Very Rare|Legendary|Artifact)\)\.\*\*/;
+
+const entries: Entry[] = [];
+for (let index = azIndex; index < lines.length; index++) {
+  if (!lines[index].startsWith("#### ")) continue;
+  let cursor = index + 1;
+  while (cursor < lines.length && lines[cursor].trim() === "") cursor++;
+  const typeLine = (lines[cursor] ?? "").trim();
+  const body: string[] = [];
+  for (
+    let scan = cursor + 1;
+    scan < lines.length && !lines[scan].startsWith("#### ") && !lines[scan].startsWith("## ");
+    scan++
+  ) {
+    body.push(lines[scan]);
+  }
+  // The rest of an item an embedded stat block interrupted goes back to that item.
+  const resumes = categoryOf(typeLine) ? -1 : body.findIndex((line) => RESUMES_ITEM.test(line.trim()));
+  const previous = entries.at(-1);
+  if (resumes >= 0 && previous) {
+    const tail = body.splice(resumes).join("\n").trim();
+    entries[entries.length - 1] = { ...previous, body: `${previous.body}\n\n${tail}` };
+  }
+  entries.push({ name: lines[index].slice(5).trim(), typeLine, body: body.join("\n").trim(), line: index + 1 });
+}
+
+/** The two creature stat blocks in the run. Named and counted: a silent filter hides a parse bug. */
+const NOT_ITEMS = ["Giant Fly", "Avatar of Death"] as const;
 
 const items = entries.filter((entry) => categoryOf(entry.typeLine));
 const skipped = entries.filter((entry) => !categoryOf(entry.typeLine));

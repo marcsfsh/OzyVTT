@@ -4,7 +4,7 @@ import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { familyModeFor, type RuleId } from "./rules-families.js";
 import { CommandRejectedError } from "./game-store.js";
 import { castSlot, noUsesRemaining, slotsLeft, spendSlot, unpreparedSpell, useLimitFor } from "./resolution/economy.js";
-import { notEnoughUses, useCostOf } from "./use-cost.js";
+import { activationCost, notEnoughUses } from "./use-cost.js";
 
 /**
  * Where an action tap goes, decided by the server. The sheet sends intent; the server answers:
@@ -77,7 +77,7 @@ export function spendLooseUses(
   const key = uses ? (uses.pool ?? action.id) : null;
   const limit = uses ? useLimitFor(siblings, action) : 0;
   const used = key ? (actor.actionUses[key] ?? 0) : 0;
-  const cost = useCostOf(action);
+  const cost = activationCost(action, used, limit);
   if (key && used >= limit) throw new CommandRejectedError(noUsesRemaining(action, limit));
   if (key && used + cost > limit) throw new CommandRejectedError(notEnoughUses(action.name, limit - used, cost));
   const slot = action.spellSlot ? castSlot(actor, action.spellSlot.level, slotLevel) : null;

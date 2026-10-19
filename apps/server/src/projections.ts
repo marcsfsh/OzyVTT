@@ -609,6 +609,8 @@ function playerEffect(
     grantedSpellAction: _grantedSpellAction,
     endAction: _endAction,
     usedOnTurn: _usedOnTurn,
+    // The pool it was paid from is its source's sheet, an exact quantity.
+    refundsUses: _refundsUses,
     shrinksEachLongRest: _shrinksEachLongRest,
     unarmedStrike: _unarmedStrike,
     // What a hit on the bearer costs its attacker names a save's DC; the server applies it.

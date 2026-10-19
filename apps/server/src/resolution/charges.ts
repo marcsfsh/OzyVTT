@@ -49,8 +49,10 @@ export function afterItemSpend(ctx: ResolveContext, action: DefinitionAction, sp
   const { attacker, deps, siblings, warnings } = ctx;
   if (!spendUse || spendUse.per === "turn") return;
   if (savedByUseMagicDevice(ctx, action, spendUse)) return;
-  // A pool spent for a time starts its wait on its first use ("can't be used again until 1d12 hours have passed").
-  if (spendUse.per === "time" && action.uses?.afterHours) {
+  // A pool spent for a time starts its wait on its first use ("can't be used again until 1d12 hours have passed"), or
+  // once the creature it brought leaves (a figurine reverting).
+  const waitsForItsCreature = action.summons?.waitsFromEnd === true && (ctx.summoned?.length ?? 0) > 0;
+  if (spendUse.per === "time" && action.uses?.afterHours && !waitsForItsCreature) {
     const line = startTimedPool(ctx.state, attacker, spendUse.key, action.name, action.uses.afterHours, deps.random);
     if (line) warnings.push(line);
   }

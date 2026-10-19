@@ -9,7 +9,6 @@ import type { DamageType, Modifier } from "@vtt/schemas";
 import type { ItemMechanics, ItemMechanicsModule } from "./overlay.js";
 import { MISTY_CLOUD } from "../spell-effects.js";
 
-/** The d10 table Armor of Resistance and Ring of Resistance roll on for their type. */
 /** Extra damage when the weapon hits a creature of one of these types ("an extra 3d6 damage of the weapon's type if the
  *  target is a Dragon"); with no `damageType` it is the weapon's own. */
 function versusTypes(formula: string, creatureTypes: string[], damageType?: DamageType): Modifier {
@@ -22,6 +21,12 @@ function versusTypes(formula: string, creatureTypes: string[], damageType?: Dama
   };
 }
 
+/** How a figurine is used, and what its creature does, shared by the Ivory Goats' three actions. */
+const GOAT_THROW = "Throw the figurine to a point on the ground within 60 feet:";
+const FIGURINE_OBEYS =
+  "The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.";
+
+/** The d10 table Armor of Resistance and Ring of Resistance roll on for their type. */
 const RESISTANCE_TABLE = [
   "acid",
   "cold",
@@ -901,9 +906,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The djinni within 120 feet, Friendly and obeying the wearer while the wearer keeps Concentration, up to 1 hour; then
-  // 24 hours before it can be summoned again. "If you fail to command it, the djinni defends itself against attackers but takes no other actions." The ring
-  // becoming nonmagical when the djinni dies is the table's.
+  // The djinni within 120 feet, Friendly and obeying the wearer while the wearer keeps Concentration, up to 1 hour,
+  // defending itself when uncommanded. The 24 hours before it can be summoned again count from when it departs, and
+  // the ring loses its magic if the djinni dies.
   "ring-of-djinni-summoning": {
     actions: [
       {
@@ -917,7 +922,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           creatures: [{ monsterId: "djinni" }],
           rangeFeet: 120,
           lasts: { type: "minutes", minutes: 60, concentration: true },
-          dodgesUncommanded: true
+          dodgesUncommanded: true,
+          waitsFromEnd: true,
+          itemEndsAtZero: "nonmagical"
         }
       }
     ]
@@ -1710,8 +1717,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // Thrown within 10 feet, it becomes a Giant Constrictor Snake that shares its user's Initiative and acts right after,
-  // commanded within 60 feet, defending itself otherwise; a Bonus Action turns it back into the staff. The hour before
-  // it can be used again, and the staff shattering when the snake dies, are the table's.
+  // commanded within 60 feet, defending itself otherwise; a Bonus Action turns it back into the staff, which then
+  // can't be used for an hour. If the snake dies, the staff shatters.
   "staff-of-the-python": {
     actions: [
       {
@@ -1719,13 +1726,16 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         name: "Throw the Staff",
         activation: "action",
         description:
-          "Throw the staff so that it lands in an unoccupied space within 10 feet, where it becomes a Giant Constrictor Snake under your control. It shares your Initiative count and takes its turn immediately after yours. You command it while it is within 60 feet of you; absent commands, it defends itself. A Bonus Action turns it back into the staff.",
+          "Throw the staff so that it lands in an unoccupied space within 10 feet, where it becomes a Giant Constrictor Snake under your control. It shares your Initiative count and takes its turn immediately after yours. You command it while it is within 60 feet of you; absent commands, it defends itself. A Bonus Action turns it back into the staff, which can't be used again for 1 hour. If the snake drops to 0 Hit Points, it dies and the staff shatters.",
+        uses: { limit: 1, per: "time", afterHours: "1" },
         summons: {
           creatures: [{ monsterId: "giant-constrictor-snake" }],
           rangeFeet: 10,
           commandFeet: 60,
           dodgesUncommanded: true,
-          dismiss: "bonus-action"
+          dismiss: "bonus-action",
+          waitsFromEnd: true,
+          itemEndsAtZero: "destroyed"
         }
       }
     ]
@@ -2181,8 +2191,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       }
     ]
   },
-  // A Bonus Action clicks the heels: Speed doubled and Disadvantage on Opportunity Attacks against the wearer, for its 10
-  // minutes a Long Rest. Clicking again ends it, and the minutes left over are the GM's to count.
+  // A Bonus Action clicks the heels: Speed doubled and Disadvantage on Opportunity Attacks against the wearer. Its 10
+  // minutes a Long Rest are 100 rounds: a click lasts all that is left, and ending it early gives the rest back.
   "boots-of-speed": {
     actions: [
       {
@@ -2192,7 +2202,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         description:
           "The boots double your Speed, and any creature that makes an Opportunity Attack against you has Disadvantage on the attack roll. Click your heels again to end it. When you've used the boots for a total of 10 minutes, they cease to function for you until you finish a Long Rest.",
         damage: [],
-        uses: { limit: 1, per: "long-rest" },
+        uses: { limit: 100, per: "long-rest", pool: "boots-of-speed-rounds" },
+        timePool: "rounds",
         grants: {
           name: "Boots of Speed",
           tags: ["boots-of-speed"],
@@ -3254,12 +3265,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       { id: "whip", name: "Whip" }
     ]
   },
-  // One action for each figurine (the Ivory Goats' three in one, picked by goat): thrown within 60 feet, it becomes its
-  // creature for its time, on its user's side and acting right after its user, defending itself when uncommanded; a
-  // Magic action turns it back, and then the figurine waits its days. The Ivory Goats' waits (one action for three
-  // goats with three waits), the Goat of Traveling's hourly charges, the Goat of Terror's fear and horns, the Onyx Dog's
-  // Blindsight and speech, the Obsidian Steed ignoring orders, and the Silver Raven (an item holds eight actions) are
-  // the table's.
+  // One action for each figurine (each lion and each goat its own): thrown within 60 feet, it becomes its creature for
+  // its time, on its user's side and acting right after its user, defending itself when uncommanded; a Magic action
+  // turns it back, and its days of waiting start when it reverts. The Goat of Traveling spends its 24 hourly charges as
+  // it goes and waits its 7 days only once they are spent. The Obsidian Steed's d10 shows 1 one time in ten, and the
+  // nightmare then answers to no one. The Goat of Terror's horns and fear, the Onyx Dog's speech, the steed's ride to
+  // Hades and the owl's telepathy are the table's.
   "figurine-of-wondrous-power": {
     variants: [
       {
@@ -3271,14 +3282,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
             name: "Throw the Bronze Griffon",
             activation: "action",
             description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes a Griffon for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+              "Throw the figurine to a point on the ground within 60 feet: it becomes a Griffon for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 5 days have passed.",
             uses: { limit: 1, per: "time", afterHours: "120" },
             summons: {
               creatures: [{ monsterId: "griffon" }],
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 360 },
               dodgesUncommanded: true,
-              dismiss: "action"
+              dismiss: "action",
+              waitsFromEnd: true
             }
           }
         ]
@@ -3292,14 +3304,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
             name: "Throw the Ebony Fly",
             activation: "action",
             description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Fly for up to 12 hours, which can be ridden as a mount. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+              "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Fly for up to 12 hours, which can be ridden as a mount. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 2 days have passed.",
             uses: { limit: 1, per: "time", afterHours: "48" },
             summons: {
               creatures: [{ monsterId: "giant-fly" }],
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 720 },
               dodgesUncommanded: true,
-              dismiss: "action"
+              dismiss: "action",
+              waitsFromEnd: true
             }
           }
         ]
@@ -3307,44 +3320,71 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       {
         id: "golden-lions",
         name: "Golden Lions",
-        actions: [
-          {
-            id: "golden-lions",
-            name: "Throw the Golden Lions",
-            activation: "action",
-            description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes a Lion for up to 1 hour, one for each figurine of the pair thrown. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
-            uses: { limit: 1, per: "time", afterHours: "168" },
-            summons: {
-              creatures: [{ monsterId: "lion", count: 2 }],
-              rangeFeet: 60,
-              lasts: { type: "minutes", minutes: 60 },
-              dodgesUncommanded: true,
-              dismiss: "action"
-            }
+        actions: (["first", "second"] as const).map((lion) => ({
+          id: `golden-lion-${lion}`,
+          name: `Throw the ${lion === "first" ? "First" : "Second"} Golden Lion`,
+          activation: "action" as const,
+          description:
+            "Throw one figurine of the pair to a point on the ground within 60 feet: it becomes a Lion for up to 1 hour. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, that lion can't be used again until 7 days have passed.",
+          uses: { limit: 1, per: "time" as const, afterHours: "168", pool: `golden-lion-${lion}` },
+          summons: {
+            creatures: [{ monsterId: "lion" }],
+            rangeFeet: 60,
+            lasts: { type: "minutes" as const, minutes: 60 },
+            dodgesUncommanded: true as const,
+            dismiss: "action" as const,
+            waitsFromEnd: true as const
           }
-        ]
+        }))
       },
       {
         id: "ivory-goats",
         name: "Ivory Goats",
         actions: [
           {
-            id: "ivory-goats",
-            name: "Throw the Ivory Goats",
+            id: "goat-of-terror",
+            name: "Throw the Goat of Terror",
             activation: "action",
-            description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes the goat it is: the Goat of Terror a Giant Goat that can't attack, the Goat of Travail a Giant Goat, the Goat of Traveling a Large goat with the statistics of a Riding Horse; each for up to 3 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+            description: `${GOAT_THROW} it becomes a Giant Goat for up to 3 hours, which can't attack. You can remove its horns as a Magic action: one becomes a +1 Lance and the other a +2 Longsword until it reverts. While you ride it, a Hostile creature that starts its turn within 30 feet of it makes a DC 15 Wisdom save or is Frightened. ${FIGURINE_OBEYS} Once it reverts, it can't be used again until 15 days have passed.`,
+            uses: { limit: 1, per: "time", afterHours: "360", pool: "goat-of-terror" },
             summons: {
-              creatures: [
-                { monsterId: "giant-goat", form: "terror", except: { name: "Goat of Terror" } },
-                { monsterId: "giant-goat", form: "travail", except: { name: "Goat of Travail" } },
-                { monsterId: "riding-horse", form: "traveling", except: { name: "Goat of Traveling" } }
-              ],
+              creatures: [{ monsterId: "giant-goat", except: { name: "Goat of Terror" } }],
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 180 },
               dodgesUncommanded: true,
-              dismiss: "action"
+              noAttacks: true,
+              dismiss: "action",
+              waitsFromEnd: true
+            }
+          },
+          {
+            id: "goat-of-travail",
+            name: "Throw the Goat of Travail",
+            activation: "action",
+            description: `${GOAT_THROW} it becomes a Giant Goat for up to 3 hours. ${FIGURINE_OBEYS} Once it reverts, it can't be used again until 30 days have passed.`,
+            uses: { limit: 1, per: "time", afterHours: "720", pool: "goat-of-travail" },
+            summons: {
+              creatures: [{ monsterId: "giant-goat", except: { name: "Goat of Travail" } }],
+              rangeFeet: 60,
+              lasts: { type: "minutes", minutes: 180 },
+              dodgesUncommanded: true,
+              dismiss: "action",
+              waitsFromEnd: true
+            }
+          },
+          {
+            id: "goat-of-traveling",
+            name: "Throw the Goat of Traveling",
+            activation: "action",
+            description: `${GOAT_THROW} it becomes a Large goat with the statistics of a Riding Horse. It has 24 charges, and each hour or part of one it spends as a goat costs 1. While it has charges you can use it as often as you wish; when they run out it reverts, and it can't be used again until 7 days have passed, when it regains them all. ${FIGURINE_OBEYS}`,
+            uses: { limit: 24, per: "time", afterHours: "168", pool: "goat-of-traveling" },
+            timePool: "hours",
+            summons: {
+              creatures: [{ monsterId: "riding-horse", except: { name: "Goat of Traveling" } }],
+              rangeFeet: 60,
+              dodgesUncommanded: true,
+              dismiss: "action",
+              waitsFromEnd: true
             }
           }
         ]
@@ -3358,14 +3398,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
             name: "Throw the Marble Elephant",
             activation: "action",
             description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes an Elephant for up to 24 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+              "Throw the figurine to a point on the ground within 60 feet: it becomes an Elephant for up to 24 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 7 days have passed.",
             uses: { limit: 1, per: "time", afterHours: "168" },
             summons: {
               creatures: [{ monsterId: "elephant" }],
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 1440 },
               dodgesUncommanded: true,
-              dismiss: "action"
+              dismiss: "action",
+              waitsFromEnd: true
             }
           }
         ]
@@ -3379,14 +3420,19 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
             name: "Throw the Obsidian Steed",
             activation: "action",
             description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes a Nightmare for up to 24 hours, which fights only to defend itself. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+              "Throw the figurine to a point on the ground within 60 feet: it becomes a Nightmare for up to 24 hours, which fights only to defend itself. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Each time you use it, there is a 10 percent chance it ignores your orders. Once it reverts, it can't be used again until 5 days have passed.",
             uses: { limit: 1, per: "time", afterHours: "120" },
             summons: {
-              creatures: [{ monsterId: "nightmare" }],
+              creatures: [
+                { monsterId: "nightmare", faces: { from: 1, to: 1 }, allegiance: "none" },
+                { monsterId: "nightmare", faces: { from: 2, to: 10 } }
+              ],
+              die: 10,
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 1440 },
               dodgesUncommanded: true,
-              dismiss: "action"
+              dismiss: "action",
+              waitsFromEnd: true
             }
           }
         ]
@@ -3400,14 +3446,17 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
             name: "Throw the Onyx Dog",
             activation: "action",
             description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes a Mastiff with an Intelligence of 8 for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+              "Throw the figurine to a point on the ground within 60 feet: it becomes a Mastiff for up to 6 hours, with an Intelligence of 8, Blindsight with a range of 60 feet, and the Common language. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 7 days have passed.",
             uses: { limit: 1, per: "time", afterHours: "168" },
             summons: {
-              creatures: [{ monsterId: "mastiff", except: { abilityScores: { int: 8 } } }],
+              creatures: [
+                { monsterId: "mastiff", except: { abilityScores: { int: 8 }, senses: ["blindsight 60 ft."] } }
+              ],
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 360 },
               dodgesUncommanded: true,
-              dismiss: "action"
+              dismiss: "action",
+              waitsFromEnd: true
             }
           }
         ]
@@ -3421,19 +3470,42 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
             name: "Throw the Serpentine Owl",
             activation: "action",
             description:
-              "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Owl for up to 8 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+              "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Owl for up to 8 hours, which can speak with you telepathically at any range on the same plane. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 2 days have passed.",
             uses: { limit: 1, per: "time", afterHours: "48" },
             summons: {
               creatures: [{ monsterId: "giant-owl" }],
               rangeFeet: 60,
               lasts: { type: "minutes", minutes: 480 },
               dodgesUncommanded: true,
-              dismiss: "action"
+              dismiss: "action",
+              waitsFromEnd: true
             }
           }
         ]
       },
-      { id: "silver-raven", name: "Silver Raven" }
+      {
+        id: "silver-raven",
+        name: "Silver Raven",
+        actions: [
+          {
+            id: "silver-raven",
+            name: "Throw the Silver Raven",
+            activation: "action",
+            description:
+              "Throw the figurine to a point on the ground within 60 feet: it becomes a Raven for up to 12 hours, and while it is a raven you can cast Animal Messenger on it. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action. Once it reverts, it can't be used again until 2 days have passed.",
+            uses: { limit: 1, per: "time", afterHours: "48" },
+            summons: {
+              creatures: [{ monsterId: "raven" }],
+              rangeFeet: 60,
+              lasts: { type: "minutes", minutes: 720 },
+              dodgesUncommanded: true,
+              dismiss: "action",
+              waitsFromEnd: true
+            }
+          }
+        ],
+        casts: [{ spellId: "animal-messenger" }]
+      }
     ]
   },
   // `folding-boat` - a vehicle.

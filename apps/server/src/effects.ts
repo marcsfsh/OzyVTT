@@ -655,6 +655,27 @@ export function endEffect(state: GameState, actorId: string, effectId: string): 
   return events;
 }
 
+/** An effect paid from a pool of time and ended before it ran out (Boots of Speed clicked off) gives what it had left
+ *  back to its source's pool. Returns the line the table reads, or null when nothing comes back. */
+export function refundUnspentTime(state: GameState, effect: EffectInstance): string | null {
+  const key = effect.refundsUses?.key;
+  const source = key ? state.actors.find((candidate) => candidate.id === effect.sourceActorId) : undefined;
+  if (!key || !source) return null;
+  const duration = effect.duration;
+  const left =
+    duration.type === "rounds"
+      ? duration.remaining
+      : duration.type === "minutes"
+        ? Math.floor(duration.remaining / 60)
+        : 0;
+  const spent = source.actionUses[key] ?? 0;
+  if (left <= 0 || spent <= 0) return null;
+  const { [key]: _old, ...others } = source.actionUses;
+  const now = Math.max(0, spent - left);
+  source.actionUses = now > 0 ? { ...others, [key]: now } : others;
+  return `${effect.name} ends early, so ${source.name} keeps the time it had left.`;
+}
+
 /** The Ready is used up (its Reaction taken, or spent another way): the Readied effect ends, and a spell it held
  *  dissipates with the Concentration holding it. The names of what ended, for the result card. */
 export function releaseReadied(state: GameState, actorId: string): string[] {

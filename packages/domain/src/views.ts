@@ -59,6 +59,7 @@ export type PlayerEffect = Omit<
   | "grantedSpellAction"
   | "endAction"
   | "usedOnTurn"
+  | "refundsUses"
   | "shrinksEachLongRest"
   | "unarmedStrike"
   | "struck"
