@@ -355,15 +355,20 @@ describe("the purse and the player's view", () => {
     expect(payFromPurse({ pp: 0, gp: 1, ep: 0, sp: 0, cp: 0 }, 101)).toBeNull();
   });
 
-  it("shows a player only the projects their characters work on, without when they started", () => {
-    const { state, deps } = table();
+  it("shows a player the party's projects, with what one cost only on their own, and never when it started", () => {
+    const { state, deps, actor } = table();
     startCraft(state, { actorId: BREN, itemId: "rations" }, PLAYER, deps);
     startCraft(state, { actorId: MIRA, itemId: "spell-scroll", spellId: "shield" }, MIRA_PLAYER, deps);
     const view = projectPlayerView(state, SESSION, () => null);
     expect(view.crafting).toEqual([
-      expect.objectContaining({ crafterId: BREN, itemName: "Rations (1 day)", helperIds: [] })
+      expect.objectContaining({ crafterId: BREN, itemName: "Rations (1 day)", helperIds: [], paidCp: 25 }),
+      expect.not.objectContaining({ paidCp: expect.anything() })
     ]);
+    expect(view.crafting[1]).toMatchObject({ crafterId: MIRA, itemName: "Spell Scroll (Shield)" });
     expect(JSON.stringify(view.crafting)).not.toContain("startedAt");
     expect(JSON.stringify(view.crafting)).not.toContain("saveDc");
+    // A hidden character's project stays with the GM.
+    actor(MIRA).visibility = "gm-only";
+    expect(projectPlayerView(state, SESSION, () => null).crafting.map((project) => project.crafterId)).toEqual([BREN]);
   });
 });

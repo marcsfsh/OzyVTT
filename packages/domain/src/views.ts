@@ -312,9 +312,9 @@ export type PlayerRestView = Readonly<{
     shortRestEarned: readonly string[];
   }> | null;
 }>;
-/** A crafting project one of the player's characters makes or helps with: what it makes, with what, and how far it
- *  has come. When it started and the scroll's numbers stay with the GM; helpers are named only among the party's
- *  visible characters. */
+/** A party crafting project as a player sees it (their own characters' and the visible party's): what it makes, with
+ *  what, and how far it has come. When it started and the scroll's numbers stay with the GM; helpers are named only
+ *  among the party's visible characters. */
 export type PlayerCraftingProject = Readonly<{
   id: string;
   crafterId: string;
@@ -326,7 +326,8 @@ export type PlayerCraftingProject = Readonly<{
   helperIds: readonly string[];
   workMinutes: number;
   doneMinutes: number;
-  paidCp: number;
+  /** What its raw materials cost, in copper: only on the player's own characters' projects. */
+  paidCp?: number;
 }>;
 export type PlayerView = Pick<GameState, "revision"> & {
   combat: PlayerCombatView;
@@ -337,7 +338,7 @@ export type PlayerView = Pick<GameState, "revision"> & {
   /** The GM's open calls for a roll that name this player's characters (see PlayerRollCall). */ rollCalls: readonly PlayerRollCall[];
   /** The tier the server applied, so the client renders the shape it was given ("no definition" and "definition withheld" look the same otherwise). Descriptive only. */ partyVisibility: PartyVisibility;
   /** Long Rest requests and the party's Short Rest, for the player's own characters only. */ rest: PlayerRestView;
-  /** The crafting projects the player's characters make or help with. */ crafting: readonly PlayerCraftingProject[];
+  /** The party's crafting projects: their own characters' and the visible party's. */ crafting: readonly PlayerCraftingProject[];
 };
 export type GmActor = Actor & { presence: PresenceStatus | null };
 /** One recorded turn boundary on the time-travel timeline. GM-only (labels can name hidden combatants); the server attaches the list to GM views at emission. */

@@ -713,8 +713,10 @@ function playerRest(state: GameState, yourActorIds: ReadonlySet<string>): Player
   };
 }
 
-/** The crafting projects a player's characters make or help with, from an allow-list: when one started and a scroll's
- *  numbers stay with the GM, and a helper is named only when it is one of theirs or a visible party character. */
+/** The party's crafting projects as a player sees them, from an allow-list: those of their own characters and of the
+ *  visible party characters, so a character can offer to help. What a project cost stays with its crafter's player (a
+ *  purse is owner-only), and when one started and a scroll's numbers stay with the GM. A helper is named only when it
+ *  is one of theirs or a visible party character. */
 function playerCrafting(state: GameState, yourActorIds: ReadonlySet<string>): PlayerView["crafting"] {
   const named = (actorId: string) =>
     yourActorIds.has(actorId) ||
@@ -723,7 +725,6 @@ function playerCrafting(state: GameState, yourActorIds: ReadonlySet<string>): Pl
         actor.id === actorId && actor.kind === "player-character" && actor.visibility === "public" && !actor.archived
     );
   return state.crafting.projects
-    .filter((project) => yourActorIds.has(project.crafterId) || project.helperIds.some((id) => yourActorIds.has(id)))
     .filter((project) => named(project.crafterId))
     .map((project) => ({
       id: project.id,
@@ -736,7 +737,7 @@ function playerCrafting(state: GameState, yourActorIds: ReadonlySet<string>): Pl
       helperIds: project.helperIds.filter(named),
       workMinutes: project.workMinutes,
       doneMinutes: project.doneMinutes,
-      paidCp: project.paidCp
+      ...(yourActorIds.has(project.crafterId) ? { paidCp: project.paidCp } : {})
     }));
 }
 
