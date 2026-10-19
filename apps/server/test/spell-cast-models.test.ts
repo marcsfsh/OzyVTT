@@ -62,6 +62,7 @@ describe("a save made later, not on the cast", () => {
 
   it("resolves the later save against a creature: Wisdom, 3d8 Radiant, half on a success", () => {
     const { resolve, state } = fight(cleric);
+    resolve("spell-spirit-guardians", { targetIds: [] });
     resolve("spell-spirit-guardians-then-save", {}, [3, 3, 3]);
     expect(state.combat.pendingSaves).toEqual([
       expect.objectContaining({ ability: "wis", targetActorId: FOE, proposedDamage: 9, halfOnSuccess: true })

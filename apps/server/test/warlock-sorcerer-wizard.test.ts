@@ -344,9 +344,13 @@ describe("Warlock: Contact Patron hands over the spell and the free casting (aud
       built.state,
       actionOf(built, "spell-contact-other-plane-free"),
       { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000010" },
-      deps(built, [])
+      deps(built, [3, 3, 3, 3, 3, 3])
     );
     expect(built.hero.actionUses["contact-patron"]).toBe(1);
+    // "When you cast this spell, make a DC 15 Intelligence saving throw": the caster's own, with 6d6 Psychic on it.
+    expect(built.state.combat.pendingSaves).toMatchObject([
+      { targetActorId: IDS.hero, ability: "int", dc: 15, proposedDamage: 18 }
+    ]);
     expect(() =>
       resolveDefinitionAction(
         built.state,

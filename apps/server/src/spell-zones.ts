@@ -1,7 +1,7 @@
 import type { SpellReference, SpellZone as ZoneTrigger } from "@vtt/content-srd-5.2.1";
 import type { GameState, SpellZone } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { footprintInTemplate } from "./area-targeting.js";
 import { areEnemies } from "./creature-sides.js";
 import { CONCENTRATING_TAG, type EffectNarration } from "./effects.js";
@@ -12,7 +12,7 @@ import { creatureDistance, DISTANCE_TOLERANCE_FEET, mapDistance } from "./moveme
 import { CommandRejectedError } from "./game-store.js";
 import { failureEffectFor } from "./resolution/pending.js";
 import { createPendingSaves } from "./saving-throws.js";
-import { countZoneDamage, endZone, zoneContentOf } from "./spell-zone-state.js";
+import { countZoneDamage, endZone, removeZone, zoneContentOf } from "./spell-zone-state.js";
 import type { TokenMapGeometry } from "./token-placement.js";
 import { withArticle } from "@vtt/domain";
 
@@ -39,7 +39,14 @@ export type ZoneDeps = Readonly<{
 }>;
 
 /** How a creature met the zone, for its narration and its marks. */
-type Meeting = "enters" | "is caught by" | "ends its turn in" | "starts its turn in" | "moves through";
+type Meeting =
+  | "enters"
+  | "is caught by"
+  | "ends its turn in"
+  | "starts its turn in"
+  | "moves through"
+  | "is set upon by"
+  | "is caught in the blast of";
 
 /** The later action whose zone this spell leaves, if any. */
 export function zoneRowOf(spell: SpellReference) {
@@ -56,10 +63,11 @@ function holds(state: GameState, zone: SpellZone): boolean {
   );
 }
 
-/** The zones still standing; one whose Concentration has gone is removed on the way. */
+/** The zones still standing; one whose Concentration has gone is removed on the way, and one bursting as its spell
+ *  ended acts only in `burstEndedZones`. */
 function liveZones(state: GameState): SpellZone[] {
-  for (const zone of state.combat.spellZones) if (!holds(state, zone)) endZone(state, zone.id);
-  return [...state.combat.spellZones];
+  for (const zone of [...state.combat.spellZones]) if (!zone.bursting && !holds(state, zone)) endZone(state, zone.id);
+  return state.combat.spellZones.filter((zone) => !zone.bursting);
 }
 
 const tokenOf = (state: GameState, actorId: string) =>
@@ -171,6 +179,8 @@ function act(
   const caster = state.actors.find((actor) => actor.id === zone.casterId);
   if (!content || !caster || times < 1) return;
   const { spell, row, trigger } = content;
+  // "If the spirit has no creature Restrained": while one is still held by the cast, the zone waits.
+  if (trigger.holdsOne && zone.castId !== null && holdsACreature(state, zone.castId)) return;
   const travelling = meeting === "moves through";
   if (!travelling) {
     if ((meeting === "enters" || meeting === "is caught by") && zone.entered.includes(creature.id)) return;
@@ -178,8 +188,7 @@ function act(
   }
   zone.entered = meeting === "enters" || meeting === "is caught by" ? [...zone.entered, creature.id] : zone.entered;
   zone.affected = zone.affected.includes(creature.id) ? zone.affected : [...zone.affected, creature.id];
-  const built = laterSpellAction(spell, row, { attackBonus: 0, saveDc: zone.dc, bearersDc: false, modifier: 0 });
-  const action = zone.level > spell.level ? upcastAction(built, spell, zone.level) : built;
+  const action = zoneAction(zone, spell, row);
   const parts = Array.from({ length: times }, () =>
     action.damage.map((part) => ({
       amount: Math.max(0, resolveDice(parseDiceFormula(part.formula), deps.rollDie).total),
@@ -226,7 +235,8 @@ function act(
   const conditionIds = save.failureConditions;
   const onFail = failureEffectFor(
     { action, attacker: caster, castId: zone.castId, riderItemId: null, deps: { catalog: deps.catalog } },
-    conditionIds
+    conditionIds,
+    { spell, level: zone.level }
   );
   // A save at the start of the creature's own turn that lasts "until the end of that turn" ends with this one.
   const currentTurn = meeting === "starts its turn in" && save.failureDuration?.type === "until-bearer-turn-end";
@@ -259,6 +269,37 @@ function act(
     actorId: creature.id,
     ...source
   });
+}
+
+/** The action a zone acts with: its spell's later action at the cast's level, in the damage type chosen at the cast
+ *  (Conjure Elemental's element), with the dice it has gained (Delayed Blast Fireball's 1d6 a turn). */
+function zoneAction(
+  zone: SpellZone,
+  spell: SpellReference,
+  row: NonNullable<ReturnType<typeof zoneContentOf>>["row"]
+): ActorAction {
+  const built = laterSpellAction(spell, row, { attackBonus: 0, saveDc: zone.dc, bearersDc: false, modifier: 0 });
+  const action = zone.level > spell.level ? upcastAction(built, spell, zone.level) : built;
+  return {
+    ...action,
+    damage: action.damage.map((part, index) => ({
+      formula: index === 0 && (zone.grown ?? 0) > 0 ? withMoreDice(part.formula, zone.grown ?? 0) : part.formula,
+      type: zone.damageType ?? part.type
+    }))
+  };
+}
+
+/** "12d6" with `extra` more dice of its size: "15d6". A formula with no dice term stays as it is. */
+function withMoreDice(formula: string, extra: number): string {
+  const match = /^(\d+)d(\d+)(.*)$/.exec(formula.trim());
+  return match ? `${Number(match[1]) + extra}d${match[2]}${match[3]}` : formula;
+}
+
+/** Whether a creature still bears what the cast restrained it with (Conjure Elemental's spirit holds one). */
+function holdsACreature(state: GameState, castId: string): boolean {
+  return state.actors.some((actor) =>
+    actor.effects.some((effect) => effect.castId === castId && effect.linkedConditionIds.includes("restrained"))
+  );
 }
 
 /** The zones a move sets off for the creature that moved: entering an area along the way (or an Emanation it carries
@@ -345,8 +386,13 @@ export function zonesAfterAreaMove(
   return events;
 }
 
-/** The zones a creature ending its turn inside sets off, before the next turn begins. */
+/** The zones a creature ending its turn inside sets off, before the next turn begins. A zone whose damage grows as its
+ *  caster's turns end gains its die (SRD Delayed Blast Fireball: "the damage increases by 1d6 whenever your turn ends
+ *  and the spell hasn't ended"). */
 export function zonesAtTurnEnd(state: GameState, actorId: string, deps: ZoneDeps): EffectNarration[] {
+  for (const zone of liveZones(state))
+    if (zone.casterId === actorId && zoneContentOf(zone, deps.catalog)?.trigger.grows)
+      zone.grown = Math.min(100, (zone.grown ?? 0) + 1);
   return zonesWhereItStands(state, actorId, "end-turn", deps);
 }
 
@@ -357,10 +403,10 @@ export function zonesAtTurnEnd(state: GameState, actorId: string, deps: ZoneDeps
  */
 export function zonesAtTurnStart(state: GameState, actorId: string, deps: ZoneDeps): EffectNarration[] {
   const events: EffectNarration[] = [];
-  for (const zone of state.combat.spellZones) {
+  for (const zone of [...state.combat.spellZones]) {
     zone.entered = [];
     zone.affected = [];
-    if (zone.casterId !== actorId) continue;
+    if (zone.casterId !== actorId || zone.bursting) continue;
     if (zone.rounds !== null && state.combat.round - zone.startedRound >= zone.rounds) {
       endZone(state, zone.id);
       events.push({ kind: "effect", text: `${zone.name} ends.`, actorId: zone.casterId });
@@ -375,6 +421,106 @@ export function zonesAtTurnStart(state: GameState, actorId: string, deps: ZoneDe
       });
   }
   events.push(...zonesWhereItStands(state, actorId, "start-turn", deps));
+  events.push(...zonesAtCasterTurnStart(state, actorId, deps));
+  return events;
+}
+
+/** SRD Faithful Hound: "At the start of each of your turns, the hound attempts to bite one enemy within 5 feet of it."
+ *  A zone that acts as its caster's turn starts acts on the one creature it can reach nearest its point (the earlier
+ *  in the initiative order on a tie). Without a measurable map the GM runs it from the caster's list. */
+function zonesAtCasterTurnStart(state: GameState, casterId: string, deps: ZoneDeps): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  if (!state.combat.active) return events;
+  for (const zone of liveZones(state)) {
+    if (zone.casterId !== casterId) continue;
+    const content = zoneContentOf(zone, deps.catalog);
+    if (!content || !content.trigger.on.includes("caster-turn-start")) continue;
+    const { spell, trigger } = content;
+    const inside = insideTest(state, zone, trigger, spell, deps.geometry);
+    const area = zone.annotationId
+      ? state.combat.annotations.find((annotation) => annotation.id === zone.annotationId)
+      : undefined;
+    if (!inside || !area || !deps.geometry) {
+      events.push({
+        kind: "effect",
+        text: `${zone.name} acts as its caster's turn starts: place its area on the map, or run it by hand.`,
+        actorId: zone.casterId,
+        gmOnly: true
+      });
+      continue;
+    }
+    const reached = exposed(state, zone, trigger, deps).filter((creature) => {
+      const token = tokenOf(state, creature.id)!;
+      return inside(token.position!, token.sizeCells);
+    });
+    const origin = area.geometry.origin;
+    const nearest = reached
+      .map((creature) => {
+        const at = tokenOf(state, creature.id)!.position!;
+        return { creature, apart: Math.hypot(at.x - origin.x, at.y - origin.y) };
+      })
+      .sort((left, right) => left.apart - right.apart)[0];
+    if (nearest) act(state, zone, nearest.creature, "is set upon by", deps, events);
+  }
+  return events;
+}
+
+/**
+ * A spell area that acts as its spell ends (SRD Delayed Blast Fireball: "When the spell ends, the bead explodes, and
+ * each creature in a 20-foot-radius Sphere centered on that point makes a Dexterity saving throw"), run once the
+ * spell has ended, by whatever ended it: every creature in the area owes the save against the damage, rolled once with
+ * the dice it gained. Without a measurable map the GM is told to name who was caught. The area then goes.
+ */
+export function burstEndedZones(state: GameState, deps: ZoneDeps): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const zone of state.combat.spellZones.filter((candidate) => candidate.bursting)) {
+    const content = zoneContentOf(zone, deps.catalog);
+    const caster = state.actors.find((actor) => actor.id === zone.casterId);
+    if (content && caster && state.combat.active) {
+      const { spell, row, trigger } = content;
+      const inside = insideTest(state, zone, trigger, spell, deps.geometry);
+      const caught = inside
+        ? state.combat.initiative.flatMap((entry) => {
+            const creature = state.actors.find((actor) => actor.id === entry.actorId);
+            const token = creature ? tokenOf(state, creature.id) : undefined;
+            return creature && token && inside(token.position!, token.sizeCells) ? [creature] : [];
+          })
+        : [];
+      const action = zoneAction(zone, spell, row);
+      const parts = action.damage.map((part) => ({
+        amount: Math.max(0, resolveDice(parseDiceFormula(part.formula), deps.rollDie).total),
+        type: part.type
+      }));
+      const save = action.save;
+      if (save && caught.length > 0)
+        createPendingSaves(state, {
+          sourceActorId: caster.id,
+          sourceName: caster.name,
+          actionName: spell.name,
+          ability: save.ability,
+          dc: save.dc,
+          targetIds: caught.map((creature) => creature.id),
+          proposedDamage: parts.reduce((sum, part) => sum + part.amount, 0),
+          proposedDamageParts: parts,
+          halfOnSuccess: save.successDamage === "half",
+          conditionIds: save.failureConditions,
+          magical: true,
+          newSaveId: deps.newId,
+          createdAt: Date.parse(deps.now())
+        });
+      events.push({
+        kind: "effect",
+        text: inside
+          ? caught.length > 0
+            ? `${zone.name} explodes: ${caught.map((creature) => creature.name).join(", ")} ${caught.length === 1 ? "makes" : "make"} ${withArticle(`${(save?.ability ?? "dex").toUpperCase()} save`)} (DC ${save?.dc ?? zone.dc}).`
+            : `${zone.name} explodes, and no creature is caught in it.`
+          : `${zone.name} explodes: its area isn't on the map, so call the saves for the creatures it catches.`,
+        actorId: zone.casterId,
+        source: { actorId: caster.id, name: caster.name }
+      });
+    }
+    removeZone(state, zone);
+  }
   return events;
 }
 

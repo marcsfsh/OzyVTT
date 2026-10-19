@@ -210,6 +210,8 @@ const PendingSaveEffectSchema = z
     /** The save the target repeats at the end of each of its turns, a success ending the effect. */
     repeatSave: EffectInstanceSchema.shape.repeatSave,
     endsOnDamage: z.boolean().optional(),
+    /** It ends when its source or one of the source's allies damages the bearer (Charm Person). */
+    endsOnSourceSideDamage: EffectInstanceSchema.shape.endsOnSourceSideDamage,
     speedZero: z.boolean().optional(),
     /** A grapple: it ends with its source's defeat, and when a move takes them farther apart than `rangeFeet`. */
     endsWhenSourceDefeated: z.boolean().optional(),
@@ -217,6 +219,8 @@ const PendingSaveEffectSchema = z
     /** The Concentration cast it belongs to: it is sustained by the caster's Concentration, and is not applied
      * once that has ended. */
     castId: z.string().min(1).max(120).optional(),
+    /** The spell that made it and the level it was cast at, which Dispel Magic weighs. Never projected. */
+    spell: EffectInstanceSchema.shape.spell,
     /** The action it came from, so a second hit from the same action refreshes it and never stacks. */
     sourceActionId: z.string().max(120).optional(),
     /** Damage the effect deals at the start of a turn while it lasts (a swallow's acid). */
@@ -756,6 +760,14 @@ export const SpellZoneSchema = z
     area: ActionAreaSchema.nullable().default(null),
     /** Damage dealt so far, against a cap the spell prints (Guardian of Faith's 60). */
     damageDealt: z.number().int().nonnegative().max(100000).default(0),
+    /** The damage type the caster chose at the cast (Conjure Elemental's element); absent, the spell's own. */
+    damageType: z.string().min(1).max(40).optional(),
+    /** Dice its damage has gained so far (Delayed Blast Fireball: 1d6 whenever its caster's turn ends). */
+    grown: z.number().int().nonnegative().max(100).optional(),
+    /** It acts when its spell ends (Delayed Blast Fireball's bead), so ending it leaves it `bursting` until the server
+     *  has raised the saves. */
+    burstsOnEnd: z.literal(true).optional(),
+    bursting: z.literal(true).optional(),
     /** This turn's marks: who has entered it, and who has made its save or taken its damage. Cleared as each turn
      *  begins. */
     entered: z.array(z.uuid()).max(200).default([]),
@@ -1103,12 +1115,14 @@ export const PartyShortRestSchema = z
   .strict();
 export type PartyShortRest = z.infer<typeof PartyShortRestSchema>;
 
-/** Game time and the rests waiting on the GM. The clock exists for the 16-hour rule between Long Rests; the GM
- *  moves it, and a party rest moves it by the rest's length. */
+/** Game time and the rests waiting on the GM. The clock is what the 16-hour rule between Long Rests reads and what
+ *  effects measured in game time count down on; the GM moves it, and a party rest moves it by the rest's length. */
 export const RestStateSchema = z
   .object({
     /** Whole hours of game time since the campaign's clock started. */
     clockHours: z.number().int().min(0).max(10_000_000).default(0),
+    /** Minutes past the hour. */
+    clockMinutes: z.number().int().min(0).max(59).default(0),
     /** Characters whose players asked for a Long Rest, oldest first. */
     requests: z.array(z.uuid()).max(50).default([]),
     shortRest: PartyShortRestSchema.nullable().default(null)

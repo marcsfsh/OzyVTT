@@ -249,6 +249,7 @@ export function GmHome() {
       token={token}
       calendar={calendar}
       gameHours={gm.gameHours}
+      gameMinutes={gm.gameMinutes}
       tight={phone}
       onChanged={() => feeds.campaignFeed.reload()}
     />

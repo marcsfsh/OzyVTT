@@ -279,7 +279,7 @@ and reactions, the action economy, release); builtin actions such as Hide and th
 add their special cases through the handler table in `resolution/builtins.ts`. Every condition
 write goes through `applyCondition` in `effects.ts`, which honours innate and item-granted
 immunities and runs what gaining a condition sets off (an Incapacitated creature drops its
-Concentration and its grapples). Effects end by their duration at turn start and turn end; the
+Concentration and its grapples). In a fight, effects count down at turn start and turn end; the
 start of a turn deals any ongoing damage, and the end opens any repeat saves
 (`turn-boundaries.ts`). What a stat block's traits do, read from their text when the bundle is built
 (`ActorDefinition.traitMechanics`), runs at those boundaries and as damage lands: Regeneration, auras,
@@ -289,6 +289,27 @@ wall of fire) opens a zone on the template the cast placed, or around its caster
 runs as tokens move, as the area moves and at each turn's end and start (`spell-zones.ts`); what
 such a spell lets its caster do on later turns is offered while it lasts, at the level it was cast
 (`lasting-spells.ts`).
+
+Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
+(`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long
+Rest moves it 8 hours and finishing the party's Short Rest moves it an hour, and `passGameTime`
+(`game-time.ts`) counts every creature's effects down by it, 10 rounds to the minute. A fight's rounds
+don't move the clock. When a fight ends, what has a minute (10 rounds) or less left ends with it, and
+anything longer carries on in game time; a parked fight's combatants and a replay's copies wait outside
+the clock. A spell of 10 minutes or less is kept in rounds and a longer one in minutes, at the duration
+printed for the slot it was cast with (`spellDurationAt`), so Major Image from a level 4 slot lasts until
+dispelled with no Concentration. An effect can also last until its bearer's next Short or Long Rest
+(`until-rest`), which that rest ends. A creature's own Long Rest (the GM approving a request) ends what
+would run out in its 8 hours and leaves longer effects for the GM to pass those hours, so they count
+once. The clock also runs a Stable creature's 1d4 hours to 1 Hit Point and a knocked-out creature's hour.
+
+Each effect a spell leaves records the spell and the level it was cast at (`spell`), so a spell can be
+ended as a whole: Dispel Magic and Remove Curse resolve in `resolution/dispel.ts`, which ends the
+spell's effects, its area or its caster's Concentration (`spell-endings.ts`). A Concentration spell that
+only affects creatures ends once no living creature keeps any of it and no save against it is still owed
+(`endIdleConcentration` in `effects.ts`). A spell area's step can also come at its caster's turn start
+(Faithful Hound's bite) or when the spell ends (Delayed Blast Fireball's bead): the command that ends
+such a spell leaves its area bursting, and the pipeline runs the burst right after it commits.
 
 Bonuses, advantage, extra damage and defences are modifiers in one vocabulary (`ModifierSchema` in
 `packages/schemas`), shared by features, feats, chosen options, magic items and live effects, and
@@ -455,8 +476,8 @@ The Scenes tab asks the Codex which records point at each table scene: `GET /api
 `codex/scene-links.ts`) lists the sessions that stage it or name it in their prep's Encounters, and the pins on the
 atlas that name it.
 
-The table has one clock (ADR-0029): the Codex calendar keeps the day and the game state keeps the hour
-(`rest.clockHours`, which the 16-hour rule between Long Rests reads). A party rest or Pass time that
+The table has one clock (ADR-0029): the Codex calendar keeps the day and the game state keeps the time
+of day (`rest.clockHours`, which the 16-hour rule between Long Rests reads, and `rest.clockMinutes`). A party rest or Pass time that
 crosses midnight moves the GM's date by the days crossed (`onTimePassed` in the command context, then
 `codexStore.advanceCampaignDate`), and the players' date with it when the two were the same day.
 

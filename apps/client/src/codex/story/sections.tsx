@@ -316,7 +316,15 @@ function GmPhoneStory({ story }: Readonly<{ story: ReturnType<typeof useGmStory>
     );
   return (
     <div className="story is-phone scroll-y">
-      <DateBar role="gm" token={shell.token} calendar={calendar} gameHours={gm.gameHours} tight onChanged={reload} />
+      <DateBar
+        role="gm"
+        token={shell.token}
+        calendar={calendar}
+        gameHours={gm.gameHours}
+        gameMinutes={gm.gameMinutes}
+        tight
+        onChanged={reload}
+      />
       <Button variant="secondary" block onClick={() => setComposer({ editing: null, kind: "entry" })}>
         <IconPlus /> Add to the chronicle
       </Button>
@@ -404,6 +412,7 @@ export function GmStorySection() {
                   token={shell.token}
                   calendar={calendar}
                   gameHours={gm.gameHours}
+                  gameMinutes={gm.gameMinutes}
                   onChanged={reload}
                 />
                 {!card.actions.warn && (

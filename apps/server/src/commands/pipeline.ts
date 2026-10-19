@@ -4,6 +4,8 @@ import type { ApiRoute } from "@vtt/api-contract/routes";
 import type { ClientToServerEvents, GameState } from "@vtt/domain";
 import { GameAccessDeniedError } from "../authorization.js";
 import { isIncapacitated } from "../condition-rules.js";
+import type { EffectNarration } from "../effects.js";
+import { burstEndedZones } from "../spell-zones.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
@@ -169,6 +171,22 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     }
   }
 
+  /**
+   * A spell area that acts as its spell ends (Delayed Blast Fireball's bead) is left bursting by whatever ended the
+   * spell; the table then raises its saves with the server's dice and the live map, as its own write.
+   */
+  async function settleBurstingZones() {
+    const before = context.readState();
+    if (!before.combat.spellZones.some((zone) => zone.bursting) || before.combat.historyCursor !== null) return;
+    const geometry = await kit.liveGeometry();
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute({ id: context.newId(), type: "spell-zone.burst" }, (draft) => {
+      events = burstEndedZones(draft, kit.zoneDeps(draft, geometry));
+    });
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
   async function dispatch(
     type: GameCommandType,
     principal: GamePrincipal,
@@ -212,7 +230,10 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     );
     const accepted = committed ? { revision: committed.state.revision, duplicate: committed.duplicate } : {};
     const reply = projectReply(principal, { ...accepted, ...extras });
-    if (settle && committed && !committed.duplicate) await settleDownedReactions();
+    if (settle && committed && !committed.duplicate) {
+      await settleBurstingZones();
+      await settleDownedReactions();
+    }
     return reply;
   }
 

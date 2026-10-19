@@ -89,6 +89,8 @@ export type ResolveInput = Readonly<{
   areaPlaced?: boolean;
   /** Ready the spell for later: its slot is spent and it is held with Concentration (SRD Ready). */
   ready?: boolean;
+  /** The spell area a cast that ends spells is aimed at (Dispel Magic on a Spirit Guardians); the GM's to name. */
+  zoneId?: string;
 }>;
 
 export type ResolveDependencies = Readonly<{

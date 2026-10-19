@@ -157,7 +157,22 @@ const LABELS: Readonly<Record<string, string>> = {
   speeds: "speeds",
   senses: "senses",
   alignment: "alignment",
-  experiencePoints: "XP"
+  experiencePoints: "XP",
+  upcastDurations: "durations from higher spell slots",
+  concentration: "Concentration",
+  minutes: "minutes",
+  rest: "rest that ends it",
+  baseArmorClass: "base Armor Class",
+  armorClassFloor: "lowest Armor Class",
+  speedMultiplier: "Speed multiplier",
+  dispel: "spells it ends",
+  automaticLevel: "highest spell level it ends outright",
+  endsCurses: "curses it ends",
+  selfSave: "the caster's own saving throw",
+  endsOnSourceSideDamage: "end on damage from the source's side",
+  persistsWithoutTargets: "lasts with no creature under it",
+  holdsOne: "one creature held at a time",
+  grows: "damage that grows each turn"
 };
 /** A key whose words depend on what holds it: a weapon's category is its weapon kind, as the editor labels it. */
 const NESTED_LABELS: Readonly<Record<string, string>> = { "weapon.category": "weapon kind" };

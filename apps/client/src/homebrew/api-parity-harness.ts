@@ -440,6 +440,7 @@ const SAVE_LIFETIME_KEYS = [
   "repeatSave",
   "escapeDc",
   "endsOnDamage",
+  "endsOnSourceSideDamage",
   "speedZero",
   "rangeFeet",
   "failsAtHitPoints",
@@ -568,6 +569,27 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
       "how a failed save's conditions end, where it pushes and who has Advantage on it, read from the spell's description as the catalog is built",
     status: "gap"
   })),
+  {
+    at: "actions[].save.bySelf",
+    types: ACTION_CARRIERS,
+    reason:
+      "a save the user makes against its own action (Contact Other Plane's DC 15 Intelligence save) - copied from the spell's cast model; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].dispel.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action that ends spells on its target (Dispel Magic), copied from the spell's cast model; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsCurses",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action that ends curses on its target (Remove Curse), copied from the spell's cast model; no editor control yet",
+    status: "gap"
+  },
   {
     at: "actions[].grants.**",
     types: ACTION_CARRIERS,
@@ -712,6 +734,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ["spell"],
     reason: "the cast model, read from the attack box, damage roll and description as the catalog is built",
     status: "permanent: system-synthesised"
+  },
+  {
+    at: "upcastDurations[].**",
+    types: ["spell"],
+    reason:
+      "a spell's duration and Concentration by slot level, authored from its higher-level text as the catalog is built; no editor control yet",
+    status: "gap"
   },
   {
     at: "area.**",

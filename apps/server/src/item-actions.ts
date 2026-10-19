@@ -244,6 +244,8 @@ export function spellCastMechanics(
       | "drain"
       | "endsConditions"
       | "endsOneCondition"
+      | "dispel"
+      | "endsCurses"
     >
   > {
   // No cast model: the save still applies, and the rest is the GM's.
@@ -258,8 +260,12 @@ export function spellCastMechanics(
     // What its damage drains as it lands (Vampiric Touch's healing, Harm's lower Hit Point maximum).
     ...(effect.drain ? { drain: { ...effect.drain } } : {}),
     ...(effect.darts ? { darts: effect.darts } : {}),
-    // The type the caster picks: of the damage (Chromatic Orb), or of the Resistance it grants (Protection from Energy).
-    ...(effect.damageTypes && (damage.length > 0 || effect.grant !== undefined)
+    // The type the caster picks: of the damage (Chromatic Orb), of the Resistance it grants (Protection from Energy), or
+    // of the area it leaves (Conjure Elemental's element).
+    ...(effect.damageTypes &&
+    (damage.length > 0 ||
+      effect.grant !== undefined ||
+      (effect.laterActions ?? []).some((row) => row.zone !== undefined && row.damage.length > 0))
       ? { damageTypes: [...effect.damageTypes] }
       : {}),
     ...(attacks > 0
@@ -279,8 +285,10 @@ export function spellCastMechanics(
         ? {
             save: {
               ...castSave,
-              dc: numbers.saveDc,
-              ...(numbers.bearersDc ? { spellcasting: true } : {}),
+              // A save the caster makes itself is at the DC the spell prints (Contact Other Plane's 15).
+              ...(effect.selfSave
+                ? { dc: effect.selfSave.dc, bySelf: true as const }
+                : { dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) }),
               ...(effect.failureEffect ? { failureEffect: structuredClone(effect.failureEffect) } : {})
             }
           }
@@ -305,7 +313,10 @@ export function spellCastMechanics(
           endsConditions: [...effect.endsConditions],
           ...(effect.endsOneCondition ? { endsOneCondition: true as const } : {})
         }
-      : {})
+      : {}),
+    // The spells it ends on its target (Dispel Magic), and the curses (Remove Curse).
+    ...(effect.dispel ? { dispel: { ...effect.dispel } } : {}),
+    ...(effect.endsCurses ? { endsCurses: true as const } : {})
   };
 }
 

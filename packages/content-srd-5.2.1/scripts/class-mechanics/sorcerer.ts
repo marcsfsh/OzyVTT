@@ -159,8 +159,7 @@ export const sorcerer: ClassMechanicsModule = {
           }))
         }
       },
-      // Bonus Action, once per Long Rest. The Fly Speed, 1-hour duration and restoring the use with
-      // Sorcery Points stay prose.
+      // Bonus Action, once per Long Rest, for an hour of game time. Restoring the use with Sorcery Points stays prose.
       "dragon-wings": {
         uses: { limit: 1, per: "long-rest" },
         actions: [
@@ -174,7 +173,7 @@ export const sorcerer: ClassMechanicsModule = {
             grants: {
               name: "Dragon Wings",
               tags: ["dragon-wings"],
-              duration: { type: "manual" },
+              duration: { type: "minutes", minutes: 60 },
               modifiers: [{ type: "special-speed", movement: "fly", feet: 60 }],
               onEnd: [],
               target: "self",

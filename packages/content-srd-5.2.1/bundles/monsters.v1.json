@@ -28402,7 +28402,11 @@
      "failureConditions": [
       "charmed",
       "poisoned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "minutes",
+      "minutes": 60
+     }
     },
     "damage": [
      {
@@ -35194,7 +35198,11 @@
      "successDamage": "none",
      "failureConditions": [
       "poisoned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "minutes",
+      "minutes": 60
+     }
     },
     "damage": [
      {

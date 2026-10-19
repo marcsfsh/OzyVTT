@@ -1,8 +1,9 @@
-import type { Actor, EffectInstance, GameState } from "@vtt/domain";
+import { isDead, ROUNDS_PER_MINUTE, type Actor, type EffectInstance, type GameState } from "@vtt/domain";
 import type { ActorDefinition, SaveFailureDuration } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { conditionLabel, exhaustionLevel, INCAPACITATING_CONDITIONS } from "./condition-rules.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
+import { areAllies } from "./creature-sides.js";
 import { wardingAura } from "./paladin-auras.js";
 import { endZonesOfCast } from "./spell-zone-state.js";
 
@@ -68,6 +69,10 @@ export const HASTED_TAG = "hasted";
 export const RECKLESS_TAG = "reckless-attack";
 /** Steady Aim: taken before moving, Advantage on the next attack roll this turn, Speed 0 until the turn ends. */
 export const STEADY_AIM_TAG = "steady-aim";
+/** A curse (Hex, Bestow Curse, Geas): Remove Curse ends it (SRD Rules Glossary, Curses). */
+export const CURSE_TAG = "curse";
+/** A Stable creature's hours until it regains 1 Hit Point (SRD Damage and Healing: "after 1d4 hours"). */
+export const STABLE_RECOVERY_TAG = "stable-recovery";
 
 /** What an effect must name; every other field takes `EffectInstanceSchema`'s default. */
 export type EffectSpec = Pick<EffectInstance, "id" | "name" | "duration"> & Partial<EffectInstance>;
@@ -116,6 +121,10 @@ export function effectDurationOf(
   switch (duration.type) {
     case "rounds":
       return { type: "rounds", remaining: duration.rounds };
+    case "minutes":
+      return { type: "minutes", remaining: duration.minutes };
+    case "until-rest":
+      return { type: "until-rest", rest: duration.rest };
     case "until-source-next-turn":
       return { type: "until-source-next-turn" };
     case "until-bearer-next-turn":
@@ -317,6 +326,23 @@ export function addEffect(
   return effect;
 }
 
+/** SRD Immunity: "it doesn't affect you in any way". Ends each of `conditionIds` the creature has, now that `cause`
+ *  makes it immune to them (Heroism's Frightened, an item's ward). An effect that also holds one keeps its other
+ *  parts. */
+export function endConditionsImmuneTo(actor: Actor, conditionIds: readonly string[], cause: string): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const conditionId of conditionIds) {
+    if (!hasCondition(actor, conditionId)) continue;
+    removeConditionDirect(actor, conditionId);
+    events.push({
+      kind: "condition",
+      text: `${actor.name} is no longer ${conditionLabel(conditionId)} (${cause}).`,
+      actorId: actor.id
+    });
+  }
+  return events;
+}
+
 /** SRD: Exhaustion 6 is death. A player character drops to 0 with three death-save failures; others are defeated.
  *  Either way it ends what the creature sustains, its Concentration included. */
 export function applyExhaustionDeath(state: GameState, actor: Actor): EffectNarration[] {
@@ -430,6 +456,9 @@ function endEffectInternal(
       }
     }
     endZonesOfCast(state, effect.castId);
+  } else if (effect.castId !== undefined) {
+    // What a cast left on one creature is gone: the spell may have nothing left.
+    events.push(...endIdleConcentration(state, effect.castId));
   }
   // Cascade: effects that exist only while another tag is present end with it.
   for (const dependent of [...actor.effects]) {
@@ -548,11 +577,41 @@ export function endEffectsSustainedBy(state: GameState, sourceActorId: string): 
   return events;
 }
 
-/** Effects that end the moment their bearer takes damage (Sleep, Turn Undead, Hypnotic Pattern). */
-export function endEffectsOnDamage(state: GameState, actor: Actor): EffectNarration[] {
+/** Effects that end the moment their bearer takes damage (Sleep, Turn Undead, Hypnotic Pattern), and those that end
+ *  when their source or one of its allies deals it (Charm Person: "until you or your allies damage it"). `dealer` is
+ *  who dealt it, when the damage has a source. */
+export function endEffectsOnDamage(
+  state: GameState,
+  actor: Actor,
+  dealer?: Readonly<{ actorId: string; resolveDefinition?: (definitionId: string) => ActorDefinition | undefined }>
+): EffectNarration[] {
   const events: EffectNarration[] = [];
-  for (const effect of actor.effects.filter((candidate) => candidate.endsOnDamage === true))
+  const by = dealer ? state.actors.find((candidate) => candidate.id === dealer.actorId) : undefined;
+  const fromSourceSide = (effect: EffectInstance) => {
+    if (!by || effect.sourceActorId === null) return false;
+    if (effect.sourceActorId === by.id) return true;
+    const source = state.actors.find((candidate) => candidate.id === effect.sourceActorId);
+    return source !== undefined && areAllies(source, by, dealer?.resolveDefinition);
+  };
+  for (const effect of actor.effects.filter(
+    (candidate) =>
+      candidate.endsOnDamage === true || (candidate.endsOnSourceSideDamage === true && fromSourceSide(candidate))
+  ))
     endEffectInternal(state, actor, effect.id, events);
+  return events;
+}
+
+/** A rest ends what lasts until the bearer finishes one: a Long Rest both kinds, a Short Rest those that a Short or Long
+ *  Rest ends (SRD Contact Other Plane: "Incapacitated condition until you finish a Long Rest"). */
+export function endEffectsAtRest(state: GameState, actorId: string, kind: "short" | "long"): EffectNarration[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return [];
+  const events: EffectNarration[] = [];
+  for (const effect of [...actor.effects]) {
+    const duration = effect.duration;
+    if (duration.type === "until-rest" && (kind === "long" || duration.rest === "short"))
+      endEffectInternal(state, actor, effect.id, events, true);
+  }
   return events;
 }
 
@@ -622,11 +681,8 @@ export function expireEffectsAtTurnEnd(state: GameState, outgoingActorId: string
   return events;
 }
 
-/** Durations a fight's end sweeps: everything measured in turns or rounds (a 1-minute spell outlasting the fight by
- *  a few rounds is the documented approximation). "Until ended" effects (a grapple still held, a curse, an
- *  hour-long Concentration) outlast the fight. */
-const ENDS_WITH_THE_FIGHT: ReadonlySet<EffectInstance["duration"]["type"]> = new Set([
-  "rounds",
+/** Durations measured in turns: the first minute of game time that passes outlasts them, and a fight's end does. */
+const MEASURED_IN_TURNS: ReadonlySet<EffectInstance["duration"]["type"]> = new Set([
   "until-source-next-turn",
   "until-bearer-next-turn",
   "until-bearer-turn-end",
@@ -634,34 +690,169 @@ const ENDS_WITH_THE_FIGHT: ReadonlySet<EffectInstance["duration"]["type"]> = new
   "encounter"
 ]);
 
-/** Encounter end: the fight's combatants' turn-measured effects end (onEnd fires); "until ended" ones stay. */
+/** Encounter end: the fight's combatants' turn-measured effects end (onEnd fires), and so does what has a minute or
+ *  less of its rounds left (a 1-minute spell outlasting the fight by a few rounds is the documented approximation).
+ *  Longer ones carry on, counted down by the game clock at 10 rounds a minute, and "until ended" ones stay. */
 export function endEncounterEffects(state: GameState, combatantIds: readonly string[]): EffectNarration[] {
   const events: EffectNarration[] = [];
   const inFight = new Set(combatantIds);
   for (const actor of state.actors) {
     if (!inFight.has(actor.id)) continue;
-    for (const effect of [...actor.effects])
-      if (ENDS_WITH_THE_FIGHT.has(effect.duration.type)) endEffectInternal(state, actor, effect.id, events, true);
+    for (const effect of [...actor.effects]) {
+      const duration = effect.duration;
+      const ends =
+        MEASURED_IN_TURNS.has(duration.type) || (duration.type === "rounds" && duration.remaining <= ROUNDS_PER_MINUTE);
+      if (ends) endEffectInternal(state, actor, effect.id, events, true);
+    }
   }
   return events;
 }
 
-/** A Long Rest: eight hours pass and the creature sleeps (Unconscious, so its Concentration ends). Its effects
- *  measured in turns or rounds end; "until ended" ones (a curse, a disease) stay. */
-export function endEffectsAtLongRest(state: GameState, actorId: string): EffectNarration[] {
+/**
+ * Game time passing for `actorIds` (time the GM passes, a rest): an effect measured in rounds loses 10 for each minute,
+ * one measured in minutes loses them, and one measured in turns ends. What runs out ends as at a turn boundary, its
+ * on-end grants firing; "until ended" effects stay. With `countDown` false, what lasts longer is left as it is.
+ */
+export function ageEffects(
+  state: GameState,
+  actorIds: ReadonlySet<string>,
+  minutes: number,
+  countDown = true
+): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  if (minutes <= 0) return events;
+  for (const actor of state.actors) {
+    if (!actorIds.has(actor.id)) continue;
+    for (const effect of [...actor.effects]) {
+      // A cascade earlier in the sweep may have ended it already.
+      const current = actor.effects.find((candidate) => candidate.id === effect.id);
+      if (!current) continue;
+      const left = remainingAfter(current.duration, minutes);
+      if (left === null) continue;
+      if (left <= 0) {
+        if (current.tags.includes(STABLE_RECOVERY_TAG)) events.push(...stableRecovers(actor));
+        endEffectInternal(state, actor, current.id, events, true);
+      } else if (countDown)
+        actor.effects = actor.effects.map((candidate) =>
+          candidate.id === current.id
+            ? { ...candidate, duration: { ...(candidate.duration as { type: "rounds" | "minutes" }), remaining: left } }
+            : candidate
+        );
+    }
+  }
+  return events;
+}
+
+/** A creature just made Stable starts its 1d4 hours on the game clock, rolled now (SRD Damage and Healing: "A Stable
+ *  creature that isn't healed regains 1 Hit Point after 1d4 hours"). Taking damage starts its dying again, so it ends
+ *  the count. */
+export function startStableRecovery(
+  state: GameState,
+  actor: Actor,
+  random: (sides: number) => number,
+  id: string
+): EffectNarration[] {
+  if (actor.deathSaves?.stable !== true || actor.hp.current !== 0) return [];
+  const hours = Math.max(1, Math.min(4, random(4)));
+  addEffect(
+    state,
+    actor.id,
+    makeEffect({
+      id,
+      name: "Stable",
+      tags: [STABLE_RECOVERY_TAG],
+      startedRound: state.combat.round,
+      duration: { type: "minutes", remaining: hours * 60 },
+      endsOnDamage: true
+    })
+  );
+  return [
+    {
+      kind: "condition",
+      text: `${actor.name} regains 1 Hit Point in ${hours} ${hours === 1 ? "hour" : "hours"} of game time unless healed first.`,
+      actorId: actor.id
+    }
+  ];
+}
+
+/** SRD: "A Stable creature that isn't healed regains 1 Hit Point after 1d4 hours." One healed meanwhile, or dying again,
+ *  gets nothing from it. */
+function stableRecovers(actor: Actor): EffectNarration[] {
+  if (actor.hp.current !== 0 || actor.deathSaves?.stable !== true) return [];
+  actor.hp = { ...actor.hp, current: 1 };
+  actor.deathSaves = null;
+  removeConditionDirect(actor, "unconscious");
+  return [{ kind: "condition", text: `${actor.name} regains 1 Hit Point and wakes.`, actorId: actor.id }];
+}
+
+/** What a duration has left once `minutes` of game time pass: 0 for one that runs out, null for one that time doesn't
+ *  touch. */
+function remainingAfter(duration: EffectInstance["duration"], minutes: number): number | null {
+  if (duration.type === "rounds") return duration.remaining - minutes * ROUNDS_PER_MINUTE;
+  if (duration.type === "minutes") return duration.remaining - minutes;
+  return MEASURED_IN_TURNS.has(duration.type) ? 0 : null;
+}
+
+/** SRD Long Rest: at least 8 hours. */
+export const LONG_REST_MINUTES = 8 * 60;
+
+/** A Long Rest: eight hours pass and the creature sleeps (Unconscious, so its Concentration ends). Unless the game clock
+ *  has already moved those hours for everyone (`clockMoved`, a party rest), what of its own would run out in them ends
+ *  here. What lasts longer waits for the GM to pass the hours, so they never count twice; "until ended" ones (a curse, a
+ *  disease) stay. */
+export function endEffectsAtLongRest(state: GameState, actorId: string, clockMoved = false): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const events: EffectNarration[] = [...endConcentrationSustainedBy(state, actorId)];
-  // SRD Long Rest: "If your Hit Point maximum was reduced, it returns to normal." An eight-hour gain (Aid) is spent by
-  // the rest's end too.
+  if (!clockMoved) events.push(...ageEffects(state, new Set([actorId]), LONG_REST_MINUTES, false));
+  // SRD Long Rest: "If your Hit Point maximum was reduced, it returns to normal." A gain kept until ended (one from
+  // before gains counted game time) is spent by the rest's end too.
   for (const effect of [...actor.effects])
     if (
-      ENDS_WITH_THE_FIGHT.has(effect.duration.type) ||
       effect.hitPointMaximumLoss !== undefined ||
-      effect.hitPointMaximumGain !== undefined
+      (effect.hitPointMaximumGain !== undefined && effect.duration.type === "manual")
     )
       endEffectInternal(state, actor, effect.id, events, true);
   // The rest restores its hit points, and a knocked-out creature wakes when it regains any.
   events.push(...endKnockOut(state, actor));
   return events;
+}
+
+/**
+ * SRD: a spell ends when nothing is left of it. A Concentration spell that is only what it leaves on creatures (its
+ * caster's Concentration marked `endsWhenUnaffected`: Hold Person, Bless) ends once no living creature keeps any of it
+ * and no save against it is still owed, and its caster's Concentration with it. The table is told why.
+ */
+export function endIdleConcentration(state: GameState, castId: string): EffectNarration[] {
+  const caster = state.actors.find((actor) =>
+    actor.effects.some(
+      (effect) => effect.castId === castId && effect.tags.includes(CONCENTRATING_TAG) && effect.endsWhenUnaffected
+    )
+  );
+  const holding = caster?.effects.find((effect) => effect.castId === castId && effect.tags.includes(CONCENTRATING_TAG));
+  if (!caster || !holding) return [];
+  if (state.combat.pendingSaves.some((save) => save.onFailEffect?.castId === castId)) return [];
+  const kept = state.actors.some(
+    (actor) =>
+      !isDead(actor) &&
+      actor.effects.some((effect) => effect.castId === castId && !effect.tags.includes(CONCENTRATING_TAG))
+  );
+  if (kept) return [];
+  const spellName = holding.name.replace(/^Concentrating on /, "");
+  const events: EffectNarration[] = [
+    {
+      kind: "effect",
+      text: `${spellName} has no creature left under it, so ${caster.name}'s Concentration on it ends.`,
+      actorId: caster.id
+    }
+  ];
+  endEffectInternal(state, caster, holding.id, events);
+  return events;
+}
+
+/** The casts a creature that has just died was under: each may have nothing left (`endIdleConcentration`). */
+export function endConcentrationOnTheDead(state: GameState, actor: Actor): EffectNarration[] {
+  if (!isDead(actor)) return [];
+  const casts = new Set(actor.effects.flatMap((effect) => (effect.castId !== undefined ? [effect.castId] : [])));
+  return [...casts].flatMap((castId) => endIdleConcentration(state, castId));
 }

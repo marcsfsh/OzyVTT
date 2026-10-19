@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { isDead, longRestWait, rosterActors, type GmActor, type GmView } from "@vtt/domain";
+import { gameTimeSpanLabel, isDead, longRestWait, rosterActors, type GmActor, type GmView } from "@vtt/domain";
 import { Badge, Button, Modal, Stepper, useToast } from "@vtt/ui";
 import { pathForSection } from "../codex/routes";
 import { command } from "../lib/command";
@@ -7,7 +7,10 @@ import { navigate } from "../router";
 import { gameDate, useGmCalendar } from "./game-date";
 import "./rest.css";
 
-const NO_REST = { clockHours: 0, requests: [] as readonly string[], shortRest: null };
+const NO_REST = { clockHours: 0, clockMinutes: 0, requests: [] as readonly string[], shortRest: null };
+
+/** The minutes the GM can add to the hours passed, from a single minute (10 rounds) up to most of an hour. */
+const MINUTE_STEPS = [0, 1, 5, 10, 15, 20, 30, 45] as const;
 
 /** Why a character can't rest at all now (no Short Rest either); null when nothing stands in the way. */
 function blockedNote(state: GmView, actor: GmActor): string | null {
@@ -35,6 +38,7 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hours, setHours] = useState(8);
+  const [minuteStep, setMinuteStep] = useState(0);
   const [unpicked, setUnpicked] = useState<ReadonlySet<string>>(new Set());
   const { toast } = useToast();
   // Read defensively: the first state a signing-in GM receives can still be player-shaped.
@@ -45,7 +49,9 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
   const shortRest = rest.shortRest;
   const picked = party.filter((actor) => !unpicked.has(actor.id));
   const calendar = useGmCalendar(token, open);
-  const clock = gameDate(calendar.data, rest.clockHours);
+  const clock = gameDate(calendar.data, rest.clockHours, rest.clockMinutes);
+  const minutes = MINUTE_STEPS[minuteStep] ?? 0;
+  const span = hours * 60 + minutes > 0 ? gameTimeSpanLabel(hours * 60 + minutes) : null;
 
   /** Opens with everyone who can rest ticked; a character who can't (down, dead, in the fight) starts unticked. */
   const openDialog = () => {
@@ -156,18 +162,34 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
               </p>
             )}
             <div className="party-rest-row">
-              <Stepper value={hours} onChange={setHours} min={1} max={72} disabled={busy} aria-label="Hours to pass" />
-              <Button
+              <Stepper
+                value={hours}
+                onChange={setHours}
+                min={0}
+                max={72}
+                format={(value) => `${value} h`}
                 disabled={busy}
-                onClick={() =>
-                  void send(() => command("time:pass", { hours }), `${hours} ${hours === 1 ? "hour" : "hours"} passed.`)
-                }
+                aria-label="Hours to pass"
+              />
+              <Stepper
+                value={minuteStep}
+                onChange={setMinuteStep}
+                min={0}
+                max={MINUTE_STEPS.length - 1}
+                format={(value) => `${MINUTE_STEPS[value] ?? 0} min`}
+                disabled={busy}
+                aria-label="Minutes to pass"
+              />
+              <Button
+                disabled={busy || span === null}
+                onClick={() => void send(() => command("time:pass", { hours, minutes }), `${span} passed.`)}
               >
-                Pass {hours} {hours === 1 ? "hour" : "hours"}
+                {span ? `Pass ${span}` : "Pass time"}
               </Button>
             </div>
             <p className="party-rest-hint">
-              Time that passes here moves the Codex calendar too. A Long Rest can start 16 hours after a
+              Time that passes here moves the Codex calendar too, and counts down spells and effects: a minute is 10
+              rounds. A fight&apos;s rounds don&apos;t move the clock. A Long Rest can start 16 hours after a
               character&apos;s last one ends.
             </p>
           </section>

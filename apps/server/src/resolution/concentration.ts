@@ -1,5 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
+import { spellDurationAt, spellSpanOf } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { EffectInstance, SpellZone } from "@vtt/domain";
+import { MAX_EFFECT_MINUTES, type SaveFailureDuration } from "@vtt/schemas";
 import { addEffect, CONCENTRATING_TAG, makeEffect, type EffectNarration } from "../effects.js";
 import { laterRowOf, laterSpellActionId } from "../item-actions.js";
 import { castThisTurnKey } from "../lasting-spells.js";
@@ -7,15 +9,46 @@ import { endZone } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
 import { tableLineOf, type ResolveContext } from "./context.js";
 
-/** A spell's printed duration as an effect duration: up to ten minutes counts rounds; longer ones last until
- *  ended (the engine keeps no clock outside a fight). */
-export function spellEffectDuration(duration: string): EffectInstance["duration"] {
-  const match = duration.match(/^(?:up to )?(\d+) (round|minute|hour|day)s?$/i);
-  if (!match) return { type: "manual" };
-  const count = Number.parseInt(match[1], 10);
-  const unit = match[2].toLowerCase();
-  const rounds = unit === "round" ? count : unit === "minute" ? count * 10 : Infinity;
-  return rounds <= 100 ? { type: "rounds", remaining: rounds } : { type: "manual" };
+type SpellLifetime = Pick<SpellReference, "duration" | "concentration" | "upcastDurations">;
+
+/** A spell's duration at the level it is cast, as the text and its higher-level rows print it (Dominate Beast from a
+ *  level 6 slot lasts up to 1 hour): up to ten minutes in rounds, longer in minutes of game time, and one that lasts
+ *  until dispelled or is instantaneous with no end of its own. */
+export function spellSaveDuration(spell: SpellLifetime, level: number): SaveFailureDuration | undefined {
+  const span = spellSpanOf(spellDurationAt(spell, level).duration);
+  if (!span) return undefined;
+  return "rounds" in span
+    ? { type: "rounds", rounds: Math.min(100, span.rounds) }
+    : { type: "minutes", minutes: Math.min(MAX_EFFECT_MINUTES, span.minutes) };
+}
+
+/** The same as an effect's duration. */
+export function spellEffectDuration(spell: SpellLifetime, level: number): EffectInstance["duration"] {
+  const duration = spellSaveDuration(spell, level);
+  if (!duration) return { type: "manual" };
+  return duration.type === "rounds"
+    ? { type: "rounds", remaining: duration.rounds }
+    : { type: "minutes", remaining: (duration as { minutes: number }).minutes };
+}
+
+/** Whether a cast at this level needs Concentration: Major Image from a level 4 slot doesn't. */
+export const castsWithConcentration = (spell: SpellLifetime, level: number) =>
+  spellDurationAt(spell, level).concentration;
+
+/** Conditions a failure leaves bare, which no effect holds (Prone ends by standing up). */
+const BARE_CONDITIONS: ReadonlySet<string> = new Set(["prone", "exhaustion"]);
+
+/** A spell that is nothing but what it leaves on creatures: a grant, a failure's effect or its held conditions, with
+ *  no later actions, area or summons of its own (`persistsWithoutTargets`). Its Concentration ends once no creature
+ *  keeps any of it (`endIdleConcentration`). */
+function onlyOnCreatures(spell: SpellReference): boolean {
+  const effect = spell.effect;
+  if (!effect || effect.persistsWithoutTargets || (effect.laterActions ?? []).length > 0) return false;
+  return (
+    effect.grant !== undefined ||
+    effect.failureEffect !== undefined ||
+    (spell.save?.failureConditions ?? []).some((conditionId) => !BARE_CONDITIONS.has(conditionId))
+  );
 }
 
 /** The spell an action casts, when the catalog knows it. */
@@ -37,7 +70,7 @@ const isLaterAction = (ctx: ResolveContext, spell: SpellReference) => laterRowOf
  */
 export function startConcentration(ctx: ResolveContext): void {
   const spell = spellOf(ctx);
-  if (!spell?.concentration) return;
+  if (!spell || !castsWithConcentration(spell, castLevelOf(ctx, spell))) return;
   // What the spell lets its caster do once it is up (Spirit Guardians' save, moving Hex) is no new cast.
   if (isLaterAction(ctx, spell)) return;
   ctx.castId = ctx.input.commandId;
@@ -60,11 +93,12 @@ export function beginConcentration(ctx: ResolveContext, spell: SpellReference, c
       sourceActorId: attacker.id,
       sourceName: attacker.name,
       startedRound: state.combat.round,
-      duration: spellEffectDuration(spell.duration),
+      duration: spellEffectDuration(spell, level),
       endsWhenSourceDefeated: true,
       concentration: true,
       castId,
-      spell: { id: spell.id, level }
+      spell: { id: spell.id, level },
+      ...(onlyOnCreatures(spell) ? { endsWhenUnaffected: true as const } : {})
     }),
     ended,
     deps
@@ -97,7 +131,8 @@ export function markCastTurn(ctx: ResolveContext): void {
  *  replaces the last ("The spell ends if you cast it again"). */
 export function markSpellUp(ctx: ResolveContext): void {
   const spell = spellOf(ctx);
-  if (!spell || spell.concentration || !(spell.effect?.laterActions ?? []).length || isLaterAction(ctx, spell)) return;
+  if (!spell || !(spell.effect?.laterActions ?? []).length || isLaterAction(ctx, spell)) return;
+  if (castsWithConcentration(spell, castLevelOf(ctx, spell))) return;
   const { state, attacker, input } = ctx;
   addEffect(
     state,
@@ -109,7 +144,7 @@ export function markSpellUp(ctx: ResolveContext): void {
       sourceName: attacker.name,
       sourceActionId: ctx.action.id,
       startedRound: state.combat.round,
-      duration: spellEffectDuration(spell.duration),
+      duration: spellEffectDuration(spell, castLevelOf(ctx, spell)),
       spell: { id: spell.id, level: castLevelOf(ctx, spell) }
     })
   );
@@ -134,7 +169,7 @@ export function openSpellZone(ctx: ResolveContext): void {
   if (!spell || !row?.zone || isLaterAction(ctx, spell) || !ctx.state.combat.active) return;
   const { state, attacker, input, targets } = ctx;
   const aroundCaster = row.zone.around === "caster";
-  const duration = spellEffectDuration(spell.duration);
+  const duration = spellEffectDuration(spell, castLevelOf(ctx, spell));
   const caught = ctx.action.save !== undefined || ctx.action.damage.length > 0;
   const zone: SpellZone = {
     id: input.commandId,
@@ -142,14 +177,19 @@ export function openSpellZone(ctx: ResolveContext): void {
     name: spell.name,
     laterActionId: laterSpellActionId(spell.id, row.name),
     casterId: attacker.id,
-    castId: spell.concentration ? ctx.castId : null,
-    rounds: !spell.concentration && duration.type === "rounds" ? Math.max(1, duration.remaining) : null,
+    castId: ctx.castId,
+    rounds: ctx.castId === null && duration.type === "rounds" ? Math.max(1, duration.remaining) : null,
     startedRound: state.combat.round,
     level: castLevelOf(ctx, spell),
     dc: zoneDc(ctx, spell, row.name),
     annotationId: !aroundCaster && input.areaPlaced === true ? input.commandId : null,
     area: aroundCaster ? null : (spell.area ?? null),
     damageDealt: 0,
+    // The damage type the caster chose for it (Conjure Elemental's element).
+    ...(input.damageType && (spell.effect?.damageTypes ?? []).includes(input.damageType as never)
+      ? { damageType: input.damageType }
+      : {}),
+    ...(row.zone.on.includes("spell-end") ? { burstsOnEnd: true as const } : {}),
     entered: [],
     affected: caught ? targets.map((target) => target.id) : []
   };

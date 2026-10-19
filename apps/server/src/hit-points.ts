@@ -29,6 +29,7 @@ import {
   addEffect,
   applyCondition,
   DEATH_WARD_TAG,
+  endConcentrationOnTheDead,
   endConcentrationSustainedBy,
   endEffect,
   endEffectsOnDamage,
@@ -36,6 +37,7 @@ import {
   endKnockOut,
   KNOCKED_OUT_TAG,
   makeEffect,
+  STABLE_RECOVERY_TAG,
   NO_HEALING_TAG,
   reduceExhaustion,
   removeConditionDirect,
@@ -388,6 +390,8 @@ function fallToZero(
   // concentration (SRD Concentration).
   events.push(...endEffectsSustainedBy(state, actor.id));
   events.push(...endConcentrationSustainedBy(state, actor.id));
+  // A spell whose last creature just died has nothing left.
+  events.push(...endConcentrationOnTheDead(state, actor));
   return { instantDeath, defeated };
 }
 
@@ -593,7 +597,16 @@ export function applyDamageDetailed(
     );
   // Sleep, Turn Undead and the like end the moment the bearer takes any damage, and so does a Short Rest.
   if (totalAdjusted > 0)
-    events.push(...endEffectsOnDamage(state, actor), ...leaveShortRest(state, new Set([actor.id]), "took damage"));
+    events.push(
+      ...endEffectsOnDamage(
+        state,
+        actor,
+        input.sourceActorId
+          ? { actorId: input.sourceActorId, ...(deps ? { resolveDefinition: deps.resolveDefinition } : {}) }
+          : undefined
+      ),
+      ...leaveShortRest(state, new Set([actor.id]), "took damage")
+    );
 
   let deathSaveFailuresAdded = 0;
   let instantDeath = false;
@@ -621,7 +634,9 @@ export function applyDamageDetailed(
         sourceActorId: input.sourceActorId ?? null,
         sourceName: input.sourceName ?? null,
         startedRound: state.combat.round,
-        duration: { type: "manual" },
+        // "The creature then has the Unconscious condition and starts a Short Rest": an hour of game time, after which
+        // it wakes, unless hit points or first aid wake it first.
+        duration: { type: "minutes", remaining: 60 },
         linkedConditionIds: ["unconscious"]
       }),
       events,
@@ -629,7 +644,7 @@ export function applyDamageDetailed(
     );
     events.push({
       kind: "condition",
-      text: `${actor.name} was knocked out, Unconscious at 1 HP until it regains hit points.`,
+      text: `${actor.name} was knocked out, Unconscious at 1 HP until it regains hit points or its Short Rest ends.`,
       actorId
     });
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deathWard(state, actor, events)) {
@@ -760,6 +775,9 @@ export function healActor(state: GameState, actorId: string, amount: number, sco
 function wakeOnHealing(state: GameState, actor: Actor, before: number): EffectNarration[] {
   if (actor.hp.current <= before) return [];
   const events = endKnockOut(state, actor);
+  // A Stable creature healed has no more need of its hours to recover.
+  for (const effect of actor.effects.filter((candidate) => candidate.tags.includes(STABLE_RECOVERY_TAG)))
+    events.push(...endEffect(state, actor.id, effect.id));
   // A troll healed off 0 Hit Points no longer waits on its turn to live or die.
   for (const effect of actor.effects.filter((candidate) => candidate.tags.includes(REGENERATING_AT_ZERO_TAG)))
     events.push(...endEffect(state, actor.id, effect.id));
@@ -806,6 +824,7 @@ export function setCurrentHp(state: GameState, actorId: string, current: number,
     // The same transition as damage to 0: what it sustains ends, and so does its Concentration.
     events.push(...endEffectsSustainedBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));
+    events.push(...endConcentrationOnTheDead(state, actor));
   }
   events.push(...wakeOnHealing(state, actor, before));
   return events;

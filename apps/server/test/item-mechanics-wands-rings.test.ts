@@ -616,7 +616,8 @@ describe("the two entries that cast nothing and keep the rest", () => {
       ability: "wis",
       dc: 13,
       successDamage: "none",
-      failureConditions: ["charmed"]
+      failureConditions: ["charmed"],
+      endsOnSourceSideDamage: true
     });
     expect(dcOf("fear")).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: ["frightened"] });
     // Speak with Animals forces no save, so a `saveDc` would have no reader.

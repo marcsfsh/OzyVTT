@@ -70,8 +70,10 @@ function game(options: { helper?: Record<string, unknown>; target?: Record<strin
 function deps(state: GameState, faces: number[] = [], distanceFeet?: number): StabilizeDeps {
   return {
     resolveDefinition: (definitionId) => state.definitions.find((entry) => entry.id === definitionId)?.definition,
-    random: () => {
+    random: (sides) => {
       const face = faces.shift();
+      // A creature made Stable rolls its 1d4 hours to 1 Hit Point; the tests here read none of it.
+      if (face === undefined && sides === 4) return 1;
       if (face === undefined) throw new Error("die queue empty");
       return face;
     },
@@ -101,7 +103,10 @@ describe("first aid: a DC 10 Wisdom (Medicine) check", () => {
     expect(bryn(state).conditions.map((condition) => condition.id)).toContain("unconscious");
     const roll = state.rolls.at(-1)!;
     expect(roll).toMatchObject({ label: "Wisdom (Medicine)", purpose: "check", actorId: HELPER, total: 10 });
-    expect(outcome.events.at(-1)?.text).toBe("Ilse stabilized Bryn (Medicine 10 vs DC 10).");
+    expect(outcome.events.map((event) => event.text)).toEqual([
+      "Ilse stabilized Bryn (Medicine 10 vs DC 10).",
+      "Bryn regains 1 Hit Point in 1 hour of game time unless healed first."
+    ]);
   });
 
   it("is made as every check is: Poisoned gives Disadvantage, and Exhaustion comes off once", () => {

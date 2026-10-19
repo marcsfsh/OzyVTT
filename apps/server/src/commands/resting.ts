@@ -6,7 +6,7 @@ import {
   RestPartySchema,
   TimePassSchema
 } from "@vtt/domain/commands";
-import type { GameState } from "@vtt/domain";
+import { gameTimeSpanLabel, type GameState } from "@vtt/domain";
 import type { EffectNarration } from "../effects.js";
 import {
   answerLongRest,
@@ -20,7 +20,8 @@ import {
 import { initiatorOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
-// Long Rest requests, the GM's party rest and game time (SRD Resting: a Long Rest waits 16 hours after the last).
+// Long Rest requests, the GM's party rest and game time (SRD Resting: a Long Rest waits 16 hours after the last). Time
+// on the clock counts down what lasts in game time (`game-time.ts`).
 
 type ClockSpan = { fromHours: number; toHours: number };
 
@@ -29,6 +30,12 @@ function timed(state: GameState, change: () => void, span: ClockSpan): void {
   span.fromHours = state.rest.clockHours;
   change();
   span.toHours = state.rest.clockHours;
+}
+
+/** "10 minutes pass.", "1 hour passes." */
+function passedLine(minutes: number): string {
+  const span = gameTimeSpanLabel(minutes);
+  return `${span} ${/^1 [a-z]+$/.test(span) ? "passes" : "pass"}.`;
 }
 
 const names = (list: readonly string[]) =>
@@ -109,7 +116,7 @@ export const restingCommands = [
     type: "rest.party",
     operationId: "restParty",
     description:
-      "GM-only: rests several characters together. All of them must be able to rest (out of any running encounter, at 1 hit point or more, and for a Long Rest 16 hours of game time after their last one) or none does, and the refusal names who can't and why. Long: each gets a Long Rest now and the game clock moves 8 hours. Short: the party's Short Rest opens; each player spends Hit Dice on their own device and marks themselves done (rest.mark-done), and rest.finish ends it. Rolling Initiative, taking any damage or casting a spell other than a cantrip takes a member out of it, with no benefits (SRD Interrupting the Rest).",
+      "GM-only: rests several characters together. All of them must be able to rest (out of any running encounter, at 1 hit point or more, and for a Long Rest 16 hours of game time after their last one) or none does, and the refusal names who can't and why. Long: the game clock moves 8 hours, which ends what runs out in that time on every creature as time.pass does, and each gets a Long Rest. Short: the party's Short Rest opens; each player spends Hit Dice on their own device and marks themselves done (rest.mark-done), and rest.finish ends it. Rolling Initiative, taking any damage or casting a spell other than a cantrip takes a member out of it, with no benefits (SRD Interrupting the Rest).",
     summary: "Rest several characters together: a Long Rest now, or a Short Rest that stays open for Hit Dice.",
     schema: RestPartySchema,
     malformed: "The party rest is malformed.",
@@ -165,7 +172,7 @@ export const restingCommands = [
     type: "rest.finish",
     operationId: "finishShortRest",
     description:
-      "GM-only: ends the party's Short Rest. With `apply`, each member who can still rest gets the Short Rest's benefits (as actor.rest) and the game clock moves an hour; a member now at 0 hit points or in a running encounter gets nothing. Without it the rest is called off and no time passes.",
+      "GM-only: ends the party's Short Rest. With `apply`, each member who can still rest gets the Short Rest's benefits (as actor.rest) and the game clock moves an hour, which ends what runs out in that time as time.pass does; a member now at 0 hit points or in a running encounter gets nothing. Without it the rest is called off and no time passes.",
     summary: "End the party's Short Rest, with its benefits or calling it off.",
     schema: RestFinishSchema,
     malformed: "The rest command is malformed.",
@@ -203,22 +210,32 @@ export const restingCommands = [
     type: "time.pass",
     operationId: "passTime",
     description:
-      "GM-only: moves the game clock forward by whole hours. The clock is what the 16-hour rule between Long Rests reads; a party rest moves it too (8 hours for a Long Rest, 1 for a Short Rest). Each midnight it crosses moves the Codex calendar's date a day, and the players' date with it when the two were the same day. Nothing else happens with the time: effects and Concentration are the GM's to end.",
-    summary: "Move game time forward by some hours.",
+      "GM-only: moves the game clock forward by hours and minutes. The clock is what the 16-hour rule between Long Rests reads; a party rest moves it too (8 hours for a Long Rest, 1 for a Short Rest). A round is 6 seconds, so 10 rounds make a minute: the time counts down every creature's effects (an effect measured in rounds loses 10 a minute, one measured in minutes or hours loses them, and one that lasts until a turn ends is over), and what runs out ends with its on-end grants, as at a turn boundary. A fight doesn't move the clock; a parked fight's combatants wait outside it. Each midnight it crosses moves the Codex calendar's date a day, and the players' date with it when the two were the same day.",
+    summary: "Move game time forward by some hours and minutes.",
     schema: TimePassSchema,
-    malformed: "Choose between 1 and 720 hours.",
+    malformed: "Choose between 1 minute and 720 hours.",
     gmOnly: "Only the GM moves game time.",
     async run({ request, execute }, kit) {
-      const { hours } = request;
+      const minutes = (request.hours ?? 0) * 60 + (request.minutes ?? 0);
+      let events: EffectNarration[] = [];
       const span: ClockSpan = { fromHours: 0, toHours: 0 };
-      const { duplicate } = await execute((state) => timed(state, () => passTime(state, hours), span));
+      const { duplicate } = await execute((state) =>
+        timed(
+          state,
+          () => {
+            events = passTime(state, request.hours ?? 0, request.minutes ?? 0);
+          },
+          span
+        )
+      );
       if (duplicate) return;
       if (span.toHours > span.fromHours) kit.context.onTimePassed?.(span);
       kit.context.appendLog({
         kind: "encounter",
-        text: `${hours} ${hours === 1 ? "hour passes" : "hours pass"}.`,
+        text: passedLine(minutes),
         gmOnly: false
       });
+      kit.publishNarrations(events);
     }
   })
 ];

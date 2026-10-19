@@ -974,7 +974,8 @@
         "dragon-wings"
        ],
        "duration": {
-        "type": "manual"
+        "type": "minutes",
+        "minutes": 60
        },
        "modifiers": [
         {

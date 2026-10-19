@@ -3,7 +3,7 @@ import { aggregateRollMode, otherDiceOf } from "@vtt/rules-5e";
 import { GameAccessDeniedError, requireActorAccess, requireGm } from "../authorization.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty } from "../condition-rules.js";
 import { rollDeathSave } from "../death-saves.js";
-import type { EffectNarration } from "../effects.js";
+import { startStableRecovery, type EffectNarration } from "../effects.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { stabilizeCreature } from "../stabilize.js";
 import {
@@ -330,6 +330,9 @@ export const saveCommands = [
         if (commit && inFight && draft.combat.turnActorId === actorId)
           draft.combat.turn = { ...draft.combat.turn, deathSaveRolled: true };
         if (commit && roll.outcome.regainsOneHitPoint) events = healActor(draft, actorId, 1, { role: "gm" });
+        // Three successes: Stable, and 1 Hit Point back after 1d4 hours of game time.
+        else if (commit && roll.outcome.state.stable)
+          events = startStableRecovery(draft, actor, kit.context.random, `${commandId}:stable`);
       });
       if (duplicate || !roll) return { rollId };
       kit.publishRolls(state, commandId);

@@ -370,6 +370,9 @@ export const ActionResolveSchema = z
     /** Ready this spell for later (SRD Ready): its slot is spent and it is held with Concentration until
      *  the start of the caster's next turn; casting it off-turn then releases it with the Reaction. */
     ready: z.boolean().optional(),
+    /** GM only: the spell area a cast that ends spells is aimed at (Dispel Magic on a Moonbeam), from
+     *  `combat.spellZones`. */
+    zoneId: z.string().min(1).max(120).optional(),
     /** false previews the attack roll only (no damage/riders/economy). The server holds the previewed d20, so a second
      *  preview of the same attack shows the same die, and the confirm (`commit: true`) uses it. Non-attack actions
      *  ignore it. */
@@ -1123,10 +1126,13 @@ export const RestFinishSchema = z
 export const TimePassSchema = z
   .object({
     commandId: z.uuid(),
-    hours: z.number().int().min(1).max(720),
+    hours: z.number().int().min(0).max(720).default(0),
+    /** Minutes on top of the hours, so a group can skip the minute or the 10 minutes a spell lasts. */
+    minutes: z.number().int().min(0).max(59).default(0),
     expectedRevision: z.number().int().nonnegative().optional()
   })
-  .strict();
+  .strict()
+  .refine((request) => request.hours > 0 || request.minutes > 0, "Choose at least 1 minute.");
 export const CharacterSetSlotSchema = z
   .object({
     commandId: z.uuid(),
