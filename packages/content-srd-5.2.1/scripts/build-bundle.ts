@@ -1321,9 +1321,8 @@ const monsters: ActorDefinition[] = creatures
     const conditionImmunities = splitTypedList(fields.condition_immunities_display, KNOWN_CONDITION_IDS);
     if (damageResistances.length > 0 || damageImmunities.length > 0 || damageVulnerabilities.length > 0)
       report.typedDefenses += 1;
-    // Legendary resources (SRD 2024): every legendary SRD creature prints "Legendary Action Uses: 3"
-    // (the "(4 in Lair)" bump stays prose: lairs aren't modeled). Legendary Resistance parses the
-    // non-lair N from the trait name; the "(or N+1/Day in Lair)" variant likewise stays prose.
+    // Legendary resources (SRD 2024): every legendary SRD creature prints "Legendary Action Uses: 3", and Legendary
+    // Resistance's N is in the trait's name. The counts in a lair come from the SRD text (`lairCountsOf`).
     const hasLegendaryActions = sortedActions.some((action) => action.fields.action_type === "LEGENDARY_ACTION");
     const resistanceTrait = (traitsByCreature.get(creature.pk) ?? [])
       .map((trait) => trait.fields.name.match(/^Legendary Resistance \((\d+)\/Day/))
