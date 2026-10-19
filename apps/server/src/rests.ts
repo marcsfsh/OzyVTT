@@ -18,7 +18,7 @@ import { passGameTime } from "./game-time.js";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { openPreparation } from "./spellcasting.js";
 import { healActor } from "./hit-points.js";
-import { chargesAfterDawn } from "./item-charges.js";
+import { chargesAfterDawn, neverRegained } from "./item-charges.js";
 
 /** SRD Resting: a Short Rest is 1 hour and a Long Rest at least 8. */
 export const SHORT_REST_HOURS = 1;
@@ -226,7 +226,7 @@ export function applyRest(
     const dawn = chargesAfterDawn(actor, longRestDefinition, catalog, charges.random);
     actor.actionUses = dawn.stillSpent;
     charges.lines.push(...dawn.lines);
-  } else actor.actionUses = {};
+  } else actor.actionUses = neverRegained(actor, longRestDefinition, catalog);
   reduceExhaustion(actor);
   actor.lastLongRestAt = state.rest.clockHours;
   // Rested, by whatever path: nothing left to ask the GM for.

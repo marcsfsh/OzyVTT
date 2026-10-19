@@ -8,6 +8,7 @@ import { castAction, itemAction } from "./item-actions.js";
 import { keepAmmunitionCount } from "./ammunition.js";
 import { endConditionsImmuneTo, endEffect, MAGE_ARMOR_TAG, type EffectNarration } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
+import { rollStartingCharges } from "./item-charges.js";
 import { scrollSpellProblem } from "./scrolls.js";
 
 const MAX_ITEMS = 200;
@@ -36,6 +37,8 @@ export type InventoryDeps = Readonly<{
   /** The spells this writer may put on a scroll: a player's own catalog, so a GM-only spell can't be probed for.
    *  Absent: the catalog's. */
   pickableSpell?: (id: string) => SpellReference | undefined;
+  /** The server's dice, for the charges a copy holds when it is added (a Necklace of Fireballs' 1d6 + 3 beads). */
+  random?: (sides: number) => number;
 }>;
 
 /** Reconciles equipment onto the actor after an inventory write, recomputed whole so unequipping needs no
@@ -397,6 +400,8 @@ export function setInventoryItem(
       if (actor.inventory.length >= MAX_ITEMS)
         throw new CommandRejectedError("This character's pack is full. Remove something first.");
       actor.inventory = [...actor.inventory, { ...item }];
+      // A new copy holds the charges its record rolls for it, which never come back.
+      if (deps.random) rollStartingCharges(actor, item, definition, deps.catalog, deps.random);
     }
   }
   reconcileEquipment(actor, definition, deps);

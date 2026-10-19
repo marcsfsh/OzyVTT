@@ -733,8 +733,8 @@ describe("the absences that were measured and must stay absent", () => {
     ]) {
       expect({ id, carries: carries(view.equipmentRecord(id)!) }).toEqual({ id, carries: false });
     }
-    // Rows needing mechanics not modeled yet, and two whose charge table costs more than one charge per use.
-    for (const id of ["mysterious-deck", "cube-of-force", "dragon-orb", "gem-of-brightness", "pearl-of-power"]) {
+    // Rows needing mechanics not modeled yet: a Pearl of Power is a slot recovery (conversions.ts), not an item row.
+    for (const id of ["mysterious-deck", "dragon-orb", "gem-of-brightness", "pearl-of-power"]) {
       expect({ id, carries: carries(view.equipmentRecord(id)!) }).toEqual({ id, carries: false });
     }
   });

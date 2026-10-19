@@ -28,17 +28,36 @@ const words = (slug: string) => slug.split("-").map(titleCase).join(" ");
 const itemActions = (item: InventoryItem, serverActions: readonly ContentActionSummary[]) =>
   serverActions.filter((row) => row.id === `item-${item.id}` || row.id.startsWith(`item-${item.id}-`));
 
-/** An item's charges: the one pool its actions spend, and what is left of it. */
-function chargesOf(rows: readonly ContentActionSummary[], spent: Readonly<Record<string, number>>) {
-  const row = rows.find((candidate) => candidate.usesLimit !== null && candidate.usesPer !== "turn");
-  if (!row || row.usesLimit === null) return null;
-  const pool = row.usesPool ?? row.id;
-  return {
-    left: Math.max(0, row.usesLimit - (spent[pool] ?? 0)),
-    limit: row.usesLimit,
-    per: row.usesPer ?? "long-rest"
-  };
+type ChargePool = Readonly<{ pool: string; name: string; left: number; limit: number; per: string }>;
+
+/** An item's charge pools, each with what is left: one its casts share ("Charges"), or a property's own (Staff of
+ *  Thunder and Lightning's once-a-day Lightning). */
+function chargePoolsOf(rows: readonly ContentActionSummary[], spent: Readonly<Record<string, number>>): ChargePool[] {
+  const pools = new Map<string, ChargePool & { spenders: number }>();
+  for (const row of rows) {
+    if (row.usesLimit === null || row.usesPer === "turn") continue;
+    const pool = row.usesPool ?? row.id;
+    const known = pools.get(pool);
+    pools.set(pool, {
+      pool,
+      name: known ? "Charges" : row.name,
+      left: Math.max(0, Math.max(known?.limit ?? 0, row.usesLimit) - (spent[pool] ?? 0)),
+      limit: Math.max(known?.limit ?? 0, row.usesLimit),
+      per: row.usesPer ?? "long-rest",
+      spenders: (known?.spenders ?? 0) + 1
+    });
+  }
+  // A pool its casts share reads as the item's charges.
+  return [...pools.values()].map(({ spenders, ...pool }) =>
+    spenders > 1 || pool.pool.endsWith("-charges") ? { ...pool, name: "Charges" } : pool
+  );
 }
+
+/** The pool the item's row shows: the charges its casts share, else its first. */
+const chargesOf = (rows: readonly ContentActionSummary[], spent: Readonly<Record<string, number>>) => {
+  const pools = chargePoolsOf(rows, spent);
+  return pools.find((pool) => pool.name === "Charges") ?? pools[0] ?? null;
+};
 
 /**
  * The Gear tab: attunement and what fills it, the coins in one row, what is worn and held, then the pack, and a way to
@@ -199,7 +218,7 @@ export function GearTab({
   const detail = open
     ? (() => {
         const rows = itemActions(open, serverActions);
-        const charges = chargesOf(rows, spent);
+        const pools = chargePoolsOf(rows, spent);
         const summary = summaryOf(open);
         const mastery = facts.get(`item-${open.id}`)?.mastery ?? null;
         const choices = summary?.damageTypeChoice;
@@ -214,18 +233,21 @@ export function GearTab({
               </button>
             }
           >
-            {charges && (
-              <p className="cs-item-charges">
+            {pools.map((charges) => (
+              <p key={charges.pool} className="cs-item-charges">
                 <UseBoxes
                   left={charges.left}
                   limit={charges.limit}
-                  label={`${charges.left} of ${charges.limit} charges left`}
+                  label={`${charges.name}: ${charges.left} of ${charges.limit} left`}
                 />
                 <span className="cs-sub">
-                  {charges.left} of {charges.limit} charges left · {returnsWords(charges.per)}
+                  {charges.name === "Charges"
+                    ? `${charges.left} of ${charges.limit} charges left`
+                    : `${charges.name} · ${charges.left} of ${charges.limit} left`}{" "}
+                  · {returnsWords(charges.per)}
                 </span>
               </p>
-            )}
+            ))}
             {open.ammunitionLeft !== undefined && (
               <p className="cs-sub">{open.ammunitionLeft} left in the open bundle.</p>
             )}

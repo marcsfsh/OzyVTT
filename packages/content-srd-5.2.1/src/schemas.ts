@@ -766,7 +766,8 @@ export const EquipmentReferenceSchema = z
       ),
     casts: z
       .array(ItemSpellCastSchema)
-      .max(8)
+      // A Staff of the Magi casts 18 spells.
+      .max(24)
       .default([])
       .describe("Spells the item can cast (Amulet of Message, Wand of Fireballs)"),
     charges: ItemChargesSchema.optional().describe(

@@ -258,7 +258,8 @@ export const characterSheetCommands = [
         ended = setInventoryItem(state, actorId, item, (definitionId) => kit.resolveDefinitionIn(state, definitionId), {
           catalog: kit.equipmentCatalog(),
           role: initiatorOf(principal).role,
-          pickableSpell: (spellId) => kit.catalogFor(principal).spellRecord(spellId)
+          pickableSpell: (spellId) => kit.catalogFor(principal).spellRecord(spellId),
+          random: (sides) => kit.context.random(sides)
         });
       });
       if (!duplicate) kit.publishNarrations(ended);

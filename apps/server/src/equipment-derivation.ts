@@ -27,7 +27,7 @@ import { isIncapacitated } from "./condition-rules.js";
 import { scrollCastAction } from "./scrolls.js";
 import { speedZeroed } from "./speed.js";
 import {
-  castAction,
+  itemCastActions,
   extraAttackAction,
   isItemActionId,
   itemAction,
@@ -472,7 +472,7 @@ export function deriveEquipment(
     takeEffects(record, item.id, label);
     for (const declared of record.actions) actions.push(itemAction(item, declared, definition));
     for (const cast of record.casts)
-      actions.push(castAction(item, cast, label, definition, catalog!.spellRecord?.(cast.spellId)));
+      actions.push(...itemCastActions(item, cast, label, definition, catalog!.spellRecord?.(cast.spellId)));
     const read = record.spellScroll ? scrollCastAction(item, definition, catalog) : null;
     if (read) actions.push(read);
     // Depth 1: the feat's riders join this block, so unequipping removes them in one recomputation.
