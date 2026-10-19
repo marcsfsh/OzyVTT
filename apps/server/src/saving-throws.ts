@@ -526,6 +526,7 @@ export function applyFailureEffect(
     escapeDc: onFail.escapeDc,
     ...(onFail.repeatSave ? { repeatSave: armedRepeat(state, target.id, onFail.repeatSave) } : {}),
     ...(onFail.endsOnDamage ? { endsOnDamage: true } : {}),
+    ...(onFail.endsOnIncapacitated ? { endsOnIncapacitated: true as const } : {}),
     ...(onFail.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
     ...(onFail.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
     ...(onFail.endsOutOfSight ? { endsOutOfSight: true as const } : {}),

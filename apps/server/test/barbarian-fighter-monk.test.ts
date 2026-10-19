@@ -1502,6 +1502,82 @@ describe("Monk: Superior Defense grants Resistance to everything but Force", () 
   });
 });
 
+describe("Monk: Superior Defense at the start of the turn, until the Monk is Incapacitated", () => {
+  const defended = (built: Built) => built.hero.effects.find((effect) => effect.tags.includes("superior-defense"));
+
+  it("is taken at the start of the Monk's turn and refused once the turn is under way", () => {
+    const built = onTheTable(build(monkInput(18)));
+    use(built, "superior-defense");
+    expect(defended(built)).toBeDefined();
+    const later = onTheTable(build(monkInput(18)));
+    use(later, "unarmed-strike", [IDS.foe], [17, 5]);
+    expect(() => use(later, "superior-defense")).toThrowError(
+      "Superior Defense is used at the start of Shan's turn, before it moves or acts."
+    );
+    // Another creature's turn is no start of the Monk's.
+    const offTurn = onTheTable(build(monkInput(18)));
+    nextInitiativeTurn(offTurn.state);
+    expect(() => use(offTurn, "superior-defense")).toThrowError("Superior Defense is used on Shan's own turn.");
+  });
+
+  it("ends when the Monk is Stunned, and stays ended once the condition goes", () => {
+    const built = onTheTable(build(monkInput(18)));
+    use(built, "superior-defense");
+    setCondition(built.state, IDS.hero, "stunned", true, undefined, { role: "gm" });
+    expect(defended(built)).toBeUndefined();
+    setCondition(built.state, IDS.hero, "stunned", false, undefined, { role: "gm" });
+    expect(defended(built)).toBeUndefined();
+  });
+
+  it("ends when the Monk drops to 0 Hit Points", () => {
+    const built = onTheTable(build(monkInput(18)));
+    use(built, "superior-defense");
+    applyDamageDetailed(built.state, IDS.hero, { amount: 500 }, { role: "gm" });
+    expect(defended(built)).toBeUndefined();
+  });
+});
+
+describe("Open Hand: Fleet Step takes Step of the Wind right after another Bonus Action", () => {
+  /** A generic action this Monk can take by id, the Bonus Action forms its features give included. */
+  const take = (built: Built, actionId: string) =>
+    resolveDefinitionAction(
+      built.state,
+      builtinActionFor(built.definition, actionId)!,
+      {
+        actorId: IDS.hero,
+        targetIds: [],
+        commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
+        builtin: true
+      },
+      deps(built)
+    );
+
+  it("lets a Monk 11 use Step of the Wind after Flurry of Blows, once", () => {
+    const built = onTheTable(build(monkInput(11)));
+    use(built, "flurry-of-blows");
+    use(built, "step-of-the-wind");
+    expect(built.hero.effects.some((effect) => effect.tags.includes("dashing"))).toBe(true);
+    // Step of the Wind twice isn't Fleet Step's.
+    expect(() => take(built, "dash-bonus")).toThrowError(/already used a Bonus Action/);
+  });
+
+  it("takes the free Step of the Wind the same way", () => {
+    const built = onTheTable(build(monkInput(11)));
+    use(built, "flurry-of-blows");
+    take(built, "dash-bonus");
+    expect(built.hero.effects.some((effect) => effect.tags.includes("dashing"))).toBe(true);
+  });
+
+  it("gives a Monk 10 no second Bonus Action, and nothing after Step of the Wind itself", () => {
+    const tenth = onTheTable(build(monkInput(10)));
+    use(tenth, "flurry-of-blows");
+    expect(() => use(tenth, "step-of-the-wind")).toThrowError(/already used a Bonus Action/);
+    const built = onTheTable(build(monkInput(11)));
+    use(built, "step-of-the-wind");
+    expect(() => take(built, "dash-bonus")).toThrowError(/already used a Bonus Action/);
+  });
+});
+
 describe("Monk: Quivering Palm starts on an Unarmed Strike hit and ends on the marked creature", () => {
   it("spends the 4 Focus Points marking the hit creature, and ending it spends none", () => {
     const built = onTheTable(build(monkInput(20)));
@@ -1607,6 +1683,37 @@ describe("Barbarian: Rage lasts while it is fed, and stops spells and Concentrat
     expect(built.hero.actionUses.rage).toBe(1);
     nextInitiativeTurn(built.state);
     expect(raging(built)).toBeDefined();
+  });
+
+  it("is refused in Heavy armor before a use or the Bonus Action is spent", () => {
+    const built = onTheTable(build(barbarianInput(5)));
+    built.hero.inventory.push({
+      id: "plate-armor",
+      name: "Plate Armor",
+      quantity: 1,
+      equipped: true,
+      attuned: false,
+      category: "armor",
+      armor: { category: "heavy", baseAc: 18, dexCap: 0, strengthRequirement: 15, stealthDisadvantage: true }
+    } as (typeof built.hero.inventory)[number]);
+    expect(() => use(built, "rage")).toThrowError("Ozar is wearing Heavy armor and can't enter a Rage.");
+    expect(built.hero.actionUses.rage).toBeUndefined();
+    expect(built.state.combat.turn.bonusActionUsed).toBe(false);
+    expect(raging(built)).toBeUndefined();
+  });
+
+  it("is extended by an attack against an enemy, and an attack on an ally doesn't feed it", () => {
+    const built = onTheTable(build(barbarianInput(5)));
+    const ally = { ...built.state.actors.find((actor) => actor.id === IDS.foe)!, id: OTHER, name: "Ally" };
+    built.state.actors.push({ ...ally, kind: "player-character" });
+    built.state.combat.initiative.push({ actorId: OTHER, score: 5 } as (typeof built.state.combat.initiative)[number]);
+    use(built, "rage");
+    nextInitiativeTurn(built.state); // the Barbarian's own turn ends: the Rage holds
+    nextInitiativeTurn(built.state);
+    nextInitiativeTurn(built.state); // the Barbarian's next turn begins
+    use(built, "item-greataxe", [OTHER], [3, 8]);
+    nextInitiativeTurn(built.state);
+    expect(raging(built)).toBeUndefined();
   });
 
   it("ends when the Barbarian is Incapacitated", () => {

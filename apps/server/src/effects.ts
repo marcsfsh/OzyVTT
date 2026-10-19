@@ -333,8 +333,9 @@ export function dropHeldItems(actor: Actor, source?: ConditionImmunitySource): E
 /**
  * What gaining a condition does beyond itself, shared by every path that can impose one (a GM chip, a failed save,
  * an on-hit rider, an effect's linked conditions): an Incapacitated creature's grapples release and its
- * Concentration breaks (SRD Incapacitated, Grappling), and its Rage ends; an Unconscious one drops what it holds;
- * Exhaustion 6 is death. 0 HP is handled by the damage path, which ends everything the creature sustains.
+ * Concentration breaks (SRD Incapacitated, Grappling), and what lasts "until you have the Incapacitated condition"
+ * ends; an Unconscious one drops what it holds; Exhaustion 6 is death. 0 HP is handled by the damage path, which ends
+ * everything the creature sustains.
  */
 export function conditionGained(
   state: GameState,
@@ -348,16 +349,32 @@ export function conditionGained(
   if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
     events.push(...releaseGrapplesHeldBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));
-    // Persistent Rage ends early only on Unconscious.
-    for (const rage of actor.effects.filter((effect) => effect.tags.includes(RAGING_TAG)))
-      if (!rage.tags.includes(PERSISTENT_RAGE_TAG) || conditionId === "unconscious")
-        endEffectInternal(state, actor, rage.id, events);
-    // Wild Shape: "until you ... have the Incapacitated condition".
-    for (const shaped of actor.effects.filter((effect) => effect.form?.endsOnIncapacitated === true))
-      endEffectInternal(state, actor, shaped.id, events);
+    events.push(...endWhatIncapacitationEnds(state, actor, conditionId));
   }
   if (conditionId === "exhaustion" && previousExhaustion < 6 && exhaustionLevel(actor) >= 6)
     events.push(...applyExhaustionDeath(state, actor));
+  return events;
+}
+
+/** Whether an effect ends when this creature is Incapacitated: its own Rage (Persistent Rage only on Unconscious) and
+ *  form (Wild Shape), and every effect, on any creature, kept by it with `endsOnIncapacitated` (Superior Defense,
+ *  Divine Sense, the Undead its Turn Undead turned, an Animated Shield). */
+function endsWithIncapacitation(keeper: Actor, bearer: Actor, effect: EffectInstance, conditionId: string): boolean {
+  if (effect.endsOnIncapacitated === true) return (effect.sourceActorId ?? bearer.id) === keeper.id;
+  if (bearer.id !== keeper.id) return false;
+  if (effect.tags.includes(RAGING_TAG))
+    return !effect.tags.includes(PERSISTENT_RAGE_TAG) || conditionId === "unconscious";
+  return effect.form?.endsOnIncapacitated === true;
+}
+
+/** SRD: what lasts "until you have the Incapacitated condition" ends once `keeper` has it (or one that includes it),
+ *  or drops to 0 Hit Points, which the damage path reports as Unconscious. */
+export function endWhatIncapacitationEnds(state: GameState, keeper: Actor, conditionId = "incapacitated") {
+  const events: EffectNarration[] = [];
+  for (const bearer of state.actors)
+    for (const effect of [...bearer.effects])
+      if (endsWithIncapacitation(keeper, bearer, effect, conditionId))
+        endEffectInternal(state, bearer, effect.id, events);
   return events;
 }
 

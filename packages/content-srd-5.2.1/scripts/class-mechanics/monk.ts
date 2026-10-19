@@ -177,6 +177,7 @@ export const monk: ClassMechanicsModule = {
           id: "superior-defense",
           name: "Superior Defense",
           activation: "other",
+          timing: "turn-start",
           description:
             "At the start of your turn, expend 3 Focus Points to bolster yourself against harm for 1 minute or until you have the Incapacitated condition. During that time, you have Resistance to every damage type except Force.",
           damage: [],
@@ -185,6 +186,7 @@ export const monk: ClassMechanicsModule = {
             name: "Superior Defense",
             tags: ["superior-defense"],
             duration: { type: "rounds", rounds: 10 },
+            endsOnIncapacitated: true,
             modifiers: [{ type: "damage-resistance", damageTypes: [...ALL_BUT_FORCE] }]
           }
         }

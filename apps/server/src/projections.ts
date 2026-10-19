@@ -272,6 +272,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   endsOnSourceSideDamage: "player",
   speedZero: "player",
   endsWhenSourceDefeated: "player",
+  // "If you have the Incapacitated condition" is the action's printed text (Turn Undead).
+  endsOnIncapacitated: "player",
   rangeFeet: "player",
   endsOnSpellHealing: "player",
   endsOutOfSight: "player",

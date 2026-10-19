@@ -276,6 +276,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       // (Bardic Inspiration) is its own once given.
       endsWhenSourceDefeated: action.spellId === undefined && grant.answer === undefined,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
+      ...(grant.endsOnIncapacitated ? { endsOnIncapacitated: true as const } : {}),
       modifiers: [
         ...modifiers,
         ...hexDisadvantage,
@@ -467,6 +468,7 @@ export function grantOutsideFight(
           : grantDuration(state, grant.duration, actor.id, null),
       endsWhenSourceDefeated: true,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
+      ...(grant.endsOnIncapacitated ? { endsOnIncapacitated: true as const } : {}),
       modifiers: grant.modifiers,
       onEnd: grant.onEnd,
       endsWithTag: grant.endsWithTag ?? null,

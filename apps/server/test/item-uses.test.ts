@@ -55,6 +55,18 @@ describe("what a worn item gave ends when it comes off", () => {
     resolveAt(table, IDS.fighter, "item-animated-shield-animate", [], { targetIds: [] });
     expect(resolveAt(table, IDS.fighter, "item-greatsword", [15, 3, 3], {}, 5).attack?.outcome).toBe("hit");
   });
+
+  it("drops the Animated Shield for good when its user is Incapacitated", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() });
+    write(table, IDS.fighter, catalogRow("animated-shield", { attuned: true }));
+    fight(table, IDS.fighter);
+    resolveAt(table, IDS.fighter, "item-animated-shield-animate", [], { targetIds: [] });
+    const animated = () => table.actor(IDS.fighter).effects.some((effect) => effect.tags.includes("animated-shield"));
+    expect(animated()).toBe(true);
+    setCondition(table.state, IDS.fighter, "unconscious", true, undefined, { role: "gm" });
+    setCondition(table.state, IDS.fighter, "unconscious", false, undefined, { role: "gm" });
+    expect(animated()).toBe(false);
+  });
 });
 
 describe("potions", () => {

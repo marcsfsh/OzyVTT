@@ -232,6 +232,8 @@ const PendingSaveEffectSchema = z
     speedZero: z.boolean().optional(),
     /** A grapple: it ends with its source's defeat, and when a move takes them farther apart than `rangeFeet`. */
     endsWhenSourceDefeated: z.boolean().optional(),
+    /** It ends when its source has the Incapacitated condition (Turn Undead). */
+    endsOnIncapacitated: EffectInstanceSchema.shape.endsOnIncapacitated,
     rangeFeet: EffectInstanceSchema.shape.rangeFeet,
     /** The Concentration cast it belongs to: it is sustained by the caster's Concentration, and is not applied
      * once that has ended. */

@@ -40,6 +40,7 @@ import {
   endEffect,
   endEffectsOnDamage,
   endEffectsSustainedBy,
+  endWhatIncapacitationEnds,
   endKnockOut,
   KNOCKED_OUT_TAG,
   makeEffect,
@@ -505,6 +506,7 @@ function fallToZero(
   // concentration (SRD Concentration).
   events.push(...endEffectsSustainedBy(state, actor.id));
   events.push(...endConcentrationSustainedBy(state, actor.id));
+  events.push(...endWhatIncapacitationEnds(state, actor, "unconscious"));
   // A spell whose last creature just died has nothing left.
   events.push(...endConcentrationOnTheDead(state, actor));
   return { instantDeath, defeated };

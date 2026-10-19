@@ -413,7 +413,8 @@
      "modifiers": [],
      "onEnd": [],
      "target": "self",
-     "voidWhileIncapacitated": true,
+     "voidWhileIncapacitated": false,
+     "endsOnIncapacitated": true,
      "concentration": false
     }
    }

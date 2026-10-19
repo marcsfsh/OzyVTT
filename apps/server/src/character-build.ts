@@ -303,6 +303,7 @@ function interpretAction(
     attack,
     save,
     damageByLevel,
+    damageDiceByAbility,
     multiattackByLevel,
     healingByLevel,
     adds,
@@ -359,6 +360,14 @@ function interpretAction(
       .sort((left, right) => left.level - right.level);
     if (rows.length > 0)
       assembled.damage = [{ formula: rows[rows.length - 1].formula, type: rows[rows.length - 1].type }];
+  }
+  // "A number of d8s equal to your Wisdom modifier (minimum of 1d8)" (Sear Undead), from its level.
+  if (damageDiceByAbility && damageDiceByAbility.level <= context.level) {
+    const count = Math.max(
+      damageDiceByAbility.minimum,
+      abilityModifier(context.finalScores[damageDiceByAbility.ability])
+    );
+    assembled.damage = [{ formula: `${count}${damageDiceByAbility.die}`, type: damageDiceByAbility.type }];
   }
   const plan = (multiattackByLevel ?? []).filter((row) => row.level <= context.level).sort((a, b) => a.level - b.level);
   if (plan.length > 0) assembled.multiattack = plan[plan.length - 1].multiattack;

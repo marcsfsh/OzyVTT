@@ -11,6 +11,7 @@ import {
   AbilitySchema,
   ActionSchema,
   DamageFormulaSchema,
+  DamageTypeSchema,
   DiceFormulaSchema,
   HealingFormulaSchema,
   EffectGrantSchema,
@@ -248,6 +249,21 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true,
       .optional()
       .describe(
         "Damage that grows with level (Sneak Attack, Divine Smite). The highest matching level replaces `damage`"
+      ),
+    /** Damage dice counted by an ability modifier, from a class level on ("a number of d8s equal to your Wisdom modifier
+     *  (minimum of 1d8)", Sear Undead on Turn Undead). It replaces `damage` from that level. */
+    damageDiceByAbility: z
+      .object({
+        level: ContentLevelSchema,
+        ability: AbilitySchema,
+        die: z.enum(["d4", "d6", "d8", "d10", "d12"]),
+        type: DamageTypeSchema,
+        minimum: z.number().int().min(1).max(5).default(1)
+      })
+      .strict()
+      .optional()
+      .describe(
+        'Damage dice counted by an ability modifier from a class level on ("a number of d8s equal to your Wisdom modifier (minimum of 1d8)"), replacing `damage` from that level'
       ),
     /** Healing that grows with level. It replaces `healing.formula` at the highest matching level (Divine Spark's heal,
      *  Wholeness of Body's Martial Arts die). */

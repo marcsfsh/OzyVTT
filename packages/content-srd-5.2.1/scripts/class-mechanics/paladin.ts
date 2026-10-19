@@ -134,6 +134,7 @@ export const paladin: ClassMechanicsModule = {
             name: "Divine Sense",
             tags: ["divine-sense"],
             duration: { type: "rounds", rounds: 100 },
+            endsOnIncapacitated: true,
             detects: { creatureTypes: ["celestial", "fiend", "undead"], feet: 60 }
           }
         }
@@ -259,6 +260,7 @@ export const paladin: ClassMechanicsModule = {
             id: "sacred-weapon",
             name: "Channel Divinity: Sacred Weapon",
             activation: "other",
+            timing: "attack-action",
             description:
               "When you take the Attack action, you can expend one use of your Channel Divinity to imbue one Melee weapon you are holding with positive energy. For 10 minutes or until you use this feature again, you add your Charisma modifier to attack rolls with that weapon (minimum bonus of +1), and each time you hit with it you can make it deal Radiant damage instead of its normal type. The weapon emits Bright Light in a 20-foot radius and Dim Light 20 feet beyond that.",
             damage: [],

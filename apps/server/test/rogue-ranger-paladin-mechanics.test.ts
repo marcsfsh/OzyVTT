@@ -1163,6 +1163,47 @@ describe("Paladin: Channel Divinity is ONE counter that three features spend", (
   });
 });
 
+describe("Paladin: Sacred Weapon comes with the Attack action, and Divine Sense ends on Incapacitated", () => {
+  it("takes the Attack action when used first, and its attacks then follow", () => {
+    const built = table(paladinInput(9));
+    resolve(built, "sacred-weapon", [], []);
+    expect(built.state.combat.turn.actionUsed).toBe(true);
+    expect(built.state.combat.turn.actionInstance?.components).toEqual({ attack: 2 });
+    swing(built, "item-longsword", [15, 4]);
+    swing(built, "item-longsword", [15, 4]);
+    expect(built.state.combat.turn.actionInstance?.components).toEqual({ attack: 0 });
+  });
+
+  it("is used between the Attack action's attacks", () => {
+    const built = table(paladinInput(9));
+    swing(built, "item-longsword", [15, 4]);
+    resolve(built, "sacred-weapon", [], []);
+    expect(built.hero.effects.some((effect) => effect.tags.includes("sacred-weapon"))).toBe(true);
+    expect(built.state.combat.turn.actionInstance?.components).toEqual({ attack: 1 });
+  });
+
+  it("is refused off the Paladin's turn and after an action that isn't the Attack action", () => {
+    const offTurn = table(paladinInput(9));
+    nextInitiativeTurn(offTurn.state);
+    expect(() => resolve(offTurn, "sacred-weapon", [], [])).toThrowError(
+      /Sacred Weapon is used on .*'s own turn\./
+    );
+    const built = table(paladinInput(9));
+    resolve(built, "abjure-foes", [1], [IDS.foe]);
+    expect(() => resolve(built, "sacred-weapon", [], [])).toThrowError(
+      /Sacred Weapon is used when .* takes the Attack action, and its action this turn went on something else\./
+    );
+  });
+
+  it("ends Divine Sense when the Paladin is Stunned", () => {
+    const built = table(paladinInput(9));
+    resolve(built, "divine-sense", [], []);
+    expect(built.hero.effects.some((effect) => effect.tags.includes("divine-sense"))).toBe(true);
+    setCondition(built.state, IDS.hero, "stunned", true, undefined, GM_SCOPE);
+    expect(built.hero.effects.some((effect) => effect.tags.includes("divine-sense"))).toBe(false);
+  });
+});
+
 describe("Paladin: the auras that are really immunities", () => {
   // The auras are gated grants (inactive while the Paladin is Incapacitated), read live through the catalog as
   // every command path passes it.

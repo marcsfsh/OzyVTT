@@ -68,6 +68,7 @@ import {
   type ShapingPlan
 } from "./metamagic.js";
 import { legendaryActionsPerRound } from "../lair.js";
+import { attackActionOpening, fleetStep, rageArmorViolation, timingViolations } from "./turn-windows.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
 
@@ -119,6 +120,8 @@ export type EconomyPlan = Readonly<{
   shaping?: ShapingPlan | null;
   /** It casts a level 1+ spell anew, which Quickened Spell reads on its caster's turn. */
   leveledCast?: boolean;
+  /** Marks the turn keeps of what this resolve did, for a timing rule that reads them (Fleet Step). */
+  turnMarks?: readonly string[];
 }>;
 
 type EconomyEvaluation = Readonly<{
@@ -143,6 +146,8 @@ type Evaluation = Readonly<{
   onOwnTurn: boolean;
   /** A prose-only Multiattack hides extra attacks from the engine, so action-slot violations degrade to warnings. */
   proseMultiattack: boolean;
+  /** Step of the Wind right after another Bonus Action takes no Bonus Action of its own (Fleet Step). */
+  freeBonusAction?: boolean;
   violations: RuleViolation[];
   softViolations: RuleViolation[];
   notes: string[];
@@ -191,6 +196,7 @@ export function evaluateActionEconomy(
   const usedMark = usedMarkOf(state, attacker.id, action, siblings);
   action = planThisTurn(state, attacker.id, action);
   siblings = siblings.map((sibling) => planThisTurn(state, attacker.id, sibling));
+  const fleet = fleetStep(state, attacker, action, definition);
   const evaluation: Evaluation = {
     state,
     attacker,
@@ -201,6 +207,7 @@ export function evaluateActionEconomy(
     resolveDefinition,
     onOwnTurn: state.combat.turnActorId === attacker.id,
     proseMultiattack: siblings.some((candidate) => candidate.untrackedMultiattack === true),
+    freeBonusAction: fleet.free,
     violations: [],
     softViolations: [],
     notes: []
@@ -218,6 +225,9 @@ export function evaluateActionEconomy(
   );
   checkTurnsBegun(evaluation);
   checkOwnTurn(evaluation);
+  evaluation.violations.push(...timingViolations(state, attacker, action));
+  const armored = rageArmorViolation(attacker, action, definition, catalog);
+  if (armored) evaluation.violations.push(armored);
   checkExtraAttackOpened(evaluation);
   checkHands(evaluation);
   checkArmorTraining(evaluation, definition, catalog);
@@ -231,7 +241,11 @@ export function evaluateActionEconomy(
   checkSteadyAim(evaluation);
   // A later ray of a spell already cast this action spends no further slot; it rolls at the first ray's.
   const continued = continuedSpellSlot(evaluation);
-  const slots = checkActionSlots(evaluation);
+  // Used before the Attack action's first attack, it takes the action as the Attack action (Sacred Weapon).
+  const opening = attackActionOpening(state, attacker, action, siblings);
+  const slots = opening
+    ? { ...checkActionSlots(evaluation), markAction: true, instance: opening }
+    : checkActionSlots(evaluation);
   // A Loading weapon fires once per action; an additional action (Action Surge) is another.
   if (slots.extraAction === null) checkLoading(evaluation);
   const spendLegendary = checkLegendary(evaluation, definition);
@@ -350,7 +364,8 @@ export function evaluateActionEconomy(
       usedMark,
       ...(components.spends.length > 0 ? { componentSpends: components.spends } : {}),
       ...(shaped?.plan ? { shaping: shaped.plan } : {}),
-      ...(newCast && spell.level >= 1 ? { leveledCast: true } : {})
+      ...(newCast && spell.level >= 1 ? { leveledCast: true } : {}),
+      ...(fleet.marks.length > 0 ? { turnMarks: fleet.marks } : {})
     },
     proseMultiattack: evaluation.proseMultiattack,
     notes: evaluation.notes
@@ -1099,7 +1114,7 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
       message: `${attacker.name} took a Bonus Action this turn, and ${shownEffectName(state, slowed, evaluation.resolveDefinition)} leaves no action as well.`
     });
   if (onOwnTurn && action.activation === "bonus-action") {
-    if (state.combat.turn.bonusActionUsed)
+    if (state.combat.turn.bonusActionUsed && evaluation.freeBonusAction !== true)
       violations.push({
         rule: "economy.bonus-action-used",
         message: `${attacker.name} has already used a Bonus Action this turn.`
@@ -1803,7 +1818,7 @@ export function commitEconomy({
   // A consumed material is used up as the cast happens ("which the spell consumes").
   if (plan.componentSpends) spendComponents(attacker, plan.componentSpends);
   commitShaping(state, attacker, plan.shaping, plan.leveledCast === true);
-  for (const key of [plan.oncePerTurn, plan.usedMark])
+  for (const key of [plan.oncePerTurn, plan.usedMark, ...(plan.turnMarks ?? [])])
     if (key)
       state.combat = {
         ...state.combat,

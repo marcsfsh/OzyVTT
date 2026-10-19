@@ -180,7 +180,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           name: "Animated Shield",
           tags: ["animated-shield"],
           duration: { type: "rounds", rounds: 10 },
-          voidWhileIncapacitated: true
+          endsOnIncapacitated: true
         }
       }
     ]

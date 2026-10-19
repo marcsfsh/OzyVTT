@@ -462,6 +462,8 @@ export function failureEffectFor(
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
     // "Until the aboleth dies".
     ...(save.endsWhenSourceDies && !grapple ? { endsWhenSourceDefeated: true } : {}),
+    // Turn Undead: "if you have the Incapacitated condition".
+    ...(save.endsWhenSourceIncapacitated ? { endsOnIncapacitated: true as const } : {}),
     ...(ongoingDamage ? { ongoingDamage } : {}),
     ...(castId !== null ? { castId } : {}),
     ...(cast ? { spell: { id: cast.spell.id, level: cast.level } } : {}),

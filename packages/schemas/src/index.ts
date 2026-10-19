@@ -1691,6 +1691,9 @@ export const EffectInstanceSchema = z
     endsWhenSourceDefeated: z.boolean().default(false),
     /** Dodge: the effect's modifiers stop applying while the bearer is Incapacitated or its Speed is 0 (SRD). */
     voidWhileIncapacitated: z.boolean().default(false),
+    /** It ends when the creature that keeps it (its source, or its bearer when it has none) gains the Incapacitated
+     *  condition or one that includes it, or drops to 0 Hit Points (Superior Defense, Turn Undead's turning). */
+    endsOnIncapacitated: z.literal(true).optional(),
     /** The source actor concentrates to sustain this (SRD Concentration): one at a time; damage prompts a CON save; incapacitation breaks it. */
     concentration: z.boolean().default(false),
     /** Cascade: this effect ends when the actor no longer has any other effect carrying this tag (Frenzy's marker ends with the Rage). */
@@ -2633,6 +2636,14 @@ export const EffectGrantSchema = z
       .boolean()
       .default(false)
       .describe("Benefits lapse while the bearer is incapacitated or its Speed is 0 (Dodge)"),
+    /** It ends for good when the granter gains the Incapacitated condition ("for 1 minute or until you have the
+     *  Incapacitated condition"). */
+    endsOnIncapacitated: z
+      .literal(true)
+      .optional()
+      .describe(
+        "It ends when the granting creature has the Incapacitated condition or drops to 0 Hit Points (Superior Defense, Divine Sense)"
+      ),
     /** The granter concentrates to sustain the effect (SRD Concentration). */
     concentration: z.boolean().default(false),
     /** Its damage riders land this many times, then it ends (Basic Poison: one coated weapon's hit, or three
@@ -3125,6 +3136,12 @@ export const SaveOutcomeFields = {
     .literal(true)
     .optional()
     .describe("The failure's conditions end when the source dies or is defeated"),
+  /** They end when the source has the Incapacitated condition (Turn Undead: "if you have the Incapacitated
+   *  condition"). */
+  endsWhenSourceIncapacitated: z
+    .literal(true)
+    .optional()
+    .describe("The failure's conditions end when the source has the Incapacitated condition or drops to 0 Hit Points"),
   /** Only creatures of these types make the save ("If the target is a Humanoid, it is subjected to the following
    *  effect"); any other is spared it. */
   onlyCreatureTypes: z
@@ -4517,6 +4534,14 @@ export const ActionSchema = z
     grants: ActionGrantSchema.optional().describe(
       "Resolving this action grants an effect to the actor itself (Rage, Reckless Attack)"
     ),
+    /** When in its user's own turn it is taken: at the turn's start, before anything else (Superior Defense), or as part
+     *  of the Attack action, before or between its attacks (Sacred Weapon), which it takes when nothing else has. */
+    timing: z
+      .enum(["turn-start", "attack-action"])
+      .optional()
+      .describe(
+        "When in its user's own turn it is taken: at the start, before moving or acting (turn-start), or as part of the Attack action (attack-action)"
+      ),
     /** The action requires an active self effect carrying this tag (Frenzy requires "raging"). */
     requiresEffectTag: EffectTagSchema.optional().describe(
       'The action requires an active self effect carrying this tag (Frenzy requires "raging")'

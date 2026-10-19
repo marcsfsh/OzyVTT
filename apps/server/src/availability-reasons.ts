@@ -117,6 +117,9 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
       : "You used your Bonus Action this turn.",
   "economy.reaction-used": () => "Your Reaction is spent until your next turn.",
   "economy.not-your-turn": () => "It isn't your turn.",
+  "economy.turn-start": () => "Use it at the start of your turn, before you move or act.",
+  "economy.attack-action": () => "Use it as part of the Attack action.",
+  "economy.heavy-armor": () => "You can't enter a Rage in Heavy armor.",
   "economy.spent-slot": () => "Only the GM gives that back.",
   "initiative.gathering": () => "Turns begin once everyone has rolled Initiative.",
   "condition.incapacitated": ({ attacker }) => {
