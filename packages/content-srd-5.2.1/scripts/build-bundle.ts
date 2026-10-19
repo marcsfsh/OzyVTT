@@ -50,7 +50,7 @@ import { UPCAST_DURATION_IDS, upcastDurationsFor } from "./spell-durations.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
 import { traitMechanicsOf } from "./trait-mechanics.js";
 import { deathTraitMechanicsOf, monsterDeathFor } from "./death-traits.js";
-import { withSpellcasting } from "./monster-spells.js";
+import { withSpellcasting } from "../src/monster-spellcasting.js";
 import { formOnlyOf, lycanthropeCurseOf, shapeShiftOf } from "./monster-forms.js";
 import { PRINTED_NAME_KEYS, printedName, statBlockActionText, statBlockTraitText } from "./monster-text.js";
 import { lairCountsOf, STATBLOCK_SLUGS, statBlockHeaderOf } from "./monster-statblock.js";

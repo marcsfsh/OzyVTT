@@ -1,6 +1,6 @@
 /**
  * The spells a stat block's actions cast, as data (`ActorAction.castsSpells`), read from the SRD 5.2.1 printings when
- * the bundle is built: a Spellcasting action's lists ("- **At Will:** Detect Magic, Fear", "- **1/Day Each:**
+ * the bundle is built and when a stat block is imported: a Spellcasting action's lists ("- **At Will:** Detect Magic, Fear", "- **1/Day Each:**
  * Fireball"), and the other actions that cast a spell or a choice of spells ("The mage casts Misty Step, using the
  * same spellcasting ability as Spellcasting", "Legendary Action. The dragon uses Spellcasting to cast Fear"). The
  * server makes each listed spell a cast action from the spell's own record (`monster-spells.ts` there), so this only
@@ -220,8 +220,9 @@ export function withSpellcasting(
   return rewired.flatMap((action) => {
     if (action === spellcasting && listNumbers && entries.length > 0)
       return [{ ...action, castsSpells: { ...listNumbers, spells: entries } }];
+    // Read again (an import filled once more), a Counterspell already beside its reaction stays the one.
     const counter = counterspellOf(action, listNumbers, knownSpell);
-    return counter ? [action, counter] : [action];
+    return counter && !actions.some((other) => other.id === counter.id) ? [action, counter] : [action];
   });
 }
 

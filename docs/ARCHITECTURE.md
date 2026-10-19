@@ -374,7 +374,8 @@ start of a turn deals any ongoing damage, and the end opens any repeat saves
 (`ActorDefinition.traitMechanics`), runs at those boundaries and as damage lands: Regeneration, auras,
 Undead Fortitude, a Death Burst (`trait-turns.ts`, `statblock-traits.ts`). A stat block's spells
 (`castsSpells`) become cast actions as the catalog loads (`monster-spells.ts`), which the stat block prints inside the
-list they belong to (`partOf`). A legendary creature the GM marks as fighting in its lair (`actor.set-lair`) has the
+list they belong to (`partOf`); a stat block the GM imports or writes has its Spellcasting read the same way
+(`statblock-spellcasting.ts`). A legendary creature the GM marks as fighting in its lair (`actor.set-lair`) has the
 lair's legendary action uses and Legendary Resistance (`lair.ts`). A spell that leaves an area acting later (Moonbeam, Spirit Guardians, a
 wall of fire) opens a zone on the template the cast placed, or around its caster, which the server
 runs as tokens move, as the area moves and at each turn's end and start (`spell-zones.ts`); what

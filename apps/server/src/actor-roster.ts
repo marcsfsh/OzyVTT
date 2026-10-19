@@ -17,6 +17,7 @@ import {
   type UnarmoredDefense
 } from "@vtt/rules-5e";
 import { withProseFacts } from "@vtt/content-srd-5.2.1/action-prose";
+import { withStatBlockSpellcasting } from "./statblock-spellcasting.js";
 import { storedClassSequence } from "./character-offers.js";
 import { endEffect, endEffectsSustainedBy } from "./effects.js";
 import { actionPools, effectiveActions } from "./effective-actions.js";
@@ -442,12 +443,18 @@ export function importActorDefinition(
   state.definitions = [...state.definitions, { id: definitionId, definition: filled }];
 }
 
-/** The definition with its actions' prose facts filled (`withProseFacts`), as it enters the campaign. */
+/** The definition with its actions' prose facts filled (`withProseFacts`), as it enters the campaign, and for a stat
+ *  block the spells its Spellcasting and casting actions name (`castsSpells`), read as the SRD bundle's are. */
 export function withDefinitionProseFacts(definition: ActorDefinition): ActorDefinition {
-  const actions = definition.actions.map((action) => withProseFacts(action));
-  return actions.every((action, index) => action === definition.actions[index])
-    ? definition
-    : { ...definition, actions };
+  const prose = definition.actions.map((action) => withProseFacts(action));
+  const actions = definition.schemaId === "vtt.actor-monster" ? withStatBlockSpellcasting(prose, definition) : prose;
+  const unchanged =
+    actions.length === definition.actions.length &&
+    actions.every(
+      (action, index) =>
+        action === definition.actions[index] || JSON.stringify(action) === JSON.stringify(definition.actions[index])
+    );
+  return unchanged ? definition : { ...definition, actions };
 }
 
 /** Fills prose facts on stored definitions imported before the fields existed. True when any changed. */

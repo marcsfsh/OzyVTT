@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadMonsterDefinitions, loadSpells } from "../src/index.js";
-import { spellIdOfName } from "../scripts/monster-spells.js";
+import { spellIdOfName } from "../src/monster-spellcasting.js";
 
 // The spells SRD stat blocks cast, read from their Spellcasting lists and their other casting actions at build time.
 

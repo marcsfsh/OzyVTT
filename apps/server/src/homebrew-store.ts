@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { HomebrewContentTypeSchema, type HomebrewContentState, type HomebrewContentType } from "@vtt/api-contract";
 import { type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { areaOfProse, withProseFacts } from "@vtt/content-srd-5.2.1/action-prose";
+import { withStatBlockSpellcasting } from "./statblock-spellcasting.js";
 import { spellEffectFromColumns } from "@vtt/content-srd-5.2.1/spell-effect";
 import {
   HOMEBREW_BODY_SCHEMAS,
@@ -1297,6 +1298,11 @@ function parseBody(type: HomebrewContentType, json: string): unknown {
  *  and cast model (from the columns its author set), and every action's facts wherever the record nests its
  *  actions (a monster's list, an item's, a feature's). */
 function withBodyProseFacts(type: HomebrewContentType, body: unknown): unknown {
+  // A stat block's Spellcasting list, read as the SRD's is, so its spells are cast actions.
+  if (type === "monster") {
+    const monster = withActionProseFacts(body) as ActorDefinition;
+    return { ...monster, actions: withStatBlockSpellcasting(monster.actions, monster) };
+  }
   if (type !== "spell") return withActionProseFacts(body);
   const spell = body as SpellReference;
   return {
