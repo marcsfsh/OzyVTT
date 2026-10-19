@@ -459,6 +459,23 @@ An item's action with a `zone` (spread Caltrops, a set Hunting Trap) rolls nothi
 a zone that carries the action's own save and damage (`SpellZone.rule`), which stays until the GM ends it
 or it goes off once.
 
+A spell's later actions scale with the slot it was cast with, part by part (`perSlot` on a damage part, a grant's
+`extraDamagePerSlot`, `upcastAction` in `item-actions.ts`). One taken with the cast itself (`withCast`, Arcane Hand's
+first fist) costs no action, and one may need the bearer of the spell's effect (`bearerOnly`) or the caster's own turn
+(`ownTurnOnly`). A spell can hold another for later (`stored-casts.ts`): Contingency, a spell glyph and a Ring of
+Spell Storing open a window as they are cast, the next spell the caster casts is stored on the effect, the zone or the
+ring row (`storedCast`, `storedCasts`) at its caster's numbers, and it takes effect when released or set off
+(`stored-cast-release.ts`). Save stages move a creature through a spell's later stages on its repeat saves
+(`save-stages.ts`), including saves at the start of the caster's turn (Prismatic Spray's Violet) and failures that
+compel the bearer's turn (Bestow Curse). A commanded creature's Reaction spends its commander's too
+(`commanded-reactions.ts`). Damage dice may explode up to a count (`explodingDice`, Sorcerous Burst). Warding Bond
+passes its ward's damage to its caster as it lands and ends at 60 feet apart or when its caster drops
+(`warding-bond.ts`). True Strike binds the weapon and leaves its action open for one attack with it
+(`resolution/true-strike.ts`); Teleport rolls its outcome table from the familiarity picked (`teleport-outcome.ts`);
+Identify marks a carried row its player then reads in full (`resolution/identify.ts`); Wish runs the use picked and its
+stress (`resolution/wish.ts`); and Reincarnate rebuilds a character from its ledger as the rolled species after the
+cast lands (`reincarnation.ts`).
+
 Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
 (`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long
 Rest moves it 8 hours and finishing the party's Short Rest moves it an hour, and `passGameTime`
@@ -568,7 +585,8 @@ it over (`character.give-item`). One record can cover several kinds of an item (
 of Tricks' bags) or the forms its holder puts it in (a Rod of Lordly Might's buttons): a carried copy is one of
 them (`variantId`), read through `rowRecord` (`item-records.ts`) so its kind's riders, actions, casts, light and
 weapon join the record's or stand in for them. The GM says what a found copy is with `character.set-inventory`,
-and the player learns it on attuning (`projections.ts`); its holder changes a form with `item.set-form`
+and the player learns it on attuning or when Identify is cast on the copy (`identified`, `projections.ts`). Only
+a cast writes `identified` and a Ring of Spell Storing's `storedCasts`, and sheet writes keep them (`inventory.ts`); its holder changes a form with `item.set-form`
 (`setItemForm` in `inventory.ts`), paying the Bonus Action the item names. A creature attunes to one copy of an
 item, two kinds of one record being two items, and a player attunes or ends attunement only during a Short Rest or
 the step a finished rest opens, to an item whose printed prerequisites (`attunement.restrictedTo`: a class, a
