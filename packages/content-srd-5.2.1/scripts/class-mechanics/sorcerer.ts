@@ -174,8 +174,8 @@ export const sorcerer: ClassMechanicsModule = {
             grants: {
               name: "Dragon Wings",
               tags: ["dragon-wings"],
-              // "For 1 hour": 600 rounds in a fight.
-              duration: { type: "rounds", rounds: 600 },
+              // "For 1 hour": longer than a grant counts in rounds, so it lasts until dismissed on the sheet.
+              duration: { type: "manual" },
               modifiers: [{ type: "special-speed", movement: "fly", feet: 60 }],
               onEnd: [],
               target: "self",
