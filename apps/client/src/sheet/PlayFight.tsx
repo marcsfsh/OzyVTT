@@ -2,6 +2,8 @@ import { useMemo, useState, type ReactNode } from "react";
 import type { ActorDefinition, ContentActionSummary, PlayerView } from "@vtt/domain";
 import { PlayerActionRunner, summaryOfOwnAction } from "../encounter/PlayerActionRunner";
 import { useSpellReference } from "../encounter/spells";
+import { useTableCalibration } from "../scene/tableGeometry";
+import { playerTargetCandidates, targetRows } from "../table/targetRows";
 import { ActionList } from "./ActionList";
 import { CastDetail } from "./CastDetail";
 import { EconomyPips } from "./PlayTab";
@@ -67,6 +69,16 @@ export function PlayFight({
     () => serverActions.filter((row) => !definition?.actions.some((own) => own.id === row.id)),
     [serverActions, definition]
   );
+  // Who the fight's creatures are as the player knows them (who is down, how far each is), for the target list.
+  const calibration = useTableCalibration(state?.combat?.mapAssetId ?? null);
+  const playerRows = useMemo(() => {
+    const view = state as PlayerView | undefined;
+    if (role !== "player" || !view?.combat?.initiative) return undefined;
+    const everyone = playerTargetCandidates(view);
+    return new Map(
+      targetRows(actor.id, everyone, view.combat.tokens ?? [], calibration, everyone).map((row) => [row.id, row])
+    );
+  }, [role, state, actor.id, calibration]);
   if (!definition) return <div className="cs-play">{death}</div>;
   // At 0 Hit Points the Death Saving Throws are the turn; the list would only say it can't be used.
   if (isDown(actor))
@@ -91,6 +103,7 @@ export function PlayFight({
           inspired={heroicInspirationOf(actor) === true}
           playerDamageMode={combat.playerDamageMode}
           targets={combat.targets}
+          {...(playerRows ? { targetRows: playerRows } : {})}
           effectTags={actor.effects.flatMap((effect) => effect.tags)}
           actor={actor}
           myTurn={combat.myTurn || readied}

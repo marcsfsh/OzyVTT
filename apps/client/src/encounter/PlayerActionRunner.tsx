@@ -28,7 +28,7 @@ import {
   useTargetingBusy,
   useTargetingResult
 } from "./targeting";
-import { foesFirst, type TargetRow } from "../table/targetRows";
+import { foesFirst, pickableTargets, type TargetRow } from "../table/targetRows";
 import { revealInRegion } from "../lib/reveal";
 import "./action-runner.css";
 
@@ -441,26 +441,30 @@ export function PlayerActionRunner({
       {picking && !result?.preview && (
         <ActionTargetPicker
           picking={picking}
-          targets={foesFirst(
-            targets
-              // A heal may be for the healer too (a potion the healer drinks), and so may a touch that cures or
-              // protects with no attack, save or damage (Lesser Restoration, Enhance Ability on the caster).
-              .filter(
-                (target) =>
-                  target.actorId !== actorId ||
-                  picking.action.healing != null ||
-                  healingOf(picking.action) !== undefined ||
-                  (picking.action.builtin !== true &&
-                    picking.action.attackBonus === null &&
-                    picking.action.saveAbility === null &&
-                    picking.action.damage.length === 0)
-              )
-              .map(
-                (target): Pick<TargetRow, "id" | "label"> & Partial<TargetRow> =>
-                  targetRows?.get(target.actorId) ?? { id: target.actorId, label: target.name }
-              ),
-            "player-character",
-            picking.action.healing != null || healingOf(picking.action) !== undefined
+          targets={pickableTargets(
+            foesFirst(
+              targets
+                // A heal may be for the healer too (a potion the healer drinks), and so may a touch that cures or
+                // protects with no attack, save or damage (Lesser Restoration, Enhance Ability on the caster).
+                .filter(
+                  (target) =>
+                    target.actorId !== actorId ||
+                    picking.action.healing != null ||
+                    healingOf(picking.action) !== undefined ||
+                    (picking.action.builtin !== true &&
+                      picking.action.attackBonus === null &&
+                      picking.action.saveAbility === null &&
+                      picking.action.damage.length === 0)
+                )
+                .map(
+                  (target): Pick<TargetRow, "id" | "label"> & Partial<TargetRow> =>
+                    targetRows?.get(target.actorId) ?? { id: target.actorId, label: target.name }
+                ),
+              "player-character",
+              picking.action.healing != null || healingOf(picking.action) !== undefined
+            ),
+            picking.action,
+            picking.action.spellId !== undefined ? spellIndex.get(picking.action.spellId) : undefined
           )}
           onMap
           {...(insideNow ? { insideNow } : {})}
