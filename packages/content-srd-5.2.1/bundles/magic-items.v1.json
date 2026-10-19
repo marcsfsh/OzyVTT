@@ -35,7 +35,11 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "no-critical-hits"
+   }
+  ]
  },
  {
   "id": "ammunition-of-slaying",
@@ -294,7 +298,13 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "ability-score-minimum",
+    "ability": "con",
+    "score": 19
+   }
+  ]
  },
  {
   "id": "amulet-of-proof-against-detection-and-location",
@@ -376,7 +386,30 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "animate",
+    "name": "Animate the Shield",
+    "activation": "bonus-action",
+    "description": "The Shield leaps into the air and hovers in your space to protect you as if you were wielding it, leaving your hands free. It remains animate for 1 minute, until you take a Bonus Action to end it, or until you die or have the Incapacitated condition, when it falls to the ground or into a free hand.",
+    "damage": [],
+    "grants": {
+     "name": "Animated Shield",
+     "tags": [
+      "animated-shield"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": true,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -860,274 +893,302 @@
   },
   "cursed": false,
   "casts": [],
-  "grantsFeatIds": [],
-  "tags": [],
-  "actions": [
+  "variants": [
    {
-    "id": "pull-gray",
-    "name": "Pull a Fuzzy Object (Gray bag)",
-    "activation": "action",
-    "description": "Pull the fuzzy object from the gray bag and throw it up to 20 feet. When it lands, it becomes the creature a d8 picks on the gray bag's table. The creature vanishes at the next dawn or at 0 Hit Points. It is Friendly to you and your allies and acts immediately after you on your Initiative count; a Bonus Action commands how it moves and what it does on its next turn.",
-    "damage": [],
-    "uses": {
-     "limit": 3,
-     "per": "long-rest",
-     "pool": "bag-of-tricks-charges"
-    },
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "weasel",
-       "count": 1,
-       "faces": {
-        "from": 1,
-        "to": 1
-       }
+    "id": "gray",
+    "name": "Gray bag",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "pull-gray",
+      "name": "Pull a Fuzzy Object (Gray bag)",
+      "activation": "action",
+      "description": "Pull the fuzzy object from the gray bag and throw it up to 20 feet. When it lands, it becomes the creature a d8 picks on the gray bag's table. The creature vanishes at the next dawn or at 0 Hit Points. It is Friendly to you and your allies and acts immediately after you on your Initiative count; a Bonus Action commands how it moves and what it does on its next turn.",
+      "damage": [],
+      "uses": {
+       "limit": 3,
+       "per": "long-rest",
+       "pool": "bag-of-tricks-charges"
       },
-      {
-       "monsterId": "giant-rat",
-       "count": 1,
-       "faces": {
-        "from": 2,
-        "to": 2
-       }
-      },
-      {
-       "monsterId": "badger",
-       "count": 1,
-       "faces": {
-        "from": 3,
-        "to": 3
-       }
-      },
-      {
-       "monsterId": "boar",
-       "count": 1,
-       "faces": {
-        "from": 4,
-        "to": 4
-       }
-      },
-      {
-       "monsterId": "panther",
-       "count": 1,
-       "faces": {
-        "from": 5,
-        "to": 5
-       }
-      },
-      {
-       "monsterId": "giant-badger",
-       "count": 1,
-       "faces": {
-        "from": 6,
-        "to": 6
-       }
-      },
-      {
-       "monsterId": "dire-wolf",
-       "count": 1,
-       "faces": {
-        "from": 7,
-        "to": 7
-       }
-      },
-      {
-       "monsterId": "giant-elk",
-       "count": 1,
-       "faces": {
-        "from": 8,
-        "to": 8
-       }
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "weasel",
+         "count": 1,
+         "faces": {
+          "from": 1,
+          "to": 1
+         }
+        },
+        {
+         "monsterId": "giant-rat",
+         "count": 1,
+         "faces": {
+          "from": 2,
+          "to": 2
+         }
+        },
+        {
+         "monsterId": "badger",
+         "count": 1,
+         "faces": {
+          "from": 3,
+          "to": 3
+         }
+        },
+        {
+         "monsterId": "boar",
+         "count": 1,
+         "faces": {
+          "from": 4,
+          "to": 4
+         }
+        },
+        {
+         "monsterId": "panther",
+         "count": 1,
+         "faces": {
+          "from": 5,
+          "to": 5
+         }
+        },
+        {
+         "monsterId": "giant-badger",
+         "count": 1,
+         "faces": {
+          "from": 6,
+          "to": 6
+         }
+        },
+        {
+         "monsterId": "dire-wolf",
+         "count": 1,
+         "faces": {
+          "from": 7,
+          "to": 7
+         }
+        },
+        {
+         "monsterId": "giant-elk",
+         "count": 1,
+         "faces": {
+          "from": 8,
+          "to": 8
+         }
+        }
+       ],
+       "die": 8,
+       "rangeFeet": 20,
+       "turn": "after-user",
+       "commandedWith": "bonus-action",
+       "lasts": {
+        "type": "until-long-rest"
+       },
+       "allegiance": "user"
       }
-     ],
-     "die": 8,
-     "rangeFeet": 20,
-     "turn": "after-user",
-     "commandedWith": "bonus-action",
-     "lasts": {
-      "type": "until-long-rest"
-     },
-     "allegiance": "user"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
-    "id": "pull-rust",
-    "name": "Pull a Fuzzy Object (Rust bag)",
-    "activation": "action",
-    "description": "Pull the fuzzy object from the rust bag and throw it up to 20 feet. When it lands, it becomes the creature a d8 picks on the rust bag's table. The creature vanishes at the next dawn or at 0 Hit Points. It is Friendly to you and your allies and acts immediately after you on your Initiative count; a Bonus Action commands how it moves and what it does on its next turn.",
-    "damage": [],
-    "uses": {
-     "limit": 3,
-     "per": "long-rest",
-     "pool": "bag-of-tricks-charges"
-    },
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "rat",
-       "count": 1,
-       "faces": {
-        "from": 1,
-        "to": 1
-       }
+    "id": "rust",
+    "name": "Rust bag",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "pull-rust",
+      "name": "Pull a Fuzzy Object (Rust bag)",
+      "activation": "action",
+      "description": "Pull the fuzzy object from the rust bag and throw it up to 20 feet. When it lands, it becomes the creature a d8 picks on the rust bag's table. The creature vanishes at the next dawn or at 0 Hit Points. It is Friendly to you and your allies and acts immediately after you on your Initiative count; a Bonus Action commands how it moves and what it does on its next turn.",
+      "damage": [],
+      "uses": {
+       "limit": 3,
+       "per": "long-rest",
+       "pool": "bag-of-tricks-charges"
       },
-      {
-       "monsterId": "owl",
-       "count": 1,
-       "faces": {
-        "from": 2,
-        "to": 2
-       }
-      },
-      {
-       "monsterId": "mastiff",
-       "count": 1,
-       "faces": {
-        "from": 3,
-        "to": 3
-       }
-      },
-      {
-       "monsterId": "goat",
-       "count": 1,
-       "faces": {
-        "from": 4,
-        "to": 4
-       }
-      },
-      {
-       "monsterId": "giant-goat",
-       "count": 1,
-       "faces": {
-        "from": 5,
-        "to": 5
-       }
-      },
-      {
-       "monsterId": "giant-boar",
-       "count": 1,
-       "faces": {
-        "from": 6,
-        "to": 6
-       }
-      },
-      {
-       "monsterId": "lion",
-       "count": 1,
-       "faces": {
-        "from": 7,
-        "to": 7
-       }
-      },
-      {
-       "monsterId": "brown-bear",
-       "count": 1,
-       "faces": {
-        "from": 8,
-        "to": 8
-       }
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "rat",
+         "count": 1,
+         "faces": {
+          "from": 1,
+          "to": 1
+         }
+        },
+        {
+         "monsterId": "owl",
+         "count": 1,
+         "faces": {
+          "from": 2,
+          "to": 2
+         }
+        },
+        {
+         "monsterId": "mastiff",
+         "count": 1,
+         "faces": {
+          "from": 3,
+          "to": 3
+         }
+        },
+        {
+         "monsterId": "goat",
+         "count": 1,
+         "faces": {
+          "from": 4,
+          "to": 4
+         }
+        },
+        {
+         "monsterId": "giant-goat",
+         "count": 1,
+         "faces": {
+          "from": 5,
+          "to": 5
+         }
+        },
+        {
+         "monsterId": "giant-boar",
+         "count": 1,
+         "faces": {
+          "from": 6,
+          "to": 6
+         }
+        },
+        {
+         "monsterId": "lion",
+         "count": 1,
+         "faces": {
+          "from": 7,
+          "to": 7
+         }
+        },
+        {
+         "monsterId": "brown-bear",
+         "count": 1,
+         "faces": {
+          "from": 8,
+          "to": 8
+         }
+        }
+       ],
+       "die": 8,
+       "rangeFeet": 20,
+       "turn": "after-user",
+       "commandedWith": "bonus-action",
+       "lasts": {
+        "type": "until-long-rest"
+       },
+       "allegiance": "user"
       }
-     ],
-     "die": 8,
-     "rangeFeet": 20,
-     "turn": "after-user",
-     "commandedWith": "bonus-action",
-     "lasts": {
-      "type": "until-long-rest"
-     },
-     "allegiance": "user"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
-    "id": "pull-tan",
-    "name": "Pull a Fuzzy Object (Tan bag)",
-    "activation": "action",
-    "description": "Pull the fuzzy object from the tan bag and throw it up to 20 feet. When it lands, it becomes the creature a d8 picks on the tan bag's table. The creature vanishes at the next dawn or at 0 Hit Points. It is Friendly to you and your allies and acts immediately after you on your Initiative count; a Bonus Action commands how it moves and what it does on its next turn.",
-    "damage": [],
-    "uses": {
-     "limit": 3,
-     "per": "long-rest",
-     "pool": "bag-of-tricks-charges"
-    },
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "jackal",
-       "count": 1,
-       "faces": {
-        "from": 1,
-        "to": 1
-       }
+    "id": "tan",
+    "name": "Tan bag",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "pull-tan",
+      "name": "Pull a Fuzzy Object (Tan bag)",
+      "activation": "action",
+      "description": "Pull the fuzzy object from the tan bag and throw it up to 20 feet. When it lands, it becomes the creature a d8 picks on the tan bag's table. The creature vanishes at the next dawn or at 0 Hit Points. It is Friendly to you and your allies and acts immediately after you on your Initiative count; a Bonus Action commands how it moves and what it does on its next turn.",
+      "damage": [],
+      "uses": {
+       "limit": 3,
+       "per": "long-rest",
+       "pool": "bag-of-tricks-charges"
       },
-      {
-       "monsterId": "ape",
-       "count": 1,
-       "faces": {
-        "from": 2,
-        "to": 2
-       }
-      },
-      {
-       "monsterId": "baboon",
-       "count": 1,
-       "faces": {
-        "from": 3,
-        "to": 3
-       }
-      },
-      {
-       "monsterId": "axe-beak",
-       "count": 1,
-       "faces": {
-        "from": 4,
-        "to": 4
-       }
-      },
-      {
-       "monsterId": "black-bear",
-       "count": 1,
-       "faces": {
-        "from": 5,
-        "to": 5
-       }
-      },
-      {
-       "monsterId": "giant-weasel",
-       "count": 1,
-       "faces": {
-        "from": 6,
-        "to": 6
-       }
-      },
-      {
-       "monsterId": "giant-hyena",
-       "count": 1,
-       "faces": {
-        "from": 7,
-        "to": 7
-       }
-      },
-      {
-       "monsterId": "tiger",
-       "count": 1,
-       "faces": {
-        "from": 8,
-        "to": 8
-       }
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "jackal",
+         "count": 1,
+         "faces": {
+          "from": 1,
+          "to": 1
+         }
+        },
+        {
+         "monsterId": "ape",
+         "count": 1,
+         "faces": {
+          "from": 2,
+          "to": 2
+         }
+        },
+        {
+         "monsterId": "baboon",
+         "count": 1,
+         "faces": {
+          "from": 3,
+          "to": 3
+         }
+        },
+        {
+         "monsterId": "axe-beak",
+         "count": 1,
+         "faces": {
+          "from": 4,
+          "to": 4
+         }
+        },
+        {
+         "monsterId": "black-bear",
+         "count": 1,
+         "faces": {
+          "from": 5,
+          "to": 5
+         }
+        },
+        {
+         "monsterId": "giant-weasel",
+         "count": 1,
+         "faces": {
+          "from": 6,
+          "to": 6
+         }
+        },
+        {
+         "monsterId": "giant-hyena",
+         "count": 1,
+         "faces": {
+          "from": 7,
+          "to": 7
+         }
+        },
+        {
+         "monsterId": "tiger",
+         "count": 1,
+         "faces": {
+          "from": 8,
+          "to": 8
+         }
+        }
+       ],
+       "die": 8,
+       "rangeFeet": 20,
+       "turn": "after-user",
+       "commandedWith": "bonus-action",
+       "lasts": {
+        "type": "until-long-rest"
+       },
+       "allegiance": "user"
       }
-     ],
-     "die": 8,
-     "rangeFeet": 20,
-     "turn": "after-user",
-     "commandedWith": "bonus-action",
-     "lasts": {
-      "type": "until-long-rest"
-     },
-     "allegiance": "user"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    }
   ],
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [],
   "effects": [],
   "modifiers": []
  },
@@ -1151,9 +1212,34 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "throw",
+    "name": "Throw a Bead of Force",
+    "activation": "action",
+    "description": "Throw the bead up to 60 feet. It explodes in a 10-foot-radius Sphere on impact and is destroyed. Each creature in the Sphere makes a DC 15 Dexterity saving throw or takes 5d4 Force damage. A sphere of transparent force then encloses the area for 1 minute, trapping each creature that failed and is wholly inside; the others are pushed out of it.",
+    "damage": [
+     {
+      "formula": "5d4",
+      "type": "force"
+     }
+    ],
+    "area": {
+     "shape": "sphere",
+     "sizeFeet": 10,
+     "widthFeet": null
+    },
+    "save": {
+     "ability": "dex",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": []
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -1224,6 +1310,12 @@
   },
   "modifiers": [
    {
+    "type": "ability-score",
+    "ability": "con",
+    "amount": 2,
+    "maximum": 20
+   },
+   {
     "type": "darkvision",
     "feet": 60
    },
@@ -1265,6 +1357,92 @@
   },
   "cursed": false,
   "casts": [],
+  "variants": [
+   {
+    "id": "hill",
+    "name": "Hill giant (21)",
+    "modifiers": [
+     {
+      "type": "ability-score-minimum",
+      "ability": "str",
+      "score": 21
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "frost",
+    "name": "Frost giant (23)",
+    "modifiers": [
+     {
+      "type": "ability-score-minimum",
+      "ability": "str",
+      "score": 23
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "stone",
+    "name": "Stone giant (23)",
+    "modifiers": [
+     {
+      "type": "ability-score-minimum",
+      "ability": "str",
+      "score": 23
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "fire",
+    "name": "Fire giant (25)",
+    "modifiers": [
+     {
+      "type": "ability-score-minimum",
+      "ability": "str",
+      "score": 25
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "cloud",
+    "name": "Cloud giant (27)",
+    "modifiers": [
+     {
+      "type": "ability-score-minimum",
+      "ability": "str",
+      "score": 27
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "storm",
+    "name": "Storm giant (29)",
+    "modifiers": [
+     {
+      "type": "ability-score-minimum",
+      "ability": "str",
+      "score": 29
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -1433,7 +1611,52 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "click-heels",
+    "name": "Click the Heels",
+    "activation": "bonus-action",
+    "description": "The boots double your Speed, and any creature that makes an Opportunity Attack against you has Disadvantage on the attack roll. Click your heels again to end it. When you've used the boots for a total of 10 minutes, they cease to function for you until you finish a Long Rest.",
+    "damage": [],
+    "grants": {
+     "name": "Boots of Speed",
+     "tags": [
+      "boots-of-speed"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 100
+     },
+     "modifiers": [
+      {
+       "type": "roll-mode",
+       "roll": "incoming-attack",
+       "mode": "disadvantage",
+       "when": [
+        {
+         "type": "on-attack-roll"
+        },
+        {
+         "type": "attack-kind-is",
+         "kinds": [
+          "opportunity"
+         ]
+        }
+       ]
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "speedMultiplier": 2
+    },
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -1462,6 +1685,11 @@
   "actions": [],
   "effects": [],
   "modifiers": [
+   {
+    "type": "speed-minimum",
+    "feet": 30,
+    "ignoresArmor": true
+   },
    {
     "type": "movement",
     "rule": "leap",
@@ -1606,7 +1834,24 @@
    "conditionImmunities": [],
    "spells": []
   },
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "damage-bonus",
+    "amount": 2,
+    "when": [
+     {
+      "type": "on-damage-roll"
+     },
+     {
+      "type": "weapon-is",
+      "ids": [
+       "longbow",
+       "shortbow"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "bracers-of-defense",
@@ -2003,7 +2248,17 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "scorching-ray",
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "consumesSpellSlot": false,
+    "attackBonus": 5
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -2182,6 +2437,24 @@
     "activation": "action",
     "description": "Expend 1 charge to give yourself the Invisible condition for 1 hour. The effect ends early if you pull the hood down (no action required) or cease wearing the cloak.",
     "damage": [],
+    "grants": {
+     "name": "Cloak of Invisibility",
+     "tags": [
+      "invisible-by-cloak"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 60
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "conditions": [
+      "invisible"
+     ]
+    },
     "uses": {
      "limit": 3,
      "per": "long-rest",
@@ -2301,7 +2574,13 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "special-speed",
+    "movement": "swim",
+    "feet": 60
+   }
+  ]
  },
  {
   "id": "crystal-ball",
@@ -2820,6 +3099,72 @@
   },
   "cursed": false,
   "casts": [],
+  "variants": [
+   {
+    "id": "ac-1",
+    "name": "+1 moved to AC",
+    "modifiers": [
+     {
+      "type": "attack-bonus",
+      "amount": 2
+     },
+     {
+      "type": "damage-bonus",
+      "amount": 2
+     },
+     {
+      "type": "armor-class",
+      "amount": 1,
+      "whileArmored": false
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "replacesRiders": true
+   },
+   {
+    "id": "ac-2",
+    "name": "+2 moved to AC",
+    "modifiers": [
+     {
+      "type": "attack-bonus",
+      "amount": 1
+     },
+     {
+      "type": "damage-bonus",
+      "amount": 1
+     },
+     {
+      "type": "armor-class",
+      "amount": 2,
+      "whileArmored": false
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "replacesRiders": true
+   },
+   {
+    "id": "ac-3",
+    "name": "+3 moved to AC",
+    "modifiers": [
+     {
+      "type": "armor-class",
+      "amount": 3,
+      "whileArmored": false
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "replacesRiders": true
+   }
+  ],
+  "variantChoice": {
+   "by": "holder"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -2991,6 +3336,22 @@
     "type": "armor-class",
     "amount": 1,
     "whileArmored": false
+   },
+   {
+    "type": "roll-mode",
+    "roll": "save",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-saving-throw"
+     },
+     {
+      "type": "source-creature-type-is",
+      "creatureTypes": [
+       "dragon"
+      ]
+     }
+    ]
    }
   ]
  },
@@ -3133,9 +3494,44 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "lastChargeRoll": false,
+   "starting": "1d6 + 4"
+  },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "sprinkle",
+    "name": "Sprinkle a Pinch on an Elemental",
+    "activation": "action",
+    "description": "Sprinkle a pinch on an Elemental within 5 feet of you that is composed mostly of water (such as a Water Elemental). It makes a DC 13 Constitution saving throw, taking 10d6 Necrotic damage on a failed save or half as much on a successful one.",
+    "damage": [
+     {
+      "formula": "10d6",
+      "type": "necrotic"
+     }
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5,
+     "creatureTypes": [
+      "elemental"
+     ]
+    },
+    "uses": {
+     "limit": 10,
+     "per": "never",
+     "pool": "dust-of-dryness-pinches"
+    },
+    "save": {
+     "ability": "con",
+     "dc": 13,
+     "successDamage": "half",
+     "failureConditions": []
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -3159,9 +3555,41 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "throw",
+    "name": "Throw the Dust",
+    "activation": "action",
+    "description": "Throw the dust into the air: you and every creature in a 30-foot Emanation originating from you make a DC 15 Constitution saving throw. Constructs, Elementals, Oozes, Plants and Undead succeed automatically. On a failed save, a creature sneezes uncontrollably: it has the Incapacitated condition and is suffocating, repeating the save at the end of each of its turns.",
+    "damage": [],
+    "targets": {
+     "notCreatureTypes": [
+      "construct",
+      "elemental",
+      "ooze",
+      "plant",
+      "undead"
+     ]
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 30,
+     "widthFeet": null
+    },
+    "save": {
+     "ability": "con",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [
+      "incapacitated"
+     ],
+     "repeatSave": true
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -3231,6 +3659,13 @@
   },
   "cursed": false,
   "casts": [],
+  "weaponChanges": {
+   "addProperties": [
+    "thrown"
+   ],
+   "rangeFeet": 20,
+   "longRangeFeet": 60
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -3243,6 +3678,46 @@
    {
     "type": "damage-bonus",
     "amount": 3
+   },
+   {
+    "type": "extra-damage",
+    "formula": "1d8",
+    "damageType": "force",
+    "doubleOnCritical": true,
+    "when": [
+     {
+      "type": "on-hit"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "ranged"
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extra-damage",
+    "formula": "1d8",
+    "damageType": "force",
+    "doubleOnCritical": true,
+    "when": [
+     {
+      "type": "on-hit"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "ranged"
+      ]
+     },
+     {
+      "type": "versus-creature-type",
+      "creatureTypes": [
+       "giant"
+      ]
+     }
+    ]
    }
   ]
  },
@@ -3365,102 +3840,139 @@
   "cursed": false,
   "casts": [],
   "consumedOnUse": true,
-  "grantsFeatIds": [],
-  "tags": [],
-  "actions": [
+  "variants": [
    {
-    "id": "break-blue-sapphire",
-    "name": "Break the Gem (Blue sapphire)",
-    "activation": "action",
-    "description": "Break the blue sapphire: an Air Elemental appears in an unoccupied space as close to the gem as possible, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
-    "damage": [],
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "air-elemental",
-       "count": 1
+    "id": "blue-sapphire",
+    "name": "Blue sapphire (Air Elemental)",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "break-blue-sapphire",
+      "name": "Break the Gem (Blue sapphire)",
+      "activation": "action",
+      "description": "Break the blue sapphire: an Air Elemental appears in an unoccupied space as close to the gem as possible, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
+      "damage": [],
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "air-elemental",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 5,
+       "turn": "after-user",
+       "lasts": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "allegiance": "user",
+       "dismiss": "bonus-action"
       }
-     ],
-     "rangeFeet": 5,
-     "turn": "after-user",
-     "lasts": {
-      "type": "minutes",
-      "minutes": 60
-     },
-     "allegiance": "user",
-     "dismiss": "bonus-action"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
-    "id": "break-emerald",
-    "name": "Break the Gem (Emerald)",
-    "activation": "action",
-    "description": "Break the emerald: a Water Elemental appears in an unoccupied space as close to the gem as possible, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
-    "damage": [],
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "water-elemental",
-       "count": 1
+    "id": "emerald",
+    "name": "Emerald (Water Elemental)",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "break-emerald",
+      "name": "Break the Gem (Emerald)",
+      "activation": "action",
+      "description": "Break the emerald: a Water Elemental appears in an unoccupied space as close to the gem as possible, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
+      "damage": [],
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "water-elemental",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 5,
+       "turn": "after-user",
+       "lasts": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "allegiance": "user",
+       "dismiss": "bonus-action"
       }
-     ],
-     "rangeFeet": 5,
-     "turn": "after-user",
-     "lasts": {
-      "type": "minutes",
-      "minutes": 60
-     },
-     "allegiance": "user",
-     "dismiss": "bonus-action"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
-    "id": "break-red-corundum",
-    "name": "Break the Gem (Red corundum)",
-    "activation": "action",
-    "description": "Break the red corundum: a Fire Elemental appears in an unoccupied space as close to the gem as possible, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
-    "damage": [],
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "fire-elemental",
-       "count": 1
+    "id": "red-corundum",
+    "name": "Red corundum (Fire Elemental)",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "break-red-corundum",
+      "name": "Break the Gem (Red corundum)",
+      "activation": "action",
+      "description": "Break the red corundum: a Fire Elemental appears in an unoccupied space as close to the gem as possible, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
+      "damage": [],
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "fire-elemental",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 5,
+       "turn": "after-user",
+       "lasts": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "allegiance": "user",
+       "dismiss": "bonus-action"
       }
-     ],
-     "rangeFeet": 5,
-     "turn": "after-user",
-     "lasts": {
-      "type": "minutes",
-      "minutes": 60
-     },
-     "allegiance": "user",
-     "dismiss": "bonus-action"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
-    "id": "break-yellow-diamond",
-    "name": "Break the Gem (Yellow diamond)",
-    "activation": "action",
-    "description": "Break the yellow diamond: an Earth Elemental appears in an unoccupied space as close to the gem as possible, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
-    "damage": [],
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "earth-elemental",
-       "count": 1
+    "id": "yellow-diamond",
+    "name": "Yellow diamond (Earth Elemental)",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "break-yellow-diamond",
+      "name": "Break the Gem (Yellow diamond)",
+      "activation": "action",
+      "description": "Break the yellow diamond: an Earth Elemental appears in an unoccupied space as close to the gem as possible, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
+      "damage": [],
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "earth-elemental",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 5,
+       "turn": "after-user",
+       "lasts": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "allegiance": "user",
+       "dismiss": "bonus-action"
       }
-     ],
-     "rangeFeet": 5,
-     "turn": "after-user",
-     "lasts": {
-      "type": "minutes",
-      "minutes": 60
-     },
-     "allegiance": "user",
-     "dismiss": "bonus-action"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    }
   ],
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [],
   "effects": [],
   "modifiers": []
  },
@@ -3484,9 +3996,28 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Elixir of Health",
+    "activation": "bonus-action",
+    "description": "Drink it, or give it to a creature within 5 feet of you: the drinker is cured of all magical contagions, and the Blinded, Deafened, Paralyzed and Poisoned conditions end on it.",
+    "damage": [],
+    "endsConditions": [
+     "blinded",
+     "deafened",
+     "paralyzed",
+     "poisoned"
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -3555,7 +4086,13 @@
   "weapon": null,
   "armor": null,
   "slot": "weapon",
-  "appliesTo": null,
+  "appliesTo": {
+   "label": "Longbow or Shortbow",
+   "baseIds": [
+    "longbow",
+    "shortbow"
+   ]
+  },
   "rarity": "very-rare",
   "isMagic": true,
   "attunement": {
@@ -3564,11 +4101,26 @@
   },
   "cursed": false,
   "casts": [],
+  "weaponChanges": {
+   "damageType": "force",
+   "removeProperties": [
+    "ammunition"
+   ]
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 1
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 1
+   }
+  ]
  },
  {
   "id": "eversmoking-bottle",
@@ -3678,7 +4230,28 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "check",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-ability-check"
+     },
+     {
+      "type": "skill-is",
+      "skills": [
+       "investigation"
+      ]
+     },
+     {
+      "type": "situation-is",
+      "situation": "examining something within 1 foot"
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "eyes-of-the-eagle",
@@ -3704,7 +4277,28 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "check",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-ability-check"
+     },
+     {
+      "type": "skill-is",
+      "skills": [
+       "perception"
+      ]
+     },
+     {
+      "type": "situation-is",
+      "situation": "relying on sight"
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "feather-token",
@@ -3727,30 +4321,80 @@
   "cursed": false,
   "casts": [],
   "consumedOnUse": true,
-  "grantsFeatIds": [],
-  "tags": [],
-  "actions": [
+  "variants": [
    {
     "id": "bird",
-    "name": "Toss the Bird Token",
-    "activation": "action",
-    "description": "Toss the token 5 feet into the air: it disappears and an enormous, multicolored bird takes its place, with the statistics of a Roc, but it can't attack. It obeys your simple commands and carries up to 500 pounds at its full speed. It disappears after flying its maximum distance for a day or at 0 Hit Points; a Magic action dismisses it.",
-    "damage": [],
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "roc",
-       "count": 1
+    "name": "Bird",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "bird",
+      "name": "Toss the Bird Token",
+      "activation": "action",
+      "description": "Toss the token 5 feet into the air: it disappears and an enormous, multicolored bird takes its place, with the statistics of a Roc, but it can't attack. It obeys your simple commands and carries up to 500 pounds at its full speed. It disappears after flying its maximum distance for a day or at 0 Hit Points; a Magic action dismisses it.",
+      "damage": [],
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "roc",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 5,
+       "turn": "after-user",
+       "allegiance": "user",
+       "noAttacks": true,
+       "dismiss": "action"
       }
-     ],
-     "rangeFeet": 5,
-     "turn": "after-user",
-     "allegiance": "user",
-     "noAttacks": true,
-     "dismiss": "action"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "anchor",
+    "name": "Anchor",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "fan",
+    "name": "Fan",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "swan-boat",
+    "name": "Swan Boat",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "tree",
+    "name": "Tree",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "whip",
+    "name": "Whip",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": []
    }
   ],
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [],
   "effects": [],
   "modifiers": []
  },
@@ -3774,262 +4418,343 @@
   },
   "cursed": false,
   "casts": [],
-  "grantsFeatIds": [],
-  "tags": [],
-  "actions": [
+  "variants": [
    {
     "id": "bronze-griffon",
-    "name": "Throw the Bronze Griffon",
-    "activation": "action",
-    "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Griffon for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
-    "damage": [],
-    "uses": {
-     "limit": 1,
-     "per": "time",
-     "afterHours": "120"
-    },
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "griffon",
-       "count": 1
+    "name": "Bronze Griffon",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "bronze-griffon",
+      "name": "Throw the Bronze Griffon",
+      "activation": "action",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Griffon for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "afterHours": "120"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "griffon",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "dodgesUncommanded": true,
+       "lasts": {
+        "type": "minutes",
+        "minutes": 360
+       },
+       "allegiance": "user",
+       "dismiss": "action"
       }
-     ],
-     "rangeFeet": 60,
-     "turn": "after-user",
-     "dodgesUncommanded": true,
-     "lasts": {
-      "type": "minutes",
-      "minutes": 360
-     },
-     "allegiance": "user",
-     "dismiss": "action"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
     "id": "ebony-fly",
-    "name": "Throw the Ebony Fly",
-    "activation": "action",
-    "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Fly for up to 12 hours, which can be ridden as a mount. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
-    "damage": [],
-    "uses": {
-     "limit": 1,
-     "per": "time",
-     "afterHours": "48"
-    },
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "giant-fly",
-       "count": 1
+    "name": "Ebony Fly",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "ebony-fly",
+      "name": "Throw the Ebony Fly",
+      "activation": "action",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Fly for up to 12 hours, which can be ridden as a mount. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "afterHours": "48"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "giant-fly",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "dodgesUncommanded": true,
+       "lasts": {
+        "type": "minutes",
+        "minutes": 720
+       },
+       "allegiance": "user",
+       "dismiss": "action"
       }
-     ],
-     "rangeFeet": 60,
-     "turn": "after-user",
-     "dodgesUncommanded": true,
-     "lasts": {
-      "type": "minutes",
-      "minutes": 720
-     },
-     "allegiance": "user",
-     "dismiss": "action"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
     "id": "golden-lions",
-    "name": "Throw the Golden Lions",
-    "activation": "action",
-    "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Lion for up to 1 hour, one for each figurine of the pair thrown. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
-    "damage": [],
-    "uses": {
-     "limit": 1,
-     "per": "time",
-     "afterHours": "168"
-    },
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "lion",
-       "count": 2
+    "name": "Golden Lions",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "golden-lions",
+      "name": "Throw the Golden Lions",
+      "activation": "action",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Lion for up to 1 hour, one for each figurine of the pair thrown. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "afterHours": "168"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "lion",
+         "count": 2
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "dodgesUncommanded": true,
+       "lasts": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "allegiance": "user",
+       "dismiss": "action"
       }
-     ],
-     "rangeFeet": 60,
-     "turn": "after-user",
-     "dodgesUncommanded": true,
-     "lasts": {
-      "type": "minutes",
-      "minutes": 60
-     },
-     "allegiance": "user",
-     "dismiss": "action"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
     "id": "ivory-goats",
-    "name": "Throw the Ivory Goats",
-    "activation": "action",
-    "description": "Throw the figurine to a point on the ground within 60 feet: it becomes the goat it is: the Goat of Terror a Giant Goat that can't attack, the Goat of Travail a Giant Goat, the Goat of Traveling a Large goat with the statistics of a Riding Horse; each for up to 3 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
-    "damage": [],
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "giant-goat",
-       "count": 1,
-       "form": "terror",
-       "except": {
-        "name": "Goat of Terror"
-       }
-      },
-      {
-       "monsterId": "giant-goat",
-       "count": 1,
-       "form": "travail",
-       "except": {
-        "name": "Goat of Travail"
-       }
-      },
-      {
-       "monsterId": "riding-horse",
-       "count": 1,
-       "form": "traveling",
-       "except": {
-        "name": "Goat of Traveling"
-       }
+    "name": "Ivory Goats",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "ivory-goats",
+      "name": "Throw the Ivory Goats",
+      "activation": "action",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes the goat it is: the Goat of Terror a Giant Goat that can't attack, the Goat of Travail a Giant Goat, the Goat of Traveling a Large goat with the statistics of a Riding Horse; each for up to 3 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "damage": [],
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "giant-goat",
+         "count": 1,
+         "form": "terror",
+         "except": {
+          "name": "Goat of Terror"
+         }
+        },
+        {
+         "monsterId": "giant-goat",
+         "count": 1,
+         "form": "travail",
+         "except": {
+          "name": "Goat of Travail"
+         }
+        },
+        {
+         "monsterId": "riding-horse",
+         "count": 1,
+         "form": "traveling",
+         "except": {
+          "name": "Goat of Traveling"
+         }
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "dodgesUncommanded": true,
+       "lasts": {
+        "type": "minutes",
+        "minutes": 180
+       },
+       "allegiance": "user",
+       "dismiss": "action"
       }
-     ],
-     "rangeFeet": 60,
-     "turn": "after-user",
-     "dodgesUncommanded": true,
-     "lasts": {
-      "type": "minutes",
-      "minutes": 180
-     },
-     "allegiance": "user",
-     "dismiss": "action"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
     "id": "marble-elephant",
-    "name": "Throw the Marble Elephant",
-    "activation": "action",
-    "description": "Throw the figurine to a point on the ground within 60 feet: it becomes an Elephant for up to 24 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
-    "damage": [],
-    "uses": {
-     "limit": 1,
-     "per": "time",
-     "afterHours": "168"
-    },
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "elephant",
-       "count": 1
+    "name": "Marble Elephant",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "marble-elephant",
+      "name": "Throw the Marble Elephant",
+      "activation": "action",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes an Elephant for up to 24 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "afterHours": "168"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "elephant",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "dodgesUncommanded": true,
+       "lasts": {
+        "type": "minutes",
+        "minutes": 1440
+       },
+       "allegiance": "user",
+       "dismiss": "action"
       }
-     ],
-     "rangeFeet": 60,
-     "turn": "after-user",
-     "dodgesUncommanded": true,
-     "lasts": {
-      "type": "minutes",
-      "minutes": 1440
-     },
-     "allegiance": "user",
-     "dismiss": "action"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
     "id": "obsidian-steed",
-    "name": "Throw the Obsidian Steed",
-    "activation": "action",
-    "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Nightmare for up to 24 hours, which fights only to defend itself. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
-    "damage": [],
-    "uses": {
-     "limit": 1,
-     "per": "time",
-     "afterHours": "120"
-    },
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "nightmare",
-       "count": 1
+    "name": "Obsidian Steed",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "obsidian-steed",
+      "name": "Throw the Obsidian Steed",
+      "activation": "action",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Nightmare for up to 24 hours, which fights only to defend itself. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "afterHours": "120"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "nightmare",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "dodgesUncommanded": true,
+       "lasts": {
+        "type": "minutes",
+        "minutes": 1440
+       },
+       "allegiance": "user",
+       "dismiss": "action"
       }
-     ],
-     "rangeFeet": 60,
-     "turn": "after-user",
-     "dodgesUncommanded": true,
-     "lasts": {
-      "type": "minutes",
-      "minutes": 1440
-     },
-     "allegiance": "user",
-     "dismiss": "action"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
     "id": "onyx-dog",
-    "name": "Throw the Onyx Dog",
-    "activation": "action",
-    "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Mastiff with an Intelligence of 8 for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
-    "damage": [],
-    "uses": {
-     "limit": 1,
-     "per": "time",
-     "afterHours": "168"
-    },
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "mastiff",
-       "count": 1,
-       "except": {
-        "abilityScores": {
-         "int": 8
+    "name": "Onyx Dog",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "onyx-dog",
+      "name": "Throw the Onyx Dog",
+      "activation": "action",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Mastiff with an Intelligence of 8 for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "afterHours": "168"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "mastiff",
+         "count": 1,
+         "except": {
+          "abilityScores": {
+           "int": 8
+          }
+         }
         }
-       }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "dodgesUncommanded": true,
+       "lasts": {
+        "type": "minutes",
+        "minutes": 360
+       },
+       "allegiance": "user",
+       "dismiss": "action"
       }
-     ],
-     "rangeFeet": 60,
-     "turn": "after-user",
-     "dodgesUncommanded": true,
-     "lasts": {
-      "type": "minutes",
-      "minutes": 360
-     },
-     "allegiance": "user",
-     "dismiss": "action"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
     "id": "serpentine-owl",
-    "name": "Throw the Serpentine Owl",
-    "activation": "action",
-    "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Owl for up to 8 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
-    "damage": [],
-    "uses": {
-     "limit": 1,
-     "per": "time",
-     "afterHours": "48"
-    },
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "giant-owl",
-       "count": 1
+    "name": "Serpentine Owl",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "serpentine-owl",
+      "name": "Throw the Serpentine Owl",
+      "activation": "action",
+      "description": "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Owl for up to 8 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+      "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "afterHours": "48"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "giant-owl",
+         "count": 1
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "dodgesUncommanded": true,
+       "lasts": {
+        "type": "minutes",
+        "minutes": 480
+       },
+       "allegiance": "user",
+       "dismiss": "action"
       }
-     ],
-     "rangeFeet": 60,
-     "turn": "after-user",
-     "dodgesUncommanded": true,
-     "lasts": {
-      "type": "minutes",
-      "minutes": 480
-     },
-     "allegiance": "user",
-     "dismiss": "action"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "silver-raven",
+    "name": "Silver Raven",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": []
    }
   ],
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [],
   "effects": [],
   "modifiers": []
  },
@@ -4211,7 +4936,13 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "ability-score-minimum",
+    "ability": "str",
+    "score": 19
+   }
+  ]
  },
  {
   "id": "gem-of-brightness",
@@ -4584,7 +5315,37 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "special-speed",
+    "movement": "climb",
+    "equalToSpeed": true
+   },
+   {
+    "type": "special-speed",
+    "movement": "swim",
+    "equalToSpeed": true
+   },
+   {
+    "type": "check-bonus",
+    "amount": 5,
+    "when": [
+     {
+      "type": "on-ability-check"
+     },
+     {
+      "type": "skill-is",
+      "skills": [
+       "athletics"
+      ]
+     },
+     {
+      "type": "situation-is",
+      "situation": "climbing or swimming"
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "gloves-of-thievery",
@@ -4810,7 +5571,13 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "ability-score-minimum",
+    "ability": "int",
+    "score": 19
+   }
+  ]
  },
  {
   "id": "helm-of-brilliance",
@@ -4935,7 +5702,21 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "teleport",
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "helm-of-teleportation-charges"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -5006,6 +5787,14 @@
   },
   "cursed": false,
   "casts": [],
+  "magicSaveAura": {
+   "feet": 10,
+   "widerAt": {
+    "classId": "paladin",
+    "level": 17,
+    "feet": 30
+   }
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -5085,151 +5874,188 @@
   },
   "cursed": false,
   "casts": [],
-  "grantsFeatIds": [],
-  "tags": [],
-  "actions": [
+  "variants": [
    {
-    "id": "blow-silver",
-    "name": "Blow the Horn (Silver)",
-    "activation": "action",
-    "description": "Blow the silver horn: 2 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: none. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
-    "damage": [],
-    "uses": {
-     "limit": 1,
-     "per": "time",
-     "afterHours": "168"
-    },
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "berserker",
-       "count": 2,
-       "except": {
-        "conditionImmunities": [
-         "charmed",
-         "frightened"
-        ]
-       }
+    "id": "silver",
+    "name": "Silver horn",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "blow-silver",
+      "name": "Blow the Horn (Silver)",
+      "activation": "action",
+      "description": "Blow the silver horn: 2 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: none. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
+      "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "afterHours": "168"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "berserker",
+         "count": 2,
+         "except": {
+          "conditionImmunities": [
+           "charmed",
+           "frightened"
+          ]
+         }
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "lasts": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "allegiance": "user"
       }
-     ],
-     "rangeFeet": 60,
-     "turn": "after-user",
-     "lasts": {
-      "type": "minutes",
-      "minutes": 60
-     },
-     "allegiance": "user"
-    }
+     }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
-    "id": "blow-brass",
-    "name": "Blow the Horn (Brass)",
-    "activation": "action",
-    "description": "Blow the brass horn: 3 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: Proficiency with all Simple weapons. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
-    "damage": [],
-    "uses": {
-     "limit": 1,
-     "per": "time",
-     "afterHours": "168"
-    },
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "berserker",
-       "count": 3,
-       "except": {
-        "conditionImmunities": [
-         "charmed",
-         "frightened"
-        ]
+    "id": "brass",
+    "name": "Brass horn",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "blow-brass",
+      "name": "Blow the Horn (Brass)",
+      "activation": "action",
+      "description": "Blow the brass horn: 3 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: Proficiency with all Simple weapons. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
+      "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "afterHours": "168"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "berserker",
+         "count": 3,
+         "except": {
+          "conditionImmunities": [
+           "charmed",
+           "frightened"
+          ]
+         }
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "lasts": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "allegiance": "user",
+       "obeysWith": {
+        "weapons": "simple"
        }
       }
-     ],
-     "rangeFeet": 60,
-     "turn": "after-user",
-     "lasts": {
-      "type": "minutes",
-      "minutes": 60
-     },
-     "allegiance": "user",
-     "obeysWith": {
-      "weapons": "simple"
      }
-    }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
-    "id": "blow-bronze",
-    "name": "Blow the Horn (Bronze)",
-    "activation": "action",
-    "description": "Blow the bronze horn: 4 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: Training with all Medium armor. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
-    "damage": [],
-    "uses": {
-     "limit": 1,
-     "per": "time",
-     "afterHours": "168"
-    },
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "berserker",
-       "count": 4,
-       "except": {
-        "conditionImmunities": [
-         "charmed",
-         "frightened"
-        ]
+    "id": "bronze",
+    "name": "Bronze horn",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "blow-bronze",
+      "name": "Blow the Horn (Bronze)",
+      "activation": "action",
+      "description": "Blow the bronze horn: 4 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: Training with all Medium armor. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
+      "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "afterHours": "168"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "berserker",
+         "count": 4,
+         "except": {
+          "conditionImmunities": [
+           "charmed",
+           "frightened"
+          ]
+         }
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "lasts": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "allegiance": "user",
+       "obeysWith": {
+        "armor": "medium"
        }
       }
-     ],
-     "rangeFeet": 60,
-     "turn": "after-user",
-     "lasts": {
-      "type": "minutes",
-      "minutes": 60
-     },
-     "allegiance": "user",
-     "obeysWith": {
-      "armor": "medium"
      }
-    }
+    ],
+    "casts": [],
+    "effects": []
    },
    {
-    "id": "blow-iron",
-    "name": "Blow the Horn (Iron)",
-    "activation": "action",
-    "description": "Blow the iron horn: 5 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: Proficiency with all Martial weapons. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
-    "damage": [],
-    "uses": {
-     "limit": 1,
-     "per": "time",
-     "afterHours": "168"
-    },
-    "summons": {
-     "creatures": [
-      {
-       "monsterId": "berserker",
-       "count": 5,
-       "except": {
-        "conditionImmunities": [
-         "charmed",
-         "frightened"
-        ]
+    "id": "iron",
+    "name": "Iron horn",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "blow-iron",
+      "name": "Blow the Horn (Iron)",
+      "activation": "action",
+      "description": "Blow the iron horn: 5 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: Proficiency with all Martial weapons. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
+      "damage": [],
+      "uses": {
+       "limit": 1,
+       "per": "time",
+       "afterHours": "168"
+      },
+      "summons": {
+       "creatures": [
+        {
+         "monsterId": "berserker",
+         "count": 5,
+         "except": {
+          "conditionImmunities": [
+           "charmed",
+           "frightened"
+          ]
+         }
+        }
+       ],
+       "rangeFeet": 60,
+       "turn": "after-user",
+       "lasts": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "allegiance": "user",
+       "obeysWith": {
+        "weapons": "martial"
        }
       }
-     ],
-     "rangeFeet": 60,
-     "turn": "after-user",
-     "lasts": {
-      "type": "minutes",
-      "minutes": 60
-     },
-     "allegiance": "user",
-     "obeysWith": {
-      "weapons": "martial"
      }
-    }
+    ],
+    "casts": [],
+    "effects": []
    }
   ],
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [],
   "effects": [],
   "modifiers": []
  },
@@ -5283,7 +6109,12 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "speed",
+    "amount": 30
+   }
+  ]
  },
  {
   "id": "immovable-rod",
@@ -5357,6 +6188,190 @@
   },
   "cursed": false,
   "casts": [],
+  "variants": [
+   {
+    "id": "absorption",
+    "name": "Absorption",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "agility",
+    "name": "Agility",
+    "modifiers": [
+     {
+      "type": "ability-score",
+      "ability": "dex",
+      "amount": 2,
+      "maximum": 20
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "awareness",
+    "name": "Awareness",
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "initiative",
+      "mode": "advantage"
+     },
+     {
+      "type": "roll-mode",
+      "roll": "check",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-ability-check"
+       },
+       {
+        "type": "skill-is",
+        "skills": [
+         "perception"
+        ]
+       }
+      ]
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "fortitude",
+    "name": "Fortitude",
+    "modifiers": [
+     {
+      "type": "ability-score",
+      "ability": "con",
+      "amount": 2,
+      "maximum": 20
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "greater-absorption",
+    "name": "Greater Absorption",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "insight",
+    "name": "Insight",
+    "modifiers": [
+     {
+      "type": "ability-score",
+      "ability": "wis",
+      "amount": 2,
+      "maximum": 20
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "intellect",
+    "name": "Intellect",
+    "modifiers": [
+     {
+      "type": "ability-score",
+      "ability": "int",
+      "amount": 2,
+      "maximum": 20
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "leadership",
+    "name": "Leadership",
+    "modifiers": [
+     {
+      "type": "ability-score",
+      "ability": "cha",
+      "amount": 2,
+      "maximum": 20
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "mastery",
+    "name": "Mastery",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "protection",
+    "name": "Protection",
+    "modifiers": [
+     {
+      "type": "armor-class",
+      "amount": 1,
+      "whileArmored": false
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "regeneration",
+    "name": "Regeneration",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "reserve",
+    "name": "Reserve",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "strength",
+    "name": "Strength",
+    "modifiers": [
+     {
+      "type": "ability-score",
+      "ability": "str",
+      "amount": 2,
+      "maximum": 20
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "sustenance",
+    "name": "Sustenance",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -5502,9 +6517,42 @@
   },
   "cursed": false,
   "casts": [],
+  "weaponChanges": {
+   "damageTypeOptions": [
+    "lightning"
+   ]
+  },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "lightning-bolt",
+    "name": "Lightning Bolt",
+    "activation": "action",
+    "description": "Throw the javelin at a target no farther than 120 feet and turn it into a bolt of lightning: a 5-foot-wide Line from you to the target. The target and each other creature in the Line make a DC 13 Dexterity saving throw, taking 4d6 Lightning damage on a failed save or half as much on a success. The javelin reappears in your hand. It can't be used this way again until the next dawn.",
+    "damage": [
+     {
+      "formula": "4d6",
+      "type": "lightning"
+     }
+    ],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "area": {
+     "shape": "line",
+     "sizeFeet": 120,
+     "widthFeet": 5
+    },
+    "save": {
+     "ability": "dex",
+     "dc": 13,
+     "successDamage": "half",
+     "failureConditions": []
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -5844,9 +6892,43 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "terror",
+    "name": "Wave of Terror",
+    "activation": "action",
+    "description": "Expend 1 charge to release a wave of terror. Each creature of your choice within 30 feet makes a DC 15 Wisdom saving throw or has the Frightened condition for 1 minute. While Frightened this way it spends its turns moving as far from you as it can, can't make Opportunity Attacks and can only Dash or try to escape what holds it. It repeats the save at the end of each of its turns.",
+    "damage": [],
+    "targets": {
+     "rangeFeet": 30,
+     "who": "others"
+    },
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "mace-of-terror-charges"
+    },
+    "save": {
+     "ability": "wis",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [
+      "frightened"
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -5874,7 +6956,21 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "save",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-saving-throw"
+     },
+     {
+      "type": "versus-spell"
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "manual-of-bodily-health",
@@ -6183,7 +7279,24 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "save",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-saving-throw"
+     },
+     {
+      "type": "versus-condition",
+      "conditionIds": [
+       "poisoned"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "necklace-of-fireballs",
@@ -6379,9 +7492,102 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "sworn-enemy",
+    "name": "Name a Sworn Enemy",
+    "activation": "other",
+    "description": "As you make a ranged attack with the bow, say \"Swift death to you who have wronged me.\" The target becomes your sworn enemy until it dies or until dawn 7 days later. You can have only one sworn enemy at a time; when it dies, you can choose a new one after the next dawn.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "seen": true,
+     "who": "others"
+    },
+    "grants": {
+     "name": "Sworn Enemy",
+     "tags": [
+      "sworn-enemy"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 10080
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "target",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    },
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
+   }
+  ],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "attack",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "ranged"
+      ]
+     },
+     {
+      "type": "versus-marked",
+      "tags": [
+       "sworn-enemy"
+      ]
+     }
+    ]
+   },
+   {
+    "type": "ignores-cover",
+    "degree": "three-quarters",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "ranged"
+      ]
+     },
+     {
+      "type": "versus-marked",
+      "tags": [
+       "sworn-enemy"
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extra-damage",
+    "formula": "3d6",
+    "damageType": "piercing",
+    "doubleOnCritical": true,
+    "when": [
+     {
+      "type": "on-hit"
+     },
+     {
+      "type": "versus-marked",
+      "tags": [
+       "sworn-enemy"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "oil-of-etherealness",
@@ -6511,9 +7717,42 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "heal",
+    "name": "Draw on the Periapt",
+    "activation": "action",
+    "description": "Regain 2d4 + 2 Hit Points. Once used, this property can't be used again until the next dawn.",
+    "damage": [],
+    "healing": {
+     "formula": "2d4 + 2",
+     "self": true
+    },
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
+   }
+  ],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "save",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-saving-throw"
+     },
+     {
+      "type": "versus-condition",
+      "conditionIds": [
+       "poisoned"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "periapt-of-proof-against-poison",
@@ -6814,7 +8053,15 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "animal-friendship",
+    "atLevel": 3,
+    "saveDc": 13,
+    "consumesSpellSlot": false
+   }
+  ],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -6867,9 +8114,59 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Climbing",
+    "activation": "bonus-action",
+    "description": "Drink it: for 1 hour you gain a Climb Speed equal to your Speed and have Advantage on Strength (Athletics) checks to climb.",
+    "damage": [],
+    "grants": {
+     "name": "Potion of Climbing",
+     "tags": [
+      "potion-of-climbing"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 60
+     },
+     "modifiers": [
+      {
+       "type": "special-speed",
+       "movement": "climb",
+       "equalToSpeed": true
+      },
+      {
+       "type": "roll-mode",
+       "roll": "check",
+       "mode": "advantage",
+       "when": [
+        {
+         "type": "on-ability-check"
+        },
+        {
+         "type": "skill-is",
+         "skills": [
+          "athletics"
+         ]
+        },
+        {
+         "type": "situation-is",
+         "situation": "climbing"
+        }
+       ]
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -7155,6 +8452,231 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
+  "variants": [
+   {
+    "id": "hill",
+    "name": "Hill giant (21)",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Giant Strength",
+      "activation": "bonus-action",
+      "description": "Drink it: for 1 hour your Strength is 21. It has no effect on you if your Strength is already 21 or higher.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Giant Strength",
+       "tags": [
+        "giant-strength"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "ability-score-minimum",
+         "ability": "str",
+         "score": 21
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "frost",
+    "name": "Frost giant (23)",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Giant Strength",
+      "activation": "bonus-action",
+      "description": "Drink it: for 1 hour your Strength is 23. It has no effect on you if your Strength is already 23 or higher.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Giant Strength",
+       "tags": [
+        "giant-strength"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "ability-score-minimum",
+         "ability": "str",
+         "score": 23
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "stone",
+    "name": "Stone giant (23)",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Giant Strength",
+      "activation": "bonus-action",
+      "description": "Drink it: for 1 hour your Strength is 23. It has no effect on you if your Strength is already 23 or higher.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Giant Strength",
+       "tags": [
+        "giant-strength"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "ability-score-minimum",
+         "ability": "str",
+         "score": 23
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "fire",
+    "name": "Fire giant (25)",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Giant Strength",
+      "activation": "bonus-action",
+      "description": "Drink it: for 1 hour your Strength is 25. It has no effect on you if your Strength is already 25 or higher.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Giant Strength",
+       "tags": [
+        "giant-strength"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "ability-score-minimum",
+         "ability": "str",
+         "score": 25
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "cloud",
+    "name": "Cloud giant (27)",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Giant Strength",
+      "activation": "bonus-action",
+      "description": "Drink it: for 1 hour your Strength is 27. It has no effect on you if your Strength is already 27 or higher.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Giant Strength",
+       "tags": [
+        "giant-strength"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "ability-score-minimum",
+         "ability": "str",
+         "score": 27
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "storm",
+    "name": "Storm giant (29)",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Giant Strength",
+      "activation": "bonus-action",
+      "description": "Drink it: for 1 hour your Strength is 29. It has no effect on you if your Strength is already 29 or higher.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Giant Strength",
+       "tags": [
+        "giant-strength"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "ability-score-minimum",
+         "ability": "str",
+         "score": 29
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -7296,6 +8818,10 @@
     "damage": [],
     "healing": {
      "formula": "4d4 + 4"
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
     }
    }
   ],
@@ -7334,6 +8860,10 @@
     "damage": [],
     "healing": {
      "formula": "8d4 + 8"
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
     }
    }
   ],
@@ -7372,6 +8902,10 @@
     "damage": [],
     "healing": {
      "formula": "10d4 + 20"
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
     }
    }
   ],
@@ -7398,9 +8932,59 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Heroism",
+    "activation": "bonus-action",
+    "description": "Drink it: you gain 10 Temporary Hit Points that last for 1 hour, and for the same hour you are under the effect of the Bless spell, with no Concentration.",
+    "damage": [],
+    "healing": {
+     "formula": "10",
+     "self": true,
+     "temporary": true
+    },
+    "grants": {
+     "name": "Potion of Heroism",
+     "tags": [
+      "blessed"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 60
+     },
+     "modifiers": [
+      {
+       "type": "attack-bonus",
+       "amount": 0,
+       "dice": "1d4",
+       "when": [
+        {
+         "type": "on-attack-roll"
+        }
+       ]
+      },
+      {
+       "type": "save-bonus",
+       "amount": 0,
+       "dice": "1d4",
+       "when": [
+        {
+         "type": "on-saving-throw"
+        }
+       ]
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -7424,9 +9008,36 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Invisibility",
+    "activation": "bonus-action",
+    "description": "Drink it: you have the Invisible condition for 1 hour. The effect ends early if you make an attack roll, deal damage, or cast a spell.",
+    "damage": [],
+    "grants": {
+     "name": "Potion of Invisibility",
+     "tags": [
+      "until-it-acts"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 60
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "conditions": [
+      "invisible"
+     ]
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -7450,9 +9061,52 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Invulnerability",
+    "activation": "bonus-action",
+    "description": "Drink it: for 1 minute you have Resistance to all damage.",
+    "damage": [],
+    "grants": {
+     "name": "Potion of Invulnerability",
+     "tags": [
+      "invulnerable"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "modifiers": [
+      {
+       "type": "damage-resistance",
+       "damageTypes": [
+        "acid",
+        "bludgeoning",
+        "cold",
+        "fire",
+        "force",
+        "lightning",
+        "necrotic",
+        "piercing",
+        "poison",
+        "psychic",
+        "radiant",
+        "slashing",
+        "thunder"
+       ]
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -7528,9 +9182,26 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink the Potion",
+    "activation": "bonus-action",
+    "description": "Drink it: you take 4d6 Poison damage and must succeed on a DC 13 Constitution saving throw or have the Poisoned condition for 1 hour.",
+    "damage": [
+     {
+      "formula": "4d6",
+      "type": "poison"
+     }
+    ],
+    "targets": {
+     "who": "self"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -7554,6 +9225,389 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
+  "variants": [
+   {
+    "id": "acid",
+    "name": "Acid",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Resistance",
+      "activation": "bonus-action",
+      "description": "Drink it: you have Resistance to Acid damage for 1 hour.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Resistance (Acid)",
+       "tags": [
+        "potion-of-resistance"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "acid"
+         ]
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "cold",
+    "name": "Cold",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Resistance",
+      "activation": "bonus-action",
+      "description": "Drink it: you have Resistance to Cold damage for 1 hour.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Resistance (Cold)",
+       "tags": [
+        "potion-of-resistance"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "cold"
+         ]
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "fire",
+    "name": "Fire",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Resistance",
+      "activation": "bonus-action",
+      "description": "Drink it: you have Resistance to Fire damage for 1 hour.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Resistance (Fire)",
+       "tags": [
+        "potion-of-resistance"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "fire"
+         ]
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "force",
+    "name": "Force",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Resistance",
+      "activation": "bonus-action",
+      "description": "Drink it: you have Resistance to Force damage for 1 hour.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Resistance (Force)",
+       "tags": [
+        "potion-of-resistance"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "force"
+         ]
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "lightning",
+    "name": "Lightning",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Resistance",
+      "activation": "bonus-action",
+      "description": "Drink it: you have Resistance to Lightning damage for 1 hour.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Resistance (Lightning)",
+       "tags": [
+        "potion-of-resistance"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "lightning"
+         ]
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "necrotic",
+    "name": "Necrotic",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Resistance",
+      "activation": "bonus-action",
+      "description": "Drink it: you have Resistance to Necrotic damage for 1 hour.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Resistance (Necrotic)",
+       "tags": [
+        "potion-of-resistance"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "necrotic"
+         ]
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "poison",
+    "name": "Poison",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Resistance",
+      "activation": "bonus-action",
+      "description": "Drink it: you have Resistance to Poison damage for 1 hour.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Resistance (Poison)",
+       "tags": [
+        "potion-of-resistance"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "poison"
+         ]
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "psychic",
+    "name": "Psychic",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Resistance",
+      "activation": "bonus-action",
+      "description": "Drink it: you have Resistance to Psychic damage for 1 hour.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Resistance (Psychic)",
+       "tags": [
+        "potion-of-resistance"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "psychic"
+         ]
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "radiant",
+    "name": "Radiant",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Resistance",
+      "activation": "bonus-action",
+      "description": "Drink it: you have Resistance to Radiant damage for 1 hour.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Resistance (Radiant)",
+       "tags": [
+        "potion-of-resistance"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "radiant"
+         ]
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   },
+   {
+    "id": "thunder",
+    "name": "Thunder",
+    "modifiers": [],
+    "actions": [
+     {
+      "id": "drink",
+      "name": "Drink Potion of Resistance",
+      "activation": "bonus-action",
+      "description": "Drink it: you have Resistance to Thunder damage for 1 hour.",
+      "damage": [],
+      "grants": {
+       "name": "Potion of Resistance (Thunder)",
+       "tags": [
+        "potion-of-resistance"
+       ],
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "thunder"
+         ]
+        }
+       ],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false
+      }
+     }
+    ],
+    "casts": [],
+    "effects": []
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -7580,9 +9634,52 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Speed",
+    "activation": "bonus-action",
+    "description": "Drink it: for 1 minute you gain the effect of the Haste spell, with no Concentration and without the wave of lethargy when it ends.",
+    "damage": [],
+    "grants": {
+     "name": "Potion of Speed",
+     "tags": [
+      "hasted"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "modifiers": [
+      {
+       "type": "roll-mode",
+       "roll": "save",
+       "mode": "advantage",
+       "when": [
+        {
+         "type": "on-saving-throw"
+        },
+        {
+         "type": "ability-is",
+         "abilities": [
+          "dex"
+         ]
+        }
+       ]
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "armorClassBonus": 2,
+     "speedMultiplier": 2
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -7606,9 +9703,26 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drink",
+    "name": "Drink Potion of Vitality",
+    "activation": "bonus-action",
+    "description": "Drink it, or give it to a creature within 5 feet of you: it removes the drinker's Exhaustion levels and ends the Poisoned condition on it. For the next 24 hours, it regains the maximum number of Hit Points for any Hit Point Die it spends.",
+    "damage": [],
+    "endsConditions": [
+     "exhaustion",
+     "poisoned"
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -7667,6 +9781,58 @@
   },
   "cursed": false,
   "casts": [],
+  "variants": [
+   {
+    "id": "rod",
+    "name": "6-inch rod",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "weapon": null,
+    "replacesRiders": true,
+    "suspendsActions": true
+   },
+   {
+    "id": "pole",
+    "name": "10-foot pole",
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "check",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-ability-check"
+       },
+       {
+        "type": "skill-is",
+        "skills": [
+         "acrobatics"
+        ]
+       }
+      ]
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "weapon": null,
+    "replacesRiders": true,
+    "suspendsActions": true
+   }
+  ],
+  "variantChoice": {
+   "by": "holder",
+   "activation": "bonus-action"
+  },
+  "weaponChanges": {
+   "addProperties": [
+    "thrown"
+   ],
+   "rangeFeet": 30,
+   "longRangeFeet": 120
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -7696,6 +9862,22 @@
    {
     "type": "damage-bonus",
     "amount": 2
+   },
+   {
+    "type": "roll-mode",
+    "roll": "check",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-ability-check"
+     },
+     {
+      "type": "skill-is",
+      "skills": [
+       "acrobatics"
+      ]
+     }
+    ]
    }
   ]
  },
@@ -7840,11 +10022,349 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d4 + 1",
+   "lastChargeRoll": false
+  },
+  "variants": [
+   {
+    "id": "air",
+    "name": "Air",
+    "modifiers": [
+     {
+      "type": "special-speed",
+      "movement": "fly",
+      "equalToSpeed": true,
+      "hover": true
+     }
+    ],
+    "grants": {
+     "skills": [],
+     "expertise": [],
+     "tools": [],
+     "languages": [],
+     "armor": [],
+     "weapons": [],
+     "saves": [],
+     "damageResistances": [
+      "lightning"
+     ],
+     "damageImmunities": [],
+     "conditionImmunities": [],
+     "spells": []
+    },
+    "actions": [],
+    "casts": [
+     {
+      "spellId": "chain-lightning",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "useCost": 3,
+      "consumesSpellSlot": false
+     },
+     {
+      "spellId": "feather-fall",
+      "saveDc": 18,
+      "consumesSpellSlot": false
+     },
+     {
+      "spellId": "gust-of-wind",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "useCost": 2,
+      "consumesSpellSlot": false
+     },
+     {
+      "spellId": "wind-wall",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "consumesSpellSlot": false
+     }
+    ],
+    "effects": []
+   },
+   {
+    "id": "earth",
+    "name": "Earth",
+    "modifiers": [],
+    "grants": {
+     "skills": [],
+     "expertise": [],
+     "tools": [],
+     "languages": [],
+     "armor": [],
+     "weapons": [],
+     "saves": [],
+     "damageResistances": [
+      "acid"
+     ],
+     "damageImmunities": [],
+     "conditionImmunities": [],
+     "spells": []
+    },
+    "actions": [],
+    "casts": [
+     {
+      "spellId": "earthquake",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "useCost": 5,
+      "consumesSpellSlot": false
+     },
+     {
+      "spellId": "stone-shape",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "useCost": 2,
+      "consumesSpellSlot": false
+     },
+     {
+      "spellId": "stoneskin",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "useCost": 3,
+      "consumesSpellSlot": false
+     },
+     {
+      "spellId": "wall-of-stone",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "useCost": 3,
+      "consumesSpellSlot": false
+     }
+    ],
+    "effects": []
+   },
+   {
+    "id": "fire",
+    "name": "Fire",
+    "modifiers": [],
+    "grants": {
+     "skills": [],
+     "expertise": [],
+     "tools": [],
+     "languages": [],
+     "armor": [],
+     "weapons": [],
+     "saves": [],
+     "damageResistances": [],
+     "damageImmunities": [
+      "fire"
+     ],
+     "conditionImmunities": [],
+     "spells": []
+    },
+    "actions": [],
+    "casts": [
+     {
+      "spellId": "burning-hands",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "consumesSpellSlot": false
+     },
+     {
+      "spellId": "fireball",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "useCost": 2,
+      "consumesSpellSlot": false
+     },
+     {
+      "spellId": "fire-storm",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "useCost": 4,
+      "consumesSpellSlot": false
+     },
+     {
+      "spellId": "wall-of-fire",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "useCost": 3,
+      "consumesSpellSlot": false
+     }
+    ],
+    "effects": []
+   },
+   {
+    "id": "water",
+    "name": "Water",
+    "modifiers": [
+     {
+      "type": "special-speed",
+      "movement": "swim",
+      "feet": 60
+     }
+    ],
+    "actions": [],
+    "casts": [
+     {
+      "spellId": "create-or-destroy-water",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "consumesSpellSlot": false
+     },
+     {
+      "spellId": "ice-storm",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "useCost": 2,
+      "consumesSpellSlot": false
+     },
+     {
+      "spellId": "tsunami",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "useCost": 5,
+      "consumesSpellSlot": false
+     },
+     {
+      "spellId": "wall-of-ice",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "useCost": 3,
+      "consumesSpellSlot": false
+     },
+     {
+      "spellId": "water-walk",
+      "saveDc": 18,
+      "uses": {
+       "limit": 5,
+       "per": "long-rest",
+       "pool": "ring-of-elemental-command-charges"
+      },
+      "useCost": 2,
+      "consumesSpellSlot": false
+     }
+    ],
+    "effects": []
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "elemental-compulsion",
+    "name": "Elemental Compulsion",
+    "activation": "action",
+    "description": "Try to compel an Elemental you see within 60 feet. It makes a DC 18 Wisdom saving throw. On a failed save, it has the Charmed condition until the start of your next turn, and you determine what it does with its move and action on its next turn.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "creatureTypes": [
+      "elemental"
+     ],
+     "seen": true
+    },
+    "save": {
+     "ability": "wis",
+     "dc": 18,
+     "successDamage": "none",
+     "failureConditions": [
+      "charmed"
+     ],
+     "failureDuration": {
+      "type": "until-source-next-turn"
+     }
+    }
+   }
+  ],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "attack",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "versus-creature-type",
+      "creatureTypes": [
+       "elemental"
+      ]
+     }
+    ]
+   },
+   {
+    "type": "roll-mode",
+    "roll": "incoming-attack",
+    "mode": "disadvantage",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "source-creature-type-is",
+      "creatureTypes": [
+       "elemental"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "ring-of-evasion",
@@ -7981,7 +10501,32 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "vanish",
+    "name": "Turn Invisible",
+    "activation": "action",
+    "description": "Give yourself the Invisible condition. You remain Invisible until the ring is removed or until you take a Bonus Action to become visible again.",
+    "damage": [],
+    "grants": {
+     "name": "Ring of Invisibility",
+     "tags": [
+      "invisible-by-ring"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "conditions": [
+      "invisible"
+     ]
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -8007,7 +10552,10 @@
   "casts": [
    {
     "spellId": "jump",
-    "consumesSpellSlot": false
+    "consumesSpellSlot": false,
+    "targets": {
+     "who": "self"
+    }
    }
   ],
   "grantsFeatIds": [],
@@ -8275,7 +10823,21 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "save",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-saving-throw"
+     },
+     {
+      "type": "versus-spell"
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "ring-of-swimming",
@@ -8426,7 +10988,24 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "damage-reduction",
+    "amount": 0,
+    "dice": "2d8",
+    "when": [
+     {
+      "type": "on-taking-damage"
+     },
+     {
+      "type": "damage-type-is",
+      "damageTypes": [
+       "cold"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "ring-of-water-walking",
@@ -8450,7 +11029,10 @@
   "casts": [
    {
     "spellId": "water-walk",
-    "consumesSpellSlot": false
+    "consumesSpellSlot": false,
+    "targets": {
+     "who": "self"
+    }
    }
   ],
   "grantsFeatIds": [],
@@ -8713,7 +11295,33 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "base-armor-class",
+    "base": 15
+   },
+   {
+    "type": "roll-mode",
+    "roll": "save",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-saving-throw"
+     },
+     {
+      "type": "versus-magic"
+     }
+    ]
+   },
+   {
+    "type": "spell-save-dc",
+    "amount": 2
+   },
+   {
+    "type": "spell-attack-bonus",
+    "amount": 2
+   }
+  ]
  },
  {
   "id": "robe-of-useful-items",
@@ -8881,6 +11489,173 @@
   },
   "cursed": false,
   "casts": [],
+  "variants": [
+   {
+    "id": "flame-longsword",
+    "name": "Flaming Longsword",
+    "modifiers": [
+     {
+      "type": "extra-damage",
+      "formula": "2d6",
+      "damageType": "fire",
+      "doubleOnCritical": true,
+      "when": [
+       {
+        "type": "on-hit"
+       }
+      ]
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "light": {
+     "brightFeet": 40,
+     "dimFeet": 40,
+     "always": true
+    },
+    "weapon": {
+     "category": "martial",
+     "damageDice": "1d8",
+     "damageType": "slashing",
+     "rangeFeet": null,
+     "longRangeFeet": null,
+     "melee": true,
+     "versatileDice": "1d10",
+     "mastery": "sap",
+     "properties": [
+      "versatile"
+     ]
+    },
+    "replacesRiders": true
+   },
+   {
+    "id": "flame-shortsword",
+    "name": "Flaming Shortsword",
+    "modifiers": [
+     {
+      "type": "extra-damage",
+      "formula": "2d6",
+      "damageType": "fire",
+      "doubleOnCritical": true,
+      "when": [
+       {
+        "type": "on-hit"
+       }
+      ]
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "light": {
+     "brightFeet": 40,
+     "dimFeet": 40,
+     "always": true
+    },
+    "weapon": {
+     "category": "martial",
+     "damageDice": "1d6",
+     "damageType": "piercing",
+     "rangeFeet": null,
+     "longRangeFeet": null,
+     "melee": true,
+     "mastery": "vex",
+     "properties": [
+      "finesse",
+      "light"
+     ]
+    },
+    "replacesRiders": true
+   },
+   {
+    "id": "battleaxe",
+    "name": "Battleaxe",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "weapon": {
+     "category": "martial",
+     "damageDice": "1d8",
+     "damageType": "slashing",
+     "rangeFeet": null,
+     "longRangeFeet": null,
+     "melee": true,
+     "versatileDice": "1d10",
+     "mastery": "topple",
+     "properties": [
+      "versatile"
+     ]
+    }
+   },
+   {
+    "id": "spear",
+    "name": "Spear",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "weapon": {
+     "category": "simple",
+     "damageDice": "1d6",
+     "damageType": "piercing",
+     "rangeFeet": 20,
+     "longRangeFeet": 60,
+     "melee": true,
+     "versatileDice": "1d8",
+     "mastery": "sap",
+     "properties": [
+      "thrown",
+      "versatile"
+     ]
+    }
+   },
+   {
+    "id": "climbing-pole",
+    "name": "Climbing pole",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "weapon": null,
+    "replacesRiders": true
+   },
+   {
+    "id": "battering-ram",
+    "name": "Battering ram",
+    "modifiers": [
+     {
+      "type": "check-bonus",
+      "amount": 10,
+      "when": [
+       {
+        "type": "on-ability-check"
+       },
+       {
+        "type": "skill-is",
+        "skills": [
+         "athletics"
+        ]
+       },
+       {
+        "type": "situation-is",
+        "situation": "breaking through a door, barricade or other barrier"
+       }
+      ]
+     }
+    ],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "weapon": null,
+    "replacesRiders": true
+   }
+  ],
+  "variantChoice": {
+   "by": "holder",
+   "activation": "bonus-action"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
@@ -9073,7 +11848,12 @@
      "successDamage": "none",
      "failureConditions": [
       "charmed"
-     ]
+     ],
+     "failureDuration": {
+      "type": "minutes",
+      "minutes": 480
+     },
+     "endsOnSourceSideDamage": true
     }
    }
   ],
@@ -9130,7 +11910,22 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "roll-mode",
+    "roll": "check",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-ability-check"
+     },
+     {
+      "type": "situation-is",
+      "situation": "climbing the knotted rope"
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "rope-of-entanglement",
@@ -9200,15 +11995,87 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "lastChargeRoll": false,
+   "lastCharge": "destroyed"
+  },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "preserve-necromancy",
+    "name": "Preservation (Necromancy spell)",
+    "activation": "reaction",
+    "description": "When you fail a saving throw against a Necromancy spell, take a Reaction and expend 1 charge to succeed instead. The scarab crumbles into powder when its last charge is expended.",
+    "damage": [],
+    "uses": {
+     "limit": 12,
+     "per": "never",
+     "pool": "scarab-of-protection-charges"
+    },
+    "answer": {
+     "rolls": [
+      "save"
+     ],
+     "whose": "own",
+     "when": "failure",
+     "versus": {
+      "spellSchools": [
+       "necromancy"
+      ]
+     },
+     "effect": {
+      "kind": "succeed"
+     }
+    }
+   },
+   {
+    "id": "preserve-undead",
+    "name": "Preservation (Undead)",
+    "activation": "reaction",
+    "description": "When you fail a saving throw against a harmful effect originating from an Undead, take a Reaction and expend 1 charge to succeed instead. The scarab crumbles into powder when its last charge is expended.",
+    "damage": [],
+    "uses": {
+     "limit": 12,
+     "per": "never",
+     "pool": "scarab-of-protection-charges"
+    },
+    "answer": {
+     "rolls": [
+      "save"
+     ],
+     "whose": "own",
+     "when": "failure",
+     "versus": {
+      "creatureTypes": [
+       "undead"
+      ]
+     },
+     "effect": {
+      "kind": "succeed"
+     }
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {
     "type": "armor-class",
     "amount": 1,
     "whileArmored": false
+   },
+   {
+    "type": "roll-mode",
+    "roll": "save",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-saving-throw"
+     },
+     {
+      "type": "versus-spell"
+     }
+    ]
    }
   ]
  },
@@ -9237,6 +12104,7 @@
   },
   "cursed": false,
   "casts": [],
+  "bonusActionAttack": true,
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -9659,6 +12527,19 @@
       "kinds": [
        "spell"
       ]
+     }
+    ]
+   },
+   {
+    "type": "roll-mode",
+    "roll": "save",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-saving-throw"
+     },
+     {
+      "type": "versus-magic"
      }
     ]
    }
@@ -11193,7 +14074,8 @@
   "light": {
    "brightFeet": 15,
    "dimFeet": 15,
-   "sunlight": true
+   "sunlight": true,
+   "always": true
   },
   "weapon": {
    "category": "martial",
@@ -11220,6 +14102,30 @@
   },
   "cursed": false,
   "casts": [],
+  "variants": [
+   {
+    "id": "hilt",
+    "name": "Hilt only",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "weapon": null,
+    "replacesRiders": true
+   },
+   {
+    "id": "blade",
+    "name": "Blade of radiance",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": []
+   }
+  ],
+  "variantChoice": {
+   "by": "holder",
+   "activation": "bonus-action"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -11282,6 +14188,13 @@
   },
   "cursed": false,
   "casts": [],
+  "onHit": [
+   {
+    "conditions": [],
+    "naturalTwenty": true,
+    "reminder": "Sword of Life Stealing: unless the target is a Construct or an Undead, it takes an extra 15 Necrotic damage, and the wielder gains that many Temporary Hit Points."
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -11527,9 +14440,71 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "clap-of-thunder",
+    "name": "Clap of Thunder",
+    "activation": "action",
+    "description": "Strike the weapon against a hard surface: a clap audible out to 300 feet, and a 30-foot Cone of thunderous energy. Each creature in the Cone makes a DC 15 Strength saving throw or has the Prone condition. Nonmagical objects in it that aren't worn or carried take 3d8 Thunder damage.",
+    "damage": [],
+    "area": {
+     "shape": "cone",
+     "sizeFeet": 30,
+     "widthFeet": null
+    },
+    "save": {
+     "ability": "str",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [
+      "prone"
+     ]
+    }
+   },
+   {
+    "id": "earthquake",
+    "name": "Earthquake",
+    "activation": "action",
+    "description": "Strike the weapon against the ground: each creature on the ground in a 50-foot-radius circle centered on the point of impact makes a DC 20 Dexterity saving throw or has the Prone condition. A concentrating creature there also makes a DC 20 Constitution saving throw or its Concentration is broken. Structures on the ground there take 50 Bludgeoning damage, and a fissure can open (the GM's). It can't be used again until the next dawn.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 50,
+     "widthFeet": null
+    },
+    "save": {
+     "ability": "dex",
+     "dc": 20,
+     "successDamage": "none",
+     "failureConditions": [
+      "prone"
+     ]
+    }
+   }
+  ],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "ability-score-minimum",
+    "ability": "str",
+    "score": 20
+   },
+   {
+    "type": "extra-damage",
+    "formula": "1d8",
+    "damageType": "thunder",
+    "doubleOnCritical": true,
+    "when": [
+     {
+      "type": "on-hit"
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "tome-of-clear-thought",
@@ -12322,6 +15297,21 @@
    {
     "type": "spell-attack-bonus",
     "amount": 1
+   },
+   {
+    "type": "ignores-cover",
+    "degree": "half",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "spell"
+      ]
+     }
+    ]
    }
   ]
  },
@@ -12355,6 +15345,21 @@
    {
     "type": "spell-attack-bonus",
     "amount": 2
+   },
+   {
+    "type": "ignores-cover",
+    "degree": "half",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "spell"
+      ]
+     }
+    ]
    }
   ]
  },
@@ -12388,6 +15393,21 @@
    {
     "type": "spell-attack-bonus",
     "amount": 3
+   },
+   {
+    "type": "ignores-cover",
+    "degree": "half",
+    "when": [
+     {
+      "type": "on-attack-roll"
+     },
+     {
+      "type": "attack-kind-is",
+      "kinds": [
+       "spell"
+      ]
+     }
+    ]
    }
   ]
  },

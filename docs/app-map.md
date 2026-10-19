@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 154 commands · 330 HTTP paths
+- 14 GameState fields · 155 commands · 331 HTTP paths
 
 ## GameState shape
 
@@ -132,6 +132,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `initiative.roll-self` | `combat:write` |
 | `initiative.set` | `combat:write` |
 | `initiative.swap` | `combat:write` |
+| `item.set-form` | `combat:write` |
 | `item.set-light` | `combat:write` |
 | `light.add` | `scene:write` |
 | `light.move` | `scene:write` |
@@ -327,6 +328,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/inventory/give`
 - `POST /api/v1/game/actors/{actorId}/inventory/recover-ammunition`
 - `POST /api/v1/game/actors/{actorId}/inventory/study`
+- `POST /api/v1/game/actors/{actorId}/items/{itemId}/form`
 - `POST /api/v1/game/actors/{actorId}/items/{itemId}/light`
 - `POST /api/v1/game/actors/{actorId}/known-forms`
 - `POST /api/v1/game/actors/{actorId}/long-rest-request`
