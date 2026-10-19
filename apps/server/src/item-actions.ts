@@ -71,7 +71,8 @@ function usesOf(
     limit: Math.min(MAX_ACTION_USES, limit),
     per: uses.per,
     ...(uses.pool ? { pool: itemPool(item, uses.pool) } : {}),
-    ...("recharge" in uses && uses.recharge !== undefined ? { recharge: uses.recharge } : {})
+    ...("recharge" in uses && uses.recharge !== undefined ? { recharge: uses.recharge } : {}),
+    ...(uses.afterHours !== undefined ? { afterHours: uses.afterHours } : {})
   };
 }
 

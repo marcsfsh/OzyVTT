@@ -2,6 +2,7 @@ import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { EquipmentReference } from "@vtt/content-srd-5.2.1";
 import type { InventoryItem } from "@vtt/schemas";
 import { holdsFeature } from "../class-features.js";
+import { startTimedPool } from "../clock-pools.js";
 import { bindTemplateItem, reconcileEquipment } from "../inventory.js";
 import { chargePoolsOfRow, itemRowOfAction, lastChargeLine, lastChargeRollFor, rollRegain } from "../item-charges.js";
 import { recordRoll, type ResolveContext } from "./context.js";
@@ -57,6 +58,18 @@ export function rollLastCharge(ctx: ResolveContext): void {
   const { action, attacker, plan, deps, siblings, warnings } = ctx;
   if (!plan.spendUse || plan.spendUse.per === "turn") return;
   if (savedByUseMagicDevice(ctx)) return;
+  // A pool spent for a time starts its wait on its first use ("can't be used again until 1d12 hours have passed").
+  if (plan.spendUse.per === "time" && action.uses?.afterHours) {
+    const line = startTimedPool(
+      ctx.state,
+      attacker,
+      plan.spendUse.key,
+      action.name,
+      action.uses.afterHours,
+      deps.random
+    );
+    if (line) warnings.push(line);
+  }
   const due = lastChargeRollFor(action, attacker.inventory, deps.catalog);
   if (!due || (attacker.actionUses[plan.spendUse.key] ?? 0) < useLimitFor(siblings, action)) return;
   const charges = due.record.charges!;

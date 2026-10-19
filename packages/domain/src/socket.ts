@@ -165,6 +165,7 @@ import type {
   TableSetStagingDefaultsSchema,
   TempHpSchema,
   TimePassSchema,
+  TimeSetDawnSchema,
   TokenMoveSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
@@ -610,6 +611,11 @@ export interface ClientToServerEvents {
   /** GM-only: move game time forward. */
   "time:pass": (
     payload: CommandPayload<typeof TimePassSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: set the hour dawn comes, or let a Long Rest stand in for it. */
+  "time:set-dawn": (
+    payload: CommandPayload<typeof TimeSetDawnSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-slot": (

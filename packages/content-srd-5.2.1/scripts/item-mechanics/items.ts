@@ -1305,7 +1305,27 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //     bonus has no reader; the AC 15 + Dex base replacement and spell-save advantage are not expressible.
 
   // `robe-of-useful-items` - per-copy patches that become objects and creatures.
-  // `wings-of-flying` - Fly Speed with a rolled 1d12-hour cooldown.
+
+  // The wings last up to an hour and then can't be used for 1d12 hours, so the wait runs 1d12 + 1 hours from the
+  // use. Ending them early doesn't start the wait sooner. Falling when they disappear is the GM's.
+  "wings-of-flying": {
+    actions: [
+      {
+        id: "wings",
+        name: "Spread the Wings",
+        activation: "action",
+        description:
+          "Magic action: the cloak turns into a pair of wings on your back for 1 hour, giving you a Fly Speed of 60 feet. When the wings disappear, you can't use them again for 1d12 hours.",
+        uses: { limit: 1, per: "time", afterHours: "1d12+1" },
+        grants: {
+          name: "Wings of Flying",
+          tags: ["wings-of-flying"],
+          duration: { type: "minutes", minutes: 60 },
+          modifiers: [{ type: "special-speed", movement: "fly", feet: 60 }]
+        }
+      }
+    ]
+  },
 
   // ==== Carried wondrous items (slot wondrous), potions and oils ==================================
   //
@@ -1528,7 +1548,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `hat-of-many-spells` - a cast gated on an Arcana check outcome with a wild-magic table.
   // `horn-of-blasting` - authorable except its 20% chance to explode and damage the user; authoring
   //     only the blast would make it strictly better than printed.
-  // `horn-of-valhalla` - a 7-day cooldown, summoned berserkers, four metals in one row.
+
+  // The 7-day wait only. The spirits (2 to 5 Berserkers by the horn's metal) are placed by the GM, and the four
+  // metals share one row, so the requirement isn't checked.
+  "horn-of-valhalla": {
+    actions: [
+      {
+        id: "blow",
+        name: "Blow the Horn",
+        activation: "action",
+        description:
+          "Magic action: warrior spirits (Berserkers) appear within 60 feet of you for 1 hour: 2 from a silver horn, 3 from brass, 4 from bronze, 5 from iron. If you don't meet the horn's requirement, they attack you. The horn can't be used again until 7 days have passed.",
+        uses: { limit: 1, per: "time", afterHours: "168" }
+      }
+    ]
+  },
   // `horseshoes-of-a-zephyr` - movement and travel are not modeled.
   // `horseshoes-of-speed` - speed reaches nothing from an item, and it is worn by a horse.
   // `instant-fortress` - a building.

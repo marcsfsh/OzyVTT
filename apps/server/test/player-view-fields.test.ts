@@ -81,6 +81,7 @@ const OWNER = [
   "spellbook",
   "preparation",
   "restStep",
+  "readyAt",
   "inventory",
   "currency"
 ];

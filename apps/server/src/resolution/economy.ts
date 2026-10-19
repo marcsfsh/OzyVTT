@@ -661,7 +661,9 @@ export function noUsesRemaining(action: DefinitionAction, limit: number): string
         ? `spent · back at the start of its next turn`
         : uses.per === "never"
           ? `all ${limit} spent · they don't come back`
-          : `${limit}/${USE_SCOPE_LABELS[uses.per]}`
+          : uses.per === "time"
+            ? `spent · back after ${uses.afterHours} hours of game time`
+            : `${limit}/${USE_SCOPE_LABELS[uses.per]}`
   }).`;
 }
 

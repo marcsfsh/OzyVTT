@@ -557,6 +557,7 @@ const PLAYER_ACTOR_FIELDS = {
   healthDisplay: "derived",
   replaySceneId: "derived",
   actionUses: "derived",
+  readyAt: "derived",
   heroicInspiration: "derived",
   choiceOverrides: "derived",
   hitDice: "derived",
@@ -625,6 +626,7 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * the claim picker, and nothing more of its sheet.
  * | definition (the imported sheet)         |  Y   |  -  |       -        |     Y      |          Y          |
  * | actionUses, hitDice, heroicInspiration  |  Y   |  -  |       -        |     -      |          Y          |
+ * | readyAt (a timed pool's return)         |  Y   |  -  |       -        |     -      |          Y          |
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
  * | restStep (what a finished rest opened)  |  Y   |  -  |       -        |     -      |          Y          |
@@ -691,6 +693,7 @@ export function projectPlayerView(
         const {
           ownerSessionId,
           actionUses,
+          readyAt,
           heroicInspiration,
           choiceOverrides,
           hitDice,
@@ -742,6 +745,10 @@ export function projectPlayerView(
           ...(species !== null ? { species } : {}),
           ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
           ...(resourcesVisible ? { actionUses: { ...actionUses }, heroicInspiration } : {}),
+          // When a pool spent for a time comes back: the owner's own sheet resource, as its spent count is.
+          ...(resourcesVisible
+            ? { readyAt: Object.fromEntries(Object.entries(readyAt).map(([key, value]) => [key, { ...value }])) }
+            : {}),
           // Same gate as actionUses: a private sheet resource. Copied, never a live reference into GameState.
           ...(resourcesVisible
             ? {

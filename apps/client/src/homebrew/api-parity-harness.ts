@@ -912,6 +912,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "uses.afterHours",
+    types: "*",
+    reason:
+      "the hours of game time before uses spent for a time come back (Wings of Flying's 1d12) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "extraPicks[].**",
     types: "*",
     reason: "extra-pick rows beyond what the resolver reads: no rows control at feature scope",

@@ -1,5 +1,6 @@
 import { ROUNDS_PER_MINUTE, type GameState } from "@vtt/domain";
 import { ageEffects, type EffectNarration } from "./effects.js";
+import { dawnRegains, dawnsBetween, rearmTimedPools, type ClockDeps } from "./clock-pools.js";
 import { endZone } from "./spell-zone-state.js";
 
 /**
@@ -32,13 +33,20 @@ function creaturesInTime(state: GameState): Set<string> {
 
 /**
  * Moves the game clock `minutes` on, and counts the time down on every creature's effects (`ageEffects`). A spell
- * area of the running fight that lasts a set number of rounds ends once the time outlasts them. Returns what ended.
+ * area of the running fight that lasts a set number of rounds ends once the time outlasts them. A pool spent for a time
+ * comes back once it has passed, and with a dawn hour each dawn passed gives back what items regain at dawn
+ * (`clock-pools.ts`, which rolls with `deps`). Returns what ended and came back.
  */
-export function passGameTime(state: GameState, minutes: number): EffectNarration[] {
+export function passGameTime(state: GameState, minutes: number, deps?: ClockDeps): EffectNarration[] {
   if (minutes <= 0) return [];
-  const total = Math.min(CLOCK_LIMIT_MINUTES, clockMinutesOf(state) + minutes);
+  const before = clockMinutesOf(state);
+  const total = Math.min(CLOCK_LIMIT_MINUTES, before + minutes);
   state.rest = { ...state.rest, clockHours: Math.floor(total / 60), clockMinutes: total % 60 };
-  const events = ageEffects(state, creaturesInTime(state), minutes);
+  const inTime = creaturesInTime(state);
+  const events = ageEffects(state, inTime, minutes);
+  events.push(...rearmTimedPools(state, inTime));
+  if (state.rest.dawnHour !== null && deps)
+    events.push(...dawnRegains(state, inTime, dawnsBetween(before, total, state.rest.dawnHour), deps));
   for (const zone of [...state.combat.spellZones]) {
     if (zone.rounds === null) continue;
     const left = zone.rounds - (state.combat.round - zone.startedRound);

@@ -15,6 +15,7 @@ import {
   type EffectNarration
 } from "./effects.js";
 import { passGameTime } from "./game-time.js";
+import { dawnPoolKeys, timedSpent, type ClockDeps } from "./clock-pools.js";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { openPreparation } from "./spellcasting.js";
 import { healActor } from "./hit-points.js";
@@ -222,11 +223,17 @@ export function applyRest(
   actor.deathSaves = null;
   removeConditionDirect(actor, "unconscious");
   const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
-  if (charges) {
+  // A pool spent for a time waits on the clock, not the rest (a Horn of Valhalla's 7 days); with a dawn hour, what
+  // an item regains at dawn waits for the clock's dawn too.
+  const waiting: Record<string, number> = timedSpent(actor);
+  if (state.rest.dawnHour !== null)
+    for (const key of dawnPoolKeys(actor, longRestDefinition, catalog))
+      if ((actor.actionUses[key] ?? 0) > 0) waiting[key] = actor.actionUses[key]!;
+  if (charges && state.rest.dawnHour === null) {
     const dawn = chargesAfterDawn(actor, longRestDefinition, catalog, charges.random);
-    actor.actionUses = dawn.stillSpent;
+    actor.actionUses = { ...dawn.stillSpent, ...waiting };
     charges.lines.push(...dawn.lines);
-  } else actor.actionUses = neverRegained(actor, longRestDefinition, catalog);
+  } else actor.actionUses = { ...neverRegained(actor, longRestDefinition, catalog), ...waiting };
   reduceExhaustion(actor);
   actor.lastLongRestAt = state.rest.clockHours;
   // Rested, by whatever path: nothing left to ask the GM for.
@@ -349,7 +356,11 @@ export function startPartyRest(
     state.rest = { ...state.rest, shortRest: { actorIds: [...actorIds], done: [] } };
     return [];
   }
-  const events = passGameTime(state, LONG_REST_MINUTES);
+  const events = passGameTime(
+    state,
+    LONG_REST_MINUTES,
+    random ? { resolveDefinition, ...(catalog ? { catalog } : {}), random } : undefined
+  );
   events.push(...members.flatMap((actor) => longRest(state, actor.id, resolveDefinition, catalog, random, true)));
   for (const actor of members) actor.lastLongRestAt = state.rest.clockHours;
   return events;
@@ -394,7 +405,8 @@ export function finishPartyShortRest(
   state: GameState,
   apply: boolean,
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
-  catalog?: EquipmentCatalog
+  catalog?: EquipmentCatalog,
+  random?: (sides: number) => number
 ): Readonly<{ events: EffectNarration[]; rested: string[] }> {
   const rest = state.rest.shortRest;
   if (!rest) throw new CommandRejectedError("No Short Rest is under way.");
@@ -414,11 +426,18 @@ export function finishPartyShortRest(
     events.push(...applyRest(state, actorId, "short", resolveDefinition, catalog, undefined, true));
     rested.push(actor.name);
   }
-  events.push(...passGameTime(state, SHORT_REST_HOURS * 60));
+  events.push(
+    ...passGameTime(
+      state,
+      SHORT_REST_HOURS * 60,
+      random ? { resolveDefinition, ...(catalog ? { catalog } : {}), random } : undefined
+    )
+  );
   return { events, rested };
 }
 
-/** The GM moves game time forward by hours and minutes, and what runs out in that time ends (`passGameTime`). */
-export function passTime(state: GameState, hours: number, minutes = 0): EffectNarration[] {
-  return passGameTime(state, hours * 60 + minutes);
+/** The GM moves game time forward by hours and minutes, and what runs out in that time ends (`passGameTime`); with
+ *  `deps`, what comes back on the clock does too. */
+export function passTime(state: GameState, hours: number, minutes = 0, deps?: ClockDeps): EffectNarration[] {
+  return passGameTime(state, hours * 60 + minutes, deps);
 }

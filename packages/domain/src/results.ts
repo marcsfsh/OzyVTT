@@ -361,7 +361,7 @@ export const ActionAvailabilitySchema = z.strictObject({
     .int()
     .nullable()
     .describe("Total limited uses including any item that raised the pool; null when unlimited"),
-  usesPer: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge", "never"]).nullable(),
+  usesPer: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge", "never", "time"]).nullable(),
   usesPool: z.string().nullable().describe("Shared pool key; actions naming one pool spend one counter"),
   /** How many uses one activation spends when it is more than one, or `chosen` when the user picks it each time. */
   useCost: z.union([z.number().int(), z.literal("chosen")]).nullable(),

@@ -15,6 +15,7 @@ import {
   EffectGrantSchema,
   GrantWhenSchema,
   HitDieSchema,
+  HoursSchema,
   ModifierSchema,
   PickBudgetScalingSchema,
   SaveFailureEffectSchema,
@@ -114,9 +115,13 @@ export const FeatureUsesSchema = z
       .optional()
       .describe("The four ways 5e actually scales a feature's uses."),
     /** "own-turn": back at the start of the bearer's next turn ("until the start of your next turn"); "never": spent
-     *  for good (a Necklace of Fireballs' beads, a Ring of Three Wishes). */
-    per: z.enum(["turn", "own-turn", "encounter", "short-rest", "long-rest", "never"]),
-    pool: ContentIdSchema.optional().describe("Shares one counter across every feature carrying the same pool id")
+     *  for good (a Necklace of Fireballs' beads, a Ring of Three Wishes); "time": back once `afterHours` of game time
+     *  pass from its first use (Wings of Flying's 1d12 hours). */
+    per: z.enum(["turn", "own-turn", "encounter", "short-rest", "long-rest", "never", "time"]),
+    pool: ContentIdSchema.optional().describe("Shares one counter across every feature carrying the same pool id"),
+    afterHours: HoursSchema.optional().describe(
+      'With per "time": the hours of game time after its first use that it comes back, rolled then (Wings of Flying: 1d12; Horn of Valhalla: 168)'
+    )
   })
   .strict()
   .superRefine((uses, context) => {
@@ -124,6 +129,12 @@ export const FeatureUsesSchema = z
       context.addIssue({
         code: "custom",
         message: "Limited uses need either a flat `limit` or a `scaling` rule."
+      });
+    if ((uses.per === "time") !== (uses.afterHours !== undefined))
+      context.addIssue({
+        code: "custom",
+        path: ["afterHours"],
+        message: "Uses that come back after a time need the hours (afterHours), and only they take them."
       });
   })
   .describe(

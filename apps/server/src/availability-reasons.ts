@@ -8,6 +8,7 @@ import type { DefinitionAction, LiveActor } from "./resolution/context.js";
 import { hitRiderOf } from "./resolution/hit-riders.js";
 import { markMoveOf } from "./resolution/marks.js";
 import { familyOf, type RuleId } from "./rules-families.js";
+import { readyIn } from "./clock-pools.js";
 
 /**
  * What the sheet says about an option it can't use now, and which options stay off the turn list. The availability
@@ -41,6 +42,12 @@ function usesReason({ state, attacker, action, siblings }: ReasonFacts): string 
     uses.per === "turn" ? (state.combat.turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
   if (spent < useLimitFor(siblings, action)) return "Not enough uses left.";
   if (uses.per === "never") return "No uses left, and they don't come back.";
+  if (uses.per === "time") {
+    const wait = readyIn(state, attacker, key);
+    return wait
+      ? `No uses left. It can be used again in ${wait} of game time.`
+      : "No uses left until enough game time passes.";
+  }
   return uses.per === "turn" ? "No uses left this turn." : `No uses left ${USES_COME_BACK[uses.per]}.`;
 }
 

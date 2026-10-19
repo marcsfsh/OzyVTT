@@ -1,10 +1,11 @@
 import { useState } from "react";
 import type { ContentActionSummary } from "@vtt/domain";
 import { Button, GmOnlyTag, Stepper, useToast } from "@vtt/ui";
+import { afterWords } from "../encounter/action-summary";
 import { command } from "../lib/command";
 
 /** One limited-use pool as the server counts it: its key, its name, its largest limit and when it comes back. */
-export type Pool = Readonly<{ id: string; name: string; limit: number; per: string }>;
+export type Pool = Readonly<{ id: string; name: string; limit: number; per: string; afterHours?: string }>;
 
 const titleOf = (slug: string) =>
   slug
@@ -28,6 +29,7 @@ export function poolsOf(actions: readonly ContentActionSummary[]): Pool[] {
       name: action.id === id ? action.name : known ? (known.named ? known.name : titleOf(id)) : action.name,
       limit: Math.max(known?.limit ?? 0, action.usesLimit),
       per: action.usesPer,
+      ...(action.usesAfterHours !== undefined ? { afterHours: action.usesAfterHours } : {}),
       named
     });
   }
@@ -35,7 +37,7 @@ export function poolsOf(actions: readonly ContentActionSummary[]): Pool[] {
 }
 
 /** When a pool's uses come back, as the sheet says it. */
-export const returnsWords = (per: string) =>
+export const returnsWords = (per: string, afterHours?: string) =>
   per === "long-rest"
     ? "Back on a Long Rest"
     : per === "short-rest"
@@ -48,7 +50,9 @@ export const returnsWords = (per: string) =>
             ? "Recharges"
             : per === "never"
               ? "Doesn't come back"
-              : per;
+              : per === "time"
+                ? `Back ${afterWords(afterHours)} after its first use`
+                : per;
 
 /** Uses left as boxes, the filled ones still to spend; a long pool (Lay on Hands' points) reads as a count. */
 export function UseBoxes({ left, limit, label }: Readonly<{ left: number; limit: number; label?: string }>) {
@@ -114,7 +118,7 @@ export function UseRow({
           {cost && <span className="cs-use-cost"> · {cost}</span>}
         </strong>
         <span className="cs-sub">
-          {returnsWords(pool.per)}
+          {returnsWords(pool.per, pool.afterHours)}
           {detail ? ` · ${detail}` : ""}
         </span>
       </span>

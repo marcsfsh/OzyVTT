@@ -499,7 +499,7 @@ export const ParkedCastSchema = z
     use: z
       .object({
         key: z.string().min(1).max(120),
-        per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge", "never"]),
+        per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge", "never", "time"]),
         amount: z.number().int().min(1).max(100)
       })
       .strict()
@@ -1197,6 +1197,9 @@ export const RestStateSchema = z
     clockMinutes: z.number().int().min(0).max(59).default(0),
     /** Characters whose players asked for a Long Rest, oldest first. */
     requests: z.array(z.uuid()).max(50).default([]),
+    /** The hour of the day dawn comes, when the GM keeps the clock: what "regains at dawn" (a wand's charges) comes
+     *  back as the clock passes it. Null: at each Long Rest. GM-set. */
+    dawnHour: z.number().int().min(0).max(23).nullable().default(null),
     shortRest: PartyShortRestSchema.nullable().default(null)
   })
   .strict();

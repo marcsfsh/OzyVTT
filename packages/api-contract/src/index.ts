@@ -283,6 +283,7 @@ export const GAME_PATHS = {
   restMarkDone: `${API_NAMESPACE}/game/rests/party/{actorId}/done`,
   restFinish: `${API_NAMESPACE}/game/rests/party/finish`,
   timePass: `${API_NAMESPACE}/game/time/pass`,
+  timeSetDawn: `${API_NAMESPACE}/game/time/dawn`,
   characterSetSlot: `${API_NAMESPACE}/game/actors/{actorId}/spell-slot`,
   characterSetPrepared: `${API_NAMESPACE}/game/actors/{actorId}/prepared-spell`,
   characterFinishPreparing: `${API_NAMESPACE}/game/actors/{actorId}/finish-preparing`,
@@ -697,6 +698,7 @@ export const GAME_COMMANDS = {
   "rest.mark-done": { scope: "actor:write", method: "post", path: GAME_PATHS.restMarkDone },
   "rest.finish": { scope: "actor:write", method: "post", path: GAME_PATHS.restFinish },
   "time.pass": { scope: "combat:write", method: "post", path: GAME_PATHS.timePass },
+  "time.set-dawn": { scope: "combat:write", method: "post", path: GAME_PATHS.timeSetDawn },
   "character.set-slot": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetSlot },
   "character.set-prepared": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetPrepared },
   "character.finish-preparing": {

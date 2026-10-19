@@ -73,6 +73,7 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
       number
     >;
     /** Whether the character holds Heroic Inspiration. Same gate as `actionUses`. */ heroicInspiration?: boolean;
+    /** When each pool spent for a time comes back (game-clock minute). Same gate as `actionUses`. */ readyAt?: Actor["readyAt"];
     /** Picks re-made on a rest, keyed by offer key (Circle of the Land's land type). Same gate as `actionUses`. */ choiceOverrides?: Record<
       string,
       { id: string; per: "short-rest" | "long-rest" }

@@ -35,7 +35,8 @@ import {
   RestAskSchema,
   RestMarkDoneSchema,
   RestPartySchema,
-  TimePassSchema
+  TimePassSchema,
+  TimeSetDawnSchema
 } from "@vtt/domain/commands";
 import { ToastProvider } from "@vtt/ui";
 import { socket } from "../socket";
@@ -201,7 +202,23 @@ describe("the GM's rest panel", () => {
     );
     await user.click(screen.getByRole("button", { name: "Rest" }));
     expect(await screen.findByRole("button", { name: "Set the date" })).toBeTruthy();
-    expect(screen.getByText("09:00")).toBeTruthy();
+    expect(screen.getByText("09:00", { selector: "p" })).toBeTruthy();
+  });
+
+  it("sets the hour dawn comes, or leaves it to each Long Rest", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <PartyRest state={gmView({ dawnHour: null })} />
+      </ToastProvider>
+    );
+    await user.click(screen.getByRole("button", { name: "Rest" }));
+    const dawn = screen.getByLabelText("Dawn");
+    expect((dawn as HTMLSelectElement).value).toBe("");
+    await user.selectOptions(dawn, "06:00");
+    const [event, payload] = emitted().at(-1)!;
+    expect(event).toBe("time:set-dawn");
+    expect(TimeSetDawnSchema.parse({ ...payload, ...COMMAND })).toMatchObject({ hour: 6 });
   });
 });
 

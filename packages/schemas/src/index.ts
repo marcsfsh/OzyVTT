@@ -1277,6 +1277,14 @@ export const ActorSchema = z.object({
   deathSaves: DeathSavesSchema.nullable().default(null),
   /** Spent limited-use counts by action id. */
   actionUses: z.record(z.string(), z.number().int().nonnegative()).default({}),
+  /** When each spent pool that comes back after a time is ready again (Wings of Flying's 1d12 hours): the game-clock
+   *  minute, and the pool's name for the line the table reads. Keyed as `actionUses`. Owner-only. */
+  readyAt: z
+    .record(
+      z.string(),
+      z.object({ minute: z.number().int().min(0).max(1_000_000_000), name: z.string().min(1).max(120) }).strict()
+    )
+    .default({}),
   /** SRD Heroic Inspiration: held or not (never more than one). Spent to reroll one die; the GM gives it, and a Human
    * gains it on finishing a Long Rest. */
   heroicInspiration: z.boolean().default(false),
@@ -1506,13 +1514,19 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
 export const MAX_ACTION_USES = 100;
 
+/** Hours of game time, as the SRD prints a wait: dice ("1d12") or a number ("168" for 7 days). */
+export const HoursSchema = z
+  .string()
+  .regex(/^(?:\d+d(?:4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?|\d{1,4})$/i, "Use hours as dice such as 1d12, or a number.");
+
 /** Limited uses. "turn"/"encounter"/rests reset as named; "own-turn" at the start of the bearer's next turn ("you
- * can't use it again until the start of your next turn"); "recharge" on a start-of-turn d6 >= `recharge`.
+ * can't use it again until the start of your next turn"); "recharge" on a start-of-turn d6 >= `recharge`; "never"
+ * never comes back; "time" once `afterHours` of game time pass from its first use (Wings of Flying's 1d12 hours).
  * `pool` shares one counter across actions (Sneak Attack once per turn regardless of weapon). */
 export const ActionUsesSchema = z
   .object({
     limit: z.number().int().min(1).max(MAX_ACTION_USES),
-    per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge", "never"]),
+    per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge", "never", "time"]),
     pool: z
       .string()
       .regex(/^[a-z0-9-]+$/)
@@ -1521,10 +1535,19 @@ export const ActionUsesSchema = z
       .describe(
         "Shares one counter across actions carrying the same pool id (Sneak Attack once per turn regardless of weapon)"
       ),
-    recharge: z.number().int().min(2).max(6).optional().describe('The d6 threshold, e.g. 5 for "Recharge 5-6"')
+    recharge: z.number().int().min(2).max(6).optional().describe('The d6 threshold, e.g. 5 for "Recharge 5-6"'),
+    afterHours: HoursSchema.optional().describe(
+      'With per "time": the hours of game time after its first use that it comes back, rolled then (Wings of Flying: 1d12)'
+    )
   })
   .strict()
   .superRefine((uses, context) => {
+    if ((uses.per === "time") !== (uses.afterHours !== undefined))
+      context.addIssue({
+        code: "custom",
+        path: ["afterHours"],
+        message: "Uses that come back after a time need the hours (afterHours), and only they take them."
+      });
     if (uses.per === "recharge" && uses.recharge === undefined)
       context.addIssue({
         code: "custom",

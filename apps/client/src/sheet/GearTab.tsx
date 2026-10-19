@@ -28,7 +28,14 @@ const words = (slug: string) => slug.split("-").map(titleCase).join(" ");
 const itemActions = (item: InventoryItem, serverActions: readonly ContentActionSummary[]) =>
   serverActions.filter((row) => row.id === `item-${item.id}` || row.id.startsWith(`item-${item.id}-`));
 
-type ChargePool = Readonly<{ pool: string; name: string; left: number; limit: number; per: string }>;
+type ChargePool = Readonly<{
+  pool: string;
+  name: string;
+  left: number;
+  limit: number;
+  per: string;
+  afterHours?: string;
+}>;
 
 /** An item's charge pools, each with what is left: one its casts share ("Charges"), or a property's own (Staff of
  *  Thunder and Lightning's once-a-day Lightning). */
@@ -44,6 +51,7 @@ function chargePoolsOf(rows: readonly ContentActionSummary[], spent: Readonly<Re
       left: Math.max(0, Math.max(known?.limit ?? 0, row.usesLimit) - (spent[pool] ?? 0)),
       limit: Math.max(known?.limit ?? 0, row.usesLimit),
       per: row.usesPer ?? "long-rest",
+      ...(row.usesAfterHours !== undefined ? { afterHours: row.usesAfterHours } : {}),
       spenders: (known?.spenders ?? 0) + 1
     });
   }
@@ -244,7 +252,7 @@ export function GearTab({
                   {charges.name === "Charges"
                     ? `${charges.left} of ${charges.limit} charges left`
                     : `${charges.name} · ${charges.left} of ${charges.limit} left`}{" "}
-                  · {returnsWords(charges.per)}
+                  · {returnsWords(charges.per, charges.afterHours)}
                 </span>
               </p>
             ))}
@@ -354,7 +362,9 @@ export function GearTab({
                     action.usesLimit !== null && action.usesLimit - (spent[action.usesPool ?? action.id] ?? 0) <= 0;
                   const why =
                     facts.get(action.id)?.reason ??
-                    (empty ? `No charges left. ${returnsWords(action.usesPer ?? "long-rest")}.` : null);
+                    (empty
+                      ? `No charges left. ${returnsWords(action.usesPer ?? "long-rest", action.usesAfterHours)}.`
+                      : null);
                   return (
                     <span key={action.id} className="cs-item-action">
                       <Button

@@ -1154,6 +1154,14 @@ export const TimePassSchema = z
   })
   .strict()
   .refine((request) => request.hours > 0 || request.minutes > 0, "Choose at least 1 minute.");
+/** The hour of the day dawn comes on the game clock, or null for a Long Rest to stand in for the day. */
+export const TimeSetDawnSchema = z
+  .object({
+    commandId: z.uuid(),
+    hour: z.number().int().min(0).max(23).nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetSlotSchema = z
   .object({
     commandId: z.uuid(),

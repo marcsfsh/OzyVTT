@@ -315,7 +315,8 @@ function interpretAction(
       assembled.uses = {
         limit: Math.min(MAX_ACTION_USES, limit),
         per: feature.uses.per,
-        ...(feature.uses.pool ? { pool: feature.uses.pool } : {})
+        ...(feature.uses.pool ? { pool: feature.uses.pool } : {}),
+        ...(feature.uses.afterHours ? { afterHours: feature.uses.afterHours } : {})
       };
     }
   }
@@ -558,7 +559,12 @@ function interpretFeature(
   const carriesUses = feature.uses !== undefined && synthesizedUses >= 1;
   // The counter of a free-cast grant (Divine Smite once per Long Rest) rides its spell's free-cast action instead.
   const freeUses: ActorAction["uses"] | undefined = carriesUses
-    ? { limit: synthesizedUses, per: feature.uses!.per, pool: owned(feature.uses!.pool ?? feature.id) }
+    ? {
+        limit: synthesizedUses,
+        per: feature.uses!.per,
+        pool: owned(feature.uses!.pool ?? feature.id),
+        ...(feature.uses!.afterHours ? { afterHours: feature.uses!.afterHours } : {})
+      }
     : undefined;
   const freeCastGrant = feature.grants?.spells.some((spell) => spell.withoutSlot === "free") === true;
   // A spell picked for a feature with limited uses is cast with them (Magic Initiate once per Long Rest, Mystic
@@ -583,7 +589,8 @@ function interpretFeature(
             uses: {
               limit: synthesizedUses,
               per: feature.uses!.per,
-              ...(feature.uses!.pool ? { pool: owned(feature.uses!.pool) } : {})
+              ...(feature.uses!.pool ? { pool: owned(feature.uses!.pool) } : {}),
+              ...(feature.uses!.afterHours ? { afterHours: feature.uses!.afterHours } : {})
             }
           }
         : {})

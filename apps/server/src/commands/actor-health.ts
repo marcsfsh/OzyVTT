@@ -447,17 +447,18 @@ export const actorHealthCommands = [
     malformed: "The spend is malformed.",
     async run({ principal, request, execute }, kit) {
       const { actorId, poolId, amount } = request;
-      let spent = { name: "", left: 0 };
+      let spent: { name: string; left: number; line: string | null } = { name: "", left: 0, line: null };
       const { duplicate } = await execute((state) => {
         spent = spendUses(state, actorId, poolId, amount, initiatorOf(principal), {
           resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
-          catalog: kit.equipmentCatalog()
+          catalog: kit.equipmentCatalog(),
+          random: (sides) => kit.context.random(sides)
         });
       });
       if (duplicate) return;
       kit.context.appendLog({
         kind: "action",
-        text: `${kit.actorName(actorId)} spends ${amount} of ${spent.name} (${spent.left} left).`,
+        text: `${kit.actorName(actorId)} spends ${amount} of ${spent.name} (${spent.left} left).${spent.line ? ` ${spent.line}` : ""}`,
         actorIds: [actorId],
         gmOnly: kit.actorHidden(actorId)
       });
