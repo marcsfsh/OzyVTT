@@ -322,6 +322,18 @@ it Prone, and Fire damage on an oiled creature within the minute deals 5 more. A
 Poison are effects the item grants its user; a coat's damage lasts a set number of hits (`damageUses`), in a fight
 or out of one.
 
+Every spell a sheet or stat block knows is a cast action (`character-build.ts`, `monster-spells.ts`), so even
+one with nothing to roll (Light) spends its casting time and slot, holds its Concentration, places its area and is
+told to the table as cast (`cast-narration.ts`). Before anything is spent the economy checks the cast's components
+(`resolution/components.ts`: speech outside Silence, a free hand, a pouch, a focus the class names or a priced
+material the content build lists on the spell) and its targets (`resolution/spell-targets.ts`: the count the spell
+names, its creature type, sight with dynamic vision on, range, and for creatures of the caster's choice in an area,
+the area). A cast with components waits while a creature that sees it may answer with Counterspell
+(`resolution/counter.ts`, `counter-answers.ts`), and a reaction spell's prompt lets its caster pick the slot. A
+creature's own spell of a minute or more takes the action on each of its turns in a fight and resolves on the last
+(`resolution/long-casting.ts`). Outside a fight a creature's own cast resolves through the same path with no turn to
+spend, and a long one moves the game clock by its whole hours; an item's cast there stays on the loose route.
+
 What a save does is data on the action's save block: `successDamage` (half or none) and the
 `failureCondition` a failed save imposes. Nothing parses the description for it. They are written where the content
 is made (the SRD build, the builder, homebrew) and copied onto the pending save prompt.
