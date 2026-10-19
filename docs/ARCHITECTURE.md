@@ -403,7 +403,10 @@ mastery property a mastered weapon swing carries (`weapon-masteries.ts`). The se
 pins (`character.set-favourites`) and counts each option that resolves for it (`option-uses.ts`), a bounded map.
 
 Every ability check, from a sheet chip, a builtin action or the GM's call for a roll, comes from one plan
-(`checkPlan` in `ability-checks.ts`), so the number a sheet shows is the roll the server makes. A die a
+(`checkPlan` in `ability-checks.ts`), so the number a sheet shows is the roll the server makes. Gear that helps a
+check only in a situation (a Book's topic, a Crowbar's leverage) carries a rider gated on `situation-is`: the
+derived sheet lists each situation (`check-situations.ts`), the sheet offers it as a toggle, and only a `check.roll`
+that names it gets the rider, its words added to the roll's name for the GM to judge. A die a
 player sees before it counts (a previewed attack, save or death save) is held on the server
 (`held-rolls.ts`, ADR-0012): a second look shows the same die, and a reroll needs Heroic Inspiration or an
 answer. An answer is data on an action, a grant or an effect (`RollAnswerSchema`): what a roll may take after it

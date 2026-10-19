@@ -12,7 +12,6 @@ import {
   type DiceResolution,
   type RandomSource,
   type ResolvedRider,
-  type RiderAbility,
   type ThrownDie
 } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
@@ -23,6 +22,7 @@ import {
   checkRiderBonus,
   effectiveSkillTier,
   rollModeClaims,
+  type CheckNarrow,
   type EquipmentDerivation,
   type RollModeClaims
 } from "./equipment-derivation.js";
@@ -33,22 +33,20 @@ import {
 /** The rider-claimed Advantage and Disadvantage for one ability check: every carrier's `roll-mode {roll: "check"}`
  *  riders, standing and `on-ability-check`, narrowed by `ability-is` and `skill-is` (Rage's Strength checks, Boots of
  *  Elvenkind, armor's Stealth). Conditions and the check's own circumstances are added by `checkPlan`. */
-export function checkRollMode(
-  derivation: EquipmentDerivation,
-  narrow: Readonly<{ ability?: RiderAbility; skill?: string }> = {}
-): AggregatedRollMode {
+export function checkRollMode(derivation: EquipmentDerivation, narrow: CheckNarrow = {}): AggregatedRollMode {
   const claims = checkRiderClaims(derivation, narrow);
   return aggregateRollMode(claims.advantage, claims.disadvantage);
 }
 
 function checkRiderClaims(
   derivation: EquipmentDerivation,
-  narrow: Readonly<{ ability?: RiderAbility; skill?: string }>,
+  narrow: CheckNarrow,
   stakes: readonly string[] = []
 ): RollModeClaims {
   return rollModeClaims(derivation, ["check"], "on-ability-check", {
     ...(narrow.ability !== undefined ? { ability: narrow.ability } : {}),
     ...(narrow.skill !== undefined ? { skill: narrow.skill } : {}),
+    ...(narrow.situations !== undefined ? { situations: narrow.situations } : {}),
     // The conditions the check would end (escaping a grapple: Grappled), for a `versus-condition` rider.
     ...(stakes.length > 0 ? { targetConditionIds: stakes } : {})
   });
@@ -76,7 +74,7 @@ export type CheckSight = Readonly<{
 export function abilityCheckClaims(
   actor: Actor,
   derivation: EquipmentDerivation,
-  narrow: Readonly<{ ability?: RiderAbility; skill?: string }>,
+  narrow: CheckNarrow,
   warded: readonly string[] = [],
   stakes: readonly string[] = [],
   sight: CheckSight = {}
@@ -196,6 +194,8 @@ export type CheckContext = Readonly<{
   stakes?: readonly string[];
   /** What sight decides about it (Frightened's line of sight, the light, how obscured `finding` is). */
   sight?: CheckSight;
+  /** The situations the roller says it fits (a Book's topic, a Crowbar's leverage), for `situation-is` riders. */
+  situations?: readonly string[];
 }>;
 
 /** The flat part of a skill check (SRD Skills, Expertise, Jack of All Trades): a GM-typed total, else the stat block's
@@ -268,7 +268,11 @@ function plainCheckPlan(
   subject: CheckSubject,
   context: CheckContext
 ): CheckPlan {
-  const narrow = { ability: subject.ability, ...(subject.skill !== undefined ? { skill: subject.skill } : {}) };
+  const narrow = {
+    ability: subject.ability,
+    ...(subject.skill !== undefined ? { skill: subject.skill } : {}),
+    ...(context.situations !== undefined && context.situations.length > 0 ? { situations: context.situations } : {})
+  };
   const toolProficient = subject.tool !== undefined && toolProficiencies(definition, derivation).includes(subject.tool);
   const { base, proficient } =
     subject.skill !== undefined
@@ -317,7 +321,7 @@ function plainCheckPlan(
   const riders = [...standing, ...atCheck];
   return {
     subject,
-    label: checkLabel(subject, context.names),
+    label: `${checkLabel(subject, context.names)}${namedSituations(atCheck)}`,
     modifier: base + checkRiderBonus(derivation, narrow, definition?.abilityScores) + exhaustion,
     exhaustion,
     rollMode: aggregateRollMode(claims.advantage, claims.disadvantage),
@@ -328,6 +332,16 @@ function plainCheckPlan(
     totalMinimum: totalMinimumOf(riders, "check", definition),
     ...(autoFails !== undefined ? { autoFails } : {})
   };
+}
+
+/** The situations that gave this check a rider, as words after its name (", consulting an accurate Book about its
+ *  topic"), so the GM sees what the roller claimed. */
+function namedSituations(riders: readonly ResolvedRider[]): string {
+  const named = new Set<string>();
+  for (const rider of riders)
+    for (const trigger of rider.modifier.when ?? [])
+      if (trigger.type === "situation-is" && trigger.situation !== undefined) named.add(trigger.situation);
+  return [...named].map((situation) => `, ${situation}`).join("");
 }
 
 /** The highest face a `d20-minimum` rider on this roll raises a lower d20 to, and the carrier that says so; one marked

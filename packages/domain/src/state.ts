@@ -438,7 +438,9 @@ export const HeldRollSchema = z
         /** The GM's forced mode, which a reroll keeps. */
         rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
         callId: z.uuid().optional(),
-        findActorId: z.uuid().optional()
+        findActorId: z.uuid().optional(),
+        /** The situations the roller said it fits, which a reroll or an answer keeps. */
+        situations: z.array(z.string().min(3).max(80)).max(6).optional()
       })
       .strict()
       .optional(),

@@ -57,7 +57,8 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
   "spell-class-is": "A spell of one class",
   "sees-other": "You can see the other creature",
   "seen-by-other": "The other creature can see you",
-  "other-lacks-sense": "The other creature lacks a sense"
+  "other-lacks-sense": "The other creature lacks a sense",
+  "situation-is": "A situation the roller names"
 };
 
 /** Read only on an effect the engine puts on another creature (Hunter's Mark, Bestow Curse), or authored only by the
@@ -128,6 +129,8 @@ function blankTrigger(type: string): Draft {
       return { type, feet: 5 };
     case "spell-class-is":
       return { type, classIds: [] };
+    case "situation-is":
+      return { type, situation: "" };
     default:
       return { type };
   }
@@ -178,6 +181,7 @@ function triggerRowLabel(row: Draft): string {
   if (values.length > 0) return `${name} · ${values.slice(0, 3).join(", ")}${values.length > 3 ? "…" : ""}`;
   if (typeof row.percent === "number") return `${name} · ${row.percent}% or less`;
   if (typeof row.feet === "number") return `${name} · ${row.feet} ft`;
+  if (typeof row.situation === "string" && row.situation.trim() !== "") return `${name} · ${row.situation.trim()}`;
   if (row.type === "while-shield") return row.wielding === false ? "Not holding a shield" : name;
   return name;
 }
@@ -383,6 +387,14 @@ export const whenField = (): FieldDef => ({
       unit: "ft",
       visibleWhen: hasType("versus-within"),
       help: "Measured on the map. Where the map can't measure, it doesn't apply."
+    },
+    {
+      key: "situation",
+      label: "Situation",
+      kind: "text",
+      placeholder: "consulting the book about its topic",
+      visibleWhen: hasType("situation-is"),
+      help: "Plain words that follow the check's name after a comma. The sheet offers it as a toggle beside the checks, and the GM decides whether a roll fits."
     }
   ]
 });

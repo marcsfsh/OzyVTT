@@ -72,7 +72,8 @@ const FILTERS: ReadonlySet<string> = new Set([
   "spell-class-is",
   "sees-other",
   "seen-by-other",
-  "other-lacks-sense"
+  "other-lacks-sense",
+  "situation-is"
 ]);
 const DYNAMIC_GATES: ReadonlySet<string> = new Set(["while-effect-tag", "while-hp-at-or-below", "while-condition"]);
 
@@ -111,6 +112,8 @@ export type RiderTrigger = Readonly<{
   /** `versus-within`: the farthest the target may stand from the bearer. */
   feet?: number;
   senses?: readonly string[];
+  /** `situation-is`: the plain words the roller names a check by ("consulting an accurate Book about its topic"). */
+  situation?: string;
 }>;
 
 /** A typed numeric rider, structurally open so each consumer reads only its fields and a variant this build
@@ -247,6 +250,8 @@ export type RiderContext = Readonly<{
   seenByOther?: boolean;
   /** The senses the other creature perceives the bearer with, within their range ("blindsight", "truesight"). */
   otherSenses?: readonly string[];
+  /** The situations the roller says this check fits, for `situation-is`. */
+  situations?: readonly string[];
 }>;
 
 const overlaps = (allowed: readonly string[] | undefined, have: readonly string[] | undefined): boolean =>
@@ -375,6 +380,8 @@ function passes(trigger: RiderTrigger, context: RiderContext): boolean {
         context.otherSenses !== undefined &&
         !trigger.senses.some((sense) => context.otherSenses!.includes(sense))
       );
+    case "situation-is":
+      return trigger.situation !== undefined && (context.situations ?? []).includes(trigger.situation);
     default:
       return false;
   }

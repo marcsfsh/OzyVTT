@@ -74,6 +74,7 @@ function derivedSheet(over: Partial<ActorDerivedSheet> = {}): ActorDerivedSheet 
     attunementSlots: 3,
     weaponMasteries: [],
     classColumns: [],
+    situations: [],
     ...over
   };
 }
@@ -157,6 +158,37 @@ describe("the sheet's checks", () => {
     // Nothing is composed on the client: no free roll carries a check's bonus.
     expect(sent("dice:roll")).toEqual([]);
     expect(await screen.findByText("Strength check: 13 (d20 12).")).toBeTruthy();
+  });
+
+  it("sends a situation the player turns on with the next check it fits, then turns it off", async () => {
+    const leverage = {
+      situation: "where the Crowbar's leverage applies",
+      source: "Crowbar",
+      effect: "Advantage",
+      abilities: ["str" as const],
+      skills: []
+    };
+    serve(derivedSheet({ situations: [leverage] }), {
+      "check:roll": {
+        ok: true,
+        check: { label: "Strength check", natural: 12, total: 13, dc: null, success: null, rollId: "r1" }
+      }
+    });
+    render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await openTab(user, "Checks");
+    const toggle = await screen.findByRole("button", { name: "Where the Crowbar's leverage applies (Advantage)" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    // A Dexterity check is not one it fits: that roll goes without it, and it stays on for the Strength check.
+    await user.click(screen.getByRole("button", { name: "Roll a Dexterity check, +1" }));
+    await user.click(screen.getByRole("button", { name: "Roll a Strength check, +1" }));
+    expect(sent("check:roll")).toEqual([
+      { actorId: HERO, ability: "dex", visibility: "public" },
+      { actorId: HERO, ability: "str", visibility: "public", situations: ["where the Crowbar's leverage applies"] }
+    ]);
+    await waitFor(() => expect(toggle.getAttribute("aria-pressed")).toBe("false"));
   });
 
   it("says an before a vowel: Roll an Intelligence check", async () => {

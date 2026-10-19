@@ -635,6 +635,24 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:healers-kit": enforced(
     "stabilize.ts spends one use of the kit to make a creature at 0 Hit Points Stable with no check, and the last use takes the kit."
   ),
+  "item:book": enforced(
+    'While it is equipped, the sheet offers "consulting an accurate Book about its topic" beside the checks (check-situations.ts), and an Intelligence (Arcana, History, Nature or Religion) check that names it gains +5 (ability-checks.ts). Whether the Book is accurate and on topic is the GM\'s.'
+  ),
+  "item:map": enforced(
+    'While it is equipped, the sheet offers "finding the way in the place an accurate Map shows" beside the checks (check-situations.ts), and a Wisdom (Survival) check that names it gains +5 (ability-checks.ts).'
+  ),
+  "item:costume": enforced(
+    'While it is worn (equipped), the sheet offers "impersonating whom the Costume represents" beside the checks (check-situations.ts), and a check that names it has Advantage (ability-checks.ts).'
+  ),
+  "item:crowbar": enforced(
+    "While it is equipped, the sheet offers \"where the Crowbar's leverage applies\" beside the checks (check-situations.ts), and a Strength check that names it has Advantage (ability-checks.ts). Whether its leverage applies is the GM's."
+  ),
+  "item:magnifying-glass": enforced(
+    'While it is equipped, the sheet offers "appraising or inspecting a highly detailed item" beside the checks (check-situations.ts), and a check that names it has Advantage (ability-checks.ts). Lighting a fire with it is the GM\'s.'
+  ),
+  "item:pole": enforced(
+    'While it is equipped, the sheet offers "vaulting with the Pole on a High or Long Jump" beside the checks (check-situations.ts), and a Strength (Athletics) check that names it has Advantage (ability-checks.ts). Touching something 10 feet away is the GM\'s.'
+  ),
   "feature:spellcasting": enforced(
     "character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows."
   ),

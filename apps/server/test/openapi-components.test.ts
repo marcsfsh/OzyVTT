@@ -467,7 +467,8 @@ describe("generated OpenAPI components", () => {
       "spell-class-is": { classIds: ["sorcerer"] },
       "sees-other": {},
       "seen-by-other": {},
-      "other-lacks-sense": { senses: ["blindsight", "truesight"] }
+      "other-lacks-sense": { senses: ["blindsight", "truesight"] },
+      "situation-is": { situation: "consulting an accurate Book about its topic" }
     };
 
     /** One payload per modifier. */

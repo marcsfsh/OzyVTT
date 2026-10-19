@@ -756,6 +756,8 @@ export const CheckRollSchema = z
     /** The creature a Wisdom (Perception or Survival) check is made to find: the roller's Hunter's Mark on it gives
      *  Advantage. */
     findActorId: z.uuid().optional(),
+    /** The situations the roller says the check fits, from the sheet's list (a Book's topic, a Crowbar's leverage). */
+    situations: z.array(z.string().trim().min(3).max(80)).max(6).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

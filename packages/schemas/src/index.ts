@@ -472,10 +472,18 @@ export const RiderTriggerSchema = z
       .strict()
       .describe(
         "Filter. On an attack roll, the other creature in it perceives the bearer with none of these senses within their range (Blur: an attacker that perceives you with Blindsight or Truesight is immune)."
+      ),
+    /** The roller says the check fits this situation (a Book's topic, a Crowbar's leverage). The sheet offers it as a
+     *  toggle beside the checks, and the GM judges whether the roll fits. */
+    z
+      .object({ type: z.literal("situation-is"), situation: z.string().trim().min(3).max(80) })
+      .strict()
+      .describe(
+        "Filter. Narrows an ability check to one the roller says fits this situation, in plain words that follow the check's name after a comma (\"consulting an accurate Book about its topic\"). The sheet offers each situation the bearer's riders name as a toggle beside its checks; the rider applies only to a roll that names it, and the GM judges whether the roll fits. Needs the `on-ability-check` moment."
       )
   ])
   .describe(
-    "When a rider applies. Forty named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
+    "When a rider applies. Forty-one named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
   );
 export type RiderTrigger = z.infer<typeof RiderTriggerSchema>;
 export type RiderTriggerKind = "static-gate" | "dynamic-gate" | "moment" | "filter";
@@ -521,7 +529,8 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "spell-class-is": "filter",
   "sees-other": "filter",
   "seen-by-other": "filter",
-  "other-lacks-sense": "filter"
+  "other-lacks-sense": "filter",
+  "situation-is": "filter"
 });
 
 /** The moments the healing step collects (`resolution/heal.ts`): a healing modifier gated on another never fires. */
@@ -578,6 +587,15 @@ export const RiderWhenSchema = z
       context.addIssue({
         code: "custom",
         message: "A filter needs a moment to narrow. Add the roll or event it applies to."
+      });
+    }
+    if (
+      triggers.some((trigger) => trigger.type === "situation-is") &&
+      !triggers.some((trigger) => trigger.type === "on-ability-check")
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "A situation the roller names fits only an ability check. Make the rider apply on an ability check."
       });
     }
     checkSharedTriggerRules(triggers, context);

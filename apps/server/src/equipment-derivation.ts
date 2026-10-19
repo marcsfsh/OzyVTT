@@ -791,13 +791,14 @@ export function skillTierSources(derivation: EquipmentDerivation, skillId: strin
  *  minimum (Thaumaturge's Wisdom, minimum +1), read from `scores`. */
 export function checkRiderBonus(
   derivation: EquipmentDerivation,
-  narrow: Readonly<{ ability?: RiderAbility; skill?: string }>,
+  narrow: CheckNarrow,
   scores?: Readonly<Record<RiderAbility, number>>
 ): number {
   const momentary = collectRiders(derivation.carriers, {
     ...derivation.context,
     ...(narrow.ability !== undefined ? { ability: narrow.ability } : {}),
     ...(narrow.skill !== undefined ? { skill: narrow.skill } : {}),
+    ...(narrow.situations !== undefined ? { situations: narrow.situations } : {}),
     moment: "on-ability-check"
   });
   const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
@@ -807,6 +808,9 @@ export function checkRiderBonus(
     abilityModifierBonus([...standing, ...momentary], "check-bonus", scores)
   );
 }
+
+/** What an ability check's riders are narrowed by: its ability and skill, and the situations the roller says it fits. */
+export type CheckNarrow = Readonly<{ ability?: RiderAbility; skill?: string; situations?: readonly string[] }>;
 
 /** What riders of one type add from an ability modifier (`abilityModifier`), each counted as at least its `minimum`;
  *  without the scores, the minimum alone. Riders sharing a `stackKey` count once. */
