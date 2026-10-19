@@ -52,7 +52,13 @@ export function projectViewerEncounterScene(
   const terrain = visibleTerrain(state.combat, sight.enabled ? exploredRectsOf(state) : undefined);
   const visionBlock = visionOf(state, partyViewerIds(state), content);
   const vision = visionBlock.enabled
-    ? { vision: { visible: visionBlock.visible, explored: visionBlock.explored } }
+    ? {
+        vision: {
+          visible: visionBlock.visible,
+          ...(visionBlock.bright ? { bright: visionBlock.bright } : {}),
+          explored: visionBlock.explored
+        }
+      }
     : {};
   // A live scene shows what players see on their own screens: its map, fog and terrain, the public tokens the GM
   // has placed that the party may see, and public drawings. Before the fight only placed tokens show.
@@ -86,7 +92,9 @@ export function projectViewerEncounterScene(
           // Ids parallel the labels so the shared screen picks the same glyphs as the table; public actors only.
           conditionIds: actor.conditions.map((condition) => condition.id),
           ...(actor.tokenAssetId ? { tokenAssetId: actor.tokenAssetId } : {}),
-          ...(displayStyle ? { healthDisplay: { style: displayStyle } } : {})
+          ...(displayStyle ? { healthDisplay: { style: displayStyle } } : {}),
+          // Height is where the token is, as public as its position.
+          ...(token.altitudeFeet ? { altitudeFeet: token.altitudeFeet } : {})
         }
       ];
     }),

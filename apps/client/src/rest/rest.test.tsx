@@ -30,7 +30,13 @@ vi.mock("../codex/api", () => ({
 }));
 
 import { GameStateSchema, type GmView, type PlayerView } from "@vtt/domain";
-import { RestAnswerSchema, RestAskSchema, RestMarkDoneSchema, RestPartySchema } from "@vtt/domain/commands";
+import {
+  RestAnswerSchema,
+  RestAskSchema,
+  RestMarkDoneSchema,
+  RestPartySchema,
+  TimePassSchema
+} from "@vtt/domain/commands";
 import { ToastProvider } from "@vtt/ui";
 import { socket } from "../socket";
 import { RestButtons } from "../sheet/PlayTab";
@@ -83,6 +89,57 @@ describe("the GM's rest panel", () => {
     const [event, payload] = emitted().at(-1)!;
     expect(event).toBe("rest:party");
     expect(RestPartySchema.parse({ ...payload, ...COMMAND })).toMatchObject({ kind: "long", actorIds: [TORVA] });
+  });
+
+  it("passes time on the road at the pace the GM picks", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <PartyRest state={gmView({ clockHours: 38 })} />
+      </ToastProvider>
+    );
+    await user.click(screen.getByRole("button", { name: "Rest" }));
+    const dialog = screen.getByRole("dialog", { name: "Rest" });
+    await user.click(within(dialog).getByRole("button", { name: "Normal" }));
+    await user.click(within(dialog).getByRole("button", { name: "Travel 8 hours" }));
+    const [event, payload] = emitted().at(-1)!;
+    expect(event).toBe("time:pass");
+    expect(TimePassSchema.parse({ ...payload, ...COMMAND })).toMatchObject({ hours: 8, pace: "normal" });
+  });
+
+  it("shows the clock's minutes and passes hours and minutes together", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <PartyRest state={gmView({ clockHours: 9, clockMinutes: 30 })} />
+      </ToastProvider>
+    );
+    await user.click(screen.getByRole("button", { name: "Rest" }));
+    const dialog = screen.getByRole("dialog", { name: "Rest" });
+    expect(await within(dialog).findByText("Deepwinter 3, 1491 DR · 09:30")).toBeTruthy();
+    const hours = within(dialog).getByRole("group", { name: "Hours to pass" });
+    const minutes = within(dialog).getByRole("group", { name: "Minutes to pass" });
+    for (let step = 0; step < 7; step += 1) await user.click(within(hours).getByRole("button", { name: "Decrease" }));
+    await user.click(within(minutes).getByRole("button", { name: "Increase" }));
+    await user.click(within(minutes).getByRole("button", { name: "Increase" }));
+    expect(within(minutes).getByText("5 min")).toBeTruthy();
+    await user.click(within(dialog).getByRole("button", { name: "Pass 1 hour 5 minutes" }));
+    const [event, payload] = emitted().at(-1)!;
+    expect(event).toBe("time:pass");
+    expect(TimePassSchema.parse({ ...payload, ...COMMAND })).toMatchObject({ hours: 1, minutes: 5 });
+  });
+
+  it("offers no pass when no time is chosen", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <PartyRest state={gmView()} />
+      </ToastProvider>
+    );
+    await user.click(screen.getByRole("button", { name: "Rest" }));
+    const hours = screen.getByRole("group", { name: "Hours to pass" });
+    for (let step = 0; step < 8; step += 1) await user.click(within(hours).getByRole("button", { name: "Decrease" }));
+    expect(screen.getByRole("button", { name: "Pass time" })).toBeDisabled();
   });
 
   it("answers a player's request from the button's badge", async () => {

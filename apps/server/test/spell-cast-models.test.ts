@@ -62,6 +62,7 @@ describe("a save made later, not on the cast", () => {
 
   it("resolves the later save against a creature: Wisdom, 3d8 Radiant, half on a success", () => {
     const { resolve, state } = fight(cleric);
+    resolve("spell-spirit-guardians", { targetIds: [] });
     resolve("spell-spirit-guardians-then-save", {}, [3, 3, 3]);
     expect(state.combat.pendingSaves).toEqual([
       expect.objectContaining({ ability: "wis", targetActorId: FOE, proposedDamage: 9, halfOnSuccess: true })
@@ -98,7 +99,9 @@ describe("a failed save's conditions", () => {
 
 describe("a damage type the caster picks", () => {
   it("deals Chromatic Orb's damage as the type picked, and refuses one the spell doesn't offer", () => {
-    const { resolve } = fight(wizard);
+    const { resolve, hero } = fight(wizard);
+    // Its material is "a diamond worth 50+ GP", which the caster must carry.
+    hero.inventory.push({ id: "diamond", name: "Diamond", quantity: 1, equipped: false, attuned: false });
     expect(resolve("spell-chromatic-orb", { damageType: "fire" }, [15, 3, 3, 3]).damage[0]).toMatchObject({
       type: "fire",
       total: 9
@@ -140,12 +143,15 @@ describe("Sacred Flame", () => {
 describe("a spell that takes a minute or more to cast", () => {
   const caster = build(wizardInput(["alarm", "magic-missile"]));
 
-  it("takes the Magic action, with a reminder of the turns and Concentration it needs", () => {
-    const { resolve, action } = fight(caster);
+  it("takes the Magic action, and in a fight the action on each turn of its minute", () => {
+    const { resolve, action, hero } = fight(caster);
     expect(action("spell-alarm").activation).toBe("action");
-    expect(resolve("spell-alarm", { targetIds: [] }).warnings?.join(" ")).toMatch(
-      /Alarm takes 1 minute to cast\. Until then, the caster takes the Magic action on each turn/
-    );
+    expect(
+      resolve("spell-alarm", { targetIds: [] })
+        .tableNarration?.map((line) => line.text)
+        .join(" ")
+    ).toMatch(/begins casting Alarm\. It takes the action on each of .+'s next 9 turns, with Concentration held\./);
+    expect(hero.effects.some((effect) => effect.longCast?.actionId === "spell-alarm")).toBe(true);
   });
 
   it("can't be cast while the caster is Incapacitated", () => {

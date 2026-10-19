@@ -4,6 +4,13 @@ import type { ApiRoute } from "@vtt/api-contract/routes";
 import type { ClientToServerEvents, GameState } from "@vtt/domain";
 import { GameAccessDeniedError } from "../authorization.js";
 import { isIncapacitated } from "../condition-rules.js";
+import type { EffectNarration } from "../effects.js";
+import { needsSettling, settleFalls as settleFallsIn } from "../falling.js";
+import { compelledMoves, fleesNow } from "../granted-moves.js";
+import { needsPlaneSettling, settlePlanes } from "../off-plane.js";
+import { heldMoveReady, settleHeldMove } from "../held-moves.js";
+import { burstEndedZones } from "../spell-zones.js";
+import { holdsAuras, settleZoneAuras, zoneAuraChanges } from "../zone-auras.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
@@ -169,6 +176,73 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     }
   }
 
+  /**
+   * Where creatures stand once a command has done its work, as its own commit told like any other: a creature made to
+   * flee takes its Reaction's move (`compelledMoves`), one that left the plane leaves the map and one back from it
+   * returns (`settlePlanes`), and whoever is in the air and can no longer stay there comes down (SRD Flying, Falling).
+   * Every way it happens (a condition, an effect ending, a broken Concentration) moves the token the same way.
+   */
+  async function settleFalls() {
+    const state = context.readState();
+    const lookup = { resolveDefinition: (definitionId: string) => kit.resolveDefinitionIn(state, definitionId) };
+    if (
+      !fleesNow(state) &&
+      !needsPlaneSettling(state) &&
+      !heldMoveReady(state) &&
+      !needsSettling(state, { ...lookup, catalog: kit.equipmentCatalog() })
+    )
+      return;
+    const distance = await kit.creatureDistance();
+    const mapAssetId = state.combat.mapAssetId;
+    const geometry = mapAssetId ? await kit.context.tokenGeometryFor(mapAssetId) : null;
+    const id = context.newId();
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute({ id, type: "positions.settle", principal: "table" }, (draft) => {
+      const deps = kit.fallDeps(draft, distance, id);
+      const sameMap = geometry !== null && draft.combat.mapAssetId === mapAssetId;
+      const held = sameMap ? settleHeldMove(draft, geometry) : [];
+      const planes = sameMap ? settlePlanes(draft, geometry) : [];
+      events = [...held, ...compelledMoves(draft, deps), ...planes, ...settleFallsIn(draft, deps)];
+    });
+    if (result.duplicate) return;
+    await context.publishGameState(result.state);
+    kit.publishRolls(result.state, id);
+    kit.publishNarrations(events);
+  }
+
+  /**
+   * A spell area that acts as its spell ends (Delayed Blast Fireball's bead) is left bursting by whatever ended the
+   * spell; the table then raises its saves with the server's dice and the live map, as its own write.
+   */
+  async function settleBurstingZones() {
+    const before = context.readState();
+    if (!before.combat.spellZones.some((zone) => zone.bursting) || before.combat.historyCursor !== null) return;
+    const geometry = await kit.liveGeometry();
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute({ id: context.newId(), type: "spell-zone.burst" }, (draft) => {
+      events = burstEndedZones(draft, kit.zoneDeps(draft, geometry));
+    });
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
+  /**
+   * What a spell's area gives the creatures in it (Holy Aura, Pass without Trace) follows them in and out: after a
+   * command moves a token, an area or ends a spell, the table settles who holds it, as its own write when anything
+   * changed.
+   */
+  async function settleZoneAurasAfter() {
+    const before = context.readState();
+    if (!holdsAuras(before) || before.combat.historyCursor !== null) return;
+    const geometry = await kit.liveGeometry();
+    const changes = zoneAuraChanges(before, kit.zoneDeps(before, geometry));
+    if (changes.leaving.length === 0 && changes.entering.length === 0) return;
+    const result = await context.store.execute({ id: context.newId(), type: "spell-zone.auras" }, (draft) => {
+      settleZoneAuras(draft, kit.zoneDeps(draft, geometry));
+    });
+    await context.publishGameState(result.state);
+  }
+
   async function dispatch(
     type: GameCommandType,
     principal: GamePrincipal,
@@ -212,7 +286,12 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     );
     const accepted = committed ? { revision: committed.state.revision, duplicate: committed.duplicate } : {};
     const reply = projectReply(principal, { ...accepted, ...extras });
-    if (settle && committed && !committed.duplicate) await settleDownedReactions();
+    if (settle && committed && !committed.duplicate) {
+      await settleBurstingZones();
+      await settleZoneAurasAfter();
+      await settleDownedReactions();
+      await settleFalls();
+    }
     return reply;
   }
 

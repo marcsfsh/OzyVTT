@@ -82,6 +82,8 @@ const LANDS: ReadonlyArray<{
 
 export const druid: ClassMechanicsModule = {
   features: {
+    // "Whenever you gain a Druid level, you can replace one of your cantrips."
+    spellcasting: { replaces: [{ offer: "class-cantrips", when: "level-up", amount: 1 }] },
     // Druidic plus Speak with Animals always prepared. Spotting a hidden message is a GM-called check.
     druidic: {
       grants: {

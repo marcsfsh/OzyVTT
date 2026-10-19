@@ -531,7 +531,14 @@ describe("an ungated granted spell still arrives, on the shipped record that gra
   it("puts Prestidigitation on a Fighter's sheet, always prepared, with a caster block to cast it from", () => {
     const built = buildCharacterDefinition(highElfInput(), elfViewGating(null), policy);
     expect(built.spellcasting!.spells).toEqual([
-      { id: "prestidigitation", name: "Prestidigitation", level: 0, prepared: true, alwaysPrepared: true }
+      {
+        id: "prestidigitation",
+        name: "Prestidigitation",
+        level: 0,
+        prepared: true,
+        alwaysPrepared: true,
+        actionId: "spell-prestidigitation"
+      }
     ]);
     // A Fighter has no spell list, so this block exists only because a trait granted a spell, and
     // `ability: "int"` comes from the grant.

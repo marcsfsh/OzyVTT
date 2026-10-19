@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { withArticle, type EffectInstance, type PlayerEffect } from "@vtt/domain";
+import { gameTimeSpanLabel, withArticle, type EffectInstance, type PlayerEffect } from "@vtt/domain";
 import { Button, Chip } from "@vtt/ui";
 import { command } from "../lib/command";
 import { newId } from "../lib/ids";
@@ -14,6 +14,10 @@ export function effectDurationLabel(effect: Pick<PlayerEffect, "duration">): str
   switch (duration.type) {
     case "rounds":
       return `${duration.remaining} ${duration.remaining === 1 ? "round" : "rounds"} left`;
+    case "minutes":
+      return `${gameTimeSpanLabel(duration.remaining)} left`;
+    case "until-rest":
+      return duration.rest === "long" ? "until its next Long Rest" : "until its next Short or Long Rest";
     case "until-source-next-turn":
       return "until its source's next turn";
     case "until-bearer-next-turn":

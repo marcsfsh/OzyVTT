@@ -29,6 +29,8 @@ import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../
 import type { ZoneDeps } from "../spell-zones.js";
 import type { TokenMapGeometry } from "../token-placement.js";
 import { hiddenFrom, playerSight } from "../vision/audience.js";
+import { sceneSight } from "../vision/sight.js";
+import type { FallDeps } from "../falling.js";
 import type { SightContent } from "../vision/senses.js";
 
 /** Who is acting. Integration credentials are the GM's own automation and act with GM authority
@@ -266,6 +268,29 @@ export function createKit(context: CommandContext) {
       now: () => new Date().toISOString()
     }),
 
+    /** What a fall reads in `state` (`falling.ts`): stat blocks and items, the server's dice, where creatures stand
+     *  for a Feather Fall's range, and who sees whom with dynamic vision on. */
+    fallDeps: (
+      state: GameState,
+      distance: (state: GameState, actorIdA: string, actorIdB: string) => number | null,
+      commandId: string
+    ): FallDeps => {
+      let sight: ReturnType<typeof sceneSight> | null = null;
+      return {
+        resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
+        catalog: equipmentCatalogOf(playCatalog()),
+        random: (sides) => context.random(sides),
+        newId: context.newId,
+        now: () => new Date().toISOString(),
+        commandId,
+        distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB),
+        sees: (viewerId, targetId) => {
+          sight ??= sceneSight(state, sightContent());
+          return !sight.enabled || sight.sees(viewerId, targetId);
+        }
+      };
+    },
+
     /** The deps a turn change runs with in `state`: recharge and ongoing-damage dice, repeat saves, the spell areas
      *  on the live map, and where creatures stand for the auras that reach them. */
     turnAdvanceDeps: (
@@ -397,8 +422,12 @@ export function createKit(context: CommandContext) {
           actorIds: [actorId],
           gmOnly: hidden
         });
-      // A reaction window opened: the table hears why nothing landed yet.
-      const waiting = resolution.waitingOnReaction ? "The attack waits" : "The damage waits";
+      // A reaction window opened: the table hears why nothing landed yet (a cast waits on a Counterspell).
+      const waiting = !resolution.waitingOnReaction
+        ? "The damage waits"
+        : resolution.attack === null
+          ? "The spell waits"
+          : "The attack waits";
       for (const prompt of resolution.reactionPrompts ?? []) {
         const promptHidden = hidden || actorHidden(prompt.actorId);
         context.appendLog({

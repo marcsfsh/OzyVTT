@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 137 commands · 313 HTTP paths
+- 14 GameState fields · 147 commands · 323 HTTP paths
 
 ## GameState shape
 
@@ -35,7 +35,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 one table entry under `apps/server/src/commands/`. Both transports register from that table, and
 the OpenAPI document generates the command's operation from it. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `light`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `item`, `light`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
 
 | Command | Scope |
 | --- | --- |
@@ -43,8 +43,12 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `action.use` | `combat:write` |
 | `actor.add-from-definition` | `actor:write` |
 | `actor.apply-damage` | `actor:write` |
+| `actor.award-experience` | `actor:write` |
+| `actor.fall` | `combat:write` |
+| `actor.give-heroic-inspiration` | `actor:write` |
 | `actor.heal` | `actor:write` |
 | `actor.import-definition` | `actor:write` |
+| `actor.mount` | `combat:write` |
 | `actor.rechoose` | `actor:write` |
 | `actor.remove` | `actor:write` |
 | `actor.remove-samples` | `actor:write` |
@@ -96,8 +100,10 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `character.set-prepared` | `actor:write` |
 | `character.set-proficiencies` | `actor:write` |
 | `character.set-slot` | `actor:write` |
+| `character.study-item` | `actor:write` |
 | `character.submit-import` | `actor:write` |
 | `character.swap-spell` | `actor:write` |
+| `check.answer` | `combat:write` |
 | `check.reroll` | `combat:write` |
 | `check.roll` | `combat:write` |
 | `damage.resolve` | `combat:write` |
@@ -124,6 +130,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `initiative.roll-self` | `combat:write` |
 | `initiative.set` | `combat:write` |
 | `initiative.swap` | `combat:write` |
+| `item.set-light` | `combat:write` |
 | `light.add` | `scene:write` |
 | `light.move` | `scene:write` |
 | `light.remove` | `scene:write` |
@@ -165,10 +172,13 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `terrain.reset` | `scene:write` |
 | `time.pass` | `combat:write` |
 | `token.move` | `combat:write` |
+| `token.set-altitude` | `combat:write` |
 | `turn.end` | `combat:write` |
 | `turn.use` | `combat:write` |
 | `turn.use-legendary` | `combat:write` |
 | `turn.use-reaction` | `combat:write` |
+| `vision.add-area` | `scene:write` |
+| `vision.remove-area` | `scene:write` |
 | `vision.reset-explored` | `scene:write` |
 | `vision.set-ambient` | `scene:write` |
 | `vision.set-enabled` | `scene:write` |
@@ -288,6 +298,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/armor-class`
 - `GET /api/v1/game/actors/{actorId}/available-actions`
 - `POST /api/v1/game/actors/{actorId}/check`
+- `POST /api/v1/game/actors/{actorId}/check/answer`
 - `POST /api/v1/game/actors/{actorId}/check/reroll`
 - `POST /api/v1/game/actors/{actorId}/conditions`
 - `POST /api/v1/game/actors/{actorId}/currency`
@@ -295,18 +306,23 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/death-save`
 - `POST /api/v1/game/actors/{actorId}/effects`
 - `POST /api/v1/game/actors/{actorId}/effects/{effectId}/end`
+- `POST /api/v1/game/actors/{actorId}/fall`
 - `POST /api/v1/game/actors/{actorId}/favourites`
 - `POST /api/v1/game/actors/{actorId}/finish-preparing`
 - `POST /api/v1/game/actors/{actorId}/heal`
 - `POST /api/v1/game/actors/{actorId}/health-display`
 - `POST /api/v1/game/actors/{actorId}/heroic-inspiration`
+- `POST /api/v1/game/actors/{actorId}/heroic-inspiration/give`
 - `POST /api/v1/game/actors/{actorId}/hp`
 - `POST /api/v1/game/actors/{actorId}/identity`
 - `POST /api/v1/game/actors/{actorId}/inventory`
 - `POST /api/v1/game/actors/{actorId}/inventory/give`
 - `POST /api/v1/game/actors/{actorId}/inventory/recover-ammunition`
+- `POST /api/v1/game/actors/{actorId}/inventory/study`
+- `POST /api/v1/game/actors/{actorId}/items/{itemId}/light`
 - `POST /api/v1/game/actors/{actorId}/long-rest-request`
 - `POST /api/v1/game/actors/{actorId}/long-rest-request/answer`
+- `POST /api/v1/game/actors/{actorId}/mount`
 - `GET /api/v1/game/actors/{actorId}/movement`
 - `GET /api/v1/game/actors/{actorId}/next-level`
 - `POST /api/v1/game/actors/{actorId}/prepared-spell`
@@ -362,6 +378,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/encounter/player-initiative-mode`
 - `POST /api/v1/game/encounter/rules-mode`
 - `POST /api/v1/game/encounter/start`
+- `POST /api/v1/game/experience/award`
 - `POST /api/v1/game/fog/enabled`
 - `POST /api/v1/game/fog/paint`
 - `POST /api/v1/game/fog/reset`
@@ -413,12 +430,15 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/terrain/paint`
 - `POST /api/v1/game/terrain/reset`
 - `POST /api/v1/game/time/pass`
+- `POST /api/v1/game/tokens/{actorId}/altitude`
 - `POST /api/v1/game/tokens/{actorId}/move`
 - `POST /api/v1/game/turn/end`
 - `POST /api/v1/game/turn/legendary`
 - `POST /api/v1/game/turn/reaction`
 - `POST /api/v1/game/turn/use`
 - `POST /api/v1/game/vision/ambient`
+- `POST /api/v1/game/vision/areas`
+- `DELETE /api/v1/game/vision/areas/{areaId}`
 - `POST /api/v1/game/vision/enabled`
 - `POST /api/v1/game/vision/explored/reset`
 - `GET /api/v1/game/vision/preview`

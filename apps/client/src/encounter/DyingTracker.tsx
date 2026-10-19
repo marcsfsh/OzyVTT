@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { type DeathSaveResult, type DeathSaves } from "@vtt/domain";
 import { command } from "../lib/command";
-import { RollControls, type DieMode } from "./RollControls";
+import { RollControls, type AnswerChoice, type DieMode } from "./RollControls";
 import { modeWords } from "./roll-mode-notes";
 import "./dying-tracker.css";
 
@@ -52,7 +52,10 @@ export function DyingTracker({
   const [forced, setForced] = useState<DieMode | undefined>(undefined);
   const [typed, setTyped] = useState(false);
   const dead = deathSaves.failures >= 3;
-  const send = (commit: boolean, extra: Readonly<{ naturalRoll?: number; reroll?: boolean; mode?: DieMode }> = {}) => {
+  const send = (
+    commit: boolean,
+    extra: Readonly<{ naturalRoll?: number; reroll?: boolean; mode?: DieMode; answer?: AnswerChoice }> = {}
+  ) => {
     setBusy(true);
     const mode = "mode" in extra ? extra.mode : forced;
     void command("death-save:roll", {
@@ -60,7 +63,8 @@ export function DyingTracker({
       commit,
       ...(mode ? { rollMode: mode } : {}),
       ...(extra.naturalRoll !== undefined ? { naturalRoll: extra.naturalRoll } : {}),
-      ...(extra.reroll ? { reroll: true } : {})
+      ...(extra.reroll ? { reroll: true } : {}),
+      ...(extra.answer ? { answer: { ...extra.answer } } : {})
     }).then((result) => {
       setBusy(false);
       if (!result.ok) {
@@ -135,6 +139,9 @@ export function DyingTracker({
             setForced(next);
             send(false, { mode: next });
           }}
+          answers={rolled?.answers}
+          answered={rolled?.answered}
+          onAnswer={(answer) => send(false, { answer })}
           summary={
             rolled ? (
               <>

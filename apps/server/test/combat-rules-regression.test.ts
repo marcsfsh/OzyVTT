@@ -37,6 +37,15 @@ import { RulesBlockedError } from "../src/game-store.js";
 // without Rage, a single-roll Extra Attack, unresisted damage against a raging barbarian, grapples with
 // no state, and 1-HP heals standing in for dying must be blocked, guided, or engine-owned (ADR-0020).
 
+/** A turn has just ended and the next creature hasn't acted yet: the window a legendary action is taken in (SRD 5.2.1
+ *  "Immediately after another creature's turn"), one action a creature. */
+function legendaryWindow(game: GameState): void {
+  game.combat = {
+    ...game.combat,
+    turn: { ...game.combat.turn, afterActorId: "10000000-0000-4000-8000-0000000000ff", legendaryTakenBy: [] }
+  };
+}
+
 const IDS = {
   torva: "10000000-0000-4000-8000-000000000001",
   pip: "10000000-0000-4000-8000-000000000002",
@@ -1061,7 +1070,7 @@ describe("reaction prompts: Uncanny Dodge (ADR-0020 amendment)", () => {
       [15, 6, 6, 6]
     );
     expect(bite.reactionPrompts).toEqual([
-      { actorId: IDS.pip, actorName: "Pip Underbough", actionName: "Uncanny Dodge" }
+      { actorId: IDS.pip, actorName: "Pip Underbough", actionName: "Uncanny Dodge", holdsDamage: true }
     ]);
     expect(game.combat.pendingReactions).toHaveLength(1);
     const prompt = game.combat.pendingReactions[0];
@@ -3751,11 +3760,14 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
   it("spends the per-round pool off-turn, blocks past it and on its own turn, and refills at its turn start", () => {
     const game = buildBossGame();
     // Torva's turn: the boss swipes (cost 1; d20 15 + 9 = 24 hits AC 15, 1d8 → 4).
+    legendaryWindow(game);
     resolve(game, bossDefinition, "tail-swipe", { actorId: BOSS, targetIds: [IDS.torva] }, [15, 4]);
     expect(game.combat.legendaryUsed[BOSS]).toBe(1);
+    legendaryWindow(game);
     // Wing Storm costs 2 → the pool is empty (3/3 spent).
     resolve(game, bossDefinition, "wing-storm", { actorId: BOSS, targetIds: [IDS.torva] }, []);
     expect(game.combat.legendaryUsed[BOSS]).toBe(3);
+    legendaryWindow(game);
     expect(() =>
       resolve(game, bossDefinition, "tail-swipe", { actorId: BOSS, targetIds: [IDS.torva] }, [15, 4])
     ).toThrowError(/0 of 3 legendary actions left/);
@@ -4506,17 +4518,21 @@ describe("Monster actions as the stat block prints them (Multiattack, legendary 
 
   it("spends a prose legendary action's cost, refuses one taken again before the creature's turn, and swings Pounce", () => {
     const { game, act } = fight("adult-red-dragon", true); // Torva's turn
+    legendaryWindow(game);
     act("commanding-presence", []);
     expect(game.combat.legendaryUsed[MONSTER]).toBe(1);
+    legendaryWindow(game);
     expect(() => act("commanding-presence", [])).toThrow(
       /can't take Commanding Presence again until the start of its next turn/
     );
+    legendaryWindow(game);
     const pounce = act("pounce");
     expect(pounce.attack).toMatchObject({ outcome: "hit" });
     expect(game.combat.legendaryUsed[MONSTER]).toBe(2);
     nextInitiativeTurn(game); // the dragon's own turn: the pool and the once-a-round marks refill
     expect(game.combat.legendaryUsed).toEqual({});
     nextInitiativeTurn(game);
+    legendaryWindow(game);
     act("commanding-presence", []);
     expect(game.combat.legendaryUsed[MONSTER]).toBe(1);
   });

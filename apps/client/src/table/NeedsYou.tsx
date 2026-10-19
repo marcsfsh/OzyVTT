@@ -88,7 +88,11 @@ function NeedsCard({
             ? `${reaction.sourceName} is leaving ${item.actor.name}'s reach.`
             : reaction.kind === "damaged-by-creature"
               ? `${reaction.sourceName} damaged ${item.actor.name}.`
-              : `${reaction.proposedDamage} damage waits on ${item.actor.name}'s answer.`;
+              : reaction.kind === "falls"
+                ? `${reaction.sourceName}'s fall waits until ${item.actor.name} answers.`
+                : reaction.kind === "casts-spell"
+                  ? `${reaction.sourceName}'s spell waits until ${item.actor.name} answers.`
+                  : `${reaction.proposedDamage} damage waits on ${item.actor.name}'s answer.`;
       const prompt = (
         <ReactionPrompt
           reaction={reaction}

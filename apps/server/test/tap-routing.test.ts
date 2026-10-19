@@ -165,6 +165,8 @@ describe("tap routing (the seam)", () => {
   it("exempts reactions and legendary actions: taking those off turn is the point", () => {
     const fight = fightState();
     expect(offTurn(fight, PARRY)).toEqual([]);
+    // Right after a turn ends, before the next creature acts (SRD 5.2.1 Legendary Actions).
+    fight.combat = { ...fight.combat, turn: { ...fight.combat.turn, afterActorId: fight.combat.turnActorId! } };
     expect(offTurn(fight, { ...SWING, activation: "other", legendary: { cost: 1 } })).toEqual([]);
   });
 

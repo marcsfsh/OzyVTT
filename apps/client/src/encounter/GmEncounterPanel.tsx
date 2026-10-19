@@ -25,6 +25,21 @@ function stillStanding(actors: GmView["actors"], actorId: string) {
   return actor !== undefined && !isDefeatedMonster(actor);
 }
 
+/** "Lyra", "Lyra and Borin", "Lyra, Borin and Kael". */
+function listOf(names: readonly string[]): string {
+  return names.length < 2 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/** The fight's XP award: its player characters, and the monsters in it at 0 Hit Points. Null when either is empty. */
+export function fightExperienceOf(state: GmView) {
+  const inFight = state.combat.initiative
+    .map((entry) => state.actors.find((actor) => actor.id === entry.actorId))
+    .filter((actor) => actor !== undefined);
+  const recipients = inFight.filter((actor) => actor.kind === "player-character");
+  const defeated = inFight.filter((actor) => actor.kind === "monster" && actor.hp.current <= 0);
+  return recipients.length > 0 && defeated.length > 0 ? { recipients, defeated } : null;
+}
+
 /** How long a turn button ignores taps after a turn command settles: longer than a double tap. */
 const TURN_SETTLE_MS = 500;
 
@@ -243,6 +258,31 @@ export function GmEncounterPanel({
       return;
     void run(() => command("encounter:end", { expectedRevision: state.revision }), "Fight ended.");
   };
+  // SRD Experience Points: the characters in the fight share the XP of the monsters they brought to 0 Hit Points.
+  const fightExperience = fightExperienceOf(state);
+  const awardFightExperience = async (inLair: boolean) => {
+    if (!fightExperience) return;
+    const names = fightExperience.recipients.map((actor) => actor.name);
+    if (
+      !(await askConfirm({
+        title: "Award the fight's XP?",
+        body: `${listOf(names)} share the XP of ${listOf(fightExperience.defeated.map((actor) => actor.name))}${inLair ? ", at the lair XP for a legendary creature" : ""}.`,
+        confirmLabel: "Award XP"
+      }))
+    )
+      return;
+    // The log says how much each gained.
+    await run(
+      () =>
+        command("actor:award-experience", {
+          actorIds: fightExperience.recipients.map((actor) => actor.id),
+          defeatedIds: fightExperience.defeated.map((actor) => actor.id),
+          // A creature with no lair XP gives its usual XP.
+          ...(inLair ? { inLairIds: fightExperience.defeated.map((actor) => actor.id) } : {})
+        }),
+      `${listOf(names)} share the fight's XP.`
+    );
+  };
   // The quick-start door: everyone active is pre-listed in the staging tray, archived characters
   // nowhere. The map, tray, Add buttons and Recent are the same parts scene prep uses.
   const stagedIds = rosterActors(state.actors)
@@ -304,6 +344,8 @@ export function GmEncounterPanel({
           <h2 id="gm-encounter-title">Start a fight</h2>
         </div>
       </div>
+      {/* Spell areas outlast a fight and can be cast outside one (Glyph of Warding, Alarm), so they are listed here too. */}
+      <SpellAreas state={state} busy={busy} run={run} onFeedback={setMessage} />
       <ScenePrepPanel
         actors={state.actors}
         staged={stagedIds}
@@ -506,6 +548,7 @@ export function GmEncounterPanel({
         onFeedback={setMessage}
         onAddMonsters={() => setBrowsing(true)}
         onEnd={() => void end()}
+        {...(fightExperience ? { onAwardExperience: (inLair: boolean) => void awardFightExperience(inLair) } : {})}
       />
     </div>
   );

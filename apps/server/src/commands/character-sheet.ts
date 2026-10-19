@@ -19,12 +19,14 @@ import {
   CharacterSetPreparedSchema,
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
+  CharacterStudyItemSchema,
   CommandIdentitySchema
 } from "@vtt/domain/commands";
 import { recoverAmmunition } from "../ammunition.js";
 import type { EffectNarration } from "../effects.js";
 import { CommandRejectedError } from "../game-store.js";
 import { giveItem, setCurrency, setInventoryItem } from "../inventory.js";
+import { studyItem, type StudyOutcome } from "../item-study.js";
 import { setFavourites } from "../option-uses.js";
 import { finishPreparing, setPreparedSpell, setSpellSlotRemaining } from "../spellcasting.js";
 import { addToSpellbook, swapClassSpell } from "../spell-choices.js";
@@ -300,6 +302,37 @@ export const characterSheetCommands = [
   }),
 
   defineCommand({
+    type: "character.study-item",
+    operationId: "studyItem",
+    description:
+      "Marks a carried manual or tome studied by the character carrying it (GM-grade only, since the hours of study are downtime the GM gives). SRD 5.2.1: \"If you spend 48 hours over a period of 6 days or fewer studying the book's contents and practicing its guidelines, your Constitution increases by 2, to a maximum of 30. The manual then loses its magic but regains it in a century.\" The increase is recorded in the character's choices ledger and the sheet is rebuilt from it, so the Hit Point maximum, modifiers, save DCs and every later rebuild follow; the copy studied is marked `dormant`, so no one else gains from it. Refused for an item with no study, a dormant copy, a score already at the most the book gives, a character in a fight, and a sheet that doesn't record how it was built. The game clock doesn't move: the GM passes the time.",
+    summary: "Mark a carried manual or tome studied: its score rises for good and the copy's magic is spent (GM).",
+    schema: CharacterStudyItemSchema,
+    malformed: "The study command is malformed.",
+    gmOnly: "Only the GM marks a book studied. Ask your GM.",
+    async run({ request, execute }, kit) {
+      const { actorId, itemId } = request;
+      let outcome: StudyOutcome | null = null;
+      const { duplicate } = await execute((state) => {
+        outcome = studyItem(state, actorId, itemId, {
+          library: kit.playCatalog(),
+          policy: state.builderPolicy,
+          catalog: kit.equipmentCatalog()
+        });
+      });
+      const done = outcome as StudyOutcome | null;
+      if (!duplicate && done)
+        kit.context.appendLog({
+          kind: "encounter",
+          text: `${kit.actorName(actorId)} studies the ${done.item}. ${done.ability} rises from ${done.before} to ${done.after}.`,
+          actorIds: [actorId],
+          gmOnly: kit.actorHidden(actorId)
+        });
+      return done ? { ability: done.ability, before: done.before, after: done.after } : {};
+    }
+  }),
+
+  defineCommand({
     type: "character.recover-ammunition",
     operationId: "recoverAmmunition",
     description:
@@ -401,7 +434,10 @@ export const characterSheetCommands = [
     async run({ principal, request, execute }, kit) {
       await execute((state) => {
         requireActorAccess(initiatorOf(principal), state, request.actorId, "edit");
-        setCharacterProficiencies(state, request.actorId, request.proficiencies, kit.equipmentCatalog());
+        setCharacterProficiencies(state, request.actorId, request.proficiencies, kit.equipmentCatalog(), {
+          library: kit.playCatalog(),
+          policy: state.builderPolicy
+        });
       });
     }
   })

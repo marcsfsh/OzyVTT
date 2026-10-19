@@ -14,7 +14,7 @@ import {
   type RandomSource,
   type RiderContext
 } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, CastShaping } from "@vtt/schemas";
 import type { EquipmentCatalog, EquipmentDerivation } from "../equipment-derivation.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "../roll-history.js";
 import type { RuleId, RulesOverride } from "../rules-families.js";
@@ -55,6 +55,8 @@ export type ResolveInput = Readonly<{
   holdKey?: string;
   /** Throw the held attack d20 again: a player's Heroic Inspiration rerolls one die, the GM throws afresh. */
   reroll?: boolean;
+  /** On a preview, answer the held attack roll with one of the attacker's answers (Peerless Skill, Stroke of Luck). */
+  answer?: Readonly<{ id: string; subtract?: boolean; face?: number }>;
   /** GM only: a hand-entered attack total, used verbatim vs AC. The natural die is unknown, so a crit is declared
    * via `critical` and a natural 1 via `fumble`. */
   attackTotal?: number;
@@ -78,6 +80,10 @@ export type ResolveInput = Readonly<{
   /** A parked attack finishing (see `parkForAcReaction`): its economy was checked and spent when it rolled, so it is
    *  neither checked nor spent again, and its target is not offered the AC reaction a second time. */
   economyPaid?: boolean;
+  /** A parked attack finishing after its target's AC reaction was answered, so it is not offered again. */
+  acSettled?: boolean;
+  /** A parked attack finishing after others answered its roll: who was asked already. */
+  answersAsked?: readonly string[];
   /** A reaction's AC bonus against this attack only (Parry), added to the target's AC. */
   reactionAcBonus?: Readonly<{ amount: number; source: string }>;
   /** A parked attack's effect dice as they rolled (Bless's d4), which the replay reuses with no new roll. */
@@ -89,6 +95,21 @@ export type ResolveInput = Readonly<{
   areaPlaced?: boolean;
   /** Ready the spell for later: its slot is spent and it is held with Concentration (SRD Ready). */
   ready?: boolean;
+  /** Take the action's own move now and the rest of it later (`movement-grants.ts`): the cost is spent, no target. */
+  moveFirst?: boolean;
+  /** The rest of an action whose move was taken first: its cost was spent then, so it is neither checked nor spent. */
+  owedPaid?: boolean;
+  /** The spell area a cast that ends spells is aimed at (Dispel Magic on a Spirit Guardians); the GM's to name. */
+  zoneId?: string;
+  /** The caster stands where no sound can be made (Silence's sphere), measured on the map by the server. */
+  silenced?: boolean;
+  /** A parked attack finishing: the declared rider (Brutal Strike) its roll forwent Advantage for, whose hit it may
+   *  still carry. */
+  forgoneAdvantageBy?: string;
+  /** A melee hit that drops its target to 0 leaves it at 1 Hit Point and Unconscious (SRD Knocking Out a Creature). */
+  knockOut?: boolean;
+  /** How the caster shapes this spell's cast (Metamagic, Sculpt Spells), checked and applied by `metamagic.ts`. */
+  shaping?: readonly CastShaping[];
 }>;
 
 export type ResolveDependencies = Readonly<{
@@ -110,7 +131,7 @@ export type ResolveDependencies = Readonly<{
   /** SRD forced movement (Push): moves a combatant straight away from another and reports the distance, or
    *  null. Built by the operation layer, which has the grid (an opportunity attack's too). */
   pushToken?: (
-    input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>
+    input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number; toward?: boolean }>
   ) => Readonly<{ value: number; unit: string }> | null;
 }>;
 
@@ -214,6 +235,9 @@ export type ResolveContext = {
   check: NonNullable<ActionResolution["check"]> | null;
   attack: ActionResolutionAttack | null;
   crit: boolean;
+  /** What answers added to the attack roll, and whether one made it hit, for a replay that holds no die. */
+  attackAnswerBonus?: number;
+  answeredHit?: boolean;
   /** The roll-specific facts riders filter on (attack kind, target size, damage types...). */
   riderFilters: Omit<Partial<RiderContext>, "moment">;
   readonly damage: Array<{ formula: string; type: string; total: number; source?: string }>;
@@ -231,7 +255,7 @@ export type ResolveContext = {
   effectGranted: ActionResolution["effectGranted"];
   /** Effects this resolve ended, each with its source so a hidden one can be masked before the result is told. */
   readonly effectsEnded: EndedEffect[];
-  readonly reactionPrompts: Array<{ actorId: string; actorName: string; actionName: string }>;
+  readonly reactionPrompts: Array<{ actorId: string; actorName: string; actionName: string; holdsDamage?: true }>;
   /** A save a builtin forced (grapple, shove); an action's own `save` is reported from the action. */
   builtinSave: ActionResolution["save"];
   healing: ActionResolution["healing"];
@@ -240,7 +264,11 @@ export type ResolveContext = {
   /** The Concentration this cast started (a Concentration spell): what its failed saves impose is sustained by it. */
   castId: string | null;
   /** The extras this hit carries whose costs are spent after the hit's own (`spendHitOptions`). */
-  readonly hitRiders: Array<{ action: DefinitionAction; slotLevel?: number }>;
+  readonly hitRiders: Array<{ action: DefinitionAction; slotLevel?: number; pactSlot?: number }>;
+  /** The declared rider (Brutal Strike) this attack roll gave up its Advantage for, or null. */
+  forgoneAdvantageBy: string | null;
+  /** A chosen rider keeps the Hide action's Invisible through this attack (Supreme Sneak's Stealth Attack). */
+  keepsHidden: boolean;
   /** The live effects whose damage riders this hit rolled, so a coat of poison is spent (`spendDamageUses`). */
   readonly damageEffectIds: string[];
 };

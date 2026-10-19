@@ -158,8 +158,10 @@ export const effectsField = (scope: RiderScope): FieldDef => ({
       kind: "select",
       options: [
         opt("rounds", "A number of rounds"),
+        opt("minutes", "A number of minutes of game time"),
         opt("until-source-next-turn", "Until your next turn"),
         opt("until-source-turn-end", "Until the end of your next turn"),
+        opt("until-rest", "Until a rest"),
         opt("encounter", "The whole encounter"),
         opt("manual", "Until removed by hand")
       ]
@@ -171,6 +173,22 @@ export const effectsField = (scope: RiderScope): FieldDef => ({
       min: 1,
       max: 100,
       visibleWhen: (row) => (row.duration as { type?: string } | undefined)?.type === "rounds"
+    },
+    {
+      key: "duration.minutes",
+      label: "Minutes",
+      kind: "number",
+      min: 1,
+      max: 527040,
+      help: "Time the GM passes and rests count it down: 60 is an hour, 1440 a day.",
+      visibleWhen: (row) => (row.duration as { type?: string } | undefined)?.type === "minutes"
+    },
+    {
+      key: "duration.rest",
+      label: "Rest",
+      kind: "select",
+      options: [opt("long", "A Long Rest"), opt("short", "A Short or Long Rest")],
+      visibleWhen: (row) => (row.duration as { type?: string } | undefined)?.type === "until-rest"
     },
     { key: "concentration", label: "Needs concentration", kind: "switch" },
     // Nested `rows`, the same depth `whenField` renders at inside `modifiersField`.

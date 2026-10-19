@@ -42,7 +42,10 @@ import {
 } from "./save-outcomes.js";
 import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
 import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } from "./spell-effects.js";
+import { costlyMaterialsFor } from "./spell-materials.js";
+import { spellSightFor } from "./spell-sight.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
+import { UPCAST_DURATION_IDS, upcastDurationsFor } from "./spell-durations.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
 import { traitMechanicsOf } from "./trait-mechanics.js";
 import { withSpellcasting } from "./monster-spells.js";
@@ -322,6 +325,11 @@ type OnHitRider = {
   duration?: SaveFailureDuration;
   ongoingDamage?: OngoingDamage;
   insteadOfDamage?: true;
+  tags?: string[];
+  modifiers?: NonNullable<ActorAction["onHit"]>[number]["modifiers"];
+  pull?: { feet: number; upTo?: true };
+  self?: true;
+  reminder?: string;
 };
 /** "takes 5 (2d4) Necrotic damage at the start of each of the stirge's turns" (the source's) or "... of its turns". */
 function riderOngoingDamage(text: string): OngoingDamage | undefined {
@@ -401,8 +409,146 @@ const parseOnHitRiders = (desc: string): OnHitRider[] | null => {
     if (ids.length > 0 && (duration || untimed) && riders.length < 2)
       riders.push({ conditions: ids.map((id) => ({ id })), ...(duration ? { duration } : {}) });
   }
-  return riders.length > 0 ? riders : null;
+  riders.push(...effectRiders(desc, maxTargetSize, riders));
+  return riders.length > 0 ? riders.slice(0, 4) : null;
 };
+
+/**
+ * The hit riders that leave more than conditions, from their stock phrasing: a pull toward the attacker, no healing
+ * while a poison lasts, no Reactions, a Speed cut, Disadvantage on the target's next attack (the Sap mastery's
+ * shape), Advantage on the next attack against it or on the attacker's own next one, and a curse the engine runs
+ * only in part, whose rest is the GM's from the reminder. `riders` are the ones already read, which a no-healing
+ * clause joins.
+ */
+function effectRiders(desc: string, maxTargetSize: OnHitRider["maxTargetSize"], riders: OnHitRider[]): OnHitRider[] {
+  const found: OnHitRider[] = [];
+  const sized = maxTargetSize ? { maxTargetSize } : {};
+  // "the balor pulls the target up to 25 feet straight toward itself, and the target has the Prone condition".
+  const pull =
+    /\bpulls the target (up to )?(\d+) feet straight toward (?:itself|it)\b(, and the target has the Prone condition)?/.exec(
+      desc
+    );
+  if (pull)
+    found.push({
+      conditions: pull[3] ? [{ id: "prone" }] : [],
+      name: "Pulled",
+      pull: { feet: Number(pull[2]), ...(pull[1] ? { upTo: true as const } : {}) },
+      ...sized
+    });
+  // "Until this poison ends, the target can't regain Hit Points" or "While Poisoned, ...": on the poison's effect.
+  if (/\b(?:Until this poison ends|While Poisoned), the target can[\u2019']t regain Hit Points\b/.test(desc)) {
+    const poison = riders.find((rider) => rider.conditions.some((condition) => condition.id === "poisoned"));
+    if (poison) poison.tags = [...(poison.tags ?? []), "no-healing"];
+  }
+  const noReactions =
+    /\bthe target can[\u2019']t take Reactions (until the (?:start|end) of (?:its|the [A-Za-z' -]+?(?:'s|s')) next turn)/.exec(
+      desc
+    );
+  const noReactionsFor = noReactions ? failureDurationOf(noReactions[1]) : undefined;
+  if (noReactionsFor)
+    found.push({ conditions: [], name: "No Reactions", tags: ["no-reactions"], duration: noReactionsFor });
+  // An ice devil's spear: no Bonus Action or Reaction, 10 feet less Speed, and a move or one action, not both.
+  const chill =
+    /\bUntil the end of its next turn, the target can[\u2019']t take a Bonus Action or Reaction, its Speed decreases by (\d+) feet, and it can move or take one action on its turn, not both\b/.exec(
+      desc
+    );
+  if (chill)
+    found.push({
+      conditions: [],
+      name: "Chilled",
+      tags: ["no-bonus-actions", "no-reactions", "dazed"],
+      modifiers: [{ type: "speed", amount: -Number(chill[1]) }],
+      duration: { type: "until-bearer-turn-end" }
+    });
+  const slowed = chill
+    ? null
+    : /\b(?:the target's|its) Speed decreases by (\d+) feet until the end of its next turn\b/.exec(desc);
+  if (slowed)
+    found.push({
+      conditions: [],
+      name: "Speed reduced",
+      modifiers: [{ type: "speed", amount: -Number(slowed[1]) }],
+      duration: { type: "until-bearer-turn-end" }
+    });
+  if (/\bhas Disadvantage on the next attack roll it makes before the end of its next turn\b/.test(desc))
+    found.push({
+      conditions: [],
+      name: "Next attack at Disadvantage",
+      tags: ["until-own-attack"],
+      modifiers: [{ type: "roll-mode", roll: "attack", mode: "disadvantage" }],
+      duration: { type: "until-bearer-turn-end" }
+    });
+  if (
+    /\bthe next attack roll made against the target before the start of the [A-Za-z' -]+?'s next turn has Advantage\b/.test(
+      desc
+    )
+  )
+    found.push({
+      conditions: [],
+      name: "Next attack against it at Advantage",
+      tags: ["until-attacked"],
+      modifiers: [{ type: "roll-mode", roll: "incoming-attack", mode: "advantage" }],
+      duration: { type: "until-source-next-turn" }
+    });
+  if (/\band the [A-Za-z -]+? has Advantage on the next attack roll it makes before the end of this turn\b/.test(desc))
+    found.push({
+      conditions: [],
+      name: "Next attack at Advantage",
+      self: true,
+      tags: ["until-own-attack"],
+      modifiers: [{ type: "roll-mode", roll: "attack", mode: "advantage" }],
+      duration: { type: "until-source-turn-end" }
+    });
+  // A mummy's curse: no healing is the engine's; what it does at rests and over days, and the death to dust, the GM's.
+  const cursed =
+    /\bit is cursed\. (While cursed, the target can[\u2019']t regain Hit Points[^.]*\.(?: A creature dies[^.]*\.)?)/.exec(
+      desc
+    );
+  if (cursed) found.push({ conditions: [], name: "Cursed", tags: ["no-healing"], reminder: cursed[1]! });
+  // An incubus's curse acts at rests, and a shadow's touch drains a score: both the GM's.
+  const restCurse = /\bthe target is cursed for [^.]*\. Until the curse ends, [^.]*\./.exec(desc);
+  if (restCurse) found.push({ conditions: [], reminder: restCurse[0]!.replace(/^the target/, "The target") });
+  const drain =
+    /\bthe target's (?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) score decreases by \d+d\d+\.(?: The target dies if this reduces that score to 0\.)?/.exec(
+      desc
+    );
+  if (drain) found.push({ conditions: [], reminder: drain[0]!.replace(/^the target/, "The target") });
+  return found;
+}
+
+const SAVE_TARGET_CONDITIONS = ["Frightened", "Charmed", "Prone", "Grappled", "Restrained", "Incapacitated"];
+const SAVE_TARGET_TYPES = ["Humanoid", "Beast", "Undead", "Fiend", "Giant", "Dragon", "Construct", "Elemental"];
+
+/**
+ * Who a save action may target, from the stock clause after its DC ("Strength Saving Throw: DC 15, one Large or smaller
+ * creature Grappled by the behir"): one creature or each, its size, a condition it must have, its creature type, a
+ * range, "the X can see", "Grappled by the X" and "in the X's space". An area's creatures come from its template, and a
+ * clause the reader doesn't know whole (willing, "Charmed or Grappled", 0 Hit Points) stays the GM's.
+ */
+function withSaveTargets(desc: string): Pick<ActorAction, "targets"> {
+  const clause = /Saving Throw: DC \d+, ((?:one|each) [^.(]*)/.exec(desc)?.[1]?.trim();
+  if (!clause) return {};
+  if (/\bin an? \d+-foot\b|\bdestination\b|\bwhose space\b|\bwilling\b| or Grappled\b|\bHit Points\b/.test(clause))
+    return {};
+  const targets: NonNullable<ActorAction["targets"]> = {};
+  if (/^one\b/.test(clause)) targets.count = 1;
+  const size = /\b(Tiny|Small|Medium|Large|Huge) or smaller\b/.exec(clause);
+  if (size) targets.maxSize = size[1]!.toLowerCase() as NonNullable<typeof targets.maxSize>;
+  const lead = new RegExp(
+    `^one (?:(?:Tiny|Small|Medium|Large|Huge) or smaller )?(${SAVE_TARGET_CONDITIONS.join("|")}) creature\\b`
+  ).exec(clause);
+  const has = new RegExp(`\\bthat has the (${SAVE_TARGET_CONDITIONS.join("|")}) condition\\b`).exec(clause);
+  const condition = (lead ?? has)?.[1];
+  if (condition) targets.conditions = [condition.toLowerCase() as NonNullable<typeof targets.conditions>[number]];
+  const type = new RegExp(`^one (${SAVE_TARGET_TYPES.join("|")})\\b`).exec(clause);
+  if (type) targets.creatureTypes = [type[1]!.toLowerCase()];
+  const range = /\bwithin (\d+) feet\b/.exec(clause);
+  if (range) targets.rangeFeet = Number(range[1]);
+  if (/\b(?:the [a-z' -]+|it) can see\b/.test(clause)) targets.seen = true;
+  if (/\bGrappled by the\b/.test(clause)) targets.grappledBySource = true;
+  if (/\bin the [a-z' -]+?'s space\b/.test(clause)) targets.inSpace = true;
+  return Object.keys(targets).length > 0 ? { targets } : {};
+}
 
 /** Typed defense lists from the display strings: exact damage-type/condition-id tokens only; qualified phrases ("…from nonmagical attacks") stay display-only. */
 const splitTypedList = (display: string, known: ReadonlySet<string>): string[] =>
@@ -422,11 +568,80 @@ const PROTECTIVE_MAGIC: Pick<ActorAction, "reaction"> = {
  * "<creature slug>/<action id>"; values merge into the adapted action.
  * - giant-crocodile tail: "…can't be targeted by the crocodile's Tail" (stated on Bite).
  * - protective-magic: its Shield, offered when an attack would hit.
+ * - burst-of-ingenuity: "The sphinx or another creature within 30 feet makes an ability check or a saving throw ...
+ *   The sphinx adds 2 to the roll", an answer to the roll.
+ * - reflexive-antennae: "An attack roll hits the rust monster ... The rust monster uses Antennae", offered when a
+ *   creature within 5 feet damages it.
+ * - deflect-missile: "hit by a ranged attack roll and takes Bludgeoning, Piercing, or Slashing damage from it ...
+ *   reduces the damage it takes from the attack by 11 (1d10 + 6)"; the redirect after reducing it to 0 stays prose.
  */
-const ACTION_ENRICHMENTS: Record<string, Pick<ActorAction, "targetRules" | "reaction">> = {
+const ACTION_ENRICHMENTS: Record<
+  string,
+  Partial<Pick<ActorAction, "targetRules" | "reaction" | "answer" | "sight" | "grants">>
+> = {
   "archmage/protective-magic": PROTECTIVE_MAGIC,
   "lich/protective-magic": PROTECTIVE_MAGIC,
-  "mage/protective-magic": PROTECTIVE_MAGIC
+  "mage/protective-magic": PROTECTIVE_MAGIC,
+  "sphinx-of-wonder/burst-of-ingenuity": {
+    answer: {
+      rolls: ["check", "save", "death-save"],
+      whose: "any",
+      rangeFeet: 30,
+      when: "any",
+      effect: { kind: "add", amount: "2" }
+    }
+  },
+  "rust-monster/reflexive-antennae": {
+    reaction: { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 5, usesAction: "antennae" }
+  },
+  "stone-giant/deflect-missile": {
+    reaction: {
+      trigger: "hit-by-attack",
+      response: "reduce-damage",
+      formula: "1d10 + 6",
+      damageTypes: ["bludgeoning", "piercing", "slashing"],
+      attackKinds: ["ranged"]
+    }
+  },
+  // "Magical darkness fills a 15-foot Emanation originating from the darkmantle. This effect lasts while the darkmantle
+  // maintains Concentration on it, up to 10 minutes. Darkvision can't penetrate this area, and no light can
+  // illuminate it."
+  "darkmantle/darkness-aura": {
+    grants: {
+      name: "Darkness Aura",
+      tags: ["darkness-aura"],
+      target: "self",
+      duration: { type: "rounds", rounds: 100 },
+      modifiers: [],
+      onEnd: [],
+      voidWhileIncapacitated: false,
+      concentration: true
+    },
+    sight: { area: { kind: "magical-darkness", aroundSelfFeet: 15 } }
+  },
+  // "The magmin sets itself ablaze or extinguishes its flames. While ablaze, the magmin sheds Bright Light in a 10-foot
+  // radius and Dim Light for an additional 10 feet."
+  "magmin/ignited-illumination": { sight: { light: { on: "caster", brightFeet: 10, dimFeet: 10 }, toggles: true } },
+  // "The Cube is Heavily Obscured for 1 minute": the Cube the reaction places.
+  "octopus/ink-cloud": { sight: { area: { kind: "heavily-obscured" }, rounds: 10 } },
+  // "Wisdom Saving Throw: DC 13, each creature in a 60-foot Cone that can see the ghost and isn't an Undead."
+  "ghost/horrific-visage": { sight: { seenBy: "user" } },
+  "giant-octopus/ink-cloud": { sight: { area: { kind: "heavily-obscured" }, rounds: 10 } },
+  // "The wisp and its light have the Invisible condition until the wisp's Concentration ends on this effect, which ends
+  // early immediately after the wisp makes an attack roll": Invisible, its Illumination out, until it attacks.
+  "will-o-wisp/vanish": {
+    grants: {
+      name: "Vanish",
+      tags: ["light-out", "until-it-acts"],
+      target: "self",
+      duration: { type: "manual" },
+      conditions: ["invisible"],
+      modifiers: [],
+      onEnd: [],
+      voidWhileIncapacitated: false,
+      concentration: true
+    }
+  }
 };
 
 const PRINTED_NAME = "[A-Z][A-Za-z'\u2019-]*(?: [A-Z][A-Za-z'\u2019-]*)*";
@@ -458,7 +673,7 @@ function linkedActions(actions: ActorAction[], idOf: (name: string) => string | 
         new RegExp(`\\buses (${PRINTED_NAME})(?=[.,]| and\\b)`).exec(body);
       const source = named ? byId.get(idOf(named[1]) ?? "") : undefined;
       if (source && (source.attack || source.save || source.damage.length > 0)) {
-        const { attack, save, damage, onHit, conditionalDamage, reminder, area, targetRules } = source;
+        const { attack, save, damage, onHit, conditionalDamage, reminder, area, targetRules, targets } = source;
         next = {
           ...next,
           ...(attack ? { attack } : {}),
@@ -468,7 +683,8 @@ function linkedActions(actions: ActorAction[], idOf: (name: string) => string | 
           ...(conditionalDamage ? { conditionalDamage } : {}),
           ...(reminder ? { reminder } : {}),
           ...(area && !next.area ? { area } : {}),
-          ...(targetRules ? { targetRules } : {})
+          ...(targetRules ? { targetRules } : {}),
+          ...(targets && !next.targets ? { targets } : {})
         };
       }
     }
@@ -720,6 +936,9 @@ const CORRECTIONS: Record<string, Partial<CreatureFields>> = {
   // mastiff / swarm-of-rats: the save *modifier* stored where the SRD-printed save bonus belongs.
   "srd-2024_mastiff": { saving_throw_wisdom: 3 },
   "srd-2024_swarm-of-rats": { saving_throw_dexterity: 2 },
+  // vampire spawn: the SRD prints "Speed 30 ft., Climb 30 ft." (its Spider Climb climbs with it); open5e drops the
+  // Climb Speed.
+  "srd-2024_vampire-spawn": { climb: 30 },
   ...Object.fromEntries(TINY_PER_SRD.map((slug) => [`srd-2024_${slug}`, { size: "tiny" }])),
   ...Object.fromEntries(MEDIUM_OR_SMALL_PER_SRD.map((slug) => [`srd-2024_${slug}`, { size: "medium" }]))
 };
@@ -734,6 +953,12 @@ for (const pk of [...Object.keys(CORRECTIONS), ...EXCLUSIONS]) {
 for (const pk of Object.keys(SPELL_CORRECTIONS)) {
   if (!spells.some((spell) => spell.pk === pk))
     throw new Error(`Spell correction targets unknown spell ${pk} - check for a typo or an upstream rename.`);
+}
+for (const id of UPCAST_DURATION_IDS) {
+  if (!spells.some((spell) => spell.pk === `srd-2024_${id}` && spell.fields.higher_level))
+    throw new Error(
+      `An upcast duration targets ${id}, which is not a spell with higher-level text - check for a typo.`
+    );
 }
 for (const id of SPELL_SAVE_OVERRIDE_IDS) {
   if (!spells.some((spell) => spell.pk === `srd-2024_${id}` && spell.fields.saving_throw_ability))
@@ -833,13 +1058,25 @@ const monsters: ActorDefinition[] = creatures
       const loss = save && fix?.drop !== "outcome" ? hitPointLossOf(action.fields.desc) : null;
       // Later-turn damage the engine deals itself (`ongoingDamage`) leaves the GM's reminder.
       const laterDamage = saveDamage?.laterDamage ?? null;
-      const reminder =
-        fix?.reminder ??
-        loss?.reminder ??
-        (laterDamage !== null && saveOutcome && "ongoingDamage" in saveOutcome
+      // "While Poisoned, the target can't regain Hit Points" (a pit fiend's Bite): the poison's own effect stops healing,
+      // so the repeat save that ends one ends both.
+      const poisonStopsHealing =
+        !loss &&
+        saveOutcome?.failureConditions.includes("poisoned") === true &&
+        /\bWhile Poisoned, the target can[\u2019']t regain Hit Points\b/.test(action.fields.desc);
+      const later =
+        laterDamage !== null && saveOutcome && "ongoingDamage" in saveOutcome
           ? withoutOngoingDamage(laterDamage)
-          : laterDamage) ??
-        undefined;
+          : laterDamage;
+      // What is left once the engine runs the no-healing and the repeat save is nothing to remind.
+      const stale =
+        poisonStopsHealing &&
+        saveOutcome?.repeatSave === true &&
+        later !== null &&
+        /^While Poisoned, the target can[\u2019']t regain Hit Points, and it repeats the save at the end of each of its turns, ending the effect on itself on a success\.$/.test(
+          later
+        );
+      const reminder = fix?.reminder ?? loss?.reminder ?? (stale ? null : later) ?? undefined;
       const fromRows = row
         ? [
             ...(row.damage_die_count && row.damage_die_type
@@ -921,7 +1158,10 @@ const monsters: ActorDefinition[] = creatures
                 ability: ABILITY_BY_NAME[save[1] as keyof typeof ABILITY_BY_NAME],
                 dc: Number.parseInt(save[2], 10),
                 ...saveOutcome!,
-                ...(loss ? { failureEffect: loss.failureEffect, ongoingDamage: loss.ongoingDamage } : {})
+                ...(loss ? { failureEffect: loss.failureEffect, ongoingDamage: loss.ongoingDamage } : {}),
+                ...(poisonStopsHealing
+                  ? { failureEffect: { name: "Poisoned", tags: ["no-healing"], modifiers: [] } }
+                  : {})
               }
             }
           : {}),
@@ -936,6 +1176,7 @@ const monsters: ActorDefinition[] = creatures
           ? { multiattackReplacements: multiattack.replacements }
           : {}),
         ...(onHit ? { onHit } : {}),
+        ...(save && !attack ? withSaveTargets(action.fields.desc) : {}),
         ...(uses ? { uses } : {}),
         ...(legendary
           ? {
@@ -1154,6 +1395,12 @@ for (const option of spellOptions) {
   spellOptionsBySpell.set(option.fields.parent, list);
 }
 
+/** The reviewed higher-slot durations, on the spells that have them. */
+const withUpcastDurations = (id: string) => {
+  const rows = upcastDurationsFor(id);
+  return rows ? { upcastDurations: rows } : {};
+};
+
 const spellRecords = onlySrd(spells).map((spell) => {
   const correction = SPELL_CORRECTIONS[spell.pk];
   if (correction) report.corrections.push(spell.pk);
@@ -1178,10 +1425,12 @@ const spellRecords = onlySrd(spells).map((spell) => {
       somatic: fields.somatic,
       material: fields.material,
       materialText: fields.material_specified || null,
-      materialConsumed: fields.material_consumed
+      materialConsumed: fields.material_consumed,
+      ...(costlyMaterialsFor(slugOf(spell.pk)) ? { costly: costlyMaterialsFor(slugOf(spell.pk)) } : {})
     },
     duration: fields.duration,
     concentration: fields.concentration,
+    ...withUpcastDurations(slugOf(spell.pk)),
     ritual: fields.ritual,
     attackRoll: makesSpellAttack(fields.desc, effect),
     damage: { roll: fields.damage_roll || null, types: [...fields.damage_types] },
@@ -1194,6 +1443,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
       : null,
     area: spellAreaFor(slugOf(spell.pk), fields.desc),
     effect,
+    ...(spellSightFor(slugOf(spell.pk)) ? { sight: spellSightFor(slugOf(spell.pk)) } : {}),
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
     higherLevel: fields.higher_level || null,

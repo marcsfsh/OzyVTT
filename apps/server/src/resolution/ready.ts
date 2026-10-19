@@ -63,7 +63,12 @@ export function holdReadiedSpell(ctx: ResolveContext): void {
       startedRound: state.combat.round,
       duration: { type: "until-source-next-turn" },
       castId,
-      readiedSpell: { actionId: action.id, level }
+      // Its Metamagic was paid with the cast, and shapes the spell when it is released.
+      readiedSpell: {
+        actionId: action.id,
+        level,
+        ...(input.shaping && input.shaping.length > 0 ? { shaping: input.shaping.map((entry) => ({ ...entry })) } : {})
+      }
     })
   );
   for (const effect of [holding, readied])

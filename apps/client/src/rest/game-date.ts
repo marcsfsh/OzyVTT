@@ -1,10 +1,10 @@
 import { useCallback } from "react";
-import { formatWorldDate, type GmCodexCalendar } from "@vtt/domain";
+import { clockTimeLabel, formatWorldDate, type GmCodexCalendar } from "@vtt/domain";
 import { calendarApi } from "../codex/api";
 import { useCodexQuery } from "../codex/useCodexQuery";
 
-/** The game clock's hour of the day: "14:00". */
-export const hourLabel = (clockHours: number) => `${String(clockHours % 24).padStart(2, "0")}:00`;
+/** The game clock's time of day: "14:30". */
+export const hourLabel = (clockHours: number, clockMinutes = 0) => clockTimeLabel(clockHours, clockMinutes);
 
 /**
  * The table's one clock as the GM reads it. The Codex calendar keeps the day and the game clock keeps the hour; the
@@ -12,11 +12,12 @@ export const hourLabel = (clockHours: number) => `${String(clockHours % 24).padS
  */
 export function gameDate(
   calendar: GmCodexCalendar | null | undefined,
-  clockHours: number
+  clockHours: number,
+  clockMinutes = 0
 ): Readonly<{ date: string | null; hour: string }> {
   return {
     date: calendar?.currentDate ? formatWorldDate(calendar, calendar.currentDate) : null,
-    hour: hourLabel(clockHours)
+    hour: hourLabel(clockHours, clockMinutes)
   };
 }
 

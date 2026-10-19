@@ -639,10 +639,45 @@
   min-width: 0;
   max-width: 100%;
 }
+/* Riding: one button a mount within reach, or the way off the one it rides. */
+.encounter-mount {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+/* A move or teleport an action granted this turn, on its own line under the modes. */
+.encounter-move-modes-grant {
+  flex-basis: 100%;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 .encounter-move-modes .nh-segmented-option {
   flex: none;
   min-height: var(--tap-min);
   white-space: nowrap;
+}
+/* A creature's height in its token menu: the stepper, then the move or the GM's free placement. */
+.encounter-height {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+/* The height badge on a token: how many feet up it is, drawn as a pill at its top right. */
+.token-altitude rect {
+  fill: var(--surface-1);
+  stroke: var(--cyan);
+  stroke-width: 1.5;
+}
+.token-altitude text {
+  fill: var(--text);
+  font-family: var(--font-label);
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.token-altitude path {
+  fill: var(--cyan);
 }
 /* A refused move's follow-up: the GM moves it anyway, a player asks the GM. */
 .encounter-move-blocked {
@@ -740,6 +775,47 @@
   stroke: var(--void);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
+}
+/* The GM's painted areas of light and obscurement, and the one being dragged: violet, shaded darker the less light
+   or sight they leave. */
+.vision-area,
+.vision-area-preview {
+  fill: var(--violet);
+  fill-opacity: 0.08;
+  stroke: var(--violet-hi);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.vision-area-dim,
+.vision-area-lightly-obscured {
+  fill-opacity: 0.16;
+}
+.vision-area-dark,
+.vision-area-heavily-obscured {
+  fill-opacity: 0.26;
+}
+.vision-area-magical-darkness {
+  fill: var(--void);
+  fill-opacity: 0.45;
+}
+/* A creature a player's character senses without seeing it (Divine Sense): a dashed ring and its creature type, in
+   the information hue, above the dark. */
+.vision-sensed circle {
+  fill: color-mix(in srgb, var(--indigo) 22%, transparent);
+  stroke: var(--indigo);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+}
+.vision-sensed text {
+  fill: var(--indigo-text);
+  font-family: var(--font-label);
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--void);
+  stroke-width: 3px;
 }
 
 /* A monster's number among its kind sits on a square badge at the token's top left. Every list shows the same number. */

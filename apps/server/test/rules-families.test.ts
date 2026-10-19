@@ -48,6 +48,10 @@ describe("rule families", () => {
       ["movement.occupied", "movement"],
       ["movement.no-speed", "movement"],
       ["movement.blocked-path", "movement"],
+      ["movement.altitude", "movement"],
+      ["movement.jump", "movement"],
+      ["movement.toward-fear", "movement"],
+      ["movement.mount", "movement"],
       ["economy.action-used", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
@@ -66,6 +70,7 @@ describe("rule families", () => {
       ["condition.no-reactions", "economy"],
       ["condition.no-spells", "economy"],
       ["legendary.own-turn", "economy"],
+      ["legendary.after-a-turn", "economy"],
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],
       ["attack.cleave-needs-hit", "economy"],
@@ -85,6 +90,7 @@ describe("rule families", () => {
       ["spell.later-turn", "economy"],
       // Sneak Attack or a smite taken alone, with no hit to add to.
       ["attack.rides-a-hit", "economy"],
+      ["roll.answers-a-roll", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
       // Action Surge with two uses, Stunning Strike: once on a turn, a spent per-turn limit.
@@ -104,8 +110,16 @@ describe("rule families", () => {
       ["cover.total", "targeting"],
       // Hiding in an enemy's sight: where the creature stands relative to the others, like cover.
       ["hide.seen", "targeting"],
+      ["hide.exposed", "targeting"],
+      ["light.too-bright", "targeting"],
       ["condition.charmed-charmer", "targeting"],
       ["target.too-many", "targeting"],
+      // Whom a spell may pick: a creature of a type it targets, one the caster sees, all in one of its areas.
+      ["target.wrong-type", "targeting"],
+      ["target.unseen", "targeting"],
+      ["target.outside-area", "targeting"],
+      // A creature the action can't affect (Turn Undead on a goblin, a flask's Holy Water on a bandit).
+      ["target.not-allowed", "targeting"],
       ["attack.cleave-same-target", "targeting"],
       ["attack.cleave-too-far", "targeting"],
       // The hit can't carry the extra: no Advantage or ally for Sneak Attack, no melee weapon for a smite.
@@ -114,7 +128,18 @@ describe("rule families", () => {
       ["slots.none-remaining", "slots"],
       ["slots.below-spell-level", "slots"],
       ["slots.one-per-turn", "slots"],
-      ["slots.not-prepared", "slots"]
+      ["slots.not-prepared", "slots"],
+      // Metamagic shapes a cast: spellcasting rules, its picks' creatures a cast's targeting, its own row a rider.
+      ["metamagic.unknown", "slots"],
+      ["metamagic.unfit", "slots"],
+      ["metamagic.too-many", "slots"],
+      ["metamagic.quickened", "slots"],
+      ["metamagic.choice", "targeting"],
+      ["metamagic.with-a-cast", "economy"],
+      // "Check spell components" relaxes speech, hands and materials alone.
+      ["spell.no-verbal", "components"],
+      ["spell.no-free-hand", "components"],
+      ["spell.no-material", "components"]
     ];
     for (const [rule, family] of expected) expect(familyOf(rule), rule).toBe(family);
     expect(expected.map(([rule]) => rule).sort()).toEqual([...RULE_IDS].sort());

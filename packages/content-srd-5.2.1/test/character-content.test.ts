@@ -1872,7 +1872,9 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     ).toHaveLength(8);
     // A granted Fly, Swim, Climb or Burrow Speed rides the same vocabulary.
     expect(feat([{ type: "special-speed", movement: "climb", equalToSpeed: true }]).feature.modifiers).toHaveLength(1);
-    expect(ModifierSchema.options).toHaveLength(27);
+    // So does a movement rule: a jump by Dexterity, a safe fall, a cheap leap.
+    expect(feat([{ type: "movement", rule: "jump-by-dexterity" }]).feature.modifiers).toHaveLength(1);
+    expect(ModifierSchema.options).toHaveLength(28);
   });
 
   it("15. an item that grants a feat", () => {
@@ -1921,7 +1923,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
   });
 
   it("keeps `when` an AND-list, not an expression language", () => {
-    // Twenty-eight triggers in four kinds, and the kind is what decides the evaluation layer.
+    // Thirty triggers in four kinds, and the kind is what decides the evaluation layer.
     expect(riderLayer([])).toBe("standing");
     expect(riderLayer([{ type: "while-hp-at-or-below", percent: 50 }])).toBe("conditional");
     expect(riderLayer([{ type: "attuned" }, { type: "while-shield", wielding: true }])).toBe("standing");

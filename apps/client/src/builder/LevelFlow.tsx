@@ -36,8 +36,15 @@ import "./character-builder.css";
 
 type LevelState = GmView | PlayerView;
 
-/** Ledger rows the build writes itself, which a level-down preview does not list as choices. */
-const BUILD_RECORDS: ReadonlySet<string> = new Set(["hp-roll", "class-levels", "ability-scores"]);
+/** Ledger rows the build writes itself or the sheet keeps (a hand edit, a studied book), which a level-down preview
+ *  does not list as choices. */
+const BUILD_RECORDS: ReadonlySet<string> = new Set([
+  "hp-roll",
+  "class-levels",
+  "ability-scores",
+  "sheet-proficiencies",
+  "studied-item"
+]);
 
 export function LevelFlow({
   state,

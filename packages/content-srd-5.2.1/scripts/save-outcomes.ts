@@ -21,6 +21,7 @@ export type SaveOutcome = {
   repeatSave?: true;
   escapeDc?: number;
   endsOnDamage?: true;
+  endsOnSourceSideDamage?: true;
   speedZero?: true;
   rangeFeet?: number;
   failsAtHitPoints?: number;
@@ -28,6 +29,7 @@ export type SaveOutcome = {
   ignoresCover?: true;
   failurePush?: ForcedPush;
   advantageAtSize?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
+  breaksConcentration?: true;
 };
 
 /** The push a failure clause prints: "is pushed 10 feet away from you", "pushed up to 30 feet straight away from the
@@ -81,21 +83,39 @@ function companionConditions(clause: string, first: readonly SaveCondition[]): S
   return found;
 }
 
+const MINUTES_PER: Readonly<Record<string, number>> = { minute: 1, hour: 60, day: 1440 };
+
 /**
  * How long the failure's conditions last, from the first duration phrase after them: "until the end of its next
  * turn" is the target's turn, "until the end of the ghoul's / your next turn" the source's, "until the start of ...
- * next turn" the source's start, "for 1 minute" ten rounds (as does "After 1 minute, it succeeds automatically").
- * Longer spans (an hour, a day) and "for the duration" are left to their own ending (Concentration, the GM).
+ * next turn" the source's start, "for 1 minute" ten rounds (as does "After 1 minute, it succeeds automatically"), a
+ * longer span ("for 1 hour", "for 24 hours") minutes of game time, and "until you finish a Long Rest" the bearer's next
+ * one. "For the duration" is left to the spell's own ending (its duration, its Concentration).
  */
 export function failureDurationOf(clause: string): SaveFailureDuration | undefined {
-  const timed = clause.match(
-    /\buntil the (start|end) of (its|your|the [A-Za-z' -]+?(?:'s|s')) next turn\b|\bfor (1|10) minutes?\b|\bAfter (1|10) minutes?, it succeeds automatically\b/
+  // "The target is immune to this ghost's Possession for 24 hours" is how long an immunity lasts, not the failure.
+  const lifetime = clause
+    .split(/(?<=[.!?])\s+/)
+    .filter((sentence) => !/\bimmune\b/i.test(sentence))
+    .join(" ");
+  const timed = lifetime.match(
+    /\buntil the (start|end) of (its|your|the [A-Za-z' -]+?(?:'s|s')) next turn\b|\bfor (\d+) (minute|hour|day)s?\b|\bAfter (\d+) (minute|hour|day)s?, it succeeds automatically\b|\buntil (?:you|it|the target) finish(?:es)? a (Short or Long|Long) Rest\b/
   );
   if (!timed) return undefined;
-  if (timed[3] ?? timed[4]) return { type: "rounds", rounds: (timed[3] ?? timed[4]) === "1" ? 10 : 100 };
+  if (timed[7]) return { type: "until-rest", rest: timed[7] === "Long" ? "long" : "short" };
+  const count = timed[3] ?? timed[5];
+  if (count) {
+    const minutes = Number.parseInt(count, 10) * MINUTES_PER[(timed[4] ?? timed[6])!]!;
+    return minutes <= 10 ? { type: "rounds", rounds: minutes * 10 } : { type: "minutes", minutes };
+  }
   if (timed[1] === "start") return { type: "until-source-next-turn" };
   return timed[2] === "its" ? { type: "until-bearer-turn-end" } : { type: "until-source-turn-end" };
 }
+
+/** "Until you or your allies damage it", "If you or one of your allies deals damage to the target": the failure ends
+ *  when the source's side deals damage to the creature. */
+const ENDS_ON_SOURCE_SIDE_DAMAGE =
+  /\buntil you or your allies (?:damage|deal damage to) (?:it|the target)\b|\bIf you or one of your allies deals damage to the target\b/;
 
 /** "Repeats the save at the end of each of its turns" in its printings, which ends on a success. A save repeated a
  *  set number of times (Flesh to Stone's three) or once (a basilisk's next turn) is left to the GM. */
@@ -207,6 +227,7 @@ function failureLifetime(clause: string, named: NamedConditions): Omit<SaveOutco
     ...(repeatsEachTurn(clause) ? { repeatSave: true as const } : {}),
     ...(escape ? { escapeDc: Number.parseInt(escape[1]!, 10) } : {}),
     ...(ENDS_ON_DAMAGE.test(clause) ? { endsOnDamage: true as const } : {}),
+    ...(ENDS_ON_SOURCE_SIDE_DAMAGE.test(clause) ? { endsOnSourceSideDamage: true as const } : {}),
     ...(/\ba Speed of 0\b/.test(clause) ? { speedZero: true as const } : {}),
     ...(ongoing ? { ongoingDamage: ongoing } : {}),
     ...(push ? { failurePush: push } : {})
@@ -292,6 +313,16 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   "vitriolic-sphere": {
     ongoingDamage: { damage: [{ formula: "5d4", type: "acid" }], at: "bearer-turn-end" }
   },
+  // "On a failed save, a creature has the Prone condition, and its Concentration is broken"; the tremor deals no damage.
+  earthquake: { successDamage: "none", breaksConcentration: true },
+  // "Have the Prone condition and lose Concentration".
+  "sleet-storm": { breaksConcentration: true },
+  // "Make a DC 15 Intelligence saving throw" yourself: "you take 6d6 Psychic damage and have the Incapacitated condition
+  // until you finish a Long Rest" (`spell-effects.ts` makes it the caster's own save).
+  "contact-other-plane": { failureDuration: { type: "until-rest", rest: "long" } },
+  // "For the duration, the target makes a Wisdom saving throw at the end of each of its turns ... On a successful save,
+  // the spell ends." The failure leaves no condition for the reader to hang it on.
+  "phantasmal-killer": { repeatSave: true },
   // "While Restrained, the target takes 1d6 Piercing damage at the start of each of its turns", and "A Large or larger
   // creature has Advantage on this save".
   "ensnaring-strike": {

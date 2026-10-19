@@ -955,7 +955,43 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [
+    "poison"
+   ],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
+  "modifiers": [
+   {
+    "type": "darkvision",
+    "feet": 60
+   },
+   {
+    "type": "roll-mode",
+    "roll": "save",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-saving-throw"
+     },
+     {
+      "type": "versus-condition",
+      "conditionIds": [
+       "poisoned"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "belt-of-giant-strength",
@@ -1096,7 +1132,30 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "levitate",
+    "name": "Levitate (Self)",
+    "activation": "action",
+    "description": "Cast Levitate on yourself: you rise up to 20 feet and stay suspended, moving only by pushing or pulling along a surface as if climbing. You can move up or down as part of your move. When it ends, you float gently to the ground. End it on your sheet.",
+    "damage": [],
+    "grants": {
+     "name": "Levitate",
+     "tags": [
+      "levitating"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 10
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -1150,7 +1209,14 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "movement",
+    "rule": "leap",
+    "feet": 30,
+    "costFeet": 10
+   }
+  ]
  },
  {
   "id": "boots-of-the-winterlands",
@@ -1414,7 +1480,36 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "ride",
+    "name": "Ride the Broom",
+    "activation": "action",
+    "description": "Stand astride the broom and speak its command word: it hovers beneath you with a Fly Speed of 50 feet (30 feet while carrying over 200 pounds). It stops hovering when you land; end it on your sheet.",
+    "damage": [],
+    "grants": {
+     "name": "Broom of Flying",
+     "tags": [
+      "broom-of-flying"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [
+      {
+       "type": "special-speed",
+       "movement": "fly",
+       "feet": 50,
+       "hover": true
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -1426,6 +1521,11 @@
   "costGp": null,
   "weightLb": null,
   "description": "Wondrous Item, Very Rare (Requires Attunement). This candle's magic is activated when the candle is lit, which requires a Magic action. After burning for 4 hours, the candle is destroyed. You can snuff it out early for use at a later time. Deduct the time it burned in increments of 1 minute from its total burn time. While lit, the candle sheds Dim Light in a 30-foot radius. While you are within that light, you have Advantage on D20 Tests. In addition, a Cleric or Druid in the light can cast level 1 spells they have prepared without expending spell slots. Alternatively, when you light the candle for the first time, you can cast Gate with it. Doing so destroys the candle. The portal created by the spell links to a particular Outer Plane chosen by the GM or determined by rolling on the following table. 1d100 01–05: Outer Plane Abyss, 1d100 55–59, Outer Plane Gehenna; 1d100 06–10: Outer Plane Acheron, 1d100 60–64, Outer Plane Hades; 1d100 11–17: Outer Plane Arborea, 1d100 65–69, Outer Plane Limbo; 1d100 18–25: Outer Plane Arcadia, 1d100 70–77, Outer Plane Mechanus; 1d100 26–33: Outer Plane Beastlands, 1d100 78–85, Outer Plane Mount Celestia; 1d100 34–41: Outer Plane Bytopia, 1d100 86–90, Outer Plane Nine Hells; 1d100 42–46: Outer Plane Carceri, 1d100 91–95, Outer Plane Pandemonium; 1d100 47–54: Outer Plane Elysium, 1d100 96–00, Outer Plane Ysgard.",
+  "light": {
+   "brightFeet": 0,
+   "dimFeet": 30,
+   "burnHours": 4
+  },
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
@@ -1463,7 +1563,16 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "dimension-door",
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "consumesSpellSlot": false
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -1606,9 +1715,26 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [],
+  "casts": [
+   {
+    "spellId": "web",
+    "saveDc": 13,
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "consumesSpellSlot": false,
+    "area": {
+     "shape": "cube",
+     "sizeFeet": 40,
+     "widthFeet": null
+    }
+   }
+  ],
   "grantsFeatIds": [],
-  "tags": [],
+  "tags": [
+   "web-walker"
+  ],
   "actions": [],
   "effects": [],
   "grants": {
@@ -1626,7 +1752,13 @@
    "conditionImmunities": [],
    "spells": []
   },
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "special-speed",
+    "movement": "climb",
+    "equalToSpeed": true
+   }
+  ]
  },
  {
   "id": "cloak-of-displacement",
@@ -2085,9 +2217,60 @@
   },
   "cursed": false,
   "casts": [],
+  "onHit": [
+   {
+    "conditions": [
+     {
+      "id": "poisoned"
+     }
+    ],
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "save": {
+     "ability": "con",
+     "dc": 15,
+     "failureDamage": [
+      {
+       "formula": "2d10",
+       "type": "poison"
+      }
+     ]
+    },
+    "spendsEffectTag": "venom-coat"
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "coat-blade",
+    "name": "Coat the Blade",
+    "activation": "bonus-action",
+    "description": "Coat the blade with poison. It remains for 1 minute or until an attack using this weapon hits a creature, which must succeed on a DC 15 Constitution saving throw or take 2d10 Poison damage and have the Poisoned condition for 1 minute.",
+    "damage": [],
+    "grants": {
+     "name": "Dagger of Venom: coated",
+     "tags": [
+      "venom-coat"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    },
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {
@@ -2169,6 +2352,10 @@
       "type": "bludgeoning"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 30
+    },
     "save": {
      "ability": "str",
      "dc": 13,
@@ -2892,7 +3079,27 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "open",
+    "name": "Open the Bottle",
+    "activation": "action",
+    "description": "Remove the stopper: smoke fills a 60-foot Emanation originating from the bottle, Heavily Obscured, for 10 minutes.",
+    "damage": [],
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 60,
+     "widthFeet": null
+    },
+    "sight": {
+     "area": {
+      "kind": "heavily-obscured",
+      "aroundSelfFeet": 60
+     },
+     "rounds": 100
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -3045,6 +3252,11 @@
   "costGp": null,
   "weightLb": null,
   "description": "Weapon (Any Melee Weapon), Rare (Requires Attunement). While holding this magic weapon, you can take a Bonus Action and use a command word to cause flames to engulf the damage-dealing part of the weapon. These flames shed Bright Light in a 40-foot radius and Dim Light for an additional 40 feet. While the weapon is ablaze, it deals an extra 2d6 Fire damage on a hit. The flames last until you take a Bonus Action to issue the command again or until you drop, stow, or sheathe the weapon.",
+  "light": {
+   "brightFeet": 40,
+   "dimFeet": 40,
+   "ridersWhileLit": true
+  },
   "weapon": null,
   "armor": null,
   "slot": "weapon",
@@ -3220,6 +3432,10 @@
   "costGp": null,
   "weightLb": null,
   "description": "Wondrous Item, Uncommon. This prism has 50 charges. While you are holding it, you can take a Magic action and use one of three command words to cause one of the following effects: First Command Word. The gem sheds Bright Light in a 30-foot radius and Dim Light for an additional 30 feet. This effect doesn't expend a charge. It lasts until you take a Bonus Action to repeat the command word or until you use another function of the gem. Second Command Word. You expend 1 charge and cause the gem to fire a brilliant beam of light at one creature you can see within 60 feet of yourself. The creature must succeed on a DC 15 Constitution saving throw or have the Blinded condition for 1 minute. The creature repeats the save at the end of each of its turns, ending the effect on itself on a success. Third Command Word. You expend 5 charges and cause the gem to flare with intense light in a 30-foot Cone. Each creature in the Cone makes a saving throw as if struck by the beam created with the second command word. When all of the gem's charges are expended, the gem becomes a nonmagical jewel worth 50 GP.",
+  "light": {
+   "brightFeet": 30,
+   "dimFeet": 30
+  },
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
@@ -3271,6 +3487,27 @@
     "activation": "action",
     "description": "Expend 1 charge. For the next 10 minutes, you have Truesight out to 120 feet when you peer through the gem.",
     "damage": [],
+    "grants": {
+     "name": "Peering Through the Gem of Seeing",
+     "tags": [
+      "gem-of-seeing"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 100
+     },
+     "modifiers": [
+      {
+       "type": "sense",
+       "sense": "truesight",
+       "feet": 120
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    },
     "uses": {
      "limit": 3,
      "per": "long-rest",
@@ -3343,6 +3580,22 @@
   },
   "cursed": false,
   "casts": [],
+  "onHit": [
+   {
+    "conditions": [
+     {
+      "id": "prone"
+     }
+    ],
+    "save": {
+     "ability": "str",
+     "dc": 15
+    },
+    "creatureTypes": [
+     "giant"
+    ]
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -3433,7 +3686,26 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "snare-missile",
+    "name": "Snare Missile",
+    "activation": "reaction",
+    "description": "If you're hit by an attack roll made with a Ranged or Thrown weapon while wearing these gloves, you can take a Reaction to reduce the damage by 1d10 plus your Dexterity modifier if you have a free hand. If you reduce the damage to 0, you can catch the ammunition or weapon if it is small enough for you to hold in that hand.",
+    "damage": [],
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "reduce-damage",
+     "formula": "1d10",
+     "attackKinds": [
+      "ranged-weapon"
+     ]
+    },
+    "adds": {
+     "abilityModifier": "dex"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -3529,7 +3801,13 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "darkvision",
+    "feet": 60,
+    "extends": true
+   }
+  ]
  },
  {
   "id": "hammer-of-thunderbolts",
@@ -4121,6 +4399,25 @@
     "activation": "action",
     "description": "Throw the sphere at a Huge or smaller creature you can see within 60 feet of yourself. As the sphere moves through the air, it opens into a tangle of metal bands. On a hit, the target has the Restrained condition until you take a Bonus Action to issue a command that releases it. Doing so or missing with the attack causes the bands to contract and become a sphere once more. A creature that can touch the bands, including the one Restrained, can take an action to make a DC 20 Strength (Athletics) check to break the iron bands. On a successful check, the item is destroyed, and the Restrained creature is freed. On a failed check, any further attempts made by that creature automatically fail until 24 hours have elapsed. Once the bands are used, they can't be used again until the next dawn.",
     "damage": [],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "restrained"
+       }
+      ],
+      "name": "Iron Bands",
+      "escapeDc": 20,
+      "tags": [
+       "escape-athletics"
+      ]
+     }
+    ],
+    "targets": {
+     "count": 1,
+     "maxSize": "huge",
+     "seen": true
+    },
     "uses": {
      "limit": 1,
      "per": "long-rest",
@@ -4165,6 +4462,17 @@
     "activation": "action",
     "description": "Target a creature you can see within 60 feet of yourself. If the flask is empty and the target is native to a plane of existence other than the one you are on, the target must succeed on a DC 17 Wisdom saving throw or be trapped in the flask. Once trapped, a creature remains in the flask until released.",
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "creatureTypes": [
+      "celestial",
+      "elemental",
+      "fey",
+      "fiend"
+     ],
+     "seen": true
+    },
     "save": {
      "ability": "wis",
      "dc": 17,
@@ -4215,6 +4523,17 @@
   "costGp": null,
   "weightLb": null,
   "description": "Wondrous Item, Uncommon. While lit, this hooded lantern burns for 6 hours on 1 pint of oil, shedding Bright Light in a 30-foot radius and Dim Light for an additional 30 feet. Invisible creatures and objects are visible as long as they are in the lantern's Bright Light. You can take a Utilize action to lower the hood, reducing the lantern's light to Dim Light in a 5-foot radius.",
+  "light": {
+   "brightFeet": 30,
+   "dimFeet": 30,
+   "hooded": {
+    "brightFeet": 0,
+    "dimFeet": 5
+   },
+   "revealsInvisible": true,
+   "burnHours": 6,
+   "fuel": "oil"
+  },
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
@@ -4266,7 +4585,33 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "luck",
+    "name": "Luck",
+    "activation": "other",
+    "description": "Reroll one failed D20 Test if you don't have the Incapacitated condition. You must use the second roll. Once used, this property can't be used again until the next dawn.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "answer": {
+     "rolls": [
+      "attack",
+      "save",
+      "check",
+      "death-save"
+     ],
+     "whose": "own",
+     "when": "failure",
+     "notWhileIncapacitated": true,
+     "effect": {
+      "kind": "reroll"
+     }
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {
@@ -4291,6 +4636,11 @@
   "costGp": null,
   "weightLb": null,
   "description": "Weapon (Mace), Rare (Requires Attunement). When you hit a Fiend or an Undead with this magic weapon, that creature takes an extra 2d6 Radiant damage. If the target has 25 Hit Points or fewer after taking this damage, it must succeed on a DC 15 Wisdom saving throw or be destroyed. On a successful save, the creature has the Frightened condition until the end of your next turn. Light. While you hold this weapon, it sheds Bright Light in a 20-foot radius and Dim Light for an additional 20 feet.",
+  "light": {
+   "brightFeet": 20,
+   "dimFeet": 20,
+   "always": true
+  },
   "weapon": null,
   "armor": null,
   "slot": "weapon",
@@ -4358,6 +4708,16 @@
   },
   "cursed": false,
   "casts": [],
+  "onHit": [
+   {
+    "conditions": [],
+    "naturalTwenty": true,
+    "creatureTypes": [
+     "construct"
+    ],
+    "reminder": "A Construct with 25 Hit Points or fewer after this damage is destroyed."
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -4406,7 +4766,7 @@
     "amount": 7,
     "when": [
      {
-      "type": "on-critical-hit"
+      "type": "on-natural-20"
      }
     ]
    },
@@ -4415,7 +4775,7 @@
     "amount": 7,
     "when": [
      {
-      "type": "on-critical-hit"
+      "type": "on-natural-20"
      },
      {
       "type": "versus-creature-type",
@@ -4504,6 +4864,13 @@
   },
   "cursed": false,
   "casts": [],
+  "study": {
+   "ability": "con",
+   "amount": 2,
+   "maximum": 30,
+   "hours": 48,
+   "days": 6
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -4530,6 +4897,13 @@
   },
   "cursed": false,
   "casts": [],
+  "study": {
+   "ability": "str",
+   "amount": 2,
+   "maximum": 30,
+   "hours": 48,
+   "days": 6
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -4582,6 +4956,13 @@
   },
   "cursed": false,
   "casts": [],
+  "study": {
+   "ability": "dex",
+   "amount": 2,
+   "maximum": 30,
+   "hours": 48,
+   "days": 6
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -5197,6 +5578,9 @@
     "activation": "action",
     "description": "Expend 1 charge to play an eerie, spellbinding tune. Each creature of your choice within 30 feet of you must succeed on a DC 15 Wisdom saving throw or have the Frightened condition for 1 minute. A creature that fails the save repeats it at the end of each of its turns, ending the effect on itself on a success. A creature that succeeds on its save is immune to the effect of these pipes for 24 hours.",
     "damage": [],
+    "targets": {
+     "rangeFeet": 30
+    },
     "uses": {
      "limit": 3,
      "per": "long-rest",
@@ -5462,15 +5846,16 @@
     "id": "drink",
     "name": "Drink Potion of Flying",
     "activation": "bonus-action",
-    "description": "Drink it: you gain a Fly Speed equal to your Speed for 1 hour and can hover. If you're in the air when it wears off, you fall unless you have some other means of staying aloft. End it on your sheet once the hour is up.",
+    "description": "Drink it: you gain a Fly Speed equal to your Speed for 1 hour and can hover. If you're in the air when it wears off, you fall unless you have some other means of staying aloft.",
     "damage": [],
     "grants": {
-     "name": "Potion of Flying (1 hour)",
+     "name": "Potion of Flying",
      "tags": [
       "potion-of-flying"
      ],
      "duration": {
-      "type": "manual"
+      "type": "minutes",
+      "minutes": 60
      },
      "modifiers": [
       {
@@ -5950,6 +6335,10 @@
   "costGp": null,
   "weightLb": null,
   "description": "Weapon (Quarterstaff), Very Rare (Requires Attunement). You have a +2 bonus to attack rolls and damage rolls made with this magic weapon. While holding this weapon, you can cause it to emit green Dim Light out to 10 feet, either as a Bonus Action or after you roll Initiative, or you can extinguish the light as a Bonus Action. While holding this weapon, you can take a Bonus Action to alter its form, turning it into a 6-inch rod (for ease of storage) or a 10-foot pole, or reverting it a Quarterstaff; the weapon will elongate only as far as the surrounding space allows. In certain forms, the weapon has the following additional properties. Acrobatic Assist (Quarterstaff and 10-Foot Pole Forms Only). While holding this weapon, you have Advantage on Dexterity (Acrobatics) checks. Attack Deflection (Quarterstaff Form Only). When you are hit by an attack while holding the weapon, you can take a Reaction to twirl the weapon around you, gaining a +5 bonus to your Armor Class against the triggering attack, potentially causing the attack to miss you. You can't use this property again until you finish a Short or Long Rest. Ranged Weapon (Quarterstaff Form Only). This weapon has the Thrown property with a normal range of 30 feet and a long range of 120 feet. Immediately after you make a ranged attack with the weapon, it flies back to your hand.",
+  "light": {
+   "brightFeet": 0,
+   "dimFeet": 10
+  },
   "weapon": null,
   "armor": null,
   "slot": "weapon",
@@ -5969,7 +6358,24 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "attack-deflection",
+    "name": "Attack Deflection",
+    "activation": "reaction",
+    "description": "When you are hit by an attack while holding the weapon, take a Reaction to twirl it around you and gain a +5 bonus to your Armor Class against the triggering attack, potentially causing it to miss. You can't use this property again until you finish a Short or Long Rest.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "short-rest"
+    },
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "ac-bonus",
+     "amount": 5
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {
@@ -6020,7 +6426,12 @@
      "per": "long-rest",
      "pool": "ring-of-animal-influence-charges"
     },
-    "consumesSpellSlot": false
+    "consumesSpellSlot": false,
+    "targets": {
+     "creatureTypes": [
+      "beast"
+     ]
+    }
    },
    {
     "spellId": "speak-with-animals",
@@ -6131,6 +6542,19 @@
      "limit": 3,
      "per": "long-rest",
      "pool": "ring-of-evasion-charges"
+    },
+    "answer": {
+     "rolls": [
+      "save"
+     ],
+     "whose": "own",
+     "when": "failure",
+     "abilities": [
+      "dex"
+     ],
+     "effect": {
+      "kind": "succeed"
+     }
     }
    }
   ],
@@ -6161,7 +6585,12 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "movement",
+    "rule": "safe-fall"
+   }
+  ]
  },
  {
   "id": "ring-of-free-action",
@@ -6701,7 +7130,36 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "x-ray-vision",
+    "name": "X-ray Vision",
+    "activation": "action",
+    "description": "Gain X-ray vision with a range of 30 feet for 1 minute: solid objects within that range appear transparent and don't prevent light from passing through them.",
+    "damage": [],
+    "grants": {
+     "name": "X-ray Vision",
+     "tags": [
+      "x-ray-vision"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "modifiers": [
+      {
+       "type": "sense",
+       "sense": "x-ray",
+       "feet": 30
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -6729,7 +7187,17 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "darkvision",
+    "feet": 120
+   },
+   {
+    "type": "sense",
+    "sense": "truesight",
+    "feet": 120
+   }
+  ]
  },
  {
   "id": "robe-of-scintillating-colors",
@@ -6764,6 +7232,41 @@
     "activation": "action",
     "description": "Expend 1 charge to make the garment display a shifting pattern of dazzling hues until the end of your next turn. During this time, the robe sheds Bright Light in a 30-foot radius and Dim Light for an additional 30 feet, and creatures that can see you have Disadvantage on attack rolls against you. Any creature in the Bright Light that can see you when the robe's power is activated must succeed on a DC 15 Wisdom saving throw or have the Stunned condition until the effect ends.",
     "damage": [],
+    "targets": {
+     "rangeFeet": 30
+    },
+    "grants": {
+     "name": "Scintillating Colors",
+     "tags": [
+      "scintillating-colors"
+     ],
+     "duration": {
+      "type": "until-source-turn-end"
+     },
+     "modifiers": [
+      {
+       "type": "roll-mode",
+       "roll": "incoming-attack",
+       "mode": "disadvantage",
+       "when": [
+        {
+         "type": "on-attack-roll"
+        },
+        {
+         "type": "seen-by-other"
+        }
+       ]
+      }
+     ],
+     "light": {
+      "brightFeet": 30,
+      "dimFeet": 30
+     },
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    },
     "uses": {
      "limit": 3,
      "per": "long-rest",
@@ -6775,7 +7278,10 @@
      "successDamage": "none",
      "failureConditions": [
       "stunned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
     }
    }
   ],
@@ -6944,6 +7450,14 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "sight": {
+     "light": {
+      "on": "point",
+      "brightFeet": 60,
+      "dimFeet": 60
+     },
+     "rounds": 100
     }
    }
   ],
@@ -6980,7 +7494,16 @@
   "costGp": null,
   "weightLb": null,
   "description": "Rod, Legendary (Requires Attunement). This rod has a flanged head, and it functions as a magic Mace that grants a +3 bonus to attack rolls and damage rolls made with it. The rod has properties associated with six different buttons that are set in a row along the haft. It has three other properties as well, detailed below. Buttons. You can press one of the following buttons as a Bonus Action; a button's effect lasts until you push a different button or until you push the same button again, which causes the rod to revert to its normal form: Button 1. A fiery blade sprouts from the end opposite the rod's flanged head. The flames shed Bright Light in a 40-foot radius and Dim Light for an additional 40 feet, and the blade functions as a magic Longsword or Shortsword (your choice) that deals an extra 2d6 Fire damage on a hit. Button 2. The rod's flanged head folds down and two crescent-shaped blades spring out, transforming the rod into a magic Battleaxe that grants a +3 bonus to attack rolls and damage rolls made with it. Button 3. The rod's flanged head folds down, a spear point springs from the rod's tip, and the rod's handle lengthens into a 6-foot haft, transforming the rod into a magic Spear that grants a +3 bonus to attack rolls and damage rolls made with it. Button 4. The rod transforms into a climbing pole up to 50 feet long (you specify the length), though the rod's buttons remain within your reach. In surfaces as hard as granite, a spike at the bottom and three hooks at the top anchor the pole. Horizontal bars 3 inches long fold out from the sides, 1 foot apart, forming a ladder. The pole can bear up to 4,000 pounds. More weight or lack of solid anchoring causes the rod to revert to its normal form. Button 5. The rod transforms into a handheld battering ram and grants its user a +10 bonus to Strength (Athletics) checks made to break through doors, barricades, and other barriers. Button 6. The rod assumes or remains in its normal form and indicates magnetic north. (Nothing happens if this function of the rod is used in a location that has no magnetic north.) The rod also gives you knowledge of your approximate depth beneath the ground or your height above it. Drain Life. When you hit a creature with a melee attack using the rod, you can force the target to make a DC 17 Constitution saving throw. On a failed save, the target takes an extra 4d6 Necrotic damage, and you regain a number of Hit Points equal to half that Necrotic damage. Once used, this property can't be used again until the next dawn. Paralyze. When you hit a creature with a melee attack using the rod, you can force the target to make a DC 17 Constitution saving throw. On a failed save, the target has the Paralyzed condition for 1 minute. The target repeats the save at the end of each of its turns, ending the effect on a success. Once used, this property can't be used again until the next dawn. Terrify. While holding the rod, you can take a Magic action to force each creature you can see within 30 feet of yourself to make a DC 17 Wisdom saving throw. On a failed save, a target has the Frightened condition for 1 minute. A Frightened target repeats the save at the end of each of its turns, ending the effect on itself on a success. Once used, this property can't be used again until the next dawn.",
-  "weapon": null,
+  "weapon": {
+   "category": "simple",
+   "damageDice": "1d6",
+   "damageType": "bludgeoning",
+   "rangeFeet": null,
+   "longRangeFeet": null,
+   "melee": true,
+   "mastery": "sap",
+   "properties": []
+  },
   "armor": null,
   "slot": "held",
   "appliesTo": null,
@@ -6994,9 +7517,101 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "drain-life",
+    "name": "Drain Life",
+    "activation": "other",
+    "description": "When you hit a creature with a melee attack using the rod, force it to make a DC 17 Constitution saving throw. On a failed save, it takes an extra 4d6 Necrotic damage, and you regain Hit Points equal to half that damage.",
+    "damage": [
+     {
+      "formula": "4d6",
+      "type": "necrotic"
+     }
+    ],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "save": {
+     "ability": "con",
+     "dc": 17,
+     "successDamage": "none",
+     "failureConditions": []
+    },
+    "ridesHit": {
+     "rides": "melee-this-weapon",
+     "reminder": "On a failed save you regain Hit Points equal to half the Necrotic damage it takes."
+    }
+   },
+   {
+    "id": "paralyze",
+    "name": "Paralyze",
+    "activation": "other",
+    "description": "When you hit a creature with a melee attack using the rod, force it to make a DC 17 Constitution saving throw. On a failed save, it has the Paralyzed condition for 1 minute, repeating the save at the end of each of its turns.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "save": {
+     "ability": "con",
+     "dc": 17,
+     "successDamage": "none",
+     "failureConditions": [
+      "paralyzed"
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
+    },
+    "ridesHit": {
+     "rides": "melee-this-weapon"
+    }
+   },
+   {
+    "id": "terrify",
+    "name": "Terrify",
+    "activation": "action",
+    "description": "Each creature you can see within 30 feet makes a DC 17 Wisdom saving throw. On a failed save, it has the Frightened condition for 1 minute, repeating the save at the end of each of its turns.",
+    "damage": [],
+    "targets": {
+     "rangeFeet": 30,
+     "seen": true,
+     "who": "others"
+    },
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "save": {
+     "ability": "wis",
+     "dc": 17,
+     "successDamage": "none",
+     "failureConditions": [
+      "frightened"
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
+    }
+   }
+  ],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 3
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 3
+   }
+  ]
  },
  {
   "id": "rod-of-resurrection",
@@ -7053,6 +7668,10 @@
     "activation": "action",
     "description": "Present the rod and command obedience from each creature of your choice that you can see within 120 feet. Each target must succeed on a DC 15 Wisdom saving throw or have the Charmed condition for 8 hours. If harmed by you or your allies, or commanded to do something contrary to its nature, a target ceases to be Charmed in this way.",
     "damage": [],
+    "targets": {
+     "rangeFeet": 120,
+     "seen": true
+    },
     "uses": {
      "limit": 1,
      "per": "long-rest"
@@ -7151,13 +7770,19 @@
     "activation": "action",
     "description": "Command the other end of the rope to dart forward and entangle one creature you can see within 20 feet of yourself. The target must succeed on a DC 15 Dexterity saving throw or have the Restrained condition. You can release the target by letting go of your end of the rope or by using a Bonus Action to repeat the command.",
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 20,
+     "seen": true
+    },
     "save": {
      "ability": "dex",
      "dc": 15,
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "escapeDc": 15
     }
    }
   ],
@@ -7735,7 +8360,35 @@
   },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "resist-enchantment",
+    "name": "Resist Enchantment",
+    "activation": "other",
+    "description": "If you fail a saving throw against an Enchantment spell that targets only you, you can turn your failed save into a successful one. You can't use this property of the staff again until the next dawn.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "answer": {
+     "rolls": [
+      "save"
+     ],
+     "whose": "own",
+     "when": "failure",
+     "versus": {
+      "spellSchools": [
+       "enchantment"
+      ],
+      "singleTarget": true
+     },
+     "effect": {
+      "kind": "succeed"
+     }
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -7897,7 +8550,19 @@
   "costGp": null,
   "weightLb": null,
   "description": "Staff, Very Rare (Requires Attunement by a Sorcerer, Warlock, or Wizard). This staff has 20 charges and can be wielded as a magic Quarterstaff that grants a +2 bonus to attack rolls and damage rolls made with it. While holding it, you gain a +2 bonus to Armor Class, saving throws, and spell attack rolls. Spells. While holding the staff, you can cast one of the spells on the following table from it, using your spell save DC. The table indicates how many charges you must expend to cast the spell. Spell *Cone of Cold*: 5; Spell *Fireball* (level 5 version): 5; Spell *Globe of Invulnerability*: 6; Spell *Hold Monster*: 5; Spell *Levitate*: 2; Spell *Lightning Bolt* (level 5 version): 5; Spell *Magic Missile*: 1; Spell *Ray of Enfeeblement*: 1; Spell *Wall of Force*: 5. Regaining Charges. The staff regains 2d8 + 4 expended charges daily at dawn. If you expend the last charge, roll 1d20. On a 1, the staff retains its +2 bonus to attack rolls and damage rolls but loses all other properties. On a 20, the staff regains 1d8 + 2 charges. Retributive Strike. You can take a Magic action to break the staff over your knee or against a solid surface. The staff is destroyed and releases its magic in an explosion that fills a 30-foot Emanation originating from itself. You have a 50 percent chance to instantly travel to a random plane of existence, avoiding the explosion. If you fail to avoid the effect, you take Force damage equal to 16 times the number of charges in the staff. Each other creature in the area makes a DC 17 Dexterity saving throw. On a failed save, a creature takes Force damage equal to 4 times the number of charges in the staff. On a successful save, a creature takes half as much damage.",
-  "weapon": null,
+  "weapon": {
+   "category": "simple",
+   "damageDice": "1d6",
+   "damageType": "bludgeoning",
+   "rangeFeet": null,
+   "longRangeFeet": null,
+   "melee": true,
+   "versatileDice": "1d8",
+   "mastery": "topple",
+   "properties": [
+    "versatile"
+   ]
+  },
   "armor": null,
   "slot": "held",
   "appliesTo": null,
@@ -7918,6 +8583,14 @@
   "actions": [],
   "effects": [],
   "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 2
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 2
+   },
    {
     "type": "armor-class",
     "amount": 2,
@@ -7941,7 +8614,19 @@
   "costGp": null,
   "weightLb": null,
   "description": "Staff, Very Rare (Requires Attunement). This staff can be wielded as a magic Quarterstaff that grants a +3 bonus to attack rolls and damage rolls made with it. The staff has 10 charges. When you hit with a melee attack using it, you can expend up to 3 charges. For each charge you expend, the target takes an extra 1d6 Force damage. Regaining Charges. The staff regains 1d6 + 4 expended charges daily at dawn. If you expend the last charge, roll 1d20. On a 1, the staff becomes a nonmagical Quarterstaff.",
-  "weapon": null,
+  "weapon": {
+   "category": "simple",
+   "damageDice": "1d6",
+   "damageType": "bludgeoning",
+   "rangeFeet": null,
+   "longRangeFeet": null,
+   "melee": true,
+   "versatileDice": "1d8",
+   "mastery": "topple",
+   "properties": [
+    "versatile"
+   ]
+  },
   "armor": null,
   "slot": "held",
   "appliesTo": null,
@@ -7953,11 +8638,87 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d6 + 4",
+   "lastChargeRoll": true
+  },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "striking-1",
+    "name": "Striking (1 charge)",
+    "activation": "other",
+    "description": "When you hit with a melee attack using the staff, expend 1 charge: the target takes an extra 1d6 Force damage.",
+    "damage": [
+     {
+      "formula": "1d6",
+      "type": "force"
+     }
+    ],
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "staff-of-striking-charges"
+    },
+    "ridesHit": {
+     "rides": "melee-this-weapon"
+    }
+   },
+   {
+    "id": "striking-2",
+    "name": "Striking (2 charges)",
+    "activation": "other",
+    "description": "When you hit with a melee attack using the staff, expend 2 charges: the target takes an extra 2d6 Force damage.",
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "force"
+     }
+    ],
+    "useCost": 2,
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "staff-of-striking-charges"
+    },
+    "ridesHit": {
+     "rides": "melee-this-weapon"
+    }
+   },
+   {
+    "id": "striking-3",
+    "name": "Striking (3 charges)",
+    "activation": "other",
+    "description": "When you hit with a melee attack using the staff, expend 3 charges: the target takes an extra 3d6 Force damage.",
+    "damage": [
+     {
+      "formula": "3d6",
+      "type": "force"
+     }
+    ],
+    "useCost": 3,
+    "uses": {
+     "limit": 10,
+     "per": "long-rest",
+     "pool": "staff-of-striking-charges"
+    },
+    "ridesHit": {
+     "rides": "melee-this-weapon"
+    }
+   }
+  ],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 3
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 3
+   }
+  ]
  },
  {
   "id": "staff-of-swarming-insects",
@@ -8008,6 +8769,14 @@
      "shape": "emanation",
      "sizeFeet": 30,
      "widthFeet": null
+    },
+    "sight": {
+     "area": {
+      "kind": "heavily-obscured",
+      "aroundSelfFeet": 30,
+      "sparesUser": true
+     },
+     "rounds": 100
     }
    }
   ],
@@ -8022,7 +8791,19 @@
   "costGp": null,
   "weightLb": null,
   "description": "Staff, Legendary (Requires Attunement by a Sorcerer, Warlock, or Wizard). This staff has 50 charges and can be wielded as a magic Quarterstaff that grants a +2 bonus to attack rolls and damage rolls made with it. While you hold it, you gain a +2 bonus to spell attack rolls. Spell Absorption. While holding the staff, you have Advantage on saving throws against spells. In addition, you can take a Reaction when another creature casts a spell that targets only you. If you do, the staff absorbs the magic of the spell, canceling its effect and gaining a number of charges equal to the absorbed spell's level. However, if doing so brings the staff's total number of charges above 50, the staff explodes as if you activated its Retributive Strike (see below). Spells. While holding the staff, you can cast one of the spells on the following table from it, using your spell save DC. The table indicates how many charges you must expend to cast the spell. Spell *Arcane Lock*: 0; Spell *Conjure Elemental*: 7; Spell *Detect Magic*: 0; Spell *Dispel Magic*: 3; Spell *Enlarge/Reduce*: 0; Spell *Fireball* (level 7 version): 7; Spell *Flaming Sphere*: 2; Spell *Ice Storm*: 4; Spell *Invisibility*: 2; Spell *Knock*: 2; Spell *Light*: 0; Spell *Lightning Bolt* (level 7 version): 7; Spell *Passwall*: 5; Spell *Plane Shift*: 7; Spell *Protection from Evil and Good*: 0; Spell *Telekinesis*: 5; Spell *Wall of Fire*: 4; Spell *Web*: 2. Regaining Charges. The staff regains 4d6 + 2 expended charges daily at dawn. If you expend the last charge, roll 1d20. On a 20, the staff regains 1d12 + 1 charges. Retributive Strike. You can take a Magic action to break the staff over your knee or against a solid surface. The staff is destroyed and releases its magic in an explosion that fills a 30-foot Emanation originating from itself. You have a 50 percent chance to instantly travel to a random plane of existence, avoiding the explosion. If you fail to avoid the effect, you take Force damage equal to 16 times the number of charges in the staff. Each other creature in the area makes a DC 17 Dexterity saving throw. On a failed save, a creature takes Force damage equal to 6 times the number of charges in the staff. On a successful save, a creature takes half as much damage.",
-  "weapon": null,
+  "weapon": {
+   "category": "simple",
+   "damageDice": "1d6",
+   "damageType": "bludgeoning",
+   "rangeFeet": null,
+   "longRangeFeet": null,
+   "melee": true,
+   "versatileDice": "1d8",
+   "mastery": "topple",
+   "properties": [
+    "versatile"
+   ]
+  },
   "armor": null,
   "slot": "held",
   "appliesTo": null,
@@ -8060,6 +8841,14 @@
   "actions": [],
   "effects": [],
   "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 2
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 2
+   },
    {
     "type": "spell-attack-bonus",
     "amount": 2
@@ -8100,7 +8889,19 @@
   "costGp": null,
   "weightLb": null,
   "description": "Staff, Rare (Requires Attunement by a Druid). This staff has 6 charges and can be wielded as a magic Quarterstaff that grants a +2 bonus to attack rolls and damage rolls made with it. While holding it, you have a +2 bonus to spell attack rolls. Spells. While holding the staff, you can cast one of the spells on the following table from it, using your spell save DC. The table indicates how many charges you must expend to cast the spell. Spell *Animal Friendship*: 1; Spell *Awaken*: 5; Spell *Barkskin*: 2; Spell *Locate Animals or Plants*: 2; Spell *Pass without Trace*: 2; Spell *Speak with Animals*: 1; Spell *Speak with Plants*: 3; Spell *Wall of Thorns*: 6. Tree Form. You can take a Magic action to plant one end of the staff in earth in an unoccupied space and expend 1 charge to transform the staff into a healthy tree. The tree is 60 feet tall and has a 5-foot-diameter trunk, and its branches at the top spread out in a 20-foot radius. The tree appears ordinary but radiates a faint aura of Transmutation magic that can be discerned with the Detect Magic spell. While touching the tree and using a Magic action, you return the staff to its normal form. Any creature in the tree falls when the tree reverts to a staff. Regaining Charges. The staff regains 1d6 expended charges daily at dawn. If you expend the last charge, roll 1d20. On a 1, the staff loses its properties and becomes a nonmagical Quarterstaff.",
-  "weapon": null,
+  "weapon": {
+   "category": "simple",
+   "damageDice": "1d6",
+   "damageType": "bludgeoning",
+   "rangeFeet": null,
+   "longRangeFeet": null,
+   "melee": true,
+   "versatileDice": "1d8",
+   "mastery": "topple",
+   "properties": [
+    "versatile"
+   ]
+  },
   "armor": null,
   "slot": "held",
   "appliesTo": null,
@@ -8156,6 +8957,14 @@
   "effects": [],
   "modifiers": [
    {
+    "type": "attack-bonus",
+    "amount": 2
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 2
+   },
+   {
     "type": "spell-attack-bonus",
     "amount": 2
    }
@@ -8169,7 +8978,19 @@
   "costGp": null,
   "weightLb": null,
   "description": "Staff, Very Rare (Requires Attunement). This staff can be wielded as a magic Quarterstaff that grants a +2 bonus to attack rolls and damage rolls made with it. It also has the following additional properties. Once one of these properties is used, it can't be used again until the next dawn. Lightning. When you hit with a melee attack using the staff, you can cause the target to take an extra 2d6 Lightning damage (no action required). Thunder. When you hit with a melee attack using the staff, you can cause the staff to emit a crack of thunder audible out to 300 feet (no action required). The target you hit must succeed on a DC 17 Constitution saving throw or have the Stunned condition until the end of your next turn. Thunder and Lightning. Immediately after you hit with a melee attack using the staff, you can take a Bonus Action to use the Lightning and Thunder properties (see above) at the same time. Doing so doesn't expend the daily use of those properties, only the use of this one. Lightning Strike. You can take a Magic action to cause a bolt of lightning to leap from the staff's tip in a Line that is 5 feet wide and 120 feet long. Each creature in that Line makes a DC 17 Dexterity saving throw, taking 9d6 Lightning damage on a failed save or half as much damage on a successful one. Thunderclap. You can take a Magic action to cause the staff to produce a thunderclap audible out to 600 feet. Every creature within a 60-foot Emanation originating from you makes a DC 17 Constitution saving throw. On a failed save, a creature takes 2d6 Thunder damage and has the Deafened condition for 1 minute. On a successful save, a creature takes half as much damage only.",
-  "weapon": null,
+  "weapon": {
+   "category": "simple",
+   "damageDice": "1d6",
+   "damageType": "bludgeoning",
+   "rangeFeet": null,
+   "longRangeFeet": null,
+   "melee": true,
+   "versatileDice": "1d8",
+   "mastery": "topple",
+   "properties": [
+    "versatile"
+   ]
+  },
   "armor": null,
   "slot": "held",
   "appliesTo": null,
@@ -8184,6 +9005,86 @@
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
+   {
+    "id": "lightning",
+    "name": "Lightning",
+    "activation": "other",
+    "description": "When you hit with a melee attack using the staff, the target takes an extra 2d6 Lightning damage.",
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "lightning"
+     }
+    ],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "ridesHit": {
+     "rides": "melee-this-weapon"
+    }
+   },
+   {
+    "id": "thunder",
+    "name": "Thunder",
+    "activation": "other",
+    "description": "When you hit with a melee attack using the staff, it emits a crack of thunder audible out to 300 feet. The target must succeed on a DC 17 Constitution saving throw or have the Stunned condition until the end of your next turn.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "save": {
+     "ability": "con",
+     "dc": 17,
+     "successDamage": "none",
+     "failureConditions": [
+      "stunned"
+     ],
+     "failureDuration": {
+      "type": "until-source-turn-end"
+     }
+    },
+    "ridesHit": {
+     "rides": "melee-this-weapon"
+    }
+   },
+   {
+    "id": "thunder-and-lightning",
+    "name": "Thunder and Lightning",
+    "activation": "bonus-action",
+    "description": "Immediately after you hit with a melee attack using the staff, take a Bonus Action to use Lightning and Thunder at once, which spends neither of their daily uses.",
+    "damage": [
+     {
+      "formula": "2d6",
+      "type": "lightning"
+     }
+    ],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "ridesHit": {
+     "rides": "melee-this-weapon",
+     "effects": [
+      {
+       "id": "thunder",
+       "name": "Thunder",
+       "save": {
+        "ability": "con",
+        "failureConditions": [
+         "stunned"
+        ],
+        "failureDuration": {
+         "type": "until-source-turn-end"
+        }
+       }
+      }
+     ],
+     "effectRequired": true,
+     "saveDc": 17
+    }
+   },
    {
     "id": "lightning-strike",
     "name": "Lightning Strike",
@@ -8241,7 +9142,16 @@
    }
   ],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 2
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 2
+   }
+  ]
  },
  {
   "id": "staff-of-withering",
@@ -8251,7 +9161,19 @@
   "costGp": null,
   "weightLb": null,
   "description": "Staff, Rare (Requires Attunement). This staff has 3 charges and regains 1d3 expended charges daily at dawn. The staff can be wielded as a magic Quarterstaff. On a hit, it deals damage as a normal Quarterstaff, and you can expend 1 charge to deal an extra 2d10 Necrotic damage to the target and force it to make a DC 15 Constitution saving throw. On a failed save, the target has Disadvantage for 1 hour on any ability check or saving throw that uses Strength or Constitution.",
-  "weapon": null,
+  "weapon": {
+   "category": "simple",
+   "damageDice": "1d6",
+   "damageType": "bludgeoning",
+   "rangeFeet": null,
+   "longRangeFeet": null,
+   "melee": true,
+   "versatileDice": "1d8",
+   "mastery": "topple",
+   "properties": [
+    "versatile"
+   ]
+  },
   "armor": null,
   "slot": "held",
   "appliesTo": null,
@@ -8263,9 +9185,86 @@
   },
   "cursed": false,
   "casts": [],
+  "charges": {
+   "regain": "1d3",
+   "lastChargeRoll": false
+  },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "withering",
+    "name": "Withering",
+    "activation": "other",
+    "description": "On a hit with the staff, expend 1 charge to deal an extra 2d10 Necrotic damage to the target and force it to make a DC 15 Constitution saving throw. On a failed save, the target has Disadvantage for 1 hour on any ability check or saving throw that uses Strength or Constitution.",
+    "damage": [
+     {
+      "formula": "2d10",
+      "type": "necrotic"
+     }
+    ],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "staff-of-withering-charges"
+    },
+    "ridesHit": {
+     "rides": "this-weapon",
+     "effects": [
+      {
+       "id": "withering",
+       "name": "Withering",
+       "save": {
+        "ability": "con",
+        "failureConditions": [],
+        "failureEffect": {
+         "name": "Withered",
+         "tags": [],
+         "modifiers": [
+          {
+           "type": "roll-mode",
+           "roll": "check",
+           "mode": "disadvantage",
+           "when": [
+            {
+             "type": "on-ability-check"
+            },
+            {
+             "type": "ability-is",
+             "abilities": [
+              "str",
+              "con"
+             ]
+            }
+           ]
+          },
+          {
+           "type": "roll-mode",
+           "roll": "save",
+           "mode": "disadvantage",
+           "when": [
+            {
+             "type": "on-saving-throw"
+            },
+            {
+             "type": "ability-is",
+             "abilities": [
+              "str",
+              "con"
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     ],
+     "effectRequired": true,
+     "saveDc": 15
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -8351,7 +9350,25 @@
   "costGp": null,
   "weightLb": null,
   "description": "Weapon (Longsword), Rare (Requires Attunement). This item appears to be a sword hilt. Blade of Radiance. While grasping the hilt, you can take a Bonus Action to cause a blade of pure radiance to spring into existence or make the blade disappear. While the blade exists, this magic weapon functions as a Longsword with the Finesse property. If you are proficient with Longswords or Shortswords, you are proficient with the Sun Blade. You gain a +2 bonus to attack rolls and damage rolls made with this weapon, which deals Radiant damage instead of Slashing damage. When you hit an Undead with it, that target takes an extra 1d8 Radiant damage. Sunlight. The sword's luminous blade emits Bright Light in a 15-foot radius and Dim Light for an additional 15 feet. The light is sunlight. While the blade persists, you can take a Magic action to expand or reduce its radius of Bright Light and Dim Light by 5 feet each, to a maximum of 30 feet each or a minimum of 10 feet each.",
-  "weapon": null,
+  "light": {
+   "brightFeet": 15,
+   "dimFeet": 15,
+   "sunlight": true
+  },
+  "weapon": {
+   "category": "martial",
+   "damageDice": "1d8",
+   "damageType": "radiant",
+   "rangeFeet": null,
+   "longRangeFeet": null,
+   "melee": true,
+   "versatileDice": "1d10",
+   "mastery": "sap",
+   "properties": [
+    "versatile",
+    "finesse"
+   ]
+  },
   "armor": null,
   "slot": "weapon",
   "appliesTo": null,
@@ -8367,7 +9384,33 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "attack-bonus",
+    "amount": 2
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 2
+   },
+   {
+    "type": "extra-damage",
+    "formula": "1d8",
+    "damageType": "radiant",
+    "doubleOnCritical": true,
+    "when": [
+     {
+      "type": "on-hit"
+     },
+     {
+      "type": "versus-creature-type",
+      "creatureTypes": [
+       "undead"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "sword-of-life-stealing",
@@ -8433,11 +9476,41 @@
   },
   "cursed": false,
   "casts": [],
+  "onHit": [
+   {
+    "conditions": [
+     {
+      "id": "exhaustion",
+      "level": 1
+     }
+    ],
+    "naturalTwenty": true
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "damage-bonus",
+    "amount": 7,
+    "when": [
+     {
+      "type": "on-natural-20"
+     }
+    ]
+   },
+   {
+    "type": "damage-bonus",
+    "amount": 7,
+    "when": [
+     {
+      "type": "on-natural-20"
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "sword-of-wounding",
@@ -8469,6 +9542,20 @@
   },
   "cursed": false,
   "casts": [],
+  "onHit": [
+   {
+    "conditions": [],
+    "name": "Wounded",
+    "tags": [
+     "no-healing"
+    ],
+    "save": {
+     "ability": "con",
+     "dc": 15,
+     "repeatSave": true
+    }
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8624,6 +9711,13 @@
   },
   "cursed": false,
   "casts": [],
+  "study": {
+   "ability": "int",
+   "amount": 2,
+   "maximum": 30,
+   "hours": 48,
+   "days": 6
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8650,6 +9744,13 @@
   },
   "cursed": false,
   "casts": [],
+  "study": {
+   "ability": "cha",
+   "amount": 2,
+   "maximum": 30,
+   "hours": 48,
+   "days": 6
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8676,6 +9777,13 @@
   },
   "cursed": false,
   "casts": [],
+  "study": {
+   "ability": "wis",
+   "amount": 2,
+   "maximum": 30,
+   "hours": 48,
+   "days": 6
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8860,6 +9968,13 @@
   },
   "cursed": false,
   "casts": [],
+  "onHit": [
+   {
+    "conditions": [],
+    "naturalTwenty": true,
+    "reminder": "On a rolled 20 the sword cuts off one of the creature's heads, and it dies if it can't survive without it. A creature with Immunity to Slashing damage, no head or one too big for the blade takes an extra 30 Slashing damage instead, and Legendary Resistance can trade the head for that damage."
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -9172,6 +10287,11 @@
     "activation": "action",
     "description": "Expend 1 charge to send a thin blue ray toward a creature you can see within 60 feet. The target must succeed on a DC 15 Constitution saving throw or have the Paralyzed condition for 1 minute. At the end of each of its turns, it repeats the save, ending the effect on itself on a success.",
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
     "uses": {
      "limit": 7,
      "per": "long-rest",
@@ -9839,15 +10959,17 @@
     "id": "fly",
     "name": "Winged Flight",
     "activation": "action",
-    "description": "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land. End it on your sheet once the hour is up.",
+    "description": "Expend 1 charge to gain a Fly Speed of 30 feet for 1 hour. If you are flying when the duration expires, you descend at a rate of 30 feet per round until you land.",
     "damage": [],
     "grants": {
-     "name": "Winged Flight (1 hour)",
+     "name": "Winged Flight",
      "tags": [
-      "winged-flight"
+      "winged-flight",
+      "descends-safely"
      ],
      "duration": {
-      "type": "manual"
+      "type": "minutes",
+      "minutes": 60
      },
      "modifiers": [
       {
@@ -9893,7 +11015,36 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "wings",
+    "name": "Wings of Flying",
+    "activation": "action",
+    "description": "Turn the cloak into wings on your back: a Fly Speed of 60 feet for 1 hour or until you end it with a Magic action. If you are in the air when they vanish, you fall. Once they vanish, you can't use them again for 1d12 hours.",
+    "damage": [],
+    "grants": {
+     "name": "Wings of Flying",
+     "tags": [
+      "wings-of-flying"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 60
+     },
+     "modifiers": [
+      {
+       "type": "special-speed",
+       "movement": "fly",
+       "feet": 60
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  }

@@ -1,7 +1,10 @@
 import { useMemo, useState, type ReactNode } from "react";
 import type { ActorDefinition, ContentActionSummary, PlayerView } from "@vtt/domain";
+import type { CastShaping } from "@vtt/schemas";
 import { PlayerActionRunner, summaryOfOwnAction } from "../encounter/PlayerActionRunner";
 import { useSpellReference } from "../encounter/spells";
+import { useTableCalibration } from "../scene/tableGeometry";
+import { playerTargetCandidates, targetRows } from "../table/targetRows";
 import { ActionList } from "./ActionList";
 import { CastDetail } from "./CastDetail";
 import { EconomyPips } from "./PlayTab";
@@ -67,6 +70,16 @@ export function PlayFight({
     () => serverActions.filter((row) => !definition?.actions.some((own) => own.id === row.id)),
     [serverActions, definition]
   );
+  // Who the fight's creatures are as the player knows them (who is down, how far each is), for the target list.
+  const calibration = useTableCalibration(state?.combat?.mapAssetId ?? null);
+  const playerRows = useMemo(() => {
+    const view = state as PlayerView | undefined;
+    if (role !== "player" || !view?.combat?.initiative) return undefined;
+    const everyone = playerTargetCandidates(view);
+    return new Map(
+      targetRows(actor.id, everyone, view.combat.tokens ?? [], calibration, everyone).map((row) => [row.id, row])
+    );
+  }, [role, state, actor.id, calibration]);
   if (!definition) return <div className="cs-play">{death}</div>;
   // At 0 Hit Points the Death Saving Throws are the turn; the list would only say it can't be used.
   if (isDown(actor))
@@ -91,9 +104,11 @@ export function PlayFight({
           inspired={heroicInspirationOf(actor) === true}
           playerDamageMode={combat.playerDamageMode}
           targets={combat.targets}
+          {...(playerRows ? { targetRows: playerRows } : {})}
           effectTags={actor.effects.flatMap((effect) => effect.tags)}
           actor={actor}
           myTurn={combat.myTurn || readied}
+          offTurn={readied && !combat.myTurn}
           castPlace={place}
           look={card ? "card" : "list"}
           round={state?.combat.round ?? null}
@@ -184,11 +199,13 @@ function GmPlayList({
           prepared: preparedState(option.spell, actor, definition) !== "unprepared"
         })
       : [];
-  const cast = (option: TurnOption, choice: CastOption) => {
+  const cast = (option: TurnOption, choice: CastOption, shaping: readonly CastShaping[] = []) => {
     const spell = option.spell!;
-    if (choice.kind === "free" && spell.freeActionId) controller.castSpellAction(spell.freeActionId);
-    else if (choice.kind === "ritual" && spell.ritualActionId) controller.castSpellAction(spell.ritualActionId);
-    else controller.castSpellAction(option.id, choice.kind === "slot" ? choice.level : undefined);
+    if (choice.kind === "free" && spell.freeActionId)
+      controller.castSpellAction(spell.freeActionId, undefined, shaping);
+    else if (choice.kind === "ritual" && spell.ritualActionId)
+      controller.castSpellAction(spell.ritualActionId, undefined, shaping);
+    else controller.castSpellAction(option.id, choice.kind === "slot" ? choice.level : undefined, shaping);
   };
   const detail = casting?.spell ? (
     <CastDetail
@@ -199,9 +216,9 @@ function GmPlayList({
       aimed={false}
       busy={false}
       onBack={() => setCasting(null)}
-      onCast={(choice) => {
+      onCast={(choice, shaping) => {
         setCasting(null);
-        cast(casting, choice);
+        cast(casting, choice, shaping);
       }}
     />
   ) : null;
@@ -214,7 +231,8 @@ function GmPlayList({
         busy={false}
         onUse={(option) => {
           const choices = choicesOf(option);
-          if (option.spell && choices.length > 1) setCasting(option);
+          const shapeable = (option.summary.shaping?.options.length ?? 0) > 0;
+          if (option.spell && (choices.length > 1 || shapeable)) setCasting(option);
           else if (option.spell && choices.length === 1) cast(option, choices[0]!);
           else controller.sendThroughServer(option.id);
         }}

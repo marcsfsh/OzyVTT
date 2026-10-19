@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { featurePicks } from "@vtt/content-srd-5.2.1";
+import { featurePicks, loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { ContentLibrary } from "../src/content-library.js";
@@ -10,6 +10,7 @@ import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation
 import { specialSpeedsOf } from "../src/speed.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
+import { applyFailureEffect } from "../src/saving-throws.js";
 import { endEncounter, startEncounter } from "../src/encounter.js";
 import { applyRest } from "../src/rests.js";
 import { builderOffers } from "../src/builder-offers.js";
@@ -223,10 +224,18 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
       per: "long-rest",
       pool: "mystic-arcanum-level-6-spell"
     });
+    // True Seeing consumes "mushroom powder worth 25+ GP", and touches one willing creature, here the Warlock itself.
+    built.hero.inventory.push({
+      id: "mushroom-powder",
+      name: "Mushroom powder",
+      quantity: 2,
+      equipped: false,
+      attuned: false
+    });
     resolveDefinitionAction(
       built.state,
       actionOf(built, "spell-true-seeing-free"),
-      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000001" },
+      { actorId: IDS.hero, targetIds: [IDS.hero], commandId: "50000000-0000-4000-8000-000000000001" },
       deps(built, [])
     );
     expect(built.hero.actionUses["mystic-arcanum-level-6-spell"]).toBe(1);
@@ -234,7 +243,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
       resolveDefinitionAction(
         built.state,
         actionOf(built, "spell-true-seeing-free"),
-        { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000002" },
+        { actorId: IDS.hero, targetIds: [IDS.hero], commandId: "50000000-0000-4000-8000-000000000002" },
         deps(built, [])
       )
     ).toThrow();
@@ -340,13 +349,19 @@ describe("Warlock: Contact Patron hands over the spell and the free casting (aud
   it("gives it a once-per-Long-Rest counter the engine really spends", () => {
     const built = table(level9());
     expect(actionOf(built, "spell-contact-other-plane-free").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    // Its minute of casting completes at once outside a fight, and the use goes with it.
+    endEncounter(built.state);
     resolveDefinitionAction(
       built.state,
       actionOf(built, "spell-contact-other-plane-free"),
       { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000010" },
-      deps(built, [])
+      deps(built, [3, 3, 3, 3, 3, 3])
     );
     expect(built.hero.actionUses["contact-patron"]).toBe(1);
+    // "When you cast this spell, make a DC 15 Intelligence saving throw": the caster's own, with 6d6 Psychic on it.
+    expect(built.state.combat.pendingSaves).toMatchObject([
+      { targetActorId: IDS.hero, ability: "int", dc: 15, proposedDamage: 18 }
+    ]);
     expect(() =>
       resolveDefinitionAction(
         built.state,
@@ -550,8 +565,57 @@ describe("Fiend Patron: Hurl Through Hell rolls its 8d10 and holds the target to
       )
     );
 
-  it("proposes 8d10 Psychic against a Charisma save at the Warlock's own spell save DC", () => {
-    const built = level14();
+  /** A Dagger in hand, thrown or stabbed: any attack roll's hit carries Hurl Through Hell. */
+  const armed = (built: Built): Built => {
+    built.hero.inventory = [
+      ...built.hero.inventory,
+      {
+        id: "dagger-x",
+        name: "Dagger",
+        quantity: 1,
+        equipped: true,
+        attuned: false,
+        category: "weapon",
+        weapon: {
+          category: "simple",
+          damageDice: "1d4",
+          damageType: "piercing",
+          rangeFeet: 20,
+          longRangeFeet: 60,
+          melee: true,
+          properties: ["finesse", "light", "thrown"]
+        }
+      }
+    ];
+    return built;
+  };
+  let hurlCommand = 30;
+  /** The action back, as on a later turn, while the long-rest use stays spent. */
+  const freshAction = (built: Built) => {
+    built.state.combat = {
+      ...built.state.combat,
+      turn: { ...built.state.combat.turn, actionUsed: false, actionInstance: null, turnUses: {} }
+    };
+  };
+  const stab = (built: Built, faces: number[], hitOptions?: Array<{ id: string }>, commit = true) =>
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, "item-dagger-x"),
+      {
+        actorId: IDS.hero,
+        targetIds: [IDS.foe],
+        commandId: `50000000-0000-4000-8000-${String(++hurlCommand).padStart(12, "0")}`,
+        ...(hitOptions ? { hitOptions } : {}),
+        ...(commit ? {} : { commit: false })
+      },
+      {
+        ...deps(built, faces),
+        resolveDefinition: (id) => built.state.definitions.find((entry) => entry.id === id)?.definition
+      }
+    );
+
+  it("rides an attack roll's hit and proposes 8d10 Psychic against a Charisma save at the Warlock's own DC", () => {
+    const built = armed(level14());
     // CHA 20 (+5) and proficiency +5 at level 14: DC 8 + 5 + 5 = 18, derived.
     const action = actionOf(built, "hurl-through-hell");
     expect(action.save).toEqual({
@@ -561,44 +625,64 @@ describe("Fiend Patron: Hurl Through Hell rolls its 8d10 and holds the target to
       successDamage: "none",
       failureConditions: ["incapacitated"],
       // "until the end of your next turn": the Warlock's.
-      failureDuration: { type: "until-source-turn-end" }
+      failureDuration: { type: "until-source-turn-end" },
+      failureEffect: { name: "Hurled Through Hell", tags: ["off-plane"], modifiers: [] }
     });
     expect(built.definition.spellcasting!.saveDc).toBe(18);
-
-    const hurled = resolveDefinitionAction(
-      built.state,
-      action,
-      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000030" },
-      deps(built, [10, 10, 10, 10, 10, 10, 10, 10])
-    );
-    expect(hurled.damage).toEqual([{ formula: "8d10", type: "psychic", total: 80 }]);
+    expect(stab(built, [15], undefined, false).hitOffers?.map((offer) => offer.id)).toContain("hurl-through-hell");
+    stab(built, [15, 2, 10, 10, 10, 10, 10, 10, 10, 10], [{ id: "hurl-through-hell" }]);
     expect(
       built.state.combat.pendingSaves.map((save) => ({
         ability: save.ability,
         dc: save.dc,
-        damage: save.proposedDamage
+        damage: save.proposedDamage,
+        half: save.halfOnSuccess
       }))
-    ).toEqual([{ ability: "cha", dc: 18, damage: 80 }]);
+    ).toEqual([{ ability: "cha", dc: 18, damage: 80, half: false }]);
   });
 
-  it("is once per Long Rest and refuses the second hurl", () => {
+  it("is refused tapped alone, with no hit to ride", () => {
     const built = level14();
-    expect(actionOf(built, "hurl-through-hell").uses).toMatchObject({ limit: 1, per: "long-rest" });
-    resolveDefinitionAction(
-      built.state,
-      actionOf(built, "hurl-through-hell"),
-      { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000031" },
-      deps(built, [1, 1, 1, 1, 1, 1, 1, 1])
-    );
-    expect(built.hero.actionUses["hurl-through-hell"]).toBe(1);
     expect(() =>
       resolveDefinitionAction(
         built.state,
         actionOf(built, "hurl-through-hell"),
-        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000032" },
-        deps(built, [])
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: "50000000-0000-4000-8000-000000000029" },
+        deps(built, [10, 10, 10, 10, 10, 10, 10, 10])
       )
-    ).toThrow();
+    ).toThrow(/Hurl Through Hell adds to a hit/);
+  });
+
+  it("deals a Fiend no damage", () => {
+    const built = armed(level14());
+    const imp = loadMonsterDefinitions().find((monster) => monster.source.externalId === "imp")!;
+    built.state.definitions.push({ id: "imp", definition: imp });
+    built.state.actors.find((actor) => actor.id === IDS.foe)!.definitionId = "imp";
+    built.state.actors.find((actor) => actor.id === IDS.foe)!.armorClass = 12;
+    const hurled = stab(built, [15, 2], [{ id: "hurl-through-hell" }]);
+    expect(built.state.combat.pendingSaves.map((save) => save.proposedDamage)).toEqual([0]);
+    expect(hurled.warnings).toContain("Hurl Through Hell: Foe is a Fiend and takes no damage.");
+  });
+
+  it("is once per Long Rest and refuses the second hurl", () => {
+    const built = armed(level14());
+    expect(actionOf(built, "hurl-through-hell").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    stab(built, [15, 2, 1, 1, 1, 1, 1, 1, 1, 1], [{ id: "hurl-through-hell" }]);
+    expect(built.hero.actionUses["hurl-through-hell"]).toBe(1);
+    freshAction(built);
+    expect(stab(built, [15], undefined, false).hitOffers?.map((offer) => offer.id) ?? []).not.toContain(
+      "hurl-through-hell"
+    );
+  });
+
+  it("takes a target that fails out of reach: nothing can target it until it returns", () => {
+    const built = armed(level14());
+    stab(built, [15, 2, 1, 1, 1, 1, 1, 1, 1, 1], [{ id: "hurl-through-hell" }]);
+    const save = built.state.combat.pendingSaves[0]!;
+    expect(save.onFailEffect).toMatchObject({ name: "Hurled Through Hell", tags: ["off-plane"] });
+    applyFailureEffect(built.state, IDS.foe, save.onFailEffect!, "hurled", {});
+    freshAction(built);
+    expect(() => stab(built, [15, 2])).toThrow(/Foe is gone from this plane for now and can't be targeted/);
   });
 });
 
@@ -1033,17 +1117,18 @@ describe("Sorcerer: Sorcerous Restoration and Epic Boon (audit row 6, the Sorcer
 
 describe("Sorcerer: Metamagic costs a Sorcery Point off the same pool Font of Magic opens", () => {
   it("debits the shared counter, so a Metamagic option and Font of Magic spend one supply", () => {
-    // Careful Spell prints "Cost: 1 Sorcery Point", so the chosen option carries a use of the same
-    // `sorcery-points` pool, and Metamagic is a button that spends.
+    // Distant Spell prints "Cost: 1 Sorcery Point": the cast it shapes pays it from the same `sorcery-points` pool,
+    // which the chosen option's own row names. The row alone spends nothing (metamagic.test.ts).
     const built = table(sorcerer(5));
-    expect(actionOf(built, "careful-spell").uses).toMatchObject({ limit: 5, per: "long-rest", pool: "sorcery-points" });
-
-    resolveDefinitionAction(
-      built.state,
-      actionOf(built, "careful-spell"),
-      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000100" },
-      deps(built, [])
-    );
+    expect(actionOf(built, "distant-spell").uses).toMatchObject({ limit: 5, per: "long-rest", pool: "sorcery-points" });
+    const distantFlame = (commandId: string) =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "spell-sacred-flame"),
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId, shaping: [{ id: "distant-spell" }] },
+        deps(built, [4, 4])
+      );
+    distantFlame("50000000-0000-4000-8000-000000000100");
     expect(built.hero.actionUses["sorcery-points"]).toBe(1);
 
     // ...and the four points left are Font of Magic's four: one pool, two ways to spend it.
@@ -1056,19 +1141,15 @@ describe("Sorcerer: Metamagic costs a Sorcery Point off the same pool Font of Ma
       );
     }
     expect(built.hero.actionUses["sorcery-points"]).toBe(5);
-    expect(() =>
-      resolveDefinitionAction(
-        built.state,
-        actionOf(built, "distant-spell"),
-        { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000119" },
-        deps(built, [])
-      )
-    ).toThrow();
+    built.state.combat = { ...built.state.combat, turn: { ...built.state.combat.turn, actionUsed: false } };
+    expect(thrown(() => distantFlame("50000000-0000-4000-8000-000000000119"))).toMatch(
+      /Ilde has 0 Sorcery Points left, and this cast's Metamagic costs 1/
+    );
   });
 
-  it("gives the two-point options NO counter, because a use is not a cost", () => {
-    // `ActionUsesSchema` counts uses and cannot charge two, so Quickened Spell ("Cost: 2 Sorcery Points")
-    // stays prose. Subtle Spell, at one point, does land.
+  it("gives the two-point options no row of their own: the cast that uses one pays its two points", () => {
+    // Quickened Spell's "Cost: 2 Sorcery Points" is paid by the cast it shapes (metamagic.test.ts); a 1-point option
+    // such as Subtle Spell keeps a row that shows the pool.
     const built = table(sorcerer(10));
     const ids = effectiveActions(built.definition, built.hero, built.catalog).map((entry) => entry.id);
     expect(ids).toContain("subtle-spell");

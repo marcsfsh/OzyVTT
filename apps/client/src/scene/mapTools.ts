@@ -14,8 +14,10 @@ export type MapTool =
   | VisionTool
   | AnnotationShapeKind;
 
-/** The GM's dynamic vision tools: drag a wall, door or window; tap to place a light; tap a wall or light to remove it. */
-export type VisionTool = "vision-wall" | "vision-door" | "vision-window" | "vision-light" | "vision-erase";
+/** The GM's dynamic vision tools: drag a wall, door or window; tap to place a light; drag an area of light or
+ *  obscurement; tap a wall, light or area to remove it. */
+export type VisionTool =
+  "vision-wall" | "vision-door" | "vision-window" | "vision-light" | "vision-area" | "vision-erase";
 export const isVisionTool = (tool: MapTool): tool is VisionTool => tool.startsWith("vision-");
 
 /** The lights a GM places, by what sheds them (SRD radii: Bright Light, then Dim Light beyond it). */
@@ -28,6 +30,18 @@ export const LIGHT_PRESETS = [
   { id: "glow", label: "Dim glow · 0 ft + 10 ft", brightFeet: 0, dimFeet: 10 }
 ] as const;
 export type LightPresetId = (typeof LIGHT_PRESETS)[number]["id"];
+
+/** The areas a GM paints over the ambient light (SRD Rules Glossary): a lit room in a dark dungeon, a dark cellar in
+ *  daylight, fog or foliage, and magical Darkness that only Blindsight, Truesight and Devil's Sight see into. */
+export const AREA_KINDS = [
+  { id: "bright", label: "Bright Light" },
+  { id: "dim", label: "Dim Light" },
+  { id: "dark", label: "Darkness" },
+  { id: "lightly-obscured", label: "Lightly Obscured (mist, foliage)" },
+  { id: "heavily-obscured", label: "Heavily Obscured (fog, smoke)" },
+  { id: "magical-darkness", label: "Magical Darkness" }
+] as const;
+export type AreaKindId = (typeof AREA_KINDS)[number]["id"];
 
 export type ClearScope = "mine" | "players" | "all";
 
@@ -96,6 +110,11 @@ export interface MapRailProps {
   onVisionEnabledChange: (enabled: boolean) => void;
   ambient: "bright" | "dim" | "dark";
   onAmbientChange: (ambient: "bright" | "dim" | "dark") => void;
+  /** The bright ambient light is sunlight (daylight outdoors), which Sunlight Sensitivity reads. */
+  sunlight: boolean;
+  onSunlightChange: (sunlight: boolean) => void;
+  areaKind: AreaKindId;
+  onAreaKindChange: (kind: AreaKindId) => void;
   lightPreset: LightPresetId;
   onLightPresetChange: (preset: LightPresetId) => void;
   hasWalls: boolean;

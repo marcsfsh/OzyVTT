@@ -1,10 +1,13 @@
 import { z } from "zod";
 import {
   ActionAreaSchema,
+  ActionSchema,
+  AreaTriggerSchema,
   ActorDefinitionSchema,
   DamageDrainSchema,
   ForcedPushSchema,
   ActorSchema,
+  CastShapingSchema,
   EffectInstanceSchema,
   EffectModifiersSchema,
   HealthDisplaySchema,
@@ -66,6 +69,9 @@ export const RollRecordSchema = z.object({
   total: z.number().int(),
   /** The d20 was typed from a physical die; the server threw nothing. */
   typed: z.literal(true).optional(),
+  /** A player's roll from the free dice roller: its formula and label are the player's own, where a rule's roll
+   *  (a check, a save, an attack) works out its bonuses on the server. */
+  free: z.literal(true).optional(),
   createdAt: z.iso.datetime()
 });
 export type RollVisibility = z.infer<typeof RollVisibilitySchema>;
@@ -97,7 +103,13 @@ export const EncounterTokenSchema = z
     gridSizePx: z.number().positive().max(4096).nullable().default(null),
     gridRotationRadians: z.number().min(-Math.PI).max(Math.PI).nullable().default(null),
     /** Footprint in cells per side; even sizes snap to grid intersections, odd ones to cell centers. */
-    sizeCells: z.number().int().min(1).max(4).default(1)
+    sizeCells: z.number().int().min(1).max(4).default(1),
+    /** Feet above the ground (SRD Flying, Climbing): on a ledge, up a wall or in the air. Absent on the ground. As
+     *  public as the token's position. */
+    altitudeFeet: z.number().int().min(1).max(10000).optional(),
+    /** What holds it up in the air: flying, which the Flying rule can end with a fall, or a levitation, which lowers
+     *  it gently when it ends. Absent on a surface: the ground, a ledge, a wall it climbs. */
+    airborne: z.enum(["fly", "levitate"]).optional()
   })
   .strict();
 export type EncounterTokenPosition = z.infer<typeof EncounterTokenPositionSchema>;
@@ -210,6 +222,8 @@ const PendingSaveEffectSchema = z
     /** The save the target repeats at the end of each of its turns, a success ending the effect. */
     repeatSave: EffectInstanceSchema.shape.repeatSave,
     endsOnDamage: z.boolean().optional(),
+    /** It ends when its source or one of the source's allies damages the bearer (Charm Person). */
+    endsOnSourceSideDamage: EffectInstanceSchema.shape.endsOnSourceSideDamage,
     speedZero: z.boolean().optional(),
     /** A grapple: it ends with its source's defeat, and when a move takes them farther apart than `rangeFeet`. */
     endsWhenSourceDefeated: z.boolean().optional(),
@@ -217,6 +231,8 @@ const PendingSaveEffectSchema = z
     /** The Concentration cast it belongs to: it is sustained by the caster's Concentration, and is not applied
      * once that has ended. */
     castId: z.string().min(1).max(120).optional(),
+    /** The spell that made it and the level it was cast at, which Dispel Magic weighs. Never projected. */
+    spell: EffectInstanceSchema.shape.spell,
     /** The action it came from, so a second hit from the same action refreshes it and never stacks. */
     sourceActionId: z.string().max(120).optional(),
     /** Damage the effect deals at the start of a turn while it lasts (a swallow's acid). */
@@ -229,6 +245,8 @@ const PendingSaveEffectSchema = z
     modifiers: EffectModifiersSchema.default([]),
     /** What it adds to AC while it lasts (Slow's -2). */
     armorClassBonus: EffectInstanceSchema.shape.armorClassBonus,
+    /** The light the creature sheds while it lasts (Faerie Fire's outline). */
+    light: EffectInstanceSchema.shape.light,
     /** "Until the end of the current turn" for a save made at the start of the bearer's own turn (Stinking Cloud),
      *  where "until the end of its next turn" would run a turn longer. */
     currentTurn: z.literal(true).optional()
@@ -301,6 +319,38 @@ export const PendingSaveSchema = z
     failurePush: ForcedPushSchema.optional(),
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
+    /** What gives the save Disadvantage, as the roll names it (Heightened Spell). GM bookkeeping, never projected. */
+    disadvantageFrom: z.string().min(1).max(60).optional(),
+    /** Nothing the server applies rides the save's outcome (Levitate, Polymorph): the GM applies what it does. The save
+     *  card says so, so it never reads as if the engine did. */
+    gmApplies: z.literal(true).optional(),
+    /** The spell the save is against, its school and level, and whether it aimed at this creature alone, for what
+     *  answers a save against a spell (Staff of Charming's Resist Enchantment). GM bookkeeping, never projected. */
+    spell: z
+      .object({
+        id: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80),
+        school: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(40),
+        level: z.number().int().min(0).max(9),
+        singleTarget: z.boolean()
+      })
+      .strict()
+      .optional(),
+    /** Confirmed and waiting on another creature's answer to the roll (Countercharm, Burst of Ingenuity): how it was
+     *  confirmed, which the finish replays, and who was asked. GM bookkeeping, never projected. */
+    confirmed: z
+      .object({
+        rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+        damageOverride: z.number().int().min(0).max(1000).optional(),
+        asked: z.array(z.string().min(1).max(300)).max(40).default([])
+      })
+      .strict()
+      .optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
@@ -323,6 +373,24 @@ export const CheckSubjectSchema = z
   })
   .strict();
 export type CheckSubject = z.infer<typeof CheckSubjectSchema>;
+
+/** One answer a held roll took (see `RollAnswerSchema`): who gave it, what it is called, and what it did to the roll.
+ *  `bonus` is added to the total (negative for Cutting Words); `face` replaced the d20 that counts (Stroke of Luck);
+ *  `succeed` and `hit` turned the outcome; `spent` is false when its use came back because the roll still failed. */
+export const HeldAnswerSchema = z
+  .object({
+    id: z.string().min(1).max(160),
+    actorId: z.uuid(),
+    name: z.string().min(1).max(120),
+    bonus: z.number().int().min(-100).max(100).default(0),
+    face: z.number().int().min(1).max(20).optional(),
+    rerolled: z.literal(true).optional(),
+    succeed: z.literal(true).optional(),
+    hit: z.literal(true).optional(),
+    spent: z.boolean().default(true)
+  })
+  .strict();
+export type HeldAnswer = z.infer<typeof HeldAnswerSchema>;
 
 /**
  * Dice thrown before they count, held so a second look at the same roll returns the same dice (ADR-0012): a previewed
@@ -349,6 +417,13 @@ export const HeldRollSchema = z
     /** The round and turn they were thrown in: a die held for one turn's attack is not reused on a later turn. */
     round: z.number().int().nonnegative(),
     turnActorId: z.uuid().nullable(),
+    /** What answered the roll so far (Bardic Inspiration's die, Indomitable's reroll), each once, read into the roll
+     *  every time it is looked at again. */
+    answers: z.array(HeldAnswerSchema).max(12).default([]),
+    /** A reroll with Advantage (Countercharm) reads the new dice that way, whatever the rules gave the first throw. */
+    readAs: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+    /** The other creatures already asked to answer this roll (a check's Cutting Words), so each is asked once. */
+    asked: z.array(z.string().min(1).max(300)).max(40).optional(),
     /** A check's subject and how it was made, so Heroic Inspiration can reroll it. */
     check: z
       .object({
@@ -459,15 +534,109 @@ export const ParkedAttackSchema = z
               .regex(/^[a-z]+$/)
               .max(40)
               .optional(),
-            slotLevel: z.number().int().min(1).max(9).optional()
+            slotLevel: z.number().int().min(1).max(9).optional(),
+            effects: z
+              .array(
+                z
+                  .string()
+                  .regex(/^[a-z0-9-]+$/)
+                  .max(80)
+              )
+              .max(3)
+              .optional()
           })
           .strict()
       )
       .max(6)
-      .default([])
+      .default([]),
+    /** The attack forwent its Advantage for this declared rider (Brutal Strike), so the replay offers its hit. */
+    forgoneAdvantageBy: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120)
+      .optional(),
+    /** The attacker chose to knock the target out (SRD Knocking Out a Creature), so the replay's damage does. */
+    knockOut: z.literal(true).optional(),
+    /** How the caster shaped the spell (Metamagic), so the replay's damage and range are the shaped ones. */
+    shaping: z.array(CastShapingSchema).max(4).optional()
   })
   .strict();
 export type ParkedAttack = z.infer<typeof ParkedAttackSchema>;
+
+/** A spell being cast that a Counterspell may still stop (SRD Counterspell), held before anything of it happens until
+ *  every such prompt is answered. Its action was spent when it was cast; its slot and the materials it consumes are
+ *  spent only if it goes ahead ("If that spell was cast with a spell slot, the slot isn't expended"). GM-only. */
+export const ParkedCastSchema = z
+  .object({
+    actionId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120),
+    /** The cast's own command, whose id its area's template and its effects carry. */
+    castCommandId: z.uuid(),
+    targetIds: z.array(z.uuid()).max(60),
+    /** The targets are the catch of a template placed on the map. */
+    areaPlaced: z.boolean(),
+    /** The slot the spell is cast with, spent if it goes ahead. */
+    slot: z
+      .object({ level: z.number().int().min(1).max(9), pact: z.boolean() })
+      .strict()
+      .nullable(),
+    /** The limited use it is cast with (a stat block's 1/Day), spent if it goes ahead, as a slot would be. */
+    use: z
+      .object({
+        key: z.string().min(1).max(120),
+        per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge"]),
+        amount: z.number().int().min(1).max(100)
+      })
+      .strict()
+      .nullable()
+      .default(null),
+    /** Materials and coins the cast uses up if it goes ahead. */
+    componentSpends: z
+      .array(
+        z.union([
+          z.object({ rowId: z.string().min(1).max(80), count: z.number().int().min(1).max(20) }).strict(),
+          z
+            .object({
+              coins: z
+                .object({ unit: z.enum(["cp", "sp", "ep", "gp", "pp"]), amount: z.number().int().min(1).max(10_000) })
+                .strict()
+            })
+            .strict()
+        ])
+      )
+      .max(8)
+      .default([]),
+    conditionId: z.string().max(60).nullable(),
+    damageType: z.string().max(40).nullable(),
+    ability: AbilityIdSchema.nullable(),
+    /** The key the cast's attack d20 is held under, if a preview rolled one. */
+    holdKey: z.string().max(120).nullable(),
+    initiatorRole: z.enum(["gm", "player"]),
+    initiatorSessionId: z.string().min(1).max(200),
+    /** How the caster shaped the spell (Metamagic, Sculpt Spells); its Sorcery Points were spent with the cast. */
+    shaping: z.array(CastShapingSchema).max(4).optional()
+  })
+  .strict();
+export type ParkedCast = z.infer<typeof ParkedCastSchema>;
+
+/** What a damage reaction does to the damage it holds: halve it (Uncanny Dodge), take a rolled amount off it (Deflect
+ *  Attacks, Stone's Endurance), or give Resistance to its type until the turn ends (Superior Hunter's Defense). */
+export const DamageResponseSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("half") }).strict(),
+  z
+    .object({
+      kind: z.literal("reduce"),
+      formula: z
+        .string()
+        .regex(/^(?:\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?|\d+)$/i)
+        .max(40)
+    })
+    .strict(),
+  z.object({ kind: z.literal("resist") }).strict()
+]);
+export type DamageResponse = z.infer<typeof DamageResponseSchema>;
 
 /** A declared reaction (ADR-0020) awaiting an answer, which persists until it is answered or the GM dismisses it, so
  * nothing it holds is lost. What it holds depends on the trigger: a hit's damage (Uncanny Dodge), an attack not yet
@@ -476,8 +645,24 @@ export const PendingReactionSchema = z
   .object({
     id: z.uuid(),
     /** What opened the window: an attack that hit the reactor, an enemy leaving its reach (opportunity attack), an
-     *  attack that would hit before its damage (`attack-would-hit`), or a creature damaging the reactor. */
-    kind: z.enum(["hit-by-attack", "leaves-reach", "attack-would-hit", "damaged-by-creature"]).default("hit-by-attack"),
+     *  attack that would hit before its damage (`attack-would-hit`), a creature damaging the reactor, a creature casting
+     *  a spell the reactor may counter (`casts-spell`), a roll another creature may answer (`roll-answer`: Cutting
+     *  Words, Countercharm), damage the reactor is about to take from any source (`takes-damage`), or a creature
+     *  falling (`falls`). */
+    kind: z
+      .enum([
+        "hit-by-attack",
+        "leaves-reach",
+        "attack-would-hit",
+        "damaged-by-creature",
+        "casts-spell",
+        "roll-answer",
+        "takes-damage",
+        "falls"
+      ])
+      .default("hit-by-attack"),
+    /** falls: how far the falling creature (`targetActorId`) is falling, in feet. */
+    fallFeet: z.number().int().min(0).max(10000).optional(),
     actorId: z.uuid(),
     actionId: z
       .string()
@@ -513,12 +698,52 @@ export const PendingReactionSchema = z
     rollsAttack: z.boolean().default(false),
     /** attack-would-hit: the attack the answer finishes. */
     parkedAttack: ParkedAttackSchema.nullable().default(null),
+    /** casts-spell (Counterspell): the cast the answers decide. */
+    parkedCast: ParkedCastSchema.optional(),
     /** attack-would-hit: the held attack's total, against the reactor's AC before the reaction. */
     attackTotal: z.number().int().min(-100).max(1000).optional(),
+    /** A reaction spell cast with a slot (Shield, Hellish Rebuke, Counterspell): the slot levels the reactor has one
+     *  of, lowest first, so the answer can pick a higher one. Absent for a reaction that spends no slot. */
+    slotLevels: z.array(z.number().int().min(1).max(9)).max(9).optional(),
+    /** roll-answer: the roll it meets (the creature whose roll it is is the source): an attack waiting at its roll
+     *  (`parkedAttack`), a save waiting on its confirm (`saveId`), that creature's latest check, or a hit's damage on
+     *  `targetActorId` (`proposedDamageParts`). */
+    rollKind: z.enum(["attack", "save", "check", "damage"]).optional(),
+    saveId: z.uuid().optional(),
+    /** roll-answer: what the answer does, for its button ("-1d8"), and whether the answerer picks its sign. */
+    answerDoes: z.string().min(1).max(80).optional(),
+    answerEither: z.literal(true).optional(),
+    /** The creatures and answers this roll or damage was already offered to, so each is asked once. */
+    asked: z.array(z.string().min(1).max(300)).max(40).optional(),
+    /** hit-by-attack and takes-damage: what using the reaction does to the damage it holds; absent, it halves it. */
+    damageResponse: DamageResponseSchema.optional(),
+    /** takes-damage: what the parked damage drains as it lands (a save's Harm). */
+    drain: DamageDrainSchema.optional(),
+    /** How the hit whose damage it holds was made, so a reaction limited to some attacks is offered after it. */
+    hitKinds: z.array(z.string().min(1).max(20)).max(10).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
 export type PendingReaction = z.infer<typeof PendingReactionSchema>;
+
+/** A fall held while the reactions it opened (Feather Fall, Slow Fall) wait for their answers (SRD Falling). Its
+ *  damage is rolled once they are answered. GM-only. */
+export const PendingFallSchema = z
+  .object({
+    /** The id the fall's prompts carry as their `triggerCommandId`. */
+    id: z.uuid(),
+    actorId: z.uuid(),
+    feet: z.number().int().min(0).max(10000),
+    /** It falls into water or another liquid, which can halve the damage. */
+    intoWater: z.boolean().default(false),
+    /** The height it lands at: 0 is the ground. */
+    landingAltitudeFeet: z.number().int().min(0).max(10000).default(0),
+    /** Damage taken off the fall by the answers given so far (Slow Fall). */
+    reduction: z.number().int().min(0).max(1000).default(0),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type PendingFall = z.infer<typeof PendingFallSchema>;
 
 /** A player's hit awaiting the GM's Apply (proposal mode, the default), so players never change HP on a creature
  * they don't own. GM-only: never projected to players or the viewer. */
@@ -539,6 +764,8 @@ export const PendingDamageSchema = z
     critical: z.boolean().default(false),
     /** What the damage drains as it lands (Vampiric Touch's healing). */
     drain: DamageDrainSchema.optional(),
+    /** The attacker knocks the target out: a drop to 0 leaves it at 1 Hit Point and Unconscious (SRD). */
+    nonlethal: z.literal(true).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
@@ -606,7 +833,7 @@ export type RuleMode = z.infer<typeof RuleModeSchema>;
 
 /** A GM relaxes rules a family at a time, never per rule id. The rule-id → family mapping lives in
  * `apps/server/src/rules-families.ts`. */
-export const RuleFamilySchema = z.enum(["movement", "economy", "resources", "targeting", "slots"]);
+export const RuleFamilySchema = z.enum(["movement", "economy", "resources", "targeting", "slots", "components"]);
 export type RuleFamily = z.infer<typeof RuleFamilySchema>;
 
 /** Per-family overrides of the standing dial; an absent key follows the dial. Not `.strict()`, so an unknown
@@ -616,7 +843,8 @@ export const RuleExceptionsSchema = z.object({
   economy: RuleModeSchema.optional(),
   resources: RuleModeSchema.optional(),
   targeting: RuleModeSchema.optional(),
-  slots: RuleModeSchema.optional()
+  slots: RuleModeSchema.optional(),
+  components: RuleModeSchema.optional()
 });
 export type RuleExceptions = z.infer<typeof RuleExceptionsSchema>;
 
@@ -669,21 +897,111 @@ export const VisionWallSchema = z
   .strict();
 export type VisionWall = z.infer<typeof VisionWallSchema>;
 
-/** A light: placed on the map (`position`) or carried by a token (`actorId`), never both. Radii are in feet as the SRD
- * prints them: Bright Light out to `brightFeet`, and Dim Light for `dimFeet` more. */
+/** What made a light or an area on the map (a spell, a feature), so it lasts as long as what keeps it: the cast's
+ * Concentration (`castId`) or an effect (`effectId`, on any creature). `spellId` and `level` let a later spell dispel
+ * it (Darkness dispels spell light of level 2 or lower). GM-only, like the rest of the vision layer. */
+export const VisionSourceSchema = z
+  .object({
+    casterId: z.uuid(),
+    spellId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
+    /** The action that made it, when no spell did (a magmin's flames). */
+    actionId: z.string().min(1).max(120).optional(),
+    level: z.number().int().min(0).max(9).optional(),
+    castId: z.string().min(1).max(120).optional(),
+    effectId: z.string().min(1).max(120).optional(),
+    /** The last round of the fight it lasts through, when nothing else keeps it (an octopus's ink). */
+    untilRound: z.number().int().positive().optional()
+  })
+  .strict();
+export type VisionSource = z.infer<typeof VisionSourceSchema>;
+
+/** A light: placed on the map (`position`), carried by a token (`actorId`), or at the centre of a spell's placed area
+ * as the area moves (`annotationId`: Moonbeam's Cylinder), exactly one of them. Radii are in feet as the SRD prints
+ * them: Bright Light out to `brightFeet`, and Dim Light for `dimFeet` more. With `sunlight`, the Bright Light is
+ * sunlight (Daylight). */
 export const VisionLightSchema = z
   .object({
     id: z.uuid(),
     position: VisionPointSchema.nullable().default(null),
     actorId: z.uuid().nullable().default(null),
+    annotationId: z.uuid().optional(),
     brightFeet: z.number().min(0).max(1000),
-    dimFeet: z.number().min(0).max(1000)
+    dimFeet: z.number().min(0).max(1000),
+    sunlight: z.literal(true).optional(),
+    source: VisionSourceSchema.optional()
   })
   .strict()
-  .refine((light) => (light.position === null) !== (light.actorId === null), {
-    message: "A light is either placed on the map or carried by a token."
-  });
+  .refine(
+    (light) =>
+      [light.position !== null, light.actorId !== null, light.annotationId !== undefined].filter(Boolean).length === 1,
+    { message: "A light is placed on the map, carried by a token, or fills a spell's area: exactly one of them." }
+  );
 export type VisionLight = z.infer<typeof VisionLightSchema>;
+
+/**
+ * What an area does to light and sight (SRD Rules Glossary). `bright`, `dim` and `dark` set its light level over the
+ * scene's (a lit room in a dark dungeon, a shadowed cellar in daylight); lights still shine into a dark one.
+ * `lightly-obscured` (patchy fog, moderate foliage) gives Disadvantage on Perception by sight; `heavily-obscured`
+ * (dense fog or foliage, a Fog Cloud) blocks sight into and through it. `magical-darkness` (the Darkness spell) is dark
+ * whatever light reaches it, and only Blindsight, Truesight and Devil's Sight see into or through it.
+ */
+export const VisionAreaKindSchema = z.enum([
+  "bright",
+  "dim",
+  "dark",
+  "lightly-obscured",
+  "heavily-obscured",
+  "magical-darkness"
+]);
+export type VisionAreaKind = z.infer<typeof VisionAreaKindSchema>;
+
+/** An area of light or obscurement: a rect or circle the GM paints, a spell's placed template (`annotationId`, moving
+ * with it; a line's width in `widthFeet`), or an Emanation around a creature that moves with its token. */
+export const VisionAreaSchema = z
+  .object({
+    id: z.uuid(),
+    kind: VisionAreaKindSchema,
+    /** A `bright` area lit by sunlight (a sunlit courtyard). */
+    sunlight: z.literal(true).optional(),
+    shape: z.discriminatedUnion("type", [
+      z
+        .object({
+          type: z.literal("rect"),
+          x: z.number().min(0).max(100000),
+          y: z.number().min(0).max(100000),
+          width: z.number().positive().max(100000),
+          height: z.number().positive().max(100000)
+        })
+        .strict(),
+      z
+        .object({
+          type: z.literal("circle"),
+          x: z.number().min(0).max(100000),
+          y: z.number().min(0).max(100000),
+          radiusFeet: z.number().positive().max(1000)
+        })
+        .strict(),
+      z
+        .object({
+          type: z.literal("template"),
+          annotationId: z.uuid(),
+          widthFeet: z.number().positive().max(1000).nullable().default(null)
+        })
+        .strict(),
+      z
+        .object({ type: z.literal("emanation"), actorId: z.uuid(), radiusFeet: z.number().positive().max(1000) })
+        .strict()
+    ]),
+    /** The one creature that sees through it (Insect Cloud: "Heavily Obscured for creatures other than you"). */
+    sparedActorId: z.uuid().optional(),
+    source: VisionSourceSchema.optional()
+  })
+  .strict();
+export type VisionArea = z.infer<typeof VisionAreaSchema>;
 
 /** The scene's dynamic vision (ADR-0023). Off by default, so a scene without it behaves as before. `measure` is the
  * map's size and scale, written by the server whenever the GM edits it, so feet convert to pixels without the map
@@ -693,8 +1011,12 @@ export const SceneVisionSchema = z
   .object({
     enabled: z.boolean().default(false),
     ambient: z.enum(["bright", "dim", "dark"]).default("bright"),
+    /** The bright ambient light is sunlight (daylight outdoors), which Sunlight Sensitivity reads. */
+    sunlight: z.boolean().default(false),
     walls: z.array(VisionWallSchema).max(1000).default([]),
     lights: z.array(VisionLightSchema).max(100).default([]),
+    /** Areas of light and obscurement over the ambient light, later ones over earlier ones. */
+    areas: z.array(VisionAreaSchema).max(100).default([]),
     measure: z
       .object({
         width: z.number().positive().max(100000),
@@ -720,8 +1042,10 @@ export type SceneVision = z.infer<typeof SceneVisionSchema>;
 export const EMPTY_SCENE_VISION: SceneVision = {
   enabled: false,
   ambient: "bright",
+  sunlight: false,
   walls: [],
   lights: [],
+  areas: [],
   measure: null,
   explored: null
 };
@@ -745,6 +1069,9 @@ export const SpellZoneSchema = z
     casterId: z.uuid(),
     /** The Concentration cast it ends with; null for a spell that lasts `rounds` from `startedRound`, or until ended. */
     castId: z.string().min(1).max(120).nullable(),
+    /** The effect on its caster that keeps a spell with no Concentration (Glyph of Warding, Guardian of Faith): the
+     *  area lasts while that effect does, in a fight and on the game clock outside one. */
+    effectId: z.string().min(1).max(120).optional(),
     rounds: z.number().int().min(1).max(100).nullable().default(null),
     startedRound: z.number().int().positive(),
     /** The slot level it was cast at, which its damage rolls at. */
@@ -754,8 +1081,27 @@ export const SpellZoneSchema = z
     annotationId: z.string().min(1).max(120).nullable(),
     /** The template the GM places it with: the spell's own area. Null for an Emanation, which is its caster's. */
     area: ActionAreaSchema.nullable().default(null),
+    /** Where its caster stood at the cast, for an Emanation that stays there (Globe of Invulnerability). */
+    anchor: z.object({ x: z.number(), y: z.number() }).strict().optional(),
+    /** What an item's or a creature's area acts with (spread Caltrops' save and damage), kept here since what left it
+     *  may be gone; a spell's area reads its spell instead. */
+    rule: z
+      .object({ trigger: AreaTriggerSchema, save: ActionSchema.shape.save, damage: ActionSchema.shape.damage })
+      .strict()
+      .optional(),
     /** Damage dealt so far, against a cap the spell prints (Guardian of Faith's 60). */
     damageDealt: z.number().int().nonnegative().max(100000).default(0),
+    /** The damage type the caster chose at the cast (Conjure Elemental's element, Transmuted Spell's); absent, the
+     *  spell's own. */
+    damageType: z.string().min(1).max(40).optional(),
+    /** The creature Heightened Spell gave Disadvantage on its saves against the spell. */
+    heightened: z.uuid().optional(),
+    /** Dice its damage has gained so far (Delayed Blast Fireball: 1d6 whenever its caster's turn ends). */
+    grown: z.number().int().nonnegative().max(100).optional(),
+    /** It acts when its spell ends (Delayed Blast Fireball's bead), so ending it leaves it `bursting` until the server
+     *  has raised the saves. */
+    burstsOnEnd: z.literal(true).optional(),
+    bursting: z.literal(true).optional(),
     /** This turn's marks: who has entered it, and who has made its save or taken its damage. Cleared as each turn
      *  begins. */
     entered: z.array(z.uuid()).max(200).default([]),
@@ -790,13 +1136,21 @@ const sceneCombatShape = {
           components: z.record(z.string(), z.number().int().nonnegative()),
           slotLevel: z.number().int().min(1).max(9).optional(),
           parentId: z.string().max(120).optional(),
-          replacements: z.record(z.string(), z.number().int().nonnegative()).optional()
+          replacements: z.record(z.string(), z.number().int().nonnegative()).optional(),
+          /** How the spell whose rays it holds was shaped (Metamagic), which every later ray keeps. Never projected. */
+          shaping: z.array(CastShapingSchema).max(4).optional()
         })
         .strict()
         .nullable()
         .default(null),
+      /** The same for a Bonus Action: a compound one's strikes, or the rays of a spell cast as one (Quickened Spell). */
       bonusActionInstance: z
-        .object({ actorId: z.uuid(), components: z.record(z.string(), z.number().int().nonnegative()) })
+        .object({
+          actorId: z.uuid(),
+          components: z.record(z.string(), z.number().int().nonnegative()),
+          slotLevel: z.number().int().min(1).max(9).optional(),
+          shaping: z.array(CastShapingSchema).max(4).optional()
+        })
         .strict()
         .nullable()
         .default(null),
@@ -804,12 +1158,28 @@ const sceneCombatShape = {
       /** Feet of movement the current turn's actor has spent (fractional on gridless maps). */
       movementUsedFeet: z.number().nonnegative().max(100000).default(0),
       /** Rule families the GM already waved through this turn. Stripped from player projections. */
-      rulesOverriddenFamilies: z.array(RuleFamilySchema).max(5).optional(),
+      rulesOverriddenFamilies: z.array(RuleFamilySchema).max(6).optional(),
       /** Who has expended a spell slot to cast a spell this turn (SRD: one per turn). Engine bookkeeping, never
        *  projected. */
       spellSlotCasters: z.array(z.uuid()).max(200).optional(),
+      /** What the turn's actor has cast this turn, for Quickened Spell ("You can't modify a spell in this way if you've
+       *  already cast a level 1+ spell on the current turn, nor can you cast a level 1+ spell on this turn after"), and
+       *  whether Arcane Apotheosis's free Metamagic option is used. Engine bookkeeping, never projected. */
+      metamagic: z
+        .object({
+          leveledCast: z.literal(true).optional(),
+          quickened: z.literal(true).optional(),
+          freeUsed: z.literal(true).optional()
+        })
+        .strict()
+        .optional(),
       /** The turn's actor has made its one death save (SRD: at the start of its turn). Never projected. */
       deathSaveRolled: z.boolean().optional(),
+      /** The creature whose turn ended just before this one, which opened the window for legendary actions
+       *  (SRD 5.2.1: "Immediately after another creature's turn"); absent on a fight's first turn. `legendaryTakenBy`:
+       *  the creatures that took their one legendary action in that window. Engine bookkeeping, never projected. */
+      afterActorId: z.uuid().optional(),
+      legendaryTakenBy: z.array(z.uuid()).max(50).optional(),
       /** The turn's actor has made an attack roll on its turn (SRD Reckless Attack is decided with the first). Engine
        *  bookkeeping, never projected. */
       attackRolled: z.boolean().optional(),
@@ -980,6 +1350,52 @@ export const CombatStateSchema = z
     /** Prepared scenes the GM parks and resumes. The active scene's own `combat` stays empty; its live copy is the top-level fields. */
     scenes: z.array(SceneSchema).max(20).default([]),
     activeSceneId: z.uuid().nullable().default(null),
+    /** Falls waiting on the reactions they opened, on the live table only. GM-only (see PendingFallSchema). */
+    pendingFalls: z.array(PendingFallSchema).max(20).default([]),
+    /** A move stopped at the edge of the reach it leaves while the Opportunity Attacks it provoked are answered
+     *  (`held-moves.ts`): where it waits, where it was going, the prompts it waits on, the movement the rest of the way
+     *  cost, and the creatures it drags. Live table only; GM-only. */
+    heldMove: z
+      .object({
+        actorId: z.uuid(),
+        at: EncounterTokenPositionSchema,
+        to: EncounterTokenPositionSchema,
+        toAltitudeFeet: z.number().int().min(1).max(10000).optional(),
+        airborne: z.enum(["fly", "levitate"]).optional(),
+        promptIds: z.array(z.uuid()).max(20),
+        refundFeet: z.number().min(0).max(100000),
+        dragged: z.array(z.uuid()).max(20)
+      })
+      .strict()
+      .nullable()
+      .default(null),
+    /** Time Stop (SRD 5.2.1): the caster takes `turnsLeft` more turns in a row, until it affects another creature or
+     *  moves more than 1,000 feet from `at`, where it cast the spell. Live table only; GM-only. */
+    timeStop: z
+      .object({
+        actorId: z.uuid(),
+        turnsLeft: z.number().int().min(0).max(5),
+        at: EncounterTokenPositionSchema.nullable()
+      })
+      .strict()
+      .nullable()
+      .default(null),
+    /** Creatures gone from the fight's plane (Banishment, Blink's Ethereal turns), with the space each left and its
+     *  height there, so it comes back to that space or the nearest unoccupied one (`off-plane.ts`). Live table only;
+     *  GM-only, since a creature the party never saw leave would be placed by it. */
+    offPlane: z
+      .array(
+        z
+          .object({
+            actorId: z.uuid(),
+            position: EncounterTokenPositionSchema,
+            altitudeFeet: z.number().int().min(1).max(10000).optional(),
+            airborne: z.enum(["fly", "levitate"]).optional()
+          })
+          .strict()
+      )
+      .max(50)
+      .default([]),
     /** Turn time-travel (live fight only): `historyCursor` is the snapshot index being viewed (null = live);
      * `historyDirty` means state changed while rewound, so moving on needs GM confirmation. */
     historyCursor: z.number().int().nonnegative().nullable().default(null),
@@ -1020,6 +1436,7 @@ export const CombatStateSchema = z
         active.combat.vision.enabled ||
         active.combat.vision.walls.length > 0 ||
         active.combat.vision.lights.length > 0 ||
+        active.combat.vision.areas.length > 0 ||
         active.combat.vision.explored !== null ||
         active.combat.pendingSaves.length > 0 ||
         active.combat.pendingReactions.length > 0 ||
@@ -1103,12 +1520,14 @@ export const PartyShortRestSchema = z
   .strict();
 export type PartyShortRest = z.infer<typeof PartyShortRestSchema>;
 
-/** Game time and the rests waiting on the GM. The clock exists for the 16-hour rule between Long Rests; the GM
- *  moves it, and a party rest moves it by the rest's length. */
+/** Game time and the rests waiting on the GM. The clock is what the 16-hour rule between Long Rests reads and what
+ *  effects measured in game time count down on; the GM moves it, and a party rest moves it by the rest's length. */
 export const RestStateSchema = z
   .object({
     /** Whole hours of game time since the campaign's clock started. */
     clockHours: z.number().int().min(0).max(10_000_000).default(0),
+    /** Minutes past the hour. */
+    clockMinutes: z.number().int().min(0).max(59).default(0),
     /** Characters whose players asked for a Long Rest, oldest first. */
     requests: z.array(z.uuid()).max(50).default([]),
     shortRest: PartyShortRestSchema.nullable().default(null)

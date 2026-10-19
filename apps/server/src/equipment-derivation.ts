@@ -175,6 +175,8 @@ export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
  *  nothing before attunement. No catalog record fails open to mundane. */
 export function itemIsActive(item: InventoryItem, record: EquipmentReference | undefined): boolean {
   if (item.quantity <= 0 || !item.equipped) return false;
+  // A Flame Tongue's fire is there only while it is ablaze.
+  if (record?.light?.ridersWhileLit === true && item.lit !== true) return false;
   const requiresAttunement = record?.attunement?.required === true || item.magic?.attunementRequired === true;
   return requiresAttunement ? item.attuned : true;
 }
@@ -391,15 +393,18 @@ export function deriveEquipment(
   const packed: ActiveItem[] = [];
   /** A curse's vulnerabilities, which hold while attuned whether or not the item is worn. */
   const cursedVulnerabilities: Defence[] = [];
-  // Every row read with the catalog's armor block, so what armor does holds for a row that names the item only.
-  const inventory = catalog ? actor.inventory.map((item) => withCatalogArmor(item, catalog)) : [];
+  // Every row read with the catalog's armor and weapon blocks, so what they do holds for a row that names the item only.
+  const inventory = catalog
+    ? actor.inventory.map((item) => withCatalogWeapon(withCatalogArmor(item, catalog), catalog))
+    : [];
   for (const item of inventory) {
     if (item.quantity <= 0) continue;
     const record = catalog!.equipmentRecord(catalogIdOf(item));
     const entry = { item, record };
     if (item.equipped) equipped.push(entry);
     if (item.equipped && itemIsActive(item, record)) active.push(entry);
-    else if (record?.consumedOnUse) packed.push(entry);
+    // Caltrops are spread straight from their bag, as a potion is drunk from the pack.
+    else if (record?.consumedOnUse || record?.actions.some((action) => action.zone !== undefined)) packed.push(entry);
     if (item.attuned && record) cursedVulnerabilities.push(...curseVulnerabilitiesOf(record, item));
   }
   const carriers: RiderCarrier[] = [
@@ -528,14 +533,16 @@ export function deriveEquipment(
   );
   for (const equippedEntry of equipped) {
     const entry = { ...equippedEntry, item: withCatalogWeaponFacts(equippedEntry, catalog!) };
-    const swing = weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce);
-    if (!swing) continue;
+    const bare = weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce);
+    if (!bare) continue;
+    const swing = { ...bare, action: withItemHitRiders(bare.action, entry) };
     const weaponAttack = swing.action;
     actions.push(weaponAttack);
     weaponActionIds.push(weaponAttack.id);
-    const twoHanded = shieldInHand
+    const bareTwoHanded = shieldInHand
       ? null
       : weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce, { twoHanded: true });
+    const twoHanded = bareTwoHanded && { ...bareTwoHanded, action: withItemHitRiders(bareTwoHanded.action, entry) };
     if (twoHanded) {
       actions.push(twoHanded.action);
       weaponActionIds.push(twoHanded.action.id);
@@ -558,15 +565,18 @@ export function deriveEquipment(
     // The extra attacks the weapon can make beside its own (not Extra Attack's to multiply, so not weapon swings
     // for `weaponActionIds`). The Light one carries the weapon's mastery; Cleave's is the mastery itself.
     if (entry.item.weapon?.properties?.includes("light") && lightWeaponsInHand >= 2) {
-      const extra = extraAttackAction(entry.item, swing, "light", {
-        insideAttackAction: freesLightExtraAttack(inForce?.id),
-        keepModifier: twoWeaponFighting
-      });
+      const extra = withItemHitRiders(
+        extraAttackAction(entry.item, swing, "light", {
+          insideAttackAction: freesLightExtraAttack(inForce?.id),
+          keepModifier: twoWeaponFighting
+        }),
+        entry
+      );
       actions.push(extra);
       if (inForce) masteryByActionId[extra.id] = inForce;
     }
     if (inForce?.id === "cleave" && weaponAttack.attack?.reachFeet !== undefined)
-      actions.push(extraAttackAction(entry.item, swing, "cleave"));
+      actions.push(withItemHitRiders(extraAttackAction(entry.item, swing, "cleave"), entry));
   }
   // A builder-minted unarmed strike (Monk Martial Arts) is a weapon swing too, so Extra Attack reaches it.
   if (definition?.actions.some((action) => action.id === UNARMED_STRIKE_ACTION_ID && action.attack !== undefined)) {
@@ -626,6 +636,36 @@ function withCatalogArmor(item: InventoryItem, catalog: EquipmentCatalog): Inven
   if (!armor) return item;
   const { acBase, addDexModifier, dexModifierCap, stealthDisadvantage, strengthRequired } = armor;
   return { ...item, armor: { acBase, addDexModifier, dexModifierCap, stealthDisadvantage, strengthRequired } };
+}
+
+/** A row with the catalog's weapon block when the row carries none and the record is no template: a staff stored
+ *  before its record could be wielded as a Quarterstaff swings like one. The row's own block wins. */
+function withCatalogWeapon(item: InventoryItem, catalog: EquipmentCatalog): InventoryItem {
+  if (item.weapon !== undefined) return item;
+  const record = catalog.equipmentRecord(catalogIdOf(item));
+  const stats = record?.appliesTo ? undefined : record?.weapon;
+  if (!stats?.damageDice || !stats.damageType) return item;
+  return {
+    ...item,
+    weapon: {
+      category: stats.category,
+      damageDice: stats.damageDice,
+      damageType: stats.damageType,
+      rangeFeet: stats.rangeFeet ?? null,
+      longRangeFeet: stats.longRangeFeet ?? null,
+      ...(stats.melee !== undefined ? { melee: stats.melee } : {}),
+      ...(stats.versatileDice !== undefined ? { versatileDice: stats.versatileDice } : {}),
+      ...(stats.properties !== undefined ? { properties: [...stats.properties] } : {})
+    }
+  };
+}
+
+/** A weapon's attack with what its hit does beside its damage (Giant Slayer, a Sword of Wounding): the record's
+ *  riders, once the item is active, so a cursed or unattuned one adds nothing. */
+function withItemHitRiders(action: ActorAction, entry: ActiveItem): ActorAction {
+  const riders = entry.record?.onHit;
+  if (!riders || riders.length === 0 || !itemIsActive(entry.item, entry.record)) return action;
+  return { ...action, onHit: [...(action.onHit ?? []), ...structuredClone(riders)].slice(0, 4) };
 }
 
 /** A weapon row with the catalog's melee band and Versatile die filled in, for rows stored before the row carried

@@ -1,4 +1,4 @@
-import type { GameState } from "@vtt/domain";
+import { gameTimeSpanLabel, type GameState } from "@vtt/domain";
 import { conditionLabel } from "./condition-rules.js";
 import { HIDDEN_SOURCE, withoutSourceName } from "./hidden-source.js";
 
@@ -11,6 +11,10 @@ function timeLeft(effect: Effect, bearerId: string, sourceName: string): string 
   switch (duration.type) {
     case "rounds":
       return `${duration.remaining} ${duration.remaining === 1 ? "round" : "rounds"} left`;
+    case "minutes":
+      return `${gameTimeSpanLabel(duration.remaining)} left`;
+    case "until-rest":
+      return duration.rest === "long" ? "until its next Long Rest" : "until its next Short or Long Rest";
     case "until-source-next-turn":
       return `until ${sourceName}'s next turn starts`;
     case "until-bearer-next-turn":

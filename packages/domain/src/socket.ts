@@ -67,6 +67,8 @@ import type {
   ActorSetSpeedSchema,
   ActorSetArmorClassSchema,
   ActorSetHeroicInspirationSchema,
+  ActorGiveHeroicInspirationSchema,
+  ActorAwardExperienceSchema,
   ActorStabilizeSchema,
   ActorSpendHitDiceSchema,
   ActorSpendUsesSchema,
@@ -95,6 +97,7 @@ import type {
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterGiveItemSchema,
+  CharacterStudyItemSchema,
   CharacterRecoverAmmunitionSchema,
   CharacterSetPreparedSchema,
   CharacterFinishPreparingSchema,
@@ -103,6 +106,7 @@ import type {
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
   CharacterSubmitImportSchema,
+  CheckAnswerSchema,
   CheckRerollSchema,
   CheckRollSchema,
   CommandIdentitySchema,
@@ -164,6 +168,9 @@ import type {
   TempHpSchema,
   TimePassSchema,
   TokenMoveSchema,
+  TokenSetAltitudeSchema,
+  ActorFallSchema,
+  ActorMountSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
   TurnUseSchema,
@@ -181,6 +188,9 @@ import type {
   ScenePreviewSchema,
   VisionResetExploredSchema,
   VisionSetAmbientSchema,
+  VisionAreaAddSchema,
+  VisionAreaRemoveSchema,
+  ItemSetLightSchema,
   VisionSetEnabledSchema,
   WallAddSchema,
   WallClearSchema,
@@ -368,6 +378,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof CheckRerollSchema>,
     acknowledgement: (result: CheckRollResult) => void
   ) => void;
+  /** Answer a character's latest check with one of its answers (Tactical Mind, a Bardic Inspiration die). */
+  "check:answer": (
+    payload: CommandPayload<typeof CheckAnswerSchema>,
+    acknowledgement: (result: CheckRollResult) => void
+  ) => void;
   /** GM: call for a check or a save from one or several characters. */
   "roll-call:start": (
     payload: CommandPayload<typeof RollCallStartSchema>,
@@ -387,6 +402,22 @@ export interface ClientToServerEvents {
   "actor:set-heroic-inspiration": (
     payload: CommandPayload<typeof ActorSetHeroicInspirationSchema>,
     acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A character's player or the GM: give its second Heroic Inspiration to a player character who lacks one, or let it go. */
+  "actor:give-heroic-inspiration": (
+    payload: CommandPayload<typeof ActorGiveHeroicInspirationSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM: award XP to player characters, each an amount and a share of the defeated creatures' XP. */
+  "actor:award-experience": (
+    payload: CommandPayload<typeof ActorAwardExperienceSchema>,
+    acknowledgement: (
+      result: MutationResult & {
+        each?: number;
+        creatures?: number;
+        ready?: Array<{ actorId: string; name: string; level: number }>;
+      }
+    ) => void
   ) => void;
   /** The server first re-runs the command as the player; only a still-blocked one is parked for the GM (`askId`). */
   "rules:ask": (
@@ -495,7 +526,7 @@ export interface ClientToServerEvents {
     acknowledgement: (result: ContentCompendiumResult) => void
   ) => void;
   "content:monster-actions": (
-    payload: { definitionId: string },
+    payload: { definitionId: string; actorId?: string },
     acknowledgement: (result: ContentActionsResult) => void
   ) => void;
   "content:monster-sheet": (
@@ -634,6 +665,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof CharacterGiveItemSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** GM: a carried manual or tome is studied; the score rises and the copy's magic is spent. */
+  "character:study-item": (
+    payload: CommandPayload<typeof CharacterStudyItemSchema>,
+    acknowledgement: (result: MutationResult & { ability?: string; before?: number; after?: number }) => void
+  ) => void;
   "character:recover-ammunition": (
     payload: CommandPayload<typeof CharacterRecoverAmmunitionSchema>,
     acknowledgement: (result: MutationResult) => void
@@ -752,6 +788,21 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof TokenMoveSchema>,
     acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
   ) => void;
+  /** GM makes a creature fall: the server rolls the damage once any reaction to it is answered. */
+  "actor:fall": (
+    payload: CommandPayload<typeof ActorFallSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A creature climbs onto a mount or off the one it rides. */
+  "actor:mount": (
+    payload: CommandPayload<typeof ActorMountSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** GM sets how high a creature is, free of movement. */
+  "token:set-altitude": (
+    payload: CommandPayload<typeof TokenSetAltitudeSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "scene:create": (
     payload: CommandPayload<typeof SceneCreateSchema>,
     acknowledgement: (result: SceneCreateResult) => void
@@ -854,6 +905,18 @@ export interface ClientToServerEvents {
   ) => void;
   "light:remove": (
     payload: CommandPayload<typeof LightRemoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "vision:add-area": (
+    payload: CommandPayload<typeof VisionAreaAddSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "vision:remove-area": (
+    payload: CommandPayload<typeof VisionAreaRemoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "item:set-light": (
+    payload: CommandPayload<typeof ItemSetLightSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:add": (

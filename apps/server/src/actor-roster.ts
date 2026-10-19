@@ -219,11 +219,21 @@ export function unarmoredDefensesOf(definition: ActorDefinition, catalog?: Equip
  * Defenses) only one applies at a time (SRD Multiclassing): the best.
  */
 export function storedArmorClass(actor: Actor, definition: ActorDefinition, catalog?: EquipmentCatalog): number {
+  return armorClassWith(actor, definition, catalog, []);
+}
+
+/** `storedArmorClass` with more ways to work out base AC while no armor is worn (Mage Armor's 13 + Dexterity). */
+function armorClassWith(
+  actor: Actor,
+  definition: ActorDefinition,
+  catalog: EquipmentCatalog | undefined,
+  extra: readonly UnarmoredDefense[]
+): number {
   if (actor.armorClassOverride !== undefined) return actor.armorClassOverride;
   const derivation = deriveEquipment(actor, definition, catalog);
   const dex = abilityModifier(definition.abilityScores.dex);
   const items = withResolvedSlots(actor.inventory, catalog);
-  const unarmored = unarmoredDefensesOf(definition, catalog);
+  const unarmored = [...unarmoredDefensesOf(definition, catalog), ...extra];
   const training = { shield: derivation.untrainedShield === null };
   const worn = [null, ...unarmored]
     .map((option) => armorClassFromEquipment(dex, items, option, training))
@@ -232,8 +242,36 @@ export function storedArmorClass(actor: Actor, definition: ActorDefinition, cata
   if (armorClassFromLoadout(definition))
     return (equipmentAc ?? 10 + dex + Math.max(0, ...unarmored.map((option) => option.bonus))) + derivation.armorClass;
   const base =
-    equipmentAc !== null && wornBodyArmor(items) ? equipmentAc + armorClassRiderOf(definition) : definition.armorClass;
+    equipmentAc !== null && wornBodyArmor(items)
+      ? equipmentAc + armorClassRiderOf(definition)
+      : Math.max(definition.armorClass, ...extra.map((option) => 10 + dex + option.bonus));
   return base + derivation.armorClass;
+}
+
+/**
+ * A live effect's way to work out base AC (SRD Mage Armor: "base AC becomes 13 plus its Dexterity modifier") is chosen
+ * like Unarmored Defense: the creature's AC with it is the best of its ways, and its other AC bonuses (a Ring of
+ * Protection, a Shield) add to it as they add to any. What it raises the stored AC by is kept on the effect as its AC
+ * bonus, and worked out again whenever the stored AC is (equipment, content). True when any changed.
+ */
+export function refreshBaseArmorClass(
+  actor: Actor,
+  definition: ActorDefinition,
+  catalog: EquipmentCatalog | undefined
+): boolean {
+  if (!actor.effects.some((effect) => effect.baseArmorClass !== undefined)) return false;
+  const without = storedArmorClass(actor, definition, catalog);
+  let changed = false;
+  actor.effects = actor.effects.map((effect) => {
+    if (effect.baseArmorClass === undefined) return effect;
+    const option = { bonus: effect.baseArmorClass - 10, allowShield: true };
+    const gain = Math.min(10, armorClassWith(actor, definition, catalog, [option]) - without);
+    const { armorClassBonus: _old, ...rest } = effect;
+    const next: typeof effect = gain > 0 ? { ...rest, armorClassBonus: gain } : rest;
+    if (next.armorClassBonus !== effect.armorClassBonus) changed = true;
+    return next;
+  });
+  return changed;
 }
 
 /** Re-derives every stored AC from current content. Inventory writes reconcile AC, but a homebrew publish or a
@@ -248,6 +286,7 @@ export function reconcileArmorClasses(
   for (const actor of state.actors) {
     const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
     if (!definition) continue;
+    if (refreshBaseArmorClass(actor, definition, catalog)) changed = true;
     const next = storedArmorClass(actor, definition, catalog);
     if (actor.armorClass === next) continue;
     actor.armorClass = next;
@@ -325,7 +364,10 @@ function instantiate(
     armorClass: storedArmorClass(seed, definition, catalog),
     initiative: definition.initiativeBonus + derivation.initiative,
     ownerSessionId: null,
-    conditions: [],
+    // A stat block that says it "has the Invisible condition" (an invisible stalker) joins the roster with it.
+    conditions: (definition.traitMechanics ?? []).some((trait) => trait.kind === "invisible")
+      ? [{ id: "invisible" as const }]
+      : [],
     effects: [],
     deathSaves: null,
     actionUses: {},
@@ -434,6 +476,17 @@ export function assertNotArchived(state: GameState, actorId: string) {
   if (actor?.archived) throw new CommandRejectedError(`${actor.name} is archived. Restore ${actor.name} first.`);
 }
 
+/** The fight a combatant is in: the live one, a paused one in a prepared scene (whose action ids and pools a rebuild
+ *  would invalidate), or none. */
+export function fightHolding(state: GameState, actorId: string): "live" | "paused" | null {
+  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) return "live";
+  return state.combat.scenes.some(
+    (scene) => scene.combat.active && scene.combat.initiative.some((entry) => entry.actorId === actorId)
+  )
+    ? "paused"
+    : null;
+}
+
 /**
  * Rebuilds one character in place (level up/down, respec) from a definition built by
  * `buildCharacterDefinition`. Keeps table identity and campaign state (conditions, effects, notes,
@@ -461,17 +514,10 @@ export function rebuildActorDefinition(
       "Finish reviewing the combat history before rebuilding a character.",
       "history_review"
     );
-  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) {
-    throw new CommandRejectedError("End the encounter before rebuilding a character who is in it.");
-  }
-  // A parked scene can hold a paused fight whose action ids and pools this rebuild would invalidate.
-  if (
-    state.combat.scenes.some(
-      (scene) => scene.combat.active && scene.combat.initiative.some((entry) => entry.actorId === actorId)
-    )
-  ) {
+  const fight = fightHolding(state, actorId);
+  if (fight === "live") throw new CommandRejectedError("End the encounter before rebuilding a character who is in it.");
+  if (fight === "paused")
     throw new CommandRejectedError("End the paused encounter in the prepared scene that uses this character first.");
-  }
 
   // Carry over the old sheet's `hp-roll` rows for levels the new build doesn't cover, so levelling back
   // up restores the original rolls.

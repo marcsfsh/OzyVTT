@@ -1,10 +1,10 @@
 import type { ActionResolution, DamageApplication, GameState, PendingReaction } from "@vtt/domain";
 import type { RandomSource } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, DamageType } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { requireGm, type Initiator } from "./authorization.js";
 import { releaseHeldRoll } from "./held-rolls.js";
-import { adjustableActor, applyDamageDetailed, halvedDamageParts, type DamageInput } from "./hit-points.js";
+import { adjustableActor, applyDamageDetailed, type DamageInput } from "./hit-points.js";
 import { addEffect, makeEffect, type EffectNarration } from "./effects.js";
 import { resolveDefinitionAction, type ResolveDependencies } from "./action-resolution.js";
 import { builtinAction, builtinActionFor } from "./builtin-actions.js";
@@ -15,10 +15,24 @@ import { damagePartsOf } from "./resolution/damage.js";
 import { commitEconomy, planEconomy } from "./resolution/economy.js";
 import { hiddenFrom } from "./vision/audience.js";
 import { checkPlan } from "./ability-checks.js";
-import { rollSettledCheck } from "./check-rolls.js";
+import { answerAbilityCheck, rollSettledCheck } from "./check-rolls.js";
 import { withOneUsedUp } from "./consumables.js";
 import { deriveEquipment } from "./equipment-derivation.js";
 import { scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "./scrolls.js";
+import {
+  classLevelOf,
+  dropFall,
+  FEATHER_FALL_TAG,
+  landFallWhenAnswered,
+  landFeatherFall,
+  reduceFall,
+  type FallDeps
+} from "./falling.js";
+import { answerCounter as answerCounterPrompt } from "./counter-answers.js";
+import { openDamageWindow, reducedParts, resistedTypeOf, respondToDamage } from "./damage-window.js";
+import { recordRoll, rolledTerms } from "./roll-history.js";
+import { answerAmount, type AnswerDeps } from "./roll-answers.js";
+import { answerSave, type SaveAnswerDependencies, type SaveOutcome } from "./saving-throws.js";
 
 export type ReactionAnswerDependencies = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -54,9 +68,15 @@ export type ReactionOutcome = Readonly<{
   kind: PendingReaction["kind"];
   /** The creature struck (an opportunity attack, Hellish Rebuke), or the attacker whose parked attack was finished. */
   other?: Readonly<{ id: string; name: string }>;
-  /** The strike's full resolution, or the parked attack's once the answer finished it. */
+  /** The strike's full resolution, or the parked attack's or cast's once the answer finished it. */
   resolution?: ActionResolution;
+  /** A save another creature's answer met, as its confirm finished it. */
+  save?: SaveOutcome;
   events: readonly EffectNarration[];
+  /** casts-spell: the Counterspell stopped the cast, which dissipates. */
+  countered?: boolean;
+  /** casts-spell: the cast's own command, whose rolls its finish recorded. */
+  castCommandId?: string;
 }>;
 
 /** Preview/confirm options for a strike that rolls an attack (an opportunity attack, Retaliation). The strike's d20 is
@@ -73,6 +93,10 @@ export type OpportunityAttackOptions = Readonly<{
   pushFeet?: number;
   /** The extras chosen for the hit on its preview (Sneak Attack). */
   hitOptions?: ResolveInput["hitOptions"];
+  /** The slot a reaction spell is cast with (Hellish Rebuke's dice, Shield's slot); absent, the lowest that can. */
+  slotLevel?: number;
+  /** An answer to another creature's roll that may go either way (Improve Fate) takes its die off. */
+  subtract?: boolean;
 }>;
 
 /** The key a reaction's strike holds its d20 under. */
@@ -116,7 +140,8 @@ export function answerReaction(
   const pending = state.combat.pendingReactions.find((entry) => entry.id === reactionId);
   if (!pending) throw new CommandRejectedError("That reaction prompt was already answered or dismissed.");
   const reactor = adjustableActor(state, pending.actorId, scope);
-  if (use && state.combat.reactionsUsed.includes(reactor.id)) {
+  // An answer to a roll checks its own cost (an Improve Fate takes no Reaction); every other prompt is a Reaction.
+  if (use && pending.kind !== "roll-answer" && state.combat.reactionsUsed.includes(reactor.id)) {
     throw new CommandRejectedError(
       `${reactor.name} has already used a reaction this round. Decline instead, or free the reaction first.`
     );
@@ -156,10 +181,79 @@ export function answerReaction(
     case "damaged-by-creature":
       return answerStrike(answer, actionId, attackOptions);
     case "attack-would-hit":
-      return answerParkedAttack(answer);
+      return answerParkedAttack(answer, attackOptions.slotLevel);
+    case "casts-spell":
+      return answerCounter(answer, attackOptions.slotLevel);
     case "hit-by-attack":
+    case "takes-damage":
       return answerParkedDamage(answer);
+    case "falls":
+      return answerFall(answer);
+    case "roll-answer":
+      return answerRoll(answer, attackOptions.subtract === true);
   }
+}
+
+/** The deps a fall lands with, from the answer's. */
+const fallDepsOf = ({ deps, commandId }: Answer): FallDeps => ({
+  resolveDefinition: deps.resolveDefinition,
+  ...(deps.catalog ? { catalog: deps.catalog } : {}),
+  random: deps.random,
+  newId: deps.newRollId,
+  now: deps.now,
+  commandId,
+  ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+});
+
+/**
+ * A fall's reaction (SRD Feather Fall, Slow Fall): "use" casts Feather Fall at the falling creature, which then lands
+ * unharmed, or takes the Slow Fall's reduction off the fall's damage. Once every prompt the fall opened is answered,
+ * the fall lands.
+ */
+function answerFall(answer: Answer): ReactionOutcome {
+  const { state, commandId, pending, reactor, use, scope, deps, base, clearPrompt } = answer;
+  const fallId = pending.triggerCommandId;
+  let resolution: ActionResolution | undefined;
+  if (use) {
+    const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
+    const declared = effectiveActions(definition, reactor, deps.catalog).find(
+      (candidate) => candidate.id === pending.actionId
+    );
+    const reaction = declared?.reaction;
+    if (!declared || reaction?.trigger !== "falls") {
+      clearPrompt(false);
+      throw new CommandRejectedError(`${reactor.name} no longer has ${pending.actionName}.`);
+    }
+    if (reaction.response === "reduce-fall-damage") {
+      reduceFall(state, fallId, reaction.perLevel * classLevelOf(definition, reaction.classId));
+      clearPrompt(true);
+    } else {
+      // The cast spends its slot and the Reaction, and its Feather Fall lands on the falling creature.
+      const fallerId = pending.targetActorId ?? reactor.id;
+      resolution = resolveDefinitionAction(
+        state,
+        { ...declared, activation: "reaction" },
+        { actorId: reactor.id, targetIds: [fallerId], commandId, rollMode: null, override: null, commit: true },
+        {
+          random: deps.random,
+          newRollId: deps.newRollId,
+          gmSessionId: deps.gmSessionId,
+          initiatorRole: scope.role,
+          ...(scope.role === "player" ? { initiatorSessionId: scope.sessionId } : {}),
+          now: deps.now,
+          definition,
+          resolveDefinition: deps.resolveDefinition,
+          catalog: deps.catalog
+        }
+      );
+      const faller = state.actors.find((actor) => actor.id === fallerId);
+      if (faller && !faller.effects.some((effect) => effect.tags.includes(FEATHER_FALL_TAG)))
+        landFeatherFall(state, fallerId, reactor.id, reactor.name, `${commandId}:feather-fall`);
+      clearPrompt(true);
+    }
+  } else clearPrompt(false);
+  const events = landFallWhenAnswered(state, fallId, fallDepsOf(answer));
+  return { ...base, used: use, appliedDamage: 0, events, ...(resolution ? { resolution } : {}) };
 }
 
 /** Damage an answer applies, through the typed pipeline and attributed to the creature that dealt it. */
@@ -192,27 +286,91 @@ function owesDamage(resolution: ActionResolution): boolean {
   return resolution.save === null;
 }
 
-/** Uncanny Dodge: the hit's damage was parked on the prompt, so both answers apply it. */
+/** The damage a damage reaction holds, applied either way: halved (Uncanny Dodge), less a rolled amount (Deflect
+ *  Attacks, Stone's Endurance) or met with Resistance to its type until the turn ends (Superior Hunter's Defense) when
+ *  used. The reaction's own cost (a use, a recharge) is spent with its Reaction. */
 function answerParkedDamage(answer: Answer): ReactionOutcome {
-  const { pending, reactor, use, base, clearPrompt } = answer;
-  const parts = use ? halvedDamageParts(pending.proposedDamageParts) : [...pending.proposedDamageParts];
+  const { state, commandId, pending, reactor, use, deps, base, clearPrompt } = answer;
+  let parts = [...pending.proposedDamageParts];
+  const events: EffectNarration[] = [];
+  if (use) {
+    const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
+    const siblings = effectiveActions(definition, reactor, deps.catalog);
+    const declared = siblings.find((candidate) => candidate.id === pending.actionId);
+    if (declared) {
+      const economy = planEconomy(
+        state,
+        reactor,
+        declared,
+        { actorId: reactor.id, targetIds: [], commandId },
+        definition,
+        [],
+        undefined,
+        siblings
+      );
+      commitEconomy({ state, attacker: reactor, input: {}, plan: economy.plan, overridden: economy.overridden });
+    }
+    const response = pending.damageResponse ?? { kind: "half" as const };
+    const answered = respondToDamage(parts, response, deps.random);
+    parts = answered.parts;
+    if (answered.rolled)
+      recordRoll(state, {
+        id: deps.newRollId(),
+        commandId,
+        initiatorSessionId: deps.gmSessionId,
+        initiatorRole: answer.scope.role,
+        initiatorLabel: reactor.name,
+        label: `${pending.actionName}: damage reduced`.slice(0, 80),
+        actorId: reactor.id,
+        purpose: "damage",
+        visibility: reactor.visibility === "public" ? "public" : "gm-only",
+        formula: answered.rolled.expression.source,
+        normalizedFormula: answered.rolled.expression.normalized,
+        ...rolledTerms(answered.rolled),
+        total: answered.rolled.total,
+        createdAt: deps.now()
+      });
+    const resisted = response.kind === "resist" ? resistedTypeOf(parts) : null;
+    if (resisted) {
+      // "Resistance to that damage and any other damage of the same type until the end of the current turn."
+      const turnActorId = state.combat.turnActorId;
+      const turnActor = state.actors.find((actor) => actor.id === turnActorId);
+      const own = turnActorId === reactor.id || !turnActor;
+      addEffect(
+        state,
+        reactor.id,
+        makeEffect({
+          id: `${commandId}:resist`,
+          name: `${pending.actionName} (${resisted[0]!.toUpperCase()}${resisted.slice(1)})`.slice(0, 120),
+          sourceActorId: own ? reactor.id : turnActor!.id,
+          sourceName: own ? reactor.name : turnActor!.name,
+          sourceActionId: pending.actionId,
+          startedRound: state.combat.round,
+          duration: own
+            ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
+            : { type: "until-source-turn-end", skipsCurrentTurn: false },
+          modifiers: [{ type: "damage-resistance", damageTypes: [resisted as DamageType] }]
+        })
+      );
+    }
+  }
+  clearPrompt(use);
   const total = parts.reduce((sum, part) => sum + part.amount, 0);
   let appliedDamage = 0;
   let application: DamageApplication | null = null;
-  let events: readonly EffectNarration[] = [];
   if (total > 0) {
     const outcome = applyAnswerDamage(answer, reactor.id, {
       amount: total,
       parts,
       critical: pending.critical,
       sourceName: pending.sourceName,
-      sourceActorId: pending.sourceActorId
+      sourceActorId: pending.sourceActorId,
+      ...(pending.drain ? { drain: pending.drain } : {})
     });
     appliedDamage = outcome.application.totalApplied;
     application = outcome.application;
-    events = outcome.events;
+    events.push(...outcome.events);
   }
-  clearPrompt(use);
   return { ...base, used: use, appliedDamage, events, ...detailOf(application) };
 }
 
@@ -286,6 +444,13 @@ function answerStrike(
     chosen = { ...(picked ?? fallbackMelee ?? builtinAction("unarmed-strike")!), activation: "reaction" };
     isBuiltin = picked ? !available.includes(picked) : fallbackMelee === undefined;
   }
+  // A reaction that uses another of its actions (a rust monster's Reflexive Antennae uses Antennae) spends its Reaction.
+  const uses =
+    strikesWithItself && declared?.reaction?.response === "strike-back" ? declared.reaction.usesAction : undefined;
+  if (uses) {
+    const sibling = available.find((candidate) => candidate.id === uses);
+    chosen = sibling ? { ...sibling, activation: "reaction" } : undefined;
+  }
   if (!chosen) throw new CommandRejectedError(`${reactor.name} no longer has ${pending.actionName}.`);
   const commit = chosen.attack === undefined ? true : (options.commit ?? true);
   // No distance function: the engine moves a token before the SRD's "right before it leaves reach", so range-checking
@@ -309,7 +474,9 @@ function answerStrike(
       // The resolver can't infer how the attack was made from the action, so announce it for `attack-kind-is` riders.
       attackKinds: pending.kind === "leaves-reach" ? ["reaction", "opportunity"] : ["reaction"],
       ...(options.pushFeet !== undefined ? { pushFeet: options.pushFeet } : {}),
-      ...(options.hitOptions ? { hitOptions: options.hitOptions } : {})
+      ...(options.hitOptions ? { hitOptions: options.hitOptions } : {}),
+      // A reaction spell cast with a higher slot rolls that slot's dice (Hellish Rebuke's 3d10 from level 2).
+      ...(options.slotLevel !== undefined && chosen.spellSlot ? { slotLevel: options.slotLevel } : {})
     },
     {
       random: deps.random,
@@ -400,11 +567,24 @@ function scrollReadAsReaction(answer: Answer, declared: DefinitionAction): Effec
     : { kind: "reaction", text: scrollLostLine(reactor.name, scroll.spell.name), actorId: reactor.id };
 }
 
-/** Parry or Shield: the attack stopped at its roll. "use" spends the reaction and what the action costs and raises AC
- *  (against this attack, or until the reactor's next turn); either answer then finishes the attack with the same die,
- *  and a hit's damage lands. */
-function answerParkedAttack(answer: Answer): ReactionOutcome {
-  const { state, commandId, pending, reactor, use, deps, base, clearPrompt } = answer;
+/** Counterspell: the cast waits on every prompt it opened; see `counter-answers.ts`. */
+function answerCounter(answer: Answer, slotLevel: number | undefined): ReactionOutcome {
+  const outcome = answerCounterPrompt(answer, slotLevel);
+  return {
+    ...answer.base,
+    used: outcome.used,
+    appliedDamage: outcome.appliedDamage,
+    other: outcome.caster,
+    ...(outcome.resolution ? { resolution: outcome.resolution } : {}),
+    events: outcome.events,
+    countered: outcome.countered,
+    castCommandId: outcome.castCommandId
+  };
+}
+
+/** The attack a prompt holds at its roll, with its attacker and action, or a refusal when it can't be finished. */
+function parkedAttackOf(answer: Answer) {
+  const { state, pending, deps } = answer;
   const parked = pending.parkedAttack;
   const attacker = pending.sourceActorId
     ? state.actors.find((candidate) => candidate.id === pending.sourceActorId)
@@ -431,7 +611,97 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
       `${hidden ? "The" : `${pending.sourceName}'s`} attack can't be finished any more. Dismiss the prompt.`
     );
   }
+  return { attacker, attackerDefinition, action, parked };
+}
 
+/** Finishes an attack a prompt held at its roll, with the same die and the dice it carries, against `targetId`; a hit's
+ *  damage lands unless a reaction window the finish opened holds it. */
+function replayParkedAttack(
+  answer: Answer,
+  finish: Readonly<{
+    targetId: string;
+    bonusDice: NonNullable<ResolveInput["attackBonusDice"]>;
+    extra: Partial<ResolveInput>;
+  }>
+): ReactionOutcome {
+  const { state, commandId, deps, base } = answer;
+  const { attacker, attackerDefinition, action, parked } = parkedAttackOf(answer);
+  const resolution = resolveDefinitionAction(
+    state,
+    action,
+    {
+      actorId: attacker.id,
+      targetIds: [finish.targetId],
+      commandId,
+      builtin: parked.builtin,
+      conditionId: parked.conditionId,
+      rollMode: null,
+      override: null,
+      cover: parked.cover,
+      commit: true,
+      ...(parked.attackNatural !== null ? { attackNatural: parked.attackNatural } : {}),
+      ...(parked.attackTotal !== null ? { attackTotal: parked.attackTotal } : {}),
+      attackKinds: parked.attackKinds,
+      ...(parked.pushFeet !== null ? { pushFeet: parked.pushFeet } : {}),
+      ...(parked.slotLevel !== null ? { slotLevel: parked.slotLevel } : {}),
+      ...(parked.damageType !== null ? { damageType: parked.damageType } : {}),
+      attackBonusDice: finish.bonusDice,
+      ...(parked.hitOptions.length > 0 ? { hitOptions: parked.hitOptions } : {}),
+      ...(parked.forgoneAdvantageBy !== undefined ? { forgoneAdvantageBy: parked.forgoneAdvantageBy } : {}),
+      ...(parked.knockOut === true ? { knockOut: true } : {}),
+      ...(parked.shaping ? { shaping: parked.shaping } : {}),
+      economyPaid: true,
+      ...finish.extra
+    },
+    {
+      random: deps.random,
+      newRollId: deps.newRollId,
+      gmSessionId: deps.gmSessionId,
+      initiatorRole: parked.initiatorRole,
+      initiatorSessionId: parked.initiatorSessionId,
+      now: deps.now,
+      definition: attackerDefinition,
+      // The distance it was rolled at, so a thrown weapon is still the melee or ranged swing it was.
+      distanceFeet: (actorIdA, actorIdB) =>
+        actorIdA === attacker.id && actorIdB === finish.targetId ? parked.distanceFeet : null,
+      resolveDefinition: deps.resolveDefinition,
+      catalog: deps.catalog,
+      ...(deps.pushToken ? { pushToken: deps.pushToken } : {})
+    }
+  );
+  let appliedDamage = 0;
+  let application: DamageApplication | null = null;
+  let events: readonly EffectNarration[] = [];
+  if (owesDamage(resolution)) {
+    const outcome = applyAnswerDamage(answer, finish.targetId, {
+      amount: resolution.damageTotal,
+      parts: damagePartsOf(resolution),
+      critical: resolution.crit,
+      sourceName: `${attacker.name}'s ${resolution.actionName}`,
+      sourceActorId: attacker.id,
+      ...(action.drain ? { drain: action.drain } : {})
+    });
+    appliedDamage = outcome.application.totalApplied;
+    application = outcome.application;
+    events = outcome.events;
+  }
+  return {
+    ...base,
+    used: false,
+    appliedDamage,
+    other: { id: attacker.id, name: attacker.name },
+    resolution,
+    events,
+    ...detailOf(application)
+  };
+}
+
+/** Parry or Shield: the attack stopped at its roll. "use" spends the reaction and what the action costs and raises AC
+ *  (against this attack, or until the reactor's next turn); either answer then finishes the attack with the same die,
+ *  and a hit's damage lands. */
+function answerParkedAttack(answer: Answer, slotLevel: number | undefined): ReactionOutcome {
+  const { state, commandId, pending, reactor, use, deps, clearPrompt } = answer;
+  const { parked } = parkedAttackOf(answer);
   clearPrompt(false);
   let effectName: string | null = null;
   // Whether the AC rises: the reaction is used, and a scroll it was read from didn't lose the spell.
@@ -447,11 +717,13 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
       state,
       reactor,
       declared,
-      { actorId: reactor.id, targetIds: [], commandId },
+      { actorId: reactor.id, targetIds: [], commandId, ...(slotLevel !== undefined ? { slotLevel } : {}) },
       definition,
       [],
       undefined,
-      siblings
+      siblings,
+      false,
+      deps.catalog
     );
     commitEconomy({ state, attacker: reactor, input: {}, plan: economy.plan, overridden: economy.overridden });
     scrollLost = scrollReadAsReaction(answer, declared);
@@ -474,83 +746,284 @@ function answerParkedAttack(answer: Answer): ReactionOutcome {
       ).name;
     }
   }
-  const resolution = resolveDefinitionAction(
-    state,
-    action,
-    {
-      actorId: attacker.id,
-      targetIds: [reactor.id],
-      commandId,
-      builtin: parked.builtin,
-      conditionId: parked.conditionId,
-      rollMode: null,
-      override: null,
-      cover: parked.cover,
-      commit: true,
-      ...(parked.attackNatural !== null ? { attackNatural: parked.attackNatural } : {}),
-      ...(parked.attackTotal !== null ? { attackTotal: parked.attackTotal } : {}),
-      attackKinds: parked.attackKinds,
-      ...(parked.pushFeet !== null ? { pushFeet: parked.pushFeet } : {}),
-      ...(parked.slotLevel !== null ? { slotLevel: parked.slotLevel } : {}),
-      ...(parked.damageType !== null ? { damageType: parked.damageType } : {}),
-      attackBonusDice: parked.bonusDice,
-      ...(parked.hitOptions.length > 0 ? { hitOptions: parked.hitOptions } : {}),
-      economyPaid: true,
+  const finished = replayParkedAttack(answer, {
+    targetId: reactor.id,
+    bonusDice: parked.bonusDice,
+    extra: {
+      acSettled: true,
+      ...(pending.asked ? { answersAsked: pending.asked } : {}),
       ...(raised && effectName === null && pending.acBonus !== null
         ? { reactionAcBonus: { amount: pending.acBonus, source: pending.actionName } }
         : {})
-    },
-    {
-      random: deps.random,
-      newRollId: deps.newRollId,
-      gmSessionId: deps.gmSessionId,
-      initiatorRole: parked.initiatorRole,
-      initiatorSessionId: parked.initiatorSessionId,
-      now: deps.now,
-      definition: attackerDefinition,
-      // The distance it was rolled at, so a thrown weapon is still the melee or ranged swing it was.
-      distanceFeet: (actorIdA, actorIdB) =>
-        actorIdA === attacker.id && actorIdB === reactor.id ? parked.distanceFeet : null,
-      resolveDefinition: deps.resolveDefinition,
-      catalog: deps.catalog,
-      ...(deps.pushToken ? { pushToken: deps.pushToken } : {})
     }
-  );
-  let appliedDamage = 0;
-  let application: DamageApplication | null = null;
-  let events: readonly EffectNarration[] = [];
-  if (owesDamage(resolution)) {
-    const outcome = applyAnswerDamage(answer, reactor.id, {
-      amount: resolution.damageTotal,
-      parts: damagePartsOf(resolution),
-      critical: resolution.crit,
-      sourceName: `${attacker.name}'s ${resolution.actionName}`,
-      sourceActorId: attacker.id,
-      ...(action.drain ? { drain: action.drain } : {})
-    });
-    appliedDamage = outcome.application.totalApplied;
-    application = outcome.application;
-    events = outcome.events;
+  });
+  return { ...finished, used: use, events: scrollLost ? [scrollLost, ...finished.events] : finished.events };
+}
+
+/** What an answer to a roll needs from the reaction's own dependencies. */
+function answerDepsFrom(answer: Answer): AnswerDeps {
+  const { deps, commandId, scope } = answer;
+  return {
+    resolveDefinition: deps.resolveDefinition,
+    ...(deps.catalog ? { catalog: deps.catalog } : {}),
+    random: deps.random,
+    newRollId: deps.newRollId,
+    sessionId: deps.gmSessionId,
+    role: scope.role,
+    now: deps.now,
+    commandId,
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+  };
+}
+
+/**
+ * Another creature's answer to a roll (Cutting Words, Countercharm, Improve Fate, Burst of Ingenuity). "use" applies it
+ * and spends its cost; either answer then hands the roll on: to the next creature that may answer it, else to what the
+ * roll does. A save waiting on its confirm is confirmed; an attack waiting at its roll is finished with the answer's
+ * die added; a check is amended; a hit's damage moves on to the damaged creature's own reaction, or lands.
+ */
+function answerRoll(answer: Answer, subtract: boolean): ReactionOutcome {
+  const { state, commandId, pending, reactor, use, deps, base, clearPrompt } = answer;
+  const roller = pending.sourceActorId ? state.actors.find((actor) => actor.id === pending.sourceActorId) : undefined;
+  const choice = { id: pending.actionId, ...(subtract ? { subtract: true } : {}) };
+  clearPrompt(false);
+  if (!roller) return { ...base, used: false, appliedDamage: 0, events: [] };
+  switch (pending.rollKind) {
+    case "save":
+      return answerSaveRoll(answer, roller, choice);
+    case "check": {
+      const checkDeps = {
+        random: deps.random,
+        newId: deps.newRollId,
+        sessionId: deps.gmSessionId,
+        now: deps.now,
+        resolveDefinition: deps.resolveDefinition,
+        commandId,
+        ...(deps.catalog ? { catalog: deps.catalog } : {}),
+        ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+      };
+      if (!use) return { ...base, used: false, appliedDamage: 0, events: [] };
+      const result = answerAbilityCheck(
+        state,
+        { role: "gm" },
+        { commandId, actorId: roller.id, answer: { ...choice, by: reactor.id } },
+        checkDeps
+      );
+      return { ...base, used: true, appliedDamage: 0, events: [...result.events] };
+    }
+    case "attack":
+      return answerAttackRoll(answer, roller, choice);
+    case "damage":
+      return answerDamageRoll(answer, roller, choice);
+    default:
+      return { ...base, used: false, appliedDamage: 0, events: [] };
   }
+}
+
+/** A save waiting on its confirm: the answer meets the held die, then the confirm is finished (or waits on the next
+ *  creature that may answer it). */
+function answerSaveRoll(answer: Answer, roller: LiveActor, choice: Readonly<{ id: string; subtract?: boolean }>) {
+  const { state, commandId, pending, reactor, use, deps, base } = answer;
+  const save = state.combat.pendingSaves.find((entry) => entry.id === pending.saveId);
+  if (!save) return { ...base, used: false, appliedDamage: 0, events: [] };
+  const saveDeps: SaveAnswerDependencies = {
+    random: deps.random,
+    newRollId: deps.newRollId,
+    sessionId: deps.gmSessionId,
+    role: answer.scope.role,
+    now: deps.now,
+    resolveDefinition: deps.resolveDefinition,
+    ...(deps.catalog ? { catalog: deps.catalog } : {}),
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
+    ...(deps.pushToken
+      ? {
+          pushToken: (input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>) =>
+            deps.pushToken!(input)
+        }
+      : {})
+  };
+  const confirmed = save.confirmed;
+  const events: EffectNarration[] = [];
+  if (use)
+    events.push(
+      ...answerSave(
+        state,
+        commandId,
+        save.id,
+        "roll",
+        undefined,
+        false,
+        { role: "gm" },
+        saveDeps,
+        false,
+        confirmed?.rollMode,
+        confirmed?.damageOverride,
+        { answer: { ...choice, by: reactor.id } }
+      ).events
+    );
+  const finished = answerSave(
+    state,
+    commandId,
+    save.id,
+    "roll",
+    undefined,
+    true,
+    { role: "gm" },
+    saveDeps,
+    false,
+    confirmed?.rollMode,
+    confirmed?.damageOverride,
+    { settling: true }
+  );
+  events.push(...finished.events);
   return {
     ...base,
     used: use,
-    appliedDamage,
-    other: { id: attacker.id, name: attacker.name },
-    resolution,
-    events: scrollLost ? [scrollLost, ...events] : events,
-    ...detailOf(application)
+    appliedDamage: finished.outcome.appliedDamage,
+    other: { id: roller.id, name: roller.name },
+    save: finished.outcome,
+    events,
+    ...(finished.outcome.parts ? { parts: finished.outcome.parts } : {})
+  };
+}
+
+/** An attack waiting at its roll: the answer's die joins the roll, and the attack is finished with the same die (its
+ *  target's Parry or Shield, or the next creature's answer, may still wait on it). */
+function answerAttackRoll(answer: Answer, roller: LiveActor, choice: Readonly<{ id: string; subtract?: boolean }>) {
+  const { state, pending, reactor, use } = answer;
+  const parked = pending.parkedAttack;
+  const events: EffectNarration[] = [];
+  let bonusDice = parked?.bonusDice ?? [];
+  if (use && parked) {
+    const answered = answerAmount(
+      state,
+      {
+        kind: "attack",
+        roller,
+        key: `parked:${pending.id}`,
+        natural: parked.attackNatural ?? 0,
+        total: 0,
+        // Whether the roll succeeds was read when the answer was offered.
+        threshold: null,
+        mode: "normal",
+        purpose: "attack",
+        label: "attack roll",
+        visibility: roller.visibility === "public" ? "public" : "gm-only"
+      },
+      reactor,
+      choice,
+      answerDepsFrom(answer)
+    );
+    events.push(...answered.events);
+    bonusDice = [
+      ...bonusDice,
+      { label: answered.name, dice: answered.amount.slice(0, 8), total: Math.max(-48, Math.min(48, answered.bonus)) }
+    ];
+  }
+  const finished = replayParkedAttack(answer, {
+    targetId: pending.targetActorId ?? reactor.id,
+    bonusDice,
+    extra: { answersAsked: pending.asked ?? [] }
+  });
+  return { ...finished, used: use, events: [...events, ...finished.events] };
+}
+
+/** A hit's damage roll: the answer's die comes off it (Cutting Words), and the damage moves on to whoever may still act
+ *  on it, else lands on its target. */
+function answerDamageRoll(answer: Answer, roller: LiveActor, choice: Readonly<{ id: string; subtract?: boolean }>) {
+  const { state, pending, reactor, use, deps, base } = answer;
+  const target = state.actors.find((actor) => actor.id === pending.targetActorId);
+  if (!target) return { ...base, used: false, appliedDamage: 0, events: [] };
+  let parts: Array<{ amount: number; type: string }> = pending.proposedDamageParts.map((part) => ({ ...part }));
+  const events: EffectNarration[] = [];
+  if (use) {
+    const answered = answerAmount(
+      state,
+      {
+        kind: "damage",
+        roller,
+        key: `parked:${pending.id}`,
+        natural: 0,
+        total: parts.reduce((sum, part) => sum + part.amount, 0),
+        threshold: null,
+        mode: "normal",
+        purpose: "damage",
+        label: "damage roll",
+        visibility: roller.visibility === "public" ? "public" : "gm-only"
+      },
+      reactor,
+      choice,
+      answerDepsFrom(answer)
+    );
+    events.push(...answered.events);
+    parts =
+      answered.bonus < 0
+        ? reducedParts(parts, -answered.bonus)
+        : parts.map((part, index) => (index === 0 ? { ...part, amount: part.amount + answered.bonus } : part));
+  }
+  const opened = openDamageWindow(
+    state,
+    {
+      source: roller,
+      sourceName: pending.sourceName,
+      target,
+      parts,
+      critical: pending.critical,
+      hit: true,
+      hitKinds: pending.hitKinds ?? [],
+      ...(pending.drain ? { drain: pending.drain } : {}),
+      asked: pending.asked ?? []
+    },
+    {
+      resolveDefinition: deps.resolveDefinition,
+      ...(deps.catalog ? { catalog: deps.catalog } : {}),
+      random: deps.random,
+      newId: deps.newRollId,
+      now: deps.now,
+      sessionId: deps.gmSessionId,
+      role: answer.scope.role,
+      commandId: answer.commandId,
+      ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+    }
+  );
+  if (opened)
+    return { ...base, used: use, appliedDamage: 0, events: [...events, ...(opened.line ? [opened.line] : [])] };
+  const total = parts.reduce((sum, part) => sum + part.amount, 0);
+  if (total <= 0) return { ...base, used: use, appliedDamage: 0, events };
+  const outcome = applyAnswerDamage(answer, target.id, {
+    amount: total,
+    parts,
+    critical: pending.critical,
+    sourceName: pending.sourceName,
+    sourceActorId: roller.id,
+    ...(pending.drain ? { drain: pending.drain } : {})
+  });
+  return {
+    ...base,
+    used: use,
+    appliedDamage: outcome.application.totalApplied,
+    other: { id: target.id, name: target.name },
+    events: [...events, ...outcome.events],
+    ...detailOf(outcome.application)
   };
 }
 
 /** Drop a reaction prompt without applying its damage (GM housekeeping, e.g. the damage was applied manually). */
 export function dismissReaction(state: GameState, reactionId: string, scope: Initiator) {
   requireGm(scope, "Only the GM can dismiss a reaction prompt.");
-  if (!state.combat.pendingReactions.some((entry) => entry.id === reactionId))
-    throw new CommandRejectedError("That reaction prompt was already answered or dismissed.");
+  const dismissed = state.combat.pendingReactions.find((entry) => entry.id === reactionId);
+  if (!dismissed) throw new CommandRejectedError("That reaction prompt was already answered or dismissed.");
   state.combat = {
     ...state.combat,
     pendingReactions: state.combat.pendingReactions.filter((entry) => entry.id !== reactionId)
   };
   releaseHeldRoll(state, reactionHoldKey(reactionId));
+  // A fall the GM settled by hand: its last prompt gone, the fall is dropped where its creature stands.
+  if (
+    dismissed.kind === "falls" &&
+    !state.combat.pendingReactions.some(
+      (entry) => entry.kind === "falls" && entry.triggerCommandId === dismissed.triggerCommandId
+    )
+  )
+    dropFall(state, dismissed.triggerCommandId);
 }

@@ -12,6 +12,8 @@ import type {
   PlayerInitiativeEntry,
   PlayerRollCall,
   PlayerRollRecord,
+  PlayerSensedCreature,
+  PlayerVision,
   PlayerView,
   PresenceStatus,
   RollRecord
@@ -22,6 +24,7 @@ import { healthBandOf } from "./hit-points.js";
 import { HIDDEN_SOURCE, withoutSourceName } from "./hidden-source.js";
 import { visibleTerrain } from "./terrain.js";
 import { exploredRectsOf, playerSight, tokenShown, visionOf, type AudienceSight } from "./vision/audience.js";
+import { sensedBy } from "./vision/detect.js";
 import type { SightContent } from "./vision/senses.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
@@ -72,6 +75,7 @@ function shownAttackRoll(
     .find(
       (candidate) =>
         candidate.purpose === "attack" &&
+        candidate.free !== true &&
         candidate.actorId === pending.sourceActorId &&
         (candidate.dice.length === 0 || candidate.dice.some((die) => die.sides === 20))
     );
@@ -222,7 +226,14 @@ const PENDING_SAVE_FIELDS = {
   drain: "never",
   failurePush: "never",
   // The save's own roll mode is read when it is answered.
-  advantageAtSize: "never"
+  advantageAtSize: "never",
+  disadvantageFrom: "never",
+  // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
+  gmApplies: "player",
+  // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
+  spell: "never",
+  // Who was asked to answer it would name them; the player is told only that it waits (`awaitingAnswer`).
+  confirmed: "derived"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
@@ -233,17 +244,23 @@ const ON_FAIL_EFFECT_FIELDS = {
   escapeDc: "player",
   modifiers: "player",
   duration: "player",
-  repeatSave: "player",
+  // Its ability and DC; what gives the repeats Disadvantage (Heightened Spell) is read when each is answered.
+  repeatSave: "derived",
   endsOnDamage: "player",
+  endsOnSourceSideDamage: "player",
   speedZero: "player",
   endsWhenSourceDefeated: "player",
   rangeFeet: "player",
   endsOnSpellHealing: "player",
   armorClassBonus: "player",
+  // The light a failure sheds is the spell's own text (Faerie Fire's Dim Light).
+  light: "player",
   name: "derived",
   sourceName: "derived",
   sourceActorId: "derived",
   castId: "never",
+  // The level a spell was cast at is the caster's to know.
+  spell: "never",
   sourceActionId: "never",
   ongoingDamage: "never",
   currentTurn: "player",
@@ -265,13 +282,29 @@ const PENDING_REACTION_FIELDS = {
   weighed: "player",
   acBonus: "player",
   rollsAttack: "player",
+  // How far the falling creature falls: its height, which is as public as the token it answers for.
+  fallFeet: "player",
+  // The reactor's own slots, which its owner already reads on the sheet; only the reactor's owner gets the prompt.
+  slotLevels: "player",
   createdAt: "player",
   sourceName: "derived",
   sourceActorId: "never",
   // Names the attacker's action and how it rolled, which the reactor's player has no need of.
   parkedAttack: "never",
+  // The cast a Counterspell decides: its action, targets and slot are the caster's, not the reactor's.
+  parkedCast: "never",
   // Sent as `attackRoll`, and only when the roll it came from is in the player's dice log.
-  attackTotal: "derived"
+  attackTotal: "derived",
+  // What kind of roll the reactor is asked to answer, and what its own answer does.
+  rollKind: "player",
+  answerDoes: "player",
+  answerEither: "player",
+  damageResponse: "player",
+  // The save it waits on and who else was asked are the GM's bookkeeping.
+  saveId: "never",
+  asked: "never",
+  drain: "never",
+  hitKinds: "never"
 } as const satisfies Record<keyof PendingReaction, FieldAudience>;
 
 const PENDING_RULE_ASK_FIELDS = {
@@ -287,6 +320,12 @@ const PENDING_RULE_ASK_FIELDS = {
 
 function isHiddenSource(sourceActorId: string | null, publicActorIds: ReadonlySet<string>): boolean {
   return sourceActorId !== null && !publicActorIds.has(sourceActorId);
+}
+
+/** A vision block with what its player's characters sense unseen, as fresh arrays: the block itself may be cached. */
+function withSensed(vision: PlayerVision, sensed: readonly PlayerSensedCreature[]): PlayerVision {
+  if (!vision.enabled || sensed.length === 0) return vision;
+  return { ...vision, sensed: sensed.map((creature) => ({ ...creature })) };
 }
 
 function ownedBy(state: GameState, actorId: string, playerSessionId: string | undefined): boolean {
@@ -379,7 +418,16 @@ export function projectPlayerCombat(
     // them, before a fight as in one.
     vision:
       sight.enabled && state.combat.mapAssetId
-        ? visionOf(state, sight.viewerIds, content)
+        ? withSensed(
+            visionOf(state, sight.viewerIds, content),
+            // What a player's own characters sense unseen (Divine Sense); a spectator senses through no one.
+            playerSessionId === undefined
+              ? []
+              : sensedBy(state, sight.viewerIds, content, (actorId) => {
+                  const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
+                  return token !== undefined && showsToken(token);
+                })
+          )
         : { enabled: false as const },
     // legendaryUsed is omitted: a monster's remaining legendary actions are GM knowledge.
     // While the GM reviews an earlier turn players get only the flag; turn labels can name hidden combatants.
@@ -396,10 +444,14 @@ export function projectPlayerCombat(
           ...copyPlayerFields(entry, PENDING_SAVE_FIELDS),
           actionName: hiddenSource ? withoutSourceName(entry.actionName, entry.sourceName) : entry.actionName,
           sourceName: hiddenSource ? HIDDEN_SOURCE : entry.sourceName,
+          ...(entry.confirmed ? { awaitingAnswer: true as const } : {}),
           ...(onFail
             ? {
                 onFailEffect: {
                   ...copyPlayerFields(onFail, ON_FAIL_EFFECT_FIELDS),
+                  ...(onFail.repeatSave
+                    ? { repeatSave: { ability: onFail.repeatSave.ability, dc: onFail.repeatSave.dc } }
+                    : {}),
                   name: onFailHidden ? withoutSourceName(onFail.name, onFail.sourceName) : onFail.name,
                   sourceName: onFailHidden ? HIDDEN_SOURCE : onFail.sourceName,
                   sourceActorId: null
@@ -452,10 +504,29 @@ function playerEffect(
     hitPointMaximumGain: _hitPointMaximumGain,
     temporaryHitPointsEachTurn: _temporaryHitPointsEachTurn,
     conditionImmunities: _conditionImmunities,
-    ...visible
+    // A granted move names the turn it belongs to and the creature it must flee, which can be hidden; its own
+    // character's grant reaches a player through `actor:movement`.
+    grantedMove: _grantedMove,
+    grantedTeleport: _grantedTeleport,
+    // Whether a Concentration spell ends once no creature keeps it is the engine's bookkeeping.
+    endsWhenUnaffected: _endsWhenUnaffected,
+    // A long casting's targets and slot are the caster's plan; its name says what is being cast.
+    longCast: _longCast,
+    // What a hit on the bearer costs its attacker names a save's DC; the server applies it.
+    struck: _struck,
+    // The light it sheds reaches players only as the lit ground in their own sight, which the server draws.
+    light: _light,
+    findDc: _findDc,
+    detects: _detects,
+    // Its ability and DC; what gives the repeats Disadvantage (Heightened Spell) is read when each is answered.
+    repeatSave,
+    ...rest
   } = effect;
+  const visible = repeatSave ? { ...rest, repeatSave: { ability: repeatSave.ability, dc: repeatSave.dc } } : rest;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
-  const yours = mine ? { yours: true as const, ...(readiedSpell ? { readiedSpell: { ...readiedSpell } } : {}) } : {};
+  // A readied spell's Metamagic picks are the engine's to apply at its release.
+  const held = readiedSpell ? (({ shaping: _shaping, ...kept }) => kept)(readiedSpell) : undefined;
+  const yours = mine ? { yours: true as const, ...(held ? { readiedSpell: held } : {}) } : {};
   if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...yours };
   return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
 }
@@ -545,6 +616,8 @@ const PLAYER_ACTOR_FIELDS = {
   replaySceneId: "derived",
   actionUses: "derived",
   heroicInspiration: "derived",
+  heroicInspirationToGive: "derived",
+  experiencePoints: "derived",
   choiceOverrides: "derived",
   hitDice: "derived",
   lastLongRestAt: "never",
@@ -611,6 +684,8 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * the claim picker, and nothing more of its sheet.
  * | definition (the imported sheet)         |  Y   |  -  |       -        |     Y      |          Y          |
  * | actionUses, hitDice, heroicInspiration  |  Y   |  -  |       -        |     -      |          Y          |
+ * | experiencePoints                        |  Y   |  -  |       -        |     -      |          Y          |
+ * | heroicInspirationToGive (a gift to make)|  Y   |  -  |       -        |     -      |          -          |
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
  * | spellbook (a Wizard's beyond the sheet) |  Y   |  -  |       -        |     -      |          Y          |
@@ -677,6 +752,8 @@ export function projectPlayerView(
           ownerSessionId,
           actionUses,
           heroicInspiration,
+          heroicInspirationToGive,
+          experiencePoints,
           choiceOverrides,
           hitDice,
           spellSlots,
@@ -726,6 +803,10 @@ export function projectPlayerView(
           ...(species !== null ? { species } : {}),
           ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
           ...(resourcesVisible ? { actionUses: { ...actionUses }, heroicInspiration } : {}),
+          // XP is a sheet resource, gated like the uses.
+          ...(resourcesVisible && experiencePoints !== undefined ? { experiencePoints } : {}),
+          // A gift to make is the owner's decision alone.
+          ...(mine && heroicInspirationToGive ? { heroicInspirationToGive } : {}),
           // Same gate as actionUses: a private sheet resource. Copied, never a live reference into GameState.
           ...(resourcesVisible
             ? {

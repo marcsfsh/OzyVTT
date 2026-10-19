@@ -6,7 +6,7 @@ import { canPlayerTarget, requireActorAccess, requireGm, type Initiator } from "
 import { rollSettledCheck } from "./check-rolls.js";
 import { conditionLabel, incapacitatingCondition } from "./condition-rules.js";
 import { withOneUsedUp } from "./consumables.js";
-import { endKnockOut, KNOCKED_OUT_TAG, type EffectNarration } from "./effects.js";
+import { endKnockOut, KNOCKED_OUT_TAG, startStableRecovery, type EffectNarration } from "./effects.js";
 import { effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
@@ -78,7 +78,8 @@ export type StabilizeOutcome = Readonly<{
 const KIT_ID = "healers-kit";
 const STABLE: DeathSaves = { successes: 0, failures: 0, stable: true };
 
-/** What the target needs: dying (and not yet stable), or knocked out, which only first aid or the GM ends. */
+/** What the target needs: dying (and not yet stable), or knocked out, which first aid, an hour of game time or the GM
+ *  ends. */
 function targetState(target: LiveActor): "dying" | "knocked-out" {
   if (isDead(target))
     throw new CommandRejectedError(`${target.name} is dead. It's too late to stabilize ${target.name}.`);
@@ -162,7 +163,7 @@ export function stabilizeCreature(
     requireGm(scope, "Only the GM can rule a creature stable.");
     const condition = targetState(target);
     const line = condition === "dying" ? `${target.name} is stable.` : `${target.name} comes round.`;
-    const events = settle(state, target, condition, line);
+    const events = settle(state, target, condition, line, deps, input.commandId);
     return {
       stabilized: condition === "dying",
       woke: condition === "knocked-out",
@@ -256,7 +257,7 @@ export function stabilizeCreature(
       condition === "dying"
         ? `${helper.name} stabilized ${target.name} (${readout}).`
         : `${helper.name}'s first aid wakes ${target.name} (${readout}).`;
-    events.push(...settle(state, target, condition, line));
+    events.push(...settle(state, target, condition, line, deps, input.commandId));
     return { stabilized: condition === "dying", woke: condition === "knocked-out", check, events, overridden };
   }
   // One use of the kit, counted on the carried row's quantity as a potion is; the last one takes the row.
@@ -265,19 +266,38 @@ export function stabilizeCreature(
     input.method === "healers-kit"
       ? `${helper.name} stabilized ${target.name} with a Healer's Kit.`
       : `${helper.name} cast Spare the Dying, and ${target.name} is stable.`;
-  events.push(...settle(state, target, condition, line));
+  events.push(...settle(state, target, condition, line, deps, input.commandId));
   return { stabilized: true, woke: false, check: null, events, overridden };
 }
 
-/** Makes a dying creature Stable (its counters reset, its Unconscious kept), or ends a knock-out. */
+/** A spell's cast that makes a dying creature Stable (Spare the Dying): its 1d4 hours to 1 Hit Point start counting on
+ *  the game clock. Null when the creature isn't dying (it has Hit Points, is dead or is already Stable). */
+export function stabilizeBySpell(
+  state: GameState,
+  target: LiveActor,
+  random: RandomSource,
+  id: string
+): EffectNarration[] | null {
+  if (isDead(target) || target.hp.current > 0 || target.deathSaves === null || target.deathSaves.stable) return null;
+  target.deathSaves = { ...STABLE };
+  return startStableRecovery(state, target, random, id);
+}
+
+/** Makes a dying creature Stable (its counters reset, its Unconscious kept, and its 1d4 hours to 1 Hit Point counting
+ *  on the game clock), or ends a knock-out. */
 function settle(
   state: GameState,
   target: LiveActor,
   condition: "dying" | "knocked-out",
-  line: string
+  line: string,
+  deps: Pick<StabilizeDeps, "random">,
+  commandId: string
 ): EffectNarration[] {
   if (condition === "knocked-out")
     return [{ kind: "condition", text: line, actorId: target.id }, ...endKnockOut(state, target)];
   target.deathSaves = { ...STABLE };
-  return [{ kind: "condition", text: line, actorId: target.id }];
+  return [
+    { kind: "condition", text: line, actorId: target.id },
+    ...startStableRecovery(state, target, deps.random, `${commandId}:stable`)
+  ];
 }

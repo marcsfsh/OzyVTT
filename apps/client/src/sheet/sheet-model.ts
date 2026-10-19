@@ -1,6 +1,7 @@
 /** What the remastered sheet reads off the actor and its stat block, as plain functions the tabs and tests share. */
 import {
   armorClassInPlay,
+  gameTimeSpanChip,
   type ActorDefinition,
   type GmActor,
   type GmView,
@@ -98,6 +99,10 @@ export function shortDuration(effect: DurationOf): string | null {
   switch (duration.type) {
     case "rounds":
       return `${duration.remaining} ${duration.remaining === 1 ? "round" : "rounds"}`;
+    case "minutes":
+      return gameTimeSpanChip(duration.remaining);
+    case "until-rest":
+      return duration.rest === "long" ? "until a Long Rest" : "until a rest";
     case "until-source-next-turn":
     case "until-bearer-next-turn":
       return "until next turn";

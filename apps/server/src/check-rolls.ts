@@ -1,4 +1,5 @@
-import type { Actor, CheckRollOutcome, GameState, RollCall, RollRecord, RollVisibility } from "@vtt/domain";
+import { checkSightFor } from "./vision/rules.js";
+import type { Actor, CheckRollOutcome, GameState, HeldRoll, RollCall, RollRecord, RollVisibility } from "@vtt/domain";
 import { d20FacesFor, otherDiceOf, rerollLowestD20, type RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { checkPlan, type CheckNames, type CheckPlan, type CheckSubject, totalCheck } from "./ability-checks.js";
@@ -13,6 +14,18 @@ import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.j
 import { CommandRejectedError } from "./game-store.js";
 import { wardedConditions } from "./paladin-auras.js";
 import { heldRollFor, holdRoll, requireTypedDie, requireTypedReroll, spendRerollRight } from "./held-rolls.js";
+import type { EffectNarration } from "./effects.js";
+import {
+  answeredLines,
+  answeredRead,
+  answerKeyOf,
+  answersFromOthers,
+  answersOffered,
+  applyRollAnswer,
+  askAnswer,
+  type AnswerDeps,
+  type AnswerTarget
+} from "./roll-answers.js";
 import { recordRoll, rolledTerms } from "./roll-history.js";
 import { createPendingSaves, dismissSave, recordCallResult, shownRollMode } from "./saving-throws.js";
 
@@ -24,6 +37,8 @@ import { createPendingSaves, dismissSave, recordCallResult, shownRollMode } from
  */
 
 export type CheckRollDependencies = Readonly<{
+  /** The command the roll belongs to, so an answer's own dice are recorded under it. */
+  commandId?: string;
   random: RandomSource;
   newId: () => string;
   sessionId: string;
@@ -52,8 +67,13 @@ export type CheckRollInput = Readonly<{
   callId?: string;
 }>;
 
-/** A check as it was rolled, and whether its numbers are kept from the one who rolled it (a blind roll). */
-export type CheckResult = Readonly<{ outcome: CheckRollOutcome; hiddenFromRoller: boolean }>;
+/** A check as it was rolled, and whether its numbers are kept from the one who rolled it (a blind roll), with what
+ *  it set off (another creature asked to answer it, an effect an answer ended). */
+export type CheckResult = Readonly<{
+  outcome: CheckRollOutcome;
+  hiddenFromRoller: boolean;
+  events?: readonly EffectNarration[];
+}>;
 
 const checkKey = (actorId: string) => `check:${actorId}`;
 
@@ -85,12 +105,21 @@ function planFor(state: GameState, scope: Initiator, input: CheckRollInput, deps
   const plan = checkPlan(actor, definition, derivation, input.subject, {
     ...(deps.names ? { names: deps.names } : {}),
     ...(finding ? { finding } : {}),
-    ...(warded.length > 0 ? { warded } : {})
+    ...(warded.length > 0 ? { warded } : {}),
+    // Frightened's line of sight, the light the roller stands in, and how obscured the creature it seeks is.
+    sight: checkSightFor(
+      state,
+      actor,
+      { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) },
+      finding,
+      deps.distanceFeet
+    )
   });
   return { actor, plan };
 }
 
-/** Records a check roll and holds its dice for a Heroic Inspiration reroll. */
+/** Records a check roll and holds its dice for a Heroic Inspiration reroll or an answer. A fresh check starts with no
+ *  answers; a reroll keeps what answered the roll before it (a Bardic Inspiration die stays added). */
 function recordCheck(
   state: GameState,
   scope: Initiator,
@@ -100,7 +129,7 @@ function recordCheck(
   faces: readonly number[],
   readAs: "advantage" | "disadvantage" | "normal",
   typed: boolean,
-  options: Readonly<{ label?: string; others?: ReturnType<typeof otherDiceOf> }>
+  options: Readonly<{ label?: string; others?: ReturnType<typeof otherDiceOf>; fresh?: boolean }>
 ): CheckResult {
   const actor = state.actors.find((candidate) => candidate.id === input.actorId)!;
   const roll = totalCheck(plan, faces, readAs, deps.random, options.others ?? []);
@@ -125,7 +154,6 @@ function recordCheck(
     createdAt: deps.now()
   };
   recordRoll(state, record);
-  const success = input.dc === null ? null : roll.total >= input.dc;
   holdRoll(state, {
     key: checkKey(actor.id),
     actorId: actor.id,
@@ -133,6 +161,7 @@ function recordCheck(
     others: otherDiceOf(roll.resolution),
     rollId,
     typed,
+    ...(options.fresh === true ? { answers: [] } : {}),
     check: {
       subject: { ...input.subject },
       dc: input.dc,
@@ -142,24 +171,195 @@ function recordCheck(
       ...(input.findActorId !== undefined ? { findActorId: input.findActorId } : {})
     }
   });
-  if (input.callId !== undefined)
-    recordCallResult(state, input.callId, actor.id, { natural: roll.natural, total: roll.total, success, rollId });
+  return heldCheckResult(state, scope, actor, plan, typed ? "normal" : readAs, deps, input.commandId);
+}
+
+/** The latest check as its held dice and answers make it: written to the GM's call it answers, and told with the
+ *  answers the roller may still give it. */
+function heldCheckResult(
+  state: GameState,
+  scope: Initiator,
+  actor: Actor,
+  plan: CheckPlan,
+  readAs: "advantage" | "disadvantage" | "normal",
+  deps: CheckRollDependencies,
+  commandId: string
+): CheckResult {
+  const held = heldRollFor(state, checkKey(actor.id))!;
+  const check = held.check!;
+  const roll = answeredCheck(plan, held, readAs, deps.random);
+  // A check that needs sight the roller hasn't fails whatever it rolls.
+  const success = plan.autoFails !== undefined ? false : check.dc === null ? null : roll.total >= check.dc;
+  const rollId = held.rollId!;
+  if (check.callId !== undefined)
+    recordCallResult(state, check.callId, actor.id, { natural: roll.natural, total: roll.total, success, rollId });
   // A typed die was thrown under the mode the rules gave, which the player was told before rolling.
-  const rollMode = shownRollMode(plan.rollMode, typed ? undefined : input.forcedMode);
+  const rollMode = shownRollMode(plan.rollMode, held.typed ? undefined : check.rollMode);
+  const answered = answeredLines(held);
+  const offered = answersOffered(state, checkTarget(actor, held, plan, readAs, roll), checkAnswerDeps(scope, deps));
+  const visibility = checkVisibility(state, scope, actor.id, check.visibility);
+  const events = askCheckAnswers(
+    state,
+    scope,
+    actor,
+    held,
+    checkTarget(actor, held, plan, readAs, roll),
+    deps,
+    commandId
+  );
   return {
+    ...(events.length > 0 ? { events } : {}),
     outcome: {
       label: plan.label,
       natural: roll.natural,
       total: roll.total,
-      dc: input.dc,
+      dc: check.dc,
       success,
       ...(rollMode ? { rollMode } : {}),
       ...(roll.reliableTalent ? { reliableTalent: true as const } : {}),
-      ...(typed ? { typed: true as const } : {}),
+      ...(held.typed ? { typed: true as const } : {}),
+      ...(answered.length > 0 ? { answered } : {}),
+      ...(offered.length > 0 ? { answers: offered } : {}),
       rollId
     },
     hiddenFromRoller: visibility === "blind" && scope.role !== "gm"
   };
+}
+
+/**
+ * Others' answers to a character's latest check once it is shown (Cutting Words on a success, Improve Fate, a sphinx's
+ * Burst of Ingenuity), asked one at a time in turn order, each creature once. The check has counted already, so an
+ * answer amends it, and the GM's call it answers.
+ */
+function askCheckAnswers(
+  state: GameState,
+  scope: Initiator,
+  actor: Actor,
+  held: HeldRoll,
+  target: AnswerTarget,
+  deps: CheckRollDependencies,
+  commandId: string
+): EffectNarration[] {
+  if (!state.combat.active) return [];
+  const waiting = state.combat.pendingReactions.some(
+    (prompt) => prompt.kind === "roll-answer" && prompt.rollKind === "check" && prompt.sourceActorId === actor.id
+  );
+  if (waiting) return [];
+  const asked = held.asked ?? [];
+  const next = answersFromOthers(state, target, checkAnswerDeps(scope, { ...deps, commandId }), new Set(asked))[0];
+  if (!next) return [];
+  const all = [...asked, answerKeyOf(next)];
+  state.heldRolls = state.heldRolls.map((entry) => (entry.key === held.key ? { ...entry, asked: all } : entry));
+  return [
+    askAnswer(
+      state,
+      next,
+      { rollKind: "check", roller: actor, targetActorId: null, asked: all },
+      { newId: deps.newId, now: deps.now, commandId }
+    )
+  ];
+}
+
+/** A held check's numbers with its answers: a d20 an answer set is read alone, and what answers added is added. */
+function answeredCheck(
+  plan: CheckPlan,
+  held: HeldRoll,
+  readAs: "advantage" | "disadvantage" | "normal",
+  random: RandomSource
+) {
+  const read = answeredRead(held);
+  const roll =
+    read.face !== null
+      ? totalCheck(plan, [read.face], "normal", random, held.others)
+      : totalCheck(plan, held.faces, held.readAs ?? readAs, random, held.others);
+  return { ...roll, total: roll.total + read.bonus };
+}
+
+/** The latest check as an answer meets it. */
+function checkTarget(
+  actor: Actor,
+  held: HeldRoll,
+  plan: CheckPlan,
+  readAs: "advantage" | "disadvantage" | "normal",
+  roll: ReturnType<typeof answeredCheck>
+): AnswerTarget {
+  const check = held.check!;
+  return {
+    kind: "check",
+    roller: actor,
+    key: held.key,
+    natural: roll.natural,
+    total: roll.total,
+    threshold: check.dc,
+    mode: held.readAs ?? readAs,
+    ability: check.subject.ability,
+    purpose: "check",
+    label: plan.label,
+    visibility: check.visibility
+  };
+}
+
+const checkAnswerDeps = (scope: Initiator, deps: CheckRollDependencies): AnswerDeps => ({
+  resolveDefinition: deps.resolveDefinition,
+  ...(deps.catalog ? { catalog: deps.catalog } : {}),
+  random: deps.random,
+  newRollId: deps.newId,
+  sessionId: deps.sessionId,
+  role: scope.role,
+  now: deps.now,
+  commandId: deps.commandId ?? deps.newId(),
+  ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+});
+
+/**
+ * Answers a character's latest check with one of its answers (SRD: a Bardic Inspiration die "after seeing the roll",
+ * Tactical Mind, the halfling's Luck), while that check is still the character's latest roll. The check's result and
+ * the GM's call it answers are updated with the answered total.
+ */
+export function answerAbilityCheck(
+  state: GameState,
+  scope: Initiator,
+  input: Readonly<{
+    commandId: string;
+    actorId: string;
+    /** `by` names another creature answering through its prompt (Cutting Words); absent, the one who rolled. */
+    answer: Readonly<{ id: string; subtract?: boolean; face?: number; by?: string }>;
+  }>,
+  deps: CheckRollDependencies
+): CheckResult & Readonly<{ events: readonly EffectNarration[] }> {
+  const actor = state.actors.find((candidate) => candidate.id === input.actorId);
+  if (!actor) throw new CommandRejectedError("That character no longer exists.");
+  requireActorAccess(scope, state, actor.id, "check", "You can only roll for your own character.");
+  const held = heldRollFor(state, checkKey(actor.id));
+  const latest = [...state.rolls].reverse().find((roll) => roll.actorId === actor.id);
+  if (!held?.check || !latest || latest.id !== held.rollId)
+    throw new CommandRejectedError(`${actor.name} has no check to answer: an answer comes right after the roll.`);
+  const check = held.check;
+  const rollInput: CheckRollInput = {
+    commandId: input.commandId,
+    actorId: actor.id,
+    subject: check.subject,
+    dc: check.dc,
+    visibility: check.visibility,
+    ...(check.rollMode !== undefined ? { forcedMode: check.rollMode } : {}),
+    ...(check.findActorId !== undefined ? { findActorId: check.findActorId } : {}),
+    ...(check.callId !== undefined ? { callId: check.callId } : {})
+  };
+  const { plan } = planFor(state, scope, rollInput, deps);
+  const readAs = held.typed ? "normal" : (check.rollMode ?? plan.rollMode.mode);
+  const roll = answeredCheck(plan, held, readAs, deps.random);
+  const bearer =
+    input.answer.by === undefined ? actor : state.actors.find((candidate) => candidate.id === input.answer.by);
+  if (!bearer) throw new CommandRejectedError("The creature answering the check is no longer here.");
+  const events = applyRollAnswer(
+    state,
+    checkTarget(actor, held, plan, readAs, roll),
+    bearer,
+    input.answer,
+    checkAnswerDeps(scope, { ...deps, commandId: input.commandId })
+  );
+  const result = heldCheckResult(state, scope, actor, plan, readAs, deps, input.commandId);
+  return { ...result, events: [...events, ...(result.events ?? [])] };
 }
 
 /** A check that settles something on the spot (first aid, reading a scroll), rolled once with its plan's bonus and
@@ -212,11 +412,13 @@ export function rollAbilityCheck(
   const forced = scope.role === "gm" ? input.forcedMode : undefined;
   if (input.face !== undefined) {
     requireTypedDie(state, scope, undefined, input.face);
-    return recordCheck(state, scope, { ...input, forcedMode: forced }, deps, plan, [input.face], "normal", true, {});
+    return recordCheck(state, scope, { ...input, forcedMode: forced }, deps, plan, [input.face], "normal", true, {
+      fresh: true
+    });
   }
   const mode = forced ?? plan.rollMode.mode;
   const faces = d20FacesFor(mode, [], deps.random);
-  return recordCheck(state, scope, { ...input, forcedMode: forced }, deps, plan, faces, mode, false, {});
+  return recordCheck(state, scope, { ...input, forcedMode: forced }, deps, plan, faces, mode, false, { fresh: true });
 }
 
 /**

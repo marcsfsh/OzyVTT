@@ -9,6 +9,7 @@ import {
   type EquipmentCatalog,
   type EquipmentDerivation
 } from "./equipment-derivation.js";
+import { spellbookRituals } from "./ritual-adept.js";
 
 /** The action list every actor-scoped consumer must read in place of `definition.actions`: item-derived
  *  actions plus standing riders (items, feats, features, live effects) folded into the numbers the resolver
@@ -24,8 +25,11 @@ export function effectiveActions(
   const taken = declared.map((action) =>
     withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition)
   );
+  // A Wizard's Ritual Adept casts a ritual from its book that the sheet doesn't list.
+  const rituals = spellbookRituals(definition, actor, catalog);
   // The definition's own list when nothing changed, so a caller holding it sees the same array.
-  const base = taken.every((action, index) => action === declared[index]) ? declared : taken;
+  const unchanged = taken.every((action, index) => action === declared[index]);
+  const base = unchanged && rituals.length === 0 ? declared : [...taken, ...rituals];
   if (!actor) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
   if (derivation.carriers.length === 0 && derivation.actions.length === 0) return base;
@@ -62,7 +66,9 @@ export function withStandingRiders(action: ActorAction, derivation: EquipmentDer
   const attackBonus =
     sumRiders(riders, "attack-bonus") +
     (action.spellId !== undefined && action.attack ? sumRiders(riders, "spell-attack-bonus") : 0);
-  const damageBonus = sumRiders(riders, "damage-bonus");
+  // What rides a hit adds dice to the weapon's damage, which carries the weapon's own bonus once (a Staff of
+  // Striking's charge is 1d6 Force, not 1d6 + 3).
+  const damageBonus = action.ridesHit ? 0 : sumRiders(riders, "damage-bonus");
   const critDice = riders.reduce(
     (total, rider) => (rider.modifier.type === "critical-bonus-dice" ? total + (rider.modifier.count ?? 0) : total),
     0

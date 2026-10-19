@@ -127,6 +127,15 @@ export function itemAction(
       }
     : undefined;
   const uses = usesOf(declared.uses, definition, item);
+  // "1d10 + your Dexterity modifier" taken off the damage (Gloves of Missile Snaring), read off the bearer.
+  const added = declared.adds
+    ? (declared.adds.abilityModifier ? scoreModifierOf(definition, declared.adds.abilityModifier) : 0) +
+      (declared.adds.proficiencyBonus ? caster.proficiencyBonus : 0)
+    : 0;
+  const reaction =
+    declared.reaction?.response === "reduce-damage" && added !== 0
+      ? { ...declared.reaction, formula: formulaPlus(declared.reaction.formula, added) }
+      : declared.reaction;
   return {
     id: itemActionId(itemId, declared.id),
     name: declared.name,
@@ -138,12 +147,32 @@ export function itemAction(
     // A Potion of Healing's 2d4 + 2.
     ...(declared.healing ? { healing: { ...declared.healing } } : {}),
     ...(uses ? { uses } : {}),
+    // Charges one use spends (a Staff of Striking's 2 or 3).
+    ...(declared.useCost !== undefined ? { useCost: declared.useCost } : {}),
     // A thrown flask uses one attack of the Attack action; the action's other attacks stay open.
     ...(declared.replacesAttack ? { replacesAttack: true } : {}),
     // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
     ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
-    ...(declared.area ? { area: { ...declared.area } } : {})
+    ...(declared.area ? { area: { ...declared.area } } : {}),
+    // The area it leaves to act later (spread Caltrops).
+    ...(declared.zone ? { zone: structuredClone(declared.zone) } : {}),
+    // Who it may target (a flask's one creature within 20 feet) and the hit it rides (a staff's charge on a hit).
+    ...(declared.targets ? { targets: structuredClone(declared.targets) } : {}),
+    ...(declared.ridesHit ? { ridesHit: itemHitRider(declared.ridesHit, definition) } : {}),
+    ...(declared.onHit ? { onHit: structuredClone(declared.onHit) } : {}),
+    // A roll it answers (a Ring of Evasion's Evade) and the trigger it is offered on (a Reaction's).
+    ...(declared.answer ? { answer: structuredClone(declared.answer) } : {}),
+    ...(reaction ? { reaction: { ...reaction } } : {})
   };
+}
+
+/** An item's hit rider with its DC as the bearer's number; how many effects it carries doesn't grow with level. */
+function itemHitRider(
+  rider: NonNullable<FeatureAction["ridesHit"]>,
+  definition: ActorDefinition | undefined
+): NonNullable<ActorAction["ridesHit"]> {
+  const { saveDc, effectsChooseByLevel: _byLevel, ...rest } = structuredClone(rider);
+  return { ...rest, ...(saveDc !== undefined ? { saveDc: resolveSaveDc(saveDc, definition) } : {}) };
 }
 
 /** `FeatureSaveDcSchema`'s three forms, resolved against the bearer. Clamped to the action schema's 1-40. */
@@ -181,7 +210,9 @@ export function castAction(
     spellId: cast.spellId,
     ...(uses ? { uses } : {}),
     // The bearer's own slot is spent on top of the item's charges when the item says so.
-    ...(cast.consumesSpellSlot && level >= 1 ? { spellSlot: { level: Math.min(9, level) } } : {})
+    ...(cast.consumesSpellSlot && level >= 1 ? { spellSlot: { level: Math.min(9, level) } } : {}),
+    // Who the item's cast may affect beside the spell's own targets (a ring's Fear: Beasts only).
+    ...(cast.targets ? { targets: structuredClone(cast.targets) } : {})
   };
   if (!spell) return base;
 
@@ -208,8 +239,22 @@ export function castAction(
     { attackBonus, saveDc: clampDc(saveDc), bearersDc, modifier: scoreModifierOf(definition, ability) },
     { roll: upcast }
   );
-  // A healing area heals the creatures the caster picks (up to its count), so it is picked with no template.
-  return { ...base, ...(spell.area && !mechanics.healing ? { area: spell.area } : {}), ...mechanics };
+  return {
+    ...base,
+    // The item's own area, where it prints one (a wand's 60-foot Cone), else the spell's.
+    ...(cast.area ? { area: structuredClone(cast.area) } : castAreaOf(spell, mechanics)),
+    ...mechanics,
+    // A Reaction spell (Shield, Hellish Rebuke) is cast from the item as a Reaction, offered when its trigger happens.
+    ...(spell.effect?.reaction
+      ? { activation: "reaction" as const, reaction: structuredClone(spell.effect.reaction) }
+      : {})
+  };
+}
+
+/** The template a cast places: the spell's area, unless the caster picks its targets in that area (Mass Cure Wounds'
+ *  six, Slow's six, Sleep's creatures of the caster's choice), which the cast then picks one by one. */
+export function castAreaOf(spell: SpellReference, mechanics: Pick<ActorAction, "healing">): Pick<ActorAction, "area"> {
+  return spell.area && !mechanics.healing && !spell.effect?.picksInArea ? { area: spell.area } : {};
 }
 
 /** A cast's grant, its "spellcasting ability modifier" fixed at the caster's for this spell. */
@@ -244,6 +289,8 @@ export function spellCastMechanics(
       | "drain"
       | "endsConditions"
       | "endsOneCondition"
+      | "dispel"
+      | "endsCurses"
     >
   > {
   // No cast model: the save still applies, and the rest is the GM's.
@@ -258,8 +305,12 @@ export function spellCastMechanics(
     // What its damage drains as it lands (Vampiric Touch's healing, Harm's lower Hit Point maximum).
     ...(effect.drain ? { drain: { ...effect.drain } } : {}),
     ...(effect.darts ? { darts: effect.darts } : {}),
-    // The type the caster picks: of the damage (Chromatic Orb), or of the Resistance it grants (Protection from Energy).
-    ...(effect.damageTypes && (damage.length > 0 || effect.grant !== undefined)
+    // The type the caster picks: of the damage (Chromatic Orb), of the Resistance it grants (Protection from Energy), or
+    // of the area it leaves (Conjure Elemental's element).
+    ...(effect.damageTypes &&
+    (damage.length > 0 ||
+      effect.grant !== undefined ||
+      (effect.laterActions ?? []).some((row) => row.zone !== undefined && row.damage.length > 0))
       ? { damageTypes: [...effect.damageTypes] }
       : {}),
     ...(attacks > 0
@@ -279,8 +330,10 @@ export function spellCastMechanics(
         ? {
             save: {
               ...castSave,
-              dc: numbers.saveDc,
-              ...(numbers.bearersDc ? { spellcasting: true } : {}),
+              // A save the caster makes itself is at the DC the spell prints (Contact Other Plane's 15).
+              ...(effect.selfSave
+                ? { dc: effect.selfSave.dc, bySelf: true as const }
+                : { dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) }),
               ...(effect.failureEffect ? { failureEffect: structuredClone(effect.failureEffect) } : {})
             }
           }
@@ -305,7 +358,10 @@ export function spellCastMechanics(
           endsConditions: [...effect.endsConditions],
           ...(effect.endsOneCondition ? { endsOneCondition: true as const } : {})
         }
-      : {})
+      : {}),
+    // The spells it ends on its target (Dispel Magic), and the curses (Remove Curse).
+    ...(effect.dispel ? { dispel: { ...effect.dispel } } : {}),
+    ...(effect.endsCurses ? { endsCurses: true as const } : {})
   };
 }
 
@@ -427,6 +483,8 @@ export function withSpellEffects(action: ActorAction, spell: SpellReference | un
   action = {
     ...action,
     ...hitRiders,
+    // The light it sheds and the fog or Darkness it fills (`vision/cast-sight.ts`).
+    ...(action.sight === undefined && spell.sight ? { sight: structuredClone(spell.sight) } : {}),
     ...(action.drain === undefined && effect.drain ? { drain: { ...effect.drain } } : {}),
     ...(action.endsConditions === undefined && effect.endsConditions
       ? {

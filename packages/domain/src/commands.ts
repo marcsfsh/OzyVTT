@@ -16,6 +16,7 @@ import {
 } from "./state.js";
 import {
   AbilitySchema,
+  CastShapingSchema,
   CharacterChoiceSchema,
   CharacterIdentitySchema,
   CurrencySchema,
@@ -37,7 +38,7 @@ import { MAX_SOUND_EFFECTS, MAX_SOUND_LAYERS, MAX_SOUND_TRACKS, SoundVolumeSchem
 export const RulesOverrideSchema = z
   .object({
     reason: z.string().trim().min(1).max(300).optional(),
-    families: z.array(RuleFamilySchema).min(1).max(5).optional()
+    families: z.array(RuleFamilySchema).min(1).max(6).optional()
   })
   .strict();
 /** Per-family exceptions on the wire are strict: a misspelled family is a rejection, never a silent no-op. */
@@ -335,9 +336,38 @@ export const HitOptionChoiceSchema = z
       .regex(/^[a-z]+$/)
       .max(40)
       .optional(),
-    slotLevel: z.number().int().min(1).max(9).optional()
+    slotLevel: z.number().int().min(1).max(9).optional(),
+    /** The effects picked with it, from the offer's `effects` (Brutal Strike's Hamstring Blow, a Cunning Strike's
+     *  Trip). */
+    effects: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80)
+      )
+      .max(3)
+      .optional()
   })
   .strict();
+/** An answer to a roll the answerer has seen (`answers` on its preview): the answer's id, `subtract` to take an
+ *  either-way die off (Boon of Fate), and the face a physical die shows when the answer rerolls a typed d20. */
+export const RollAnswerChoiceSchema = z
+  .object({
+    id: z.string().min(1).max(160),
+    subtract: z.boolean().optional(),
+    face: z.number().int().min(1).max(20).optional()
+  })
+  .strict();
+/** How a spell's caster shapes this casting: Metamagic options paid in Sorcery Points (Careful Spell's and Heightened
+ *  Spell's creatures, Transmuted Spell's new damage type) and Sculpt Spells' protected creatures. The server checks each
+ *  against the caster's picks, the spell and the points left, and spends them. Each option at most once. */
+const CastShapingListSchema = z
+  .array(CastShapingSchema)
+  .max(4)
+  .refine((list) => new Set(list.map((entry) => entry.id)).size === list.length, {
+    error: "Choose each way to shape the spell at most once."
+  });
 export const ActionResolveSchema = z
   .object({
     commandId: z.uuid(),
@@ -370,6 +400,13 @@ export const ActionResolveSchema = z
     /** Ready this spell for later (SRD Ready): its slot is spent and it is held with Concentration until
      *  the start of the caster's next turn; casting it off-turn then releases it with the Reaction. */
     ready: z.boolean().optional(),
+    /** Take the action's own move before the rest of it ("The dragon moves up to half its Speed, and it makes one
+     *  Rend attack"): the action's cost is spent and the move granted now, with no target; the action taken again
+     *  afterwards makes the rest at no further cost. */
+    moveFirst: z.boolean().optional(),
+    /** GM only: the spell area a cast that ends spells is aimed at (Dispel Magic on a Moonbeam), from
+     *  `combat.spellZones`. */
+    zoneId: z.string().min(1).max(120).optional(),
     /** false previews the attack roll only (no damage/riders/economy). The server holds the previewed d20, so a second
      *  preview of the same attack shows the same die, and the confirm (`commit: true`) uses it. Non-attack actions
      *  ignore it. */
@@ -387,6 +424,9 @@ export const ActionResolveSchema = z
     /** With `commit: false`, throw the held attack d20 again: a player spends Heroic Inspiration to reroll one die (the
      *  lowest); the GM rerolls freely. */
     reroll: z.boolean().optional(),
+    /** With `commit: false`, answer the held attack roll with one of the preview's `answers` (Peerless Skill, Stroke of
+     *  Luck), which then counts in every later look and the confirm. */
+    answer: RollAnswerChoiceSchema.optional(),
     /** The skill a check action is made with: Influence (Deception, Intimidation, Performance, Persuasion or Animal
      *  Handling), Search (Insight, Medicine, Perception or Survival) or Study (Arcana, History, Investigation, Nature or
      *  Religion). */
@@ -409,6 +449,10 @@ export const ActionResolveSchema = z
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
     /** How much of its pool an action that lets its user choose spends (Lay on Hands' points); refused otherwise. */
     spend: z.number().int().min(1).max(100).optional(),
+    /** Knocking out a creature (SRD): a melee hit that drops the target to 0 leaves it at 1 Hit Point and Unconscious
+     *  instead. Refused on any other attack. */
+    knockOut: z.boolean().optional(),
+    shaping: CastShapingListSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -440,6 +484,9 @@ export const SaveAnswerSchema = z
     /** With `commit: false`, throw the held d20 again: a player spends Heroic Inspiration to reroll one die (the
      *  lowest); the GM rerolls freely. */
     reroll: z.boolean().optional(),
+    /** With `commit: false`, answer the held save with one of the preview's `answers` (Indomitable, a Bardic
+     *  Inspiration die), which then counts in every later look and the confirm. */
+    answer: RollAnswerChoiceSchema.optional(),
     /** false previews: the d20 is thrown and held, so a later preview or the confirm uses the same die. */
     commit: z.boolean().default(true),
     legendaryResistance: z.boolean().default(false),
@@ -486,6 +533,11 @@ export const ReactionAnswerSchema = z
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     /** The extras the swing's previewed hit offered that the answerer adds to it (Sneak Attack), sent with the confirm. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
+    /** The spell slot a reaction spell is cast with (Shield, Hellish Rebuke, Counterspell): absent, its own level or the
+     *  lowest above it with a slot left. A higher slot upcasts it as a cast on the caster's turn does. */
+    slotLevel: z.number().int().min(1).max(9).optional(),
+    /** An answer to another creature's roll that may go either way (Improve Fate): take its die off the roll. */
+    subtract: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -510,6 +562,14 @@ export const ContentActionsSchema = z
       .max(200)
   })
   .strict();
+/** A stat block's actions to run, for one combatant built from it when `actorId` names one. */
+export const ContentMonsterActionsQuerySchema = z
+  .object({
+    /** A combatant built from the stat block: its actions as it has them now, with what its items give. */
+    actorId: z.uuid().optional()
+  })
+  .strict();
+export const ContentMonsterActionsSchema = ContentActionsSchema.extend(ContentMonsterActionsQuerySchema.shape);
 export const TurnReactionSchema = z
   .object({
     commandId: z.uuid(),
@@ -584,6 +644,8 @@ export const DeathSaveRollSchema = z
     naturalRoll: z.number().int().min(1).max(20).optional(),
     /** With `commit: false`, throw the held d20 again: Heroic Inspiration for a player, free for the GM. */
     reroll: z.boolean().optional(),
+    /** With `commit: false`, answer the held death save with one of the preview's `answers` (the halfling's Luck). */
+    answer: RollAnswerChoiceSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -634,6 +696,8 @@ export const ActionUseSchema = z
     spend: z.number().int().min(1).max(100).optional(),
     /** The damage type picked; see `action.resolve`. */
     damageType: DamageTypeSchema.optional(),
+    /** How the spell's caster shapes the cast (Metamagic); see `action.resolve`. Refused on the loose route. */
+    shaping: CastShapingListSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -700,6 +764,17 @@ export const CheckRerollSchema = z
   })
   .strict();
 
+/** Answer a character's latest check with one of its `answers` (Tactical Mind, a Bardic Inspiration die), while it is
+ *  still their latest roll. */
+export const CheckAnswerSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    answer: RollAnswerChoiceSchema,
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
 /** The GM calls for a check or a save from one or several characters, with an optional DC. */
 export const RollCallStartSchema = z
   .object({
@@ -757,6 +832,29 @@ export const ActorSetHeroicInspirationSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     has: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
+/** A character's player (or the GM) gives its second Heroic Inspiration to a player character who lacks one, or lets
+ *  it go (`recipientId` null). */
+export const ActorGiveHeroicInspirationSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    recipientId: z.uuid().nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
+/** The GM awards XP: an amount to each recipient, and an even share of the defeated creatures' stat block XP. */
+export const ActorAwardExperienceSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorIds: z.array(z.uuid()).min(1).max(12),
+    amount: z.number().int().min(-1_000_000).max(1_000_000).default(0),
+    defeatedIds: z.array(z.uuid()).max(60).default([]),
+    inLairIds: z.array(z.uuid()).max(60).default([]),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -920,10 +1018,71 @@ export const VisionSetAmbientSchema = z
   .object({
     commandId: z.uuid(),
     ambient: z.enum(["bright", "dim", "dark"]),
+    /** The bright ambient light is sunlight (daylight outdoors). Left as it was when absent. */
+    sunlight: z.boolean().optional(),
     sceneId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** An area of light or obscurement painted over the ambient light: a rect (snapped to whole cells), or a circle for
+ *  fog or magical Darkness. */
+export const VisionAreaAddSchema = z
+  .object({
+    commandId: z.uuid(),
+    kind: z.enum(["bright", "dim", "dark", "lightly-obscured", "heavily-obscured", "magical-darkness"]),
+    sunlight: z.boolean().optional(),
+    rect: z
+      .object({
+        x: z.number().min(-100000).max(1_000_000),
+        y: z.number().min(-100000).max(1_000_000),
+        width: z.number().min(-1_000_000).max(1_000_000),
+        height: z.number().min(-1_000_000).max(1_000_000)
+      })
+      .strict()
+      .optional(),
+    circle: z
+      .object({
+        x: z.number().min(-100000).max(1_000_000),
+        y: z.number().min(-100000).max(1_000_000),
+        radiusFeet: z.number().positive().max(1000)
+      })
+      .strict()
+      .optional(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((area) => (area.rect === undefined) !== (area.circle === undefined), {
+    message: "Give the area a rectangle or a circle, not both."
+  });
+export const VisionAreaRemoveSchema = z
+  .object({
+    commandId: z.uuid(),
+    areaId: z.uuid(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Light or put out a light source a creature carries, lower or raise a Hooded Lantern's hood, or aim a Bullseye
+ *  Lantern. */
+export const ItemSetLightSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    lit: z.boolean().optional(),
+    hoodLowered: z.boolean().optional(),
+    facingDegrees: z.number().min(-360).max(720).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine(
+    (change) => change.lit !== undefined || change.hoodLowered !== undefined || change.facingDegrees !== undefined,
+    { message: "Say whether to light it, hood it or aim it." }
+  );
 export const VisionResetExploredSchema = z
   .object({
     commandId: z.uuid(),
@@ -1123,10 +1282,15 @@ export const RestFinishSchema = z
 export const TimePassSchema = z
   .object({
     commandId: z.uuid(),
-    hours: z.number().int().min(1).max(720),
+    hours: z.number().int().min(0).max(720).default(0),
+    /** Minutes on top of the hours, so a group can skip the minute or the 10 minutes a spell lasts. */
+    minutes: z.number().int().min(0).max(59).default(0),
+    /** The party travels for that time at this pace (SRD 5.2.1 Travel Pace): the log says how far it went. */
+    pace: z.enum(["fast", "normal", "slow"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
-  .strict();
+  .strict()
+  .refine((request) => request.hours > 0 || request.minutes > 0, "Choose at least 1 minute.");
 export const CharacterSetSlotSchema = z
   .object({
     commandId: z.uuid(),
@@ -1201,6 +1365,18 @@ export const CharacterGiveItemSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     toActorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM marks a carried manual or tome studied by the character carrying it. */
+export const CharacterStudyItemSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     itemId: z
       .string()
       .regex(/^[a-z0-9-]+$/)
@@ -1465,7 +1641,7 @@ export const DiceRollSchema = z
   .strict();
 /** How a token move travels (SRD Movement): on foot or by one of the special speeds, which spend movement; by
  *  teleportation, which spends none and provokes no Opportunity Attack; or moved by force (the GM's), neither. */
-export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "teleport", "forced"]);
+export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "jump", "teleport", "forced"]);
 export type MoveMode = z.infer<typeof MoveModeSchema>;
 
 export const TokenMoveSchema = z
@@ -1475,8 +1651,48 @@ export const TokenMoveSchema = z
     position: EncounterTokenPositionSchema.nullable(),
     /** Absent: walking. A player may teleport only with the GM's go-ahead, and only the GM moves a creature by force. */
     mode: MoveModeSchema.optional(),
+    /** Feet above the ground the move ends at; absent keeps the height it has. Rising or descending costs movement as
+     *  distance does, and only flying, climbing, jumping, teleporting or a forced move changes it. */
+    altitudeFeet: z.number().int().min(0).max(10000).optional(),
     sceneId: z.uuid().optional(),
     /** GM-grade bypass of a movement-rule rejection (speed budget); audited like every override. */
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** GM-set height of a token, free of movement: on a surface (a ledge, a balcony, a wall), or in the air flying or
+ *  levitating. 0 puts it on the ground. */
+export const TokenSetAltitudeSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    altitudeFeet: z.number().int().min(0).max(10000),
+    /** What holds it up in the air; null or absent: it stands or clings on a surface. */
+    airborne: z.enum(["fly", "levitate"]).nullable().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM makes a creature fall (SRD Falling): from its height, or `feet` given, onto the ground or a lower ledge. */
+export const ActorFallSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    /** How far it falls; absent, from the height it is at. */
+    feet: z.number().int().min(1).max(10000).optional(),
+    /** It falls into water or another liquid, which can halve the damage. */
+    intoWater: z.boolean().optional(),
+    /** The height it lands at; the ground when absent. */
+    landingAltitudeFeet: z.number().int().min(0).max(10000).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A creature climbs onto a mount (`mountId`) or off the one it rides (`mountId: null`), SRD 5.2.1 Mounted Combat. */
+export const ActorMountSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    mountId: z.uuid().nullable(),
+    /** GM-grade bypass of a movement-rule rejection (the half Speed it costs, a mount too small or too far). */
     override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })

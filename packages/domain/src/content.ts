@@ -8,6 +8,7 @@ import {
   type DamageType
 } from "@vtt/schemas";
 import type { Wire } from "./wire.js";
+import type { CastShapingOffers } from "./results.js";
 
 /** An open identity slug; ids are never closed enums, so homebrew stays additive. */
 const slug = (max = 80) =>
@@ -251,6 +252,30 @@ export const ContentEquipmentSummarySchema = z.strictObject({
     .optional()
     .describe(
       "The spell levels one copy of a Spell Scroll can bear (0 is a cantrip), for the picker's spell step; absent on anything else"
+    ),
+  /** A manual or tome: its study raises a score for good (`character.study-item`). */
+  study: z
+    .strictObject({
+      ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]),
+      amount: z.number().int(),
+      maximum: z.number().int(),
+      hours: z.number().int(),
+      days: z.number().int()
+    })
+    .optional()
+    .describe(
+      "A manual or tome: `hours` of study within `days` raise the reader's `ability` by `amount`, never above `maximum`, as its text prints it; absent on anything else"
+    ),
+  /** A light source: lit and put out on the row unless it always glows, with a hood to lower or a Cone to aim. */
+  light: z
+    .strictObject({
+      always: z.literal(true).optional(),
+      hooded: z.literal(true).optional(),
+      cone: z.literal(true).optional()
+    })
+    .optional()
+    .describe(
+      "How the item sheds light, as its own text says: lit and put out on its row (item.set-light) unless `always` (it glows while held), with a hood to lower (`hooded`) or a Cone to aim (`cone`). Absent on anything that sheds none"
     )
 });
 export type ContentEquipmentSummary = Wire<z.infer<typeof ContentEquipmentSummarySchema>>;
@@ -835,6 +860,7 @@ export type ContentActionSummary = Readonly<{
   rangeFeet: number | null;
   /** Normal range band for two-range weapons; shots beyond it (up to rangeFeet) roll at disadvantage. */ rangeNormalFeet:
     number | null;
+  /** How far its targets may be when it says so without an attack (Lay on Hands' touch is 5). */ targetRangeFeet?: number;
   saveAbility: string | null;
   saveDc: number | null;
   damage: ReadonlyArray<{ formula: string; type: string }>;
@@ -861,6 +887,8 @@ export type ContentActionSummary = Readonly<{
   /** How many creatures one use heals when it can be more than one (Prayer of Healing's five). */ healTargets?: number;
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
   /** "Can't take this action again until the start of its next turn." */ legendaryOncePerRound?: true;
+  /** Its own move comes before the rest of it ("moves up to half its Speed, and it makes one Rend attack"), so it can
+   *  be taken move first: `action.resolve`'s `moveFirst`. */ moveFirst?: true;
   /** Taken as one attack of the Attack action (an Unarmed Strike, a Breath Weapon), so it spends one the action has left. */ replacesAttack?: true;
   /** Added to a hit and never taken alone (Sneak Attack, a smite): chosen on an attack's result. */ ridesAHit?: true;
   /** Darts the action makes, each assigned to a target (Magic Missile); see `ActorAction.darts`. */ darts?: number;
@@ -879,6 +907,7 @@ export type ContentActionSummary = Readonly<{
   }>;
   /** The spell list this cast belongs to, by its action id; it is shown under that list. */ castFrom?: string;
   /** The spell it casts. */ spellId?: string;
+  /** The ways its caster may shape the cast (Metamagic, Sculpt Spells), from the server's availability read. */ shaping?: CastShapingOffers;
 }>;
 export type ContentActionsResult = {
   ok: boolean;

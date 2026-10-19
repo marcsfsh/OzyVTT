@@ -363,6 +363,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "alarm",
+     "activation": "other",
+     "when": "Whenever a creature other than your allies enters the warded area, the alarm alerts you.",
+     "damage": [],
+     "zone": {
+      "on": [
+       "enter"
+      ],
+      "alerts": true,
+      "affects": "enemies"
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -452,7 +467,8 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "endsOnSourceSideDamage": true
   },
   "target": {
    "type": "creature",
@@ -467,7 +483,11 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true,
+   "targetTypes": [
+    "beast"
+   ]
   },
   "classes": [
    "bard",
@@ -548,6 +568,43 @@
   },
   "duration": "24 hours",
   "concentration": false,
+  "upcastDurations": [
+   {
+    "level": 3,
+    "duration": "72 hours",
+    "concentration": false
+   },
+   {
+    "level": 4,
+    "duration": "120 hours",
+    "concentration": false
+   },
+   {
+    "level": 5,
+    "duration": "168 hours",
+    "concentration": false
+   },
+   {
+    "level": 6,
+    "duration": "216 hours",
+    "concentration": false
+   },
+   {
+    "level": 7,
+    "duration": "264 hours",
+    "concentration": false
+   },
+   {
+    "level": 8,
+    "duration": "312 hours",
+    "concentration": false
+   },
+   {
+    "level": 9,
+    "duration": "360 hours",
+    "concentration": false
+   }
+  ],
   "ritual": true,
   "attackRoll": false,
   "damage": {
@@ -568,7 +625,14 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true,
+   "targetTypes": [
+    "beast"
+   ]
   },
   "classes": [
    "bard",
@@ -659,7 +723,8 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "druid"
@@ -866,6 +931,27 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "barrier",
+     "activation": "other",
+     "when": "Creatures other than Constructs and Undead can't pass or reach through the Emanation.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 10,
+      "bars": {
+       "way": "both",
+       "except": [
+        "construct",
+        "undead"
+       ],
+       "reach": true
+      }
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -968,6 +1054,9 @@
    "attacks": 0,
    "damage": [],
    "noCastSave": true,
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -1114,7 +1203,17 @@
    "somatic": true,
    "material": true,
    "materialText": "gold dust worth 25+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "gold dust",
+     "matches": [
+      "gold dust"
+     ],
+     "costGp": 25,
+     "consumed": true
+    }
+   ]
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -1160,7 +1259,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a miniature sword worth 250+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "miniature sword",
+     "matches": [
+      "miniature sword"
+     ],
+     "costGp": 250,
+     "consumed": false
+    }
+   ]
   },
   "duration": "1 minute",
   "concentration": true,
@@ -1258,6 +1367,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -1284,7 +1396,27 @@
    "somatic": true,
    "material": true,
    "materialText": "for each of the spell's targets, one jacinth worth 1,000+ GP and one silver bar worth 100+ GP, all of which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "jacinth",
+     "matches": [
+      "jacinth"
+     ],
+     "costGp": 1000,
+     "consumed": true,
+     "perTarget": true
+    },
+    {
+     "name": "silver bar",
+     "matches": [
+      "silver bar"
+     ],
+     "costGp": 100,
+     "consumed": true,
+     "perTarget": true
+    }
+   ]
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -1304,6 +1436,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 9
+   },
    "healing": null
   },
   "classes": [
@@ -1332,7 +1467,20 @@
    "somatic": true,
    "material": true,
    "materialText": "specially marked sticks, bones, cards, or other divinatory tokens worth 25+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "divinatory tokens",
+     "matches": [
+      "divinatory",
+      "marked sticks",
+      "marked bones",
+      "cards"
+     ],
+     "costGp": 25,
+     "consumed": false
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -1406,6 +1554,33 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "aura",
+     "activation": "other",
+     "when": "You and your allies in the aura have Resistance to Necrotic damage; an ally at 0 Hit Points that starts its turn there regains 1 Hit Point.",
+     "damage": [],
+     "zone": {
+      "on": [
+       "start-turn"
+      ],
+      "around": "caster",
+      "feet": 30,
+      "affects": "allies",
+      "holds": {
+       "modifiers": [
+        {
+         "type": "damage-resistance",
+         "damageTypes": [
+          "necrotic"
+         ]
+        }
+       ]
+      },
+      "revives": 1
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -1433,7 +1608,17 @@
    "somatic": true,
    "material": true,
    "materialText": "an agate worth 1,000+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "agate",
+     "matches": [
+      "agate"
+     ],
+     "costGp": 1000,
+     "consumed": true
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -1453,7 +1638,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "targetTypes": [
+    "beast",
+    "plant"
+   ]
   },
   "classes": [
    "bard",
@@ -1540,7 +1729,8 @@
       ]
      }
     ]
-   }
+   },
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -1647,7 +1837,15 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Banished",
+    "tags": [
+     "off-plane"
+    ],
+    "modifiers": []
+   },
+   "seenTargets": true
   },
   "classes": [
    "cleric",
@@ -1728,6 +1926,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
    "grant": {
     "modifiers": [],
@@ -1741,7 +1942,8 @@
     "target": "target",
     "duration": {
      "type": "manual"
-    }
+    },
+    "armorClassFloor": 17
    }
   },
   "classes": [
@@ -1851,6 +2053,9 @@
      "type": "psychic"
     }
    ],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
    "failureEffect": {
     "name": "Befuddlement",
@@ -1858,7 +2063,8 @@
      "no-spells"
     ],
     "modifiers": []
-   }
+   },
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -1891,6 +2097,28 @@
   },
   "duration": "1 minute",
   "concentration": true,
+  "upcastDurations": [
+   {
+    "level": 4,
+    "duration": "10 minutes",
+    "concentration": true
+   },
+   {
+    "level": 5,
+    "duration": "8 hours",
+    "concentration": false
+   },
+   {
+    "level": 7,
+    "duration": "24 hours",
+    "concentration": false
+   },
+   {
+    "level": 9,
+    "duration": "until dispelled",
+    "concentration": false
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -1913,7 +2141,17 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "failureEffect": {
+    "name": "Bestow Curse",
+    "tags": [
+     "curse"
+    ],
+    "modifiers": []
+   }
   },
   "classes": [
    "bard",
@@ -2019,7 +2257,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that enters the area or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "when": "A creature that enters the area or ends its turn there makes the save. A creature makes this save only once per turn. The area is Difficult Terrain.",
      "save": {
       "ability": "str",
       "successDamage": "none",
@@ -2038,7 +2276,10 @@
        "enter",
        "end-turn"
       ],
-      "oncePerTurn": true
+      "oncePerTurn": true,
+      "terrain": {
+       "cost": 2
+      }
      }
     }
    ],
@@ -2107,7 +2348,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that enters the wall's space or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "when": "A creature that enters the wall's space or ends its turn there makes the save. A creature makes this save only once per turn. Its space is Difficult Terrain.",
      "save": {
       "ability": "dex",
       "successDamage": "half",
@@ -2124,7 +2365,10 @@
        "enter",
        "end-turn"
       ],
-      "oncePerTurn": true
+      "oncePerTurn": true,
+      "terrain": {
+       "cost": 2
+      }
      }
     }
    ],
@@ -2154,7 +2398,22 @@
    "somatic": true,
    "material": true,
    "materialText": "a Holy Symbol worth 5+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "Holy Symbol",
+     "matches": [
+      "holy symbol"
+     ],
+     "itemIds": [
+      "holy-symbol-amulet",
+      "holy-symbol-emblem",
+      "holy-symbol-reliquary"
+     ],
+     "costGp": 5,
+     "consumed": false
+    }
+   ]
   },
   "duration": "1 minute",
   "concentration": true,
@@ -2321,7 +2580,11 @@
      "type": "necrotic"
     }
    ],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "druid",
@@ -2416,7 +2679,8 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -2508,7 +2772,22 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Blink",
+    "tags": [
+     "blink"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -2565,6 +2844,13 @@
       "when": [
        {
         "type": "on-attack-roll"
+       },
+       {
+        "type": "other-lacks-sense",
+        "senses": [
+         "blindsight",
+         "truesight"
+        ]
        }
       ]
      }
@@ -2745,7 +3031,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 5,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [
@@ -2872,7 +3162,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "targetTypes": [
+    "humanoid"
+   ]
   },
   "classes": [
    "bard",
@@ -2930,7 +3223,13 @@
      "type": "lightning"
     }
    ],
-   "healing": null
+   "targets": {
+    "count": 4,
+    "perSlot": 1
+   },
+   "healing": null,
+   "seenTargets": true,
+   "chainFeet": 30
   },
   "classes": [
    "sorcerer",
@@ -2972,7 +3271,8 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "endsOnSourceSideDamage": true
   },
   "target": {
    "type": "creature",
@@ -2987,7 +3287,8 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -3063,7 +3364,8 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "endsOnSourceSideDamage": true
   },
   "target": {
    "type": "creature",
@@ -3078,7 +3380,11 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true,
+   "targetTypes": [
+    "humanoid"
+   ]
   },
   "classes": [
    "bard",
@@ -3250,7 +3556,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a diamond worth 50+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "diamond",
+     "matches": [
+      "diamond"
+     ],
+     "costGp": 50,
+     "consumed": false
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -3363,7 +3679,17 @@
    "somatic": true,
    "material": true,
    "materialText": "the powder of a crushed black pearl worth 500+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "black pearl",
+     "matches": [
+      "black pearl"
+     ],
+     "costGp": 500,
+     "consumed": false
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -3449,7 +3775,18 @@
    "somatic": true,
    "material": true,
    "materialText": "a focus worth 100+ GP, either a jeweled horn for hearing or a glass eye for seeing",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "jeweled horn or glass eye",
+     "matches": [
+      "jeweled horn",
+      "glass eye"
+     ],
+     "costGp": 100,
+     "consumed": false
+    }
+   ]
   },
   "duration": "10 minutes",
   "concentration": true,
@@ -3498,7 +3835,25 @@
    "somatic": true,
    "material": true,
    "materialText": "a diamond worth 1,000+ GP, which the spell consumes, and a sealable vessel worth 2,000+ GP that is large enough to hold the creature being cloned",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "diamond",
+     "matches": [
+      "diamond"
+     ],
+     "costGp": 1000,
+     "consumed": true
+    },
+    {
+     "name": "sealable vessel",
+     "matches": [
+      "vessel"
+     ],
+     "costGp": 2000,
+     "consumed": false
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -3518,6 +3873,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -3604,11 +3962,17 @@
        "enter",
        "end-turn"
       ],
-      "oncePerTurn": true
+      "oncePerTurn": true,
+      "drifts": 10
      }
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "area": {
+    "kind": "heavily-obscured"
+   }
   },
   "classes": [
    "sorcerer",
@@ -3753,7 +4117,8 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -3998,7 +4363,8 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard"
@@ -4148,7 +4514,8 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "areaPerSlot": 5
   },
   "classes": [
    "bard",
@@ -4360,6 +4727,13 @@
     "addsModifier": true
    }
   },
+  "sight": {
+   "light": {
+    "on": "area",
+    "brightFeet": 10,
+    "dimFeet": 0
+   }
+  },
   "classes": [
    "cleric"
   ],
@@ -4368,13 +4742,13 @@
   "castingOptions": [
    {
     "type": "slot_level_8",
-    "damageRoll": "2d12",
+    "damageRoll": "5d12",
     "targetCount": null,
     "description": "Healing and damage increase by 1d12."
    },
    {
     "type": "slot_level_9",
-    "damageRoll": "3d12",
+    "damageRoll": "6d12",
     "targetCount": null,
     "description": "Healing and damage increase by 2d12."
    }
@@ -4419,7 +4793,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -4447,7 +4825,17 @@
        "formula": "8d8",
        "type": "lightning"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "start-turn"
+      ],
+      "around": "point",
+      "feet": 10,
+      "affects": "enemies",
+      "holdsOne": true
+     }
     }
    ],
    "healing": null
@@ -4646,6 +5034,23 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "ground",
+     "activation": "other",
+     "when": "The ground in the Emanation is Difficult Terrain for your enemies.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 15,
+      "terrain": {
+       "cost": 2,
+       "for": "enemies"
+      }
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -4838,7 +5243,11 @@
    "successDamage": "none",
    "failureConditions": [
     "incapacitated"
-   ]
+   ],
+   "failureDuration": {
+    "type": "until-rest",
+    "rest": "long"
+   }
   },
   "target": {
    "type": "creature",
@@ -4848,8 +5257,16 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
-   "healing": null
+   "damage": [
+    {
+     "formula": "6d6",
+     "type": "psychic"
+    }
+   ],
+   "healing": null,
+   "selfSave": {
+    "dc": 15
+   }
   },
   "classes": [
    "warlock",
@@ -4909,6 +5326,9 @@
      "type": "necrotic"
     }
    ],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -4936,7 +5356,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a gem-encrusted statuette of yourself worth 1,500+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "statuette of yourself",
+     "matches": [
+      "statuette"
+     ],
+     "costGp": 1500,
+     "consumed": false
+    }
+   ]
   },
   "duration": "10 days",
   "concentration": false,
@@ -4982,7 +5412,17 @@
    "somatic": true,
    "material": true,
    "materialText": "ruby dust worth 50+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "ruby dust",
+     "matches": [
+      "ruby"
+     ],
+     "costGp": 50,
+     "consumed": true
+    }
+   ]
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -5003,6 +5443,13 @@
    "attacks": 0,
    "damage": [],
    "healing": null
+  },
+  "sight": {
+   "light": {
+    "on": "targets",
+    "brightFeet": 20,
+    "dimFeet": 20
+   }
   },
   "classes": [
    "cleric",
@@ -5150,7 +5597,17 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "reaction": {
+    "trigger": "casts-spell",
+    "response": "counter",
+    "ability": "con",
+    "rangeFeet": 60
+   },
+   "seenTargets": true
   },
   "classes": [
    "sorcerer",
@@ -5249,7 +5706,8 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "areaPerSlot": 5
   },
   "classes": [
    "cleric",
@@ -5325,7 +5783,18 @@
    "somatic": true,
    "material": true,
    "materialText": "one 150+ GP black onyx stone for each corpse",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "black onyx stone",
+     "matches": [
+      "onyx"
+     ],
+     "costGp": 150,
+     "consumed": false,
+     "perTarget": true
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -5599,6 +6068,14 @@
    "damage": [],
    "healing": null
   },
+  "sight": {
+   "light": {
+    "on": "point",
+    "brightFeet": 0,
+    "dimFeet": 10,
+    "count": 4
+   }
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -5655,6 +6132,15 @@
    "damage": [],
    "healing": null
   },
+  "sight": {
+   "area": {
+    "kind": "magical-darkness"
+   },
+   "dispels": {
+    "kind": "light",
+    "upToLevel": 2
+   }
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -5701,7 +6187,29 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "darkvision",
+      "feet": 150
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Darkvision",
+    "tags": [
+     "darkvision-spell"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "druid",
@@ -5760,6 +6268,18 @@
    "damage": [],
    "healing": null
   },
+  "sight": {
+   "light": {
+    "on": "area",
+    "brightFeet": 60,
+    "dimFeet": 60,
+    "sunlight": true
+   },
+   "dispels": {
+    "kind": "darkness",
+    "upToLevel": 3
+   }
+  },
   "classes": [
    "cleric",
    "druid",
@@ -5808,6 +6328,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
    "grant": {
     "modifiers": [],
@@ -5904,6 +6427,12 @@
       "shape": "sphere",
       "sizeFeet": 20,
       "widthFeet": null
+     },
+     "zone": {
+      "on": [
+       "spell-end"
+      ],
+      "grows": true
      }
     }
    ],
@@ -6015,7 +6544,33 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Detect Evil and Good",
+    "tags": [
+     "detect-evil-and-good"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    },
+    "detects": {
+     "creatureTypes": [
+      "aberration",
+      "celestial",
+      "elemental",
+      "fey",
+      "fiend",
+      "undead"
+     ],
+     "feet": 30,
+     "blockedByWalls": true
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -6218,7 +6773,12 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "teleport": {
+    "feet": 500,
+    "unseen": true,
+    "failDamage": "4d6"
+   }
   },
   "classes": [
    "bard",
@@ -6326,7 +6886,11 @@
      "type": "force"
     }
    ],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "sorcerer",
@@ -6439,7 +7003,13 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "dispel": {
+    "automaticLevel": 3
+   }
   },
   "classes": [
    "bard",
@@ -6549,7 +7119,19 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Dissonant Whispers",
+    "tags": [
+     "flees-with-reaction"
+    ],
+    "duration": {
+     "type": "rounds",
+     "rounds": 1
+    },
+    "modifiers": []
+   },
+   "seenTargets": true
   },
   "classes": [
    "bard"
@@ -6624,7 +7206,17 @@
    "somatic": true,
    "material": true,
    "materialText": "incense worth 25+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "incense",
+     "matches": [
+      "incense"
+     ],
+     "costGp": 25,
+     "consumed": true
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -6909,6 +7501,23 @@
   },
   "duration": "1 minute",
   "concentration": true,
+  "upcastDurations": [
+   {
+    "level": 5,
+    "duration": "10 minutes",
+    "concentration": true
+   },
+   {
+    "level": 6,
+    "duration": "1 hour",
+    "concentration": true
+   },
+   {
+    "level": 7,
+    "duration": "8 hours",
+    "concentration": true
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -6934,7 +7543,11 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true,
+   "targetTypes": [
+    "beast"
+   ]
   },
   "classes": [
    "druid",
@@ -6997,6 +7610,13 @@
   },
   "duration": "1 hour",
   "concentration": true,
+  "upcastDurations": [
+   {
+    "level": 9,
+    "duration": "8 hours",
+    "concentration": true
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -7022,7 +7642,8 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -7062,6 +7683,23 @@
   },
   "duration": "1 minute",
   "concentration": true,
+  "upcastDurations": [
+   {
+    "level": 6,
+    "duration": "10 minutes",
+    "concentration": true
+   },
+   {
+    "level": 7,
+    "duration": "1 hour",
+    "concentration": true
+   },
+   {
+    "level": 8,
+    "duration": "8 hours",
+    "concentration": true
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -7087,7 +7725,11 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true,
+   "targetTypes": [
+    "humanoid"
+   ]
   },
   "classes": [
    "bard",
@@ -7203,6 +7845,9 @@
      }
     }
    ],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -7300,6 +7945,9 @@
    "attacks": 0,
    "damage": [],
    "noCastSave": true,
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -7392,10 +8040,11 @@
   },
   "save": {
    "ability": "dex",
-   "successDamage": "half",
+   "successDamage": "none",
    "failureConditions": [
     "prone"
-   ]
+   ],
+   "breaksConcentration": true
   },
   "target": {
    "type": "creature",
@@ -7406,11 +8055,40 @@
    "size": 100,
    "unit": "feet"
   },
-  "area": null,
+  "area": {
+   "shape": "cylinder",
+   "sizeFeet": 100,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "laterActions": [
+    {
+     "name": "tremor",
+     "activation": "other",
+     "when": "At the end of each of your turns, each creature on the ground in the area makes the save: Prone and its Concentration broken on a failure. The ground is Difficult Terrain.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": [
+       "prone"
+      ],
+      "breaksConcentration": true
+     },
+     "damage": [],
+     "zone": {
+      "on": [
+       "caster-turn-end"
+      ],
+      "terrain": {
+       "cost": 2
+      }
+     }
+    }
+   ],
+   "healing": null,
+   "persistsWithoutTargets": true
   },
   "classes": [
    "cleric",
@@ -7703,7 +8381,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -7875,7 +8557,23 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "laterActions": [
+    {
+     "name": "ground",
+     "activation": "other",
+     "when": "The plants turn the ground in the area into Difficult Terrain.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "terrain": {
+       "cost": 2,
+       "kind": "plants"
+      }
+     }
+    }
+   ],
+   "healing": null,
+   "persistsWithoutTargets": true
   },
   "classes": [
    "druid",
@@ -7926,7 +8624,8 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -7975,7 +8674,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Etherealness",
+    "tags": [
+     "off-plane"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -8090,7 +8803,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -8223,10 +8940,17 @@
       "when": [
        {
         "type": "on-attack-roll"
+       },
+       {
+        "type": "seen-by-other"
        }
       ]
      }
-    ]
+    ],
+    "light": {
+     "brightFeet": 0,
+     "dimFeet": 10
+    }
    }
   },
   "classes": [
@@ -8276,7 +9000,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 5,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -8296,7 +9024,15 @@
        "formula": "4d8",
        "type": "force"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "caster-turn-start"
+      ],
+      "around": "point",
+      "feet": 5,
+      "affects": "enemies"
+     }
     }
    ],
    "healing": null
@@ -8510,7 +9246,30 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 5
+   },
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Feather Fall",
+    "tags": [
+     "feather-fall"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   },
+   "reaction": {
+    "trigger": "falls",
+    "response": "cast-on-faller",
+    "rangeFeet": 60
+   }
   },
   "classes": [
    "bard",
@@ -8538,7 +9297,17 @@
    "somatic": true,
    "material": true,
    "materialText": "burning incense worth 10+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "incense",
+     "matches": [
+      "incense"
+     ],
+     "costGp": 10,
+     "consumed": true
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -8673,7 +9442,19 @@
    "somatic": true,
    "material": true,
    "materialText": "a set of divination tools—such as cards or runes—worth 100+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "divination tools",
+     "matches": [
+      "divination tools",
+      "cards",
+      "runes"
+     ],
+     "costGp": 100,
+     "consumed": false
+    }
+   ]
   },
   "duration": "1 day",
   "concentration": true,
@@ -8800,7 +9581,11 @@
      "type": "necrotic"
     }
    ],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "sorcerer",
@@ -8929,6 +9714,13 @@
    "attacks": 0,
    "damage": [],
    "healing": null
+  },
+  "sight": {
+   "light": {
+    "on": "caster",
+    "brightFeet": 10,
+    "dimFeet": 10
+   }
   },
   "classes": [
    "druid",
@@ -9168,6 +9960,13 @@
    ],
    "healing": null
   },
+  "sight": {
+   "light": {
+    "on": "caster",
+    "brightFeet": 10,
+    "dimFeet": 10
+   }
+  },
   "classes": [
    "druid",
    "sorcerer"
@@ -9396,10 +10195,25 @@
        "formula": "2d6",
        "type": "fire"
       }
-     ]
+     ],
+     "area": {
+      "shape": "sphere",
+      "sizeFeet": 5,
+      "widthFeet": null
+     },
+     "movesArea": {
+      "feet": 30
+     }
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "light": {
+    "on": "area",
+    "brightFeet": 20,
+    "dimFeet": 20
+   }
   },
   "classes": [
    "druid",
@@ -9496,7 +10310,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "druid",
@@ -9709,7 +10527,13 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "areaPerSlot": 20
+  },
+  "sight": {
+   "area": {
+    "kind": "heavily-obscured"
+   }
   },
   "classes": [
    "druid",
@@ -9787,7 +10611,17 @@
    "somatic": true,
    "material": true,
    "materialText": "ruby dust worth 1,000+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "ruby dust",
+     "matches": [
+      "ruby"
+     ],
+     "costGp": 1000,
+     "consumed": false
+    }
+   ]
   },
   "duration": "1 day",
   "concentration": false,
@@ -9805,10 +10639,47 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 200,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
+   "damageTypes": [
+    "radiant",
+    "necrotic"
+   ],
+   "laterActions": [
+    {
+     "name": "ward",
+     "activation": "other",
+     "when": "An Aberration, Celestial, Elemental, Fey, Fiend or Undead that enters the area for the first time on a turn or ends its turn there takes the damage. No creature can teleport into the area.",
+     "damage": [
+      {
+       "formula": "5d10",
+       "type": "radiant"
+      }
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "end-turn"
+      ],
+      "oncePerTurn": true,
+      "types": [
+       "aberration",
+       "celestial",
+       "elemental",
+       "fey",
+       "fiend",
+       "undead"
+      ],
+      "noTeleport": true
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -9835,7 +10706,17 @@
    "somatic": true,
    "material": true,
    "materialText": "ruby dust worth 1,500+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "ruby dust",
+     "matches": [
+      "ruby"
+     ],
+     "costGp": 1500,
+     "consumed": true
+    }
+   ]
   },
   "duration": "1 hour",
   "concentration": true,
@@ -9908,6 +10789,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
    "grant": {
     "modifiers": [
@@ -10278,7 +11162,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a diamond worth 5,000+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "diamond",
+     "matches": [
+      "diamond"
+     ],
+     "costGp": 5000,
+     "consumed": false
+    }
+   ]
   },
   "duration": "1 minute",
   "concentration": true,
@@ -10331,6 +11225,18 @@
   },
   "duration": "30 days",
   "concentration": false,
+  "upcastDurations": [
+   {
+    "level": 7,
+    "duration": "365 days",
+    "concentration": false
+   },
+   {
+    "level": 9,
+    "duration": "until dispelled",
+    "concentration": false
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -10355,7 +11261,18 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "failureEffect": {
+    "name": "Geas",
+    "tags": [
+     "curse"
+    ],
+    "modifiers": []
+   },
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -10398,7 +11315,18 @@
    "somatic": true,
    "material": true,
    "materialText": "2 Copper Pieces, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "2 Copper Pieces",
+     "costGp": null,
+     "consumed": true,
+     "coins": {
+      "unit": "cp",
+      "amount": 2
+     }
+    }
+   ]
   },
   "duration": "10 days",
   "concentration": false,
@@ -10590,6 +11518,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "barrier",
+     "activation": "other",
+     "when": "A spell of level 5 or lower cast from outside the barrier can't affect anything within it.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 10,
+      "stays": true,
+      "wardsSpells": 5
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -10636,7 +11579,17 @@
    "somatic": true,
    "material": true,
    "materialText": "powdered diamond worth 200+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "powdered diamond",
+     "matches": [
+      "diamond"
+     ],
+     "costGp": 200,
+     "consumed": true
+    }
+   ]
   },
   "duration": "until dispelled or triggered",
   "concentration": false,
@@ -10660,6 +11613,41 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "damageTypes": [
+    "thunder",
+    "acid",
+    "cold",
+    "fire",
+    "lightning"
+   ],
+   "laterActions": [
+    {
+     "name": "explosive rune",
+     "activation": "other",
+     "when": "A creature that steps onto the glyph sets it off: each creature in the 20-foot-radius Sphere makes the save, and the spell ends.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "half",
+      "failureConditions": []
+     },
+     "damage": [
+      {
+       "formula": "5d8",
+       "type": "thunder"
+      }
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "spell-end"
+      ],
+      "around": "point",
+      "feet": 5,
+      "once": true,
+      "hidden": true
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -10806,7 +11794,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that enters the area or ends its turn there must also succeed on the save or fall Prone.",
+     "when": "A creature that enters the area or ends its turn there must also succeed on the save or fall Prone. The grease is Difficult Terrain.",
      "save": {
       "ability": "dex",
       "successDamage": "none",
@@ -10819,7 +11807,10 @@
       "on": [
        "enter",
        "end-turn"
-      ]
+      ],
+      "terrain": {
+       "cost": 2
+      }
      }
     }
    ],
@@ -10870,6 +11861,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
    "grant": {
     "modifiers": [],
@@ -10916,7 +11910,17 @@
    "somatic": true,
    "material": true,
    "materialText": "diamond dust worth 100+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "diamond dust",
+     "matches": [
+      "diamond"
+     ],
+     "costGp": 100,
+     "consumed": true
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -10936,6 +11940,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -11051,7 +12058,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a silver rod worth 10+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "silver rod",
+     "matches": [
+      "silver rod"
+     ],
+     "costGp": 10,
+     "consumed": false
+    }
+   ]
   },
   "duration": "24 hours",
   "concentration": false,
@@ -11122,6 +12139,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -11204,8 +12224,7 @@
     "target": "target",
     "onHit": true,
     "duration": {
-     "type": "rounds",
-     "rounds": 2
+     "type": "until-source-turn-end"
     }
    }
   },
@@ -11315,6 +12334,11 @@
    "damage": [],
    "healing": null
   },
+  "sight": {
+   "dispels": {
+    "kind": "fog"
+   }
+  },
   "classes": [
    "druid",
    "ranger",
@@ -11342,7 +12366,17 @@
    "somatic": true,
    "material": true,
    "materialText": "incense worth 1,000+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "incense",
+     "matches": [
+      "incense"
+     ],
+     "costGp": 1000,
+     "consumed": true
+    }
+   ]
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -11482,7 +12516,11 @@
      "type": "necrotic"
     }
    ],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "cleric"
@@ -11568,8 +12606,10 @@
      "type": "rounds",
      "rounds": 10
     },
+    "speedMultiplier": 2,
     "armorClassBonus": 2
-   }
+   },
+   "seenTargets": true
   },
   "classes": [
    "sorcerer",
@@ -11616,6 +12656,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": {
     "formula": "70",
     "addsModifier": false
@@ -11624,7 +12667,8 @@
     "blinded",
     "deafened",
     "poisoned"
-   ]
+   ],
+   "seenTargets": true
   },
   "classes": [
    "cleric",
@@ -11696,7 +12740,8 @@
    "healing": {
     "formula": "2d4",
     "addsModifier": true
-   }
+   },
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -11920,6 +12965,9 @@
      "type": "fire"
     }
    ],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
    "reaction": {
     "trigger": "damaged-by-creature",
@@ -12000,7 +13048,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a gem-encrusted bowl worth 1,000+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "gem-encrusted bowl",
+     "matches": [
+      "bowl"
+     ],
+     "costGp": 1000,
+     "consumed": true
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -12181,6 +13239,23 @@
   },
   "duration": "1 hour",
   "concentration": true,
+  "upcastDurations": [
+   {
+    "level": 2,
+    "duration": "4 hours",
+    "concentration": true
+   },
+   {
+    "level": 3,
+    "duration": "8 hours",
+    "concentration": true
+   },
+   {
+    "level": 5,
+    "duration": "24 hours",
+    "concentration": true
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -12209,6 +13284,9 @@
      "laterTurnsOnly": true
     }
    ],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
    "grant": {
     "modifiers": [
@@ -12232,13 +13310,15 @@
     "concentration": false,
     "name": "Hex",
     "tags": [
-     "hexed"
+     "hexed",
+     "curse"
     ],
     "target": "target",
     "duration": {
      "type": "manual"
     }
-   }
+   },
+   "seenTargets": true
   },
   "classes": [
    "warlock"
@@ -12345,7 +13425,8 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -12453,7 +13534,8 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -12538,7 +13620,11 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true,
+   "targetTypes": [
+    "humanoid"
+   ]
   },
   "classes": [
    "bard",
@@ -12612,7 +13698,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a reliquary worth 1,000+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "reliquary",
+     "matches": [
+      "reliquary"
+     ],
+     "costGp": 1000,
+     "consumed": false
+    }
+   ]
   },
   "duration": "1 minute",
   "concentration": true,
@@ -12636,7 +13732,53 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "laterActions": [
+    {
+     "name": "aura",
+     "activation": "other",
+     "when": "You and your allies in the aura have Advantage on saving throws, and attack rolls against them have Disadvantage; a Fiend or an Undead that hits one with a melee attack makes a Constitution save or is Blinded.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 30,
+      "affects": "allies",
+      "holds": {
+       "modifiers": [
+        {
+         "type": "roll-mode",
+         "roll": "save",
+         "mode": "advantage"
+        },
+        {
+         "type": "roll-mode",
+         "roll": "incoming-attack",
+         "mode": "disadvantage",
+         "when": [
+          {
+           "type": "on-attack-roll"
+          }
+         ]
+        }
+       ],
+       "struck": {
+        "creatureTypes": [
+         "fiend",
+         "undead"
+        ],
+        "save": {
+         "ability": "con",
+         "conditions": [
+          "blinded"
+         ]
+        }
+       }
+      }
+     }
+    }
+   ],
+   "healing": null,
+   "picksInArea": true
   },
   "classes": [
    "cleric"
@@ -12666,6 +13808,18 @@
   },
   "duration": "1 hour",
   "concentration": true,
+  "upcastDurations": [
+   {
+    "level": 3,
+    "duration": "8 hours",
+    "concentration": true
+   },
+   {
+    "level": 5,
+    "duration": "24 hours",
+    "concentration": true
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -12693,6 +13847,9 @@
      "movesGrant": true
     }
    ],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
    "grant": {
     "modifiers": [
@@ -12722,7 +13879,8 @@
     "duration": {
      "type": "manual"
     }
-   }
+   },
+   "seenTargets": true
   },
   "classes": [
    "ranger"
@@ -12829,6 +13987,9 @@
    "attacks": 0,
    "damage": [],
    "healing": null
+  },
+  "sight": {
+   "seenBy": "area"
   },
   "classes": [
    "bard",
@@ -13021,6 +14182,22 @@
      "type": "cold"
     }
    ],
+   "laterActions": [
+    {
+     "name": "ground",
+     "activation": "other",
+     "when": "Hailstones turn the ground in the Cylinder into Difficult Terrain until the end of your next turn.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "terrain": {
+       "cost": 2,
+       "kind": "ice"
+      },
+      "untilCasterNextTurnEnd": true
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -13080,7 +14257,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a pearl worth 100+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "pearl",
+     "matches": [
+      "pearl"
+     ],
+     "costGp": 100,
+     "consumed": false
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -13127,7 +14314,20 @@
    "somatic": true,
    "material": true,
    "materialText": "ink worth 10+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "ink",
+     "itemIds": [
+      "ink"
+     ],
+     "matches": [
+      "bottle of ink"
+     ],
+     "costGp": 10,
+     "consumed": true
+    }
+   ]
   },
   "duration": "10 days",
   "concentration": false,
@@ -13175,7 +14375,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a statuette of the target worth 5,000+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "statuette of the target",
+     "matches": [
+      "statuette"
+     ],
+     "costGp": 5000,
+     "consumed": false
+    }
+   ]
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -13199,7 +14409,18 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "failureEffect": {
+    "name": "Imprisoned",
+    "tags": [
+     "off-plane"
+    ],
+    "modifiers": []
+   },
+   "seenTargets": true
   },
   "classes": [
    "warlock",
@@ -13286,11 +14507,17 @@
        "enter",
        "end-turn"
       ],
-      "oncePerTurn": true
+      "oncePerTurn": true,
+      "drifts": 10
      }
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "area": {
+    "kind": "heavily-obscured"
+   }
   },
   "classes": [
    "druid",
@@ -13470,7 +14697,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that enters the area for the first time on a turn or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "when": "A creature that enters the area for the first time on a turn or ends its turn there makes the save. A creature makes this save only once per turn. The area is Difficult Terrain.",
      "save": {
       "ability": "con",
       "successDamage": "half",
@@ -13487,11 +14714,19 @@
        "enter",
        "end-turn"
       ],
-      "oncePerTurn": true
+      "oncePerTurn": true,
+      "terrain": {
+       "cost": 2
+      }
      }
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "area": {
+    "kind": "lightly-obscured"
+   }
   },
   "classes": [
    "cleric",
@@ -13544,7 +14779,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a sapphire worth 1,000+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "sapphire",
+     "matches": [
+      "sapphire"
+     ],
+     "costGp": 1000,
+     "consumed": false
+    }
+   ]
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -13730,7 +14975,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -13781,7 +15030,29 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "movement",
+      "rule": "leap",
+      "feet": 30,
+      "costFeet": 10
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Jump",
+    "tags": [
+     "jump"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "druid",
@@ -13907,7 +15178,26 @@
    "somatic": true,
    "material": true,
    "materialText": "incense worth 250+ GP, which the spell consumes, and four ivory strips worth 50+ GP each",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "incense",
+     "matches": [
+      "incense"
+     ],
+     "costGp": 250,
+     "consumed": true
+    },
+    {
+     "name": "ivory strips",
+     "matches": [
+      "ivory"
+     ],
+     "costGp": 50,
+     "consumed": false,
+     "count": 4
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -13975,6 +15265,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
    "endsConditions": [
     "blinded",
@@ -14036,7 +15329,18 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "failureEffect": {
+    "name": "Levitate",
+    "tags": [
+     "levitating"
+    ],
+    "modifiers": []
+   },
+   "seenTargets": true
   },
   "classes": [
    "sorcerer",
@@ -14084,6 +15388,13 @@
    "attacks": 0,
    "damage": [],
    "healing": null
+  },
+  "sight": {
+   "light": {
+    "on": "targets",
+    "brightFeet": 20,
+    "dimFeet": 20
+   }
   },
   "classes": [
    "bard",
@@ -14522,7 +15833,8 @@
     "target": "target",
     "duration": {
      "type": "manual"
-    }
+    },
+    "baseArmorClass": 13
    }
   },
   "classes": [
@@ -14599,10 +15911,53 @@
    "somatic": true,
    "material": true,
    "materialText": "salt and powdered silver worth 100+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "salt and powdered silver",
+     "matches": [
+      "powdered silver",
+      "silver dust"
+     ],
+     "costGp": 100,
+     "consumed": true
+    }
+   ]
   },
   "duration": "1 hour",
   "concentration": false,
+  "upcastDurations": [
+   {
+    "level": 4,
+    "duration": "2 hours",
+    "concentration": false
+   },
+   {
+    "level": 5,
+    "duration": "3 hours",
+    "concentration": false
+   },
+   {
+    "level": 6,
+    "duration": "4 hours",
+    "concentration": false
+   },
+   {
+    "level": 7,
+    "duration": "5 hours",
+    "concentration": false
+   },
+   {
+    "level": 8,
+    "duration": "6 hours",
+    "concentration": false
+   },
+   {
+    "level": 9,
+    "duration": "7 hours",
+    "concentration": false
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -14628,6 +15983,27 @@
    "attacks": 0,
    "damage": [],
    "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "barrier",
+     "activation": "other",
+     "when": "Celestials, Elementals, Fey, Fiends and Undead can't willingly enter the Cylinder.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "bars": {
+       "way": "in",
+       "types": [
+        "celestial",
+        "elemental",
+        "fey",
+        "fiend",
+        "undead"
+       ]
+      }
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -14694,7 +16070,19 @@
    "somatic": true,
    "material": true,
    "materialText": "a gem, crystal, or reliquary worth 500+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "gem, crystal or reliquary",
+     "matches": [
+      "gem",
+      "crystal",
+      "reliquary"
+     ],
+     "costGp": 500,
+     "consumed": false
+    }
+   ]
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -14772,7 +16160,8 @@
     }
    ],
    "darts": 3,
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "sorcerer",
@@ -14848,7 +16237,17 @@
    "somatic": true,
    "material": true,
    "materialText": "jade dust worth 10+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "jade dust",
+     "matches": [
+      "jade"
+     ],
+     "costGp": 10,
+     "consumed": true
+    }
+   ]
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -14987,7 +16386,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a miniature door worth 15+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "miniature door",
+     "matches": [
+      "miniature door"
+     ],
+     "costGp": 15,
+     "consumed": false
+    }
+   ]
   },
   "duration": "24 hours",
   "concentration": false,
@@ -15046,6 +16455,13 @@
   },
   "duration": "10 minutes",
   "concentration": true,
+  "upcastDurations": [
+   {
+    "level": 4,
+    "duration": "until dispelled",
+    "concentration": false
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -15170,7 +16586,8 @@
    "healing": {
     "formula": "5d8",
     "addsModifier": true
-   }
+   },
+   "picksInArea": true
   },
   "classes": [
    "bard",
@@ -15252,7 +16669,8 @@
     "blinded",
     "deafened",
     "poisoned"
-   ]
+   ],
+   "seenTargets": true
   },
   "classes": [
    "cleric"
@@ -15304,7 +16722,8 @@
    "healing": {
     "formula": "2d4",
     "addsModifier": true
-   }
+   },
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -15372,6 +16791,23 @@
   },
   "duration": "24 hours",
   "concentration": false,
+  "upcastDurations": [
+   {
+    "level": 7,
+    "duration": "10 days",
+    "concentration": false
+   },
+   {
+    "level": 8,
+    "duration": "30 days",
+    "concentration": false
+   },
+   {
+    "level": 9,
+    "duration": "366 days",
+    "concentration": false
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -15383,7 +16819,8 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "endsOnSourceSideDamage": true
   },
   "target": {
    "type": "creature",
@@ -15394,7 +16831,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 12
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -15461,7 +16902,26 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Maze",
+    "tags": [
+     "off-plane"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "rounds",
+     "rounds": 100
+    }
+   },
+   "seenTargets": true
   },
   "classes": [
    "wizard"
@@ -15607,6 +17067,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -15729,6 +17192,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -15787,7 +17253,11 @@
      "type": "psychic"
     }
    ],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "sorcerer",
@@ -16076,7 +17546,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "teleport": {
+    "feet": 30
+   }
   },
   "classes": [
    "sorcerer",
@@ -16132,7 +17605,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -16242,9 +17719,31 @@
       ],
       "oncePerTurn": true
      }
+    },
+    {
+     "name": "move",
+     "activation": "action",
+     "when": "On your later turns, a Magic action moves the Cylinder up to 60 feet; a creature it moves onto makes the save.",
+     "laterTurnsOnly": true,
+     "damage": [],
+     "area": {
+      "shape": "cylinder",
+      "sizeFeet": 5,
+      "widthFeet": null
+     },
+     "movesArea": {
+      "feet": 60
+     }
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "light": {
+    "on": "area",
+    "brightFeet": 0,
+    "dimFeet": 5
+   }
   },
   "classes": [
    "druid"
@@ -16365,7 +17864,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a pinch of diamond dust worth 25+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "diamond dust",
+     "matches": [
+      "diamond"
+     ],
+     "costGp": 25,
+     "consumed": true
+    }
+   ]
   },
   "duration": "8 hours",
   "concentration": false,
@@ -16385,6 +17894,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -16437,7 +17949,41 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "laterActions": [
+    {
+     "name": "aura",
+     "activation": "other",
+     "when": "You and your allies in the aura have a +10 bonus to Dexterity (Stealth) checks.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 30,
+      "affects": "allies",
+      "holds": {
+       "modifiers": [
+        {
+         "type": "check-bonus",
+         "amount": 10,
+         "when": [
+          {
+           "type": "on-ability-check"
+          },
+          {
+           "type": "skill-is",
+           "skills": [
+            "stealth"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    }
+   ],
+   "healing": null,
+   "picksInArea": true
   },
   "classes": [
    "druid",
@@ -16544,7 +18090,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -16587,7 +18137,8 @@
   "save": {
    "ability": "wis",
    "successDamage": "half",
-   "failureConditions": []
+   "failureConditions": [],
+   "repeatSave": true
   },
   "target": {
    "type": "creature",
@@ -16606,7 +18157,26 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Phantasmal Killer",
+    "tags": [
+     "phantasmal-killer"
+    ],
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "attack",
+      "mode": "disadvantage"
+     },
+     {
+      "type": "roll-mode",
+      "roll": "check",
+      "mode": "disadvantage"
+     }
+    ]
+   },
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -16756,10 +18326,43 @@
    "somatic": true,
    "material": true,
    "materialText": "a jewel worth 1,000+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "jewel",
+     "matches": [
+      "jewel",
+      "gem"
+     ],
+     "costGp": 1000,
+     "consumed": true
+    }
+   ]
   },
   "duration": "24 hours",
   "concentration": false,
+  "upcastDurations": [
+   {
+    "level": 6,
+    "duration": "10 days",
+    "concentration": false
+   },
+   {
+    "level": 7,
+    "duration": "30 days",
+    "concentration": false
+   },
+   {
+    "level": 8,
+    "duration": "180 days",
+    "concentration": false
+   },
+   {
+    "level": 9,
+    "duration": "366 days",
+    "concentration": false
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -16835,7 +18438,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a forked, metal rod worth 250+ GP and attuned to a plane of existence",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "forked metal rod",
+     "matches": [
+      "forked"
+     ],
+     "costGp": 250,
+     "consumed": false
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -16855,6 +18468,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 9
+   },
    "healing": null
   },
   "classes": [
@@ -16909,6 +18525,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "ground",
+     "activation": "other",
+     "when": "A creature moving through the overgrown area spends 4 feet of movement for every foot.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "terrain": {
+       "cost": 4,
+       "kind": "plants"
+      }
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -17043,7 +18674,8 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -17092,6 +18724,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": {
     "formula": "1",
     "addsModifier": false,
@@ -17103,7 +18738,8 @@
     "paralyzed",
     "poisoned",
     "stunned"
-   ]
+   ],
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -17152,7 +18788,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -17213,7 +18853,8 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -17493,6 +19134,13 @@
    "noCastSave": true,
    "healing": null
   },
+  "sight": {
+   "light": {
+    "on": "area",
+    "brightFeet": 100,
+    "dimFeet": 100
+   }
+  },
   "classes": [
    "bard",
    "wizard"
@@ -17636,6 +19284,13 @@
    ],
    "healing": null
   },
+  "sight": {
+   "light": {
+    "on": "caster",
+    "brightFeet": 20,
+    "dimFeet": 20
+   }
+  },
   "classes": [
    "druid"
   ],
@@ -17679,7 +19334,17 @@
    "somatic": true,
    "material": true,
    "materialText": "jade dust worth 25+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "jade dust",
+     "matches": [
+      "jade"
+     ],
+     "costGp": 25,
+     "consumed": false
+    }
+   ]
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -17734,7 +19399,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a statuette of yourself worth 5+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "statuette of yourself",
+     "matches": [
+      "statuette"
+     ],
+     "costGp": 5,
+     "consumed": false
+    }
+   ]
   },
   "duration": "1 day",
   "concentration": true,
@@ -17808,6 +19483,9 @@
     "lightning",
     "thunder"
    ],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
    "grant": {
     "modifiers": [],
@@ -17853,7 +19531,20 @@
    "somatic": true,
    "material": true,
    "materialText": "a flask of Holy Water worth 25+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "Holy Water",
+     "itemIds": [
+      "holy-water"
+     ],
+     "matches": [
+      "holy water"
+     ],
+     "costGp": 25,
+     "consumed": true
+    }
+   ]
   },
   "duration": "10 minutes",
   "concentration": true,
@@ -17873,6 +19564,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -17925,6 +19619,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
    "endsConditions": [
     "poisoned"
@@ -18050,7 +19747,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a diamond worth 500+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "diamond",
+     "matches": [
+      "diamond"
+     ],
+     "costGp": 500,
+     "consumed": true
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -18070,6 +19777,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -18122,6 +19832,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -18385,6 +20098,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": {
     "formula": "4d8 + 15",
     "addsModifier": false
@@ -18416,7 +20132,17 @@
    "somatic": true,
    "material": true,
    "materialText": "rare oils worth 1,000+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "rare oils",
+     "matches": [
+      "rare oil"
+     ],
+     "costGp": 1000,
+     "consumed": true
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -18436,7 +20162,13 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "targetTypes": [
+    "humanoid"
+   ]
   },
   "classes": [
    "druid"
@@ -18482,7 +20214,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "endsCurses": true
   },
   "classes": [
    "cleric",
@@ -18535,6 +20271,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -18581,6 +20320,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -18608,7 +20350,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a diamond worth 1,000+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "diamond",
+     "matches": [
+      "diamond"
+     ],
+     "costGp": 1000,
+     "consumed": true
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -18628,6 +20380,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -18711,7 +20466,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a diamond worth 300+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "diamond",
+     "matches": [
+      "diamond"
+     ],
+     "costGp": 300,
+     "consumed": true
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -18731,6 +20496,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -18841,7 +20609,8 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "cleric"
@@ -18911,6 +20680,9 @@
    "attacks": 0,
    "damage": [],
    "noCastSave": true,
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -19038,7 +20810,19 @@
    "somatic": true,
    "material": true,
    "materialText": "a focus worth 1,000+ GP, such as a crystal ball, mirror, or water-filled font",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "crystal ball, mirror or font",
+     "matches": [
+      "crystal ball",
+      "mirror",
+      "font"
+     ],
+     "costGp": 1000,
+     "consumed": false
+    }
+   ]
   },
   "duration": "10 minutes",
   "concentration": true,
@@ -19062,6 +20846,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -19199,7 +20986,25 @@
    "somatic": true,
    "material": true,
    "materialText": "a chest, 3 feet by 2 feet by 2 feet, constructed from rare materials worth 5,000+ GP, and a Tiny replica of the chest made from the same materials worth 50+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "chest of rare materials",
+     "matches": [
+      "chest"
+     ],
+     "costGp": 5000,
+     "consumed": false
+    },
+    {
+     "name": "Tiny replica of the chest",
+     "matches": [
+      "replica"
+     ],
+     "costGp": 50,
+     "consumed": false
+    }
+   ]
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -19265,7 +21070,27 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "sense",
+      "sense": "see-invisibility",
+      "feet": 0
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "See Invisibility",
+    "tags": [
+     "see-invisibility"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -19317,7 +21142,8 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -19365,6 +21191,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -19393,7 +21222,17 @@
    "somatic": true,
    "material": true,
    "materialText": "gem dust worth 5,000+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "gem dust",
+     "matches": [
+      "gem"
+     ],
+     "costGp": 5000,
+     "consumed": true
+    }
+   ]
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -19413,6 +21252,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -19439,7 +21281,17 @@
    "somatic": true,
    "material": true,
    "materialText": "a jade circlet worth 1,500+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "jade circlet",
+     "matches": [
+      "circlet"
+     ],
+     "costGp": 1500,
+     "consumed": false
+    }
+   ]
   },
   "duration": "1 hour",
   "concentration": true,
@@ -20000,7 +21852,24 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "laterActions": [
+    {
+     "name": "aura",
+     "activation": "other",
+     "when": "A creature inside the Sphere has the Deafened condition.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "holds": {
+       "conditions": [
+        "deafened"
+       ]
+      }
+     }
+    }
+   ],
+   "healing": null,
+   "silencesArea": true
   },
   "classes": [
    "bard",
@@ -20084,7 +21953,17 @@
    "somatic": true,
    "material": true,
    "materialText": "powdered ruby worth 1,500+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "powdered ruby",
+     "matches": [
+      "ruby"
+     ],
+     "costGp": 1500,
+     "consumed": true
+    }
+   ]
   },
   "duration": "until dispelled",
   "concentration": false,
@@ -20104,7 +21983,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "targetTypes": [
+    "beast",
+    "humanoid"
+   ]
   },
   "classes": [
    "wizard"
@@ -20168,7 +22051,8 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "picksInArea": true
   },
   "classes": [
    "bard",
@@ -20211,7 +22095,8 @@
    "successDamage": "none",
    "failureConditions": [
     "prone"
-   ]
+   ],
+   "breaksConcentration": true
   },
   "target": {
    "type": "creature",
@@ -20231,24 +22116,34 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration.",
+     "when": "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration. The ground is Difficult Terrain.",
      "save": {
       "ability": "dex",
       "successDamage": "none",
       "failureConditions": [
        "prone"
-      ]
+      ],
+      "breaksConcentration": true
      },
      "damage": [],
      "zone": {
       "on": [
        "enter",
        "start-turn"
-      ]
+      ],
+      "terrain": {
+       "cost": 2,
+       "kind": "ice"
+      }
      }
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "area": {
+    "kind": "heavily-obscured"
+   }
   },
   "classes": [
    "druid",
@@ -20309,6 +22204,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 6
+   },
    "healing": null,
    "failureEffect": {
     "name": "Slow",
@@ -20335,7 +22233,8 @@
       ]
      }
     ]
-   }
+   },
+   "picksInArea": true
   },
   "classes": [
    "bard",
@@ -20466,7 +22365,12 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "stabilizes": true,
+   "rangeDoubles": true
   },
   "classes": [
    "cleric",
@@ -20810,7 +22714,7 @@
     {
      "name": "spikes",
      "activation": "other",
-     "when": "A creature that moves into or within the area takes the damage for every 5 feet it travels.",
+     "when": "A creature that moves into or within the area takes the damage for every 5 feet it travels. The area is Difficult Terrain.",
      "damage": [
       {
        "formula": "2d4",
@@ -20820,7 +22724,11 @@
      "zone": {
       "on": [
        "travel"
-      ]
+      ],
+      "terrain": {
+       "cost": 2,
+       "kind": "plants"
+      }
      }
     }
    ],
@@ -21144,6 +23052,10 @@
     "onHit": true,
     "duration": {
      "type": "until-source-turn-end"
+    },
+    "light": {
+     "brightFeet": 0,
+     "dimFeet": 10
     }
    }
   },
@@ -21251,6 +23163,11 @@
    ],
    "healing": null
   },
+  "sight": {
+   "area": {
+    "kind": "heavily-obscured"
+   }
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -21325,7 +23242,17 @@
    "somatic": true,
    "material": true,
    "materialText": "diamond dust worth 100+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "diamond dust",
+     "matches": [
+      "diamond"
+     ],
+     "costGp": 100,
+     "consumed": true
+    }
+   ]
   },
   "duration": "1 hour",
   "concentration": true,
@@ -21347,6 +23274,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
    "grant": {
     "modifiers": [
@@ -21423,7 +23353,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "cylinder",
+   "sizeFeet": 300,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [
@@ -21432,7 +23366,8 @@
      "type": "thunder"
     }
    ],
-   "healing": null
+   "healing": null,
+   "persistsWithoutTargets": true
   },
   "classes": [
    "druid"
@@ -21473,7 +23408,8 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "endsOnSourceSideDamage": true
   },
   "target": {
    "type": "creature",
@@ -21487,7 +23423,8 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -21516,7 +23453,17 @@
    "somatic": true,
    "material": true,
    "materialText": "an object with the image of a dragon engraved on it worth 500+ GP",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "object engraved with a dragon",
+     "matches": [
+      "dragon"
+     ],
+     "costGp": 500,
+     "consumed": false
+    }
+   ]
   },
   "duration": "1 hour",
   "concentration": true,
@@ -21657,6 +23604,14 @@
    ],
    "healing": null
   },
+  "sight": {
+   "light": {
+    "on": "caster",
+    "brightFeet": 30,
+    "dimFeet": 30,
+    "sunlight": true
+   }
+  },
   "classes": [
    "cleric",
    "druid",
@@ -21732,6 +23687,11 @@
    ],
    "healing": null
   },
+  "sight": {
+   "dispels": {
+    "kind": "darkness"
+   }
+  },
   "classes": [
    "cleric",
    "druid",
@@ -21759,7 +23719,17 @@
    "somatic": true,
    "material": true,
    "materialText": "powdered diamond worth 1,000+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "powdered diamond",
+     "matches": [
+      "diamond"
+     ],
+     "costGp": 1000,
+     "consumed": true
+    }
+   ]
   },
   "duration": "until dispelled or triggered",
   "concentration": false,
@@ -21840,7 +23810,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "sorcerer",
@@ -21887,6 +23861,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 8
+   },
    "healing": null
   },
   "classes": [
@@ -21934,7 +23911,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 9
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -21962,7 +23943,17 @@
    "somatic": false,
    "material": true,
    "materialText": "rare inks worth 50+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "rare inks",
+     "matches": [
+      "rare ink"
+     ],
+     "costGp": 50,
+     "consumed": true
+    }
+   ]
   },
   "duration": "1 round",
   "concentration": false,
@@ -22299,6 +24290,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -22446,7 +24440,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "seenTargets": true
   },
   "classes": [
    "bard",
@@ -22474,7 +24472,17 @@
    "somatic": true,
    "material": true,
    "materialText": "diamonds worth 25,000+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "diamonds",
+     "matches": [
+      "diamond"
+     ],
+     "costGp": 25000,
+     "consumed": true
+    }
+   ]
   },
   "duration": "instantaneous",
   "concentration": false,
@@ -22494,6 +24502,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -22521,7 +24532,17 @@
    "somatic": true,
    "material": true,
    "materialText": "mushroom powder worth 25+ GP, which the spell consumes",
-   "materialConsumed": true
+   "materialConsumed": true,
+   "costly": [
+    {
+     "name": "mushroom powder",
+     "matches": [
+      "mushroom"
+     ],
+     "costGp": 25,
+     "consumed": true
+    }
+   ]
   },
   "duration": "1 hour",
   "concentration": false,
@@ -22541,7 +24562,30 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "sense",
+      "sense": "truesight",
+      "feet": 120
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "True Seeing",
+    "tags": [
+     "true-seeing"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -22663,7 +24707,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "line",
+   "sizeFeet": 300,
+   "widthFeet": 50
+  },
   "effect": {
    "attacks": 0,
    "damage": [
@@ -22677,7 +24725,7 @@
   "classes": [
    "druid"
   ],
-  "description": "A wall of water springs into existence at a point you choose within range. You can make the wall up to 300 feet long, 300 feet high, and 50 feet thick. The wall lasts for the duration. When the wall appears, each creature in its area makes a Strength saving throw, taking 6d10 Bludgeoning damage on a failed save or half as much damage on a successful one. At the start of each of your turns after the wall appears, the wall, along with any creatures in it, moves 50 feet away from you. Any Huge or smaller creature inside the wall or whose space the wall enters when it moves must succeed on a Strength saving throw or take 5d10 Bludgeoning damage. A creature can take this damage only once per round. At the end of the turn, the wall's height is reduced by 50 feet, and the damage the wall deals on later rounds is reduced by 1d10. When the wall reaches 0 feet in height, the spell ends. A creature caught in the wall can move by swimming. Because of the wave's force, though, the creature must succeed on a Strength (Athletics) check against your spell save DC to move at all. If it fails the check, it can't move. A creature that moves out of the wall falls to the ground. ### U-Z Spells",
+  "description": "A wall of water springs into existence at a point you choose within range. You can make the wall up to 300 feet long, 300 feet high, and 50 feet thick. The wall lasts for the duration.\n\nWhen the wall appears, each creature in its area makes a Strength saving throw, taking 6d10 Bludgeoning damage on a failed save or half as much damage on a successful one.\n\nAt the start of each of your turns after the wall appears, the wall, along with any creatures in it, moves 50 feet away from you. Any Huge or smaller creature inside the wall or whose space the wall enters when it moves must succeed on a Strength saving throw or take 5d10 Bludgeoning damage. A creature can take this damage only once per round. At the end of the turn, the wall's height is reduced by 50 feet, and the damage the wall deals on later rounds is reduced by 1d10. When the wall reaches 0 feet in height, the spell ends.\n\nA creature caught in the wall can move by swimming. Because of the wave's force, though, the creature must succeed on a Strength (Athletics) check against your spell save DC to move at all. If it fails the check, it can't move. A creature that moves out of the wall falls to the ground.",
   "higherLevel": null,
   "castingOptions": []
  },
@@ -23263,9 +25311,9 @@
   },
   "shape": null,
   "area": {
-   "shape": "cube",
-   "sizeFeet": 10,
-   "widthFeet": null
+   "shape": "line",
+   "sizeFeet": 100,
+   "widthFeet": 5
   },
   "effect": {
    "attacks": 0,
@@ -23414,7 +25462,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that enters a space in the wall for the first time on a turn or ends its turn there makes the save. A creature makes this save only once per turn.",
+     "when": "A creature that enters a space in the wall for the first time on a turn or ends its turn there makes the save. A creature makes this save only once per turn. Moving through the wall costs 4 feet for every foot.",
      "save": {
       "ability": "dex",
       "successDamage": "half",
@@ -23431,7 +25479,11 @@
        "enter",
        "end-turn"
       ],
-      "oncePerTurn": true
+      "oncePerTurn": true,
+      "terrain": {
+       "cost": 4,
+       "kind": "plants"
+      }
      }
     }
    ],
@@ -23480,7 +25532,18 @@
    "somatic": true,
    "material": true,
    "materialText": "a pair of platinum rings worth 50+ GP each, which you and the target must wear for the duration",
-   "materialConsumed": false
+   "materialConsumed": false,
+   "costly": [
+    {
+     "name": "platinum rings",
+     "matches": [
+      "platinum ring"
+     ],
+     "costGp": 50,
+     "consumed": false,
+     "count": 2
+    }
+   ]
   },
   "duration": "1 hour",
   "concentration": false,
@@ -23500,6 +25563,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null
   },
   "classes": [
@@ -23547,6 +25613,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 10
+   },
    "healing": null
   },
   "classes": [
@@ -23596,6 +25665,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 10
+   },
    "healing": null
   },
   "classes": [
@@ -23666,7 +25738,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action.",
+     "when": "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action. The webs are Difficult Terrain.",
      "save": {
       "ability": "dex",
       "successDamage": "none",
@@ -23679,11 +25751,20 @@
       "on": [
        "enter",
        "start-turn"
-      ]
+      ],
+      "terrain": {
+       "cost": 2,
+       "kind": "webs"
+      }
      }
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "area": {
+    "kind": "lightly-obscured"
+   }
   },
   "classes": [
    "sorcerer",
@@ -23752,7 +25833,8 @@
      "type": "psychic"
     }
    ],
-   "healing": null
+   "healing": null,
+   "picksInArea": true
   },
   "classes": [
    "warlock",
@@ -23801,6 +25883,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 11
+   },
    "healing": null
   },
   "classes": [
@@ -23849,7 +25934,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "line",
+   "sizeFeet": 50,
+   "widthFeet": 5
+  },
   "effect": {
    "attacks": 0,
    "damage": [
@@ -23954,6 +26043,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 6
+   },
    "healing": null
   },
   "classes": [

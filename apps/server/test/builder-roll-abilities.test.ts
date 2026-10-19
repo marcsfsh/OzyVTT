@@ -182,9 +182,10 @@ describe("a player's rolled dice are the table's", () => {
       payload: { baseScores: assigned(roll.scores) }
     });
 
-    // Levelling up re-sends the values the sheet recorded, in any order, with no new roll; other values need one.
-    const levelFour = (baseScores: Record<string, number>) =>
-      post(base, GAME_PATHS.characterRebuild.replace("{actorId}", actorId), playerToken, {
+    // Levelling up re-sends the values the sheet recorded with no new roll; other values need one. Putting the same
+    // six in another order is a respec, which only the GM makes.
+    const levelFour = (baseScores: Record<string, number>, token = playerToken) =>
+      post(base, GAME_PATHS.characterRebuild.replace("{actorId}", actorId), token, {
         ...fighterCreate({ level: 4, baseScores }),
         name: undefined,
         actorId,
@@ -203,13 +204,18 @@ describe("a player's rolled dice are the table's", () => {
     const raised = assigned(roll.scores.map((score: number) => (score === 18 ? 3 : score + 1)));
     expect((await levelFour(raised)).status).toBe(409);
     const swapped = assigned(roll.scores);
-    [swapped.str, swapped.dex] = [swapped.dex, swapped.str];
+    // Strength trades with an ability that rolled another number, so the order really changes.
+    const other = (["dex", "con", "int", "wis", "cha"] as const).find((ability) => swapped[ability] !== swapped.str);
+    [swapped.str, swapped[other ?? "dex"]] = [swapped[other ?? "dex"], swapped.str];
     // ...even once the GM stops allowing rolled scores for new characters.
     await post(base, GAME_PATHS.builderPolicy, gmToken, {
       commandId: randomUUID(),
       allowedAbilityMethods: ["standard-array"]
     });
-    expect((await levelFour(swapped)).status).toBe(200);
+    const reordered = await levelFour(swapped);
+    expect(reordered.status).toBe(409);
+    expect((await reordered.json()).error.details.reason).toBe("level_up_limit");
+    expect((await levelFour(swapped, gmToken)).status).toBe(200);
   });
 
   it("lets a sheet that recorded no scores re-send the ones its totals imply, and nothing else", async () => {

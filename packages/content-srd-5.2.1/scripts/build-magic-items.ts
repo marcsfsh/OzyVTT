@@ -442,7 +442,7 @@ function armorBaseIds(entry: Entry, qualifier: string): readonly string[] {
 /**
  * Rows not bound even though they name a base: the SRD prints them as more than their base (Sun
  * Blade's radiant blade, Energy Bow's force damage), and a bare-base bind would derive a wrong attack.
- * Unbound until weapon-swing overrides exist.
+ * The Sun Blade carries its own block instead (`WIELDED_AS`); the Energy Bow stays unbound.
  */
 const RESERVED_UNBINDABLE = new Set(["sun-blade", "energy-bow"]);
 
@@ -468,6 +468,41 @@ function appliesToOf(entry: Entry, type: TypeLine, slotId: string): ItemAppliesT
     return { label: type.qualifier, baseIds: [...armorBaseIds(entry, type.qualifier)] };
   }
   return null;
+}
+
+/**
+ * Rows that are a weapon of their own and no template: a staff "can be wielded as a magic Quarterstaff", the Rod of
+ * Lordly Might "functions as a magic Mace", and the Sun Blade's blade "functions as a Longsword with the Finesse
+ * property" that deals Radiant damage. Each carries its base's block, with what its text changes, so it swings.
+ */
+const WIELDED_AS: Readonly<Record<string, Readonly<{ base: string; damageType?: string; addProperties?: string[] }>>> =
+  {
+    "staff-of-power": { base: "quarterstaff" },
+    "staff-of-striking": { base: "quarterstaff" },
+    "staff-of-the-magi": { base: "quarterstaff" },
+    "staff-of-the-woodlands": { base: "quarterstaff" },
+    "staff-of-thunder-and-lightning": { base: "quarterstaff" },
+    "staff-of-withering": { base: "quarterstaff" },
+    "rod-of-lordly-might": { base: "mace" },
+    "sun-blade": { base: "longsword", damageType: "radiant", addProperties: ["finesse"] }
+  };
+
+function wieldedAs(id: string): EquipmentReference["weapon"] {
+  const form = WIELDED_AS[id];
+  if (!form) return null;
+  const base = BASE_WEAPONS.find((weapon) => weapon.id === form.base);
+  if (!base) return die(`${id} is wielded as "${form.base}", which weapons.v1.json does not carry.`);
+  return {
+    category: base.category,
+    damageDice: base.damage.dice,
+    damageType: form.damageType ?? base.damage.type,
+    rangeFeet: base.rangeFeet,
+    longRangeFeet: base.longRangeFeet,
+    ...(base.melee !== undefined ? { melee: base.melee } : {}),
+    ...(base.versatileDice !== undefined ? { versatileDice: base.versatileDice } : {}),
+    mastery: base.mastery,
+    properties: [...new Set([...(base.properties ?? []), ...(form.addProperties ?? [])])]
+  };
 }
 
 // ---- 6. Emit ------------------------------------------------------------------------------------
@@ -523,7 +558,7 @@ for (const entry of items) {
         costGp: null,
         weightLb: null,
         description: description.text,
-        weapon: null,
+        weapon: wieldedAs(slug(tier.name)),
         armor: slotId === "shield" ? SHIELD_ARMOR : null,
         appliesTo,
         isMagic: true,

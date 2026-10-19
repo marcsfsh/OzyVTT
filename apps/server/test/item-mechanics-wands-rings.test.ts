@@ -388,7 +388,9 @@ describe("a staff's resistance and its shared charge pool", () => {
     );
     expect(actor.actionUses["staff-of-charming-charges"]).toBe(10);
     // The last charge rolls a d20; on a 1 the staff's own text decides, so the GM is told.
-    expect(last.warnings?.[0]).toMatch(/^Staff of Charming's last charge is spent and the d20 shows 1/);
+    expect(last.warnings).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^Staff of Charming's last charge is spent and the d20 shows 1/)])
+    );
 
     newTurn(state);
     // A different cast on the same pool is refused too: one pool.
@@ -532,11 +534,13 @@ describe("the two entries that cast nothing and keep the rest", () => {
     expect(saveTotalFor(definition, state.actors[0], "dex", derivation)).toBe(4);
     // Both casts were removed, so the 20-charge pool has nothing drawing on it.
     expect(view.equipmentRecord("staff-of-power")!.casts).toEqual([]);
+    // What it does is swing as a magic Quarterstaff, in one hand or two.
     expect(
-      effectiveActions(definition, state.actors[0], catalog).filter((entry) =>
-        entry.id.startsWith("item-staff-of-power-")
-      )
-    ).toEqual([]);
+      effectiveActions(definition, state.actors[0], catalog)
+        .filter((entry) => entry.id.startsWith("item-staff-of-power"))
+        .map((entry) => entry.id)
+        .sort()
+    ).toEqual(["item-staff-of-power", "item-staff-of-power-two-handed"]);
   });
 
   it("leaves Staff of the Magi four at-will casts and Ring of Shooting Stars its two cantrips and its own action", () => {
@@ -555,7 +559,7 @@ describe("the two entries that cast nothing and keep the rest", () => {
     );
     expect(
       effectiveActions(definition, magi.actors[0], catalog)
-        .filter((entry) => entry.id.startsWith("item-staff-of-the-magi-"))
+        .filter((entry) => entry.id.startsWith("item-staff-of-the-magi-cast-"))
         .map((entry) => entry.id)
         .sort()
     ).toEqual([
@@ -616,7 +620,8 @@ describe("the two entries that cast nothing and keep the rest", () => {
       ability: "wis",
       dc: 13,
       successDamage: "none",
-      failureConditions: ["charmed"]
+      failureConditions: ["charmed"],
+      endsOnSourceSideDamage: true
     });
     expect(dcOf("fear")).toEqual({ ability: "wis", dc: 13, successDamage: "none", failureConditions: ["frightened"] });
     // Speak with Animals forces no save, so a `saveDc` would have no reader.

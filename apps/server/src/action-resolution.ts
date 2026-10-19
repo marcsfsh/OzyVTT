@@ -5,6 +5,7 @@ import {
   type ActionResolution,
   type GameState
 } from "@vtt/domain";
+import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { ActorDefinition, SaveCondition } from "@vtt/schemas";
 import { conditionChoicesOf } from "./item-actions.js";
 import { BUILTIN_TARGETING } from "./builtin-actions.js";
@@ -18,7 +19,9 @@ import { consumableRowFor } from "./consumables.js";
 import {
   rollAttack,
   spendDistraction,
+  spendForgoneDeclaration,
   spendSteadyAim,
+  spendSundering,
   spendUntilAttacked,
   spendUntilItActs,
   spendUntilOwnAttack
@@ -35,9 +38,13 @@ import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
+import { applyMovementGrants } from "./resolution/movement-grants.js";
+import { applyTimeStop } from "./time-stop.js";
+import { applySpellEndings } from "./resolution/dispel.js";
 import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
+import { stabilizeOnCast } from "./resolution/stabilize.js";
 import {
   recordAttackRoll,
   recordCleaveOpening,
@@ -47,21 +54,34 @@ import {
 import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
-import { markMultiattackDefense, strikeBackOnHit } from "./resolution/struck.js";
+import { endTargetMarks } from "./resolution/action-targets.js";
+import { markMultiattackDefense, strikeBackFromEffects, strikeBackOnHit } from "./resolution/struck.js";
 import {
   parkActionSave,
   parkBurstSave,
   parkForAcReaction,
+  parkForRollAnswer,
   parkHeldObjectSave,
   parkReaction
 } from "./resolution/pending.js";
-import { markCastTurn, markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
+import {
+  markCastTurn,
+  markSpellUp,
+  openActionZone,
+  openSpellZone,
+  startConcentration
+} from "./resolution/concentration.js";
+import { parkForCounterspell } from "./resolution/counter.js";
+import { placeCastSight } from "./resolution/cast-sight.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
 import { holdReadiedSpell } from "./resolution/ready.js";
+import { checkKnockOut, knockOutOffered, knocksOut } from "./resolution/knock-out.js";
 import { healLimit } from "./loose-healing.js";
 import { passiveOf, unavailableReason } from "./availability-reasons.js";
+import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-casting.js";
+import { shapedAction, shapedOutcome, shapingInForce, shapingOffers, withShapedSpell } from "./resolution/metamagic.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -74,17 +94,42 @@ export type { ResolveDependencies, ResolveInput };
  */
 export function resolveDefinitionAction(
   state: GameState,
-  action: DefinitionAction,
-  input: ResolveInput,
-  deps: ResolveDependencies
+  declared: DefinitionAction,
+  declaredInput: ResolveInput,
+  declaredDeps: ResolveDependencies
 ): ActionResolution {
-  const ctx = openResolve(state, action, input, deps);
+  const printed = declared.spellId ? declaredDeps.catalog?.spellRecord?.(declared.spellId) : undefined;
+  // A spell of a minute or more cast in a fight takes the action on each of its caster's turns, and resolves on the
+  // last with the targets, slot and shaping picked on the first.
+  const longCast = longCastStepOf(state, declared, declaredInput, printed);
+  // How its caster shapes the cast (Metamagic): every step reads the spell and the action as shaped.
+  const stepped = longCast?.input ?? declaredInput;
+  const { shaping: _sent, ...stepInput } = stepped;
+  const shaping = shapingInForce(state, declared, stepped);
+  const input: ResolveInput = shaping.length > 0 ? { ...stepInput, shaping } : stepInput;
+  const deps = withShapedSpell(declaredDeps, declared.spellId, shaping);
+  const ctx = openResolve(state, shapedAction(declared, shaping), input, deps);
+  // Checked against the spell as printed, Transmuted Spell's type and Extended Spell's durations land on what it does.
+  ctx.action = shapedOutcome(ctx.action, printed, shaping, ctx.plan.castLevel);
   ctx.builtin?.check?.(ctx);
   ctx.builtin?.apply?.(ctx);
+  if (longCast && longCast.phase !== "finish") {
+    stepLongCast(ctx, longCast);
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  if (longCast) finishLongCast(ctx);
   // A readied spell is cast now and held: its slot and the action are spent, and nothing else happens yet.
   if (input.ready === true) {
     holdReadiedSpell(ctx);
     commitEconomy(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // The action's move taken before the rest of it: its cost is spent and the move granted, and the rest waits.
+  if (input.moveFirst === true) {
+    commitEconomy(ctx);
+    applyMovementGrants(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
   // A failed check to read a scroll spends the cast and the scroll, and nothing else happens.
@@ -93,12 +138,29 @@ export function resolveDefinitionAction(
     useUpConsumable(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
+  // Spread Caltrops or a set trap acts on whoever meets it later, so nothing is rolled now.
+  if (openActionZone(ctx)) {
+    commitEconomy(ctx);
+    useUpConsumable(ctx);
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   // A spell that Slow's chance makes fail spends its slot and its action, and nothing else happens.
   if (slowedSpellFails(ctx)) {
     commitEconomy(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
+  // A cast a Counterspell may stop waits before anything of it happens: its action is spent and it was seen cast, but
+  // its slot, its limited use and the materials it consumes wait to see whether it goes ahead.
+  if (parkForCounterspell(ctx)) {
+    commitEconomy({ ...ctx, plan: { ...ctx.plan, spendSpellSlot: null, spendUse: null, componentSpends: [] } });
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
+  }
   rollAttack(ctx);
+  checkKnockOut(ctx);
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
   if (ctx.attack !== null && input.commit === false) return previewOf(ctx);
@@ -111,9 +173,11 @@ export function resolveDefinitionAction(
     spendUntilAttacked(ctx);
     spendUntilOwnAttack(ctx);
     spendSteadyAim(ctx);
+    spendForgoneDeclaration(ctx);
   }
-  // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
-  if (parkForAcReaction(ctx)) {
+  // A roll another creature may still answer (Cutting Words), or a hit the target's Parry or Shield may still turn into
+  // a miss: the attack is spent, and the answer finishes it.
+  if (parkForRollAnswer(ctx) || parkForAcReaction(ctx)) {
     commitEconomy(ctx);
     rollLastCharge(ctx);
     spendAmmunition(ctx);
@@ -126,6 +190,7 @@ export function resolveDefinitionAction(
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
 
+  spendSundering(ctx);
   rollWeaponDamage(ctx);
   ctx.masterySwing = masterySwingOf(ctx);
   // Graze fires on a miss, when no other damage rolled.
@@ -138,19 +203,26 @@ export function resolveDefinitionAction(
 
   applyOnHitEffects(ctx);
   strikeBackOnHit(ctx);
+  strikeBackFromEffects(ctx);
   markMultiattackDefense(ctx);
   applyMasteryForces(ctx);
   startConcentration(ctx);
   markSpellUp(ctx);
   markCastTurn(ctx);
   openSpellZone(ctx);
+  applyMovementGrants(ctx);
+  applyTimeStop(ctx);
   applyGrant(ctx);
+  placeCastSight(ctx);
   applyHealing(ctx);
   applyConditionCures(ctx);
+  applySpellEndings(ctx);
+  stabilizeOnCast(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
   parkActionSave(ctx);
+  endTargetMarks(ctx);
   parkBurstSave(ctx);
   parkHeldObjectSave(ctx);
   applyRageRules(ctx);
@@ -190,7 +262,8 @@ function previewOf(ctx: ResolveContext): ActionResolution {
     overridden: ctx.overridden,
     push: offeredPush(ctx),
     preview: true,
-    ...withOffers(hitOffersOf(ctx))
+    ...withOffers(hitOffersOf(ctx)),
+    ...(knockOutOffered(ctx) ? { knockOut: "offered" as const } : {})
   };
 }
 
@@ -252,7 +325,8 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
     ...(ctx.effectsEnded.length > 0 ? { effectsEnded: ctx.effectsEnded.map((ended) => toldEnded(ctx, ended)) } : {}),
     ...(ctx.healing ? { healing: ctx.healing } : {}),
     ...(ctx.opens ? { opens: ctx.opens } : {}),
-    ...(damageTargets ? { damageTargets } : {})
+    ...(damageTargets ? { damageTargets } : {}),
+    ...(knocksOut(ctx) ? { knockOut: "chosen" as const } : {})
   };
 }
 
@@ -307,6 +381,7 @@ export function actionAvailability(
     }
     const reason = unavailableReason(evaluation.violations, { state, attacker, action, siblings, spell });
     const passive = passiveOf(action, builtin);
+    const shaping = builtin ? undefined : shapingOffers(state, attacker, action, spell, definition, siblings);
     return {
       id: action.id,
       name: action.name,
@@ -316,16 +391,19 @@ export function actionAvailability(
       // The sheet's one sentence for why not; the violations keep the full account.
       ...(reason !== undefined ? { reason } : {}),
       ...(passive !== undefined ? { passive } : {}),
+      ...(shaping !== undefined ? { shaping } : {}),
       usesRemaining,
       componentsRemaining,
       ...(builtin ? { builtin: true } : {}),
-      ...(hitRiderOf(action) ? { ridesAHit: true as const } : {}),
+      // A rider tapped before its roll (Brutal Strike) stays on the turn list.
+      ...(hitRiderOf(action) && !hitRiderOf(action)!.declaredBeforeRoll ? { ridesAHit: true as const } : {}),
       // Display values only (ADR-0007), from the effective list; resolution recomputes from the id.
       description: action.description,
       attackBonus: action.attack?.bonus ?? null,
       reachFeet: action.attack?.reachFeet ?? null,
       rangeFeet: action.attack?.rangeFeet ?? null,
       rangeNormalFeet: action.attack?.rangeNormalFeet ?? null,
+      ...(action.targets?.rangeFeet !== undefined ? { targetRangeFeet: action.targets.rangeFeet } : {}),
       attackCount: action.attack?.count ?? null,
       saveAbility: action.save?.ability ?? null,
       saveDc: action.save?.dc ?? null,
@@ -351,7 +429,7 @@ export function actionAvailability(
       // A builtin says what the stat block's action list says of it (Help picks one creature, Dodge none).
       targeting: builtin
         ? (BUILTIN_TARGETING[action.id] ?? "none")
-        : tapTargeting(action, consumableRowFor(action, attacker.inventory, catalog) !== null),
+        : tapTargeting(action, consumableRowFor(action, attacker.inventory, catalog) !== null, spell),
       // A spell cast from an item picks as the spell's own cast does: darts by target, the type to deal.
       darts: action.darts ?? null,
       damageTypes: action.damageTypes ? [...action.damageTypes] : null,
@@ -367,13 +445,27 @@ export function actionAvailability(
 /** Who a tap of this action picks, as the resolver will take it: one creature for an attack, a grant aimed at a
  *  target or a heal (a potion: the drinker); several for a save, damage with no attack roll, a grant on each
  *  creature it targets (a scroll of Bless) or a divided heal; none for what acts on its user (a self heal, Rage, a
- *  scroll of Detect Magic). Null for an action with nothing structured to resolve. */
-function tapTargeting(action: DefinitionAction, usesUpItem: boolean): "none" | "single" | "multi" | null {
-  if (action.attack || action.grants?.target === "target") return "single";
+ *  scroll of Detect Magic). A spell that rolls nothing picks the creatures it names (Guidance's one), else none (Light).
+ *  Null for an action with nothing structured to resolve. */
+function tapTargeting(
+  action: DefinitionAction,
+  usesUpItem: boolean,
+  spell: SpellReference | undefined
+): "none" | "single" | "multi" | null {
+  if (action.attack || action.grants?.target === "target" || action.targets?.count === 1) return "single";
   if (action.save || action.damage.length > 0 || action.grants?.target === "targets") return "multi";
   if (action.healing) return action.healing.self ? "none" : action.healing.divided ? "multi" : "single";
+  // A touch that ends a condition picks who it touches (Lesser Restoration).
+  if (action.endsConditions) return "single";
+  if (action.spellId !== undefined) {
+    const named = spell?.effect?.targets;
+    return named === undefined ? "none" : named.count > 1 || named.perSlot !== undefined ? "multi" : "single";
+  }
   const structured =
     action.grants !== undefined ||
+    action.move !== undefined ||
+    action.teleport !== undefined ||
+    action.leap !== undefined ||
     action.multiattack !== undefined ||
     action.uses !== undefined ||
     action.spellSlot !== undefined ||

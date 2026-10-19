@@ -29,6 +29,7 @@ import {
   type ClassLevelRow,
   type ClassReference,
   type FeatureRecord,
+  type FeatureSaveDc,
   type Modifier,
   type SpellReference
 } from "@vtt/content-srd-5.2.1";
@@ -45,6 +46,7 @@ import {
 import type { ContentView } from "./content-library.js";
 import { BUILDER_BAKED_MODIFIER_TYPES, type CharacterFeatureRef } from "./equipment-derivation.js";
 import {
+  castAreaOf,
   isLongCastingTime,
   laterSpellAction,
   ritualSpellActionId,
@@ -53,6 +55,9 @@ import {
 } from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
 import { BUILDER_SOURCE_NAME } from "./actor-roster.js";
+import { CONTENT_STAMP } from "./content-stamp.js";
+import { withProficiencyEdit } from "./sheet-proficiency-edits.js";
+import { studyIncreasesOf } from "./study-ledger.js";
 import { featHoldings, featPrerequisiteFailure } from "./feat-prerequisites.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -176,7 +181,7 @@ type CarrierRiderType = Exclude<Modifier["type"], (typeof BUILDER_BAKED_MODIFIER
  *  fails. These reach the table as rider carriers via `deriveEquipment`. Values record where each is
  *  consumed ("unread": no consumer yet). */
 const CARRIER_RIDER_DISPOSITION: Readonly<
-  Record<CarrierRiderType, "standing" | "at-its-moment" | "unread" | "display-only">
+  Record<CarrierRiderType, "standing" | "at-its-moment" | "unread" | "display-only" | "vision">
 > = {
   "attack-bonus": "standing", // effective-actions folds it into attack.bonus; action-resolution adds the on-attack-roll half
   "save-bonus": "standing", // saving-throws.ts saveRiderBonus (standing + on-saving-throw)
@@ -190,6 +195,7 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "armor-class": "standing", // storedArmorClass, via derivation.armorClass, so Defense follows the armor worn now
   "attunement-slots": "standing", // inventory.ts, the attunement limit
   "special-speed": "standing", // speed.ts specialSpeedsOf, the movement modes
+  movement: "standing", // falling.ts and jumping.ts: safe falls, leaps and jump distance
   "roll-mode": "at-its-moment", // rollModeClaims: attacks, saves, checks, initiative
   "extra-damage": "at-its-moment", // resolution/damage.ts rolls it as its own typed damage entry
   "damage-bonus": "standing", // effective-actions folds it into the first damage part's formula; a moment-gated one lands as a bonusDamage line in resolution/damage.ts
@@ -198,15 +204,15 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "damage-reduction": "at-its-moment", // hit-points.ts damageReductionsFor, taken off the hit before resistances
   "damage-resistance": "standing", // derivation.damageResistances, beside the definition's own
   "damage-vulnerability": "standing", // derivation.damageVulnerabilities, beside the definition's own
-  sense: "display-only" // like `darkvision`: the trait prose carries it; no definition field models senses
+  sense: "vision" // vision/senses.ts reads it live for dynamic vision, from every carrier
 };
 
 /** Where a modifier type is consumed, for the coverage manifest (`srd-coverage.ts`): baked by the builder, read at a
- *  roll, or read by nothing yet. `darkvision` is baked, but only to be displayed, like `sense`. */
+ *  roll, read live by dynamic vision (`darkvision` and `sense`, `vision/senses.ts`), or read by nothing yet. */
 export function modifierDisposition(
   type: Modifier["type"]
-): "baked" | "standing" | "at-its-moment" | "unread" | "display-only" {
-  if (type === "darkvision") return "display-only";
+): "baked" | "standing" | "at-its-moment" | "unread" | "display-only" | "vision" {
+  if (type === "darkvision") return "vision";
   return (BUILDER_BAKED_MODIFIER_TYPES as readonly string[]).includes(type)
     ? "baked"
     : CARRIER_RIDER_DISPOSITION[type as CarrierRiderType];
@@ -235,14 +241,81 @@ function resolvedUseLimit(uses: NonNullable<FeatureRecord["uses"]>, context: Bui
   return rows.length > 0 ? rows[rows.length - 1].limit : 0;
 }
 
+type FeatureHitRider = NonNullable<FeatureRecord["actions"][number]["ridesHit"]>;
+
+/** A feature's DC in one of `FeatureSaveDcSchema`'s three forms, as the character's number. */
+function featureDc(feature: FeatureRecord, dc: FeatureSaveDc, context: BuildContext): number {
+  if (dc === "spellcasting") {
+    if (context.spellcastingAbility === null)
+      reject(`"${feature.name}" uses the spell save DC, but this class has no spellcasting.`);
+    return spellSaveDc(context.finalScores[context.spellcastingAbility!], context.proficiencyBonus);
+  }
+  if (typeof dc === "number") return dc;
+  return (
+    dc.base + abilityModifier(context.finalScores[dc.ability]) + (dc.proficiencyBonus ? context.proficiencyBonus : 0)
+  );
+}
+
+/** A feature's hit rider with its DC as the character's number and the effects one hit carries at this level. */
+function builtHitRider(
+  feature: FeatureRecord,
+  rider: FeatureHitRider,
+  context: BuildContext
+): NonNullable<ActorAction["ridesHit"]> {
+  const { saveDc, effectsChooseByLevel, ...rest } = rider;
+  const rows = (effectsChooseByLevel ?? []).filter((row) => row.level <= context.level);
+  const choose = rows.length > 0 ? Math.max(...rows.map((row) => row.choose)) : rest.effectsChoose;
+  return {
+    ...rest,
+    ...(saveDc !== undefined ? { saveDc: Math.max(1, Math.min(40, featureDc(feature, saveDc, context))) } : {}),
+    ...(choose !== undefined ? { effectsChoose: choose } : {})
+  };
+}
+
 /** A feature action as a definition action. The rider templates' to-hit and DC come from the character's numbers. */
 function interpretAction(
   feature: FeatureRecord,
   action: FeatureRecord["actions"][number],
   context: BuildContext
 ): ActorAction {
-  const { attack, save, damageByLevel, multiattackByLevel, healingByLevel, adds, grantScaling, ...carried } = action;
+  const {
+    attack,
+    save,
+    damageByLevel,
+    multiattackByLevel,
+    healingByLevel,
+    adds,
+    grantScaling,
+    ridesHit,
+    spendsNoUses,
+    answerAmountByLevel,
+    reactionByLevel,
+    ...carried
+  } = action;
   const assembled: Record<string, unknown> = { ...carried };
+  if (ridesHit) assembled.ridesHit = builtHitRider(feature, ridesHit, context);
+  // A reaction that changes with level (Deflect Energy widens Deflect Attacks to every damage type at Monk 13).
+  const reactionRows = (reactionByLevel ?? [])
+    .filter((row) => row.level <= context.level)
+    .sort((left, right) => left.level - right.level);
+  if (reactionRows.length > 0) assembled.reaction = reactionRows[reactionRows.length - 1]!.reaction;
+  // The die an answer rolls at this level (the Bardic Inspiration die), on the action's answer and its grant's.
+  const answerRows = (answerAmountByLevel ?? [])
+    .filter((row) => row.level <= context.level)
+    .sort((left, right) => left.level - right.level);
+  const answerAmount = answerRows[answerRows.length - 1]?.amount;
+  if (answerAmount !== undefined) {
+    const withAmount = (answer: ActorAction["answer"]): ActorAction["answer"] =>
+      answer && "amount" in answer.effect ? { ...answer, effect: { ...answer.effect, amount: answerAmount } } : answer;
+    if (action.answer) assembled.answer = withAmount(action.answer);
+    if (action.grants?.answer) assembled.grants = { ...action.grants, answer: withAmount(action.grants.answer) };
+  }
+  // "Reroll it with a bonus equal to your Fighter level": the level multiple is the reroll's bonus.
+  if (adds?.classLevel && action.answer?.effect.kind === "reroll")
+    assembled.answer = {
+      ...action.answer,
+      effect: { ...action.answer.effect, bonus: adds.classLevel * context.level }
+    };
   if (attack) {
     const ability = attack.ability === "spellcasting" ? context.spellcastingAbility : attack.ability;
     if (!ability)
@@ -254,18 +327,9 @@ function interpretAction(
     };
   }
   if (save) {
-    if (save.dc === "spellcasting" && context.spellcastingAbility === null)
-      reject(`"${feature.name}" uses the spell save DC, but this class has no spellcasting.`);
     // `FeatureSaveDcSchema` has three forms: "spellcasting", a number, and `{base, ability,
     // proficiencyBonus}` (Dragonborn Breath Weapon, 8 + CON + PB). All must resolve to a number.
-    const dc =
-      save.dc === "spellcasting"
-        ? spellSaveDc(context.finalScores[context.spellcastingAbility!], context.proficiencyBonus)
-        : typeof save.dc === "number"
-          ? save.dc
-          : save.dc.base +
-            abilityModifier(context.finalScores[save.dc.ability]) +
-            (save.dc.proficiencyBonus ? context.proficiencyBonus : 0);
+    const dc = featureDc(feature, save.dc, context);
     assembled.save = { ...save, dc, ...(save.dc === "spellcasting" ? { spellcasting: true } : {}) };
   }
   if (damageByLevel && damageByLevel.length > 0) {
@@ -293,6 +357,10 @@ function interpretAction(
       assembled.damage = [{ ...damage[0], formula: formulaPlus(damage[0].formula, bonus) }, ...damage.slice(1)];
     const healing = assembled.healing as ActorAction["healing"];
     if (healing) assembled.healing = { ...healing, formula: formulaPlus(healing.formula, bonus) };
+    // "1d10 plus your Dexterity modifier and Monk level" taken off a hit's damage.
+    const reaction = assembled.reaction as ActorAction["reaction"];
+    if (reaction?.response === "reduce-damage")
+      assembled.reaction = { ...reaction, formula: formulaPlus(reaction.formula, bonus) };
   }
   // The grant's damage bonus is the printed column at this level (Rage Damage), and the sheet says the number.
   if (grantScaling && action.grants) {
@@ -307,8 +375,8 @@ function interpretAction(
       assembled.description = `${action.description} ${amount.name}: +${amount.amount}.`.slice(0, 12000);
     }
   }
-  // The feature's limited uses ride the action when the action declares none of its own.
-  if (feature.uses && assembled.uses === undefined) {
+  // The feature's limited uses ride the action when the action declares none of its own and spends them.
+  if (feature.uses && assembled.uses === undefined && spendsNoUses !== true) {
     const limit = resolvedUseLimit(feature.uses, context);
     if (limit >= 1) {
       assembled.uses = {
@@ -329,10 +397,10 @@ const spellActionId = (spellId: string): string => `spell-${spellId}`;
 const DICE_FORMULA = /^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i;
 
 /**
- * The server-resolved action for one known cantrip, or null. Cantrips only, since a leveled spell
- * action would need a slot the sheet can't express. A roll counts as damage only with a damage type,
- * and an action is minted only for typed damage or a save (save outranks attack). Scaled by character
- * level from the printed rows (Fire Bolt's 2d10 at 5, Eldritch Blast's second beam), as the sheet is.
+ * The server-resolved action for one known cantrip, or null for a leveled spell. Every cantrip is cast through the
+ * server, so a cast that rolls nothing (Light, Guidance) still spends its action, holds its Concentration and is told
+ * to the table. Scaled by character level from the printed rows (Fire Bolt's 2d10 at 5, Eldritch Blast's second
+ * beam), as the sheet is.
  */
 function cantripActionFor(
   spell: SpellReference,
@@ -348,16 +416,13 @@ function cantripActionFor(
       ...(tier?.targetCount && spell.effect?.attacks ? { attacks: tier.targetCount } : {})
     }
   );
-  // A cantrip that lasts and acts later (Produce Flame) is cast to start it, with nothing to roll.
-  if (mechanics.damage.length === 0 && !mechanics.save && (spell.effect?.laterActions ?? []).length === 0) return null;
   return {
     id: spellActionId(spell.id),
     name: spell.name,
     activation: activationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
-    // A healing area heals up to a number of creatures the caster picks (Mass Cure Wounds' six), so it is picked.
-    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
+    ...castAreaOf(spell, mechanics),
     ...(spell.effect?.reaction ? { reaction: spell.effect.reaction } : {}),
     // `spell-id-is` riders (Agonizing Blast) match on this field alone.
     spellId: spell.id
@@ -379,29 +444,18 @@ type CasterNumbers = Readonly<{ attackBonus: number; saveDc: number; characterLe
 /**
  * A leveled spell as an action. Cast with a slot, it carries `spellSlot` at the spell's level, which the economy
  * spends (a higher slot on request upcasts the dice). Cast without one (`free`), it spends the granting
- * feature's uses, or nothing at will. Null for an at-will cast with nothing to resolve.
+ * feature's uses, or nothing at will. A cast that rolls nothing still spends its action and is told to the table.
  */
 function leveledSpellActionFor(
   spell: SpellReference,
   numbers: CasterNumbers,
   free?: ActorAction["uses"] | null
-): ActorAction | null {
+): ActorAction {
   const mechanics = spellCastMechanics(
     spell,
     { attackBonus: numbers.attackBonus, saveDc: numbers.saveDc, bearersDc: true, modifier: numbers.modifier },
     {}
   );
-  // A reaction the table can offer (Shield) is something to resolve too.
-  const resolvable =
-    mechanics.damage.length > 0 ||
-    mechanics.save !== undefined ||
-    mechanics.healing !== undefined ||
-    mechanics.attack ||
-    mechanics.grants !== undefined ||
-    spell.effect?.reaction !== undefined ||
-    // A spell that lasts and acts on later turns (Flame Blade) is cast to start it.
-    (spell.effect?.laterActions ?? []).length > 0;
-  if (free === null && !resolvable) return null;
   const freeCast = free !== undefined;
   return {
     id: freeCast ? `${spellActionId(spell.id)}-free` : spellActionId(spell.id),
@@ -409,8 +463,7 @@ function leveledSpellActionFor(
     activation: activationOf(spell.castingTime),
     description: spell.description.slice(0, 12000),
     ...mechanics,
-    // A healing area heals up to a number of creatures the caster picks (Mass Cure Wounds' six), so it is picked.
-    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
+    ...castAreaOf(spell, mechanics),
     // A reaction spell's trigger rides its action, so the table offers it (Shield when an attack would hit).
     ...(spell.effect?.reaction ? { reaction: spell.effect.reaction } : {}),
     ...(freeCast ? (free ? { uses: free } : {}) : { spellSlot: { level: spell.level } }),
@@ -482,7 +535,7 @@ function linkSpellActions(
         const cast = leveledSpellActionFor(record, numbers);
         mint(cast, "actionId");
         // SRD Rituals: a prepared ritual spell can be cast without a slot and takes 10 minutes longer.
-        if (cast && record.ritual) mint(ritualActionOf(cast, record), "ritualActionId");
+        if (record.ritual) mint(ritualActionOf(cast, record), "ritualActionId");
       }
       if (entry.free !== undefined) mint(leveledSpellActionFor(record, numbers, entry.free), "freeActionId");
     }
@@ -490,6 +543,8 @@ function linkSpellActions(
     const tier =
       record.level === 0 ? cantripTierAt(cantripScalingOf(record.castingOptions), numbers.characterLevel) : null;
     for (const later of record.effect?.laterActions ?? []) {
+      // An area that only changes the ground (Entangle's plants) is the server's alone, with nothing to take or roll.
+      if (later.activation === "other" && !later.save && later.damage.length === 0 && !later.attackRange) continue;
       const action = laterSpellAction(
         record,
         later,
@@ -665,7 +720,7 @@ function interpretFeature(
           into.unarmoredDefenses.push({ ability: modifier.ability, allowShield: modifier.allowShield });
         break;
       case "darkvision":
-        break; // display-only: the trait prose carries the senses; no definition field models them
+        break; // nothing to bake: dynamic vision reads it live (vision/senses.ts)
       // The roll-time variants; see `CARRIER_RIDER_DISPOSITION`.
       default:
         ownedByTheRollTimeCollector(modifier);
@@ -847,6 +902,9 @@ export function buildCharacterDefinition(
       });
     });
   }
+  // A studied manual or tome lands after its level's own increases, so an Ability Score Improvement taken later still
+  // stops at 20.
+  const studies = studyIncreasesOf(input.choices, input.level);
   const holdings = featHoldings({ classes, granted });
   const featChecks = [
     ...(originFeat ? [{ feat: originFeat, level: 1 }] : []),
@@ -874,6 +932,11 @@ export function buildCharacterDefinition(
           `${increase.ability.toUpperCase()} would be ${finalScores[increase.ability]}; ${increase.source} cannot raise a score above ${increase.maximum}. Choose another ability.`
         );
     }
+    for (const study of studies.filter((candidate) => candidate.level === level))
+      finalScores[study.ability] = Math.max(
+        finalScores[study.ability],
+        Math.min(study.maximum, finalScores[study.ability] + study.amount)
+      );
   }
 
   // ---- 5c. Feature `ability-score` riders, before any feature is interpreted: `interpretAction`
@@ -1049,33 +1112,37 @@ export function buildCharacterDefinition(
   for (const skill of expertiseTaken) {
     if (!skillTaken.includes(skill)) reject(`Expertise in "${skill}" requires proficiency in it first.`);
   }
-  const proficiencies = {
-    saves: dedupe([...classRecord.savingThrows, ...interpreted.grantedSaves]),
-    skills: dedupe(skillTaken).map((id) => ({
-      id,
-      proficiency: expertiseTaken.includes(id) ? "expertise" : "proficient"
-    })),
-    armor: dedupe([...classRecord.armorProficiencies, ...multiclassTraining("armor"), ...interpreted.grantedArmor]),
-    weapons: dedupe([
-      ...classRecord.weaponProficiencies,
-      ...multiclassTraining("weapons"),
-      ...interpreted.grantedWeapons
-    ]),
-    tools: dedupe([
-      ...classRecord.toolProficiencies,
-      ...multiclassTraining("tools"),
-      ...takenOf("tool"),
-      ...skillOrTool.filter((id) => !skillIds.has(id)),
-      ...background.toolProficiencies,
-      ...interpreted.grantedTools
-    ]),
-    languages: dedupe([
-      ...species.languages,
-      ...takenOf("language"),
-      ...background.languages,
-      ...interpreted.grantedLanguages
-    ])
-  };
+  // A hand edit made on the sheet comes last, so it outlasts the rebuild (`sheet-proficiency-edits.ts`).
+  const proficiencies = withProficiencyEdit(
+    {
+      saves: dedupe([...classRecord.savingThrows, ...interpreted.grantedSaves]),
+      skills: dedupe(skillTaken).map((id) => ({
+        id,
+        proficiency: expertiseTaken.includes(id) ? "expertise" : "proficient"
+      })),
+      armor: dedupe([...classRecord.armorProficiencies, ...multiclassTraining("armor"), ...interpreted.grantedArmor]),
+      weapons: dedupe([
+        ...classRecord.weaponProficiencies,
+        ...multiclassTraining("weapons"),
+        ...interpreted.grantedWeapons
+      ]),
+      tools: dedupe([
+        ...classRecord.toolProficiencies,
+        ...multiclassTraining("tools"),
+        ...takenOf("tool"),
+        ...skillOrTool.filter((id) => !skillIds.has(id)),
+        ...background.toolProficiencies,
+        ...interpreted.grantedTools
+      ]),
+      languages: dedupe([
+        ...species.languages,
+        ...takenOf("language"),
+        ...background.languages,
+        ...interpreted.grantedLanguages
+      ])
+    },
+    input.choices
+  );
 
   // ---- 9. Spellcasting: each casting class's own row (cantrips, prepared cap, the highest level it prepares, its
   // list and ability) over one shared slot pool, plus chosen and granted spells. ----
@@ -1444,7 +1511,7 @@ export function buildCharacterDefinition(
   return ActorDefinitionSchema.parse({
     schemaId: "vtt.actor-character",
     schemaVersion: 1,
-    source: { name: BUILDER_SOURCE_NAME, version: "1" },
+    source: { name: BUILDER_SOURCE_NAME, version: CONTENT_STAMP },
     name: input.name,
     summary,
     size,

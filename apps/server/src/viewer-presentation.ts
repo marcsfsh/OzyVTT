@@ -56,6 +56,8 @@ export type ViewerTerrain = Readonly<{
  *  and what it has seen. Everything else on the map is dark. */
 export type ViewerVision = Readonly<{
   visible: readonly (readonly number[])[];
+  /** The part of `visible` in Bright Light; absent when all of it is. */
+  bright?: readonly (readonly number[])[];
   explored: readonly Readonly<{ x: number; y: number; width: number; height: number }>[];
 }>;
 
@@ -80,6 +82,8 @@ export type ViewerEncounterToken = Readonly<{
   /** Present only when the GM shows a richer indicator to everyone; the fill derives from the band, never exact HP. */
   healthDisplay?: Readonly<{ style: "bar" | "ring" | "aura" }>;
   tokenAssetId?: string;
+  /** Feet above the ground, as public as the position. Absent on the ground. */
+  altitudeFeet?: number;
 }>;
 
 /** Player-safe drawing for the shared screen; only `public` annotations are projected. */
@@ -243,6 +247,12 @@ function healthDisplayStyle(value: unknown): "bar" | "ring" | "aura" {
   throw new InvalidRequestError('Viewer token health display style must be "bar" or "ring".');
 }
 
+function altitude(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 10000)
+    throw new InvalidRequestError("Viewer token height is invalid.");
+  return value;
+}
+
 function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
   const mapAssetId = value.mapAssetId === null ? null : safeText(value.mapAssetId, "Encounter map asset ID", 128);
   if (value.tokens.length > 200) throw new InvalidRequestError("Viewer encounter cannot exceed 200 tokens.");
@@ -267,7 +277,8 @@ function encounter(value: ViewerEncounterScene): ViewerEncounterScene {
       health: healthBand(token.health),
       conditions: conditionList(token.conditions),
       ...(token.conditionIds ? { conditionIds: conditionIdList(token.conditionIds) } : {}),
-      ...(token.healthDisplay ? { healthDisplay: { style: healthDisplayStyle(token.healthDisplay.style) } } : {})
+      ...(token.healthDisplay ? { healthDisplay: { style: healthDisplayStyle(token.healthDisplay.style) } } : {}),
+      ...(token.altitudeFeet !== undefined ? { altitudeFeet: altitude(token.altitudeFeet) } : {})
     };
   });
   if (activeTokens > 1) throw new InvalidRequestError("Viewer encounter can have at most one active token.");

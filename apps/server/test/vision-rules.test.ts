@@ -102,6 +102,30 @@ describe("walls in the way of a move", () => {
   });
 });
 
+describe("a ranged attack in close combat", () => {
+  // SRD: Disadvantage "if you are within 5 feet of an enemy who can see you and who doesn't have the Incapacitated
+  // condition". The goblin shoots Borin beside it.
+  it("has Disadvantage while the enemy beside the archer can see it", () => {
+    const state = visionGame({ positions: { [GOBLIN]: cell(2, 5) }, actors: { [GOBLIN]: GOBLIN_STATS } });
+    expect(goblinSwing(state, "shortbow").rollMode?.disadvantage).toContain("Enemy within 5 feet (Borin)");
+  });
+
+  it("has none when the enemy beside it can't see the archer, in the dark or Blinded", () => {
+    const dark = visionGame({
+      ambient: "dark",
+      positions: { [GOBLIN]: cell(2, 5) },
+      actors: { [GOBLIN]: GOBLIN_STATS }
+    });
+    expect(goblinSwing(dark, "shortbow").rollMode?.disadvantage ?? []).not.toContain("Enemy within 5 feet (Borin)");
+    const blinded = visionGame({
+      enabled: false,
+      positions: { [GOBLIN]: cell(2, 5) },
+      actors: { [GOBLIN]: GOBLIN_STATS, [HERO]: { conditions: [{ id: "blinded" }] } }
+    });
+    expect(goblinSwing(blinded, "shortbow").rollMode?.disadvantage ?? []).not.toContain("Enemy within 5 feet (Borin)");
+  });
+});
+
 describe("who sees whom, on the attack roll", () => {
   it("gives Advantage against a target that can't see the attacker", () => {
     // Dark, and the goblin's Darkvision finds the hero beside it; the hero has none.

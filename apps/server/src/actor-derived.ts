@@ -16,7 +16,9 @@ import {
   type EquipmentCatalog,
   type EquipmentDerivation
 } from "./equipment-derivation.js";
+import type { ClassReference } from "@vtt/content-srd-5.2.1";
 import { choiceOverrideDefenses } from "./choice-overrides.js";
+import { classColumnsOf } from "./class-columns.js";
 import { autoFailsPhysicalSaves } from "./condition-rules.js";
 import { standingDefences } from "./hit-points.js";
 import { auraBonusOf, saveRollSources, saveTotalFor } from "./saving-throws.js";
@@ -45,7 +47,8 @@ export function deriveActorSheet(
   definition: ActorDefinition | undefined,
   derivation: EquipmentDerivation,
   skills: readonly ContentSkillSummary[],
-  catalog?: Partial<Pick<EquipmentCatalog, "featureRecord" | "equipmentRecord">>
+  catalog?: Partial<Pick<EquipmentCatalog, "featureRecord" | "equipmentRecord">>,
+  classRecord: (id: string) => ClassReference | undefined = () => undefined
 ): ActorDerivedSheet {
   const proficiencyBonus = definition?.proficiencyBonus ?? 0;
   const proficientSaves = new Set(definition?.proficiencies?.saves ?? []);
@@ -129,7 +132,8 @@ export function deriveActorSheet(
     ),
     // The SRD's three, plus what an `attunement-slots` rider adds (Use Magic Device).
     attunementSlots: 3 + derivation.attunementSlots,
-    weaponMasteries: weaponMasteriesOf(definition, catalog?.equipmentRecord)
+    weaponMasteries: weaponMasteriesOf(definition, catalog?.equipmentRecord),
+    classColumns: classColumnsOf(definition, classRecord)
   };
 }
 

@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { type ActionRollMode, type PendingSave, type PlayerPendingSave } from "@vtt/domain";
+import {
+  type ActionRollMode,
+  type PendingSave,
+  type PlayerPendingSave,
+  type RollAnswerOffer,
+  type RollAnswered
+} from "@vtt/domain";
 import { useRollPreference } from "../dice/roll-preference";
 import { command } from "../lib/command";
-import { RollControls, type DieMode } from "./RollControls";
+import { RollControls, type AnswerChoice, type DieMode } from "./RollControls";
 import { damageAdjustments } from "./format";
 import { modeWords } from "./roll-mode-notes";
 import { saveAnswerPayload, saveDamageAmend } from "./save-answer";
@@ -69,6 +75,10 @@ export function SavePrompt({
     autoFailed?: boolean;
     autoSucceeded?: string;
     basis: number;
+    answers?: readonly RollAnswerOffer[];
+    answered?: readonly RollAnswered[];
+    /** The confirm waits on another creature's answer to the roll (Countercharm). */
+    awaiting?: boolean;
   } | null>(null);
   // The GM's forced mode, sent with every later look at the held die so Confirm reads it the same way.
   const [forced, setForced] = useState<DieMode | undefined>(undefined);
@@ -103,6 +113,7 @@ export function SavePrompt({
       reroll?: boolean;
       legendaryResistance?: boolean;
       mode?: DieMode;
+      answer?: AnswerChoice;
     }>
   ) => {
     setBusy(true);
@@ -118,7 +129,8 @@ export function SavePrompt({
         ...(options.face !== undefined ? { face: options.face } : {}),
         ...(options.reroll ? { reroll: true } : {}),
         ...(mode ? { dieMode: mode } : {}),
-        ...(damageOverride !== undefined ? { damageOverride } : {})
+        ...(damageOverride !== undefined ? { damageOverride } : {}),
+        ...(options.answer ? { answer: options.answer } : {})
       })
     ).then((result) => {
       setBusy(false);
@@ -142,12 +154,15 @@ export function SavePrompt({
           ...(outcome.rollMode ? { rollMode: outcome.rollMode } : {}),
           ...(outcome.autoFailed ? { autoFailed: true } : {}),
           ...(outcome.autoSucceeded ? { autoSucceeded: outcome.autoSucceeded } : {}),
-          basis: proposal
+          basis: proposal,
+          ...(outcome.answers ? { answers: outcome.answers } : {}),
+          ...(outcome.answered ? { answered: outcome.answered } : {}),
+          ...(outcome.awaitingAnswer ? { awaiting: true } : {})
         });
         return;
       }
       onFeedback(
-        `${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc}).${outcome.appliedDamage > 0 ? ` ${targetName} took ${outcome.appliedDamage} damage.` : ""}${outcome.conditionApplied ? " The condition is applied." : ""}`
+        `${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc}).${outcome.appliedDamage > 0 ? ` ${targetName} took ${outcome.appliedDamage} damage.` : ""}${outcome.damageHeld ? " The damage waits on a reaction." : ""}${outcome.conditionApplied ? " The condition is applied." : ""}`
       );
     });
   };
@@ -160,6 +175,9 @@ export function SavePrompt({
       );
     });
   };
+  // A confirm parked on another creature's answer outlives this prompt's own state (a reload, another screen).
+  const parked =
+    ("confirmed" in save && save.confirmed !== undefined) || ("awaitingAnswer" in save && save.awaitingAnswer === true);
   // The shown projection was computed from `basis`; once the field moves off it, it is stale.
   const stale = rolled !== null && proposal !== rolled.basis;
   useEffect(() => {
@@ -214,6 +232,8 @@ export function SavePrompt({
         </strong>{" "}
         vs {save.actionName} ({save.sourceName})
       </span>
+      {/* The server rolls this save but applies nothing of it: the spell's text says what a failure does. */}
+      {save.gmApplies && <span className="save-prompt-gm">The GM applies what this save does.</span>}
       {save.proposedDamage > 0 && (viewer === "gm" || mayType) && (
         <label className="save-damage-amend">
           <span>Damage on a failure{save.halfOnSuccess ? ", half on a success" : ""}</span>
@@ -235,8 +255,9 @@ export function SavePrompt({
       )}
       <RollControls
         rollMode={rollMode}
+        autoRoll={parked ? false : undefined}
         busy={busy}
-        rolled={rolled !== null}
+        rolled={rolled !== null || parked}
         viewer={viewer}
         inspired={inspired}
         typed={typed}
@@ -254,6 +275,10 @@ export function SavePrompt({
           send({ commit: false, mode: next });
         }}
         onDismiss={canDismiss ? dismiss : undefined}
+        answers={rolled?.answers}
+        answered={rolled?.answered}
+        onAnswer={(answer) => send({ commit: false, answer })}
+        waiting={parked || rolled?.awaiting ? "Waiting on an answer to the roll." : undefined}
         summary={
           rolled ? (
             <>

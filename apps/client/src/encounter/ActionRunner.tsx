@@ -14,6 +14,7 @@ import {
   resolveActionDirect,
   resolveTargeting,
   setTargetingResult,
+  takeMoveFirst,
   useTargeting,
   useTargetingBlocked,
   useTargetingBusy,
@@ -24,7 +25,7 @@ import { registerContentCache } from "../content/invalidate";
 import { useRollPreference } from "../dice/roll-preference";
 import { useTableCalibration } from "../scene/tableGeometry";
 import { caughtByArea } from "../table/targetHints";
-import { foesFirst, targetRows } from "../table/targetRows";
+import { foesFirst, pickableTargets, targetRows } from "../table/targetRows";
 import "./action-runner.css";
 
 /** Per-definition action cache. Cleared on `homebrew:changed` (`content/invalidate.ts`), since a GM
@@ -42,9 +43,11 @@ export function ActionRunner({
   actor,
   onFeedback
 }: Readonly<{ state: GmView; actor: GmActor; onFeedback: (text: string) => void }>) {
-  const [actions, setActions] = useState<readonly ContentActionSummary[] | null>(
-    actionCache.get(actor.definitionId ?? "") ?? null
-  );
+  // The combatant's own list, with what its items give: it moves with what it carries and the effects on it.
+  const cacheKey = `${actor.definitionId ?? ""}:${actor.id}:${actor.inventory
+    .map((item) => `${item.id}/${item.quantity}/${item.equipped}/${item.attuned}`)
+    .join(",")}:${actor.effects.map((effect) => effect.id).join(",")}`;
+  const [actions, setActions] = useState<readonly ContentActionSummary[] | null>(actionCache.get(cacheKey) ?? null);
   const [applied, setApplied] = useState<ReadonlySet<string>>(new Set());
   // A typed damage override (manual roll mode, or a GM adjustment).
   const [damageEdit, setDamageEdit] = useState<string | null>(null);
@@ -66,19 +69,19 @@ export function ActionRunner({
     clearTargeting();
     setTargetingResult(null);
     if (!definitionId) return;
-    const cached = actionCache.get(definitionId);
+    const cached = actionCache.get(cacheKey);
     if (cached) {
       setActions(cached);
       return;
     }
     setActions(null);
-    void read("content:monster-actions", { definitionId }).then((response) => {
+    void read("content:monster-actions", { definitionId, actorId: actor.id }).then((response) => {
       if (response.ok && response.actions) {
-        actionCache.set(definitionId, response.actions);
+        actionCache.set(cacheKey, response.actions);
         setActions(response.actions);
       } else onFeedback(response.message ?? "The stat block could not be loaded.");
     });
-  }, [definitionId, actor.id, onFeedback]);
+  }, [definitionId, cacheKey, actor.id, onFeedback]);
   // Clear the shared targeting when this runner unmounts (the turn moved off this combatant).
   useEffect(
     () => () => {
@@ -107,7 +110,8 @@ export function ActionRunner({
     const confirmed = attack !== null && previewedTarget.current === attack.targetId;
     previewedTarget.current = null;
     if (!confirmed || rollMode !== "auto" || result.damageTotal <= 0 || result.waitingOnReaction) return;
-    if (result.reactionPrompts?.some((prompt) => prompt.actorId === attack.targetId)) return;
+    // A prompt holding the damage (the target's Uncanny Dodge, another creature's Cutting Words) applies it itself.
+    if (result.reactionPrompts?.some((prompt) => prompt.holdsDamage || prompt.actorId === attack.targetId)) return;
     applyRef.current(attack.targetId, attack.targetName, attack.targetId);
   }, [result, rollMode]);
 
@@ -172,7 +176,9 @@ export function ActionRunner({
       // Names the action, so the server lands what its damage drains (a Life Drain's lower Hit Point maximum).
       ...(result.actionId !== undefined && result.actionId.length <= 120 ? { sourceActionId: result.actionId } : {}),
       sourceName: `${actor.name}'s ${result.actionName}`,
-      critical: result.crit
+      critical: result.crit,
+      // The attacker chose to knock the target out with this melee hit.
+      ...(result.knockOut === "chosen" ? { nonlethal: true } : {})
     }).then((response) => {
       setBusy(false);
       if (!response.ok) {
@@ -253,23 +259,27 @@ export function ActionRunner({
       {picking && !result?.preview && (
         <ActionTargetPicker
           picking={picking}
-          targets={foesFirst(
-            targetRows(
-              actor.id,
-              combatants
-                .filter((target) => target.id !== actor.id)
-                .map((target) => ({
-                  id: target.id,
-                  name: target.name,
-                  kind: target.kind,
-                  ...(target.armorClass !== undefined ? { armorClass: armorClassInPlay(target) } : {})
-                })),
-              state.combat.tokens,
-              calibration,
-              combatants
+          targets={pickableTargets(
+            foesFirst(
+              targetRows(
+                actor.id,
+                combatants
+                  .filter((target) => target.id !== actor.id)
+                  .map((target) => ({
+                    id: target.id,
+                    name: target.name,
+                    kind: target.kind,
+                    ...(target.armorClass !== undefined ? { armorClass: armorClassInPlay(target) } : {}),
+                    ...(target.hp.current <= 0 ? { down: true } : {})
+                  })),
+                state.combat.tokens,
+                calibration,
+                combatants
+              ),
+              actor.kind,
+              picking.action.healing != null
             ),
-            actor.kind,
-            picking.action.healing != null
+            picking.action
           )}
           insideNow={insideNow}
           onMap
@@ -278,6 +288,7 @@ export function ActionRunner({
           onRoll={(face) =>
             resolveTargeting(state.revision, onOutcome, face !== undefined ? { attackNatural: face } : {})
           }
+          onMoveFirst={() => takeMoveFirst(onOutcome)}
         />
       )}
       {result && (

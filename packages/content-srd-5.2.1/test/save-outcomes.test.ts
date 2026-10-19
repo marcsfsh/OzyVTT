@@ -23,7 +23,10 @@ function saveBlocksIn(file: string): Array<{ path: string; save: SaveBlock }> {
       const record = node as Record<string, unknown>;
       if (record.save && typeof record.save === "object")
         found.push({ path: `${path}${record.id ? `(${String(record.id)})` : ""}`, save: record.save as SaveBlock });
-      for (const [key, child] of Object.entries(record)) walk(child, `${path}.${key}`);
+      // A hit rider's save (a Cunning Strike's Trip, Giant Slayer's) does nothing on a success by its own shape, and so
+      // does the save a melee hit on an aura's bearer costs its attacker (Holy Aura's Blinded).
+      for (const [key, child] of Object.entries(record))
+        if (key !== "ridesHit" && key !== "onHit" && key !== "struck") walk(child, `${path}.${key}`);
     }
   };
   walk(JSON.parse(readFileSync(join(bundlesDir, file), "utf8")), file);
@@ -226,15 +229,16 @@ describe("save outcomes in the shipped content", () => {
       { formula: "3d6", type: "acid" },
       { formula: "3d6", type: "fire" }
     ]);
+    // The no-healing rides the poison's own effect and the engine repeats the save, so nothing is left to remind.
     expect(monsterAction("pit-fiend", "bite")).toMatchObject({
       save: {
         failureConditions: ["poisoned"],
         repeatSave: true,
-        ongoingDamage: { damage: [{ formula: "6d6", type: "poison" }], at: "bearer-turn-start" }
-      },
-      reminder:
-        "While Poisoned, the target can't regain Hit Points, and it repeats the save at the end of each of its turns, ending the effect on itself on a success."
+        ongoingDamage: { damage: [{ formula: "6d6", type: "poison" }], at: "bearer-turn-start" },
+        failureEffect: { name: "Poisoned", tags: ["no-healing"] }
+      }
     });
+    expect(monsterAction("pit-fiend", "bite").reminder).toBeUndefined();
     // A reminder that was only the damage goes.
     expect(monsterAction("vrock", "spores").save?.ongoingDamage?.at).toBe("bearer-turn-start");
     expect(monsterAction("vrock", "spores").reminder).toBeUndefined();

@@ -6,7 +6,13 @@ import type {
   RuleExceptions,
   RuleMode
 } from "@vtt/domain";
+import { dropStaleGrants } from "./granted-moves.js";
+import { proneInSharedSpace } from "./occupied-space.js";
+import { blinkAway } from "./off-plane.js";
+import { timeStopGoesOn } from "./time-stop.js";
+import { familyModeFor } from "./rules-families.js";
 import { abilityCheckClaims } from "./ability-checks.js";
+import { holdsFeature } from "./class-features.js";
 import { wardedConditions } from "./paladin-auras.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -23,9 +29,11 @@ import {
 import { leaveShortRest } from "./short-rest-interruptions.js";
 import { releaseSwallowedBy } from "./swallow.js";
 import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
-import { zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
+import { zoneHeld, zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
+import { lapseLongCasts } from "./resolution/long-casting.js";
+import { checkSightFor } from "./vision/rules.js";
 
 type StartEncounterInput = Readonly<{
   mapAssetId: string;
@@ -108,7 +116,12 @@ export function initiativeRollFor(
   const warded = deps.resolveDefinition
     ? wardedConditions(state, actor, { resolveDefinition: deps.resolveDefinition })
     : [];
-  const asCheck = abilityCheckClaims(actor, derivation, { ability: "dex" }, warded);
+  // Frightened only while its source is within line of sight, and the light it stands in (Sunlight Sensitivity).
+  const sight = checkSightFor(state, actor, {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
+  const asCheck = abilityCheckClaims(actor, derivation, { ability: "dex" }, warded, [], sight);
   for (const side of ["advantage", "disadvantage"] as const)
     for (const claim of asCheck[side])
       if (!claims[side].some((held) => held.label === claim.label)) claims[side].push(claim);
@@ -265,6 +278,7 @@ export function startEncounter(
     return { actorId: actor.id, score: roll.total, tieBreaker, ...flags };
   });
   const sorted = ordered(state, initiative);
+  const lasting = lastingOnMap(state, input.mapAssetId);
   // Spread, never a fresh literal, so fields added to CombatState are not dropped. Fog rides the spread:
   // it is prepped before the fight and persists after it.
   state.combat = {
@@ -281,8 +295,8 @@ export function startEncounter(
       }),
       tokenGeometry
     ).map((token) => ({ ...token, position: placedPositions.get(token.actorId) ?? token.position })),
-    annotations: [],
-    spellZones: [],
+    annotations: lasting.annotations,
+    spellZones: lasting.zones,
     turn: { ...EMPTY_TURN },
     rulesMode: input.rulesMode ?? state.combat.rulesMode,
     ruleExceptions: input.ruleExceptions ?? state.combat.ruleExceptions,
@@ -402,6 +416,28 @@ export function addCombatant(
   leaveShortRest(state, new Set([actorId]), "rolled Initiative");
 }
 
+/**
+ * What a fight starting on this map keeps of the scene: the spell areas still held (a Glyph of Warding, a Fog Cloud cast
+ * before it) and the shapes they and the spells' lights and fog stand on. Every other drawing is cleared, and a fight on
+ * another map keeps nothing.
+ */
+function lastingOnMap(
+  state: GameState,
+  mapAssetId: string
+): Readonly<{ zones: GameState["combat"]["spellZones"]; annotations: GameState["combat"]["annotations"] }> {
+  if (state.combat.mapAssetId !== mapAssetId) return { zones: [], annotations: [] };
+  const zones = state.combat.spellZones
+    .filter((zone) => !zone.bursting && zoneHeld(state, zone))
+    .map((zone) => ({ ...zone, entered: [], affected: [] }));
+  const vision = state.combat.vision;
+  const kept = new Set<string>([
+    ...zones.flatMap((zone) => (zone.annotationId === null ? [] : [zone.annotationId])),
+    ...vision.lights.flatMap((light) => (light.annotationId === undefined ? [] : [light.annotationId])),
+    ...vision.areas.flatMap((area) => (area.shape.type === "template" ? [area.shape.annotationId] : []))
+  ]);
+  return { zones, annotations: state.combat.annotations.filter((annotation) => kept.has(annotation.id)) };
+}
+
 export function endEncounter(state: GameState) {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter to end.");
   // Ending mid-review would strand the timeline pointing at a fight that no longer exists.
@@ -417,8 +453,11 @@ export function endEncounter(state: GameState) {
     turnActorId: null,
     turn: { ...EMPTY_TURN },
     underwater: false,
-    // The fight's spell areas end with it; Concentration on them is the caster's to keep or drop.
-    spellZones: [],
+    // A spell area outlasts the fight while what keeps it does (the caster's Concentration, or the effect of a longer
+    // spell, which `endEncounterEffects` has already ended if a minute or less of it was left).
+    spellZones: state.combat.spellZones
+      .filter((zone) => !zone.bursting && zoneHeld(state, zone))
+      .map((zone) => ({ ...zone, entered: [], affected: [] })),
     reactionsUsed: [],
     legendaryUsed: {},
     pendingSaves: [],
@@ -546,6 +585,13 @@ function settleGatherIfComplete(state: GameState) {
 
 /** Dependencies for start-of-turn recharge rolls and ongoing damage and end-of-turn repeat saves; optional so scene
  *  bookkeeping can advance turns without them. */
+/** Whether a creature takes a Reaction on every turn, not once a round (a marilith's Reactive trait). */
+function reactsEveryTurn(state: GameState, actorId: string, deps: TurnAdvanceDeps | undefined): boolean {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor?.definitionId || !deps) return false;
+  return holdsFeature(deps.resolveDefinition(actor.definitionId), "reactive", "Reactive");
+}
+
 export type TurnAdvanceDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   /** The item catalog, so an item's recharge pool re-arms like a stat block's. */
@@ -657,35 +703,53 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   while (steps < length && isDefeated(state, state.combat.initiative[(currentIndex + steps) % length].actorId))
     steps += 1;
   if (steps === length) steps = 1;
-  const wraps = currentIndex + steps >= length;
+  // Time Stop: the caster takes its turns in a row while no time passes for anyone else.
+  const stopped = timeStopGoesOn(state);
+  const wraps = !stopped && currentIndex + steps >= length;
   // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
   const ending: EffectNarration[] = [];
   const outgoingId = state.combat.turnActorId;
+  // "If you somehow end a turn in a space with another creature, you have the Prone condition" (SRD 5.2.1).
+  const calibration = deps?.geometry?.calibration;
+  if (outgoingId && calibration && deps && familyModeFor(state.combat, "movement") !== "freeform")
+    proneInSharedSpace(state, outgoingId, calibration, deps.resolveDefinition, ending);
+  // Blink: "Roll 1d6 at the end of each of your turns".
+  if (outgoingId && deps?.newId) blinkAway(state, outgoingId, deps.rollDie, deps.newId, ending);
   endOfTurn(
     state,
     outgoingId,
     ending,
     deps?.newId ? { ...deps, newId: deps.newId, now: deps.now ?? (() => new Date().toISOString()) } : undefined
   );
+  // A spell cast over several turns lapses on a turn that went without its action.
+  lapseLongCasts(state, outgoingId, ending);
   // A spell area the creature ends its turn in acts on it (Moonbeam, Spirit Guardians).
   const zones = zoneDepsOf(deps);
   if (zones) ending.push(...zonesAtTurnEnd(state, outgoingId, zones));
   events?.push(...ending);
   // A new round sorts the whole order again, which settles any mid-round score change.
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
-  const nextActorId = wraps
-    ? (order.find((entry) => !isDefeated(state, entry.actorId)) ?? order[0]).actorId
-    : order[currentIndex + steps].actorId;
+  const nextActorId = stopped
+    ? outgoingId!
+    : wraps
+      ? (order.find((entry) => !isDefeated(state, entry.actorId)) ?? order[0]).actorId
+      : order[currentIndex + steps].actorId;
   state.combat = {
     ...state.combat,
     initiative: order,
     round: wraps ? state.combat.round + 1 : state.combat.round,
     turnActorId: nextActorId,
-    // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD).
-    turn: { ...EMPTY_TURN },
-    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId),
+    // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD). The turn
+    // that just ended opens the window for legendary actions, until the incoming creature does something.
+    turn: { ...EMPTY_TURN, ...(outgoingId && !stopped ? { afterActorId: outgoingId } : {}) },
+    // A marilith's Reactive: "The marilith can take one Reaction on every turn of combat."
+    reactionsUsed: state.combat.reactionsUsed.filter(
+      (actorId) => actorId !== nextActorId && !reactsEveryTurn(state, actorId, deps)
+    ),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, nextActorId)
   };
+  // A move or teleport granted for the turn that ended lapses with it.
+  dropStaleGrants(state);
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
   events?.push(...expiry);
@@ -719,4 +783,5 @@ export function previousInitiativeTurn(state: GameState) {
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== previousActorId),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, previousActorId)
   };
+  dropStaleGrants(state);
 }
