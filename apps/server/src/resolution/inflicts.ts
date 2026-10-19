@@ -34,10 +34,13 @@ export function inflictOnTargets(ctx: ResolveContext): void {
             name: `${conditionLabel(conditions[0]!)} by ${attacker.name} (${action.name})`.slice(0, 120),
             sourceActorId: attacker.id,
             sourceName: attacker.name,
-            sourceActionId: action.id,
+            // An effect refreshes its source's earlier one from the same action, so beside the action's own grant
+            // (Awaken's Intelligence) the condition keeps an id of its own.
+            sourceActionId: action.grants ? `${action.id}:inflicted` : action.id,
             startedRound: state.combat.round,
             duration: effectDurationOf(state, inflicts.duration, target.id, attacker.id),
-            linkedConditionIds: [...conditions]
+            linkedConditionIds: [...conditions],
+            ...(inflicts.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true } : {})
           }),
           events,
           immunities

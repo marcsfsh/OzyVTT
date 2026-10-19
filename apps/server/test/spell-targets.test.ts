@@ -76,21 +76,20 @@ describe("how many creatures a spell targets", () => {
 });
 
 describe("the creature types a spell targets", () => {
-  it("refuses Hold Person at a Beast, and takes a Humanoid", () => {
-    const { state } = beasts();
-    expect(() => cast(state, "hold-person", { targetIds: [FOE] })).toThrowError(
-      /Hold Person targets a Humanoid, and Wolf isn't one/
-    );
-    const resolution = cast(state, "hold-person", { targetIds: [FOE2] });
+  it("does nothing to a Beast picked for Hold Person, and asks a Humanoid for the save", () => {
+    const beast = cast(beasts().state, "hold-person", { targetIds: [FOE] });
+    expect(beast.save?.targets ?? []).toEqual([]);
+    expect(beast.warnings).toContain("Hold Person has no effect on Wolf.");
+    const resolution = cast(beasts().state, "hold-person", { targetIds: [FOE2] });
     expect(resolution.save?.targets).toEqual([expect.objectContaining({ targetName: "Bandit" })]);
   });
 
-  it("refuses Animal Friendship at a Humanoid, and Charm Person at a Beast", () => {
-    expect(() => cast(beasts().state, "animal-friendship", { targetIds: [FOE2] })).toThrowError(
-      /Animal Friendship targets a Beast, and Bandit isn't one/
+  it("does nothing to a Humanoid picked for Animal Friendship, or a Beast for Charm Person", () => {
+    expect(cast(beasts().state, "animal-friendship", { targetIds: [FOE2] }).warnings).toContain(
+      "Animal Friendship has no effect on Bandit."
     );
-    expect(() => cast(beasts().state, "charm-person", { targetIds: [FOE] })).toThrowError(
-      /Charm Person targets a Humanoid, and Wolf isn't one/
+    expect(cast(beasts().state, "charm-person", { targetIds: [FOE] }).warnings).toContain(
+      "Charm Person has no effect on Wolf."
     );
   });
 
@@ -98,9 +97,7 @@ describe("the creature types a spell targets", () => {
     const { state } = beasts();
     const resolution = cast(state, "calm-emotions", { targetIds: [FOE, FOE2], areaPlaced: true });
     expect(resolution.save?.targets.map((target) => target.targetName)).toEqual(["Bandit"]);
-    expect(resolution.warnings).toContain(
-      "Wolf isn't affected by Calm Emotions, which affects only humanoid creatures."
-    );
+    expect(resolution.warnings).toContain("Calm Emotions has no effect on Wolf.");
   });
 });
 

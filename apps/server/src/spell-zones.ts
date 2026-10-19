@@ -25,6 +25,7 @@ import { pullTokenToward } from "./forced-movement.js";
 import { AURA_IMMUNE_TAG } from "./statblock-traits.js";
 import { breakTimeStop } from "./time-stop.js";
 import { applyCastSight } from "./vision/cast-sight.js";
+import { spellWardOf } from "./resolution/spell-wards.js";
 
 type Actor = GameState["actors"][number];
 type Point = Readonly<{ x: number; y: number }>;
@@ -389,6 +390,9 @@ export function exposed(
     const types = zone.types ?? trigger.types;
     if (types && !types.includes(typeOf(creature, deps) ?? "")) return [];
     if (trigger.sizes && !trigger.sizes.includes(creature.size ?? "medium")) return [];
+    // A spell that can't reach the creature leaves it out (a Ring of Mind Shielding in Zone of Truth).
+    const spell = zone.rule === undefined ? deps.catalog?.spellRecord?.(zone.spellId) : undefined;
+    if (spell && spellWardOf(state, creature, spell, zone.casterId, deps) !== null) return [];
     // A defeated creature takes no more; a dying character does (damage at 0 HP is a failed death save).
     if (creature.hp.current <= 0 && (creature.kind !== "player-character" || (creature.deathSaves?.failures ?? 0) >= 3))
       return [];

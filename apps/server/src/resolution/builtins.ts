@@ -1,4 +1,4 @@
-import { d20FacesFor } from "@vtt/rules-5e";
+import { d20Count, d20FacesFor, otherDiceOf, type AggregatedRollMode } from "@vtt/rules-5e";
 import { wardedConditions } from "../paladin-auras.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import {
@@ -7,6 +7,7 @@ import {
   toolAbility,
   toolProficiencies,
   totalCheck,
+  type CheckRoll,
   type CheckSubject,
   type CheckVersus
 } from "../ability-checks.js";
@@ -94,6 +95,28 @@ export function rollCheck(
   /** An Advantage the check's own rule gives it, by name (a Talisman of the Sphere). */
   advantage?: string
 ): boolean | null {
+  return rolledCheck(ctx, subject, dc, label, stakes, versus, disadvantage, advantage).success;
+}
+
+/** A check `rollCheck` made: its outcome, its plan's context, the dice it threw and the mode they were thrown under. */
+type RolledCheck = Readonly<{
+  success: boolean | null;
+  warded: readonly string[];
+  roll: CheckRoll;
+  mode: AggregatedRollMode["mode"];
+  forced: AggregatedRollMode["mode"] | undefined;
+}>;
+
+function rolledCheck(
+  ctx: ResolveContext,
+  subject: CheckSubject,
+  dc: number | null,
+  label?: string,
+  stakes: readonly string[] = [],
+  versus?: CheckVersus,
+  disadvantage?: string,
+  advantage?: string
+): RolledCheck {
   // A Help an earlier check used ends before this one is planned.
   const helpEnded = endUsedHelp(ctx.state, ctx.attacker);
   const warded = ctx.deps.resolveDefinition
@@ -146,7 +169,7 @@ export function rollCheck(
   const success = plan.autoFails !== undefined ? false : dc === null ? null : roll.total >= dc;
   if (plan.autoFails !== undefined) ctx.warnings.push(plan.autoFails);
   ctx.check = { skill: label ?? plan.label, total: roll.total, naturalRoll: roll.natural, dc, success };
-  return success;
+  return { success, warded, roll, mode, forced };
 }
 
 /** The skills an SRD [Action] check may use, and the ability each goes with: Search's are Wisdom (Insight, Medicine,
@@ -268,24 +291,57 @@ function chosenSubject(ctx: ResolveContext, ability: CheckSubject["ability"]): C
  *  whose Hide total it meets ("an enemy finds you"), with dynamic vision on, among those it could see but for hiding. */
 const searchOrStudy = (ability: CheckSubject["ability"]) => (ctx: ResolveContext) => {
   const subject = chosenSubject(ctx, ability);
-  rollCheck(ctx, subject, null);
-  if (ctx.action.id === "search" && subject.skill === "perception") findHidden(ctx);
+  const rolled = rolledCheck(ctx, subject, null);
+  if (ctx.action.id === "search" && subject.skill === "perception") findHidden(ctx, subject, rolled);
 };
 
-/** Ends the Hide of each enemy the searcher's Perception total finds. */
-function findHidden(ctx: ResolveContext): void {
-  const total = ctx.check?.total;
-  if (total === undefined) return;
+/** How a roll's mode reads in the GM's line. */
+const MODE_WORDS: Readonly<Record<AggregatedRollMode["mode"], string>> = {
+  normal: "rolls one d20",
+  advantage: "has Advantage",
+  disadvantage: "has Disadvantage"
+};
+
+/**
+ * Ends the Hide of each enemy the searcher's Perception total finds. One roll serves them all, read against each hider
+ * as the rules read a check to find it: Disadvantage when it is Lightly Obscured to the searcher (Dim Light, light fog),
+ * Advantage from the searcher's Hunter's Mark on it. Where that changes the roll's mode, the d20s already thrown count
+ * again, one more is thrown when two are needed, and the other dice (Guidance's d4) are kept.
+ */
+function findHidden(ctx: ResolveContext, subject: CheckSubject, rolled: RolledCheck): void {
   const { state, attacker, deps } = ctx;
   const content = {
     ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
     ...(deps.catalog ? { catalog: deps.catalog } : {})
   };
+  const pool = [...rolled.roll.faces];
+  const others = otherDiceOf(rolled.roll.resolution);
   for (const other of state.actors) {
     if (other.id === attacker.id) continue;
     const hiding = other.effects.find((effect) => effect.tags.includes("hidden") && effect.findDc !== undefined);
-    if (!hiding || total < hiding.findDc!) continue;
+    if (!hiding) continue;
     if (!couldSpot(state, content, attacker.id, other.id, deps.distanceFeet)) continue;
+    const sight = checkSightFor(state, attacker, content, other, deps.distanceFeet);
+    const plan = checkPlan(attacker, deps.definition, ctx.derivation, subject, {
+      ...(rolled.warded.length > 0 ? { warded: rolled.warded } : {}),
+      finding: other,
+      sight
+    });
+    if (plan.autoFails !== undefined) continue;
+    const mode = rolled.forced ?? plan.rollMode.mode;
+    let total = rolled.roll.total;
+    if (mode !== rolled.mode) {
+      while (pool.length < d20Count(mode)) pool.push(deps.random(20));
+      total = totalCheck(plan, pool.slice(0, d20Count(mode)), mode, deps.random, others).total;
+      const why = [...plan.rollMode.advantage, ...plan.rollMode.disadvantage].join(", ");
+      ctx.tableNarration.push({
+        kind: "effect",
+        text: `${attacker.name}'s Perception against ${other.name} ${MODE_WORDS[mode]}${why ? ` (${why})` : ""}: ${total} against its ${hiding.findDc}.`,
+        actorIds: [attacker.id, other.id],
+        gmOnly: true
+      });
+    }
+    if (total < hiding.findDc!) continue;
     const events = endEffect(state, other.id, hiding.id);
     for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
     ctx.tableNarration.push({
@@ -305,7 +361,7 @@ function influence(ctx: ResolveContext): void {
   const monsterDefinition = monster?.definitionId ? ctx.deps.resolveDefinition?.(monster.definitionId) : undefined;
   const dc = monsterDefinition ? Math.max(15, monsterDefinition.abilityScores.int) : null;
   const subject = chosenSubject(ctx, "cha");
-  const type = monster ? creatureTypeOf(monster, monsterDefinition) : null;
+  const type = monster ? creatureTypeOf(monster, monsterDefinition, "true") : null;
   if (subject.skill === "animal-handling" && type !== null && type !== "beast" && type !== "monstrosity")
     throw new CommandRejectedError(
       `Animal Handling influences a Beast or Monstrosity, and ${monster!.name} is ${/^[aeiou]/.test(type) ? "an" : "a"} ${titleCase(type)}.`

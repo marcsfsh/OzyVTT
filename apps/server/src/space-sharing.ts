@@ -17,6 +17,11 @@ const SHARES_SPACE = ["Air Form", "Fire Form", "Water Form", "Swarm"] as const;
 export const passesCreatures = (definition: ActorDefinition | undefined): boolean =>
   SHARES_SPACE.some((name) => holdsFeature(definition, name, name));
 
+/** Halfling Nimbleness: "You can move through the space of any creature that is a size larger than you, but you can't
+ *  stop in the same space." The space still costs as Difficult Terrain, and ending there stays refused. */
+export const isNimble = (definition: ActorDefinition | undefined): boolean =>
+  holdsFeature(definition, "halfling-nimbleness", "Halfling Nimbleness");
+
 /** Whether a creature with this stat block is a swarm, whose space any creature may cross. */
 export const isSwarm = (definition: ActorDefinition | undefined): boolean => holdsFeature(definition, "swarm", "Swarm");
 
@@ -25,14 +30,14 @@ export const isSwarm = (definition: ActorDefinition | undefined): boolean => hol
 export const opensItsSpace = (definition: ActorDefinition | undefined): boolean =>
   isSwarm(definition) || traitOf(definition, "engulfs-entrants") !== undefined;
 
-/** What the drag preview needs for `actorId`'s move: whether it passes creatures, and the swarms on the map among the
- *  creatures `hidden` leaves the asker. */
+/** What the drag preview needs for `actorId`'s move: whether it passes creatures (all, or larger ones), and the swarms
+ *  on the map among the creatures `hidden` leaves the asker. */
 export function spaceSharingFor(
   state: GameState,
   actorId: string,
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
   hidden: (actorId: string) => boolean
-): Readonly<{ passesCreatures?: true; swarmIds?: string[] }> {
+): Readonly<{ passesCreatures?: true; nimble?: true; swarmIds?: string[] }> {
   const definitionOf = (id: string) => {
     const definitionId = state.actors.find((actor) => actor.id === id)?.definitionId;
     return definitionId ? resolveDefinition(definitionId) : undefined;
@@ -46,6 +51,7 @@ export function spaceSharingFor(
   const formShares = mover !== undefined && formEffectOf(mover)?.form?.sharesSpaces === true;
   return {
     ...(passesCreatures(definitionOf(actorId)) || formShares ? { passesCreatures: true as const } : {}),
+    ...(isNimble(definitionOf(actorId)) ? { nimble: true as const } : {}),
     ...(swarmIds.length > 0 ? { swarmIds } : {})
   };
 }

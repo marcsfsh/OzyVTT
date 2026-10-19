@@ -366,6 +366,19 @@ export const SpellEffectSchema = z
     effectOptions: ActionSchema.shape.effectOptions,
     /** Only an unwilling creature makes the cast's save; one on the caster's side takes its effect with no save. */
     unwillingOnly: z.literal(true).optional(),
+    /** What the cast does to each target with no roll (Awaken's Charmed for 30 days), as `ActionSchema.inflicts`. */
+    inflicts: ActionSchema.shape.inflicts,
+    /** Its targets are this size or smaller (Animal Messenger: "A Tiny Beast"); a larger creature picked is refused. */
+    targetMaxSize: ActionTargetsSchema.shape.maxSize,
+    /** Its target has this ability score or less (Awaken: "a Beast or Plant creature with an Intelligence of 3 or
+     *  less"); a creature with more picked is refused. */
+    targetAbilityMax: z
+      .object({ ability: AbilitySchema, score: z.number().int().min(1).max(30) })
+      .strict()
+      .optional(),
+    /** Its target is the caster or a willing creature, which the server takes to be one on the caster's side (Light:
+     *  "an object that isn't being worn or carried by someone else"; Nondetection: "a willing creature"). */
+    willingTargets: z.literal(true).optional(),
     /** Feet its area's size grows for each slot level above the spell's (Fog Cloud's radius: 20; Confusion's: 5). */
     areaPerSlot: z.number().int().min(5).max(100).optional()
   })

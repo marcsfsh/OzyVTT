@@ -1059,6 +1059,23 @@ describe("reaction prompts: Uncanny Dodge (ADR-0020 amendment)", () => {
       { ...deps(faces, definition), resolveDefinition: gameResolver(game) }
     );
 
+  // SRD Uncanny Dodge: "When an attacker that you can see hits you".
+  it("opens no prompt for an attacker Pip can't see, with the map's vision off", () => {
+    const game = crocTurn();
+    const croc = game.actors.find((actor) => actor.id === IDS.croc1)!;
+    croc.conditions = [{ id: "invisible" }] as typeof croc.conditions;
+    const bite = resolveLive(
+      game,
+      crocodileDefinition,
+      "bite",
+      { actorId: IDS.croc1, targetIds: [IDS.pip] },
+      [15, 15, 6, 6, 6]
+    );
+    expect(bite.attack?.outcome).toBe("hit");
+    expect(bite.reactionPrompts ?? []).toEqual([]);
+    expect(game.combat.pendingReactions).toEqual([]);
+  });
+
   it("parks a hit's damage on a pending prompt instead of the apply button", () => {
     const game = crocTurn();
     // Croc 1 bites Pip: 15 + 8 = 23 vs AC 16 hits; 6+6+6+5 = 23 piercing.

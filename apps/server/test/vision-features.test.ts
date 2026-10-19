@@ -180,6 +180,51 @@ describe("Divine Sense and Detect Evil and Good", () => {
     expect(sensed(walled, SESSION_A)).toEqual([]);
   });
 
+  // SRD Ring of Mind Shielding: "immune to magic that allows other creatures to ... know your creature type."
+  it("senses a creature wearing a Ring of Mind Shielding with neither Detect Evil and Good nor Divine Sense", () => {
+    const spell = loadSpells().find((entry) => entry.id === "detect-evil-and-good")!;
+    const near = { positions: { [GOBLIN]: cell(5, 5) } };
+    const withSpell = (state: GameState) => {
+      state.actors[0]!.effects = [
+        {
+          ...structuredClone(divineSense),
+          detects: structuredClone(spell.effect!.grant!.detects!),
+          spell: { id: "detect-evil-and-good", level: 1 }
+        }
+      ];
+      return state;
+    };
+    expect(sensed(withSpell(dark(near)), SESSION_A)).toHaveLength(1);
+    const ring = {
+      id: "ring-of-mind-shielding",
+      name: "Ring of Mind Shielding",
+      quantity: 1,
+      equipped: true,
+      attuned: true,
+      category: "ring"
+    };
+    const shielded = withSpell(dark({ ...near, actors: { [GOBLIN]: { definitionId: "zombie", inventory: [ring] } } }));
+    expect(sensed(shielded, SESSION_A)).toEqual([]);
+    // Divine Sense tells the creature's type as well, so the ring hides the zombie from it too.
+    const sensedByPaladin = dark({ ...near, actors: { [GOBLIN]: { definitionId: "zombie", inventory: [ring] } } });
+    expect(sensed(sensedByPaladin, SESSION_A)).toEqual([]);
+    // Nondetection wards against Divination spells, so only Divine Sense still finds its bearer.
+    const hidden = dark(near);
+    addEffect(
+      hidden,
+      GOBLIN,
+      makeEffect({
+        id: "effect-nondetection",
+        name: "Nondetection",
+        duration: { type: "minutes", remaining: 480 },
+        tags: ["nondetection"],
+        modifiers: [{ type: "spell-ward", schools: ["divination"] }]
+      })
+    );
+    expect(sensed(hidden, SESSION_A)).toHaveLength(1);
+    expect(sensed(withSpell(hidden), SESSION_A)).toEqual([]);
+  });
+
   it("is what the Paladin's Divine Sense grants", () => {
     const action = actionOf(classFeature("paladin", "channel-divinity")?.actions, "divine-sense");
     expect(action.grants?.detects).toEqual(divineSense.detects);

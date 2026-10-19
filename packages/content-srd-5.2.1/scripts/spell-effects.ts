@@ -5,7 +5,15 @@
  * the caster makes ("Make a ranged spell attack"), never one the text only mentions. `test/spell-effects.test.ts`
  * pins the cases.
  */
-import { DamageTypeSchema, type ActionArea, type DamageType, type GrantOption, type OnHitRider } from "@vtt/schemas";
+import {
+  DamageTypeSchema,
+  MASKED_TYPE_TAG,
+  type ActionArea,
+  type DamageType,
+  type GrantOption,
+  type OnHitRider
+} from "@vtt/schemas";
+import { CREATURE_TYPE_IDS as CREATURE_TYPES } from "../src/enums.js";
 import { areaOfProse } from "../src/action-prose.js";
 import type { SpellEffect, SpellLaterAction, SpellReference } from "../src/schemas.js";
 import { healingOfText, spellAttackRangeOf, type SpellRange } from "../src/spell-effect.js";
@@ -121,6 +129,7 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   antipathysympathy: { count: 1 },
   "arcanists-magic-aura": { count: 1 },
   "astral-projection": { count: 9 },
+  awaken: { count: 1 },
   bane: { count: 3, perSlot: 1 },
   banishment: { count: 1, perSlot: 1 },
   barkskin: { count: 1 },
@@ -133,6 +142,7 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   "chain-lightning": { count: 4, perSlot: 1 },
   "charm-monster": { count: 1, perSlot: 1 },
   "charm-person": { count: 1, perSlot: 1 },
+  "continual-flame": { count: 1 },
   clone: { count: 1 },
   command: { count: 1, perSlot: 1 },
   contagion: { count: 1 },
@@ -183,6 +193,7 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   jump: { count: 1, perSlot: 1 },
   "lesser-restoration": { count: 1 },
   levitate: { count: 1 },
+  light: { count: 1 },
   longstrider: { count: 1, perSlot: 1 },
   "mage-armor": { count: 1 },
   "mass-cure-wounds": { count: 6 },
@@ -2198,8 +2209,40 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     tags: ["mind-blank"],
     target: "target",
     duration: { type: "manual" },
-    modifiers: [{ type: "damage-immunity", damageTypes: ["psychic"] }],
+    modifiers: [
+      { type: "damage-immunity", damageTypes: ["psychic"] },
+      { type: "spell-ward", schools: ["divination"] }
+    ],
     conditionImmunities: ["charmed"]
+  }),
+  // "The target gains an Intelligence of 10", for good; its Charmed for 30 days is the cast's `inflicts`. The language
+  // it learns and a natural plant's statistics are the GM's.
+  awaken: spellGrant({
+    name: "Awakened",
+    tags: ["awakened"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [{ type: "ability-score-minimum", ability: "int", score: 10 }]
+  }),
+  // "You hide a target that you touch from Divination spells ... The target can't be targeted by any Divination
+  // spell." A place or an object, and scrying sensors, are the GM's.
+  nondetection: spellGrant({
+    name: "Nondetection",
+    tags: ["nondetection"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [{ type: "spell-ward", schools: ["divination"] }]
+  }),
+  // Mask: "Choose a creature type other than the target's actual type. Spells and other magical effects treat the
+  // target as if it were a creature of the chosen type." The pick is the effect's tag, which creatureTypeOf reads.
+  "arcanists-magic-aura": spellGrant({
+    name: "Arcanist's Magic Aura",
+    tags: ["arcanists-magic-aura"],
+    target: "target",
+    duration: { type: "manual" },
+    options: CREATURE_TYPES.map((type) =>
+      option(type, `Mask: ${type[0]!.toUpperCase()}${type.slice(1)}`, { tags: [`${MASKED_TYPE_TAG}${type}`] })
+    )
   }),
   // "Resistance to Poison damage ... Immunity to the Frightened and Poisoned conditions. Its Hit Point maximum also
   // increases by 2d10, and it gains the same number of Hit Points", rolled for each, for 24 hours.
@@ -2857,7 +2900,33 @@ const CAST_EFFECT_OPTIONS: Readonly<Record<string, NonNullable<SpellEffect["effe
 
 /** Spells whose save only an unwilling creature makes ("If the target is an unwilling creature, it can make a ...
  *  saving throw"): a creature on the caster's side takes the effect with no save. */
-const UNWILLING_ONLY: ReadonlySet<string> = new Set(["enlargereduce", "true-polymorph"]);
+const UNWILLING_ONLY: ReadonlySet<string> = new Set(["enlargereduce", "true-polymorph", "levitate", "seeming"]);
+
+/** What a cast does to its targets with no roll (SRD 5.2.1 text): Awaken's "The awakened target has the Charmed
+ *  condition for 30 days or until you or your allies deal damage to it." */
+const CAST_INFLICTS: Readonly<Record<string, NonNullable<SpellEffect["inflicts"]>>> = {
+  awaken: { conditions: ["charmed"], duration: { type: "minutes", minutes: 43_200 }, endsOnSourceSideDamage: true }
+};
+
+/** The most its target may be (SRD 5.2.1 text): Animal Messenger's "A Tiny Beast". */
+const TARGET_MAX_SIZE: Readonly<Record<string, NonNullable<SpellEffect["targetMaxSize"]>>> = {
+  "animal-messenger": "tiny"
+};
+
+/** The highest score its target may have: Awaken's "a Beast or Plant creature with an Intelligence of 3 or less". */
+const TARGET_ABILITY_MAX: Readonly<Record<string, NonNullable<SpellEffect["targetAbilityMax"]>>> = {
+  awaken: { ability: "int", score: 3 }
+};
+
+/** Spells whose target is the caster or a willing creature: Light and Continual Flame's object "that isn't being worn
+ *  or carried by someone else" (the caster's own, or one a willing creature hands over), Nondetection's and
+ *  Arcanist's Magic Aura's "willing creature". */
+const WILLING_TARGETS: ReadonlySet<string> = new Set([
+  "light",
+  "continual-flame",
+  "nondetection",
+  "arcanists-magic-aura"
+]);
 
 /** Saves the caster makes itself at a printed DC (SRD Contact Other Plane: "When you cast this spell, make a DC 15
  *  Intelligence saving throw"). */
@@ -2991,6 +3060,10 @@ export function spellEffectFor(
     ...(shapeShift ? { shapeShift: structuredClone(shapeShift) } : {}),
     ...(effectOptions ? { effectOptions: structuredClone(effectOptions) } : {}),
     ...(UNWILLING_ONLY.has(id) ? { unwillingOnly: true as const } : {}),
+    ...(CAST_INFLICTS[id] ? { inflicts: structuredClone(CAST_INFLICTS[id]) } : {}),
+    ...(TARGET_MAX_SIZE[id] ? { targetMaxSize: TARGET_MAX_SIZE[id] } : {}),
+    ...(TARGET_ABILITY_MAX[id] ? { targetAbilityMax: { ...TARGET_ABILITY_MAX[id] } } : {}),
+    ...(WILLING_TARGETS.has(id) ? { willingTargets: true as const } : {}),
     ...(AREA_PER_SLOT[id] !== undefined ? { areaPerSlot: AREA_PER_SLOT[id] } : {}),
     // The creatures it brings and the commands it gives (`spell-summons.ts`).
     ...spellSummonFieldsFor(id)
@@ -3082,6 +3155,11 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...PERSISTS_WITHOUT_TARGETS,
   ...SEEN_TARGETS,
   ...Object.keys(TARGET_TYPES),
+  ...UNWILLING_ONLY,
+  ...Object.keys(TARGET_MAX_SIZE),
+  ...Object.keys(CAST_INFLICTS),
+  ...Object.keys(TARGET_ABILITY_MAX),
+  ...WILLING_TARGETS,
   ...STABILIZES,
   ...RANGE_DOUBLES,
   ...SILENCES_AREA,

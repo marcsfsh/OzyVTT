@@ -244,6 +244,25 @@ export function readComponents(
   return { gaps, spends };
 }
 
+/** Whether the cast is made with a Verbal component (SRD Hide: casting such a spell ends it): a new cast of a spell
+ *  that has one, from neither a magic item (a Spell Scroll is read aloud) nor a stat block that goes without it, and
+ *  not made Subtle. */
+export function castsWithVerbal(
+  input: Readonly<{
+    attacker: LiveActor;
+    action: DefinitionAction;
+    spell: SpellReference | undefined;
+    definition: ActorDefinition | undefined;
+    catalog: EquipmentCatalog | undefined;
+    subtle: boolean;
+  }>
+): boolean {
+  const { attacker, action, spell, definition, catalog } = input;
+  if (!spell || !spell.components.verbal || laterRowOf(spell, action.id) !== undefined || input.subtle) return false;
+  if (isItemActionId(action.id) && scrollOfAction(action, attacker.inventory, catalog) === null) return false;
+  return !waivedBy(definition, action).has("verbal");
+}
+
 /** What `readComponents` said a cast uses up, taken from the caster's pack and purse. */
 export function spendComponents(attacker: LiveActor, spends: readonly ComponentSpend[]): void {
   for (const spend of spends) {

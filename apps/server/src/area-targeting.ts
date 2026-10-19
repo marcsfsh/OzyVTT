@@ -95,6 +95,17 @@ export function tokensInTemplate(
   return caught;
 }
 
+/** An area's point of origin on the map, from which its lines and its cover are read: a Sphere, Cylinder or
+ *  Emanation's centre, a Cone or Line's start, and a Cube's middle. */
+export function areaOriginPoint(
+  geometry: Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>,
+  shape: AnnotationShapeKind
+): AnnotationPoint {
+  return shape === "square"
+    ? { x: (geometry.origin.x + geometry.target.x) / 2, y: (geometry.origin.y + geometry.target.y) / 2 }
+    : geometry.origin;
+}
+
 /** Whether a straight line from an area's point of origin reaches a cell (its centre or a point near a corner):
  *  always, with vision off. A Sphere, Cylinder or Emanation spreads from its centre, a Cone or Line from its start, and
  *  a Cube here from its middle. */
@@ -110,10 +121,7 @@ function blockedFromOrigin(
   const obstacles = vision.walls
     .filter((wall) => (wall.kind !== "door" || wall.open !== true) && wall.bars !== true)
     .flatMap(segmentsOf);
-  const origin =
-    shape === "square"
-      ? { x: (geometry.origin.x + geometry.target.x) / 2, y: (geometry.origin.y + geometry.target.y) / 2 }
-      : geometry.origin;
+  const origin = areaOriginPoint(geometry, shape);
   return (cell) =>
     [0, 0.35, -0.35].some((dx) =>
       [0, 0.35, -0.35].some(

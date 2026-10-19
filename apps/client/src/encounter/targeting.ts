@@ -38,6 +38,10 @@ export type TargetingSession = Readonly<
     slotLevel?: number;
     /** How much of its pool an action whose user picks the cost spends (Lay on Hands' points). */
     spend?: number;
+    /** The conditions a touch also ends, each for points of its pool (Restoring Touch). */
+    conditionIds?: readonly string[];
+    /** The Hit Points each target takes of a pool its user divides (Preserve Life); absent, the server splits evenly. */
+    healingShares?: Readonly<Record<string, number>>;
     /** A darts action's darts (Magic Missile at this slot) and how many each selected target takes. */
     darts?: Readonly<{ total: number; counts: Readonly<Record<string, number>> }>;
     /** The damage type picked for an action whose caster chooses one (Chromatic Orb). */
@@ -397,10 +401,18 @@ export function targetingReady(picking: TargetingSession): boolean {
   if (picking.action.choosesAbility && picking.ability === undefined) return false;
   if (shapingUnchosen(picking)) return false;
   if (formUnchosen(picking.action, picking, picking.selected)) return false;
+  // A chosen cost of nothing spends nothing (Restoring Touch with no Hit Points and no condition picked).
+  if (picking.action.useCost === "chosen" && picking.spend === 0 && (picking.conditionIds ?? []).length === 0)
+    return false;
+  // A divided pool can't give out more than it holds.
+  if (picking.action.dividesHealing !== undefined && sharedOut(picking) > picking.action.dividesHealing) return false;
   if (picking.mode === "template") return Boolean(picking.template?.placed);
   if (picking.mode === "none") return true;
   return picking.selected.length > 0;
 }
+/** The Hit Points of a divided pool given to the creatures still selected (Preserve Life). */
+export const sharedOut = (picking: TargetingSession): number =>
+  picking.selected.reduce((sum, id) => sum + (picking.healingShares?.[id] ?? 0), 0);
 /** Sets how many darts a selected target takes, within the darts the action has left to assign. */
 export function setTargetDarts(actorId: string, count: number) {
   if (!session?.darts || !session.selected.includes(actorId)) return;
@@ -433,6 +445,22 @@ export function setTemplatePlacement(origin: AnnotationPoint, target: Annotation
 export function setTargetingSpend(spend: number) {
   if (!session || session.action.useCost !== "chosen") return;
   session = { ...session, spend };
+  emit();
+}
+/** Picks or drops a condition the touch also ends (Restoring Touch). */
+export function toggleConditionPick(conditionId: string) {
+  if (!session?.action.conditionPicks?.conditions.includes(conditionId)) return;
+  const picked = session.conditionIds ?? [];
+  session = {
+    ...session,
+    conditionIds: picked.includes(conditionId) ? picked.filter((id) => id !== conditionId) : [...picked, conditionId]
+  };
+  emit();
+}
+/** The Hit Points one target takes of a pool its user divides (Preserve Life). */
+export function setHealingShare(targetId: string, points: number) {
+  if (!session || session.action.dividesHealing === undefined) return;
+  session = { ...session, healingShares: { ...session.healingShares, [targetId]: Math.max(0, points) } };
   emit();
 }
 export function clearTargeting() {
@@ -496,6 +524,8 @@ export function resolveTargeting(
     template,
     slotLevel,
     spend,
+    conditionIds,
+    healingShares,
     darts,
     damageType,
     skill,
@@ -545,6 +575,15 @@ export function resolveTargeting(
     ...(opts.damageAnswer ? { damageAnswer: { id: opts.damageAnswer.id, dice: [...opts.damageAnswer.dice] } } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
     ...(spend !== undefined ? { spend } : {}),
+    ...(conditionIds && conditionIds.length > 0 ? { conditionIds: [...conditionIds] } : {}),
+    // The division of a pool among the creatures still selected; a target given nothing takes nothing.
+    ...(healingShares && action.dividesHealing !== undefined
+      ? {
+          healingShares: Object.fromEntries(
+            selected.map((id) => [id, healingShares[id] ?? 0] as const).filter(([, points]) => points > 0)
+          )
+        }
+      : {}),
     ...(damageType !== undefined ? { damageType } : {}),
     ...(skill !== undefined ? { skill } : {}),
     ...(ability !== undefined ? { ability } : {}),
