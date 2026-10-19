@@ -134,9 +134,9 @@ describe("what one cast of an SRD spell does", () => {
       // "Any other creature's Speed is halved in the Emanation."
       halvesSpeed: true
     });
-    expect(zoneOf("web")).toEqual({ on: ["enter", "start-turn"] });
+    expect(zoneOf("web")).toEqual({ on: ["enter", "start-turn"], terrain: { cost: 2, kind: "webs" } });
     expect(zoneOf("stinking-cloud")).toEqual({ on: ["start-turn"] });
-    expect(zoneOf("spike-growth")).toEqual({ on: ["travel"] });
+    expect(zoneOf("spike-growth")).toEqual({ on: ["travel"], terrain: { cost: 2, kind: "plants" } });
     expect(zoneOf("flaming-sphere")).toEqual({ on: ["end-turn"], around: "point", feet: 5 });
     expect(zoneOf("guardian-of-faith")).toMatchObject({ affects: "enemies", damageCap: 60 });
     // Damage with no save (a wall of fire), and a fixed amount (the guardian's 20).
@@ -153,6 +153,28 @@ describe("what one cast of an SRD spell does", () => {
       ["save", "other"],
       ["ram", "bonus-action"]
     ]);
+  });
+
+  it("marks the ground an area makes difficult, and how long the ground stays", () => {
+    const zoneOf = (id: string) => effectOf(id)!.laterActions?.find((row) => row.zone)?.zone;
+    expect(zoneOf("entangle")).toEqual({ on: [], terrain: { cost: 2, kind: "plants" } });
+    // "Until the end of your next turn."
+    expect(zoneOf("ice-storm")).toEqual({ on: [], terrain: { cost: 2, kind: "ice" }, untilCasterNextTurnEnd: true });
+    // "4 feet of movement for every 1 foot."
+    expect(zoneOf("plant-growth")?.terrain).toEqual({ cost: 4, kind: "plants" });
+    expect(zoneOf("wall-of-thorns")?.terrain).toEqual({ cost: 4, kind: "plants" });
+    expect(zoneOf("conjure-minor-elementals")).toEqual({
+      on: [],
+      around: "caster",
+      feet: 15,
+      terrain: { cost: 2, for: "enemies" }
+    });
+    expect(zoneOf("earthquake")).toEqual({ on: ["caster-turn-end"], terrain: { cost: 2 } });
+    for (const id of ["black-tentacles", "blade-barrier", "grease", "insect-plague", "sleet-storm"])
+      expect(zoneOf(id)?.terrain?.cost, id).toBe(2);
+    // A failed save also ends the creature's Concentration.
+    expect(effectOf("sleet-storm")!.laterActions?.[0]!.save?.breaksConcentration).toBe(true);
+    expect(loadSpells().find((spell) => spell.id === "earthquake")!.save?.breaksConcentration).toBe(true);
   });
 
   it("gives a wall and a thing placed at a point an area the GM can place", () => {

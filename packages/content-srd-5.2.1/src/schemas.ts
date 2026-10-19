@@ -80,7 +80,8 @@ const SpellDamageSchema = z
  * Where and when what a spell leaves behind acts on a creature, so the server raises the save or deals the damage:
  * a creature entering it (or the area moving onto the creature), starting or ending its turn there, or travelling in
  * it (Spike Growth's damage for every 5 feet); the start of each of its caster's turns, on the one creature in it
- * nearest its point (Faithful Hound's bite); or the spell's end, on every creature in it (Delayed Blast Fireball's
+ * nearest its point (Faithful Hound's bite); the end of each of its caster's turns, on every creature in it
+ * (Earthquake's tremor); or the spell's end, on every creature in it (Delayed Blast Fireball's
  * bead). The area is the one the cast places on the map, or within `feet` of the caster (an Emanation) or of the point
  * the spell is placed at (Flaming Sphere, a guardian). `oncePerTurn`: "A creature makes this save only once per turn"
  * (entering counts once a turn anyway); `affects` "enemies" spares the caster's allies (Guardian of Faith; spirits that
@@ -88,9 +89,9 @@ const SpellDamageSchema = z
  */
 export const SpellZoneSchema = z
   .object({
+    /** When it acts; none for an area that only changes the ground (Entangle's plants, Ice Storm's hail). */
     on: z
-      .array(z.enum(["enter", "start-turn", "end-turn", "travel", "caster-turn-start", "spell-end"]))
-      .min(1)
+      .array(z.enum(["enter", "start-turn", "end-turn", "travel", "caster-turn-start", "caster-turn-end", "spell-end"]))
       .max(3),
     oncePerTurn: z.literal(true).optional(),
     around: z.enum(["caster", "point"]).optional(),
@@ -103,7 +104,21 @@ export const SpellZoneSchema = z
      *  Restrained"). */
     holdsOne: z.literal(true).optional(),
     /** Its damage grows by one die each time its caster's turn ends while it lasts (Delayed Blast Fireball). */
-    grows: z.literal(true).optional()
+    grows: z.literal(true).optional(),
+    /** What it does to the ground while it lasts: Difficult Terrain (`cost` 2: Web, Entangle) or 4 feet of movement
+     *  for every foot (Plant Growth, Wall of Thorns), for every creature or only the caster's enemies (Conjure Minor
+     *  Elementals). `kind` is what the ground is made of, for a creature that moves through it freely (Web Walker's
+     *  webs, Ice Walk's ice). */
+    terrain: z
+      .object({
+        cost: z.union([z.literal(2), z.literal(4)]),
+        for: z.literal("enemies").optional(),
+        kind: z.enum(["webs", "ice", "plants"]).optional()
+      })
+      .strict()
+      .optional(),
+    /** It lasts until the end of its caster's next turn, whatever the spell's own duration (Ice Storm's hailstones). */
+    untilCasterNextTurnEnd: z.literal(true).optional()
   })
   .strict();
 export type SpellZone = z.infer<typeof SpellZoneSchema>;

@@ -3,6 +3,7 @@ import type { GameState, SpellZone } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { footprintInTemplate } from "./area-targeting.js";
+import { holdsFeature } from "./class-features.js";
 import { areEnemies } from "./creature-sides.js";
 import { CONCENTRATING_TAG, endEffectIfPresent, type EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
@@ -46,7 +47,8 @@ type Meeting =
   | "starts its turn in"
   | "moves through"
   | "is set upon by"
-  | "is caught in the blast of";
+  | "is caught in the blast of"
+  | "is caught in";
 
 /** The later action whose zone this spell leaves, if any. */
 export function zoneRowOf(spell: SpellReference) {
@@ -82,7 +84,7 @@ export function endZoneAndItsSpell(state: GameState, zoneId: string): EffectNarr
 
 /** The zones still standing; one whose Concentration has gone is removed on the way, and one bursting as its spell
  *  ended acts only in `burstEndedZones`. */
-function liveZones(state: GameState): SpellZone[] {
+export function liveZones(state: GameState): SpellZone[] {
   pruneEndedZones(state);
   return state.combat.spellZones.filter((zone) => !zone.bursting);
 }
@@ -103,7 +105,7 @@ function creaturesOnMap(state: GameState): Actor[] {
 
 /** "Is a creature of this size at this point inside the zone?", or null when the map can't say (no grid, the area
  *  not placed, its caster off the map). `casterAt` stands the caster of an Emanation somewhere else. */
-function insideTest(
+export function insideTest(
   state: GameState,
   zone: SpellZone,
   trigger: ZoneTrigger,
@@ -142,18 +144,41 @@ function insideTest(
     footprintInTemplate(calibration, area.geometry, shape, spell.area?.widthFeet ?? null, position, sizeCells);
 }
 
-/** The creatures a zone can act on: those on the map (in the fight, during one), except an Emanation's anchor, and only
- *  the caster's enemies where the spell spares the rest. */
-function exposed(
+/** The traits that free a creature from a kind of ground (SRD Web Walker: it "ignores movement restrictions caused by
+ *  webs", so webs neither slow nor hold it; Ice Walk: "Difficult Terrain composed of ice or snow doesn't cost it extra
+ *  movement"). */
+const FREE_ON: Readonly<Record<string, Readonly<{ id: string; name: string; uncaught: boolean }>>> = {
+  webs: { id: "web-walker", name: "Web Walker", uncaught: true },
+  ice: { id: "ice-walk", name: "Ice Walk", uncaught: false }
+};
+
+/** Whether the creature crosses this kind of ground at no extra cost; with `caught`, whether the ground can't hold it
+ *  either. */
+export function movesFreelyOn(
+  creature: Actor,
+  kind: string,
+  deps: Pick<ZoneDeps, "resolveDefinition">,
+  caught = false
+): boolean {
+  const trait = FREE_ON[kind];
+  if (!trait || !creature.definitionId || (caught && !trait.uncaught)) return false;
+  return holdsFeature(deps.resolveDefinition(creature.definitionId), trait.id, trait.name);
+}
+
+/** The creatures a zone can act on: those on the map (in the fight, during one), except an Emanation's anchor, only
+ *  the caster's enemies where the spell spares the rest, and none that its ground can't hold (a spider in the webs). */
+export function exposed(
   state: GameState,
   zone: SpellZone,
   trigger: ZoneTrigger,
   deps: Pick<ZoneDeps, "resolveDefinition">
 ): Actor[] {
   const caster = state.actors.find((actor) => actor.id === zone.casterId);
+  const kind = trigger.terrain?.kind;
   return creaturesOnMap(state).flatMap((creature) => {
     if (trigger.around === "caster" && creature.id === zone.casterId) return [];
     if (trigger.affects === "enemies" && (!caster || !areEnemies(caster, creature, deps.resolveDefinition))) return [];
+    if (kind && movesFreelyOn(creature, kind, deps, true)) return [];
     // A defeated creature takes no more; a dying character does (damage at 0 HP is a failed death save).
     if (creature.hp.current <= 0 && (creature.kind !== "player-character" || (creature.deathSaves?.failures ?? 0) >= 3))
       return [];
@@ -181,9 +206,6 @@ export function speedHalvingAt(
   }
   return tests.length > 0 ? (position, sizeCells) => tests.some((inside) => inside(position, sizeCells)) : null;
 }
-
-/** SRD Sleet Storm: a failure "and lose Concentration". */
-const BREAKS_CONCENTRATION: ReadonlySet<string> = new Set(["sleet-storm"]);
 
 const capitalised = (text: string) => (text.length > 0 ? `${text[0].toUpperCase()}${text.slice(1)}` : text);
 
@@ -286,7 +308,7 @@ function act(
     ...(onFail ? { onFailEffect: currentTurn ? { ...onFail, currentTurn: true as const } : onFail } : {}),
     extra: {
       zoneId: zone.id,
-      ...(BREAKS_CONCENTRATION.has(spell.id) ? { breaksConcentration: true as const } : {})
+      ...(save.breaksConcentration ? { breaksConcentration: true as const } : {})
     },
     // A creature can owe this zone a second save before answering the first (entering, then ending its turn there).
     replaceExisting: false,
@@ -423,7 +445,26 @@ export function zonesAtTurnEnd(state: GameState, actorId: string, deps: ZoneDeps
   for (const zone of liveZones(state))
     if (zone.casterId === actorId && zoneContentOf(zone, deps.catalog)?.trigger.grows)
       zone.grown = Math.min(100, (zone.grown ?? 0) + 1);
-  return zonesWhereItStands(state, actorId, "end-turn", deps);
+  return [...zonesWhereItStands(state, actorId, "end-turn", deps), ...zonesAtCasterTurnEnd(state, actorId, deps)];
+}
+
+/** SRD Earthquake: "at the end of each of your turns for the duration, each creature on the ground in the area makes a
+ *  Dexterity saving throw". A zone that acts as its caster's turn ends acts on every creature in it then. */
+function zonesAtCasterTurnEnd(state: GameState, casterId: string, deps: ZoneDeps): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  if (!state.combat.active) return events;
+  for (const zone of liveZones(state)) {
+    if (zone.casterId !== casterId) continue;
+    const content = zoneContentOf(zone, deps.catalog);
+    if (!content || !content.trigger.on.includes("caster-turn-end")) continue;
+    const inside = insideTest(state, zone, content.trigger, content.spell, deps.geometry);
+    if (!inside) continue;
+    for (const creature of exposed(state, zone, content.trigger, deps)) {
+      const token = tokenOf(state, creature.id)!;
+      if (inside(token.position!, token.sizeCells)) act(state, zone, creature, "is caught in", deps, events);
+    }
+  }
+  return events;
 }
 
 /**

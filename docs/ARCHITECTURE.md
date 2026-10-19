@@ -282,7 +282,11 @@ of a hidden thing. When in doubt, leave it out.
   and a mirror test checks the two agree. The `actor:movement` reply tells the preview whether the
   mover shares spaces (Air Form, a swarm) and which swarms its viewer can see (`space-sharing.ts`),
   so it charges those spaces as the server does. Players and the table screen get only the terrain the
-  fog reveals, and with vision on only what the party has seen.
+  fog reveals, and with vision on only what the party has seen. A spell's area changes the ground while it
+  lasts (`zone-ground.ts`): Web, Entangle or Ice Storm's hail make its cells Difficult Terrain, Plant Growth
+  and Wall of Thorns cost 4 feet for every foot, Conjure Minor Elementals' only for the caster's enemies, and
+  a creature whose trait frees it from that kind of ground (Web Walker, Ice Walk) pays nothing extra. The
+  server alone charges it; the area itself is on the map.
 
 ## Rules engine
 

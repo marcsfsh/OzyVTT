@@ -53,12 +53,14 @@ const most = (states: readonly CoverageState[]): CoverageState =>
 type SpellLater = NonNullable<NonNullable<SpellReference["effect"]>["laterActions"]>[number];
 
 /** A later action applies when it deals damage, makes an attack or imposes conditions on a failed save; with a `zone`
- *  the server raises it as creatures enter or start or end a turn in the area (`spell-zones.ts`). */
+ *  the server raises it as creatures enter or start or end a turn in the area (`spell-zones.ts`), and charges the
+ *  ground the area makes difficult (`zone-ground.ts`). */
 const laterApplies = (later: SpellLater) =>
   later.damage.length > 0 ||
   later.attackRange !== undefined ||
   (later.save?.failureConditions.length ?? 0) > 0 ||
-  later.save?.speedZero === true;
+  later.save?.speedZero === true ||
+  later.zone?.terrain !== undefined;
 
 /** A spell is enforced when a cast applies its numbers or leaves its effect on the targets, or the area it leaves
  *  applies them later. Every other spell is guided: each is a cast action (`character-build.ts`, `monster-spells.ts`)

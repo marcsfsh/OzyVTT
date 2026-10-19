@@ -2,7 +2,7 @@ import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { spellDurationAt, spellSpanOf } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { EffectInstance, SpellZone } from "@vtt/domain";
 import { MAX_EFFECT_MINUTES, type SaveFailureDuration } from "@vtt/schemas";
-import { addEffect, CONCENTRATING_TAG, makeEffect, type EffectNarration } from "../effects.js";
+import { addEffect, CONCENTRATING_TAG, makeEffect, turnEndDuration, type EffectNarration } from "../effects.js";
 import { laterRowOf, laterSpellActionId } from "../item-actions.js";
 import { castThisTurnKey } from "../lasting-spells.js";
 import { endZone } from "../spell-zone-state.js";
@@ -144,7 +144,10 @@ export function markSpellUp(ctx: ResolveContext): void {
       sourceName: attacker.name,
       sourceActionId: ctx.action.id,
       startedRound: state.combat.round,
-      duration: spellEffectDuration(spell, castLevelOf(ctx, spell)),
+      // Ice Storm's hailstones last "until the end of your next turn", whatever the spell's own duration.
+      duration: zoneRowOf(spell)?.zone?.untilCasterNextTurnEnd
+        ? turnEndDuration(state, "until-source-turn-end", attacker.id)
+        : spellEffectDuration(spell, castLevelOf(ctx, spell)),
       spell: { id: spell.id, level: castLevelOf(ctx, spell) }
     })
   );

@@ -1882,7 +1882,12 @@ export const SaveOutcomeFields = {
   failurePush: ForcedPushSchema.optional(),
   /** A creature this size or larger has Advantage on the save (Ensnaring Strike: "A Large or larger creature has
    *  Advantage on this save"). */
-  advantageAtSize: SizeSchema.optional()
+  advantageAtSize: SizeSchema.optional(),
+  /** A failure also breaks the creature's Concentration (Earthquake: "its Concentration is broken"; Sleet Storm). */
+  breaksConcentration: z
+    .literal(true)
+    .optional()
+    .describe("A failure also ends the Concentration the creature holds (Earthquake, Sleet Storm)")
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */

@@ -35,7 +35,8 @@ import {
   type MovementNarration
 } from "../movement-narration.js";
 import { releaseGrapplesOutOfRange, type EffectNarration } from "../effects.js";
-import { endZoneAndItsSpell, placeZone, speedHalvingAt, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
+import { endZoneAndItsSpell, placeZone, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
+import { zoneMovementOptions } from "../zone-ground.js";
 import { movementCost } from "../terrain.js";
 import { moveEncounterToken, moveSceneToken } from "../token-placement.js";
 import { HIDDEN_SOURCE } from "../hidden-source.js";
@@ -151,10 +152,12 @@ export const mapCommands = [
           mode,
           byPlayer: !isGmGrade(principal),
           distance: (a, b) => mapDistance(geometry, a, b)?.value ?? null,
-          cost: (a, b, options) => {
-            const halvedAt = speedHalvingAt(state, actorId, kit.zoneDeps(state, geometry));
-            return movementCost(state, geometry, actorId, a, b, { ...options, ...(halvedAt ? { halvedAt } : {}) });
-          },
+          // Spell areas on the way: Spirit Guardians' halved Speed, and the ground they make difficult.
+          cost: (a, b, options) =>
+            movementCost(state, geometry, actorId, a, b, {
+              ...options,
+              ...zoneMovementOptions(state, actorId, kit.zoneDeps(state, geometry))
+            }),
           calibration: geometry.calibration,
           dragging: {
             actorIds: dragged,

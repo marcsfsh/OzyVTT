@@ -526,6 +526,10 @@ export function parkActionSave(ctx: ResolveContext): void {
         singleTarget: targets.length === 1 && action.area === undefined && spell.area === null
       }
     : undefined;
+  const extra = {
+    ...(onSuccessEffect ? { onSuccessEffect } : gmApplies ? { gmApplies: true as const } : {}),
+    ...(action.save.breaksConcentration ? { breaksConcentration: true as const } : {})
+  };
   for (const [saveBonus, targetIds] of groups)
     createPendingSaves(state, {
       sourceActorId: attacker.id,
@@ -540,7 +544,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       halfOnSuccess: action.save.successDamage === "half",
       conditionIds,
       ...(onFailEffect ? { onFailEffect } : {}),
-      ...(onSuccessEffect ? { extra: { onSuccessEffect } } : gmApplies ? { extra: { gmApplies: true as const } } : {}),
+      ...(Object.keys(extra).length > 0 ? { extra } : {}),
       ...(action.drain ? { drain: action.drain } : {}),
       ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
       ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),

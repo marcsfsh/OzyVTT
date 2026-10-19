@@ -89,6 +89,8 @@ export type MovementCostOptions = Readonly<{
   passesCreatures?: boolean;
   /** Whether the mover's Speed is halved with its centre at this point (Spirit Guardians' Emanation). */
   halvedAt?: (position: Point, sizeCells: number) => boolean;
+  /** Whether a spell's area makes the cell with this centre Difficult Terrain for the mover (Web, Entangle). */
+  difficultAt?: (position: Point) => boolean;
 }>;
 
 /** The movement-blocking walls of the live scene (walls, closed doors, windows) in grid units, while its dynamic
@@ -163,7 +165,8 @@ export function movementCost(
     sizeCells,
     isDifficult: (column, row) =>
       difficultCells.has(`${column},${row}`) ||
-      pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), terrain),
+      pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), terrain) ||
+      options.difficultAt?.(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 })) === true,
     // A path can't leave the map to walk round something, nor pass a creature that bars the way.
     isOpen: (column, row) => {
       if (closedCells.has(`${column},${row}`)) return false;

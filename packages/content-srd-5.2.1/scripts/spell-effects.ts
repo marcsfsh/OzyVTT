@@ -355,6 +355,10 @@ const save = (ability: "str" | "dex" | "con" | "int" | "wis" | "cha") => ({
 const ONCE_PER_TURN = "A creature makes this save only once per turn.";
 /** Entering the area or ending a turn in it, once per turn: the shape most lingering areas print. */
 const ENTER_OR_END_ONCE: Zone = { on: ["enter", "end-turn"], oncePerTurn: true };
+/** "The area is Difficult Terrain" for every creature. */
+const DIFFICULT: NonNullable<Zone["terrain"]> = { cost: 2 };
+/** A row for an area that only changes the ground while it lasts, with nothing to roll. */
+const ground = (when: string, zone: Zone): Later => ({ name: "ground", activation: "other", when, damage: [], zone });
 
 /**
  * What a spell lets its caster do after the cast (SRD 5.2.1 text): the attacks a summoned thing or a held flame
@@ -377,20 +381,20 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters the area or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature that enters the area or ends its turn there makes the save. ${ONCE_PER_TURN} The area is Difficult Terrain.`,
       save: { ability: "str", successDamage: "none", failureConditions: ["restrained"] },
       damage: [{ formula: "3d6", type: "bludgeoning" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT }
     }
   ],
   "blade-barrier": [
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN} Its space is Difficult Terrain.`,
       save: save("dex"),
       damage: [{ formula: "6d10", type: "force" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT }
     }
   ],
   // "Until the spell ends, you can take a Magic action to call down lightning in that way again."
@@ -447,6 +451,15 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [{ formula: "3d12", type: "psychic", addsModifier: true }]
     }
   ],
+  // "The ground in the Emanation is Difficult Terrain for your enemies."
+  "conjure-minor-elementals": [
+    ground("The ground in the Emanation is Difficult Terrain for your enemies.", {
+      on: [],
+      around: "caster",
+      feet: 15,
+      terrain: { cost: 2, for: "enemies" }
+    })
+  ],
   "conjure-woodland-beings": [
     {
       name: "save",
@@ -477,6 +490,26 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [{ formula: "3d6", type: "acid" }],
       area: { shape: "cone", sizeFeet: 15, widthFeet: null }
     }
+  ],
+  // "The ground there is Difficult Terrain", and "at the end of each of your turns for the duration, each creature on
+  // the ground in the area makes a Dexterity saving throw. On a failed save, a creature has the Prone condition, and
+  // its Concentration is broken."
+  earthquake: [
+    {
+      name: "tremor",
+      activation: "other",
+      when: "At the end of each of your turns, each creature on the ground in the area makes the save: Prone and its Concentration broken on a failure. The ground is Difficult Terrain.",
+      save: { ability: "dex", successDamage: "none", failureConditions: ["prone"], breaksConcentration: true },
+      damage: [],
+      zone: { on: ["caster-turn-end"], terrain: DIFFICULT }
+    }
+  ],
+  // "For the duration, these plants turn the ground in the area into Difficult Terrain."
+  entangle: [
+    ground("The plants turn the ground in the area into Difficult Terrain.", {
+      on: [],
+      terrain: { cost: 2, kind: "plants" }
+    })
   ],
   "faithful-hound": [
     {
@@ -518,10 +551,10 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: "A creature that enters the area or ends its turn there must also succeed on the save or fall Prone.",
+      when: "A creature that enters the area or ends its turn there must also succeed on the save or fall Prone. The grease is Difficult Terrain.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["prone"] },
       damage: [],
-      zone: { on: ["enter", "end-turn"] }
+      zone: { on: ["enter", "end-turn"], terrain: DIFFICULT }
     }
   ],
   "guardian-of-faith": [
@@ -566,6 +599,14 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       movesGrant: true
     }
   ],
+  // "Hailstones turn ground in the Cylinder into Difficult Terrain until the end of your next turn."
+  "ice-storm": [
+    ground("Hailstones turn the ground in the Cylinder into Difficult Terrain until the end of your next turn.", {
+      on: [],
+      terrain: { cost: 2, kind: "ice" },
+      untilCasterNextTurnEnd: true
+    })
+  ],
   "incendiary-cloud": [
     {
       name: "save",
@@ -580,10 +621,10 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters the area for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature that enters the area for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN} The area is Difficult Terrain.`,
       save: save("con"),
       damage: [{ formula: "4d10", type: "piercing" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT }
     }
   ],
   moonbeam: [
@@ -595,6 +636,14 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [{ formula: "2d10", type: "radiant" }],
       zone: ENTER_OR_END_ONCE
     }
+  ],
+  // Overgrowth: "A creature moving through that area must spend 4 feet of movement for every 1 foot it moves." The
+  // plants stay overgrown, so the area stays until the GM ends it.
+  "plant-growth": [
+    ground("A creature moving through the overgrown area spends 4 feet of movement for every foot.", {
+      on: [],
+      terrain: { cost: 4, kind: "plants" }
+    })
   ],
   "produce-flame": [
     {
@@ -609,19 +658,19 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration.",
-      save: { ability: "dex", successDamage: "none", failureConditions: ["prone"] },
+      when: "A creature that enters the Cylinder for the first time on a turn or starts its turn there makes the save; a failure also breaks its Concentration. The ground is Difficult Terrain.",
+      save: { ability: "dex", successDamage: "none", failureConditions: ["prone"], breaksConcentration: true },
       damage: [],
-      zone: { on: ["enter", "start-turn"] }
+      zone: { on: ["enter", "start-turn"], terrain: { cost: 2, kind: "ice" } }
     }
   ],
   "spike-growth": [
     {
       name: "spikes",
       activation: "other",
-      when: "A creature that moves into or within the area takes the damage for every 5 feet it travels.",
+      when: "A creature that moves into or within the area takes the damage for every 5 feet it travels. The area is Difficult Terrain.",
       damage: [{ formula: "2d4", type: "piercing" }],
-      zone: { on: ["travel"] }
+      zone: { on: ["travel"], terrain: { cost: 2, kind: "plants" } }
     }
   ],
   "spirit-guardians": [
@@ -700,20 +749,20 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters a space in the wall for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN}`,
+      when: `A creature that enters a space in the wall for the first time on a turn or ends its turn there makes the save. ${ONCE_PER_TURN} Moving through the wall costs 4 feet for every foot.`,
       save: save("dex"),
       damage: [{ formula: "7d8", type: "slashing" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, terrain: { cost: 4, kind: "plants" } }
     }
   ],
   web: [
     {
       name: "save",
       activation: "other",
-      when: "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action.",
+      when: "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action. The webs are Difficult Terrain.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["restrained"] },
       damage: [],
-      zone: { on: ["enter", "start-turn"] }
+      zone: { on: ["enter", "start-turn"], terrain: { cost: 2, kind: "webs" } }
     }
   ],
   "zone-of-truth": [
@@ -1240,6 +1289,8 @@ const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   "conjure-animals": { shape: "sphere", sizeFeet: 10, widthFeet: null },
   // The Large spirit and the 5 feet it reaches around it.
   "conjure-elemental": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  // "A 100-foot-radius circle centered on that point."
+  earthquake: { shape: "cylinder", sizeFeet: 100, widthFeet: null },
   // The hound and the 5 feet it bites in.
   "faithful-hound": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "flaming-sphere": { shape: "sphere", sizeFeet: 5, widthFeet: null },

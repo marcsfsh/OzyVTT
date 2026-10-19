@@ -3,7 +3,44 @@ import { addAnnotation } from "../src/annotations.js";
 import { answerSave, type SaveAnswerDependencies } from "../src/saving-throws.js";
 import { zonesAfterMove, type ZoneDeps } from "../src/spell-zones.js";
 import { createEncounterTokens, type TokenMapGeometry } from "../src/token-placement.js";
-import { catalog } from "./spell-casters.js";
+import type { ActorDefinition } from "@vtt/schemas";
+import type { CharacterCreateRequestInput } from "../src/character-build.js";
+import { build, catalog, clericInput, druidInput, wizardInput } from "./spell-casters.js";
+
+/** The picks a caster above level 5 needs: the Ability Score Improvements at 8, 12 and 16, and the level 7 choice. */
+function levelled(input: CharacterCreateRequestInput, level: number): CharacterCreateRequestInput {
+  const classId = input.classId;
+  const asi = [8, 12, 16]
+    .filter((at) => at <= level)
+    .flatMap((at) => [
+      { level: at, classId, kind: "asi-or-feat", id: "ability-score-improvement" },
+      { level: at, kind: "ability-score", id: "con", payload: { featureId: "ability-score-improvement" } },
+      { level: at, kind: "ability-score", id: "dex", payload: { featureId: "ability-score-improvement" } }
+    ]);
+  const seventh =
+    level >= 7 && classId === "cleric"
+      ? [{ level: 7, classId, kind: "blessed-strikes", id: "divine-strike", payload: { featureId: "blessed-strikes" } }]
+      : level >= 7 && classId === "druid"
+        ? [
+            {
+              level: 7,
+              classId,
+              kind: "elemental-fury",
+              id: "potent-spellcasting",
+              payload: { featureId: "elemental-fury" }
+            }
+          ]
+        : [];
+  return { ...input, level, choices: [...input.choices, ...asi, ...seventh] } as CharacterCreateRequestInput;
+}
+
+/** SRD casters of a higher level, for spells above level 3. */
+export const wizardAt = (level: number, spells: readonly string[]): ActorDefinition =>
+  build(levelled(wizardInput(spells), level));
+export const clericAt = (level: number, spells: readonly string[]): ActorDefinition =>
+  build(levelled(clericInput(spells), level));
+export const druidAt = (level: number, spells: readonly string[]): ActorDefinition =>
+  build(levelled(druidInput(spells), level));
 
 /**
  * A measured map and the moves, areas and saves the spell-area tests share: 50px cells of 5 feet, so cell (c,r) has its
