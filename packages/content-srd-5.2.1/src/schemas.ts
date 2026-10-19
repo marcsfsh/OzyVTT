@@ -24,6 +24,7 @@ import {
   DamageFormulaSchema,
   DamageTypeSchema,
   DispelSchema,
+  EffectGrantSchema,
   HealingFormulaSchema,
   ItemSlotSchema,
   OnHitRiderSchema,
@@ -37,9 +38,12 @@ import {
   ContentIdSchema,
   ContentSourceSchema,
   FeatReferenceSchema,
+  FeatureActionSchema,
+  FeatureGrantsSchema,
   FeatureUsesSchema,
   ITEM_REFUSED_MODIFIER_MESSAGE,
   ITEM_REFUSED_MODIFIER_TYPES,
+  ModifierSchema,
   SpeciesReferenceSchema,
   SpellListReferenceSchema,
   SubclassReferenceSchema,
@@ -584,7 +588,24 @@ export const ItemSpellCastSchema = z
      *  Web filling twice its area). */
     area: ActionAreaSchema.optional().describe(
       "The area the item's cast covers in place of the spell's own (a wand's 60-foot Cone of Fear), placed as the template"
-    )
+    ),
+    /** A flat printed attack bonus for the cast's spell attacks ("with a +5 bonus to hit", Circlet of Blasting). */
+    attackBonus: z
+      .number()
+      .int()
+      .min(-5)
+      .max(20)
+      .optional()
+      .describe(
+        "A flat printed attack bonus for the cast's spell attacks (Circlet of Blasting's +5). It overrides any derivation"
+      ),
+    /** It is cast as this, whatever the spell's casting time says (a Necklace of Prayer Beads' bead: a Bonus Action). */
+    activation: z
+      .enum(["action", "bonus-action"])
+      .optional()
+      .describe(
+        "What casting it from the item takes, where the item says so in place of the spell's casting time (a prayer bead: a Bonus Action)"
+      )
   })
   .strict()
   .describe(
@@ -738,6 +759,79 @@ const ItemLightSchema = z
     "The light the item sheds while it is lit and equipped: Bright Light out to `brightFeet` and Dim Light for `dimFeet` more, a Cone with `cone`, less with its hood down (`hooded`), sunlight with `sunlight`, and revealing Invisible creatures in its Bright Light with `revealsInvisible`. `burnHours` is how long it burns once lit, spending a `fuel` item when it names one. With `always` it shines whenever it is held, and with `ridersWhileLit` its other riders apply only while it is lit."
   );
 export type ItemLight = z.infer<typeof ItemLightSchema>;
+
+/**
+ * One kind of an item whose record covers several (an Ioun Stone's fourteen stones, a Belt of Giant Strength's six
+ * giants), or one form its holder can put it in (a Rod of Lordly Might's buttons). Its riders join the record's while a
+ * carried copy is that kind (`InventoryItem.variantId`); a `weapon` block is how the copy swings in that form, and
+ * null leaves it no weapon there.
+ */
+export const ItemVariantSchema = z
+  .object({
+    id: ContentIdSchema,
+    name: z.string().min(1).max(80),
+    modifiers: z.array(ModifierSchema).max(8).default([]),
+    grants: FeatureGrantsSchema.optional(),
+    actions: z.array(FeatureActionSchema).max(8).default([]),
+    casts: z.array(ItemSpellCastSchema).max(12).default([]),
+    effects: z.array(EffectGrantSchema).max(4).default([]),
+    light: ItemLightSchema.optional(),
+    weapon: EquipmentWeaponStatsSchema.nullable().optional(),
+    onHit: z.array(OnHitRiderSchema).max(4).optional(),
+    /** In this form only its own riders apply, none of the record's (a Quarterstaff of the Acrobat folded into a rod). */
+    replacesRiders: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "One kind or form of the item, with the riders it adds to the record's own while a carried copy is that kind, or in place of them with `replacesRiders`. A `weapon` block is how the copy swings in that form; null leaves it no weapon there."
+  );
+export type ItemVariant = z.infer<typeof ItemVariantSchema>;
+
+/** Who picks a copy's kind: the GM ("The GM chooses the type", what was found) or its holder, at the action it costs
+ *  (pressing one of the rod's buttons is a Bonus Action). */
+export const ItemVariantChoiceSchema = z
+  .object({
+    by: z.enum(["gm", "holder"]),
+    activation: z.enum(["bonus-action", "action"]).optional()
+  })
+  .strict()
+  .describe(
+    "Who picks which of the item's kinds a copy is: the GM (what was found) or its holder, who changes it at the cost of `activation` in a fight"
+  );
+
+/** What a magic weapon changes about the base it is bound to: its damage type (an Energy Bow's Force), properties it
+ *  adds or loses (a Dwarven Thrower's Thrown, an Energy Bow needing no ammunition) and its range. */
+export const ItemWeaponChangesSchema = z
+  .object({
+    damageType: DamageTypeSchema.optional(),
+    addProperties: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(40)
+      )
+      .min(1)
+      .max(4)
+      .optional(),
+    removeProperties: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(40)
+      )
+      .min(1)
+      .max(4)
+      .optional(),
+    rangeFeet: z.number().int().min(5).max(600).optional(),
+    longRangeFeet: z.number().int().min(5).max(1200).optional()
+  })
+  .strict()
+  .describe(
+    "What the item changes about the base weapon it is bound to, copied onto the bound row: its damage type, properties added or taken away, and a normal and long range (a Dwarven Thrower's Thrown 20/60)"
+  );
+export type ItemWeaponChanges = z.infer<typeof ItemWeaponChangesSchema>;
 
 /**
  * The base weapons or armors a template item may bind to: the SRD's printed qualifier (`label`) and
@@ -925,6 +1019,22 @@ export const EquipmentReferenceSchema = z
       .describe(
         "What a hit with this weapon does beside its damage: each rider rides every attack the item makes (both grips, its Light extra attack) and lands as the monster on-hit riders do, a save at its DC (Giant Slayer), a rolled 20 only (Sword of Sharpness), a creature type only, or the coat its own action put on (Dagger of Venom). Needs a `weapon` block or `appliesTo`"
       ),
+    /** The kinds one record covers, one per carried copy (an Ioun Stone's fourteen), or the forms its holder can put
+     *  it in (a Rod of Lordly Might's buttons). */
+    variants: z
+      .array(ItemVariantSchema)
+      .min(2)
+      .max(16)
+      .optional()
+      .describe(
+        "The kinds this record covers, of which each carried copy is one (an Ioun Stone's fourteen stones, a Potion of Resistance's ten types), or the forms its holder puts it in (a Rod of Lordly Might's buttons). The copy's pick is `InventoryItem.variantId`; until one is picked the copy has the record's own riders alone"
+      ),
+    variantChoice: ItemVariantChoiceSchema.optional().describe(
+      "Who picks a copy's kind: the GM (absent, or by gm) or its holder (by holder), paying `activation` in a fight"
+    ),
+    weaponChanges: ItemWeaponChangesSchema.optional().describe(
+      "What a magic weapon changes about its base: the bound row deals this damage type, gains or loses these properties and has this range (a Dwarven Thrower is Thrown 20/60, an Energy Bow deals Force and needs no ammunition)"
+    ),
     /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
     grantsFeatIds: z
       .array(ContentIdSchema)
@@ -970,6 +1080,17 @@ export const EquipmentReferenceSchema = z
         code: "custom",
         path: ["vulnerableToOtherChoices"],
         message: "Vulnerability to the other choices needs a cursed item whose resistance the GM chooses."
+      });
+    if (item.variants) {
+      const ids = item.variants.map((variant) => variant.id);
+      if (new Set(ids).size !== ids.length)
+        context.addIssue({ code: "custom", path: ["variants"], message: "Each kind of the item needs its own id." });
+    }
+    if (item.variantChoice && !item.variants)
+      context.addIssue({
+        code: "custom",
+        path: ["variantChoice"],
+        message: "Who picks the item's kind needs kinds to pick from: give it variants."
       });
     // A hit rider rides the item's own attacks, so the item has to make one.
     if (item.onHit && !item.weapon && !item.appliesTo)

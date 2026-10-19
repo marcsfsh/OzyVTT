@@ -38,6 +38,7 @@ import {
   weaponSwing
 } from "./item-actions.js";
 import { freesLightExtraAttack, IMPLEMENTED_MASTERIES, type MasteryInForce } from "./weapon-mastery.js";
+import { rowRecord } from "./item-records.js";
 
 /**
  * Every rider contribution is a pure function of (actor, definition, catalog), recomputed whole on every read
@@ -181,6 +182,9 @@ export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
  *  nothing before attunement. No catalog record fails open to mundane. */
 export function itemIsActive(item: InventoryItem, record: EquipmentReference | undefined): boolean {
   if (item.quantity <= 0 || !item.equipped) return false;
+  // A template not yet bound to its base ("Armor, +1" with no armor picked) is no armor or weapon yet, so its magic
+  // has nothing to ride.
+  if (record?.appliesTo && item.baseId === undefined) return false;
   // A Flame Tongue's fire is there only while it is ablaze.
   if (record?.light?.ridersWhileLit === true && item.lit !== true) return false;
   const requiresAttunement = record?.attunement?.required === true || item.magic?.attunementRequired === true;
@@ -411,12 +415,18 @@ export function deriveEquipment(
     catalog && !gearMerged(actor)
       ? actor.inventory.map((item) => withCatalogWeapon(withCatalogArmor(item, catalog), catalog))
       : [];
+  /** Records a copy is attuned to: "You can't attune to more than one copy of an item", so a second copy a GM's write
+   *  left attuned gives nothing. */
+  const attunedRecords = new Set<string>();
   for (const item of inventory) {
     if (item.quantity <= 0) continue;
-    const record = catalog!.equipmentRecord(catalogIdOf(item));
+    // The copy's kind adds its riders (an Ioun Stone of Protection's +1 AC).
+    const record = rowRecord(catalog, item);
     const entry = { item, record };
+    const secondCopy = item.attuned && record?.attunement?.required === true && attunedRecords.has(catalogIdOf(item));
+    if (item.attuned && record?.attunement?.required === true) attunedRecords.add(catalogIdOf(item));
     if (item.equipped) equipped.push(entry);
-    if (item.equipped && itemIsActive(item, record)) active.push(entry);
+    if (item.equipped && !secondCopy && itemIsActive(item, record)) active.push(entry);
     // Caltrops are spread straight from their bag, as a potion is drunk from the pack.
     else if (record?.consumedOnUse || record?.actions.some((action) => action.zone !== undefined)) packed.push(entry);
     if (item.attuned && record) cursedVulnerabilities.push(...curseVulnerabilitiesOf(record, item));
@@ -617,6 +627,12 @@ export function deriveEquipment(
     effectTags: itemEffectTags
   });
   const standing = collectRiders(carriers, { ...context, moment: null });
+  // SRD Armor Training: a Shield gives a holder without Shield training none of its AC, its magic bonus included.
+  const untrainedShieldId = training.untrainedShield?.itemId;
+  const armorRiders =
+    untrainedShieldId === undefined
+      ? standing
+      : standing.filter((rider) => rider.modifier.type !== "armor-class" || rider.sourceItemId !== untrainedShieldId);
   return {
     context,
     skills,
@@ -625,7 +641,7 @@ export function deriveEquipment(
     damageVulnerabilities: [...defencesOf(standing, "damage-vulnerability"), ...cursedVulnerabilities],
     damageImmunities: [...damageImmunities, ...defencesOf(standing, "damage-immunity")],
     conditionImmunities,
-    armorClass: sumRiders(standing, "armor-class"),
+    armorClass: sumRiders(armorRiders, "armor-class"),
     // "Add your Proficiency Bonus" is proficiency, so it counts once however many carriers grant it.
     initiative:
       sumRiders(standing, "initiative") +
@@ -663,7 +679,7 @@ function withCatalogArmor(item: InventoryItem, catalog: EquipmentCatalog): Inven
  *  before its record could be wielded as a Quarterstaff swings like one. The row's own block wins. */
 function withCatalogWeapon(item: InventoryItem, catalog: EquipmentCatalog): InventoryItem {
   if (item.weapon !== undefined) return item;
-  const record = catalog.equipmentRecord(catalogIdOf(item));
+  const record = rowRecord(catalog, item);
   const stats = record?.appliesTo ? undefined : record?.weapon;
   if (!stats?.damageDice || !stats.damageType) return item;
   return {
@@ -902,4 +918,12 @@ export function sourceItemOf(
 export function weaponPropertiesOf(itemId: string | null, inventory: readonly InventoryItem[]): readonly string[] {
   if (itemId === null) return [];
   return inventory.find((item) => item.id === itemId)?.weapon?.properties ?? [];
+}
+
+/** Which weapon a derived action's item is: its catalog id and the base a magic weapon is bound to, so `weapon-is` can
+ *  narrow (Bracers of Archery's Longbow and Shortbow, a +1 Longbow among them). */
+export function weaponIdsOf(itemId: string | null, inventory: readonly InventoryItem[]): readonly string[] {
+  const row = itemId === null ? undefined : inventory.find((item) => item.id === itemId);
+  if (!row?.weapon) return [];
+  return row.baseId !== undefined ? [catalogIdOf(row), row.baseId] : [catalogIdOf(row)];
 }

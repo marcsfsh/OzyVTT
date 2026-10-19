@@ -133,7 +133,8 @@ export function saveRollSources(
   derivation: EquipmentDerivation,
   concentration = false,
   stakes: readonly string[] = [],
-  sourceCreatureType: string | null = null
+  sourceCreatureType: string | null = null,
+  against: SaveSource = {}
 ): RollModeClaims {
   const claims: RollModeClaims = { advantage: [], disadvantage: [] };
   if (ability === "dex" && target.conditions.some((condition) => condition.id === "restrained")) {
@@ -147,11 +148,34 @@ export function saveRollSources(
       ability,
       ...(stakes.length > 0 ? { targetConditionIds: stakes } : {}),
       // The creature whose effect forces the save, for a rider against its kind (Protection from Evil and Good).
-      ...(sourceCreatureType !== null ? { sourceCreatureType } : {})
+      ...(sourceCreatureType !== null ? { sourceCreatureType } : {}),
+      // A save against a spell or another magical effect (Spellguard Shield), and against a spell, with its school and
+      // level (Mantle of Spell Resistance).
+      ...(against.magical ? { magicalSource: true } : {}),
+      ...(against.spell
+        ? {
+            spellSource: true,
+            spellId: against.spell.id,
+            spellSchool: against.spell.school,
+            spellLevel: against.spell.level
+          }
+        : {})
     },
     claims
   );
 }
+
+/** What a save is against, for a rider that reads it: magic, and the spell. */
+export type SaveSource = Readonly<{
+  magical?: boolean;
+  spell?: Readonly<{ id: string; school: string; level: number }>;
+}>;
+
+/** What a pending save is against: a spell is magic too. */
+export const saveSourceOf = (pending: Pick<PendingSave, "magical" | "spell">): SaveSource => ({
+  ...(pending.magical === true || pending.spell !== undefined ? { magical: true } : {}),
+  ...(pending.spell ? { spell: pending.spell } : {})
+});
 
 /**
  * A save's total once its riders' floors apply: a d20 under a `d20-minimum` counts as it, and a total under a
@@ -371,7 +395,9 @@ export function rollSaveAtOnce(
   const derivation = deriveEquipment(actor, definition, deps.catalog);
   const modifier =
     saveTotalFor(definition, actor, ability, derivation) + (auraOfProtection(state, actor, deps)?.amount ?? 0);
-  const sources = saveRollSources(actor, ability, derivation);
+  const sources = saveRollSources(actor, ability, derivation, false, [], null, {
+    ...(deps.magical === true ? { magical: true } : {})
+  });
   if (deps.magical === true && magicResistanceOf(definition) !== null)
     sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
   const rollMode = aggregateRollMode(sources.advantage, sources.disadvantage);
@@ -824,7 +850,8 @@ export function answerSave(
       derivation,
       pending.endsEffects !== undefined,
       conditionsAtStake(state, pending),
-      sourceCreatureTypeOf(state, pending.sourceActorId, deps.resolveDefinition)
+      sourceCreatureTypeOf(state, pending.sourceActorId, deps.resolveDefinition),
+      saveSourceOf(pending)
     );
     if (magicResistance === "advantage")
       sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });

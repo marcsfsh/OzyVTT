@@ -12,7 +12,8 @@ import {
   resolveWithD20s,
   sumRiders,
   weaponAbilityFrom,
-  type AttackKind
+  type AttackKind,
+  type ResolvedRider
 } from "@vtt/rules-5e";
 import { conditionLabel, exhaustionLevel, exhaustionPenalty, isIncapacitated } from "../condition-rules.js";
 import { CommandRejectedError } from "../game-store.js";
@@ -37,6 +38,7 @@ import {
 import {
   deriveEquipment,
   rollModeClaims,
+  weaponIdsOf,
   weaponPropertiesOf,
   type EquipmentDerivation,
   type RollModeClaims
@@ -618,6 +620,22 @@ function rollBonusDice(
   });
 }
 
+/** The most cover each degree an attacker ignores sets aside: Half Cover's +2, or Three-Quarters Cover's +5 too. */
+const COVER_IGNORED: Readonly<Record<"half" | "three-quarters", number>> = { half: 2, "three-quarters": 5 };
+
+/** The widest cover the attacker's riders ignore on this attack roll, with the carrier that does. */
+function coverIgnoredBy(
+  riders: readonly ResolvedRider[]
+): Readonly<{ degree: "half" | "three-quarters"; label: string }> | null {
+  let found: { degree: "half" | "three-quarters"; label: string } | null = null;
+  for (const rider of riders) {
+    const degree = rider.modifier.type === "ignores-cover" ? rider.modifier.degree : undefined;
+    if (degree === undefined) continue;
+    if (found === null || COVER_IGNORED[degree] > COVER_IGNORED[found.degree]) found = { degree, label: rider.label };
+  }
+  return found;
+}
+
 /** The attack roll against the one target: rider filters, roll mode, bonus, the d20 and the outcome
  *  (2024: a hit on an Unconscious or Paralyzed creature from within 5 feet is a critical hit). */
 export function rollAttack(ctx: ResolveContext): void {
@@ -648,6 +666,8 @@ export function rollAttack(ctx: ResolveContext): void {
     attackKinds: attackKindsOf(ctx, distance),
     ...(ability ? { ability } : {}),
     weaponProperties: weaponPropertiesOf(ctx.riderItemId, attacker.inventory),
+    // Which weapon it is, by its id and the base a magic weapon is bound to (Bracers of Archery's bows).
+    weaponIds: weaponIdsOf(ctx.riderItemId, attacker.inventory),
     damageTypes,
     targetSize: target.size ?? "medium",
     targetConditionIds: target.conditions.map((condition) => condition.id),
@@ -712,9 +732,25 @@ export function rollAttack(ctx: ResolveContext): void {
 
   // Cover raises the effective AC (SRD Cover: +2 half, +5 three-quarters), and so does a reaction against this
   // attack (Parry); both are shown in the result. A lasting reaction bonus (Shield) is already in `armorClassInPlay`.
+  // An attacker that ignores cover of a degree sets it aside (Wand of the War Mage: Half Cover on a spell attack).
+  const ignoresCover = coverIgnoredBy([...standing, ...atRoll]);
+  const coverSetAside =
+    ignoresCover !== null && ctx.coverBonus > 0 && ctx.coverBonus <= COVER_IGNORED[ignoresCover.degree];
+  if (coverSetAside)
+    warnings.push(`${ignoresCover.label}: ${attacker.name} ignores ${target.name}'s cover on this attack roll.`);
+  const coverBonus = coverSetAside ? 0 : ctx.coverBonus;
   const reactionBonus = input.reactionAcBonus?.amount ?? 0;
   const inPlay = armorClassInPlay(target);
-  const targetAc = inPlay !== undefined ? inPlay + ctx.coverBonus + reactionBonus : null;
+  const targetAc = inPlay !== undefined ? inPlay + coverBonus + reactionBonus : null;
+  // "Any Critical Hit against you becomes a normal hit" (Adamantine Armor), read on the target as the attack lands.
+  const critImmune = [
+    ...collectRiders(targetDerivation.carriers, { ...targetDerivation.context, moment: null }),
+    ...collectRiders(targetDerivation.carriers, {
+      ...targetDerivation.context,
+      ...(ctx.riderFilters.attackKinds ? { attackKinds: ctx.riderFilters.attackKinds } : {}),
+      moment: "on-attack-roll"
+    })
+  ].find((rider) => rider.modifier.type === "no-critical-hits");
   const answersHeld = () =>
     input.commit === false && input.holdKey !== undefined ? heldRollFor(state, input.holdKey) : answeredBefore;
   /** The roll as its die, its bonus and its answers make it, against the target's AC. */
@@ -749,6 +785,10 @@ export function rollAttack(ctx: ResolveContext): void {
         crit = true;
       }
     }
+    if (crit && critImmune) {
+      outcome = "hit";
+      crit = false;
+    }
     return { naturalRoll, total: read.total, outcome, crit, resisted, read };
   };
   const reachFeet = action.attack.reachFeet;
@@ -780,6 +820,8 @@ export function rollAttack(ctx: ResolveContext): void {
     judged = judge();
   }
   ctx.crit = judged.crit;
+  if (critImmune && judged.outcome === "hit" && thrown.naturalRoll >= 20)
+    warnings.push(`${critImmune.label}: the Critical Hit against ${target.name} is a normal hit.`);
   if (judged.resisted && deps.initiatorRole !== "player")
     warnings.push(`${target.name}'s Greater Magic Resistance: spell attack rolls automatically miss it.`);
   const held = answersHeld();
@@ -797,7 +839,7 @@ export function rollAttack(ctx: ResolveContext): void {
     naturalRoll: judged.naturalRoll,
     targetAc,
     outcome: judged.outcome,
-    ...(ctx.coverBonus > 0 ? { coverBonus: ctx.coverBonus } : {}),
+    ...(coverBonus > 0 ? { coverBonus } : {}),
     ...(input.reactionAcBonus ? { reactionAcBonus: { ...input.reactionAcBonus } } : {}),
     ...(bonusDice.length > 0 ? { bonusDice } : {}),
     ...(answered.length > 0 ? { answered } : {}),

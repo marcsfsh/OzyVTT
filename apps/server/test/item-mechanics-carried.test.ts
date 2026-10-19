@@ -380,34 +380,54 @@ describe("the Stone of Good Luck: both halves reach the roll", () => {
 });
 
 describe("what the carried items' buttons do outside an encounter", () => {
-  it("leaves them to the loose route, which uses each and spends its charges", () => {
-    // Their printed uses (scrying, messaging, Truesight) are not combat activities: the structured resolver
-    // refuses them, and the loose `action.use` route uses them with nothing to roll, charge by charge.
+  it("casts an item's spell or puts its effect on its user, and leaves a save with no fight to the loose route", () => {
     const definition = definitionOf();
+    // A cast resolves outside a fight as a creature's own does, and spends its charge.
     for (const [id, name, actionId] of [
-      ["crystal-ball", "Crystal Ball", "item-crystal-ball-cast-scrying"],
       ["sending-stones", "Sending Stones", "item-sending-stones-cast-sending"],
-      ["gem-of-seeing", "Gem of Seeing", "item-gem-of-seeing-peer"],
-      ["pipes-of-haunting", "Pipes of Haunting", "item-pipes-of-haunting-play"]
+      ["gem-of-seeing", "Gem of Seeing", "item-gem-of-seeing-peer"]
     ] as const) {
       const state = stateWith([carried(id, name)]); // no `fight()`
       const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === actionId)!;
       expect(action, `${id} - the button is on the sheet`).toBeDefined();
-      expect(() =>
-        resolveDefinitionAction(
-          state,
-          action,
-          { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(17) },
-          deps([], definition)
-        )
-      ).toThrow("Start an encounter before resolving actions.");
-      expect({ id, plan: looseRollPlan(action, { includeDamage: true }) }).toEqual({ id, plan: [] });
-      if (!action.uses) continue;
-      // Every printed charge, then a refusal.
-      const available = effectiveActions(definition, state.actors[0], catalog);
-      for (let charge = 0; charge < action.uses.limit; charge++) spendLooseUses(state.actors[0], action, available);
-      expect(() => spendLooseUses(state.actors[0], action, available), id).toThrow("no uses remaining");
+      resolveDefinitionAction(
+        state,
+        action,
+        { actorId: IDS.hero, targetIds: [], commandId: cmd(17) },
+        deps([], definition)
+      );
+      expect(state.actors[0].actionUses[action.uses!.pool ?? action.id], `${id} - its charge is spent`).toBe(1);
     }
+    // The Gem of Seeing's Truesight lands on its user.
+    const peered = stateWith([carried("gem-of-seeing", "Gem of Seeing")]);
+    const peer = effectiveActions(definition, peered.actors[0], catalog).find(
+      (entry) => entry.id === "item-gem-of-seeing-peer"
+    )!;
+    resolveDefinitionAction(
+      peered,
+      peer,
+      { actorId: IDS.hero, targetIds: [], commandId: cmd(18) },
+      deps([], definition)
+    );
+    expect(peered.actors[0].effects.map((effect) => effect.name)).toContain("Peering Through the Gem of Seeing");
+
+    // A save its user forces on others has no one to resolve against outside a fight: the loose route spends it.
+    const state = stateWith([carried("pipes-of-haunting", "Pipes of Haunting")]);
+    const action = effectiveActions(definition, state.actors[0], catalog).find(
+      (entry) => entry.id === "item-pipes-of-haunting-play"
+    )!;
+    expect(() =>
+      resolveDefinitionAction(
+        state,
+        action,
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(19) },
+        deps([], definition)
+      )
+    ).toThrow("Start an encounter before resolving actions.");
+    expect(looseRollPlan(action, { includeDamage: true })).toEqual([]);
+    const available = effectiveActions(definition, state.actors[0], catalog);
+    for (let charge = 0; charge < action.uses!.limit; charge++) spendLooseUses(state.actors[0], action, available);
+    expect(() => spendLooseUses(state.actors[0], action, available)).toThrow("no uses remaining");
   });
 
   it("rolls the Iron Bands' attack loose, and spends their one charge a dawn", () => {

@@ -4,6 +4,7 @@ import type { EquipmentReference } from "@vtt/content-srd-5.2.1";
 import { effectiveActions } from "./effective-actions.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { castAction, isItemActionId, itemAction, itemActionRest } from "./item-actions.js";
+import { rowRecord } from "./item-records.js";
 
 /**
  * A charged item's charges (SRD magic items): counted per carried copy in `actor.actionUses` under keys that name
@@ -31,7 +32,7 @@ export function lastChargeRollFor(
 ): Readonly<{ item: InventoryItem; record: EquipmentReference }> | null {
   if (!action.uses || action.uses.per === "turn") return null;
   const item = itemRowOfAction(action.id, inventory);
-  const record = item ? catalog?.equipmentRecord(catalogIdOf(item)) : undefined;
+  const record = item ? rowRecord(catalog, item) : undefined;
   return item && record && (record.charges?.lastChargeRoll || record.charges?.lastCharge) ? { item, record } : null;
 }
 
@@ -108,7 +109,7 @@ export function chargePoolsOfRow(
   definition: ActorDefinition | undefined,
   catalog: EquipmentCatalog | undefined
 ): Map<string, number> {
-  const record = catalog?.equipmentRecord(catalogIdOf(item));
+  const record = rowRecord(catalog, item);
   const pools = new Map<string, number>();
   if (!record) return pools;
   const actions = [

@@ -106,6 +106,14 @@ function stateWith(inventory: InventoryItem[]): GameState {
 
 const EQUIPMENT = loadEquipment();
 
+/** Chain Mail's armor block, as the bind copies it onto the row. */
+function chainMail() {
+  const { acBase, addDexModifier, dexModifierCap, stealthDisadvantage, strengthRequired } = EQUIPMENT.find(
+    (record) => record.id === "chain-mail"
+  )!.armor!;
+  return { acBase, addDexModifier, dexModifierCap, stealthDisadvantage, strengthRequired };
+}
+
 // The inventory row the weapon bind mints: the magic item's id/name/category and the two booleans,
 // plus the base weapon's block copied from its shipped catalog row (minus `mastery`, which the strict
 // `ItemWeaponSchema` does not carry).
@@ -113,6 +121,7 @@ const boundTo = (magicId: string, baseId: string, over: Record<string, unknown> 
   const base = EQUIPMENT.find((record) => record.id === baseId)?.weapon;
   if (!base) throw new Error(`no shipped equipment row "${baseId}" carries a weapon block to bind`);
   return asPicked(magicId, {
+    baseId,
     weapon: {
       category: base.category,
       damageDice: base.damageDice,
@@ -162,7 +171,8 @@ describe("Armor of Resistance halves a typed damage total", () => {
   const ARMOR = shipped("armor-of-resistance");
   const catalog = catalogOf([ARMOR]);
   const definition = definitionOf();
-  const worn = (equipped = true) => stateWith([asPicked("armor-of-resistance", { equipped })]);
+  const worn = (equipped = true) =>
+    stateWith([asPicked("armor-of-resistance", { equipped, baseId: "chain-mail", armor: chainMail() })]);
 
   it("halves the authored damage type and names the armor on the line", () => {
     const state = worn();
@@ -234,10 +244,8 @@ describe("the armour and shield rows move a real Armor Class", () => {
     // `armor` block. A shield adds the plain shield's +2 from its block on top of its own bonus: Dex 14
     // and no body armor make 10 + 2 + 2 = 14 before the rider. Built, so a Shield alone derives the AC.
     for (const [id, amount] of [
-      ["armor-1", 1],
       ["shield-2", 2 + 2],
-      ["sentinel-shield", 2],
-      ["dwarven-plate", 2]
+      ["sentinel-shield", 2]
     ] as const) {
       const catalog = catalogOf([shipped(id)]);
       const definition = { ...definitionOf(), source: { name: "OzyVTT Character Builder", version: "1" } };
@@ -247,6 +255,19 @@ describe("the armour and shield rows move a real Armor Class", () => {
       setInventoryItem(state, IDS.hero, asPicked(id, { equipped: false }), () => definition, { catalog });
       expect(state.actors[0].armorClass, `${id}: unequipping must be the un-grant`).toBe(12);
     }
+  });
+});
+
+describe("a template armor's magic rides its bound base", () => {
+  it("gives nothing until it is bound, and its bonus on top of the base armor once it is", () => {
+    // SRD Armor, +1: "You have a bonus to Armor Class while wearing this armor." Unbound, it is no armor yet.
+    const catalog = catalogOf([shipped("armor-1"), EQUIPMENT.find((record) => record.id === "chain-mail")!]);
+    const definition = { ...definitionOf(), source: { name: "OzyVTT Character Builder", version: "1" } };
+    const state = stateWith([]);
+    setInventoryItem(state, IDS.hero, asPicked("armor-1"), () => definition, { catalog });
+    expect(state.actors[0].armorClass, "an unbound Armor, +1 must not raise AC").toBe(12);
+    setInventoryItem(state, IDS.hero, asPicked("armor-1", { baseId: "chain-mail" }), () => definition, { catalog });
+    expect(state.actors[0].armorClass, "Chain Mail 16, +1").toBe(17);
   });
 });
 

@@ -586,10 +586,11 @@ export const actionCommands = [
       if (!found) throw new CommandRejectedError("That action is not on the stat block.");
       const listed = withChosenCost(found, chosenSpend);
 
-      // Outside a fight a creature's own spell is cast as it is in one, with no turn to spend: its grant,
-      // Concentration, saves and area happen, and a heal says who regained what. A cast that only helps lands on its
-      // caster when no one is named (Mage Armor on oneself). One that rolls against creatures and names none (a Fire
-      // Bolt tapped on the sheet) has no one to resolve against, so it rolls loose below, as an item's cast does.
+      // Outside a fight a spell is cast as it is in one, from a sheet or an item, with no turn to spend: its grant,
+      // Concentration, saves and area happen, and a heal says who regained what. So does an item's use that leaves an
+      // effect on its user (Winged Boots). A cast that only helps lands on its caster when no one is named (Mage Armor
+      // on oneself). One that rolls against creatures and names none (a Fire Bolt tapped on the sheet) has no one to
+      // resolve against, so it rolls loose below.
       const rollsOnTargets = listed.attack !== undefined || listed.save !== undefined || listed.damage.length > 0;
       const aimed =
         listed.grants?.target === "target" ||
@@ -599,10 +600,10 @@ export const actionCommands = [
       const named = targetIds && targetIds.length > 0 ? targetIds : !rollsOnTargets && aimed ? [actorId] : [];
       // A shape-shift outside a fight (Wild Shape to scout, a werewolf's change) takes its form the same way.
       const shapeShifts = listed.shapeShift !== undefined || listed.endsForm === true;
+      const itemGrant = isItemActionId(listed.id) && listed.grants !== undefined;
       if (
         !snapshot.combat.active &&
-        !isItemActionId(listed.id) &&
-        (castSpellOf(listed, kit.equipmentCatalog().spellRecord) !== null || shapeShifts) &&
+        (castSpellOf(listed, kit.equipmentCatalog().spellRecord) !== null || shapeShifts || itemGrant) &&
         (named.length > 0 || !rollsOnTargets || shapeShifts)
       ) {
         const result = await dispatch("action.resolve", {

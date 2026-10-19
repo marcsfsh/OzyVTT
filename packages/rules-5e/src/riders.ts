@@ -54,6 +54,9 @@ const MOMENTS: ReadonlySet<string> = new Set<RiderMoment>([
 const FILTERS: ReadonlySet<string> = new Set([
   "attack-kind-is",
   "weapon-property-is",
+  "weapon-is",
+  "versus-magic",
+  "versus-spell",
   "damage-type-is",
   "ability-is",
   "skill-is",
@@ -162,6 +165,14 @@ export type RiderModifier = Readonly<{
   proficientOnly?: boolean;
   /** `total-minimum`: the ability whose score a lower total counts as (Indomitable Might's Strength). */
   abilityScore?: RiderAbility;
+  /** `ability-score-minimum`: the least the score counts as ("Your Strength is 19"). */
+  score?: number;
+  /** `ability-score`: the most an increase takes the score to (20 when absent). */
+  maximum?: number;
+  /** `ignores-cover`: the most cover the attack sets aside. */
+  degree?: "half" | "three-quarters";
+  /** `speed-minimum`: armor's Strength requirement takes nothing from it either. */
+  ignoresArmor?: boolean;
   /** `damage-bonus`: a penalty that leaves the damage at 1 or more (Reduce). */
   leavesOne?: boolean;
   /** `damage-reduction`: once a turn, on an effect (Resistance). */
@@ -257,6 +268,11 @@ export type RiderContext = Readonly<{
   otherSenses?: readonly string[];
   /** The situations the roller says this check fits, for `situation-is`. */
   situations?: readonly string[];
+  /** The weapon the attack is made with: its catalog id and the base a magic weapon is bound to, for `weapon-is`. */
+  weaponIds?: readonly string[];
+  /** The save is against a spell or another magical effect (`versus-magic`), and against a spell (`versus-spell`). */
+  magicalSource?: boolean;
+  spellSource?: boolean;
 }>;
 
 const overlaps = (allowed: readonly string[] | undefined, have: readonly string[] | undefined): boolean =>
@@ -315,6 +331,12 @@ function passes(trigger: RiderTrigger, context: RiderContext): boolean {
       return overlaps(trigger.kinds as readonly string[] | undefined, context.attackKinds);
     case "weapon-property-is":
       return overlaps(trigger.properties, context.weaponProperties);
+    case "weapon-is":
+      return overlaps(trigger.ids, context.weaponIds);
+    case "versus-magic":
+      return context.magicalSource === true;
+    case "versus-spell":
+      return context.spellSource === true;
     case "damage-type-is":
       return overlaps(trigger.damageTypes, context.damageTypes);
     case "ability-is":

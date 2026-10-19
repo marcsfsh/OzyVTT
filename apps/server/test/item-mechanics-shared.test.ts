@@ -250,12 +250,14 @@ describe("the rider families held only by a bundle assertion, driven", () => {
   it("a roll-mode rider really reaches the initiative die, on all three of its carriers", () => {
     const definition = definitionOf();
     for (const id of ["sentinel-shield", "weapon-of-warning", "rod-of-alertness"]) {
+      // Weapon of Warning is any weapon, bound to the one it is.
+      const bound = id === "weapon-of-warning" ? { baseId: "longsword" } : {};
       expect(
-        initiativeRollMode(stateWith([picked(id)]), IDS.hero, () => definition, catalog),
+        initiativeRollMode(stateWith([picked(id, bound)]), IDS.hero, () => definition, catalog),
         `${id}: the authored advantage did not reach initiativeRollMode`
       ).toBe("advantage");
       expect(
-        initiativeRollMode(stateWith([picked(id, { equipped: false })]), IDS.hero, () => definition, catalog),
+        initiativeRollMode(stateWith([picked(id, { ...bound, equipped: false })]), IDS.hero, () => definition, catalog),
         `${id}: unequipping must be the un-grant`
       ).toBe("normal");
     }
