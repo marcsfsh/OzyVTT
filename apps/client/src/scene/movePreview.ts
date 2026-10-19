@@ -86,6 +86,8 @@ export function previewMove(
     straight?: boolean;
     /** The mover passes through walls and creatures as through Difficult Terrain (Incorporeal Movement). */
     throughWalls?: boolean;
+    /** Difficult Terrain costs the mover nothing extra (Freedom of Movement). */
+    ignoresDifficult?: boolean;
     /** Walls that bar the way while the scene's dynamic vision is on (`movementWallsOf`). */
     walls?: readonly MoveWall[];
     /** The mover's height as it sets off and where the move ends, in feet; on the ground when absent. */
@@ -150,7 +152,8 @@ export function previewMove(
     to,
     sizeCells,
     isDifficult: (column, row) =>
-      difficultCells.has(`${column},${row}`) || (lowFeet <= 0 && pointInRects(center(column, row), terrain)),
+      input.ignoresDifficult !== true &&
+      (difficultCells.has(`${column},${row}`) || (lowFeet <= 0 && pointInRects(center(column, row), terrain))),
     isOpen: (column, row) => {
       if (closedCells.has(`${column},${row}`)) return false;
       const point = center(column, row);
@@ -162,6 +165,7 @@ export function previewMove(
     // A footprint that fits only as a creature one size smaller squeezes through, as through Difficult Terrain, and
     // so does a wall an incorporeal mover passes.
     isStepSqueezed: (stepFrom, stepTo) => {
+      if (input.ignoresDifficult === true) return false;
       const passage = footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, gridWalls);
       return passage === "squeeze" || (input.throughWalls === true && passage === "blocked");
     },

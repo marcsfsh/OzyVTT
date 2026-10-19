@@ -93,6 +93,8 @@ export type MovementCostOptions = Readonly<{
   passesCreatures?: boolean;
   /** The mover passes through walls as through Difficult Terrain (a ghost's Incorporeal Movement). */
   throughWalls?: boolean;
+  /** Difficult Terrain costs the mover nothing extra (Freedom of Movement). */
+  ignoresDifficult?: boolean;
   /** Whether the mover's Speed is halved with its centre at this point (Spirit Guardians' Emanation). */
   halvedAt?: (position: Point, sizeCells: number) => boolean;
   /** The mover's height as it sets off and where the move ends, in feet; on the ground when absent. */
@@ -188,8 +190,9 @@ export function movementCost(
     to: footprintOrigin(imageToGrid(calibration, to), sizeCells),
     sizeCells,
     isDifficult: (column, row) =>
-      difficultCells.has(`${column},${row}`) ||
-      (!aloft && pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), terrain)),
+      options.ignoresDifficult !== true &&
+      (difficultCells.has(`${column},${row}`) ||
+        (!aloft && pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), terrain))),
     // A path can't leave the map to walk round something, nor pass a creature that bars the way.
     isOpen: (column, row) => {
       if (closedCells.has(`${column},${row}`)) return false;
@@ -201,6 +204,7 @@ export function movementCost(
     // A footprint that fits only as a creature one size smaller squeezes through, as through Difficult Terrain, and
     // so does a wall an incorporeal mover passes.
     isStepSqueezed: (stepFrom, stepTo) => {
+      if (options.ignoresDifficult === true) return false;
       const passage = footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls);
       return passage === "squeeze" || (options.throughWalls === true && passage === "blocked");
     },

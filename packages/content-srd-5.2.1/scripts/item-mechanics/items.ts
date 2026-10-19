@@ -1070,7 +1070,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ---- Shoulders -------------------------------------------------------------------------------
 
-  // `cape-of-the-mountebank` - the Dimension Door cast would deal its 4d6 to the target; the smoke cloud is not modeled.
+  // "You can use it to cast Dimension Door", once a dawn: the cast teleports its wearer (`granted-moves.ts`), the 4d6
+  // falling only on an arrival in a filled space. The smoke cloud is the GM's.
+  "cape-of-the-mountebank": { casts: [{ spellId: "dimension-door", uses: { limit: 1, per: "long-rest" } }] },
 
   // Spider Climb, Spider Walk and the Web cast are not expressible.
   "cloak-of-arachnida": { grants: { damageResistances: ["poison"] } },

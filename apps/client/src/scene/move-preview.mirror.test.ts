@@ -284,6 +284,27 @@ describe("the drag preview squeezes and passes walls as the server does", () => 
   });
 });
 
+describe("the drag preview leaves Difficult Terrain free under Freedom of Movement, as the server does", () => {
+  it("charges rubble as open ground", () => {
+    const state = table([cells(2, 0, 3, 19)], {});
+    const charged = movementCost(state, GRID, HERO, cell(0, 5), cell(6, 5), { ignoresDifficult: true });
+    expect(charged?.feet).toBe(30);
+    expect(charged?.difficultFeet).toBe(0);
+    const previewed = previewMove({
+      calibration: CALIBRATION,
+      size: { width: GRID.width, height: GRID.height },
+      terrain: state.combat.terrain.difficult,
+      tokens: state.combat.tokens,
+      actorsById: new Map(state.actors.map((actor) => [actor.id, actor as GmActor])),
+      moverId: HERO,
+      from: cell(0, 5),
+      to: cell(6, 5),
+      ignoresDifficult: true
+    });
+    expect(previewed?.feet).toBe(charged?.feet);
+  });
+});
+
 describe("the drag preview takes jumps and granted moves as the server does", () => {
   const base = (state: GameState) => ({
     calibration: CALIBRATION,

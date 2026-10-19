@@ -206,7 +206,8 @@ export function movementStatus(
       ? { dragging: true }
       : {}),
     ...grantsOf(state, actor),
-    ...(incorporeal(definition) ? { throughWalls: true } : {})
+    ...(incorporeal(definition) ? { throughWalls: true } : {}),
+    ...(actor && freeOfDifficultTerrain(actor) ? { ignoresDifficultTerrain: true } : {})
   };
 }
 
@@ -683,6 +684,10 @@ const moverDefinitionOf = (mover: GameState["actors"][number], input: Pick<Movem
 const incorporeal = (definition: ActorDefinition | undefined) =>
   holdsFeature(definition, "incorporeal-movement", "Incorporeal Movement");
 
+/** Freedom of Movement: "The target's movement is unaffected by Difficult Terrain." */
+const freeOfDifficultTerrain = (mover: GameState["actors"][number]) =>
+  mover.effects.some((effect) => effect.tags.includes("freedom-of-movement"));
+
 /** What each foot of a move costs beside itself, and the options the path's cost is measured with. */
 function costOptions(
   state: GameState,
@@ -707,6 +712,7 @@ function costOptions(
       ...(input.perceives ? { perceives: input.perceives } : {}),
       ...(sharesSpace(state, input.actorId, input) || incorporeal(moverDefinition) ? { passesCreatures: true } : {}),
       ...(incorporeal(moverDefinition) ? { throughWalls: true } : {}),
+      ...(freeOfDifficultTerrain(mover) ? { ignoresDifficult: true } : {}),
       ...(fromAltitude !== 0 || toAltitude !== 0 ? { altitude: { fromFeet: fromAltitude, toFeet: toAltitude } } : {})
     }
   };
