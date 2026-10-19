@@ -4,7 +4,10 @@ import { setAltitude } from "./altitude.js";
 import { addEffect, makeEffect, type EffectNarration } from "./effects.js";
 import { ETHEREAL_SHUNT_TAG, ETHEREAL_TAG, isEthereal, onOtherPlanes } from "./ethereal.js";
 import type { FallDeps } from "./falling.js";
+import { removeCombatant } from "./encounter.js";
+import { clockMinutesOf } from "./game-time.js";
 import { grantTeleport } from "./granted-moves.js";
+import { creatureTypeOf } from "./statblock-facts.js";
 import { imageToGrid } from "./grid-calibration.js";
 import { applyDamageDetailed, damageAdjustmentDetail } from "./hit-points.js";
 import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
@@ -26,6 +29,10 @@ export const OFF_PLANE_TAG = "off-plane";
 export const BLINK_TAG = "blink";
 /** Blink: "You return to an unoccupied space of your choice that you can see within 10 feet of the space you left." */
 const BLINK_RETURN_FEET = 10;
+/** On Banishment's effect: "If the target is an Aberration, a Celestial, an Elemental, a Fey, or a Fiend, the target
+ *  doesn't return if the spell lasts for 1 minute." */
+export const BANISHED_HOME_TAG = "banished-home";
+const HOME_PLANE_TYPES: ReadonlySet<string> = new Set(["aberration", "celestial", "elemental", "fey", "fiend"]);
 
 type Actor = GameState["actors"][number];
 type Token = GameState["combat"]["tokens"][number];
@@ -56,7 +63,7 @@ export function settlePlanes(state: GameState, geometry: TokenMapGeometry, deps?
     if (!token) continue;
     const kept = state.combat.offPlane.find((entry) => entry.actorId === actor.id);
     if (isOffPlane(actor) && token.position) {
-      leave(state, actor.id, token, kept?.ethereal ? kept.position : token.position);
+      leave(state, actor.id, token, kept?.ethereal ? kept.position : token.position, staysGoneAt(state, actor, deps));
       moveEncounterToken(state, actor.id, null, geometry);
       events.push({ kind: "effect", text: `${actor.name} vanishes from this plane.`, actorId: actor.id });
       continue;
@@ -75,6 +82,10 @@ export function settlePlanes(state: GameState, geometry: TokenMapGeometry, deps?
       if (token.position) events.push(...returnFromEthereal(state, actor, token.position, kept, geometry, deps));
       continue;
     }
+    if (kept.staysGone && minuteRanOut(state, kept.staysGone)) {
+      events.push(...sentHome(state, actor, deps));
+      continue;
+    }
     const landing = nearestOpenSpace(state, actor.id, kept.position, geometry);
     moveEncounterToken(state, actor.id, landing, geometry);
     if (landing === kept.position) setAltitude(state, actor.id, kept.altitudeFeet ?? 0, kept.airborne);
@@ -91,7 +102,13 @@ export function settlePlanes(state: GameState, geometry: TokenMapGeometry, deps?
 }
 
 /** Keeps the space a creature leaves the map from, and its height there. */
-function leave(state: GameState, actorId: string, token: Token, position: Point): void {
+function leave(
+  state: GameState,
+  actorId: string,
+  token: Token,
+  position: Point,
+  staysGone: OffPlaneEntry["staysGone"]
+): void {
   state.combat = {
     ...state.combat,
     offPlane: [
@@ -100,11 +117,43 @@ function leave(state: GameState, actorId: string, token: Token, position: Point)
         actorId,
         position: { ...position },
         ...(token.altitudeFeet ? { altitudeFeet: token.altitudeFeet } : {}),
-        ...(token.airborne ? { airborne: token.airborne } : {})
+        ...(token.airborne ? { airborne: token.airborne } : {}),
+        ...(staysGone ? { staysGone } : {})
       }
     ]
   };
   setAltitude(state, actorId, 0, undefined);
+}
+
+/** When a banished Aberration, Celestial, Elemental, Fey or Fiend has been gone the full minute: the round 10 rounds
+ *  on in a fight, or the game-clock minute after this one outside one. Undefined for any other creature. */
+function staysGoneAt(state: GameState, actor: Actor, deps: FallDeps | undefined): OffPlaneEntry["staysGone"] {
+  const banished = actor.effects.find((effect) => effect.tags.includes(BANISHED_HOME_TAG));
+  if (!banished) return undefined;
+  const definition = actor.definitionId ? deps?.resolveDefinition(actor.definitionId) : undefined;
+  const type = creatureTypeOf(actor, definition);
+  if (type === null || !HOME_PLANE_TYPES.has(type)) return undefined;
+  return state.combat.active
+    ? { round: banished.startedRound + 10 }
+    : { minute: clockMinutesOf(state) + 1 };
+}
+
+const minuteRanOut = (state: GameState, at: NonNullable<OffPlaneEntry["staysGone"]>) =>
+  at.round !== undefined
+    ? state.combat.active && state.combat.round >= at.round
+    : at.minute !== undefined && clockMinutesOf(state) >= at.minute;
+
+/** "The target is instead transported to a random location on a plane (GM's choice) associated with its creature
+ *  type": it stays off the map and leaves the fight. */
+function sentHome(state: GameState, actor: Actor, deps: FallDeps | undefined): EffectNarration[] {
+  const events: EffectNarration[] = [
+    { kind: "effect", text: `${actor.name} doesn't return: the banishment held for its full minute.`, actorId: actor.id }
+  ];
+  const fighting = state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id);
+  if (fighting && deps && state.combat.turnActorId !== actor.id && state.combat.initiative.length > 1)
+    events.push(...removeCombatant(state, actor.id, deps.resolveDefinition));
+  else state.combat = { ...state.combat, tokens: state.combat.tokens.filter((token) => token.actorId !== actor.id) };
+  return events;
 }
 
 /** Marks a creature as on the Border Ethereal, with what its return will do: a shunt that hurts (the Etherealness

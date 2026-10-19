@@ -1695,7 +1695,16 @@ export const CombatStateSchema = z
             /** Coming back into a filled space shunts it with 2 Force damage a foot (the Etherealness spell). */
             shunt: z.literal(true).optional(),
             /** It may then teleport to a space it sees within this many feet of where it went (Blink: 10). */
-            returnFeet: z.number().int().min(5).max(60).optional()
+            returnFeet: z.number().int().min(5).max(60).optional(),
+            /** Gone this long, it doesn't come back (a banished Fiend after the full minute): the fight's round, or
+             *  the game-clock minute outside a fight. */
+            staysGone: z
+              .object({
+                round: z.number().int().min(1).optional(),
+                minute: z.number().int().min(0).optional()
+              })
+              .strict()
+              .optional()
           })
           .strict()
       )

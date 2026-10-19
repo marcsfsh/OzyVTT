@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { GameStateSchema, PendingSaveSchema, type GameState } from "@vtt/domain";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
 import { addEffect, endEffect, makeEffect } from "../src/effects.js";
@@ -170,5 +171,51 @@ describe("a creature off the plane", () => {
     settlePlanes(state, GRID);
     expect(token(state, MAGE).position).toEqual(cell(0, 0));
     expect(state.combat.offPlane).toEqual([]);
+  });
+});
+
+describe("Banishment of a creature from another plane", () => {
+  const monsters = loadMonsterDefinitions();
+  const fallDeps = {
+    resolveDefinition: (id: string) => monsters.find((monster) => monster.source.externalId === id),
+    random: () => 1,
+    newId: () => "e",
+    now: () => "2026-10-19T00:00:00.000Z"
+  };
+  const banishFiend = () => {
+    const state = game();
+    state.actors.find((actor) => actor.id === OGRE)!.definitionId = "imp";
+    addEffect(
+      state,
+      OGRE,
+      makeEffect({
+        id: "banished",
+        name: "Banished",
+        tags: ["off-plane", "banished-home"],
+        duration: { type: "manual" },
+        startedRound: 1
+      })
+    );
+    settlePlanes(state, GRID, fallDeps);
+    return state;
+  };
+
+  it("doesn't return when the spell lasts its full minute, and leaves the fight", () => {
+    const state = banishFiend();
+    state.combat.round = 11;
+    endEffect(state, OGRE, "banished");
+    expect(settlePlanes(state, GRID, fallDeps).map((event) => event.text)).toContain(
+      "Ogre doesn't return: the banishment held for its full minute."
+    );
+    expect(state.combat.initiative.map((entry) => entry.actorId)).not.toContain(OGRE);
+    expect(state.combat.tokens.some((candidate) => candidate.actorId === OGRE)).toBe(false);
+  });
+
+  it("returns to its space when the Concentration breaks before the minute is up", () => {
+    const state = banishFiend();
+    state.combat.round = 5;
+    endEffect(state, OGRE, "banished");
+    settlePlanes(state, GRID, fallDeps);
+    expect(token(state, OGRE).position).toEqual(cell(3, 0));
   });
 });

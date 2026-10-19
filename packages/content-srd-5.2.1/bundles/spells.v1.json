@@ -2294,7 +2294,8 @@
    "failureEffect": {
     "name": "Banished",
     "tags": [
-     "off-plane"
+     "off-plane",
+     "banished-home"
     ],
     "modifiers": []
    },

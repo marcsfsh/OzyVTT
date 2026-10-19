@@ -2051,9 +2051,9 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   // climbing"; when it ends the target "floats gently to the ground" (`falling.ts` raises and lowers it).
   levitate: { name: "Levitate", tags: ["levitating"], modifiers: [] },
   // "Transported to a harmless demiplane for the duration ... When the spell ends, the target reappears in the space it
-  // left or in the nearest unoccupied space": it leaves the map until the effect ends (`off-plane.ts`). An
-  // extraplanar target that stays gone for the full minute is the GM's.
-  banishment: { name: "Banished", tags: ["off-plane"], modifiers: [] },
+  // left or in the nearest unoccupied space": it leaves the map until the effect ends (`off-plane.ts`). An Aberration,
+  // a Celestial, an Elemental, a Fey or a Fiend gone the full minute doesn't come back (`banished-home`).
+  banishment: { name: "Banished", tags: ["off-plane", "banished-home"], modifiers: [] },
   // Imprisoned "until the spell is dispelled": off the map until the GM ends it. Its form, and the trigger that frees
   // it, are the GM's.
   imprisonment: { name: "Imprisoned", tags: ["off-plane"], modifiers: [] },
