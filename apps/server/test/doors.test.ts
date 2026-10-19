@@ -217,6 +217,41 @@ describe("Iron Spikes", () => {
   });
 });
 
+describe("Carpenter's and Smith's Tools", () => {
+  // SRD Carpenter's Tools: "Seal or pry open a door or container (DC 20)"; Smith's Tools: "Pry open a door or
+  // container (DC 20)".
+  const use = (state: GameState, wallId: string, how: "pry" | "seal", face: number) =>
+    useDoor(state, { wallId, actorId: HERO, how, visibility: "public" }, PLAYER_A, deps([face]));
+
+  it("pry a barred door open on a DC 20 Strength check, and fail below it", () => {
+    const shut = doorway({ fastenings: [{ kind: "barred", dc: 12 }] }, [row("smiths-tools", "Smith's Tools")]);
+    expect(use(shut.state, shut.door.id, "pry", 10).opened).toBe(false);
+    expect(shut.doorOf(shut.state).open).toBe(false);
+    const pried = doorway({ fastenings: [{ kind: "barred", dc: 12 }] }, [row("smiths-tools", "Smith's Tools")]);
+    expect(use(pried.state, pried.door.id, "pry", 20).text).toBe("Borin pries the door open.");
+    expect(pried.doorOf(pried.state).open).toBe(true);
+    expect(pried.doorOf(pried.state).door?.fastenings).toEqual([]);
+  });
+
+  it("need the tools, and can't pry a door Stone Shape sealed", () => {
+    const bare = doorway({ fastenings: [{ kind: "stuck" }] });
+    expect(() => use(bare.state, bare.door.id, "pry", 20)).toThrowError(
+      "Borin needs Carpenter's or Smith's Tools to pry a door open."
+    );
+    const sealed = doorway({ fastenings: [{ kind: "sealed" }] }, [row("carpenters-tools", "Carpenter's Tools")]);
+    expect(() => use(sealed.state, sealed.door.id, "pry", 20)).toThrowError(
+      "The door is sealed shut. Break it down or shape the stone again."
+    );
+  });
+
+  it("seal a closed door with Carpenter's Tools, which then forces open only at DC 20", () => {
+    const { state, door, doorOf } = doorway(undefined, [row("carpenters-tools", "Carpenter's Tools")]);
+    expect(use(state, door.id, "seal", 20).text).toBe("Borin seals the door shut.");
+    expect(doorOf(state).door?.fastenings).toEqual([{ kind: "stuck", dc: 20 }]);
+    expect(heldShutAgainst(state, doorOf(state), FRIEND)).toBe("The door is stuck.");
+  });
+});
+
 describe("what players learn of a door", () => {
   it("sends a secret door as wall, and no lock at all", () => {
     const { state, door } = doorway({ fastenings: [{ kind: "lock", dc: 18 }], hidden: true });

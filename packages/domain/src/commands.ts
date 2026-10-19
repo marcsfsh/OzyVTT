@@ -1159,7 +1159,9 @@ export const DoorUseSchema = z
     commandId: z.uuid(),
     wallId: z.uuid(),
     actorId: z.uuid(),
-    how: z.enum(["pick", "force", "jam"]),
+    /** Pick its lock (Thieves' Tools), force it, jam it with an Iron Spike, pry it open (Carpenter's or Smith's
+     *  Tools) or seal it (Carpenter's Tools). */
+    how: z.enum(["pick", "force", "jam", "pry", "seal"]),
     /** Another character helping with a Portable Ram (Advantage on the check). */
     helperId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()

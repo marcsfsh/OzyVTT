@@ -32,6 +32,11 @@ const KNOCK_MINUTES = 10;
 const THIEVES_TOOLS = "thieves-tools";
 const PORTABLE_RAM = "portable-ram";
 const IRON_SPIKES = "iron-spikes";
+const CARPENTERS_TOOLS = "carpenters-tools";
+const SMITHS_TOOLS = "smiths-tools";
+/** SRD Carpenter's Tools: "Seal or pry open a door or container (DC 20)"; Smith's Tools: "Pry open a door or container
+ *  (DC 20)". */
+const TOOL_DOOR_DC = 20;
 /** Spikes come in bundles of ten. */
 const SPIKES_PER_BUNDLE = 10;
 
@@ -132,7 +137,7 @@ function spendAction(state: GameState, actor: Actor, initiator: Initiator, what:
 const carried = (actor: Actor, id: string) =>
   actor.inventory.find((row) => row.quantity > 0 && catalogIdOf(row) === id);
 
-export type DoorUse = "pick" | "force" | "jam";
+export type DoorUse = "pick" | "force" | "jam" | "pry" | "seal";
 
 export type DoorUseDeps = Readonly<{
   random: RandomSource;
@@ -157,8 +162,9 @@ export type DoorUseResult = Readonly<{
 /**
  * A creature next to a door works on it: picks its lock with Thieves' Tools (a Dexterity (Sleight of Hand) check), forces
  * it (a Strength (Athletics) check, +4 with a Portable Ram and Advantage with a helper on the ram), or jams it shut with
- * an Iron Spike. Each takes the Utilize action in a fight. A pick or a force that succeeds opens the way: the lock is
- * unlocked, or every fastening it beat is broken and the door swings open.
+ * an Iron Spike. With Carpenter's or Smith's Tools it pries the door open, and with Carpenter's Tools it seals one shut
+ * (a Strength check with the tool against DC 20). Each takes the Utilize action in a fight. A pick, a force or a pry
+ * that succeeds opens the way: the lock is unlocked, or every fastening it beat is broken and the door swings open.
  */
 export function useDoor(
   state: GameState,
@@ -176,8 +182,10 @@ export function useDoor(
   if (!doorWithinReach(state, wall.id, [actor.id]))
     throw new GameAccessDeniedError("Move your character next to the door to work on it.");
   if (input.how === "jam") return jamDoor(state, wall, actor, initiator);
-  if (wall.open === true) throw new CommandRejectedError("The door is already open.");
   const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
+  if (input.how === "seal") return sealDoor(state, wall, actor, definition, input.visibility, initiator, deps);
+  if (wall.open === true) throw new CommandRejectedError("The door is already open.");
+  if (input.how === "pry") return pryDoor(state, wall, actor, definition, input.visibility, initiator, deps);
   return input.how === "pick"
     ? pickLock(state, wall, actor, definition, input.visibility, initiator, deps)
     : forceDoor(state, wall, actor, definition, input, initiator, deps);
@@ -294,6 +302,81 @@ function forceDoor(
     return { text: `${actor.name} fails to force the door.`, opened: false, total: roll.total };
   writeDoor(state, wall.id, (current) => ({ ...withoutFastenings(current, holding), open: true }));
   return { text: `${actor.name} forces the door open.`, opened: true, total: roll.total };
+}
+
+/** The Strength check a woodworker's or smith's tool makes, proficiency coming from the tool. */
+function toolCheck(
+  state: GameState,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  tool: string,
+  label: string,
+  visibility: RollVisibility,
+  initiator: Initiator,
+  deps: DoorUseDeps
+) {
+  const plan = checkPlan(
+    actor,
+    definition,
+    deriveEquipment(actor, definition, deps.catalog),
+    { ability: "str", tool },
+    deps.names ? { names: deps.names } : {}
+  );
+  return rollFor(state, actor, plan, label, visibility, initiator, deps);
+}
+
+/** SRD Carpenter's Tools and Smith's Tools: "Pry open a door or container (DC 20)". Whatever holds the door shut gives
+ *  way, but Stone Shape's seal and an Arcane Lock don't. */
+function pryDoor(
+  state: GameState,
+  wall: VisionWall,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  visibility: RollVisibility,
+  initiator: Initiator,
+  deps: DoorUseDeps
+): DoorUseResult {
+  const tools = carried(actor, CARPENTERS_TOOLS) ?? carried(actor, SMITHS_TOOLS);
+  if (!tools) throw new CommandRejectedError(`${actor.name} needs Carpenter's or Smith's Tools to pry a door open.`);
+  const door = wall.door;
+  if (door?.fastenings.some((fastening) => fastening.kind === "sealed"))
+    throw new CommandRejectedError("The door is sealed shut. Break it down or shape the stone again.");
+  if (door && arcaneLockBars(state, door, actor.id))
+    throw new CommandRejectedError("The door won't move: magic holds it shut. Break it down or dispel the magic.");
+  spendAction(state, actor, initiator, "Pry the door open");
+  const roll = toolCheck(state, actor, definition, catalogIdOf(tools), "Pry a door open", visibility, initiator, deps);
+  if (roll.total < TOOL_DOOR_DC)
+    return { text: `${actor.name} fails to pry the door open.`, opened: false, total: roll.total };
+  const holding = door ? fasteningsAgainst(door, actor.id) : [];
+  writeDoor(state, wall.id, (current) => ({ ...withoutFastenings(current, holding), open: true }));
+  return { text: `${actor.name} pries the door open.`, opened: true, total: roll.total };
+}
+
+/** SRD Carpenter's Tools: "Seal ... a door or container (DC 20)". It is forced or pried open at that DC. */
+function sealDoor(
+  state: GameState,
+  wall: VisionWall,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  visibility: RollVisibility,
+  initiator: Initiator,
+  deps: DoorUseDeps
+): DoorUseResult {
+  if (wall.open === true) throw new CommandRejectedError("Close the door before sealing it.");
+  if (!carried(actor, CARPENTERS_TOOLS))
+    throw new CommandRejectedError(`${actor.name} needs Carpenter's Tools to seal a door.`);
+  spendAction(state, actor, initiator, "Seal the door");
+  const roll = toolCheck(state, actor, definition, CARPENTERS_TOOLS, "Seal a door", visibility, initiator, deps);
+  if (roll.total < TOOL_DOOR_DC)
+    return { text: `${actor.name} fails to seal the door.`, opened: false, total: roll.total };
+  writeDoor(state, wall.id, (current) => ({
+    ...current,
+    door: {
+      ...(current.door ?? { fastenings: [] }),
+      fastenings: [...(current.door?.fastenings ?? []), { kind: "stuck" as const, dc: TOOL_DOOR_DC }].slice(-6)
+    }
+  }));
+  return { text: `${actor.name} seals the door shut.`, opened: false, total: roll.total };
 }
 
 /** SRD Spikes, Iron: "As a Utilize action, you can use a blunt object ... to hammer a spike into wood ... to jam a door
