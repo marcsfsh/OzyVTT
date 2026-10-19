@@ -380,8 +380,15 @@ function interpretAction(
   const healingRows = (healingByLevel ?? [])
     .filter((row) => row.level <= context.level)
     .sort((left, right) => left.level - right.level);
-  if (healingRows.length > 0)
-    assembled.healing = { ...(action.healing ?? {}), formula: healingRows[healingRows.length - 1].formula };
+  if (healingRows.length > 0) {
+    const { formula, self, temporary } = healingRows[healingRows.length - 1];
+    assembled.healing = {
+      ...(action.healing ?? {}),
+      ...(self ? { self } : {}),
+      ...(temporary ? { temporary } : {}),
+      formula
+    };
+  }
   // "1d10 plus your Fighter level", "add your Wisdom modifier": read off the character as it is built.
   if (adds) {
     const bonus =

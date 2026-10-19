@@ -24,11 +24,13 @@ import { areEnemies } from "./creature-sides.js";
 import { burrowsThroughWalls, openingPassage, stopsOnlyInEnemySpace } from "./wall-passage.js";
 import { effectiveActions } from "./effective-actions.js";
 import {
+  endEffect,
   NO_OPPORTUNITY_ATTACKS_TAG,
   NO_REACTIONS_TAG,
   NO_TELEPORT_TAG,
   READIED_TAG,
-  releaseReadied
+  releaseReadied,
+  type EffectNarration
 } from "./effects.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
@@ -247,6 +249,31 @@ function grantsOf(state: GameState, actor: GameState["actors"][number] | undefin
       : {}),
     ...(teleport ? { teleport: { name: teleport.name, feet: teleport.feet } } : {})
   };
+}
+
+/** On a willing ally a Monk's Step of the Wind carries (Heightened Focus): "You move the creature with you until the end
+ *  of your turn. The creature's movement doesn't provoke Opportunity Attacks." */
+export const CARRIED_ALONG_TAG = "carried-along";
+
+/** The creatures `moverId` carries along on its own turn (Heightened Focus), which its moves take with it. */
+export function carriedAlongBy(state: GameState, moverId: string): readonly string[] {
+  if (state.combat.turnActorId !== moverId) return [];
+  return state.actors
+    .filter((actor) =>
+      actor.effects.some((effect) => effect.tags.includes(CARRIED_ALONG_TAG) && effect.sourceActorId === moverId)
+    )
+    .map((actor) => actor.id);
+}
+
+/** "Until the end of your turn": what the creature carried ends as its turn does. */
+export function setDownCarried(state: GameState, actorId: string): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const actor of state.actors)
+    for (const effect of actor.effects.filter(
+      (candidate) => candidate.tags.includes(CARRIED_ALONG_TAG) && candidate.sourceActorId === actorId
+    ))
+      events.push(...endEffect(state, actor.id, effect.id));
+  return events;
 }
 
 /** The creatures a grappler holds (its `grapple` effects on them). */

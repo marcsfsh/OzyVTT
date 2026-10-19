@@ -32,7 +32,7 @@ export const monk: ClassMechanicsModule = {
      * Focus Points read off the printed column; the shared `pool` lets all three 1-point actions (and
      * Stunning Strike) spend one counter. These are the paid forms; the free Disengage/Dash forms are in
      * the text. Flurry's strikes are a compound Bonus Action: resolving it opens a pool of Unarmed Strikes
-     * (two, three from Heightened Focus at 10) that each strike spends. Heightened Focus's other upgrades stay prose.
+     * (two, three from Heightened Focus at 10) that each strike spends.
      */
     "monks-focus": {
       uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
@@ -51,8 +51,14 @@ export const monk: ClassMechanicsModule = {
           name: "Patient Defense",
           activation: "bonus-action",
           description:
-            "Expend 1 Focus Point to take both the Disengage and the Dodge actions as a Bonus Action. Taking Disengage alone as a Bonus Action costs no Focus Point.",
-          damage: []
+            "Expend 1 Focus Point to take both the Disengage and the Dodge actions as a Bonus Action. Taking Disengage alone as a Bonus Action costs no Focus Point. From Monk level 10 (Heightened Focus), you also gain Temporary Hit Points equal to two rolls of your Martial Arts die.",
+          damage: [],
+          // Heightened Focus: two rolls of the Martial Arts die (d8 at 10, d10 at 11, d12 at 17).
+          healingByLevel: [
+            { level: 10, formula: "2d8", self: true, temporary: true },
+            { level: 11, formula: "2d10", self: true, temporary: true },
+            { level: 17, formula: "2d12", self: true, temporary: true }
+          ]
         },
         {
           id: "step-of-the-wind",
@@ -196,6 +202,32 @@ export const monk: ClassMechanicsModule = {
         }
       ]
     },
+    /**
+     * Patient Defense's Temporary Hit Points ride its action above. Step of the Wind's carried ally is its own action
+     * on the turn the Monk Dashes: the ally moves with the Monk's moves until the turn ends (movement-rules.ts).
+     */
+    "heightened-focus": {
+      actions: [
+        {
+          id: "step-of-the-wind-carry",
+          name: "Step of the Wind: carry an ally",
+          activation: "other",
+          timing: "own-turn",
+          requiresEffectTag: "dashing",
+          description:
+            "When you use Step of the Wind, choose a willing creature within 5 feet of yourself that is Large or smaller. You move the creature with you until the end of your turn. The creature's movement doesn't provoke Opportunity Attacks.",
+          damage: [],
+          targets: { count: 1, rangeFeet: 5, maxSize: "large", who: "allies" },
+          grants: {
+            name: "Carried by Step of the Wind",
+            tags: ["carried-along"],
+            target: "target",
+            notSelf: true,
+            duration: { type: "until-source-turn-end" }
+          }
+        }
+      ]
+    },
     "epic-boon": {
       choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },
@@ -206,11 +238,8 @@ export const monk: ClassMechanicsModule = {
         { type: "ability-score", ability: "wis", amount: 4, maximum: 25 }
       ]
     }
-    // Not modeled here: Martial Arts' Unarmed Strike is minted by the builder (`martialArtsStrike`),
-    // but its die and Dexterity do not reach inventory Monk weapons. Martial-Arts-die features (Deflect
-    // Attacks' redirect, temp HP amounts), and Acrobatic Movement, Empowered Strikes, Self-Restoration
-    // and Perfect Focus stay prose. Evasion is read by the save outcome (`hasEvasion` in the server) from the
-    // held feature.
+    // Martial Arts' Unarmed Strike is minted by the builder (`martialArtsStrike`), and Evasion is read by the save
+    // outcome (`hasEvasion` in the server) from the held feature. Acrobatic Movement stays prose.
   },
   // The Unarmored Movement column's steps (+15 at 6, +20 at 10, +25 at 14, +30 at 18), each replacing the last.
   stages: [6, 10, 14, 18].map((level, index, levels) => ({

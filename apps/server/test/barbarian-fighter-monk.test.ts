@@ -18,7 +18,7 @@ import { UNARMED_STRIKE_ACTION_ID } from "../src/item-actions.js";
 import { applyDamageDetailed, RELENTLESS_RAGE_KEY } from "../src/hit-points.js";
 import { applyRest } from "../src/rests.js";
 import { currentSpeedFeet } from "../src/speed.js";
-import { dragCostsExtra } from "../src/movement-rules.js";
+import { carriedAlongBy, dragCostsExtra } from "../src/movement-rules.js";
 
 // Barbarian, Fighter and Monk mechanics, asserted as numbers a player can act on: sheet AC, the DC a
 // target is held to, the die the engine keeps, the counter it spends, or the refusal it prints. Runs
@@ -1635,6 +1635,16 @@ describe("Monk: the Bonus Action forms Martial Arts and Monk's Focus give", () =
     // Dodge's half lapses at Speed 0 or while Incapacitated, as the Dodge action does.
     expect(effect.voidWhileIncapacitated).toBe(true);
     expect(built.hero.actionUses["focus-points"]).toBe(1);
+    expect(built.hero.hp.temporary ?? 0).toBe(0);
+  });
+
+  it("gives a Monk 10's paid Patient Defense Temporary Hit Points of two Martial Arts dice (Heightened Focus)", () => {
+    const built = onTheTable(build(monkInput(10)));
+    expect(actionOf(built, "patient-defense").healing).toEqual({ formula: "2d8", self: true, temporary: true });
+    use(built, "patient-defense", [], [5, 7]);
+    expect(built.hero.hp.temporary).toBe(12);
+    expect(built.hero.effects.some((entry) => entry.tags.includes("dodging"))).toBe(true);
+    expect(actionOf(onTheTable(build(monkInput(17))), "patient-defense").healing?.formula).toBe("2d12");
   });
 });
 
@@ -2589,7 +2599,7 @@ describe("Monk: Self-Restoration ends a condition as the turn ends", () => {
         id: "fear",
         name: "Cause Fear",
         linkedConditionIds: ["frightened"],
-        duration: { type: "rounds", rounds: 10 }
+        duration: { type: "rounds", remaining: 10 }
       })
     );
     expect(conditionIds(built)).toEqual(["frightened"]);
@@ -2603,5 +2613,48 @@ describe("Monk: Self-Restoration ends a condition as the turn ends", () => {
     setCondition(built.state, IDS.hero, "poisoned", true, undefined, { role: "gm" });
     endTurn(built);
     expect(conditionIds(built)).toEqual(["poisoned"]);
+  });
+});
+
+describe("Monk: Heightened Focus carries a willing ally on Step of the Wind", () => {
+  /** A Monk with an ally beside it, of `size`. */
+  const withAlly = (level: number, size = "medium") => {
+    const built = onTheTable(build(monkInput(level)));
+    built.state.actors.push({
+      ...structuredClone(built.hero),
+      id: OTHER,
+      name: "Ally",
+      size,
+      definitionId: undefined,
+      effects: [],
+      conditions: [],
+      inventory: []
+    } as Actor);
+    built.state.combat.initiative.push({ actorId: OTHER, score: 5 } as (typeof built.state.combat.initiative)[number]);
+    return built;
+  };
+  const carry = (built: Built) => use(built, "step-of-the-wind-carry", [OTHER]);
+  const ally = (built: Built) => built.state.actors.find((actor) => actor.id === OTHER)!;
+
+  it("takes the ally along on the Monk's moves after Step of the Wind, until the turn ends", () => {
+    const built = withAlly(10);
+    expect(() => carry(built)).toThrow(/requires an active/);
+    use(built, "step-of-the-wind");
+    carry(built);
+    expect(ally(built).effects).toMatchObject([{ name: "Carried by Step of the Wind", tags: ["carried-along"] }]);
+    expect(carriedAlongBy(built.state, IDS.hero)).toEqual([OTHER]);
+    nextInitiativeTurn(built.state);
+    expect(ally(built).effects).toEqual([]);
+  });
+
+  it("refuses a Huge ally, and a Monk 9 has no such action", () => {
+    const huge = withAlly(10, "huge");
+    use(huge, "step-of-the-wind");
+    expect(() => carry(huge)).toThrow(/Large or smaller|larger than Large|too large|size/i);
+    expect(
+      effectiveActions(build(monkInput(9)), withAlly(9).hero, catalog).some(
+        (action) => action.id === "step-of-the-wind-carry"
+      )
+    ).toBe(false);
   });
 });

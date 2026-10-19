@@ -274,11 +274,20 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true,
     /** Healing that grows with level. It replaces `healing.formula` at the highest matching level (Divine Spark's heal,
      *  Wholeness of Body's Martial Arts die). */
     healingByLevel: z
-      .array(z.object({ level: ContentLevelSchema, formula: HealingFormulaSchema }).strict())
+      .array(
+        z
+          .object({
+            level: ContentLevelSchema,
+            formula: HealingFormulaSchema,
+            self: z.literal(true).optional(),
+            temporary: z.literal(true).optional()
+          })
+          .strict()
+      )
       .max(20)
       .optional()
       .describe(
-        "Healing that grows with level (Divine Spark's heal, Wholeness of Body's Martial Arts die). The highest matching level replaces `healing.formula`"
+        "Healing that grows with level (Divine Spark's heal, Wholeness of Body's Martial Arts die). The highest matching level replaces `healing.formula`; a row with `self` or `temporary` gives an action with no healing below that level its own (Heightened Focus's Temporary Hit Points)"
       ),
     /** What the built action adds to its first damage part and its healing, read off the character when it is built:
      *  a multiple of its level ("1d10 plus your Fighter level", "five times your Cleric level") and an ability

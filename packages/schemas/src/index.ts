@@ -4553,10 +4553,11 @@ export const ActionSchema = z
     grants: ActionGrantSchema.optional().describe(
       "Resolving this action grants an effect to the actor itself (Rage, Reckless Attack)"
     ),
-    /** When in its user's own turn it is taken: at the turn's start, before anything else (Superior Defense), or as part
-     *  of the Attack action, before or between its attacks (Sacred Weapon), which it takes when nothing else has. */
+    /** When in its user's own turn it is taken: at the turn's start, before anything else (Superior Defense), as part
+     *  of the Attack action, before or between its attacks (Sacred Weapon), which it takes when nothing else has, or at
+     *  any point of it (Heightened Focus's carried ally). */
     timing: z
-      .enum(["turn-start", "attack-action"])
+      .enum(["turn-start", "attack-action", "own-turn"])
       .optional()
       .describe(
         "When in its user's own turn it is taken: at the start, before moving or acting (turn-start), or as part of the Attack action (attack-action)"

@@ -5951,8 +5951,28 @@
       "id": "patient-defense",
       "name": "Patient Defense",
       "activation": "bonus-action",
-      "description": "Expend 1 Focus Point to take both the Disengage and the Dodge actions as a Bonus Action. Taking Disengage alone as a Bonus Action costs no Focus Point.",
-      "damage": []
+      "description": "Expend 1 Focus Point to take both the Disengage and the Dodge actions as a Bonus Action. Taking Disengage alone as a Bonus Action costs no Focus Point. From Monk level 10 (Heightened Focus), you also gain Temporary Hit Points equal to two rolls of your Martial Arts die.",
+      "damage": [],
+      "healingByLevel": [
+       {
+        "level": 10,
+        "formula": "2d8",
+        "self": true,
+        "temporary": true
+       },
+       {
+        "level": 11,
+        "formula": "2d10",
+        "self": true,
+        "temporary": true
+       },
+       {
+        "level": 17,
+        "formula": "2d12",
+        "self": true,
+        "temporary": true
+       }
+      ]
      },
      {
       "id": "step-of-the-wind",
@@ -6173,7 +6193,35 @@
     "id": "heightened-focus",
     "name": "Heightened Focus",
     "level": 10,
-    "description": "Your Flurry of Blows, Patient Defense, and Step of the Wind gain the following benefits. Flurry of Blows. You can expend 1 Focus Point to use Flurry of Blows and make three Unarmed Strikes with it instead of two. Patient Defense. When you expend a Focus Point to use Patient Defense, you gain a number of Temporary Hit Points equal to two rolls of your Martial Arts die. Step of the Wind. When you expend a Focus Point to use Step of the Wind, you can choose a willing creature within 5 feet of yourself that is Large or smaller. You move the creature with you until the end of your turn. The creature's movement doesn't provoke Opportunity Attacks."
+    "description": "Your Flurry of Blows, Patient Defense, and Step of the Wind gain the following benefits. Flurry of Blows. You can expend 1 Focus Point to use Flurry of Blows and make three Unarmed Strikes with it instead of two. Patient Defense. When you expend a Focus Point to use Patient Defense, you gain a number of Temporary Hit Points equal to two rolls of your Martial Arts die. Step of the Wind. When you expend a Focus Point to use Step of the Wind, you can choose a willing creature within 5 feet of yourself that is Large or smaller. You move the creature with you until the end of your turn. The creature's movement doesn't provoke Opportunity Attacks.",
+    "actions": [
+     {
+      "id": "step-of-the-wind-carry",
+      "name": "Step of the Wind: carry an ally",
+      "activation": "other",
+      "timing": "own-turn",
+      "requiresEffectTag": "dashing",
+      "description": "When you use Step of the Wind, choose a willing creature within 5 feet of yourself that is Large or smaller. You move the creature with you until the end of your turn. The creature's movement doesn't provoke Opportunity Attacks.",
+      "damage": [],
+      "targets": {
+       "count": 1,
+       "rangeFeet": 5,
+       "maxSize": "large",
+       "who": "allies"
+      },
+      "grants": {
+       "name": "Carried by Step of the Wind",
+       "tags": [
+        "carried-along"
+       ],
+       "target": "target",
+       "notSelf": true,
+       "duration": {
+        "type": "until-source-turn-end"
+       }
+      }
+     }
+    ]
    },
    {
     "id": "self-restoration",

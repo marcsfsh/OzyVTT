@@ -1129,8 +1129,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:action-surge": enforced(
     "resolution/economy.ts gives one more action on the Fighter's own turn, once a turn, and refuses it for the Magic action."
   ),
-  "feature:heightened-focus": guided(
-    "Flurry of Blows makes three strikes from Monk level 10 (Monk's Focus carries it). The Temporary Hit Points from Patient Defense and the creature carried by Step of the Wind are the GM's."
+  "feature:heightened-focus": enforced(
+    "Flurry of Blows makes three strikes from Monk level 10 (Monk's Focus carries it), and the paid Patient Defense gives Temporary Hit Points of two Martial Arts dice (character-build.ts). After Step of the Wind's Dash, the Monk's own turn offers to carry a willing ally within 5 feet, Large or smaller: the Monk's moves on the map take it along as a drag does, which provokes no Opportunity Attacks, until the turn ends (movement-rules.ts)."
   ),
   "feature:two-weapon-fighting": enforced(
     "equipment-derivation.ts adds the ability modifier to the damage of the Light property's extra attack."
