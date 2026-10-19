@@ -4504,6 +4504,13 @@
   },
   "cursed": false,
   "casts": [],
+  "study": {
+   "ability": "con",
+   "amount": 2,
+   "maximum": 30,
+   "hours": 48,
+   "days": 6
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -4530,6 +4537,13 @@
   },
   "cursed": false,
   "casts": [],
+  "study": {
+   "ability": "str",
+   "amount": 2,
+   "maximum": 30,
+   "hours": 48,
+   "days": 6
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -4582,6 +4596,13 @@
   },
   "cursed": false,
   "casts": [],
+  "study": {
+   "ability": "dex",
+   "amount": 2,
+   "maximum": 30,
+   "hours": 48,
+   "days": 6
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8624,6 +8645,13 @@
   },
   "cursed": false,
   "casts": [],
+  "study": {
+   "ability": "int",
+   "amount": 2,
+   "maximum": 30,
+   "hours": 48,
+   "days": 6
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8650,6 +8678,13 @@
   },
   "cursed": false,
   "casts": [],
+  "study": {
+   "ability": "cha",
+   "amount": 2,
+   "maximum": 30,
+   "hours": 48,
+   "days": 6
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -8676,6 +8711,13 @@
   },
   "cursed": false,
   "casts": [],
+  "study": {
+   "ability": "wis",
+   "amount": 2,
+   "maximum": 30,
+   "hours": 48,
+   "days": 6
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],

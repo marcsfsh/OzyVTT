@@ -5243,6 +5243,9 @@
             }
           },
           "additionalProperties": false
+        },
+        "dormant": {
+          "type": "boolean"
         }
       },
       "required": [

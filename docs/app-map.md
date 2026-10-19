@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 137 commands · 313 HTTP paths
+- 14 GameState fields · 140 commands · 316 HTTP paths
 
 ## GameState shape
 
@@ -43,6 +43,8 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `action.use` | `combat:write` |
 | `actor.add-from-definition` | `actor:write` |
 | `actor.apply-damage` | `actor:write` |
+| `actor.award-experience` | `actor:write` |
+| `actor.give-heroic-inspiration` | `actor:write` |
 | `actor.heal` | `actor:write` |
 | `actor.import-definition` | `actor:write` |
 | `actor.rechoose` | `actor:write` |
@@ -96,6 +98,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `character.set-prepared` | `actor:write` |
 | `character.set-proficiencies` | `actor:write` |
 | `character.set-slot` | `actor:write` |
+| `character.study-item` | `actor:write` |
 | `character.submit-import` | `actor:write` |
 | `character.swap-spell` | `actor:write` |
 | `check.reroll` | `combat:write` |
@@ -300,11 +303,13 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/heal`
 - `POST /api/v1/game/actors/{actorId}/health-display`
 - `POST /api/v1/game/actors/{actorId}/heroic-inspiration`
+- `POST /api/v1/game/actors/{actorId}/heroic-inspiration/give`
 - `POST /api/v1/game/actors/{actorId}/hp`
 - `POST /api/v1/game/actors/{actorId}/identity`
 - `POST /api/v1/game/actors/{actorId}/inventory`
 - `POST /api/v1/game/actors/{actorId}/inventory/give`
 - `POST /api/v1/game/actors/{actorId}/inventory/recover-ammunition`
+- `POST /api/v1/game/actors/{actorId}/inventory/study`
 - `POST /api/v1/game/actors/{actorId}/long-rest-request`
 - `POST /api/v1/game/actors/{actorId}/long-rest-request/answer`
 - `GET /api/v1/game/actors/{actorId}/movement`
@@ -362,6 +367,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/encounter/player-initiative-mode`
 - `POST /api/v1/game/encounter/rules-mode`
 - `POST /api/v1/game/encounter/start`
+- `POST /api/v1/game/experience/award`
 - `POST /api/v1/game/fog/enabled`
 - `POST /api/v1/game/fog/paint`
 - `POST /api/v1/game/fog/reset`
