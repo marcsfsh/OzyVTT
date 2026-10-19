@@ -363,7 +363,8 @@ function optionAsFeature(option: FeatureOption): FeatureRecord {
     ...(option.uses ? { uses: option.uses } : {}),
     ...(option.grants ? { grants: option.grants } : {}),
     // Options cannot nest further options; restate `from` because the feature-level type requires it.
-    ...(option.choice ? { choice: { ...option.choice, from: option.choice.from } } : {})
+    ...(option.choice ? { choice: { ...option.choice, from: option.choice.from } } : {}),
+    ...(option.choices ? { choices: option.choices.map((choice) => ({ ...choice, from: choice.from })) } : {})
   };
 }
 

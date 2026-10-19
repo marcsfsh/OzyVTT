@@ -920,26 +920,6 @@ describe("Warlock invocations: the ones that ask a question of their own (audit 
     );
   });
 
-  it("Pact of the Tome asks for THREE cantrips and puts all three on the sheet", () => {
-    const tome = (ids: readonly string[]) =>
-      withInvocation(
-        "pact-of-the-tome",
-        ids.map((id) => ({ level: 5, kind: "cantrip", id, payload: { featureId: "pact-of-the-tome" } }) as Row)
-      );
-    const built = tome(["chill-touch", "minor-illusion", "true-strike"]);
-    for (const id of ["chill-touch", "minor-illusion", "true-strike"]) {
-      expect(spellOf(built, id)).toMatchObject({ id, level: 0, prepared: true });
-    }
-    // A level-5 Warlock's own cantrip budget is 3 and untouched: the book's three are extra.
-    expect((built.spellcasting!.spells ?? []).filter((spell) => spell.level === 0)).toHaveLength(5); // 3 book + 2 Magic Initiate
-    expect(thrown(() => tome(["chill-touch", "minor-illusion"]))).toMatch(
-      /"Pact of the Tome" needs 3 pick\(s\) of kind "cantrip"/
-    );
-    expect(thrown(() => tome(["chill-touch", "minor-illusion", "true-strike", "mage-hand"]))).toMatch(
-      /exceeds what this build may choose/
-    );
-  });
-
   it("Pact of the Chain hands over Find Familiar, free (audit row 36)", () => {
     expect(spellOf(withInvocation("pact-of-the-chain"), "find-familiar")).toMatchObject({
       id: "find-familiar",

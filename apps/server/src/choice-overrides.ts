@@ -64,6 +64,9 @@ export type ReplaceableOffer = Readonly<{
    *  to `swaps` of them a rest. Always written to the ledger. */
   multi: boolean;
   swaps: number;
+  /** The kind of the ledger rows answering it, which tells a feature's picks of different kinds apart (Pact of the
+   *  Tome's cantrips and rituals). */
+  kind: string | null;
 }>;
 
 /** Every option a choice offers, from whichever sources it names, within its spell level window, casting time and
@@ -157,7 +160,8 @@ function classCantripOffer(
     optionNames: Object.fromEntries(cantrips.map((option) => [option.id, option.name])),
     rebuilds: true,
     multi: true,
-    swaps: clause.amount
+    swaps: clause.amount,
+    kind: "cantrip"
   };
 }
 
@@ -193,13 +197,13 @@ export function replaceableOffers(
         clause.offer.startsWith("feature:") && clause.offer.slice("feature:".length).replace(/\/\d+$/, "") === record.id
           ? record
           : (records.find((candidate) => `feature:${candidate.id}` === clause.offer) ?? null);
-      // A clause on a feature of several picks re-makes one answer across all of them (Spell Mastery's "replace one
-      // of those spells"); one naming a later pick (`/2`) re-makes that pick.
+      // A clause on a feature of several picks re-makes one answer across those of its first pick's kind (Spell
+      // Mastery's "replace one of those spells"); one naming a later pick (`/2`) re-makes that pick.
       const nth = /\/(\d+)$/.exec(clause.offer);
       const blocks = target?.choices?.length
         ? nth
           ? [target.choices[Number(nth[1]) - 1]].filter((block) => block !== undefined)
-          : target.choices
+          : target.choices.filter((block) => block.kind === target.choices![0]!.kind)
         : target?.choice
           ? [target.choice]
           : [];
@@ -217,7 +221,11 @@ export function replaceableOffers(
       offers.push({
         offer: clause.offer,
         per: clause.when,
-        label: target!.name,
+        // A feature asking picks of several kinds names which ("Pact of the Tome: cantrips").
+        label:
+          new Set((target!.choices ?? []).map((block) => block.kind)).size > 1 && choice.kind
+            ? `${target!.name}: ${choice.kind.replace(/-/g, " ")}s`
+            : target!.name,
         options: options.map((option) => option.id),
         optionNames: Object.fromEntries(options.map((option) => [option.id, option.name])),
         rebuilds:
@@ -226,7 +234,8 @@ export function replaceableOffers(
           (choice.options ?? []).some((option) => (option.grants?.spells?.length ?? 0) > 0) ||
           hasDependents(records, clause.offer),
         multi,
-        swaps: clause.amount
+        swaps: clause.amount,
+        kind: choice.kind ?? null
       });
     }
   }

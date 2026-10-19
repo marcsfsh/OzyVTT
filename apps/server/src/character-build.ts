@@ -56,6 +56,7 @@ import {
   UNARMED_STRIKE_ACTION_ID
 } from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
+import { bookOfShadowsRow } from "./book-of-shadows.js";
 import { BUILDER_SOURCE_NAME } from "./actor-roster.js";
 import { CONTENT_STAMP } from "./content-stamp.js";
 import { withProficiencyEdit } from "./sheet-proficiency-edits.js";
@@ -1448,6 +1449,22 @@ export function buildCharacterDefinition(
         : `"${row.id}" is chosen for "${row.classId}", a class this character has no levels in.`
     );
   }
+  // Pact of the Tome: "they must be spells you don't already have prepared", so a book pick the sheet already holds
+  // would be merged away and lost.
+  const featurePicked = [...featurePicksOf("cantrip"), ...featurePicksOf("spell")];
+  const bookPick = featurePicked
+    .filter((pick) => pick.featureId === "pact-of-the-tome")
+    .find((pick) =>
+      [
+        ...classSpells.flatMap((budget) => [...budget.cantripRows, ...budget.spellRows]),
+        ...interpreted.grantedSpells,
+        ...featurePicked.filter((other) => other.featureId !== "pact-of-the-tome")
+      ].some((held) => held.id === pick.id)
+    );
+  if (bookPick)
+    reject(
+      `"${bookPick.id}" is already prepared. The Book of Shadows holds spells the character doesn't already have prepared.`
+    );
   let spellcasting: Record<string, unknown> | undefined;
   if (classSpells.length > 0) {
     const { slots, pact } = spellSlotsOf(classes);
@@ -1639,8 +1656,12 @@ export function buildCharacterDefinition(
             id: item.id,
             name: record?.name ?? item.name,
             quantity: item.quantity,
+            // A focus that is also a weapon (the Wizard's staff, "also used as a Quarterstaff") is in hand too.
             equipped: record
-              ? record.category === "armor" || record.category === "shield" || record.category === "weapon"
+              ? record.category === "armor" ||
+                record.category === "shield" ||
+                record.category === "weapon" ||
+                record.weapon !== undefined
               : false,
             attuned: false,
             ...(record?.weightLb !== null && record?.weightLb !== undefined ? { weightEach: record.weightLb } : {}),
@@ -1688,6 +1709,8 @@ export function buildCharacterDefinition(
   );
   if (strayEquipment)
     reject(`"${strayEquipment.id}" is not ${withArticle(classRecord.name)} or ${background.name} equipment option.`);
+  // Pact of the Tome's book, conjured before the first adventure as at the end of a rest.
+  if (heldFeatures.some((ref) => ref.id === "pact-of-the-tome")) inventory.push(bookOfShadowsRow());
   // Only one body armor stays equipped (two would fight over derived AC); keep the best base.
   const equippedArmor = inventory.filter((item) => item.category === "armor" && item.equipped);
   for (const extra of equippedArmor

@@ -24,6 +24,7 @@ import {
 } from "../effects.js";
 import { refreshBaseArmorClass } from "../actor-roster.js";
 import { holdsFeature } from "../class-features.js";
+import { GIFT_OF_THE_PROTECTORS_TAG, refuseFullPage } from "../book-of-shadows.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
 import { currentSpeedFeet } from "../speed.js";
@@ -139,6 +140,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
     throw new CommandRejectedError(
       `${recipient.name} already has ${grant.name ?? action.name}, and a creature can have only one at a time.`
     );
+  if (grant.tags.includes(GIFT_OF_THE_PROTECTORS_TAG)) refuseFullPage(state, attacker, recipient, deps.definition);
   // A concentration grant may end the granter's previous concentration; surfaced as a warning line.
   const replaced: EffectNarration[] = [];
   const recipientDefinition =

@@ -56,8 +56,9 @@ function rowIndexOf(choices: readonly CharacterChoice[], offer: string): number 
 }
 
 /** Every ledger row answering a pick of several (`feature:weapon-mastery`): rows for the feature, or of its own kind
- *  (a Weapon Mastery pick is a `weapon-mastery` row). */
-function rowIndexesOf(definition: ActorDefinition | undefined, offer: string): number[] {
+ *  (a Weapon Mastery pick is a `weapon-mastery` row). `kind` narrows a feature's rows to one of its picks (Pact of the
+ *  Tome's cantrips, `feature:pact-of-the-tome`, and its rituals, `feature:pact-of-the-tome/2`). */
+function rowIndexesOf(definition: ActorDefinition | undefined, offer: string, kind?: string | null): number[] {
   const choices = definition?.character?.choices ?? [];
   // A class's own cantrips (`class-cantrips:wizard`): its cantrip rows, the starting class's carrying no class.
   const cantrips = /^class-cantrips:([a-z0-9-]+)$/.exec(offer);
@@ -67,9 +68,11 @@ function rowIndexesOf(definition: ActorDefinition | undefined, offer: string): n
       row.kind === "cantrip" && !row.payload?.featureId && (row.classId ?? starting) === cantrips[1] ? [at] : []
     );
   }
-  const match = /^feature:([a-z0-9-]+)$/.exec(offer);
+  const match = /^feature:([a-z0-9-]+)(?:\/\d+)?$/.exec(offer);
   if (!match) return [];
-  return choices.flatMap((row, at) => (row.payload?.featureId === match[1] || row.kind === match[1] ? [at] : []));
+  return choices.flatMap((row, at) =>
+    (row.payload?.featureId === match[1] || row.kind === match[1]) && (!kind || row.kind === kind) ? [at] : []
+  );
 }
 
 /** The row a feature's pick with a default answer stands for when the ledger holds none (a High Elf made before its
@@ -90,7 +93,8 @@ export function rechooseInLedger(
   offer: string,
   id: string,
   deps: Readonly<{ library: ContentView; policy: BuilderPolicy; catalog?: EquipmentCatalog }>,
-  replacing?: string
+  replacing?: string,
+  kind?: string | null
 ): boolean {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -99,7 +103,7 @@ export function rechooseInLedger(
   let index = rowIndexOf(choices, offer);
   if (replacing !== undefined) {
     // A pick of several: the held answer named goes, and the new one may not already be held.
-    const held = rowIndexesOf(definition, offer);
+    const held = rowIndexesOf(definition, offer, kind);
     if (held.some((at) => choices[at].id === id)) throw new CommandRejectedError(`${actor.name} already has that one.`);
     index = held.find((at) => choices[at].id === replacing) ?? -1;
     if (index < 0 && held.length > 0) throw new CommandRejectedError(`${actor.name} has no "${replacing}" to change.`);
@@ -126,9 +130,9 @@ export function rechooseInLedger(
 }
 
 /** The ledger's answers to a pick of several, in ledger order. */
-function ledgerAnswersOf(definition: ActorDefinition | undefined, offer: string): string[] {
+function ledgerAnswersOf(definition: ActorDefinition | undefined, offer: string, kind: string | null): string[] {
   const choices = definition?.character?.choices ?? [];
-  return rowIndexesOf(definition, offer).map((at) => choices[at].id);
+  return rowIndexesOf(definition, offer, kind).map((at) => choices[at].id);
 }
 
 /** The ledger's answer to `offer`, or null when the sheet records none. */
@@ -153,6 +157,6 @@ export function rechoicesOf(
     options: offer.options.map((id) => ({ id, name: offer.optionNames[id] ?? id })),
     chosen:
       (offer.rebuilds ? undefined : actor.choiceOverrides[offer.offer]?.id) ?? ledgerAnswerOf(definition, offer.offer),
-    ...(offer.multi ? { held: ledgerAnswersOf(definition, offer.offer), swaps: offer.swaps } : {})
+    ...(offer.multi ? { held: ledgerAnswersOf(definition, offer.offer, offer.kind), swaps: offer.swaps } : {})
   }));
 }

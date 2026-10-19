@@ -61,6 +61,14 @@ describe("the High Elf's Arcane Cantrip", () => {
       expect.objectContaining({ kind: "cantrip", id: "prestidigitation", payload: { featureId: "high-elf-cantrip" } })
     );
     expect(cantripsOf(build(highElf("fire-bolt")))).toEqual(["fire-bolt"]);
+    // Another lineage has no such pick.
+    const woodElf = highElf();
+    const wood = build({
+      ...woodElf,
+      choices: woodElf.choices.map((row) => (row.kind === "lineage" ? { ...row, id: "wood-elf" } : row))
+    } as CharacterCreateRequestInput);
+    expect(cantripsOf(wood)).not.toContain("prestidigitation");
+    expect(wood.character?.choices?.some((row) => row.payload?.featureId === "high-elf-cantrip")).toBe(false);
   });
 
   it("is swapped for another Wizard cantrip in the step a Long Rest opens, and the sheet is rebuilt", () => {

@@ -8,6 +8,7 @@ import { isItemActionId, laterRowOf } from "../item-actions.js";
 import { isDivineCast } from "../divine-intervention.js";
 import type { RuleId } from "../rules-families.js";
 import { boundFocusRows } from "../pact-weapon.js";
+import { BOOK_OF_SHADOWS_ID, holdsPactOfTheTome } from "../book-of-shadows.js";
 import { scrollOfAction } from "../scrolls.js";
 import type { DefinitionAction, LiveActor } from "./context.js";
 
@@ -84,7 +85,10 @@ function focusKinds(
     const focus = catalog?.classRecord?.(id)?.spellcasting?.focus;
     return focus ? [focus] : [];
   });
-  return { kinds, books: classIds.flatMap((id) => (SPELLBOOK_FOCUS[id] ? [SPELLBOOK_FOCUS[id]!] : [])) };
+  const books = classIds.flatMap((id) => (SPELLBOOK_FOCUS[id] ? [SPELLBOOK_FOCUS[id]!] : []));
+  // Pact of the Tome: "You can use the book as a Spellcasting Focus."
+  if (holdsPactOfTheTome(definition)) books.push(BOOK_OF_SHADOWS_ID);
+  return { kinds, books };
 }
 
 /** The rows a cast can use as its Spellcasting Focus. */

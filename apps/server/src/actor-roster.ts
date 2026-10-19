@@ -19,6 +19,7 @@ import {
 import { withProseFacts } from "@vtt/content-srd-5.2.1/action-prose";
 import { withStatBlockSpellcasting } from "./statblock-spellcasting.js";
 import { storedClassSequence } from "./character-offers.js";
+import { syncBookOfShadows } from "./book-of-shadows.js";
 import { endEffect, endEffectsSustainedBy } from "./effects.js";
 import { actionPools, effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, withResolvedSlots, type EquipmentCatalog } from "./equipment-derivation.js";
@@ -591,6 +592,7 @@ export function rebuildActorDefinition(
   );
   actor.size = definition.size;
   actor.sizeCells = Math.max(definition.token.footprint.width, definition.token.footprint.height);
+  syncBookOfShadows(state, actor, previous, definition);
   state.definitions = state.definitions.map((entry) =>
     entry.id === definitionId ? { id: definitionId, definition: rebuilt } : entry
   );

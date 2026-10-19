@@ -1,10 +1,4 @@
-/**
- * Warlock and Fiend Patron mechanics, merged over the ETL-generated prose.
- *
- * Stays prose throughout: "whenever you gain a Warlock level, you can replace..." clauses; the pact weapon's
- * own riders (Charisma for its rolls, its damage types), since the trigger vocabulary cannot name one conjured
- * weapon. Eldritch Smite and Lifedrinker ride its hits.
- */
+/** Warlock and Fiend Patron mechanics, merged over the ETL-generated prose. */
 import { spellTableStages, type ClassMechanicsModule } from "./overlay.js";
 
 /** An invocation's spell: cast at will without a slot, and never with one, since the Warlock does not know it. */
@@ -216,10 +210,58 @@ export const warlock: ClassMechanicsModule = {
           choice: { kind: "feat", choose: 1, fromCatalog: "origin-feats" }
         },
         /**
-         * The three cantrips only. The two level-1 Ritual spells from any class list are not expressible
-         * (no all-classes list, no Ritual filter).
+         * "Choose three cantrips, and choose two level 1 spells that have the Ritual tag. The spells can be from any
+         * class's spell list, and they must be spells you don't already have prepared" (character-build.ts refuses one
+         * the sheet has). The book is conjured "at the end of a Short or Long Rest", when its spells may be chosen anew,
+         * and it is a gear row: its spells are prepared and it serves as a Spellcasting Focus while it is carried
+         * (book-of-shadows.ts).
          */
-        "pact-of-the-tome": { choice: { kind: "cantrip", choose: 3, fromCatalog: "warlock-spells", maxSpellLevel: 0 } }
+        "pact-of-the-tome": {
+          choices: [
+            { kind: "cantrip", choose: 3, fromCatalog: "spells", maxSpellLevel: 0 },
+            { kind: "spell", choose: 2, fromCatalog: "spells", minSpellLevel: 1, maxSpellLevel: 1, ritual: true }
+          ],
+          replaces: [
+            { offer: "feature:pact-of-the-tome", when: "short-rest", amount: 3 },
+            { offer: "feature:pact-of-the-tome/2", when: "short-rest", amount: 2 }
+          ]
+        },
+        /**
+         * "A new page appears in your Book of Shadows when you conjure it. With your permission, a creature can take an
+         * action to write its name on that page, which can contain a number of names equal to your Charisma modifier
+         * (minimum of one name). When any creature whose name is on the page is reduced to 0 Hit Points but not killed
+         * outright, the creature magically drops to 1 Hit Point instead. Once this magic is triggered, no creature can
+         * benefit from it until you finish a Long Rest." A name is an effect from the Warlock on the creature named (the
+         * GM adds one outside a fight); book-of-shadows.ts holds the page to the Charisma modifier, blanks it when a book
+         * is conjured, and keeps a named creature at 1 Hit Point on the Warlock's counter.
+         */
+        "gift-of-the-protectors": {
+          actions: [
+            {
+              id: "gift-of-the-protectors",
+              name: "Gift of the Protectors",
+              activation: "other",
+              description:
+                "With your permission, a creature takes an action to write its name on the page in your Book of Shadows. The page holds as many names as your Charisma modifier (minimum one), and a new book starts a blank page.",
+              damage: [],
+              grants: {
+                name: "Gift of the Protectors",
+                target: "target",
+                tags: ["gift-of-the-protectors", "ends-on-death"],
+                duration: { type: "manual" }
+              }
+            },
+            {
+              id: "gift-of-the-protectors-page",
+              name: "Gift of the Protectors: 1 Hit Point",
+              activation: "other",
+              description:
+                "Spent when a creature named on the page is reduced to 0 Hit Points but not killed outright, and drops to 1 Hit Point instead. No creature benefits again until you finish a Long Rest.",
+              damage: [],
+              uses: { limit: 1, per: "long-rest" }
+            }
+          ]
+        }
         // Thirsting Blade and Devouring Blade are read off the bonded pact weapon (pact-weapon.ts).
       }
     },

@@ -340,14 +340,10 @@ function speciesIssues(entry: SpeciesReference, checks: Checks) {
         `Two lineages of ${entry.name} share one id, so only the first would ever be granted. Give ${lineage.name} its own.`
       );
     seen.add(lineage.id);
-    // Lineage traits are flattened untagged, so a choice there would be offered for every lineage.
-    lineage.traits.forEach((trait, traitIndex) => {
-      if (featurePicks(trait).length > 0)
-        checks.add(
-          ["lineages", index, "traits", traitIndex, "choice"],
-          `${trait.name} asks the player to choose from inside a lineage. Lineage traits cannot carry choices yet. Move the choice up to a species trait.`
-        );
-    });
+    // A lineage trait's pick is offered only to a character of that lineage (the High Elf's cantrip).
+    lineage.traits.forEach((trait, traitIndex) =>
+      featureIssues(trait, ["lineages", index, "traits", traitIndex], checks, 1)
+    );
   });
 
   const self: SelfCatalog = {

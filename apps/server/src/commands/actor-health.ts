@@ -378,7 +378,8 @@ export const actorHealthCommands = [
           offer,
           id,
           { library: kit.playCatalog(), policy: state.builderPolicy, catalog: kit.equipmentCatalog() },
-          replacing
+          replacing,
+          match.kind
         );
         const rested = state.actors.find((candidate) => candidate.id === actorId);
         if (match.multi && rested?.restStep)

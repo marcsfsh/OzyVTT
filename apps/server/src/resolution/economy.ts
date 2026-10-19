@@ -41,6 +41,7 @@ import {
 } from "../rules-families.js";
 import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
 import { carriesSpellbook, hasClassFeature } from "../ritual-adept.js";
+import { bookOfShadowsGap } from "../book-of-shadows.js";
 import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
 import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
@@ -1403,13 +1404,17 @@ function checkSpellSlot({ state, attacker, action, slotLevel, violations }: Eval
 
 /** Why a spell cast with a slot is refused for not being prepared (SRD: you cast the spells you have prepared), or
  *  null. Cantrips, always-prepared spells, anything not on the sheet's list (an item's cast) and a sheet that keeps
- *  no prepared list (an import with no prepared cap) need nothing. */
+ *  no prepared list (an import with no prepared cap) need nothing, except a Book of Shadows' spells, which are
+ *  prepared only while the book is carried. */
 export function unpreparedSpell(
   actor: Pick<LiveActor, "name" | "preparedSpellIds"> & Partial<Pick<LiveActor, "inventory">>,
   action: Pick<DefinitionAction, "id" | "spellSlot" | "spellId">,
   definition: ActorDefinition | undefined
 ): string | null {
   if (action.spellId === undefined) return null;
+  const entry = definition?.spellcasting?.spells.find((candidate) => candidate.id === action.spellId);
+  const book = entry && !isItemActionId(action.id) ? bookOfShadowsGap(actor, entry, definition) : null;
+  if (book) return book;
   // A slot cast, or a Ritual ("To cast a spell as a Ritual, a spellcaster must have it prepared").
   const ritual = action.id === ritualSpellActionId(action.spellId);
   if (!action.spellSlot && !ritual) return null;
