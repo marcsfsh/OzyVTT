@@ -23,14 +23,33 @@ import { policeBarrier } from "./zone-barriers.js";
 
 type Placed = Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }>;
 
-/** How far a later action of a spell moves the spell's area, or null when it moves none. */
+type MovesArea = NonNullable<NonNullable<ReturnType<typeof laterRowOf>>["movesArea"]>;
+
+/** How far a later action of a spell moves the spell's area, and on what terms, or null when it moves none. */
 export function areaMoveOf(
   action: Pick<ActorAction, "id" | "spellId">,
   catalog: Pick<EquipmentCatalog, "spellRecord"> | undefined
-): Readonly<{ spell: SpellReference; feet: number; fromCaster: boolean }> | null {
+): Readonly<{ spell: SpellReference; feet: number; fromCaster: boolean; terms: MovesArea }> | null {
   const spell = action.spellId ? catalog?.spellRecord?.(action.spellId) : undefined;
   const moves = spell ? laterRowOf(spell, action.id)?.movesArea : undefined;
-  return spell && moves !== undefined ? { spell, feet: moves.feet, fromCaster: moves.fromCaster === true } : null;
+  return spell && moves !== undefined
+    ? { spell, feet: moves.feet, fromCaster: moves.fromCaster === true, terms: moves }
+    : null;
+}
+
+/** The `turnUses` key a move that goes with its caster's own leaves, so it is taken once a turn. */
+const withMoveKey = (casterId: string, spellId: string) => `${casterId}:moves-with:${spellId}`;
+
+/** Why a move on these terms can't be made now, or null: one that goes with its caster's move needs the caster to have
+ *  moved on its own turn, once a turn. */
+function movesWithCaster(state: GameState, casterId: string, spell: SpellReference): string | null {
+  const combat = state.combat;
+  if (!combat.active || !combat.initiative.some((entry) => entry.actorId === casterId)) return null;
+  if (combat.turnActorId !== casterId) return `${spell.name}'s area moves only on its caster's turn.`;
+  if (combat.turn.movementUsedFeet <= 0) return `${spell.name}'s area moves when its caster moves. Move first.`;
+  if ((combat.turn.turnUses[withMoveKey(casterId, spell.id)] ?? 0) > 0)
+    return `${spell.name}'s area has already moved this turn.`;
+  return null;
 }
 
 export type AreaMove = Readonly<{
@@ -56,6 +75,8 @@ export function planAreaMove(
     override: RulesOverride | null;
     widthFeet: number | null;
     fromCaster?: boolean;
+    /** The rest of the spell's terms for the move (`movesArea`). */
+    terms?: MovesArea;
   }>,
   geometry: TokenMapGeometry
 ): AreaMove {
@@ -68,28 +89,57 @@ export function planAreaMove(
     : undefined;
   if (!zone || !area || area.shape === null)
     throw new CommandRejectedError(`${input.spell.name}'s area isn't on the map. Place it first.`);
+  const terms = input.terms;
   const snapped = shapeGeometry(calibration, input.placed.shape, input.placed.origin, input.placed.target);
   // An area placed again from its caster (Gust of Wind's Line, turned) starts where the caster stands now.
   const caster = state.combat.tokens.find((token) => token.actorId === input.casterId)?.position;
   const fromCaster = input.fromCaster === true && caster !== undefined && caster !== null;
-  const moved = mapDistance(geometry, fromCaster ? caster : area.geometry.origin, snapped.origin)?.value ?? 0;
-  const note = fromCaster
-    ? moved > calibration.distancePerCell + DISTANCE_TOLERANCE_FEET
-      ? policeBarrier(
-          state,
-          input.override,
-          "range.out-of-range",
-          `${input.spell.name}'s area starts at its caster; that one starts ${Math.round(moved)} feet away.`
-        )
-      : null
-    : moved > input.feet + DISTANCE_TOLERANCE_FEET
-      ? policeBarrier(
-          state,
-          input.override,
-          "range.out-of-range",
-          `${input.spell.name}'s area moves up to ${input.feet} feet; that move is ${Math.round(moved)} feet.`
-        )
-      : null;
+  const apart = (from: AnnotationPoint, to: AnnotationPoint) => mapDistance(geometry, from, to)?.value ?? 0;
+  const notes: Array<string | null> = [];
+  const refuse = (rule: Parameters<typeof policeBarrier>[2], message: string) =>
+    notes.push(policeBarrier(state, input.override, rule, message));
+  // A move that goes with its caster's own (Conjure Animals' pack) waits for the caster to move, once a turn.
+  const waits = terms?.withCasterMove ? movesWithCaster(state, input.casterId, input.spell) : null;
+  if (waits) refuse("economy.not-your-turn", waits);
+  if (terms?.anywhereInRange && caster) {
+    // An illusion goes to any spot within the spell's range of its caster (Silent Image, Major Image).
+    const out = apart(caster, snapped.origin);
+    if (out > input.feet + DISTANCE_TOLERANCE_FEET)
+      refuse(
+        "range.out-of-range",
+        `${input.spell.name}'s area moves to a spot within ${input.feet} feet of its caster; that one is ${Math.round(out)} feet away.`
+      );
+    const now = apart(caster, area.geometry.origin);
+    if (terms.casterInRange && now > input.feet + DISTANCE_TOLERANCE_FEET)
+      refuse(
+        "range.out-of-range",
+        `${input.spell.name}'s caster must be within ${input.feet} feet of it to move it; it is ${Math.round(now)} feet away.`
+      );
+  } else {
+    const moved = apart(fromCaster ? caster : area.geometry.origin, snapped.origin);
+    if (fromCaster && moved > calibration.distancePerCell + DISTANCE_TOLERANCE_FEET)
+      refuse(
+        "range.out-of-range",
+        `${input.spell.name}'s area starts at its caster; that one starts ${Math.round(moved)} feet away.`
+      );
+    else if (!fromCaster && moved > input.feet + DISTANCE_TOLERANCE_FEET)
+      refuse(
+        "range.out-of-range",
+        `${input.spell.name}'s area moves up to ${input.feet} feet; that move is ${Math.round(moved)} feet.`
+      );
+  }
+  // "To an unoccupied space": no creature's space covers the spot it moves to.
+  if (terms?.unoccupied) {
+    const taken = state.combat.tokens.find(
+      (token) =>
+        token.position !== null &&
+        token.actorId !== input.casterId &&
+        Math.abs(token.position.x - snapped.origin.x) < (calibration.cellSizePx * token.sizeCells) / 2 &&
+        Math.abs(token.position.y - snapped.origin.y) < (calibration.cellSizePx * token.sizeCells) / 2
+    );
+    if (taken) refuse("movement.occupied", `${input.spell.name}'s area moves to an unoccupied space.`);
+  }
+  const note = notes.find((entry) => entry !== null) ?? null;
   const before = new Set(tokensInTemplate(state, calibration, area.geometry, area.shape, input.widthFeet));
   const movedOnto = tokensInTemplate(state, calibration, snapped, area.shape, input.widthFeet).filter(
     (id) => !before.has(id) && id !== input.casterId
@@ -104,9 +154,17 @@ export function moveArea(
   move: AreaMove,
   placed: Placed,
   table: AnnotationActor,
-  deps: ZoneDeps & Readonly<{ geometry: TokenMapGeometry }>
+  deps: ZoneDeps & Readonly<{ geometry: TokenMapGeometry }>,
+  terms?: MovesArea
 ): EffectNarration[] {
   const annotationId = move.zone.annotationId!;
   moveAnnotation(state, annotationId, placed.origin, placed.target, table, deps.geometry);
+  if (terms?.withCasterMove && state.combat.active) {
+    const key = withMoveKey(move.zone.casterId, move.zone.spellId);
+    state.combat = {
+      ...state.combat,
+      turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
+    };
+  }
   return zonesAfterAreaMove(state, annotationId, move.before, deps);
 }

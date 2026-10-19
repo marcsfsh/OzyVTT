@@ -3990,6 +3990,21 @@ export const AreaTriggerSchema = z
         side: z.enum(["left", "right", "inside", "outside"])
       })
       .strict()
+      .optional(),
+    /** It tells the GM when a creature of these sizes other than its caster comes within `feet` of its point, with no
+     *  save (Faithful Hound's bark: "When a Small or larger creature comes within 30 feet of it"). */
+    warns: z
+      .object({ feet: z.number().int().min(5).max(120), sizes: z.array(SizeSchema).min(1).max(6) })
+      .strict()
+      .optional(),
+    /** It ends, with its spell, when its caster is more than this many feet from its point (Faithful Hound: "until
+     *  the two of you are more than 300 feet apart"). */
+    leash: z.number().int().min(5).max(5280).optional(),
+    /** What its caster holds while within `feet` of its point (Conjure Animals: "You have Advantage on Strength saving
+     *  throws while you're within 5 feet of the pack"). */
+    casterHolds: z
+      .object({ feet: z.number().int().min(5).max(120), modifiers: EffectModifiersSchema })
+      .strict()
       .optional()
   })
   .strict();

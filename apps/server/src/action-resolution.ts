@@ -560,7 +560,7 @@ export function actionAvailability(
         componentsRemaining = instance.components["attack"];
     }
     const reason = unavailableReason(evaluation.violations, { state, attacker, action, siblings, spell });
-    const passive = passiveOf(action, builtin);
+    const passive = passiveOf(action, builtin, spell);
     const shaping = builtin ? undefined : shapingOffers(state, attacker, action, spell, definition, siblings);
     const damageLook = !builtin && damageLookOffered(state, attacker, action, definition, siblings);
     const forms = action.shapeShift ? formsOffer(state, attacker, action, definition, catalog) : undefined;

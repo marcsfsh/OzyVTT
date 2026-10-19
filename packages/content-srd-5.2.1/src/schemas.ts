@@ -163,7 +163,17 @@ export const SpellLaterActionSchema = z
       .object({
         feet: z.number().int().min(5).max(300),
         /** The area is placed again from its caster, pointing a new way (Gust of Wind's Line, turned). */
-        fromCaster: z.literal(true).optional()
+        fromCaster: z.literal(true).optional(),
+        /** It goes to any spot within `feet` of its caster, however far that is from where it stood (Silent Image:
+         *  "move to any spot within range"). */
+        anywhereInRange: z.literal(true).optional(),
+        /** Only while its caster is within `feet` of it (Major Image: "If you are within range of the illusion"). */
+        casterInRange: z.literal(true).optional(),
+        /** Only on its caster's turn once the caster has moved, once a turn and at no cost (Conjure Animals: "when you
+         *  move on your turn, you can also move the pack up to 30 feet"). */
+        withCasterMove: z.literal(true).optional(),
+        /** To a spot no creature's space covers (Conjure Animals' pack: "to an unoccupied space"). */
+        unoccupied: z.literal(true).optional()
       })
       .strict()
       .optional(),

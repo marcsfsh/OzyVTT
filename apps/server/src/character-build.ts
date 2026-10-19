@@ -614,7 +614,14 @@ function linkSpellActions(
       // effect, not the caster's.
       if (record.effect?.grant?.grantsLaterAction === later.name) continue;
       // An area that only changes the ground (Entangle's plants) is the server's alone, with nothing to take or roll.
-      if (later.activation === "other" && !later.save && later.damage.length === 0 && !later.attackRange) continue;
+      if (
+        later.activation === "other" &&
+        !later.save &&
+        later.damage.length === 0 &&
+        !later.attackRange &&
+        !later.movesArea
+      )
+        continue;
       const action = laterSpellAction(
         record,
         later,

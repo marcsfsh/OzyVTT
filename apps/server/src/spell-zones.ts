@@ -569,6 +569,57 @@ export function zonesAfterMove(
       act(state, zone, mover, "moves through", deps, events, Math.floor((feet + DISTANCE_TOLERANCE_FEET) / 5));
     }
   }
+  events.push(...warnings(state, mover, path, deps), ...leashedZones(state, deps));
+  return events;
+}
+
+/** SRD Faithful Hound: "When a Small or larger creature comes within 30 feet of it ... the hound starts barking
+ *  loudly." A zone that warns tells the GM who came within its reach, with no save; the password is the GM's. */
+function warnings(state: GameState, mover: Actor, path: readonly Point[], deps: ZoneDeps): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const zone of liveZones(state)) {
+    const content = zoneContentOf(zone, deps.catalog);
+    const warns = content?.trigger.warns;
+    if (!content || !warns || zone.casterId === mover.id || !warns.sizes.includes(mover.size ?? "medium")) continue;
+    const near = insideTest(state, zone, { on: [], around: "point", feet: warns.feet }, content, deps.geometry);
+    const token = tokenOf(state, mover.id);
+    if (!near || !token) continue;
+    const height = altitudeOf(token);
+    if (!near(path[0]!, token.sizeCells, height) && near(path[path.length - 1]!, token.sizeCells, height))
+      events.push({
+        kind: "effect",
+        text: `${content.name}: ${mover.name} comes within ${warns.feet} feet, and the hound starts barking.`,
+        actorId: mover.id,
+        gmOnly: true
+      });
+  }
+  return events;
+}
+
+/** SRD Faithful Hound: "The hound remains for the duration or until the two of you are more than 300 feet apart from
+ *  each other." A zone on a leash ends, with its spell, once its caster is farther than that from its point. */
+export function leashedZones(state: GameState, deps: Pick<ZoneDeps, "geometry" | "catalog">): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  if (!deps.geometry?.calibration) return events;
+  for (const zone of liveZones(state)) {
+    const leash = zoneContentOf(zone, deps.catalog)?.trigger.leash;
+    const area = zone.annotationId
+      ? state.combat.annotations.find((annotation) => annotation.id === zone.annotationId)
+      : undefined;
+    const caster = tokenOf(state, zone.casterId);
+    if (leash === undefined || !area || !caster?.position) continue;
+    const apart = mapDistance(deps.geometry, caster.position, area.geometry.origin)?.value ?? 0;
+    if (apart <= leash + DISTANCE_TOLERANCE_FEET) continue;
+    const casterName = state.actors.find((actor) => actor.id === zone.casterId)?.name ?? "its caster";
+    events.push(
+      {
+        kind: "effect",
+        text: `${zone.name} ends: ${casterName} is more than ${leash} feet from it.`,
+        actorId: zone.casterId
+      },
+      ...endZoneAndItsSpell(state, zone.id)
+    );
+  }
   return events;
 }
 
@@ -610,6 +661,7 @@ export function zonesAfterAreaMove(
         act(state, zone, creature, "is caught by", deps, events);
     }
   }
+  events.push(...leashedZones(state, deps));
   return events;
 }
 

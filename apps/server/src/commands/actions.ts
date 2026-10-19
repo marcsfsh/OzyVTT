@@ -170,6 +170,7 @@ export const actionCommands = [
         let resolvedTargetIds: readonly string[];
         let originAtCaster = false;
         let areaMove: AreaMove | null = null;
+        let areaMoveTerms: NonNullable<ReturnType<typeof areaMoveOf>>["terms"] | undefined;
         // An item's action that leaves an area to act later (spread Caltrops) catches no one as it is used.
         const leavesArea = action.zone !== undefined && action.spellId === undefined;
         // The template as the action's area makes it, which the table's drawn shape records.
@@ -300,12 +301,14 @@ export const actionCommands = [
                 spell: moving.spell,
                 feet: moving.feet,
                 fromCaster: moving.fromCaster,
+                terms: moving.terms,
                 placed,
                 override: isPlayer ? null : (override ?? null),
                 widthFeet: action.area?.widthFeet ?? null
               },
               geometry!
             );
+            areaMoveTerms = moving.terms;
             resolvedTargetIds = action.save ? areaMove.movedOnto : [];
           }
         } else {
@@ -584,7 +587,8 @@ export const actionCommands = [
             {
               ...kit.zoneDeps(draft, geometry),
               geometry: geometry!
-            }
+            },
+            areaMoveTerms
           );
         } else if (placed)
           // The first area takes the command's id, which a lingering spell's zone reads; any others take their own.

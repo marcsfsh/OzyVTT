@@ -571,14 +571,40 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       zone: { ...ENTER_OR_END_ONCE, drifts: 10 }
     }
   ],
+  // "You have Advantage on Strength saving throws while you're within 5 feet of the pack, and when you move on your
+  // turn, you can also move the pack up to 30 feet to an unoccupied space you can see."
   "conjure-animals": [
     {
       name: "save",
       activation: "other",
-      when: `When the pack moves within 10 feet of a creature, or a creature enters a space within 10 feet of it or ends its turn there, you can force the save. ${ONCE_PER_TURN}`,
+      when: `When the pack moves within 10 feet of a creature, or a creature enters a space within 10 feet of it or ends its turn there, you can force the save. ${ONCE_PER_TURN} You have Advantage on Strength saving throws within 5 feet of the pack.`,
       save: { ability: "dex", successDamage: "none", failureConditions: [] },
       damage: [{ formula: "3d10", type: "slashing" }],
-      zone: { ...ENTER_OR_END_ONCE, around: "point", feet: 10, affects: "enemies" }
+      zone: {
+        ...ENTER_OR_END_ONCE,
+        around: "point",
+        feet: 10,
+        affects: "enemies",
+        casterHolds: {
+          feet: 5,
+          modifiers: [
+            {
+              type: "roll-mode",
+              roll: "save",
+              mode: "advantage",
+              when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["str"] }]
+            }
+          ]
+        }
+      }
+    },
+    {
+      name: "move",
+      activation: "other",
+      when: "When you move on your turn, you can also move the pack up to 30 feet to an unoccupied space.",
+      damage: [],
+      area: { shape: "sphere", sizeFeet: 10, widthFeet: null },
+      movesArea: { feet: 30, withCasterMove: true, unoccupied: true }
     }
   ],
   "conjure-elemental": [
@@ -672,14 +698,34 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       terrain: { cost: 2, kind: "plants" }
     })
   ],
+  // "The hound remains for the duration or until the two of you are more than 300 feet apart", "No one but you can see
+  // the hound", "When a Small or larger creature comes within 30 feet of it ... the hound starts barking loudly", and "On
+  // your later turns, you can take a Magic action to move the hound up to 30 feet." The password is the GM's.
   "faithful-hound": [
     {
       name: "bite",
       activation: "other",
-      when: "At the start of each of your turns, the hound bites one enemy within 5 feet of it.",
+      when: "At the start of each of your turns, the hound bites one enemy within 5 feet of it. It barks when a Small or larger creature comes within 30 feet of it.",
       save: { ability: "dex", successDamage: "none", failureConditions: [] },
       damage: [{ formula: "4d8", type: "force" }],
-      zone: { on: ["caster-turn-start"], around: "point", feet: 5, affects: "enemies" }
+      zone: {
+        on: ["caster-turn-start"],
+        around: "point",
+        feet: 5,
+        affects: "enemies",
+        hidden: true,
+        warns: { feet: 30, sizes: ["small", "medium", "large", "huge", "gargantuan"] },
+        leash: 300
+      }
+    },
+    {
+      name: "move",
+      activation: "action",
+      when: "On your later turns, a Magic action moves the hound up to 30 feet.",
+      laterTurnsOnly: true,
+      damage: [],
+      area: { shape: "sphere", sizeFeet: 5, widthFeet: null },
+      movesArea: { feet: 30 }
     }
   ],
   // "When a creature of a chosen type enters the spell's area for the first time on a turn or ends its turn there, the
@@ -907,6 +953,31 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [],
       area: { shape: "cylinder", sizeFeet: 5, widthFeet: null },
       movesArea: { feet: 60 }
+    }
+  ],
+  // "If you are within range of the illusion, you can take a Magic action to cause the image to move to any other spot
+  // within range." The image itself is the GM's to run.
+  "major-image": [
+    lasting("image", "The image stands where it was placed.", { on: [] }),
+    {
+      name: "move",
+      activation: "action",
+      when: "While you are within 120 feet of the image, a Magic action moves it to any other spot within 120 feet of you.",
+      damage: [],
+      area: { shape: "cube", sizeFeet: 20, widthFeet: null },
+      movesArea: { feet: 120, anywhereInRange: true, casterInRange: true }
+    }
+  ],
+  // "As a Magic action, you can cause the image to move to any spot within range."
+  "silent-image": [
+    lasting("image", "The image stands where it was placed.", { on: [] }),
+    {
+      name: "move",
+      activation: "action",
+      when: "A Magic action moves the image to any spot within 60 feet of you.",
+      damage: [],
+      area: { shape: "cube", sizeFeet: 15, widthFeet: null },
+      movesArea: { feet: 60, anywhereInRange: true }
     }
   ],
   // "As a Magic action on your later turns, you can control the hand thus again": it opens or closes an unlocked door.
