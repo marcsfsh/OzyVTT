@@ -202,3 +202,43 @@ describe("the drag preview follows the server through other creatures and slow m
     expect(moveLabel(flight, budget, "walk")).toEqual({ text: "50 ft · 10 ft too far", over: true });
   });
 });
+
+describe("the drag preview counts height as the server does", () => {
+  const aloft = (
+    state: GameState,
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    fromFeet: number,
+    toFeet: number
+  ) =>
+    previewMove({
+      calibration: CALIBRATION,
+      size: { width: GRID.width, height: GRID.height },
+      terrain: state.combat.terrain.difficult,
+      tokens: state.combat.tokens,
+      actorsById: new Map(state.actors.map((actor) => [actor.id, actor as GmActor])),
+      moverId: HERO,
+      from,
+      to,
+      altitude: { fromFeet, toFeet }
+    });
+
+  it.each([
+    ["rising in place", cell(0, 0), cell(0, 0), 0, 30],
+    ["across while rising less", cell(0, 0), cell(6, 0), 10, 30],
+    ["across while rising more", cell(0, 0), cell(2, 0), 0, 40]
+  ] as const)("%s", (_label, from, to, fromFeet, toFeet) => {
+    const state = table([], {});
+    const charged = movementCost(state, GRID, HERO, from, to, { altitude: { fromFeet, toFeet } });
+    expect(aloft(state, from, to, fromFeet, toFeet)?.feet).toBe(charged?.feet);
+  });
+
+  it("flies over rubble and over an ogre below, as the server does", () => {
+    const state = table([cells(2, 0, 2, 19)], { [OGRE]: { x: 250, y: 50 } });
+    const charged = movementCost(state, GRID, HERO, cell(0, 0), cell(8, 0), {
+      altitude: { fromFeet: 20, toFeet: 20 }
+    });
+    expect(charged?.feet).toBe(40);
+    expect(aloft(state, cell(0, 0), cell(8, 0), 20, 20)?.feet).toBe(charged?.feet);
+  });
+});

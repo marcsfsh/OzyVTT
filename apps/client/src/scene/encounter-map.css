@@ -644,6 +644,29 @@
   min-height: var(--tap-min);
   white-space: nowrap;
 }
+/* A creature's height in its token menu: the stepper, then the move or the GM's free placement. */
+.encounter-height {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+/* The height badge on a token: how many feet up it is, drawn as a pill at its top right. */
+.token-altitude rect {
+  fill: var(--surface-1);
+  stroke: var(--cyan);
+  stroke-width: 1.5;
+}
+.token-altitude text {
+  fill: var(--text);
+  font-family: var(--font-label);
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.token-altitude path {
+  fill: var(--cyan);
+}
 /* A refused move's follow-up: the GM moves it anyway, a player asks the GM. */
 .encounter-move-blocked {
   display: flex;

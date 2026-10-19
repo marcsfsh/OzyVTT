@@ -478,6 +478,23 @@ export const ModifierSchema = z
         ...riderGate
       })
       .strict(),
+    /** How the bearer falls and jumps, read live by the movement rules from features, items and effects. */
+    z
+      .object({
+        type: z.literal("movement"),
+        rule: z.enum(["safe-fall", "leap", "jump-by-dexterity", "jump-multiplier"]),
+        /** `leap`: how far the jump may go. */
+        feet: z.number().int().min(5).max(120).optional(),
+        /** `leap`: the movement it spends, whatever its length. */
+        costFeet: z.number().int().min(0).max(60).optional(),
+        /** `jump-multiplier`: what the jump's distance is multiplied by. */
+        times: z.number().int().min(2).max(4).optional(),
+        ...riderGate
+      })
+      .strict()
+      .describe(
+        'How the bearer falls and jumps (SRD Falling, Jumping): "safe-fall" takes no damage from a fall (Ring of Feather Falling); "leap" jumps up to `feet` for `costFeet` of movement once on each of its turns (Jump, Boots of Striding and Springing); "jump-by-dexterity" measures jumps with Dexterity in place of Strength (Second-Story Work); "jump-multiplier" multiplies the jump\'s distance by `times` (Step of the Wind). Read live by the movement rules, so it ends with its carrier.'
+      ),
     /**
      * Flat AC. `whileArmored` (the Defense fighting style) predates `when: [{type: "while-armored"}]` and
      * stays because shipped bundles use it.
@@ -1638,6 +1655,24 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
       trigger: z.literal("damaged-by-creature"),
       response: z.literal("melee-attack"),
       rangeFeet: ReactionRangeFeet
+    })
+    .strict(),
+  /** Feather Fall: when the reactor or a creature it can see within `rangeFeet` falls, this action lands on the
+   *  falling creature before the fall does. */
+  z
+    .object({ trigger: z.literal("falls"), response: z.literal("cast-on-faller"), rangeFeet: ReactionRangeFeet })
+    .strict(),
+  /** Slow Fall: when the reactor itself falls, the fall's damage is reduced by `perLevel` times its level in
+   *  `classId`. */
+  z
+    .object({
+      trigger: z.literal("falls"),
+      response: z.literal("reduce-fall-damage"),
+      perLevel: z.number().int().min(1).max(10),
+      classId: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(60)
     })
     .strict()
 ]);

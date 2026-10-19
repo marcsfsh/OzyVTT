@@ -190,6 +190,7 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "armor-class": "standing", // storedArmorClass, via derivation.armorClass, so Defense follows the armor worn now
   "attunement-slots": "standing", // inventory.ts, the attunement limit
   "special-speed": "standing", // speed.ts specialSpeedsOf, the movement modes
+  movement: "standing", // falling.ts and jumping.ts: safe falls, leaps and jump distance
   "roll-mode": "at-its-moment", // rollModeClaims: attacks, saves, checks, initiative
   "extra-damage": "at-its-moment", // resolution/damage.ts rolls it as its own typed damage entry
   "damage-bonus": "standing", // effective-actions folds it into the first damage part's formula; a moment-gated one lands as a bonusDamage line in resolution/damage.ts

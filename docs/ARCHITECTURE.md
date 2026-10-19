@@ -266,6 +266,18 @@ of a hidden thing. When in doubt, leave it out.
   read along the whole path (`movement-rules.ts`). The map's drag preview runs the same function,
   and a mirror test checks the two agree. Players and the table screen get only the terrain the
   fog reveals, and with vision on only what the party has seen.
+- Height (`altitude.ts`, `@vtt/rules-5e` `altitude.ts`): a token's `altitudeFeet` is how far its lowest
+  point is above the ground, and `airborne` says what holds it up in the air (flying, or a
+  levitation); a creature on a ledge or a wall it climbs is up without being airborne. A space is as
+  tall as it is wide. Height counts by the grid's own diagonal rule, the one the floor uses (every
+  diagonal step is one square): on a grid the distance between two creatures is the larger of the
+  squares across and the squares up, and on a gridless map it is straight through the air
+  (`creatureDistance`), so reach, range, auras, grapples and opportunity attacks read it. A move pays
+  for the height it gains or loses the same way, a mover off the ground passes over painted terrain
+  and over creatures wholly below it, and only flying, climbing, jumping, teleporting or a forced
+  move changes height (`movement.altitude`). An area reaches only as high as its shape does
+  (`withinAreaHeight`). The GM sets any creature's height free of movement (`token.set-altitude`).
+  Height is as public as position, so it travels with the token in every projection.
 
 ## Rules engine
 

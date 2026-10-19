@@ -1,11 +1,15 @@
 import type { ActorMovementReply, EncounterToken, GmActor, PlayerActor } from "@vtt/domain";
 import {
+  climbCells,
+  costWithClimb,
   footprintCenter,
   footprintOrigin,
   footprintStepBlocked,
   movementPath,
   pointInRects,
+  spaceHeightCells,
   spacePassage,
+  spansOverlap,
   wallCrossing
 } from "@vtt/rules-5e";
 import { gridToImagePreview, imageToGridPreview, type GridCalibration } from "./gridPreview";
@@ -80,6 +84,8 @@ export function previewMove(
     free?: boolean;
     /** Walls that bar the way while the scene's dynamic vision is on (`movementWallsOf`). */
     walls?: readonly MoveWall[];
+    /** The mover's height as it sets off and where the move ends, in feet; on the ground when absent. */
+    altitude?: Readonly<{ fromFeet: number; toFeet: number }>;
   }>
 ): MovePreview | null {
   const { calibration, size, terrain, tokens, actorsById, moverId } = input;
@@ -89,11 +95,19 @@ export function previewMove(
   const to = footprintOrigin(imageToGridPreview(calibration, input.to), sizeCells);
   const centerOf = (cell: Readonly<{ column: number; row: number }>) =>
     gridToImagePreview(calibration, footprintCenter(cell, sizeCells));
+  // Height, as the server counts it: rising or falling costs by the diagonal rule, a creature wholly above or below
+  // the mover's way is no obstacle, and a mover off the ground the whole way passes over painted terrain.
+  const feetPerCell = calibration.distancePerCell;
+  const fromFeet = input.altitude?.fromFeet ?? 0;
+  const toFeet = input.altitude?.toFeet ?? fromFeet;
+  const climb = climbCells(fromFeet, toFeet, feetPerCell);
+  const lowFeet = Math.min(fromFeet, toFeet);
+  const highFeet = Math.max(fromFeet, toFeet) + spaceHeightCells(sizeCells) * feetPerCell;
   if (input.free) {
-    const cells = Math.max(Math.abs(to.column - from.column), Math.abs(to.row - from.row));
+    const cells = Math.max(Math.abs(to.column - from.column), Math.abs(to.row - from.row), climb);
     return {
       path: [centerOf(from), centerOf(to)],
-      feet: cells * calibration.distancePerCell,
+      feet: cells * feetPerCell,
       difficultFeet: 0,
       free: true
     };
@@ -105,6 +119,9 @@ export function previewMove(
     if (token.actorId === moverId || !token.position || input.carried?.includes(token.actorId)) continue;
     const occupant = actorsById.get(token.actorId);
     if (!mover || !occupant || occupant.visibility === "gm-only") continue;
+    const occupantLow = token.altitudeFeet ?? 0;
+    if (!spansOverlap(lowFeet, highFeet, occupantLow, occupantLow + spaceHeightCells(token.sizeCells) * feetPerCell))
+      continue;
     const passage = spacePassage({
       ally: isAlly(mover, occupant),
       incapacitated: occupant.conditions.some((condition) => INCAPACITATING.has(condition.id)),
@@ -129,7 +146,8 @@ export function previewMove(
     from,
     to,
     sizeCells,
-    isDifficult: (column, row) => difficultCells.has(`${column},${row}`) || pointInRects(center(column, row), terrain),
+    isDifficult: (column, row) =>
+      difficultCells.has(`${column},${row}`) || (lowFeet <= 0 && pointInRects(center(column, row), terrain)),
     isOpen: (column, row) => {
       if (closedCells.has(`${column},${row}`)) return false;
       const point = center(column, row);
@@ -142,8 +160,8 @@ export function previewMove(
   if (path.blocked) return { path: [centerOf(from), centerOf(to)], feet: 0, difficultFeet: 0, blocked: true };
   return {
     path: path.steps.map(centerOf),
-    feet: path.costCells * calibration.distancePerCell,
-    difficultFeet: path.difficultSteps * calibration.distancePerCell
+    feet: costWithClimb(path.costCells, path.steps.length - 1, climb, input.extraPerStep ?? 0) * feetPerCell,
+    difficultFeet: path.difficultSteps * feetPerCell
   };
 }
 

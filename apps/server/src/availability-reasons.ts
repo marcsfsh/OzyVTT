@@ -96,6 +96,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "movement.occupied": () => "Another creature is in that space.",
   "movement.no-speed": () => "You don't have that speed.",
   "movement.blocked-path": () => "Enemies block the way.",
+  "movement.altitude": () => "Fly, climb or jump to change height.",
   "economy.action-used": actionSpentReason,
   "economy.bonus-action-used": ({ state, attacker }) =>
     hasEffectTag(attacker, SLOWED_TAG) && state.combat.turn.actionUsed && !state.combat.turn.bonusActionUsed

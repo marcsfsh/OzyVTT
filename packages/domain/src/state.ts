@@ -97,7 +97,13 @@ export const EncounterTokenSchema = z
     gridSizePx: z.number().positive().max(4096).nullable().default(null),
     gridRotationRadians: z.number().min(-Math.PI).max(Math.PI).nullable().default(null),
     /** Footprint in cells per side; even sizes snap to grid intersections, odd ones to cell centers. */
-    sizeCells: z.number().int().min(1).max(4).default(1)
+    sizeCells: z.number().int().min(1).max(4).default(1),
+    /** Feet above the ground (SRD Flying, Climbing): on a ledge, up a wall or in the air. Absent on the ground. As
+     *  public as the token's position. */
+    altitudeFeet: z.number().int().min(1).max(10000).optional(),
+    /** What holds it up in the air: flying, which the Flying rule can end with a fall, or a levitation, which lowers
+     *  it gently when it ends. Absent on a surface: the ground, a ledge, a wall it climbs. */
+    airborne: z.enum(["fly", "levitate"]).optional()
   })
   .strict();
 export type EncounterTokenPosition = z.infer<typeof EncounterTokenPositionSchema>;

@@ -32,6 +32,7 @@ import { useMovementBudget } from "./useMovementBudget";
 import { ShapeEditor } from "./ShapeEditor";
 import { TerrainOverlay } from "./TerrainOverlay";
 import { TokenContextMenu } from "./TokenContextMenu";
+import { HeightControl } from "./HeightControl";
 import { useMapCommands } from "./useMapCommands";
 import { useMapGestures } from "./useMapGestures";
 import { useMapView } from "./useMapView";
@@ -329,7 +330,10 @@ export function EncounterMap({
   useEffect(() => {
     setModeChoice(null);
   }, [activeActorId]);
-  const moveMode: MoveMode = modeChoice && modeChoice.actorId === moverId ? modeChoice.mode : "walk";
+  // A creature in the air moves by flying until another way is picked.
+  const moverAirborne = moverId !== null && tokensById.get(moverId)?.airborne === "fly";
+  const moveMode: MoveMode =
+    modeChoice && modeChoice.actorId === moverId ? modeChoice.mode : moverAirborne ? "fly" : "walk";
   const moverBudget = useMovementBudget(moverPlaced ? moverId : null, revision);
   const commands = useMapCommands({
     revision,
@@ -518,7 +522,12 @@ export function EncounterMap({
           extraPerStep: extraPerStepFor(draggedBudget, draggedMode),
           carried: grappledBy(actors, dragging.actorId, role),
           free: draggedMode === "teleport" || draggedMode === "forced",
-          walls: moveWalls
+          walls: moveWalls,
+          // A drag keeps the creature at its height; the token menu changes it.
+          altitude: {
+            fromFeet: tokensById.get(dragging.actorId)?.altitudeFeet ?? 0,
+            toFeet: tokensById.get(dragging.actorId)?.altitudeFeet ?? 0
+          }
         })
       : null;
   // The drag's label says how the creature travels when it isn't walking: the way to move lives in the drag itself.
@@ -871,6 +880,24 @@ export function EncounterMap({
                         )
                       }
                     : {})}
+                  height={(() => {
+                    const placedToken = tokensById.get(actor.id);
+                    const at = placedToken?.position;
+                    if (!at || moveSceneId) return undefined;
+                    return (
+                      <HeightControl
+                        name={actor.name}
+                        altitudeFeet={placedToken.altitudeFeet ?? 0}
+                        airborne={placedToken.airborne}
+                        mode={actor.id === moverId ? moveMode : "walk"}
+                        canMove={actor.id === moverId && state?.combat.active === true}
+                        gm={role === "gm"}
+                        busy={busyActorId === actor.id}
+                        onMove={(feet) => void commands.submitMove(actor.id, at, feet)}
+                        onSet={(feet, airborne) => void commands.setAltitude(actor.id, feet, airborne)}
+                      />
+                    );
+                  })()}
                   onOpenSheet={() => setSheetActorId(actor.id)}
                   onReturnToTray={() => void commands.submitMove(actor.id, null)}
                   onClose={() => setContextMenu(null)}

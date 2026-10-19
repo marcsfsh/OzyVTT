@@ -1475,9 +1475,24 @@ export const TokenMoveSchema = z
     position: EncounterTokenPositionSchema.nullable(),
     /** Absent: walking. A player may teleport only with the GM's go-ahead, and only the GM moves a creature by force. */
     mode: MoveModeSchema.optional(),
+    /** Feet above the ground the move ends at; absent keeps the height it has. Rising or descending costs movement as
+     *  distance does, and only flying, climbing, jumping, teleporting or a forced move changes it. */
+    altitudeFeet: z.number().int().min(0).max(10000).optional(),
     sceneId: z.uuid().optional(),
     /** GM-grade bypass of a movement-rule rejection (speed budget); audited like every override. */
     override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** GM-set height of a token, free of movement: on a surface (a ledge, a balcony, a wall), or in the air flying or
+ *  levitating. 0 puts it on the ground. */
+export const TokenSetAltitudeSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    altitudeFeet: z.number().int().min(0).max(10000),
+    /** What holds it up in the air; null or absent: it stands or clings on a surface. */
+    airborne: z.enum(["fly", "levitate"]).nullable().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

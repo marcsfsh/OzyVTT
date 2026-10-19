@@ -3,6 +3,7 @@ import type { MoveMode } from "@vtt/domain/commands";
 import type { ActorDefinition } from "@vtt/schemas";
 import { footprintOrigin } from "@vtt/rules-5e";
 import { RulesBlockedError } from "./game-store.js";
+import { altitudesAlong, heightRefusal, sharesHeight } from "./altitude.js";
 import { holdsFeature } from "./class-features.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
@@ -35,15 +36,25 @@ export type MovementRulesInput = Readonly<{
   to: EncounterTokenPosition | null;
   /** How the move travels; walking when absent. */
   mode?: MoveMode;
+  /** The mover's height before and after the move, in feet; on the ground when absent. */
+  fromAltitudeFeet?: number;
+  toAltitudeFeet?: number;
   /** A player moved the token (not the GM): off its turn, or by teleportation, that needs the GM's go-ahead. */
   byPlayer?: boolean;
+  /** What held the mover up as it set off (the token's own, when absent). */
+  wasAirborne?: "fly" | "levitate";
   /** Map distance in feet between two image points; null when unmeasurable. */
   distance: (a: Point, b: Point) => number | null;
   /** What the move costs the mover, difficult terrain, creatures and extra costs included (`movementCost`);
    *  `distance` when absent. */
   cost?: (from: Point, to: Point, options: MovementCostOptions) => MovementCost | null;
-  /** Footprint-aware feet between an enemy and the mover at `point` (SRD: nearest point of each space); center-to-center when absent. Used for reach. */
-  creatureDistance?: (enemy: Readonly<{ actorId: string; position: Point }>, moverPoint: Point) => number | null;
+  /** Footprint-aware feet between an enemy and the mover at `point` and `altitudeFeet` (SRD: nearest point of each space,
+   *  height included); center-to-center when absent. Used for reach. */
+  creatureDistance?: (
+    enemy: Readonly<{ actorId: string; position: Point }>,
+    moverPoint: Point,
+    altitudeFeet?: number
+  ) => number | null;
   /** The map's grid, so a move can't end in another creature's space; no check without one. */
   calibration?: SquareGridCalibration | null;
   /** Creatures the mover drags along (it grapples them), and whether that costs it an extra foot per foot. */
@@ -289,9 +300,12 @@ function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Po
   if (!input.calibration || sharesSpace(state, input.actorId, input)) return false;
   const moverToken = state.combat.tokens.find((token) => token.actorId === input.actorId);
   const mine = cellsAt(input.calibration, to, moverToken?.sizeCells ?? 1);
+  const feetPerCell = input.calibration.distancePerCell;
   return state.combat.tokens.some((token) => {
     if (token.actorId === input.actorId || !token.position || input.dragging?.actorIds.includes(token.actorId))
       return false;
+    // A creature above or below the mover's space at the end isn't in it (a flier over a goblin).
+    if (moverToken && !sharesHeight(moverToken, token, feetPerCell, input.toAltitudeFeet ?? 0)) return false;
     if (sharesSpace(state, token.actorId, input, true)) return false;
     if (state.actors.find((actor) => actor.id === token.actorId)?.visibility === "gm-only") return false;
     if (input.perceives && !input.perceives(token.actorId)) return false;
@@ -344,6 +358,15 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     police(state, input, "movement.teleport", `${mover.name} can teleport only with the GM's go-ahead.`, outcome);
   if ((counted || input.byPlayer) && endsInOccupiedSpace(state, input, to))
     police(state, input, "movement.occupied", `${mover.name} can't end its move in another creature's space.`, outcome);
+  // Height changes by flying, climbing, jumping or teleporting; a creature in the air moves by flying.
+  const fromAltitude = input.fromAltitudeFeet ?? 0;
+  const toAltitude = input.toAltitudeFeet ?? fromAltitude;
+  const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
+  const heightBar =
+    counted || input.byPlayer
+      ? heightRefusal(mover.name, mode, fromAltitude, toAltitude, input.wasAirborne ?? moverToken?.airborne)
+      : null;
+  if (heightBar) police(state, input, "movement.altitude", heightBar, outcome);
   if (mode === "teleport" || !counted) return done();
 
   // The budget for this way of moving; Prone, the only way is to crawl (SRD Prone: "Your only movement options are
@@ -364,11 +387,14 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     carried: input.dragging?.actorIds ?? [],
     resolveDefinition: input.resolveDefinition,
     ...(input.perceives ? { perceives: input.perceives } : {}),
-    ...(sharesSpace(state, actorId, input) ? { passesCreatures: true } : {})
+    ...(sharesSpace(state, actorId, input) ? { passesCreatures: true } : {}),
+    ...(fromAltitude !== 0 || toAltitude !== 0 ? { altitude: { fromFeet: fromAltitude, toFeet: toAltitude } } : {})
   };
   const straight = (): MovementCost | null => {
     const distance = input.distance(from, to);
-    return distance === null ? null : { feet: distance * (1 + extraPerStep), difficultFeet: 0 };
+    if (distance === null) return null;
+    const rise = Math.abs(toAltitude - fromAltitude);
+    return { feet: Math.max(distance, rise) * (1 + extraPerStep), difficultFeet: 0 };
   };
   let charge = input.cost ? input.cost(from, to, options) : straight();
   if (charge?.blocked) {
@@ -416,7 +442,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     state.combat = { ...state.combat, reactionsUsed: [...new Set([...state.combat.reactionsUsed, mover.id])] };
     releaseReadied(state, mover.id);
   }
-  openOpportunityAttacks(state, input, mover, charge?.path ?? [from, to], prompts);
+  const path = charge?.path && charge.path.length > 1 ? charge.path : [from, to];
+  openOpportunityAttacks(state, input, mover, path, prompts);
   return done(crawling);
 }
 
@@ -463,11 +490,17 @@ function openOpportunityAttacks(
       input.creatureDistance ??
       ((target: Readonly<{ actorId: string; position: Point }>, point: Point) =>
         input.distance(target.position, point));
+    // The mover rises or falls evenly along the way, so a flier climbing out of reach leaves it too.
+    const heights = altitudesAlong(
+      path.length,
+      input.fromAltitudeFeet ?? 0,
+      input.toAltitudeFeet ?? input.fromAltitudeFeet ?? 0
+    );
     // Tolerance both ways: "was in reach" forgives noise at exactly reach, and "now out" needs a real step past it.
     let left: number | null = null;
     for (let index = 1; index < path.length && left === null; index++) {
-      const wasIn = measure({ actorId: enemy.id, position: enemyPosition }, path[index - 1]!);
-      const nowOut = measure({ actorId: enemy.id, position: enemyPosition }, path[index]!);
+      const wasIn = measure({ actorId: enemy.id, position: enemyPosition }, path[index - 1]!, heights[index - 1]);
+      const nowOut = measure({ actorId: enemy.id, position: enemyPosition }, path[index]!, heights[index]);
       if (
         wasIn !== null &&
         nowOut !== null &&

@@ -22,6 +22,8 @@ const RULE_FAMILIES = {
   // Flying or burrowing without the speed, and a path that hostile creatures shut.
   "movement.no-speed": "movement",
   "movement.blocked-path": "movement",
+  // Height changes by flying, climbing, jumping or teleporting, and a creature in the air moves by flying.
+  "movement.altitude": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",

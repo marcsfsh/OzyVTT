@@ -22,13 +22,16 @@ import {
   AnnotationVisibilitySetSchema,
   SpellZoneEndSchema,
   SpellZonePlaceSchema,
-  TokenMoveSchema
+  TokenMoveSchema,
+  TokenSetAltitudeSchema
 } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
+import { airborneAfter, altitudeOf, setAltitude } from "../altitude.js";
 import { applyMovementRules, dragAlong, dragCostsExtra, grappledBy } from "../movement-rules.js";
 import {
   creatureDistance,
   DISTANCE_TOLERANCE_FEET,
+  footprintOf,
   mapDistance,
   narrateTokenMove,
   tokenCreatureDistance,
@@ -114,7 +117,10 @@ export const mapCommands = [
         // Before a fight the GM sets the scene; players move their own tokens once it starts.
         if (!state.combat.active && !isGmGrade(principal))
           throw new CommandRejectedError("Your GM places the tokens before the fight starts.");
-        const from = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
+        const startToken = state.combat.tokens.find((token) => token.actorId === actorId);
+        const from = startToken?.position ?? null;
+        const fromAltitude = altitudeOf(startToken);
+        const wasAirborne = startToken?.airborne;
         // Dynamic vision, as the mover set off: what it perceived, and who saw it go. A player's move also passes over
         // the creatures hidden from them under the fog, as their preview does.
         const sight = sceneSight(state, kit.sightContent());
@@ -143,6 +149,9 @@ export const mapCommands = [
               )
             : [];
         moveEncounterToken(state, actorId, position, geometry);
+        // The height it ends at, and what holds it up there; back in the tray it is on the ground.
+        const toAltitude = position === null ? 0 : (request.altitudeFeet ?? fromAltitude);
+        setAltitude(state, actorId, toAltitude, airborneAfter(mode, toAltitude, wasAirborne));
         // Movement budget and opportunity attacks (SRD), after the snap; a strict rejection discards the draft.
         const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
         const outcome = applyMovementRules(state, {
@@ -150,6 +159,9 @@ export const mapCommands = [
           from,
           to: moverToken?.position ?? null,
           mode,
+          fromAltitudeFeet: fromAltitude,
+          toAltitudeFeet: toAltitude,
+          ...(wasAirborne ? { wasAirborne } : {}),
           byPlayer: !isGmGrade(principal),
           distance: (a, b) => mapDistance(geometry, a, b)?.value ?? null,
           cost: (a, b, options) => {
@@ -163,14 +175,14 @@ export const mapCommands = [
               kit.resolveDefinitionIn(state, definitionId)
             )
           },
-          creatureDistance: (enemy, moverPoint) => {
+          creatureDistance: (enemy, moverPoint, altitudeFeet) => {
             const enemyToken = state.combat.tokens.find((token) => token.actorId === enemy.actorId);
             if (!enemyToken || !moverToken) return null;
             return (
               creatureDistance(
                 geometry,
-                { position: enemy.position, sizeCells: enemyToken.sizeCells ?? 1, sizePx: enemyToken.sizePx },
-                { position: moverPoint, sizeCells: moverToken.sizeCells ?? 1, sizePx: moverToken.sizePx }
+                footprintOf(enemyToken, enemy.position),
+                footprintOf(moverToken, moverPoint, altitudeFeet ?? toAltitude)
               )?.value ?? null
             );
           },
@@ -215,7 +227,8 @@ export const mapCommands = [
               mode,
               crawled: outcome.crawled,
               hiddenFromTable: hiddenAfter,
-              fromHiding: moverHiddenAtStart
+              fromHiding: moverHiddenAtStart,
+              fromAltitudeFeet: fromAltitude
             })
           : null;
         const to = moverToken?.position ?? null;
@@ -277,6 +290,33 @@ export const mapCommands = [
           actorIds: [prompt.actorId],
           gmOnly: kit.actorHidden(prompt.actorId)
         });
+    }
+  }),
+
+  defineCommand({
+    type: "token.set-altitude",
+    operationId: "setTokenAltitude",
+    description:
+      "Sets how high a creature is above the ground (GM-grade only), free of movement: standing or clinging on a surface such as a ledge, a balcony or a wall (`airborne` null), or in the air, flying (`fly`) or held up by a levitation (`levitate`). 0 puts it on the ground. Height counts in every distance between creatures, so reach, range and auras read it. A creature put in the air that can't stay there falls as the command commits.",
+    summary: "Set how high a creature is, on a surface or in the air (GM).",
+    schema: TokenSetAltitudeSchema,
+    malformed: "The height change is malformed.",
+    gmOnly: "Only the GM sets a creature's height. Fly, climb or jump to change your own.",
+    async run({ request, execute }, kit) {
+      const { actorId, altitudeFeet } = request;
+      const { duplicate } = await execute((state) => {
+        const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
+        if (!token?.position) throw new CommandRejectedError("Place that creature on the map first.");
+        setAltitude(state, actorId, altitudeFeet, request.airborne ?? undefined);
+      });
+      if (duplicate) return;
+      const name = kit.actorName(actorId);
+      kit.context.appendLog({
+        kind: "movement",
+        text: altitudeFeet > 0 ? `${name} is ${altitudeFeet} ft up.` : `${name} is on the ground.`,
+        actorIds: [actorId],
+        gmOnly: kit.actorHidden(actorId)
+      });
     }
   }),
 

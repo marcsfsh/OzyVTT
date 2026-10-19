@@ -1,5 +1,6 @@
 import type { EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { MoveMode } from "@vtt/domain/commands";
+import { verticalEdgeCells } from "@vtt/rules-5e";
 import { imageToGrid } from "./grid-calibration.js";
 import { measureGridPath } from "./map-measurement.js";
 import type { TokenMapGeometry } from "./token-placement.js";
@@ -54,13 +55,34 @@ export function mapDistance(
   return null;
 }
 
-export type CreatureFootprint = Readonly<{ position: Point; sizeCells: number; sizePx: number }>;
+/** How far a move went, its rise or fall included: by the grid's diagonal rule on a grid (the larger of the two), and
+ *  straight through the air on a gridless map. */
+export function moveDistance(
+  geometry: TokenMapGeometry,
+  from: Point,
+  to: Point,
+  riseFeet: number
+): Readonly<{ value: number; unit: string }> | null {
+  const across = mapDistance(geometry, from, to);
+  if (!across || riseFeet === 0) return across;
+  const rise = Math.abs(riseFeet);
+  return geometry.calibration
+    ? { value: Math.max(across.value, rise), unit: across.unit }
+    : { value: Math.hypot(across.value, rise), unit: across.unit };
+}
+
+/** A creature's space on the map: where it stands, how wide it is, and how high above the ground (absent: on it). */
+export type CreatureFootprint = Readonly<{ position: Point; sizeCells: number; sizePx: number; altitudeFeet?: number }>;
+
+/** Feet per square of height on a gridless map, where a creature's space is as tall as the SRD's size table says. */
+const GRIDLESS_FEET_PER_CELL = 5;
 
 /**
  * Rules-facing distance between two creatures, edge to edge (SRD: from the nearest point of each
  * creature's space), so Medium adjacent to Large (2x2) is 5 ft away. Grid maps subtract each
  * footprint's half-width in cells; scaled gridless maps subtract each token's radius beyond its central
- * cell. Null when unmeasurable.
+ * cell. Height counts too: on a grid by the same diagonal rule as the floor (the larger of the two counts), on a
+ * gridless map straight through the air. Null when unmeasurable.
  */
 export function creatureDistance(
   geometry: TokenMapGeometry,
@@ -77,18 +99,33 @@ export function creatureDistance(
       0,
       centerCells - (Math.max(1, a.sizeCells) - 1) / 2 - (Math.max(1, b.sizeCells) - 1) / 2
     );
-    return clean(edgeCells * geometry.calibration.distancePerCell, "ft");
+    const upCells = verticalEdgeCells(a, b, geometry.calibration.distancePerCell);
+    return clean(Math.max(edgeCells, upCells) * geometry.calibration.distancePerCell, "ft");
   }
   if (geometry.scale) {
     const beyondCentralCell = (footprint: CreatureFootprint) =>
       (footprint.sizePx - footprint.sizePx / Math.max(1, footprint.sizeCells)) / 2;
     const centerPx = Math.hypot(b.position.x - a.position.x, b.position.y - a.position.y);
-    return clean(
-      Math.max(0, centerPx - beyondCentralCell(a) - beyondCentralCell(b)) * geometry.scale.distancePerPixel,
-      geometry.scale.unit
-    );
+    const across =
+      Math.max(0, centerPx - beyondCentralCell(a) - beyondCentralCell(b)) * geometry.scale.distancePerPixel;
+    const up = verticalEdgeCells(a, b, GRIDLESS_FEET_PER_CELL) * GRIDLESS_FEET_PER_CELL;
+    return clean(Math.hypot(across, up), geometry.scale.unit);
   }
   return null;
+}
+
+/** A token's space as `creatureDistance` measures it, at `position` (where it stands, or a point it passes). */
+export function footprintOf(
+  token: Readonly<{ sizeCells?: number; sizePx: number; altitudeFeet?: number }>,
+  position: Point,
+  altitudeFeet = token.altitudeFeet
+): CreatureFootprint {
+  return {
+    position,
+    sizeCells: token.sizeCells ?? 1,
+    sizePx: token.sizePx,
+    ...(altitudeFeet ? { altitudeFeet } : {})
+  };
 }
 
 /** creatureDistance from encounter-token lookups: null when either combatant is unplaced. */
@@ -101,11 +138,7 @@ export function tokenCreatureDistance(
   const tokenA = state.combat.tokens.find((token) => token.actorId === actorIdA);
   const tokenB = state.combat.tokens.find((token) => token.actorId === actorIdB);
   if (!tokenA?.position || !tokenB?.position) return null;
-  return creatureDistance(
-    geometry,
-    { position: tokenA.position, sizeCells: tokenA.sizeCells ?? 1, sizePx: tokenA.sizePx },
-    { position: tokenB.position, sizeCells: tokenB.sizeCells ?? 1, sizePx: tokenB.sizePx }
-  );
+  return creatureDistance(geometry, footprintOf(tokenA, tokenA.position), footprintOf(tokenB, tokenB.position));
 }
 
 function formatDistance(distance: Readonly<{ value: number; unit: string }>): string {
@@ -130,6 +163,8 @@ export function narrateTokenMove(
     /** It was hidden from the table when it set off. The table's line then says only where it is now: where it
      *  started and how far it came would say where it hid. */
     fromHiding?: boolean;
+    /** Its height before the move; on the ground when absent. */
+    fromAltitudeFeet?: number;
   }>
 ): MovementNarration | null {
   const { state, actorId, from, geometry } = input;
@@ -146,15 +181,19 @@ export function narrateTokenMove(
     return moverHidden ? { publicText: null, gmText: text } : { publicText: text, gmText: null };
   }
 
-  const moved = from === null ? null : mapDistance(geometry, from, to);
-  if (from !== null && moved !== null && Math.round(moved.value * 10) === 0) return null; // snapped back to the same spot
+  const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
+  const fromAltitude = input.fromAltitudeFeet ?? 0;
+  const toAltitude = moverToken?.altitudeFeet ?? 0;
+  const moved = from === null ? null : moveDistance(geometry, from, to, toAltitude - fromAltitude);
+  // Snapped back to the same spot at the same height: nothing happened.
+  if (from !== null && moved !== null && Math.round(moved.value * 10) === 0) return null;
 
   // Footprint-aware ranges, so the narrated distance matches what the rules enforce.
-  const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
-  const moverAt = (point: Point) => ({
+  const moverAt = (point: Point, altitudeFeet: number) => ({
     position: point,
     sizeCells: moverToken?.sizeCells ?? 1,
-    sizePx: moverToken?.sizePx ?? 0
+    sizePx: moverToken?.sizePx ?? 0,
+    ...(altitudeFeet > 0 ? { altitudeFeet } : {})
   });
   type Range = Readonly<{ name: string; hidden: boolean; label: string; nowLabel: string }>;
   const ranges: Range[] = [];
@@ -163,14 +202,10 @@ export function narrateTokenMove(
     const other = state.actors.find((actor) => actor.id === entry.actorId);
     const otherToken = state.combat.tokens.find((token) => token.actorId === entry.actorId);
     if (!other || !otherToken?.position) continue;
-    const footprint = {
-      position: otherToken.position,
-      sizeCells: otherToken.sizeCells ?? 1,
-      sizePx: otherToken.sizePx
-    };
-    const now = creatureDistance(geometry, moverAt(to), footprint);
+    const footprint = footprintOf(otherToken, otherToken.position);
+    const now = creatureDistance(geometry, moverAt(to, toAltitude), footprint);
     if (now === null) continue; // no measurable map: narrate the move without numbers
-    const before = from === null ? null : creatureDistance(geometry, moverAt(from), footprint);
+    const before = from === null ? null : creatureDistance(geometry, moverAt(from, fromAltitude), footprint);
     const label =
       before === null
         ? `${other.name} ${formatDistance(now)}`
@@ -179,12 +214,15 @@ export function narrateTokenMove(
   }
 
   const how = input.crawled ? "crawled" : MODE_VERBS[input.mode ?? "walk"];
+  // A change of height says where it ended up: so many feet up, or down on the ground.
+  const height =
+    from !== null && toAltitude !== fromAltitude ? (toAltitude > 0 ? `, ${toAltitude} ft up` : " to the ground") : "";
   const verb =
     from === null
-      ? `${mover.name} entered the map`
+      ? `${mover.name} entered the map${toAltitude > 0 ? `, ${toAltitude} ft up` : ""}`
       : moved === null
-        ? `${mover.name} ${how}`
-        : `${mover.name} ${how} ${formatDistance(moved)}`;
+        ? `${mover.name} ${how}${height}`
+        : `${mover.name} ${how} ${formatDistance(moved)}${height}`;
   const withRanges = (list: readonly Range[]) =>
     list.length > 0 ? `${verb} - ${list.map((range) => range.label).join(", ")}.` : `${verb}.`;
 

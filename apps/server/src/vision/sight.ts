@@ -221,7 +221,9 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
       const invisible = has(target, "invisible") && !outlined(target);
       for (const point of samplesOf(token)) {
         const feet = distance(viewer.at, point) / pixelsPerFoot;
-        if (byTremorsense && within(feet, senses.tremorsense)) {
+        // Tremorsense needs both on the same surface, so it finds nothing in the air and works from nowhere aloft.
+        const grounded = token.airborne === undefined && tokens.get(viewerId)?.airborne === undefined;
+        if (byTremorsense && grounded && within(feet, senses.tremorsense)) {
           result = true;
           break;
         }

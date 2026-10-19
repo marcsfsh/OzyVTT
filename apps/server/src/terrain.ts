@@ -1,6 +1,8 @@
 import type { CombatState, EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import {
+  climbCells,
+  costWithClimb,
   footprintCenter,
   footprintOrigin,
   footprintStepBlocked,
@@ -8,6 +10,8 @@ import {
   pointInRects,
   segmentsMeet,
   spacePassage,
+  spaceHeightCells,
+  spansOverlap,
   wallCrossing
 } from "@vtt/rules-5e";
 import { isIncapacitated } from "./condition-rules.js";
@@ -89,6 +93,8 @@ export type MovementCostOptions = Readonly<{
   passesCreatures?: boolean;
   /** Whether the mover's Speed is halved with its centre at this point (Spirit Guardians' Emanation). */
   halvedAt?: (position: Point, sizeCells: number) => boolean;
+  /** The mover's height as it sets off and where the move ends, in feet; on the ground when absent. */
+  altitude?: Readonly<{ fromFeet: number; toFeet: number }>;
 }>;
 
 /** The movement-blocking walls of the live scene (walls, closed doors, windows) in grid units, while its dynamic
@@ -118,16 +124,29 @@ export function movementCost(
 ): MovementCost | null {
   const extra = Math.max(0, options.extraPerStep ?? 0);
   const calibration = geometry.calibration;
+  const rise = options.altitude ? options.altitude.toFeet - options.altitude.fromFeet : 0;
   if (!calibration) {
     // No cells to path round a wall on a gridless map: a straight move through one is barred.
     if (straightThroughWall(state, from, to)) return { feet: 0, difficultFeet: 0, path: [], blocked: true };
     const straight = mapDistance(geometry, from, to);
     return straight
-      ? { feet: straight.value * (1 + extra), difficultFeet: 0, path: sampled(from, to, straight.value) }
+      ? {
+          feet: Math.hypot(straight.value, rise) * (1 + extra),
+          difficultFeet: 0,
+          path: sampled(from, to, straight.value)
+        }
       : null;
   }
   const mover = state.actors.find((candidate) => candidate.id === actorId);
   const sizeCells = state.combat.tokens.find((token) => token.actorId === actorId)?.sizeCells ?? 1;
+  // Height: the mover's way runs from its lowest point to the top of its space at its highest. A creature whose space
+  // lies wholly above or below it is no obstacle, and a mover off the ground the whole way passes over painted terrain.
+  const feetPerCell = calibration.distancePerCell;
+  const lowFeet = Math.min(options.altitude?.fromFeet ?? 0, options.altitude?.toFeet ?? 0);
+  const highFeet =
+    Math.max(options.altitude?.fromFeet ?? 0, options.altitude?.toFeet ?? 0) +
+    spaceHeightCells(sizeCells) * feetPerCell;
+  const aloft = lowFeet > 0;
   const difficultCells = new Set<string>();
   const closedCells = new Set<string>();
   for (const token of state.combat.tokens) {
@@ -135,6 +154,9 @@ export function movementCost(
     const occupant = state.actors.find((candidate) => candidate.id === token.actorId);
     if (!mover || !occupant || occupant.visibility === "gm-only") continue;
     if (options.perceives && !options.perceives(occupant.id)) continue;
+    const occupantLow = token.altitudeFeet ?? 0;
+    if (!spansOverlap(lowFeet, highFeet, occupantLow, occupantLow + spaceHeightCells(token.sizeCells) * feetPerCell))
+      continue;
     const printed = spacePassage({
       ally: areAllies(mover, occupant, options.resolveDefinition),
       incapacitated: isIncapacitated(occupant),
@@ -163,7 +185,7 @@ export function movementCost(
     sizeCells,
     isDifficult: (column, row) =>
       difficultCells.has(`${column},${row}`) ||
-      pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), terrain),
+      (!aloft && pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), terrain)),
     // A path can't leave the map to walk round something, nor pass a creature that bars the way.
     isOpen: (column, row) => {
       if (closedCells.has(`${column},${row}`)) return false;
@@ -179,16 +201,21 @@ export function movementCost(
         }
       : {})
   });
+  const climb = climbCells(0, rise, feetPerCell);
   if (!path) {
     // Past the search budget (a very long drag): fall back to the straight count, as before terrain existed.
     const straight = mapDistance(geometry, from, to);
     return straight
-      ? { feet: straight.value * (1 + extra), difficultFeet: 0, path: sampled(from, to, straight.value) }
+      ? {
+          feet: Math.max(straight.value, Math.abs(rise)) * (1 + extra),
+          difficultFeet: 0,
+          path: sampled(from, to, straight.value)
+        }
       : null;
   }
   if (path.blocked) return { feet: 0, difficultFeet: 0, path: [], blocked: true };
   return {
-    feet: path.costCells * calibration.distancePerCell,
+    feet: costWithClimb(path.costCells, path.steps.length - 1, climb, extra) * feetPerCell,
     difficultFeet: path.difficultSteps * calibration.distancePerCell,
     path: path.steps.map((step) => gridToImage(calibration, footprintCenter(step, sizeCells)))
   };
