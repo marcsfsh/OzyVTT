@@ -91,14 +91,77 @@ function burnInSunlight(
       events.push(...dealTraitDamage(state, actor, actor, trait.name, [{ ...trait.damageAtTurnStart }], deps));
 }
 
-/** The end of `actorId`'s turn: its auras that burn what is near it. */
+/** The end of `actorId`'s turn: its auras that burn what is near it, or ask a save of it (Mucus Cloud). */
 export function traitsAtTurnEnd(state: GameState, actorId: string, deps: TraitTurnDeps): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const events: EffectNarration[] = [];
-  for (const aura of traitMechanicsOf(definitionOf(actor, deps)))
-    if (aura.kind === "aura" && aura.trigger === "bearer-turn-end") burnAround(state, actor, aura, deps, events);
+  for (const aura of traitMechanicsOf(definitionOf(actor, deps))) {
+    if (aura.kind !== "aura" || aura.trigger !== "bearer-turn-end") continue;
+    // "While underwater": only in an underwater fight.
+    if (aura.underwaterOnly && !state.combat.underwater) continue;
+    if (aura.save) saveAround(state, actor, aura, deps, events);
+    else burnAround(state, actor, aura, deps, events);
+  }
   return events;
+}
+
+/** "Constitution Saving Throw: DC 14, each creature in a 5-foot Emanation originating from the aboleth at the end of
+ *  the aboleth's turn": a save for each creature in reach, its failure the trait's declared effect. */
+function saveAround(state: GameState, bearer: Actor, aura: Aura, deps: TraitTurnDeps, events: EffectNarration[]) {
+  if (!aura.save || !auraActive(bearer, aura) || !deps.newId) return;
+  const targets = reached(state, bearer, aura, deps);
+  if (targets === null) {
+    events.push({
+      kind: "effect",
+      text: `${bearer.name}'s ${aura.name}: each creature within ${aura.rangeFeet} feet makes a DC ${aura.save.dc} ${aura.save.ability.toUpperCase()} save. The map can't measure, so call for it by hand.`,
+      actorId: bearer.id,
+      gmOnly: true
+    });
+    return;
+  }
+  if (targets.length === 0) return;
+  const save = aura.save;
+  const declared = save.failureEffect;
+  createPendingSaves(state, {
+    sourceActorId: bearer.id,
+    sourceName: bearer.name,
+    actionName: aura.name,
+    ability: save.ability,
+    dc: save.dc,
+    targetIds: targets.map((target) => target.id),
+    proposedDamage: 0,
+    halfOnSuccess: false,
+    conditionIds: save.failureConditions,
+    ...(declared
+      ? {
+          onFailEffect: {
+            name: `${declared.name} by ${bearer.name}`.slice(0, 120),
+            tags: [...declared.tags],
+            linkedConditionIds: save.failureConditions.filter((id) => id !== "prone"),
+            escapeDc: null,
+            sourceActorId: bearer.id,
+            sourceName: bearer.name,
+            sourceActionId: traitActionId(aura.name),
+            modifiers: [...declared.modifiers]
+          }
+        }
+      : {}),
+    newSaveId: deps.newId,
+    createdAt: Date.parse((deps.now ?? (() => new Date().toISOString()))())
+  });
+  events.push({
+    kind: "condition",
+    text: `${bearer.name}'s ${aura.name}: ${targets.map((target) => target.name).join(", ")} ${targets.length === 1 ? "makes" : "make"} a DC ${save.dc} ${save.ability.toUpperCase()} save.`,
+    actorId: bearer.id
+  });
+  if (aura.reminder)
+    events.push({
+      kind: "effect",
+      text: `${bearer.name}'s ${aura.name}: ${aura.reminder}`,
+      actorId: bearer.id,
+      gmOnly: true
+    });
 }
 
 /**
@@ -185,7 +248,18 @@ function goBerserk(
       sourceName: actor.name,
       sourceActionId: traitActionId(trait.name),
       startedRound: state.combat.round,
-      duration: { type: "manual" }
+      duration: { type: "manual" },
+      // "The golem's creator ... can try to calm it by taking an action": End an Effect within reach of its words.
+      ...(trait.calm
+        ? {
+            endedBy: {
+              name: "Calm the golem",
+              by: "others" as const,
+              withinFeet: trait.calm.withinFeet,
+              check: { ability: "cha" as const, skill: "persuasion", dc: trait.calm.dc }
+            }
+          }
+        : {})
     })
   );
   events.push({

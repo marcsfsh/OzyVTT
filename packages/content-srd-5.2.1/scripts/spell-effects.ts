@@ -429,7 +429,15 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "save",
       activation: "other",
       when: "A creature that enters the spirit's space or starts its turn within 5 feet of it makes the save, if the spirit has no creature Restrained; the Restrained target repeats it at the start of each of its turns, taking 4d8 on a failure.",
-      save: { ability: "dex", successDamage: "none", failureConditions: ["restrained"] },
+      // "At the start of each of its turns, the Restrained target repeats the save. On a failed save, the target takes
+      // 4d8 damage of the spirit's type. On a successful save, the target isn't Restrained by the spirit."
+      save: {
+        ability: "dex",
+        successDamage: "none",
+        failureConditions: ["restrained"],
+        repeatAtTurnStart: true,
+        repeatFailureDamage: [{ formula: "4d8", type: "lightning" }]
+      },
       damage: [{ formula: "8d8", type: "lightning" }],
       // A Large spirit: its space and 5 feet around it reach 10 feet from its point. The caster's chosen element is
       // its damage type.

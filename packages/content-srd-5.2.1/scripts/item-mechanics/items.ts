@@ -456,8 +456,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The curse's attunement lock is authored (SRD: attunement to a cursed item can't be ended voluntarily). Not
-  // modeled: +1 HP per level (`hit-points-per-level` is refused on items) and the curse's berserk save.
+  // The curse's attunement lock is authored (SRD: attunement to a cursed item can't be ended voluntarily), and its
+  // berserk save is the server's (`berserker-axe.ts`). Not modeled: +1 HP per level (`hit-points-per-level` is refused
+  // on items).
   "berserker-axe": {
     cursed: true,
     modifiers: [

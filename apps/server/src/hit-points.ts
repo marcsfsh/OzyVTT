@@ -40,6 +40,7 @@ import {
   makeEffect,
   STABLE_RECOVERY_TAG,
   NO_HEALING_TAG,
+  NO_HEALING_ON_LAND_TAG,
   reduceExhaustion,
   removeConditionDirect,
   sourceOf,
@@ -49,6 +50,7 @@ import { reconcileEquipment } from "./inventory.js";
 import { offerDamageReaction } from "./damage-reactions.js";
 import { releaseSwallowedBy } from "./swallow.js";
 import { openRepeatSavesOnDamage } from "./save-stages.js";
+import { berserkerCurse } from "./berserker-axe.js";
 import { lycanthropyAtZero } from "./curses.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
@@ -676,6 +678,15 @@ export function applyDamageDetailed(
       })
     );
 
+  // A Berserker Axe's curse: damage from another creature asks a save against going berserk.
+  if (totalAdjusted > 0 && deps?.newId)
+    events.push(
+      ...berserkerCurse(state, actor, input.sourceActorId ?? undefined, {
+        newId: deps.newId,
+        now: deps.now ?? (() => new Date().toISOString())
+      })
+    );
+
   let deathSaveFailuresAdded = 0;
   let instantDeath = false;
   let defeated = false;
@@ -817,8 +828,12 @@ export const deadCantHealLine = (name: string) => `${name} is dead and can't reg
 export function healActor(state: GameState, actorId: string, amount: number, scope: Initiator): EffectNarration[] {
   const actor = adjustableActor(state, actorId, scope);
   if (isDead(actor)) return [{ kind: "condition", text: deadCantHealLine(actor.name), actorId }];
-  // "It can't regain Hit Points until the end of your next turn" (Chill Touch).
-  const barred = actor.effects.find((effect) => effect.tags.includes(NO_HEALING_TAG));
+  // "It can't regain Hit Points until the end of your next turn" (Chill Touch); an aboleth's curse "unless it is
+  // underwater".
+  const underwater = state.combat.active && state.combat.underwater;
+  const barred = actor.effects.find(
+    (effect) => effect.tags.includes(NO_HEALING_TAG) || (effect.tags.includes(NO_HEALING_ON_LAND_TAG) && !underwater)
+  );
   if (barred)
     return [
       {

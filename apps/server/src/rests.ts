@@ -11,6 +11,7 @@ import {
   endEffectsAtRest,
   LONG_REST_MINUTES,
   NO_HEALING_TAG,
+  NO_HEALING_ON_LAND_TAG,
   reduceExhaustion,
   removeConditionDirect,
   type EffectNarration
@@ -237,7 +238,9 @@ export function applyRest(
     ...endEffectsAtRest(state, actorId, "long")
   );
   // A curse that bars healing ("The target can't regain Hit Points", a mummy's) outlasts the rest and keeps them.
-  const barred = actor.effects.find((effect) => effect.tags.includes(NO_HEALING_TAG));
+  const barred = actor.effects.find(
+    (effect) => effect.tags.includes(NO_HEALING_TAG) || effect.tags.includes(NO_HEALING_ON_LAND_TAG)
+  );
   if (barred)
     events.push({
       kind: "condition",

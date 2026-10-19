@@ -1011,6 +1011,8 @@ export const EndedBySchema = z
     name: z.string().min(1).max(60),
     by: z.enum(["bearer", "others", "either"]),
     near: z.enum(["bearer", "source"]).optional(),
+    /** How near another creature must be, in feet; 5 when absent. */
+    withinFeet: z.number().int().min(5).max(300).optional(),
     check: z
       .object({
         ability: AbilitySchema,
@@ -3236,7 +3238,9 @@ const TraitSaveSchema = z
   .object({
     ability: AbilitySchema,
     dc: z.number().int().min(1).max(40),
-    ...SaveOutcomeFields
+    ...SaveOutcomeFields,
+    /** What a failure leaves beyond conditions (an aboleth's Mucus Cloud curse). */
+    failureEffect: SaveFailureEffectSchema.optional()
   })
   .strict();
 
@@ -3290,6 +3294,8 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       notWhileIncapacitated: z.literal(true).optional(),
       /** Only a creature that can see the bearer is affected ("and can see the hag's true form"). */
       seenOnly: z.literal(true).optional(),
+      /** It acts only while the fight is underwater (an aboleth's Mucus Cloud). */
+      underwaterOnly: z.literal(true).optional(),
       damage: TraitDamageSchema.optional(),
       save: TraitSaveSchema.optional(),
       /** The fire it sets (a fire elemental's Emanation): "start burning" (SRD Burning). */
@@ -3343,7 +3349,13 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       kind: z.literal("berserk"),
       name: TraitNameSchema,
       /** The d6 face, or higher, that sends it berserk. */
-      on: z.number().int().min(1).max(6)
+      on: z.number().int().min(1).max(6),
+      /** Another creature within `withinFeet` calms it with an action and a Charisma (Persuasion) check against `dc`
+       *  (the flesh golem's creator). */
+      calm: z
+        .object({ dc: z.number().int().min(1).max(40), withinFeet: z.number().int().min(5).max(300) })
+        .strict()
+        .optional()
     })
     .strict(),
   /** "The stalker has the Invisible condition": the creature joins the roster with it. */

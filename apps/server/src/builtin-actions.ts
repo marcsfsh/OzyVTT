@@ -234,7 +234,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "End an Effect",
     activation: "action",
     description:
-      "Take the action an effect's text names to end it: wake a creature within 5 feet, stanch a wound with a Wisdom (Medicine) check, study a phantasm with an Intelligence (Investigation) check, pull a creature out of a cube or a whelm with a Strength (Athletics) check, or detach a stirge. Target yourself to collect yourself and repeat a save that allows it (Irresistible Dance). (SRD 5.2.1)",
+      "Take the action an effect's text names to end it: wake a creature within 5 feet, stanch a wound with a Wisdom (Medicine) check, study a phantasm with an Intelligence (Investigation) check, pull a creature out of a cube or a whelm with a Strength (Athletics) check, detach a stirge or a darkmantle, or calm a berserk flesh golem with a Charisma (Persuasion) check from within 60 feet. Target yourself to collect yourself and repeat a save that allows it (Irresistible Dance). (SRD 5.2.1)",
     damage: []
   },
   {

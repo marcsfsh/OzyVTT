@@ -80,7 +80,12 @@ describe("Gibbering", () => {
     const fight = caster();
     const goblin = actorOf(fight.state, FOE);
     goblin.effects = [
-      makeEffect({ id: "g", name: "Gibbering", tags: ["gibbering"], duration: { type: "until-bearer-turn-end" } })
+      makeEffect({
+        id: "g",
+        name: "Gibbering",
+        tags: ["gibbering"],
+        duration: { type: "until-bearer-turn-end", skipsCurrentTurn: false }
+      })
     ];
     expect(gibberingTurn(goblin, () => 3)[0]?.text).toBe(
       "Goblin rolls 3 on the d8 for Gibbering: it does nothing this turn."

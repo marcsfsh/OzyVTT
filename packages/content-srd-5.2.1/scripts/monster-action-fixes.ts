@@ -60,6 +60,22 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
       }
     }
   },
+  "darkmantle/crush": {
+    why: "the attachment, and detaching it with an action and an Athletics check, are printed in the hit's text",
+    onHit: [
+      {
+        conditions: [],
+        name: "Attached",
+        tags: ["attached"],
+        endsWhenSourceDies: true,
+        // "A creature can take an action to try to detach the darkmantle from itself, doing so with a successful DC 13
+        // Strength (Athletics) check."
+        endedBy: { name: "Detach the darkmantle", by: "bearer", check: { ability: "str", skill: "athletics", dc: 13 } }
+      }
+    ],
+    reminder:
+      "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target, which is Blinded and suffocating (hold its breath) while the darkmantle is attached."
+  },
   "otyugh/bite": {
     why: "the save comes after each Long Rest, and its failure lowers the Hit Point maximum until the poison ends",
     onHit: [

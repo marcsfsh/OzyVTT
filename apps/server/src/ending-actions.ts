@@ -17,7 +17,8 @@ export const END_EFFECT_ACTION_ID = "end-effect";
 /** Why End an Effect can't be taken: nothing it names. */
 export const NO_ENDING_OPTION = "No effect on you or a creature beside you ends by an action now.";
 
-/** How near the creature taking the action must be, in feet, to the bearer or the effect's source. */
+/** How near the creature taking the action must be, in feet, to the bearer or the effect's source, unless the text
+ *  says how far (a flesh golem's creator calms it from 60 feet). */
 const WITHIN_FEET = 5;
 
 /** One effect `taker` can end by its action: by repeating the effect's save (`repeat`), or by its printed means. */
@@ -33,10 +34,10 @@ export function endingOptions(
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null
 ): EndingOption[] {
   const self = taker.id === bearer.id;
-  const near = (otherId: string | null) => {
+  const near = (otherId: string | null, feet: number) => {
     if (otherId === null) return false;
     const apart = distanceFeet?.(taker.id, otherId) ?? null;
-    return apart === null || apart <= WITHIN_FEET + DISTANCE_TOLERANCE_FEET;
+    return apart === null || apart <= feet + DISTANCE_TOLERANCE_FEET;
   };
   return bearer.effects.flatMap((effect): EndingOption[] => {
     if (self && effect.repeatSave?.byAction) return [{ bearer, effect, kind: "repeat" }];
@@ -44,7 +45,8 @@ export function endingOptions(
     if (!ended) return [];
     const allowed = self ? ended.by !== "others" : ended.by !== "bearer";
     if (!allowed) return [];
-    if (!self && !near(ended.near === "source" ? effect.sourceActorId : bearer.id)) return [];
+    if (!self && !near(ended.near === "source" ? effect.sourceActorId : bearer.id, ended.withinFeet ?? WITHIN_FEET))
+      return [];
     return [{ bearer, effect, kind: "ended-by" }];
   });
 }

@@ -1,11 +1,12 @@
 import type { GameState } from "@vtt/domain";
 import { breathAtTurnEnd } from "./breath.js";
 import { confusedTurn } from "./random-outcomes.js";
+import { calmAtTurnStart } from "./berserker-axe.js";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { holdsFeature } from "./class-features.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
-import { expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
+import { endEffect, expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
 import { applyDamageDetailed, damageAdjustmentDetail, loseHitPoints, UNTYPED_DAMAGE } from "./hit-points.js";
 import { holyNimbusBurns } from "./paladin-auras.js";
 import { endEffectsOutOfSight, openEndingSave, openRepeatSaves } from "./save-stages.js";
@@ -97,6 +98,9 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
   temporaryHitPointsEachTurn(state, actorId, events);
   // SRD Confusion: "it rolls 1d10 at the start of each of its turns to determine its behavior for that turn".
   events.push(...confusedTurn(state, actorId, deps.rollDie));
+  // A Berserker Axe's berserk ends on a turn that starts with no creature within 60 feet.
+  const calm = calmAtTurnStart(state, actorId, deps.distanceFeet);
+  if (calm) events.push(...endEffect(state, actorId, calm));
   events.push(...traitsAtTurnStart(state, actorId, deps));
   holyNimbus(state, actorId, events, deps);
   dealOngoingAt(state, actorId, "start", events, deps);
