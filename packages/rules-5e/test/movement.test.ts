@@ -4,6 +4,7 @@ import {
   footprintOrigin,
   footprintStepBlocked,
   footprintStepPassage,
+  laneWidth,
   movementPath,
   pointInRects,
   segmentsMeet,
@@ -161,6 +162,15 @@ describe("movement over a square grid", () => {
     expect(spacePassage({ ...enemy, moverSize: "huge", occupantSize: "medium" })).toBe("difficult");
   });
 
+  // SRD 5.2.1 Halfling Nimbleness: "You can move through the space of any creature that is a size larger than you".
+  it("lets a nimble mover through a hostile creature larger than itself, as Difficult Terrain", () => {
+    const halfling = { ally: false, incapacitated: false, moverSize: "small", nimble: true };
+    expect(spacePassage({ ...halfling, occupantSize: "medium" })).toBe("difficult");
+    expect(spacePassage({ ...halfling, occupantSize: "large" })).toBe("difficult");
+    expect(spacePassage({ ...halfling, occupantSize: "small" })).toBe("blocked");
+    expect(spacePassage({ ...halfling, nimble: false, occupantSize: "medium" })).toBe("blocked");
+  });
+
   it("goes round a creature it can't pass, and says when there is no way through", () => {
     const orc = cellSet([[2, 0]]);
     const round = movementPath({
@@ -296,6 +306,72 @@ describe("walls in the way of a move", () => {
     expect(segmentsMeet(p(0, 0), p(1, 1), p(1, 1), p(3, 0))).toBe(true);
     expect(segmentsMeet(p(0, 0), p(2, 0), p(1, 0), p(3, 0))).toBe(true);
     expect(segmentsMeet(p(0, 0), p(1, 0), p(0, 1), p(1, 1))).toBe(false);
+  });
+});
+
+// SRD 5.2.1 Difficult Terrain: "A narrow opening sized for a creature one size smaller than you". A one-cell
+// footprint's opening is measured: half a square (a Tiny creature's space) is a squeeze, and less bars it.
+describe("squeezing a one-cell footprint through an opening", () => {
+  // A wall along x = 2 with a gap of the given width in feet, centred on row 0.5, on 5-foot squares.
+  const gap = (feet: number) => {
+    const half = feet / 10;
+    return [
+      { a: { column: 2, row: -10 }, b: { column: 2, row: 0.5 - half } },
+      { a: { column: 2, row: 0.5 + half }, b: { column: 2, row: 10 } }
+    ];
+  };
+  const through = (feet: number, tiny = false) => {
+    const walls = gap(feet);
+    return footprintStepPassage({ column: 1, row: 0 }, { column: 2, row: 0 }, 1, wallCrossing(walls), walls, { tiny });
+  };
+
+  it("bars a Medium creature at a 1-foot gap and makes it pay double through a 3-foot one", () => {
+    expect(through(1)).toBe("blocked");
+    expect(through(2)).toBe("blocked");
+    expect(through(3)).toBe("squeeze");
+    expect(through(4)).toBe("open");
+    expect(through(5)).toBe("open");
+    const walls = gap(3);
+    const crosses = wallCrossing(walls);
+    const passage = (from: { column: number; row: number }, to: { column: number; row: number }) =>
+      footprintStepPassage(from, to, 1, crosses, walls);
+    const path = movementPath({
+      from: { column: 0, row: 0 },
+      to: { column: 4, row: 0 },
+      sizeCells: 1,
+      isDifficult: open,
+      isStepOpen: (from, to) => passage(from, to) !== "blocked",
+      isStepSqueezed: (from, to) => passage(from, to) === "squeeze"
+    });
+    expect(path?.costCells).toBe(5);
+    expect(path?.difficultSteps).toBe(1);
+  });
+
+  it("lets a Tiny creature through half a square at no cost, and no narrower", () => {
+    expect(through(3, true)).toBe("open");
+    expect(through(2.5, true)).toBe("open");
+    expect(through(2, true)).toBe("blocked");
+  });
+
+  it("measures an opening off the centre line, and none from walls running alongside", () => {
+    // A 3-foot gap from row 0.2 to row 0.8, then one from row 0 to row 0.6.
+    expect(laneWidth({ column: 1, row: 0 }, { column: 2, row: 0 }, gap(3))).toBeCloseTo(0.6);
+    const offCentre = [
+      { a: { column: 2, row: -10 }, b: { column: 2, row: 0 } },
+      { a: { column: 2, row: 0.6 }, b: { column: 2, row: 10 } }
+    ];
+    expect(laneWidth({ column: 1, row: 0 }, { column: 2, row: 0 }, offCentre)).toBeCloseTo(0.6);
+    // A corridor's walls inside the square, along the way, are no opening to pass.
+    const corridor = [
+      { a: { column: -10, row: 0.2 }, b: { column: 10, row: 0.2 } },
+      { a: { column: -10, row: 0.8 }, b: { column: 10, row: 0.8 } }
+    ];
+    expect(laneWidth({ column: 1, row: 0 }, { column: 2, row: 0 }, corridor)).toBe(1);
+    // Cutting past the end of a wall diagonally squeezes by it.
+    const end = [{ a: { column: -10, row: 1 }, b: { column: 0.8, row: 1 } }];
+    expect(footprintStepPassage({ column: 0, row: 0 }, { column: 1, row: 1 }, 1, wallCrossing(end), end)).toBe(
+      "squeeze"
+    );
   });
 });
 
