@@ -435,18 +435,18 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       bars: { way: "both", except: ["construct", "undead"], reach: true }
     })
   ],
-  // "While in the aura, you and your allies have Resistance to Necrotic damage", and "if an ally with 0 Hit Points
-  // starts its turn in the aura, that ally regains 1 Hit Point."
+  // "While in the aura, you and your allies have Resistance to Necrotic damage, and your Hit Point maximums can't be
+  // reduced", and "if an ally with 0 Hit Points starts its turn in the aura, that ally regains 1 Hit Point."
   "aura-of-life": [
     lasting(
       "aura",
-      "You and your allies in the aura have Resistance to Necrotic damage; an ally at 0 Hit Points that starts its turn there regains 1 Hit Point.",
+      "You and your allies in the aura have Resistance to Necrotic damage, and your Hit Point maximums can't be reduced; an ally at 0 Hit Points that starts its turn there regains 1 Hit Point.",
       {
         on: ["start-turn"],
         around: "caster",
         feet: 30,
         affects: "allies",
-        holds: { modifiers: [{ type: "damage-resistance", damageTypes: ["necrotic"] }] },
+        holds: { modifiers: [{ type: "damage-resistance", damageTypes: ["necrotic"] }], keepsMaximum: true },
         revives: 1
       }
     )
@@ -899,11 +899,11 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       }
     })
   ],
-  // "Creatures have the Deafened condition while entirely inside it."
+  // "Creatures have the Deafened condition while entirely inside it" and "Immunity to Thunder damage".
   silence: [
-    lasting("aura", "A creature inside the Sphere has the Deafened condition.", {
+    lasting("aura", "A creature inside the Sphere has the Deafened condition and Immunity to Thunder damage.", {
       on: [],
-      holds: { conditions: ["deafened"] }
+      holds: { modifiers: [{ type: "damage-immunity", damageTypes: ["thunder"] }], conditions: ["deafened"] }
     })
   ],
   "sleet-storm": [

@@ -398,8 +398,9 @@ its spell the first time it acts and burst over its area (Glyph of Warding, draw
 caster alone), or raise a barrier at its edge (`zone-barriers.ts`): a step across it closes the path
 for the creatures it holds back (Antilife Shell, Magic Circle), a melee attack without a Reach weapon
 can't reach through Antilife Shell, and no creature teleports into Forbiddance. What an area gives the
-creatures in it (Holy Aura's Advantage on saves, Pass without Trace's +10 to Stealth, Silence's Deafened)
-is an effect each one holds while it stands inside (`zone-auras.ts`): the pipeline settles who holds it
+creatures in it (Holy Aura's Advantage on saves, Pass without Trace's +10 to Stealth, Silence's Deafened
+and Thunder immunity, Aura of Life's Hit Point maximum that can't drop) is an effect each one holds while
+it stands inside (`zone-auras.ts`): the pipeline settles who holds it
 after every command, as its own write when anything changed. A later action that moves a spell's area
 (Moonbeam's Magic action, Flaming Sphere's ram) takes a template like a cast: the area moves there if that
 is within the spell's reach of where it stood, its save falls on the creatures the area moves onto, and no

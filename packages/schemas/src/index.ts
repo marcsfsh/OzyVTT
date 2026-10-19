@@ -3760,11 +3760,13 @@ export const AreaTriggerSchema = z
     noTeleport: z.literal(true).optional(),
     /** What a creature it affects holds while it stands inside (Holy Aura's Advantage on saving throws, Pass without
      *  Trace's +10 to Stealth checks, Silence's Deafened): one effect, added as the creature comes in and taken away as
-     *  it leaves. A struck save rolls against the cast's save DC. */
+     *  it leaves. A struck save rolls against the cast's save DC. `keepsMaximum`: its Hit Point maximum can't be
+     *  reduced while there (Aura of Life). */
     holds: z
       .object({
         modifiers: EffectModifiersSchema.optional(),
         conditions: z.array(ConditionSchema).min(1).max(2).optional(),
+        keepsMaximum: z.literal(true).optional(),
         struck: StruckSchema.omit({ save: true })
           .extend({
             save: z
