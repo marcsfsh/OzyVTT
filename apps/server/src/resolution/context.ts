@@ -14,7 +14,7 @@ import {
   type RandomSource,
   type RiderContext
 } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, CastShaping } from "@vtt/schemas";
 import type { EquipmentCatalog, EquipmentDerivation } from "../equipment-derivation.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "../roll-history.js";
 import type { RuleId, RulesOverride } from "../rules-families.js";
@@ -102,6 +102,10 @@ export type ResolveInput = Readonly<{
   areaPlaced?: boolean;
   /** Ready the spell for later: its slot is spent and it is held with Concentration (SRD Ready). */
   ready?: boolean;
+  /** Take the action's own move now and the rest of it later (`movement-grants.ts`): the cost is spent, no target. */
+  moveFirst?: boolean;
+  /** The rest of an action whose move was taken first: its cost was spent then, so it is neither checked nor spent. */
+  owedPaid?: boolean;
   /** The spell area a cast that ends spells is aimed at (Dispel Magic on a Spirit Guardians); the GM's to name. */
   zoneId?: string;
   /** The caster stands where no sound can be made (Silence's sphere), measured on the map by the server. */
@@ -111,6 +115,8 @@ export type ResolveInput = Readonly<{
   forgoneAdvantageBy?: string;
   /** A melee hit that drops its target to 0 leaves it at 1 Hit Point and Unconscious (SRD Knocking Out a Creature). */
   knockOut?: boolean;
+  /** How the caster shapes this spell's cast (Metamagic, Sculpt Spells), checked and applied by `metamagic.ts`. */
+  shaping?: readonly CastShaping[];
 }>;
 
 export type ResolveDependencies = Readonly<{

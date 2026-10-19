@@ -8,6 +8,7 @@ export const MOVE_MODE_NAMES: Readonly<Record<MoveMode, string>> = {
   swim: "Swim",
   climb: "Climb",
   burrow: "Burrow",
+  jump: "Jump",
   teleport: "Teleport",
   forced: "Forced"
 };
@@ -19,14 +20,16 @@ export const MOVE_MODE_KEYS: Readonly<Record<string, MoveMode>> = {
   s: "swim",
   c: "climb",
   b: "burrow",
+  j: "jump",
   t: "teleport",
   m: "forced"
 };
 
 /**
  * How a creature's next drag travels, picked with one tap in its token menu: walking or one of its special speeds
- * (with the feet left this turn), climbing or swimming without the speed (each foot costs double), teleporting, and
- * for the GM, moving it by force. Prone, every way is a crawl. The drag's label names the way chosen.
+ * (with the feet left this turn), climbing or swimming without the speed (each foot costs double), jumping,
+ * teleporting, and for the GM, moving it by force. Prone, every way is a crawl. A move or teleport an action granted
+ * this turn (Pounce, Misty Step) is named under it. The drag's label names the way chosen.
  */
 export function MoveModeChoice({
   name,
@@ -64,6 +67,11 @@ export function MoveModeChoice({
           : `Feet of ${MOVE_MODE_NAMES[entry.mode]} movement left this turn`
       })),
     {
+      value: "jump",
+      label: MOVE_MODE_NAMES.jump,
+      title: "A foot of movement for each foot jumped, over what lies between"
+    },
+    {
       value: "teleport",
       label: MOVE_MODE_NAMES.teleport,
       title: "Spends no movement and provokes no Opportunity Attack"
@@ -88,6 +96,18 @@ export function MoveModeChoice({
         value={mode}
         onChange={(value) => onChange(value as MoveMode)}
       />
+      {budget?.granted ? (
+        <span className="encounter-move-modes-grant">
+          {budget.granted.name}:{" "}
+          {budget.granted.jump ? "jump" : MOVE_MODE_NAMES[budget.granted.mode ?? "walk"].toLowerCase()}{" "}
+          {budget.granted.feet} ft{budget.granted.provokes ? "" : ", no Opportunity Attacks"}
+        </span>
+      ) : null}
+      {budget?.teleport ? (
+        <span className="encounter-move-modes-grant">
+          {budget.teleport.name}: teleport up to {budget.teleport.feet} ft
+        </span>
+      ) : null}
     </div>
   );
 }

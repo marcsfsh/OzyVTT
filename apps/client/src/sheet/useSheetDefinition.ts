@@ -58,6 +58,8 @@ export type AvailabilityRow = Readonly<{
   passive?: "rider" | "rest" | "automatic";
   /** The Weapon Mastery property this character applies with the swing. */
   mastery?: Readonly<{ id: string; name: string }>;
+  /** The ways the caster may shape this spell's cast (Metamagic, Sculpt Spells). */
+  shaping?: ContentActionSummary["shaping"];
 }>;
 
 /** What the server says of one row now: whether it can be used, why not, and what a weapon's swing masters. */
@@ -118,7 +120,9 @@ export function summaryOfAvailability(row: AvailabilityRow): ContentActionSummar
     // Search, Study and the like pick the skill they are made with.
     ...(row.checkSkills ? { checkSkills: row.checkSkills } : {}),
     // Fire Shield's warm or chill, Bestow Curse's curse, the weapon Magic Weapon is cast on.
-    ...(row.choices ? { choices: row.choices } : {})
+    ...(row.choices ? { choices: row.choices } : {}),
+    // A spell's cast offers the Metamagic its caster knows.
+    ...(row.shaping ? { shaping: row.shaping } : {})
   };
 }
 

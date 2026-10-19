@@ -10,6 +10,7 @@ import {
   templateOfArea,
   type AnnotationActor
 } from "../annotations.js";
+import { pointInRects } from "@vtt/rules-5e";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import {
   AnnotationAddSchema,
@@ -22,13 +23,24 @@ import {
   AnnotationVisibilitySetSchema,
   SpellZoneEndSchema,
   SpellZonePlaceSchema,
-  TokenMoveSchema
+  ActorFallSchema,
+  ActorMountSchema,
+  TokenMoveSchema,
+  TokenSetAltitudeSchema
 } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
+import { airborneAfter, altitudeOf, setAltitude } from "../altitude.js";
+import { startFall } from "../falling.js";
+import { failedTeleport } from "../granted-moves.js";
+import { holdMove } from "../held-moves.js";
+import { landJump } from "../jumping.js";
+import { carryRiders, mountOf, mountOrDismount, ridersOf, RIDING_TAG } from "../mounts.js";
+import { timeStopOutOfRange } from "../time-stop.js";
 import { applyMovementRules, dragAlong, dragCostsExtra, grappledBy } from "../movement-rules.js";
 import {
   creatureDistance,
   DISTANCE_TOLERANCE_FEET,
+  footprintOf,
   mapDistance,
   narrateTokenMove,
   tokenCreatureDistance,
@@ -40,6 +52,7 @@ import { placeZone, speedHalvingAt, zonesAfterAreaMove, zonesAfterMove } from ".
 import { movementCost } from "../terrain.js";
 import { moveEncounterToken, moveSceneToken } from "../token-placement.js";
 import { HIDDEN_SOURCE } from "../hidden-source.js";
+import { insidePolygon } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -67,7 +80,7 @@ export const mapCommands = [
     type: "token.move",
     operationId: "moveToken",
     description:
-      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. `mode` says how it travels: walking (default) or a special speed (`fly`, `swim`, `climb`, `burrow`) spends movement, `teleport` spends none and provokes no Opportunity Attack, and `forced` (GM only) is a creature moved against its will. A grappler drags the creatures it grapples along. Player sessions may move only their claimed character, and only once a fight is running; in a fight, moving it off its turn or teleporting is the GM's to allow, and only the GM takes a placed token back to the tray. Before a fight the GM places tokens on the live scene without narration. `sceneId` targets a prepared (GM-private) scene; without it the token moves on the live table.",
+      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. `mode` says how it travels: walking (default) or a special speed (`fly`, `swim`, `climb`, `burrow`) spends movement, `jump` leaps straight over what lies between up to the jump distance (a foot of movement for each foot), `teleport` spends none and provokes no Opportunity Attack, and `forced` (GM only) is a creature moved against its will. A grappler drags the creatures it grapples along. Player sessions may move only their claimed character, and only once a fight is running; in a fight, moving it off its turn or teleporting is the GM's to allow unless an action or feature granted that move or teleport this turn (Tactical Shift, Misty Step), which the move is charged to, and only the GM takes a placed token back to the tray. Before a fight the GM places tokens on the live scene without narration. `sceneId` targets a prepared (GM-private) scene; without it the token moves on the live table.",
     summary:
       "Move a combatant's token (server-snapped) walking, by a special speed, teleporting or by force; position null returns it to the tray.",
     schema: TokenMoveSchema,
@@ -100,8 +113,10 @@ export const mapCommands = [
       let released: EffectNarration[] = [];
       const zoneEvents: EffectNarration[] = [];
       const draggedNames: string[] = [];
+      const landing: EffectNarration[] = [];
+      let granted: string | undefined;
       let moverHiddenAtStart = false;
-      const { duplicate } = await execute((state) => {
+      const { state: moved, duplicate } = await execute((state) => {
         if (state.combat.mapAssetId !== mapAssetId)
           throw new CommandRejectedError("The active encounter changed. Try moving the token again.");
         requireActorAccess(
@@ -114,7 +129,18 @@ export const mapCommands = [
         // Before a fight the GM sets the scene; players move their own tokens once it starts.
         if (!state.combat.active && !isGmGrade(principal))
           throw new CommandRejectedError("Your GM places the tokens before the fight starts.");
-        const from = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
+        // A rider goes where its mount takes it (SRD Mounted Combat), until it dismounts.
+        const riding = position !== null && state.combat.active ? mountOf(state, actorId) : undefined;
+        if (riding && mode !== "forced" && mode !== "teleport")
+          throw new CommandRejectedError(
+            `${kit.actorName(actorId)} is riding ${riding.name}. Move ${riding.name}, or dismount first.`
+          );
+        // A mover waiting on its Opportunity Attacks that moves again gives up the rest of the held move.
+        if (state.combat.heldMove?.actorId === actorId) state.combat = { ...state.combat, heldMove: null };
+        const startToken = state.combat.tokens.find((token) => token.actorId === actorId);
+        const from = startToken?.position ?? null;
+        const fromAltitude = altitudeOf(startToken);
+        const wasAirborne = startToken?.airborne;
         // Dynamic vision, as the mover set off: what it perceived, and who saw it go. A player's move also passes over
         // the creatures hidden from them under the fog, as their preview does.
         const sight = sceneSight(state, kit.sightContent());
@@ -143,6 +169,9 @@ export const mapCommands = [
               )
             : [];
         moveEncounterToken(state, actorId, position, geometry);
+        // The height it ends at, and what holds it up there; back in the tray it is on the ground.
+        const toAltitude = position === null ? 0 : (request.altitudeFeet ?? fromAltitude);
+        setAltitude(state, actorId, toAltitude, airborneAfter(mode, toAltitude, wasAirborne));
         // Movement budget and opportunity attacks (SRD), after the snap; a strict rejection discards the draft.
         const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
         const outcome = applyMovementRules(state, {
@@ -150,6 +179,9 @@ export const mapCommands = [
           from,
           to: moverToken?.position ?? null,
           mode,
+          fromAltitudeFeet: fromAltitude,
+          toAltitudeFeet: toAltitude,
+          ...(wasAirborne ? { wasAirborne } : {}),
           byPlayer: !isGmGrade(principal),
           distance: (a, b) => mapDistance(geometry, a, b)?.value ?? null,
           cost: (a, b, options) => {
@@ -158,19 +190,20 @@ export const mapCommands = [
           },
           calibration: geometry.calibration,
           dragging: {
-            actorIds: dragged,
+            // Its riders move with it too, and their space is no obstacle.
+            actorIds: [...dragged, ...ridersOf(state, actorId)],
             costsExtra: dragCostsExtra(state, actorId, dragged, (definitionId) =>
               kit.resolveDefinitionIn(state, definitionId)
             )
           },
-          creatureDistance: (enemy, moverPoint) => {
+          creatureDistance: (enemy, moverPoint, altitudeFeet) => {
             const enemyToken = state.combat.tokens.find((token) => token.actorId === enemy.actorId);
             if (!enemyToken || !moverToken) return null;
             return (
               creatureDistance(
                 geometry,
-                { position: enemy.position, sizeCells: enemyToken.sizeCells ?? 1, sizePx: enemyToken.sizePx },
-                { position: moverPoint, sizeCells: moverToken.sizeCells ?? 1, sizePx: moverToken.sizePx }
+                footprintOf(enemyToken, enemy.position),
+                footprintOf(moverToken, moverPoint, altitudeFeet ?? toAltitude)
               )?.value ?? null
             );
           },
@@ -179,16 +212,75 @@ export const mapCommands = [
           catalog: kit.equipmentCatalog(),
           ...(perceives ? { perceives } : {}),
           ...(seenAtStart ? { seenBy: (id: string) => seenAtStart.has(id) } : {}),
+          ...(sight.enabled
+            ? {
+                seesPoint: (point: { x: number; y: number }) =>
+                  sight.areaOf([actorId]).some((area) => insidePolygon(point, area))
+              }
+            : {}),
+          difficultAt: (point) => pointInRects(point, state.combat.terrain.difficult),
           moverHiddenFromPlayers: moverHiddenAtStart,
           newPromptId: kit.context.newId,
           now: Date.now,
           commandId
         });
+        // A jump that lands in Difficult Terrain: the server rolls the DC 10 Dexterity (Acrobatics) check.
+        if (outcome.landsOnDifficult) {
+          const jumper = state.actors.find((actor) => actor.id === actorId);
+          if (jumper)
+            landJump(
+              state,
+              jumper,
+              kit.fallDeps(
+                state,
+                (current, a, b) => tokenCreatureDistance(current, geometry, a, b)?.value ?? null,
+                commandId
+              ),
+              landing
+            );
+        }
+        granted = outcome.granted;
+        // A move that provokes waits at the edge of reach while the attacks are answered.
+        const destination = state.combat.tokens.find((token) => token.actorId === actorId)?.position;
+        if (outcome.heldAt && destination)
+          holdMove(state, geometry, {
+            actorId,
+            at: outcome.heldAt.position,
+            altitudeFeet: outcome.heldAt.altitudeFeet,
+            to: destination,
+            toAltitudeFeet: toAltitude,
+            ...(airborneAfter(mode, toAltitude, wasAirborne)
+              ? { airborne: airborneAfter(mode, toAltitude, wasAirborne)! }
+              : {}),
+            promptIds: outcome.heldAt.promptIds,
+            refundFeet: outcome.heldAt.refundFeet,
+            dragged
+          });
+        // Time Stop ends once its caster goes more than 1,000 feet from where it cast it.
+        landing.push(...timeStopOutOfRange(state, actorId, (a, b) => mapDistance(geometry, a, b)?.value ?? null));
+        // A teleport into a filled space fails: back where it was, hurt (Dimension Door).
+        if (outcome.teleportFails && from !== null) {
+          moveEncounterToken(state, actorId, from, geometry);
+          setAltitude(state, actorId, fromAltitude, wasAirborne);
+          const caster = state.actors.find((actor) => actor.id === actorId);
+          if (caster)
+            failedTeleport(
+              state,
+              caster,
+              outcome.teleportFails,
+              kit.fallDeps(
+                state,
+                (current, a, b) => tokenCreatureDistance(current, geometry, a, b)?.value ?? null,
+                commandId
+              ),
+              landing
+            );
+        }
         movementWarning = outcome.warning;
         movementOverridden = outcome.overridden;
         opportunityPrompts.push(...outcome.prompts);
         // A spell area the move enters (or that its mover carries over others) acts on whoever it meets.
-        const arrived = moverToken?.position ?? null;
+        const arrived = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
         if (from !== null && arrived !== null) {
           const path =
             mode === "teleport"
@@ -215,10 +307,12 @@ export const mapCommands = [
               mode,
               crawled: outcome.crawled,
               hiddenFromTable: hiddenAfter,
-              fromHiding: moverHiddenAtStart
+              fromHiding: moverHiddenAtStart,
+              fromAltitudeFeet: fromAltitude,
+              ...(granted ? { granted } : {})
             })
           : null;
-        const to = moverToken?.position ?? null;
+        const to = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
         if (from !== null && to !== null)
           for (const heldId of dragAlong(state, dragged, from, to, geometry)) {
             draggedNames.push(hiddenAfter(heldId) ? HIDDEN_SOURCE : kit.actorName(heldId));
@@ -233,6 +327,17 @@ export const mapCommands = [
                 )
               );
           }
+        // A mount carries its riders; one that teleports or is moved by force leaves them where they were, off it.
+        if (mode === "teleport" || mode === "forced")
+          for (const riderId of ridersOf(state, actorId)) {
+            const rider = state.actors.find((actor) => actor.id === riderId)!;
+            rider.effects = rider.effects.filter((effect) => !effect.tags.includes(RIDING_TAG));
+          }
+        else carryRiders(state, actorId, geometry);
+        if (riding && (mode === "teleport" || mode === "forced")) {
+          const rider = state.actors.find((actor) => actor.id === actorId)!;
+          rider.effects = rider.effects.filter((effect) => !effect.tags.includes(RIDING_TAG));
+        }
         // SRD Grappling: a grapple ends once the two are farther apart than its range.
         released = releaseGrapplesOutOfRange(
           state,
@@ -242,6 +347,7 @@ export const mapCommands = [
         );
       });
       if (duplicate) return;
+      if (landing.length > 0) kit.publishRolls(moved, commandId);
       kit.publishNarrations(released);
       if (movement?.publicText)
         kit.context.appendLog({ kind: "movement", text: movement.publicText, actorIds: [actorId] });
@@ -253,8 +359,9 @@ export const mapCommands = [
           gmOnly: kit.actorHidden(actorId)
         });
       if (movement?.gmText) kit.context.appendLog({ kind: "movement", text: movement.gmText, gmOnly: true });
-      // What the spell areas did to the mover follows the move itself.
+      // What the spell areas did to the mover follows the move itself, as does a jump's landing.
       kit.publishNarrations(zoneEvents);
+      kit.publishNarrations(landing);
       if (movementWarning)
         kit.context.appendLog({
           kind: "movement",
@@ -276,6 +383,124 @@ export const mapCommands = [
           text: `${prompt.name} may make an opportunity attack against ${moverName}.`,
           actorIds: [prompt.actorId],
           gmOnly: kit.actorHidden(prompt.actorId)
+        });
+    }
+  }),
+
+  defineCommand({
+    type: "token.set-altitude",
+    operationId: "setTokenAltitude",
+    description:
+      "Sets how high a creature is above the ground (GM-grade only), free of movement: standing or clinging on a surface such as a ledge, a balcony or a wall (`airborne` null), or in the air, flying (`fly`) or held up by a levitation (`levitate`). 0 puts it on the ground. Height counts in every distance between creatures, so reach, range and auras read it. A creature put in the air that can't stay there falls as the command commits.",
+    summary: "Set how high a creature is, on a surface or in the air (GM).",
+    schema: TokenSetAltitudeSchema,
+    malformed: "The height change is malformed.",
+    gmOnly: "Only the GM sets a creature's height. Fly, climb or jump to change your own.",
+    async run({ request, execute }, kit) {
+      const { actorId, altitudeFeet } = request;
+      const { duplicate } = await execute((state) => {
+        const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
+        if (!token?.position) throw new CommandRejectedError("Place that creature on the map first.");
+        setAltitude(state, actorId, altitudeFeet, request.airborne ?? undefined);
+      });
+      if (duplicate) return;
+      const name = kit.actorName(actorId);
+      kit.context.appendLog({
+        kind: "movement",
+        text: altitudeFeet > 0 ? `${name} is ${altitudeFeet} ft up.` : `${name} is on the ground.`,
+        actorIds: [actorId],
+        gmOnly: kit.actorHidden(actorId)
+      });
+    }
+  }),
+
+  defineCommand({
+    type: "actor.fall",
+    operationId: "fallActor",
+    description:
+      "Makes a creature fall (GM-grade only), SRD Falling: 1d6 Bludgeoning damage for every 10 feet, to a maximum of 20d6, rolled by the server, and the Prone condition unless it takes no damage. It falls from the height it is at unless `feet` says how far, and lands on the ground or at `landingAltitudeFeet`. With `intoWater` it may use its Reaction for a DC 15 Strength (Athletics) or Dexterity (Acrobatics) check, which the server rolls with the better of the two, a success halving the damage. In a fight, a creature that can answer the fall with its Reaction (Feather Fall within range and sight, the faller's own Slow Fall) gets a `falls` prompt, and the fall waits for the answers. A creature that can't stay in the air falls this way by itself after any command.",
+    summary: "Make a creature fall; the server rolls the damage once any reaction to it is answered (GM).",
+    schema: ActorFallSchema,
+    malformed: "The fall is malformed.",
+    gmOnly: "Only the GM makes a creature fall.",
+    async run({ request, execute }, kit) {
+      const { commandId, actorId } = request;
+      const distance = await kit.creatureDistance();
+      let events: EffectNarration[] = [];
+      const { state, duplicate } = await execute((draft) => {
+        const actor = draft.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+        const height = altitudeOf(draft.combat.tokens.find((token) => token.actorId === actorId));
+        const feet = request.feet ?? height - (request.landingAltitudeFeet ?? 0);
+        if (feet <= 0) throw new CommandRejectedError(`${actor.name} is on the ground. Say how far it falls.`);
+        events = startFall(
+          draft,
+          {
+            actorId,
+            feet,
+            ...(request.intoWater ? { intoWater: true } : {}),
+            ...(request.landingAltitudeFeet !== undefined ? { landingAltitudeFeet: request.landingAltitudeFeet } : {})
+          },
+          kit.fallDeps(draft, distance, commandId)
+        );
+      });
+      if (duplicate) return;
+      kit.publishRolls(state, commandId);
+      kit.publishNarrations(events);
+    }
+  }),
+
+  defineCommand({
+    type: "actor.mount",
+    operationId: "mountActor",
+    description:
+      "A creature climbs onto a mount (`mountId`) or gets off the one it rides (`mountId: null`), SRD 5.2.1 Mounted Combat: the mount must be within 5 feet and at least one size larger, and either costs half the rider's Speed on its turn in a fight. The rider shares the mount's space and height, the mount's moves carry it, and it moves only by its mount until it dismounts; a dismounted rider stands in the nearest unoccupied space. A mount that teleports or is moved by force leaves its rider behind, off it. A player may mount or dismount only their own character; the GM may `override` a movement rule.",
+    summary: "Mount a creature or dismount; the mount's moves carry its rider.",
+    schema: ActorMountSchema,
+    malformed: "The mount request is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const { actorId, mountId } = request;
+      if (request.override && !isGmGrade(principal))
+        throw new GameAccessDeniedError("Only the GM can override movement rules.");
+      const { mapAssetId, geometry } = await liveMap(kit, "Make a scene live before mounting a creature.");
+      const distance = await kit.creatureDistance();
+      let mountName: string | null = null;
+      let outcome: ReturnType<typeof mountOrDismount> = { warnings: [], overridden: null };
+      const { duplicate } = await execute((state) => {
+        requireSameMap(state.combat.mapAssetId, mapAssetId);
+        requireActorAccess(initiatorOf(principal), state, actorId, "move", "You may only move your claimed character.");
+        mountName = (mountId ? kit.actorName(mountId) : mountOf(state, actorId)?.name) ?? null;
+        outcome = mountOrDismount(
+          state,
+          {
+            riderId: actorId,
+            mountId,
+            override: isGmGrade(principal) ? (request.override ?? null) : null,
+            distanceFeet: (a, b) => distance(state, a, b),
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+            catalog: kit.equipmentCatalog(),
+            newId: kit.context.newId
+          },
+          geometry
+        );
+      });
+      if (duplicate) return;
+      const name = kit.actorName(actorId);
+      kit.context.appendLog({
+        kind: "movement",
+        text: mountId
+          ? `${name} mounts ${mountName ?? "a creature"}.`
+          : `${name} dismounts from ${mountName ?? "its mount"}.`,
+        actorIds: [actorId, ...(mountId ? [mountId] : [])],
+        gmOnly: kit.actorHidden(actorId) || (mountId !== null && kit.actorHidden(mountId))
+      });
+      for (const warning of outcome.warnings)
+        kit.context.appendLog({ kind: "movement", text: `Rules note: ${warning}`, actorIds: [actorId], gmOnly: true });
+      if (outcome.overridden)
+        kit.context.appendLog({
+          kind: "override",
+          text: `OVERRIDE (movement): ${name} mounted past a movement rule · ${outcome.overridden}`,
+          actorIds: [actorId]
         });
     }
   }),

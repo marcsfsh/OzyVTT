@@ -1496,15 +1496,16 @@ describe("Rogue: Cunning Strike forgoes Sneak Attack dice for an effect", () => 
     ).toThrowError(/Sneak Attack can't add Trip to this hit/);
   });
 
-  it("gives Withdraw's half Speed of movement on the Rogue's own turn", () => {
+  it("gives Withdraw's half Speed of movement on the Rogue's own turn, provoking no Opportunity Attacks", () => {
     const built = table(rogueInput(5));
     swing(built, "item-shortsword", [15, 2, 3, 4, 4], {
       rollMode: "advantage",
       hitOptions: [{ id: "sneak-attack", effects: ["withdraw"] }]
     });
     const speed = currentSpeedFeet(built.hero, deriveEquipment(built.hero, built.definition, built.catalog)) ?? 0;
-    expect(built.hero.effects.find((effect) => effect.tags.includes("half-speed-move"))).toMatchObject({
-      movementGrantFeet: Math.floor(speed / 10) * 5
+    expect(built.hero.effects.find((effect) => effect.grantedMove !== undefined)).toMatchObject({
+      name: "Sneak Attack: Withdraw",
+      grantedMove: { feet: Math.floor(speed / 10) * 5, provokes: false }
     });
   });
 

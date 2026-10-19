@@ -6,6 +6,11 @@ import type {
   RuleExceptions,
   RuleMode
 } from "@vtt/domain";
+import { dropStaleGrants } from "./granted-moves.js";
+import { proneInSharedSpace } from "./occupied-space.js";
+import { blinkAway } from "./off-plane.js";
+import { timeStopGoesOn } from "./time-stop.js";
+import { familyModeFor } from "./rules-families.js";
 import { abilityCheckClaims } from "./ability-checks.js";
 import { holdsFeature } from "./class-features.js";
 import { wardedConditions } from "./paladin-auras.js";
@@ -672,10 +677,18 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   while (steps < length && isDefeated(state, state.combat.initiative[(currentIndex + steps) % length].actorId))
     steps += 1;
   if (steps === length) steps = 1;
-  const wraps = currentIndex + steps >= length;
+  // Time Stop: the caster takes its turns in a row while no time passes for anyone else.
+  const stopped = timeStopGoesOn(state);
+  const wraps = !stopped && currentIndex + steps >= length;
   // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
   const ending: EffectNarration[] = [];
   const outgoingId = state.combat.turnActorId;
+  // "If you somehow end a turn in a space with another creature, you have the Prone condition" (SRD 5.2.1).
+  const calibration = deps?.geometry?.calibration;
+  if (outgoingId && calibration && deps && familyModeFor(state.combat, "movement") !== "freeform")
+    proneInSharedSpace(state, outgoingId, calibration, deps.resolveDefinition, ending);
+  // Blink: "Roll 1d6 at the end of each of your turns".
+  if (outgoingId && deps?.newId) blinkAway(state, outgoingId, deps.rollDie, deps.newId, ending);
   endOfTurn(
     state,
     outgoingId,
@@ -690,22 +703,27 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   events?.push(...ending);
   // A new round sorts the whole order again, which settles any mid-round score change.
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
-  const nextActorId = wraps
-    ? (order.find((entry) => !isDefeated(state, entry.actorId)) ?? order[0]).actorId
-    : order[currentIndex + steps].actorId;
+  const nextActorId = stopped
+    ? outgoingId!
+    : wraps
+      ? (order.find((entry) => !isDefeated(state, entry.actorId)) ?? order[0]).actorId
+      : order[currentIndex + steps].actorId;
   state.combat = {
     ...state.combat,
     initiative: order,
     round: wraps ? state.combat.round + 1 : state.combat.round,
     turnActorId: nextActorId,
-    // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD).
-    turn: { ...EMPTY_TURN },
+    // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD). The turn
+    // that just ended opens the window for legendary actions, until the incoming creature does something.
+    turn: { ...EMPTY_TURN, ...(outgoingId && !stopped ? { afterActorId: outgoingId } : {}) },
     // A marilith's Reactive: "The marilith can take one Reaction on every turn of combat."
     reactionsUsed: state.combat.reactionsUsed.filter(
       (actorId) => actorId !== nextActorId && !reactsEveryTurn(state, actorId, deps)
     ),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, nextActorId)
   };
+  // A move or teleport granted for the turn that ended lapses with it.
+  dropStaleGrants(state);
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
   events?.push(...expiry);
@@ -739,4 +757,5 @@ export function previousInitiativeTurn(state: GameState) {
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== previousActorId),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, previousActorId)
   };
+  dropStaleGrants(state);
 }

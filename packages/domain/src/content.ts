@@ -8,6 +8,7 @@ import {
   type DamageType
 } from "@vtt/schemas";
 import type { Wire } from "./wire.js";
+import type { CastShapingOffers } from "./results.js";
 
 /** An open identity slug; ids are never closed enums, so homebrew stays additive. */
 const slug = (max = 80) =>
@@ -925,6 +926,8 @@ export type ContentActionSummary = Readonly<{
   /** How many creatures one use heals when it can be more than one (Prayer of Healing's five). */ healTargets?: number;
   /** SRD Legendary Action cost against the creature's per-round pool (taken on other creatures' turns). */ legendaryCost?: number;
   /** "Can't take this action again until the start of its next turn." */ legendaryOncePerRound?: true;
+  /** Its own move comes before the rest of it ("moves up to half its Speed, and it makes one Rend attack"), so it can
+   *  be taken move first: `action.resolve`'s `moveFirst`. */ moveFirst?: true;
   /** Taken as one attack of the Attack action (an Unarmed Strike, a Breath Weapon), so it spends one the action has left. */ replacesAttack?: true;
   /** Added to a hit and never taken alone (Sneak Attack, a smite): chosen on an attack's result. */ ridesAHit?: true;
   /** Darts the action makes, each assigned to a target (Magic Missile); see `ActorAction.darts`. */ darts?: number;
@@ -944,6 +947,7 @@ export type ContentActionSummary = Readonly<{
   }>;
   /** The spell list this cast belongs to, by its action id; it is shown under that list. */ castFrom?: string;
   /** The spell it casts. */ spellId?: string;
+  /** The ways its caster may shape the cast (Metamagic, Sculpt Spells), from the server's availability read. */ shaping?: CastShapingOffers;
 }>;
 export type ContentActionsResult = {
   ok: boolean;

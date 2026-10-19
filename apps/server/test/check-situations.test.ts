@@ -118,12 +118,12 @@ describe("a situation the roller names", () => {
       history({ subject: { ability: "str" }, situations: [LEVERAGE] }),
       depsFor([3, 17])
     );
-    expect(forced.outcome.rollMode.mode).toBe("advantage");
+    expect(forced.outcome.rollMode?.mode).toBe("advantage");
     expect(forced.outcome.natural).toBe(17);
     expect(state.heldRolls.at(-1)?.check?.situations).toEqual([LEVERAGE]);
     // The GM rerolls the check: the leverage still counts.
     const again = rerollAbilityCheck(state, { role: "gm" }, { commandId: COMMAND, actorId: SAGE }, depsFor([2, 15]));
-    expect(again.outcome.rollMode.mode).toBe("advantage");
+    expect(again.outcome.rollMode?.mode).toBe("advantage");
     // A Dexterity check is not the Strength check the Crowbar helps.
     const dexterity = rollAbilityCheck(
       state,

@@ -1853,6 +1853,13 @@
     "perSlot": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Banished",
+    "tags": [
+     "off-plane"
+    ],
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -3099,7 +3106,22 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Blink",
+    "tags": [
+     "blink"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -7418,7 +7440,12 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "teleport": {
+    "feet": 500,
+    "unseen": true,
+    "failDamage": "4d6"
+   }
   },
   "classes": [
    "bard",
@@ -7796,6 +7823,17 @@
     "count": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Dissonant Whispers",
+    "tags": [
+     "flees-with-reaction"
+    ],
+    "duration": {
+     "type": "rounds",
+     "rounds": 1
+    },
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -9582,7 +9620,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Etherealness",
+    "tags": [
+     "off-plane"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -10203,7 +10255,27 @@
    "targets": {
     "count": 5
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Feather Fall",
+    "tags": [
+     "feather-fall"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   },
+   "reaction": {
+    "trigger": "falls",
+    "response": "cast-on-faller",
+    "rangeFeet": 60
+   }
   },
   "classes": [
    "bard",
@@ -10669,10 +10741,6 @@
        "type": "fire"
       }
      ]
-    },
-    "light": {
-     "brightFeet": 10,
-     "dimFeet": 10
     },
     "options": [
      {
@@ -15828,6 +15896,13 @@
     "count": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Imprisoned",
+    "tags": [
+     "off-plane"
+    ],
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -16492,7 +16567,29 @@
     "count": 1,
     "perSlot": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "movement",
+      "rule": "leap",
+      "feet": 30,
+      "costFeet": 10
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Jump",
+    "tags": [
+     "jump"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "druid",
@@ -16773,6 +16870,13 @@
     "count": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Levitate",
+    "tags": [
+     "levitating"
+    ],
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -18356,7 +18460,8 @@
     "concentration": false,
     "name": "Maze",
     "tags": [
-     "maze"
+     "maze",
+     "off-plane"
     ],
     "target": "target",
     "duration": {
@@ -19046,7 +19151,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "teleport": {
+    "feet": 30
+   }
   },
   "classes": [
    "sorcerer",

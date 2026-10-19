@@ -766,6 +766,7 @@ export function rollAttack(ctx: ResolveContext): void {
         ? { automatic: "succeed" as const }
         : {}),
     mode: ctx.rollMode?.mode ?? mode,
+    ...(action.spellId !== undefined ? { spellAttack: true } : {}),
     purpose: "attack",
     label: `${action.name} attack roll`,
     visibility: ctx.rollBase.visibility

@@ -3,6 +3,7 @@ import {
   footprintCenter,
   footprintOrigin,
   footprintStepBlocked,
+  footprintStepPassage,
   movementPath,
   pointInRects,
   segmentsMeet,
@@ -254,6 +255,32 @@ describe("walls in the way of a move", () => {
     expect(footprintStepBlocked({ column: 0, row: 0 }, { column: 1, row: 1 }, 1, corner)).toBe(true);
     // The orthogonal step from (0,0) to (1,0) crosses nothing.
     expect(footprintStepBlocked({ column: 0, row: 0 }, { column: 1, row: 0 }, 1, corner)).toBe(false);
+  });
+
+  it("lets a Large creature squeeze through a 5-foot door at the cost of Difficult Terrain", () => {
+    // A wall along x = 2 with a one-cell door between rows 0 and 1.
+    const walls = [
+      { a: { column: 2, row: -10 }, b: { column: 2, row: 0 } },
+      { a: { column: 2, row: 1 }, b: { column: 2, row: 10 } }
+    ];
+    const door = wallCrossing(walls);
+    const passage = (from: { column: number; row: number }, to: { column: number; row: number }) =>
+      footprintStepPassage(from, to, 2, door, walls);
+    expect(passage({ column: 0, row: 0 }, { column: 1, row: 0 })).toBe("squeeze");
+    // A Medium creature walks through the same door.
+    expect(footprintStepPassage({ column: 1, row: 0 }, { column: 2, row: 0 }, 1, door, walls)).toBe("open");
+    const path = movementPath({
+      from: { column: -2, row: 0 },
+      to: { column: 3, row: 0 },
+      sizeCells: 2,
+      isDifficult: open,
+      isStepOpen: (from, to) => passage(from, to) !== "blocked",
+      isStepSqueezed: (from, to) => passage(from, to) === "squeeze"
+    });
+    expect(path?.blocked).toBeUndefined();
+    expect(path?.difficultSteps).toBeGreaterThan(0);
+    // A wall running clean across the footprint is no opening.
+    expect(footprintStepPassage({ column: 0, row: 0 }, { column: 1, row: 0 }, 2, crosses, [wall])).toBe("blocked");
   });
 
   it("keeps a Large creature from straddling a wall", () => {

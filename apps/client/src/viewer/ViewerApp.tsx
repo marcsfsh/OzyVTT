@@ -5,7 +5,7 @@ import { ApiError, apiRequest } from "../lib/api";
 import { probeImageDimensions } from "../scene/mapImage";
 import { FogOverlay, type VisionMask } from "../scene/FogOverlay";
 import { TerrainOverlay } from "../scene/TerrainOverlay";
-import { bandFraction, TokenGlyph, TokenHealthAura, TokenStatusBadges } from "../scene/tokenGlyph";
+import { bandFraction, TokenAltitudeBadge, TokenGlyph, TokenHealthAura, TokenStatusBadges } from "../scene/tokenGlyph";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
 import { InitiativeRow } from "../encounter/InitiativeList";
@@ -60,6 +60,7 @@ export type Presentation = Readonly<{
       conditionIds?: readonly string[];
       healthDisplay?: Readonly<{ style: "bar" | "ring" | "aura" }>;
       tokenAssetId?: string;
+      altitudeFeet?: number;
     }>[];
     annotations?: readonly ViewerAnnotation[];
     fog?: Readonly<{
@@ -395,6 +396,10 @@ export function MapStage({
                   ? { style: token.healthDisplay.style, fraction: bandFraction(token.health ?? "healthy") }
                   : undefined
               }
+            />
+            <TokenAltitudeBadge
+              sizePx={token.sizePx}
+              {...(token.altitudeFeet ? { altitudeFeet: token.altitudeFeet } : {})}
             />
           </g>
         ))}

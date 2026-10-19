@@ -2372,7 +2372,18 @@
     "id": "second-story-work",
     "name": "Second-Story Work",
     "level": 3,
-    "description": "You've trained to get into especially hard-to-reach places, granting you these benefits. Climber. You gain a Climb Speed equal to your Speed. Jumper. You can determine your jump distance using your Dexterity rather than your Strength."
+    "description": "You've trained to get into especially hard-to-reach places, granting you these benefits. Climber. You gain a Climb Speed equal to your Speed. Jumper. You can determine your jump distance using your Dexterity rather than your Strength.",
+    "modifiers": [
+     {
+      "type": "special-speed",
+      "movement": "climb",
+      "equalToSpeed": true
+     },
+     {
+      "type": "movement",
+      "rule": "jump-by-dexterity"
+     }
+    ]
    },
    {
     "id": "supreme-sneak",

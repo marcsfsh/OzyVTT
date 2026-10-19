@@ -519,7 +519,8 @@ describe("generated OpenAPI components", () => {
       "advantage-denied": { roll: "incoming-attack" },
       "healing-received-maximized": {},
       "healing-dice-maximized": {},
-      "healing-bonus": { amount: 2, perSlotLevel: true }
+      "healing-bonus": { amount: 2, perSlotLevel: true },
+      movement: { rule: "leap", feet: 30, costFeet: 10 }
     };
 
     it("validates every trigger against the branch its discriminator routes it to", () => {

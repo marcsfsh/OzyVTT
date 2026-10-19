@@ -227,6 +227,7 @@ const PENDING_SAVE_FIELDS = {
   failurePush: "never",
   // The save's own roll mode is read when it is answered.
   advantageAtSize: "never",
+  disadvantageFrom: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
   gmApplies: "player",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
@@ -243,7 +244,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   escapeDc: "player",
   modifiers: "player",
   duration: "player",
-  repeatSave: "player",
+  // Its ability and DC; what gives the repeats Disadvantage (Heightened Spell) is read when each is answered.
+  repeatSave: "derived",
   endsOnDamage: "player",
   endsOnSourceSideDamage: "player",
   speedZero: "player",
@@ -286,6 +288,8 @@ const PENDING_REACTION_FIELDS = {
   weighed: "player",
   acBonus: "player",
   rollsAttack: "player",
+  // How far the falling creature falls: its height, which is as public as the token it answers for.
+  fallFeet: "player",
   // The reactor's own slots, which its owner already reads on the sheet; only the reactor's owner gets the prompt.
   slotLevels: "player",
   createdAt: "player",
@@ -451,6 +455,9 @@ export function projectPlayerCombat(
             ? {
                 onFailEffect: {
                   ...copyPlayerFields(onFail, ON_FAIL_EFFECT_FIELDS),
+                  ...(onFail.repeatSave
+                    ? { repeatSave: { ability: onFail.repeatSave.ability, dc: onFail.repeatSave.dc } }
+                    : {}),
                   name: onFailHidden ? withoutSourceName(onFail.name, onFail.sourceName) : onFail.name,
                   sourceName: onFailHidden ? HIDDEN_SOURCE : onFail.sourceName,
                   sourceActorId: null
@@ -503,6 +510,10 @@ function playerEffect(
     hitPointMaximumGain: _hitPointMaximumGain,
     temporaryHitPointsEachTurn: _temporaryHitPointsEachTurn,
     conditionImmunities: _conditionImmunities,
+    // A granted move names the turn it belongs to and the creature it must flee, which can be hidden; its own
+    // character's grant reaches a player through `actor:movement`.
+    grantedMove: _grantedMove,
+    grantedTeleport: _grantedTeleport,
     // Whether a Concentration spell ends once no creature keeps it is the engine's bookkeeping.
     endsWhenUnaffected: _endsWhenUnaffected,
     // A long casting's targets and slot are the caster's plan; its name says what is being cast.
@@ -530,10 +541,15 @@ function playerEffect(
     light: _light,
     findDc: _findDc,
     detects: _detects,
-    ...visible
+    // Its ability and DC; what gives the repeats Disadvantage (Heightened Spell) is read when each is answered.
+    repeatSave,
+    ...rest
   } = effect;
+  const visible = repeatSave ? { ...rest, repeatSave: { ability: repeatSave.ability, dc: repeatSave.dc } } : rest;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
-  const yours = mine ? { yours: true as const, ...(readiedSpell ? { readiedSpell: { ...readiedSpell } } : {}) } : {};
+  // A readied spell's Metamagic picks are the engine's to apply at its release.
+  const held = readiedSpell ? (({ shaping: _shaping, ...kept }) => kept)(readiedSpell) : undefined;
+  const yours = mine ? { yours: true as const, ...(held ? { readiedSpell: held } : {}) } : {};
   if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...yours };
   return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
 }

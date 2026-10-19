@@ -1301,6 +1301,13 @@ button.cs-lastroll-open {
 .cs-cast-option .cs-cast-reason {
   color: var(--caution-hi);
 }
+/* Transmuted Spell's new damage type, picked under its option. */
+.cs-cast-type {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+}
 
 /* ---- The level box ---- */
 .cs-level-wrap {

@@ -14,6 +14,7 @@ import {
   AmmunitionKindSchema,
   BurstSchema,
   ActionReactionSchema,
+  ActionTeleportSchema,
   ActionSchema,
   ActionTargetsSchema,
   ActorDefinitionSchema,
@@ -202,6 +203,8 @@ export const SpellEffectSchema = z
     successEffect: SaveFailureEffectSchema.optional(),
     /** A reaction spell's trigger and response (Shield, Hellish Rebuke), so the table offers it as a prompt. */
     reaction: ActionReactionSchema.optional(),
+    /** The teleport the cast gives its caster (Misty Step's 30 feet), taken on the map at once with no GM ask. */
+    teleport: ActionTeleportSchema.optional(),
     /** The caster makes the spell's save itself, at this DC whatever its own (Contact Other Plane's DC 15). */
     selfSave: z
       .object({ dc: z.number().int().min(1).max(40) })

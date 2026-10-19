@@ -1,7 +1,7 @@
 import type { GameState } from "@vtt/domain";
 import type { CheckSight } from "../ability-checks.js";
 import { crossesSpace, mapCover } from "../cover.js";
-import { distance, type Point } from "./geometry.js";
+import { distance } from "./geometry.js";
 import { definitionOf, sensesOf, type Senses, type SightContent } from "./senses.js";
 import { sceneSight, type LightAt, type Obscurement } from "./sight.js";
 
@@ -144,22 +144,6 @@ export function frightenedApplies(actor: Actor, rules: SightRules): boolean {
   const sources = fearSources(actor);
   if (sources.length === 0 || !rules.visionOn) return true;
   return sources.some((sourceId) => rules.lineOfSight(actor.id, sourceId) !== false);
-}
-
-/**
- * SRD Frightened, Can't Approach: "You can't willingly move closer to the source of fear." The source a willing move
- * from `from` to `to` brings the creature closer to, by name, or null. Read for the movement rules.
- */
-export function frightenedApproach(state: GameState, actorId: string, from: Point, to: Point): string | null {
-  const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor || !has(actor, "frightened")) return null;
-  for (const sourceId of fearSources(actor)) {
-    const at = state.combat.tokens.find((token) => token.actorId === sourceId)?.position;
-    if (!at) continue;
-    if (distance(to, at) < distance(from, at) - 1e-6)
-      return state.actors.find((candidate) => candidate.id === sourceId)?.name ?? "the source of its fear";
-  }
-  return null;
 }
 
 /** The light-sensitivity traits that bear on one kind of roll where the creature stands (Sunlight Sensitivity, Light

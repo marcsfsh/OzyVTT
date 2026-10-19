@@ -22,6 +22,8 @@ export type BlockedMove = Readonly<{
   actorId: string;
   position: EncounterTokenPosition;
   mode: MoveMode | undefined;
+  /** The height the move asked for; absent keeps the token's own. */
+  altitudeFeet?: number;
   blocked: RulesBlocked;
 }>;
 
@@ -69,7 +71,8 @@ export function useMapCommands({
     actorId: string,
     position: EncounterTokenPosition | null,
     mode: MoveMode | undefined,
-    override?: Readonly<{ reason: string }>
+    override?: Readonly<{ reason: string }>,
+    altitudeFeet?: number
   ) => {
     setBusyActorId(actorId);
     setMessage("");
@@ -78,6 +81,7 @@ export function useMapCommands({
       actorId,
       position,
       ...(mode && mode !== "walk" && position ? { mode } : {}),
+      ...(altitudeFeet !== undefined && position ? { altitudeFeet } : {}),
       ...(override ? { override } : {}),
       ...scene,
       expectedRevision: revision
@@ -90,29 +94,76 @@ export function useMapCommands({
         : (result.message ?? "The token move was rejected.")
     );
     if (!result.ok && result.blocked?.overridable && position)
-      setBlockedMove({ actorId, position, mode, blocked: result.blocked });
+      setBlockedMove({
+        actorId,
+        position,
+        mode,
+        ...(altitudeFeet !== undefined ? { altitudeFeet } : {}),
+        blocked: result.blocked
+      });
     setBusyActorId(null);
   };
-  const submitMove = async (actorId: string, position: EncounterTokenPosition | null) => {
+  /** Moves a token; `altitudeFeet` is the height the move ends at, the token's own when absent. */
+  const submitMove = async (actorId: string, position: EncounterTokenPosition | null, altitudeFeet?: number) => {
     if (busyActorId || !canMove(actorId)) return;
-    await sendMove(actorId, position, moveModeFor(actorId));
+    await sendMove(actorId, position, moveModeFor(actorId), undefined, altitudeFeet);
+  };
+  /** The GM puts a creature at a height, free of movement: on a surface, or in the air. */
+  const setAltitude = async (actorId: string, altitudeFeet: number, airborne: "fly" | "levitate" | null) => {
+    if (busyActorId) return;
+    setBusyActorId(actorId);
+    setMessage("");
+    const result = await command("token:set-altitude", { actorId, altitudeFeet, airborne, expectedRevision: revision });
+    setMessage(result.ok ? "Height set." : (result.message ?? "The height could not be set."));
+    setBusyActorId(null);
+  };
+  /** A creature climbs onto a mount, or off the one it rides with null. */
+  const mount = async (actorId: string, mountId: string | null) => {
+    if (busyActorId) return;
+    setBusyActorId(actorId);
+    setMessage("");
+    const result = await command("actor:mount", { actorId, mountId, expectedRevision: revision });
+    setMessage(
+      result.ok
+        ? mountId
+          ? "Mounted."
+          : "Dismounted."
+        : (result.message ?? (mountId ? "That creature can't be mounted now." : "It can't dismount now."))
+    );
+    setBusyActorId(null);
+  };
+  /** The GM drops a creature from the height it is at; the server rolls the damage. */
+  const fall = async (actorId: string, intoWater: boolean) => {
+    if (busyActorId) return;
+    setBusyActorId(actorId);
+    setMessage("");
+    const result = await command("actor:fall", { actorId, ...(intoWater ? { intoWater } : {}) });
+    setMessage(result.ok ? "The fall is rolled." : (result.message ?? "The fall could not be rolled."));
+    setBusyActorId(null);
   };
   /** The GM's ruling on a refused move: the same move again, with an audited override. */
   const moveAnyway = async () => {
     if (!blockedMove || busyActorId) return;
-    await sendMove(blockedMove.actorId, blockedMove.position, blockedMove.mode, { reason: "GM ruling on the map" });
+    await sendMove(
+      blockedMove.actorId,
+      blockedMove.position,
+      blockedMove.mode,
+      { reason: "GM ruling on the map" },
+      blockedMove.altitudeFeet
+    );
   };
   /** A player's question about a refused move, parked for the GM to allow or deny. */
   const askAboutMove = async () => {
     if (!blockedMove) return;
-    const { actorId, position, mode } = blockedMove;
+    const { actorId, position, mode, altitudeFeet } = blockedMove;
     const result = await command("rules:ask", {
       type: "token.move",
       payload: {
         commandId: newId(),
         actorId,
         position,
-        ...(mode && mode !== "walk" ? { mode } : {})
+        ...(mode && mode !== "walk" ? { mode } : {}),
+        ...(altitudeFeet !== undefined ? { altitudeFeet } : {})
       }
     });
     setBlockedMove(null);
@@ -372,6 +423,9 @@ export function useMapCommands({
     setMessage,
     busyActorId,
     submitMove,
+    setAltitude,
+    mount,
+    fall,
     placeAtCenter,
     blockedMove,
     moveAnyway,

@@ -4,6 +4,7 @@ import { io as connect, type Socket } from "socket.io-client";
 import { CODEX_PATHS, GAME_PATHS } from "@vtt/api-contract";
 import { GameStateSchema, type CodexInWorldDate, type GameState, type GmCodexCalendar } from "@vtt/domain";
 import { bootServer } from "./boot-server.js";
+import { travelLine } from "../src/commands/resting.js";
 
 // One game clock: the game keeps the hour (`rest.clockHours`, the 16-hour rule's clock) and the Codex calendar keeps
 // the day, so a rest or Pass time that crosses midnight moves the Codex date. And the notices a first evening needs:
@@ -131,6 +132,27 @@ function notices(socket: Socket): string[] {
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 150));
+
+describe("travel", () => {
+  it("goes 4, 3 or 2 miles an hour by pace, and says what the pace does to the party's checks", async () => {
+    expect(travelLine(8, "normal")).toBe(
+      "The party travels 24 miles at a Normal pace, with Disadvantage on Dexterity (Stealth) checks on the way."
+    );
+    expect(travelLine(1, "fast")).toContain("4 miles at a Fast pace");
+    expect(travelLine(3, "slow")).toContain(
+      "6 miles at a Slow pace, with Advantage on Wisdom (Perception or Survival)"
+    );
+    expect(travelLine(1.5, "normal")).toContain("4.5 miles at a Normal pace");
+    const booted = await boot();
+    const travelled = await booted.post(GAME_PATHS.timePass, booted.gmToken, {
+      commandId: randomUUID(),
+      hours: 8,
+      pace: "fast"
+    });
+    expect(travelled.status).toBe(200);
+    expect(booted.server.store.snapshot.rest.clockHours).toBe(8);
+  });
+});
 
 describe("notices on the GM's devices", () => {
   it("a player's Long Rest ask reaches the GM as a notice, and no other player hears it", async () => {
