@@ -411,6 +411,21 @@ export function CharacterSheet({
       pools={pools}
       serverActions={serverActions}
       onUse={(actionId) => controller.sendThroughServer(actionId)}
+      {...(controller.inFight
+        ? {}
+        : {
+            rest: {
+              rechoices,
+              afterLongRest: role === "gm" || Boolean(actor.preparation),
+              busy,
+              onRechoose: (choice, option) =>
+                void edit("actor:rechoose", { actorId: actor.id, offer: choice.offer, id: option.id }).then(
+                  (result) => {
+                    if (result.ok) say(`${choice.label}: ${option.name}.`);
+                  }
+                )
+            }
+          })}
       next={
         canLevel && levelUpTo !== null ? (
           <NextLevel level={levelUpTo} lines={next?.lines ?? []} onLevelUp={onLevel!} />

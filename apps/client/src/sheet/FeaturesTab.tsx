@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
-import type { ActorDefinition, ActorDerivedSheet, ContentActionSummary } from "@vtt/domain";
-import { Button, IconLevelUp } from "@vtt/ui";
+import type { ActorDefinition, ActorDerivedSheet, ContentActionSummary, Rechoice } from "@vtt/domain";
+import { Button, IconLevelUp, Select } from "@vtt/ui";
 import { RichText } from "../encounter/RichText";
 import type { SrdExtension } from "../encounter/sheet-extension";
 import type { SheetActor } from "./sheet-model";
@@ -82,6 +82,60 @@ function ClassColumns({ columns }: Readonly<{ columns: ActorDerivedSheet["classC
   );
 }
 
+/** When a rest re-choice comes back, as the sheet says it. */
+const REST_WORDS: Readonly<Record<Rechoice["per"], string>> = {
+  "short-rest": "Chosen again after a Short or Long Rest",
+  "long-rest": "Chosen again after a Long Rest"
+};
+
+/**
+ * The picks a feature lets the character make again after a rest (Fiendish Resilience's damage type, a Circle of the
+ * Land's land), each with its answer in force. A Long Rest pick waits for the step that rest opens; the GM can make it
+ * any time. The server checks each one.
+ */
+function RestChoices({
+  rechoices,
+  afterLongRest,
+  busy,
+  onRechoose
+}: Readonly<{
+  rechoices: readonly Rechoice[];
+  afterLongRest: boolean;
+  busy: boolean;
+  onRechoose: (choice: Rechoice, option: Rechoice["options"][number]) => void;
+}>) {
+  return (
+    <section className="cs-group" aria-label="Rests">
+      <span className="cs-eyebrow">Rests</span>
+      {rechoices.map((choice) => {
+        const open = choice.per === "short-rest" || afterLongRest;
+        return (
+          <label key={choice.offer} className="cs-field">
+            <span className="cs-use-name">{choice.label}</span>
+            <span className="cs-sub">{REST_WORDS[choice.per]}</span>
+            <Select
+              aria-label={choice.label}
+              value={choice.chosen ?? ""}
+              disabled={busy || !open}
+              onChange={(event) => {
+                const picked = choice.options.find((option) => option.id === event.target.value);
+                if (picked) onRechoose(choice, picked);
+              }}
+            >
+              {choice.chosen === null && <option value="">None</option>}
+              {choice.options.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </Select>
+          </label>
+        );
+      })}
+    </section>
+  );
+}
+
 /** The Weapon Mastery picks as tiles, each weapon kind with its property; a tap shows what the property does. */
 function MasteryBlock({ masteries }: Readonly<{ masteries: NonNullable<ActorDerivedSheet["weaponMasteries"]> }>) {
   const [open, setOpen] = useState<string | null>(null);
@@ -150,6 +204,7 @@ export function FeaturesTab({
   pools,
   serverActions,
   onUse,
+  rest,
   next
 }: Readonly<{
   actor: SheetActor;
@@ -161,6 +216,13 @@ export function FeaturesTab({
   serverActions: readonly ContentActionSummary[];
   /** Uses a pool's own action through the server, which applies what it does (Second Wind's healing). */
   onUse: (actionId: string) => void;
+  /** The picks a rest lets the character make again, out of a fight; absent or empty leaves the area out. */
+  rest?: Readonly<{
+    rechoices: readonly Rechoice[];
+    afterLongRest: boolean;
+    busy: boolean;
+    onRechoose: (choice: Rechoice, option: Rechoice["options"][number]) => void;
+  }>;
   /** What the next level brings and the way to it, when the caller may level the character. */
   next?: ReactNode;
 }>) {
@@ -219,6 +281,7 @@ export function FeaturesTab({
           />
         </section>
       )}
+      {rest && rest.rechoices.length > 0 && <RestChoices {...rest} />}
       {masteries.length > 0 && <MasteryBlock masteries={masteries} />}
       {groups.map((group) => (
         <section key={group.key} className="cs-group" aria-label={group.title}>
