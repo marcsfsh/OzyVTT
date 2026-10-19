@@ -127,6 +127,26 @@ describe("malnutrition", () => {
     expect(exhaustion(hero)).toBe(1);
   });
 
+  it("eats a Bead of Nourishment as a day of Rations once the Rations run out", () => {
+    // SRD Bead of Nourishment: it "provides as much nourishment as 1 day of Rations".
+    const { state, hero } = party([
+      { id: "rations", name: "Rations (1 day)", quantity: 1 },
+      { id: "bead-of-nourishment", name: "Bead of Nourishment", quantity: 2 }
+    ]);
+    nourish(state, IDS.hero, { water: "fill" }, GM);
+    days(state, 1);
+    expect(hero.inventory.map((row) => [row.id, row.quantity])).toEqual([["bead-of-nourishment", 2]]);
+    nourish(state, IDS.hero, { water: "fill" }, GM);
+    const events = days(state, 1);
+    expect(events.map((event) => event.text)).toContain("Hero eats a Bead of Nourishment.");
+    expect(hero.nourishment).toMatchObject({ daysUnfed: 0, hungerLevels: 0 });
+    // Eaten by hand, a bead meets the day's food too.
+    nourish(state, IDS.hero, { food: "bead" }, { role: "player", sessionId: IDS.session });
+    expect(hero.inventory).toEqual([]);
+    expect(hero.nourishment).toMatchObject({ foodPounds: 1 });
+    expect(() => nourish(state, IDS.hero, { food: "bead" }, GM)).toThrow("Hero carries no Bead of Nourishment.");
+  });
+
   it("leaves a creature that isn't tracked alone", () => {
     const { state, hero } = party();
     setSurvivalTracking(state, false, GM);

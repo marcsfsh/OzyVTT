@@ -2101,6 +2101,16 @@ export const InventoryItemSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(80)
       .optional(),
+    /** A Spell Scroll a character scribed (SRD Scribing Spell Scrolls): its spell uses the scribe's spell save DC and
+     *  attack bonus, and a cantrip on it works as if cast at the scribe's level. The server keeps it. */
+    scribed: z
+      .object({
+        saveDc: z.number().int().min(1).max(40),
+        attackBonus: z.number().int().min(-5).max(30),
+        casterLevel: z.number().int().min(1).max(20)
+      })
+      .strict()
+      .optional(),
     /** Ammunition pieces left in a row sold in bundles ("Arrows (20)"), when some are spent; absent = every bundle
      *  full. The server keeps it: shots spend it and a quantity change moves it by whole bundles. */
     ammunitionLeft: z.number().int().min(0).max(1_000_000).optional(),

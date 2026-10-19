@@ -105,6 +105,8 @@ import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-
 import { layOutProvisions } from "./resolution/provisions.js";
 import { turnedAwayByWard } from "./resolution/ward.js";
 import { orbLeap } from "./resolution/orb-leap.js";
+import { fastHandsAllows } from "./fast-hands.js";
+import { holdsFastHands } from "./utilize.js";
 import {
   shapedAction,
   shapedOutcome,
@@ -559,6 +561,30 @@ export function actionAvailability(
         componentsRemaining = instance.components["attack"];
     }
     const reason = unavailableReason(evaluation.violations, { state, attacker, action, siblings, spell });
+    // Fast Hands' Bonus Action form of an item's Utilize or Magic action, checked as that form would be.
+    const fastForm =
+      !builtin && fastHandsAllows(action) && holdsFastHands(definition)
+        ? { ...action, activation: "bonus-action" as const }
+        : null;
+    const fastEvaluation = fastForm
+      ? evaluateActionEconomy(
+          state,
+          attacker,
+          fastForm,
+          [],
+          definition,
+          undefined,
+          siblings,
+          undefined,
+          false,
+          catalog,
+          spell
+        )
+      : null;
+    const fastReason =
+      fastForm && fastEvaluation
+        ? unavailableReason(fastEvaluation.violations, { state, attacker, action: fastForm, siblings, spell })
+        : undefined;
     const passive = passiveOf(action, builtin);
     const shaping = builtin ? undefined : shapingOffers(state, attacker, action, spell, definition, siblings);
     const damageLook = !builtin && damageLookOffered(state, attacker, action, definition, siblings);
@@ -571,6 +597,14 @@ export function actionAvailability(
       violations: evaluation.violations,
       // The sheet's one sentence for why not; the violations keep the full account.
       ...(reason !== undefined ? { reason } : {}),
+      ...(fastEvaluation
+        ? {
+            fastHands: {
+              available: fastEvaluation.violations.length === 0,
+              ...(fastReason !== undefined ? { reason: fastReason } : {})
+            }
+          }
+        : {}),
       ...(passive !== undefined ? { passive } : {}),
       ...(shaping !== undefined ? { shaping } : {}),
       ...(damageLook ? { damageLook: true as const } : {}),

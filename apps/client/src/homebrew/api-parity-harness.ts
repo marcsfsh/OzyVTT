@@ -1250,6 +1250,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "^utilize[].**",
+    types: ["equipment"],
+    reason:
+      "a gear item's Utilize checks at their printed DCs (a Grappling Hook's DC 13 Acrobatics) - authored in the equipment source; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "charges.lastChargeTwenty",
     types: ["equipment"],
     reason:

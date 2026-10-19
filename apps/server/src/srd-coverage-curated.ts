@@ -307,7 +307,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "jumping.ts lets a jump cover up to the Strength score with 10 feet moved this turn before it, half from a standing start, a foot of movement for each foot, and rolls the DC 10 Dexterity (Acrobatics) check on a landing in Difficult Terrain. Clearing a low obstacle is the GM's."
   ),
   "long-rest": enforced(
-    "rests.ts needs 1 Hit Point and 16 hours since the last one. It restores Hit Points, Hit Point Dice, spell slots and uses, removes a level of Exhaustion and ends what lasts until a Long Rest. The party's Long Rest moves the game clock 8 hours, which counts down every effect (game-time.ts)."
+    "rests.ts needs 1 Hit Point and 16 hours since the last one. It restores Hit Points, Hit Point Dice, spell slots and uses, removes a level of Exhaustion and ends what lasts until a Long Rest. The party's Long Rest stays open from the game clock's time until the GM finishes it, which moves the clock 8 hours and counts down every effect (long-rest.ts, game-time.ts). Rolling Initiative, taking damage or casting a spell above a cantrip interrupts a member's rest, and the GM interrupts one for an hour of walking or exertion (rest-interruptions.ts): after an hour of rest it gets a Short Rest's benefits and may spend Hit Point Dice, and resuming adds an hour per interruption. A Long Rest the GM grants one character at once has no span to interrupt."
   ),
   magic: enforced(
     "resolution/economy.ts spends the action when a spell or an item's action is used. A creature's own spell of a minute or more takes the action on each of its turns in a fight and resolves on the last (resolution/long-casting.ts); outside a fight it completes at once and moves the game clock by its whole hours. An item's long cast in a fight is a reminder to the GM (resolution/validate.ts)."
@@ -368,7 +368,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "transform/assume.ts takes a form as an effect on the creature: a stat block's statistics replace its own, with what the effect says it keeps (transform/compose.ts), or one of its printed forms changes its size and speeds. Its Hit Points stay its own, conditions and effects carry over, and the token takes the form's size (transform/forms.ts). It reverts when the effect ends or it dies (transform/rules.ts)."
   ),
   "short-rest": enforced(
-    "rests.ts needs 1 Hit Point, lets Hit Point Dice be spent, gives back what a Short Rest restores and ends what lasts until one. The party's Short Rest moves the game clock an hour when the GM finishes it. short-rest-interruptions.ts ends it for anyone who rolls Initiative, takes damage or casts a spell above a cantrip."
+    "rests.ts needs 1 Hit Point, lets Hit Point Dice be spent, gives back what a Short Rest restores and ends what lasts until one. The party's Short Rest moves the game clock an hour when the GM finishes it. rest-interruptions.ts ends it for anyone who rolls Initiative, takes damage or casts a spell above a cantrip."
   ),
   "simultaneous-effects": guided(
     "simultaneous-effects.ts: two or more things that change Hit Points as a turn starts or ends (ongoing damage, Hit Points or Temporary Hit Points regained, a trait that burns or regenerates) wait for the creature's controller, its player or the GM, to put them in order, and turn-boundaries.ts plays them out that way. The saves a turn opens are prompts answered in any order. Other things that happen at once (effects set off by the same hit) run in the server's order, which the GM may correct."
@@ -430,7 +430,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   unconscious: condition("unconscious"),
   "unoccupied-space": enforced("movement-rules.ts ends a move only in a space no other creature fills."),
   utilize: guided(
-    "resolution/economy.ts spends the action, and a Shield donned or doffed in a fight takes it (held-items.ts). The sheet offers each tool's Utilize uses as checks at their printed DCs. What the object does is the GM's."
+    "In a fight the Utilize action takes the user's action on its own turn, and outside one it takes nothing. A Shield donned or doffed (held-items.ts), a door worked on (doors.ts) and a tool's or gear's Utilize use from the sheet (tool-uses.ts) take it, and a use needs the item in the pack. What the object does is the GM's."
   ),
   vulnerability: enforced("hit-points.ts doubles damage of a type the creature is vulnerable to, once per instance."),
   weapon: reference("A definition. Each weapon's own row under Weapons says what the app does with it."),
@@ -447,10 +447,15 @@ const revives = guided(
 const breath = enforced(
   "breath.ts reads it: the creature breathes water, or holds its breath for the time it prints, when it is out of air."
 );
-/** A tool's row: its check and its Utilize uses are the sheet's; crafting with it is the GM's. */
-const toolUse = guided(
-  "The sheet rolls its check with the ability it names and offers its Utilize uses at their printed DCs (ability-checks.ts toolUses). In a fight that is the Utilize action, and crafting with it is the GM's."
+/** What every tool's Utilize uses do on the sheet. */
+const TOOL_USES =
+  "The sheet rolls its check with the ability it names and offers its Utilize uses at their printed DCs; a use rolled in a fight takes the Utilize action and needs the tool in the pack (tool-uses.ts).";
+/** A tool with a Craft line: its uses, and crafting.ts making what the line lists. */
+const toolCraft = guided(
+  `${TOOL_USES} crafting.ts makes what its Craft line lists in downtime, for half the price in raw materials and a day of 8 hours per 10 GP, helpers with the proficiency dividing the days. What a check finds is the GM's.`
 );
+/** A tool with no Craft line: its uses, and what the check finds or makes. */
+const toolCheck = (what: string) => guided(`${TOOL_USES} What the check finds or makes (${what}) is the GM's.`);
 /** A trait that lights the map around its creature. */
 const sheds = enforced("vision/senses.ts gives the creature its printed Bright and Dim Light, carried with its token.");
 /** A trait that hinders a creature standing in sunlight, read from the light where its token stands. */
@@ -989,7 +994,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Its action binds a creature within 5 feet that is Grappled, Incapacitated or Restrained: the creature is Restrained until a DC 18 Dexterity (Acrobatics) check, its action, frees it. The DC 13 Strength (Athletics) check to bind it and bursting the Chain are the GM's."
   ),
   "item:rope": enforced(
-    "Its action binds a creature within 5 feet that is Grappled, Incapacitated or Restrained: the creature is Restrained until a DC 15 Dexterity (Acrobatics) check, its action, frees it. Bursting the Rope is the GM's."
+    "Its action binds a creature within 5 feet that is Grappled, Incapacitated or Restrained: the creature is Restrained until a DC 15 Dexterity (Acrobatics) check, its action, frees it. Its Utilize use ties a knot with a DC 10 Dexterity (Sleight of Hand) check (tool-uses.ts). Bursting the Rope is the GM's."
   ),
   "item:manacles": guided(
     "Its action binds a Small or Medium creature within 5 feet that is Grappled, Incapacitated or Restrained: it has Disadvantage on attack rolls until a DC 20 Dexterity (Sleight of Hand) check, its action, frees it. The DC 13 check to bind it, the Restrained condition while they are fixed in place, and bursting them are the GM's."
@@ -1020,10 +1025,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     [
       "alchemists-supplies",
       "brewers-supplies",
-      "calligraphers-supplies",
-      "carpenters-tools",
       "cartographers-tools",
-      "cobblers-tools",
       "cooks-utensils",
       "glassblowers-tools",
       "jewelers-tools",
@@ -1031,20 +1033,20 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
       "masons-tools",
       "painters-supplies",
       "potters-tools",
-      "smiths-tools",
       "tinkers-tools",
       "weavers-tools",
       "woodcarvers-tools",
       "disguise-kit",
-      "forgery-kit",
-      "herbalism-kit",
-      "navigators-tools",
-      "poisoners-kit",
-      "thieves-tools",
-      "gaming-set-dice",
-      "gaming-set-playing-cards",
-      "gaming-set-dragonchess",
-      "gaming-set-three-dragon-ante",
+      "poisoners-kit"
+    ].map((id) => [`item:${id}`, toolCraft])
+  ),
+  ...Object.fromEntries(
+    ["gaming-set-dice", "gaming-set-playing-cards", "gaming-set-dragonchess", "gaming-set-three-dragon-ante"].map(
+      (id) => [`item:${id}`, toolCheck("who cheats and who wins the game")]
+    )
+  ),
+  ...Object.fromEntries(
+    [
       "instrument-bagpipes",
       "instrument-drum",
       "instrument-dulcimer",
@@ -1055,7 +1057,24 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
       "instrument-pan-flute",
       "instrument-shawm",
       "instrument-viol"
-    ].map((id) => [`item:${id}`, toolUse])
+    ].map((id) => [`item:${id}`, toolCheck("how the tune or song lands")])
+  ),
+  "item:forgery-kit": toolCheck("how convincing the forgery is"),
+  "item:navigators-tools": toolCheck("the course plotted and the position found"),
+  "item:calligraphers-supplies": guided(
+    `${TOOL_USES} crafting.ts makes Ink in downtime, and scribes a Spell Scroll of a spell the scribe has prepared on each day of work, at the Spell Scroll Costs table's days and gold, with the scribe's spell save DC and attack bonus. What a check finds is the GM's.`
+  ),
+  "item:herbalism-kit": guided(
+    `${TOOL_USES} crafting.ts makes what its Craft line lists in downtime, and brews a Potion of Healing for 25 GP and a day of work. What a check finds is the GM's.`
+  ),
+  "item:cobblers-tools": guided(
+    `${TOOL_USES} A success at modifying footwear gives its wearer Advantage on its next Dexterity (Acrobatics) check (help-assist.ts). crafting.ts makes a Climber's Kit in downtime. Hiding a compartment in a boot heel is the GM's.`
+  ),
+  "item:grappling-hook": guided(
+    "Its Utilize use rolls a DC 13 Dexterity (Acrobatics) check to catch the hook, taking the action in a fight (tool-uses.ts). Whether something within 50 feet can hold it is the GM's."
+  ),
+  "item:bead-of-nourishment": enforced(
+    "It is a day's food: while the GM tracks food and water, a character eats one from its pack (actor.nourish), and survival.ts eats the beads it carries as the game day ends, after its Rations."
   ),
   "item:rations": enforced(
     "survival.ts, while the GM tracks food and water: a character eats a Ration from its inventory on its own (actor.nourish) or as the game day ends, a pound of food each, as far as its need goes."
@@ -1273,6 +1292,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "feature:devious-strikes": enforced(
     "Daze (one of moving, an action or a Bonus Action, resolution/economy.ts), Knock Out (Unconscious that ends on damage, with repeat saves) and Obscure (Blinded) join Cunning Strike's effects. A Dazed creature's move after acting is the GM's."
+  ),
+  "feature:fast-hands": enforced(
+    "As a Bonus Action the Thief takes the Utilize action for a tool's or gear's use on the sheet (tool-uses.ts) or at a door (doors.ts), a magic item's Magic action (fast-hands.ts), or a Dexterity (Sleight of Hand) check with Thieves' Tools or to pick a pocket. The server spends the Thief's Bonus Action for it."
   ),
   "feature:supreme-sneak": guided(
     "Stealth Attack joins Cunning Strike's effects, and the attack leaves the Rogue's Invisible from the Hide action on (resolution/release.ts). Whether it ends the turn behind Three-Quarters or Total Cover is the GM's, said with the hit."
@@ -2165,13 +2187,13 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Thrown in place of an attack at a Large or smaller creature the thrower sees within 15 feet, a failed Dexterity save leaves it Restrained, escaped with a DC 10 Strength (Athletics) check. The Net is an object with AC 10 and 5 Hit Points, immune to Bludgeoning damage, and an attack that breaks it frees the creature (objects.ts)."
   ),
   "item:thieves-tools": guided(
-    "door.use's pick rolls a Dexterity (Sleight of Hand) check with the tools against a lock on a door of the map, DC 15 unless the GM sets another, and unlocks it on a success (doors.ts). It takes the Utilize action in a fight. Disarming a trap is the GM's."
+    "door.use's pick rolls a Dexterity (Sleight of Hand) check with the tools against a lock on a door of the map, DC 15 unless the GM sets another, and unlocks it on a success (doors.ts). Its Utilize uses roll from the sheet at their DCs (tool-uses.ts), and every use takes the Utilize action in a fight. Picking Manacles' lock and disarming a trap are the GM's, rolled as the sheet's check."
   ),
   "item:carpenters-tools": guided(
-    "door.use pries a door on the map open, or seals a closed one, with a DC 20 Strength check with the tools (doors.ts). A sealed door is forced open at DC 20. Crafting is the GM's."
+    "door.use pries a door on the map open, or seals a closed one, with a DC 20 Strength check with the tools, taking the Utilize action in a fight (doors.ts). A sealed door is forced open at DC 20. Its sheet use takes the Utilize action too (tool-uses.ts), and crafting.ts makes what its Craft line lists in downtime. Prying a container is the GM's."
   ),
   "item:smiths-tools": guided(
-    "door.use pries a door on the map open with a DC 20 Strength check with the tools (doors.ts). Crafting is the GM's."
+    "door.use pries a door on the map open with a DC 20 Strength check with the tools, taking the Utilize action in a fight (doors.ts). Its sheet use takes the Utilize action too (tool-uses.ts), and crafting.ts makes what its Craft line lists in downtime, the melee weapons and the armor its bands name among them. Prying a container is the GM's."
   ),
   "item:lock": enforced(
     "A door on the map can be locked (the GM's door editor): it stays shut against everyone but the creatures holding its key, and Thieves' Tools pick it with a DC 15 Dexterity (Sleight of Hand) check (doors.ts)."

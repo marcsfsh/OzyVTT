@@ -1850,6 +1850,14 @@ function ammunitionKindOf(weaponId: string, properties: string): AmmunitionKind 
   return kind.data;
 }
 
+/** A price cell ("15 GP", "5 SP", "2 CP") in gold pieces; the build fails on any other. */
+function tableCostGp(cell: string | undefined, where: string): number {
+  const price = /^([\d,]+) (GP|SP|CP)$/.exec(stripTags(cell ?? ""));
+  if (!price) throw new Error(`${where} has no price the build can read: "${stripTags(cell ?? "")}".`);
+  const amount = Number(price[1]!.replace(/,/g, ""));
+  return price[2] === "GP" ? amount : price[2] === "SP" ? amount / 10 : amount / 100;
+}
+
 const weaponTable = (() => {
   const table = weaponTableSource.match(/\*\*Weapons\*\*\s*(<table>[\s\S]*?<\/table>)/);
   if (!table) throw new Error("No **Weapons** table in sources/dnd-5e-srd-markdown/equipment.md.");
@@ -1861,6 +1869,7 @@ const weaponTable = (() => {
       melee: boolean;
       versatileDice: string | null;
       ammunition: AmmunitionKind | null;
+      costGp: number;
     }
   >();
   // The `<th colspan="6">` band rows ("Simple Melee Weapons", ...) are the only source of melee vs
@@ -1893,7 +1902,8 @@ const weaponTable = (() => {
       mastery: tableSlug(cells[3]),
       melee: band.melee,
       versatileDice: /Versatile \((\d+d\d+)\)/.exec(properties)?.[1] ?? null,
-      ammunition: ammunitionKindOf(tableSlug(cells[0]), properties)
+      ammunition: ammunitionKindOf(tableSlug(cells[0]), properties),
+      costGp: tableCostGp(cells[5], `Weapons table: "${stripTags(cells[0])}"`)
     });
   }
   // Both vocabularies come from the fixtures' `WeaponProperty` rows, as bare ids (riders match the bare word).
@@ -1937,6 +1947,8 @@ const weaponRecords = onlySrd(weapons).map((weapon) => {
     ...(row.versatileDice !== null ? { versatileDice: row.versatileDice } : {}),
     ...(row.ammunition !== null ? { ammunition: row.ammunition } : {}),
     improvised: weapon.fields.is_improvised,
+    // The table's price, which crafting reads (SRD Crafting Nonmagical Items).
+    costGp: row.costGp,
     mastery: row.mastery,
     // `[]` when the table prints an em dash: a Mace has no properties, which differs from "not recorded".
     properties: row.properties,
@@ -1957,7 +1969,7 @@ if (unmatched.length > 0) throw new Error(`Weapons table rows matched no open5e 
 const armorTable = (() => {
   const table = weaponTableSource.match(/\*\*Armor\*\*\s*(<table>[\s\S]*?<\/table>)/);
   if (!table) throw new Error("No **Armor** table in sources/dnd-5e-srd-markdown/equipment.md.");
-  const categories = new Map<string, "light" | "medium" | "heavy" | "shield">();
+  const categories = new Map<string, Readonly<{ band: "light" | "medium" | "heavy" | "shield"; costGp: number }>>();
   let band: "light" | "medium" | "heavy" | "shield" | null = null;
   for (const [, row] of (table[1].match(/<tbody>([\s\S]*?)<\/tbody>/)?.[1] ?? "").matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
     const heading = row.match(/<th[^>]*>([\s\S]*?)<\/th>/);
@@ -1971,15 +1983,18 @@ const armorTable = (() => {
     const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((cell) => cell[1]);
     if (cells.length === 0) continue;
     if (band === null) throw new Error(`Armor table: data row before any category band: ${stripTags(row)}`);
-    categories.set(tableSlug(cells[0]), band);
+    categories.set(tableSlug(cells[0]), {
+      band,
+      costGp: tableCostGp(cells[5], `Armor table: "${stripTags(cells[0])}"`)
+    });
   }
   return categories;
 })();
 
 const armorRecords = onlySrd(armors).map((armor) => {
   const id = slugOf(armor.pk);
-  const category = armorTable.get(id);
-  if (!category)
+  const row = armorTable.get(id);
+  if (!row)
     throw new Error(
       `No SRD Armor-table row for "${id}" - check the name slug in sources/dnd-5e-srd-markdown/equipment.md.`
     );
@@ -1987,7 +2002,9 @@ const armorRecords = onlySrd(armors).map((armor) => {
     id,
     name: armor.fields.name,
     acBase: armor.fields.ac_base,
-    category,
+    category: row.band,
+    // The table's price, which crafting reads (SRD Crafting Nonmagical Items).
+    costGp: row.costGp,
     addDexModifier: armor.fields.ac_add_dexmod,
     dexModifierCap: armor.fields.ac_cap_dexmod,
     stealthDisadvantage: armor.fields.grants_stealth_disadvantage,

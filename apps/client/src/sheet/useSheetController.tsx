@@ -245,15 +245,17 @@ export function useSheetController({
     beginTargeting(aimless ? { ...own, targeting: "none" } : own, actor.id, slotLevel, darts, shaping);
     if (attackMode === "jump") onJumpToInitiative?.();
   };
-  /** A server-derived action (an item's) handed to targeting by its id; the numbers are for display only. */
-  const routeSummary = (row: ContentActionSummary) => {
+  /** A server-derived action (an item's) handed to targeting by its id; the numbers are for display only. With
+   *  `fastHands`, a Thief takes it as a Bonus Action. */
+  const routeSummary = (row: ContentActionSummary, fastHands = false) => {
     setTargetingResult(null);
-    beginTargeting(row, actor.id);
+    beginTargeting(row, actor.id, undefined, undefined, undefined, fastHands ? { fastHands: true } : {});
     if (attackMode === "jump") onJumpToInitiative?.();
   };
-  /** An item's own action from its detail: aimed on the character's turn, rolled by the server outside a fight. */
-  const itemAction = (row: ContentActionSummary) => {
-    if (structuredAttacks && role === "player") routeSummary(row);
+  /** An item's own action from its detail: aimed on the character's turn, rolled by the server outside a fight. Fast
+   *  Hands' Bonus Action form is aimed the same way. */
+  const itemAction = (row: ContentActionSummary, options: Readonly<{ fastHands?: boolean }> = {}) => {
+    if ((structuredAttacks && role === "player") || options.fastHands) routeSummary(row, options.fastHands === true);
     else sendThroughServer(row.id, row.damage.length > 0 ? { includeDamage: true } : {});
   };
   /** Why an item's action waits: off the character's turn in a fight, only a reaction can be used. */

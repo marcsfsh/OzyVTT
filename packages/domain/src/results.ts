@@ -566,6 +566,14 @@ export const ActionAvailabilitySchema = z.strictObject({
     .describe(
       'Why it can\'t be used now, in one short sentence for the sheet ("Not prepared.", "No level 2 spell slots left.", "You used your Bonus Action this turn."). Present exactly when `available` is false. The character comes first (Stunned, 0 Hit Points), then the option itself, then the turn, then targeting; `violations` keeps the full account. A hint only: resolution checks again.'
     ),
+  /** A Thief's Fast Hands can take this item action as a Bonus Action (`action.resolve`'s `fastHands`): whether that
+   *  form can be used now, and why not. */
+  fastHands: z
+    .strictObject({ available: z.boolean(), reason: z.string().optional() })
+    .optional()
+    .describe(
+      "A Thief's Fast Hands can take this item action (a Utilize action, or a magic item's Magic action) as a Bonus Action with `action.resolve`'s `fastHands`: whether that form can be used now, and why not"
+    ),
   /** The ways its caster may shape this spell's cast (Metamagic, Sculpt Spells), for the cast to offer. */
   shaping: CastShapingOffersSchema.optional(),
   /** Its user may answer this action's damage roll after seeing it (Empowered Spell on a spell, Heroic Inspiration):
@@ -666,6 +674,20 @@ const DerivedSkillRowSchema = z.strictObject({
 });
 export type DerivedSkillRow = Wire<z.infer<typeof DerivedSkillRowSchema>>;
 /** A tool the character is proficient with, checked with the ability its SRD entry names. */
+/** One printed Utilize use: what it does and its DC. */
+const DerivedUtilizeUseSchema = z.strictObject({
+  label: z.string(),
+  dc: z.number().int().min(1).max(40),
+  /** The skill the check uses with it (Thieves' Tools' lock: Sleight of Hand). */
+  skill: z.string().optional().describe("The skill the check uses with it (Thieves' Tools' lock: Sleight of Hand)"),
+  /** The use works for a creature its user picks within 5 feet (Cobbler's Tools' footwear), sent as `forActorId`. */
+  forAnother: z
+    .literal(true)
+    .optional()
+    .describe(
+      "The use works for a creature its user picks within 5 feet (Cobbler's Tools' footwear), sent as `forActorId`"
+    )
+});
 const DerivedToolRowSchema = z.strictObject({
   id: z.string(),
   name: z.string(),
@@ -673,13 +695,32 @@ const DerivedToolRowSchema = z.strictObject({
   bonus: z.number().int(),
   mode: RollModeSummarySchema,
   reliableTalent: z.boolean(),
+  /** The character is proficient with the tool, so its checks add the Proficiency Bonus. */
+  proficient: z
+    .boolean()
+    .describe("The character is proficient with the tool, so its checks add the Proficiency Bonus"),
+  /** The tool is in the character's pack, which every use of it needs. */
+  carried: z.boolean().describe("The tool is in the character's pack, which every use of it needs"),
   uses: z
-    .array(z.strictObject({ label: z.string(), dc: z.number().int().min(1).max(40) }))
+    .array(DerivedUtilizeUseSchema)
     .describe(
-      "What the tool's Utilize line lets it do, each with its printed DC (Thieves' Tools: Pick a lock, DC 15), rolled as a check with `tool` and `dc`. In a fight it takes the Utilize action. Empty when the tool prints none"
+      "What the tool's Utilize line lets it do, each with its printed DC (Thieves' Tools: Pick a lock, DC 15), rolled with `check.roll`'s `tool` and `use` (its place in this list). It needs the tool carried, and in a fight it takes the Utilize action. Empty when the tool prints none"
     )
 });
 export type DerivedToolRow = Wire<z.infer<typeof DerivedToolRowSchema>>;
+/** A carried piece of gear's printed Utilize uses, each a check at its DC (a Grappling Hook's catch). */
+const DerivedGearUsesSchema = z.strictObject({
+  id: z.string().describe("The item's catalog id, sent as `check.roll`'s `item`"),
+  name: z.string(),
+  uses: z.array(
+    DerivedUtilizeUseSchema.extend({
+      ability: AbilityIdSchema,
+      bonus: z.number().int().describe("The check's bonus"),
+      mode: RollModeSummarySchema
+    })
+  )
+});
+export type DerivedGearUses = Wire<z.infer<typeof DerivedGearUsesSchema>>;
 /** A situation the character's riders name for its checks (a Book's topic, prying with a Crowbar), offered as a toggle
  *  beside the checks. */
 const DerivedSituationSchema = z.strictObject({
@@ -704,7 +745,18 @@ const ActorDerivedSheetSchema = z.strictObject({
   tools: z
     .array(DerivedToolRowSchema)
     .describe(
-      "The tools the character is proficient with that the SRD names an ability for, each with its check bonus"
+      "The tools the character is proficient with or carries that the SRD names an ability for, each with its check bonus"
+    ),
+  /** The carried gear with printed Utilize uses (a Grappling Hook's catch, tying a Rope's knot). */
+  gearUses: z
+    .array(DerivedGearUsesSchema)
+    .describe("The carried gear with printed Utilize uses, each a check at its DC (a Grappling Hook's catch)"),
+  /** A Thief's Fast Hands: a Utilize use, a magic item's Magic action and a Sleight of Hand check can be a Bonus
+   *  Action. */
+  fastHands: z
+    .boolean()
+    .describe(
+      "A Thief's Fast Hands: a Utilize use, a magic item's Magic action and a Dexterity (Sleight of Hand) check can be taken as a Bonus Action"
     ),
   /** 10 plus the Wisdom (Perception) bonus, 5 more with Advantage on such checks or 5 less with Disadvantage. */
   passivePerception: z
@@ -985,6 +1037,60 @@ export const NextLevelReplySchema = z.strictObject({
 });
 export type NextLevelReply = Wire<z.infer<typeof NextLevelReplySchema>>;
 export type NextLevelResult = MutationResult & Partial<NextLevelReply>;
+
+/** One thing a character could start making: its raw materials and the 8-hour days of work it takes alone. */
+const CraftOfferSchema = z.strictObject({
+  id: z.string().describe("The catalog item, sent as `crafting.start`'s `itemId`"),
+  name: z.string(),
+  kind: z.enum(["item", "potion-of-healing", "spell-scroll", "magic-item"]),
+  materialsCp: z.number().int().min(0).describe("What its raw materials cost, in copper pieces"),
+  days: z.number().min(0).describe("The 8-hour days of work it takes one worker; helpers divide them"),
+  baseIds: z
+    .array(z.string())
+    .optional()
+    .describe("A magic weapon's or armor's choice of base, sent as `baseId`; the base's price is paid unless carried")
+});
+/** What `actor:crafting-offers` answers its owner or the GM (SRD 5.2.1 Crafting). */
+export const CraftingOffersReplySchema = z.strictObject({
+  tools: z
+    .array(
+      z.strictObject({
+        toolId: z.string(),
+        name: z.string(),
+        carried: z.boolean().describe("The tool is in the pack, which crafting with it needs"),
+        items: z.array(CraftOfferSchema)
+      })
+    )
+    .describe("The tools the character is proficient with, each with what its Craft line makes and the price"),
+  scrolls: z
+    .strictObject({
+      carried: z.boolean().describe("Calligrapher's Supplies are in the pack"),
+      spells: z.array(
+        z.strictObject({
+          id: z.string(),
+          name: z.string(),
+          level: z.number().int().min(0).max(9),
+          days: z.number(),
+          materialsCp: z.number().int().min(0)
+        })
+      )
+    })
+    .nullable()
+    .describe(
+      "Scribing Spell Scrolls with proficiency in Arcana or with Calligrapher's Supplies: the prepared spells it can scribe, with the Spell Scroll Costs table's days and gold; null without the proficiency"
+    ),
+  magicItems: z
+    .array(
+      CraftOfferSchema.extend({
+        rarity: z.string(),
+        toolIds: z.array(z.string()).describe("The tools it can be made with that the character is proficient with")
+      })
+    )
+    .describe("Magic items it can craft with Arcana proficiency and a tool it is proficient with"),
+  purseCp: z.number().int().min(0).describe("What its purse holds, in copper pieces")
+});
+export type CraftingOffersReply = Wire<z.infer<typeof CraftingOffersReplySchema>>;
+export type CraftingOffersResult = MutationResult & Partial<CraftingOffersReply>;
 
 /** What `vision:preview` answers the GM: where one creature (or the whole party) sees now, as image-pixel polygons
  *  (`[x0, y0, x1, y1, ...]`), and the creatures it perceives. Empty while the scene's vision is off. */
