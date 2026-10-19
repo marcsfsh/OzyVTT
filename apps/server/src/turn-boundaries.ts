@@ -1,5 +1,6 @@
 import type { GameState } from "@vtt/domain";
 import { breathAtTurnEnd } from "./breath.js";
+import { confusedTurn } from "./random-outcomes.js";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { holdsFeature } from "./class-features.js";
@@ -94,6 +95,8 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
       })
     );
   temporaryHitPointsEachTurn(state, actorId, events);
+  // SRD Confusion: "it rolls 1d10 at the start of each of its turns to determine its behavior for that turn".
+  events.push(...confusedTurn(state, actorId, deps.rollDie));
   events.push(...traitsAtTurnStart(state, actorId, deps));
   holyNimbus(state, actorId, events, deps);
   dealOngoingAt(state, actorId, "start", events, deps);

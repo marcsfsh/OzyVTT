@@ -1,4 +1,5 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
+import { prismaticSpray } from "./prismatic.js";
 import type { PendingReaction, PendingSave } from "@vtt/domain";
 import { catalogIdOf, DamageTypeSchema, type ActionReaction } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
@@ -512,6 +513,8 @@ export function parkActionSave(ctx: ResolveContext): void {
     }
   }
   if (saving.length === 0) return;
+  // Prismatic Spray's d8 picks a ray, and a save of its own, for each creature.
+  if (prismaticSpray(ctx, saving)) return;
   const parts = rider ? [] : damagePartsOf(ctx);
   const onSuccessEffect = successEffectFor(ctx, cast);
   // A spell's save whose outcome the engine applies nothing of (Levitate, Polymorph): the card and the GM's result say

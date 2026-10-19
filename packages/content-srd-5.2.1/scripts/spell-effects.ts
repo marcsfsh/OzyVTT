@@ -1219,6 +1219,8 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   "hideous-laughter": { name: "Hideous Laughter", tags: ["cant-stand"], modifiers: [] },
   // "Each target ... drops whatever it is holding and has the Frightened condition for the duration."
   fear: { name: "Fear", tags: ["drops-held"], modifiers: [] },
+  // "Can't take Bonus Actions or Reactions, and it rolls 1d10 at the start of each of its turns" (`random-outcomes.ts`).
+  confusion: { name: "Confusion", tags: ["confused", "no-bonus-actions", "no-reactions"], modifiers: [] },
   // "Has Disadvantage on Dexterity saving throws and attack rolls, and other creatures have Advantage on attack rolls
   // against it" while it dances (the save's Speed 0 keeps it dancing in place).
   "irresistible-dance": {

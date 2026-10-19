@@ -50,6 +50,7 @@ import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
 import { startHoldingBreath } from "./breath.js";
+import { GIBBERING_TAG, gibberingTurn } from "./random-outcomes.js";
 import {
   addEffect,
   CONCENTRATING_TAG,
@@ -1037,6 +1038,9 @@ export function answerSave(
     events.push(
       ...applyFailureEffect(state, target.id, pending.onFailEffect, `${commandId}:${saveId}:fail`, immunities)
     );
+  // A gibbering mouther's d8 decides what the creature does this turn.
+  if (!success && pending.onFailEffect?.tags.includes(GIBBERING_TAG))
+    events.push(...gibberingTurn(target, deps.random));
   // What a success leaves instead (Heat Metal's Disadvantage on a creature that keeps hold of the object).
   if (success && pending.onSuccessEffect)
     events.push(

@@ -126,7 +126,7 @@ function turnEndAura(trait: Trait): TraitMechanic | null {
 /** "Constitution Saving Throw: DC 10, any creature that starts its turn in a 5-foot Emanation originating from the
  *  ghast. Failure: The target has the Poisoned condition until the start of its next turn. Success: The target is
  *  immune to this ghast's Stench for 24 hours." A pit fiend's names "any enemy ... in the aura" of a 20-foot
- *  Emanation; a gibbering mouther's "within 20 feet", its failure a d8 table the GM reads; a sea hag's "any Beast or
+ *  Emanation; a gibbering mouther's "within 20 feet", its failure a d8 table the server rolls; a sea hag's "any Beast or
  *  Humanoid that starts its turn within 30 feet of the hag and can see the hag's true form", whose sight the GM
  *  judges. */
 function turnStartAura(trait: Trait): TraitMechanic | null {
@@ -165,7 +165,12 @@ function turnStartAura(trait: Trait): TraitMechanic | null {
       ...(conditionId ? { failureDuration: { type: "until-bearer-next-turn" as const } } : {}),
       ...(match[7] && /^The target is immune to this\b/.test(match[7]) ? { immuneOnSuccess: true as const } : {})
     },
-    ...(conditionId ? {} : { reminder: `On a failed save: ${failure}`.slice(0, 600) })
+    // A gibbering mouther's "rolls 1d8 to determine what it does during the current turn" is a table the server rolls.
+    ...(conditionId
+      ? {}
+      : /^The target rolls 1d8 to determine what it does during the current turn:/.test(failure)
+        ? { failureTable: "gibbering" as const }
+        : { reminder: `On a failed save: ${failure}`.slice(0, 600) })
   };
 }
 

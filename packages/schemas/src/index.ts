@@ -3294,7 +3294,9 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       save: TraitSaveSchema.optional(),
       /** The fire it sets (a fire elemental's Emanation): "start burning" (SRD Burning). */
       hazard: z.literal("burning").optional(),
-      /** What a failed save does that the engine leaves to the GM (a gibbering mouther's d8 table). */
+      /** A failed save rolls on a table the server reads for the creature's turn (a gibbering mouther's d8). */
+      failureTable: z.literal("gibbering").optional(),
+      /** What a failed save does that the engine leaves to the GM. */
       reminder: z.string().min(1).max(600).optional()
     })
     .strict(),

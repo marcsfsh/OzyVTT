@@ -74,6 +74,7 @@ import { healLimit } from "./loose-healing.js";
 import { passiveOf, unavailableReason } from "./availability-reasons.js";
 import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-casting.js";
 import { layOutProvisions } from "./resolution/provisions.js";
+import { divinationChance, orbLeap, reincarnation } from "./resolution/cast-tables.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -186,6 +187,9 @@ export function resolveDefinitionAction(
   openSpellZone(ctx);
   applyGrant(ctx);
   layOutProvisions(ctx);
+  divinationChance(ctx);
+  reincarnation(ctx);
+  orbLeap(ctx);
   placeCastSight(ctx);
   applyHealing(ctx);
   applyConditionCures(ctx);

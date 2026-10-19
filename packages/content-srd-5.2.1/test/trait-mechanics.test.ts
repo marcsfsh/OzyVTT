@@ -108,12 +108,13 @@ describe("trait mechanics in the monster bundle", () => {
     expect(mechanicsOf("hezrou")[0]).toMatchObject({ rangeFeet: 10, save: { dc: 16 } });
     expect(mechanicsOf("hezrou")[0]).not.toHaveProperty("save.immuneOnSuccess");
     expect(mechanicsOf("ghast")[0]).toMatchObject({ save: { immuneOnSuccess: true } });
-    // The mouther's failure is a d8 table the GM reads.
+    // The mouther's failure is a d8 table the server rolls.
     expect(mechanicsOf("gibbering-mouther")[0]).toMatchObject({
       rangeFeet: 20,
       save: { ability: "wis", dc: 10, failureConditions: [] },
-      reminder: expect.stringContaining("1-4: The target does nothing.")
+      failureTable: "gibbering"
     });
+    expect(mechanicsOf("gibbering-mouther")[0]).not.toHaveProperty("reminder");
     // "Any Beast or Humanoid that starts its turn within 30 feet of the hag and can see the hag's true form": the types
     // are read, and only a creature that sees the hag makes the save.
     expect(mechanicsOf("sea-hag")).toEqual([

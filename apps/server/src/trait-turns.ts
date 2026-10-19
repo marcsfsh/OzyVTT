@@ -1,4 +1,5 @@
 import type { GameState } from "@vtt/domain";
+import { GIBBERING_TAG } from "./random-outcomes.js";
 import { parseDiceFormula, resolveDice, type RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition, TraitMechanic } from "@vtt/schemas";
 import { conditionLabel, isIncapacitated } from "./condition-rules.js";
@@ -368,7 +369,22 @@ function aurasStartedIn(state: GameState, actor: Actor, deps: TraitTurnDeps, eve
                 sourceActionId: key
               }
             }
-          : {}),
+          : aura.failureTable === "gibbering"
+            ? {
+                // "What it does during the current turn": the roll's limits last until this turn ends.
+                onFailEffect: {
+                  name: `${aura.name} (${bearer.name})`.slice(0, 120),
+                  tags: [GIBBERING_TAG],
+                  linkedConditionIds: [],
+                  escapeDc: null,
+                  sourceActorId: bearer.id,
+                  sourceName: bearer.name,
+                  duration: { type: "until-bearer-turn-end" },
+                  currentTurn: true,
+                  sourceActionId: key
+                }
+              }
+            : {}),
         ...(save.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
         newSaveId: deps.newId,
         createdAt: Date.parse((deps.now ?? (() => new Date().toISOString()))())
