@@ -166,7 +166,14 @@ export function beginTargeting(
       selected: [],
       template: {
         shape,
-        sizeFeet: area.sizeFeet,
+        // A higher slot grows the area where the spell says so (Fog Cloud), as the server will place it.
+        sizeFeet: Math.min(
+          1000,
+          area.sizeFeet +
+            (slotLevel !== undefined && action.areaPerSlot
+              ? action.areaPerSlot.feet * Math.max(0, slotLevel - action.areaPerSlot.level)
+              : 0)
+        ),
         widthFeet: area.widthFeet,
         placed: null,
         ...(area.count !== undefined ? { count: area.count, others: [] } : {})

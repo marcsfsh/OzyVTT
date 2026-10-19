@@ -1,4 +1,4 @@
-import type { GameState } from "@vtt/domain";
+import type { GameState, SpellZone } from "@vtt/domain";
 import { areEnemies } from "./creature-sides.js";
 import { zoneContentOf } from "./spell-zone-state.js";
 import { insideTest, liveZones, movesFreelyOn, speedHalvingAt, type ZoneDeps } from "./spell-zones.js";
@@ -21,31 +21,9 @@ export function zoneMovementOptions(
   actorId: string,
   deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">
 ): Pick<MovementCostOptions, "difficultAt" | "halvedAt" | "costlyGroundAt" | "barredStep" | "costlyStep"> {
-  const mover = state.actors.find((actor) => actor.id === actorId);
-  if (!mover) return {};
-  const difficult: Inside[] = [];
-  const doubled: Inside[] = [];
-  // Steps that cost double in an area for going toward its caster (Gust of Wind).
-  const toward: Array<Readonly<{ inside: Inside; caster: Point }>> = [];
-  const halving = speedHalvingAt(state, actorId, deps);
-  for (const zone of liveZones(state)) {
-    const content = zoneContentOf(zone, deps.catalog);
-    if (content?.trigger.towardCaster && zone.casterId !== actorId) {
-      const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
-      const caster = state.combat.tokens.find((token) => token.actorId === zone.casterId)?.position;
-      if (inside && caster) toward.push({ inside, caster });
-    }
-    const terrain = content?.trigger.terrain;
-    if (!content || !terrain) continue;
-    const caster = state.actors.find((actor) => actor.id === zone.casterId);
-    if (terrain.for === "enemies" && (!caster || !areEnemies(caster, mover, deps.resolveDefinition))) continue;
-    if (terrain.kind && movesFreelyOn(mover, terrain.kind, deps)) continue;
-    const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
-    if (!inside) continue;
-    difficult.push(inside);
-    // 4 feet for every foot: Difficult Terrain's 2, doubled.
-    if (terrain.cost === 4) doubled.push(inside);
-  }
+  const ground = zoneGround(state, actorId, deps);
+  if (!ground) return {};
+  const { difficult, doubled, toward, halving } = ground;
   const barredStep = barredStepFor(state, actorId, deps);
   const closer = (from: Point, to: Point, caster: Point) =>
     Math.hypot(to.x - caster.x, to.y - caster.y) < Math.hypot(from.x - caster.x, from.y - caster.y) - 0.5;
@@ -65,4 +43,45 @@ export function zoneMovementOptions(
       ? { costlyGroundAt: (point: Point, sizeCells: number) => doubled.some((inside) => inside(point, sizeCells)) }
       : {})
   };
+}
+
+/** The ground the given spell areas make for one mover: Difficult Terrain, ground at 4 feet for every foot, the areas
+ *  where a step toward their caster costs double, and where its Speed is halved. Null for a creature not in the state. */
+export function zoneGround(
+  state: GameState,
+  actorId: string,
+  deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">,
+  zones: readonly SpellZone[] = liveZones(state)
+): Readonly<{
+  difficult: Inside[];
+  doubled: Inside[];
+  toward: Array<Readonly<{ inside: Inside; caster: Point }>>;
+  halving: ((position: Point, sizeCells: number) => boolean) | null;
+}> | null {
+  const mover = state.actors.find((actor) => actor.id === actorId);
+  if (!mover) return null;
+  const difficult: Inside[] = [];
+  const doubled: Inside[] = [];
+  // Steps that cost double in an area for going toward its caster (Gust of Wind).
+  const toward: Array<Readonly<{ inside: Inside; caster: Point }>> = [];
+  const halving = speedHalvingAt(state, actorId, deps, zones);
+  for (const zone of zones) {
+    const content = zoneContentOf(zone, deps.catalog);
+    if (content?.trigger.towardCaster && zone.casterId !== actorId) {
+      const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
+      const caster = state.combat.tokens.find((token) => token.actorId === zone.casterId)?.position;
+      if (inside && caster) toward.push({ inside, caster });
+    }
+    const terrain = content?.trigger.terrain;
+    if (!content || !terrain) continue;
+    const caster = state.actors.find((actor) => actor.id === zone.casterId);
+    if (terrain.for === "enemies" && (!caster || !areEnemies(caster, mover, deps.resolveDefinition))) continue;
+    if (terrain.kind && movesFreelyOn(mover, terrain.kind, deps)) continue;
+    const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
+    if (!inside) continue;
+    difficult.push(inside);
+    // 4 feet for every foot: Difficult Terrain's 2, doubled.
+    if (terrain.cost === 4) doubled.push(inside);
+  }
+  return { difficult, doubled, toward, halving };
 }

@@ -297,8 +297,10 @@ of a hidden thing. When in doubt, leave it out.
   and Wall of Thorns cost 4 feet for every foot, Conjure Minor Elementals' only for the caster's enemies,
   Gust of Wind's Line 2 feet for every foot a creature moves closer to its caster (`costlyStep`), and
   a creature whose trait frees it from that kind of ground (Web Walker, Ice Walk) pays nothing extra. The
-  server alone charges it, on the ground (a mover off the ground passes over it as over painted terrain); the
-  area itself is on the map.
+  server charges it on the ground (a mover off the ground passes over it as over painted terrain), and the
+  `actor:movement` reply gives the preview the cells it changes for the mover, of the areas the asker can see
+  (`areaGround`, `zone-preview.ts`); the area itself is on the map. A cast's template grows with a higher slot as
+  the availability row says (`areaPerSlot`), so the drawn template is the size the server places.
 - Height (`altitude.ts`, `@vtt/rules-5e` `altitude.ts`): a token's `altitudeFeet` is how far its lowest
   point is above the ground, and `airborne` says what holds it up in the air (flying, or a
   levitation); a creature on a ledge or a wall it climbs is up without being airborne. A space is as

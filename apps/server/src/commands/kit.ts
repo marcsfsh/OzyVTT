@@ -29,6 +29,7 @@ import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../
 import type { ZoneDeps } from "../spell-zones.js";
 import type { SummonDeps } from "../summons.js";
 import type { TokenMapGeometry } from "../token-placement.js";
+import type { SquareGridCalibration } from "../grid-calibration.js";
 import { hiddenFrom, playerSight } from "../vision/audience.js";
 import { sceneSight } from "../vision/sight.js";
 import type { FallDeps } from "../falling.js";
@@ -100,7 +101,11 @@ export type CommandContext = Readonly<{
   readState: () => GameState;
   combatLog: Pick<CombatLogStore, "list" | "exportSince">;
   contentLibrary: ContentLibrary;
-  mapCatalog: Readonly<{ get: (assetId: string) => { kind: string } | undefined | null }>;
+  mapCatalog: Readonly<{
+    get: (
+      assetId: string
+    ) => { kind: string; calibration?: { calibration?: SquareGridCalibration | null } | null } | undefined | null;
+  }>;
   tokenCatalog: Readonly<{
     get: (assetId: string) => unknown;
     touchLastUsed: (assetId: string) => void;

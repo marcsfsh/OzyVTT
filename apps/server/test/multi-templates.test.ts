@@ -4,6 +4,8 @@ import { GameStateSchema } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { afterEach, describe, expect, it } from "vitest";
 import { importActorDefinition } from "../src/actor-roster.js";
+import { actionAvailability } from "../src/action-resolution.js";
+import { effectiveActions } from "../src/effective-actions.js";
 import { bootServer } from "./boot-server.js";
 import { png } from "./image-fixtures.js";
 import { catalog, FOE, FOE2, HERO } from "./spell-casters.js";
@@ -124,5 +126,20 @@ describe("Meteor Swarm's Spheres", () => {
     expect(await five.text()).toMatch(/Meteor Swarm places up to 4 Spheres, and 5 were placed/);
     const twice = await cast("spell-meteor-swarm", [sphere(10, 2), sphere(10, 2)]);
     expect(await twice.text()).toMatch(/Each of Meteor Swarm's Spheres goes at a different point/);
+  });
+});
+
+// SRD 5.2.1 Fog Cloud: "The Sphere's radius increases by 20 feet for each spell slot level above 1."
+describe("a template grown by a higher slot", () => {
+  it("tells the sheet how much the area grows for each slot level above the spell's own", () => {
+    const wizard = wizardAt(5, ["fog-cloud"]);
+    const state = GameStateSchema.parse({ schemaVersion: 1 });
+    importActorDefinition(state, wizard, HERO, "public", catalog);
+    const hero = state.actors.find((actor) => actor.id === HERO)!;
+    const actions = effectiveActions(wizard, hero, catalog);
+    const fog = actionAvailability(state, hero, actions, wizard, false, actions, catalog).find(
+      (row) => row.id === "spell-fog-cloud"
+    );
+    expect(fog?.areaPerSlot).toEqual({ feet: 20, level: 1 });
   });
 });

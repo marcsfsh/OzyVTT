@@ -549,6 +549,7 @@ export function EncounterMap({
           walls: moveWalls,
           ...(draggedBudget?.passesCreatures ? { passesCreatures: true } : {}),
           ...(draggedBudget?.swarmIds ? { swarmIds: draggedBudget.swarmIds } : {}),
+          ...(draggedBudget?.areaGround ? { areaGround: draggedBudget.areaGround } : {}),
           // A drag keeps the creature at its height; the token menu changes it.
           altitude: {
             fromFeet: tokensById.get(dragging.actorId)?.altitudeFeet ?? 0,

@@ -246,10 +246,11 @@ export function exposed(
 export function speedHalvingAt(
   state: GameState,
   actorId: string,
-  deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">
+  deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">,
+  zones: readonly SpellZone[] = liveZones(state)
 ): ((position: Point, sizeCells: number) => boolean) | null {
   const tests: Array<(position: Point, sizeCells: number) => boolean> = [];
-  for (const zone of liveZones(state)) {
+  for (const zone of zones) {
     const content = zoneContentOf(zone, deps.catalog);
     if (!content?.trigger.halvesSpeed) continue;
     if (!exposed(state, zone, content.trigger, deps).some((creature) => creature.id === actorId)) continue;

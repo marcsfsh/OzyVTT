@@ -568,6 +568,9 @@ export const ActionAvailabilitySchema = z.strictObject({
   /** Its user may answer this action's damage roll after seeing it (Empowered Spell on a spell, Heroic Inspiration):
    *  `action.resolve` with `commit: false` and `damageLook` rolls the damage and holds it for the answer. */
   damageLook: z.literal(true).optional(),
+  /** Its area grows by `feet` for each slot level above `level`, the spell's own (Fog Cloud's radius by 20), so the
+   *  template drawn for a higher slot is the size the server places. */
+  areaPerSlot: z.strictObject({ feet: z.number().int().min(1), level: z.number().int().min(0).max(9) }).optional(),
   /** The forms a shape-shift may take now, for the user to pick (`action.resolve`'s `form`): Wild Shape's known forms,
    *  the bestiary's Beasts for Polymorph, a werewolf's printed forms with its true form. Wild Shape also lists the
    *  forms its user may learn, how many it knows and whether a Long Rest opened one to replace. */
@@ -911,7 +914,26 @@ export const ActorMovementReplySchema = z.strictObject({
    *  space still costs as Difficult Terrain. */
   passesCreatures: z.boolean().optional(),
   /** The swarms on the map the asker can see. Any creature may cross a swarm's space, as Difficult Terrain. */
-  swarmIds: z.array(z.uuid()).max(200).optional()
+  swarmIds: z.array(z.uuid()).max(200).optional(),
+  /** The ground the spell areas the asker can see change for this mover, in grid cells near it, as the server charges
+   *  it: Difficult Terrain (each cell), and where its footprint (named by its top-left cell) has its Speed halved,
+   *  costs double again on the ground (Plant Growth), or pays double for a step toward an area's caster (Gust of
+   *  Wind's Line, the caster's position in image pixels). */
+  areaGround: z
+    .strictObject({
+      difficult: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
+      halved: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
+      costlyGround: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
+      toward: z
+        .array(
+          z.strictObject({
+            caster: z.strictObject({ x: z.number(), y: z.number() }),
+            cells: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000)
+          })
+        )
+        .max(10)
+    })
+    .optional()
 });
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;

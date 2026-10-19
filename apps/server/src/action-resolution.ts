@@ -555,6 +555,10 @@ export function actionAvailability(
       ...(passive !== undefined ? { passive } : {}),
       ...(shaping !== undefined ? { shaping } : {}),
       ...(damageLook ? { damageLook: true as const } : {}),
+      // A template drawn for a higher slot grows as the cast's will (Fog Cloud).
+      ...(spell?.effect?.areaPerSlot && action.area && action.spellSlot
+        ? { areaPerSlot: { feet: spell.effect.areaPerSlot, level: spell.level } }
+        : {}),
       ...(forms !== undefined ? { forms } : {}),
       ...(action.effectOptions
         ? { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) }

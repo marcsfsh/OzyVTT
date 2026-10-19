@@ -139,7 +139,11 @@ export function projectPublicInitiative(
   });
 }
 
-function visibleToPlayerAnnotation(state: GameState, annotation: Annotation, playerSessionId: string | undefined) {
+export function visibleToPlayerAnnotation(
+  state: GameState,
+  annotation: Annotation,
+  playerSessionId: string | undefined
+) {
   switch (annotation.visibility) {
     case "public":
       return true;
