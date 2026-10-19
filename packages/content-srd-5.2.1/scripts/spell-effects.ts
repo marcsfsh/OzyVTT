@@ -134,6 +134,8 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   banishment: { count: 1, perSlot: 1 },
   // "Up to three willing creatures (including yourself) for each spell slot level above 7": the caster alone at 7.
   etherealness: { count: 1 },
+  // The creatures that climb the rope into its space, eight at most.
+  "rope-trick": { count: 8 },
   barkskin: { count: 1 },
   befuddlement: { count: 1 },
   "bestow-curse": { count: 1 },
@@ -1652,6 +1654,33 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: rounds(10),
     teleportEachTurn: { feet: 500, unseen: true, costFeet: 10 }
   }),
+  // "You step into a stone object or surface ... Nothing of your presence remains visible or otherwise detectable by
+  // nonmagical senses. While merged with the stone, you can't see what occurs outside it, and any Wisdom (Perception)
+  // checks you make to hear sounds outside it are made with Disadvantage ... can cast spells on yourself": off the map,
+  // untouchable both ways, back where it entered (`off-plane.ts`), for 8 hours.
+  "meld-into-stone": spellGrant({
+    name: "Meld into Stone",
+    tags: ["off-plane", "meld-into-stone"],
+    target: "self",
+    duration: { type: "minutes", minutes: 480 },
+    modifiers: [
+      {
+        type: "roll-mode",
+        roll: "check",
+        mode: "disadvantage",
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
+      }
+    ]
+  }),
+  // "Up to eight Medium or smaller creatures" climb into the extradimensional space at the rope's top for the hour:
+  // "Attacks, spells, and other effects can't pass into or out of the space ... Anything inside the space drops out when
+  // the spell ends" (`off-plane.ts`, back to the space each left).
+  "rope-trick": spellGrant({
+    name: "Inside the Rope Trick",
+    tags: ["off-plane", "rope-trick"],
+    target: "targets",
+    duration: { type: "minutes", minutes: 60 }
+  }),
   // "Gains a Fly Speed of 60 feet and can hover."
   fly: spellGrant({
     name: "Fly",
@@ -2459,7 +2488,9 @@ const CAST_INFLICTS: Readonly<Record<string, NonNullable<SpellEffect["inflicts"]
 
 /** The most its target may be (SRD 5.2.1 text): Animal Messenger's "A Tiny Beast". */
 const TARGET_MAX_SIZE: Readonly<Record<string, NonNullable<SpellEffect["targetMaxSize"]>>> = {
-  "animal-messenger": "tiny"
+  "animal-messenger": "tiny",
+  // "The space can hold up to eight Medium or smaller creatures."
+  "rope-trick": "medium"
 };
 
 /** The highest score its target may have: Awaken's "a Beast or Plant creature with an Intelligence of 3 or less". */
@@ -2472,6 +2503,7 @@ const TARGET_ABILITY_MAX: Readonly<Record<string, NonNullable<SpellEffect["targe
  *  Arcanist's Magic Aura's "willing creature". */
 const WILLING_TARGETS: ReadonlySet<string> = new Set([
   "etherealness",
+  "rope-trick",
   "light",
   "continual-flame",
   "nondetection",

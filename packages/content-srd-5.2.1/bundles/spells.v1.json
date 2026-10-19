@@ -19695,7 +19695,40 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "check",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-ability-check"
+       },
+       {
+        "type": "skill-is",
+        "skills": [
+         "perception"
+        ]
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Meld into Stone",
+    "tags": [
+     "off-plane",
+     "meld-into-stone"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "minutes",
+     "minutes": 480
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -23950,7 +23983,28 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 8
+   },
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Inside the Rope Trick",
+    "tags": [
+     "off-plane",
+     "rope-trick"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "minutes",
+     "minutes": 60
+    }
+   },
+   "targetMaxSize": "medium",
+   "willingTargets": true
   },
   "classes": [
    "wizard"
