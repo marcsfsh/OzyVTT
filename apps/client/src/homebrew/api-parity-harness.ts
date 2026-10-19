@@ -959,6 +959,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "^study.**",
+    types: ["equipment"],
+    reason:
+      "a manual's or tome's study, the score it raises for good once the GM marks it done; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "^uses.scaling.id",
     types: ["equipment"],
     reason:

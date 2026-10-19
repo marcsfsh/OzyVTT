@@ -832,6 +832,7 @@ const MAGIC_KEYS = [
   "damageTypeChoice",
   "vulnerableToOtherChoices",
   "removesArmorDrawbacks",
+  "study",
   "casts",
   "grantsFeatIds",
   "modifiers",
