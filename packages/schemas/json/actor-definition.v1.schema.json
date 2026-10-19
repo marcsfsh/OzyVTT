@@ -9401,6 +9401,69 @@
           "properties": {
             "kind": {
               "type": "string",
+              "const": "absorbs"
+            },
+            "name": {
+              "$ref": "#/$defs/__schema702"
+            },
+            "damageType": {
+              "$ref": "#/$defs/__schema64"
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "damageType"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "damage-weakens"
+            },
+            "name": {
+              "$ref": "#/$defs/__schema702"
+            },
+            "damageType": {
+              "$ref": "#/$defs/__schema64"
+            },
+            "modifiers": {
+              "$ref": "#/$defs/__schema135"
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "damageType",
+            "modifiers"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "blurred"
+            },
+            "name": {
+              "$ref": "#/$defs/__schema702"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
               "const": "misty-escape"
             },
             "name": {

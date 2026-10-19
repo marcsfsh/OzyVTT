@@ -4856,6 +4856,22 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       name: TraitNameSchema
     })
     .strict(),
+  /** "Whenever the golem is subjected to Acid damage, it takes no damage and instead regains a number of Hit Points equal
+   *  to the Acid damage dealt" (Acid Absorption): the damage type it heals by. */
+  z.object({ kind: z.literal("absorbs"), name: TraitNameSchema, damageType: DamageTypeSchema }).strict(),
+  /** "If the golem takes Fire damage, it has Disadvantage on attack rolls and ability checks until the end of its next
+   *  turn" (Aversion to Fire), "its Speed decreases by 20 feet" (Freeze): what taking that damage type leaves on it. */
+  z
+    .object({
+      kind: z.literal("damage-weakens"),
+      name: TraitNameSchema,
+      damageType: DamageTypeSchema,
+      modifiers: EffectModifiersSchema
+    })
+    .strict(),
+  /** "Attack rolls against the mephit are made with Disadvantage unless the mephit has the Incapacitated condition"
+   *  (Blurred Form). */
+  z.object({ kind: z.literal("blurred"), name: TraitNameSchema }).strict(),
   /** A vampire's Misty Escape: dropped to 0 Hit Points, it turns to mist and lives on at 0 unless it stands in
    *  sunlight, where it can't shape-shift and is destroyed. */
   z.object({ kind: z.literal("misty-escape"), name: TraitNameSchema }).strict(),

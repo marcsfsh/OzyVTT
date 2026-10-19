@@ -59,6 +59,7 @@ import { rollSaveAtOnce } from "./saving-throws.js";
 import { offerDamageReaction } from "./damage-reactions.js";
 import { releaseSwallowedBy, tallyDamageFromInside } from "./swallow.js";
 import { markBloodiedHit } from "./bloodied-hits.js";
+import { damageTypeTraits } from "./damage-traits.js";
 import { openRepeatSavesOnDamage } from "./save-stages.js";
 import { berserkerCurse } from "./berserker-axe.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
@@ -786,6 +787,8 @@ export function applyDamageDetailed(
   // What its stat block does as the damage lands: Acid or Fire stops a troll's Regeneration, and Undead Fortitude may
   // leave a zombie at 1 Hit Point.
   if (totalAdjusted > 0) events.push(...stopRegeneration(state, actor, definition, parts));
+  // What a damage type does to the stat block it lands on (Acid Absorption, Aversion to Fire, Freeze).
+  events.push(...damageTypeTraits(state, actor, definition, parts));
   if (!isPlayerCharacter && !knockedOut && !wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deps)
     undeadFortitude(
       state,

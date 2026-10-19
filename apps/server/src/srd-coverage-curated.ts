@@ -462,8 +462,8 @@ const sharesSpace = (who: string) =>
   );
 /** A trait that regains Hit Points from damage of one type, which the creature is also immune to. */
 const absorbs = (type: string) =>
-  reference(
-    `hit-points.ts applies the stat block's Immunity to ${type} damage. The Hit Points it regains from that damage are the GM's to add.`
+  enforced(
+    `Each time ${type} damage lands on it, the creature regains Hit Points equal to the ${type} damage dealt (damage-traits.ts), beside the stat block's own defences against it (hit-points.ts).`
   );
 
 export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
@@ -480,7 +480,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Aura of Authority": enforced(
     "statblock-traits.ts gives the hobgoblin and its allies within 10 feet Advantage on attack rolls and saving throws while it isn't Incapacitated."
   ),
-  "Aversion to Fire": reference("The Disadvantage after it takes Fire damage is the GM's to apply."),
+  "Aversion to Fire": enforced(
+    "Fire damage that lands gives the golem Disadvantage on attack rolls and ability checks until the end of its next turn (damage-traits.ts)."
+  ),
   "Barbed Hide": enforced(
     "trait-turns.ts deals 1d10 Piercing damage at the start of the devil's turns to each creature it grapples or that grapples it."
   ),
@@ -495,7 +497,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "resolution/attack.ts and saving-throws.ts give the Bloodied berserker Advantage on attack rolls and saving throws."
   ),
   "Bloodied Fury": enforced("resolution/attack.ts gives the Bloodied creature Advantage on attack rolls."),
-  "Blurred Form": reference("The Disadvantage on attack rolls against the mephit is the GM's to apply."),
+  "Blurred Form": enforced(
+    "Attack rolls against the mephit have Disadvantage unless it is Incapacitated (resolution/attack.ts)."
+  ),
   Bound: reference("The amulet and the damage it shares are the GM's to run."),
   "Celestial Restoration": revives,
   Compression: squeezes,
@@ -518,7 +522,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   "Eldritch Restoration": revives,
   "Elemental Restoration": revives,
-  Ephemeral: reference("What it can carry is the GM's to rule."),
+  Ephemeral: enforced("inventory.ts refuses any item given to the wisp to wear or carry."),
   "Ethereal Sight": senses,
   Evasion: enforced(
     "saving-throws.ts takes no damage on a successful Dexterity save for half damage and half on a failure, while the assassin isn't Incapacitated."
@@ -536,7 +540,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "movement-rules.ts lets the elemental end a move in a creature's space, and the map's drag preview (movePreview.ts) charges the same path. The 1d10 Fire damage when it first enters a space on a turn is the GM's to deal."
   ),
   Flyby: enforced("movement-rules.ts opens no Opportunity Attack when it flies out of an enemy's reach."),
-  Freeze: reference("The slower Speed after Cold damage is the GM's to apply."),
+  Freeze: enforced(
+    "Cold damage that lands lowers the elemental's Speed by 20 feet until the end of its next turn (damage-traits.ts)."
+  ),
   Gibbering: enforced(
     "trait-turns.ts opens the Wisdom save for each creature that starts its turn within 20 feet, and on a failure random-outcomes.ts rolls the d8: doing nothing takes its actions, Bonus Action, Reaction and Speed for the turn, wandering its actions and Bonus Action, and the random attack is said to the table."
   ),

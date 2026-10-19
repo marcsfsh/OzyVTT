@@ -13267,6 +13267,11 @@
   ],
   "traitMechanics": [
    {
+    "kind": "absorbs",
+    "name": "Acid Absorption",
+    "damageType": "acid"
+   },
+   {
     "kind": "berserk",
     "name": "Berserk",
     "on": 6
@@ -18919,6 +18924,33 @@
   ],
   "traitMechanics": [
    {
+    "kind": "damage-weakens",
+    "name": "Aversion to Fire",
+    "damageType": "fire",
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "attack",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     },
+     {
+      "type": "roll-mode",
+      "roll": "check",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-ability-check"
+       }
+      ]
+     }
+    ]
+   },
+   {
     "kind": "berserk",
     "name": "Berserk",
     "on": 6,
@@ -18926,6 +18958,11 @@
      "dc": 15,
      "withinFeet": 60
     }
+   },
+   {
+    "kind": "absorbs",
+    "name": "Lightning Absorption",
+    "damageType": "lightning"
    }
   ],
   "extensions": {
@@ -29416,6 +29453,13 @@
    "paralyzed",
    "petrified",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "absorbs",
+    "name": "Fire Absorption",
+    "damageType": "fire"
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -41178,6 +41222,13 @@
    "deafened",
    "exhaustion"
   ],
+  "traitMechanics": [
+   {
+    "kind": "absorbs",
+    "name": "Lightning Absorption",
+    "damageType": "lightning"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 5,
@@ -43606,6 +43657,10 @@
    "poisoned"
   ],
   "traitMechanics": [
+   {
+    "kind": "blurred",
+    "name": "Blurred Form"
+   },
    {
     "kind": "death-burst",
     "name": "Death Burst",
@@ -48956,6 +49011,19 @@
    "prone",
    "restrained",
    "unconscious"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "damage-weakens",
+    "name": "Freeze",
+    "damageType": "cold",
+    "modifiers": [
+     {
+      "type": "speed",
+      "amount": -20
+     }
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {

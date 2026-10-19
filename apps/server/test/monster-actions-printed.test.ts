@@ -8,7 +8,8 @@ import { addEffect, CONCENTRATING_TAG, makeEffect } from "../src/effects.js";
 import { activeMoveGrant, activeTeleportGrant } from "../src/granted-moves.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { answerSave } from "../src/saving-throws.js";
-import { RulesBlockedError } from "../src/game-store.js";
+import { CommandRejectedError, RulesBlockedError } from "../src/game-store.js";
+import { setInventoryItem } from "../src/inventory.js";
 
 // Stat block actions that give, protect, kill or knock out as their SRD 5.2.1 text says: a frost giant's War Cry, a
 // unicorn's Shimmering Shield, a will-o'-wisp's Consume Life, an incubus's Nightmare and an invisible stalker's Vortex.
@@ -29,7 +30,16 @@ const heroDefinition = {
   proficiencyBonus: 2,
   abilityScores: { str: 14, dex: 12, con: 14, int: 10, wis: 10, cha: 10 },
   hitPoints: { maximum: 120 },
-  actions: [],
+  actions: [
+    {
+      id: "dagger",
+      name: "Dagger",
+      activation: "action",
+      description: "A stab.",
+      attack: { bonus: 6, reachFeet: 5 },
+      damage: [{ formula: "1d4", type: "piercing" }]
+    }
+  ],
   extensions: {}
 } as unknown as ActorDefinition;
 
@@ -324,5 +334,89 @@ describe("legendary actions that strike an area", () => {
       [IDS.ally, 10]
     ]);
     expect(activeTeleportGrant(built.state, actor(built, IDS.monster))).toMatchObject({ feet: 60 });
+  });
+});
+
+describe("what a damage type does to a stat block", () => {
+  const strike = (built: Table, amount: number, type: string) =>
+    applyDamageDetailed(built.state, IDS.monster, { amount, parts: [{ amount, type }] }, GM, {
+      resolveDefinition: resolveDefinition(built),
+      newId: nextId,
+      now: NOW,
+      rollDie: () => 3
+    });
+
+  it("heals a clay golem by the Acid damage dealt, which its Immunity takes", () => {
+    const built = table("clay-golem");
+    strike(built, 10, "acid");
+    expect(actor(built, IDS.monster).hp.current).toBe(70);
+  });
+
+  it("heals a flesh golem by Lightning, and gives it Disadvantage after Fire until the end of its next turn", () => {
+    const built = table("flesh-golem");
+    strike(built, 8, "lightning");
+    expect(actor(built, IDS.monster).hp.current).toBe(68);
+    strike(built, 5, "fire");
+    expect(actor(built, IDS.monster).effects).toMatchObject([
+      {
+        name: "Aversion to Fire",
+        duration: { type: "until-bearer-turn-end" },
+        modifiers: [
+          { type: "roll-mode", roll: "attack", mode: "disadvantage" },
+          { type: "roll-mode", roll: "check", mode: "disadvantage" }
+        ]
+      }
+    ]);
+  });
+
+  it("slows a water elemental by 20 feet after Cold damage", () => {
+    const built = table("water-elemental");
+    strike(built, 5, "cold");
+    expect(actor(built, IDS.monster).effects).toMatchObject([
+      { name: "Freeze", modifiers: [{ type: "speed", amount: -20 }] }
+    ]);
+  });
+});
+
+describe("a steam mephit's Blurred Form", () => {
+  const stab = (built: Table) =>
+    resolveDefinitionAction(
+      built.state,
+      heroDefinition.actions[0]!,
+      { actorId: IDS.hero, targetIds: [IDS.monster], commandId: nextId() },
+      {
+        random: (sides) => Math.min(sides, 10),
+        newRollId: nextId,
+        gmSessionId: IDS.gm,
+        now: NOW,
+        definition: heroDefinition,
+        resolveDefinition: resolveDefinition(built)
+      }
+    );
+
+  it("gives attacks against it Disadvantage unless it is Incapacitated", () => {
+    const built = table("steam-mephit");
+    built.state.combat = { ...built.state.combat, turnActorId: IDS.hero };
+    expect(stab(built).rollMode?.disadvantage).toContain("Blurred Form");
+    actor(built, IDS.monster).conditions = [{ id: "incapacitated" }];
+    built.state.combat = {
+      ...built.state.combat,
+      turn: { ...built.state.combat.turn, actionUsed: false, actionInstance: null }
+    };
+    expect(stab(built).rollMode?.disadvantage ?? []).not.toContain("Blurred Form");
+  });
+});
+
+describe("a will-o'-wisp's Ephemeral", () => {
+  it("refuses anything given to the wisp to wear or carry", () => {
+    const built = table("will-o-wisp");
+    expect(() =>
+      setInventoryItem(
+        built.state,
+        IDS.monster,
+        { id: "rope", name: "Rope", quantity: 1, equipped: false, attuned: false } as never,
+        resolveDefinition(built)
+      )
+    ).toThrow(CommandRejectedError);
   });
 });

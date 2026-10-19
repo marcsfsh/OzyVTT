@@ -22,7 +22,7 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | --- | --- | --- | --- |
 | Spells (339) | 200 | 139 | 0 |
 | Monster actions (989) | 898 | 81 | 10 |
-| Monster traits (106) | 45 | 16 | 45 |
+| Monster traits (106) | 52 | 16 | 38 |
 | Barbarian features (23) | 22 | 0 | 1 |
 | Bard features (16) | 15 | 1 | 0 |
 | Cleric features (19) | 15 | 2 | 2 |
@@ -44,7 +44,7 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | Armor (13) | 13 | 0 | 0 |
 | Conditions (15) | 15 | 0 | 0 |
 | Rules glossary (155) | 124 | 10 | 21 |
-| All records (2420) | 1786 | 421 | 213 |
+| All records (2420) | 1793 | 421 | 206 |
 
 ## How records are classified
 
@@ -357,21 +357,21 @@ The number after each trait is how many stat blocks print it.
 | --- | --- | --- |
 | Abduct (2) | enforced | movement-rules.ts charges the bugbear no extra movement to drag a creature it grapples. |
 | Aberrant Ground (1) | reference | The GM can paint the Emanation as difficult terrain (terrain.ts), but the painted terrain doesn't move with the mouther. |
-| Acid Absorption (1) | reference | hit-points.ts applies the stat block's Immunity to Acid damage. The Hit Points it regains from that damage are the GM's to add. |
+| Acid Absorption (1) | enforced | Each time Acid damage lands on it, the creature regains Hit Points equal to the Acid damage dealt (damage-traits.ts), beside the stat block's own defences against it (hit-points.ts). |
 | Adhesive (1) | reference | Sticking to what touches it is the GM's to apply with the Grappled condition. |
 | Agile (2) | enforced | movement-rules.ts opens no Opportunity Attack when it moves out of an enemy's reach. |
 | Air Form (2) | enforced | movement-rules.ts lets the elemental end a move in another creature's space, and the map's drag preview (movePreview.ts) charges the same path. Fitting through a narrow gap is the GM's to allow. |
 | Amorphous (4) | reference | A gap sized for one size smaller is passed as Difficult Terrain (terrain.ts); one narrower still, an inch wide, is the GM's to allow. |
 | Amphibious (31) | enforced | breath.ts reads it: the creature breathes water, or holds its breath for the time it prints, when it is out of air. |
 | Aura of Authority (1) | enforced | statblock-traits.ts gives the hobgoblin and its allies within 10 feet Advantage on attack rolls and saving throws while it isn't Incapacitated. |
-| Aversion to Fire (1) | reference | The Disadvantage after it takes Fire damage is the GM's to apply. |
+| Aversion to Fire (1) | enforced | Fire damage that lands gives the golem Disadvantage on attack rolls and ability checks until the end of its next turn (damage-traits.ts). |
 | Barbed Hide (1) | enforced | trait-turns.ts deals 1d10 Piercing damage at the start of the devil's turns to each creature it grapples or that grapples it. |
 | Beast of Burden (1) | reference | Carrying capacity isn't tracked. |
 | Berserk (2) | enforced | trait-turns.ts rolls the d6 when the golem starts its turn Bloodied and keeps it berserk until it isn't Bloodied. Choosing what it attacks is the GM's. |
 | Blood Frenzy (1) | enforced | resolution/attack.ts gives the sahuagin Advantage against a creature that doesn't have all its Hit Points. |
 | Bloodied Frenzy (1) | enforced | resolution/attack.ts and saving-throws.ts give the Bloodied berserker Advantage on attack rolls and saving throws. |
 | Bloodied Fury (2) | enforced | resolution/attack.ts gives the Bloodied creature Advantage on attack rolls. |
-| Blurred Form (1) | reference | The Disadvantage on attack rolls against the mephit is the GM's to apply. |
+| Blurred Form (1) | enforced | Attack rolls against the mephit have Disadvantage unless it is Incapacitated (resolution/attack.ts). |
 | Bound (1) | reference | The amulet and the damage it shares are the GM's to run. |
 | Celestial Restoration (1) | guided | death-traits.ts tells the GM as the creature dies that it may come back, and marks a body that disappears as gone (death.ts). When and where it returns are the GM's. |
 | Compression (1) | reference | A gap sized for one size smaller is passed as Difficult Terrain (terrain.ts); one narrower still, an inch wide, is the GM's to allow. |
@@ -386,17 +386,17 @@ The number after each trait is how many stat blocks print it.
 | Earth Glide (2) | reference | Its Burrow Speed moves it on the map; passing through stone without a trace is the GM's to allow. |
 | Eldritch Restoration (1) | guided | death-traits.ts tells the GM as the creature dies that it may come back, and marks a body that disappears as gone (death.ts). When and where it returns are the GM's. |
 | Elemental Restoration (2) | guided | death-traits.ts tells the GM as the creature dies that it may come back, and marks a body that disappears as gone (death.ts). When and where it returns are the GM's. |
-| Ephemeral (1) | reference | What it can carry is the GM's to rule. |
+| Ephemeral (1) | enforced | inventory.ts refuses any item given to the wisp to wear or carry. |
 | Ethereal Sight (2) | reference | Communication and senses like this are the GM's to run. |
 | Evasion (1) | enforced | saving-throws.ts takes no damage on a successful Dexterity save for half damage and half on a failure, while the assassin isn't Incapacitated. |
 | Exalted Restoration (3) | guided | death-traits.ts tells the GM as the creature dies that it may come back, and marks a body that disappears as gone (death.ts). When and where it returns are the GM's. |
 | Fear Aura (1) | enforced | trait-turns.ts opens the Wisdom save for each enemy that starts its turn in the aura while the pit fiend isn't Incapacitated. A failure is Frightened until the start of its next turn, and a success makes it immune for the fight. |
 | Fiendish Restoration (2) | guided | death-traits.ts tells the GM as the creature dies that it may come back, and marks a body that disappears as gone (death.ts). When and where it returns are the GM's. |
-| Fire Absorption (1) | reference | hit-points.ts applies the stat block's Immunity to Fire damage. The Hit Points it regains from that damage are the GM's to add. |
+| Fire Absorption (1) | enforced | Each time Fire damage lands on it, the creature regains Hit Points equal to the Fire damage dealt (damage-traits.ts), beside the stat block's own defences against it (hit-points.ts). |
 | Fire Aura (4) | enforced | trait-turns.ts deals the Fire damage at the end of the bearer's turns to each creature in the Emanation, or to an azer's enemies there. A fire elemental's aura also sets them burning. |
 | Fire Form (1) | guided | movement-rules.ts lets the elemental end a move in a creature's space, and the map's drag preview (movePreview.ts) charges the same path. The 1d10 Fire damage when it first enters a space on a turn is the GM's to deal. |
 | Flyby (7) | enforced | movement-rules.ts opens no Opportunity Attack when it flies out of an enemy's reach. |
-| Freeze (1) | reference | The slower Speed after Cold damage is the GM's to apply. |
+| Freeze (1) | enforced | Cold damage that lands lowers the elemental's Speed by 20 feet until the end of its next turn (damage-traits.ts). |
 | Gibbering (1) | enforced | trait-turns.ts opens the Wisdom save for each creature that starts its turn within 20 feet, and on a failure random-outcomes.ts rolls the d8: doing nothing takes its actions, Bonus Action, Reaction and Speed for the turn, wandering its actions and Bonus Action, and the random attack is said to the table. |
 | Greater Magic Resistance (1) | enforced | saving-throws.ts makes the rakshasa succeed on saves against spells and magic items without a roll, and resolution/attack.ts makes spell attack rolls miss it. Hiding from divination is the GM's. |
 | Heat Aura (1) | enforced | trait-turns.ts deals 3d10 Fire damage at the end of the remorhaz's turns to each creature within 5 feet. |
@@ -413,7 +413,7 @@ The number after each trait is how many stat blocks print it.
 | Jumper (1) | enforced | jumping.ts measures its jumps with Dexterity in place of Strength. |
 | Legendary Resistance (32) | enforced | saving-throws.ts lets the GM turn a failed save into a success, as many times a day as the stat block prints, or its lair count while the GM marks it fighting in its lair (lair.ts). A Long Rest restores them. |
 | Light Sensitivity (1) | enforced | resolution/attack.ts gives the cloaker Disadvantage on attack rolls while it stands in Bright Light (vision/rules.ts). With dynamic vision off, the light is the GM's. |
-| Lightning Absorption (2) | reference | hit-points.ts applies the stat block's Immunity to Lightning damage. The Hit Points it regains from that damage are the GM's to add. |
+| Lightning Absorption (2) | enforced | Each time Lightning damage lands on it, the creature regains Hit Points equal to the Lightning damage dealt (damage-traits.ts), beside the stat block's own defences against it (hit-points.ts). |
 | Limited Amphibiousness (1) | guided | breath.ts lets it breathe water. Its four hours out of water before it starts to suffocate are the GM's to count. |
 | Loathsome Limbs (1) | enforced | death-traits.ts severs a limb when the troll ends any turn Bloodied after taking 15 Slashing damage or more in it, four times a day. The limb joins the fight as a Troll Limb under the troll's command and on its side in its space, and acts right after the troll (summons.ts). The troll has 1 Exhaustion level for each missing limb until it next regains Hit Points, when they grow back. |
 | Magic Resistance (34) | enforced | saving-throws.ts gives it Advantage on saves against spells and magic items, saves a spell asks it to repeat included. |

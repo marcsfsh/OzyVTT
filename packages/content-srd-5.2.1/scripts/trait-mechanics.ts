@@ -329,6 +329,52 @@ function alwaysInvisible(trait: Trait): TraitMechanic | null {
     : null;
 }
 
+/** "Whenever the golem is subjected to Acid damage, it (takes no damage and instead) regains a number of Hit Points
+ *  equal to the Acid damage dealt." */
+function absorption(trait: Trait): TraitMechanic | null {
+  const match =
+    /^Whenever the [\w' -]+? is subjected to ([A-Z][a-z]+) damage, it (?:takes no damage and instead )?regains a number of Hit Points equal to the \1 damage dealt\.$/.exec(
+      trait.description
+    );
+  return match ? { kind: "absorbs", name: trait.name, damageType: match[1]!.toLowerCase() as never } : null;
+}
+
+/** "If the golem takes Fire damage, it has Disadvantage on attack rolls and ability checks until the end of its next
+ *  turn", "If the elemental takes Cold damage, its Speed decreases by 20 feet until the end of its next turn." */
+function damageWeakens(trait: Trait): TraitMechanic | null {
+  const match =
+    /^If the [\w' -]+? takes ([A-Z][a-z]+) damage, (?:it has (Disadvantage) on attack rolls and ability checks|its Speed decreases by (\d+) feet) until the end of its next turn\.$/.exec(
+      trait.description
+    );
+  if (!match) return null;
+  const modifiers = match[2]
+    ? [
+        {
+          type: "roll-mode" as const,
+          roll: "attack" as const,
+          mode: "disadvantage" as const,
+          when: [{ type: "on-attack-roll" as const }]
+        },
+        {
+          type: "roll-mode" as const,
+          roll: "check" as const,
+          mode: "disadvantage" as const,
+          when: [{ type: "on-ability-check" as const }]
+        }
+      ]
+    : [{ type: "speed" as const, amount: -Number(match[3]) }];
+  return { kind: "damage-weakens", name: trait.name, damageType: match[1]!.toLowerCase() as never, modifiers };
+}
+
+/** "Attack rolls against the mephit are made with Disadvantage unless the mephit has the Incapacitated condition." */
+function blurredForm(trait: Trait): TraitMechanic | null {
+  return /^Attack rolls against the [\w' -]+? are made with Disadvantage unless the [\w' -]+? has the Incapacitated condition\.$/.test(
+    trait.description
+  )
+    ? { kind: "blurred", name: trait.name }
+    : null;
+}
+
 const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
   regeneration,
   undeadFortitude,
@@ -341,7 +387,10 @@ const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
   berserk,
   illumination,
   lightSensitivity,
-  alwaysInvisible
+  alwaysInvisible,
+  absorption,
+  damageWeakens,
+  blurredForm
 ];
 
 /** Every trait the engine can run, in the stat block's order; the rest stay prose. */

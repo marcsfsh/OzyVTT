@@ -48,7 +48,7 @@ import { areAllies, areEnemies } from "../creature-sides.js";
 import { holdsFeature, spellClassOf } from "../class-features.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { creatureTypeOf, swimSpeedFeet } from "../statblock-facts.js";
-import { auraOfAuthority } from "../statblock-traits.js";
+import { auraOfAuthority, traitOf } from "../statblock-traits.js";
 import { hitRiderOf } from "./hit-riders.js";
 import { wardedConditions } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
@@ -489,6 +489,10 @@ function traitClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeCl
     sources.advantage.push({ source: "printed", label: `${ctx.action.name} (first round)` });
   const authority = auraOfAuthority(state, attacker, deps);
   if (authority) sources.advantage.push(authority);
+  // SRD Blurred Form (a steam mephit): "Attack rolls against the mephit are made with Disadvantage unless the mephit
+  // has the Incapacitated condition."
+  const blurred = traitOf(target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined, "blurred");
+  if (blurred && !isIncapacitated(target)) sources.disadvantage.push({ source: "blurred", label: blurred.name });
   if (!deps.distanceFeet || !holdsFeature(deps.definition, "pack-tactics", "Pack Tactics")) return;
   for (const entry of state.combat.initiative) {
     const ally = state.actors.find((candidate) => candidate.id === entry.actorId);
