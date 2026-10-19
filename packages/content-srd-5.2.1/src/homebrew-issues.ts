@@ -154,6 +154,8 @@ const LABELS: Readonly<Record<string, string>> = {
   toggles: "ends what it gave when taken again",
   orAnother: "teleports another creature instead",
   typeTag: "type tag",
+  throughCreatures: "moves through other creatures",
+  entered: "creatures its move went through",
   afterHurtingBloodied: "right after damaging a Bloodied creature",
   disgorges: "lets the creature out after its damage",
   regurgitate: "damage from inside that makes it save",

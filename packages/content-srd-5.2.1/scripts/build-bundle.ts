@@ -559,6 +559,9 @@ const SAVE_TARGET_TYPES = ["Humanoid", "Beast", "Undead", "Fiend", "Giant", "Dra
  * clause the reader doesn't know whole (willing, "Charmed or Grappled", 0 Hit Points) stays the GM's.
  */
 function withSaveTargets(desc: string): Pick<ActorAction, "targets"> {
+  // "Each creature whose space the centaur enters", "each creature whose space the cube enters for the first time
+  // during this move": the creatures its move went through.
+  if (/\bwhose space the [a-z' -]+? enters\b/i.test(desc)) return { targets: { entered: true } };
   const clause = /Saving Throw: DC \d+, ((?:one|each) [^.(]*)/.exec(desc)?.[1]?.trim();
   if (!clause) return {};
   if (/\bin an? \d+-foot\b|\bdestination\b|\bwhose space\b|\bwilling\b| or Grappled\b|\bHit Points\b/.test(clause))
@@ -722,6 +725,8 @@ const ACTION_ENRICHMENTS: Record<
   },
   // "The shambling mound can have only one creature Grappled by this action at a time."
   "shambling-mound/engulf": { holdsAtOnce: 1 },
+  // Ooze Cube: "The cube can hold one Large creature or up to four Medium or Small creatures inside itself at a time."
+  "gelatinous-cube/engulf": { holdsAtOnce: 4, largeFillsHold: true },
   // "The elemental can grapple one Large creature or up to two Medium or smaller creatures at a time with Whelm."
   "water-elemental/whelm": { holdsAtOnce: 2, largeFillsHold: true },
   // "The tarrasque moves up to its Speed. At the end of this movement, the tarrasque creates an instantaneous shock
@@ -1619,9 +1624,7 @@ const monsters: ActorDefinition[] = creatures
   });
 
 for (const slug of SEQUENCE_SLUGS)
-  if (
-    !monsters.some((monster) => slugOf(monster.source.externalId) === slug && monster.actions.some((a) => a.useNumber))
-  )
+  if (!monsters.some((monster) => monster.source.externalId === slug && monster.actions.some((a) => a.useNumber)))
     throw new Error(
       `A sequence names ${slug}, whose action it no longer finds - check for a typo or an upstream rename.`
     );

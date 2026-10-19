@@ -9,6 +9,7 @@ import { hiddenFrom } from "../vision/audience.js";
 import { sceneSight } from "../vision/sight.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { creatureTypeOf } from "../statblock-facts.js";
+import { enteredOnMoveOf } from "../granted-moves.js";
 import type { RuleId } from "../rules-families.js";
 import { endedEffect, sizeAtMost, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
@@ -118,6 +119,11 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
       violations.push({
         rule: "target.not-allowed",
         message: `${action.name} targets a ${rules.typeTag}, and ${name} isn't one.`
+      });
+    if (rules.entered && !(enteredOnMoveOf(attacker, action.id) ?? []).includes(target.id))
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} targets the creatures whose spaces ${attacker.name} entered on its move, and ${name} isn't one.`
       });
     if (rules.atZeroHitPoints && target.hp.current > 0)
       violations.push({

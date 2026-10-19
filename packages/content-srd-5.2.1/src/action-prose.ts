@@ -284,12 +284,17 @@ export function moveOfProse(description: string): ActionMove | null {
   const rest = found[5] ?? "";
   const first =
     ATTACK_OR_SAVE.test(description.slice(found.index)) && !ATTACK_OR_SAVE.test(description.slice(0, found.index));
+  // "The cube can move through the spaces of Large or smaller creatures".
+  const through = /\bcan move through the spaces of (Tiny|Small|Medium|Large|Huge) or smaller creatures/i
+    .exec(description)?.[1]
+    ?.toLowerCase() as "tiny" | "small" | "medium" | "large" | "huge" | undefined;
   return {
     speed: found[2] ? "half" : "full",
     ...(mode ? { mode } : {}),
     provokes: !/without provoking Opportunity Attacks/i.test(rest),
     ...(/straight toward/i.test(rest) ? { straight: true as const } : {}),
-    ...(first ? { first: true as const } : {})
+    ...(first ? { first: true as const } : {}),
+    ...(through ? { throughCreatures: through } : {})
   };
 }
 

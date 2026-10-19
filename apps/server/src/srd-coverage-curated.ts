@@ -594,7 +594,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Multiple Heads": enforced(
     "death-traits.ts kills one head on each turn the hydra takes 25 damage or more, and the hydra with its last. At the end of its turn it grows two heads for each one lost since its last turn and regains 20 Hit Points, unless it took Fire damage since then. Its Multiattack makes one Bite per living head (effective-actions.ts)."
   ),
-  "Ooze Cube": reference("Entering the cube, and pulling a creature out, are the GM's to run with its Engulf."),
+  "Ooze Cube": reference(
+    "Its Engulf holds the creatures inside and gives them Total Cover, and pulling one out is an action. A creature that enters the cube's space is the GM's to run with Engulf at Disadvantage."
+  ),
   "Pack Tactics": enforced(
     "resolution/attack.ts gives Advantage when an ally of the attacker that isn't Incapacitated is within 5 feet of the target."
   ),
@@ -909,8 +911,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Dryad/tree-stride": guided(
     "A teleport of up to 65 feet is granted (granted-moves.ts). Whether a Large tree stands at each end is the GM's, since trees aren't on the map."
   ),
-  "action:Centaur Trooper/trampling-charge-recharge-5-6": guided(
-    "It can be taken move first: a move of its Speed that provokes no Opportunity Attacks is granted (granted-moves.ts), and the Strength save, damage and Prone apply to the creatures the GM picks. Passing through Medium or smaller creatures' spaces needs the GM's go-ahead on the map."
+  "action:Centaur Trooper/trampling-charge-recharge-5-6": enforced(
+    "Taken move first, it grants a move of its Speed that provokes no Opportunity Attacks and goes straight through the spaces of Medium or smaller creatures (granted-moves.ts, movement-rules.ts). The Strength save, damage and Prone then reach only the creatures whose spaces it entered (resolution/action-targets.ts)."
+  ),
+  "action:Gelatinous Cube/engulf": guided(
+    "Taken move first, it grants a move of its Speed that provokes no Opportunity Attacks and goes straight through the spaces of Large or smaller creatures (movement-rules.ts); the save reaches only the creatures it entered. A failure Restrains the creature inside the cube, where it can't speak, holds its breath, has Total Cover from outside and moves with the cube (swallow.ts); the cube holds one Large or four smaller creatures, and the acid comes at the start of its turns. The Athletics escape and the pull from outside, with the puller's acid, are actions. Moving a creature out on a success, and a creature that walks into the cube, are the GM's."
   ),
   "action:Weretiger/prowl-tiger-or-hybrid-form-only": guided(
     "It works only in the tiger and hybrid forms (transform/rules.ts), and a move of its Speed that provokes no Opportunity Attacks is granted (granted-moves.ts). The Hide at the end of it is the GM's."

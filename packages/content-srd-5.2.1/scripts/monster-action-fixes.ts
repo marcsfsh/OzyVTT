@@ -30,8 +30,10 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
       // "An engulfed target can try to escape by taking an action to make a DC 12 Strength (Athletics) check."
       escapeDc: 12,
       escapeAthletics: true,
-      // "Can't cast spells with a Verbal component", and "is suffocating": it holds its breath while engulfed.
-      failureEffect: { name: "Engulfed", tags: ["cant-speak", "smothering"], modifiers: [] },
+      // "Can't cast spells with a Verbal component", and "is suffocating": it holds its breath while engulfed. Inside
+      // the cube it moves with it and has Total Cover from outside (Ooze Cube), as a swallowed creature does.
+      failureEffect: { name: "Engulfed", tags: ["cant-speak", "smothering", "swallowed"], modifiers: [] },
+      endsWhenSourceDies: true,
       // "As an action, a creature within 5 feet of the cube can pull a creature ... out of the cube by succeeding on a
       // DC 12 Strength (Athletics) check, and the puller takes 10 (3d6) Acid damage."
       endedBy: {
@@ -43,7 +45,7 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
       }
     },
     reminder:
-      "The cube moves up to its Speed first; an engulfed creature moves with it and has Total Cover from attacks outside the cube."
+      "A creature that succeeds moves to an unoccupied space within 5 feet of the cube, or fails if there is none; one that escapes enters the nearest unoccupied space. A creature that enters the cube's space is subjected to Engulf with Disadvantage."
   },
   "water-elemental/whelm": {
     why: "a creature outside can pull the whelmed one free, and the whelmed one holds its breath, which the save's text prints",

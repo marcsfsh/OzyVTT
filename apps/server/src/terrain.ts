@@ -15,6 +15,7 @@ import {
   wallCrossing
 } from "@vtt/rules-5e";
 import { isIncapacitated } from "./condition-rules.js";
+import { sizeAtMost } from "./resolution/context.js";
 import { areAllies } from "./creature-sides.js";
 import { holdsFeature } from "./class-features.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -91,6 +92,11 @@ export type MovementCostOptions = Readonly<{
   perceives?: (actorId: string) => boolean;
   /** The mover may stop in other creatures' spaces (an air elemental's Air Form), so none bars its way. */
   passesCreatures?: boolean;
+  /** The mover may pass through the spaces of creatures this size or smaller (a gelatinous cube's Engulf). */
+  passesCreaturesUpTo?: string;
+  /** The path keeps to the straight line drawn, so a move through creatures enters the spaces along it rather than
+   *  going round them. */
+  alongLine?: boolean;
   /** The mover passes through walls as through Difficult Terrain (a ghost's Incorporeal Movement). */
   throughWalls?: boolean;
   /** Difficult Terrain costs the mover nothing extra (Freedom of Movement). */
@@ -181,7 +187,10 @@ export function movementCost(
       occupant.definitionId !== null &&
       occupant.definitionId !== undefined &&
       holdsFeature(options.resolveDefinition?.(occupant.definitionId), "swarm", "Swarm");
-    const passage = printed === "blocked" && (options.passesCreatures || swarm) ? "difficult" : printed;
+    const passes =
+      options.passesCreatures === true ||
+      (options.passesCreaturesUpTo !== undefined && sizeAtMost(occupant.size, options.passesCreaturesUpTo));
+    const passage = printed === "blocked" && (passes || swarm) ? "difficult" : printed;
     if (passage === "open") continue;
     const cells = passage === "blocked" ? closedCells : difficultCells;
     const origin = footprintOrigin(imageToGrid(calibration, token.position), token.sizeCells);
@@ -193,9 +202,20 @@ export function movementCost(
   const crosses = wallCrossing(walls);
   const halvedAt = options.halvedAt;
   const costlyGroundAt = aloft ? undefined : options.costlyGroundAt;
+  const fromCell = footprintOrigin(imageToGrid(calibration, from), sizeCells);
+  const toCell = footprintOrigin(imageToGrid(calibration, to), sizeCells);
+  const lineLength = Math.hypot(toCell.column - fromCell.column, toCell.row - fromCell.row);
+  const nearLine = (cell: { column: number; row: number }) =>
+    lineLength === 0 ||
+    Math.abs(
+      (cell.column - fromCell.column) * (toCell.row - fromCell.row) -
+        (cell.row - fromCell.row) * (toCell.column - fromCell.column)
+    ) /
+      lineLength <=
+      0.75;
   const path = movementPath({
-    from: footprintOrigin(imageToGrid(calibration, from), sizeCells),
-    to: footprintOrigin(imageToGrid(calibration, to), sizeCells),
+    from: fromCell,
+    to: toCell,
     sizeCells,
     isDifficult: (column, row) =>
       options.ignoresDifficult !== true &&
@@ -211,6 +231,7 @@ export function movementCost(
       return center.x >= 0 && center.y >= 0 && center.x <= geometry.width && center.y <= geometry.height;
     },
     isStepOpen: (stepFrom, stepTo) =>
+      (options.alongLine !== true || nearLine(stepTo)) &&
       (options.throughWalls === true ||
         footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls) !== "blocked") &&
       // A spell's barrier holds back even a mover that passes walls.

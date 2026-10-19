@@ -8,6 +8,7 @@ import { altitudesAlong, heightRefusal, sharesHeight } from "./altitude.js";
 import {
   activeMoveGrant,
   activeTeleportGrant,
+  recordEntered,
   spendMoveGrant,
   spendTeleportGrant,
   type MoveGrant
@@ -238,6 +239,30 @@ function grantsOf(state: GameState, actor: GameState["actors"][number] | undefin
       : {}),
     ...(teleport ? { teleport: { name: teleport.name, feet: teleport.feet } } : {})
   };
+}
+
+/** The creatures whose spaces a mover's space overlaps at some point of its path (each grid step, or each few feet off
+ *  the grid), in no order. Its own token and those it carries are left out. */
+function creaturesEntered(
+  state: GameState,
+  moverId: string,
+  path: readonly Point[],
+  carried: readonly string[]
+): string[] {
+  const mover = state.combat.tokens.find((token) => token.actorId === moverId);
+  if (!mover) return [];
+  const halfOf = (token: (typeof state.combat.tokens)[number]) =>
+    Math.max(token.sizePx, (token.gridSizePx ?? 0) * token.sizeCells) / 2;
+  return state.combat.tokens
+    .filter((token) => token.position !== null && token.actorId !== moverId && !carried.includes(token.actorId))
+    .filter((token) => {
+      // Squares overlap when they are nearer than their two halves on both axes; a corner passed diagonally isn't.
+      const apart = (halfOf(token) + halfOf(mover)) * 0.9;
+      return path
+        .slice(1)
+        .some((at) => Math.max(Math.abs(at.x - token.position!.x), Math.abs(at.y - token.position!.y)) < apart);
+    })
+    .map((token) => token.actorId);
 }
 
 /** The creatures a grappler holds (its `grapple` effects on them). */
@@ -493,6 +518,13 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   // A granted move is charged to its grant, and provokes unless it says otherwise.
   if (grant) {
     spendMoveGrant(mover, grant.effectId, grant.chargeFeet);
+    // The creatures a move through them entered are what its action then targets (a cube's Engulf).
+    if (grant.throughCreatures)
+      recordEntered(
+        mover,
+        grant.effectId,
+        creaturesEntered(state, actorId, grant.path, input.dragging?.actorIds ?? [])
+      );
     if (grant.jump && grant.costFeet > 0) {
       const used = state.combat.turn.movementUsedFeet;
       const budget = movementCounts(state, actorId)
@@ -825,7 +857,12 @@ function fittingMoveGrant(
   let cost: MovementCost | null;
   if (grant.jump) cost = straightCost(input, from, to, fromAltitude, toAltitude);
   else {
-    const { options, extraPerStep } = costOptions(state, input, mover, travel, fromAltitude, toAltitude);
+    const costed = costOptions(state, input, mover, travel, fromAltitude, toAltitude);
+    const { extraPerStep } = costed;
+    // "The cube can move through the spaces of Large or smaller creatures."
+    const options = grant.throughCreatures
+      ? { ...costed.options, passesCreaturesUpTo: grant.throughCreatures, alongLine: true }
+      : costed.options;
     cost = input.cost
       ? input.cost(from, to, options)
       : straightCost(input, from, to, fromAltitude, toAltitude, extraPerStep);

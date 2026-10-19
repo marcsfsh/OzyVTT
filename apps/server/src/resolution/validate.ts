@@ -46,6 +46,7 @@ import {
   type ResolveInput
 } from "./context.js";
 import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
+import { actionTargetViolations } from "./action-targets.js";
 
 /** The attacker and targets, refused unless the action has something structured to resolve against them. */
 function combatantsOf(
@@ -314,6 +315,19 @@ export function openResolve(
     ...(deps.catalog ? { catalog: deps.catalog } : {})
   };
   const sightBlocks: Array<readonly [RuleId, string]> = [];
+  // An action taken move first names its targets only once it has moved, so its own targeting rules are checked then
+  // (a gelatinous cube's Engulf takes only the creatures it moved through).
+  if (input.owedPaid === true)
+    for (const violation of actionTargetViolations({
+      state,
+      attacker,
+      action,
+      targetIds: input.targetIds,
+      definition: deps.definition,
+      resolveDefinition: deps.resolveDefinition,
+      distanceFeet: deps.distanceFeet
+    }))
+      sightBlocks.push([violation.rule, violation.message]);
   // SRD Hide: "you must be out of any enemy's line of sight". With dynamic vision on the engine knows who sees whom;
   // only an enemy the hider sees counts ("if you can see a creature, you can discern whether it can see you"), so
   // the refusal never gives away one the player doesn't know of.

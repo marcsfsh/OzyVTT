@@ -57,6 +57,7 @@ export function grantMove(
     owedActionId?: string;
     awayFromActorId?: string;
     towardActorId?: string;
+    throughCreatures?: ActionMove["throughCreatures"];
   }>
 ): void {
   const grant: MoveGrant = {
@@ -69,7 +70,8 @@ export function grantMove(
     turnActorId: state.combat.turnActorId,
     ...(input.owedActionId ? { owedActionId: input.owedActionId } : {}),
     ...(input.awayFromActorId ? { awayFromActorId: input.awayFromActorId } : {}),
-    ...(input.towardActorId ? { towardActorId: input.towardActorId } : {})
+    ...(input.towardActorId ? { towardActorId: input.towardActorId } : {}),
+    ...(input.throughCreatures ? { throughCreatures: input.throughCreatures } : {})
   };
   actor.effects = [
     ...actor.effects.filter((effect) => effect.grantedMove === undefined),
@@ -144,6 +146,28 @@ export function spendMoveGrant(actor: Actor, effectId: string, feet: number): vo
 /** The teleport is taken: its grant goes. */
 export function spendTeleportGrant(actor: Actor, effectId: string): void {
   actor.effects = actor.effects.filter((effect) => effect.id !== effectId);
+}
+
+/** The creatures whose spaces a move through them entered, kept on its grant for the action it owes. */
+export function recordEntered(actor: Actor, effectId: string, entered: readonly string[]): void {
+  if (entered.length === 0) return;
+  actor.effects = actor.effects.map((effect) =>
+    effect.id === effectId && effect.grantedMove
+      ? {
+          ...effect,
+          grantedMove: {
+            ...effect.grantedMove,
+            entered: [...new Set([...(effect.grantedMove.entered ?? []), ...entered])].slice(0, 50)
+          }
+        }
+      : effect
+  );
+}
+
+/** The creatures the move this action gave its user has entered so far, or null when it gave none. */
+export function enteredOnMoveOf(actor: Actor, actionId: string): readonly string[] | null {
+  const grant = actor.effects.find((effect) => effect.grantedMove?.owedActionId === actionId)?.grantedMove;
+  return grant ? (grant.entered ?? []) : null;
 }
 
 /** The action a move-first grant held is taken now: the grant no longer owes it. Returns whether one was owed. */

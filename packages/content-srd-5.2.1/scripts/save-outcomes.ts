@@ -367,7 +367,7 @@ type DamagePenalty = Readonly<{
   type: "damage-bonus";
   amount: 0;
   dice: string;
-  when: ReadonlyArray<{ type: "on-damage-roll" }>;
+  when: Array<{ type: "on-damage-roll" }>;
 }>;
 
 /**

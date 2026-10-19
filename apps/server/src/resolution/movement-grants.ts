@@ -46,6 +46,7 @@ export function applyMovementGrants(ctx: ResolveContext): void {
       ...(move.mode ? { mode: move.mode } : {}),
       provokes: move.provokes,
       ...(move.straight ? { straight: true as const } : {}),
+      ...(move.throughCreatures ? { throughCreatures: move.throughCreatures } : {}),
       ...(input.moveFirst === true ? { owedActionId: action.id } : {})
     });
     const verb =

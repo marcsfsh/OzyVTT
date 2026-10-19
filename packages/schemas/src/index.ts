@@ -1589,7 +1589,10 @@ export const EffectInstanceSchema = z
         turnActorId: z.uuid().nullable(),
         owedActionId: z.string().min(1).max(120).optional(),
         awayFromActorId: z.uuid().optional(),
-        towardActorId: z.uuid().optional()
+        towardActorId: z.uuid().optional(),
+        /** It passes through the spaces of creatures this size or smaller, and these are the ones it has entered. */
+        throughCreatures: SizeSchema.optional(),
+        entered: z.array(z.uuid()).max(50).optional()
       })
       .strict()
       .optional(),
@@ -3546,6 +3549,9 @@ export const ActionTargetsSchema = z
     markedBy: EffectTagSchema.optional(),
     /** Only a creature at 0 Hit Points (a will-o'-wisp's Consume Life). */
     atZeroHitPoints: z.literal(true).optional(),
+    /** Only a creature whose space its user entered on the move the action gave it ("each creature whose space the cube
+     *  enters for the first time during this move"). */
+    entered: z.literal(true).optional(),
     /** Only a creature whose stat block prints this type tag ("a willing demon": a Fiend (Demon)). */
     typeTag: z.string().min(1).max(40).optional(),
     /** Only a creature under this creature's effect from that action (one Restrained by an ettercap's Web Strand). */
@@ -3786,7 +3792,10 @@ export const ActionMoveSchema = z
     mode: z.enum(["walk", "fly", "swim", "climb", "burrow"]).optional(),
     provokes: z.boolean().default(true),
     straight: z.literal(true).optional(),
-    first: z.literal(true).optional()
+    first: z.literal(true).optional(),
+    /** The largest creature whose space it may pass through (a gelatinous cube's Engulf: "can move through the spaces
+     *  of Large or smaller creatures"); the creatures whose spaces it enters are what the action then targets. */
+    throughCreatures: SizeSchema.optional()
   })
   .strict();
 export type ActionMove = z.infer<typeof ActionMoveSchema>;
