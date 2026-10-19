@@ -48,6 +48,8 @@ describe("rule families", () => {
       ["movement.occupied", "movement"],
       ["movement.no-speed", "movement"],
       ["movement.blocked-path", "movement"],
+      // Hideous Laughter: standing up is movement the effect holds back.
+      ["movement.cant-stand", "movement"],
       ["movement.altitude", "movement"],
       ["movement.jump", "movement"],
       ["movement.toward-fear", "movement"],
@@ -69,6 +71,11 @@ describe("rule families", () => {
       // An effect that takes away Reactions (Slow) is "you have no reaction", like Incapacitated.
       ["condition.no-reactions", "economy"],
       ["condition.no-spells", "economy"],
+      // What an effect leaves its bearer able to do on a turn (Gaseous Form's no attacks, Abjure Foes' one thing,
+      // Command's Flee): like Slow's no Reactions.
+      ["condition.cant-attack", "economy"],
+      ["condition.dash-only", "economy"],
+      ["condition.one-thing-a-turn", "economy"],
       ["legendary.own-turn", "economy"],
       ["legendary.after-a-turn", "economy"],
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.

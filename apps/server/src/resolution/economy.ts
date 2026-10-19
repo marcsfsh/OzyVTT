@@ -8,6 +8,8 @@ import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { wardingAura } from "../paladin-auras.js";
 import { areAllies } from "../creature-sides.js";
 import {
+  CANT_ATTACK_TAG,
+  DASH_ONLY_TAG,
   HASTED_TAG,
   hasEffectTag,
   NO_ACTIONS_TAG,
@@ -357,6 +359,8 @@ function checkMarkMove(
 function checkSpellUp({ attacker, action, siblings, violations }: Evaluation, spell: SpellReference): void {
   const row = laterRowOf(spell, action.id);
   if (!row || !takenWhileUp(row) || spellUpLevel(attacker, spell) !== null) return;
+  // Another creature's spell gave it this action (Dragon's Breath), so it is there while that effect is.
+  if (attacker.effects.some((effect) => effect.grantedSpellAction?.spellId === spell.id)) return;
   // A sheet built before the cast itself was an action (Produce Flame's) has no way to start it, so it isn't asked to.
   if (!siblings.some((sibling) => sibling.spellId === spell.id && !laterRowOf(spell, sibling.id))) return;
   violations.push({
@@ -502,6 +506,10 @@ const ANSWERS_A_ROLL: ReadonlySet<string> = new Set([
   "boon-of-fate"
 ]);
 
+/** What a creature limited to Dash may still do (Wind Walk): the Dash action, as an action or a Bonus Action, and the
+ *  action that ends its cloud form. */
+const DASH_ONLY_ALLOWED: ReadonlySet<string> = new Set(["dash", "dash-bonus", "end-effect"]);
+
 /** An effect's name in a refusal, as the creature's own sheet shows it: a caster hidden from the table is "A hidden
  *  threat" there. */
 function shownEffectName(
@@ -552,6 +560,26 @@ function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition,
     violations.push({
       rule: "condition.incapacitated",
       message: `${attacker.name} is reeling from ${shownEffectName(state, reeling, resolveDefinition)} and can't take an action or a Bonus Action this turn.`
+    });
+  // SRD Gaseous Form: the cloud "can't attack".
+  const unarmed = action.id.startsWith("unarmed-");
+  const cantAttack = attacker.effects.find((effect) => effect.tags.includes(CANT_ATTACK_TAG));
+  if (cantAttack && (action.attack !== undefined || action.multiattack !== undefined || unarmed))
+    violations.push({
+      rule: "condition.cant-attack",
+      message: `${attacker.name} can't attack while ${shownEffectName(state, cantAttack, resolveDefinition)} lasts.`
+    });
+  // SRD Wind Walk: "The only actions it can take in this form are the Dash action or a Magic action to begin reverting".
+  const dashOnly = attacker.effects.find((effect) => effect.tags.includes(DASH_ONLY_TAG));
+  if (
+    dashOnly &&
+    !DASH_ONLY_ALLOWED.has(action.id) &&
+    action.activation !== "reaction" &&
+    action.activation !== "other"
+  )
+    violations.push({
+      rule: "condition.dash-only",
+      message: `${attacker.name} can take only the Dash action or end ${shownEffectName(state, dashOnly, resolveDefinition)} while it lasts.`
     });
   // SRD Befuddlement: the target "can't cast spells or take the Magic action".
   const befuddled = attacker.effects.find((effect) => effect.tags.includes(NO_SPELLS_TAG));
@@ -1491,12 +1519,12 @@ function checkTargeting(
     !charmWarded &&
     (action.attack !== undefined || action.save !== undefined || action.damage.length > 0 || magical)
   ) {
-    // The condition itself must be on: a hand cleared it while its effect lingers.
-    const charmers = attacker.conditions.some((condition) => condition.id === "charmed")
-      ? attacker.effects.filter(
-          (effect) => effect.linkedConditionIds.includes("charmed") && effect.sourceActorId !== null
-        )
-      : [];
+    // Only while the creature is Charmed: a hand cleared it, or an effect holds it off (Calm Emotions), and the bar
+    // lifts.
+    const charmed = attacker.conditions.some((condition) => condition.id === "charmed");
+    const charmers = attacker.effects.filter(
+      (effect) => charmed && effect.linkedConditionIds.includes("charmed") && effect.sourceActorId !== null
+    );
     for (const targetId of targetIds) {
       const charmer = charmers.find((effect) => effect.sourceActorId === targetId);
       if (charmer) {

@@ -8,6 +8,9 @@ export type DamageDefenses = Readonly<{
   vulnerabilities: readonly string[];
   /** Resistance to every damage type (SRD Petrified). Immunities still zero; a same-type vulnerability still doubles. */
   resistAll?: boolean;
+  /** Damage types whose Resistance the damage ignores (Boon of Irresistible Offense's Bludgeoning, Piercing and
+   *  Slashing); Immunity still holds. */
+  ignoresResistance?: readonly string[];
 }>;
 export type DamageAdjustment = "resistance" | "immunity" | "vulnerability" | "resistance-and-vulnerability";
 export type AdjustedDamagePart = Readonly<{
@@ -29,11 +32,12 @@ export function adjustDamageParts(parts: readonly DamagePart[], defenses: Damage
   const resistances = new Set(defenses.resistances.map(normalizeType));
   const immunities = new Set(defenses.immunities.map(normalizeType));
   const vulnerabilities = new Set(defenses.vulnerabilities.map(normalizeType));
+  const ignored = new Set((defenses.ignoresResistance ?? []).map(normalizeType));
   return parts.map((part) => {
     const type = normalizeType(part.type);
     if (immunities.has(type))
       return { type: part.type, amount: part.amount, adjusted: 0, adjustment: "immunity" as const };
-    const resistant = resistances.has(type) || defenses.resistAll === true;
+    const resistant = (resistances.has(type) || defenses.resistAll === true) && !ignored.has(type);
     const vulnerable = vulnerabilities.has(type);
     const halved = resistant ? Math.floor(part.amount / 2) : part.amount;
     const adjusted = vulnerable ? halved * 2 : halved;

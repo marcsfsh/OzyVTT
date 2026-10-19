@@ -10,6 +10,7 @@ import type {
 import { aggregateRollMode, collectRiders, sumRiders } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { checkPlan, passivePerception, toolAbility, toolProficiencies, type CheckNames } from "./ability-checks.js";
+import { checkSituations } from "./check-situations.js";
 import {
   checkRiderBonus,
   EMPTY_DERIVATION,
@@ -136,7 +137,8 @@ export function deriveActorSheet(
     // The SRD's three, plus what an `attunement-slots` rider adds (Use Magic Device).
     attunementSlots: 3 + derivation.attunementSlots,
     weaponMasteries: weaponMasteriesOf(definition, catalog?.equipmentRecord),
-    classColumns: classColumnsOf(definition, classRecord)
+    classColumns: classColumnsOf(definition, classRecord),
+    situations: checkSituations(derivation)
   };
 }
 

@@ -849,6 +849,45 @@ export const ENHANCED_ABILITY_TAG = "enhanced-ability";
 export const choosesAbility = (action: Readonly<{ grants?: Readonly<{ tags: readonly string[] }> }>): boolean =>
   action.grants?.tags.includes(CHOSEN_ABILITY_TAG) === true ||
   action.grants?.tags.includes(ENHANCED_ABILITY_TAG) === true;
+/** The choices an action asks for as it resolves: an option of its grant or failed save (Fire Shield's warm or
+ *  chill, Bestow Curse's curse), one for each target where the text says so, and the carried weapon its grant binds to
+ *  (Magic Weapon). Sent as `action.resolve`'s `optionId`, `targetOptions` and `itemId`. */
+export type ActionChoices = Readonly<{
+  options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
+  optionsPerTarget?: true;
+  bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true }>;
+}>;
+type ChoosingAction = Readonly<{
+  grants?: Readonly<{
+    options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
+    optionsPerTarget?: true;
+    bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true }>;
+  }>;
+  save?: Readonly<{
+    failureEffect?: Readonly<{
+      options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
+      optionsPerTarget?: true;
+    }>;
+  }>;
+}>;
+/** What an action asks its user to choose as it resolves, or null when it asks nothing. */
+export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
+  const chooser = action.grants?.options ? action.grants : action.save?.failureEffect;
+  const binds = action.grants?.bindsWeapon;
+  if (!chooser?.options && !binds) return null;
+  return {
+    ...(chooser?.options ? { options: chooser.options.map((option) => ({ id: option.id, name: option.name })) } : {}),
+    ...(chooser?.optionsPerTarget ? { optionsPerTarget: true as const } : {}),
+    ...(binds
+      ? {
+          bindsWeapon: {
+            ...(binds.weaponIds ? { weaponIds: [...binds.weaponIds] } : {}),
+            ...(binds.melee ? { melee: true as const } : {})
+          }
+        }
+      : {})
+  };
+}
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */
 export type ContentActionSummary = Readonly<{
   id: string;
@@ -902,6 +941,7 @@ export type ContentActionSummary = Readonly<{
     Readonly<{ id: string; ability: z.infer<typeof AbilitySchema> }>
   >;
   /** The cast chooses an ability (Hex); `action.resolve`'s `ability`. */ choosesAbility?: boolean;
+  /** An option, one for each target, or a carried weapon it asks for (`actionChoicesOf`). */ choices?: ActionChoices;
   /** A stat block's spell list (Spellcasting, Divine Aid): the numbers its casts are made with. */ spellList?: Readonly<{
     ability: z.infer<typeof AbilitySchema>;
     saveDc: number;

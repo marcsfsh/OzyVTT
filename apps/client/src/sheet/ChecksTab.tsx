@@ -86,6 +86,39 @@ export function SkillButton({
   );
 }
 
+/** The situations the character's gear and features name (a Book's topic, prying with a Crowbar), each a toggle the
+ *  next check it fits carries to the server. The GM judges whether the check really fits. */
+export function CheckSituations({
+  situations,
+  rolls
+}: Readonly<{ situations: ActorDerivedSheet["situations"]; rolls: SheetRolls }>) {
+  if (situations.length === 0) return null;
+  return (
+    <div className="cs-situations" role="group" aria-label="Situations">
+      <span className="cs-eyebrow">Situations</span>
+      <p className="cs-sub">Turn one on, then roll the check it fits. Your GM decides whether it does.</p>
+      <div className="cs-chiprow">
+        {situations.map((situation) => {
+          const on = rolls.declared.some((entry) => entry.situation === situation.situation);
+          return (
+            <button
+              key={situation.situation}
+              type="button"
+              className={`cs-toggle interactive${on ? " is-on" : ""}`}
+              aria-pressed={on}
+              disabled={rolls.rolling}
+              title={situation.source}
+              onClick={() => rolls.toggleSituation(situation)}
+            >
+              {situation.situation.charAt(0).toUpperCase() + situation.situation.slice(1)} ({situation.effect})
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const tierWord = (tier: SkillRow["tier"]) =>
   tier === "expertise" ? "Expertise" : tier === "proficient" ? "Proficient" : "Not proficient";
 
@@ -319,6 +352,7 @@ export function ChecksTab({
         </p>
       )}
       <RollModeNotes derived={derived} />
+      <CheckSituations situations={derived?.situations ?? []} rolls={rolls} />
       <div className="cs-section-head">
         <span className="cs-eyebrow">Skills</span>
         {actor.kind === "player-character" && !editing && (

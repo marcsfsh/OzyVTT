@@ -78,6 +78,8 @@ describe("Sleep", () => {
     answer(table.state, FOE, 2);
     expect(conditions(table.state, FOE)).toEqual(["prone", "unconscious"]);
     expect(actorOf(table.state, FOE).effects[0]).toMatchObject({ endsOnDamage: true, duration: { type: "manual" } });
+    // The second stage stays one a Shake Awake ends.
+    expect(actorOf(table.state, FOE).effects[0]?.tags).toContain("wakeable");
     hurt(table.state, FOE, 1);
     expect(conditions(table.state, FOE)).toEqual(["prone"]);
   });
@@ -230,7 +232,8 @@ describe("what a success or a failure leaves besides conditions", () => {
     cast(table, "irresistible-dance");
     answer(table.state, FOE, 2);
     const foe = actorOf(table.state, FOE);
-    expect(foe.effects[0]).toMatchObject({ speedZero: true, repeatSave: { byAction: true, timing: "none" } });
+    // Its way out is its own action (`builtin-actions.ts`): a Wisdom save at the spell save DC.
+    expect(foe.effects[0]).toMatchObject({ speedZero: true, endAction: { kind: "save", ability: "wis", dc: 15 } });
     const sources = saveRollSources(foe, "dex", deriveEquipment(foe, undefined, catalog));
     expect(sources.disadvantage.length).toBeGreaterThan(0);
     wizardsTurn(table.state);
@@ -238,7 +241,7 @@ describe("what a success or a failure leaves besides conditions", () => {
     cast(saved, "irresistible-dance");
     answer(saved.state, FOE, 19);
     expect(actorOf(saved.state, FOE).effects).toMatchObject([
-      { name: "Dancing", speedZero: true, duration: { type: "until-bearer-turn-end" } }
+      { name: "Irresistible Dance", speedZero: true, duration: { type: "until-bearer-turn-end" } }
     ]);
   });
 });

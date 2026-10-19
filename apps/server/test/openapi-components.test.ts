@@ -458,9 +458,17 @@ describe("generated OpenAPI components", () => {
       "versus-size": { sizes: ["large", "huge"] },
       "versus-condition": { conditionIds: ["prone"] },
       "by-effect-source": {},
+      "on-healing": {},
+      "source-creature-type-is": { creatureTypes: ["fiend", "undead"] },
+      "versus-effect-source": {},
+      "versus-marked": { tags: ["hunters-mark"] },
+      "versus-hurt": {},
+      "versus-within": { feet: 5 },
+      "spell-class-is": { classIds: ["sorcerer"] },
       "sees-other": {},
       "seen-by-other": {},
-      "other-lacks-sense": { senses: ["blindsight", "truesight"] }
+      "other-lacks-sense": { senses: ["blindsight", "truesight"] },
+      "situation-is": { situation: "consulting an accurate Book about its topic" }
     };
 
     /** One payload per modifier. */
@@ -503,6 +511,15 @@ describe("generated OpenAPI components", () => {
       "damage-vulnerability": { damageTypes: ["cold"] },
       sense: { sense: "tremorsense", feet: 30 },
       "special-speed": { movement: "fly", feet: 60, hover: true },
+      "d20-minimum": { roll: "check", minimum: 10, proficientOnly: true },
+      "total-minimum": { roll: "check", abilityScore: "str" },
+      "damage-die-minimum": { minimum: 3 },
+      "damage-immunity": { damageTypes: ["psychic"] },
+      "ignores-resistance": { damageTypes: ["bludgeoning", "piercing", "slashing"] },
+      "advantage-denied": { roll: "incoming-attack" },
+      "healing-received-maximized": {},
+      "healing-dice-maximized": {},
+      "healing-bonus": { amount: 2, perSlotLevel: true },
       movement: { rule: "leap", feet: 30, costFeet: 10 }
     };
 

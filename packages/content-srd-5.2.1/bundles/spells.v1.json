@@ -425,7 +425,85 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Alter Self",
+    "tags": [
+     "alter-self"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    },
+    "options": [
+     {
+      "id": "aquatic-adaptation",
+      "name": "Aquatic Adaptation",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "special-speed",
+        "movement": "swim",
+        "equalToSpeed": true
+       }
+      ]
+     },
+     {
+      "id": "change-appearance",
+      "name": "Change Appearance",
+      "tags": [],
+      "modifiers": []
+     },
+     {
+      "id": "claws",
+      "name": "Claws",
+      "tags": [],
+      "modifiers": [],
+      "unarmedStrike": {
+       "dice": "1d6",
+       "damageType": "slashing",
+       "ability": "spellcasting"
+      }
+     },
+     {
+      "id": "fangs",
+      "name": "Fangs",
+      "tags": [],
+      "modifiers": [],
+      "unarmedStrike": {
+       "dice": "1d6",
+       "damageType": "piercing",
+       "ability": "spellcasting"
+      }
+     },
+     {
+      "id": "horns",
+      "name": "Horns",
+      "tags": [],
+      "modifiers": [],
+      "unarmedStrike": {
+       "dice": "1d6",
+       "damageType": "piercing",
+       "ability": "spellcasting"
+      }
+     },
+     {
+      "id": "hooves",
+      "name": "Hooves",
+      "tags": [],
+      "modifiers": [],
+      "unarmedStrike": {
+       "dice": "1d6",
+       "damageType": "bludgeoning",
+       "ability": "spellcasting"
+      }
+     }
+    ]
+   }
   },
   "classes": [
    "sorcerer",
@@ -2038,7 +2116,47 @@
    "attacks": 0,
    "damage": [],
    "noCastSave": true,
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "save",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-saving-throw"
+       },
+       {
+        "type": "ability-is",
+        "abilities": [
+         "wis"
+        ]
+       }
+      ]
+     },
+     {
+      "type": "roll-mode",
+      "roll": "death-save",
+      "mode": "advantage"
+     },
+     {
+      "type": "healing-received-maximized"
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Beacon of Hope",
+    "tags": [
+     "beacon-of-hope"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "cleric"
@@ -2192,7 +2310,292 @@
     "tags": [
      "curse"
     ],
-    "modifiers": []
+    "modifiers": [],
+    "options": [
+     {
+      "id": "str",
+      "name": "Strength curse",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "dex",
+      "name": "Dexterity curse",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "dex"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "dex"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "con",
+      "name": "Constitution curse",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "con"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "con"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "int",
+      "name": "Intelligence curse",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "int"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "int"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "wis",
+      "name": "Wisdom curse",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "wis"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "wis"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "cha",
+      "name": "Charisma curse",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "cha"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "cha"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "against-you",
+      "name": "Attacks against you",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "attack",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-attack-roll"
+         },
+         {
+          "type": "versus-effect-source"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "dodge",
+      "name": "Forced to Dodge",
+      "tags": [
+       "curse-dodge"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "necrotic",
+      "name": "Extra Necrotic damage",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "extra-damage",
+        "formula": "1d8",
+        "damageType": "necrotic",
+        "doubleOnCritical": true,
+        "when": [
+         {
+          "type": "on-hit"
+         },
+         {
+          "type": "by-effect-source"
+         }
+        ]
+       }
+      ]
+     }
+    ]
    }
   },
   "classes": [
@@ -3205,6 +3608,38 @@
    "attacks": 0,
    "damage": [],
    "healing": null,
+   "failureEffect": {
+    "name": "Calm Emotions",
+    "tags": [
+     "calm-emotions"
+    ],
+    "modifiers": [],
+    "optionsPerTarget": true,
+    "options": [
+     {
+      "id": "calm",
+      "name": "Calmed",
+      "tags": [],
+      "modifiers": [],
+      "conditionImmunities": [
+       "charmed",
+       "frightened"
+      ],
+      "suppressesConditions": [
+       "charmed",
+       "frightened"
+      ]
+     },
+     {
+      "id": "indifferent",
+      "name": "Indifferent",
+      "tags": [
+       "indifferent"
+      ],
+      "modifiers": []
+     }
+    ]
+   },
    "targetTypes": [
     "humanoid"
    ]
@@ -3314,8 +3749,7 @@
    "failureConditions": [
     "charmed"
    ],
-   "endsOnSourceSideDamage": true,
-   "advantageIfFighting": true
+   "endsOnSourceSideDamage": true
   },
   "target": {
    "type": "creature",
@@ -3408,8 +3842,7 @@
    "failureConditions": [
     "charmed"
    ],
-   "endsOnSourceSideDamage": true,
-   "advantageIfFighting": true
+   "endsOnSourceSideDamage": true
   },
   "target": {
    "type": "creature",
@@ -4162,6 +4595,61 @@
     "perSlot": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Command",
+    "tags": [
+     "commanded"
+    ],
+    "duration": {
+     "type": "until-bearer-turn-end"
+    },
+    "modifiers": [],
+    "options": [
+     {
+      "id": "approach",
+      "name": "Approach",
+      "tags": [],
+      "modifiers": []
+     },
+     {
+      "id": "drop",
+      "name": "Drop",
+      "tags": [
+       "no-actions"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "flee",
+      "name": "Flee",
+      "tags": [
+       "dash-only"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "grovel",
+      "name": "Grovel",
+      "tags": [
+       "no-actions"
+      ],
+      "modifiers": [],
+      "conditions": [
+       "prone"
+      ],
+      "speedZero": true
+     },
+     {
+      "id": "halt",
+      "name": "Halt",
+      "tags": [
+       "no-actions"
+      ],
+      "modifiers": [],
+      "speedZero": true
+     }
+    ]
+   },
    "seenTargets": true
   },
   "classes": [
@@ -4539,8 +5027,7 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureConditions": [],
-   "repeatSave": true
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -4560,15 +5047,6 @@
    "attacks": 0,
    "damage": [],
    "healing": null,
-   "failureEffect": {
-    "name": "Confusion",
-    "tags": [
-     "confused",
-     "no-bonus-actions",
-     "no-reactions"
-    ],
-    "modifiers": []
-   },
    "areaPerSlot": 5
   },
   "classes": [
@@ -4872,13 +5350,6 @@
       "successDamage": "none",
       "failureConditions": [
        "restrained"
-      ],
-      "repeatAtTurnStart": true,
-      "repeatFailureDamage": [
-       {
-        "formula": "4d8",
-        "type": "lightning"
-       }
       ]
      },
      "damage": [
@@ -5112,7 +5583,112 @@
      }
     }
    ],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Conjure Minor Elementals",
+    "tags": [
+     "conjure-minor-elementals"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 100
+    },
+    "options": [
+     {
+      "id": "acid",
+      "name": "Acid",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "extra-damage",
+        "formula": "2d8",
+        "damageType": "acid",
+        "doubleOnCritical": true,
+        "when": [
+         {
+          "type": "on-hit"
+         },
+         {
+          "type": "versus-within",
+          "feet": 15
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "cold",
+      "name": "Cold",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "extra-damage",
+        "formula": "2d8",
+        "damageType": "cold",
+        "doubleOnCritical": true,
+        "when": [
+         {
+          "type": "on-hit"
+         },
+         {
+          "type": "versus-within",
+          "feet": 15
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "fire",
+      "name": "Fire",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "extra-damage",
+        "formula": "2d8",
+        "damageType": "fire",
+        "doubleOnCritical": true,
+        "when": [
+         {
+          "type": "on-hit"
+         },
+         {
+          "type": "versus-within",
+          "feet": 15
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "lightning",
+      "name": "Lightning",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "extra-damage",
+        "formula": "2d8",
+        "damageType": "lightning",
+        "doubleOnCritical": true,
+        "when": [
+         {
+          "type": "on-hit"
+         },
+         {
+          "type": "versus-within",
+          "feet": 15
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
   },
   "classes": [
    "druid",
@@ -5229,7 +5805,25 @@
      }
     }
    ],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Conjure Woodland Beings",
+    "tags": [
+     "conjure-woodland-beings"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 100
+    },
+    "bonusActions": [
+     "disengage"
+    ]
+   }
   },
   "classes": [
    "druid",
@@ -5371,17 +5965,7 @@
    "successDamage": "none",
    "failureConditions": [
     "poisoned"
-   ],
-   "repeatTally": 3,
-   "secondFailure": {
-    "conditions": [
-     "poisoned"
-    ],
-    "duration": {
-     "type": "minutes",
-     "minutes": 10080
-    }
-   }
+   ]
   },
   "target": {
    "type": "creature",
@@ -5400,7 +5984,154 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Contagion",
+    "tags": [
+     "contagion"
+    ],
+    "modifiers": [],
+    "options": [
+     {
+      "id": "str",
+      "name": "Strength",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "dex",
+      "name": "Dexterity",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "dex"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "con",
+      "name": "Constitution",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "con"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "int",
+      "name": "Intelligence",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "int"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "wis",
+      "name": "Wisdom",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "wis"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "cha",
+      "name": "Charisma",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "cha"
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
   },
   "classes": [
    "cleric",
@@ -7033,7 +7764,43 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "incoming-attack",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       },
+       {
+        "type": "source-creature-type-is",
+        "creatureTypes": [
+         "celestial",
+         "elemental",
+         "fey",
+         "fiend",
+         "undead"
+        ]
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Dispel Evil and Good",
+    "tags": [
+     "dispel-evil-and-good"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -7651,9 +8418,7 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ],
-   "repeatOnDamage": {},
-   "advantageIfFighting": true
+   ]
   },
   "target": {
    "type": "creature",
@@ -7752,9 +8517,7 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ],
-   "repeatOnDamage": {},
-   "advantageIfFighting": true
+   ]
   },
   "target": {
    "type": "creature",
@@ -7837,9 +8600,7 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ],
-   "repeatOnDamage": {},
-   "advantageIfFighting": true
+   ]
   },
   "target": {
    "type": "creature",
@@ -7976,7 +8737,23 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Dragon's Breath",
+    "tags": [
+     "dragons-breath"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "grantsLaterAction": "exhale"
+   }
   },
   "classes": [
    "sorcerer",
@@ -8404,13 +9181,130 @@
     "concentration": false,
     "name": "Enhance Ability",
     "tags": [
-     "enhance-ability",
-     "enhanced-ability"
+     "enhance-ability"
     ],
     "target": "targets",
     "duration": {
      "type": "manual"
-    }
+    },
+    "optionsPerTarget": true,
+    "options": [
+     {
+      "id": "str",
+      "name": "Strength",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "advantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "dex",
+      "name": "Dexterity",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "advantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "dex"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "int",
+      "name": "Intelligence",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "advantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "int"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "wis",
+      "name": "Wisdom",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "advantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "wis"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "cha",
+      "name": "Charisma",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "advantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "cha"
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
    }
   },
   "classes": [
@@ -8619,6 +9513,24 @@
           "type": "ability-is",
           "abilities": [
            "str"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "damage-bonus",
+        "amount": 0,
+        "dice": "-1d4",
+        "leavesOne": true,
+        "when": [
+         {
+          "type": "on-damage-roll"
+         },
+         {
+          "type": "attack-kind-is",
+          "kinds": [
+           "weapon",
+           "unarmed"
           ]
          }
         ]
@@ -8867,6 +9779,29 @@
    "attacks": 0,
    "damage": [],
    "healing": null,
+   "failureEffect": {
+    "name": "Enthrall",
+    "tags": [
+     "enthralled"
+    ],
+    "modifiers": [
+     {
+      "type": "check-bonus",
+      "amount": -10,
+      "when": [
+       {
+        "type": "on-ability-check"
+       },
+       {
+        "type": "skill-is",
+        "skills": [
+         "perception"
+        ]
+       }
+      ]
+     }
+    ]
+   },
    "seenTargets": true
   },
   "classes": [
@@ -8993,7 +9928,26 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Expeditious Retreat",
+    "tags": [
+     "expeditious-retreat"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 100
+    },
+    "dashesNow": true,
+    "bonusActions": [
+     "dash"
+    ]
+   }
   },
   "classes": [
    "sorcerer",
@@ -9049,6 +10003,47 @@
     "count": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Eyebite",
+    "tags": [
+     "eyebite"
+    ],
+    "modifiers": [],
+    "options": [
+     {
+      "id": "asleep",
+      "name": "Asleep",
+      "tags": [
+       "wakeable"
+      ],
+      "modifiers": [],
+      "conditions": [
+       "unconscious"
+      ],
+      "endsOnDamage": true
+     },
+     {
+      "id": "panicked",
+      "name": "Panicked",
+      "tags": [
+       "dash-only"
+      ],
+      "modifiers": [],
+      "conditions": [
+       "frightened"
+      ]
+     },
+     {
+      "id": "sickened",
+      "name": "Sickened",
+      "tags": [],
+      "modifiers": [],
+      "conditions": [
+       "poisoned"
+      ]
+     }
+    ]
+   },
    "seenTargets": true
   },
   "classes": [
@@ -9420,8 +10415,7 @@
    "successDamage": "none",
    "failureConditions": [
     "frightened"
-   ],
-   "repeatUnseenSource": true
+   ]
   },
   "target": {
    "type": "creature",
@@ -9440,14 +10434,7 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null,
-   "failureEffect": {
-    "name": "Fear",
-    "tags": [
-     "drops-held"
-    ],
-    "modifiers": []
-   }
+   "healing": null
   },
   "classes": [
    "bard",
@@ -9971,7 +10958,60 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Fire Shield",
+    "tags": [
+     "fire-shield"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    },
+    "struck": {
+     "withinFeet": 5,
+     "damage": [
+      {
+       "formula": "2d8",
+       "type": "fire"
+      }
+     ]
+    },
+    "options": [
+     {
+      "id": "warm",
+      "name": "Warm Shield",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "damage-resistance",
+        "damageTypes": [
+         "cold"
+        ]
+       }
+      ],
+      "damageType": "fire"
+     },
+     {
+      "id": "chill",
+      "name": "Chill Shield",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "damage-resistance",
+        "damageTypes": [
+         "fire"
+        ]
+       }
+      ],
+      "damageType": "cold"
+     }
+    ]
+   }
   },
   "sight": {
    "light": {
@@ -10557,18 +11597,7 @@
    "successDamage": "none",
    "failureConditions": [
     "restrained"
-   ],
-   "repeatTally": 3,
-   "secondFailure": {
-    "conditions": [
-     "petrified"
-    ]
-   },
-   "autoSuccess": {
-    "creatureTypes": [
-     "construct"
-    ]
-   }
+   ]
   },
   "target": {
    "type": "creature",
@@ -10583,15 +11612,6 @@
     "count": 1
    },
    "healing": null,
-   "successEffect": {
-    "name": "Flesh to Stone",
-    "tags": [],
-    "speedZero": true,
-    "duration": {
-     "type": "until-source-next-turn"
-    },
-    "modifiers": []
-   },
    "seenTargets": true
   },
   "classes": [
@@ -11198,7 +12218,11 @@
     "target": "targets",
     "duration": {
      "type": "manual"
-    }
+    },
+    "conditionImmunities": [
+     "paralyzed",
+     "restrained"
+    ]
    }
   },
   "classes": [
@@ -11851,7 +12875,38 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "d20-minimum",
+      "roll": "check",
+      "minimum": 15,
+      "when": [
+       {
+        "type": "on-ability-check"
+       },
+       {
+        "type": "ability-is",
+        "abilities": [
+         "cha"
+        ]
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Glibness",
+    "tags": [
+     "glibness"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -12522,7 +13577,438 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Guidance",
+    "tags": [
+     "guidance"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "options": [
+     {
+      "id": "acrobatics",
+      "name": "Acrobatics",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "acrobatics"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "animal-handling",
+      "name": "Animal Handling",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "animal-handling"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "arcana",
+      "name": "Arcana",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "arcana"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "athletics",
+      "name": "Athletics",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "athletics"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "deception",
+      "name": "Deception",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "deception"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "history",
+      "name": "History",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "history"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "insight",
+      "name": "Insight",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "insight"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "intimidation",
+      "name": "Intimidation",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "intimidation"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "investigation",
+      "name": "Investigation",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "investigation"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "medicine",
+      "name": "Medicine",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "medicine"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "nature",
+      "name": "Nature",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "nature"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "perception",
+      "name": "Perception",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "perception"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "performance",
+      "name": "Performance",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "performance"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "persuasion",
+      "name": "Persuasion",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "persuasion"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "religion",
+      "name": "Religion",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "religion"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "sleight-of-hand",
+      "name": "Sleight of Hand",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "sleight-of-hand"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "stealth",
+      "name": "Stealth",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "stealth"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "survival",
+      "name": "Survival",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "check-bonus",
+        "amount": 0,
+        "dice": "1d4",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "survival"
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
   },
   "classes": [
    "cleric",
@@ -13468,7 +14954,40 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 12
+   },
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "damage-resistance",
+      "damageTypes": [
+       "poison"
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Heroes' Feast",
+    "tags": [
+     "heroes-feast"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "minutes",
+     "minutes": 1440
+    },
+    "conditionImmunities": [
+     "frightened",
+     "poisoned"
+    ],
+    "hitPointMaximumGain": {
+     "amount": 0,
+     "formula": "2d10"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -13790,10 +15309,7 @@
     "prone",
     "incapacitated"
    ],
-   "repeatSave": true,
-   "repeatOnDamage": {
-    "advantage": true
-   }
+   "repeatSave": true
   },
   "target": {
    "type": "creature",
@@ -15354,9 +16870,7 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ],
-   "speedZero": true,
-   "repeatByAction": true
+   ]
   },
   "target": {
    "type": "creature",
@@ -15373,17 +16887,15 @@
    "healing": null,
    "failureEffect": {
     "name": "Irresistible Dance",
-    "tags": [],
+    "tags": [
+     "dancing"
+    ],
+    "speedZero": true,
     "modifiers": [
      {
       "type": "roll-mode",
       "roll": "attack",
-      "mode": "disadvantage",
-      "when": [
-       {
-        "type": "on-attack-roll"
-       }
-      ]
+      "mode": "disadvantage"
      },
      {
       "type": "roll-mode",
@@ -15411,15 +16923,24 @@
        }
       ]
      }
-    ]
+    ],
+    "endAction": {
+     "activation": "action",
+     "kind": "save",
+     "ability": "wis",
+     "dc": "spellcasting",
+     "label": "Collect itself"
+    }
    },
    "successEffect": {
-    "name": "Dancing",
-    "tags": [],
-    "speedZero": true,
+    "name": "Irresistible Dance",
+    "tags": [
+     "dancing"
+    ],
     "duration": {
      "type": "until-bearer-turn-end"
     },
+    "speedZero": true,
     "modifiers": []
    },
    "seenTargets": true
@@ -16757,7 +18278,38 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Magic Weapon",
+    "tags": [
+     "magic-weapon"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    },
+    "bindsWeapon": {
+     "nonmagical": true,
+     "bonusBySlot": [
+      {
+       "level": 2,
+       "bonus": 1
+      },
+      {
+       "level": 3,
+       "bonus": 2
+      },
+      {
+       "level": 6,
+       "bonus": 3
+      }
+     ]
+    }
+   }
   },
   "classes": [
    "paladin",
@@ -17356,12 +18908,21 @@
     "concentration": false,
     "name": "Maze",
     "tags": [
+     "maze",
      "off-plane"
     ],
     "target": "target",
     "duration": {
      "type": "rounds",
      "rounds": 100
+    },
+    "endAction": {
+     "activation": "action",
+     "kind": "check",
+     "ability": "int",
+     "skill": "investigation",
+     "dc": 20,
+     "label": "Find the way out"
     }
    },
    "seenTargets": true
@@ -17638,7 +19199,31 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "damage-immunity",
+      "damageTypes": [
+       "psychic"
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Mind Blank",
+    "tags": [
+     "mind-blank"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    },
+    "conditionImmunities": [
+     "charmed"
+    ]
+   }
   },
   "classes": [
    "bard",
@@ -17700,6 +19285,13 @@
     "count": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Mind Spike",
+    "tags": [
+     "outlined-to-source"
+    ],
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -17957,7 +19549,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Mislead",
+    "tags": [
+     "mislead",
+     "invisible-until-it-acts"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    },
+    "conditions": [
+     "invisible"
+    ]
+   }
   },
   "classes": [
    "bard",
@@ -18532,15 +20142,7 @@
   "save": {
    "ability": "int",
    "successDamage": "none",
-   "failureConditions": [],
-   "endedBy": {
-    "name": "Study the illusion",
-    "by": "bearer",
-    "check": {
-     "ability": "int",
-     "skill": "investigation"
-    }
-   }
+   "failureConditions": []
   },
   "target": {
    "type": "creature",
@@ -18563,11 +20165,6 @@
     "count": 1
    },
    "healing": null,
-   "failureEffect": {
-    "name": "Phantasmal Force",
-    "tags": [],
-    "modifiers": []
-   },
    "seenTargets": true
   },
   "classes": [
@@ -18612,8 +20209,7 @@
    "ability": "wis",
    "successDamage": "half",
    "failureConditions": [],
-   "repeatSave": true,
-   "repeatDamageAgain": true
+   "repeatSave": true
   },
   "target": {
    "type": "creature",
@@ -20063,7 +21659,58 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "incoming-attack",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       },
+       {
+        "type": "source-creature-type-is",
+        "creatureTypes": [
+         "aberration",
+         "celestial",
+         "elemental",
+         "fey",
+         "fiend",
+         "undead"
+        ]
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Protection from Evil and Good",
+    "tags": [
+     "protection-from-evil-and-good"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "rounds",
+     "rounds": 100
+    },
+    "conditionWards": {
+     "conditionIds": [
+      "charmed",
+      "frightened"
+     ],
+     "creatureTypes": [
+      "aberration",
+      "celestial",
+      "elemental",
+      "fey",
+      "fiend",
+      "undead"
+     ]
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -20342,7 +21989,9 @@
    "healing": null,
    "failureEffect": {
     "name": "Ray of Enfeeblement",
-    "tags": [],
+    "tags": [
+     "enfeebled"
+    ],
     "modifiers": [
      {
       "type": "roll-mode",
@@ -20351,6 +22000,22 @@
       "when": [
        {
         "type": "on-attack-roll"
+       },
+       {
+        "type": "ability-is",
+        "abilities": [
+         "str"
+        ]
+       }
+      ]
+     },
+     {
+      "type": "roll-mode",
+      "roll": "check",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-ability-check"
        },
        {
         "type": "ability-is",
@@ -20377,18 +22042,13 @@
       ]
      },
      {
-      "type": "roll-mode",
-      "roll": "check",
-      "mode": "disadvantage",
+      "type": "damage-bonus",
+      "amount": 0,
+      "dice": "-1d8",
+      "leavesOne": true,
       "when": [
        {
-        "type": "on-ability-check"
-       },
-       {
-        "type": "ability-is",
-        "abilities": [
-         "str"
-        ]
+        "type": "on-damage-roll"
        }
       ]
      }
@@ -20406,12 +22066,7 @@
      {
       "type": "roll-mode",
       "roll": "attack",
-      "mode": "disadvantage",
-      "when": [
-       {
-        "type": "on-attack-roll"
-       }
-      ]
+      "mode": "disadvantage"
      }
     ]
    }
@@ -20683,6 +22338,21 @@
    "healing": {
     "formula": "4d8 + 15",
     "addsModifier": false
+   },
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Regenerate",
+    "tags": [
+     "regenerate"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    },
+    "hitPointsEachTurn": 1
    }
   },
   "classes": [
@@ -20907,7 +22577,288 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Resistance",
+    "tags": [
+     "resistance"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "options": [
+     {
+      "id": "acid",
+      "name": "Acid",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "damage-reduction",
+        "amount": 0,
+        "dice": "1d4",
+        "oncePerTurn": true,
+        "when": [
+         {
+          "type": "on-taking-damage"
+         },
+         {
+          "type": "damage-type-is",
+          "damageTypes": [
+           "acid"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "bludgeoning",
+      "name": "Bludgeoning",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "damage-reduction",
+        "amount": 0,
+        "dice": "1d4",
+        "oncePerTurn": true,
+        "when": [
+         {
+          "type": "on-taking-damage"
+         },
+         {
+          "type": "damage-type-is",
+          "damageTypes": [
+           "bludgeoning"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "cold",
+      "name": "Cold",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "damage-reduction",
+        "amount": 0,
+        "dice": "1d4",
+        "oncePerTurn": true,
+        "when": [
+         {
+          "type": "on-taking-damage"
+         },
+         {
+          "type": "damage-type-is",
+          "damageTypes": [
+           "cold"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "fire",
+      "name": "Fire",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "damage-reduction",
+        "amount": 0,
+        "dice": "1d4",
+        "oncePerTurn": true,
+        "when": [
+         {
+          "type": "on-taking-damage"
+         },
+         {
+          "type": "damage-type-is",
+          "damageTypes": [
+           "fire"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "lightning",
+      "name": "Lightning",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "damage-reduction",
+        "amount": 0,
+        "dice": "1d4",
+        "oncePerTurn": true,
+        "when": [
+         {
+          "type": "on-taking-damage"
+         },
+         {
+          "type": "damage-type-is",
+          "damageTypes": [
+           "lightning"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "necrotic",
+      "name": "Necrotic",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "damage-reduction",
+        "amount": 0,
+        "dice": "1d4",
+        "oncePerTurn": true,
+        "when": [
+         {
+          "type": "on-taking-damage"
+         },
+         {
+          "type": "damage-type-is",
+          "damageTypes": [
+           "necrotic"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "piercing",
+      "name": "Piercing",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "damage-reduction",
+        "amount": 0,
+        "dice": "1d4",
+        "oncePerTurn": true,
+        "when": [
+         {
+          "type": "on-taking-damage"
+         },
+         {
+          "type": "damage-type-is",
+          "damageTypes": [
+           "piercing"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "poison",
+      "name": "Poison",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "damage-reduction",
+        "amount": 0,
+        "dice": "1d4",
+        "oncePerTurn": true,
+        "when": [
+         {
+          "type": "on-taking-damage"
+         },
+         {
+          "type": "damage-type-is",
+          "damageTypes": [
+           "poison"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "radiant",
+      "name": "Radiant",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "damage-reduction",
+        "amount": 0,
+        "dice": "1d4",
+        "oncePerTurn": true,
+        "when": [
+         {
+          "type": "on-taking-damage"
+         },
+         {
+          "type": "damage-type-is",
+          "damageTypes": [
+           "radiant"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "slashing",
+      "name": "Slashing",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "damage-reduction",
+        "amount": 0,
+        "dice": "1d4",
+        "oncePerTurn": true,
+        "when": [
+         {
+          "type": "on-taking-damage"
+         },
+         {
+          "type": "damage-type-is",
+          "damageTypes": [
+           "slashing"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "thunder",
+      "name": "Thunder",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "damage-reduction",
+        "amount": 0,
+        "dice": "1d4",
+        "oncePerTurn": true,
+        "when": [
+         {
+          "type": "on-taking-damage"
+         },
+         {
+          "type": "damage-type-is",
+          "damageTypes": [
+           "thunder"
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
   },
   "classes": [
    "cleric",
@@ -21280,26 +23231,7 @@
    "targets": {
     "count": 1
    },
-   "healing": null,
-   "grant": {
-    "modifiers": [],
-    "onEnd": [],
-    "voidWhileIncapacitated": false,
-    "concentration": false,
-    "name": "Sanctuary",
-    "tags": [
-     "sanctuary",
-     "until-it-acts"
-    ],
-    "target": "target",
-    "duration": {
-     "type": "rounds",
-     "rounds": 10
-    },
-    "ward": {
-     "ability": "wis"
-    }
-   }
+   "healing": null
   },
   "classes": [
    "cleric"
@@ -21871,7 +23803,26 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Sequester",
+    "tags": [
+     "sequester"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    },
+    "conditions": [
+     "invisible",
+     "unconscious"
+    ],
+    "endsOnDamage": true
+   }
   },
   "classes": [
    "wizard"
@@ -22244,7 +24195,50 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Shillelagh",
+    "tags": [
+     "shillelagh"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "bindsWeapon": {
+     "weaponIds": [
+      "club",
+      "quarterstaff"
+     ],
+     "ability": "spellcasting",
+     "dice": [
+      {
+       "level": 1,
+       "formula": "1d8"
+      },
+      {
+       "level": 5,
+       "formula": "1d10"
+      },
+      {
+       "level": 11,
+       "formula": "1d12"
+      },
+      {
+       "level": 17,
+       "formula": "2d6"
+      }
+     ],
+     "damageTypes": [
+      "force"
+     ]
+    }
+   }
   },
   "classes": [
    "druid"
@@ -22687,24 +24681,6 @@
    "endsOnDamage": true,
    "failureDuration": {
     "type": "until-bearer-turn-end"
-   },
-   "repeatOnce": true,
-   "secondFailure": {
-    "conditions": [
-     "unconscious"
-    ],
-    "endsOnDamage": true,
-    "endedBy": {
-     "name": "Wake",
-     "by": "others"
-    }
-   },
-   "autoSuccess": {
-    "sleepless": true
-   },
-   "endedBy": {
-    "name": "Wake",
-    "by": "others"
    }
   },
   "target": {
@@ -22725,6 +24701,13 @@
    "attacks": 0,
    "damage": [],
    "healing": null,
+   "failureEffect": {
+    "name": "Sleep",
+    "tags": [
+     "wakeable"
+    ],
+    "modifiers": []
+   },
    "picksInArea": true
   },
   "classes": [
@@ -24699,7 +26682,77 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Thaumaturgy",
+    "tags": [
+     "thaumaturgy"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "options": [
+     {
+      "id": "altered-eyes",
+      "name": "Altered Eyes",
+      "tags": [],
+      "modifiers": []
+     },
+     {
+      "id": "booming-voice",
+      "name": "Booming Voice",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "advantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "skill-is",
+          "skills": [
+           "intimidation"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "fire-play",
+      "name": "Fire Play",
+      "tags": [],
+      "modifiers": []
+     },
+     {
+      "id": "invisible-hand",
+      "name": "Invisible Hand",
+      "tags": [],
+      "modifiers": []
+     },
+     {
+      "id": "phantom-sound",
+      "name": "Phantom Sound",
+      "tags": [],
+      "modifiers": []
+     },
+     {
+      "id": "tremors",
+      "name": "Tremors",
+      "tags": [],
+      "modifiers": []
+     }
+    ]
+   }
   },
   "classes": [
    "cleric"
@@ -26256,7 +28309,50 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "save-bonus",
+      "amount": 1,
+      "when": [
+       {
+        "type": "on-saving-throw"
+       }
+      ]
+     },
+     {
+      "type": "damage-resistance",
+      "damageTypes": [
+       "acid",
+       "bludgeoning",
+       "cold",
+       "fire",
+       "force",
+       "lightning",
+       "necrotic",
+       "piercing",
+       "poison",
+       "psychic",
+       "radiant",
+       "slashing",
+       "thunder"
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Warding Bond",
+    "tags": [
+     "warding-bond"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    },
+    "armorClassBonus": 1
+   }
   },
   "classes": [
    "cleric",
@@ -26306,21 +28402,7 @@
    "targets": {
     "count": 10
    },
-   "healing": null,
-   "grant": {
-    "modifiers": [],
-    "onEnd": [],
-    "voidWhileIncapacitated": false,
-    "concentration": false,
-    "name": "Water Breathing",
-    "tags": [
-     "water-breathing"
-    ],
-    "target": "targets",
-    "duration": {
-     "type": "manual"
-    }
-   }
+   "healing": null
   },
   "classes": [
    "druid",
@@ -26513,13 +28595,7 @@
    "failureConditions": [
     "frightened"
    ],
-   "repeatSave": true,
-   "repeatFailureDamage": [
-    {
-     "formula": "5d10",
-     "type": "psychic"
-    }
-   ]
+   "repeatSave": true
   },
   "target": {
    "type": "creature",

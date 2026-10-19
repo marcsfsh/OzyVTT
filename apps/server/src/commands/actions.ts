@@ -137,7 +137,7 @@ export const actionCommands = [
         const statBlockAction = effectiveActions(definition, attacker, kit.equipmentCatalog()).find(
           (candidate) => candidate.id === actionId
         );
-        const listed = statBlockAction ?? builtinActionFor(definition, actionId);
+        const listed = statBlockAction ?? builtinActionFor(definition, actionId, attacker);
         if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
         // An action whose user picks its cost (Lay on Hands) resolves at the amount picked.
         const action = withChosenCost(listed, request.spend);
@@ -323,6 +323,9 @@ export const actionCommands = [
             ...(fumble !== undefined ? { fumble } : {}),
             ...(request.skill !== undefined ? { skill: request.skill } : {}),
             ...(request.ability !== undefined ? { ability: request.ability } : {}),
+            ...(request.optionId !== undefined ? { optionId: request.optionId } : {}),
+            ...(request.targetOptions !== undefined ? { targetOptions: request.targetOptions } : {}),
+            ...(request.itemId !== undefined ? { itemId: request.itemId } : {}),
             ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
             ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),
@@ -578,7 +581,8 @@ export const actionCommands = [
 
       const definition = actor.definitionId ? kit.resolveDefinitionIn(snapshot, actor.definitionId) : undefined;
       const available = effectiveActions(definition, actor, kit.equipmentCatalog());
-      const found = available.find((candidate) => candidate.id === actionId) ?? builtinActionFor(definition, actionId);
+      const found =
+        available.find((candidate) => candidate.id === actionId) ?? builtinActionFor(definition, actionId, actor);
       if (!found) throw new CommandRejectedError("That action is not on the stat block.");
       const listed = withChosenCost(found, chosenSpend);
 

@@ -1336,7 +1336,7 @@ describe("public game API over /api/v1", () => {
     // No encounter running: nothing is spent, so everything reports available with no violations, but the actions
     // that need an effect nobody has: putting out a fire needs the crocodile to be burning, and End an Effect needs an
     // effect an action ends.
-    const needsEffect = rows.filter((row) => row.id === "extinguish-fire" || row.id === "end-effect");
+    const needsEffect = rows.filter((row) => row.id === "extinguish-fire" || row.id === "end-an-effect");
     expect(needsEffect.map((row) => [row.available, row.violations.map((violation) => violation.rule)])).toEqual([
       [false, ["feature.requires-effect"]],
       [false, ["feature.requires-effect"]]

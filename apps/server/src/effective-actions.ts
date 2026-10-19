@@ -2,7 +2,7 @@ import { potentRangeFeet } from "./class-features.js";
 import type { Actor } from "@vtt/domain";
 import { MAX_ACTION_USES, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
-import { withTakenActions } from "./builtin-actions.js";
+import { withEmpoweredStrikes, withTakenActions } from "./builtin-actions.js";
 import { atSpellUpLevel } from "./lasting-spells.js";
 import {
   deriveEquipment,
@@ -11,6 +11,8 @@ import {
   type EquipmentDerivation
 } from "./equipment-derivation.js";
 import { spellbookRituals } from "./ritual-adept.js";
+import { spellClassOf } from "./class-features.js";
+import { grantedSpellActions } from "./granted-actions.js";
 import { withHeadCount } from "./death-traits.js";
 
 /** The action list every actor-scoped consumer must read in place of `definition.actions`: item-derived
@@ -27,7 +29,10 @@ export function effectiveActions(
   const taken = declared.map((action) =>
     withHeadCount(
       withPotentRange(
-        withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition),
+        withEmpoweredStrikes(
+          withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition),
+          definition
+        ),
         definition,
         catalog
       ),
@@ -39,11 +44,14 @@ export function effectiveActions(
   const rituals = spellbookRituals(definition, actor, catalog);
   // The definition's own list when nothing changed, so a caller holding it sees the same array.
   const unchanged = taken.every((action, index) => action === declared[index]);
-  const base = unchanged && rituals.length === 0 ? declared : [...taken, ...rituals];
+  // What another creature's spell lets this one do while it lasts (Dragon's Breath's exhale).
+  const granted = actor ? grantedSpellActions(actor, catalog) : [];
+  const base =
+    unchanged && rituals.length === 0 && granted.length === 0 ? declared : [...taken, ...rituals, ...granted];
   if (!actor) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
   if (derivation.carriers.length === 0 && derivation.actions.length === 0) return base;
-  return [...base, ...derivation.actions].map((action) => withStandingRiders(action, derivation, actor));
+  return [...base, ...derivation.actions].map((action) => withStandingRiders(action, derivation, actor, definition));
 }
 
 /** SRD Eldritch Spear: the cantrip picked for it reaches 30 feet farther for each Warlock level. Applied to the spell
@@ -82,10 +90,23 @@ function atLevelUp(action: ActorAction, actor: Actor | undefined, catalog: Equip
 }
 
 /** Folds the standing riders that apply to one action into the numbers the resolver reads. */
-export function withStandingRiders(action: ActorAction, derivation: EquipmentDerivation, actor: Actor): ActorAction {
+export function withStandingRiders(
+  action: ActorAction,
+  derivation: EquipmentDerivation,
+  actor: Actor,
+  definition?: ActorDefinition
+): ActorAction {
   const sourceItemId = sourceItemOf(action, derivation, actor.inventory);
-  const riders = collectRiders(derivation.carriers, { ...derivation.context, moment: null, sourceItemId });
-  if (riders.length === 0) return action;
+  const all = collectRiders(derivation.carriers, { ...derivation.context, moment: null, sourceItemId });
+  if (all.length === 0) return action;
+  // A spellcasting rider that names a class reaches only the spells cast as that class (Innate Sorcery's DC).
+  const spellClass = spellClassOf(definition, action.spellId);
+  const riders = all.filter(
+    (rider) =>
+      (rider.modifier.type !== "spell-save-dc" && rider.modifier.type !== "spell-attack-bonus") ||
+      rider.modifier.classId === undefined ||
+      rider.modifier.classId === spellClass
+  );
 
   // A wand of the war mage's bonus to spell attack rolls lands on every spell attack its bearer makes.
   const attackBonus =

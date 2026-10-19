@@ -157,7 +157,7 @@ describe("what an action ends", () => {
     };
     return resolveDefinitionAction(
       built.state,
-      builtinAction("end-effect")!,
+      builtinAction("end-an-effect")!,
       { actorId: IDS.hero, targetIds: [targetId], commandId: nextId(), builtin: true },
       {
         random: () => faces.shift() ?? 3,

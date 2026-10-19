@@ -12,7 +12,7 @@ type Actor = GameState["actors"][number];
 type Effect = Actor["effects"][number];
 
 /** The id of the generic action that ends an effect by the means its text prints. */
-export const END_EFFECT_ACTION_ID = "end-effect";
+export const END_EFFECT_ACTION_ID = "end-an-effect";
 
 /** Why End an Effect can't be taken: nothing it names. */
 export const NO_ENDING_OPTION = "No effect on you or a creature beside you ends by an action now.";

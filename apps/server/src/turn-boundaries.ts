@@ -1,13 +1,13 @@
-import type { GameState } from "@vtt/domain";
-import { breathAtTurnEnd } from "./breath.js";
-import { confusedTurn } from "./random-outcomes.js";
-import { calmAtTurnStart } from "./berserker-axe.js";
-import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
+import { isDead, type GameState } from "@vtt/domain";
+import { abilityModifier, parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
+import { calmAtTurnStart } from "./berserker-axe.js";
+import { breathAtTurnEnd } from "./breath.js";
 import { holdsFeature } from "./class-features.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { endEffect, expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
-import { applyDamageDetailed, damageAdjustmentDetail, loseHitPoints, UNTYPED_DAMAGE } from "./hit-points.js";
+import { applyDamageDetailed, damageAdjustmentDetail, healActor, loseHitPoints, UNTYPED_DAMAGE } from "./hit-points.js";
+import { confusedTurn } from "./random-outcomes.js";
 import { holyNimbusBurns } from "./paladin-auras.js";
 import { endEffectsOutOfSight, openEndingSave, openRepeatSaves } from "./save-stages.js";
 import { sceneSight, type SceneSight } from "./vision/sight.js";
@@ -114,6 +114,7 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
   // A Berserker Axe's berserk ends on a turn that starts with no creature within 60 feet.
   const calm = calmAtTurnStart(state, actorId, deps.distanceFeet);
   if (calm) events.push(...endEffect(state, actorId, calm));
+  hitPointsEachTurn(state, actorId, events, deps);
   events.push(...traitsAtTurnStart(state, actorId, deps));
   holyNimbus(state, actorId, events, deps);
   dealOngoingAt(state, actorId, "start", events, deps);
@@ -200,6 +201,36 @@ function temporaryHitPointsEachTurn(state: GameState, actorId: string, events: E
       actorId,
       ...sourceOf(effect)
     });
+  }
+}
+
+/** Hit points an effect restores at the start of each of its bearer's turns (SRD Regenerate: "regains 1 Hit Point at
+ *  the start of each of its turns"), and the Champion's Heroic Rally ("5 plus your Constitution modifier if you are
+ *  Bloodied and have at least 1 Hit Point"). Through the healing rules, so a dying creature wakes and the dead don't. */
+function hitPointsEachTurn(state: GameState, actorId: string, events: EffectNarration[], deps: TurnStartDeps): void {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || isDead(actor)) return;
+  const heals: Array<Readonly<{ amount: number; source: string; effect?: (typeof actor.effects)[number] }>> =
+    actor.effects.flatMap((effect) =>
+      effect.hitPointsEachTurn !== undefined ? [{ amount: effect.hitPointsEachTurn, source: effect.name, effect }] : []
+    );
+  const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
+  const bloodied = actor.hp.current >= 1 && actor.hp.current * 2 <= actor.hp.maximum;
+  if (bloodied && definition && holdsFeature(definition, "survivor", "Survivor"))
+    heals.push({ amount: Math.max(0, 5 + abilityModifier(definition.abilityScores.con)), source: "Heroic Rally" });
+  for (const heal of heals) {
+    if (heal.amount <= 0 || actor.hp.current >= actor.hp.maximum) continue;
+    const before = actor.hp.current;
+    const woke = healActor(state, actor.id, heal.amount, { role: "gm" });
+    const regained = actor.hp.current - before;
+    if (regained > 0)
+      events.push({
+        kind: "effect",
+        text: `${actor.name} regains ${regained} ${regained === 1 ? "hit point" : "hit points"} (${heal.source}).`,
+        actorId,
+        ...(heal.effect ? sourceOf(heal.effect) : {})
+      });
+    events.push(...woke);
   }
 }
 

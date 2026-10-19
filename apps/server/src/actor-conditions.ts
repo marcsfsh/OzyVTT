@@ -144,14 +144,14 @@ function checkPlayerRemoval(
 /** SRD Prone: standing up costs half your Speed, so it happens on your own turn, with movement you have. */
 function standUp(state: GameState, actor: Actor, scope: Initiator, options: SetConditionOptions | undefined) {
   const events: EffectNarration[] = [];
-  // SRD Hideous Laughter: "it can't end the Prone condition on itself" while the spell lasts.
-  const pinned = actor.effects.find((effect) => effect.tags.includes(CANT_STAND_TAG));
-  if (pinned && scope.role === "player")
+  // SRD Hideous Laughter: the target "can't end the Prone condition on itself". The GM's housekeeping stays free.
+  const held = actor.effects.find((effect) => effect.tags.includes(CANT_STAND_TAG));
+  if (held && scope.role === "player")
     policeConditionRule(
       state,
       actor,
-      "condition.imposed",
-      `${actor.name} can't end the Prone condition while ${pinned.name} lasts.`,
+      "movement.cant-stand",
+      `${actor.name} can't stand up while ${held.name} lasts.`,
       options,
       events
     );

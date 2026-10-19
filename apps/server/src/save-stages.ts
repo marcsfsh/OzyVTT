@@ -299,7 +299,8 @@ export function settleEndingSave(
 }
 
 /** The effect a failed repeat turns into: the next stage's conditions in place of the first's, from the same source
- *  and cast, so the caster's Concentration still holds it. */
+ *  and cast, so the caster's Concentration still holds it. Its tags and modifiers carry over: a shake still wakes a
+ *  sleeper, and Contagion's Disadvantage on the chosen ability lasts its 7 days. */
 function nextStage(
   state: GameState,
   bearer: Actor,
@@ -313,6 +314,8 @@ function nextStage(
   const replacement = makeEffect({
     id: id.slice(0, 120),
     name: stage.name,
+    tags: [...effect.tags],
+    modifiers: structuredClone(effect.modifiers),
     sourceActorId: effect.sourceActorId,
     sourceName: effect.sourceName,
     sourceActionId: effect.sourceActionId,

@@ -115,6 +115,15 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
   "damage-reduction": "at-its-moment",
   "damage-resistance": "standing",
   "damage-vulnerability": "standing",
+  "damage-immunity": "standing",
+  "ignores-resistance": "standing",
+  "d20-minimum": "at-its-moment",
+  "total-minimum": "at-its-moment",
+  "damage-die-minimum": "at-its-moment",
+  "advantage-denied": "at-its-moment",
+  "healing-received-maximized": "at-its-moment",
+  "healing-dice-maximized": "at-its-moment",
+  "healing-bonus": "at-its-moment",
   sense: "vision"
 });
 

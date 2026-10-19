@@ -67,7 +67,9 @@ describe("casting a spell that rolls nothing, in a fight", () => {
 
   it("holds Concentration on Guidance, and touches one creature only", () => {
     const { resolve, hero } = fight(cleric, { ally: true });
-    expect(() => resolve("spell-guidance", { targetIds: [HERO, ALLY] })).toThrowError(/targets one creature/);
+    expect(() => resolve("spell-guidance", { targetIds: [HERO, ALLY] })).toThrowError(
+      /targets one creature|exactly one target/
+    );
     resolve("spell-guidance", { targetIds: [ALLY] });
     expect(hero.effects.map((effect) => effect.name)).toContain("Concentrating on Guidance");
   });

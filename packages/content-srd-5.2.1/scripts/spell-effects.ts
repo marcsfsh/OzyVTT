@@ -5,7 +5,7 @@
  * the caster makes ("Make a ranged spell attack"), never one the text only mentions. `test/spell-effects.test.ts`
  * pins the cases.
  */
-import { DamageTypeSchema, type ActionArea, type DamageType, type OnHitRider } from "@vtt/schemas";
+import { DamageTypeSchema, type ActionArea, type DamageType, type GrantOption, type OnHitRider } from "@vtt/schemas";
 import { areaOfProse } from "../src/action-prose.js";
 import type { SpellEffect, SpellLaterAction, SpellReference } from "../src/schemas.js";
 import { healingOfText, spellAttackRangeOf, type SpellRange } from "../src/spell-effect.js";
@@ -148,6 +148,8 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   "dragons-breath": { count: 1 },
   dream: { count: 1 },
   "enhance-ability": { count: 1, perSlot: 1 },
+  // "Up to twelve creatures can partake of the feast."
+  "heroes-feast": { count: 12 },
   enlargereduce: { count: 1 },
   eyebite: { count: 1 },
   // "Choose up to five falling creatures within range."
@@ -1112,6 +1114,94 @@ const markDamage = (type: DamageType): Modifier => ({
   when: [{ type: "on-hit" }, { type: "by-effect-source" }]
 });
 
+/** One choice a grant or a failed save offers, with what it adds. */
+const option = (id: string, name: string, rest: Partial<Omit<GrantOption, "id" | "name">> = {}): GrantOption => ({
+  id,
+  name,
+  tags: [],
+  modifiers: [],
+  ...rest
+});
+const ABILITIES = [
+  ["str", "Strength"],
+  ["dex", "Dexterity"],
+  ["con", "Constitution"],
+  ["int", "Intelligence"],
+  ["wis", "Wisdom"],
+  ["cha", "Charisma"]
+] as const;
+/** The SRD skills, for a spell that picks one (Guidance). */
+const SKILLS: ReadonlyArray<readonly [id: string, name: string]> = [
+  ["acrobatics", "Acrobatics"],
+  ["animal-handling", "Animal Handling"],
+  ["arcana", "Arcana"],
+  ["athletics", "Athletics"],
+  ["deception", "Deception"],
+  ["history", "History"],
+  ["insight", "Insight"],
+  ["intimidation", "Intimidation"],
+  ["investigation", "Investigation"],
+  ["medicine", "Medicine"],
+  ["nature", "Nature"],
+  ["perception", "Perception"],
+  ["performance", "Performance"],
+  ["persuasion", "Persuasion"],
+  ["religion", "Religion"],
+  ["sleight-of-hand", "Sleight of Hand"],
+  ["stealth", "Stealth"],
+  ["survival", "Survival"]
+];
+const titled = (type: string) => `${type[0]!.toUpperCase()}${type.slice(1)}`;
+/** Resistance's eleven types. */
+const RESISTANCE_TYPES: readonly DamageType[] = [
+  "acid",
+  "bludgeoning",
+  "cold",
+  "fire",
+  "lightning",
+  "necrotic",
+  "piercing",
+  "poison",
+  "radiant",
+  "slashing",
+  "thunder"
+];
+/** The kinds of creature Protection from Evil and Good guards against; Dispel Evil and Good leaves Aberrations out. */
+const OTHERWORLDLY = ["aberration", "celestial", "elemental", "fey", "fiend", "undead"];
+/** Disadvantage on attack rolls against the bearer from creatures of these kinds. */
+const attackedWithDisadvantageBy = (creatureTypes: readonly string[]): Modifier => ({
+  type: "roll-mode",
+  roll: "incoming-attack",
+  mode: "disadvantage",
+  when: [{ type: "on-attack-roll" }, { type: "source-creature-type-is", creatureTypes: [...creatureTypes] }]
+});
+/** A roll mode on one ability's checks, saves or attack rolls. */
+const onAbility = (
+  roll: "check" | "save" | "attack",
+  mode: "advantage" | "disadvantage",
+  ability: (typeof ABILITIES)[number][0]
+): Modifier => ({
+  type: "roll-mode",
+  roll,
+  mode,
+  when: [
+    { type: roll === "check" ? "on-ability-check" : roll === "save" ? "on-saving-throw" : "on-attack-roll" },
+    { type: "ability-is", abilities: [ability] }
+  ]
+});
+/** Alter Self's natural weapon: the Unarmed Strike deals 1d6 of this type with the spellcasting ability. */
+const naturalWeapon = (id: string, name: string, damageType: DamageType) =>
+  option(id, name, { unarmedStrike: { dice: "1d6", damageType, ability: "spellcasting" } });
+/** A die on the bearer's weapon and Unarmed Strike damage rolls, or with a minus taken off them (Reduce's 1d4 less,
+ *  never below 1). */
+const weaponDamageDie = (dice: string, leavesOne = false): Modifier => ({
+  type: "damage-bonus",
+  amount: 0,
+  dice,
+  ...(leavesOne ? { leavesOne: true as const } : {}),
+  when: [{ type: "on-damage-roll" }, { type: "attack-kind-is", kinds: ["weapon", "unarmed"] }]
+});
+
 /**
  * What a cast leaves on the creatures it targets (or the one its attack hits) while it lasts, in the effect vocabulary
  * the engine reads (SRD 5.2.1 text). A grant "until ended" lasts the spell's own duration at the level it was cast
@@ -1351,12 +1441,17 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "target",
     duration: { type: "manual" }
   }),
-  // "Advantage on ability checks using the chosen ability", one for every target the cast takes.
+  // "Advantage on ability checks using the chosen ability", any but Constitution, picked for each target the cast
+  // takes.
   "enhance-ability": spellGrant({
     name: "Enhance Ability",
-    tags: ["enhance-ability", "enhanced-ability"],
+    tags: ["enhance-ability"],
     target: "targets",
-    duration: { type: "manual" }
+    duration: { type: "manual" },
+    optionsPerTarget: true,
+    options: ABILITIES.filter(([ability]) => ability !== "con").map(([ability, name]) =>
+      option(ability, name, { modifiers: [onAbility("check", "advantage", ability)] })
+    )
   }),
   // "A creature you touch has the Invisible condition until the spell ends."
   "greater-invisibility": spellGrant({
@@ -1426,13 +1521,21 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "self",
     duration: { type: "manual" }
   }),
-  // "You banish a creature ... into a labyrinthine demiplane": off the map while the caster concentrates; its escape
-  // check is the GM's.
+  // "You banish a creature ... into a labyrinthine demiplane": off the map while the caster concentrates. "The target
+  // can take a Study action to try to escape ... a DC 20 Intelligence (Investigation) check": its way out ends it.
   maze: spellGrant({
     name: "Maze",
-    tags: ["off-plane"],
+    tags: ["maze", "off-plane"],
     target: "target",
-    duration: rounds(100)
+    duration: rounds(100),
+    endAction: {
+      activation: "action",
+      kind: "check",
+      ability: "int",
+      skill: "investigation",
+      dc: 20,
+      label: "Find the way out"
+    }
   }),
   // "Roll 1d6 at the end of each of your turns": the server rolls it, and on a 4 or more the caster is off the map
   // until the start of its next turn (`off-plane.ts`).
@@ -1472,7 +1575,303 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     tags: ["freedom-of-movement"],
     target: "targets",
     duration: { type: "manual" },
-    modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }]
+    modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }],
+    // "Spells and other magical effects can neither reduce its Speed nor cause it to have the Paralyzed or Restrained
+    // conditions"; a nonmagical restraint it escapes for 5 feet of movement, so it is kept off whatever its source.
+    conditionImmunities: ["paralyzed", "restrained"]
+  }),
+  // "Until the spell ends, the target can take a Magic action to exhale", the type chosen at the cast: the touched
+  // creature's own action, at the caster's numbers.
+  "dragons-breath": spellGrant({
+    name: "Dragon's Breath",
+    tags: ["dragons-breath"],
+    target: "target",
+    duration: rounds(10),
+    grantsLaterAction: "exhale"
+  }),
+  // "Choose a skill. Until the spell ends, the creature adds 1d4 to any ability check using the chosen skill."
+  guidance: spellGrant({
+    name: "Guidance",
+    tags: ["guidance"],
+    target: "target",
+    duration: rounds(10),
+    options: SKILLS.map(([skill, name]) =>
+      option(skill, name, {
+        modifiers: [
+          {
+            type: "check-bonus",
+            amount: 0,
+            dice: "1d4",
+            when: [{ type: "on-ability-check" }, { type: "skill-is", skills: [skill] }]
+          }
+        ]
+      })
+    )
+  }),
+  // "Choose a damage type ... the creature reduces the total damage taken by 1d4. A creature can benefit from this
+  // spell only once per turn."
+  resistance: spellGrant({
+    name: "Resistance",
+    tags: ["resistance"],
+    target: "target",
+    duration: rounds(10),
+    options: RESISTANCE_TYPES.map((type) =>
+      option(type, titled(type), {
+        modifiers: [
+          {
+            type: "damage-reduction",
+            amount: 0,
+            dice: "1d4",
+            oncePerTurn: true,
+            when: [{ type: "on-taking-damage" }, { type: "damage-type-is", damageTypes: [type] }]
+          }
+        ]
+      })
+    )
+  }),
+  // "When you make a Charisma check, you can replace the number you roll with a 15." The lie-detecting magic is the
+  // GM's.
+  glibness: spellGrant({
+    name: "Glibness",
+    tags: ["glibness"],
+    target: "self",
+    duration: { type: "manual" },
+    modifiers: [
+      {
+        type: "d20-minimum",
+        roll: "check",
+        minimum: 15,
+        when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["cha"] }]
+      }
+    ]
+  }),
+  // "Immunity to Psychic damage and the Charmed condition." What it hides from divination is the GM's.
+  "mind-blank": spellGrant({
+    name: "Mind Blank",
+    tags: ["mind-blank"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [{ type: "damage-immunity", damageTypes: ["psychic"] }],
+    conditionImmunities: ["charmed"]
+  }),
+  // "Resistance to Poison damage ... Immunity to the Frightened and Poisoned conditions. Its Hit Point maximum also
+  // increases by 2d10, and it gains the same number of Hit Points", rolled for each, for 24 hours.
+  "heroes-feast": spellGrant({
+    name: "Heroes' Feast",
+    tags: ["heroes-feast"],
+    target: "targets",
+    duration: { type: "minutes", minutes: 1440 },
+    modifiers: [{ type: "damage-resistance", damageTypes: ["poison"] }],
+    conditionImmunities: ["frightened", "poisoned"],
+    hitPointMaximumGain: { amount: 0, formula: "2d10" }
+  }),
+  // "For the duration, the target regains 1 Hit Point at the start of each of its turns."
+  regenerate: spellGrant({
+    name: "Regenerate",
+    tags: ["regenerate"],
+    target: "target",
+    duration: { type: "manual" },
+    hitPointsEachTurn: 1
+  }),
+  // "Advantage on Wisdom saving throws and Death Saving Throws and regains the maximum number of Hit Points possible
+  // from any healing."
+  "beacon-of-hope": spellGrant({
+    name: "Beacon of Hope",
+    tags: ["beacon-of-hope"],
+    target: "targets",
+    duration: rounds(10),
+    modifiers: [
+      onAbility("save", "advantage", "wis"),
+      { type: "roll-mode", roll: "death-save", mode: "advantage" },
+      { type: "healing-received-maximized" }
+    ]
+  }),
+  // "Creatures of those types have Disadvantage on attack rolls against the target. The target also can't be possessed
+  // by or gain the Charmed or Frightened conditions from them."
+  "protection-from-evil-and-good": spellGrant({
+    name: "Protection from Evil and Good",
+    tags: ["protection-from-evil-and-good"],
+    target: "target",
+    duration: rounds(100),
+    modifiers: [attackedWithDisadvantageBy(OTHERWORLDLY)],
+    conditionWards: { conditionIds: ["charmed", "frightened"], creatureTypes: [...OTHERWORLDLY] }
+  }),
+  // "Celestials, Elementals, Fey, Fiends, and Undead have Disadvantage on attack rolls against you."
+  "dispel-evil-and-good": spellGrant({
+    name: "Dispel Evil and Good",
+    tags: ["dispel-evil-and-good"],
+    target: "self",
+    duration: rounds(10),
+    modifiers: [attackedWithDisadvantageBy(OTHERWORLDLY.filter((type) => type !== "aberration"))]
+  }),
+  // "The warm shield grants you Resistance to Cold damage, and the chill shield grants you Resistance to Fire damage",
+  // and a creature within 5 feet that hits you with a melee attack roll takes 2d8 Fire or Cold.
+  "fire-shield": spellGrant({
+    name: "Fire Shield",
+    tags: ["fire-shield"],
+    target: "self",
+    duration: { type: "manual" },
+    struck: { withinFeet: 5, damage: [{ formula: "2d8", type: "fire" }] },
+    options: [
+      option("warm", "Warm Shield", {
+        modifiers: [{ type: "damage-resistance", damageTypes: ["cold"] }],
+        damageType: "fire"
+      }),
+      option("chill", "Chill Shield", {
+        modifiers: [{ type: "damage-resistance", damageTypes: ["fire"] }],
+        damageType: "cold"
+      })
+    ]
+  }),
+  // "That weapon becomes a magic weapon with a +1 bonus to attack rolls and damage rolls", +2 from a level 3 slot and
+  // +3 from a level 6 slot. One of the caster's own weapons.
+  "magic-weapon": spellGrant({
+    name: "Magic Weapon",
+    tags: ["magic-weapon"],
+    target: "self",
+    duration: { type: "manual" },
+    bindsWeapon: {
+      nonmagical: true,
+      bonusBySlot: [
+        { level: 2, bonus: 1 },
+        { level: 3, bonus: 2 },
+        { level: 6, bonus: 3 }
+      ]
+    }
+  }),
+  // "You can use your spellcasting ability instead of Strength for the attack and damage rolls of melee attacks using
+  // that weapon, and the weapon's damage die becomes a d8 ... it can be Force damage", d10 at level 5, d12 at 11, 2d6
+  // at 17.
+  shillelagh: spellGrant({
+    name: "Shillelagh",
+    tags: ["shillelagh"],
+    target: "self",
+    duration: rounds(10),
+    bindsWeapon: {
+      weaponIds: ["club", "quarterstaff"],
+      ability: "spellcasting",
+      dice: [
+        { level: 1, formula: "1d8" },
+        { level: 5, formula: "1d10" },
+        { level: 11, formula: "1d12" },
+        { level: 17, formula: "2d6" }
+      ],
+      damageTypes: ["force"]
+    }
+  }),
+  // "You take the Dash action, and until the spell ends, you can take that action again as a Bonus Action."
+  "expeditious-retreat": spellGrant({
+    name: "Expeditious Retreat",
+    tags: ["expeditious-retreat"],
+    target: "self",
+    duration: rounds(100),
+    dashesNow: true,
+    bonusActions: ["dash"]
+  }),
+  // "You can take the Disengage action as a Bonus Action" while the spell lasts.
+  "conjure-woodland-beings": spellGrant({
+    name: "Conjure Woodland Beings",
+    tags: ["conjure-woodland-beings"],
+    target: "self",
+    duration: rounds(100),
+    bonusActions: ["disengage"]
+  }),
+  // "Any attack you make deals an extra 2d8 damage when you hit a creature within 15 feet of yourself. This damage is
+  // Acid, Cold, Fire, or Lightning", picked at the cast.
+  "conjure-minor-elementals": spellGrant({
+    name: "Conjure Minor Elementals",
+    tags: ["conjure-minor-elementals"],
+    target: "self",
+    duration: rounds(100),
+    options: (["acid", "cold", "fire", "lightning"] as const).map((type) =>
+      option(type, titled(type), {
+        modifiers: [
+          {
+            type: "extra-damage",
+            formula: "2d8",
+            damageType: type,
+            doubleOnCritical: true,
+            when: [{ type: "on-hit" }, { type: "versus-within", feet: 15 }]
+          }
+        ]
+      })
+    )
+  }),
+  // Aquatic Adaptation's Swim Speed, or a natural weapon for the Unarmed Strike: 1d6 with the spellcasting ability.
+  "alter-self": spellGrant({
+    name: "Alter Self",
+    tags: ["alter-self"],
+    target: "self",
+    duration: { type: "manual" },
+    options: [
+      option("aquatic-adaptation", "Aquatic Adaptation", {
+        modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }]
+      }),
+      option("change-appearance", "Change Appearance"),
+      naturalWeapon("claws", "Claws", "slashing"),
+      naturalWeapon("fangs", "Fangs", "piercing"),
+      naturalWeapon("horns", "Horns", "piercing"),
+      naturalWeapon("hooves", "Hooves", "bludgeoning")
+    ]
+  }),
+  // "Until the spell ends, the target has a +1 bonus to AC and saving throws, and it has Resistance to all damage."
+  // The caster's share of its damage is the GM's.
+  "warding-bond": spellGrant({
+    name: "Warding Bond",
+    tags: ["warding-bond"],
+    target: "target",
+    duration: { type: "manual" },
+    armorClassBonus: 1,
+    modifiers: [
+      { type: "save-bonus", amount: 1, when: [{ type: "on-saving-throw" }] },
+      {
+        type: "damage-resistance",
+        damageTypes: [...DamageTypeSchema.options]
+      }
+    ]
+  }),
+  // "You gain the Invisible condition ... the invisibility ends immediately after you make an attack roll, deal damage,
+  // or cast a spell", while the double lasts.
+  mislead: spellGrant({
+    name: "Mislead",
+    tags: ["mislead", "invisible-until-it-acts"],
+    target: "self",
+    duration: { type: "manual" },
+    conditions: ["invisible"]
+  }),
+  // "The target has the Invisible condition ... it has the Unconscious condition ... This spell also ends if the target
+  // takes any damage." The end the caster sets is the GM's.
+  sequester: spellGrant({
+    name: "Sequester",
+    tags: ["sequester"],
+    target: "target",
+    duration: { type: "manual" },
+    conditions: ["invisible", "unconscious"],
+    endsOnDamage: true
+  }),
+  // Booming Voice: "Advantage on Charisma (Intimidation) checks". The other wonders are the GM's.
+  thaumaturgy: spellGrant({
+    name: "Thaumaturgy",
+    tags: ["thaumaturgy"],
+    target: "self",
+    duration: rounds(10),
+    options: [
+      option("altered-eyes", "Altered Eyes"),
+      option("booming-voice", "Booming Voice", {
+        modifiers: [
+          {
+            type: "roll-mode",
+            roll: "check",
+            mode: "advantage",
+            when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["intimidation"] }]
+          }
+        ]
+      }),
+      option("fire-play", "Fire Play"),
+      option("invisible-hand", "Invisible Hand"),
+      option("phantom-sound", "Phantom Sound"),
+      option("tremors", "Tremors")
+    ]
   }),
   // "The target's Speed is doubled", whatever its Speed is at each moment.
   haste: spellGrant({
@@ -1551,55 +1950,146 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
       { type: "roll-mode", roll: "check", mode: "disadvantage" }
     ]
   },
-  // "Become cursed for the duration": the curse the caster picks is the GM's to apply, and Remove Curse ends it.
-  "bestow-curse": { name: "Bestow Curse", tags: ["curse"], modifiers: [] },
+  // "Become cursed for the duration" with the curse the caster picks, which Remove Curse ends: Disadvantage on one
+  // ability's checks and saves, Disadvantage on attack rolls against the caster, the Wisdom save each turn (the GM's to
+  // ask), or an extra 1d8 Necrotic when the caster's attack hits it.
+  "bestow-curse": {
+    name: "Bestow Curse",
+    tags: ["curse"],
+    modifiers: [],
+    options: [
+      ...ABILITIES.map(([ability, name]) =>
+        option(ability, `${name} curse`, {
+          modifiers: [onAbility("check", "disadvantage", ability), onAbility("save", "disadvantage", ability)]
+        })
+      ),
+      option("against-you", "Attacks against you", {
+        modifiers: [
+          {
+            type: "roll-mode",
+            roll: "attack",
+            mode: "disadvantage",
+            when: [{ type: "on-attack-roll" }, { type: "versus-effect-source" }]
+          }
+        ]
+      }),
+      option("dodge", "Forced to Dodge", { tags: ["curse-dodge"] }),
+      option("necrotic", "Extra Necrotic damage", {
+        modifiers: [
+          {
+            type: "extra-damage",
+            formula: "1d8",
+            damageType: "necrotic",
+            doubleOnCritical: true,
+            when: [{ type: "on-hit" }, { type: "by-effect-source" }]
+          }
+        ]
+      })
+    ]
+  },
+  // Picked for each creature: immune to Charmed and Frightened, one it has held off; or Indifferent (the GM's).
+  "calm-emotions": {
+    name: "Calm Emotions",
+    tags: ["calm-emotions"],
+    modifiers: [],
+    optionsPerTarget: true,
+    options: [
+      option("calm", "Calmed", {
+        conditionImmunities: ["charmed", "frightened"],
+        suppressesConditions: ["charmed", "frightened"]
+      }),
+      option("indifferent", "Indifferent", { tags: ["indifferent"] })
+    ]
+  },
+  // "Follow the command on its next turn": Flee spends its turn on the Dash, Grovel is Prone and ends its turn, Halt
+  // neither moves nor acts. Approach and Drop are the GM's to move and drop.
+  command: {
+    name: "Command",
+    tags: ["commanded"],
+    duration: { type: "until-bearer-turn-end" },
+    modifiers: [],
+    options: [
+      option("approach", "Approach"),
+      option("drop", "Drop", { tags: ["no-actions"] }),
+      option("flee", "Flee", { tags: ["dash-only"] }),
+      option("grovel", "Grovel", { conditions: ["prone"], tags: ["no-actions"], speedZero: true }),
+      option("halt", "Halt", { tags: ["no-actions"], speedZero: true })
+    ]
+  },
+  // One of three for the duration: Asleep (Unconscious, waking on damage or a shake), Panicked (Frightened, and its
+  // turns spent on the Dash), Sickened (Poisoned).
+  eyebite: {
+    name: "Eyebite",
+    tags: ["eyebite"],
+    modifiers: [],
+    options: [
+      option("asleep", "Asleep", { conditions: ["unconscious"], tags: ["wakeable"], endsOnDamage: true }),
+      option("panicked", "Panicked", { conditions: ["frightened"], tags: ["dash-only"] }),
+      option("sickened", "Sickened", { conditions: ["poisoned"] })
+    ]
+  },
+  // "A -10 penalty to Wisdom (Perception) checks and Passive Perception until the spell ends."
+  enthrall: {
+    name: "Enthrall",
+    tags: ["enthralled"],
+    modifiers: [
+      {
+        type: "check-bonus",
+        amount: -10,
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
+      }
+    ]
+  },
+  // "Must use all its movement to dance in place, and has Disadvantage on Dexterity saving throws and attack rolls, and
+  // other creatures have Advantage on attack rolls against it", ended by its own action and a Wisdom save.
+  "irresistible-dance": {
+    name: "Irresistible Dance",
+    tags: ["dancing"],
+    speedZero: true,
+    modifiers: [
+      { type: "roll-mode", roll: "attack", mode: "disadvantage" },
+      onAbility("save", "disadvantage", "dex"),
+      attackedWithAdvantage
+    ],
+    endAction: { activation: "action", kind: "save", ability: "wis", dc: "spellcasting", label: "Collect itself" }
+  },
+  // "You also always know the target's location ... if it has the Invisible condition, it gains no benefit from that
+  // condition against you."
+  "mind-spike": { name: "Mind Spike", tags: ["outlined-to-source"], modifiers: [] },
+  // "Disadvantage on Strength-based D20 Tests for the duration. During that time, it also subtracts 1d8 from all its
+  // damage rolls."
+  "ray-of-enfeeblement": {
+    name: "Ray of Enfeeblement",
+    tags: ["enfeebled"],
+    modifiers: [
+      onAbility("attack", "disadvantage", "str"),
+      onAbility("check", "disadvantage", "str"),
+      onAbility("save", "disadvantage", "str"),
+      { type: "damage-bonus", amount: 0, dice: "-1d8", leavesOne: true, when: [{ type: "on-damage-roll" }] }
+    ]
+  },
+  // "Choose one ability ... While Poisoned, the target has Disadvantage on saving throws made with the chosen ability."
+  contagion: {
+    name: "Contagion",
+    tags: ["contagion"],
+    modifiers: [],
+    options: ABILITIES.map(([ability, name]) =>
+      option(ability, name, { modifiers: [onAbility("save", "disadvantage", ability)] })
+    )
+  },
+  // "The target can't end the Prone condition on itself until the spell ends."
+  "hideous-laughter": { name: "Hideous Laughter", tags: ["cant-stand"], modifiers: [] },
+  // "The spell ends on a target if it takes damage or someone within 5 feet of it takes an action to shake it out of
+  // the spell's effect" (Shake Awake).
+  sleep: { name: "Sleep", tags: ["wakeable"], modifiers: [] },
   // "A Remove Curse, Greater Restoration, or Wish spell ends this spell."
   geas: { name: "Geas", tags: ["curse"], modifiers: [] },
   // "You create a phantasmal object, creature, or other phenomenon ... perceivable only to the target for the duration."
   "phantasmal-force": { name: "Phantasmal Force", tags: [], modifiers: [] },
-  // "It can't end the Prone condition on itself" while it laughs.
-  "hideous-laughter": { name: "Hideous Laughter", tags: ["cant-stand"], modifiers: [] },
   // "Each target ... drops whatever it is holding and has the Frightened condition for the duration."
   fear: { name: "Fear", tags: ["drops-held"], modifiers: [] },
   // "Can't take Bonus Actions or Reactions, and it rolls 1d10 at the start of each of its turns" (`random-outcomes.ts`).
   confusion: { name: "Confusion", tags: ["confused", "no-bonus-actions", "no-reactions"], modifiers: [] },
-  // "Has Disadvantage on Dexterity saving throws and attack rolls, and other creatures have Advantage on attack rolls
-  // against it" while it dances (the save's Speed 0 keeps it dancing in place).
-  "irresistible-dance": {
-    name: "Irresistible Dance",
-    tags: [],
-    modifiers: [
-      { type: "roll-mode", roll: "attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] },
-      {
-        type: "roll-mode",
-        roll: "save",
-        mode: "disadvantage",
-        when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
-      },
-      attackedWithAdvantage
-    ]
-  },
-  // "Disadvantage on Strength-based D20 Tests for the duration". Its 1d8 off each damage roll is the GM's.
-  "ray-of-enfeeblement": {
-    name: "Ray of Enfeeblement",
-    tags: [],
-    modifiers: (["attack", "save", "check"] as const).map((roll) => ({
-      type: "roll-mode" as const,
-      roll,
-      mode: "disadvantage" as const,
-      when: [
-        {
-          type:
-            roll === "attack"
-              ? ("on-attack-roll" as const)
-              : roll === "save"
-                ? ("on-saving-throw" as const)
-                : ("on-ability-check" as const)
-        },
-        { type: "ability-is" as const, abilities: ["str" as const] }
-      ]
-    }))
-  },
   // "Disadvantage on the next attack roll it makes before the end of its next turn": its own roll spends it.
   "vicious-mockery": {
     name: "Vicious Mockery",
@@ -1609,7 +2099,7 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   }
 };
 
-/** What a successful save against the cast leaves on the creature instead (SRD 5.2.1 text). */
+/** What a successful save against the cast still leaves on the creature (SRD 5.2.1 text). */
 const SAVE_SUCCESS_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   // "On a successful save, its Speed is 0 until the start of your next turn."
   "flesh-to-stone": {
@@ -1619,22 +2109,22 @@ const SAVE_SUCCESS_EFFECTS: Readonly<Record<string, FailureEffect>> = {
     duration: { type: "until-source-next-turn" },
     modifiers: []
   },
-  // "On a successful save, the target dances comically until the end of its next turn, during which it must spend all
-  // its movement to dance in place."
-  "irresistible-dance": {
-    name: "Dancing",
-    tags: [],
-    speedZero: true,
-    duration: { type: "until-bearer-turn-end" },
-    modifiers: []
-  },
   // "On a successful save, the target has Disadvantage on the next attack roll it makes until the start of your next
-  // turn": its own roll spends it.
+  // turn."
   "ray-of-enfeeblement": {
     name: "Ray of Enfeeblement",
     tags: ["until-own-attack"],
     duration: { type: "until-source-next-turn" },
-    modifiers: [{ type: "roll-mode", roll: "attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }]
+    modifiers: [{ type: "roll-mode", roll: "attack", mode: "disadvantage" }]
+  },
+  // "The target dances comically until the end of its next turn, during which it must spend all its movement to dance
+  // in place."
+  "irresistible-dance": {
+    name: "Irresistible Dance",
+    tags: ["dancing"],
+    duration: { type: "until-bearer-turn-end" },
+    speedZero: true,
+    modifiers: []
   }
 };
 
@@ -1781,8 +2271,8 @@ const strengthRolls = (mode: "advantage" | "disadvantage"): Modifier[] => [
 const CAST_EFFECT_OPTIONS: Readonly<Record<string, NonNullable<SpellEffect["effectOptions"]>>> = {
   // "Enlarge. The target's size increases by one category ... Advantage on Strength checks and Strength saving throws.
   // The target's attacks with its enlarged weapons or Unarmed Strikes deal an extra 1d4 damage on a hit." "Reduce. The
-  // target's size decreases by one category ... Disadvantage on Strength checks and Strength saving throws." Reduce's
-  // 1d4 less damage (never below 1) is the GM's: no rider takes dice away.
+  // target's size decreases by one category ... Disadvantage on Strength checks and Strength saving throws ... 1d4 less
+  // damage (this can't reduce the damage below 1)".
   enlargereduce: [
     {
       id: "enlarge",
@@ -1805,7 +2295,12 @@ const CAST_EFFECT_OPTIONS: Readonly<Record<string, NonNullable<SpellEffect["effe
     {
       id: "reduce",
       name: "Reduce",
-      effect: { name: "Reduced", tags: ["reduced"], sizeChange: { step: -1 }, modifiers: strengthRolls("disadvantage") }
+      effect: {
+        name: "Reduced",
+        tags: ["reduced"],
+        sizeChange: { step: -1 },
+        modifiers: [...strengthRolls("disadvantage"), weaponDamageDie("-1d4", true)]
+      }
     }
   ]
 };

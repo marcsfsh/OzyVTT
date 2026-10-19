@@ -214,8 +214,8 @@ export const SpellEffectSchema = z
     grant: ActionGrantSchema.optional(),
     /** What a failed save against the cast leaves on the creature (Bane's -1d4, Faerie Fire's outline). */
     failureEffect: SaveFailureEffectSchema.optional(),
-    /** What a successful save leaves on the creature instead (Flesh to Stone: Speed 0 until the start of the caster's
-     *  next turn). */
+    /** What a successful save leaves on the creature instead (Flesh to Stone's Speed 0 until the start of the caster's
+     *  next turn, Ray of Enfeeblement's Disadvantage on the next attack roll). */
     successEffect: SaveFailureEffectSchema.optional(),
     /** A reaction spell's trigger and response (Shield, Hellish Rebuke), so the table offers it as a prompt. */
     reaction: ActionReactionSchema.optional(),

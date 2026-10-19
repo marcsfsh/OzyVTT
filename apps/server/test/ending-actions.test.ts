@@ -136,7 +136,7 @@ function endIt(built: Table, actorId: string, targetId: string, faces: number[] 
   };
   return resolveDefinitionAction(
     built.state,
-    builtinAction("end-effect")!,
+    builtinAction("end-an-effect")!,
     { actorId, targetIds: [targetId], commandId: nextId(), builtin: true },
     deps(built, faces, heroDefinition)
   );
@@ -238,7 +238,7 @@ describe("ending a spell's effect by an action", () => {
     };
     resolveDefinitionAction(
       fight.state,
-      builtinAction("end-effect")!,
+      builtinAction("end-an-effect")!,
       { actorId: FOE, targetIds: [FOE], commandId: nextId(), builtin: true },
       {
         random: () => 17,
@@ -248,26 +248,6 @@ describe("ending a spell's effect by an action", () => {
         resolveDefinition: () => undefined
       }
     );
-    expect(actorOf(fight.state, FOE).effects).toEqual([]);
-  });
-
-  it("lets a dancer collect itself and repeat Irresistible Dance's save, a success ending it", () => {
-    const fight = caster();
-    cast(fight, "irresistible-dance");
-    answer(fight.state, FOE, 2);
-    fight.state.combat = {
-      ...fight.state.combat,
-      turnActorId: FOE,
-      turn: { ...fight.state.combat.turn, actionUsed: false, actionInstance: null }
-    };
-    resolveDefinitionAction(
-      fight.state,
-      builtinAction("end-effect")!,
-      { actorId: FOE, targetIds: [FOE], commandId: nextId(), builtin: true },
-      { random: () => 10, newRollId: nextId, gmSessionId: IDS.gm, now: NOW, resolveDefinition: () => undefined }
-    );
-    expect(fight.state.combat.pendingSaves).toMatchObject([{ targetActorId: FOE, ability: "wis", dc: 15 }]);
-    answer(fight.state, FOE, 19);
     expect(actorOf(fight.state, FOE).effects).toEqual([]);
   });
 });

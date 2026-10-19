@@ -447,6 +447,15 @@ vision. Riders name damage types and
 conditions from the SRD's closed sets, and the homebrew publish gate (`homebrew-validate.ts`)
 refuses a rider gated on a moment its reader never collects.
 
+A grant or a failed save can offer options (Fire Shield's warm or chill, Bestow Curse's curse), one for
+each target where the text says so. The resolve carries the pick (`optionId`, `targetOptions`), which is
+checked before anything rolls and kept on the effect with what it adds (`resolution/grant-extras.ts`). A
+grant can also bind to one carried weapon (`itemId`): its `this-item` riders reach that row's rolls and
+its `weapon` changes how the row swings, until the row leaves the pack (`bound-weapons.ts`). A live effect
+can offer its bearer actions: a Bonus Action Dash or Disengage, an action that ends it with a save or a
+check, and another creature's spell action at the numbers it was cast with (`builtinActionsFor` in
+`builtin-actions.ts`, `granted-actions.ts`).
+
 What rides a hit is data on its action (`ridesHit`): the hits it rides, once a turn or on its user's own
 turn, the dice it gives up, its cost, the save it opens and the effects picked with it (Sneak Attack's
 Cunning Strikes, Brutal Strike, Stunning Strike, a staff's charges). The attack's preview offers it and
@@ -543,7 +552,10 @@ mastery property a mastered weapon swing carries (`weapon-masteries.ts`). The se
 pins (`character.set-favourites`) and counts each option that resolves for it (`option-uses.ts`), a bounded map.
 
 Every ability check, from a sheet chip, a builtin action or the GM's call for a roll, comes from one plan
-(`checkPlan` in `ability-checks.ts`), so the number a sheet shows is the roll the server makes. A die a
+(`checkPlan` in `ability-checks.ts`), so the number a sheet shows is the roll the server makes. Gear that helps a
+check only in a situation (a Book's topic, prying with a Crowbar) carries a rider gated on `situation-is`: the
+derived sheet lists each situation (`check-situations.ts`), the sheet offers it as a toggle, and only a `check.roll`
+that names it gets the rider, its words added to the roll's name for the GM to judge. A die a
 player sees before it counts (a previewed attack, save or death save) is held on the server
 (`held-rolls.ts`, ADR-0012): a second look shows the same die, and a reroll needs Heroic Inspiration or an
 answer. An answer is data on an action, a grant or an effect (`RollAnswerSchema`): what a roll may take after it

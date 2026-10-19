@@ -1,6 +1,12 @@
 import type { HomebrewContentType, HomebrewValidationIssue, HomebrewValidity } from "@vtt/api-contract";
 import { CatalogChoiceError, resolveCatalogChoice, withArticle, type CatalogChoiceCatalogs } from "@vtt/domain";
-import { DAMAGE_ROLL_MOMENTS, RIDER_TRIGGER_KINDS, type ActorDefinition, type Modifier } from "@vtt/schemas";
+import {
+  DAMAGE_ROLL_MOMENTS,
+  HEALING_MOMENTS,
+  RIDER_TRIGGER_KINDS,
+  type ActorDefinition,
+  type Modifier
+} from "@vtt/schemas";
 import {
   CONDITION_IDS,
   DAMAGE_TYPE_IDS,
@@ -595,8 +601,26 @@ function riderBlockIssues(
 const MOMENTS_READ: Partial<Record<Modifier["type"], readonly string[]>> = {
   "damage-bonus": DAMAGE_ROLL_MOMENTS,
   "extra-damage": DAMAGE_ROLL_MOMENTS,
+  "damage-die-minimum": DAMAGE_ROLL_MOMENTS,
   "damage-resistance": [],
-  "damage-vulnerability": []
+  "damage-vulnerability": [],
+  "damage-immunity": [],
+  "ignores-resistance": [],
+  "advantage-denied": [],
+  "healing-received-maximized": [],
+  "healing-dice-maximized": HEALING_MOMENTS,
+  "healing-bonus": HEALING_MOMENTS,
+  "d20-minimum": ["on-ability-check", "on-saving-throw"],
+  "total-minimum": ["on-ability-check", "on-saving-throw"],
+  "damage-reduction": ["on-taking-damage"]
+};
+
+/** A moment in the words the publish gate uses. */
+const MOMENT_WORDS: Readonly<Record<string, string>> = {
+  "on-ability-check": "on an ability check",
+  "on-saving-throw": "on a saving throw",
+  "on-healing": "when the bearer heals",
+  "on-taking-damage": "when the bearer takes damage"
 };
 
 /** Riders that parse but would never take effect. Checked here because Zod cannot refine inside a
@@ -610,7 +634,9 @@ function riderIssues(modifiers: readonly Modifier[] | undefined, path: Path, lab
         [...path, index],
         read.length === 0
           ? `A modifier of ${label} waits for a moment in a roll, but a defence is read before any roll, so it would never apply. Remove the moment, or make it depend on a state, such as an effect or a condition.`
-          : `A damage modifier of ${label} waits for a moment the damage roll never reaches, so it would add nothing. Make it apply on a hit or on the damage roll, or remove the moment for a bonus that always applies.`
+          : read === DAMAGE_ROLL_MOMENTS
+            ? `A damage modifier of ${label} waits for a moment the damage roll never reaches, so it would add nothing. Make it apply on a hit or on the damage roll, or remove the moment for a bonus that always applies.`
+            : `A modifier of ${label} waits for a moment its rule never reaches, so it would never apply. Make it apply ${read.map((entry) => MOMENT_WORDS[entry] ?? entry).join(" or ")}, or remove the moment.`
       );
     }
     if (modifier.type === "extra-damage" && modifier.formula === undefined && modifier.abilityModifier === undefined) {
@@ -619,6 +645,21 @@ function riderIssues(modifiers: readonly Modifier[] | undefined, path: Path, lab
         `An extra damage modifier of ${label} has no dice and no ability modifier, so it would add nothing. Fill in one of the two.`
       );
     }
+    if (modifier.type === "damage-reduction" && modifier.amount === 0 && modifier.dice === undefined)
+      checks.add(
+        [...path, index],
+        `A damage reduction of ${label} takes off 0 and no dice, so it would reduce nothing. Give it an amount or dice.`
+      );
+    if (modifier.type === "check-bonus" && modifier.minimum !== undefined && modifier.abilityModifier === undefined)
+      checks.add(
+        [...path, index],
+        `An ability check bonus of ${label} has a least amount but no ability modifier for it to apply to. Pick the ability, or remove the least amount.`
+      );
+    if (modifier.type === "healing-bonus" && modifier.amount === 0 && modifier.perSlotLevel !== true)
+      checks.add(
+        [...path, index],
+        `More healing from ${label} adds 0 and not the slot's level, so it would add nothing. Give it an amount or add the slot's level.`
+      );
   });
 }
 

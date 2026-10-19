@@ -512,12 +512,12 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   },
   // "At which point it must repeat the save. If the target fails the second save, the target has the Unconscious
   // condition for the duration"; elves and creatures immune to Exhaustion succeed outright.
-  // "Or someone within 5 feet of it takes an action to shake it out of the spell's effect", at either stage.
+  // "Or someone within 5 feet of it takes an action to shake it out of the spell's effect", at either stage: the Shake
+  // Awake action, which reads the failure's wakeable tag.
   sleep: {
     repeatOnce: true,
-    secondFailure: { conditions: ["unconscious"], endsOnDamage: true, endedBy: { name: "Wake", by: "others" } },
-    autoSuccess: { sleepless: true },
-    endedBy: { name: "Wake", by: "others" }
+    secondFailure: { conditions: ["unconscious"], endsOnDamage: true },
+    autoSuccess: { sleepless: true }
   },
   // "The target can take a Study action to examine the phantasm with an Intelligence (Investigation) check against your
   // spell save DC. If the check succeeds, ... the spell ends."
@@ -528,7 +528,7 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   // Psychic damage."
   weird: { repeatFailureDamage: [{ formula: "5d10", type: "psychic" }] },
   // "Must use all its movement to dance in place", and "can take an action to collect itself and repeat the save".
-  "irresistible-dance": { speedZero: true, repeatByAction: true },
+  "irresistible-dance": { speedZero: true },
   // "The target repeats the save at the end of each of its turns, ending the spell on a success." The text names no
   // condition for the reader to hang it on.
   "ray-of-enfeeblement": { repeatSave: true },

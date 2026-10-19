@@ -20,12 +20,14 @@ const isResolvable = (action: ContentActionSummary) =>
   action.builtin === true;
 /** Rage/Reckless (grants), a Multiattack plan, a spent charge, a legendary action that only spends the pool, and
  *  no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go
- *  through targeting, as do check actions that ask for a skill (Search, Study). */
+ *  through targeting, as do check actions that ask for a skill (Search, Study) and actions that ask for an option or a
+ *  weapon (Fire Shield, Magic Weapon). */
 const isTargetless = (action: ContentActionSummary) =>
   // A shape-shift picks its form first (a werewolf's hybrid), and Enlarge/Reduce its effect.
   action.forms === undefined &&
   action.options === undefined &&
   action.checkSkills === undefined &&
+  action.choices === undefined &&
   action.attackBonus === null &&
   action.saveAbility === null &&
   action.damage.length === 0 &&

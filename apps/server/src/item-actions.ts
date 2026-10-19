@@ -13,6 +13,8 @@ import {
   MAX_ACTION_USES,
   type ActorAction,
   type ActorDefinition,
+  type DamageType,
+  type EffectInstance,
   type InventoryItem,
   type OngoingDamage
 } from "@vtt/schemas";
@@ -717,14 +719,18 @@ export function weaponSwing(
   definition: ActorDefinition | undefined,
   grantedWeapons: readonly string[] = [],
   martialArtsInForce = false,
-  options: Readonly<{ twoHanded?: boolean }> = {}
+  options: Readonly<{ twoHanded?: boolean; bound?: EffectInstance["weapon"] }> = {}
 ): WeaponSwing | null {
   const weapon = item.weapon;
   if (!weapon || !definition) return null;
   if (options.twoHanded && !weapon.versatileDice) return null;
   const properties = weapon.properties ?? [];
-  const modifier = weaponAbilityModifier(item, definition, martialArtsInForce);
-  const weaponDice = options.twoHanded ? weapon.versatileDice! : weapon.damageDice;
+  const { bound } = options;
+  // An effect bound to the weapon may lend it an ability ("you can use your spellcasting ability instead of
+  // Strength"), so the better of the two counts, and set its die (Shillelagh's d8).
+  const own = weaponAbilityModifier(item, definition, martialArtsInForce);
+  const modifier = bound?.ability ? Math.max(own, abilityModifier(definition.abilityScores[bound.ability])) : own;
+  const weaponDice = bound?.dice ?? (options.twoHanded ? weapon.versatileDice! : weapon.damageDice);
   // Martial Arts: the Monk may roll its die in place of the weapon's, so the bigger one is rolled.
   const martialArts = martialArtsSwing(item, definition, martialArtsInForce);
   const dice = martialArts ? biggerDie(weaponDice, martialArts.die) : weaponDice;
@@ -734,6 +740,7 @@ export function weaponSwing(
   const proficient =
     trained === undefined || trainingCovers(grantedWeapons, weapon, ids) || trainingCovers(trained, weapon, ids);
   const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
+  const pickable = bound?.damageTypes ? [...new Set([weapon.damageType as DamageType, ...bound.damageTypes])] : [];
   const action: ActorAction = {
     id: itemActionId(item.id, options.twoHanded ? TWO_HANDED_SUFFIX : undefined),
     name: options.twoHanded ? `${item.name} (two-handed)` : item.name,
@@ -751,7 +758,9 @@ export function weaponSwing(
         ? { rangeFeet: weapon.longRangeFeet ?? weapon.rangeFeet, rangeNormalFeet: weapon.rangeFeet }
         : {})
     },
-    damage: [{ formula: withModifier(dice, modifier), type: weapon.damageType }]
+    damage: [{ formula: withModifier(dice, modifier), type: weapon.damageType }],
+    // Its wielder picks each hit's damage type from these (Shillelagh: Force or the weapon's own).
+    ...(pickable.length >= 2 ? { damageTypes: pickable } : {})
   };
   return { action, dice, modifier };
 }
