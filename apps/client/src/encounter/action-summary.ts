@@ -8,6 +8,14 @@ export const tagLabel = (tag: string) =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 
+/** "1d12 hours", "7 days": the wait a pool spent for a time names. */
+export const afterWords = (afterHours: string | undefined) =>
+  afterHours === undefined
+    ? "some time"
+    : /^\d+$/.test(afterHours) && Number(afterHours) % 24 === 0
+      ? `${Number(afterHours) / 24} day${Number(afterHours) === 24 ? "" : "s"}`
+      : `${afterHours} hour${afterHours === "1" ? "" : "s"}`;
+
 /** How a limited use comes back, as a sheet says it ("Short Rest"): one back at the start of the bearer's next turn
  *  (Peerless Aim) is once a round. The rests are SRD rules terms, so they are capitalised. */
 export const usesScopeLabel = (per: NonNullable<ContentActionSummary["usesPer"]>) =>
@@ -56,7 +64,11 @@ export function actionSummaryParts(action: ContentActionSummary, all: readonly C
     parts.push(
       action.usesPer === "recharge"
         ? `Recharge ${action.usesRecharge}${(action.usesRecharge ?? 6) < 6 ? "-6" : ""}`
-        : `${action.usesLimit}/${action.usesPer === null ? "" : usesScopeLabel(action.usesPer)}`
+        : action.usesPer === "never"
+          ? `${action.usesLimit} uses, not regained`
+          : action.usesPer === "time"
+            ? `${action.usesLimit}, back ${afterWords(action.usesAfterHours)} after the first`
+            : `${action.usesLimit}/${action.usesPer === null ? "" : usesScopeLabel(action.usesPer)}`
     );
   if (action.legendaryCost !== undefined)
     parts.push(

@@ -17449,7 +17449,23 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Mirror Image",
+    "tags": [
+     "mirror-image",
+     "mirror-image-3"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    }
+   }
   },
   "classes": [
    "bard",

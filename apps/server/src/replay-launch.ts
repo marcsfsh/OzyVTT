@@ -83,7 +83,8 @@ function sceneCombatFrom(combat: GameState["combat"]): SceneCombat {
     pendingReactions: combat.pendingReactions,
     pendingDamage: combat.pendingDamage,
     pendingRuleAsks: combat.pendingRuleAsks,
-    pendingInitiative: combat.pendingInitiative
+    pendingInitiative: combat.pendingInitiative,
+    initiativeWindow: combat.initiativeWindow
   };
 }
 

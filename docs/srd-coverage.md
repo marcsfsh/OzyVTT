@@ -20,31 +20,31 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 
 | Records | Enforced | Guided | Reference |
 | --- | --- | --- | --- |
-| Spells (339) | 141 | 198 | 0 |
-| Monster actions (992) | 907 | 57 | 28 |
+| Spells (339) | 143 | 196 | 0 |
+| Monster actions (992) | 908 | 56 | 28 |
 | Monster traits (106) | 37 | 6 | 63 |
-| Barbarian features (23) | 20 | 0 | 3 |
-| Bard features (16) | 14 | 1 | 1 |
+| Barbarian features (23) | 21 | 0 | 2 |
+| Bard features (16) | 15 | 1 | 0 |
 | Cleric features (19) | 11 | 3 | 5 |
-| Druid features (21) | 13 | 4 | 4 |
+| Druid features (21) | 17 | 3 | 1 |
 | Fighter features (21) | 18 | 0 | 3 |
-| Monk features (30) | 22 | 3 | 5 |
-| Paladin features (26) | 23 | 2 | 1 |
-| Ranger features (22) | 16 | 2 | 4 |
-| Rogue features (23) | 18 | 3 | 2 |
-| Sorcerer features (18) | 15 | 3 | 0 |
-| Warlock features (20) | 15 | 3 | 2 |
-| Wizard features (15) | 9 | 2 | 4 |
+| Monk features (30) | 24 | 2 | 4 |
+| Paladin features (26) | 23 | 3 | 0 |
+| Ranger features (22) | 17 | 2 | 3 |
+| Rogue features (23) | 19 | 2 | 2 |
+| Sorcerer features (18) | 17 | 1 | 0 |
+| Warlock features (20) | 17 | 2 | 1 |
+| Wizard features (15) | 10 | 4 | 1 |
 | Species traits (77) | 73 | 1 | 3 |
 | Backgrounds (4) | 4 | 0 | 0 |
-| Feats (19) | 15 | 3 | 1 |
-| Magic items (270) | 73 | 131 | 66 |
+| Feats (19) | 16 | 2 | 1 |
+| Magic items (270) | 88 | 121 | 61 |
 | Gear and tools (141) | 24 | 38 | 79 |
 | Weapons (38) | 38 | 0 | 0 |
 | Armor (13) | 13 | 0 | 0 |
 | Conditions (15) | 13 | 2 | 0 |
 | Rules glossary (155) | 115 | 11 | 29 |
-| All records (2423) | 1647 | 473 | 303 |
+| All records (2423) | 1681 | 456 | 286 |
 
 ## How records are classified
 
@@ -78,9 +78,9 @@ what they do, are curated too (`RECORD_OVERRIDES`). Each group lists their notes
 
 ## Spells
 
-**Enforced (141):** Acid Arrow · Acid Splash · Aid · Alarm · Animal Friendship · Antilife Shell · Arcane Sword · Bane · Barkskin · Befuddlement · Black Tentacles · Bless · Blight · Blindness/Deafness · Blur · Burning Hands · Chain Lightning · Charm Monster · Charm Person · Chill Touch · Circle of Death · Cloudkill · Color Spray · Cone of Cold · Conjure Animals · Conjure Fey · Conjure Woodland Beings · Contact Other Plane · Continual Flame · Counterspell · Cure Wounds · Dancing Lights · Darkness · Darkvision · Daylight · Death Ward · Detect Evil and Good · Disintegrate · Dispel Magic · Dissonant Whispers · Divine Favor · Divine Smite · Dragon's Breath · Eldritch Blast · Enhance Ability · Ensnaring Strike · Entangle · Faerie Fire · False Life · Feather Fall · Finger of Death · Fire Bolt · Fire Shield · Fire Storm · Fireball · Flame Blade · Flame Strike · Flaming Sphere · Fly · Fog Cloud · Forbiddance · Foresight · Freezing Sphere · Geas · Globe of Invulnerability · Grease · Greater Invisibility · Guardian of Faith · Guiding Bolt · Harm · Haste · Heal · Healing Word · Heat Metal · Hellish Rebuke · Heroism · Hex · Hold Monster · Hold Person · Holy Aura · Hunter's Mark · Hypnotic Pattern · Ice Knife · Ice Storm · Inflict Wounds · Insect Plague · Invisibility · Jump · Lesser Restoration · Lightning Bolt · Longstrider · Mage Armor · Magic Missile · Mass Cure Wounds · Mass Heal · Mass Healing Word · Mass Suggestion · Meteor Swarm · Mind Spike · Misty Step · Modify Memory · Moonbeam · Pass without Trace · Poison Spray · Power Word Heal · Power Word Stun · Produce Flame · Protection from Energy · Protection from Poison · Ray of Frost · Ray of Sickness · Remove Curse · Sacred Flame · Scorching Ray · Searing Smite · See Invisibility · Shatter · Shield · Shield of Faith · Shining Smite · Shocking Grasp · Slow · Spare the Dying · Spider Climb · Spike Growth · Spirit Guardians · Spiritual Weapon · Starry Wisp · Stinking Cloud · Stoneskin · Suggestion · Sunbeam · Sunburst · Thunderwave · True Seeing · Vampiric Touch · Vicious Mockery · Vitriolic Sphere · Wall of Fire · Wall of Thorns · Web
+**Enforced (143):** Acid Arrow · Acid Splash · Aid · Alarm · Animal Friendship · Antilife Shell · Arcane Sword · Bane · Barkskin · Befuddlement · Black Tentacles · Bless · Blight · Blindness/Deafness · Blur · Burning Hands · Chain Lightning · Charm Monster · Charm Person · Chill Touch · Circle of Death · Cloudkill · Color Spray · Cone of Cold · Conjure Animals · Conjure Fey · Conjure Woodland Beings · Contact Other Plane · Continual Flame · Counterspell · Cure Wounds · Dancing Lights · Darkness · Darkvision · Daylight · Death Ward · Detect Evil and Good · Disintegrate · Dispel Magic · Dissonant Whispers · Divine Favor · Divine Smite · Dragon's Breath · Eldritch Blast · Enhance Ability · Ensnaring Strike · Entangle · Faerie Fire · False Life · Feather Fall · Finger of Death · Fire Bolt · Fire Shield · Fire Storm · Fireball · Flame Blade · Flame Strike · Flaming Sphere · Fly · Fog Cloud · Forbiddance · Foresight · Freezing Sphere · Geas · Globe of Invulnerability · Grease · Greater Invisibility · Guardian of Faith · Guiding Bolt · Harm · Haste · Heal · Healing Word · Heat Metal · Hellish Rebuke · Heroism · Hex · Hold Monster · Hold Person · Holy Aura · Hunter's Mark · Hypnotic Pattern · Ice Knife · Ice Storm · Inflict Wounds · Insect Plague · Invisibility · Jump · Lesser Restoration · Lightning Bolt · Longstrider · Mage Armor · Magic Missile · Mass Cure Wounds · Mass Heal · Mass Healing Word · Mass Suggestion · Meteor Swarm · Mind Spike · Mirror Image · Misty Step · Modify Memory · Moonbeam · Pass without Trace · Poison Spray · Power Word Heal · Power Word Stun · Prayer of Healing · Produce Flame · Protection from Energy · Protection from Poison · Ray of Frost · Ray of Sickness · Remove Curse · Sacred Flame · Scorching Ray · Searing Smite · See Invisibility · Shatter · Shield · Shield of Faith · Shining Smite · Shocking Grasp · Slow · Spare the Dying · Spider Climb · Spike Growth · Spirit Guardians · Spiritual Weapon · Starry Wisp · Stinking Cloud · Stoneskin · Suggestion · Sunbeam · Sunburst · Thunderwave · True Seeing · Vampiric Touch · Vicious Mockery · Vitriolic Sphere · Wall of Fire · Wall of Thorns · Web
 
-**Guided (198):** Alter Self · Animal Messenger · Animal Shapes · Animate Dead · Animate Objects · Antimagic Field · Antipathy/Sympathy · Arcane Eye · Arcane Hand · Arcane Lock · Arcanist's Magic Aura · Astral Projection · Augury · Aura of Life · Awaken · Banishment · Beacon of Hope · Bestow Curse · Blade Barrier · Blink · Call Lightning · Calm Emotions · Chromatic Orb · Clairvoyance · Clone · Command · Commune · Commune with Nature · Comprehend Languages · Compulsion · Confusion · Conjure Celestial · Conjure Elemental · Conjure Minor Elementals · Contagion · Contingency · Control Water · Control Weather · Create Food and Water · Create or Destroy Water · Create Undead · Creation · Delayed Blast Fireball · Demiplane · Detect Magic · Detect Poison and Disease · Detect Thoughts · Dimension Door · Disguise Self · Dispel Evil and Good · Divination · Divine Word · Dominate Beast · Dominate Monster · Dominate Person · Dream · Druidcraft · Earthquake · Elementalism · Enlarge/Reduce · Enthrall · Etherealness · Expeditious Retreat · Eyebite · Fabricate · Faithful Hound · Fear · Find Familiar · Find Steed · Find the Path · Find Traps · Flesh to Stone · Floating Disk · Forcecage · Freedom of Movement · Gaseous Form · Gate · Gentle Repose · Giant Insect · Glibness · Glyph of Warding · Goodberry · Greater Restoration · Guards and Wards · Guidance · Gust of Wind · Hallow · Hallucinatory Terrain · Heroes' Feast · Hideous Laughter · Identify · Illusory Script · Imprisonment · Incendiary Cloud · Instant Summons · Irresistible Dance · Knock · Legend Lore · Levitate · Light · Locate Animals or Plants · Locate Creature · Locate Object · Mage Hand · Magic Circle · Magic Jar · Magic Mouth · Magic Weapon · Magnificent Mansion · Major Image · Maze · Meld into Stone · Mending · Message · Mind Blank · Minor Illusion · Mirage Arcane · Mirror Image · Mislead · Move Earth · Nondetection · Passwall · Phantasmal Force · Phantasmal Killer · Phantom Steed · Planar Ally · Planar Binding · Plane Shift · Plant Growth · Polymorph · Power Word Kill · Prayer of Healing · Prestidigitation · Prismatic Spray · Prismatic Wall · Private Sanctum · Programmed Illusion · Project Image · Protection from Evil and Good · Purify Food and Drink · Raise Dead · Ray of Enfeeblement · Regenerate · Reincarnate · Resilient Sphere · Resistance · Resurrection · Reverse Gravity · Revivify · Rope Trick · Sanctuary · Scrying · Secret Chest · Seeming · Sending · Sequester · Shapechange · Shillelagh · Silence · Silent Image · Simulacrum · Sleep · Sleet Storm · Sorcerous Burst · Speak with Animals · Speak with Dead · Speak with Plants · Stone Shape · Storm of Vengeance · Summon Dragon · Symbol · Telekinesis · Telepathic Bond · Teleport · Teleportation Circle · Thaumaturgy · Time Stop · Tiny Hut · Tongues · Transport via Plants · Tree Stride · True Polymorph · True Resurrection · True Strike · Tsunami · Unseen Servant · Wall of Force · Wall of Ice · Wall of Stone · Warding Bond · Water Breathing · Water Walk · Weird · Wind Walk · Wind Wall · Wish · Word of Recall · Zone of Truth
+**Guided (196):** Alter Self · Animal Messenger · Animal Shapes · Animate Dead · Animate Objects · Antimagic Field · Antipathy/Sympathy · Arcane Eye · Arcane Hand · Arcane Lock · Arcanist's Magic Aura · Astral Projection · Augury · Aura of Life · Awaken · Banishment · Beacon of Hope · Bestow Curse · Blade Barrier · Blink · Call Lightning · Calm Emotions · Chromatic Orb · Clairvoyance · Clone · Command · Commune · Commune with Nature · Comprehend Languages · Compulsion · Confusion · Conjure Celestial · Conjure Elemental · Conjure Minor Elementals · Contagion · Contingency · Control Water · Control Weather · Create Food and Water · Create or Destroy Water · Create Undead · Creation · Delayed Blast Fireball · Demiplane · Detect Magic · Detect Poison and Disease · Detect Thoughts · Dimension Door · Disguise Self · Dispel Evil and Good · Divination · Divine Word · Dominate Beast · Dominate Monster · Dominate Person · Dream · Druidcraft · Earthquake · Elementalism · Enlarge/Reduce · Enthrall · Etherealness · Expeditious Retreat · Eyebite · Fabricate · Faithful Hound · Fear · Find Familiar · Find Steed · Find the Path · Find Traps · Flesh to Stone · Floating Disk · Forcecage · Freedom of Movement · Gaseous Form · Gate · Gentle Repose · Giant Insect · Glibness · Glyph of Warding · Goodberry · Greater Restoration · Guards and Wards · Guidance · Gust of Wind · Hallow · Hallucinatory Terrain · Heroes' Feast · Hideous Laughter · Identify · Illusory Script · Imprisonment · Incendiary Cloud · Instant Summons · Irresistible Dance · Knock · Legend Lore · Levitate · Light · Locate Animals or Plants · Locate Creature · Locate Object · Mage Hand · Magic Circle · Magic Jar · Magic Mouth · Magic Weapon · Magnificent Mansion · Major Image · Maze · Meld into Stone · Mending · Message · Mind Blank · Minor Illusion · Mirage Arcane · Mislead · Move Earth · Nondetection · Passwall · Phantasmal Force · Phantasmal Killer · Phantom Steed · Planar Ally · Planar Binding · Plane Shift · Plant Growth · Polymorph · Power Word Kill · Prestidigitation · Prismatic Spray · Prismatic Wall · Private Sanctum · Programmed Illusion · Project Image · Protection from Evil and Good · Purify Food and Drink · Raise Dead · Ray of Enfeeblement · Regenerate · Reincarnate · Resilient Sphere · Resistance · Resurrection · Reverse Gravity · Revivify · Rope Trick · Sanctuary · Scrying · Secret Chest · Seeming · Sending · Sequester · Shapechange · Shillelagh · Silence · Silent Image · Simulacrum · Sleep · Sleet Storm · Sorcerous Burst · Speak with Animals · Speak with Dead · Speak with Plants · Stone Shape · Storm of Vengeance · Summon Dragon · Symbol · Telekinesis · Telepathic Bond · Teleport · Teleportation Circle · Thaumaturgy · Time Stop · Tiny Hut · Tongues · Transport via Plants · Tree Stride · True Polymorph · True Resurrection · True Strike · Tsunami · Unseen Servant · Wall of Force · Wall of Ice · Wall of Stone · Warding Bond · Water Breathing · Water Walk · Weird · Wind Walk · Wind Wall · Wish · Word of Recall · Zone of Truth
 
 Notes on the curated rows:
 
@@ -88,6 +88,7 @@ Notes on the curated rows:
 | --- | --- | --- |
 | Alarm | enforced | The warded area lasts 8 hours, in a fight or out of one, on the game clock (spell-zones.ts, game-time.ts). When an enemy of the caster enters it, the GM is told who in a line only the GM sees. The GM wards a door or a window by hand, and passes on the bell or the ping. |
 | Antilife Shell | enforced | zone-barriers.ts holds every creature but Constructs and Undead out of the 10-foot Emanation. A walk goes round its edge, and strict rules refuse a move or a melee attack across it (resolution/validate.ts). A Ranged attack, a Reach weapon and a spell go through. The caster's move that forces the edge across such a creature ends the spell. |
+| Augury | guided | Each cast after the first before a Long Rest rolls the d100 against a 25 percent chance of no answer for each earlier cast (resolution/divinations.ts). The omen is the GM's. |
 | Aura of Life | guided | zone-auras.ts gives the caster and its allies Resistance to Necrotic damage while they stand in the 30-foot Emanation. spell-zones.ts gives an ally at 0 Hit Points that starts its turn there 1 Hit Point. Keeping their Hit Point maximums from dropping is the GM's. |
 | Banishment | guided | A failed save Incapacitates the target and takes it off the map while the caster concentrates (off-plane.ts); it can't be targeted, and it returns to the space it left or the nearest unoccupied one. An extraplanar creature that stays gone after the full minute is the GM's. |
 | Befuddlement | enforced | A failed save deals the Psychic damage and bars the target from casting spells and the Magic action (resolution/economy.ts). The save every 30 days, and Greater Restoration, Heal or Wish ending it, are the GM's. |
@@ -99,6 +100,7 @@ Notes on the curated rows:
 | Call Lightning | guided | The cast and each later Magic action strike a 5-foot Sphere with the Dexterity save against 3d10 Lightning damage, at the cast's slot level. Keeping the bolts under the cloud, and the extra 1d10 in a storm, are the GM's. |
 | Chromatic Orb | guided | The attack and the chosen damage type are applied. The leap to another target on matching dice is the GM's. |
 | Cloudkill | enforced | spell-zones.ts asks for the Constitution save against 5d8 Poison damage on the cast and when a creature enters the Sphere or ends its turn there, once a turn. At the start of each of the caster's turns it moves the Sphere 10 feet straight away from the caster, and a creature the Sphere moves onto makes the save. The Sphere is Heavily Obscured for dynamic vision (vision/cast-sight.ts). |
+| Commune | guided | Each cast after the first before a Long Rest rolls the d100 against a 25 percent chance of no answer for each earlier cast (resolution/divinations.ts). The deity's answers are the GM's. |
 | Compulsion | guided | A failed save imposes Charmed. The move it forces each turn, and the save after it, are the GM's. |
 | Conjure Celestial | guided | The Healing Light on the cast is applied, and Bright Light fills the Cylinder for dynamic vision (vision/cast-sight.ts). Searing Light, and moving the Cylinder, are the GM's. |
 | Conjure Elemental | guided | spell-zones.ts asks for the spirit's Dexterity save when an enemy enters its space or starts its turn within 5 feet of it, while it has no creature Restrained: 8d8 damage of its element and Restrained until the spell ends on a failure. The Restrained creature's repeat save with 4d8 damage at the start of each of its turns is the GM's. |
@@ -111,6 +113,7 @@ Notes on the curated rows:
 | Dimension Door | guided | granted-moves.ts gives the caster a 500-foot teleport for the turn to any space, seen or not; arriving where a creature it didn't perceive stands fails and deals it 4d6 Force damage. Taking a willing creature along is the GM's. |
 | Dispel Magic | enforced | resolution/dispel.ts ends each spell on the target creature of the slot's level or lower, and for each higher one rolls the caster's spellcasting ability check against DC 10 plus its level. The GM can aim it at a spell's area on the map instead. A spell on an object the app doesn't track is the GM's. |
 | Dissonant Whispers | enforced | The save and its Psychic damage are applied. On a failure the target spends its Reaction, when it can take one, on a move of its Speed that must end farther from the caster (granted-moves.ts), provoking as any move does; the route is the mover's. |
+| Divination | guided | Each cast after the first before a Long Rest rolls the d100 against a 25 percent chance of no answer for each earlier cast (resolution/divinations.ts). The truthful reply is the GM's. |
 | Dominate Beast | guided | A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts). The repeat save each time the target takes damage, and its orders, are the GM's. |
 | Dominate Monster | guided | A failed save imposes Charmed for the spell's duration, longer from a level 9 slot (resolution/concentration.ts). The repeat save each time the target takes damage, and its orders, are the GM's. |
 | Dominate Person | guided | A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts). The repeat save each time the target takes damage, and its orders, are the GM's. |
@@ -149,6 +152,7 @@ Notes on the curated rows:
 | Maze | guided | The target leaves the map while the caster concentrates (off-plane.ts) and returns to the space it left or the nearest unoccupied one. Its DC 20 Intelligence (Investigation) check to escape is the GM's, who ends the effect. |
 | Mending | guided | The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. The repair is the GM's. |
 | Message | guided | The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. The whisper and its reply are the table's. |
+| Mirror Image | enforced | The caster has three duplicates for a minute. Each hit on it rolls a d6 a duplicate, and on a 3 or higher the hit lands on a duplicate, which is destroyed, ending the spell with the last; an attacker Blinded or with Blindsight or Truesight is unaffected (resolution/mirror-image.ts). |
 | Misty Step | enforced | granted-moves.ts gives the caster a 30-foot teleport for the turn, which movement-rules.ts takes at once to an unoccupied space it can see and refuses beyond its range. |
 | Moonbeam | enforced | spell-zones.ts asks for the Constitution save against 2d10 Radiant damage on the cast and when a creature enters the Cylinder or ends its turn there, once a turn. On the caster's later turns a Magic action moves the Cylinder up to 60 feet (zone-moves.ts), and a creature it moves onto makes the save. Its Dim Light is placed for dynamic vision (vision/cast-sight.ts), and the shape-shifter's change back is the GM's. |
 | Pass without Trace | enforced | zone-auras.ts gives the caster and its allies +10 to Dexterity (Stealth) checks while they stand in the 30-foot Emanation. Leaving no tracks is the GM's to narrate. |
@@ -156,7 +160,7 @@ Notes on the curated rows:
 | Plant Growth | guided | Overgrowth makes a creature spend 4 feet of movement for every foot it moves in the Sphere (zone-ground.ts), until the GM ends the area. Leaving parts of the Sphere out, and the 8-hour Enrichment, are the GM's. |
 | Power Word Heal | enforced | resolution/heal.ts restores all the target's Hit Points and ends Charmed, Frightened, Paralyzed, Poisoned and Stunned, for one creature (resolution/spell-targets.ts). Standing up from Prone with its Reaction is the creature's choice. |
 | Power Word Stun | enforced | A target with 150 Hit Points or fewer is Stunned and repeats the save at the end of each of its turns; a tougher one's Speed is 0 until the start of the caster's next turn (resolution/pending.ts). |
-| Prayer of Healing | guided | The 2d8 Hit Points are applied. The Short Rest's benefits, and the limit of once per Long Rest, are the GM's. |
+| Prayer of Healing | enforced | The 2d8 Hit Points are applied, each target gains a Short Rest's benefits, and a creature it healed is refused until it finishes a Long Rest (resolution/prayer-of-healing.ts). |
 | Prestidigitation | guided | The cast spends its action and checks its components (resolution/economy.ts, resolution/components.ts), and the table is told. Its minor tricks are the GM's. |
 | Prismatic Wall | guided | The save against Blinded for a creature near the wall is applied. Each layer's save and effect are the GM's. |
 | Protection from Poison | enforced | The cast ends Poisoned and leaves Resistance to Poison damage and Advantage on saves to avoid or end Poisoned, for an hour counted on the game clock (game-time.ts). |
@@ -183,9 +187,9 @@ Notes on the curated rows:
 
 ## Monster actions
 
-**Enforced (907):** too many to list, so the guided and reference actions below stand out.
+**Enforced (908):** too many to list, so the guided and reference actions below stand out.
 
-**Guided (57):** Adult Black Dragon: Frightful Presence · Adult Red Dragon: Commanding Presence · Adult White Dragon: Frightful Presence · Ancient Black Dragon: Frightful Presence · Ancient Red Dragon: Commanding Presence · Ancient White Dragon: Frightful Presence · Balor: Teleport · Bearded Devil: Infernal Glaive · Behir: Swallow · Centaur Trooper: Trampling Charge (Recharge 5-6) · Cloaker: Phantasms (Recharge after a Short or Long Rest) · Djinni: Create Whirlwind · Doppelganger: Read Thoughts · Dryad: Tree Stride · Dust Mephit: Sleep (1/Day) · Frost Giant: War Cry (Recharge 5-6) · Gelatinous Cube: Engulf · Ghost: Etherealness · Giant Hyena: Rampage (1/Day) · Giant Octopus: Ink Cloud (1/Day) · Gnoll Warrior: Rampage (1/Day) · Horned Devil: Infernal Tail · Hydra: Multiattack · Ice Devil: Ice Wall (Recharge 6) · Incubus: Nightmare (Recharge 6) · Invisible Stalker: Vortex · Kraken: Swallow · Lich: Deathly Teleport · Lich: Frightening Gaze · Mummy Lord: Dread Command · Mummy Lord: Necrotic Strike · Mummy Lord: Whirlwind of Sand · Night Hag: Nightmare Haunting (1/Day) · Octopus: Ink Cloud (1/Day) · Otyugh: Bite · Pit Fiend: Hellfire Spellcasting (Recharge 4-6) · Priest Acolyte: Spellcasting · Purple Worm: Swallow · Remorhaz: Swallow · Roc: Swoop (Recharge 5-6) · Rust Monster: Reflexive Antennae · Sea Hag: Death Glare (Recharge 5-6) · Sea Hag: Illusory Appearance · Shambling Mound: Engulf · Solar: Slaying Bow · Sphinx of Valor: Roar (3/Day) · Stone Giant: Deflect Missile (Recharge 5-6) · Storm Giant: Spellcasting · Succubus: Charm · Tarrasque: Onslaught · Tarrasque: Swallow · Tarrasque: World-Shaking Movement · Treant: Animate Trees (1/Day) · Unicorn: Shimmering Shield · Vampire: Beguile · Water Elemental: Whelm (Recharge 4-6) · Weretiger: Prowl (Tiger or Hybrid Form Only)
+**Guided (56):** Adult Black Dragon: Frightful Presence · Adult Red Dragon: Commanding Presence · Adult White Dragon: Frightful Presence · Ancient Black Dragon: Frightful Presence · Ancient Red Dragon: Commanding Presence · Ancient White Dragon: Frightful Presence · Balor: Teleport · Bearded Devil: Infernal Glaive · Behir: Swallow · Centaur Trooper: Trampling Charge (Recharge 5-6) · Djinni: Create Whirlwind · Doppelganger: Read Thoughts · Dryad: Tree Stride · Dust Mephit: Sleep (1/Day) · Frost Giant: War Cry (Recharge 5-6) · Gelatinous Cube: Engulf · Ghost: Etherealness · Giant Hyena: Rampage (1/Day) · Giant Octopus: Ink Cloud (1/Day) · Gnoll Warrior: Rampage (1/Day) · Horned Devil: Infernal Tail · Hydra: Multiattack · Ice Devil: Ice Wall (Recharge 6) · Incubus: Nightmare (Recharge 6) · Invisible Stalker: Vortex · Kraken: Swallow · Lich: Deathly Teleport · Lich: Frightening Gaze · Mummy Lord: Dread Command · Mummy Lord: Necrotic Strike · Mummy Lord: Whirlwind of Sand · Night Hag: Nightmare Haunting (1/Day) · Octopus: Ink Cloud (1/Day) · Otyugh: Bite · Pit Fiend: Hellfire Spellcasting (Recharge 4-6) · Priest Acolyte: Spellcasting · Purple Worm: Swallow · Remorhaz: Swallow · Roc: Swoop (Recharge 5-6) · Rust Monster: Reflexive Antennae · Sea Hag: Death Glare (Recharge 5-6) · Sea Hag: Illusory Appearance · Shambling Mound: Engulf · Solar: Slaying Bow · Sphinx of Valor: Roar (3/Day) · Stone Giant: Deflect Missile (Recharge 5-6) · Storm Giant: Spellcasting · Succubus: Charm · Tarrasque: Onslaught · Tarrasque: Swallow · Tarrasque: World-Shaking Movement · Treant: Animate Trees (1/Day) · Unicorn: Shimmering Shield · Vampire: Beguile · Water Elemental: Whelm (Recharge 4-6) · Weretiger: Prowl (Tiger or Hybrid Form Only)
 
 **Reference (28):** Black Pudding: Split · Chain Devil: Unnerving Gaze · Doppelganger: Shape-Shift · Ettercap: Reel · Giant Frog: Swallow · Giant Toad: Swallow · Goblin Boss: Redirect Attack · Imp: Shape-Shift · Mimic: Shape-Shift · Nalfeshnee: Pursuit · Night Hag: Shape-Shift · Nightmare: Ethereal Stride · Ochre Jelly: Split · Oni: Shape-Shift · Phase Spider: Ethereal Jaunt · Quasit: Shape-Shift · Roper: Reel · Rust Monster: Destroy Metal · Shield Guardian: Protection · Shrieker Fungus: Shriek · Succubus: Shape-Shift · Vampire: Shape-Shift · Werebear: Shape-Shift · Wereboar: Shape-Shift · Wererat: Shape-Shift · Weretiger: Shape-Shift · Werewolf: Shape-Shift · Wraith: Create Specter
 
@@ -325,9 +329,9 @@ The number after each trait is how many stat blocks print it.
 
 ## Barbarian features
 
-**Enforced (20):** Ability Score Improvement · Barbarian Subclass · Brutal Strike · Danger Sense · Epic Boon · Extra Attack · Fast Movement · Feral Instinct · Improved Brutal Strike · Instinctive Pounce · Intimidating Presence (Path of the Berserker) · Mindless Rage (Path of the Berserker) · Persistent Rage · Primal Champion · Primal Knowledge · Rage · Reckless Attack · Retaliation (Path of the Berserker) · Unarmored Defense · Weapon Mastery
+**Enforced (21):** Ability Score Improvement · Barbarian Subclass · Brutal Strike · Danger Sense · Epic Boon · Extra Attack · Fast Movement · Feral Instinct · Improved Brutal Strike · Instinctive Pounce · Intimidating Presence (Path of the Berserker) · Mindless Rage (Path of the Berserker) · Persistent Rage · Primal Champion · Primal Knowledge · Rage · Reckless Attack · Relentless Rage · Retaliation (Path of the Berserker) · Unarmored Defense · Weapon Mastery
 
-**Reference (3):** Frenzy (Path of the Berserker) · Indomitable Might · Relentless Rage
+**Reference (2):** Frenzy (Path of the Berserker) · Indomitable Might
 
 Notes on the curated rows:
 
@@ -336,17 +340,18 @@ Notes on the curated rows:
 | Brutal Strike | enforced | After Reckless Attack, the tap forgoes the Advantage of the Barbarian's next Strength attack this turn (resolution/attack.ts), and its hit carries 1d10 of the weapon's type and one effect (resolution/hit-options.ts): Forceful Blow's 15-foot push and a move of half its Speed that must end nearer the target and provokes no Opportunity Attacks (granted-moves.ts), or Hamstring Blow's 15 feet less Speed, one at a time on a creature. |
 | Improved Brutal Strike | enforced | Staggering Blow (Disadvantage on the next save and no Opportunity Attacks) and Sundering Blow (+5 to the next attack roll another creature makes against the target) join Brutal Strike's effects, and from Barbarian 17 a hit carries 2d10 and two effects (resolution/hit-options.ts, resolution/attack.ts). |
 | Instinctive Pounce | enforced | The Bonus Action that starts a Rage gives the Barbarian a move of half its Speed for the turn (resolution/movement-grants.ts), charged to its own grant (movement-rules.ts). |
+| Intimidating Presence (Path of the Berserker) | enforced | The Bonus Action's Wisdom save against Frightened is applied, and conversions.ts restores its use for one use of Rage (actor.convert). |
 | Mindless Rage (Path of the Berserker) | enforced | Immunity to Charmed and Frightened while raging is applied (equipment-derivation.ts), and either condition ends as the Rage starts (resolution/grant.ts). |
-| Persistent Rage | enforced | Taking the Persistent Rage action restores every expended use of Rage, once per Long Rest (resolution/rage.ts). A Rage under it lasts 10 minutes, and only Unconscious ends it early (effects.ts). |
+| Persistent Rage | enforced | When the Barbarian rolls Initiative, initiative-hooks.ts opens its window and the Persistent Rage action restores every expended use of Rage, once per Long Rest (resolution/rage.ts). A Rage under it lasts 10 minutes, and only Unconscious ends it early (effects.ts). |
 | Primal Knowledge | enforced | The extra skill is applied. While raging, Acrobatics, Intimidation, Perception, Stealth and Survival checks are made as Strength checks when that is the better roll (ability-checks.ts). |
+| Relentless Rage | enforced | hit-points.ts rolls the Constitution save when a raging Barbarian drops to 0 Hit Points and isn't killed outright: DC 10, 5 more for each use since its last rest (rests.ts clears the count). A success leaves it at twice its Barbarian level. |
+| Weapon Mastery | enforced | equipment-derivation.ts applies the mastery property of each picked weapon kind. A Barbarian picks melee weapons and a Rogue the weapons it is proficient with. In the step a Long Rest opens, actor.rechoose swaps picks and rebuilds the sheet (ledger-rechoice.ts): one for a Barbarian or Fighter, any for a Paladin, Ranger or Rogue. |
 
 ## Bard features
 
-**Enforced (14):** Ability Score Improvement · Bard Subclass · Bonus Proficiencies (College of Lore) · Countercharm · Cutting Words (College of Lore) · Epic Boon · Expertise · Font of Inspiration · Jack of All Trades · Magical Discoveries (College of Lore) · Magical Secrets · Peerless Skill (College of Lore) · Spellcasting · Words of Creation
+**Enforced (15):** Ability Score Improvement · Bard Subclass · Bonus Proficiencies (College of Lore) · Countercharm · Cutting Words (College of Lore) · Epic Boon · Expertise · Font of Inspiration · Jack of All Trades · Magical Discoveries (College of Lore) · Magical Secrets · Peerless Skill (College of Lore) · Spellcasting · Superior Inspiration · Words of Creation
 
 **Guided (1):** Bardic Inspiration
-
-**Reference (1):** Superior Inspiration
 
 Notes on the curated rows:
 
@@ -355,9 +360,11 @@ Notes on the curated rows:
 | Bardic Inspiration | guided | The Bonus Action gives another creature the Bard's die, a d6 growing to a d12, one die at a time, and roll-answers.ts offers it when that creature fails an attack roll, a save, a check or a death save: the die is added and spent. Measuring the 60 feet, and ending an unused die after an hour, are the GM's. |
 | Countercharm | enforced | roll-answers.ts asks the Bard by a reaction prompt when it or a creature within 30 feet fails a save against an effect that would make it Charmed or Frightened. The save waits, and using the Reaction rerolls it with Advantage. |
 | Cutting Words (College of Lore) | enforced | roll-answers.ts asks the Bard by a reaction prompt when a creature it can see within 60 feet hits with an attack roll, succeeds on a check or rolls damage. Using it spends a Bardic Inspiration use and the Reaction and takes the die off the roll, which can turn the hit into a miss or lower the damage before it lands (damage-window.ts). |
+| Font of Inspiration | enforced | Bardic Inspiration comes back on a Short Rest, and conversions.ts spends a spell slot for one use of it. |
 | Jack of All Trades | enforced | ability-checks.ts adds half the Proficiency Bonus, rounded down, to a skill check the Bard isn't proficient in. |
 | Peerless Skill (College of Lore) | enforced | roll-answers.ts offers it on the Bard's failed attack roll or check: the Bardic Inspiration die is added, and the use is kept when the roll still fails. |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows. |
+| Superior Inspiration | enforced | When the Bard rolls Initiative with fewer than two uses of Bardic Inspiration left, initiative-hooks.ts brings it up to two. |
 | Words of Creation | enforced | Power Word Heal and Power Word Kill are always prepared, and either may take a second creature within 10 feet of the first (resolution/action-targets.ts). |
 
 ## Cleric features
@@ -377,20 +384,24 @@ Notes on the curated rows:
 
 ## Druid features
 
-**Enforced (13):** Ability Score Improvement · Circle of the Land Spells (Circle of the Land) · Circle of the Land Spells (Level 5) (Circle of the Land) · Circle of the Land Spells (Level 7) (Circle of the Land) · Circle of the Land Spells (Level 9) (Circle of the Land) · Druid Subclass · Druidic · Elemental Fury · Epic Boon · Nature's Ward (Circle of the Land) · Spellcasting · Wild Companion · Wild Shape
+**Enforced (17):** Ability Score Improvement · Archdruid · Circle of the Land Spells (Circle of the Land) · Circle of the Land Spells (Level 5) (Circle of the Land) · Circle of the Land Spells (Level 7) (Circle of the Land) · Circle of the Land Spells (Level 9) (Circle of the Land) · Druid Subclass · Druidic · Elemental Fury · Epic Boon · Improved Elemental Fury · Natural Recovery (Circle of the Land) · Nature's Ward (Circle of the Land) · Spellcasting · Wild Companion · Wild Resurgence · Wild Shape
 
-**Guided (4):** Improved Elemental Fury · Land's Aid (Circle of the Land) · Nature's Sanctuary (Circle of the Land) · Primal Order
+**Guided (3):** Land's Aid (Circle of the Land) · Nature's Sanctuary (Circle of the Land) · Primal Order
 
-**Reference (4):** Archdruid · Beast Spells · Natural Recovery (Circle of the Land) · Wild Resurgence
+**Reference (1):** Beast Spells
 
 Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
+| Archdruid | enforced | When the Druid rolls Initiative with no use of Wild Shape left, initiative-hooks.ts restores one. conversions.ts turns uses of Wild Shape into one spell slot, two levels a use, once per Long Rest (Nature Magician). Its slow aging is narrative. |
 | Elemental Fury | enforced | Primal Strike's extra damage, of the type the Druid picks, is applied once a turn. Potent Spellcasting adds the Druid's Wisdom modifier to the damage of Poison Spray, Produce Flame and Starry Wisp. |
+| Improved Elemental Fury | enforced | Primal Strike deals 2d8. Improved Potent Spellcasting adds 300 feet to a Druid cantrip of 10 feet or more (effective-actions.ts, resolution/spell-targets.ts). |
 | Land's Aid (Circle of the Land) | guided | The save and its Necrotic damage against the Druid's spell save DC are applied, and a use of Wild Shape is spent. Healing the creature it picks is the GM's. |
+| Natural Recovery (Circle of the Land) | enforced | In the step a Short Rest opens, conversions.ts recovers slots of combined level up to half the Druid level, none of level 6 or higher, once per Long Rest. |
 | Primal Order | guided | Magician's extra cantrip and Warden's training are applied. The Wisdom bonus to the checks each role names is the GM's. |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows. |
+| Wild Resurgence | enforced | conversions.ts spends a spell slot for a use of Wild Shape once a turn, and a use of Wild Shape for a level 1 slot once per Long Rest. |
 
 ## Fighter features
 
@@ -407,14 +418,15 @@ Notes on the curated rows:
 | Indomitable | enforced | roll-answers.ts offers it on the Fighter's failed save: the save is rerolled with the Fighter level added, and the new roll stands. |
 | Tactical Mind | enforced | roll-answers.ts offers it on the Fighter's failed check: a Second Wind use adds 1d10 to the check, and the use is kept when the check still fails. |
 | Tactical Shift | enforced | Second Wind gives the Fighter a move of half its Speed for the turn that provokes no Opportunity Attacks (resolution/movement-grants.ts), charged to its own grant (movement-rules.ts). |
+| Weapon Mastery | enforced | equipment-derivation.ts applies the mastery property of each picked weapon kind. A Barbarian picks melee weapons and a Rogue the weapons it is proficient with. In the step a Long Rest opens, actor.rechoose swaps picks and rebuilds the sheet (ledger-rechoice.ts): one for a Barbarian or Fighter, any for a Paladin, Ranger or Rogue. |
 
 ## Monk features
 
-**Enforced (22):** Ability Score Improvement · Body and Mind · Deflect Energy · Disciplined Survivor · Epic Boon · Evasion · Extra Attack · Martial Arts · Monk Subclass · Monk's Focus · Open Hand Technique (Warrior of the Open Hand) · Quivering Palm (Warrior of the Open Hand) · Slow Fall · Stunning Strike · Superior Defense · Unarmored Defense · Unarmored Movement (level 2) · Unarmored Movement (level 6) · Unarmored Movement (level 10) · Unarmored Movement (level 14) · Unarmored Movement (level 18) · Wholeness of Body (Warrior of the Open Hand)
+**Enforced (24):** Ability Score Improvement · Body and Mind · Deflect Energy · Disciplined Survivor · Epic Boon · Evasion · Extra Attack · Martial Arts · Monk Subclass · Monk's Focus · Open Hand Technique (Warrior of the Open Hand) · Perfect Focus · Quivering Palm (Warrior of the Open Hand) · Slow Fall · Stunning Strike · Superior Defense · Unarmored Defense · Unarmored Movement (level 2) · Unarmored Movement (level 6) · Unarmored Movement (level 10) · Unarmored Movement (level 14) · Unarmored Movement (level 18) · Uncanny Metabolism · Wholeness of Body (Warrior of the Open Hand)
 
-**Guided (3):** Deflect Attacks · Heightened Focus · Uncanny Metabolism
+**Guided (2):** Deflect Attacks · Heightened Focus
 
-**Reference (5):** Acrobatic Movement · Empowered Strikes · Fleet Step (Warrior of the Open Hand) · Perfect Focus · Self-Restoration
+**Reference (4):** Acrobatic Movement · Empowered Strikes · Fleet Step (Warrior of the Open Hand) · Self-Restoration
 
 Notes on the curated rows:
 
@@ -426,16 +438,16 @@ Notes on the curated rows:
 | Heightened Focus | guided | Flurry of Blows makes three strikes from Monk level 10 (Monk's Focus carries it). The Temporary Hit Points from Patient Defense and the creature carried by Step of the Wind are the GM's. |
 | Martial Arts | enforced | builtin-actions.ts offers an Unarmed Strike as a Bonus Action, and resolution/attack.ts rolls Unarmed Strikes and Monk weapons with the Martial Arts die and the better of Strength and Dexterity. |
 | Open Hand Technique (Warrior of the Open Hand) | enforced | A Flurry of Blows hit carries Addle, Push or Topple (resolution/hit-options.ts): no Opportunity Attacks until the target's next turn, a Strength save against a 15-foot push, or a Dexterity save against Prone. |
+| Perfect Focus | enforced | When the Monk rolls Initiative with 3 Focus Points or fewer, initiative-hooks.ts brings them up to 4. |
 | Quivering Palm (Warrior of the Open Hand) | enforced | An Unarmed Strike's hit can spend 4 Focus Points to set the vibrations on its target, one creature at a time (resolution/hit-rider-outcomes.ts). The ending action targets only that creature: a Constitution save for 10d12 Force, half on a success. The days they last are the GM's. |
 | Stunning Strike | enforced | It rides a hit with a Monk weapon or an Unarmed Strike (resolution/hit-options.ts), never tapped alone: a target that fails its Constitution save against the Monk's DC is Stunned until the start of the Monk's next turn, once a turn for a Focus Point. On a success resolution/pending.ts halves its Speed until then (speed.ts), and the next attack roll against it before then has Advantage and spends it (resolution/attack.ts). |
+| Uncanny Metabolism | enforced | When the Monk rolls Initiative, initiative-hooks.ts offers it: all Focus Points back and Hit Points equal to its Monk level plus a Martial Arts die, once per Long Rest (conversions.ts). |
 
 ## Paladin features
 
 **Enforced (23):** Ability Score Improvement · Aura Expansion · Aura of Courage · Aura of Devotion (Oath of Devotion) · Aura of Protection · Channel Divinity · Epic Boon · Extra Attack · Faithful Steed · Fighting Style · Holy Nimbus (Oath of Devotion) · Lay On Hands · Oath of Devotion Spells (Level 5) (Oath of Devotion) · Oath of Devotion Spells (Level 9) (Oath of Devotion) · Oath of Devotion Spells (Level 13) (Oath of Devotion) · Oath of Devotion Spells (Level 17) (Oath of Devotion) · Oath of Devotion Spells (Oath of Devotion) · Paladin Subclass · Paladin's Smite · Radiant Strikes · Smite of Protection (Oath of Devotion) · Spellcasting · Weapon Mastery
 
-**Guided (2):** Abjure Foes · Sacred Weapon (Oath of Devotion)
-
-**Reference (1):** Restoring Touch
+**Guided (3):** Abjure Foes · Restoring Touch · Sacred Weapon (Oath of Devotion)
 
 Notes on the curated rows:
 
@@ -446,33 +458,39 @@ Notes on the curated rows:
 | Aura of Courage | enforced | paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Frightened while it isn't Incapacitated, and an ally already Frightened has no Disadvantage from it there (resolution/attack.ts, check-rolls.ts). |
 | Aura of Devotion (Oath of Devotion) | enforced | paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Charmed while it isn't Incapacitated, and an ally already Charmed may target its charmer while there (resolution/economy.ts). |
 | Aura of Protection | enforced | saving-throws.ts adds the Paladin's Charisma modifier, at least 1, to its own saves and its allies' within 10 feet, while it isn't Incapacitated. A creature in two auras gets the better one. |
-| Holy Nimbus (Oath of Devotion) | enforced | The Bonus Action puts Holy Nimbus on the Paladin for 10 minutes. turn-boundaries.ts deals its Radiant damage to an enemy that starts its turn in the aura, and saving-throws.ts gives the Paladin Advantage on saves a Fiend or an Undead forces. Its 30 feet of sunlight is carried with the Paladin's token (vision/senses.ts), which Sunlight Sensitivity reads. Restoring it with a level 5 slot is the GM's. |
+| Holy Nimbus (Oath of Devotion) | enforced | The Bonus Action puts Holy Nimbus on the Paladin for 10 minutes. turn-boundaries.ts deals its Radiant damage to an enemy that starts its turn in the aura, and saving-throws.ts gives the Paladin Advantage on saves a Fiend or an Undead forces. Its 30 feet of sunlight is carried with the Paladin's token (vision/senses.ts), which Sunlight Sensitivity reads. conversions.ts restores the use with a level 5 slot. |
 | Lay On Hands | enforced | The Bonus Action spends the points the Paladin picks to heal one creature it touches, within 5 feet (resolution/action-targets.ts), or 5 points to end Poisoned. |
+| Restoring Touch | guided | From Paladin 14, Lay on Hands spends 5 points to end one of Blinded, Charmed, Deafened, Frightened, Paralyzed or Stunned on a creature it touches (resolution/heal.ts). Ending several in one Bonus Action takes one use each here. |
 | Sacred Weapon (Oath of Devotion) | guided | A use of Channel Divinity puts Sacred Weapon on the Paladin for 10 minutes, and its 20 feet of Bright Light and 20 of Dim are carried with the Paladin's token (vision/senses.ts). The Charisma bonus to attack rolls with the weapon and its Radiant damage are the GM's. |
 | Smite of Protection (Oath of Devotion) | enforced | resolution/hit-options.ts marks the Paladin when Divine Smite rides a hit, and until its next turn the creatures in its aura have Half Cover against attacks and on Dexterity saves (resolution/validate.ts, resolution/pending.ts). |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows. |
+| Weapon Mastery | enforced | equipment-derivation.ts applies the mastery property of each picked weapon kind. A Barbarian picks melee weapons and a Rogue the weapons it is proficient with. In the step a Long Rest opens, actor.rechoose swaps picks and rebuilds the sheet (ledger-rechoice.ts): one for a Barbarian or Fighter, any for a Paladin, Ranger or Rogue. |
 
 ## Ranger features
 
-**Enforced (16):** Ability Score Improvement · Defensive Tactics (Hunter) · Deft Explorer · Epic Boon · Expertise · Extra Attack · Favored Enemy · Feral Senses · Fighting Style · Nature's Veil · Ranger Subclass · Roving · Spellcasting · Superior Hunter's Defense (Hunter) · Tireless · Weapon Mastery
+**Enforced (17):** Ability Score Improvement · Defensive Tactics (Hunter) · Deft Explorer · Epic Boon · Expertise · Extra Attack · Favored Enemy · Feral Senses · Fighting Style · Nature's Veil · Ranger Subclass · Relentless Hunter · Roving · Spellcasting · Superior Hunter's Defense (Hunter) · Tireless · Weapon Mastery
 
 **Guided (2):** Hunter's Prey (Hunter) · Superior Hunter's Prey (Hunter)
 
-**Reference (4):** Foe Slayer · Hunter's Lore (Hunter) · Precise Hunter · Relentless Hunter
+**Reference (3):** Foe Slayer · Hunter's Lore (Hunter) · Precise Hunter
 
 Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
+| Defensive Tactics (Hunter) | enforced | Escape the Horde gives Opportunity Attacks against the Ranger Disadvantage, and Multiattack Defense marks a creature that hit it (resolution/struck.ts). The option is swapped after a Short or Long Rest (ledger-rechoice.ts). |
+| Hunter's Prey (Hunter) | guided | The option is picked at build and swapped after a Short or Long Rest (ledger-rechoice.ts). Colossus Slayer's extra die and Horde Breaker's attack are the GM's. |
+| Relentless Hunter | enforced | hit-points.ts opens no Concentration save from damage when the only spell the Ranger concentrates on is Hunter's Mark. |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows. |
 | Superior Hunter's Defense (Hunter) | enforced | damage-window.ts offers it when the Ranger is about to take damage from a hit or a failed save. Using it gives Resistance to the damage's largest type, that damage included, until the end of the current turn. |
 | Superior Hunter's Prey (Hunter) | guided | The tap deals the mark's 1d6 Force (1d10 from Foe Slayer) to one other creature the Ranger can see, once a turn. That the marked creature took the Ranger's damage this turn, and the 30 feet from it, are the GM's. |
+| Weapon Mastery | enforced | equipment-derivation.ts applies the mastery property of each picked weapon kind. A Barbarian picks melee weapons and a Rogue the weapons it is proficient with. In the step a Long Rest opens, actor.rechoose swaps picks and rebuilds the sheet (ledger-rechoice.ts): one for a Barbarian or Fighter, any for a Paladin, Ranger or Rogue. |
 
 ## Rogue features
 
-**Enforced (18):** Ability Score Improvement · Cunning Action · Cunning Strike · Devious Strikes · Epic Boon · Evasion · Expertise · Improved Cunning Strike · Reliable Talent · Rogue Subclass · Second-Story Work (Thief) · Slippery Mind · Sneak Attack · Steady Aim · Stroke of Luck · Thieves' Cant · Uncanny Dodge · Weapon Mastery
+**Enforced (19):** Ability Score Improvement · Cunning Action · Cunning Strike · Devious Strikes · Epic Boon · Evasion · Expertise · Improved Cunning Strike · Reliable Talent · Rogue Subclass · Second-Story Work (Thief) · Slippery Mind · Sneak Attack · Steady Aim · Stroke of Luck · Thieves' Cant · Uncanny Dodge · Use Magic Device (Thief) · Weapon Mastery
 
-**Guided (3):** Fast Hands (Thief) · Supreme Sneak (Thief) · Use Magic Device (Thief)
+**Guided (2):** Fast Hands (Thief) · Supreme Sneak (Thief)
 
 **Reference (2):** Elusive · Thief's Reflexes (Thief)
 
@@ -488,53 +506,68 @@ Notes on the curated rows:
 | Reliable Talent | enforced | ability-checks.ts treats a d20 of 9 or lower as a 10 on a check with a skill or tool the Rogue is proficient in. |
 | Stroke of Luck | enforced | roll-answers.ts offers it on the Rogue's failed D20 Test: the d20 becomes a 20, which makes an attack roll a Critical Hit, and the use returns on a Short or Long Rest. |
 | Supreme Sneak (Thief) | guided | Stealth Attack joins Cunning Strike's effects, and the attack leaves the Rogue's Invisible from the Hide action on (resolution/release.ts). Whether it ends the turn behind Three-Quarters or Total Cover is the GM's, said with the hit. |
-| Use Magic Device (Thief) | guided | The fourth attuned item is applied (inventory.ts). The roll to save a charge, and reading any Spell Scroll, are the GM's. |
+| Use Magic Device (Thief) | enforced | The fourth attuned item is applied (inventory.ts), and resolution/charges.ts rolls the d6 when an item's charges are spent, giving them back on a 6. Reading any Spell Scroll is the GM's. |
+| Weapon Mastery | enforced | equipment-derivation.ts applies the mastery property of each picked weapon kind. A Barbarian picks melee weapons and a Rogue the weapons it is proficient with. In the step a Long Rest opens, actor.rechoose swaps picks and rebuilds the sheet (ledger-rechoice.ts): one for a Barbarian or Fighter, any for a Paladin, Ranger or Rogue. |
 
 ## Sorcerer features
 
-**Enforced (15):** Ability Score Improvement · Arcane Apotheosis · Draconic Resilience (Draconic Sorcery) · Draconic Spells (Draconic Sorcery) · Draconic Spells (Level 5) (Draconic Sorcery) · Draconic Spells (Level 7) (Draconic Sorcery) · Draconic Spells (Level 9) (Draconic Sorcery) · Dragon Companion (Draconic Sorcery) · Dragon Wings (Draconic Sorcery) · Elemental Affinity (Draconic Sorcery) · Epic Boon · Innate Sorcery · Metamagic · Sorcerer Subclass · Spellcasting
+**Enforced (17):** Ability Score Improvement · Arcane Apotheosis · Draconic Resilience (Draconic Sorcery) · Draconic Spells (Draconic Sorcery) · Draconic Spells (Level 5) (Draconic Sorcery) · Draconic Spells (Level 7) (Draconic Sorcery) · Draconic Spells (Level 9) (Draconic Sorcery) · Dragon Companion (Draconic Sorcery) · Dragon Wings (Draconic Sorcery) · Epic Boon · Font of Magic · Innate Sorcery · Metamagic · Sorcerer Subclass · Sorcerous Restoration · Sorcery Incarnate · Spellcasting
 
-**Guided (3):** Font of Magic · Sorcerous Restoration · Sorcery Incarnate
+**Guided (1):** Elemental Affinity (Draconic Sorcery)
 
 Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
 | Arcane Apotheosis | enforced | While Innate Sorcery is active, the first Metamagic option on each of the Sorcerer's turns in a fight costs no Sorcery Points (resolution/metamagic.ts). |
+| Dragon Wings (Draconic Sorcery) | enforced | The Bonus Action gives a Fly Speed of 60 feet, once per Long Rest, and conversions.ts restores the use for 3 Sorcery Points. |
+| Elemental Affinity (Draconic Sorcery) | guided | Resistance to the chosen type is applied, and the Charisma modifier is added to a spell's damage of that type, never a weapon's (resolution/damage.ts). A spell of several rolls gets it on each, which the GM trims to one. |
+| Font of Magic | enforced | conversions.ts turns a spell slot into Sorcery Points equal to its level, and Sorcery Points into a slot at the SRD costs (2, 3, 5, 6 or 7 for levels 1 to 5, each at its Sorcerer level) as a Bonus Action. A created slot is gone after a Long Rest, which sets the slots to their maximum. |
 | Metamagic | enforced | A cast carries one Metamagic option the Sorcerer knows, paid in Sorcery Points and applied by the server (resolution/metamagic.ts, resolution/economy.ts). Empowered Spell can join another option, and Seeking Spell is offered when a spell attack misses (roll-answers.ts). The server refuses an option the spell can't take, and picks the dice Empowered Spell rerolls. Careful Spell covers the save the cast itself calls for (resolution/pending.ts). |
-| Sorcery Incarnate | guided | While Innate Sorcery is active, a cast may carry two Metamagic options (resolution/metamagic.ts). Activating Innate Sorcery for 2 Sorcery Points once its uses are spent is the GM's. |
+| Sorcerous Restoration | enforced | In the step a Short Rest opens, conversions.ts restores Sorcery Points up to half the Sorcerer level, once per Long Rest. |
+| Sorcery Incarnate | enforced | While Innate Sorcery is active, a cast may carry two Metamagic options (resolution/metamagic.ts), and with no use of Innate Sorcery left conversions.ts spends 2 Sorcery Points for one. |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows. |
 
 ## Warlock features
 
-**Enforced (15):** Ability Score Improvement · Contact Patron · Dark One's Own Luck (Fiend Patron) · Epic Boon · Fiend Spells (Fiend Patron) · Fiend Spells (Level 5) (Fiend Patron) · Fiend Spells (Level 7) (Fiend Patron) · Fiend Spells (Level 9) (Fiend Patron) · Fiendish Resilience (Fiend Patron) · Mystic Arcanum (level 6 spell) · Mystic Arcanum (level 7 spell) · Mystic Arcanum (level 8 spell) · Mystic Arcanum (level 9 spell) · Pact Magic · Warlock Subclass
+**Enforced (17):** Ability Score Improvement · Contact Patron · Dark One's Own Luck (Fiend Patron) · Eldritch Master · Epic Boon · Fiend Spells (Fiend Patron) · Fiend Spells (Level 5) (Fiend Patron) · Fiend Spells (Level 7) (Fiend Patron) · Fiend Spells (Level 9) (Fiend Patron) · Fiendish Resilience (Fiend Patron) · Magical Cunning · Mystic Arcanum (level 6 spell) · Mystic Arcanum (level 7 spell) · Mystic Arcanum (level 8 spell) · Mystic Arcanum (level 9 spell) · Pact Magic · Warlock Subclass
 
-**Guided (3):** Eldritch Invocations · Hurl Through Hell (Fiend Patron) · Magical Cunning
+**Guided (2):** Eldritch Invocations · Hurl Through Hell (Fiend Patron)
 
-**Reference (2):** Dark One's Blessing (Fiend Patron) · Eldritch Master
+**Reference (1):** Dark One's Blessing (Fiend Patron)
 
 Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
+| Contact Patron | enforced | Contact Other Plane is always prepared and cast once per Long Rest with no slot, and that cast succeeds on its own Intelligence save with no roll (resolution/pending.ts). What the patron answers is the GM's. |
 | Dark One's Own Luck (Fiend Patron) | enforced | roll-answers.ts offers it on the Warlock's check or save once the roll is seen: 1d10 is added, and a use is spent. |
 | Eldritch Invocations | guided | Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied, and level-up-picks.ts lets a level up replace one invocation. Eldritch Smite's Pact Magic slot dice and Prone, and Lifedrinker's damage and Hit Point Die, ride a pact weapon's hit (resolution/hit-options.ts). Devil's Sight and Witch Sight are senses dynamic vision reads (vision/senses.ts), and One with Shadows' Invisibility is refused in Bright Light (resolution/validate.ts). Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's. |
-| Hurl Through Hell (Fiend Patron) | guided | It rides an attack roll's hit once a Long Rest: the Charisma save, 8d10 Psychic unless the target is a Fiend, and Incapacitated off the map with nothing able to target it until the end of the Warlock's next turn, when it returns to the space it left or the nearest unoccupied one (off-plane.ts). Restoring the use with a Pact Magic spell slot is the GM's. |
+| Eldritch Master | enforced | Magical Cunning restores every expended Pact Magic slot (conversions.ts). |
+| Hurl Through Hell (Fiend Patron) | guided | It rides an attack roll's hit once a Long Rest: the Charisma save, 8d10 Psychic unless the target is a Fiend, and Incapacitated off the map with nothing able to target it until the end of the Warlock's next turn, when it returns to the space it left or the nearest unoccupied one (off-plane.ts). conversions.ts restores the use with a Pact Magic slot. |
+| Magical Cunning | enforced | Outside a fight, conversions.ts restores expended Pact Magic slots up to half the maximum, once per Long Rest. |
 | Pact Magic | enforced | character-build.ts gives the Warlock its Pact Magic slots at the level its table prints, and resolution/economy.ts spends them. rests.ts restores them on a Short or Long Rest. |
 
 ## Wizard features
 
-**Enforced (9):** Ability Score Improvement · Epic Boon · Evocation Savant (Evoker) · Scholar · Sculpt Spells (Evoker) · Signature Spells · Spell Mastery · Spellcasting · Wizard Subclass
+**Enforced (10):** Ability Score Improvement · Arcane Recovery · Epic Boon · Evocation Savant (Evoker) · Memorize Spell · Potent Cantrip (Evoker) · Scholar · Sculpt Spells (Evoker) · Spellcasting · Wizard Subclass
 
-**Guided (2):** Arcane Recovery · Overchannel (Evoker)
+**Guided (4):** Empowered Evocation (Evoker) · Overchannel (Evoker) · Signature Spells · Spell Mastery
 
-**Reference (4):** Empowered Evocation (Evoker) · Memorize Spell · Potent Cantrip (Evoker) · Ritual Adept
+**Reference (1):** Ritual Adept
 
 Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
+| Arcane Recovery | enforced | In the step a Short Rest opens, conversions.ts recovers slots of combined level up to half the Wizard level, none of level 6 or higher, once per Long Rest. |
+| Empowered Evocation (Evoker) | guided | The Intelligence modifier is added to an Evocation spell's damage (resolution/damage.ts). A spell of several rolls (Scorching Ray's rays) gets it on each, which the GM trims to one. |
+| Memorize Spell | enforced | Finishing a Short Rest opens a prepare step with one change (rests.ts): one prepared spell swapped for another from the spellbook. |
+| Overchannel (Evoker) | guided | A cast sent with overchannel (action.resolve) deals a Wizard spell's maximum damage with a level 1 to 5 slot, and from the second use before a Long Rest the Evoker takes 2d12 Necrotic a slot level, 1d12 more each time, past its defences (resolution/overchannel.ts). The sheet has no control for it yet, so the table asks for it through the API. |
+| Potent Cantrip (Evoker) | enforced | resolution/damage.ts deals half an Evoker's cantrip damage on a missed attack roll, and resolution/pending.ts halves it on a successful save, with no other effect. |
 | Sculpt Spells (Evoker) | enforced | An Evoker's Evocation spell protects up to 1 plus the spell's level creatures the Wizard can see: they succeed on its save with no roll and take no damage (resolution/pending.ts). Saves its area calls for later are rolled as usual. |
+| Signature Spells | guided | Both spells are always prepared, and each is cast once at level 3 with no slot, back on a Short or Long Rest, on its own counter (character-build.ts). That they come from the spellbook is the player's to keep. |
+| Spell Mastery | guided | The level 1 and level 2 picks are always prepared and cast at will at their own level with no slot (character-build.ts). That they come from the spellbook with a casting time of an action, and swapping one after a Long Rest, are the GM's. |
 | Spellcasting | enforced | character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows. |
 
 ## Species traits
@@ -565,9 +598,9 @@ Notes on the curated rows:
 
 ## Feats
 
-**Enforced (15):** Ability Score Improvement · Alert · Archery · Boon of Combat Prowess · Boon of Dimensional Travel · Boon of Fate · Boon of the Night Spirit · Boon of Truesight · Defense · Magic Initiate (Cleric) · Magic Initiate (Druid) · Magic Initiate (Wizard) · Savage Attacker · Skilled · Two-Weapon Fighting
+**Enforced (16):** Ability Score Improvement · Alert · Archery · Boon of Combat Prowess · Boon of Dimensional Travel · Boon of Fate · Boon of Spell Recall · Boon of the Night Spirit · Boon of Truesight · Defense · Magic Initiate (Cleric) · Magic Initiate (Druid) · Magic Initiate (Wizard) · Savage Attacker · Skilled · Two-Weapon Fighting
 
-**Guided (3):** Boon of Irresistible Offense · Boon of Spell Recall · Grappler
+**Guided (2):** Boon of Irresistible Offense · Grappler
 
 **Reference (1):** Great Weapon Fighting
 
@@ -579,7 +612,7 @@ Notes on the curated rows:
 | Boon of Dimensional Travel | enforced | The ability score increase is applied, and after the Attack or Magic action resolution/movement-grants.ts gives a 30-foot teleport for the turn, which movement-rules.ts takes at once to an unoccupied space the creature can see. |
 | Boon of Fate | enforced | The ability score increase is applied. roll-answers.ts offers Improve Fate on the holder's own D20 Test, and asks by a prompt about another creature's within 60 feet: 2d4 is added or taken off, and the use returns when Initiative is rolled or on a rest. |
 | Boon of Irresistible Offense | guided | The ability score increase is applied. Overcoming Resistance, and the extra damage on a 20, are the GM's. |
-| Boon of Spell Recall | guided | The ability score increase is applied. Casting a spell without spending its slot is the GM's. |
+| Boon of Spell Recall | enforced | The ability score increase is applied, and resolution/spell-recall.ts rolls a d4 for a spell cast with a level 1 to 4 slot, keeping the slot when it matches the level. |
 | Boon of the Night Spirit | enforced | The ability score increase is applied. With dynamic vision on, Merge with Shadows makes the creature Invisible as a Bonus Action only in Dim Light or Darkness (resolution/validate.ts), until it next takes an action, a Bonus Action or a Reaction (resolution/release.ts), and hit-points.ts gives it Resistance to all damage but Psychic and Radiant there. |
 | Boon of Truesight | enforced | The ability score increase is applied, and Truesight 60 feet is a sense dynamic vision and attack rolls read (vision/senses.ts). |
 | Grappler | guided | The ability score increase is applied. Punch and Grab, Attack Advantage and Fast Wrestler are the GM's. |
@@ -588,11 +621,11 @@ Notes on the curated rows:
 
 ## Magic items
 
-**Enforced (73):** Ammunition, +1 · Ammunition, +2 · Ammunition, +3 · Armor of Resistance · Armor of Vulnerability · Armor, +1 · Armor, +2 · Armor, +3 · Belt of Dwarvenkind · Boots of Elvenkind · Boots of the Winterlands · Bracers of Defense · Candle of Invocation · Cloak of Arachnida · Cloak of Elvenkind · Cloak of Protection · Dagger of Venom · Decanter of Endless Water · Dragon Slayer · Elven Chain · Eversmoking Bottle · Eyes of Charming · Flame Tongue · Frost Brand · Gem of Brightness · Gem of Seeing · Giant Slayer · Glamoured Studded Leather · Gloves of Missile Snaring · Gloves of Thievery · Goggles of Night · Lantern of Revealing · Manual of Bodily Health · Manual of Gainful Exercise · Manual of Quickness of Action · Mithral Armor · Periapt of Proof against Poison · Potion of Flying · Potion of Healing (greater) · Potion of Healing (superior) · Potion of Healing (supreme) · Ring of Animal Influence · Ring of Evasion · Ring of Feather Falling · Ring of Jumping · Ring of Protection · Ring of Resistance · Ring of Swimming · Ring of X-ray Vision · Robe of Eyes · Rod of Rulership · Sentinel Shield · Shield of the Cavalier · Shield, +1 · Shield, +2 · Shield, +3 · Slippers of Spider Climbing · Spell Scroll · Staff of Striking · Staff of Swarming Insects · Staff of Thunder and Lightning · Staff of Withering · Stone of Good Luck (Luckstone) · Sword of Wounding · Tome of Clear Thought · Tome of Leadership and Influence · Tome of Understanding · Vicious Weapon · Wand of Paralysis · Weapon, +1 · Weapon, +2 · Weapon, +3 · Winged Boots
+**Enforced (88):** Ammunition, +1 · Ammunition, +2 · Ammunition, +3 · Armor of Resistance · Armor of Vulnerability · Armor, +1 · Armor, +2 · Armor, +3 · Belt of Dwarvenkind · Boots of Elvenkind · Boots of the Winterlands · Bracers of Defense · Candle of Invocation · Chime of Opening · Cloak of Arachnida · Cloak of Elvenkind · Cloak of Protection · Cube of Force · Dagger of Venom · Decanter of Endless Water · Dragon Slayer · Elven Chain · Eversmoking Bottle · Eyes of Charming · Flame Tongue · Frost Brand · Gem of Brightness · Gem of Seeing · Giant Slayer · Glamoured Studded Leather · Gloves of Missile Snaring · Gloves of Thievery · Goggles of Night · Lantern of Revealing · Manual of Bodily Health · Manual of Gainful Exercise · Manual of Quickness of Action · Mithral Armor · Necklace of Fireballs · Pearl of Power · Periapt of Proof against Poison · Potion of Flying · Potion of Healing (greater) · Potion of Healing (superior) · Potion of Healing (supreme) · Ring of Animal Influence · Ring of Evasion · Ring of Feather Falling · Ring of Jumping · Ring of Protection · Ring of Resistance · Ring of Swimming · Ring of X-ray Vision · Robe of Eyes · Rod of Resurrection · Rod of Rulership · Sentinel Shield · Shield of the Cavalier · Shield, +1 · Shield, +2 · Shield, +3 · Slippers of Spider Climbing · Spell Scroll · Staff of Fire · Staff of Frost · Staff of Healing · Staff of Striking · Staff of Swarming Insects · Staff of the Woodlands · Staff of Thunder and Lightning · Staff of Withering · Stone of Good Luck (Luckstone) · Sword of Wounding · Tome of Clear Thought · Tome of Leadership and Influence · Tome of Understanding · Vicious Weapon · Wand of Binding · Wand of Fireballs · Wand of Lightning Bolts · Wand of Magic Missiles · Wand of Paralysis · Wand of Web · Weapon, +1 · Weapon, +2 · Weapon, +3 · Winged Boots · Wings of Flying
 
-**Guided (131):** Adamantine Armor · Ammunition of Slaying · Amulet of Health · Amulet of Proof against Detection and Location · Amulet of the Planes · Animated Shield · Armor of Invulnerability · Arrow-Catching Shield · Bag of Tricks · Belt of Giant Strength · Berserker Axe · Boots of Levitation · Boots of Speed · Boots of Striding and Springing · Bowl of Commanding Water Elementals · Bracers of Archery · Brazier of Commanding Fire Elementals · Brooch of Shielding · Broom of Flying · Cape of the Mountebank · Censer of Controlling Air Elementals · Cloak of Displacement · Cloak of Invisibility · Cloak of the Bat · Cloak of the Manta Ray · Crystal Ball · Crystal Ball of Mind Reading · Crystal Ball of Telepathy · Crystal Ball of True Seeing · Cube of Force · Cubic Gate · Dancing Sword · Defender · Demon Armor · Dragon Orb · Dragon Scale Mail · Dwarven Plate · Dwarven Thrower · Energy Bow · Gauntlets of Ogre Power · Gloves of Swimming and Climbing · Hammer of Thunderbolts · Hat of Disguise · Hat of Many Spells · Headband of Intellect · Helm of Brilliance · Helm of Comprehending Languages · Helm of Telepathy · Helm of Teleportation · Holy Avenger · Instant Fortress · Ioun Stone · Iron Bands · Iron Flask · Javelin of Lightning · Luck Blade · Mace of Disruption · Mace of Smiting · Mace of Terror · Mantle of Spell Resistance · Medallion of Thoughts · Necklace of Adaptation · Necklace of Prayer Beads · Nine Lives Stealer · Oathbow · Pearl of Power · Periapt of Health · Periapt of Wound Closure · Pipes of Haunting · Pipes of the Sewers · Plate Armor of Etherealness · Quarterstaff of the Acrobat · Ring of Djinni Summoning · Ring of Elemental Command · Ring of Free Action · Ring of Invisibility · Ring of Mind Shielding · Ring of Regeneration · Ring of Shooting Stars · Ring of Spell Storing · Ring of Spell Turning · Ring of Telekinesis · Ring of the Ram · Ring of Warmth · Ring of Water Walking · Robe of Scintillating Colors · Robe of Stars · Robe of the Archmagi · Rod of Absorption · Rod of Alertness · Rod of Lordly Might · Rod of Resurrection · Rope of Entanglement · Scarab of Protection · Scimitar of Speed · Sending Stones · Shield of Missile Attraction · Spellguard Shield · Staff of Charming · Staff of Fire · Staff of Frost · Staff of Healing · Staff of Power · Staff of the Magi · Staff of the Python · Staff of the Woodlands · Stone of Controlling Earth Elementals · Sun Blade · Sword of Life Stealing · Sword of Sharpness · Talisman of Pure Good · Talisman of the Sphere · Talisman of Ultimate Evil · Thunderous Greatclub · Trident of Fish Command · Vorpal Sword · Wand of Binding · Wand of Enemy Detection · Wand of Fear · Wand of Fireballs · Wand of Lightning Bolts · Wand of Magic Detection · Wand of Polymorph · Wand of Secrets · Wand of the War Mage, +1 · Wand of the War Mage, +2 · Wand of the War Mage, +3 · Wand of Web · Wand of Wonder · Weapon of Warning · Wings of Flying
+**Guided (121):** Adamantine Armor · Ammunition of Slaying · Amulet of Health · Amulet of Proof against Detection and Location · Amulet of the Planes · Animated Shield · Armor of Invulnerability · Arrow-Catching Shield · Bag of Tricks · Belt of Giant Strength · Berserker Axe · Boots of Levitation · Boots of Speed · Boots of Striding and Springing · Bowl of Commanding Water Elementals · Bracers of Archery · Brazier of Commanding Fire Elementals · Brooch of Shielding · Broom of Flying · Cape of the Mountebank · Censer of Controlling Air Elementals · Cloak of Displacement · Cloak of Invisibility · Cloak of the Bat · Cloak of the Manta Ray · Crystal Ball · Crystal Ball of Mind Reading · Crystal Ball of Telepathy · Crystal Ball of True Seeing · Cubic Gate · Dancing Sword · Defender · Demon Armor · Dragon Orb · Dragon Scale Mail · Dwarven Plate · Dwarven Thrower · Energy Bow · Gauntlets of Ogre Power · Gloves of Swimming and Climbing · Hammer of Thunderbolts · Hat of Disguise · Hat of Many Spells · Headband of Intellect · Helm of Brilliance · Helm of Comprehending Languages · Helm of Telepathy · Helm of Teleportation · Holy Avenger · Horn of Valhalla · Instant Fortress · Ioun Stone · Iron Bands · Iron Flask · Javelin of Lightning · Luck Blade · Mace of Disruption · Mace of Smiting · Mace of Terror · Mantle of Spell Resistance · Medallion of Thoughts · Necklace of Adaptation · Necklace of Prayer Beads · Nine Lives Stealer · Oathbow · Periapt of Health · Periapt of Wound Closure · Pipes of Haunting · Pipes of the Sewers · Plate Armor of Etherealness · Quarterstaff of the Acrobat · Ring of Djinni Summoning · Ring of Elemental Command · Ring of Free Action · Ring of Invisibility · Ring of Mind Shielding · Ring of Regeneration · Ring of Shooting Stars · Ring of Spell Storing · Ring of Spell Turning · Ring of Telekinesis · Ring of the Ram · Ring of Three Wishes · Ring of Warmth · Ring of Water Walking · Robe of Scintillating Colors · Robe of Stars · Robe of the Archmagi · Rod of Absorption · Rod of Alertness · Rod of Lordly Might · Rope of Entanglement · Scarab of Protection · Scimitar of Speed · Sending Stones · Shield of Missile Attraction · Spellguard Shield · Staff of Charming · Staff of Power · Staff of the Magi · Staff of the Python · Stone of Controlling Earth Elementals · Sun Blade · Sword of Life Stealing · Sword of Sharpness · Talisman of Pure Good · Talisman of the Sphere · Talisman of Ultimate Evil · Thunderous Greatclub · Trident of Fish Command · Vorpal Sword · Wand of Enemy Detection · Wand of Fear · Wand of Magic Detection · Wand of Polymorph · Wand of Secrets · Wand of the War Mage, +1 · Wand of the War Mage, +2 · Wand of the War Mage, +3 · Wand of Wonder · Weapon of Warning
 
-**Reference (66):** Apparatus of the Crab · Bag of Beans · Bag of Devouring · Bag of Holding · Bead of Force · Bead of Nourishment · Carpet of Flying · Chime of Opening · Circlet of Blasting · Deck of Illusions · Dimensional Shackles · Dust of Disappearance · Dust of Dryness · Dust of Sneezing and Choking · Efficient Quiver · Efreeti Bottle · Elemental Gem · Elixir of Health · Eyes of Minute Seeing · Eyes of the Eagle · Feather Token · Figurine of Wondrous Power · Folding Boat · Handy Haversack · Horn of Blasting · Horn of Valhalla · Horseshoes of a Zephyr · Horseshoes of Speed · Immovable Rod · Manual of Golems · Marvelous Pigments · Mirror of Life Trapping · Mysterious Deck · Necklace of Fireballs · Oil of Etherealness · Oil of Sharpness · Oil of Slipperiness · Philter of Love · Portable Hole · Potion of Animal Friendship · Potion of Clairvoyance · Potion of Climbing · Potion of Diminution · Potion of Gaseous Form · Potion of Giant Strength · Potion of Growth · Potion of Heroism · Potion of Invisibility · Potion of Invulnerability · Potion of Longevity · Potion of Mind Reading · Potion of Poison · Potion of Resistance · Potion of Speed · Potion of Vitality · Potion of Water Breathing · Ring of Three Wishes · Robe of Useful Items · Rod of Security · Rope of Climbing · Sovereign Glue · Sphere of Annihilation · Universal Solvent · Wand of Magic Missiles · Well of Many Worlds · Wind Fan
+**Reference (61):** Apparatus of the Crab · Bag of Beans · Bag of Devouring · Bag of Holding · Bead of Force · Bead of Nourishment · Carpet of Flying · Circlet of Blasting · Deck of Illusions · Dimensional Shackles · Dust of Disappearance · Dust of Dryness · Dust of Sneezing and Choking · Efficient Quiver · Efreeti Bottle · Elemental Gem · Elixir of Health · Eyes of Minute Seeing · Eyes of the Eagle · Feather Token · Figurine of Wondrous Power · Folding Boat · Handy Haversack · Horn of Blasting · Horseshoes of a Zephyr · Horseshoes of Speed · Immovable Rod · Manual of Golems · Marvelous Pigments · Mirror of Life Trapping · Mysterious Deck · Oil of Etherealness · Oil of Sharpness · Oil of Slipperiness · Philter of Love · Portable Hole · Potion of Animal Friendship · Potion of Clairvoyance · Potion of Climbing · Potion of Diminution · Potion of Gaseous Form · Potion of Giant Strength · Potion of Growth · Potion of Heroism · Potion of Invisibility · Potion of Invulnerability · Potion of Longevity · Potion of Mind Reading · Potion of Poison · Potion of Resistance · Potion of Speed · Potion of Vitality · Potion of Water Breathing · Robe of Useful Items · Rod of Security · Rope of Climbing · Sovereign Glue · Sphere of Annihilation · Universal Solvent · Well of Many Worlds · Wind Fan
 
 Notes on the curated rows:
 
@@ -606,6 +639,7 @@ Notes on the curated rows:
 | Brooch of Shielding | guided | Resistance to Force damage is applied. Immunity to Magic Missile is the GM's. |
 | Broom of Flying | guided | The action gives the rider a Fly Speed of 50 feet with hover until it ends it on the sheet. The 30 feet while carrying over 200 pounds is the GM's, since weight isn't tracked. |
 | Cape of the Mountebank | guided | The cast of Dimension Door, once a dawn, teleports the wearer on the map (granted-moves.ts). The smoke cloud is the GM's. |
+| Chime of Opening | enforced | Each strike casts Knock on its 10 charges, which never come back, and the last one cracks it (resolution/charges.ts). |
 | Cloak of Arachnida | enforced | Resistance to Poison damage and a Climb Speed equal to its wearer's Speed are applied. The webs of a Web spell can't hold the wearer (spell-zones.ts), and its Web cast is DC 13 over a 40-foot Cube once a Long Rest. Climbing upside down on ceilings is the GM's to allow. |
 | Cloak of the Bat | guided | Advantage on Dexterity (Stealth) checks is applied. The Fly Speed in darkness and the Polymorph cast are the GM's. |
 | Dagger of Venom | enforced | The +1 to attack and damage rolls is applied. Coating the blade is a Bonus Action once a day, and the dagger's next hit spends it on a DC 15 Constitution save against 2d10 Poison and Poisoned for 1 minute (resolution/on-hit.ts). |
@@ -614,38 +648,44 @@ Notes on the curated rows:
 | Dragon Scale Mail | guided | The +1 AC and the Resistance to one type are applied. Advantage on saves against a dragon's breath, and sensing dragons, are the GM's. |
 | Dwarven Plate | guided | The +2 AC is applied. The Reaction against forced movement is the GM's. |
 | Dwarven Thrower | guided | The +3 to attack and damage rolls is applied. Throwing it, its return and the extra damage against Giants are the GM's. |
+| Gem of Brightness | enforced | Its light is lit and put out on the row, and its beam (1 charge) and flare (5 charges) open the DC 15 Constitution save against Blinded on its 50 charges, which never come back. |
 | Giant Slayer | enforced | The +1 to attack and damage rolls and the extra 2d6 against Giants are applied, and a hit on a Giant opens its DC 15 Strength save against Prone (resolution/on-hit.ts). |
 | Gloves of Missile Snaring | enforced | A hit by a weapon from range opens a reaction prompt (damage-window.ts), and using it takes 1d10 plus the wearer's Dexterity modifier off the damage. Whether a hand is free, and catching the missile, are the GM's. |
 | Hammer of Thunderbolts | guided | The +1 to attack and damage rolls is applied. Its thrown thunderclap and its powers against Giants are the GM's. |
 | Helm of Telepathy | guided | Its Detect Thoughts and Suggestion casts are cast actions. The telepathy itself is the GM's. |
 | Holy Avenger | guided | The +3 to attack and damage rolls and the extra 2d10 Radiant against Fiends and Undead are applied. The aura's Advantage on saves against spells for its wielder's allies is the GM's. |
+| Horn of Valhalla | guided | Blowing it is counted, and clock-pools.ts keeps it from being blown again until 7 days have passed on the game clock. The Berserkers it calls, and the requirement of its metal, are the GM's. |
 | Iron Bands | guided | The throw's attack roll is applied. Restraining the target on a hit, and the check to break free, are the GM's. |
 | Iron Flask | guided | The command's save is applied. Trapping the creature in the flask is the GM's. |
-| Luck Blade | guided | The +1 to attack and damage rolls and saving throws is applied, and roll-answers.ts offers its Luck reroll on a failed D20 Test once a day while the wielder isn't Incapacitated. Its Wish is the GM's. |
+| Luck Blade | guided | The +1 to attack and damage rolls and saving throws is applied, and roll-answers.ts offers its Luck reroll on a failed D20 Test once a day while the wielder isn't Incapacitated. Its Wish casts on 1d3 charges rolled when it is added, which never come back; its once a day limit, and what a Wish does, are the GM's. |
 | Mace of Disruption | guided | The extra 2d6 Radiant against Fiends and Undead is applied. The save against destruction at 25 Hit Points or fewer, and the Frightened condition a success leaves, are the GM's. |
 | Mace of Smiting | guided | The +1 to attack and damage rolls, +3 against Constructs, and the 7 Bludgeoning on a rolled 20 (14 against a Construct) are applied. Destroying a Construct left at 25 Hit Points or fewer is the GM's, said with the hit. |
 | Manual of Bodily Health | enforced | item-study.ts records the study in the reader's build, so Constitution rises by 2 (to at most 30) and stays through every rebuild, and the copy's magic is spent. The 48 hours of study are downtime the GM gives, and the GM moves the clock. |
 | Manual of Gainful Exercise | enforced | item-study.ts records the study in the reader's build, so Strength rises by 2 (to at most 30) and stays through every rebuild, and the copy's magic is spent. The 48 hours of study are downtime the GM gives, and the GM moves the clock. |
 | Manual of Quickness of Action | enforced | item-study.ts records the study in the reader's build, so Dexterity rises by 2 (to at most 30) and stays through every rebuild, and the copy's magic is spent. The 48 hours of study are downtime the GM gives, and the GM moves the clock. |
+| Necklace of Fireballs | enforced | inventory.ts rolls its 1d6 + 3 beads when it is added, and each bead casts a level 3 Fireball at DC 15 and never comes back. Hurling several beads at once is the GM's. |
 | Nine Lives Stealer | guided | The +2 to attack and damage rolls is applied. Life Stealing on a Critical Hit is the GM's. |
+| Pearl of Power | enforced | Its Magic action restores one expended slot of level 3 or lower, once per Long Rest (conversions.ts). |
 | Pipes of Haunting | guided | The save against Frightened, with its repeat at the end of each turn, is applied. The immunity after a success is the GM's. |
 | Quarterstaff of the Acrobat | guided | The +2 to attack and damage rolls is applied, and Attack Deflection is offered once a rest when a hit would land, adding 5 to AC against it (resolution/pending.ts). Its forms, its throw and Acrobatic Assist are the GM's. |
 | Ring of Shooting Stars | guided | Its at-will cantrips and the one-charge Shooting Stars are applied. Faerie Fire, the Lightning Spheres and the larger Shooting Stars are the GM's. |
+| Ring of Three Wishes | guided | Its three Wish casts are counted and never come back (resolution/charges.ts). What a Wish does is the GM's. |
 | Robe of Scintillating Colors | guided | The save against Stunned is applied. The light, the Disadvantage on attacks against the wearer and ending the stun are the GM's. |
-| Robe of Stars | guided | The +1 to saving throws is applied. The Magic Missile stars and the trip to the Astral Plane are the GM's. |
+| Robe of Stars | guided | The +1 to saving throws is applied, and its six stars each cast a level 5 Magic Missile, 1d6 coming back at dusk or a Long Rest. The trip to the Astral Plane is the GM's. |
 | Rod of Alertness | guided | Advantage on Initiative and Wisdom (Perception) checks, and its detection casts, are applied. The Protective Aura's benefit to allies is the GM's. |
 | Rod of Lordly Might | guided | It swings as a +3 Mace. Drain Life and Paralyze ride a melee hit and Terrify is an action, each once a day. The buttons' other forms, and Drain Life's healing, are the GM's. |
+| Rod of Resurrection | enforced | Its casts spend their printed charges, and it regains 1 charge at dawn or at a Long Rest (item-charges.ts). |
 | Rope of Entanglement | guided | The save against Restrained is applied. The check to escape the rope is the GM's. |
 | Scarab of Protection | guided | The +1 AC is applied. Advantage on saves against spells, and its Preservation, are the GM's. |
 | Scimitar of Speed | guided | The +2 to attack and damage rolls is applied. The extra attack as a Bonus Action is the GM's. |
 | Spellguard Shield | guided | Spell attack rolls against its holder have Disadvantage (resolution/attack.ts). Advantage on saves against spells and other magical effects is the GM's. |
 | Staff of Charming | guided | Its one-charge casts are cast actions, and roll-answers.ts offers to turn a failed save against an Enchantment spell aimed only at the holder into a success once a day. Turning the spell back on its caster is the GM's. |
-| Staff of Fire | guided | Resistance to Fire damage and its one-charge Burning Hands are applied. Fireball and Wall of Fire, which cost more charges, are the GM's. |
-| Staff of Frost | guided | Resistance to Cold damage and its one-charge Fog Cloud are applied. The spells that cost more charges are the GM's. |
-| Staff of Power | guided | It swings as a +2 Quarterstaff, and the +2 to AC, saving throws and spell attack rolls is applied. Its spells and its Retributive Strike are the GM's. |
+| Staff of Fire | enforced | Resistance to Fire damage is applied, and Burning Hands, Fireball and Wall of Fire spend their printed charges (item-actions.ts); a 1 on the last charge's d20 destroys it (resolution/charges.ts). |
+| Staff of Frost | enforced | Resistance to Cold damage is applied, and Fog Cloud, Cone of Cold, Ice Storm and Wall of Ice spend their printed charges (item-actions.ts); a 1 on the last charge's d20 destroys it (resolution/charges.ts). |
+| Staff of Power | guided | It swings as a +2 Quarterstaff, the +2 to AC, saving throws and spell attack rolls is applied, and its spells spend their printed charges; a 20 on the last charge's d20 gives 1d8 + 2 back (resolution/charges.ts). Retributive Strike, and a 1 on that d20, are the GM's. |
 | Staff of Striking | enforced | It swings as a +3 Quarterstaff, and a melee hit can spend 1, 2 or 3 of its 10 charges for 1d6 Force each (resolution/hit-options.ts). |
-| Staff of the Magi | guided | It swings as a +2 Quarterstaff, and its four casts that cost no charge and the +2 to spell attack rolls are applied. The spells that cost charges, Spell Absorption and Retributive Strike are the GM's. |
-| Staff of the Woodlands | guided | It swings as a +2 Quarterstaff, its one-charge casts are cast actions, Tree Form's use is counted, and the +2 to spell attack rolls is applied. The spells that cost more charges are the GM's. |
+| Staff of the Magi | guided | It swings as a +2 Quarterstaff, the +2 to spell attack rolls is applied, and its spells spend their printed charges from 50; a 20 on the last charge's d20 gives 1d12 + 1 back (resolution/charges.ts). Advantage on saves against spells, Spell Absorption and Retributive Strike are the GM's. |
+| Staff of the Woodlands | enforced | It swings as a +2 Quarterstaff, the +2 to spell attack rolls is applied, its spells spend their printed charges and Tree Form's use is counted. A 1 on the last charge's d20 leaves a plain Quarterstaff (resolution/charges.ts). |
 | Staff of Thunder and Lightning | enforced | It swings as a +2 Quarterstaff. Lightning and Thunder ride a melee hit, Thunder and Lightning does both as a Bonus Action (resolution/hit-options.ts), and Lightning Strike and Thunderclap are actions, each once a day. |
 | Staff of Withering | enforced | It swings as a Quarterstaff, and a hit can spend a charge for 2d10 Necrotic and a DC 15 Constitution save against Disadvantage on Strength and Constitution checks and saves (resolution/hit-options.ts). The hour it lasts is the GM's. |
 | Sun Blade | guided | It swings as a +2 Finesse Longsword that deals Radiant damage, with 1d8 Radiant more against an Undead. The Bonus Action that makes the blade appear, and its sunlight, are the GM's. |
@@ -657,13 +697,13 @@ Notes on the curated rows:
 | Tome of Leadership and Influence | enforced | item-study.ts records the study in the reader's build, so Charisma rises by 2 (to at most 30) and stays through every rebuild, and the copy's magic is spent. The 48 hours of study are downtime the GM gives, and the GM moves the clock. |
 | Tome of Understanding | enforced | item-study.ts records the study in the reader's build, so Wisdom rises by 2 (to at most 30) and stays through every rebuild, and the copy's magic is spent. The 48 hours of study are downtime the GM gives, and the GM moves the clock. |
 | Vorpal Sword | guided | The +3 to attack and damage rolls is applied. Ignoring Resistance to Slashing damage, and the head it takes on a rolled 20, are the GM's, said with the hit. |
-| Wand of Fireballs | guided | Fireball at DC 15 on its charges is applied. Spending more charges for a higher-level Fireball is the GM's. |
-| Wand of Lightning Bolts | guided | Lightning Bolt at DC 15 on its charges is applied. Spending more charges for a higher-level Lightning Bolt is the GM's. |
+| Wand of Fireballs | enforced | Fireball at DC 15 on its charges, each charge past the first raising its level by 1 up to 3 (item-actions.ts); a 1 on the last charge's d20 destroys it (resolution/charges.ts). |
+| Wand of Lightning Bolts | enforced | Lightning Bolt at DC 15 on its charges, each charge past the first raising its level by 1 up to 3 (item-actions.ts); a 1 on the last charge's d20 destroys it (resolution/charges.ts). |
 | Wand of the War Mage, +1 | guided | The +1 to spell attack rolls is applied. Ignoring Half Cover on a spell attack is the GM's, who sets the cover. |
 | Wand of the War Mage, +2 | guided | The +2 to spell attack rolls is applied. Ignoring Half Cover on a spell attack is the GM's, who sets the cover. |
 | Wand of the War Mage, +3 | guided | The +3 to spell attack rolls is applied. Ignoring Half Cover on a spell attack is the GM's, who sets the cover. |
 | Weapon of Warning | guided | Advantage on Initiative for its wielder is applied. The same for allies within 30 feet, and waking them, are the GM's. |
-| Wings of Flying | guided | The action gives a Fly Speed of 60 feet for an hour, or until the wearer ends it on the sheet; a creature in the air when it ends falls (falling.ts). The 1d12 hours before the wings work again are the GM's. |
+| Wings of Flying | enforced | The action gives a Fly Speed of 60 feet for an hour, or until the wearer ends it on the sheet; a creature in the air when it ends falls (falling.ts). clock-pools.ts keeps the wings from being used again until 1d12 + 1 hours of game time have passed from their use (the hour they last, then the wait). |
 
 ## Gear and tools
 
@@ -794,7 +834,7 @@ Notes on the curated rows:
 | Heroic Inspiration | guided | held-rolls.ts spends it to reroll the d20 of an attack, a check, a save or a death save while the roll is shown. Only the GM gives it by hand. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. A character who gains a second one passes it to a player character without it or lets it go (heroic-inspiration.ts). Rerolling a damage die or Initiative is the GM's. |
 | Hide | enforced | resolution/builtins.ts rolls a DC 15 Dexterity (Stealth) check and makes the creature Invisible on a success, until it attacks, casts a spell with a Verbal component or an enemy's Search meets its total. With dynamic vision on, resolution/validate.ts asks that it be Heavily Obscured or behind Three-Quarters or Total Cover and out of every enemy's sight (vision/rules.ts). A sound louder than a whisper is the GM's call. |
 | High Jump | enforced | jumping.ts lets a jump rise up to 3 plus the Strength modifier with 10 feet moved this turn before it, half from a standing start, a foot of movement for each foot. Reaching up half its height more is the GM's. |
-| Hit Point Dice | enforced | rests.ts spends them on a Short Rest, each healing its roll plus the Constitution modifier, and restores them all on a Long Rest. |
+| Hit Point Dice | enforced | rests.ts lets a creature spend them only during a Short Rest (its own or the party's), each healing its roll plus the Constitution modifier, and restores them all on a Long Rest. The GM may spend them any time. |
 | Hit Points | enforced | hit-points.ts keeps Hit Points between 0 and the maximum, and a creature at 0 falls Unconscious or dies. |
 | Hostile | reference | Attitudes aren't tracked; the GM applies the Disadvantage on Influence. |
 | Hover | enforced | speed.ts records whether a creature hovers, and falling.ts keeps a hovering flier in the air while it is Prone, Incapacitated or at a Fly Speed of 0. |

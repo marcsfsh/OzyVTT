@@ -71,7 +71,8 @@ function usesOf(
     limit: Math.min(MAX_ACTION_USES, limit),
     per: uses.per,
     ...(uses.pool ? { pool: itemPool(item, uses.pool) } : {}),
-    ...("recharge" in uses && uses.recharge !== undefined ? { recharge: uses.recharge } : {})
+    ...("recharge" in uses && uses.recharge !== undefined ? { recharge: uses.recharge } : {}),
+    ...(uses.afterHours !== undefined ? { afterHours: uses.afterHours } : {})
   };
 }
 
@@ -209,6 +210,8 @@ export function castAction(
     // Set even when the catalog cannot resolve the record, since `spell-id-is` gates on the authored id.
     spellId: cast.spellId,
     ...(uses ? { uses } : {}),
+    // A cast of several charges spends them all from the item's pool (Staff of Fire's Fireball: 3).
+    ...(uses && cast.useCost !== undefined ? { useCost: cast.useCost } : {}),
     // The bearer's own slot is spent on top of the item's charges when the item says so.
     ...(cast.consumesSpellSlot && level >= 1 ? { spellSlot: { level: Math.min(9, level) } } : {}),
     // Who the item's cast may affect beside the spell's own targets (a ring's Fear: Beasts only).
@@ -219,10 +222,6 @@ export function castAction(
   const caster = casterNumbers(definition);
   // An authored `ability` powers the item; absent, the wielder's own.
   const ability = cast.ability ?? caster.ability;
-  const upcast =
-    level > spell.level
-      ? (spell.castingOptions.find((option) => option.type === `slot_level_${level}`)?.damageRoll ?? null)
-      : null;
   const attackBonus =
     cast.ability !== undefined || caster.attackBonus === null
       ? scoreModifierOf(definition, ability) + caster.proficiencyBonus
@@ -234,12 +233,13 @@ export function castAction(
     (cast.ability !== undefined || caster.saveDc === null
       ? 8 + scoreModifierOf(definition, ability) + caster.proficiencyBonus
       : caster.saveDc);
-  const mechanics = spellCastMechanics(
-    spell,
-    { attackBonus, saveDc: clampDc(saveDc), bearersDc, modifier: scoreModifierOf(definition, ability) },
-    { roll: upcast }
-  );
-  return {
+  const mechanics = spellCastMechanics(spell, {
+    attackBonus,
+    saveDc: clampDc(saveDc),
+    bearersDc,
+    modifier: scoreModifierOf(definition, ability)
+  });
+  const built: ActorAction = {
     ...base,
     // The item's own area, where it prints one (a wand's 60-foot Cone), else the spell's.
     ...(cast.area ? { area: structuredClone(cast.area) } : castAreaOf(spell, mechanics)),
@@ -249,6 +249,41 @@ export function castAction(
       ? { activation: "reaction" as const, reaction: structuredClone(spell.effect.reaction) }
       : {})
   };
+  // A higher level rolls that slot's dice and makes its darts and rays, as a slot cast at it would (Robe of Stars'
+  // level 5 Magic Missile).
+  return level > spell.level ? upcastAction(built, spell, level) : built;
+}
+
+/** An item cast as the sheet offers it: one cast, or, where each charge after the first casts it a level higher (a
+ *  Wand of Fireballs' 1 to 3 charges), one cast for each number of charges, at its level and cost. */
+export function itemCastActions(
+  item: CarriedItem,
+  cast: ItemSpellCast,
+  itemName: string,
+  definition: ActorDefinition | undefined,
+  spell: SpellReference | undefined
+): ActorAction[] {
+  const first = castAction(item, cast, itemName, definition, spell);
+  if (cast.chargesRaiseLevel === undefined || !spell || !first.uses) return [first];
+  const baseLevel = cast.atLevel ?? spell.level;
+  const baseCost = cast.useCost ?? 1;
+  const more: ActorAction[] = [];
+  for (let extra = 1; baseCost + extra <= cast.chargesRaiseLevel && baseLevel + extra <= 9; extra++) {
+    const level = baseLevel + extra;
+    const raised = castAction(
+      item,
+      { ...cast, atLevel: level, useCost: baseCost + extra },
+      itemName,
+      definition,
+      spell
+    );
+    more.push({
+      ...raised,
+      id: `${first.id}-${level}`,
+      name: `Cast ${spell.name} at level ${level} (${itemName})`
+    });
+  }
+  return [first, ...more];
 }
 
 /** The template a cast places: the spell's area, unless the caster picks its targets in that area (Mass Cure Wounds'

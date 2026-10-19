@@ -501,6 +501,25 @@ export const ItemSpellCastSchema = z
       .describe('A flat printed DC ("save DC 15"). It overrides any derivation'),
     /** Charges. Share one pool across several casts with `uses.pool`. */
     uses: FeatureUsesSchema.optional().describe("Charges. Share one pool across several casts with `uses.pool`"),
+    /** Charges one cast spends, when more than one (Staff of Fire's Fireball: 3). */
+    useCost: z
+      .number()
+      .int()
+      .min(2)
+      .max(50)
+      .optional()
+      .describe("Charges one cast spends, when more than one (Staff of Fire's Fireball: 3)"),
+    /** The most charges one cast may spend, each charge after the first casting it one level higher (Wand of
+     *  Fireballs: 3, for levels 3 to 5). The sheet offers each as its own cast. */
+    chargesRaiseLevel: z
+      .number()
+      .int()
+      .min(2)
+      .max(9)
+      .optional()
+      .describe(
+        "The most charges one cast may spend, each charge after the first casting it one level higher (Wand of Fireballs: 3, for levels 3 to 5). Each becomes its own cast on the sheet"
+      ),
     /** Whether casting it also spends one of the bearer's own spell slots. */
     consumesSpellSlot: z
       .boolean()
@@ -527,14 +546,37 @@ export type ItemSpellCast = z.infer<typeof ItemSpellCastSchema>;
  * Long Rest ("regains 1d6 + 1 expended charges daily at dawn"; absent = all come back), and `lastChargeRoll` rolls a
  * d20 when the last charge is spent, whose 1 does what the item's text says (most crumble).
  */
+/** A charge count as the SRD prints one: dice ("1d6 + 1"; a d3 is a die of its own here) or a flat number ("1"). */
+const ChargeCountSchema = z
+  .string()
+  .regex(
+    /^(?:\d+d(?:3|4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?|\d{1,2})$/i,
+    "Use a dice formula such as 1d6 + 1, or a number."
+  );
+
 export const ItemChargesSchema = z
   .object({
     // The SRD's own grammar here includes a d3 ("regains 1d3 expended charges"), which the dice roller lacks.
-    regain: z
-      .string()
-      .regex(/^\d+d(?:3|4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?$/i, "Use a dice formula such as 1d6 + 1.")
-      .optional(),
-    lastChargeRoll: z.boolean().default(false)
+    regain: ChargeCountSchema.optional(),
+    lastChargeRoll: z.boolean().default(false),
+    /** What spending the last charge does to the item: with `lastChargeRoll`, on a d20 of 1, and otherwise always (a
+     *  Chime of Opening cracks). `destroyed` takes the row away; `becomes` turns it into that plain item (a Staff of
+     *  Striking becomes a Quarterstaff). Absent: the GM is told, and decides. */
+    lastCharge: z
+      .union([z.literal("destroyed"), z.object({ becomes: ContentIdSchema }).strict()])
+      .optional()
+      .describe(
+        "What spending the last charge does to the item: with lastChargeRoll on a d20 of 1, otherwise always. destroyed takes the row away; becomes turns it into that plain item. Absent: the GM is told"
+      ),
+    /** With `lastChargeRoll`, the charges a d20 of 20 gives back (Staff of Power: 1d8 + 2). */
+    lastChargeTwenty: ChargeCountSchema.optional().describe(
+      "With lastChargeRoll, the charges a d20 of 20 gives back (Staff of Power: 1d8 + 2)"
+    ),
+    /** The charges a copy holds when it is added, rolled then (a Necklace of Fireballs' 1d6 + 3 beads). Its pools
+     *  count from there. */
+    starting: ChargeCountSchema.optional().describe(
+      "The charges a copy holds when it is added, rolled then (a Necklace of Fireballs' 1d6 + 3 beads); its pools count from there"
+    )
   })
   .strict();
 export type ItemCharges = z.infer<typeof ItemChargesSchema>;
@@ -750,7 +792,8 @@ export const EquipmentReferenceSchema = z
       ),
     casts: z
       .array(ItemSpellCastSchema)
-      .max(8)
+      // A Staff of the Magi casts 18 spells.
+      .max(24)
       .default([])
       .describe("Spells the item can cast (Amulet of Message, Wand of Fireballs)"),
     charges: ItemChargesSchema.optional().describe(

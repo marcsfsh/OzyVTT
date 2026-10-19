@@ -6,6 +6,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { laterRowOf } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
+import { potentRangeFeet } from "../class-features.js";
 import type { RuleId } from "../rules-families.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { sceneSight } from "../vision/sight.js";
@@ -120,7 +121,10 @@ export function spellTargetViolations(
   }
 
   if (action.attack !== undefined || !distanceFeet) return violations;
-  const range = castRangeFeet(spell, input.characterLevel);
+  const cast = castRangeFeet(spell, input.characterLevel);
+  // Improved Potent Spellcasting: a Druid cantrip of 10 feet or more reaches 300 feet farther.
+  const definition = attacker.definitionId ? input.resolveDefinition?.(attacker.definitionId) : undefined;
+  const range = cast !== null && cast >= 10 ? cast + potentRangeFeet(definition, spell) : cast;
   const span = effect?.picksInArea && spell.area ? areaSpan(spell.area) : null;
   const selfArea = effect?.picksInArea && spell.area && span === null ? spell.area.sizeFeet : null;
   const reach = selfArea ?? (range === null ? null : range + (span?.past ?? 0));

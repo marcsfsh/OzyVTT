@@ -162,7 +162,8 @@ export const sorcerer: ClassMechanicsModule = {
       },
       /**
        * Five inline options, each granting its resistance and an `extra-damage` rider of the Charisma
-       * modifier for its own type, gated on `damage-type-is`. It can also fire on a weapon of that type.
+       * modifier for its own type, gated on `damage-type-is` and on a spell (any level), so a weapon of that type
+       * gets none.
        */
       "elemental-affinity": {
         choice: {
@@ -178,7 +179,11 @@ export const sorcerer: ClassMechanicsModule = {
                 type: "extra-damage" as const,
                 abilityModifier: "cha" as const,
                 damageType: id,
-                when: [{ type: "on-damage-roll" as const }, { type: "damage-type-is" as const, damageTypes: [id] }]
+                when: [
+                  { type: "on-damage-roll" as const },
+                  { type: "damage-type-is" as const, damageTypes: [id] },
+                  { type: "spell-level-is" as const, levels: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }
+                ]
               }
             ]
           }))

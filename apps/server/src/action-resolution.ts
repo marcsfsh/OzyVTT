@@ -27,6 +27,11 @@ import {
   spendUntilOwnAttack
 } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
+import { recallSpellSlot } from "./resolution/spell-recall.js";
+import { rollForAnAnswer } from "./resolution/divinations.js";
+import { prayerShortRest, refuseThePrayedFor } from "./resolution/prayer-of-healing.js";
+import { strikeADuplicate } from "./resolution/mirror-image.js";
+import { checkOverchannel, overchannelBacklash } from "./resolution/overchannel.js";
 import type {
   DefinitionAction,
   EndedEffect,
@@ -111,6 +116,7 @@ export function resolveDefinitionAction(
   const ctx = openResolve(state, shapedAction(declared, shaping), input, deps);
   // Checked against the spell as printed, Transmuted Spell's type and Extended Spell's durations land on what it does.
   ctx.action = shapedOutcome(ctx.action, printed, shaping, ctx.plan.castLevel);
+  checkOverchannel(ctx);
   ctx.builtin?.check?.(ctx);
   ctx.builtin?.apply?.(ctx);
   if (longCast && longCast.phase !== "finish") {
@@ -179,6 +185,7 @@ export function resolveDefinitionAction(
   // a miss: the attack is spent, and the answer finishes it.
   if (parkForRollAnswer(ctx) || parkForAcReaction(ctx)) {
     commitEconomy(ctx);
+    recallSpellSlot(ctx);
     rollLastCharge(ctx);
     spendAmmunition(ctx);
     useUpConsumable(ctx);
@@ -190,6 +197,8 @@ export function resolveDefinitionAction(
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
 
+  // A duplicate of Mirror Image may take the settled hit.
+  if (input.commit !== false) strikeADuplicate(ctx);
   spendSundering(ctx);
   rollWeaponDamage(ctx);
   ctx.masterySwing = masterySwingOf(ctx);
@@ -214,7 +223,9 @@ export function resolveDefinitionAction(
   applyTimeStop(ctx);
   applyGrant(ctx);
   placeCastSight(ctx);
+  refuseThePrayedFor(ctx);
   applyHealing(ctx);
+  prayerShortRest(ctx);
   applyConditionCures(ctx);
   applySpellEndings(ctx);
   stabilizeOnCast(ctx);
@@ -228,6 +239,9 @@ export function resolveDefinitionAction(
   applyRageRules(ctx);
 
   commitEconomy(ctx);
+  recallSpellSlot(ctx);
+  rollForAnAnswer(ctx);
+  overchannelBacklash(ctx);
   spendHitOptions(ctx);
   spendDamageUses(ctx);
   rollLastCharge(ctx);
