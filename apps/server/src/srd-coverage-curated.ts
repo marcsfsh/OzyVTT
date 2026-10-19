@@ -1262,6 +1262,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:open-hand-technique": enforced(
     "A Flurry of Blows hit carries Addle, Push or Topple (resolution/hit-options.ts): no Opportunity Attacks until the target's next turn, a Strength save against a 15-foot push, or a Dexterity save against Prone."
   ),
+  "feature:self-restoration": enforced(
+    "As the Monk's turn ends, self-restoration.ts ends one of its Charmed, Frightened or Poisoned conditions (the first in that order when it has several), with an effect that imposes nothing else, and going without food and drink gives it no Exhaustion (survival.ts)."
+  ),
   "feature:quivering-palm": enforced(
     "An Unarmed Strike's hit can spend 4 Focus Points to set the vibrations on its target, one creature at a time (resolution/hit-rider-outcomes.ts). The ending action targets only that creature: a Constitution save for 10d12 Force, half on a success. The days they last are the GM's."
   ),

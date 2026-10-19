@@ -2552,3 +2552,48 @@ describe("Monk: Open Hand Technique rides the strikes Flurry of Blows grants", (
     ]);
   });
 });
+
+describe("Monk: Self-Restoration ends a condition as the turn ends", () => {
+  const endTurn = (built: Built) =>
+    nextInitiativeTurn(built.state, [], {
+      resolveDefinition: (id: string) => (id === built.hero.definitionId ? built.definition : undefined),
+      catalog,
+      rollDie: () => 1,
+      newId: () => "40000000-0000-4000-8000-0000000000f1",
+      now: () => "2026-08-07T00:00:00.000Z"
+    });
+  const conditionIds = (built: Built) => built.hero.conditions.map((condition) => condition.id).sort();
+
+  it("ends Frightened of a Frightened and Poisoned Monk 10, and leaves it Poisoned", () => {
+    const built = onTheTable(build(monkInput(10)));
+    setCondition(built.state, IDS.hero, "frightened", true, undefined, { role: "gm" });
+    setCondition(built.state, IDS.hero, "poisoned", true, undefined, { role: "gm" });
+    endTurn(built);
+    expect(conditionIds(built)).toEqual(["poisoned"]);
+  });
+
+  it("ends an effect that imposes nothing but the condition", () => {
+    const built = onTheTable(build(monkInput(10)));
+    addEffect(
+      built.state,
+      IDS.hero,
+      makeEffect({
+        id: "fear",
+        name: "Cause Fear",
+        linkedConditionIds: ["frightened"],
+        duration: { type: "rounds", rounds: 10 }
+      })
+    );
+    expect(conditionIds(built)).toEqual(["frightened"]);
+    endTurn(built);
+    expect(conditionIds(built)).toEqual([]);
+    expect(built.hero.effects.some((effect) => effect.id === "fear")).toBe(false);
+  });
+
+  it("does nothing for a Monk 9", () => {
+    const built = onTheTable(build(monkInput(9)));
+    setCondition(built.state, IDS.hero, "poisoned", true, undefined, { role: "gm" });
+    endTurn(built);
+    expect(conditionIds(built)).toEqual(["poisoned"]);
+  });
+});
