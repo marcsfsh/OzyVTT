@@ -21,9 +21,9 @@ import { spellWardOf } from "./spell-wards.js";
 export type TypeGated = Readonly<{
   /** The targets the action affects. */
   affected: LiveActor[];
-  /** A sentence for each target left out, naming no creature type, for whoever used the action. */
+  /** A sentence for each target left out, for whoever used the action. It names no creature type. */
   warnings: string[];
-  /** The GM's line for each target left out, saying why. */
+  /** The GM's line for each target left out, which says why. */
   gmLines: ActionTableNarration[];
 }>;
 

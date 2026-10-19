@@ -160,9 +160,9 @@ function receivesMaximized(ctx: ResolveContext, target: LiveActor): boolean {
   );
 }
 
-/** A divided pool as its user divides it ("divide those Hit Points among them"): a share for each target, adding up to
- *  the pool at most and none past the target's cap (Preserve Life: "no more than half its Hit Point maximum"). A target
- *  given no share regains nothing. */
+/** A divided pool as its user divides it ("divide those Hit Points among them"): a share for each target. The shares add
+ *  up to the pool at most, and none goes past its target's cap (Preserve Life: "no more than half its Hit Point
+ *  maximum"). A target given no share regains nothing. */
 function dividedAsPicked(
   targets: readonly Pick<LiveActor, "id" | "name" | "hp">[],
   total: number,
