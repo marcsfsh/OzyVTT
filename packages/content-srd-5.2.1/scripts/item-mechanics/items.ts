@@ -406,7 +406,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // +3 against a Construct, and 7 Bludgeoning more on a rolled 20 (14 against a Construct), never on a crit from a wider
-  // range; a mace's damage is Bludgeoning, so a flat bonus carries it. Destroying a Construct is the GM's, said then.
+  // range; a mace's damage is Bludgeoning, so a flat bonus carries it.
   "mace-of-smiting": {
     modifiers: [
       { type: "attack-bonus", amount: 1 },

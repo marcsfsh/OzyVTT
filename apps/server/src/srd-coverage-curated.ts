@@ -412,7 +412,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
 };
 
 /** A trait that brings a creature back to life somewhere else, which happens off the table. */
-const revives = reference("Its return after death happens off the table; the GM runs it.");
+const revives = guided(
+  "death-traits.ts tells the GM as the creature dies that it may come back, and marks a body that disappears as gone (death.ts). When and where it returns are the GM's."
+);
 /** A trait about breathing, which the app doesn't track. */
 const breath = reference("Breathing isn't tracked.");
 /** A trait that lights the map around its creature. */
@@ -543,15 +545,21 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   "Lightning Absorption": absorbs("Lightning"),
   "Limited Amphibiousness": breath,
-  "Loathsome Limbs": reference("Severed limbs are the GM's to place as Troll Limb stat blocks."),
+  "Loathsome Limbs": enforced(
+    "death-traits.ts severs a limb when the troll ends any turn Bloodied after taking 15 Slashing damage or more in it, four times a day. The limb joins the fight as a Troll Limb on the troll's side in its space and acts right after the troll (risen.ts). The troll has 1 Exhaustion level for each missing limb until it next regains Hit Points, when they grow back."
+  ),
   "Magic Resistance": enforced(
     "saving-throws.ts gives it Advantage on saves against spells and magic items, saves a spell asks it to repeat included."
   ),
   "Magic Rope": reference("The rope and its statistics are the GM's to run."),
   Mimicry: senses,
-  "Misty Escape": reference("Turning to mist at 0 Hit Points is the GM's to run."),
+  "Misty Escape": guided(
+    "death-traits.ts keeps the vampire alive at 0 Hit Points as mist that can't take actions or speak until it regains Hit Points; in sunlight, read with dynamic vision on, it is destroyed instead. The mist form's statistics, running water and the 2 hours to reach its resting place are the GM's."
+  ),
   "Mucus Cloud": reference("The save at the end of the aboleth's turn and its curse are the GM's to run."),
-  "Multiple Heads": reference("Heads lost and regrown, and the Hit Points that come with them, are the GM's to track."),
+  "Multiple Heads": enforced(
+    "death-traits.ts kills one head on each turn the hydra takes 25 damage or more, and the hydra with its last. At the end of its turn it grows two heads for each one lost since its last turn and regains 20 Hit Points, unless it took Fire damage since then. Its Multiattack makes one Bite per living head (effective-actions.ts)."
+  ),
   "Ooze Cube": reference("Entering the cube, and pulling a creature out, are the GM's to run with its Engulf."),
   "Pack Tactics": enforced(
     "resolution/attack.ts gives Advantage when an ally of the attacker that isn't Incapacitated is within 5 feet of the target."
@@ -691,6 +699,21 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "action:Lich/deathly-teleport": guided(
     "The legendary use is spent and a 60-foot teleport granted (granted-moves.ts). Who stood within 10 feet of the space it left, for the Necrotic damage, is the GM's to pick."
+  ),
+  "action:Hydra/multiattack": enforced(
+    "effective-actions.ts makes the Multiattack one Bite per living head, which death-traits.ts counts as heads die and grow back (Multiple Heads)."
+  ),
+  "action:Sea Hag/death-glare": enforced(
+    "Only a Frightened creature the hag can see within 30 feet can be targeted (resolution/action-targets.ts). On a failed save one with 20 Hit Points or fewer drops to 0, and any other takes 3d8 Psychic damage (fatal-saves.ts)."
+  ),
+  "action:Solar/slaying-bow": enforced(
+    "On a failed DC 21 Dexterity save a creature with 100 Hit Points or fewer dies outright, a character with no death saves, and Death Ward turns it aside; any other takes the Piercing and Radiant damage (fatal-saves.ts)."
+  ),
+  "action:Wraith/create-specter": enforced(
+    "resolution/revival.ts takes a Humanoid corpse within 10 feet dead no longer than 1 minute, and refuses an eighth specter. Its spirit rises as a Specter on the wraith's side in the corpse's space, acting right after the wraith (risen.ts), and the corpse leaves the fight."
+  ),
+  "action:Gibbering Mouther/bite": enforced(
+    "The hit's damage, and Prone on a Medium or smaller target, are applied. A creature it drops to 0 Hit Points dies outright with nothing left of its body (hit-points.ts)."
   ),
   "action:Mummy Lord/whirlwind-of-sand": guided(
     "The Reaction gives a 60-foot teleport (granted-moves.ts). The +2 AC against the triggering attack and the creatures it blinds are the GM's."
@@ -1028,14 +1051,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:gloves-of-missile-snaring": enforced(
     "A hit by a weapon from range opens a reaction prompt (damage-window.ts), and using it takes 1d10 plus the wearer's Dexterity modifier off the damage. Whether a hand is free, and catching the missile, are the GM's."
   ),
-  "item:mace-of-disruption": guided(
-    "The extra 2d6 Radiant against Fiends and Undead is applied. The save against destruction at 25 Hit Points or fewer, and the Frightened condition a success leaves, are the GM's."
+  "item:mace-of-disruption": enforced(
+    "The extra 2d6 Radiant against Fiends and Undead and the weapon's light are applied. A Fiend or an Undead the hit leaves at 25 Hit Points or fewer makes the DC 15 Wisdom save (resolution/kill.ts): a failure destroys it, and a success leaves it Frightened until the end of the wielder's next turn."
   ),
-  "item:mace-of-smiting": guided(
-    "The +1 to attack and damage rolls, +3 against Constructs, and the 7 Bludgeoning on a rolled 20 (14 against a Construct) are applied. Destroying a Construct left at 25 Hit Points or fewer is the GM's, said with the hit."
+  "item:mace-of-smiting": enforced(
+    "The +1 to attack and damage rolls, +3 against Constructs, and the 7 Bludgeoning on a rolled 20 (14 against a Construct) are applied. A Construct that rolled 20 leaves at 25 Hit Points or fewer is destroyed (resolution/kill.ts)."
   ),
   "item:nine-lives-stealer": guided(
-    "The +2 to attack and damage rolls is applied. Life Stealing on a Critical Hit is the GM's."
+    "The +2 to attack and damage rolls is applied. On a rolled 20 against a creature with fewer than 100 Hit Points, other than a Construct or an Undead, the target makes the DC 15 Constitution save, and a failure slays it (resolution/kill.ts). The 1d8 + 1 charges, one spent per slaying, are the GM's to count."
   ),
   "item:pipes-of-haunting": guided(
     "The save against Frightened, with its repeat at the end of each turn, is applied. The immunity after a success is the GM's."
@@ -1113,7 +1136,10 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The extra Necrotic damage is applied, and a hit opens a DC 15 Constitution save whose failure stops the target regaining Hit Points until it succeeds on the save it repeats at the end of each of its turns (resolution/on-hit.ts)."
   ),
   "item:vorpal-sword": guided(
-    "The +3 to attack and damage rolls is applied. Ignoring Resistance to Slashing damage, and the head it takes on a rolled 20, are the GM's, said with the hit."
+    "The +3 to attack and damage rolls is applied. On a rolled 20 it cuts off the target's head (resolution/kill.ts): the creature dies, and only a revival that restores lost parts brings it back. A creature with no head, Immunity to Slashing damage, a neck too big (larger than Large) or Legendary Resistance to spend takes 30 Slashing damage more instead, and a hydra loses one head. Ignoring Resistance to Slashing damage, and a creature that lives without its head, are the GM's."
+  ),
+  "item:periapt-of-wound-closure": enforced(
+    "death-saves.ts counts an attuned wearer's death save of 9 or lower as a 10, and rests.ts and resolution/hit-point-die.ts double what each Hit Point Die it rolls to heal restores."
   ),
   "item:wand-of-fireballs": guided(
     "Fireball at DC 15 on its charges is applied. Spending more charges for a higher-level Fireball is the GM's."
@@ -1169,7 +1195,38 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/dispel.ts ends each spell on the target creature of the slot's level or lower, and for each higher one rolls the caster's spellcasting ability check against DC 10 plus its level. The GM can aim it at a spell's area on the map instead. A spell on an object the app doesn't track is the GM's."
   ),
   "spell:death-ward": enforced(
-    "hit-points.ts leaves the target at 1 Hit Point the first time it would drop to 0, and ends the spell. Negating an effect that would kill it without damage is the GM's."
+    "hit-points.ts leaves the target at 1 Hit Point the first time it would drop to 0, and ends the spell. An effect that would kill it outright without dealing damage (Power Word Kill, Divine Word, a Slaying Bow) ends the spell instead (hit-points.ts, fatal-saves.ts)."
+  ),
+  // Death and coming back (death.ts, resolution/revival.ts, resolution/kill.ts, fatal-saves.ts, risen.ts).
+  "spell:revivify": enforced(
+    "resolution/revival.ts refuses a target that isn't dead, died more than a minute of game time ago (death.ts keeps the time of death: a fight's rounds, then the game clock), or lost its body or its head. The cast returns it with 1 Hit Point and spends the diamond (resolution/components.ts). Death by old age is the GM's to rule."
+  ),
+  "spell:raise-dead": enforced(
+    "resolution/revival.ts refuses a target dead more than 10 days of game time, less any time under Gentle Repose, one Undead when it died, and one whose body or head is gone. It returns with 1 Hit Point and no longer Poisoned, and takes a -4 penalty to D20 Tests that eases by 1 with each Long Rest (death.ts)."
+  ),
+  "spell:resurrection": enforced(
+    "resolution/revival.ts refuses a target dead more than a century, one Undead when it died, and one whose body is gone; a lost head is restored. It returns with all its Hit Points, no longer Poisoned, with a -4 penalty to D20 Tests that eases by 1 with each Long Rest (death.ts). For a creature dead 365 days or longer the caster can't cast spells and has Disadvantage on D20 Tests until a Long Rest. Death by old age is the GM's to rule."
+  ),
+  "spell:true-resurrection": enforced(
+    "resolution/revival.ts refuses a target dead more than 200 years, and brings back one whose body is gone (Disintegrate) in a new body. It returns with all its Hit Points, its poison, curses and Contagion ended. Where a new body appears, and the stat block of an Undead returned to life, are the GM's."
+  ),
+  "spell:reincarnate": guided(
+    "resolution/revival.ts refuses a target dead more than 10 days and returns it with all its Hit Points in a new body, rolling the d10 for its species (a 1 rolls again) and noting it on the creature. Rebuilding the sheet with the new species, and the soul's consent, are the GM's."
+  ),
+  "spell:gentle-repose": enforced(
+    "resolution/revival.ts takes only a corpse, and the game time it spends under the spell's 10 days doesn't count against a revival's limit (death.ts). Keeping it from becoming Undead is the GM's."
+  ),
+  "spell:disintegrate": enforced(
+    "The save and its Force damage are applied, and a target it drops to 0 Hit Points dies with nothing left of its body (hit-points.ts): only True Resurrection or Wish brings it back (resolution/revival.ts). The gear it leaves is the GM's."
+  ),
+  "spell:power-word-kill": enforced(
+    "resolution/kill.ts kills a target with 100 Hit Points or fewer outright, a character with no death saves, and deals 12d12 Psychic damage to any other. Death Ward turns the death aside."
+  ),
+  "spell:finger-of-death": enforced(
+    "The save and its Necrotic damage are applied. A Humanoid it kills rises as a Zombie on the caster's side at the start of the caster's next turn, in the corpse's space and acting after the caster (risen.ts). Its orders are the GM's to give."
+  ),
+  "spell:divine-word": enforced(
+    "A failed Charisma save acts by the target's Hit Points (fatal-saves.ts): 20 or fewer dies, 30 or fewer is Blinded, Deafened and Stunned for 1 hour, 40 or fewer Blinded and Deafened for 10 minutes, and 50 or fewer Deafened for 1 minute. A Celestial, an Elemental, a Fey or a Fiend that fails leaves the map for 24 hours (off-plane.ts)."
   ),
   "spell:dissonant-whispers": enforced(
     "The save and its Psychic damage are applied. On a failure the target spends its Reaction, when it can take one, on a move of its Speed that must end farther from the caster (granted-moves.ts), provoking as any move does; the route is the mover's."
