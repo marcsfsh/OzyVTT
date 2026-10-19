@@ -251,7 +251,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/attack.ts gives the next attack roll by an ally against the distracted enemy Advantage. Help with a Check gives an ally Advantage on its next check with one of the helper's skill proficiencies before the helper's next turn (help-assist.ts). A tool's assist, and help outside a fight, are the GM's."
   ),
   "heroic-inspiration": guided(
-    "held-rolls.ts spends it to reroll the d20 of an attack, a check, a save or a death save while the roll is shown. Only the GM gives it by hand. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. A character who gains a second one passes it to a player character without it or lets it go (heroic-inspiration.ts). Rerolling a damage die or Initiative is the GM's."
+    "held-rolls.ts spends it to reroll the d20 of an attack, a check, a save or a death save while the roll is shown, initiative-reroll.ts an initiative die before the character's first turn, and resolution/held-damage.ts one die of an action's damage looked at before it counts. Only the GM gives it by hand. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. A character who gains a second one passes it to a player character without it or lets it go (heroic-inspiration.ts). The dice of a hit's extras (Sneak Attack, a smite), a reaction's strike, healing and Hit Point Dice are the GM's to reroll."
   ),
   hide: enforced(
     "resolution/builtins.ts rolls a DC 15 Dexterity (Stealth) check and makes the creature Invisible on a success, until it attacks, casts a spell with a Verbal component or an enemy's Search meets its total. With dynamic vision on, resolution/validate.ts asks that it be Heavily Obscured or behind Three-Quarters or Total Cover and out of every enemy's sight (vision/rules.ts). A sound louder than a whisper is the GM's call."
@@ -319,7 +319,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "movement-rules.ts refuses a move that ends in another creature's space, unless one of them can share it, and occupied-space.ts leaves a creature that ends its turn in another's space Prone unless it is Tiny or larger than the other."
   ),
   "opportunity-attacks": enforced(
-    "movement-rules.ts opens a Reaction prompt when a mover leaves an enemy's reach, and reactions.ts resolves it as one melee attack. The mover waits at the edge of that reach while the prompt is open and carries on once it is answered, unless the attack dropped it, grappled it or knocked it Prone (held-moves.ts). Disengage, teleporting and forced movement provoke none."
+    "movement-rules.ts opens a Reaction prompt when a mover leaves an enemy's reach, and reactions.ts resolves it as one melee attack. The mover waits at the edge of that reach while the prompt is open and carries on once it is answered, unless the attack dropped it, grappled it or knocked it Prone (held-moves.ts), and the spell areas on the rest of its way act on it as it goes on. Disengage, teleporting and forced movement provoke none."
   ),
   paralyzed: condition("paralyzed"),
   "passive-perception": enforced(
@@ -1054,7 +1054,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "roll-answers.ts offers it on the sphinx's own check or save and asks it by a prompt about another creature's within 30 feet. Using it adds 2 to the roll, twice a day."
   ),
   "feature:savage-attacker": enforced(
-    "resolution/hit-options.ts offers it on a weapon hit once a turn. Chosen, resolution/damage.ts rolls the weapon's damage dice twice and uses the higher roll."
+    "resolution/hit-options.ts offers it on a weapon hit once a turn. Chosen, resolution/damage.ts rolls the weapon's damage dice twice and uses the higher roll, the one an attacker always picks of the two."
   ),
   "feature:divine-order": enforced(
     "Protector's training and Thaumaturge's extra cantrip are applied, and Thaumaturge adds the Wisdom modifier, at least +1, to Arcana and Religion checks (ability-checks.ts)."
@@ -1169,7 +1169,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
 
   // Features that shape a spell as it is cast (resolution/metamagic.ts), checked and paid for by the economy.
   "feature:metamagic": enforced(
-    "A cast carries one Metamagic option the Sorcerer knows, paid in Sorcery Points and applied by the server (resolution/metamagic.ts, resolution/economy.ts). Empowered Spell can join another option, and Seeking Spell is offered when a spell attack misses (roll-answers.ts). The server refuses an option the spell can't take, and picks the dice Empowered Spell rerolls. Careful Spell covers the save the cast itself calls for (resolution/pending.ts)."
+    "A cast carries one Metamagic option the Sorcerer knows, paid in Sorcery Points and applied by the server (resolution/metamagic.ts, resolution/economy.ts). Seeking Spell is offered when a spell attack misses (roll-answers.ts), and Empowered Spell on a look at the spell's damage, where the Sorcerer picks up to the Charisma modifier of the spell's dice to reroll and the confirm deals them (resolution/held-damage.ts). The server refuses an option the spell can't take. Careful Spell covers the save the cast itself calls for (resolution/pending.ts)."
   ),
   "feature:sculpt-spells": enforced(
     "An Evoker's Evocation spell protects up to 1 plus the spell's level creatures the Wizard can see: they succeed on its save with no roll and take no damage (resolution/pending.ts). Saves its area calls for later are rolled as usual."
@@ -1196,13 +1196,13 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Resistance to Poison damage and a Climb Speed equal to its wearer's Speed are applied. The webs of a Web spell can't hold the wearer (spell-zones.ts), and its Web cast is DC 13 over a 40-foot Cube once a Long Rest. Climbing upside down on ceilings is the GM's to allow."
   ),
   "item:caltrops": enforced(
-    "Spreading them from the pack places a 5-foot square that rolls nothing as it lands (resolution/concentration.ts). spell-zones.ts asks a creature that enters it for the DC 15 Dexterity save, once a turn: 1 Piercing damage and a Speed of 0 until the start of its next turn on a failure. The square stays until the GM ends it, which is gathering them up."
+    "Spreading them from the pack places a 5-foot square that rolls nothing as it lands (resolution/concentration.ts). spell-zones.ts asks a creature that enters it for the DC 15 Dexterity save, once a turn: 1 Piercing damage and a Speed of 0 until the start of its next turn on a failure. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). The square stays until the GM ends it, which is gathering them up."
   ),
   "item:ball-bearings": enforced(
-    "Spilling them from the pack places a 10-foot square that rolls nothing as it lands (resolution/concentration.ts). spell-zones.ts asks a creature that enters it for the DC 10 Dexterity save, once a turn, and a failure leaves it Prone. The square stays until the GM ends it, which is gathering them up."
+    "Spilling them from the pack places a 10-foot square that rolls nothing as it lands (resolution/concentration.ts). spell-zones.ts asks a creature that enters it for the DC 10 Dexterity save, once a turn, and a failure leaves it Prone. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). The square stays until the GM ends it, which is gathering them up."
   ),
   "item:hunting-trap": guided(
-    "Setting it places a 5-foot square (resolution/concentration.ts). The first creature that enters it makes the DC 13 Dexterity save, with 1d4 Piercing damage and a Speed of 0 until the start of its next turn on a failure, and the trap springs and leaves the map (spell-zones.ts). The chain that holds the creature after that, and the Strength (Athletics) check to break free, are the GM's."
+    "Setting it places a 5-foot square (resolution/concentration.ts). The first creature that enters it makes the DC 13 Dexterity save, with 1d4 Piercing damage and a Speed of 0 until the start of its next turn on a failure, and the trap springs and leaves the map (spell-zones.ts). A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). The chain that holds the creature after that, and the Strength (Athletics) check to break free, are the GM's."
   ),
   "item:cloak-of-the-bat": guided(
     "Advantage on Dexterity (Stealth) checks is applied. The Fly Speed in darkness and the Polymorph cast are the GM's."
@@ -1605,7 +1605,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A Champion 18 rolls death saves with Advantage (saving-throws.ts) and regains 5 plus its Constitution modifier at the start of each turn while Bloodied and above 0 (turn-boundaries.ts). An 18 or 19 on a death save counting as a 20 is the GM's."
   ),
   "spell:sleet-storm": guided(
-    "spell-zones.ts asks for the Dexterity save when a creature enters the Cylinder or starts its turn there, and a failure leaves it Prone and ends its Concentration. zone-ground.ts makes the Cylinder Difficult Terrain of ice, and it is Heavily Obscured for dynamic vision (vision/cast-sight.ts). Dousing the flames in it is the GM's."
+    "spell-zones.ts asks for the Dexterity save when a creature enters the Cylinder or starts its turn there, and a failure leaves it Prone and ends its Concentration. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the Cylinder Difficult Terrain of ice, and it is Heavily Obscured for dynamic vision (vision/cast-sight.ts). Dousing the flames in it is the GM's."
   ),
   "spell:alarm": enforced(
     "The warded area lasts 8 hours, in a fight or out of one, on the game clock (spell-zones.ts, game-time.ts). When an enemy of the caster enters it, the GM is told who in a line only the GM sees. The GM wards a door or a window by hand, and passes on the bell or the ping."
@@ -1617,7 +1617,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "zone-auras.ts gives the caster and its allies Resistance to Necrotic damage while they stand in the 30-foot Emanation. spell-zones.ts gives an ally at 0 Hit Points that starts its turn there 1 Hit Point. Keeping their Hit Point maximums from dropping is the GM's."
   ),
   "spell:black-tentacles": enforced(
-    "spell-zones.ts asks for the Strength save on the cast and when a creature enters the square or ends its turn there, once a turn: 3d6 Bludgeoning damage and Restrained, escaped with a Strength (Athletics) check against the spell save DC. zone-ground.ts makes the square Difficult Terrain."
+    "spell-zones.ts asks for the Strength save on the cast and when a creature enters the square or ends its turn there, once a turn: 3d6 Bludgeoning damage and Restrained, escaped with a Strength (Athletics) check against the spell save DC. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the square Difficult Terrain."
   ),
   "spell:blade-barrier": guided(
     "spell-zones.ts asks for the Dexterity save against 6d10 Force damage on the cast and when a creature enters the wall or ends its turn there, once a turn. zone-ground.ts makes the wall's space Difficult Terrain. Its Three-Quarters Cover and its ring form are the GM's."
@@ -1650,7 +1650,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The explosive rune lasts until it goes off, in a fight or out of one, drawn for the GM and the caster's player alone. The first creature that steps onto it sets it off: each creature in the 20-foot Sphere makes the Dexterity save against 5d8 damage of the type chosen at the cast, and the spell ends (spell-zones.ts). Other triggers, noticing the glyph and the spell glyph are the GM's."
   ),
   "spell:grease": enforced(
-    "spell-zones.ts asks for the Dexterity save when a creature enters the square or ends its turn there, and a failure leaves it Prone. zone-ground.ts makes the square Difficult Terrain."
+    "spell-zones.ts asks for the Dexterity save when a creature enters the square or ends its turn there, and a failure leaves it Prone. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the square Difficult Terrain."
   ),
   "spell:holy-aura": enforced(
     "While the caster and its allies stand in the 30-foot Emanation, zone-auras.ts gives them Advantage on saving throws and Disadvantage to attack rolls against them. A Fiend or an Undead that hits one with a melee attack makes the Constitution save or is Blinded until the end of its next turn (resolution/struck.ts)."
@@ -1686,7 +1686,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "spell-zones.ts asks for the Dexterity save against 7d8 Slashing damage when a creature enters the wall or ends its turn there, once a turn, after the cast's 7d8 Piercing. zone-ground.ts makes a creature spend 4 feet of movement for every foot it moves through the wall. The wall's block on sight and its circle form are the GM's."
   ),
   "spell:web": enforced(
-    "spell-zones.ts asks for the Dexterity save the first time a creature enters the webs on a turn or starts its turn there, and a failure leaves it Restrained, escaped with a Strength (Athletics) check against the spell save DC. zone-ground.ts makes the webs Difficult Terrain, and they are Lightly Obscured for dynamic vision (vision/cast-sight.ts). Burning the webs away is the GM's, who ends the area."
+    "spell-zones.ts asks for the Dexterity save the first time a creature enters the webs on a turn or starts its turn there, and a failure leaves it Restrained, escaped with a Strength (Athletics) check against the spell save DC. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the webs Difficult Terrain, and they are Lightly Obscured for dynamic vision (vision/cast-sight.ts). Burning the webs away is the GM's, who ends the area."
   ),
   "action:Octopus/ink-cloud": guided(
     "The Reaction fills its 5-foot Cube with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). Offering it when a creature ends its turn beside the octopus underwater is the GM's."

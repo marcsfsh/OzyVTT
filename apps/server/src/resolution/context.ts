@@ -58,6 +58,10 @@ export type ResolveInput = Readonly<{
   reroll?: boolean;
   /** On a preview, answer the held attack roll with one of the attacker's answers (Peerless Skill, Stroke of Luck). */
   answer?: Readonly<{ id: string; subtract?: boolean; face?: number }>;
+  /** On a preview, roll the damage too and hold its dice for the roller to answer (`held-damage.ts`). */
+  damageLook?: boolean;
+  /** On a look, the answer to the held damage: the dice it rerolls, by their place in the held roll. */
+  damageAnswer?: Readonly<{ id: "empowered-spell" | "heroic-inspiration"; dice: readonly number[] }>;
   /** GM only: a hand-entered attack total, used verbatim vs AC. The natural die is unknown, so a crit is declared
    * via `critical` and a natural 1 via `fumble`. */
   attackTotal?: number;
@@ -300,6 +304,8 @@ export type ResolveContext = {
   readonly damageEffectIds: string[];
   /** The creatures this resolve brought onto the map (`resolution/summon.ts`). */
   summoned?: ReadonlyArray<Readonly<{ actorId: string; name: string }>>;
+  /** A look at the damage records no roll: the roller alone sees its dice until the confirm deals them. */
+  silentRolls?: boolean;
 };
 
 /** Records one rolled formula in the shared history, attributed like every roll of this resolve; `label` names a die
@@ -323,7 +329,7 @@ export function recordRoll(
     total: extra.total ?? resolution.total,
     ...(extra.typed ? { typed: true as const } : {})
   };
-  recordRollInHistory(ctx.state, record);
+  if (!ctx.silentRolls) recordRollInHistory(ctx.state, record);
   return record.id;
 }
 

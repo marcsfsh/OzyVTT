@@ -5,12 +5,50 @@ import { useRollPreference } from "../dice/roll-preference";
 import "./prompts.css";
 
 /**
+ * Right after a character's initiative is rolled, Heroic Inspiration may reroll its die (SRD "immediately after rolling
+ * it"): the server throws one die again and the new score sets the order, or Keep leaves it.
+ */
+export function InitiativeReroll({ actorId, onDone }: Readonly<{ actorId: string; onDone: () => void }>) {
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  return (
+    <div className="save-prompt initiative-prompt" role="group" aria-label="Reroll your initiative">
+      <span className="save-prompt-confirm">
+        <Button type="button" variant="secondary" disabled={busy} onClick={onDone}>
+          Keep
+        </Button>
+        <button
+          type="button"
+          className="encounter-primary"
+          disabled={busy}
+          onClick={() => {
+            setBusy(true);
+            void command("initiative:roll-self", { actorId, reroll: true }).then((result) => {
+              setBusy(false);
+              if (result.ok) onDone();
+              else setFeedback(result.message ?? "Initiative could not be rerolled.");
+            });
+          }}
+        >
+          Reroll with Heroic Inspiration
+        </button>
+      </span>
+      {feedback && (
+        <p className="save-prompt-outcome" role="status">
+          {feedback}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
  * A player's "roll for initiative" prompt while their id is in `combat.pendingInitiative`. Digital rolls on
  * the server, which applies Advantage or Disadvantage from the rules (Surprise, conditions, features); manual
  * takes a typed d20. The server adds the initiative modifier and, in wait mode, starts turns once everyone
  * has rolled.
  */
-export function InitiativePrompt({ actorId }: Readonly<{ actorId: string }>) {
+export function InitiativePrompt({ actorId, onRolled }: Readonly<{ actorId: string; onRolled?: () => void }>) {
   const { rollInput } = useRollPreference();
   const [busy, setBusy] = useState(false);
   const [manual, setManual] = useState("");
@@ -20,6 +58,7 @@ export function InitiativePrompt({ actorId }: Readonly<{ actorId: string }>) {
     void command("initiative:roll-self", { actorId, ...(natural !== undefined ? { natural } : {}) }).then((result) => {
       setBusy(false);
       if (!result.ok) setFeedback(result.message ?? "Initiative could not be rolled.");
+      else onRolled?.();
     });
   };
   const submitManual = () => {

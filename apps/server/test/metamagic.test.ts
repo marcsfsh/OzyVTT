@@ -169,18 +169,21 @@ describe("Metamagic: the picks, the price and one option a spell", () => {
     expect(points(table)).toBe(0);
   });
 
-  it("allows one counted option on a spell, and Empowered Spell beside it", () => {
+  it("allows one counted option on a spell, and leaves Empowered Spell to the damage roll", () => {
     const table = sorcerer10(["careful-spell", "distant-spell", "empowered-spell", "subtle-spell"]);
     expect(
       refusal(() =>
         cast(table, "spell-fireball", [{ id: "careful-spell", creatureIds: [ALLY] }, { id: "subtle-spell" }])
       )
-    ).toMatch(/can use one Metamagic option on a spell \(Empowered Spell aside\)/);
-    cast(table, "spell-fireball", [{ id: "careful-spell", creatureIds: [ALLY] }, { id: "empowered-spell" }], {
-      targetIds: [FOE, ALLY]
-    });
-    // Careful's point at the cast, Empowered's with the reroll of the damage's low dice.
-    expect(points(table)).toBe(2);
+    ).toMatch(/can use one Metamagic option on a spell\./);
+    // "When you roll damage for a spell": Empowered Spell answers the damage once it is seen.
+    expect(
+      refusal(() =>
+        cast(table, "spell-fireball", [{ id: "careful-spell", creatureIds: [ALLY] }, { id: "empowered-spell" }])
+      )
+    ).toMatch(/Empowered Spell is used once the damage is rolled/);
+    cast(table, "spell-fireball", [{ id: "careful-spell", creatureIds: [ALLY] }], { targetIds: [FOE, ALLY] });
+    expect(points(table)).toBe(1);
   });
 
   it("keeps an option's own row off the turn: it is chosen with a cast", () => {
@@ -282,26 +285,77 @@ describe("Distant Spell: range doubled, Touch becomes 30 feet", () => {
   });
 });
 
-describe("Empowered Spell: reroll damage dice up to the Charisma modifier", () => {
-  it("rerolls Fireball's five lowest dice under the die's average and keeps the new rolls", () => {
-    const table = sorcerer10(["careful-spell", "empowered-spell", "quickened-spell", "subtle-spell"]);
-    // 8d6: five 1s, a 2 and two 6s; Charisma +5 rerolls the five 1s, which come up 6. Elemental Affinity adds 5 Fire.
+describe("Empowered Spell: reroll damage dice up to the Charisma modifier once they are seen", () => {
+  const look = (table: Fight, faces: number[], answer?: Readonly<{ dice: number[] }>) =>
     cast(
       table,
       "spell-fireball",
-      [{ id: "empowered-spell" }],
-      { targetIds: [FOE] },
-      [1, 1, 1, 1, 1, 2, 6, 6, 6, 6, 6, 6, 6]
+      [],
+      {
+        targetIds: [FOE],
+        commit: false,
+        damageLook: true,
+        ...(answer ? { damageAnswer: { id: "empowered-spell" as const, dice: answer.dice } } : {})
+      },
+      faces
     );
+  const facesOf = (result: ReturnType<typeof look>) => (result.heldDamage?.dice ?? []).map((die) => die.face);
+
+  it("rerolls the dice the Sorcerer picks for 1 Sorcery Point, and the confirm deals them", () => {
+    const table = sorcerer10(["careful-spell", "empowered-spell", "quickened-spell", "subtle-spell"]);
+    const first = look(table, [1, 1, 1, 1, 1, 2, 6, 6]);
+    expect(facesOf(first)).toEqual([1, 1, 1, 1, 1, 2, 6, 6]);
+    expect(first.heldDamage?.answers.find((offer) => offer.id === "empowered-spell")).toEqual({
+      id: "empowered-spell",
+      name: "Empowered Spell",
+      dice: 5,
+      ownOnly: true,
+      cost: "1 Sorcery Point"
+    });
+    expect(points(table)).toBe(0);
+    // Charisma +5: the five 1s are rerolled, and come up 6. Elemental Affinity adds 5 Fire.
+    const answered = look(table, [6, 6, 6, 6, 6], { dice: [0, 1, 2, 3, 4] });
+    expect(facesOf(answered)).toEqual([6, 6, 6, 6, 6, 2, 6, 6]);
+    expect(answered.damageTotal).toBe(5 * 6 + 2 + 6 + 6 + 5);
+    expect(points(table)).toBe(1);
+    expect(answered.heldDamage?.answers.some((offer) => offer.id === "empowered-spell")).toBe(false);
+    cast(table, "spell-fireball", [], { targetIds: [FOE] }, [1, 1, 1, 1, 1, 1, 1, 1]);
     expect(savesOf(table.state)[0]!.proposedDamage).toBe(5 * 6 + 2 + 6 + 6 + 5);
+  });
+
+  it("rerolls no more dice than the Charisma modifier, and once a roll", () => {
+    const table = sorcerer10(["careful-spell", "empowered-spell", "quickened-spell", "subtle-spell"]);
+    look(table, [1, 1, 1, 1, 1, 1, 1, 1]);
+    expect(refusal(() => look(table, [], { dice: [0, 1, 2, 3, 4, 5] }))).toMatch(
+      /Empowered Spell rerolls up to 5 dice/
+    );
+    look(table, [4], { dice: [0] });
+    expect(refusal(() => look(table, [], { dice: [1] }))).toMatch(/Empowered Spell has already rerolled this damage/);
     expect(points(table)).toBe(1);
   });
 
-  it("spends nothing when no die rolled under its average", () => {
+  it("leaves dice nobody looked at as they fell", () => {
     const table = sorcerer10(["careful-spell", "empowered-spell", "quickened-spell", "subtle-spell"]);
-    cast(table, "spell-fireball", [{ id: "empowered-spell" }], { targetIds: [FOE] }, [4, 4, 4, 4, 4, 4, 4, 4]);
-    expect(savesOf(table.state)[0]!.proposedDamage).toBe(32 + 5);
+    cast(table, "spell-fireball", [], { targetIds: [FOE] }, [1, 1, 1, 1, 1, 2, 6, 6]);
+    expect(savesOf(table.state)[0]!.proposedDamage).toBe(5 + 2 + 12 + 5);
     expect(points(table)).toBe(0);
+  });
+
+  it("offers a look on the cast while a Sorcery Point is left", () => {
+    const table = sorcerer10(["careful-spell", "empowered-spell", "quickened-spell", "subtle-spell"]);
+    const offered = () =>
+      actionAvailability(
+        table.state,
+        table.hero,
+        effectiveActions(table.definition, table.hero, catalog).filter((action) => action.id === "spell-fireball"),
+        table.definition,
+        false,
+        undefined,
+        catalog
+      )[0]!.damageLook;
+    expect(offered()).toBe(true);
+    table.hero.actionUses = { ...table.hero.actionUses, "sorcery-points": 10 };
+    expect(offered()).toBeUndefined();
   });
 });
 

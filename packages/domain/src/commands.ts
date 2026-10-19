@@ -110,6 +110,10 @@ export const InitiativeRollSelfSchema = z
     actorId: z.uuid(),
     natural: z.number().int().min(1).max(20).optional(),
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+    /** Reroll the initiative die just thrown (SRD Heroic Inspiration), before the character's first turn: a player
+     *  spends Heroic Inspiration to reroll one die, the GM rerolls freely. With `natural`, the face a physical reroll
+     *  shows, for a die that was typed. */
+    reroll: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -490,6 +494,19 @@ export const ActionResolveSchema = z
     /** With `commit: false`, answer the held attack roll with one of the preview's `answers` (Peerless Skill, Stroke of
      *  Luck), which then counts in every later look and the confirm. */
     answer: RollAnswerChoiceSchema.optional(),
+    /** With `commit: false`, roll the damage as well and hold its dice (SRD Empowered Spell, Heroic Inspiration: "after
+     *  seeing the roll"): another look shows the same dice, and the confirm deals them. The extras a hit carries
+     *  (`hitOptions`) roll at the confirm. */
+    damageLook: z.boolean().optional(),
+    /** With `damageLook`, answer the held damage with one of its `heldDamage.answers`: reroll the dice at these
+     *  positions in `heldDamage.dice`. */
+    damageAnswer: z
+      .object({
+        id: z.enum(["empowered-spell", "heroic-inspiration"]),
+        dice: z.array(z.number().int().min(0).max(199)).min(1).max(20)
+      })
+      .strict()
+      .optional(),
     /** The skill a check action is made with: Influence (Deception, Intimidation, Performance, Persuasion or Animal
      *  Handling), Search (Insight, Medicine, Perception or Survival) or Study (Arcana, History, Investigation, Nature or
      *  Religion). */

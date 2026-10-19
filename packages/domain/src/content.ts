@@ -953,6 +953,8 @@ export type ContentActionSummary = Readonly<{
   /** The spell list this cast belongs to, by its action id; it is shown under that list. */ castFrom?: string;
   /** The spell it casts. */ spellId?: string;
   /** The ways its caster may shape the cast (Metamagic, Sculpt Spells), from the server's availability read. */ shaping?: CastShapingOffers;
+  /** Its damage may be looked at before it counts, for Empowered Spell or Heroic Inspiration to answer; from the
+   *  server's availability read. */ damageLook?: true;
   /** The forms a shape-shift may take (Wild Shape, Polymorph), from the server's availability read; `action.resolve`'s
    *  `form`, or `targetForms` when each target takes its own. */ forms?: ActionAvailability["forms"];
   /** The effects a use picks one of (Enlarge or Reduce); `action.resolve`'s `option`. */ options?: ActionAvailability["options"];

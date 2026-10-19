@@ -61,6 +61,8 @@ export type AvailabilityRow = Readonly<{
   mastery?: Readonly<{ id: string; name: string }>;
   /** The ways the caster may shape this spell's cast (Metamagic, Sculpt Spells). */
   shaping?: ContentActionSummary["shaping"];
+  /** Its damage may be looked at before it counts (Empowered Spell, Heroic Inspiration). */
+  damageLook?: true;
   /** The forms a shape-shift may take now, and for Wild Shape the Beasts its user may learn. */
   forms?: ContentActionSummary["forms"];
   /** The effects a use picks one of (Enlarge or Reduce). */
@@ -128,6 +130,8 @@ export function summaryOfAvailability(row: AvailabilityRow): ContentActionSummar
     ...(row.choices ? { choices: row.choices } : {}),
     // A spell's cast offers the Metamagic its caster knows.
     ...(row.shaping ? { shaping: row.shaping } : {}),
+    // Its damage may be looked at first, for Empowered Spell or Heroic Inspiration.
+    ...(row.damageLook ? { damageLook: true as const } : {}),
     // A shape-shift picks its form (Wild Shape), and Enlarge/Reduce which of its effects.
     ...(row.forms ? { forms: row.forms } : {}),
     ...(row.options ? { options: row.options } : {})

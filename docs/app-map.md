@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 159 commands · 335 HTTP paths
+- 15 GameState fields · 159 commands · 335 HTTP paths
 
 ## GameState shape
 
@@ -16,6 +16,7 @@ single JSON blob the server persists and projects per role.
 - `builderPolicy`
 - `combat`
 - `definitions`
+- `heldDamage`
 - `heldRolls`
 - `partyVisibility`
 - `pendingImports`

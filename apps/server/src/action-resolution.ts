@@ -98,6 +98,17 @@ import { layOutProvisions } from "./resolution/provisions.js";
 import { turnedAwayByWard } from "./resolution/ward.js";
 import { orbLeap } from "./resolution/orb-leap.js";
 import { shapedAction, shapedOutcome, shapingInForce, shapingOffers, withShapedSpell } from "./resolution/metamagic.js";
+import {
+  answerHeldDamage,
+  damageLookOffered,
+  damageTape,
+  heldDamageFor,
+  heldDamageLook,
+  holdDamage,
+  releaseHeldDamage,
+  type DamageTape
+} from "./resolution/held-damage.js";
+import { CommandRejectedError } from "./game-store.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -123,14 +134,27 @@ export function resolveDefinitionAction(
   const { shaping: _sent, ...stepInput } = stepped;
   const shaping = shapingInForce(state, declared, stepped);
   const input: ResolveInput = shaping.length > 0 ? { ...stepInput, shaping } : stepInput;
-  const deps = withShapedSpell(declaredDeps, declared.spellId, shaping);
-  const ctx = openResolve(state, shapedAction(declared, shaping), input, deps);
+  const shapedDeps = withShapedSpell(declaredDeps, declared.spellId, shaping);
+  // The damage steps throw through a tape, so a look at the damage holds its dice and the confirm deals them.
+  const tape = damageTape(shapedDeps.random);
+  const ctx = openResolve(state, shapedAction(declared, shaping), input, { ...shapedDeps, random: tape.random });
   // Checked against the spell as printed, Transmuted Spell's type and Extended Spell's durations land on what it does.
   ctx.action = shapedOutcome(ctx.action, printed, shaping, ctx.plan.castLevel);
+  const look = input.commit === false && input.damageLook === true;
+  if (look && !ctx.action.damage.some((part) => /\d+d\d+/i.test(part.formula)))
+    throw new CommandRejectedError(`${ctx.action.name} rolls no damage dice to look at.`);
+  if (input.damageAnswer && !look)
+    throw new CommandRejectedError("Answer the damage on a look at it, before it is dealt.");
   checkOverchannel(ctx);
   ctx.builtin?.check?.(ctx);
   // A form the action can't give is refused before anything is spent.
   checkShapeShift(ctx);
+  // A look at the damage of an action with no attack roll throws its damage and nothing else.
+  if (look && !ctx.action.attack) {
+    // With no attack to roll it only sets the filters the damage riders read.
+    rollAttack(ctx);
+    return lookAtDamage(ctx, tape);
+  }
   ctx.builtin?.apply?.(ctx);
   // A warded target (Sanctuary) asks its save as the attack or spell is made; a failure spends nothing and stops here.
   if (input.commit !== false && input.economyPaid !== true && turnedAwayByWard(ctx))
@@ -185,7 +209,7 @@ export function resolveDefinitionAction(
   checkKnockOut(ctx);
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
-  if (ctx.attack !== null && input.commit === false) return previewOf(ctx);
+  if (ctx.attack !== null && input.commit === false) return look ? lookAtDamage(ctx, tape) : previewOf(ctx);
   // The roll is made, so a Vex marker, a Sap or Guiding Bolt's light it read is spent; a finishing replay already
   // spent them.
   if (input.economyPaid !== true) {
@@ -219,12 +243,9 @@ export function resolveDefinitionAction(
   // A duplicate of Mirror Image may take the settled hit.
   if (input.commit !== false) strikeADuplicate(ctx);
   spendSundering(ctx);
-  rollWeaponDamage(ctx);
-  ctx.masterySwing = masterySwingOf(ctx);
-  // Graze fires on a miss, when no other damage rolled.
-  ctx.bonusDamage.push(...masteryMissDamage(ctx.masterySwing));
-  rollRiderDamage(ctx);
-  ctx.builtin?.hitDamage?.(ctx);
+  // The dice a look held are dealt now, as they were looked at; without a look the server throws them.
+  rollDamage(ctx, tape, heldDamageFor(state, ctx.attacker.id, ctx.action.id)?.dice ?? []);
+  releaseHeldDamage(state, ctx.attacker.id);
   rollHitOptions(ctx);
   // What the stat block leaves to the GM (damage on later turns) is said where the GM reads the result.
   if (ctx.action.reminder) ctx.warnings.push(ctx.action.reminder);
@@ -282,6 +303,52 @@ export function resolveDefinitionAction(
   return resolutionOf(ctx);
 }
 
+/** The damage steps: the action's own dice, Graze, the riders' dice and a builtin's. The tape gives back `held` first
+ *  and notes which dice are the action's own. Returns the dice thrown. */
+function rollDamage(
+  ctx: ResolveContext,
+  tape: DamageTape,
+  held: Parameters<DamageTape["start"]>[0]
+): ReturnType<DamageTape["stop"]> {
+  tape.start(held);
+  tape.own(true);
+  rollWeaponDamage(ctx);
+  tape.own(false);
+  ctx.masterySwing = masterySwingOf(ctx);
+  // Graze fires on a miss, when no other damage rolled.
+  ctx.bonusDamage.push(...masteryMissDamage(ctx.masterySwing));
+  rollRiderDamage(ctx);
+  ctx.builtin?.hitDamage?.(ctx);
+  return tape.stop();
+}
+
+/**
+ * A look at the damage before it counts (`held-damage.ts`): an answer the look carries rerolls the held dice it picks
+ * first; then the damage is thrown through the tape, the held dice coming back as they were, and held again. Nothing is
+ * recorded, spent or applied: the confirm deals these dice.
+ */
+function lookAtDamage(ctx: ResolveContext, tape: DamageTape): ActionResolution {
+  const { state, attacker, action, input } = ctx;
+  let held = heldDamageFor(state, attacker.id, action.id);
+  if (input.damageAnswer) {
+    if (!held || held.dice.length === 0)
+      throw new CommandRejectedError("Roll the damage first: an answer rerolls dice that were thrown.");
+    held = answerHeldDamage(ctx, held, input.damageAnswer, tape.random);
+  }
+  ctx.silentRolls = true;
+  const dice = rollDamage(ctx, tape, held?.dice ?? []);
+  ctx.silentRolls = false;
+  const kept = holdDamage(state, { actorId: attacker.id, actionId: action.id, dice, answers: held?.answers ?? [] });
+  const { damage, bonusDamage } = ctx;
+  return {
+    ...previewOf(ctx),
+    damage,
+    damageTotal: owedDamageTotal({ damage, bonusDamage }),
+    ...(bonusDamage.length > 0 ? { bonusDamage } : {}),
+    heldDamage: heldDamageLook(ctx, kept)
+  };
+}
+
 /** The roll mode is reported only when some source shaped it. */
 const rollModeOf = ({ rollMode }: ResolveContext) =>
   rollMode && (rollMode.advantage.length > 0 || rollMode.disadvantage.length > 0) ? { rollMode } : {};
@@ -303,6 +370,13 @@ function previewOf(ctx: ResolveContext): ActionResolution {
     push: offeredPush(ctx),
     preview: true,
     ...withOffers(hitOffersOf(ctx)),
+    // A hit's damage may be looked at before it counts, for an answer to it.
+    ...(ctx.attack !== null &&
+    ctx.attack.outcome !== "miss" &&
+    ctx.attack.outcome !== "fumble" &&
+    damageLookOffered(ctx.state, ctx.attacker, ctx.action, ctx.deps.definition, ctx.siblings)
+      ? { damageLook: "offered" as const }
+      : {}),
     ...(knockOutOffered(ctx) ? { knockOut: "offered" as const } : {})
   };
 }
@@ -424,6 +498,7 @@ export function actionAvailability(
     const reason = unavailableReason(evaluation.violations, { state, attacker, action, siblings, spell });
     const passive = passiveOf(action, builtin);
     const shaping = builtin ? undefined : shapingOffers(state, attacker, action, spell, definition, siblings);
+    const damageLook = !builtin && damageLookOffered(state, attacker, action, definition, siblings);
     const forms = action.shapeShift ? formsOffer(state, attacker, action, definition, catalog) : undefined;
     return {
       id: action.id,
@@ -435,6 +510,7 @@ export function actionAvailability(
       ...(reason !== undefined ? { reason } : {}),
       ...(passive !== undefined ? { passive } : {}),
       ...(shaping !== undefined ? { shaping } : {}),
+      ...(damageLook ? { damageLook: true as const } : {}),
       ...(forms !== undefined ? { forms } : {}),
       ...(action.effectOptions
         ? { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) }

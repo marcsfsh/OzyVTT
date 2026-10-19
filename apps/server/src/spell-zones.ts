@@ -378,7 +378,7 @@ function act(
 /** The action a zone acts with: its spell's later action at the cast's level, or the rule an item left (Caltrops'
  *  save), in the damage type chosen at the cast (Conjure Elemental's element), with the dice it has gained (Delayed
  *  Blast Fireball's 1d6 a turn). */
-function zoneAction(zone: SpellZone, content: ZoneContent): ActorAction | undefined {
+export function zoneAction(zone: SpellZone, content: ZoneContent): ActorAction | undefined {
   let action: ActorAction;
   if (content.spell && content.row) {
     const { spell, row } = content;

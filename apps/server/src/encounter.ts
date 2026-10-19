@@ -17,7 +17,8 @@ import { holdsFeature } from "./class-features.js";
 import { wardedConditions } from "./paladin-auras.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
-import { aggregateRollMode } from "@vtt/rules-5e";
+import { aggregateRollMode, d20FacesFor, keptD20 } from "@vtt/rules-5e";
+import { holdRoll } from "./held-rolls.js";
 import { checkRiderBonus, deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
 import { effectiveActions } from "./effective-actions.js";
 import {
@@ -172,7 +173,7 @@ function rollUnderMode(rollD20: () => number, mode: RollMode): number {
 
 /** One combatant's initiative: the d20 (rolled, or a hand-typed `natural`) plus its modifier and the
  *  Exhaustion penalty. Every path that rolls initiative goes through here, so they all follow the same rules. */
-function rollInitiative(
+export function rollInitiative(
   state: GameState,
   actorId: string,
   surprised: boolean,
@@ -624,8 +625,18 @@ export function rollSelfInitiative(
   if (!state.combat.pendingInitiative.includes(actorId))
     throw new CommandRejectedError("Your initiative is already set.");
   const override = options.rollMode;
-  const natural = options.natural ?? (override ? rollUnderMode(rollD20, override) : undefined);
+  // The dice are thrown here and held (`initiative:<actorId>`), so Heroic Inspiration can reroll one of them.
+  const mode = override ?? initiativeRollFor(state, actorId, entry.surprised === true, deps).mode;
+  const faces = options.natural === undefined ? d20FacesFor(mode, [], () => rollD20()) : [options.natural];
+  const natural = options.natural ?? keptD20(faces, mode);
   const roll = rollInitiative(state, actorId, entry.surprised === true, rollD20, deps, natural);
+  holdRoll(state, {
+    key: `initiative:${actorId}`,
+    actorId,
+    faces,
+    typed: options.natural !== undefined,
+    ...(options.natural === undefined ? { readAs: mode } : {})
+  });
   // A hand-typed `natural` is a die the server never threw, so only server rolls reach the feed.
   if (options.natural === undefined) onRoll?.({ actorId, ...roll, mode: override ?? roll.mode });
   const initiative = reorderMidRound(

@@ -517,6 +517,47 @@ export const HeldRollSchema = z
   .strict();
 export type HeldRoll = z.infer<typeof HeldRollSchema>;
 
+/** One die of a held damage roll: its size, the face it shows, and whether it is the action's own damage (what
+ *  Empowered Spell rerolls) or a rider's. */
+export const HeldDamageDieSchema = z
+  .object({
+    sides: z.number().int().min(2).max(100),
+    face: z.number().int().min(1).max(100),
+    own: z.boolean()
+  })
+  .strict();
+export type HeldDamageDie = z.infer<typeof HeldDamageDieSchema>;
+
+/**
+ * A damage roll looked at before it counts (SRD Empowered Spell and Heroic Inspiration act "after seeing the roll"): the
+ * dice a look threw for one creature's action this turn, in the order thrown, which the action's confirm deals. What
+ * answered it is kept with it, each answer once. GM-only; the roller saw the dice in the look's reply.
+ */
+export const HeldDamageSchema = z
+  .object({
+    actorId: z.uuid(),
+    actionId: z.string().min(1).max(160),
+    dice: z.array(HeldDamageDieSchema).max(200),
+    answers: z
+      .array(
+        z
+          .object({
+            id: z.enum(["empowered-spell", "heroic-inspiration"]),
+            name: z.string().min(1).max(80),
+            /** The positions of the dice it rerolled. */
+            dice: z.array(z.number().int().min(0).max(199)).min(1).max(20)
+          })
+          .strict()
+      )
+      .max(4)
+      .default([]),
+    round: z.number().int().nonnegative(),
+    turnActorId: z.uuid().nullable(),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type HeldDamage = z.infer<typeof HeldDamageSchema>;
+
 /** One character's part of a call for a roll: who, the pending save a save call opened, and the result once rolled. */
 export const RollCallEntrySchema = z
   .object({
@@ -1431,9 +1472,10 @@ export const CombatStateSchema = z
     activeSceneId: z.uuid().nullable().default(null),
     /** Falls waiting on the reactions they opened, on the live table only. GM-only (see PendingFallSchema). */
     pendingFalls: z.array(PendingFallSchema).max(20).default([]),
-    /** A move stopped at the edge of the reach it leaves while the Opportunity Attacks it provoked are answered
-     *  (`held-moves.ts`): where it waits, where it was going, the prompts it waits on, the movement the rest of the way
-     *  cost, and the creatures it drags. Live table only; GM-only. */
+    /** A move stopped at the edge of the reach it leaves while the Opportunity Attacks it provoked are answered, or
+     *  where it entered an area whose save, failed, stops it (`held-moves.ts`): where it waits, where it was going and
+     *  the way there, the prompts and saves it waits on, the movement the rest of the way cost, and the creatures it
+     *  drags. Live table only; GM-only. */
     heldMove: z
       .object({
         actorId: z.uuid(),
@@ -1441,9 +1483,12 @@ export const CombatStateSchema = z
         to: EncounterTokenPositionSchema,
         toAltitudeFeet: z.number().int().min(1).max(10000).optional(),
         airborne: z.enum(["fly", "levitate"]).optional(),
+        /** The prompts and saves it waits on: Opportunity Attacks, or the save of an area that stops its mover. */
         promptIds: z.array(z.uuid()).max(20),
         refundFeet: z.number().min(0).max(100000),
-        dragged: z.array(z.uuid()).max(20)
+        dragged: z.array(z.uuid()).max(20),
+        /** The way it goes on from `at` to `to`, so the areas along it act on the mover as it resumes. */
+        rest: z.array(EncounterTokenPositionSchema).max(400).optional()
       })
       .strict()
       .nullable()
@@ -1649,6 +1694,8 @@ export const GameStateSchema = z.object({
   partyVisibility: PartyVisibilitySchema.default("name-and-class"),
   /** Dice thrown before they count (see HeldRollSchema). GM-only. */
   heldRolls: z.array(HeldRollSchema).max(100).default([]),
+  /** Damage rolls looked at before they count (see HeldDamageSchema). GM-only. */
+  heldDamage: z.array(HeldDamageSchema).max(40).default([]),
   /** The GM's open calls for a roll. A player reads only their own part of each. */
   rollCalls: z.array(RollCallSchema).max(20).default([]),
   /** Game time, Long Rest requests and the party's Short Rest. Players see only their own characters' part. */

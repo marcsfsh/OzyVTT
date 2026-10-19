@@ -19,6 +19,7 @@ import { useSpellReference } from "./spells";
 import { ActionResultHead, CheckOutcome, HealingOutcome } from "./ActionResultHead";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
+import { DamageLook } from "./DamageLook";
 import { CommonActionChips } from "./CommonActionChips";
 import { ReadyChooser, readyableSpells } from "./ReadyChooser";
 import { damageBreakdown } from "./format";
@@ -526,6 +527,9 @@ export function PlayerActionRunner({
           busy={busy}
           onInvalidFace={onFeedback}
           onRoll={(face) => resolveTargeting(revision, onOutcome, face !== undefined ? { attackNatural: face } : {})}
+          {...(picking.action.damageLook && picking.action.attackBonus === null
+            ? { onLookAtDamage: () => resolveTargeting(revision, onOutcome, { damageLook: true }) }
+            : {})}
         />
       )}
       {result && (
@@ -553,7 +557,21 @@ export function PlayerActionRunner({
               push={result.push}
               {...(result.hitOffers ? { hitOffers: result.hitOffers } : {})}
               knockOutOffered={result.knockOut === "offered"}
+              look={result}
               resolve={(options) => resolveTargeting(revision, onOutcome, options)}
+            />
+          )}
+          {/* A spell's damage looked at before the cast lands (Empowered Spell, Heroic Inspiration). */}
+          {result.preview && !result.attack && result.heldDamage && (
+            <DamageLook
+              result={result}
+              look={result.heldDamage}
+              busy={busy}
+              confirmLabel="Confirm"
+              onAnswer={(id, dice) =>
+                resolveTargeting(revision, onOutcome, { damageLook: true, damageAnswer: { id, dice } })
+              }
+              onConfirm={() => resolveTargeting(revision, onOutcome, { commit: true })}
             />
           )}
           {result.save && (

@@ -48,7 +48,7 @@ function blockedReason(offer: Offer, chosen: readonly Offer[], offers: CastShapi
   if (!offer.available) return offer.reason ?? "This spell can't take it.";
   if (offer.counted && chosen.filter((pick) => pick.counted).length >= offers.limit)
     return offers.limit === 1
-      ? "One Metamagic option a spell, Empowered Spell aside."
+      ? "One Metamagic option a spell."
       : "Two Metamagic options a spell while Innate Sorcery is active.";
   if (costOf([...chosen, offer], offers.free === true) > offers.points) return "Not enough Sorcery Points.";
   if (!aimed && PROTECTS.has(offer.id)) return "Aim the spell on your turn in a fight to choose who it protects.";

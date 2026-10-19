@@ -426,6 +426,10 @@ export type ResolveOptions = Readonly<{
   knockOut?: boolean;
   /** An answer to the previewed attack roll (Bardic Inspiration, Peerless Aim), applied to the held die. */
   answer?: Readonly<{ id: string; subtract?: boolean; face?: number }>;
+  /** Roll the damage and hold it, so it can be answered before it counts (Empowered Spell, Heroic Inspiration). */
+  damageLook?: boolean;
+  /** An answer to the held damage: the dice it rerolls, by their place in the look. */
+  damageAnswer?: Readonly<{ id: "empowered-spell" | "heroic-inspiration"; dice: readonly number[] }>;
 }>;
 
 export function resolveTargeting(
@@ -476,7 +480,8 @@ export function resolveTargeting(
   // server holds the die for it. Templates, multi-target and save/utility actions resolve straight
   // through. An explicit `commit` in opts wins (the Confirm tap).
   const isAttack = action.attackBonus !== null && mode === "single";
-  const commit = opts.commit ?? !isAttack;
+  // A look at the damage is a preview of it, whatever the action.
+  const commit = opts.damageLook ? false : (opts.commit ?? !isAttack);
   const extra = {
     ...(opts.override ? { override: opts.override } : {}),
     ...(opts.rollMode ? { rollMode: opts.rollMode } : {}),
@@ -486,6 +491,8 @@ export function resolveTargeting(
     ...(opts.hitOptions && opts.hitOptions.length > 0 ? { hitOptions: [...opts.hitOptions] } : {}),
     ...(opts.knockOut ? { knockOut: true } : {}),
     ...(opts.answer ? { answer: { ...opts.answer } } : {}),
+    ...(opts.damageLook ? { damageLook: true } : {}),
+    ...(opts.damageAnswer ? { damageAnswer: { id: opts.damageAnswer.id, dice: [...opts.damageAnswer.dice] } } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
     ...(spend !== undefined ? { spend } : {}),
     ...(damageType !== undefined ? { damageType } : {}),

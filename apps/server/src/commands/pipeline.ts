@@ -9,6 +9,7 @@ import { needsSettling, settleFalls as settleFallsIn } from "../falling.js";
 import { compelledMoves, fleesNow } from "../granted-moves.js";
 import { needsPlaneSettling, settlePlanes } from "../off-plane.js";
 import { heldMoveReady, settleHeldMove } from "../held-moves.js";
+import { movementCost } from "../terrain.js";
 import { burstEndedZones } from "../spell-zones.js";
 import { planNextTurn } from "../combat-history.js";
 import { nextInitiativeTurn } from "../encounter.js";
@@ -203,7 +204,15 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     const result = await context.store.execute({ id, type: "positions.settle", principal: "table" }, (draft) => {
       const deps = kit.fallDeps(draft, distance, id);
       const sameMap = geometry !== null && draft.combat.mapAssetId === mapAssetId;
-      const held = sameMap ? settleHeldMove(draft, geometry) : [];
+      const held = sameMap
+        ? settleHeldMove(draft, geometry, {
+            zones: kit.zoneDeps(draft, geometry),
+            costFeet: (from, to) => {
+              const heldId = draft.combat.heldMove?.actorId;
+              return heldId ? (movementCost(draft, geometry, heldId, from, to)?.feet ?? null) : null;
+            }
+          })
+        : [];
       const planes = sameMap ? settlePlanes(draft, geometry) : [];
       events = [...held, ...compelledMoves(draft, deps), ...planes, ...settleFallsIn(draft, deps)];
     });

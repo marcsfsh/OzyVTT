@@ -284,8 +284,10 @@ of a hidden thing. When in doubt, leave it out.
   `@vtt/rules-5e`). How a token travels (walking, a special speed, jumping, teleporting, moved by force)
   rides on `token.move`, each speed with its own budget (`speed.ts`), and opportunity attacks are
   read along the whole path (`movement-rules.ts`). A move that provokes waits at the last point of its
-  way still in reach (`combat.heldMove`) until its prompts are answered; the settle step then finishes
-  it, or leaves a mover the attack dropped, Grappled or knocked Prone where it stood and gives back the
+  way still in reach (`combat.heldMove`) until its prompts are answered, and a move that enters an area whose
+  save, failed, stops its mover (Caltrops, Web, Ball Bearings) waits where it entered until the save is answered
+  (`zone-stops.ts`); the settle step then finishes it along the rest of its way, where the areas act on it in turn,
+  or leaves a mover that was dropped, knocked Prone or left with a Speed of 0 where it stood and gives back the
   rest of its movement (`held-moves.ts`). The map's drag preview runs the same function,
   and a mirror test checks the two agree. The `actor:movement` reply tells the preview whether the
   mover shares spaces (Air Form, a swarm) and which swarms its viewer can see (`space-sharing.ts`),
@@ -576,7 +578,11 @@ derived sheet lists each situation (`check-situations.ts`), the sheet offers it 
 that names it gets the rider, its words added to the roll's name for the GM to judge. A die a
 player sees before it counts (a previewed attack, save or death save) is held on the server
 (`held-rolls.ts`, ADR-0012): a second look shows the same die, and a reroll needs Heroic Inspiration or an
-answer. An answer is data on an action, a grant or an effect (`RollAnswerSchema`): what a roll may take after it
+answer. An initiative die is held as it is thrown, so Heroic Inspiration may reroll it before the character's first
+turn (`initiative-reroll.ts`). A damage roll may be looked at before it counts too (`damageLook`): the damage steps
+throw through a tape that holds the dice in order, Empowered Spell or Heroic Inspiration rerolls the dice the roller
+picks, and the confirm reads the held dice back, so it deals what was looked at (`resolution/held-damage.ts`). The
+extras a hit carries roll at the confirm. An answer is data on an action, a grant or an effect (`RollAnswerSchema`): what a roll may take after it
 is seen and before it counts (Bardic Inspiration's die, Indomitable's reroll, Stroke of Luck's 20).
 `roll-answers.ts` offers the roller's own answers on the preview and applies the one picked to the held roll;
 another creature's answer (Cutting Words, Countercharm, Improve Fate) is a `roll-answer` reaction prompt, asked one

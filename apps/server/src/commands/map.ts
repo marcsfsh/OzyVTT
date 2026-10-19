@@ -33,6 +33,7 @@ import { airborneAfter, altitudeOf, setAltitude } from "../altitude.js";
 import { startFall } from "../falling.js";
 import { failedTeleport } from "../granted-moves.js";
 import { holdMove } from "../held-moves.js";
+import { walkThroughZones } from "../zone-stops.js";
 import { landJump } from "../jumping.js";
 import { carryRiders, mountOf, mountOrDismount, ridersOf, RIDING_TAG } from "../mounts.js";
 import { timeStopOutOfRange } from "../time-stop.js";
@@ -249,6 +250,16 @@ export const mapCommands = [
         granted = outcome.granted;
         // A move that provokes waits at the edge of reach while the attacks are answered.
         const destination = state.combat.tokens.find((token) => token.actorId === actorId)?.position;
+        // What a stretch of the way costs this mover, the ground spell areas make included.
+        const costFeet = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+          movementCost(
+            state,
+            geometry,
+            actorId,
+            a,
+            b,
+            zoneMovementOptions(state, actorId, kit.zoneDeps(state, geometry))
+          )?.feet ?? null;
         if (outcome.heldAt && destination)
           holdMove(state, geometry, {
             actorId,
@@ -261,7 +272,12 @@ export const mapCommands = [
               : {}),
             promptIds: outcome.heldAt.promptIds,
             refundFeet: outcome.heldAt.refundFeet,
-            dragged
+            dragged,
+            // The areas on the rest of the way act on the mover as it goes on.
+            rest: movementCost(state, geometry, actorId, outcome.heldAt.position, destination)?.path ?? [
+              outcome.heldAt.position,
+              destination
+            ]
           });
         // Time Stop ends once its caster goes more than 1,000 feet from where it cast it.
         landing.push(...timeStopOutOfRange(state, actorId, (a, b) => mapDistance(geometry, a, b)?.value ?? null));
@@ -306,10 +322,33 @@ export const mapCommands = [
             mode === "teleport"
               ? [from, arrived]
               : (movementCost(state, geometry, actorId, from, arrived)?.path ?? [from, arrived]);
-          zoneEvents.push(
-            ...zonesAfterMove(state, { moverId: actorId, path, teleported: mode === "teleport" }, zoneDeps),
-            ...(mode === "teleport" ? [] : shellsForcedBy(state, actorId, path, zoneDeps))
-          );
+          // A creature's own move goes as far as the first area whose save, failed, stops it, and waits there on the
+          // save; a move already waiting on its Opportunity Attacks meets the areas past them as it goes on.
+          const ownMove = mode !== "teleport" && mode !== "forced" && state.combat.heldMove?.actorId !== actorId;
+          if (ownMove) {
+            const walk = walkThroughZones(state, actorId, path, zoneDeps);
+            zoneEvents.push(...walk.events);
+            if (walk.stop !== null) {
+              const stopAt = path[walk.stop]!;
+              const airborne = airborneAfter(mode, toAltitude, wasAirborne);
+              holdMove(state, geometry, {
+                actorId,
+                at: stopAt,
+                altitudeFeet: toAltitude,
+                to: arrived,
+                toAltitudeFeet: toAltitude,
+                ...(airborne ? { airborne } : {}),
+                promptIds: walk.saveIds,
+                refundFeet: costFeet(stopAt, arrived) ?? 0,
+                dragged,
+                rest: path.slice(walk.stop)
+              });
+            }
+          } else
+            zoneEvents.push(
+              ...zonesAfterMove(state, { moverId: actorId, path, teleported: mode === "teleport" }, zoneDeps)
+            );
+          if (mode !== "teleport") zoneEvents.push(...shellsForcedBy(state, actorId, path, zoneDeps));
         }
         // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.
         // A creature hidden from the table after the move is left out of the table's line. Setting the scene before

@@ -43,7 +43,6 @@ const SHAPING = {
   points: 5,
   options: [
     { id: "careful-spell", name: "Careful Spell", cost: 1, available: true, counted: true, creatures: { count: 3 } },
-    { id: "empowered-spell", name: "Empowered Spell", cost: 1, available: true, counted: false },
     { id: "quickened-spell", name: "Quickened Spell", cost: 2, available: true, counted: true },
     {
       id: "transmuted-spell",
@@ -174,12 +173,10 @@ describe("the cast offers the Sorcerer's Metamagic", () => {
     const twinned = shape.getByRole("button", { name: /^Twinned Spell/ }) as HTMLButtonElement;
     expect(twinned.disabled).toBe(true);
     expect(twinned.textContent).toContain("and Fire Burst doesn't.");
-    // One counted option a spell: picking Quickened Spell closes the other counted ones, and Empowered Spell stays.
+    // One counted option a spell: picking Quickened Spell closes the other counted ones.
     await user.click(shape.getByRole("button", { name: /^Quickened Spell/ }));
     expect((shape.getByRole("button", { name: /^Careful Spell/ }) as HTMLButtonElement).disabled).toBe(true);
-    expect((shape.getByRole("button", { name: /^Empowered Spell/ }) as HTMLButtonElement).disabled).toBe(false);
-    await user.click(shape.getByRole("button", { name: /^Empowered Spell/ }));
-    expect(detail.getByText("It spends 3 Sorcery Points.")).toBeTruthy();
+    expect(detail.getByText("It spends 2 Sorcery Points.")).toBeTruthy();
   });
 
   it("sends Careful Spell with the creature chosen among the targets", async () => {

@@ -10,6 +10,7 @@ import {
   swapInitiative
 } from "../src/encounter.js";
 import { evaluateActionEconomy } from "../src/resolution/economy.js";
+import { rerollInitiative } from "../src/initiative-reroll.js";
 
 const PC = "10000000-0000-4000-8000-000000000001";
 const PC2 = "10000000-0000-4000-8000-000000000003";
@@ -285,5 +286,40 @@ describe("ties", () => {
     nextInitiativeTurn(game);
     nextInitiativeTurn(game);
     expect(order(game)).toEqual([PC2, PC]);
+  });
+});
+
+// SRD 5.2.1 Heroic Inspiration: "you can expend it to reroll any die immediately after rolling it, and you must use the
+// new roll." Initiative is a Dexterity check, so its die may be rerolled before the character's first turn.
+describe("Heroic Inspiration on an initiative roll", () => {
+  const player = { role: "player" as const, sessionId: OWNER };
+
+  it("rerolls the held die once Heroic Inspiration is spent, and the new score sets the order", () => {
+    const game = started("wait", [10, 10, 15]);
+    rollSelfInitiative(game, PC, {}, queue([3]));
+    expect(scoreOf(game, PC)).toBe(5);
+    expect(() => rerollInitiative(game, PC, player, undefined, queue([18]))).toThrowError(
+      /Alpha has no Heroic Inspiration to reroll the die with/
+    );
+    game.actors.find((actor) => actor.id === PC)!.heroicInspiration = true;
+    expect(rerollInitiative(game, PC, player, undefined, queue([18]))).toBe(20);
+    expect(scoreOf(game, PC)).toBe(20);
+    expect(game.actors.find((actor) => actor.id === PC)!.heroicInspiration).toBe(false);
+    // The die is spent: a second reroll has nothing held to throw again.
+    expect(() => rerollInitiative(game, PC, { role: "gm" }, undefined, queue([1]))).toThrowError(
+      /Roll initiative first/
+    );
+  });
+
+  it("is refused once the fight has come to the character's first turn", () => {
+    const game = started("immediate", [10, 10, 1]);
+    rollSelfInitiative(game, PC, {}, queue([10]));
+    rollSelfInitiative(game, PC2, {}, queue([1]));
+    // Alpha 12 leads the order, so Alpha's turn has begun.
+    expect(game.combat.turnActorId).toBe(PC);
+    game.actors.find((actor) => actor.id === PC)!.heroicInspiration = true;
+    expect(() => rerollInitiative(game, PC, player, undefined, queue([18]))).toThrowError(
+      /rerolled only right after it is rolled, before Alpha's first turn/
+    );
   });
 });

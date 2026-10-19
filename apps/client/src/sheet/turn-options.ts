@@ -225,7 +225,8 @@ export function turnOptions({
     const rolled = {
       ...own,
       ...(row && row.damage.length === own.damage.length ? { damage: row.damage } : {}),
-      ...(row?.shaping ? { shaping: row.shaping } : {})
+      ...(row?.shaping ? { shaping: row.shaping } : {}),
+      ...(row?.damageLook ? { damageLook: true as const } : {})
     };
     // Who a feature's grant reaches, as the server takes it: a self grant is a tap with no target.
     const summary =

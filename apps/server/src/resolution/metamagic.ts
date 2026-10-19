@@ -1,7 +1,6 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { spellDurationAt, spellRangeFeet, spellSpanOf } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { CastShapingOffers, GameState } from "@vtt/domain";
-import { parseDiceFormula, resolveDice, type DiceResolution } from "@vtt/rules-5e";
 import type { ActorDefinition, CastShaping, CastShapingId, DamageType } from "@vtt/schemas";
 import { holdsFeature } from "../class-features.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
@@ -9,7 +8,7 @@ import { hasEffectTag, READIED_TAG } from "../effects.js";
 import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
 import type { RuleId } from "../rules-families.js";
 import { sceneSight } from "../vision/sight.js";
-import { abilityModifier, recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
+import { abilityModifier, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
 /**
  * SRD 5.2.1 Metamagic ("You use the chosen options to temporarily modify spells you cast. To use an option, you must
@@ -18,8 +17,8 @@ import { abilityModifier, recordRoll, type DefinitionAction, type LiveActor, typ
  * economy checks each pick against the caster's options, the spell and the points left, and spends them. What a pick
  * does reaches the steps that read the spell or the action: the spell's range and duration (Distant, Extended), the
  * action's casting time, attack range and damage type (Quickened, Distant, Transmuted), its level (Twinned), its
- * components (Subtle), its saves (Careful, Heightened, Sculpt Spells) and its damage dice (Empowered). Seeking Spell
- * answers a missed spell attack on its roll instead (`roll-answers.ts`).
+ * components (Subtle) and its saves (Careful, Heightened, Sculpt Spells). Seeking Spell answers a missed spell attack on
+ * its roll instead (`roll-answers.ts`), and Empowered Spell the damage roll once it is seen (`held-damage.ts`).
  */
 
 /** The Sorcery Points pool every Metamagic option is paid from (Font of Magic). */
@@ -170,9 +169,8 @@ function unfitFor(id: CastShapingId, facts: CastFacts): string | null {
         ? null
         : `${name} needs a spell with a range of 5 feet or more, or Touch.`;
     case "empowered-spell":
-      return action.damage.some((part) => /\d+d\d+/i.test(part.formula))
-        ? null
-        : `${name} rerolls damage dice, and ${spell.name} rolls none.`;
+      // "When you roll damage for a spell": it answers the damage roll once it is seen (`held-damage.ts`).
+      return `${name} is used once the damage is rolled. Look at ${spell.name}'s damage, then pick the dice to reroll.`;
     case "extended-spell": {
       const minutes = durationMinutes(printedSpell(spell), castLevel);
       return minutes !== null && minutes >= 1 && minutes < 24 * 60
@@ -254,7 +252,7 @@ export const levelBonusOf = (shaping: readonly CastShaping[] | undefined) =>
 
 /** What a resolve's shaping costs and changes in the turn's bookkeeping, committed with the economy. */
 export type ShapingPlan = Readonly<{
-  /** Sorcery Points spent now; Empowered Spell's point is spent when its dice are rerolled. */
+  /** Sorcery Points spent now. */
   points: number;
   /** Arcane Apotheosis's free option is used. */
   free: boolean;
@@ -309,17 +307,14 @@ export function shapingCheck(
       rule: "metamagic.too-many",
       message:
         allowed === 1
-          ? `${attacker.name} can use one Metamagic option on a spell (Empowered Spell aside).`
+          ? `${attacker.name} can use one Metamagic option on a spell.`
           : `${attacker.name} can use two Metamagic options on a spell while Innate Sorcery is active.`
     });
   // The turn's free option waives the dearest counted option; with none counted it is left for Empowered Spell.
-  const freeReady = freeOptionReady(state, attacker, definition);
-  const free = freeReady && counted.length > 0;
+  const free = freeOptionReady(state, attacker, definition) && counted.length > 0;
   const costs = counted.map((entry) => SHAPINGS[entry.id].cost);
   const points = costs.reduce((sum, cost) => sum + cost, 0) - (free ? Math.max(...costs) : 0);
-  // Empowered Spell's point is spent with its reroll, so it is only held back here.
-  const empoweredPoint = shapingOf(shaping, "empowered-spell") !== undefined && !(freeReady && !free) ? 1 : 0;
-  const needed = points + empoweredPoint;
+  const needed = points;
   const { left } = sorceryPoints(attacker, facts.siblings);
   if (needed > left)
     violations.push({
@@ -418,8 +413,12 @@ export function shapingOffers(
   siblings: ReadonlyArray<DefinitionAction>
 ): CastShapingOffers | undefined {
   if (!spell || action.spellId !== spell.id || laterRowOf(spell, action.id) !== undefined) return undefined;
+  // Empowered Spell answers the damage once it is rolled, so a cast offers a look at its damage instead.
   const ids = (Object.keys(SHAPINGS) as CastShapingId[]).filter(
-    (id) => knowsShaping(definition, id) && (id !== "sculpt-spells" || spell.school === "evocation")
+    (id) =>
+      id !== "empowered-spell" &&
+      knowsShaping(definition, id) &&
+      (id !== "sculpt-spells" || spell.school === "evocation")
   );
   if (ids.length === 0) return undefined;
   const points = sorceryPoints(attacker, siblings);
@@ -649,57 +648,6 @@ export function shapedZone(
     damage.every((part) => (TRANSMUTABLE as readonly string[]).includes(part.type));
   const heightened = heightenedTarget(ctx);
   return { ...(transmutes ? { damageType: type } : {}), ...(heightened !== null ? { heightened } : {}) };
-}
-
-/** What Empowered Spell has left to reroll in each resolve, and whether its point is paid. */
-const empowerment = new WeakMap<ResolveContext, { left: number; paid: boolean }>();
-
-/**
- * SRD Empowered Spell: "When you roll damage for a spell, you can spend 1 Sorcery Point to reroll a number of the
- * damage dice up to your Charisma modifier (minimum of one), and you must use the new rolls." Chosen with the cast, the
- * server rerolls the dice for the caster: the lowest that rolled under their die's average, as many as the modifier
- * allows across the cast's damage. The point is spent with the first reroll (free with Arcane Apotheosis's option).
- */
-export function empowered(ctx: ResolveContext, rolled: DiceResolution): DiceResolution {
-  const { input, action, attacker, state, deps } = ctx;
-  if (action.spellId === undefined || !shapingOf(input.shaping, "empowered-spell")) return rolled;
-  const budget = empowerment.get(ctx) ?? { left: Math.max(1, abilityModifier(deps.definition, "cha")), paid: false };
-  empowerment.set(ctx, budget);
-  if (budget.left <= 0) return rolled;
-  const low: Array<{ term: number; die: number; face: number }> = [];
-  rolled.terms.forEach((term, termIndex) => {
-    if (term.kind !== "dice" || term.sign !== 1) return;
-    term.dice.forEach((die, dieIndex) => {
-      if (die.kept && die.face < (term.sides + 1) / 2) low.push({ term: termIndex, die: dieIndex, face: die.face });
-    });
-  });
-  const picked = low.sort((left, right) => left.face - right.face).slice(0, budget.left);
-  if (picked.length === 0) return rolled;
-  const again = new Set(picked.map((entry) => `${entry.term}:${entry.die}`));
-  const faces: number[] = [];
-  rolled.terms.forEach((term, termIndex) => {
-    if (term.kind !== "dice") return;
-    term.dice.forEach((die, dieIndex) =>
-      faces.push(again.has(`${termIndex}:${dieIndex}`) ? deps.random(term.sides) : die.face)
-    );
-  });
-  const rerolled = resolveDice(parseDiceFormula(rolled.expression.source), () => faces.shift()!);
-  recordRoll(ctx, rerolled, "damage", `${action.name}: Empowered Spell`);
-  budget.left -= picked.length;
-  if (!budget.paid) {
-    budget.paid = true;
-    const definition = deps.definition;
-    if (freeOptionReady(state, attacker, definition)) useFreeOption(state);
-    else
-      attacker.actionUses = {
-        ...attacker.actionUses,
-        [SORCERY_POINTS]: (attacker.actionUses[SORCERY_POINTS] ?? 0) + 1
-      };
-    ctx.warnings.push(
-      `Empowered Spell rerolls ${picked.length} of ${action.name}'s damage ${picked.length === 1 ? "die" : "dice"}.`
-    );
-  }
-  return rerolled;
 }
 
 /** Commits a shaping plan with the economy: its Sorcery Points, this turn's free option, and Quickened Spell's turn. A

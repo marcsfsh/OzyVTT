@@ -3,7 +3,7 @@ import type { PlayerActor, PlayerPendingReaction, PlayerView } from "@vtt/domain
 import { useRollPreference } from "../dice/roll-preference";
 import { DyingTracker } from "../encounter/DyingTracker";
 import { plainActionName } from "../encounter/format";
-import { InitiativePrompt } from "../encounter/InitiativePrompt";
+import { InitiativePrompt, InitiativeReroll } from "../encounter/InitiativePrompt";
 import { ReactionPrompt } from "../encounter/ReactionPrompt";
 import { RollCallCard, useRollCallCards, type RollCallCardModel } from "../encounter/RollCallPrompt";
 import { SavePrompt } from "../encounter/SavePrompt";
@@ -124,6 +124,9 @@ export function PromptSlot({
   ];
   const first = entries[0];
   const [outcome, setOutcome] = useState("");
+  // The character whose initiative was just rolled, while Heroic Inspiration may still reroll it.
+  const [rerollFor, setRerollFor] = useState<string | null>(null);
+  const rerolling = rerollFor ? state.actors.find((actor) => actor.id === rerollFor) : undefined;
   const heading = useRef<HTMLElement | null>(null);
   const slot = useRef<HTMLElement | null>(null);
   const shownKey = useRef<string | null>(null);
@@ -253,7 +256,12 @@ export function PromptSlot({
             title={`Roll initiative for ${first.actor.name}`}
             headingRef={headingRef}
           >
-            <InitiativePrompt actorId={first.actor.id} />
+            <InitiativePrompt
+              actorId={first.actor.id}
+              onRolled={() => {
+                if (first.actor.heroicInspiration === true) setRerollFor(first.actor.id);
+              }}
+            />
           </PromptCard>
         );
         break;
@@ -280,6 +288,18 @@ export function PromptSlot({
       <p className="nh-sr-only" aria-live="assertive">
         {announcement}
       </p>
+      {!first && rerolling?.heroicInspiration === true && (
+        <section className="prompt-slot scroll-y" aria-label="Answer now">
+          <PromptCard
+            eyebrow="Initiative"
+            title={`Initiative rolled for ${rerolling.name}`}
+            detail="Heroic Inspiration can reroll the die before your first turn."
+            headingRef={headingRef}
+          >
+            <InitiativeReroll actorId={rerolling.id} onDone={() => setRerollFor(null)} />
+          </PromptCard>
+        </section>
+      )}
       {(first || outcome) && (
         <section className="prompt-slot scroll-y" aria-label="Answer now" ref={slot}>
           {card}

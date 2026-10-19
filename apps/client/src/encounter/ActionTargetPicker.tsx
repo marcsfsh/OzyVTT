@@ -62,7 +62,8 @@ export function ActionTargetPicker({
   onInvalidFace,
   insideNow,
   carried = [],
-  onMoveFirst
+  onMoveFirst,
+  onLookAtDamage
 }: Readonly<{
   picking: TargetingSession;
   targets: ReadonlyArray<Pick<TargetRow, "id" | "label"> & Partial<TargetRow>>;
@@ -78,6 +79,8 @@ export function ActionTargetPicker({
   carried?: readonly CarriedRow[];
   /** Take the action's own move first (Pounce), when it has one that comes before the rest. */
   onMoveFirst?: () => void;
+  /** Roll the damage and look at it before it counts, for an answer to it (Empowered Spell, Heroic Inspiration). */
+  onLookAtDamage?: () => void;
 }>) {
   const { mayType } = useRollPreference();
   // On a phone the panel under the map is short, so the picker scrolls up to show its first rows.
@@ -319,6 +322,11 @@ export function ActionTargetPicker({
           {picking.action.moveFirst && onMoveFirst && (
             <Button type="button" variant="secondary" disabled={busy} onClick={onMoveFirst}>
               Move first
+            </Button>
+          )}
+          {onLookAtDamage && (
+            <Button type="button" variant="secondary" disabled={busy || !ready} onClick={onLookAtDamage}>
+              Roll damage first
             </Button>
           )}
           <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>

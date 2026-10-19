@@ -156,6 +156,25 @@ export type HitOptionChoice = Readonly<{
   slotLevel?: number;
   effects?: readonly string[];
 }>;
+/** A way the roller may answer its own damage roll after seeing it, sent back as `damageAnswer` with the dice it
+ *  picks: Empowered Spell rerolls up to `dice` of the spell's own dice, Heroic Inspiration one die of any. */
+export type DamageAnswerOffer = Readonly<{
+  id: "empowered-spell" | "heroic-inspiration";
+  name: string;
+  /** How many dice it may reroll. */
+  dice: number;
+  /** Only the action's own dice (`own` on the held dice), never a rider's. */
+  ownOnly: boolean;
+  /** What using it spends ("1 Sorcery Point", "Heroic Inspiration"), or null when it is free now. */
+  cost: string | null;
+}>;
+/** A damage roll looked at before it counts (`damageLook`): its dice in the order thrown, which the confirm deals, what
+ *  answered it, and what may still answer it. */
+export type HeldDamageLook = Readonly<{
+  dice: ReadonlyArray<Readonly<{ sides: number; face: number; own: boolean }>>;
+  answered: readonly RollAnswered[];
+  answers: readonly DamageAnswerOffer[];
+}>;
 /** The damage an action with no attack roll and no save owes one target (Magic Missile, a smite resolved alone). */
 export type DamageTarget = Readonly<{
   targetId: string;
@@ -228,6 +247,11 @@ export type ActionResolution = Readonly<{
   preview?: boolean;
   /** On a previewed hit, the extras the attacker may add when confirming (`hitOptions`). */
   hitOffers?: readonly HitOffer[];
+  /** On a previewed hit, the attacker may answer its damage roll after seeing it: a look (`damageLook`) rolls and holds
+   *  the damage first. */
+  damageLook?: "offered";
+  /** A look at the damage before it counts: the dice the confirm deals, and the answers they may still take. */
+  heldDamage?: HeldDamageLook;
   /** No attack roll and no save, but damage: what each target is owed, applied or proposed like a hit. A darts action
    *  (Magic Missile) owes each creature only what its own darts dealt. */
   damageTargets?: readonly DamageTarget[];
@@ -541,6 +565,9 @@ export const ActionAvailabilitySchema = z.strictObject({
     ),
   /** The ways its caster may shape this spell's cast (Metamagic, Sculpt Spells), for the cast to offer. */
   shaping: CastShapingOffersSchema.optional(),
+  /** Its user may answer this action's damage roll after seeing it (Empowered Spell on a spell, Heroic Inspiration):
+   *  `action.resolve` with `commit: false` and `damageLook` rolls the damage and holds it for the answer. */
+  damageLook: z.literal(true).optional(),
   /** The forms a shape-shift may take now, for the user to pick (`action.resolve`'s `form`): Wild Shape's known forms,
    *  the bestiary's Beasts for Polymorph, a werewolf's printed forms with its true form. Wild Shape also lists the
    *  forms its user may learn, how many it knows and whether a Long Rest opened one to replace. */

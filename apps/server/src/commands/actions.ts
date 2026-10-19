@@ -358,6 +358,8 @@ export const actionCommands = [
             holdKey,
             ...(request.reroll === true ? { reroll: true } : {}),
             ...(request.answer ? { answer: request.answer } : {}),
+            ...(request.damageLook === true ? { damageLook: true } : {}),
+            ...(request.damageAnswer ? { damageAnswer: request.damageAnswer } : {}),
             attackTotal,
             critical,
             ...(fumble !== undefined ? { fumble } : {}),

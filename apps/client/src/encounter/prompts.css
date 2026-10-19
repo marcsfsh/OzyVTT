@@ -346,3 +346,27 @@
   color: var(--text-dim);
   font-size: var(--fs-xs);
 }
+/* A damage roll looked at before it counts: its dice as toggles to pick for a reroll. */
+.damage-look {
+  display: grid;
+  gap: var(--space-2);
+}
+.damage-look-dice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.damage-look-die {
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-sm);
+}
+.damage-look-die small {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+}
