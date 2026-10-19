@@ -270,6 +270,11 @@
 .save-legendary:hover:not(:disabled) {
   border-color: var(--violet);
 }
+/* A save whose outcome the server leaves to the GM says so under its label. */
+.save-prompt-gm {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
 /* What the target's defences did, on its own line under the rolled result. */
 .save-prompt-defences {
   flex-basis: 100%;
