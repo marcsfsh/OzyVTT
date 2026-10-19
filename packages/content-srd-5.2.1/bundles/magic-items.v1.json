@@ -10628,7 +10628,8 @@
      "detect-thoughts",
      "zone-of-truth",
      "detect-evil-and-good"
-    ]
+    ],
+    "typeSenses": true
    }
   ]
  },
