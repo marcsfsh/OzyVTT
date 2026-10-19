@@ -1,4 +1,5 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
+import { isOffPlane } from "../off-plane.js";
 import type { GameState } from "@vtt/domain";
 import { effectiveActions } from "../effective-actions.js";
 import { withShotAmmunitionOnly } from "../ammunition.js";
@@ -46,10 +47,18 @@ function combatantsOf(
   const attacker = state.actors.find((item) => item.id === input.actorId);
   if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
   if (!inFight(input.actorId)) throw new CommandRejectedError("That combatant is not in this encounter.");
+  // A creature off the plane affects and is affected only by what is there with it (Banishment, Blink).
+  const awayFrom = (target: LiveActor) => isOffPlane(attacker) !== isOffPlane(target);
   // A target named twice is one target (a second dart is the only reason to name it again).
   const targets = [...new Set(input.targetIds)].map((targetId) => {
     const target = state.actors.find((item) => item.id === targetId);
     if (!target || !inFight(targetId)) throw new CommandRejectedError("Every target must be in this encounter.");
+    if (awayFrom(target))
+      throw new CommandRejectedError(
+        isOffPlane(attacker)
+          ? `${attacker.name} is off this plane and can't reach ${target.name}.`
+          : `${target.name} is off this plane.`
+      );
     return target;
   });
   // A readied spell is cast now and aimed when its trigger comes (SRD Ready), so it names no target yet; nor does an

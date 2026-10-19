@@ -7,6 +7,7 @@ import { isIncapacitated } from "../condition-rules.js";
 import type { EffectNarration } from "../effects.js";
 import { needsSettling, settleFalls as settleFallsIn } from "../falling.js";
 import { compelledMoves, fleesNow } from "../granted-moves.js";
+import { needsPlaneSettling, settlePlanes } from "../off-plane.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
@@ -173,21 +174,29 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
   }
 
   /**
-   * Whoever is in the air and can no longer stay there comes down (SRD Flying, Falling): a Prone or Incapacitated
-   * flier without hover, one whose flight ended, a levitation that ran out. It is its own commit after the command
-   * that caused it, told like any other, so every way a creature loses its flight (a condition, an effect ending, a
-   * broken Concentration) lands it the same way.
+   * Where creatures stand once a command has done its work, as its own commit told like any other: a creature made to
+   * flee takes its Reaction's move (`compelledMoves`), one that left the plane leaves the map and one back from it
+   * returns (`settlePlanes`), and whoever is in the air and can no longer stay there comes down (SRD Flying, Falling).
+   * Every way it happens (a condition, an effect ending, a broken Concentration) moves the token the same way.
    */
   async function settleFalls() {
     const state = context.readState();
     const lookup = { resolveDefinition: (definitionId: string) => kit.resolveDefinitionIn(state, definitionId) };
-    if (!fleesNow(state) && !needsSettling(state, { ...lookup, catalog: kit.equipmentCatalog() })) return;
+    if (
+      !fleesNow(state) &&
+      !needsPlaneSettling(state) &&
+      !needsSettling(state, { ...lookup, catalog: kit.equipmentCatalog() })
+    )
+      return;
     const distance = await kit.creatureDistance();
+    const mapAssetId = state.combat.mapAssetId;
+    const geometry = mapAssetId ? await kit.context.tokenGeometryFor(mapAssetId) : null;
     const id = context.newId();
     let events: EffectNarration[] = [];
     const result = await context.store.execute({ id, type: "positions.settle", principal: "table" }, (draft) => {
       const deps = kit.fallDeps(draft, distance, id);
-      events = [...compelledMoves(draft, deps), ...settleFallsIn(draft, deps)];
+      const planes = geometry && draft.combat.mapAssetId === mapAssetId ? settlePlanes(draft, geometry) : [];
+      events = [...compelledMoves(draft, deps), ...planes, ...settleFallsIn(draft, deps)];
     });
     if (result.duplicate) return;
     await context.publishGameState(result.state);

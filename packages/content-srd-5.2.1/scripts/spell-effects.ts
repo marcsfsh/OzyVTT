@@ -903,6 +903,30 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: rounds(10),
     modifiers: [{ type: "movement", rule: "leap", feet: 30, costFeet: 10 }]
   }),
+  // "You step into the border regions of the Ethereal Plane": off the map, unseen and untouchable from this plane,
+  // until the caster ends it (8 hours); it returns to the space it left or the nearest unoccupied one.
+  etherealness: spellGrant({
+    name: "Etherealness",
+    tags: ["off-plane"],
+    target: "self",
+    duration: { type: "manual" }
+  }),
+  // "You banish a creature ... into a labyrinthine demiplane": off the map while the caster concentrates; its escape
+  // check is the GM's.
+  maze: spellGrant({
+    name: "Maze",
+    tags: ["off-plane"],
+    target: "target",
+    duration: rounds(100)
+  }),
+  // "Roll 1d6 at the end of each of your turns": the server rolls it, and on a 4 or more the caster is off the map
+  // until the start of its next turn (`off-plane.ts`).
+  blink: spellGrant({
+    name: "Blink",
+    tags: ["blink"],
+    target: "self",
+    duration: rounds(10)
+  }),
   // "Gains a Fly Speed of 60 feet and can hover."
   fly: spellGrant({
     name: "Fly",
@@ -974,6 +998,13 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   // "Rises vertically up to 20 feet and remains suspended there for the duration", moving only "as if it were
   // climbing"; when it ends the target "floats gently to the ground" (`falling.ts` raises and lowers it).
   levitate: { name: "Levitate", tags: ["levitating"], modifiers: [] },
+  // "Transported to a harmless demiplane for the duration ... When the spell ends, the target reappears in the space it
+  // left or in the nearest unoccupied space": it leaves the map until the effect ends (`off-plane.ts`). An
+  // extraplanar target that stays gone for the full minute is the GM's.
+  banishment: { name: "Banished", tags: ["off-plane"], modifiers: [] },
+  // Imprisoned "until the spell is dispelled": off the map until the GM ends it. Its form, and the trigger that frees
+  // it, are the GM's.
+  imprisonment: { name: "Imprisoned", tags: ["off-plane"], modifiers: [] },
   // "Must immediately use its Reaction, if available, to move as far away from you as it can, using the safest route":
   // the server spends the Reaction and gives the creature a move of its Speed that must end farther away.
   "dissonant-whispers": {

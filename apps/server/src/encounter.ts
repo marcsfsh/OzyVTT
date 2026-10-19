@@ -8,6 +8,7 @@ import type {
 } from "@vtt/domain";
 import { dropStaleGrants } from "./granted-moves.js";
 import { proneInSharedSpace } from "./occupied-space.js";
+import { blinkAway } from "./off-plane.js";
 import { familyModeFor } from "./rules-families.js";
 import { abilityCheckClaims } from "./ability-checks.js";
 import { wardedConditions } from "./paladin-auras.js";
@@ -668,6 +669,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   const calibration = deps?.geometry?.calibration;
   if (outgoingId && calibration && deps && familyModeFor(state.combat, "movement") !== "freeform")
     proneInSharedSpace(state, outgoingId, calibration, deps.resolveDefinition, ending);
+  // Blink: "Roll 1d6 at the end of each of your turns".
+  if (outgoingId && deps?.newId) blinkAway(state, outgoingId, deps.rollDie, deps.newId, ending);
   endOfTurn(
     state,
     outgoingId,

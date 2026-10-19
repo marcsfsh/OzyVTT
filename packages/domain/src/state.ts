@@ -1016,6 +1016,22 @@ export const CombatStateSchema = z
     activeSceneId: z.uuid().nullable().default(null),
     /** Falls waiting on the reactions they opened, on the live table only. GM-only (see PendingFallSchema). */
     pendingFalls: z.array(PendingFallSchema).max(20).default([]),
+    /** Creatures gone from the fight's plane (Banishment, Blink's Ethereal turns), with the space each left and its
+     *  height there, so it comes back to that space or the nearest unoccupied one (`off-plane.ts`). Live table only;
+     *  GM-only, since a creature the party never saw leave would be placed by it. */
+    offPlane: z
+      .array(
+        z
+          .object({
+            actorId: z.uuid(),
+            position: EncounterTokenPositionSchema,
+            altitudeFeet: z.number().int().min(1).max(10000).optional(),
+            airborne: z.enum(["fly", "levitate"]).optional()
+          })
+          .strict()
+      )
+      .max(50)
+      .default([]),
     /** Turn time-travel (live fight only): `historyCursor` is the snapshot index being viewed (null = live);
      * `historyDirty` means state changed while rewound, so moving on needs GM confirmation. */
     historyCursor: z.number().int().nonnegative().nullable().default(null),

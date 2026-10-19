@@ -308,6 +308,14 @@ of a hidden thing. When in doubt, leave it out.
   farther from the source (`compelledMoves`); a levitation (`levitating`) lifts its creature 20 feet,
   which then moves only as if climbing; and a creature that ends its turn in another's space, unless
   Tiny or larger, falls Prone (`occupied-space.ts`).
+- Off the plane (`off-plane.ts`): an effect tagged `off-plane` (Banishment, Etherealness, Maze,
+  Imprisonment, Blink's Ethereal turns) takes its creature off the map in the settle step, keeping its
+  place in the initiative and the space it left in `combat.offPlane` (GM-only); it can't target or be
+  targeted across the plane, and when the effect ends it returns to that space or the nearest
+  unoccupied one. Blink's d6 is rolled by the server as the caster's turn ends.
+- Squeezing and passing walls: a footprint that fits a gap only as a creature one size smaller squeezes
+  through it as through Difficult Terrain (`footprintStepPassage`), and Incorporeal Movement passes walls
+  and creatures the same way.
 - Legendary actions are taken right after another creature's turn (`legendary.after-a-turn`): a turn
   change records the creature whose turn ended (`turn.afterActorId`), and the window stays open, one
   action a legendary creature, until the creature whose turn it is does something.
