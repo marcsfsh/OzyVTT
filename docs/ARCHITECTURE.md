@@ -365,6 +365,15 @@ creature's own spell of a minute or more takes the action on each of its turns i
 (`resolution/long-casting.ts`). Outside a fight a creature's own cast resolves through the same path with no turn to
 spend, and a long one moves the game clock by its whole hours; an item's cast there stays on the loose route.
 
+A cast can carry Metamagic options and Sculpt Spells' picks (`ResolveInput.shaping`, `resolution/metamagic.ts`).
+The economy checks each pick against the options the caster knows, the spell and the Sorcery Points left, and spends
+the points with the cast. A pick changes what later steps read: the spell's range and duration (Distant, Extended),
+the action's casting time and damage type (Quickened, Transmuted), the cast's level (Twinned), its components
+(Subtle), its saves (Careful, Heightened, Sculpt Spells) and its damage dice (Empowered). Seeking Spell is a roll
+answer on a missed spell attack. The shaping stays on the cast's open action instance for its later rays, on a
+readied spell for its release and on a spell area for the saves it calls for later. `actor:available-actions` offers
+each known option with its cost and why it can't be used now, and the sheet's cast detail sends the picks.
+
 What a save does is data on the action's save block: `successDamage` (half or none) and the
 `failureCondition` a failed save imposes. Nothing parses the description for it. They are written where the content
 is made (the SRD build, the builder, homebrew) and copied onto the pending save prompt.
