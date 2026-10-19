@@ -132,8 +132,11 @@ export function printedSaveDamage(description: string): { damage: Part[]; laterD
   return { damage: termsIn(first ?? ""), laterDamage: later.length > 0 ? withoutSourceTags(later) : null };
 }
 
-/** The upstream's 5etools link tags ("Cover|XPHB|Total Cover"), which read as noise to the table. */
-const withoutSourceTags = (text: string) => text.replace(/(?:\[[^\]]*\]|\w+)\|XPHB\|/g, "");
+/** 5etools cross-reference tags that leaked into open5e's text ("[Area of Effect]|XPHB|Sphere", "Cover|XPHB|Total
+ *  Cover", "Short Rest|XPHB|Short or Long Rest"): the rules entry's name, bracketed or in title case, goes, and the
+ *  readable words after the tag stay. */
+export const withoutSourceTags = (text: string) =>
+  text.replace(/(?:\[[^\]]*\]|\b(?:[A-Z][a-z]+ )*[A-Z][a-z]+)\|XPHB\|/g, "");
 
 /** Every rolled, typed damage term in a passage. */
 function termsIn(text: string): Part[] {

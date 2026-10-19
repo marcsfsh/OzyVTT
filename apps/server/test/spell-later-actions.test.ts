@@ -135,6 +135,12 @@ describe("Conjure Elemental", () => {
     ]);
     answer(table.state, FOE, 2);
     expect(actorOf(table.state, FOE).conditions.map((condition) => condition.id)).toContain("restrained");
+    // At the start of each of its turns it repeats the save, a failure costing 4d8 of the chosen element.
+    expect(actorOf(table.state, FOE).effects.find((effect) => effect.repeatSave)?.repeatSave).toMatchObject({
+      ability: "dex",
+      timing: "turn-start",
+      failureDamage: [{ formula: "4d8", type: "fire" }]
+    });
     // The spirit holds the goblin, so the orc walks in unchallenged.
     expect(
       walk(FOE2, [

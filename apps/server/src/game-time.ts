@@ -2,6 +2,9 @@ import { ROUNDS_PER_MINUTE, type GameState } from "@vtt/domain";
 import { ageEffects, type EffectNarration } from "./effects.js";
 import { dawnRegains, dawnsBetween, rearmTimedPools, type ClockDeps } from "./clock-pools.js";
 import { endZone } from "./spell-zone-state.js";
+import { afterDays } from "./rest-triggers.js";
+import { breathOverTime } from "./breath.js";
+import { endOfDays } from "./survival.js";
 import { zoneHeld } from "./spell-zones.js";
 
 /**
@@ -36,7 +39,8 @@ function creaturesInTime(state: GameState): Set<string> {
  * Moves the game clock `minutes` on, and counts the time down on every creature's effects (`ageEffects`). A spell
  * area ends with the effect that keeps it, or once the time outlasts the rounds it lasts. A pool spent for a time comes
  * back once it has passed, and with a dawn hour each dawn passed gives back what items regain at dawn
- * (`clock-pools.ts`, which rolls with `deps`). Returns what ended and came back.
+ * (`clock-pools.ts`, which rolls with `deps`). With `deps`, what acts every 24 hours does too (`afterDays`: a mummy's
+ * curse). Returns what ended, came back or acted.
  */
 export function passGameTime(state: GameState, minutes: number, deps?: ClockDeps): EffectNarration[] {
   if (minutes <= 0) return [];
@@ -48,6 +52,13 @@ export function passGameTime(state: GameState, minutes: number, deps?: ClockDeps
   events.push(...rearmTimedPools(state, inTime));
   if (state.rest.dawnHour !== null && deps)
     events.push(...dawnRegains(state, inTime, dawnsBetween(before, total, state.rest.dawnHour), deps));
+  // Outside a fight a creature holding its breath spends it as the minutes pass.
+  if (!state.combat.active) events.push(...breathOverTime(state, inTime, total - before));
+  if (deps) {
+    events.push(...afterDays(state, inTime, before, total, deps));
+    // Each midnight the clock crosses ends a day of eating and drinking.
+    events.push(...endOfDays(state, inTime, before, total, deps));
+  }
   for (const zone of [...state.combat.spellZones]) {
     const ends =
       zone.rounds !== null

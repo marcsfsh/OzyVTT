@@ -21,9 +21,7 @@ const HIT_NOTES: Readonly<Record<string, string>> = {
   "barbed-devil/hurl-flame": HURL_FLAME,
   "black-pudding/dissolving-pseudopod": ARMOR_PENALTY,
   "darkmantle/crush":
-    "The darkmantle attaches to the target: it moves with the target at Speed 0 and attacks only it, with Advantage. With Advantage on this hit against a Medium or smaller target, it covers the target, which is Blinded and suffocating while it is attached. The target detaches it with an action and a DC 13 Strength (Athletics) check, and the darkmantle with 5 feet of its movement.",
-  "rakshasa/cursed-touch":
-    "The target is cursed: it gains no benefit from finishing a Short or Long Rest until the curse ends. Remove Curse ends it.",
+    "While attached, the darkmantle moves with the target at Speed 0 and can attack only it, with Advantage. It detaches itself with 5 feet of its movement.",
   "stirge/proboscis":
     "While attached, the stirge can't make Proboscis attacks. It detaches with 5 feet of its movement, and the target or a creature within 5 feet can detach it with an action.",
   "cloaker/attach":

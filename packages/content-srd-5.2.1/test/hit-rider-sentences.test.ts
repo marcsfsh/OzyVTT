@@ -78,9 +78,17 @@ const READERS: readonly Check[] = [
     read: (action) => action.drain?.reducesMaximum === true
   },
   {
-    pattern: /\bit is cursed\b|\bWhile cursed\b/,
+    pattern: /\bit is cursed\b|\bWhile cursed\b|\bis cursed for\b|\bUntil the curse ends\b/,
     read: (action) =>
       (action.onHit ?? []).some((rider) => rider.name === "Cursed" || rider.tags?.includes("no-healing"))
+  },
+  {
+    pattern: /^(?:and )?the target has the [A-Z][a-z]+ condition\.$/,
+    read: (action) => (action.onHit ?? []).some((rider) => rider.conditions.length > 0)
+  },
+  {
+    pattern: /\bWhenever the [A-Za-z]+ target finishes a Long Rest\b/,
+    read: (action) => (action.onHit ?? []).some((rider) => rider.atRest?.at === "long-rest")
   },
   {
     pattern:
@@ -90,7 +98,8 @@ const READERS: readonly Check[] = [
   {
     pattern:
       /^(?:Constitution|Strength|Dexterity|Wisdom|Intelligence|Charisma) Saving Throw: DC \d+\.$|^(?:First |Second |Subsequent )?Failures?:?\b|^Success:|^After 1 minute, it succeeds automatically\.$|^The target repeats the save\b|^While (?:Poisoned|wounded)\b|^The wound closes\b|^If the cursed target drops to 0 Hit Points\b/,
-    read: (action) => action.save !== undefined || (action.onHit ?? []).some((rider) => rider.save)
+    read: (action) =>
+      action.save !== undefined || (action.onHit ?? []).some((rider) => rider.save || rider.atRest?.save)
   }
 ];
 

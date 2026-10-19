@@ -90,12 +90,31 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Help",
     activation: "action",
     description:
-      "Distract an enemy within 5 feet of you: the next attack roll one of your allies makes against it has Advantage. The benefit expires at the start of your next turn. Help can also assist an ally's ability check with one of your skill or tool proficiencies; adjudicate that one at the table. (SRD 5.2.1, Help [Action])",
+      "Distract an enemy within 5 feet of you: the next attack roll one of your allies makes against it has Advantage. The benefit expires at the start of your next turn. To assist an ally's ability check instead, take Help with a Check. (SRD 5.2.1, Help [Action])",
     damage: [],
     // The effect sits on the distracted enemy; the attack roll reads and spends it (`resolution/attack.ts`).
     grants: {
       name: "Distracted",
       tags: ["distracted"],
+      duration: { type: "until-source-next-turn" },
+      modifiers: [],
+      onEnd: [],
+      target: "target",
+      voidWhileIncapacitated: false,
+      concentration: false
+    }
+  },
+  {
+    id: "help-check",
+    name: "Help with a Check",
+    activation: "action",
+    description:
+      "Choose one of your skill proficiencies and an ally near enough to assist: that ally has Advantage on the next ability check they make with that skill. The benefit expires if they don't use it before the start of your next turn. A tool's assist is the GM's call. (SRD 5.2.1, Help [Action])",
+    damage: [],
+    // The rider narrowed to the chosen skill is written by the handler (`resolution/builtins.ts`).
+    grants: {
+      name: "Helped",
+      tags: ["helped"],
       duration: { type: "until-source-next-turn" },
       modifiers: [],
       onEnd: [],
@@ -212,6 +231,14 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     activation: "action",
     description:
       "Use your action to make a Strength (Athletics) or Dexterity (Acrobatics) check (your best) against the grapple's escape DC. On a success, the Grappled condition ends. (SRD 5.2.1, Grappling)",
+    damage: []
+  },
+  {
+    id: "end-an-effect",
+    name: "End an Effect",
+    activation: "action",
+    description:
+      "Take the action an effect's text names to end it: wake a creature within 5 feet, stanch a wound with a Wisdom (Medicine) check, study a phantasm with an Intelligence (Investigation) check, pull a creature out of a cube or a whelm with a Strength (Athletics) check, detach a stirge or a darkmantle, or calm a berserk flesh golem with a Charisma (Persuasion) check from within 60 feet. (SRD 5.2.1)",
     damage: []
   },
   {
@@ -453,6 +480,8 @@ export function builtinBaseId(actionId: string): string {
  *  targets the creature it would sway, whose Intelligence can raise its DC. */
 export const BUILTIN_TARGETING: Readonly<Record<string, "single">> = {
   help: "single",
+  "help-check": "single",
+  "end-an-effect": "single",
   influence: "single",
   "unarmed-strike": "single",
   "unarmed-grapple": "single",

@@ -155,6 +155,8 @@
      "failureConditions": [
       "charmed"
      ],
+     "repeatOnDamage": {},
+     "endsWhenSourceDies": true,
      "failureEffect": {
       "name": "Dominated by the Aboleth",
       "tags": [
@@ -189,6 +191,30 @@
    "resistancesInLair": 4
   },
   "traitMechanics": [
+   {
+    "kind": "aura",
+    "name": "Mucus Cloud",
+    "trigger": "bearer-turn-end",
+    "rangeFeet": 5,
+    "affects": "all",
+    "underwaterOnly": true,
+    "save": {
+     "ability": "con",
+     "dc": 14,
+     "successDamage": "none",
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Cursed (slimy skin)",
+      "tags": [
+       "curse",
+       "water-breathing",
+       "no-healing-on-land"
+      ],
+      "modifiers": []
+     }
+    },
+    "reminder": "Out of water, the cursed creature takes 6 (1d12) Acid damage at the end of every 10 minutes unless moisture is applied to its skin."
+   },
    {
     "kind": "restoration",
     "name": "Eldritch Restoration"
@@ -1047,6 +1073,21 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
+     },
+     "repeatOnce": true,
+     "secondFailure": {
+      "conditions": [
+       "unconscious"
+      ],
+      "duration": {
+       "type": "rounds",
+       "rounds": 100
+      },
+      "endsOnDamage": true,
+      "endedBy": {
+       "name": "Wake",
+       "by": "others"
+      }
      }
     },
     "damage": [],
@@ -1711,7 +1752,19 @@
      "ability": "con",
      "dc": 18,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Slowing Breath",
+      "tags": [
+       "no-reactions",
+       "speed-halved",
+       "action-or-bonus"
+      ],
+      "modifiers": []
+     },
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -2038,9 +2091,70 @@
      "ability": "str",
      "dc": 21,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "sparesAffected": true,
+     "failureEffect": {
+      "name": "Weakening Breath",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "attack",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-attack-roll"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
     },
     "damage": [],
+    "reminder": "While Weakening Breath lasts, the target subtracts 1d6 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 60,
@@ -2950,6 +3064,17 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
+     },
+     "repeatOnce": true,
+     "secondFailure": {
+      "conditions": [
+       "paralyzed"
+      ],
+      "duration": {
+       "type": "rounds",
+       "rounds": 10
+      },
+      "repeatSave": true
      }
     },
     "damage": [],
@@ -4407,6 +4532,21 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
+     },
+     "repeatOnce": true,
+     "secondFailure": {
+      "conditions": [
+       "unconscious"
+      ],
+      "duration": {
+       "type": "rounds",
+       "rounds": 100
+      },
+      "endsOnDamage": true,
+      "endedBy": {
+       "name": "Wake",
+       "by": "others"
+      }
      }
     },
     "damage": [],
@@ -5089,7 +5229,19 @@
      "ability": "con",
      "dc": 22,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Slowing Breath",
+      "tags": [
+       "no-reactions",
+       "speed-halved",
+       "action-or-bonus"
+      ],
+      "modifiers": []
+     },
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -5422,9 +5574,70 @@
      "ability": "str",
      "dc": 24,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "sparesAffected": true,
+     "failureEffect": {
+      "name": "Weakening Breath",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "attack",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-attack-roll"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
     },
     "damage": [],
+    "reminder": "While Weakening Breath lasts, the target subtracts 1d10 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 90,
@@ -6359,6 +6572,17 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
+     },
+     "repeatOnce": true,
+     "secondFailure": {
+      "conditions": [
+       "paralyzed"
+      ],
+      "duration": {
+       "type": "rounds",
+       "rounds": 10
+      },
+      "repeatSave": true
      }
     },
     "damage": [],
@@ -9398,7 +9622,13 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "repeatOnce": true,
+     "secondFailure": {
+      "conditions": [
+       "petrified"
+      ]
+     }
     },
     "damage": [],
     "uses": {
@@ -9658,15 +9888,24 @@
       ],
       "at": "bearer-turn-start",
       "hitPointLoss": true
-     }
+     },
+     "endedBy": {
+      "name": "Stanch the wound",
+      "by": "either",
+      "check": {
+       "ability": "wis",
+       "skill": "medicine",
+       "dc": 12
+      }
+     },
+     "sparesAffected": true
     },
     "damage": [
      {
       "formula": "1d10 + 3",
       "type": "slashing"
      }
-    ],
-    "reminder": "The infernal wound also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC 12 Wisdom (Medicine) check: end it by hand."
+    ]
    }
   ],
   "token": {
@@ -11169,6 +11408,21 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
+     },
+     "repeatOnce": true,
+     "secondFailure": {
+      "conditions": [
+       "unconscious"
+      ],
+      "duration": {
+       "type": "rounds",
+       "rounds": 10
+      },
+      "endsOnDamage": true,
+      "endedBy": {
+       "name": "Wake",
+       "by": "others"
+      }
      }
     },
     "damage": [],
@@ -13083,7 +13337,8 @@
      ],
      "failureDuration": {
       "type": "until-source-turn-end"
-     }
+     },
+     "immuneOnSuccess": true
     },
     "damage": [],
     "area": {
@@ -13510,7 +13765,17 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "repeatOnce": true,
+     "secondFailure": {
+      "conditions": [
+       "petrified"
+      ],
+      "duration": {
+       "type": "minutes",
+       "minutes": 1440
+      }
+     }
     },
     "damage": [
      {
@@ -13868,7 +14133,19 @@
      "ability": "con",
      "dc": 11,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Slowing Breath",
+      "tags": [
+       "no-reactions",
+       "speed-halved",
+       "action-or-bonus"
+      ],
+      "modifiers": []
+     },
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -14696,7 +14973,26 @@
       "type": "bludgeoning"
      }
     ],
-    "reminder": "The darkmantle attaches to the target: it moves with the target at Speed 0 and attacks only it, with Advantage. With Advantage on this hit against a Medium or smaller target, it covers the target, which is Blinded and suffocating while it is attached. The target detaches it with an action and a DC 13 Strength (Athletics) check, and the darkmantle with 5 feet of its movement."
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Attached",
+      "tags": [
+       "attached"
+      ],
+      "endsWhenSourceDies": true,
+      "endedBy": {
+       "name": "Detach the darkmantle",
+       "by": "bearer",
+       "check": {
+        "ability": "str",
+        "skill": "athletics",
+        "dc": 13
+       }
+      }
+     }
+    ],
+    "reminder": "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target, which is Blinded and suffocating (hold its breath) while the darkmantle is attached. While attached, the darkmantle moves with the target at Speed 0 and can attack only it, with Advantage. It detaches itself with 5 feet of its movement."
    },
    {
     "id": "darkness-aura",
@@ -14840,7 +15136,16 @@
      "successDamage": "none",
      "failureConditions": [
       "poisoned"
-     ]
+     ],
+     "atRest": {
+      "at": "day",
+      "save": {
+       "ability": "con",
+       "dc": 12
+      },
+      "maximumLoss": "1d10",
+      "holdsMaximum": true
+     }
     },
     "damage": [
      {
@@ -18565,7 +18870,11 @@
    {
     "kind": "berserk",
     "name": "Berserk",
-    "on": 6
+    "on": 6,
+    "calm": {
+     "dc": 15,
+     "withinFeet": 60
+    }
    }
   ],
   "extensions": {
@@ -19177,6 +19486,32 @@
        }
       ],
       "at": "source-turn-start"
+     },
+     "escapeDc": 12,
+     "escapeAthletics": true,
+     "failureEffect": {
+      "name": "Engulfed",
+      "tags": [
+       "cant-speak",
+       "smothering"
+      ],
+      "modifiers": []
+     },
+     "endedBy": {
+      "name": "Pull free",
+      "by": "others",
+      "near": "source",
+      "check": {
+       "ability": "str",
+       "skill": "athletics",
+       "dc": 12
+      },
+      "takerDamage": [
+       {
+        "formula": "3d6",
+        "type": "acid"
+       }
+      ]
      }
     },
     "damage": [
@@ -19185,7 +19520,7 @@
       "type": "acid"
      }
     ],
-    "reminder": "An engulfed target is suffocating, can't cast spells with a Verbal component, has the Restrained condition.",
+    "reminder": "The cube moves up to its Speed first; an engulfed creature moves with it and has Total Cover from attacks outside the cube.",
     "move": {
      "speed": "full",
      "provokes": false,
@@ -19489,7 +19824,8 @@
      ],
      "failureDuration": {
       "type": "until-source-next-turn"
-     }
+     },
+     "immuneOnSuccess": true
     },
     "damage": [
      {
@@ -19517,7 +19853,8 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ]
+     ],
+     "immuneOnSuccess": true
     },
     "damage": [],
     "targets": {
@@ -23126,7 +23463,7 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "reminder": "On a failed save: The target rolls 1d8 to determine what it does during the current turn:\n\n- 1-4: The target does nothing.\n- 5-6: The target takes no action or Bonus Action and uses all its movement to move in a random direction.\n- 7-8: The target makes a melee attack against a randomly determined creature within its reach or does nothing if it can't make such an attack."
+    "failureTable": "gibbering"
    }
   ],
   "extensions": {
@@ -24310,9 +24647,70 @@
      "ability": "str",
      "dc": 13,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "sparesAffected": true,
+     "failureEffect": {
+      "name": "Weakening Breath",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "attack",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-attack-roll"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
     },
     "damage": [],
+    "reminder": "While Weakening Breath lasts, the target subtracts 1d4 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 15,
@@ -24473,7 +24871,13 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "repeatOnce": true,
+     "secondFailure": {
+      "conditions": [
+       "petrified"
+      ]
+     }
     },
     "damage": [],
     "uses": {
@@ -25845,12 +26249,24 @@
      "successDamage": "half",
      "failureConditions": []
     },
-    "damage": [],
+    "damage": [
+     {
+      "formula": "8d6",
+      "type": "fire"
+     }
+    ],
     "uses": {
      "limit": 1,
      "per": "recharge",
      "recharge": 5
     },
+    "damageTypes": [
+     "acid",
+     "cold",
+     "fire",
+     "lightning",
+     "poison"
+    ],
     "area": {
      "shape": "cone",
      "sizeFeet": 30,
@@ -25971,7 +26387,11 @@
       "charmed",
       "incapacitated"
      ],
-     "repeatSave": true
+     "repeatSave": true,
+     "repeatOnDamage": {
+      "notFromSource": true
+     },
+     "immuneOnSuccess": true
     },
     "damage": [],
     "area": {
@@ -27290,6 +27710,15 @@
       ],
       "at": "bearer-turn-start",
       "hitPointLoss": true
+     },
+     "endedBy": {
+      "name": "Stanch the wound",
+      "by": "either",
+      "check": {
+       "ability": "wis",
+       "skill": "medicine",
+       "dc": 17
+      }
      }
     },
     "damage": [
@@ -27298,7 +27727,6 @@
       "type": "necrotic"
      }
     ],
-    "reminder": "The infernal wound also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC 17 Wisdom (Medicine) check: end it by hand.",
     "targets": {
      "count": 1,
      "rangeFeet": 10,
@@ -28375,7 +28803,18 @@
     "onHit": [
      {
       "conditions": [],
-      "reminder": "The target is cursed for 24 hours or until the incubus dies. Until the curse ends, the target gains no benefit from finishing Short Rests."
+      "name": "Cursed",
+      "tags": [
+       "curse"
+      ],
+      "duration": {
+       "type": "minutes",
+       "minutes": 1440
+      },
+      "endsWhenSourceDies": true,
+      "atRest": {
+       "noBenefit": "short"
+      }
      }
     ]
    },
@@ -31709,7 +32148,13 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "repeatOnce": true,
+     "secondFailure": {
+      "conditions": [
+       "petrified"
+      ]
+     }
     },
     "damage": [],
     "uses": {
@@ -32722,9 +33167,14 @@
       "conditions": [],
       "name": "Cursed",
       "tags": [
-       "no-healing"
+       "no-healing",
+       "curse"
       ],
-      "reminder": "While cursed, the target can't regain Hit Points, its Hit Point maximum doesn't return to normal when finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse."
+      "atRest": {
+       "at": "day",
+       "maximumLoss": "3d6",
+       "holdsMaximum": true
+      }
      }
     ],
     "drain": {
@@ -32748,7 +33198,8 @@
      ],
      "failureDuration": {
       "type": "until-source-turn-end"
-     }
+     },
+     "immuneOnSuccess": true
     },
     "damage": [],
     "targets": {
@@ -32948,9 +33399,14 @@
       "conditions": [],
       "name": "Cursed",
       "tags": [
-       "no-healing"
+       "no-healing",
+       "curse"
       ],
-      "reminder": "While cursed, the target can't regain Hit Points, it gains no benefit from finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse."
+      "atRest": {
+       "at": "day",
+       "maximumLoss": "3d6",
+       "noBenefit": "long"
+      }
      }
     ],
     "drain": {
@@ -33215,7 +33671,9 @@
       "type": "rounds",
       "rounds": 10
      },
-     "endsOnDamage": true
+     "endsOnDamage": true,
+     "immuneOnSuccess": true,
+     "endsOutOfSight": true
     },
     "damage": [
      {
@@ -34617,14 +35075,22 @@
       "type": "piercing"
      }
     ],
-    "reminder": "The hit gives the target the Poisoned condition. Whenever the Poisoned target finishes a Long Rest, it makes a DC 15 Constitution save: on a failure its Hit Point maximum decreases by 5 (1d10); on a success the Poisoned condition ends.",
     "onHit": [
      {
       "conditions": [
        {
         "id": "poisoned"
        }
-      ]
+      ],
+      "name": "Poisoned",
+      "atRest": {
+       "at": "long-rest",
+       "save": {
+        "ability": "con",
+        "dc": 15
+       },
+       "maximumLoss": "1d10"
+      }
      }
     ]
    },
@@ -37611,7 +38077,18 @@
       "type": "necrotic"
      }
     ],
-    "reminder": "The target is cursed: it gains no benefit from finishing a Short or Long Rest until the curse ends. Remove Curse ends it."
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Cursed",
+      "tags": [
+       "curse"
+      ],
+      "atRest": {
+       "noBenefit": "both"
+      }
+     }
+    ]
    },
    {
     "id": "baleful-command",
@@ -38981,7 +39458,8 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "damage": []
+    "damage": [],
+    "reminder": "On a failure, the armor or weapon the rust monster targeted takes a cumulative -1 penalty: to the AC it offers, or to its attack rolls. Change the item by hand. Armor whose AC falls to 10, or a weapon at -5, is destroyed, and Mending removes the penalty."
    },
    {
     "id": "destroy-metal",
@@ -40761,6 +41239,17 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
+     },
+     "repeatOnce": true,
+     "secondFailure": {
+      "conditions": [
+       "paralyzed"
+      ],
+      "duration": {
+       "type": "rounds",
+       "rounds": 10
+      },
+      "repeatSave": true
      }
     },
     "damage": [],
@@ -41497,7 +41986,8 @@
      "ability": "con",
      "dc": 16,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureExhaustion": 1
     },
     "damage": [],
     "targets": {
@@ -41788,7 +42278,8 @@
      "ability": "con",
      "dc": 16,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureExhaustion": 1
     },
     "damage": [],
     "targets": {
@@ -42924,6 +43415,10 @@
         }
        ],
        "at": "source-turn-start"
+      },
+      "endedBy": {
+       "name": "Detach",
+       "by": "either"
       }
      }
     ],
@@ -47981,6 +48476,23 @@
        }
       ],
       "at": "source-turn-start"
+     },
+     "failureEffect": {
+      "name": "Whelmed",
+      "tags": [
+       "smothering"
+      ],
+      "modifiers": []
+     },
+     "endedBy": {
+      "name": "Pull free",
+      "by": "others",
+      "near": "source",
+      "check": {
+       "ability": "str",
+       "skill": "athletics",
+       "dc": 14
+      }
      }
     },
     "damage": [
@@ -49643,7 +50155,10 @@
      "ability": "con",
      "dc": 10,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureKills": {
+      "sourceRegains": "3d6"
+     }
     },
     "damage": []
    },
@@ -50995,6 +51510,21 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
+     },
+     "repeatOnce": true,
+     "secondFailure": {
+      "conditions": [
+       "unconscious"
+      ],
+      "duration": {
+       "type": "rounds",
+       "rounds": 10
+      },
+      "endsOnDamage": true,
+      "endedBy": {
+       "name": "Wake",
+       "by": "others"
+      }
      }
     },
     "damage": [],
@@ -51344,7 +51874,19 @@
      "ability": "con",
      "dc": 14,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Slowing Breath",
+      "tags": [
+       "no-reactions",
+       "speed-halved",
+       "action-or-bonus"
+      ],
+      "modifiers": []
+     },
+     "failureDuration": {
+      "type": "until-bearer-turn-end"
+     }
     },
     "damage": [],
     "area": {
@@ -51513,9 +52055,70 @@
      "ability": "str",
      "dc": 17,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "sparesAffected": true,
+     "failureEffect": {
+      "name": "Weakening Breath",
+      "tags": [],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "attack",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-attack-roll"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "check",
+        "mode": "disadvantage",
+        "when": [
+         {
+          "type": "on-ability-check"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "repeatSave": true
     },
     "damage": [],
+    "reminder": "While Weakening Breath lasts, the target subtracts 1d6 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 30,
@@ -51994,6 +52597,17 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
+     },
+     "repeatOnce": true,
+     "secondFailure": {
+      "conditions": [
+       "paralyzed"
+      ],
+      "duration": {
+       "type": "rounds",
+       "rounds": 10
+      },
+      "repeatSave": true
      }
     },
     "damage": [],

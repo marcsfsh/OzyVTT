@@ -658,6 +658,13 @@
 .own-effect-row {
   margin-top: var(--space-1);
 }
+/* The player's own row offers going before a character tied on its score: buttons that wrap on a phone. */
+.initiative-tie-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
 .own-dying {
   margin-top: var(--space-1);
 }

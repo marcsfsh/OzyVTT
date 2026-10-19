@@ -743,7 +743,8 @@ describe("Warlock invocations: the eleven free castings are handed over (audit r
     resolveDefinitionAction(
       built.state,
       actionOf(built, "spell-water-breathing-free"),
-      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000040" },
+      // Water Breathing is for the willing creatures it names; the Warlock names itself.
+      { actorId: IDS.hero, targetIds: [IDS.hero], commandId: "50000000-0000-4000-8000-000000000040" },
       deps(built, [])
     );
     expect(built.hero.actionUses["gift-of-the-depths"]).toBe(1);
@@ -751,7 +752,7 @@ describe("Warlock invocations: the eleven free castings are handed over (audit r
       resolveDefinitionAction(
         built.state,
         actionOf(built, "spell-water-breathing-free"),
-        { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000041" },
+        { actorId: IDS.hero, targetIds: [IDS.hero], commandId: "50000000-0000-4000-8000-000000000041" },
         deps(built, [])
       )
     ).toThrow();

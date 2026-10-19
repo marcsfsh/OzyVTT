@@ -295,6 +295,8 @@ export type CheckRollOutcome = Readonly<{
   rollMode?: ActionRollMode;
   /** Reliable Talent counted a d20 of 9 or lower as 10. */
   reliableTalent?: true;
+  /** Why it failed whatever it rolled (a Blinded roller's check that needs sight). */
+  autoFailed?: string;
   /** The d20 was typed from a physical die. */
   typed?: true;
   /** What answered the check, already in its numbers. */

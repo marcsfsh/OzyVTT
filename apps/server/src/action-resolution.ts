@@ -94,6 +94,9 @@ import { checkKnockOut, knockOutOffered, knocksOut } from "./resolution/knock-ou
 import { healLimit } from "./loose-healing.js";
 import { passiveOf, unavailableReason } from "./availability-reasons.js";
 import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-casting.js";
+import { layOutProvisions } from "./resolution/provisions.js";
+import { turnedAwayByWard } from "./resolution/ward.js";
+import { orbLeap } from "./resolution/orb-leap.js";
 import { shapedAction, shapedOutcome, shapingInForce, shapingOffers, withShapedSpell } from "./resolution/metamagic.js";
 
 export type { ResolveDependencies, ResolveInput };
@@ -129,6 +132,9 @@ export function resolveDefinitionAction(
   // A form the action can't give is refused before anything is spent.
   checkShapeShift(ctx);
   ctx.builtin?.apply?.(ctx);
+  // A warded target (Sanctuary) asks its save as the attack or spell is made; a failure spends nothing and stops here.
+  if (input.commit !== false && input.economyPaid !== true && turnedAwayByWard(ctx))
+    return { ...resolutionOf(ctx), save: null };
   if (longCast && longCast.phase !== "finish") {
     stepLongCast(ctx, longCast);
     releaseHideAndReady(ctx);
@@ -237,6 +243,8 @@ export function resolveDefinitionAction(
   applyGrant(ctx);
   applySummons(ctx);
   applyShapeShift(ctx);
+  layOutProvisions(ctx);
+  orbLeap(ctx);
   placeCastSight(ctx);
   refuseThePrayedFor(ctx);
   applyHealing(ctx);

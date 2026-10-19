@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Actor, ContentConditionSummary } from "@vtt/domain";
-import { Button, Chip, Stepper, type ChipTone } from "@vtt/ui";
+import { Button, Chip, Select, Stepper, type ChipTone } from "@vtt/ui";
 import { command, read } from "../lib/command";
 import { newId } from "../lib/ids";
 import { CONDITION_GLYPHS } from "../scene/tokenGlyph";
@@ -116,7 +116,19 @@ export function ConditionText({ text }: Readonly<{ text: string }>) {
 }
 
 /** What links a condition: the effect holding it, when one does (its name says where it came from). */
-export type LinkingEffect = Readonly<{ name: string; linkedConditionIds: readonly string[]; escapeDc: number | null }>;
+export type LinkingEffect = Readonly<{
+  name: string;
+  linkedConditionIds: readonly string[];
+  escapeDc: number | null;
+  sourceActorId?: string | null;
+}>;
+
+/** A creature the GM can name as a condition's source (the charmer, the source of fear). */
+export type ConditionSource = Readonly<{ id: string; name: string }>;
+
+/** The conditions whose source the rules read: a charmed creature can't harm its charmer, a frightened one can't
+ *  move closer to its source. */
+const SOURCED = new Set(["charmed", "frightened"]);
 
 /**
  * The commands a condition chip sends: set or clear a condition (a level for Exhaustion), and a player's question to
@@ -128,9 +140,15 @@ export function useConditionCommands(
   onCleared?: (conditionId: string) => void
 ) {
   const [busy, setBusy] = useState(false);
-  const send = (conditionId: string, active: boolean, level?: number) => {
+  const send = (conditionId: string, active: boolean, level?: number, sourceActorId?: string) => {
     setBusy(true);
-    const payload = { actorId, conditionId, active, ...(level !== undefined ? { level } : {}) };
+    const payload = {
+      actorId,
+      conditionId,
+      active,
+      ...(level !== undefined ? { level } : {}),
+      ...(sourceActorId !== undefined ? { sourceActorId } : {})
+    };
     void command("actor:set-condition", payload).then((result) => {
       setBusy(false);
       if (!result.ok) {
@@ -212,6 +230,7 @@ export function ConditionEditor({
   effects = [],
   viewer,
   canAsk = false,
+  sources = [],
   onFeedback
 }: Readonly<{
   actorId: string;
@@ -219,6 +238,8 @@ export function ConditionEditor({
   /** The actor's effects, so a linked condition can say what holds it. */
   effects?: readonly LinkingEffect[];
   viewer: "gm" | "player";
+  /** For the GM: the creatures that can be named as Charmed's or Frightened's source. */
+  sources?: readonly ConditionSource[];
   /** A player can ask the GM in a live fight, where the GM's question queue is. */
   canAsk?: boolean;
   onFeedback: (text: string) => void;
@@ -276,6 +297,8 @@ export function ConditionEditor({
           viewer={viewer}
           canAsk={canAsk}
           busy={busy}
+          sources={viewer === "gm" && SOURCED.has(shownInstance.id) ? sources : []}
+          onSource={(sourceActorId) => send(shownInstance.id, true, undefined, sourceActorId)}
           onRemove={() => send(shownInstance.id, false)}
           onAsk={() => ask(shownInstance.id)}
           onClose={() => setShown(null)}
@@ -295,6 +318,8 @@ export function ConditionDetail({
   viewer,
   canAsk,
   busy,
+  sources = [],
+  onSource,
   onRemove,
   onAsk,
   onClose
@@ -306,6 +331,9 @@ export function ConditionDetail({
   viewer: "gm" | "player";
   canAsk: boolean;
   busy: boolean;
+  /** Creatures the GM can name as its source; empty when it takes none. */
+  sources?: readonly ConditionSource[];
+  onSource?: (sourceActorId: string) => void;
   onRemove: () => void;
   onAsk: () => void;
   onClose: () => void;
@@ -323,6 +351,25 @@ export function ConditionDetail({
       <p className="condition-detail-name">{label}</p>
       {text ? <ConditionText text={text} /> : <p className="condition-detail-muted">Loading the rules text.</p>}
       {origin && <p className="condition-detail-origin">{origin}</p>}
+      {sources.length > 0 && onSource && (
+        <label className="condition-detail-source">
+          <span>{instance.id === "charmed" ? "Charmed by" : "Frightened of"}</span>
+          <Select
+            value={holder?.sourceActorId ?? ""}
+            disabled={busy}
+            onChange={(event) => {
+              if (event.target.value) onSource(event.target.value);
+            }}
+          >
+            <option value="">No one named</option>
+            {sources.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.name}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
       <div className="condition-detail-actions">
         {removable ? (
           <Button size="sm" variant="secondary" disabled={busy} onClick={onRemove}>

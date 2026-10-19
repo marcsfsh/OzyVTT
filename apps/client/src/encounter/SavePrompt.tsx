@@ -114,6 +114,8 @@ export function SavePrompt({
       legendaryResistance?: boolean;
       mode?: DieMode;
       answer?: AnswerChoice;
+      /** The creature chooses to fail without rolling (a willing target). */
+      fail?: boolean;
     }>
   ) => {
     setBusy(true);
@@ -123,7 +125,7 @@ export function SavePrompt({
       "save:answer",
       saveAnswerPayload({
         saveId: save.id,
-        method: "roll",
+        method: options.fail ? "fail" : "roll",
         commit: options.commit,
         legendaryResistance: options.legendaryResistance ?? false,
         ...(options.face !== undefined ? { face: options.face } : {}),
@@ -162,7 +164,7 @@ export function SavePrompt({
         return;
       }
       onFeedback(
-        `${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc}).${outcome.appliedDamage > 0 ? ` ${targetName} took ${outcome.appliedDamage} damage.` : ""}${outcome.damageHeld ? " The damage waits on a reaction." : ""}${outcome.conditionApplied ? " The condition is applied." : ""}`
+        `${options.fail ? `${targetName} chose to fail.` : `${targetName} ${outcome.success ? "succeeded" : "failed"} (${outcome.total} vs DC ${outcome.dc}).`}${outcome.appliedDamage > 0 ? ` ${targetName} took ${outcome.appliedDamage} damage.` : ""}${outcome.damageHeld ? " The damage waits on a reaction." : ""}${outcome.conditionApplied ? " The condition is applied." : ""}`
       );
     });
   };
@@ -178,6 +180,19 @@ export function SavePrompt({
   // A confirm parked on another creature's answer outlives this prompt's own state (a reload, another screen).
   const parked =
     ("confirmed" in save && save.confirmed !== undefined) || ("awaitingAnswer" in save && save.awaitingAnswer === true);
+  // SRD Saving Throw: a willing target can decide to fail without rolling. An auto-rolled die shown before anyone
+  // chose to roll it doesn't take that choice away.
+  const chooseToFail = (
+    <button
+      type="button"
+      className="save-choose-fail"
+      disabled={busy}
+      title="Fail this save without rolling, as a willing target may"
+      onClick={() => send({ commit: true, fail: true })}
+    >
+      Choose to fail
+    </button>
+  );
   // The shown projection was computed from `basis`; once the field moves off it, it is stale.
   const stale = rolled !== null && proposal !== rolled.basis;
   useEffect(() => {
@@ -303,6 +318,7 @@ export function SavePrompt({
             </>
           ) : undefined
         }
+        beforeRoll={chooseToFail}
         extraActions={
           rolled && !rolled.success && (legendaryResistanceLeft ?? 0) > 0 ? (
             <button
@@ -314,6 +330,8 @@ export function SavePrompt({
             >
               Legendary Resistance ({legendaryResistanceLeft} left)
             </button>
+          ) : rolled && !rolled.awaiting ? (
+            chooseToFail
           ) : undefined
         }
       />

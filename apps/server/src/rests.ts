@@ -11,6 +11,8 @@ import {
   endEffectsAtLongRest,
   endEffectsAtRest,
   LONG_REST_MINUTES,
+  NO_HEALING_TAG,
+  NO_HEALING_ON_LAND_TAG,
   reduceExhaustion,
   removeConditionDirect,
   type EffectNarration
@@ -24,6 +26,7 @@ import { easeOrdeals } from "./death.js";
 import { healActor, RELENTLESS_RAGE_KEY } from "./hit-points.js";
 import { gainHeroicInspiration } from "./heroic-inspiration.js";
 import { chargesAfterDawn, neverRegained } from "./item-charges.js";
+import { afterLongRest, deniedRestLine, holdsMaximumAtRest, restDeniedBy } from "./rest-triggers.js";
 
 /** SRD Resting: a Short Rest is 1 hour and a Long Rest at least 8. */
 export const SHORT_REST_HOURS = 1;
@@ -203,6 +206,21 @@ export function applyRest(
   const refusal = restRefusal(state, actor, kind);
   if (refusal) throw new CommandRejectedError(refusal);
   const events: EffectNarration[] = [];
+  // "The target gains no benefit from finishing a Short or Long Rest" (a rakshasa's curse): the time passes and what
+  // the rest ends still ends, but nothing comes back.
+  const denied = restDeniedBy(actor, kind);
+  if (denied) {
+    events.push(deniedRestLine(actor, denied, kind));
+    if (kind === "short") return [...events, ...endEffectsAtRest(state, actorId, "short")];
+    events.push(...endEffectsAtLongRest(state, actorId, clockMoved, true), ...endEffectsAtRest(state, actorId, "long"));
+    actor.lastLongRestAt = state.rest.clockHours;
+    state.rest = { ...state.rest, requests: state.rest.requests.filter((id) => id !== actorId) };
+    if (charges)
+      events.push(
+        ...afterLongRest(state, actor, { random: charges.random, resolveDefinition, ...(catalog ? { catalog } : {}) })
+      );
+    return events;
+  }
   if (kind === "short") {
     const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
     actor.actionUses = usesAfterShortRest(
@@ -230,11 +248,21 @@ export function applyRest(
   }
   // Eight hours with sleep: Concentration ends and what lasts less runs out; "until ended" ones (a curse) stay.
   events.push(
-    ...endEffectsAtLongRest(state, actorId, clockMoved),
+    ...endEffectsAtLongRest(state, actorId, clockMoved, holdsMaximumAtRest(actor)),
     ...endEffectsAtRest(state, actorId, "long"),
     ...easeOrdeals(state, actor)
   );
-  actor.hp.current = actor.hp.maximum;
+  // A curse that bars healing ("The target can't regain Hit Points", a mummy's) outlasts the rest and keeps them.
+  const barred = actor.effects.find(
+    (effect) => effect.tags.includes(NO_HEALING_TAG) || effect.tags.includes(NO_HEALING_ON_LAND_TAG)
+  );
+  if (barred)
+    events.push({
+      kind: "condition",
+      text: `${actor.name} regains no Hit Points from the rest while ${barred.name} lasts.`,
+      actorId
+    });
+  else actor.hp.current = actor.hp.maximum;
   actor.hp.temporary = 0;
   // Every die size in the pool comes back (SRD 5.2.1 "Regain All HP").
   if (actor.hitDice)
@@ -284,6 +312,11 @@ export function applyRest(
     longRestDefinition?.character?.race?.id === "human"
   )
     gainHeroicInspiration(actor);
+  // What acts as the creature finishes a Long Rest ("Whenever the Poisoned target finishes a Long Rest").
+  if (charges)
+    events.push(
+      ...afterLongRest(state, actor, { random: charges.random, resolveDefinition, ...(catalog ? { catalog } : {}) })
+    );
   return events;
 }
 
@@ -458,7 +491,7 @@ export function finishPartyShortRest(
 }
 
 /** The GM moves game time forward by hours and minutes, and what runs out in that time ends (`passGameTime`); with
- *  `deps`, what comes back on the clock does too. */
+ *  `deps`, what comes back on the clock does too, and what acts every 24 hours acts. */
 export function passTime(state: GameState, hours: number, minutes = 0, deps?: ClockDeps): EffectNarration[] {
   return passGameTime(state, hours * 60 + minutes, deps);
 }

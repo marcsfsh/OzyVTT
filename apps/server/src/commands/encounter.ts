@@ -10,6 +10,7 @@ import {
   removeCombatant,
   rollRemainingInitiative,
   rollSelfInitiative,
+  orderTiedCharacters,
   setInitiativeScore,
   startEncounter,
   swapInitiative
@@ -24,6 +25,7 @@ import {
   InitiativeRollSelfSchema,
   InitiativeScoreSchema,
   InitiativeSwapSchema,
+  InitiativeOrderTieSchema,
   RemoveCombatantSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
@@ -331,6 +333,28 @@ export const encounterCommands = [
         text: `${kit.actorName(request.actorId)} and ${kit.actorName(request.withActorId)} swapped initiative.`,
         actorIds: [request.actorId, request.withActorId],
         gmOnly: kit.actorHidden(request.actorId) || kit.actorHidden(request.withActorId)
+      });
+    }
+  }),
+
+  defineCommand({
+    type: "initiative.order-tie",
+    operationId: "orderTiedCharacters",
+    description:
+      "Puts a character directly ahead of another character tied with it on the same initiative score (SRD Initiative: the players decide the order among tied characters), before either has taken a turn in this fight. GM-grade for any character; a player session only for their own claimed character.",
+    summary: "Order your character before another character tied on initiative.",
+    schema: InitiativeOrderTieSchema,
+    malformed: "The tie order is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const { duplicate } = await execute((state) =>
+        orderTiedCharacters(state, initiatorOf(principal), request.actorId, request.beforeActorId)
+      );
+      if (duplicate) return;
+      kit.context.appendLog({
+        kind: "encounter",
+        text: `${kit.actorName(request.actorId)} goes before ${kit.actorName(request.beforeActorId)} on their tied initiative.`,
+        actorIds: [request.actorId, request.beforeActorId],
+        gmOnly: kit.actorHidden(request.actorId) || kit.actorHidden(request.beforeActorId)
       });
     }
   }),

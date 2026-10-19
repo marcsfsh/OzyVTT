@@ -1,12 +1,16 @@
-import { isDead, type AbilityId, type GameState } from "@vtt/domain";
+import { isDead, type GameState } from "@vtt/domain";
 import { abilityModifier, parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
+import { calmAtTurnStart } from "./berserker-axe.js";
+import { breathAtTurnEnd } from "./breath.js";
 import { holdsFeature } from "./class-features.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
-import { expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
+import { endEffect, expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
 import { applyDamageDetailed, damageAdjustmentDetail, healActor, loseHitPoints, UNTYPED_DAMAGE } from "./hit-points.js";
+import { confusedTurn } from "./random-outcomes.js";
 import { holyNimbusBurns } from "./paladin-auras.js";
-import { createPendingSaves } from "./saving-throws.js";
+import { endEffectsOutOfSight, openEndingSave, openRepeatSaves } from "./save-stages.js";
+import { sceneSight, type SceneSight } from "./vision/sight.js";
 import { traitsAtTurnEnd, traitsAtTurnStart } from "./trait-turns.js";
 import { deathTraitsAtTurnEnd } from "./death-traits.js";
 import { riseAtTurnStart } from "./risen.js";
@@ -39,14 +43,21 @@ export type TurnStartDeps = Readonly<{
 /**
  * SRD: "at the end of its turn". When `actorId`'s turn ends, before the next begins:
  * 1. "until the end of its/your next turn" durations it owns end (`expireEffectsAtTurnEnd`);
- * 2. each effect it bears that "repeats the save at the end of each of its turns" opens that save, a success ending
- *    the effect (`openRepeatSaves`);
+ * 2. each effect it bears that "repeats the save at the end of each of its turns" opens that save (`openRepeatSaves`:
+ *    a success ends the effect, unless the text counts them or makes the failure worse);
  * 3. its stat block's traits that act as its turn ends (Fire Aura) do (`traitsAtTurnEnd`), and the ongoing damage
  *    printed for the end of a turn lands.
  */
 export function endOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps?: TurnEndDeps): void {
   events.push(...expireEffectsAtTurnEnd(state, actorId));
-  if (deps) events.push(...openRepeatSaves(state, actorId, deps));
+  // SRD Suffocation: a round of held breath, or once it is out, a level of Exhaustion "at the end of each of its turns".
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (actor) events.push(...breathAtTurnEnd(state, actor));
+  if (deps) {
+    const sees = sightOf(state, deps);
+    events.push(...endEffectsOutOfSight(state, actorId, { ...deps, sees }));
+    events.push(...openRepeatSaves(state, actorId, "turn-end", { ...deps, sees }));
+  }
   if (!deps?.rollDie || !deps.resolveDefinition) return;
   const dice = { ...deps, rollDie: deps.rollDie, resolveDefinition: deps.resolveDefinition };
   events.push(...traitsAtTurnEnd(state, actorId, dice));
@@ -54,6 +65,19 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
   events.push(...deathTraitsAtTurnEnd(state, actorId, dice));
   // "Takes 10 (3d6) Acid damage at the end of each of the toad's turns."
   dealOngoingAt(state, actorId, "end", events, dice);
+}
+
+/** Whether one creature sees another on the live map, worked out only when a rule asks; true when vision is off, so a
+ *  rule that needs a creature out of sight leaves it to the GM. */
+function sightOf(state: GameState, deps: TurnEndDeps): (viewerId: string, targetId: string) => boolean {
+  let sight: SceneSight | null = null;
+  return (viewerId, targetId) => {
+    sight ??= sceneSight(state, {
+      ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+      ...(deps.catalog ? { catalog: deps.catalog } : {})
+    });
+    return !sight.enabled || sight.sees(viewerId, targetId);
+  };
 }
 
 /**
@@ -75,7 +99,21 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
       })
     );
   heroicWarrior(state, actorId, events, deps);
+  // "At the start of each of its turns, the Restrained target repeats the save" (Conjure Elemental).
+  if (deps.newId)
+    events.push(
+      ...openRepeatSaves(state, actorId, "turn-start", {
+        newId: deps.newId,
+        now: deps.now ?? (() => new Date().toISOString()),
+        rollDie: deps.rollDie
+      })
+    );
   temporaryHitPointsEachTurn(state, actorId, events);
+  // SRD Confusion: "it rolls 1d10 at the start of each of its turns to determine its behavior for that turn".
+  events.push(...confusedTurn(state, actorId, deps.rollDie));
+  // A Berserker Axe's berserk ends on a turn that starts with no creature within 60 feet.
+  const calm = calmAtTurnStart(state, actorId, deps.distanceFeet);
+  if (calm) events.push(...endEffect(state, actorId, calm));
   hitPointsEachTurn(state, actorId, events, deps);
   events.push(...traitsAtTurnStart(state, actorId, deps));
   holyNimbus(state, actorId, events, deps);
@@ -262,48 +300,4 @@ function dealOngoingDamage(state: GameState, bearer: Actor, effect: Effect, deps
     },
     ...events
   ];
-}
-
-/** One pending save per repeating effect the creature bears. An unanswered one from its last turn is replaced. */
-export function openRepeatSaves(state: GameState, actorId: string, deps: TurnEndDeps): EffectNarration[] {
-  const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor) return [];
-  return actor.effects.flatMap((effect) =>
-    effect.repeatSave ? [openEndingSave(state, actor, effect, effect.repeatSave, "repeats", deps)] : []
-  );
-}
-
-/** A save the bearer owes against one of its effects, a success ending it (`repeatOf`): repeated at the end of its
- *  turn, or made once its ongoing damage lands. */
-function openEndingSave(
-  state: GameState,
-  bearer: Actor,
-  effect: Effect,
-  save: Readonly<{ ability: AbilityId; dc: number; disadvantageFrom?: string }>,
-  verb: "repeats" | "makes",
-  deps: TurnEndDeps
-): EffectNarration {
-  createPendingSaves(state, {
-    ...(save.disadvantageFrom ? { disadvantage: { targetId: bearer.id, from: save.disadvantageFrom } } : {}),
-    sourceActorId: effect.sourceActorId,
-    sourceName: effect.sourceName ?? effect.name,
-    actionName: `${effect.name} - ${verb === "repeats" ? "repeat save" : "save"}`.slice(0, 120),
-    ability: save.ability,
-    dc: save.dc,
-    targetIds: [bearer.id],
-    proposedDamage: 0,
-    halfOnSuccess: false,
-    conditionIds: [],
-    repeatOf: { actorId: bearer.id, effectId: effect.id },
-    // Repeated against a spell's effect (Hold Person), it is still a save against magic.
-    magical: effect.magical === true,
-    newSaveId: deps.newId,
-    createdAt: Date.parse(deps.now())
-  });
-  return {
-    kind: "condition",
-    text: `${bearer.name} ${verb} the ${save.ability.toUpperCase()} save against ${effect.name} (DC ${save.dc}); a success ends it.`,
-    actorId: bearer.id,
-    ...sourceOf(effect)
-  };
 }

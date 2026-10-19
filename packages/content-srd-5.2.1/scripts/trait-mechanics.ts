@@ -123,10 +123,44 @@ function turnEndAura(trait: Trait): TraitMechanic | null {
   };
 }
 
+/** "While underwater, the aboleth is surrounded by mucus. Constitution Saving Throw: DC 14, each creature in a 5-foot
+ *  Emanation originating from the aboleth at the end of the aboleth's turn. Failure: The target is cursed. Until the
+ *  curse ends, the target's skin becomes slimy, the target can breathe air and water, and it can't regain Hit Points
+ *  unless it is underwater." Its acid every 10 minutes out of water is downtime, the GM's. */
+function turnEndSaveAura(trait: Trait): TraitMechanic | null {
+  const match =
+    /^While underwater, the [\w -]+? is surrounded by mucus\. ([A-Z][a-z]+) Saving Throw: DC (\d+), each creature in a (\d+)-foot Emanation originating from the [\w -]+? at the end of the [\w' -]+? turn\. Failure: The target is cursed\./.exec(
+      trait.description
+    );
+  const ability = match ? abilityOf(match[1]!) : null;
+  if (!match || !ability) return null;
+  return {
+    kind: "aura",
+    name: trait.name,
+    trigger: "bearer-turn-end",
+    rangeFeet: Number(match[3]),
+    affects: "all",
+    underwaterOnly: true,
+    save: {
+      ability,
+      dc: Number(match[2]),
+      successDamage: "none",
+      failureConditions: [],
+      failureEffect: {
+        name: "Cursed (slimy skin)",
+        tags: ["curse", "water-breathing", "no-healing-on-land"],
+        modifiers: []
+      }
+    },
+    reminder:
+      "Out of water, the cursed creature takes 6 (1d12) Acid damage at the end of every 10 minutes unless moisture is applied to its skin."
+  };
+}
+
 /** "Constitution Saving Throw: DC 10, any creature that starts its turn in a 5-foot Emanation originating from the
  *  ghast. Failure: The target has the Poisoned condition until the start of its next turn. Success: The target is
  *  immune to this ghast's Stench for 24 hours." A pit fiend's names "any enemy ... in the aura" of a 20-foot
- *  Emanation; a gibbering mouther's "within 20 feet", its failure a d8 table the GM reads; a sea hag's "any Beast or
+ *  Emanation; a gibbering mouther's "within 20 feet", its failure a d8 table the server rolls; a sea hag's "any Beast or
  *  Humanoid that starts its turn within 30 feet of the hag and can see the hag's true form", whose sight the GM
  *  judges. */
 function turnStartAura(trait: Trait): TraitMechanic | null {
@@ -165,7 +199,12 @@ function turnStartAura(trait: Trait): TraitMechanic | null {
       ...(conditionId ? { failureDuration: { type: "until-bearer-next-turn" as const } } : {}),
       ...(match[7] && /^The target is immune to this\b/.test(match[7]) ? { immuneOnSuccess: true as const } : {})
     },
-    ...(conditionId ? {} : { reminder: `On a failed save: ${failure}`.slice(0, 600) })
+    // A gibbering mouther's "rolls 1d8 to determine what it does during the current turn" is a table the server rolls.
+    ...(conditionId
+      ? {}
+      : /^The target rolls 1d8 to determine what it does during the current turn:/.test(failure)
+        ? { failureTable: "gibbering" as const }
+        : { reminder: `On a failed save: ${failure}`.slice(0, 600) })
   };
 }
 
@@ -223,13 +262,26 @@ function meleeHitDamage(trait: Trait): TraitMechanic | null {
   return match && damage ? { kind: "melee-hit-damage", name: trait.name, damage } : null;
 }
 
-/** "Whenever the golem starts its turn Bloodied, roll 1d6. On a 6, the golem goes berserk." */
+/** "Whenever the golem starts its turn Bloodied, roll 1d6. On a 6, the golem goes berserk." A flesh golem's "creator,
+ *  if within 60 feet of the berserk golem, can try to calm it by taking an action to make a DC 15 Charisma (Persuasion)
+ *  check". */
 function berserk(trait: Trait): TraitMechanic | null {
   const match =
     /^Whenever the [\w -]+? starts its turn Bloodied, roll 1d6\. On a (\d), the [\w -]+? goes berserk\./.exec(
       trait.description
     );
-  return match ? { kind: "berserk", name: trait.name, on: Number(match[1]) } : null;
+  const calm =
+    /\bif within (\d+) feet of the berserk [\w -]+?, can try to calm it by taking an action to make a DC (\d+) Charisma \(Persuasion\) check\b/.exec(
+      trait.description
+    );
+  return match
+    ? {
+        kind: "berserk",
+        name: trait.name,
+        on: Number(match[1]),
+        ...(calm ? { calm: { dc: Number(calm[2]), withinFeet: Number(calm[1]) } } : {})
+      }
+    : null;
 }
 
 /** "The elemental sheds Bright Light in a 30-foot radius and Dim Light for an additional 30 feet." */
@@ -281,6 +333,7 @@ const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
   regeneration,
   undeadFortitude,
   turnEndAura,
+  turnEndSaveAura,
   turnStartAura,
   grappleTurnStart,
   deathBurst,

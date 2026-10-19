@@ -448,7 +448,27 @@ const SAVE_LIFETIME_KEYS = [
   "failureHazard",
   "failurePush.**",
   "advantageAtSize",
-  "escapeAthletics"
+  "escapeAthletics",
+  "repeatOnce",
+  "repeatAtTurnStart",
+  "repeatOnDamage.**",
+  "repeatByAction",
+  "repeatFailureDamage[].**",
+  "repeatTally",
+  "secondFailure.**",
+  "failureExhaustion",
+  "advantageIfFighting",
+  "immuneOnSuccess",
+  "endsWhenSourceDies",
+  "onlyCreatureTypes",
+  "sparesAffected",
+  "failureKills.**",
+  "repeatDamageAgain",
+  "repeatUnseenSource",
+  "endsOutOfSight",
+  "autoSuccess.**",
+  "endedBy.**",
+  "atRest.**"
 ] as const;
 
 /** The save-block keys that make a failure act by the target's Hit Points or send it home (`SaveOutcomeFields`). */
