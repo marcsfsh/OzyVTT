@@ -1,12 +1,4 @@
-import type {
-  Actor,
-  CheckRollOutcome,
-  GameState,
-  HeldRoll,
-  RollCall,
-  RollRecord,
-  RollVisibility
-} from "@vtt/domain";
+import type { Actor, CheckRollOutcome, GameState, HeldRoll, RollCall, RollRecord, RollVisibility } from "@vtt/domain";
 import { d20FacesFor, otherDiceOf, rerollLowestD20, type RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { checkPlan, type CheckNames, type CheckPlan, type CheckSubject, totalCheck } from "./ability-checks.js";
@@ -25,8 +17,11 @@ import type { EffectNarration } from "./effects.js";
 import {
   answeredLines,
   answeredRead,
+  answerKeyOf,
+  answersFromOthers,
   answersOffered,
   applyRollAnswer,
+  askAnswer,
   type AnswerDeps,
   type AnswerTarget
 } from "./roll-answers.js";
@@ -71,8 +66,13 @@ export type CheckRollInput = Readonly<{
   callId?: string;
 }>;
 
-/** A check as it was rolled, and whether its numbers are kept from the one who rolled it (a blind roll). */
-export type CheckResult = Readonly<{ outcome: CheckRollOutcome; hiddenFromRoller: boolean }>;
+/** A check as it was rolled, and whether its numbers are kept from the one who rolled it (a blind roll), with what
+ *  it set off (another creature asked to answer it, an effect an answer ended). */
+export type CheckResult = Readonly<{
+  outcome: CheckRollOutcome;
+  hiddenFromRoller: boolean;
+  events?: readonly EffectNarration[];
+}>;
 
 const checkKey = (actorId: string) => `check:${actorId}`;
 
@@ -162,7 +162,7 @@ function recordCheck(
       ...(input.findActorId !== undefined ? { findActorId: input.findActorId } : {})
     }
   });
-  return heldCheckResult(state, scope, actor, plan, typed ? "normal" : readAs, deps);
+  return heldCheckResult(state, scope, actor, plan, typed ? "normal" : readAs, deps, input.commandId);
 }
 
 /** The latest check as its held dice and answers make it: written to the GM's call it answers, and told with the
@@ -173,7 +173,8 @@ function heldCheckResult(
   actor: Actor,
   plan: CheckPlan,
   readAs: "advantage" | "disadvantage" | "normal",
-  deps: CheckRollDependencies
+  deps: CheckRollDependencies,
+  commandId: string
 ): CheckResult {
   const held = heldRollFor(state, checkKey(actor.id))!;
   const check = held.check!;
@@ -187,7 +188,17 @@ function heldCheckResult(
   const answered = answeredLines(held);
   const offered = answersOffered(state, checkTarget(actor, held, plan, readAs, roll), checkAnswerDeps(scope, deps));
   const visibility = checkVisibility(state, scope, actor.id, check.visibility);
+  const events = askCheckAnswers(
+    state,
+    scope,
+    actor,
+    held,
+    checkTarget(actor, held, plan, readAs, roll),
+    deps,
+    commandId
+  );
   return {
+    ...(events.length > 0 ? { events } : {}),
     outcome: {
       label: plan.label,
       natural: roll.natural,
@@ -203,6 +214,40 @@ function heldCheckResult(
     },
     hiddenFromRoller: visibility === "blind" && scope.role !== "gm"
   };
+}
+
+/**
+ * Others' answers to a character's latest check once it is shown (Cutting Words on a success, Improve Fate, a sphinx's
+ * Burst of Ingenuity), asked one at a time in turn order, each creature once. The check has counted already, so an
+ * answer amends it, and the GM's call it answers.
+ */
+function askCheckAnswers(
+  state: GameState,
+  scope: Initiator,
+  actor: Actor,
+  held: HeldRoll,
+  target: AnswerTarget,
+  deps: CheckRollDependencies,
+  commandId: string
+): EffectNarration[] {
+  if (!state.combat.active) return [];
+  const waiting = state.combat.pendingReactions.some(
+    (prompt) => prompt.kind === "roll-answer" && prompt.rollKind === "check" && prompt.sourceActorId === actor.id
+  );
+  if (waiting) return [];
+  const asked = held.asked ?? [];
+  const next = answersFromOthers(state, target, checkAnswerDeps(scope, { ...deps, commandId }), new Set(asked))[0];
+  if (!next) return [];
+  const all = [...asked, answerKeyOf(next)];
+  state.heldRolls = state.heldRolls.map((entry) => (entry.key === held.key ? { ...entry, asked: all } : entry));
+  return [
+    askAnswer(
+      state,
+      next,
+      { rollKind: "check", roller: actor, targetActorId: null, asked: all },
+      { newId: deps.newId, now: deps.now, commandId }
+    )
+  ];
 }
 
 /** A held check's numbers with its answers: a d20 an answer set is read alone, and what answers added is added. */
@@ -264,9 +309,14 @@ const checkAnswerDeps = (scope: Initiator, deps: CheckRollDependencies): AnswerD
 export function answerAbilityCheck(
   state: GameState,
   scope: Initiator,
-  input: Readonly<{ commandId: string; actorId: string; answer: Readonly<{ id: string; subtract?: boolean; face?: number }> }>,
+  input: Readonly<{
+    commandId: string;
+    actorId: string;
+    /** `by` names another creature answering through its prompt (Cutting Words); absent, the one who rolled. */
+    answer: Readonly<{ id: string; subtract?: boolean; face?: number; by?: string }>;
+  }>,
   deps: CheckRollDependencies
-): CheckResult & Readonly<{ events: EffectNarration[] }> {
+): CheckResult & Readonly<{ events: readonly EffectNarration[] }> {
   const actor = state.actors.find((candidate) => candidate.id === input.actorId);
   if (!actor) throw new CommandRejectedError("That character no longer exists.");
   requireActorAccess(scope, state, actor.id, "check", "You can only roll for your own character.");
@@ -288,14 +338,18 @@ export function answerAbilityCheck(
   const { plan } = planFor(state, scope, rollInput, deps);
   const readAs = held.typed ? "normal" : (check.rollMode ?? plan.rollMode.mode);
   const roll = answeredCheck(plan, held, readAs, deps.random);
+  const bearer =
+    input.answer.by === undefined ? actor : state.actors.find((candidate) => candidate.id === input.answer.by);
+  if (!bearer) throw new CommandRejectedError("The creature answering the check is no longer here.");
   const events = applyRollAnswer(
     state,
     checkTarget(actor, held, plan, readAs, roll),
-    actor,
+    bearer,
     input.answer,
     checkAnswerDeps(scope, { ...deps, commandId: input.commandId })
   );
-  return { ...heldCheckResult(state, scope, actor, plan, readAs, deps), events };
+  const result = heldCheckResult(state, scope, actor, plan, readAs, deps, input.commandId);
+  return { ...result, events: [...events, ...(result.events ?? [])] };
 }
 
 /** A check that settles something on the spot (first aid, reading a scroll), rolled once with its plan's bonus and

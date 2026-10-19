@@ -111,6 +111,7 @@ export const rollCommands = [
       if (duplicate || !result) return;
       kit.publishRolls(state, commandId);
       narrateVerdict(kit, actorId, result, visibility);
+      kit.publishNarrations(result.events ?? []);
       return checkReply(result);
     }
   }),
@@ -145,6 +146,7 @@ export const rollCommands = [
       if (duplicate || !result) return;
       kit.publishRolls(state, request.commandId);
       narrateVerdict(kit, request.actorId, result, visibility);
+      kit.publishNarrations(result.events ?? []);
       return checkReply(result);
     }
   }),
@@ -252,6 +254,7 @@ export const rollCommands = [
       if (duplicate || !result) return;
       kit.publishRolls(state, request.commandId);
       narrateVerdict(kit, request.actorId, result, blind ? "gm-only" : "public");
+      kit.publishNarrations(result.events ?? []);
       return checkReply(result);
     }
   }),

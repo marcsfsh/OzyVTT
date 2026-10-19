@@ -250,9 +250,15 @@ function interpretAction(
     adds,
     grantScaling,
     answerAmountByLevel,
+    reactionByLevel,
     ...carried
   } = action;
   const assembled: Record<string, unknown> = { ...carried };
+  // A reaction that changes with level (Deflect Energy widens Deflect Attacks to every damage type at Monk 13).
+  const reactionRows = (reactionByLevel ?? [])
+    .filter((row) => row.level <= context.level)
+    .sort((left, right) => left.level - right.level);
+  if (reactionRows.length > 0) assembled.reaction = reactionRows[reactionRows.length - 1]!.reaction;
   // The die an answer rolls at this level (the Bardic Inspiration die), on the action's answer and its grant's.
   const answerRows = (answerAmountByLevel ?? [])
     .filter((row) => row.level <= context.level)
@@ -320,6 +326,10 @@ function interpretAction(
       assembled.damage = [{ ...damage[0], formula: formulaPlus(damage[0].formula, bonus) }, ...damage.slice(1)];
     const healing = assembled.healing as ActorAction["healing"];
     if (healing) assembled.healing = { ...healing, formula: formulaPlus(healing.formula, bonus) };
+    // "1d10 plus your Dexterity modifier and Monk level" taken off a hit's damage.
+    const reaction = assembled.reaction as ActorAction["reaction"];
+    if (reaction?.response === "reduce-damage")
+      assembled.reaction = { ...reaction, formula: formulaPlus(reaction.formula, bonus) };
   }
   // The grant's damage bonus is the printed column at this level (Rage Damage), and the sheet says the number.
   if (grantScaling && action.grants) {

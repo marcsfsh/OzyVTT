@@ -1061,7 +1061,7 @@ describe("reaction prompts: Uncanny Dodge (ADR-0020 amendment)", () => {
       [15, 6, 6, 6]
     );
     expect(bite.reactionPrompts).toEqual([
-      { actorId: IDS.pip, actorName: "Pip Underbough", actionName: "Uncanny Dodge" }
+      { actorId: IDS.pip, actorName: "Pip Underbough", actionName: "Uncanny Dodge", holdsDamage: true }
     ]);
     expect(game.combat.pendingReactions).toHaveLength(1);
     const prompt = game.combat.pendingReactions[0];

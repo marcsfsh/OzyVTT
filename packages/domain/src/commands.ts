@@ -501,6 +501,8 @@ export const ReactionAnswerSchema = z
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     /** The extras the swing's previewed hit offered that the answerer adds to it (Sneak Attack), sent with the confirm. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
+    /** An answer to another creature's roll that may go either way (Improve Fate): take its die off the roll. */
+    subtract: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

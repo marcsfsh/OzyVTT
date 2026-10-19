@@ -3,6 +3,7 @@ import type {
   GameState,
   HeldAnswer,
   HeldRoll,
+  PendingReaction,
   PendingSave,
   RollAnswered,
   RollAnswerOffer,
@@ -31,6 +32,7 @@ import { recordRoll, rolledTerms } from "./roll-history.js";
 import { effectiveModeFor } from "./rules-families.js";
 import { statblockFacts } from "./statblock-facts.js";
 import { useCostOf } from "./use-cost.js";
+import { hiddenFrom } from "./vision/audience.js";
 
 /**
  * Answers to a roll its maker has seen and that hasn't counted yet (SRD "after seeing the roll but before any of the
@@ -41,7 +43,7 @@ import { useCostOf } from "./use-cost.js";
  */
 
 type RollMode = "advantage" | "disadvantage" | "normal";
-export type AnswerRollKind = "attack" | "save" | "check" | "death-save";
+export type AnswerRollKind = "attack" | "save" | "check" | "death-save" | "damage";
 
 /** What a save is against, for an answer limited to some saves (Countercharm, Resist Enchantment). */
 export type SaveStakes = Readonly<{
@@ -68,7 +70,7 @@ export type AnswerTarget = Readonly<{
   ability?: AbilityId;
   stakes?: SaveStakes;
   /** How the roll was recorded, so an answer's own dice are recorded the same way. */
-  purpose: "attack" | "save" | "check";
+  purpose: "attack" | "save" | "check" | "damage";
   label: string;
   visibility: RollVisibility;
 }>;
@@ -256,10 +258,12 @@ function refusal(
     if (apart !== null && apart > answer.rangeFeet + DISTANCE_TOLERANCE_FEET)
       return `${target.roller.name} is farther than ${answer.rangeFeet} feet from ${bearer.name}.`;
   }
-  const success = succeeds(target, 0);
+  // A damage roll neither succeeds nor fails: an answer to it is offered whenever one is made.
+  const success = target.kind === "damage" ? null : succeeds(target, 0);
   if (answer.when === "failure" && success === true) return `${source.name} answers a roll that fails.`;
   if (answer.when === "success" && success === false) return `${source.name} answers a roll that succeeds.`;
-  if (answer.when === "natural-one" && target.natural !== 1) return `${source.name} answers a d20 that shows 1.`;
+  if (answer.when === "natural-one" && (target.kind === "damage" || target.natural !== 1))
+    return `${source.name} answers a d20 that shows 1.`;
   if (answer.notWhileIncapacitated && (bearer.hp.current <= 0 || isIncapacitated(bearer)))
     return `${bearer.name} can't use ${source.name} while Incapacitated.`;
   if (answer.abilities && (target.ability === undefined || !answer.abilities.includes(target.ability)))
@@ -269,8 +273,8 @@ function refusal(
   const effect = answer.effect;
   if (effect.kind === "succeed" && target.kind !== "save") return `${source.name} answers a saving throw.`;
   if (effect.kind === "hit" && target.kind !== "attack") return `${source.name} answers an attack roll.`;
-  const held = heldOf(state, target.key);
-  if (held.answers.some((given) => given.id === source.id && given.actorId === bearer.id))
+  const held = state.heldRolls.find((entry) => entry.key === target.key);
+  if (held?.answers.some((given) => given.id === source.id && given.actorId === bearer.id))
     return `${source.name} has already answered this roll.`;
   if (source.kind === "effect") return null;
   const action = source.action;
@@ -330,9 +334,19 @@ export function answersFromOthers(
   return order.flatMap((actorId) => {
     const bearer = state.actors.find((actor) => actor.id === actorId);
     if (!bearer || !state.combat.initiative.some((entry) => entry.actorId === bearer.id)) return [];
+    // "A creature you can see": a player is never asked about a roll of a creature hidden from them, which the
+    // prompt would point at.
+    const owner = bearer.kind === "player-character" ? bearer.ownerSessionId : null;
+    const content = { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
+    if (owner !== null && hiddenFrom(state, content, owner)(target.roller.id)) return [];
     const { sources, siblings } = sourcesOf(bearer, deps);
     return sources.flatMap((source) => {
-      if (source.answer.whose === "own" || asked.has(`${bearer.id}:${source.id}`)) return [];
+      if (
+        source.kind !== "action" ||
+        source.answer.whose === "own" ||
+        asked.has(answerKeyOf({ bearer, offer: source }))
+      )
+        return [];
       if (refusal(state, target, bearer, source, siblings, deps) !== null) return [];
       const effect = source.answer.effect;
       return [
@@ -429,9 +443,7 @@ export function applyRollAnswer(
   choice: Readonly<{ id: string; subtract?: boolean; face?: number }>,
   deps: AnswerDeps
 ): EffectNarration[] {
-  const { sources, siblings } = sourcesOf(bearer, deps);
-  const source = sources.find((candidate) => candidate.id === choice.id);
-  if (!source) throw new CommandRejectedError(`${bearer.name} has no such answer to give.`);
+  const { source, siblings } = answerSourceOf(bearer, choice.id, deps);
   const refused = refusal(state, target, bearer, source, siblings, deps);
   if (refused !== null) throw new CommandRejectedError(refused);
   const held = heldOf(state, target.key);
@@ -516,6 +528,121 @@ export function applyRollAnswer(
   }));
   return events;
 }
+
+/** The bearer's answer by its id. */
+function answerSourceOf(
+  bearer: LiveActor,
+  id: string,
+  deps: Pick<AnswerDeps, "resolveDefinition" | "catalog">
+): { source: AnswerSource; siblings: readonly DefinitionAction[] } {
+  const { sources, siblings } = sourcesOf(bearer, deps);
+  const source = sources.find((candidate) => candidate.id === id);
+  if (!source) throw new CommandRejectedError(`${bearer.name} has no such answer to give.`);
+  return { source, siblings };
+}
+
+/**
+ * An answer to a roll that holds no die of its own any more (an attack waiting at its roll, a hit's damage): only an
+ * answer that adds or takes off a rolled amount meets it (Cutting Words, Improve Fate). Rolls the amount, records it,
+ * pays for it, and returns what it adds to the roll.
+ */
+export function answerAmount(
+  state: GameState,
+  target: AnswerTarget,
+  bearer: LiveActor,
+  choice: Readonly<{ id: string; subtract?: boolean }>,
+  deps: AnswerDeps
+): Readonly<{ name: string; amount: string; bonus: number; events: EffectNarration[] }> {
+  const { source, siblings } = answerSourceOf(bearer, choice.id, deps);
+  const refused = refusal(state, target, bearer, source, siblings, deps);
+  if (refused !== null) throw new CommandRejectedError(refused);
+  const effect = source.answer.effect;
+  if (effect.kind !== "add" && effect.kind !== "subtract" && effect.kind !== "add-or-subtract")
+    throw new CommandRejectedError(`${source.name} can't answer this roll any more.`);
+  const rolled = resolveDice(parseDiceFormula(effect.amount), deps.random);
+  const sign = effect.kind === "subtract" || (effect.kind === "add-or-subtract" && choice.subtract === true) ? -1 : 1;
+  recordAnswerRoll(state, target, bearer, `${source.name} on ${target.roller.name}'s ${target.label}`, rolled, deps);
+  const events: EffectNarration[] = [];
+  payFor(state, bearer, source, events);
+  return { name: source.name, amount: effect.amount, bonus: sign * rolled.total, events };
+}
+
+/** The key a prompt remembers an answer by, so each creature's answer is asked once per roll. */
+export function answerKeyOf(
+  asked: Readonly<{ bearer: Pick<LiveActor, "id">; offer: Readonly<{ id: string }> }>
+): string {
+  return `${asked.bearer.id}:${asked.offer.id}`;
+}
+
+/** What a prompt for another creature's answer carries: the roll it meets, and what was asked before. */
+export type AnswerPromptRoll = Readonly<{
+  rollKind: "attack" | "save" | "check" | "damage";
+  roller: LiveActor;
+  /** The creature the roll is aimed at: an attack's or a damage roll's target. */
+  targetActorId: string | null;
+  saveId?: string;
+  parkedAttack?: PendingReaction["parkedAttack"];
+  proposedDamageParts?: PendingReaction["proposedDamageParts"];
+  critical?: boolean;
+  /** A held hit's damage: how the hit was made, and what it drains, for the reactions after this answer. */
+  hitKinds?: readonly string[];
+  drain?: PendingReaction["drain"];
+  asked: readonly string[];
+}>;
+
+/**
+ * Opens the prompt that asks a creature for its answer to another's roll (Cutting Words, Countercharm, Improve Fate):
+ * its player, or the GM for a stat block, answers it with `reaction.answer`. Returns the line that announces it, the
+ * roller masked for the table when hidden.
+ */
+export function askAnswer(
+  state: GameState,
+  next: Readonly<{ bearer: LiveActor; offer: RollAnswerOffer }>,
+  roll: AnswerPromptRoll,
+  deps: Readonly<{ newId: () => string; now: () => string; commandId: string }>
+): EffectNarration {
+  const parts = roll.proposedDamageParts ?? [];
+  const prompt: PendingReaction = {
+    id: deps.newId(),
+    kind: "roll-answer",
+    actorId: next.bearer.id,
+    actionId: next.offer.id,
+    actionName: next.offer.name,
+    targetActorId: roll.targetActorId,
+    sourceActorId: roll.roller.id,
+    sourceName: roll.roller.name,
+    triggerCommandId: deps.commandId,
+    proposedDamage: parts.reduce((sum, part) => sum + part.amount, 0),
+    proposedDamageParts: [...parts],
+    critical: roll.critical ?? false,
+    weighed: null,
+    acBonus: null,
+    rollsAttack: false,
+    parkedAttack: roll.parkedAttack ?? null,
+    rollKind: roll.rollKind,
+    ...(roll.saveId !== undefined ? { saveId: roll.saveId } : {}),
+    answerDoes: next.offer.does.slice(0, 80),
+    ...(next.offer.either ? { answerEither: true as const } : {}),
+    asked: [...roll.asked],
+    ...(roll.hitKinds && roll.hitKinds.length > 0 ? { hitKinds: [...roll.hitKinds] } : {}),
+    ...(roll.drain ? { drain: roll.drain } : {}),
+    createdAt: Date.parse(deps.now())
+  };
+  state.combat = { ...state.combat, pendingReactions: [...state.combat.pendingReactions, prompt] };
+  return {
+    kind: "reaction",
+    text: `${next.bearer.name} may answer ${roll.roller.name}'s ${ROLL_WORDS[roll.rollKind]} with ${next.offer.name}.`,
+    actorId: next.bearer.id,
+    source: { actorId: roll.roller.id, name: roll.roller.name }
+  };
+}
+
+const ROLL_WORDS: Readonly<Record<AnswerPromptRoll["rollKind"], string>> = {
+  attack: "attack roll",
+  save: "saving throw",
+  check: "ability check",
+  damage: "damage roll"
+};
 
 /** The d20 a held roll's faces show once a reroll answer changed how they are read. */
 export function keptFace(held: Pick<HeldRoll, "faces" | "readAs">, mode: RollMode): number {

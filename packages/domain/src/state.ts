@@ -318,6 +318,16 @@ export const PendingSaveSchema = z
       })
       .strict()
       .optional(),
+    /** Confirmed and waiting on another creature's answer to the roll (Countercharm, Burst of Ingenuity): how it was
+     *  confirmed, which the finish replays, and who was asked. GM bookkeeping, never projected. */
+    confirmed: z
+      .object({
+        rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+        damageOverride: z.number().int().min(0).max(1000).optional(),
+        asked: z.array(z.string().min(1).max(300)).max(40).default([])
+      })
+      .strict()
+      .optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
@@ -389,6 +399,8 @@ export const HeldRollSchema = z
     answers: z.array(HeldAnswerSchema).max(12).default([]),
     /** A reroll with Advantage (Countercharm) reads the new dice that way, whatever the rules gave the first throw. */
     readAs: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+    /** The other creatures already asked to answer this roll (a check's Cutting Words), so each is asked once. */
+    asked: z.array(z.string().min(1).max(300)).max(40).optional(),
     /** A check's subject and how it was made, so Heroic Inspiration can reroll it. */
     check: z
       .object({
@@ -509,6 +521,23 @@ export const ParkedAttackSchema = z
   .strict();
 export type ParkedAttack = z.infer<typeof ParkedAttackSchema>;
 
+/** What a damage reaction does to the damage it holds: halve it (Uncanny Dodge), take a rolled amount off it (Deflect
+ *  Attacks, Stone's Endurance), or give Resistance to its type until the turn ends (Superior Hunter's Defense). */
+export const DamageResponseSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("half") }).strict(),
+  z
+    .object({
+      kind: z.literal("reduce"),
+      formula: z
+        .string()
+        .regex(/^(?:\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?|\d+)$/i)
+        .max(40)
+    })
+    .strict(),
+  z.object({ kind: z.literal("resist") }).strict()
+]);
+export type DamageResponse = z.infer<typeof DamageResponseSchema>;
+
 /** A declared reaction (ADR-0020) awaiting an answer, which persists until it is answered or the GM dismisses it, so
  * nothing it holds is lost. What it holds depends on the trigger: a hit's damage (Uncanny Dodge), an attack not yet
  * landed (Parry), or nothing, when answering strikes a creature (an opportunity attack, Hellish Rebuke). */
@@ -516,8 +545,12 @@ export const PendingReactionSchema = z
   .object({
     id: z.uuid(),
     /** What opened the window: an attack that hit the reactor, an enemy leaving its reach (opportunity attack), an
-     *  attack that would hit before its damage (`attack-would-hit`), or a creature damaging the reactor. */
-    kind: z.enum(["hit-by-attack", "leaves-reach", "attack-would-hit", "damaged-by-creature"]).default("hit-by-attack"),
+     *  attack that would hit before its damage (`attack-would-hit`), a creature damaging the reactor, a roll another
+     *  creature may answer (`roll-answer`: Cutting Words, Countercharm), or damage the reactor is about to take from
+     *  any source (`takes-damage`). */
+    kind: z
+      .enum(["hit-by-attack", "leaves-reach", "attack-would-hit", "damaged-by-creature", "roll-answer", "takes-damage"])
+      .default("hit-by-attack"),
     actorId: z.uuid(),
     actionId: z
       .string()
@@ -555,6 +588,22 @@ export const PendingReactionSchema = z
     parkedAttack: ParkedAttackSchema.nullable().default(null),
     /** attack-would-hit: the held attack's total, against the reactor's AC before the reaction. */
     attackTotal: z.number().int().min(-100).max(1000).optional(),
+    /** roll-answer: the roll it meets (the creature whose roll it is is the source): an attack waiting at its roll
+     *  (`parkedAttack`), a save waiting on its confirm (`saveId`), that creature's latest check, or a hit's damage on
+     *  `targetActorId` (`proposedDamageParts`). */
+    rollKind: z.enum(["attack", "save", "check", "damage"]).optional(),
+    saveId: z.uuid().optional(),
+    /** roll-answer: what the answer does, for its button ("-1d8"), and whether the answerer picks its sign. */
+    answerDoes: z.string().min(1).max(80).optional(),
+    answerEither: z.literal(true).optional(),
+    /** The creatures and answers this roll or damage was already offered to, so each is asked once. */
+    asked: z.array(z.string().min(1).max(300)).max(40).optional(),
+    /** hit-by-attack and takes-damage: what using the reaction does to the damage it holds; absent, it halves it. */
+    damageResponse: DamageResponseSchema.optional(),
+    /** takes-damage: what the parked damage drains as it lands (a save's Harm). */
+    drain: DamageDrainSchema.optional(),
+    /** How the hit whose damage it holds was made, so a reaction limited to some attacks is offered after it. */
+    hitKinds: z.array(z.string().min(1).max(20)).max(10).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();

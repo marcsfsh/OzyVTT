@@ -1687,10 +1687,18 @@ export type ActionArea = z.infer<typeof ActionAreaSchema>;
 
 const ReactionRangeFeet = z.number().int().min(5).max(1000).optional();
 
+/** The attack kinds a damage reaction can be limited to ("an attack roll made with a Ranged or Thrown weapon"). */
+const ReactionAttackKindSchema = z.enum(["melee", "ranged", "melee-weapon", "ranged-weapon", "thrown", "spell"]);
+
 /**
  * A reaction the engine offers as a prompt when its trigger happens (ADR-0020); only meaningful on activation
  * "reaction". The response is what answering "use" does:
  * - half-damage (Uncanny Dodge): halve the hit's damage.
+ * - reduce-damage (Deflect Attacks, Stone's Endurance): roll `formula` and take it off the damage, on a hit
+ *   (`hit-by-attack`, limited to `damageTypes` it includes and `attackKinds` it was made as) or on any damage the
+ *   reactor is about to take (`takes-damage`, from a hit or a failed save).
+ * - resist-type (Superior Hunter's Defense): Resistance to the damage's type until the end of the current turn, the
+ *   triggering damage included.
  * - ac-bonus (Parry, Shield): add `amount` to AC against the attack before it lands, possibly turning the hit into a
  *   miss. `melee` limits it to melee attacks; `untilNextTurn` keeps the bonus until the reactor's next turn starts.
  * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action against the creature that dealt the damage.
@@ -1699,6 +1707,16 @@ const ReactionRangeFeet = z.number().int().min(5).max(1000).optional();
  */
 export const ActionReactionSchema = z.discriminatedUnion("response", [
   z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict(),
+  z
+    .object({
+      trigger: z.enum(["hit-by-attack", "takes-damage"]),
+      response: z.literal("reduce-damage"),
+      formula: DamageFormulaSchema,
+      damageTypes: z.array(DamageTypeSchema).min(1).max(13).optional(),
+      attackKinds: z.array(ReactionAttackKindSchema).min(1).max(6).optional()
+    })
+    .strict(),
+  z.object({ trigger: z.literal("takes-damage"), response: z.literal("resist-type") }).strict(),
   z
     .object({
       trigger: z.literal("hit-by-attack"),

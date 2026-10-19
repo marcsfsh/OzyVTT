@@ -24,6 +24,22 @@ function reactionLine(outcome: ReactionOutcome): { kind: "reaction" | "damage"; 
   const attack = resolution?.attack ?? null;
   const verdict = attack ? (attack.outcome === "crit" ? "CRIT" : attack.outcome.toUpperCase()) : null;
   switch (outcome.kind) {
+    case "roll-answer": {
+      if (!outcome.used) return null;
+      const save = outcome.save;
+      const after = save
+        ? `: ${save.awaitingAnswer ? "the save waits on another answer" : `the save ${save.success ? "succeeds" : "fails"} (${save.total} vs DC ${save.dc})`}`
+        : verdict
+          ? `: ${verdict}${damage ? `, ${damage}` : ""}`
+          : damage
+            ? `: ${damage}`
+            : "";
+      return {
+        kind: "reaction",
+        text: `${outcome.actorName} used ${outcome.actionName} on ${outcome.sourceName}'s roll${after}.`
+      };
+    }
+    case "takes-damage":
     case "hit-by-attack":
       return outcome.used
         ? {
@@ -92,7 +108,7 @@ export const reactionCommands = [
     type: "reaction.answer",
     operationId: "answerReaction",
     description:
-      "Answers a pending reaction prompt; `use: true` spends the reaction, `use: false` declines it. What else happens depends on the prompt's `kind`. `hit-by-attack` (Uncanny Dodge): the hit's parked damage applies either way, each typed part halved first on use. `attack-would-hit` (Parry, Shield): the attack waiting at its roll finishes either way with the same die, against AC raised by the reaction on use, and a hit's damage applies. `leaves-reach` (an opportunity attack) and `damaged-by-creature` (Hellish Rebuke, Retaliation): use strikes the creature with one melee attack with a weapon or an Unarmed Strike (another action is refused), previewable with `commit: false`, the confirm carrying the `hitOptions` its preview offered (Sneak Attack), and damage that lands applies. Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
+      "Answers a pending reaction prompt; `use: true` spends the reaction, `use: false` declines it. What else happens depends on the prompt's `kind`. `hit-by-attack` (Uncanny Dodge, Deflect Attacks) and `takes-damage` (Stone's Endurance, Superior Hunter's Defense): the parked damage applies either way, halved, less a rolled amount, or met with Resistance to its type on use. `roll-answer` (Cutting Words, Countercharm, Improve Fate): use applies the answer to the other creature's roll (`subtract` takes an either-way die off), and either way the roll moves on to the next creature that may answer it, then lands. `attack-would-hit` (Parry, Shield): the attack waiting at its roll finishes either way with the same die, against AC raised by the reaction on use, and a hit's damage applies. `leaves-reach` (an opportunity attack) and `damaged-by-creature` (Hellish Rebuke, Retaliation): use strikes the creature with one melee attack with a weapon or an Unarmed Strike (another action is refused), previewable with `commit: false`, the confirm carrying the `hitOptions` its preview offered (Sneak Attack), and damage that lands applies. Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
     summary: "Answer a pending reaction prompt: use it (spend the reaction) or decline it.",
     schema: ReactionAnswerSchema,
     malformed: "The reaction answer is malformed.",
@@ -107,7 +123,8 @@ export const reactionCommands = [
         attackNatural,
         reroll,
         pushFeet,
-        hitOptions
+        hitOptions,
+        subtract
       } = request;
       const initiator = initiatorOf(principal);
       // The rules count a player's Advantage and Disadvantage; only the GM may force a mode.
@@ -146,7 +163,8 @@ export const reactionCommands = [
             ...(attackNatural !== undefined ? { attackNatural } : {}),
             ...(reroll === true ? { reroll: true } : {}),
             ...(pushFeet !== undefined ? { pushFeet } : {}),
-            ...(hitOptions ? { hitOptions } : {})
+            ...(hitOptions ? { hitOptions } : {}),
+            ...(subtract === true ? { subtract: true } : {})
           }
         );
         // The reaction taken counts toward the sheet's most-used options: the strike's own action, or the prompt's.
@@ -171,11 +189,13 @@ export const reactionCommands = [
       if (outcome.resolution && !outcome.resolution.preview)
         kit.narrateResolution(
           outcome.resolution,
-          outcome.kind === "attack-would-hit" ? outcome.other!.id : outcome.actorId
+          outcome.kind === "attack-would-hit" || outcome.kind === "roll-answer" ? outcome.other!.id : outcome.actorId
         );
       kit.publishNarrations(outcome.events);
       const resolution =
-        outcome.resolution && outcome.kind === "attack-would-hit" && !isGmGrade(principal)
+        outcome.resolution &&
+        (outcome.kind === "attack-would-hit" || outcome.kind === "roll-answer") &&
+        !isGmGrade(principal)
           ? metAttack(
               outcome.resolution,
               outcome.other?.name ?? null,
@@ -198,12 +218,21 @@ export const reactionCommands = [
     type: "reaction.dismiss",
     operationId: "dismissReaction",
     description:
-      "Dismisses a pending reaction prompt without applying anything it holds (GM-grade only): parked damage is dropped, and so is an attack waiting on a Parry or Shield. It is for when the GM settled it by hand.",
+      "Dismisses a pending reaction prompt without applying anything it holds (GM-grade only): parked damage is dropped, and so is an attack waiting on a Parry or Shield. It is for when the GM settled it by hand. A prompt asking another creature to answer a roll (`roll-answer`) is declined instead, so the roll moves on without that answer.",
     summary: "Dismiss a pending reaction prompt without applying what it holds (GM).",
     schema: ReactionDismissSchema,
     malformed: "The dismissal is malformed.",
     gmOnly: "Only the GM can dismiss a reaction prompt.",
-    async run({ principal, request, execute }) {
+    async run({ principal, request, execute, dispatch }, kit) {
+      // A roll waiting on an answer moves on without it: the GM closing the prompt is a decline.
+      const prompt = kit.read().combat.pendingReactions.find((entry) => entry.id === request.reactionId);
+      if (prompt?.kind === "roll-answer")
+        return dispatch("reaction.answer", {
+          commandId: request.commandId,
+          reactionId: request.reactionId,
+          use: false,
+          ...(request.expectedRevision === undefined ? {} : { expectedRevision: request.expectedRevision })
+        });
       await execute((state) => dismissReaction(state, request.reactionId, initiatorOf(principal)));
     }
   }),

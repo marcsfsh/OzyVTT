@@ -52,6 +52,7 @@ import {
   parkActionSave,
   parkBurstSave,
   parkForAcReaction,
+  parkForRollAnswer,
   parkHeldObjectSave,
   parkReaction
 } from "./resolution/pending.js";
@@ -112,8 +113,9 @@ export function resolveDefinitionAction(
     spendUntilOwnAttack(ctx);
     spendSteadyAim(ctx);
   }
-  // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
-  if (parkForAcReaction(ctx)) {
+  // A roll another creature may still answer (Cutting Words), or a hit the target's Parry or Shield may still turn into
+  // a miss: the attack is spent, and the answer finishes it.
+  if (parkForRollAnswer(ctx) || parkForAcReaction(ctx)) {
     commitEconomy(ctx);
     rollLastCharge(ctx);
     spendAmmunition(ctx);

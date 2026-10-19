@@ -224,7 +224,9 @@ const PENDING_SAVE_FIELDS = {
   // The save's own roll mode is read when it is answered.
   advantageAtSize: "never",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
-  spell: "never"
+  spell: "never",
+  // Who was asked to answer it would name them; the player is told only that it waits (`awaitingAnswer`).
+  confirmed: "derived"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
@@ -273,7 +275,17 @@ const PENDING_REACTION_FIELDS = {
   // Names the attacker's action and how it rolled, which the reactor's player has no need of.
   parkedAttack: "never",
   // Sent as `attackRoll`, and only when the roll it came from is in the player's dice log.
-  attackTotal: "derived"
+  attackTotal: "derived",
+  // What kind of roll the reactor is asked to answer, and what its own answer does.
+  rollKind: "player",
+  answerDoes: "player",
+  answerEither: "player",
+  damageResponse: "player",
+  // The save it waits on and who else was asked are the GM's bookkeeping.
+  saveId: "never",
+  asked: "never",
+  drain: "never",
+  hitKinds: "never"
 } as const satisfies Record<keyof PendingReaction, FieldAudience>;
 
 const PENDING_RULE_ASK_FIELDS = {
@@ -398,6 +410,7 @@ export function projectPlayerCombat(
           ...copyPlayerFields(entry, PENDING_SAVE_FIELDS),
           actionName: hiddenSource ? withoutSourceName(entry.actionName, entry.sourceName) : entry.actionName,
           sourceName: hiddenSource ? HIDDEN_SOURCE : entry.sourceName,
+          ...(entry.confirmed ? { awaitingAnswer: true as const } : {}),
           ...(onFail
             ? {
                 onFailEffect: {

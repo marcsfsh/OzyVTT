@@ -182,7 +182,9 @@ export type ActionResolution = Readonly<{
   /** On a previewed hit, the push its weapon mastery offers (SRD "up to 10 feet"); the confirm says how far with `pushFeet`. */
   push?: Readonly<{ targetName: string; maxFeet: number }> | null;
   /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer. */
-  reactionPrompts?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; actionName: string }>>;
+  reactionPrompts?: ReadonlyArray<
+    Readonly<{ actorId: string; actorName: string; actionName: string; holdsDamage?: true }>
+  >;
   /** An extra attack this swing opened (Cleave's swing at a second creature), for the result card to offer. */
   opens?: Readonly<{ actionId: string; actionName: string }>;
   /** The attack would hit, and the target's reaction (Parry, Shield) may still turn it into a miss. Nothing past the

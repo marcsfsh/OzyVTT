@@ -34,8 +34,11 @@ import { holdsFeature } from "./class-features.js";
 import { heldRollFor, holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
 import {
   answeredLines,
+  answerKeyOf,
+  answersFromOthers,
   answersOffered,
   applyRollAnswer,
+  askAnswer,
   withAnswers,
   type AnswerDeps,
   type AnswerTarget
@@ -100,6 +103,11 @@ export type SaveOutcome = Readonly<{
   autoSucceeded?: string;
   /** Advantage/disadvantage sources that shaped the rolled save (Restrained, Dodge); absent for a plain d20. */
   rollMode?: AggregatedRollMode;
+  /** What answered the roll, already in its numbers, and on a preview what may still answer it. */
+  answered?: readonly RollAnswered[];
+  answers?: readonly RollAnswerOffer[];
+  /** The confirm waits on another creature's answer to the roll (Countercharm); nothing is applied yet. */
+  awaitingAnswer?: true;
 }>;
 
 /** Advantage/disadvantage sources for a save: Restrained gives disadvantage on DEX saves (SRD), and every
@@ -585,7 +593,10 @@ export function shownRollMode(
 export type SaveAnswerOptions = Readonly<{
   face?: number;
   reroll?: boolean;
-  answer?: Readonly<{ id: string; subtract?: boolean; face?: number }>;
+  /** `by` names another creature answering (Countercharm, through its Reaction prompt); absent, the saving one. */
+  answer?: Readonly<{ id: string; subtract?: boolean; face?: number; by?: string }>;
+  /** The confirm of a save that waited on others' answers, finished once they have answered. */
+  settling?: true;
 }>;
 
 /** Answers a pending save (a roll, a typed d20, or the GM's typed total) and auto-applies it: fail takes full damage
@@ -615,6 +626,9 @@ export function answerSave(
   if (damageOverride !== undefined && scope.role !== "gm" && state.builderPolicy.typedRolls !== "open")
     throw new CommandRejectedError("At this table the server rolls the dice. Ask the GM to change the damage.");
   const heldKey = `save:${saveId}`;
+  // A confirmed save waiting on another creature's answer moves only through that answer.
+  if (pending.confirmed && options.settling !== true && options.answer?.by === undefined)
+    throw new CommandRejectedError(`${target.name}'s save waits on an answer to the roll. The GM can close it.`);
 
   let total: number;
   let natural: number | null = null;
@@ -626,6 +640,8 @@ export function answerSave(
   let answered: RollAnswered[] = [];
   let offered: RollAnswerOffer[] = [];
   const answerEvents: EffectNarration[] = [];
+  // A confirm that waits on another creature's answer to the roll applies nothing yet.
+  let awaitingAnswer = false;
   if (options.answer && method !== "roll") throw new CommandRejectedError("Answer a save the dice decide.");
   const targetDefinition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
   const magicResistance = pending.magical ? magicResistanceOf(targetDefinition) : null;
@@ -738,11 +754,14 @@ export function answerSave(
       visibility: target.visibility === "gm-only" ? "gm-only" : "public"
     });
     if (options.answer) {
+      const bearer =
+        options.answer.by === undefined ? target : state.actors.find((actor) => actor.id === options.answer!.by);
+      if (!bearer) throw new CommandRejectedError("The creature answering the save is no longer here.");
       answerEvents.push(
         ...applyRollAnswer(
           state,
           answerTarget(heldRollFor(state, heldKey)),
-          target,
+          bearer,
           options.answer,
           answerDepsOf(deps, commandId)
         )
@@ -750,8 +769,45 @@ export function answerSave(
       // A reroll answer changed the held dice; this look reads them.
       test = throwSave({});
     }
-    const held = commit ? answeredBefore : heldRollFor(state, heldKey);
-    if (commit) releaseHeldRoll(state, heldKey);
+    let held = commit ? answeredBefore : heldRollFor(state, heldKey);
+    // Another creature may answer the confirmed roll first (Countercharm, a sphinx's Burst of Ingenuity), one at a
+    // time in turn order: the confirm waits on its prompt, and the answer finishes it.
+    if (commit && !legendaryResistance && state.combat.active) {
+      const asked = pending.confirmed?.asked ?? [];
+      const next = answersFromOthers(state, answerTarget(held), answerDepsOf(deps, commandId), new Set(asked))[0];
+      if (next) {
+        holdRoll(state, {
+          key: heldKey,
+          actorId: target.id,
+          faces: test.faces,
+          others: otherDiceOf(test.resolution),
+          rollId: held?.rollId ?? (test.fresh ? rollId : null),
+          typed: test.typed
+        });
+        held = heldRollFor(state, heldKey);
+        const confirmed = {
+          ...(forced !== undefined ? { rollMode: forced } : {}),
+          ...(damageOverride !== undefined ? { damageOverride } : {}),
+          asked: [...asked, answerKeyOf(next)]
+        };
+        state.combat = {
+          ...state.combat,
+          pendingSaves: state.combat.pendingSaves.map((entry) =>
+            entry.id === saveId ? { ...entry, confirmed } : entry
+          )
+        };
+        answerEvents.push(
+          askAnswer(
+            state,
+            next,
+            { rollKind: "save", roller: target, targetActorId: null, saveId, asked: confirmed.asked },
+            { newId: deps.newRollId, now: deps.now, commandId }
+          )
+        );
+        awaitingAnswer = true;
+      }
+    }
+    if (commit && !awaitingAnswer) releaseHeldRoll(state, heldKey);
     const read = shown(held);
     natural = read.natural;
     total = read.total;
@@ -759,6 +815,8 @@ export function answerSave(
     answered = answeredLines(held);
     if (!commit) offered = answersOffered(state, answerTarget(held), answerDepsOf(deps, commandId));
   }
+  // Waiting on an answer, the confirm reads as a look: nothing lands until the answer finishes it.
+  const applying = commit && !awaitingAnswer;
 
   let success = autoSucceeded !== null || (autoFailed === null && total >= pending.dc) || answerSucceeds;
   // SRD Legendary Resistance: on a failed save the creature can choose to succeed. The GM commits with
@@ -821,7 +879,7 @@ export function answerSave(
   // Preview (commit=false): the roll is recorded so everyone sees it, but nothing is applied and the
   // save stays open until the answerer confirms. The damage is weighed through the target's defences, so the
   // prompt shows what Confirm will land.
-  if (!commit) {
+  if (!applying) {
     const weighed =
       outcomeDamage > 0
         ? previewDamage(
@@ -849,7 +907,8 @@ export function answerSave(
         ...(weighed && weighed.parts.length > 0 ? { parts: weighed.parts } : {}),
         ...(weighed?.flatReduction ? { flatReduction: weighed.flatReduction } : {}),
         ...(answered.length > 0 ? { answered } : {}),
-        ...(offered.length > 0 ? { answers: offered } : {})
+        ...(offered.length > 0 ? { answers: offered } : {}),
+        ...(awaitingAnswer ? { awaitingAnswer: true as const } : {})
       },
       events: answerEvents
     };

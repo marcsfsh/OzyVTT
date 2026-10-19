@@ -226,7 +226,8 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
       ),
     /** What the built action adds to its first damage part and its healing, read off the character when it is built:
      *  a multiple of its level ("1d10 plus your Fighter level", "five times your Cleric level") and an ability
-     *  modifier ("add your Wisdom modifier"). A reroll answer takes the level multiple as its bonus (Indomitable). */
+     *  modifier ("add your Wisdom modifier"). A reroll answer takes the level multiple as its bonus (Indomitable), and
+     *  a reaction that reduces damage adds all of it to its roll (Deflect Attacks). */
     adds: z
       .object({
         classLevel: z.number().int().min(1).max(10).optional(),
@@ -263,6 +264,13 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
       .describe(
         "The die an answer to a roll rolls, growing with level (the Bardic Inspiration die). The highest matching level replaces the amount of the action's answer and of its grant's answer"
       ),
+    /** A reaction that changes with level. It replaces `reaction` at the highest matching level (Deflect Energy lets
+     *  Deflect Attacks meet every damage type at Monk 13). */
+    reactionByLevel: z
+      .array(z.object({ level: ContentLevelSchema, reaction: ActionSchema.shape.reaction.unwrap() }).strict())
+      .max(20)
+      .optional()
+      .describe("A reaction that changes with level. The highest matching level replaces `reaction`"),
     /** A compound plan that grows with level. It replaces `multiattack` at the highest matching level (Flurry of
      *  Blows' third strike at Monk 10). */
     multiattackByLevel: z

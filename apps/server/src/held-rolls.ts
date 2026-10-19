@@ -47,6 +47,7 @@ export function holdRoll(
     others: [],
     answers: earlier?.answers ?? [],
     ...(earlier?.readAs !== undefined && held.answers === undefined ? { readAs: earlier.readAs } : {}),
+    ...(earlier?.asked !== undefined && held.answers === undefined ? { asked: earlier.asked } : {}),
     ...held,
     round: state.combat.round,
     turnActorId: state.combat.turnActorId,
