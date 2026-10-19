@@ -206,18 +206,33 @@ export function multiattackOfProse(
  * regains Hit Points equal to that amount". Null when the text says neither, or names a fixed amount ("decreases by 5
  * (1d10)"), which stays the GM's.
  */
-export function drainOfProse(description: string): DamageDrain | null {
+export function drainOfProse(description: string, name?: string): DamageDrain | null {
   const lowered =
     /\bHit Point maximum decreases by an amount equal to the (?:([A-Z][a-z]+) )?damage (?:taken|dealt)\b/.exec(
       description
     );
   const heals = /\bregains Hit Points equal to (half )?(?:that amount|the damage (?:taken|dealt))\b/.exec(description);
-  if (!lowered && !heals) return null;
+  // "The target dies if it is reduced to 0 Hit Points by this attack. Its body is then absorbed into the mouther", "A
+  // creature dies and turns to dust if reduced to 0 Hit Points by this attack" (a mummy's Rotting Fist).
+  const kills =
+    /\b(?:The target|A creature) dies( and turns to dust)? if (?:it is )?reduced to 0 Hit Points by this attack\b/.exec(
+      description
+    );
+  if (!lowered && !heals && !kills) return null;
   const type = lowered?.[1]?.toLowerCase();
+  const bodyGone = kills !== null && (kills[1] !== undefined || /\bIts body is then absorbed\b/.test(description));
   return {
     ...(type ? { damageType: type } : {}),
     ...(lowered ? { reducesMaximum: true as const } : {}),
-    ...(heals ? { heals: heals[1] ? ("half" as const) : ("all" as const) } : {})
+    ...(heals ? { heals: heals[1] ? ("half" as const) : ("all" as const) } : {}),
+    ...(kills
+      ? {
+          killsAtZero: {
+            ...(name ? { cause: name.trim().slice(0, 80) } : {}),
+            ...(bodyGone ? { bodyGone: true as const } : {})
+          }
+        }
+      : {})
   };
 }
 
@@ -292,7 +307,7 @@ export function withProseFacts<Action extends ActorAction>(action: Action): Acti
   const area = action.area ?? areaOfProse(action.description);
   const untracked = /multiattack/i.test(action.name) && !action.multiattack;
   const reaction = action.reaction ?? (action.activation === "reaction" ? acReactionOfProse(action.description) : null);
-  const drain = action.drain ?? (action.damage.length > 0 ? drainOfProse(action.description) : null);
+  const drain = action.drain ?? (action.damage.length > 0 ? drainOfProse(action.description, action.name) : null);
   // A save's push is the save's (`failurePush`); an attack's lands with the hit.
   const push = action.onHitPush ?? (action.attack && !action.save ? hitPushOfProse(action.description) : null);
   const move = action.move ?? moveOfProse(action.description);

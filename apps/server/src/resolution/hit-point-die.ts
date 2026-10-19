@@ -1,5 +1,6 @@
 import { makeHitDicePool } from "@vtt/schemas";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
+import { HIT_DICE_DOUBLED_TAG } from "../death-saves.js";
 import { healActor } from "../hit-points.js";
 import { hitDieSizesToSpend, spendFromPool } from "../rests.js";
 import { abilityModifier, recordRoll, tableLineOf, type ResolveContext } from "./context.js";
@@ -19,7 +20,9 @@ export function spendHitPointDie(ctx: ResolveContext, source: string): void {
   }
   const rolled = resolveDice(parseDiceFormula(`1d${sides}`), deps.random);
   recordRoll(ctx, rolled, "healing", source);
-  const regained = Math.max(1, rolled.total + abilityModifier(deps.definition, "con"));
+  // A Periapt of Wound Closure doubles what the die restores.
+  const doubled = ctx.derivation.context.effectTags?.includes(HIT_DICE_DOUBLED_TAG) === true;
+  const regained = Math.max(1, rolled.total + abilityModifier(deps.definition, "con")) * (doubled ? 2 : 1);
   attacker.hitDice = makeHitDicePool(spendFromPool(pool.entries, 1));
   for (const event of healActor(ctx.state, attacker.id, regained, { role: "gm" }))
     ctx.tableNarration.push(tableLineOf(ctx, event, "heal"));

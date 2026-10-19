@@ -36,7 +36,6 @@ const NO_CAST_DAMAGE: Readonly<Record<string, string>> = {
   "hunters-mark": "a rider on later hits",
   "meld-into-stone": "harms the caster if the stone is destroyed",
   "phantasmal-force": "harms on later turns",
-  "power-word-kill": "kills outright, or harms only above 100 Hit Points",
   "prismatic-spray": "a random ray per creature",
   "prismatic-wall": "a wall",
   "produce-flame": "the flame is hurled on later turns",

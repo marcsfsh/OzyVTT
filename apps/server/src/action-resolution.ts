@@ -50,6 +50,8 @@ import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
 import { stabilizeOnCast } from "./resolution/stabilize.js";
+import { raiseOnAction, reviveOnCast } from "./resolution/revival.js";
+import { killOnCast } from "./resolution/kill.js";
 import {
   recordAttackRoll,
   recordCleaveOpening,
@@ -229,6 +231,9 @@ export function resolveDefinitionAction(
   applyConditionCures(ctx);
   applySpellEndings(ctx);
   stabilizeOnCast(ctx);
+  reviveOnCast(ctx);
+  raiseOnAction(ctx);
+  killOnCast(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);
@@ -292,8 +297,9 @@ function damageTargetsOf(ctx: ResolveContext): ActionResolution["damageTargets"]
   if (darts) return darts;
   const parts = owedDamageParts(ctx);
   const total = parts.reduce((sum, part) => sum + part.amount, 0);
-  if (total <= 0 || ctx.targets.length === 0) return undefined;
-  return ctx.targets.map((target) => ({ targetId: target.id, targetName: target.name, parts, total }));
+  const struck = ctx.targets.filter((target) => !ctx.spared?.has(target.id));
+  if (total <= 0 || struck.length === 0) return undefined;
+  return struck.map((target) => ({ targetId: target.id, targetName: target.name, parts, total }));
 }
 
 /** An ended effect as the result tells it, to the initiator and in the table's toast: a source hidden from the
