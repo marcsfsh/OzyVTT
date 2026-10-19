@@ -74,6 +74,11 @@ const READERS: readonly Check[] = [
   },
   { pattern: /\bbody is then absorbed\b/, read: (action) => action.drain?.killsAtZero?.bodyGone === true },
   {
+    pattern:
+      /\bthe target becomes Stable\b|^While (?:it has the )?Poisoned(?: condition)?, the target (?:also )?has the Paralyzed condition\b/,
+    read: (action) => action.drain?.stableAtZero !== undefined
+  },
+  {
     pattern: /\bHit Point maximum decreases by an amount equal to the damage taken\b/,
     read: (action) => action.drain?.reducesMaximum === true
   },

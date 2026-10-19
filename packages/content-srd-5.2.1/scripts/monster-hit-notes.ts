@@ -10,8 +10,6 @@ const ARMOR_PENALTY =
   "Nonmagical armor the target wears takes a cumulative -1 penalty to the AC it offers, and is destroyed when the penalty reduces its AC to 10. Mending removes the penalty. Change the armor by hand.";
 const HURL_FLAME =
   "A flammable object the target hit that isn't worn or carried starts burning; objects are the GM's to burn.";
-const STABLE_POISON =
-  "A target this damage drops to 0 Hit Points becomes Stable instead, and has the Poisoned condition for 1 hour, with the Paralyzed condition while Poisoned. Apply both by hand.";
 
 const HIT_NOTES: Readonly<Record<string, string>> = {
   "allosaurus/claws":
@@ -21,9 +19,7 @@ const HIT_NOTES: Readonly<Record<string, string>> = {
   "barbed-devil/hurl-flame": HURL_FLAME,
   "black-pudding/dissolving-pseudopod": ARMOR_PENALTY,
   "gray-ooze/pseudopod": ARMOR_PENALTY,
-  "horned-devil/hurl-flame": HURL_FLAME,
-  "phase-spider/bite": STABLE_POISON,
-  "vampire-familiar/umbral-dagger": STABLE_POISON
+  "horned-devil/hurl-flame": HURL_FLAME
 };
 
 /** The stat block's actions with what each hit leaves to the GM said beside its reminder. */

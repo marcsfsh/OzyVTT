@@ -3491,6 +3491,16 @@ export const DamageDrainSchema = z
       })
       .strict()
       .optional(),
+    /** A creature the damage reduces to 0 Hit Points becomes Stable instead of dying, and has these conditions for
+     *  `minutes` (a phase spider's Bite: "the target becomes Stable, and it has the Poisoned condition for 1 hour. While
+     *  Poisoned, the target also has the Paralyzed condition"). */
+    stableAtZero: z
+      .object({
+        conditions: z.array(SaveConditionSchema).min(1).max(3),
+        minutes: z.number().int().min(1).max(1440)
+      })
+      .strict()
+      .optional(),
     /** A creature of `creatureTypes` the damage kills rises as `monsterId` on the dealer's side at the start of the
      *  dealer's next turn (Finger of Death: "A Humanoid killed by this spell rises at the start of your next turn as a
      *  Zombie"). */

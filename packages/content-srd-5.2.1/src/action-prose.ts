@@ -232,13 +232,30 @@ export function drainOfProse(description: string, name?: string): DamageDrain | 
     /\b(?:The target|A creature) dies( and turns to dust)? if (?:it is )?reduced to 0 Hit Points by this attack\b/.exec(
       description
     );
-  if (!lowered && !heals && !kills) return null;
+  // "If this damage reduces the target to 0 Hit Points, the target becomes Stable, and it has the Poisoned condition for 1
+  // hour. While Poisoned, the target also has the Paralyzed condition" (a phase spider's Bite, a vampire familiar's
+  // Umbral Dagger).
+  const stable =
+    /\b(?:If this damage reduces the target to 0 Hit Points|If the target is reduced to 0 Hit Points by this attack), the target becomes Stable(?:, and it| but) has the ([A-Z][a-z]+) condition for (\d+) (hour|minute)s?\. While (?:it has the )?([A-Z][a-z]+)(?: condition)?, the target (?:also )?has the ([A-Z][a-z]+) condition\b/.exec(
+      description
+    );
+  const stableAtZero =
+    stable && stable[4] === stable[1]
+      ? {
+          conditions: [stable[1]!, stable[5]!].map(
+            (word) => word.toLowerCase() as NonNullable<DamageDrain["stableAtZero"]>["conditions"][number]
+          ),
+          minutes: Number.parseInt(stable[2]!, 10) * (stable[3] === "hour" ? 60 : 1)
+        }
+      : null;
+  if (!lowered && !heals && !kills && !stableAtZero) return null;
   const type = lowered?.[1]?.toLowerCase();
   const bodyGone = kills !== null && (kills[1] !== undefined || /\bIts body is then absorbed\b/.test(description));
   return {
     ...(type ? { damageType: type } : {}),
     ...(lowered ? { reducesMaximum: true as const } : {}),
     ...(heals ? { heals: heals[1] ? ("half" as const) : ("all" as const) } : {}),
+    ...(stableAtZero ? { stableAtZero } : {}),
     ...(kills
       ? {
           killsAtZero: {

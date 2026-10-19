@@ -54,6 +54,7 @@ import {
 } from "./effects.js";
 import { returnToLife, stampDeath } from "./death.js";
 import { markRising } from "./risen.js";
+import { dropStable } from "./stable-at-zero.js";
 import { mistyEscape, regainedHitPoints, restorationAtDeath, tallyTurnDamage } from "./death-traits.js";
 import { holdsFeature } from "./class-features.js";
 import { rollSaveAtOnce } from "./saving-throws.js";
@@ -882,6 +883,21 @@ export function applyDamageDetailed(
     });
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deathWard(state, actor, events)) {
     // Death Ward held the creature at 1 Hit Point: nothing falls.
+  } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && input.drain?.stableAtZero) {
+    // "The target becomes Stable" (a phase spider's Bite): no dying, no defeat, and the poison's conditions.
+    events.push(
+      ...dropStable(
+        state,
+        actor,
+        input.drain.stableAtZero,
+        {
+          actorId: input.sourceActorId ?? null,
+          name: input.sourceName ?? null,
+          commandId: deps?.commandId ?? deps?.newId?.() ?? `${actor.id}:${hpBefore}`
+        },
+        { ...(deps ?? {}), state }
+      )
+    );
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && input.drain?.killsAtZero) {
     // "The target dies if it is reduced to 0 Hit Points by this attack": no death saves, no trait to hold it up.
     const kill = input.drain.killsAtZero;
