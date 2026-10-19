@@ -456,7 +456,14 @@ describe("generated OpenAPI components", () => {
       "versus-creature-type": { creatureTypes: ["undead"] },
       "versus-size": { sizes: ["large", "huge"] },
       "versus-condition": { conditionIds: ["prone"] },
-      "by-effect-source": {}
+      "by-effect-source": {},
+      "on-healing": {},
+      "source-creature-type-is": { creatureTypes: ["fiend", "undead"] },
+      "versus-effect-source": {},
+      "versus-marked": { tags: ["hunters-mark"] },
+      "versus-hurt": {},
+      "versus-within": { feet: 5 },
+      "spell-class-is": { classIds: ["sorcerer"] }
     };
 
     /** One payload per modifier. */
@@ -498,7 +505,16 @@ describe("generated OpenAPI components", () => {
       "damage-resistance": { damageTypes: ["fire"], when: [{ type: "while-effect-tag", tags: ["raging"] }] },
       "damage-vulnerability": { damageTypes: ["cold"] },
       sense: { sense: "tremorsense", feet: 30 },
-      "special-speed": { movement: "fly", feet: 60, hover: true }
+      "special-speed": { movement: "fly", feet: 60, hover: true },
+      "d20-minimum": { roll: "check", minimum: 10, proficientOnly: true },
+      "total-minimum": { roll: "check", abilityScore: "str" },
+      "damage-die-minimum": { minimum: 3 },
+      "damage-immunity": { damageTypes: ["psychic"] },
+      "ignores-resistance": { damageTypes: ["bludgeoning", "piercing", "slashing"] },
+      "advantage-denied": { roll: "incoming-attack" },
+      "healing-received-maximized": {},
+      "healing-dice-maximized": {},
+      "healing-bonus": { amount: 2, perSlotLevel: true }
     };
 
     it("validates every trigger against the branch its discriminator routes it to", () => {

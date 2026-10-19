@@ -7,6 +7,7 @@ import { areAllies } from "./creature-sides.js";
 import { wardingAura } from "./paladin-auras.js";
 import { endZonesOfCast } from "./spell-zone-state.js";
 import { creatureTypeOf } from "./statblock-facts.js";
+import { restoreSuppressed } from "./suppressed-conditions.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
  *  end, which clears linked conditions and fires onEnd grants. Returns narration events and writes nothing to
@@ -480,6 +481,8 @@ function endEffectInternal(
       actorId: actor.id
     });
   }
+  // Calm Emotions: what it held off comes back where it still applies.
+  for (const text of restoreSuppressed(actor, effect)) events.push({ kind: "condition", text, actorId: actor.id });
   for (const grant of effect.onEnd) {
     const before = exhaustionLevel(actor);
     const level = grant.conditionId === "exhaustion" ? Math.min(6, before + (grant.level ?? 1)) : grant.level;

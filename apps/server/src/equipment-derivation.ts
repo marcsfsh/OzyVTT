@@ -362,13 +362,19 @@ function effectCarriers(actor: Actor): RiderCarrier[] {
   const lapsed = isIncapacitated(actor) || speedZeroed(actor) || actor.speedFeet === 0;
   return actor.effects.flatMap((effect) => {
     if (effect.voidWhileIncapacitated && lapsed) return [];
-    const modifiers = effect.modifiers.filter(notItemScoped);
+    // One bound to a carried row (Magic Weapon) reaches that row's rolls with its `this-item` riders, and nothing
+    // once the row is gone.
+    const bound =
+      effect.itemId !== undefined && actor.inventory.some((row) => row.id === effect.itemId && row.quantity > 0);
+    if (effect.itemId !== undefined && !bound) return [];
+    const modifiers = bound ? effect.modifiers : effect.modifiers.filter(notItemScoped);
     if (modifiers.length === 0) return [];
     return [
       {
         label: effect.name,
         modifiers,
         sourceEffectId: effect.id,
+        ...(bound ? { sourceItemId: effect.itemId } : {}),
         ...(effect.stackKey !== undefined ? { stackKey: effect.stackKey } : {})
       }
     ];
@@ -528,14 +534,21 @@ export function deriveEquipment(
   );
   for (const equippedEntry of equipped) {
     const entry = { ...equippedEntry, item: withCatalogWeaponFacts(equippedEntry, catalog!) };
-    const swing = weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce);
+    // An effect bound to this row changes how it swings while it lasts (Shillelagh's ability and die).
+    const bound = actor.effects.find((effect) => effect.itemId === entry.item.id && effect.weapon)?.weapon;
+    const swing = weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce, {
+      ...(bound ? { bound } : {})
+    });
     if (!swing) continue;
     const weaponAttack = swing.action;
     actions.push(weaponAttack);
     weaponActionIds.push(weaponAttack.id);
     const twoHanded = shieldInHand
       ? null
-      : weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce, { twoHanded: true });
+      : weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce, {
+          twoHanded: true,
+          ...(bound ? { bound } : {})
+        });
     if (twoHanded) {
       actions.push(twoHanded.action);
       weaponActionIds.push(twoHanded.action.id);

@@ -276,6 +276,8 @@ function checkMarkMove(
 function checkSpellUp({ attacker, action, siblings, violations }: Evaluation, spell: SpellReference): void {
   const row = laterRowOf(spell, action.id);
   if (!row || !takenWhileUp(row) || spellUpLevel(attacker, spell) !== null) return;
+  // Another creature's spell gave it this action (Dragon's Breath), so it is there while that effect is.
+  if (attacker.effects.some((effect) => effect.grantedSpellAction?.spellId === spell.id)) return;
   // A sheet built before the cast itself was an action (Produce Flame's) has no way to start it, so it isn't asked to.
   if (!siblings.some((sibling) => sibling.spellId === spell.id && !laterRowOf(spell, sibling.id))) return;
   violations.push({
@@ -1347,8 +1349,10 @@ function checkTargeting(
       ...(distanceFeet ? { distanceFeet } : {})
     }) !== null;
   if (!charmWarded && (action.attack !== undefined || action.save !== undefined || action.damage.length > 0)) {
+    // Only while the creature is Charmed: an effect that holds it off (Calm Emotions) lifts the bar too.
+    const charmed = attacker.conditions.some((condition) => condition.id === "charmed");
     const charmers = attacker.effects.filter(
-      (effect) => effect.linkedConditionIds.includes("charmed") && effect.sourceActorId !== null
+      (effect) => charmed && effect.linkedConditionIds.includes("charmed") && effect.sourceActorId !== null
     );
     for (const targetId of targetIds) {
       const charmer = charmers.find((effect) => effect.sourceActorId === targetId);

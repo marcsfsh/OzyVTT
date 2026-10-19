@@ -25,7 +25,14 @@ import {
 } from "../held-rolls.js";
 import { GM_CHOICE, magicResistanceOf } from "../saving-throws.js";
 import { criticalThreshold } from "../effective-actions.js";
-import { CONCENTRATING_TAG, endEffect, STEADY_AIM_TAG, UNTIL_IT_ACTS_TAG } from "../effects.js";
+import {
+  CONCENTRATING_TAG,
+  endEffect,
+  INVISIBLE_UNTIL_IT_ACTS_TAG,
+  OUTLINED_TO_SOURCE_TAG,
+  STEADY_AIM_TAG,
+  UNTIL_IT_ACTS_TAG
+} from "../effects.js";
 import {
   deriveEquipment,
   rollModeClaims,
@@ -166,6 +173,9 @@ function distractionOf(ctx: ResolveContext, target: LiveActor) {
   });
 }
 const outlined = (actor: LiveActor) => actor.effects.some((effect) => effect.tags.includes(OUTLINED_TAG));
+/** Mind Spike: "if it has the Invisible condition, it gains no benefit from that condition against you". */
+const outlinedTo = (actor: LiveActor, viewerId: string) =>
+  actor.effects.some((effect) => effect.tags.includes(OUTLINED_TO_SOURCE_TAG) && effect.sourceActorId === viewerId);
 
 /** Riders on both sides at `on-attack-roll`, read whoever's turn it is (opportunity attacks are off-turn): the
  *  attacker's claims on its attack (Reckless Attack, a cursed blade) and the target's on attacks against it
@@ -242,13 +252,22 @@ function sightClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeCl
   });
   if (!sight.enabled) return false;
   const invisible = (actor: LiveActor) => has(actor, "invisible") && !outlined(actor);
-  if (!has(target, "blinded") && !sight.sees(target.id, attacker.id))
+  // Unseen only for being Invisible to a creature it is outlined to (Mind Spike's caster) counts as seen.
+  if (
+    !has(target, "blinded") &&
+    !sight.sees(target.id, attacker.id) &&
+    !(invisible(attacker) && outlinedTo(attacker, target.id))
+  )
     sources.advantage.push(
       invisible(attacker)
         ? { source: "attacker-invisible", label: "Attacker is Invisible" }
         : { source: "attacker-unseen", label: "Target can't see the attacker" }
     );
-  if (!has(attacker, "blinded") && !sight.sees(attacker.id, target.id))
+  if (
+    !has(attacker, "blinded") &&
+    !sight.sees(attacker.id, target.id) &&
+    !(invisible(target) && outlinedTo(target, attacker.id))
+  )
     sources.disadvantage.push(
       invisible(target)
         ? { source: "target-invisible", label: "Target is Invisible" }
@@ -275,6 +294,9 @@ function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: numbe
     if (!has(side, entry.condition)) continue;
     if (entry.side === "attacker" && warded.includes(entry.condition)) continue;
     if (entry.condition === "invisible" && (outlined(side) || sighted)) continue;
+    // Invisible gives nothing against the creature it is outlined to (Mind Spike).
+    const other = entry.side === "attacker" ? target : attacker;
+    if (entry.condition === "invisible" && outlinedTo(side, other.id)) continue;
     sources[entry.mode].push({
       source: `${entry.side}-${entry.condition}`,
       label: `${entry.side === "attacker" ? "Attacker" : "Target"} is ${conditionLabel(entry.condition)}`
@@ -692,6 +714,7 @@ export function spendUntilItActs(ctx: ResolveContext): void {
   if (input.commit === false) return;
   const acted = attack !== null || action.spellId !== undefined || action.spellSlot !== undefined || damage.length > 0;
   if (!acted) return;
+  dropInvisibilityOnActing(ctx);
   for (const effect of attacker.effects.filter(
     (candidate) => candidate.tags.includes(UNTIL_IT_ACTS_TAG) && !candidate.id.startsWith(input.commandId)
   )) {
@@ -709,6 +732,33 @@ export function spendUntilItActs(ctx: ResolveContext): void {
       endEffect(state, caster.id, holding.id);
       effectsEnded.push(endedEffect(caster, holding));
     }
+  }
+}
+
+/** SRD Mislead: "the invisibility ends immediately after you make an attack roll, deal damage, or cast a spell", while
+ *  the spell and its double go on. The effect lets go of Invisible, which ends unless something else holds it. */
+function dropInvisibilityOnActing(ctx: ResolveContext): void {
+  const { attacker, input, tableNarration } = ctx;
+  for (const effect of attacker.effects.filter(
+    (candidate) =>
+      candidate.tags.includes(INVISIBLE_UNTIL_IT_ACTS_TAG) &&
+      candidate.linkedConditionIds.includes("invisible") &&
+      !candidate.id.startsWith(input.commandId)
+  )) {
+    attacker.effects = attacker.effects.map((candidate) =>
+      candidate.id === effect.id
+        ? { ...candidate, linkedConditionIds: candidate.linkedConditionIds.filter((id) => id !== "invisible") }
+        : candidate
+    );
+    const held = attacker.effects.some((candidate) => candidate.linkedConditionIds.includes("invisible"));
+    const entry = attacker.conditions.find((condition) => condition.id === "invisible");
+    if (held || !entry || entry.standalone) continue;
+    attacker.conditions = attacker.conditions.filter((condition) => condition.id !== "invisible");
+    tableNarration.push({
+      kind: "effect",
+      text: `${attacker.name} is no longer Invisible (${effect.name} goes on).`,
+      actorIds: [attacker.id]
+    });
   }
 }
 

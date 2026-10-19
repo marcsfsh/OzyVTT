@@ -11,6 +11,7 @@ import {
 } from "./equipment-derivation.js";
 import { spellbookRituals } from "./ritual-adept.js";
 import { spellClassOf } from "./class-features.js";
+import { grantedSpellActions } from "./granted-actions.js";
 
 /** The action list every actor-scoped consumer must read in place of `definition.actions`: item-derived
  *  actions plus standing riders (items, feats, features, live effects) folded into the numbers the resolver
@@ -30,7 +31,10 @@ export function effectiveActions(
   const rituals = spellbookRituals(definition, actor, catalog);
   // The definition's own list when nothing changed, so a caller holding it sees the same array.
   const unchanged = taken.every((action, index) => action === declared[index]);
-  const base = unchanged && rituals.length === 0 ? declared : [...taken, ...rituals];
+  // What another creature's spell lets this one do while it lasts (Dragon's Breath's exhale).
+  const granted = actor ? grantedSpellActions(actor, catalog) : [];
+  const base =
+    unchanged && rituals.length === 0 && granted.length === 0 ? declared : [...taken, ...rituals, ...granted];
   if (!actor) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
   if (derivation.carriers.length === 0 && derivation.actions.length === 0) return base;

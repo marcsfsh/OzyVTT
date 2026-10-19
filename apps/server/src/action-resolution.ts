@@ -1,4 +1,5 @@
 import {
+  actionChoicesOf,
   owedDamageParts,
   owedDamageTotal,
   type ActionAvailability,
@@ -388,6 +389,8 @@ export function actionAvailability(
       ...(conditionChoicesOf(action, spell).length > 0
         ? { conditionChoices: [...conditionChoicesOf(action, spell)] as SaveCondition[] }
         : {}),
+      // An option, one for each target, or the weapon a grant binds to (Fire Shield, Bestow Curse, Magic Weapon).
+      ...(actionChoicesOf(action) ? { choices: structuredClone(actionChoicesOf(action)!) } : {}),
       // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.
       ...(builtin && builtinCheckSkills(action.id).length > 0 ? { checkSkills: builtinCheckSkills(action.id) } : {})
     };

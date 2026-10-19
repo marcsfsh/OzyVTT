@@ -34,6 +34,7 @@ import {
   CONCENTRATING_TAG,
   effectDurationOf,
   endConcentrationSustainedBy,
+  endConditionsImmuneTo,
   endEffectIfPresent,
   endIdleConcentration,
   makeEffect,
@@ -50,6 +51,7 @@ import {
 } from "./equipment-derivation.js";
 import { countZoneDamage } from "./spell-zone-state.js";
 import { creatureTypeOf } from "./statblock-facts.js";
+import { suppressConditions } from "./suppressed-conditions.js";
 import { sizeAtMost, sizeRank } from "./resolution/context.js";
 
 export type SaveAnswerDependencies = Readonly<{
@@ -511,12 +513,28 @@ export function applyFailureEffect(
       ...(onFail.armorClassBonus !== undefined ? { armorClassBonus: onFail.armorClassBonus } : {}),
       ...(onFail.endAction ? { endAction: { ...onFail.endAction } } : {}),
       ...(onFail.optionId !== undefined ? { optionId: onFail.optionId } : {}),
+      ...(onFail.conditionImmunities ? { conditionImmunities: [...onFail.conditionImmunities] } : {}),
       // What it does while it lasts (Bane's -1d4).
       modifiers: [...onFail.modifiers]
     }),
     events,
     immunities
   );
+  // Calm Emotions: a Charmed or Frightened it holds off is kept on the effect for later; one it makes the creature
+  // immune to and doesn't hold off ends.
+  const held = suppressConditions(target, onFail.suppressesConditions ?? []);
+  if (held.length > 0) {
+    target.effects = target.effects.map((effect) =>
+      effect.id === applied.id ? { ...effect, suppressedConditions: held } : effect
+    );
+    events.push({
+      kind: "condition",
+      text: `${target.name} is no longer ${held.map((entry) => conditionLabel(entry.id)).join(" or ")} while ${applied.name} lasts.`,
+      actorId: target.id
+    });
+  }
+  if (onFail.conditionImmunities)
+    events.push(...endConditionsImmuneTo(target, onFail.conditionImmunities, applied.name));
   return [
     { kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id, ...sourceOf(applied) },
     ...events

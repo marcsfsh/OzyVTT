@@ -10,8 +10,11 @@ import { plainActionName } from "./format";
 import type { TargetRow } from "../table/targetRows";
 import { InFooter } from "../table/footerSlot";
 import { revealInRegion } from "../lib/reveal";
+import { weaponChoicesOf, type CarriedRow } from "./weapon-choices";
 import {
   clearTargeting,
+  setBoundItem,
+  setChoiceOption,
   setCheckSkill,
   setChosenAbility,
   setConditionChoice,
@@ -49,7 +52,8 @@ export function ActionTargetPicker({
   busy,
   onRoll,
   onInvalidFace,
-  insideNow
+  insideNow,
+  carried = []
 }: Readonly<{
   picking: TargetingSession;
   targets: ReadonlyArray<Pick<TargetRow, "id" | "label"> & Partial<TargetRow>>;
@@ -61,6 +65,8 @@ export function ActionTargetPicker({
   onInvalidFace?: (message: string) => void;
   /** For an area: who it covers where it is placed, of the creatures this viewer can see. The server decides. */
   insideNow?: readonly TargetRow[];
+  /** What the acting creature carries, for a grant cast on one of its weapons (Magic Weapon). */
+  carried?: readonly CarriedRow[];
 }>) {
   const { mayType } = useRollPreference();
   // On a phone the panel under the map is short, so the picker scrolls up to show its first rows.
@@ -211,6 +217,7 @@ export function ActionTargetPicker({
           </Select>
         </label>
       )}
+      <ChoicePicks picking={picking} targets={targets} carried={carried} />
       {picking.action.conditionChoices && picking.action.conditionChoices.length > 1 && (
         <label className="action-damage-type">
           <span>{picking.action.saveAbility ? "Condition on a failed save" : "Condition to end"}</span>
@@ -248,6 +255,71 @@ export function ActionTargetPicker({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * What the action asks for as it resolves: one option (Fire Shield's warm or chill), one for each selected target
+ * (Eyebite's effect on each), and the carried weapon a grant binds to (Magic Weapon). Each starts on the first, as the
+ * server reads none.
+ */
+function ChoicePicks({
+  picking,
+  targets,
+  carried
+}: Readonly<{
+  picking: TargetingSession;
+  targets: ReadonlyArray<Pick<TargetRow, "id" | "label">>;
+  carried: readonly CarriedRow[];
+}>) {
+  const choices = picking.action.choices;
+  if (!choices) return null;
+  const options = choices.options ?? [];
+  const weapons = weaponChoicesOf(carried, choices.bindsWeapon);
+  const optionSelect = (key: string, label: string, value: string | undefined, onPick: (id: string) => void) => (
+    <label className="action-damage-type" key={key}>
+      <span>{label}</span>
+      <Select value={value ?? options[0]?.id} onChange={(event) => onPick(event.target.value)}>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.name}
+          </option>
+        ))}
+      </Select>
+    </label>
+  );
+  return (
+    <>
+      {options.length > 0 &&
+        !choices.optionsPerTarget &&
+        optionSelect("one", "Choice", picking.optionId, (id) => setChoiceOption(id))}
+      {options.length > 0 &&
+        choices.optionsPerTarget &&
+        picking.selected.map((targetId) =>
+          optionSelect(
+            targetId,
+            `For ${targets.find((target) => target.id === targetId)?.label ?? "this target"}`,
+            picking.targetOptions?.[targetId] ?? picking.optionId,
+            (id) => setChoiceOption(id, targetId)
+          )
+        )}
+      {choices.bindsWeapon && (
+        <label className="action-damage-type">
+          <span>Weapon</span>
+          {weapons.length > 0 ? (
+            <Select value={picking.itemId ?? weapons[0]!.id} onChange={(event) => setBoundItem(event.target.value)}>
+              {weapons.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                </option>
+              ))}
+            </Select>
+          ) : (
+            <span>No weapon it can be cast on is carried.</span>
+          )}
+        </label>
+      )}
+    </>
   );
 }
 

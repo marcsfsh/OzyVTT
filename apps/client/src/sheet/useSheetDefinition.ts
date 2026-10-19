@@ -50,6 +50,8 @@ export type AvailabilityRow = Readonly<{
   darts?: number | null;
   damageTypes?: ContentActionSummary["damageTypes"] | null;
   checkSkills?: ContentActionSummary["checkSkills"];
+  /** An option, one for each target, or the carried weapon it asks for as it resolves. */
+  choices?: ContentActionSummary["choices"];
   /** Why it can't be used now, in one plain sentence; present exactly when it isn't available. */
   reason?: string;
   /** A row that never goes on the turn list: a rider chosen with a roll, a rest's feature, or one the server runs. */
@@ -114,7 +116,9 @@ export function summaryOfAvailability(row: AvailabilityRow): ContentActionSummar
     ...(row.darts ? { darts: row.darts } : {}),
     ...(row.damageTypes ? { damageTypes: row.damageTypes } : {}),
     // Search, Study and the like pick the skill they are made with.
-    ...(row.checkSkills ? { checkSkills: row.checkSkills } : {})
+    ...(row.checkSkills ? { checkSkills: row.checkSkills } : {}),
+    // Fire Shield's warm or chill, Bestow Curse's curse, the weapon Magic Weapon is cast on.
+    ...(row.choices ? { choices: row.choices } : {})
   };
 }
 

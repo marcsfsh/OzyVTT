@@ -255,7 +255,10 @@ const ON_FAIL_EFFECT_FIELDS = {
   magical: "never",
   // The DC of the action that ends it is the caster's number; the option it carries shows in its name.
   endAction: "never",
-  optionId: "never"
+  optionId: "never",
+  // Kept off as the landed effect keeps them off (`playerEffect`); its name says what it is.
+  conditionImmunities: "never",
+  suppressesConditions: "never"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {

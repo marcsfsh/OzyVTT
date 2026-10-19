@@ -72,7 +72,8 @@ export function longCastStepOf(
     ...input,
     targetIds: [...casting.targetIds],
     ...(casting.slotLevel !== null ? { slotLevel: casting.slotLevel } : {}),
-    ...(casting.areaPlaced ? { areaPlaced: true } : {})
+    ...(casting.areaPlaced ? { areaPlaced: true } : {}),
+    ...(casting.optionId !== undefined ? { optionId: casting.optionId } : {})
   };
   return { phase: casting.turnsLeft <= 1 ? "finish" : "continue", input: carried, spell, rounds };
 }
@@ -89,6 +90,7 @@ export function stepLongCast(ctx: ResolveContext, step: LongCastStep): void {
       targetIds: ctx.targets.map((target) => target.id),
       slotLevel: ctx.plan.spendSpellSlot?.level ?? null,
       areaPlaced: input.areaPlaced === true,
+      ...(input.optionId != null ? { optionId: input.optionId } : {}),
       turnsLeft: step.rounds - 1,
       lastRound: state.combat.round
     };

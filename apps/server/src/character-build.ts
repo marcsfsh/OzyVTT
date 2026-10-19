@@ -485,6 +485,9 @@ function linkSpellActions(
     const tier =
       record.level === 0 ? cantripTierAt(cantripScalingOf(record.castingOptions), numbers.characterLevel) : null;
     for (const later of record.effect?.laterActions ?? []) {
+      // One the spell gives the creature it touches (Dragon's Breath's exhale) is on that creature's sheet, from its
+      // effect, not the caster's.
+      if (record.effect?.grant?.grantsLaterAction === later.name) continue;
       const action = laterSpellAction(
         record,
         later,

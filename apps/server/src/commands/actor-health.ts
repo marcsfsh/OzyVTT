@@ -61,7 +61,7 @@ function sourceActionOf(
   const definition = source.definitionId ? kit.resolveDefinition(source.definitionId) : undefined;
   return (
     effectiveActions(definition, source, kit.equipmentCatalog()).find((candidate) => candidate.id === sourceActionId) ??
-    builtinActionFor(definition, sourceActionId)
+    builtinActionFor(definition, sourceActionId, source)
   );
 }
 

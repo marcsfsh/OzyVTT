@@ -26,6 +26,8 @@ import { currentSpeedFeet } from "../speed.js";
 import { spellEffectDuration, spellOf } from "./concentration.js";
 import { recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 import { moveMark } from "./marks.js";
+import { boundWeaponOf, grantExtras, optionFor, optionParts, withOptionName } from "./grant-extras.js";
+import { suppressConditions } from "../suppressed-conditions.js";
 
 /** Reckless Attack's Advantage is on attack rolls using Strength. A sheet built before that gate was authored carries
  *  the roll mode ungated, so it is narrowed as it lands. */
@@ -168,19 +170,34 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   const armorClassFloor = grant.armorClassFloor ?? (grant.tags.includes(BARKSKIN_TAG) ? 17 : undefined);
   const spell = spellOf(ctx);
   const castLevel = spell ? (ctx.plan.castLevel ?? spell.level) : null;
+  // The choice made as it is granted (Fire Shield's warm or chill), and the weapon it binds to (Magic Weapon).
+  const option = grant.options
+    ? optionFor(
+        ctx,
+        { options: grant.options, perTarget: grant.optionsPerTarget === true },
+        recipient,
+        grant.name ?? action.name
+      )
+    : null;
+  const parts = optionParts(option);
+  const bound = boundWeaponOf(ctx, grant, recipient);
+  if (grant.bindsWeapon && !bound) return;
+  const linkedConditionIds = [...new Set([...(grant.conditions ?? []), ...parts.conditions])].slice(0, 4);
+  const conditionImmunities = [...new Set([...(grant.conditionImmunities ?? []), ...parts.conditionImmunities])];
+  const baseName =
+    ctx.builtin?.grantName?.(ctx) ??
+    ((hexAbility ?? enhancedAbility)
+      ? `${grant.name ?? action.name} (${ABILITY_NAMES[(hexAbility ?? enhancedAbility)!]})`
+      : chosenType
+        ? `${grant.name ?? action.name} (${chosenType[0]!.toUpperCase()}${chosenType.slice(1)})`
+        : (grant.name ?? action.name));
   const effect = addEffect(
     state,
     recipient.id,
     makeEffect({
       id: grant.target === "targets" ? `${input.commandId}:grant:${recipient.id}` : `${input.commandId}:grant`,
-      name:
-        ctx.builtin?.grantName?.(ctx) ??
-        ((hexAbility ?? enhancedAbility)
-          ? `${grant.name ?? action.name} (${ABILITY_NAMES[(hexAbility ?? enhancedAbility)!]})`
-          : chosenType
-            ? `${grant.name ?? action.name} (${chosenType[0]!.toUpperCase()}${chosenType.slice(1)})`
-            : (grant.name ?? action.name)),
-      tags: rage ? [...rage.tags] : grant.tags,
+      name: withOptionName(baseName, option),
+      tags: [...new Set([...(rage ? rage.tags : grant.tags), ...parts.tags])].slice(0, 8),
       sourceActorId: attacker.id,
       sourceName: attacker.name,
       sourceActionId: action.id,
@@ -198,9 +215,16 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       // A spell's effect outlasts its caster's fall; only Concentration ends it early.
       endsWhenSourceDefeated: action.spellId === undefined,
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
-      modifiers: [...modifiers, ...hexDisadvantage, ...enhancedAdvantage, ...chosenResistance],
+      modifiers: [
+        ...modifiers,
+        ...hexDisadvantage,
+        ...enhancedAdvantage,
+        ...chosenResistance,
+        ...parts.modifiers,
+        ...(bound?.modifiers ?? [])
+      ],
       // Greater Invisibility's Invisible condition, which ends with the effect.
-      ...(grant.conditions ? { linkedConditionIds: [...grant.conditions] } : {}),
+      ...(linkedConditionIds.length > 0 ? { linkedConditionIds } : {}),
       onEnd: grant.onEnd,
       endsWithTag: grant.endsWithTag ?? null,
       concentration: grant.concentration,
@@ -218,11 +242,13 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       ...(steadyAim ? { speedZero: true } : {}),
       ...grantedMovement,
       // Heroism: immune to Frightened, and Temporary Hit Points at the start of each of the bearer's turns.
-      ...(grant.conditionImmunities ? { conditionImmunities: [...grant.conditionImmunities] } : {}),
+      ...(conditionImmunities.length > 0 ? { conditionImmunities: conditionImmunities.slice(0, 6) } : {}),
       ...turnStartTemporaryHitPoints(grant.temporaryHitPointsEachTurn, deps.definition),
       // Aid: the Hit Point maximum and current hit points rise while it lasts (`addEffect`); Heroes' Feast rolls its
       // 2d10 for each creature.
-      ...hitPointMaximumGainOf(ctx, grant.hitPointMaximumGain, recipient.name)
+      ...hitPointMaximumGainOf(ctx, grant.hitPointMaximumGain, recipient.name),
+      ...grantExtras(ctx, grant, recipient, option),
+      ...(bound?.fields ?? {})
     }),
     replaced,
     deps
@@ -231,9 +257,11 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   // A new way to work out AC counts at once.
   if (baseArmorClass !== undefined && recipientDefinition)
     refreshBaseArmorClass(recipient, recipientDefinition, deps.catalog);
+  // Calm Emotions: a Charmed or Frightened it holds off is kept on the effect for later, rather than ended.
+  holdOff(ctx, recipient, effect, [...(grant.suppressesConditions ?? []), ...parts.suppresses]);
   // SRD Immunity: a condition the grant makes its bearer immune to ends now (Heroism's Frightened), as the table hears.
-  if (grant.conditionImmunities)
-    for (const event of endConditionsImmuneTo(recipient, grant.conditionImmunities, effect.name))
+  if (conditionImmunities.length > 0)
+    for (const event of endConditionsImmuneTo(recipient, conditionImmunities, effect.name))
       ctx.tableNarration.push({ kind: "effect", text: event.text, actorIds: [recipient.id] });
   // Mindless Rage: "If you're Charmed or Frightened when you enter your Rage, the condition ends on you." A condition
   // the Rage now makes its bearer immune to ends as it starts.
@@ -255,9 +283,29 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       targetId: recipient.id,
       targetName: recipient.name,
       name: effect.name,
-      conditionIds: [...(grant.conditions ?? [])]
+      conditionIds: [...linkedConditionIds]
     });
   else ctx.effectGranted = { name: effect.name, tags: effect.tags };
+}
+
+/** Takes the conditions an effect suppresses off its bearer and keeps them on the effect, as the table hears. */
+export function holdOff(
+  ctx: Pick<ResolveContext, "tableNarration">,
+  bearer: LiveActor,
+  effect: EffectInstance,
+  conditionIds: readonly string[]
+): void {
+  if (conditionIds.length === 0) return;
+  const held = suppressConditions(bearer, conditionIds);
+  if (held.length === 0) return;
+  bearer.effects = bearer.effects.map((candidate) =>
+    candidate.id === effect.id ? { ...candidate, suppressedConditions: held } : candidate
+  );
+  ctx.tableNarration.push({
+    kind: "effect",
+    text: `${bearer.name} is no longer ${held.map((entry) => conditionLabel(entry.id)).join(" or ")} while ${effect.name} lasts.`,
+    actorIds: [bearer.id]
+  });
 }
 
 /** What a grant adds to its recipient's Hit Point maximum: its amount, and its dice rolled for this recipient. */

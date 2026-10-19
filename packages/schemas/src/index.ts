@@ -1732,6 +1732,8 @@ export const GrantOptionSchema = z
     /** Conditions it adds while the effect lasts, which end with it (Eyebite's Asleep: Unconscious). */
     conditions: z.array(ConditionSchema).min(1).max(3).optional(),
     conditionImmunities: z.array(ConditionSchema).min(1).max(6).optional(),
+    /** Conditions the bearer already has that stop applying while it lasts and come back after (Calm Emotions). */
+    suppressesConditions: z.array(ConditionSchema).min(1).max(6).optional(),
     /** The bearer's Speed is 0 while it lasts (Command's Halt). */
     speedZero: z.literal(true).optional(),
     /** It ends early when the bearer takes damage (Eyebite's Asleep). */

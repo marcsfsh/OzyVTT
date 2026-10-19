@@ -1,6 +1,6 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { PendingSave } from "@vtt/domain";
-import { catalogIdOf, type ActionReaction } from "@vtt/schemas";
+import { catalogIdOf, type ActionReaction, type GrantOption } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
 import { addEffect, ESCAPE_ATHLETICS_TAG, makeEffect, NO_ACTIONS_TAG } from "../effects.js";
@@ -11,7 +11,8 @@ import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
 import { HIDDEN_SOURCE } from "../hidden-source.js";
 import { rollDice } from "@vtt/rules-5e";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
-import { recordRoll, tableLineOf, type ResolveContext } from "./context.js";
+import { recordRoll, tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
+import { optionFor, optionParts, withOptionName } from "./grant-extras.js";
 import { coverBonusOf, coverFor } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf } from "./damage.js";
@@ -199,14 +200,20 @@ export function spellCastOf(ctx: ResolveContext): SpellCast | undefined {
 export function failureEffectFor(
   ctx: MagicalSource & Pick<ResolveContext, "castId">,
   conditionIds: readonly string[],
-  cast?: SpellCast
+  cast?: SpellCast,
+  option: GrantOption | null = null
 ): PendingSave["onFailEffect"] {
   const { action, attacker, castId } = ctx;
   const save = action.save;
   if (!save) return undefined;
-  const linked = conditionIds.filter((id) => !BARE_FAILURE_CONDITIONS.has(id));
+  // The pick the caster made for this target adds its part (Eyebite's Asleep: Unconscious, ending on damage).
+  const parts = optionParts(option);
+  const linked = [...new Set([...conditionIds, ...parts.conditions])]
+    .filter((id) => !BARE_FAILURE_CONDITIONS.has(id))
+    .slice(0, 4);
   // What the failure leaves besides conditions (Bane's -1d4, Faerie Fire's outline), declared by the action.
   const declared = save.failureEffect;
+  const endAction = declared?.endAction;
   // Alchemist's Fire sets its target burning, Oil covers it: an effect of its own, or riding the conditions.
   const hazard = save.failureHazard ? HAZARDS[save.failureHazard] : undefined;
   if (linked.length === 0 && !declared && !hazard) return undefined;
@@ -220,18 +227,27 @@ export function failureEffectFor(
     (cast ? spellSaveDuration(cast.spell, cast.level) : undefined);
   const ongoingDamage = save.ongoingDamage ?? hazard?.ongoingDamage;
   return {
-    name: (
+    name: withOptionName(
       declared?.name ??
-      (linked.length > 0 ? `${conditionLabel(linked[0]!)} by ${attacker.name} (${action.name})` : hazard!.name)
-    ).slice(0, 120),
+        (linked.length > 0 ? `${conditionLabel(linked[0]!)} by ${attacker.name} (${action.name})` : hazard!.name),
+      option
+    ),
     tags: [
-      ...(grapple ? ["grapple"] : []),
-      ...(athletics ? [ESCAPE_ATHLETICS_TAG] : []),
-      ...(action.spellId !== undefined && NO_ACTIONS_FAILURES.has(action.spellId) ? [NO_ACTIONS_TAG] : []),
-      ...(declared?.tags ?? []),
-      ...(hazard ? [hazard.tag] : [])
+      ...new Set([
+        ...(grapple ? ["grapple"] : []),
+        ...(athletics ? [ESCAPE_ATHLETICS_TAG] : []),
+        ...(action.spellId !== undefined && NO_ACTIONS_FAILURES.has(action.spellId) ? [NO_ACTIONS_TAG] : []),
+        ...(declared?.tags ?? []),
+        ...parts.tags,
+        ...(hazard ? [hazard.tag] : [])
+      ])
     ].slice(0, 8),
-    modifiers: [...(declared?.modifiers ?? [])],
+    modifiers: [...(declared?.modifiers ?? []), ...parts.modifiers],
+    ...(option ? { optionId: option.id } : {}),
+    ...(parts.conditionImmunities.length > 0 ? { conditionImmunities: [...parts.conditionImmunities] } : {}),
+    ...(parts.suppresses.length > 0 ? { suppressesConditions: [...parts.suppresses] } : {}),
+    // Irresistible Dance: the action its bearer may take to end it, at the spell save DC.
+    ...(endAction ? { endAction: { ...endAction, dc: endAction.dc === "spellcasting" ? save.dc : endAction.dc } } : {}),
     ...(declared?.armorClassBonus !== undefined ? { armorClassBonus: declared.armorClassBonus } : {}),
     linkedConditionIds: linked,
     // An escape DC the text doesn't print is the grapple's own DC, as the 2024 rules set it; a spell's restraint is
@@ -241,10 +257,10 @@ export function failureEffectFor(
     sourceName: attacker.name,
     ...(duration ? { duration } : {}),
     ...(save.repeatSave ? { repeatSave: { ability: save.ability, dc: save.dc } } : {}),
-    ...(save.endsOnDamage ? { endsOnDamage: true } : {}),
+    ...(save.endsOnDamage || option?.endsOnDamage ? { endsOnDamage: true } : {}),
     ...(save.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
     ...(declared?.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
-    ...(save.speedZero ? { speedZero: true } : {}),
+    ...(save.speedZero || declared?.speedZero || option?.speedZero ? { speedZero: true } : {}),
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
     ...(ongoingDamage ? { ongoingDamage } : {}),
     ...(castId !== null ? { castId } : {}),
@@ -298,7 +314,14 @@ export function parkActionSave(ctx: ResolveContext): void {
   // The GM's explicit choice wins over the condition the action declares.
   const conditionIds = input.conditionId ? [input.conditionId] : action.save.failureConditions;
   const cast = spellCastOf(ctx);
+  // The caster's pick of what the failure does (Bestow Curse's curse), one for each target where the text says so.
+  const offered = action.save.failureEffect?.options
+    ? { options: action.save.failureEffect.options, perTarget: action.save.failureEffect.optionsPerTarget === true }
+    : null;
+  const optionOf = (target: LiveActor) => (offered ? optionFor(ctx, offered, target, action.name) : null);
   const onFailEffect = failureEffectFor(ctx, conditionIds, cast);
+  const onFailFor = (option: GrantOption | null) =>
+    option ? failureEffectFor(ctx, conditionIds, cast, option) : onFailEffect;
   // A save its user makes (Contact Other Plane) is the user's alone, whatever was aimed at.
   let saving = action.save.bySelf ? [attacker] : targets;
   const threshold = action.save.failsAtHitPoints;
@@ -342,7 +365,7 @@ export function parkActionSave(ctx: ResolveContext): void {
           ? applyFailureEffect(
               state,
               target.id,
-              onFailEffect,
+              onFailFor(optionOf(target))!,
               `${input.commandId}:${target.id}:fail`,
               conditionDeps(deps)
             )
@@ -383,9 +406,17 @@ export function parkActionSave(ctx: ResolveContext): void {
               : null)
         )
       : 0;
-  const groups = new Map<number, string[]>();
-  for (const target of saving) groups.set(saveBonusOf(target), [...(groups.get(saveBonusOf(target)) ?? []), target.id]);
-  for (const [saveBonus, targetIds] of groups)
+  // One prompt group for each cover bonus and pick.
+  const groups = new Map<string, { saveBonus: number; option: GrantOption | null; targetIds: string[] }>();
+  for (const target of saving) {
+    const option = optionOf(target);
+    const key = `${saveBonusOf(target)}|${option?.id ?? ""}`;
+    const group = groups.get(key) ?? { saveBonus: saveBonusOf(target), option, targetIds: [] };
+    group.targetIds.push(target.id);
+    groups.set(key, group);
+  }
+  for (const { saveBonus, option, targetIds } of groups.values()) {
+    const onFailEffect = onFailFor(option);
     createPendingSaves(state, {
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -407,6 +438,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
+  }
 }
 
 /**

@@ -239,7 +239,19 @@ const PendingSaveEffectSchema = z
     /** An action the bearer may take to end it (Irresistible Dance's "collect itself"). */
     endAction: EffectInstanceSchema.shape.endAction,
     /** The option the caster picked for the failure (Bestow Curse's curse). */
-    optionId: EffectInstanceSchema.shape.optionId
+    optionId: EffectInstanceSchema.shape.optionId,
+    /** Conditions the bearer is immune to while it lasts (Calm Emotions' Charmed and Frightened). */
+    conditionImmunities: EffectInstanceSchema.shape.conditionImmunities,
+    /** Conditions the bearer already has that stop applying while it lasts and come back after (Calm Emotions). */
+    suppressesConditions: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(60)
+      )
+      .max(6)
+      .optional()
   })
   .strict();
 

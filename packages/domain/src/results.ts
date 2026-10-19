@@ -403,6 +403,20 @@ export const ActionAvailabilitySchema = z.strictObject({
     ),
   /** The conditions its caster picks one of for a failed save (Blindness/Deafness); `action.resolve`'s `conditionId`. */
   conditionChoices: z.array(SaveConditionSchema).optional(),
+  /** What it asks its user to choose as it resolves: an option (Fire Shield's warm or chill), one for each target, or
+   *  the carried weapon it binds to. */
+  choices: z
+    .strictObject({
+      options: z.array(z.strictObject({ id: z.string(), name: z.string() })).optional(),
+      optionsPerTarget: z.literal(true).optional(),
+      bindsWeapon: z
+        .strictObject({ weaponIds: z.array(z.string()).optional(), melee: z.literal(true).optional() })
+        .optional()
+    })
+    .optional()
+    .describe(
+      "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), and `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`)"
+    ),
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple). */
   checkSkills: z.array(z.strictObject({ id: z.string(), ability: AbilityIdSchema })).optional(),
   /** The weapon mastery property this character uses with this swing (Graze on Borin's Greatsword): present only when
