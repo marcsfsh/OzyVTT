@@ -125,7 +125,7 @@ describe("the starting kits", () => {
     expect(carried(picked("instrument-flute"))).not.toContainEqual(["instrument-drum", 1]);
     // "Musical Instrument of your choice" names no proficiency, so one outside the three is taken too.
     expect(carried(picked("instrument-horn"))).toContainEqual(["instrument-horn", 1]);
-    expect(() => buildCharacterDefinition(picked("dagger"), library, policy)).toThrow(/isn't an item/);
+    expect(() => buildCharacterDefinition(picked("dagger"), library, policy)).toThrow(/isn't one of the items/);
   });
 
   it("offers the kit's instrument as its own pick in the builder once the kit is chosen", () => {

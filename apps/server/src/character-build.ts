@@ -1629,7 +1629,7 @@ export function buildCharacterDefinition(
       const tool = chosenTools.shift()!;
       return { ...item, id: tool, name: library.equipmentRecord(tool)?.name ?? item.name };
     });
-    if (kitPicks.length > 0) reject(`"${kitPicks[0]}" isn't an item ${chosen.label} lets you pick.`);
+    if (kitPicks.length > 0) reject(`"${kitPicks[0]}" isn't one of the items ${chosen.label} offers a choice of.`);
     // An equipment pack is the things it holds, each its own row ("10 Torches" a stack of ten).
     const items = picked.flatMap((item) => {
       const contents = library.equipmentRecord(item.id)?.contents;
