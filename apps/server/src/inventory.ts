@@ -6,6 +6,7 @@ import { refreshBaseArmorClass, spellSlotMaxima, storedArmorClass } from "./acto
 import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
 import { castAction, itemAction } from "./item-actions.js";
 import { keepAmmunitionCount } from "./ammunition.js";
+import { keepLightState } from "./item-light.js";
 import { endConditionsImmuneTo, endEffect, MAGE_ARMOR_TAG, type EffectNarration } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
 import { scrollSpellProblem } from "./scrolls.js";
@@ -386,6 +387,12 @@ export function setInventoryItem(
   item = keepDormant(
     actor.inventory.find((entry) => entry.id === item.id),
     item
+  );
+  // Whether a light burns is the server's: lit with item.set-light, put out by stowing it.
+  item = keepLightState(
+    actor.inventory.find((entry) => entry.id === item.id),
+    item,
+    state.rest.clockHours
   );
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   enforceCurse(actor, item, deps);

@@ -7107,7 +7107,25 @@
       "name": "Channel Divinity: Divine Sense",
       "activation": "bonus-action",
       "description": "You open your awareness to detect Celestials, Fiends, and Undead. For the next 10 minutes or until you have the Incapacitated condition, you know the location of any creature of those types within 60 feet of yourself, and you know its creature type. Within the same radius, you also detect any place or object that has been consecrated or desecrated, as with the Hallow spell.",
-      "damage": []
+      "damage": [],
+      "grants": {
+       "name": "Divine Sense",
+       "tags": [
+        "divine-sense"
+       ],
+       "duration": {
+        "type": "rounds",
+        "rounds": 100
+       },
+       "detects": {
+        "creatureTypes": [
+         "celestial",
+         "fiend",
+         "undead"
+        ],
+        "feet": 60
+       }
+      }
      }
     ]
    },
@@ -10591,7 +10609,14 @@
        "id": "devils-sight",
        "name": "Devil's Sight",
        "description": "Prerequisite: Level 2+ Warlock You can see normally in Dim Light and Darkness—both magical and nonmagical—within 120 feet of yourself.",
-       "level": 2
+       "level": 2,
+       "modifiers": [
+        {
+         "type": "sense",
+         "sense": "devils-sight",
+         "feet": 120
+        }
+       ]
       },
       {
        "id": "devouring-blade",
@@ -10954,7 +10979,14 @@
        "id": "witch-sight",
        "name": "Witch Sight",
        "description": "Prerequisite: Level 15+ Warlock You have Truesight with a range of 30 feet.",
-       "level": 15
+       "level": 15,
+       "modifiers": [
+        {
+         "type": "sense",
+         "sense": "truesight",
+         "feet": 30
+        }
+       ]
       }
      ]
     },

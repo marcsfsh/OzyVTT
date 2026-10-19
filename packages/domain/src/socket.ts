@@ -185,6 +185,9 @@ import type {
   ScenePreviewSchema,
   VisionResetExploredSchema,
   VisionSetAmbientSchema,
+  VisionAreaAddSchema,
+  VisionAreaRemoveSchema,
+  ItemSetLightSchema,
   VisionSetEnabledSchema,
   WallAddSchema,
   WallClearSchema,
@@ -884,6 +887,18 @@ export interface ClientToServerEvents {
   ) => void;
   "light:remove": (
     payload: CommandPayload<typeof LightRemoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "vision:add-area": (
+    payload: CommandPayload<typeof VisionAreaAddSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "vision:remove-area": (
+    payload: CommandPayload<typeof VisionAreaRemoveSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "item:set-light": (
+    payload: CommandPayload<typeof ItemSetLightSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:add": (

@@ -955,7 +955,43 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "grants": {
+   "skills": [],
+   "expertise": [],
+   "tools": [],
+   "languages": [],
+   "armor": [],
+   "weapons": [],
+   "saves": [],
+   "damageResistances": [
+    "poison"
+   ],
+   "damageImmunities": [],
+   "conditionImmunities": [],
+   "spells": []
+  },
+  "modifiers": [
+   {
+    "type": "darkvision",
+    "feet": 60
+   },
+   {
+    "type": "roll-mode",
+    "roll": "save",
+    "mode": "advantage",
+    "when": [
+     {
+      "type": "on-saving-throw"
+     },
+     {
+      "type": "versus-condition",
+      "conditionIds": [
+       "poisoned"
+      ]
+     }
+    ]
+   }
+  ]
  },
  {
   "id": "belt-of-giant-strength",
@@ -1426,6 +1462,11 @@
   "costGp": null,
   "weightLb": null,
   "description": "Wondrous Item, Very Rare (Requires Attunement). This candle's magic is activated when the candle is lit, which requires a Magic action. After burning for 4 hours, the candle is destroyed. You can snuff it out early for use at a later time. Deduct the time it burned in increments of 1 minute from its total burn time. While lit, the candle sheds Dim Light in a 30-foot radius. While you are within that light, you have Advantage on D20 Tests. In addition, a Cleric or Druid in the light can cast level 1 spells they have prepared without expending spell slots. Alternatively, when you light the candle for the first time, you can cast Gate with it. Doing so destroys the candle. The portal created by the spell links to a particular Outer Plane chosen by the GM or determined by rolling on the following table. 1d100 01–05: Outer Plane Abyss, 1d100 55–59, Outer Plane Gehenna; 1d100 06–10: Outer Plane Acheron, 1d100 60–64, Outer Plane Hades; 1d100 11–17: Outer Plane Arborea, 1d100 65–69, Outer Plane Limbo; 1d100 18–25: Outer Plane Arcadia, 1d100 70–77, Outer Plane Mechanus; 1d100 26–33: Outer Plane Beastlands, 1d100 78–85, Outer Plane Mount Celestia; 1d100 34–41: Outer Plane Bytopia, 1d100 86–90, Outer Plane Nine Hells; 1d100 42–46: Outer Plane Carceri, 1d100 91–95, Outer Plane Pandemonium; 1d100 47–54: Outer Plane Elysium, 1d100 96–00, Outer Plane Ysgard.",
+  "light": {
+   "brightFeet": 0,
+   "dimFeet": 30,
+   "burnHours": 4
+  },
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
@@ -2947,7 +2988,27 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "open",
+    "name": "Open the Bottle",
+    "activation": "action",
+    "description": "Remove the stopper: smoke fills a 60-foot Emanation originating from the bottle, Heavily Obscured, for 10 minutes.",
+    "damage": [],
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 60,
+     "widthFeet": null
+    },
+    "sight": {
+     "area": {
+      "kind": "heavily-obscured",
+      "aroundSelfFeet": 60
+     },
+     "rounds": 100
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -3100,6 +3161,11 @@
   "costGp": null,
   "weightLb": null,
   "description": "Weapon (Any Melee Weapon), Rare (Requires Attunement). While holding this magic weapon, you can take a Bonus Action and use a command word to cause flames to engulf the damage-dealing part of the weapon. These flames shed Bright Light in a 40-foot radius and Dim Light for an additional 40 feet. While the weapon is ablaze, it deals an extra 2d6 Fire damage on a hit. The flames last until you take a Bonus Action to issue the command again or until you drop, stow, or sheathe the weapon.",
+  "light": {
+   "brightFeet": 40,
+   "dimFeet": 40,
+   "ridersWhileLit": true
+  },
   "weapon": null,
   "armor": null,
   "slot": "weapon",
@@ -3275,6 +3341,10 @@
   "costGp": null,
   "weightLb": null,
   "description": "Wondrous Item, Uncommon. This prism has 50 charges. While you are holding it, you can take a Magic action and use one of three command words to cause one of the following effects: First Command Word. The gem sheds Bright Light in a 30-foot radius and Dim Light for an additional 30 feet. This effect doesn't expend a charge. It lasts until you take a Bonus Action to repeat the command word or until you use another function of the gem. Second Command Word. You expend 1 charge and cause the gem to fire a brilliant beam of light at one creature you can see within 60 feet of yourself. The creature must succeed on a DC 15 Constitution saving throw or have the Blinded condition for 1 minute. The creature repeats the save at the end of each of its turns, ending the effect on itself on a success. Third Command Word. You expend 5 charges and cause the gem to flare with intense light in a 30-foot Cone. Each creature in the Cone makes a saving throw as if struck by the beam created with the second command word. When all of the gem's charges are expended, the gem becomes a nonmagical jewel worth 50 GP.",
+  "light": {
+   "brightFeet": 30,
+   "dimFeet": 30
+  },
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
@@ -3326,6 +3396,27 @@
     "activation": "action",
     "description": "Expend 1 charge. For the next 10 minutes, you have Truesight out to 120 feet when you peer through the gem.",
     "damage": [],
+    "grants": {
+     "name": "Peering Through the Gem of Seeing",
+     "tags": [
+      "gem-of-seeing"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 100
+     },
+     "modifiers": [
+      {
+       "type": "sense",
+       "sense": "truesight",
+       "feet": 120
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    },
     "uses": {
      "limit": 3,
      "per": "long-rest",
@@ -3619,7 +3710,13 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "darkvision",
+    "feet": 60,
+    "extends": true
+   }
+  ]
  },
  {
   "id": "hammer-of-thunderbolts",
@@ -4335,6 +4432,17 @@
   "costGp": null,
   "weightLb": null,
   "description": "Wondrous Item, Uncommon. While lit, this hooded lantern burns for 6 hours on 1 pint of oil, shedding Bright Light in a 30-foot radius and Dim Light for an additional 30 feet. Invisible creatures and objects are visible as long as they are in the lantern's Bright Light. You can take a Utilize action to lower the hood, reducing the lantern's light to Dim Light in a 5-foot radius.",
+  "light": {
+   "brightFeet": 30,
+   "dimFeet": 30,
+   "hooded": {
+    "brightFeet": 0,
+    "dimFeet": 5
+   },
+   "revealsInvisible": true,
+   "burnHours": 6,
+   "fuel": "oil"
+  },
   "weapon": null,
   "armor": null,
   "slot": "wondrous",
@@ -4437,6 +4545,11 @@
   "costGp": null,
   "weightLb": null,
   "description": "Weapon (Mace), Rare (Requires Attunement). When you hit a Fiend or an Undead with this magic weapon, that creature takes an extra 2d6 Radiant damage. If the target has 25 Hit Points or fewer after taking this damage, it must succeed on a DC 15 Wisdom saving throw or be destroyed. On a successful save, the creature has the Frightened condition until the end of your next turn. Light. While you hold this weapon, it sheds Bright Light in a 20-foot radius and Dim Light for an additional 20 feet.",
+  "light": {
+   "brightFeet": 20,
+   "dimFeet": 20,
+   "always": true
+  },
   "weapon": null,
   "armor": null,
   "slot": "weapon",
@@ -6131,6 +6244,10 @@
   "costGp": null,
   "weightLb": null,
   "description": "Weapon (Quarterstaff), Very Rare (Requires Attunement). You have a +2 bonus to attack rolls and damage rolls made with this magic weapon. While holding this weapon, you can cause it to emit green Dim Light out to 10 feet, either as a Bonus Action or after you roll Initiative, or you can extinguish the light as a Bonus Action. While holding this weapon, you can take a Bonus Action to alter its form, turning it into a 6-inch rod (for ease of storage) or a 10-foot pole, or reverting it a Quarterstaff; the weapon will elongate only as far as the surrounding space allows. In certain forms, the weapon has the following additional properties. Acrobatic Assist (Quarterstaff and 10-Foot Pole Forms Only). While holding this weapon, you have Advantage on Dexterity (Acrobatics) checks. Attack Deflection (Quarterstaff Form Only). When you are hit by an attack while holding the weapon, you can take a Reaction to twirl the weapon around you, gaining a +5 bonus to your Armor Class against the triggering attack, potentially causing the attack to miss you. You can't use this property again until you finish a Short or Long Rest. Ranged Weapon (Quarterstaff Form Only). This weapon has the Thrown property with a normal range of 30 feet and a long range of 120 feet. Immediately after you make a ranged attack with the weapon, it flies back to your hand.",
+  "light": {
+   "brightFeet": 0,
+   "dimFeet": 10
+  },
   "weapon": null,
   "armor": null,
   "slot": "weapon",
@@ -6917,7 +7034,36 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "x-ray-vision",
+    "name": "X-ray Vision",
+    "activation": "action",
+    "description": "Gain X-ray vision with a range of 30 feet for 1 minute: solid objects within that range appear transparent and don't prevent light from passing through them.",
+    "damage": [],
+    "grants": {
+     "name": "X-ray Vision",
+     "tags": [
+      "x-ray-vision"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 10
+     },
+     "modifiers": [
+      {
+       "type": "sense",
+       "sense": "x-ray",
+       "feet": 30
+      }
+     ],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -6945,7 +7091,17 @@
   "tags": [],
   "actions": [],
   "effects": [],
-  "modifiers": []
+  "modifiers": [
+   {
+    "type": "darkvision",
+    "feet": 120
+   },
+   {
+    "type": "sense",
+    "sense": "truesight",
+    "feet": 120
+   }
+  ]
  },
  {
   "id": "robe-of-scintillating-colors",
@@ -6982,6 +7138,38 @@
     "damage": [],
     "targets": {
      "rangeFeet": 30
+    },
+    "grants": {
+     "name": "Scintillating Colors",
+     "tags": [
+      "scintillating-colors"
+     ],
+     "duration": {
+      "type": "until-source-turn-end"
+     },
+     "modifiers": [
+      {
+       "type": "roll-mode",
+       "roll": "incoming-attack",
+       "mode": "disadvantage",
+       "when": [
+        {
+         "type": "on-attack-roll"
+        },
+        {
+         "type": "seen-by-other"
+        }
+       ]
+      }
+     ],
+     "light": {
+      "brightFeet": 30,
+      "dimFeet": 30
+     },
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false
     },
     "uses": {
      "limit": 3,
@@ -7166,6 +7354,14 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "sight": {
+     "light": {
+      "on": "point",
+      "brightFeet": 60,
+      "dimFeet": 60
+     },
+     "rounds": 100
     }
    }
   ],
@@ -8477,6 +8673,14 @@
      "shape": "emanation",
      "sizeFeet": 30,
      "widthFeet": null
+    },
+    "sight": {
+     "area": {
+      "kind": "heavily-obscured",
+      "aroundSelfFeet": 30,
+      "sparesUser": true
+     },
+     "rounds": 100
     }
    }
   ],
@@ -9050,6 +9254,11 @@
   "costGp": null,
   "weightLb": null,
   "description": "Weapon (Longsword), Rare (Requires Attunement). This item appears to be a sword hilt. Blade of Radiance. While grasping the hilt, you can take a Bonus Action to cause a blade of pure radiance to spring into existence or make the blade disappear. While the blade exists, this magic weapon functions as a Longsword with the Finesse property. If you are proficient with Longswords or Shortswords, you are proficient with the Sun Blade. You gain a +2 bonus to attack rolls and damage rolls made with this weapon, which deals Radiant damage instead of Slashing damage. When you hit an Undead with it, that target takes an extra 1d8 Radiant damage. Sunlight. The sword's luminous blade emits Bright Light in a 15-foot radius and Dim Light for an additional 15 feet. The light is sunlight. While the blade persists, you can take a Magic action to expand or reduce its radius of Bright Light and Dim Light by 5 feet each, to a maximum of 30 feet each or a minimum of 10 feet each.",
+  "light": {
+   "brightFeet": 15,
+   "dimFeet": 15,
+   "sunlight": true
+  },
   "weapon": {
    "category": "martial",
    "damageDice": "1d8",

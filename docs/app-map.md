@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 141 commands · 317 HTTP paths
+- 14 GameState fields · 144 commands · 320 HTTP paths
 
 ## GameState shape
 
@@ -35,7 +35,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 one table entry under `apps/server/src/commands/`. Both transports register from that table, and
 the OpenAPI document generates the command's operation from it. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `light`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `item`, `light`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
 
 | Command | Scope |
 | --- | --- |
@@ -128,6 +128,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `initiative.roll-self` | `combat:write` |
 | `initiative.set` | `combat:write` |
 | `initiative.swap` | `combat:write` |
+| `item.set-light` | `combat:write` |
 | `light.add` | `scene:write` |
 | `light.move` | `scene:write` |
 | `light.remove` | `scene:write` |
@@ -173,6 +174,8 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `turn.use` | `combat:write` |
 | `turn.use-legendary` | `combat:write` |
 | `turn.use-reaction` | `combat:write` |
+| `vision.add-area` | `scene:write` |
+| `vision.remove-area` | `scene:write` |
 | `vision.reset-explored` | `scene:write` |
 | `vision.set-ambient` | `scene:write` |
 | `vision.set-enabled` | `scene:write` |
@@ -312,6 +315,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/inventory/give`
 - `POST /api/v1/game/actors/{actorId}/inventory/recover-ammunition`
 - `POST /api/v1/game/actors/{actorId}/inventory/study`
+- `POST /api/v1/game/actors/{actorId}/items/{itemId}/light`
 - `POST /api/v1/game/actors/{actorId}/long-rest-request`
 - `POST /api/v1/game/actors/{actorId}/long-rest-request/answer`
 - `GET /api/v1/game/actors/{actorId}/movement`
@@ -427,6 +431,8 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/turn/reaction`
 - `POST /api/v1/game/turn/use`
 - `POST /api/v1/game/vision/ambient`
+- `POST /api/v1/game/vision/areas`
+- `DELETE /api/v1/game/vision/areas/{areaId}`
 - `POST /api/v1/game/vision/enabled`
 - `POST /api/v1/game/vision/explored/reset`
 - `GET /api/v1/game/vision/preview`

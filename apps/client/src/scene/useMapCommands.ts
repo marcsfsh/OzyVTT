@@ -10,6 +10,7 @@ import { command } from "../lib/command";
 import { newId } from "../lib/ids";
 import type { MoveMode } from "./movePreview";
 import type { Point } from "./useMapView";
+import type { AreaKindId } from "./mapTools";
 
 /**
  * Everything the map sends: token moves, annotations, fog, terrain and vision. Each family has its own busy flag, and
@@ -286,10 +287,38 @@ export function useMapCommands({
       () => command("vision:set-enabled", { enabled, ...scene, expectedRevision: revision }),
       "Vision could not be switched."
     );
-  const setAmbient = (ambient: "bright" | "dim" | "dark") =>
+  const setAmbient = (ambient: "bright" | "dim" | "dark", sunlight?: boolean) =>
     runVision(
-      () => command("vision:set-ambient", { ambient, ...scene, expectedRevision: revision }),
+      () =>
+        command("vision:set-ambient", {
+          ambient,
+          ...(sunlight !== undefined ? { sunlight } : {}),
+          ...scene,
+          expectedRevision: revision
+        }),
       "The light could not be changed."
+    );
+  /** An area of light or obscurement over a dragged rectangle. */
+  const addArea = (kind: AreaKindId, a: Point, b: Point) => {
+    if (Math.abs(a.x - b.x) < 4 || Math.abs(a.y - b.y) < 4) {
+      setMessage("Drag over the map to paint an area.");
+      return;
+    }
+    const rect = {
+      x: Math.min(a.x, b.x),
+      y: Math.min(a.y, b.y),
+      width: Math.abs(a.x - b.x),
+      height: Math.abs(a.y - b.y)
+    };
+    runVision(
+      () => command("vision:add-area", { kind, rect, ...scene, expectedRevision: revision }),
+      "The area could not be painted."
+    );
+  };
+  const removeArea = (areaId: string) =>
+    runVision(
+      () => command("vision:remove-area", { areaId, ...scene, expectedRevision: revision }),
+      "That area could not be removed."
     );
   const addWall = (kind: "wall" | "door" | "window", a: Point, b: Point) => {
     if (Math.hypot(a.x - b.x, a.y - b.y) < 4) {
@@ -368,6 +397,8 @@ export function useMapCommands({
     visionBusy,
     setVisionEnabled,
     setAmbient,
+    addArea,
+    removeArea,
     addWall,
     removeWall,
     clearWalls,

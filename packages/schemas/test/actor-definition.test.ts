@@ -520,10 +520,13 @@ describe("actor definition v1", () => {
       "versus-creature-type": { creatureTypes: ["undead"] },
       "versus-size": { sizes: ["large"] },
       "versus-condition": { conditionIds: ["prone"] },
-      "by-effect-source": {}
+      "by-effect-source": {},
+      "sees-other": {},
+      "seen-by-other": {},
+      "other-lacks-sense": { senses: ["blindsight"] }
     };
     const declared = RiderTriggerSchema.options.map((option) => option.shape.type.value as string);
-    expect(declared).toHaveLength(30);
+    expect(declared).toHaveLength(33);
     expect(Object.keys(samples).sort()).toEqual([...declared].sort());
     // Every trigger must be classified, or it would evaluate in the wrong layer.
     const kinds = declared.map((type) => RIDER_TRIGGER_KINDS[type as keyof typeof RIDER_TRIGGER_KINDS]);
@@ -531,7 +534,7 @@ describe("actor definition v1", () => {
     expect(kinds.filter((kind) => kind === "static-gate")).toHaveLength(6);
     expect(kinds.filter((kind) => kind === "dynamic-gate")).toHaveLength(3);
     expect(kinds.filter((kind) => kind === "moment")).toHaveLength(9);
-    expect(kinds.filter((kind) => kind === "filter")).toHaveLength(12);
+    expect(kinds.filter((kind) => kind === "filter")).toHaveLength(15);
 
     for (const type of declared) {
       const trigger = { type, ...samples[type] };

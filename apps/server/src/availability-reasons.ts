@@ -96,6 +96,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "movement.occupied": () => "Another creature is in that space.",
   "movement.no-speed": () => "You don't have that speed.",
   "movement.blocked-path": () => "Enemies block the way.",
+  "movement.toward-fear": () => "You can't move closer to what you fear.",
   "economy.action-used": actionSpentReason,
   "economy.bonus-action-used": ({ state, attacker }) =>
     hasEffectTag(attacker, SLOWED_TAG) && state.combat.turn.actionUsed && !state.combat.turn.bonusActionUsed
@@ -143,6 +144,8 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "target.mark-still-standing": () => "It moves once its creature drops to 0 Hit Points.",
   "cover.total": () => "The target has Total Cover.",
   "hide.seen": () => "An enemy can see you.",
+  "hide.exposed": () => "Hide in darkness, fog or behind a wall.",
+  "light.too-bright": () => "Only in Dim Light or darkness.",
   "attack.cleave-same-target": () => "Choose a second creature.",
   "attack.cleave-too-far": () => "The second creature must be within 5 feet of the first.",
   "target.too-many": () => "Too many targets.",

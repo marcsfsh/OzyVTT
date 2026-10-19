@@ -12,6 +12,8 @@ import type {
   PlayerInitiativeEntry,
   PlayerRollCall,
   PlayerRollRecord,
+  PlayerSensedCreature,
+  PlayerVision,
   PlayerView,
   PresenceStatus,
   RollRecord
@@ -22,6 +24,7 @@ import { healthBandOf } from "./hit-points.js";
 import { HIDDEN_SOURCE, withoutSourceName } from "./hidden-source.js";
 import { visibleTerrain } from "./terrain.js";
 import { exploredRectsOf, playerSight, tokenShown, visionOf, type AudienceSight } from "./vision/audience.js";
+import { sensedBy } from "./vision/detect.js";
 import type { SightContent } from "./vision/senses.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
@@ -248,6 +251,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   rangeFeet: "player",
   endsOnSpellHealing: "player",
   armorClassBonus: "player",
+  // The light a failure sheds is the spell's own text (Faerie Fire's Dim Light).
+  light: "player",
   name: "derived",
   sourceName: "derived",
   sourceActorId: "derived",
@@ -311,6 +316,12 @@ const PENDING_RULE_ASK_FIELDS = {
 
 function isHiddenSource(sourceActorId: string | null, publicActorIds: ReadonlySet<string>): boolean {
   return sourceActorId !== null && !publicActorIds.has(sourceActorId);
+}
+
+/** A vision block with what its player's characters sense unseen, as fresh arrays: the block itself may be cached. */
+function withSensed(vision: PlayerVision, sensed: readonly PlayerSensedCreature[]): PlayerVision {
+  if (!vision.enabled || sensed.length === 0) return vision;
+  return { ...vision, sensed: sensed.map((creature) => ({ ...creature })) };
 }
 
 function ownedBy(state: GameState, actorId: string, playerSessionId: string | undefined): boolean {
@@ -403,7 +414,16 @@ export function projectPlayerCombat(
     // them, before a fight as in one.
     vision:
       sight.enabled && state.combat.mapAssetId
-        ? visionOf(state, sight.viewerIds, content)
+        ? withSensed(
+            visionOf(state, sight.viewerIds, content),
+            // What a player's own characters sense unseen (Divine Sense); a spectator senses through no one.
+            playerSessionId === undefined
+              ? []
+              : sensedBy(state, sight.viewerIds, content, (actorId) => {
+                  const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
+                  return token !== undefined && showsToken(token);
+                })
+          )
         : { enabled: false as const },
     // legendaryUsed is omitted: a monster's remaining legendary actions are GM knowledge.
     // While the GM reviews an earlier turn players get only the flag; turn labels can name hidden combatants.
@@ -483,6 +503,10 @@ function playerEffect(
     longCast: _longCast,
     // What a hit on the bearer costs its attacker names a save's DC; the server applies it.
     struck: _struck,
+    // The light it sheds reaches players only as the lit ground in their own sight, which the server draws.
+    light: _light,
+    findDc: _findDc,
+    detects: _detects,
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);

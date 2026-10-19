@@ -222,7 +222,9 @@ check: GM-only, or hidden by sight or the fog, for the table or for one player. 
 name a hidden creature names "A hidden threat", a rule it would bend for a visible creature doesn't
 apply, and a public roll it makes is recorded GM-only. Another player's character out of
 sight keeps its actor but loses its token. An audience's own characters are always sent, and so
-is a creature with any part of its space revealed.
+is a creature with any part of its space revealed. A player's vision block also marks the creatures
+one of their own characters senses without seeing (Divine Sense, `vision/detect.ts`): where each
+stands and its creature type, never its identity, and never to the table or another player.
 
 The rule for a new field: it may reach a player or the viewer only if everything it carries is
 already public to them, and it carries no exact quantity and no identity, position or existence
@@ -248,15 +250,28 @@ of a hidden thing. When in doubt, leave it out.
   makes the scene live in a copy of the state and runs the real projections over it, and nothing
   is committed (ADR-0035).
 - Dynamic vision (ADR-0023) is per scene and off by default: walls, doors and windows as
-  image-pixel segments, placed and carried lights, and an ambient light level
-  (`vision/edit.ts`). The server builds each viewer's visibility polygon against the walls, cuts it
-  to the creature's senses and the lights (`vision/geometry.ts`, `vision/sight.ts`), and caches
-  polygons by walls, origin and radius. Senses come from stat blocks, species and features, and
-  light from equipped items (`vision/senses.ts`). After every command the server adds what the
-  party sees to the scene's explored memory (`rememberExplored`). Players and the table screen
-  get only polygons and rectangles to paint. While vision is on, walls, closed doors and windows
-  also bar movement, and sight decides an attack's unseen Advantage and Disadvantage and whether
-  Hide is allowed.
+  image-pixel segments, placed and carried lights, an ambient light level (sunlight or not), and
+  painted areas of Bright Light, Dim Light, Darkness, light or heavy obscurement and magical
+  Darkness (`vision/edit.ts`, `vision/areas.ts`). The server builds each viewer's visibility
+  polygon against the walls, cuts it to the creature's senses, the light at each point and the
+  areas (`vision/geometry.ts`, `vision/sight.ts`), and caches polygons by walls, origin and
+  radius. Senses come from stat blocks, species, features, feats, active items and live effects,
+  and light from items lit on their row, effects and a stat block's own glow (`vision/senses.ts`,
+  `item-light.ts`, which burns a light down on the game clock). A cast or an action places its
+  light, fog or magical Darkness and dispels what it overlaps; each ends with the Concentration,
+  effect or rounds that keep it (`vision/cast-sight.ts`). After every command the server adds what
+  the party sees to the scene's explored memory (`rememberExplored`). Players and the table screen
+  get only polygons and rectangles to paint: what is in sight, the bright part of it, and what
+  has been seen. While vision is on, walls, closed doors and windows also bar movement.
+- The rules read sight through `vision/rules.ts` (`sightRules`), which answers with the map while
+  vision is on and with the conditions and Blindsight, Truesight and See Invisibility by distance
+  while it is off: an attack's unseen Advantage and Disadvantage and Invisible, Cover from walls
+  and creatures between (`cover.ts`), an area that leaves out what its origin can't reach
+  (`area-targeting.ts`), Hide's hiding place, Search finding a hidden creature, Frightened's line
+  of sight and its refused approach (`movement-rules.ts`), Dodge and other riders that name who
+  sees whom (`sees-other`, `seen-by-other`, `other-lacks-sense`), Blinded and Heavily Obscured
+  checks, a save that needs its source seen (a gaze, a pattern), and the traits and features that
+  ask for sunlight, Bright Light, or Dim Light and Darkness.
 - Difficult terrain is a GM-painted set of cell-snapped rectangles per scene (`terrain.ts`).
   A move is charged along the cheapest grid path, where terrain costs double, other creatures'
   spaces cost double or bar the way, and crawling, climbing or swimming without the speed, or
@@ -321,7 +336,8 @@ they grant, its own feats and features, its live effects) with one context of be
 each roll collects the standing modifiers plus those gated on its moment (`on-attack-roll`,
 `on-saving-throw`, ...), so a modifier's `when` gate means the same thing on every carrier. A
 carrier refuses what it cannot give back: an item refuses hit points and ability scores, an effect
-everything the sheet stores (AC, initiative, slots, senses). Riders name damage types and
+everything the sheet stores (AC, initiative, slots). Senses on any carrier are read live by dynamic
+vision. Riders name damage types and
 conditions from the SRD's closed sets, and the homebrew publish gate (`homebrew-validate.ts`)
 refuses a rider gated on a moment its reader never collects.
 

@@ -364,7 +364,10 @@ function instantiate(
     armorClass: storedArmorClass(seed, definition, catalog),
     initiative: definition.initiativeBonus + derivation.initiative,
     ownerSessionId: null,
-    conditions: [],
+    // A stat block that says it "has the Invisible condition" (an invisible stalker) joins the roster with it.
+    conditions: (definition.traitMechanics ?? []).some((trait) => trait.kind === "invisible")
+      ? [{ id: "invisible" as const }]
+      : [],
     effects: [],
     deathSaves: null,
     actionUses: {},

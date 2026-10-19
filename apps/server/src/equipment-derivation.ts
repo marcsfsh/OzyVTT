@@ -175,6 +175,8 @@ export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
  *  nothing before attunement. No catalog record fails open to mundane. */
 export function itemIsActive(item: InventoryItem, record: EquipmentReference | undefined): boolean {
   if (item.quantity <= 0 || !item.equipped) return false;
+  // A Flame Tongue's fire is there only while it is ablaze.
+  if (record?.light?.ridersWhileLit === true && item.lit !== true) return false;
   const requiresAttunement = record?.attunement?.required === true || item.magic?.attunementRequired === true;
   return requiresAttunement ? item.attuned : true;
 }

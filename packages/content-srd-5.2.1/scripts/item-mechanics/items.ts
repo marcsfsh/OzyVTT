@@ -332,8 +332,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Attack Deflection's +5 AC is offered on a hit, once per rest. Not modeled: the form changes, which would gate it
-  // and Acrobatic Assist (prose) to the Quarterstaff form.
+  // Attack Deflection's +5 AC is offered on a hit, once per rest, and its glow ("Dim Light out to 10 feet") is lit and
+  // put out on the row. Not modeled: the form changes, which would gate it and Acrobatic Assist (prose) to the
+  // Quarterstaff form.
   "quarterstaff-of-the-acrobat": {
     modifiers: [
       { type: "attack-bonus", amount: 2 },
@@ -350,7 +351,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         uses: { limit: 1, per: "short-rest" },
         reaction: { trigger: "hit-by-attack", response: "ac-bonus", amount: 5 }
       }
-    ]
+    ],
+    light: { brightFeet: 0, dimFeet: 10 }
   },
 
   // The coat is a Bonus Action once per dawn, an effect on the bearer that the dagger's next hit spends on its save.
@@ -434,8 +436,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // "When you hit a Fiend or an Undead with this magic weapon, that creature takes an extra 2d6 Radiant damage." The
-  // save against destruction at 25 Hit Points or fewer is not modeled.
-  "mace-of-disruption": { modifiers: [versusTypes("2d6", ["fiend", "undead"], "radiant")] },
+  // save against destruction at 25 Hit Points or fewer is not modeled. "While you hold this weapon, it sheds Bright
+  // Light in a 20-foot radius and Dim Light for an additional 20 feet."
+  "mace-of-disruption": {
+    modifiers: [versusTypes("2d6", ["fiend", "undead"], "radiant")],
+    light: { brightFeet: 20, dimFeet: 20, always: true }
+  },
 
   // "An extra 2d6 damage to any creature it hits", of the weapon's own type.
   "vicious-weapon": {
@@ -460,8 +466,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Authored always on: the command-word lit state is not modeled, and a drawn Flame Tongue in combat is lit.
-  "flame-tongue": { modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "fire", doubleOnCritical: true }] },
+  // Its flames are lit and put out on the row (a Bonus Action): ablaze, it deals 2d6 Fire more and sheds light.
+  "flame-tongue": {
+    modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "fire", doubleOnCritical: true }],
+    light: { brightFeet: 40, dimFeet: 40, ridersWhileLit: true }
+  },
 
   // The DC 15 Constitution save against healing, repeated at the end of each of the target's turns. Its hour outlasts
   // any fight, so the effect lasts until the save ends it.
@@ -483,19 +492,22 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // A Longsword with Finesse that deals Radiant damage (its weapon block), +2, and 1d8 Radiant more against an Undead.
-  // Not modeled: the Bonus Action that makes the blade appear, and its sunlight.
+  // "While the blade exists, it sheds Bright Light in a 15-foot radius and Dim Light for an additional 15 feet. The
+  // light is sunlight": the blade is made and put away on the row, lit or not. Not modeled: the radius its Magic action
+  // adjusts.
   "sun-blade": {
     modifiers: [
       { type: "attack-bonus", amount: 2 },
       { type: "damage-bonus", amount: 2 },
       versusTypes("1d8", ["undead"], "radiant")
-    ]
+    ],
+    light: { brightFeet: 15, dimFeet: 15, sunlight: true }
   },
 
   // Prose-only items:
   //   `javelin-of-lightning`: Lightning where the javelin deals Piercing, and a Line area.
-  //   `energy-bow`: deals Force where the weapon's own type would go; unbound until weapon-swing overrides exist.
-  //       Its arrow options are not expressible either.
+  //   `energy-bow`: deals Force where the bow's own type would go; unbound until weapon-swing overrides exist. Its
+  //       arrow options are not expressible either.
   //   `thunderous-greatclub` - "your Strength is 20" is `ability-score`, refused on items; areas.
   //   `adamantine-armor` - no rider suppresses an incoming critical hit.
   //   `mithral-armor` - no rider removes a base armor's stealth disadvantage or Strength requirement.
@@ -634,7 +646,26 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   /** "While wearing this ring, you cast Water Walk from it, targeting only yourself." Self-only is prose. */
   "ring-of-water-walking": { casts: [{ spellId: "water-walk" }] },
 
-  // `ring-of-x-ray-vision`: `sense` is display-only and standing, with no timed activation.
+  /** "You can take a Magic action to gain X-ray vision with a range of 30 feet for 1 minute": walls don't block the
+   *  wearer's sight within 30 feet. Not modeled: the Exhaustion save on a second use before a Long Rest, and the lead
+   *  that still blocks it. */
+  "ring-of-x-ray-vision": {
+    actions: [
+      {
+        id: "x-ray-vision",
+        name: "X-ray Vision",
+        activation: "action",
+        description:
+          "Gain X-ray vision with a range of 30 feet for 1 minute: solid objects within that range appear transparent and don't prevent light from passing through them.",
+        grants: {
+          name: "X-ray Vision",
+          tags: ["x-ray-vision"],
+          duration: { type: "rounds", rounds: 10 },
+          modifiers: [{ type: "sense", sense: "x-ray", feet: 30 }]
+        }
+      }
+    ]
+  },
 
   // ---- Rods ------------------------------------------------------------------------------------
 
@@ -668,7 +699,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Plant the haft end of the rod in the ground. Its head sheds Bright Light in a 60-foot radius and Dim Light for an additional 60 feet. While in that Bright Light, you and your allies gain a +1 bonus to Armor Class and saving throws and can sense the location of any Invisible creature that is also in the Bright Light. Ends after 10 minutes or when a creature pulls the rod from the ground.",
-        uses: { limit: 1, per: "long-rest" }
+        uses: { limit: 1, per: "long-rest" },
+        // The planted rod's light, set down where its holder stands for 10 minutes.
+        sight: { light: { on: "point", brightFeet: 60, dimFeet: 60 }, rounds: 100 }
       }
     ]
   },
@@ -841,7 +874,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     }))
   },
 
-  // Insect Cloud's counter; the Heavily Obscured area is a GM ruling. Giant Insect and Insect Plague are multi-charge.
+  // Insect Cloud: a Heavily Obscured Emanation round the holder, who sees through it. Giant Insect and Insect Plague are
+  // multi-charge.
   "staff-of-swarming-insects": {
     charges: { regain: "1d6 + 4", lastChargeRoll: true },
     actions: [
@@ -852,7 +886,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         area: { shape: "emanation", sizeFeet: 30, widthFeet: null },
         description:
           "Expend 1 charge to fill a 30-foot Emanation originating from you with a swarm of harmless flying insects. They remain for 10 minutes, making the area Heavily Obscured for creatures other than you. A strong wind disperses the swarm and ends the effect.",
-        uses: { limit: 10, per: "long-rest", pool: "staff-of-swarming-insects-charges" }
+        uses: { limit: 10, per: "long-rest", pool: "staff-of-swarming-insects-charges" },
+        sight: { area: { kind: "heavily-obscured", aroundSelfFeet: 30, sparesUser: true }, rounds: 100 }
       }
     ]
   },
@@ -1190,9 +1225,22 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ---- Belt ------------------------------------------------------------------------------------
 
-  // `belt-of-dwarvenkind` - Constitution +2 (`ability-score`, refused), Dwarvish (item languages have
-  //     no reader), Persuasion advantage limited to dwarves (no target creature type), and Darkvision
-  //     and Poison resistance under a negated species gate ("if you aren't a dwarf").
+  /** "If you aren't a dwarf or duergar, you have Darkvision 60 feet, Resistance to Poison damage, and Advantage on
+   *  saving throws to avoid or end the Poisoned condition": authored for every wearer, since a dwarf's own Darkvision
+   *  (120 feet) and Dwarven Resilience already give it as much. Not modeled: Constitution +2 (`ability-score`,
+   *  refused), Dwarvish (item languages have no reader), and the Persuasion Advantage with dwarves. */
+  "belt-of-dwarvenkind": {
+    grants: { damageResistances: ["poison"] },
+    modifiers: [
+      { type: "darkvision", feet: 60 },
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "advantage",
+        when: [{ type: "on-saving-throw" }, { type: "versus-condition", conditionIds: ["poisoned"] }]
+      }
+    ]
+  },
   // `belt-of-giant-strength` - sets Strength (`ability-score`, refused).
 
   // ---- Feet ------------------------------------------------------------------------------------
@@ -1311,7 +1359,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `eyes-of-minute-seeing` - Darkvision, and Investigation advantage limited to within one foot.
   // `eyes-of-the-eagle` - Perception advantage "that rely on sight" and long-distance sight.
-  // `goggles-of-night` - Darkvision reaches nothing from an item.
+
+  /** "While wearing these dark lenses, you have Darkvision out to 60 feet. If you already have Darkvision, wearing the
+   *  goggles increases its range by 60 feet." */
+  "goggles-of-night": { modifiers: [{ type: "darkvision", feet: 60, extends: true }] },
 
   // An unlimited self-cast with no damage, attack or save.
   "hat-of-disguise": { casts: [{ spellId: "disguise-self" }] },
@@ -1444,12 +1495,20 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `cloak-of-the-manta-ray` - underwater breathing and Swim Speed are not modeled.
   // `mantle-of-spell-resistance` - spell-save advantage would apply to every save.
-  // `robe-of-eyes` - Perception advantage "that rely on sight", Darkvision and Truesight, and its Light/Daylight drawback.
+  /** Darkvision and Truesight out to 120 feet, which dynamic vision reads. Not modeled: Advantage on Wisdom
+   *  (Perception) checks "that rely on sight" (a check doesn't say what it relies on), and the Light or Daylight
+   *  drawback that Blinds the wearer. */
+  "robe-of-eyes": {
+    modifiers: [
+      { type: "darkvision", feet: 120 },
+      { type: "sense", sense: "truesight", feet: 120 }
+    ]
+  },
 
   /**
-   * A real DC 15 Wisdom save that Stuns until the end of the wearer's next turn, at creatures within its 30 feet of
-   * Bright Light. Not modeled: the light, which creatures can see the wearer, and the attack disadvantage for the
-   * duration.
+   * A real DC 15 Wisdom save that Stuns until the end of the wearer's next turn, at creatures within 30 feet, and the
+   * robe's light and the Disadvantage of attackers that can see the wearer until the end of its next turn. Not modeled:
+   * the save only for those in the Bright Light that see it.
    */
   "robe-of-scintillating-colors": {
     charges: { regain: "1d3" },
@@ -1468,7 +1527,22 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           failureDuration: { type: "until-source-turn-end" }
         },
         uses: { limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" },
-        targets: { rangeFeet: 30 }
+        targets: { rangeFeet: 30 },
+        grants: {
+          name: "Scintillating Colors",
+          tags: ["scintillating-colors"],
+          duration: { type: "until-source-turn-end" },
+          light: { brightFeet: 30, dimFeet: 30 },
+          // "Creatures that can see you have Disadvantage on attack rolls against you."
+          modifiers: [
+            {
+              type: "roll-mode",
+              roll: "incoming-attack",
+              mode: "disadvantage",
+              when: [{ type: "on-attack-roll" }, { type: "seen-by-other" }]
+            }
+          ]
+        }
       }
     ]
   },
@@ -1562,7 +1636,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `broom-of-flying` - Fly Speed is not modeled (also `carpet-of-flying`, `horseshoes-of-a-zephyr`).
 
-  // `candle-of-invocation` - advantage on all D20 Tests while within its light; no light-area gate or burn-down duration.
+  // Its light: "the candle sheds Dim Light in a 30-foot radius" for its 4 hours of burning. Not modeled: Advantage on
+  // D20 Tests and slot-free level 1 spells within that light, and the Gate it can open.
+  "candle-of-invocation": { light: { brightFeet: 0, dimFeet: 30, burnHours: 4 } },
 
   // One of the four elemental-commanding items; see the bowl.
   "censer-of-controlling-air-elementals": {
@@ -1644,13 +1720,31 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `efficient-quiver` - a container.
   // `efreeti-bottle` - a first-opening table governing later uses.
   // `elemental-gem` - single use.
-  // `eversmoking-bottle` - obscurement is not modeled.
+  /** Opened, "smoke billows out of the bottle and fills a 60-foot Emanation originating from the bottle", Heavily
+   *  Obscured, for 10 minutes. Not modeled: the cloud growing 10 feet a minute while it stays open, and a strong wind
+   *  dispersing it. */
+  "eversmoking-bottle": {
+    actions: [
+      {
+        id: "open",
+        name: "Open the Bottle",
+        activation: "action",
+        area: { shape: "emanation", sizeFeet: 60, widthFeet: null },
+        description:
+          "Remove the stopper: smoke fills a 60-foot Emanation originating from the bottle, Heavily Obscured, for 10 minutes.",
+        sight: { area: { kind: "heavily-obscured", aroundSelfFeet: 60 }, rounds: 100 }
+      }
+    ]
+  },
   // `feather-token` - six single-use tokens in one row.
   // `figurine-of-wondrous-power` - ten figurines, summons, multi-day cooldowns.
   // `folding-boat` - a vehicle.
-  // `gem-of-brightness` - 50 non-renewing charges, a 5-charge option.
+  // Its first command's light ("Bright Light in a 30-foot radius and Dim Light for an additional 30 feet"), lit and put
+  // out on the row. Not modeled: the 50 charges that never return, and the beam and flare that Blind.
+  "gem-of-brightness": { light: { brightFeet: 30, dimFeet: 30 } },
 
-  // Charge-alone. Not cast as True Seeing (that spell targets someone you touch); the Truesight is narrated.
+  // Not cast as True Seeing (that spell targets someone you touch): the charge gives its user Truesight 120 feet for
+  // 10 minutes, which dynamic vision reads.
   "gem-of-seeing": {
     charges: { regain: "1d3" },
     actions: [
@@ -1660,7 +1754,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge. For the next 10 minutes, you have Truesight out to 120 feet when you peer through the gem.",
-        uses: { limit: 3, per: "long-rest", pool: "gem-of-seeing-charges" }
+        uses: { limit: 3, per: "long-rest", pool: "gem-of-seeing-charges" },
+        grants: {
+          name: "Peering Through the Gem of Seeing",
+          tags: ["gem-of-seeing"],
+          duration: { type: "rounds", rounds: 100 },
+          modifiers: [{ type: "sense", sense: "truesight", feet: 120 }]
+        }
       }
     ]
   },
@@ -1712,8 +1812,20 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `lantern-of-revealing` - no rider suppresses Invisible within a light radius.
-
+  /** "While lit, this hooded lantern burns for 6 hours on 1 pint of oil, shedding Bright Light in a 30-foot radius and
+   *  Dim Light for an additional 30 feet. Invisible creatures and objects are visible as long as they are in the
+   *  lantern's Bright Light. You can take a Utilize action to lower the hood, reducing the light to Dim Light in a
+   *  5-foot radius." */
+  "lantern-of-revealing": {
+    light: {
+      brightFeet: 30,
+      dimFeet: 30,
+      revealsInvisible: true,
+      hooded: { brightFeet: 0, dimFeet: 5 },
+      burnHours: 6,
+      fuel: "oil"
+    }
+  },
   // ---- Manuals and tomes: "If you spend 48 hours over a period of 6 days or fewer studying the book's contents and
   // practicing its guidelines, your Constitution increases by 2, to a maximum of 30. The manual then loses its magic but
   // regains it in a century." The increase is permanent, so it goes into the reader's build (the GM marks the study

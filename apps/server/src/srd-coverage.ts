@@ -86,19 +86,39 @@ export function spellState(spell: SpellReference): CoverageState {
       (effect?.damage.length ?? 0) > 0 ||
       spell.save.speedZero === true ||
       spell.save.failurePush !== undefined);
-  return applies || saveApplies ? "enforced" : "guided";
+  // The light it sheds or the fog or Darkness it fills, which dynamic vision reads.
+  const sight = spell.sight;
+  return applies ||
+    saveApplies ||
+    sight?.light !== undefined ||
+    sight?.area !== undefined ||
+    sight?.dispels !== undefined
+    ? "enforced"
+    : "guided";
 }
 
 type ResolvingFields = Pick<
   ActorAction,
-  "damage" | "healing" | "multiattack" | "onHit" | "darts" | "reaction" | "grants" | "endsConditions" | "answer"
+  | "damage"
+  | "healing"
+  | "multiattack"
+  | "onHit"
+  | "darts"
+  | "reaction"
+  | "grants"
+  | "endsConditions"
+  | "answer"
+  | "sight"
 > &
   Readonly<{ attack?: unknown; save?: unknown; damageByLevel?: unknown }>;
 
 /** An action resolves when it rolls an attack or a save, deals damage, heals, grants an effect, ends conditions,
- *  runs a structured Multiattack, is offered as a reaction prompt or answers a roll (`roll-answers.ts`). One with none
- *  of these only spends its use and its place in the turn. */
+ *  runs a structured Multiattack, places light or an area of obscurement on the map, is offered as a reaction prompt
+ *  or answers a roll (`roll-answers.ts`). One with none of these only spends its use and its place in the turn. */
 const actionResolves = (action: ResolvingFields) =>
+  action.sight?.light !== undefined ||
+  action.sight?.area !== undefined ||
+  action.sight?.dispels !== undefined ||
   action.attack !== undefined ||
   action.save !== undefined ||
   action.damage.length > 0 ||
@@ -148,9 +168,9 @@ const modifierApplies = (riders: Riders) => (modifier: Modifier) => {
   return modifier.type !== "short-rest-regain" || riders.actions.length === 0;
 };
 
-/** A modifier nothing reads yet (a spell attack bonus, a sense): its record applies in part at most. */
+/** A modifier nothing reads yet: its record applies in part at most. Senses are read by dynamic vision. */
 const unreadModifier = (riders: Riders) =>
-  riders.modifiers.some((modifier) => modifierDisposition(modifier.type) === "unread" || modifier.type === "sense");
+  riders.modifiers.some((modifier) => modifierDisposition(modifier.type) === "unread");
 
 const ridersApply = (riders: Riders) =>
   riders.actions.some(actionResolves) ||
@@ -196,6 +216,8 @@ export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<str
     item.study !== undefined ||
     item.removesArmorDrawbacks === true ||
     (item.onHit?.length ?? 0) > 0 ||
+    // Its light, which dynamic vision reads while it is lit.
+    item.light !== undefined ||
     ridersApply(item);
   if (applies) return unreadModifier(item) ? "guided" : "enforced";
   const casts = item.casts.map((cast) => spellStates.get(cast.spellId) ?? "reference");

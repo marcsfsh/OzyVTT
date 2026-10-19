@@ -1894,7 +1894,21 @@
       "name": "Channel Divinity: Sacred Weapon",
       "activation": "other",
       "description": "When you take the Attack action, you can expend one use of your Channel Divinity to imbue one Melee weapon you are holding with positive energy. For 10 minutes or until you use this feature again, you add your Charisma modifier to attack rolls with that weapon (minimum bonus of +1), and each time you hit with it you can make it deal Radiant damage instead of its normal type. The weapon emits Bright Light in a 20-foot radius and Dim Light 20 feet beyond that.",
-      "damage": []
+      "damage": [],
+      "grants": {
+       "name": "Sacred Weapon",
+       "tags": [
+        "sacred-weapon"
+       ],
+       "duration": {
+        "type": "rounds",
+        "rounds": 100
+       },
+       "light": {
+        "brightFeet": 20,
+        "dimFeet": 20
+       }
+      }
      }
     ]
    },
@@ -1952,6 +1966,11 @@
        "duration": {
         "type": "rounds",
         "rounds": 100
+       },
+       "light": {
+        "brightFeet": 30,
+        "dimFeet": 0,
+        "sunlight": true
        }
       }
      }

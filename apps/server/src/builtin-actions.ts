@@ -61,7 +61,13 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
       tags: ["dodging"],
       duration: { type: "until-source-next-turn" },
       modifiers: [
-        { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage" },
+        // "If you can see the attacker", as the server's sight answers it.
+        {
+          type: "roll-mode",
+          roll: "incoming-attack",
+          mode: "disadvantage",
+          when: [{ type: "on-attack-roll" }, { type: "sees-other" }]
+        },
         {
           type: "roll-mode",
           roll: "save",
@@ -334,6 +340,19 @@ function bonusVariant(base: BonusBase, source: string, definition: ActorDefiniti
     activation: "bonus-action",
     description: `With ${source}, you can take this as a Bonus Action. ${generic.description}`
   };
+}
+
+/** Whether the stat-block row that offers this Bonus Action form works only "While in Dim Light or darkness" (a
+ *  shadow's Shadow Stealth), read as the offer is. */
+export function bonusNeedsDarkness(definition: ActorDefinition | undefined, actionId: string): boolean {
+  if (!actionId.endsWith(BONUS_SUFFIX)) return false;
+  const base = builtinBaseId(actionId) as BonusBase;
+  return (definition?.actions ?? []).some(
+    (action) =>
+      action.activation === "bonus-action" &&
+      offeredActions(action.description).includes(base) &&
+      /^While in Dim Light or darkness\b/i.test(action.description)
+  );
 }
 
 /** The generic actions every combatant has, then the Bonus Action forms its features give it. */

@@ -1,4 +1,4 @@
-import { GameStateSchema, type GameState, type VisionLight, type VisionWall } from "@vtt/domain";
+import { GameStateSchema, type GameState, type VisionArea, type VisionLight, type VisionWall } from "@vtt/domain";
 import type { TokenMapGeometry } from "../src/token-placement.js";
 
 /** A 1000 x 600 battlemap of 50-pixel, 5-foot cells (10 pixels a foot), and the creatures the vision tests use. */
@@ -50,6 +50,11 @@ export type VisionGameOptions = Readonly<{
   ambient?: "bright" | "dim" | "dark";
   walls?: readonly VisionWall[];
   lights?: readonly VisionLight[];
+  /** Areas of light and obscurement, and whether bright ambient light is sunlight. */
+  areas?: readonly VisionArea[];
+  sunlight?: boolean;
+  /** Annotations on the map (a spell's placed template). */
+  annotations?: readonly unknown[];
   positions?: Readonly<Record<string, { x: number; y: number } | null>>;
   /** Per-actor fields over the defaults (conditions, inventory, definitionId...). */
   actors?: Readonly<Record<string, Record<string, unknown>>>;
@@ -91,6 +96,7 @@ export function visionGame(options: VisionGameOptions = {}): GameState {
       turnActorId: HERO,
       mapAssetId: MAP,
       initiative: actors.map((actor, index) => ({ actorId: actor.id, score: 20 - index })),
+      annotations: options.annotations ?? [],
       tokens: actors.map((actor) => ({
         actorId: actor.id,
         position: positions[actor.id] ?? null,
@@ -118,6 +124,8 @@ export function visionGame(options: VisionGameOptions = {}): GameState {
         ambient: options.ambient ?? "bright",
         walls: options.walls ?? [],
         lights: options.lights ?? [],
+        areas: options.areas ?? [],
+        sunlight: options.sunlight ?? false,
         measure: MEASURE
       }
     }

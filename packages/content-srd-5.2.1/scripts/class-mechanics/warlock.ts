@@ -3,7 +3,7 @@
  *
  * Stays prose throughout: "whenever you gain a Warlock level, you can replace..." clauses; the pact weapon's
  * own riders (Charisma for its rolls, its damage types), since the trigger vocabulary cannot name one conjured
- * weapon; and senses, which are display-only. Eldritch Smite and Lifedrinker ride its hits.
+ * weapon. Eldritch Smite and Lifedrinker ride its hits.
  */
 import { spellTableStages, type ClassMechanicsModule } from "./overlay.js";
 
@@ -72,6 +72,11 @@ export const warlock: ClassMechanicsModule = {
         },
         // "Advantage on Constitution saving throws that you make to maintain Concentration."
         "eldritch-mind": { modifiers: [{ type: "roll-mode", roll: "concentration", mode: "advantage" }] },
+        // ---- senses, read by dynamic vision ----------------------------------------------------------
+        // "You can see normally in Dim Light and Darkness, both magical and nonmagical, within 120 feet of yourself."
+        "devils-sight": { modifiers: [{ type: "sense", sense: "devils-sight", feet: 120 }] },
+        // "You have Truesight with a range of 30 feet."
+        "witch-sight": { modifiers: [{ type: "sense", sense: "truesight", feet: 30 }] },
         // ---- castings without a spell slot ---------------------------------------------------------
         "armor-of-shadows": { grants: { spells: [atWill("mage-armor", 1)] } },
         "ascendant-step": { grants: { spells: [atWill("levitate", 2)] } },
@@ -155,9 +160,8 @@ export const warlock: ClassMechanicsModule = {
          */
         "pact-of-the-tome": { choice: { kind: "cantrip", choose: 3, fromCatalog: "warlock-spells", maxSpellLevel: 0 } }
         // Not modeled: Lessons of the First Ones (a feat pick on an option's nested choice cannot be
-        // settled by the build's pass ordering), Devil's Sight and Witch Sight (senses are display-only), the pact
-        // weapon itself with Thirsting Blade and Devouring Blade, and Gaze of Two Minds, Gift of the Protectors and
-        // Investment of the Chain Master.
+        // settled by the build's pass ordering), the pact weapon itself with Thirsting Blade and Devouring Blade, and
+        // Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master.
       }
     },
     /**
