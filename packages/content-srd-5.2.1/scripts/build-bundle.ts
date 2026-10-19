@@ -57,6 +57,7 @@ import { formOnlyOf, lycanthropeCurseOf, shapeShiftOf } from "./monster-forms.js
 import { PRINTED_NAME_KEYS, printedName, statBlockActionText, statBlockTraitText } from "./monster-text.js";
 import { lairCountsOf, STATBLOCK_SLUGS, statBlockHeaderOf } from "./monster-statblock.js";
 import { HIT_NOTE_KEYS, withHitNotes } from "./monster-hit-notes.js";
+import { swallowOf } from "./monster-swallow.js";
 import { SUMMON_STAT_BLOCKS } from "./summon-stat-blocks.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
@@ -623,7 +624,17 @@ const ACTION_ENRICHMENTS: Record<
   Partial<
     Pick<
       ActorAction,
-      "targetRules" | "targets" | "reaction" | "answer" | "sight" | "grants" | "healing" | "summons" | "endsUntilItActs"
+      | "targetRules"
+      | "targets"
+      | "reaction"
+      | "answer"
+      | "sight"
+      | "grants"
+      | "healing"
+      | "summons"
+      | "endsUntilItActs"
+      | "pull"
+      | "holdsAtOnce"
     >
   >
 > = {
@@ -660,6 +671,16 @@ const ACTION_ENRICHMENTS: Record<
       concentration: false
     }
   },
+  // "The roper pulls each creature Grappled by it up to 30 feet straight toward it."
+  "roper/reel": { targets: { grappledBySource: true }, pull: { feet: 30, upTo: true } },
+  // "The ettercap pulls one creature within 30 feet of itself that is Restrained by its Web Strand up to 25 feet
+  // straight toward itself."
+  "ettercap/reel": {
+    targets: { count: 1, rangeFeet: 30, heldByAction: "web-strand" },
+    pull: { feet: 25, upTo: true }
+  },
+  // "The shambling mound can have only one creature Grappled by this action at a time."
+  "shambling-mound/engulf": { holdsAtOnce: 1 },
   // "One living creature the wisp can see within 5 feet that has 0 Hit Points", and Vanish "ends early immediately
   // after the wisp makes an attack roll or uses Consume Life".
   "will-o-wisp/consume-life": {
@@ -1359,6 +1380,23 @@ const monsters: ActorDefinition[] = creatures
       // A reviewed fix may finish the save the reader read (how a creature is pulled out of a gelatinous cube).
       if (actionFix?.save && built.save) built.save = { ...built.save, ...structuredClone(actionFix.save) };
       if (actionFix?.reminder === null) delete built.reminder;
+      // A Swallow: how many it holds and what holding them does; a save's failure swallows, and the engine runs the
+      // swallowed creature's conditions, cover and acid, so the reminder that restated them goes.
+      const swallowing = swallowOf(action.fields.name, action.fields.desc, siblingIdOf);
+      if (swallowing) {
+        built.swallow = swallowing.swallow;
+        if (swallowing.targets) built.targets = swallowing.targets;
+        if (built.save)
+          built.save = {
+            ...built.save,
+            failureEffect: {
+              name: "Swallowed",
+              tags: ["swallowed", ...swallowing.tags],
+              modifiers: []
+            }
+          };
+        delete built.reminder;
+      }
       return built;
     });
     // The spells its actions cast, each a cast action in play; only spells the SRD spell list holds.

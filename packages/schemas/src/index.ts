@@ -1645,7 +1645,9 @@ export const EffectInstanceSchema = z
       saveToEnd: z
         .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
         .strict()
-        .optional()
+        .optional(),
+      /** Once it deals its damage, the effect ends and a bearer still alive is let out Prone (a giant frog's swallow). */
+      disgorges: z.literal(true).optional()
     })
       .strict()
       .optional(),
@@ -3535,7 +3537,13 @@ export const ActionTargetsSchema = z
     /** Only a creature this creature's own effect with this tag marks (Quivering Palm's vibrations). */
     markedBy: EffectTagSchema.optional(),
     /** Only a creature at 0 Hit Points (a will-o'-wisp's Consume Life). */
-    atZeroHitPoints: z.literal(true).optional()
+    atZeroHitPoints: z.literal(true).optional(),
+    /** Only a creature under this creature's effect from that action (one Restrained by an ettercap's Web Strand). */
+    heldByAction: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120)
+      .optional()
   })
   .strict()
   .describe(
@@ -3784,6 +3792,48 @@ export const ActionTeleportSchema = z
   })
   .strict();
 export type ActionTeleport = z.infer<typeof ActionTeleportSchema>;
+
+/**
+ * A swallow (SRD 5.2.1 behir, purple worm, giant toad): a creature taken inside the user. A save's failure swallows
+ * (its failure effect carries the `swallowed` tag); an action with no save swallows its target outright with
+ * `conditions`. Either way the grapple on the target ends, and the swallowed creature has Total Cover from everything
+ * outside the swallower.
+ * - `capacity`: how many it can hold at once ("it can have up to three creatures swallowed at a time").
+ * - `maxSize`: only a creature this size or smaller is swallowed; a larger one takes the failure's damage alone (a
+ *   kraken's "If the target is Large or smaller, it is swallowed").
+ * - `ongoingDamage`: what an outright swallow deals while it lasts (a giant toad's Acid at the end of each of its
+ *   turns); `disgorges`: after it deals that damage once, a survivor is let out Prone (a giant frog's).
+ * - `blocks`: its own actions it can't use while it holds a creature swallowed (a giant toad's Bite).
+ * - `regurgitate`: "If the behir takes 30 damage or more on a single turn from the swallowed creature, the behir must
+ *   succeed on a DC 14 Constitution saving throw at the end of that turn or regurgitate the creature, which falls in a
+ *   space within 10 feet of the behir and has the Prone condition."
+ */
+export const SwallowSchema = z
+  .object({
+    capacity: z.number().int().min(1).max(10),
+    maxSize: SizeSchema.optional(),
+    conditions: z.array(ConditionIdSchema).min(1).max(3).optional(),
+    ongoingDamage: OngoingDamageSchema.optional(),
+    disgorges: z.literal(true).optional(),
+    blocks: z
+      .array(z.string().regex(/^[a-z0-9-]+$/))
+      .min(1)
+      .max(4)
+      .optional(),
+    regurgitate: z
+      .object({
+        damage: z.number().int().min(1).max(500),
+        dc: z.number().int().min(1).max(40),
+        withinFeet: z.number().int().min(5).max(60)
+      })
+      .strict()
+      .optional()
+  })
+  .strict()
+  .describe(
+    "A swallow: how many creatures the user holds at once, the largest it swallows, the conditions and damage of one with no save, the actions it can't use meanwhile, and the damage from inside that makes it save or let them out"
+  );
+export type Swallow = z.infer<typeof SwallowSchema>;
 
 /** One stat block a summon can bring onto the map, and how many of it come. */
 export const SummonCreatureSchema = z
@@ -4264,6 +4314,14 @@ export const ActionSchema = z
     /** A teleport the action grants ("teleports up to 60 feet to an unoccupied space it can see"), see
      *  `ActionTeleportSchema`. */
     teleport: ActionTeleportSchema.optional(),
+    /** It swallows its target (a behir's, a giant toad's), see `SwallowSchema`. */
+    swallow: SwallowSchema.optional(),
+    /** Each target is pulled straight toward the user as it resolves, stopping beside it (a roper's Reel: "pulls each
+     *  creature Grappled by it up to 30 feet straight toward it"). */
+    pull: ForcedPushSchema.optional(),
+    /** How many creatures its effect can hold at once (a shambling mound's Engulf: "only one creature Grappled by this
+     *  action at a time"). */
+    holdsAtOnce: z.number().int().min(1).max(10).optional(),
     /** The creatures it brings onto the map (Summon Dragon, a Bowl of Commanding Water Elementals), see `SummonSchema`. */
     summons: SummonSchema.optional(),
     /** Its spell is cast with this action alone, whatever the spell's casting time (Pact of the Chain: "cast it as a

@@ -166,7 +166,7 @@ type ResolvingFields = Pick<
   | "effectOptions"
   | "raisesCorpse"
 > &
-  Partial<Pick<ActorAction, "move" | "teleport" | "leap">> &
+  Partial<Pick<ActorAction, "move" | "teleport" | "leap" | "pull" | "swallow">> &
   Readonly<{ attack?: unknown; save?: Readonly<Record<string, unknown>>; damageByLevel?: unknown }>;
 
 /** A save applies when its failure leaves something (conditions or a choice of them, an effect, Speed 0, a push, a
@@ -196,8 +196,9 @@ const saveApplies = (save: Readonly<Record<string, unknown>> | undefined) =>
 
 /** An action resolves when it rolls an attack or a save, deals damage, heals, grants an effect, ends conditions,
  *  runs a structured Multiattack, places light or an area of obscurement on the map, is offered as a reaction prompt,
- *  answers a roll (`roll-answers.ts`), or grants a move, a jump or a teleport the movement rules charge
- *  (`granted-moves.ts`). One with none of these only spends its use and its place in the turn. */
+ *  answers a roll (`roll-answers.ts`), grants a move, a jump or a teleport the movement rules charge
+ *  (`granted-moves.ts`), pulls its targets in, or swallows one (`swallow.ts`). One with none of these only spends its
+ *  use and its place in the turn. */
 const actionResolves = (action: ResolvingFields) =>
   action.sight?.light !== undefined ||
   action.sight?.area !== undefined ||
@@ -220,6 +221,8 @@ const actionResolves = (action: ResolvingFields) =>
   action.move !== undefined ||
   action.teleport !== undefined ||
   action.leap !== undefined ||
+  action.pull !== undefined ||
+  action.swallow?.conditions !== undefined ||
   action.raisesCorpse !== undefined;
 
 /**

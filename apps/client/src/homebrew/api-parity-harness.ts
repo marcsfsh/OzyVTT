@@ -718,6 +718,26 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].swallow.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a stat block's Swallow (how many it holds, the size it swallows, its acid and its regurgitation), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].pull.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action that pulls its targets toward its user (a roper's Reel), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].holdsAtOnce",
+    types: "*",
+    reason: "one SRD author (a shambling mound's Engulf, one creature at a time)",
+    status: "permanent: lone SRD record"
+  },
+  {
     at: "actions[].multiattackAlternativesAfter",
     types: "*",
     reason: "one SRD author (a clay golem's three Slams after Hasten), read from its Multiattack's prose",

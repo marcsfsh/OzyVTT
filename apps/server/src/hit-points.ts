@@ -57,7 +57,7 @@ import { mistyEscape, regainedHitPoints, restorationAtDeath, tallyTurnDamage } f
 import { holdsFeature } from "./class-features.js";
 import { rollSaveAtOnce } from "./saving-throws.js";
 import { offerDamageReaction } from "./damage-reactions.js";
-import { releaseSwallowedBy } from "./swallow.js";
+import { releaseSwallowedBy, tallyDamageFromInside } from "./swallow.js";
 import { openRepeatSavesOnDamage } from "./save-stages.js";
 import { berserkerCurse } from "./berserker-axe.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
@@ -901,6 +901,8 @@ export function applyDamageDetailed(
   // A Fiend Warlock near the fall, or the one who dealt it, gains Temporary Hit Points.
   if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deps)
     events.push(...blessOnTheKill(state, actor, input.sourceActorId, deps));
+  // A swallower counts the damage the creatures inside it deal this turn.
+  tallyDamageFromInside(state, actor.id, input.sourceActorId, totalAdjusted);
   // A hydra's heads and a troll's limbs count the damage of each turn.
   events.push(
     ...tallyTurnDamage(state, actor, definition, parts, totalAdjusted, (cause) => {

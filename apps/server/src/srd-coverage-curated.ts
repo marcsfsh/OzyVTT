@@ -855,6 +855,36 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Wraith/create-specter": enforced(
     "resolution/revival.ts takes a Humanoid corpse within 10 feet dead no longer than 1 minute, and refuses an eighth specter. Its spirit rises as a Specter under the wraith's command and on its side in the corpse's space, acting right after the wraith (summons.ts), and the corpse leaves the fight."
   ),
+  "action:Behir/swallow": enforced(
+    "A failed save swallows a creature the behir grapples (swallow.ts): the grapple ends, and the swallowed creature has the printed conditions and Total Cover from everything outside the behir (resolution/validate.ts), takes the acid as printed and moves with it. It holds one at a time. 30 damage from inside in one turn makes it save at DC 14 as that turn ends or let them all out Prone where they stand, and its death lets them climb out."
+  ),
+  "action:Kraken/swallow": enforced(
+    "A failed save swallows a creature the kraken grapples (swallow.ts): the grapple ends, and the swallowed creature has the printed conditions and Total Cover from everything outside the kraken (resolution/validate.ts), takes the acid as printed and moves with it. It holds four at a time. A Huge or larger creature that fails takes the Piercing damage alone. 50 damage from inside in one turn makes it save at DC 25 as that turn ends or let them all out Prone where they stand, and its death lets them climb out."
+  ),
+  "action:Purple Worm/swallow": enforced(
+    "A failed save swallows a creature the purple worm grapples (swallow.ts): the grapple ends, and the swallowed creature has the printed conditions and Total Cover from everything outside the purple worm (resolution/validate.ts), takes the acid as printed and moves with it. It holds three at a time. 30 damage from inside in one turn makes it save at DC 21 as that turn ends or let them all out Prone where they stand, and its death lets them climb out."
+  ),
+  "action:Remorhaz/swallow": enforced(
+    "A failed save swallows a creature the remorhaz grapples (swallow.ts): the grapple ends, and the swallowed creature has the printed conditions and Total Cover from everything outside the remorhaz (resolution/validate.ts), takes the acid as printed and moves with it. It holds two at a time. 30 damage from inside in one turn makes it save at DC 15 as that turn ends or let them all out Prone where they stand, and its death lets them climb out."
+  ),
+  "action:Tarrasque/swallow": enforced(
+    "A failed save swallows a creature the tarrasque grapples (swallow.ts): the grapple ends, and the swallowed creature has the printed conditions and Total Cover from everything outside the tarrasque (resolution/validate.ts), takes the acid as printed and moves with it. It holds six at a time. A swallowed creature can't teleport. 60 damage from inside in one turn makes it save at DC 20 as that turn ends or let them all out Prone where they stand, and its death lets them climb out."
+  ),
+  "action:Giant Toad/swallow": enforced(
+    "The action swallows a Medium or smaller creature the toad grapples, with no save (swallow.ts): the grapple ends, it is Blinded and Restrained with Total Cover from outside the toad, takes 3d6 Acid as each of the toad's turns ends and moves with it. The toad holds one at a time, can't Bite meanwhile, and its death lets it climb out."
+  ),
+  "action:Giant Frog/swallow": enforced(
+    "The action swallows a Small or smaller creature the frog grapples, with no save (swallow.ts): the grapple ends, it is Blinded and Restrained with Total Cover from outside the frog, and the frog can't Bite meanwhile. As the frog's next turn ends it takes 2d4 Acid and, alive, is disgorged Prone; the frog's death lets it climb out."
+  ),
+  "action:Shambling Mound/engulf": guided(
+    "A failed save Grapples, Blinds and Restrains a Medium or smaller creature within 5 feet, with the Lightning at the start of its turns; the mound carries it at no extra cost (movement-rules.ts) and holds one at a time (swallow.ts). Moving its token into the mound's space is the GM's."
+  ),
+  "action:Roper/reel": enforced(
+    "Each creature the roper grapples is pulled up to 30 feet straight toward it, stopping beside it (resolution/swallowing.ts, forced-movement.ts)."
+  ),
+  "action:Ettercap/reel": enforced(
+    "Only a creature within 30 feet Restrained by the ettercap's own Web Strand is pulled, up to 25 feet straight toward it (resolution/action-targets.ts, forced-movement.ts)."
+  ),
   "action:Gibbering Mouther/bite": enforced(
     "The hit's damage, and Prone on a Medium or smaller target, are applied. A creature it drops to 0 Hit Points dies outright with nothing left of its body (hit-points.ts)."
   ),

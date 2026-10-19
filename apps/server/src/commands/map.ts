@@ -37,6 +37,7 @@ import { landJump } from "../jumping.js";
 import { carryRiders, mountOf, mountOrDismount, ridersOf, RIDING_TAG } from "../mounts.js";
 import { timeStopOutOfRange } from "../time-stop.js";
 import { applyMovementRules, dragAlong, dragCostsExtra, grappledBy } from "../movement-rules.js";
+import { swallowedBy } from "../swallow.js";
 import {
   creatureDistance,
   DISTANCE_TOLERANCE_FEET,
@@ -161,12 +162,13 @@ export const mapCommands = [
         // Taking a placed token off the map mid-fight would move it for free.
         if (position === null && from !== null && !isGmGrade(principal) && state.combat.active)
           throw new CommandRejectedError("Only the GM takes a token off the map during a fight.");
-        // A grappler drags what it holds (SRD Grappled: "Movable"); teleporting or being moved by force doesn't.
+        // A grappler drags what it holds (SRD Grappled: "Movable"), and a swallower carries what is inside it;
+        // teleporting or being moved by force doesn't.
         const dragged =
           from !== null &&
           position !== null &&
           (mode === "walk" || mode === "fly" || mode === "swim" || mode === "climb" || mode === "burrow")
-            ? grappledBy(state, actorId).filter(
+            ? [...grappledBy(state, actorId), ...swallowedBy(state, actorId).map(({ prey }) => prey.id)].filter(
                 (heldId) => state.combat.tokens.find((token) => token.actorId === heldId)?.position
               )
             : [];
@@ -196,8 +198,12 @@ export const mapCommands = [
           dragging: {
             // Its riders move with it too, and their space is no obstacle.
             actorIds: [...dragged, ...ridersOf(state, actorId)],
-            costsExtra: dragCostsExtra(state, actorId, dragged, (definitionId) =>
-              kit.resolveDefinitionIn(state, definitionId)
+            // What it swallowed is inside it, and costs it nothing to carry.
+            costsExtra: dragCostsExtra(
+              state,
+              actorId,
+              dragged.filter((heldId) => grappledBy(state, actorId).includes(heldId)),
+              (definitionId) => kit.resolveDefinitionIn(state, definitionId)
             )
           },
           creatureDistance: (enemy, moverPoint, altitudeFeet) => {

@@ -689,7 +689,7 @@ describe("damage an effect deals at the start of a turn", () => {
     failed(state, "behir", "swallow");
     const hero = actor(state, IDS.hero);
     expect(hero.effects[0]).toMatchObject({
-      name: "Blinded by Foe (Swallow)",
+      name: "Swallowed",
       ongoingDamage: { damage: [{ formula: "6d6", type: "acid" }], at: "source-turn-start" }
     });
     advanceRolling(state, [6, 6, 6, 6, 6, 6]); // the ally's turn
@@ -708,7 +708,7 @@ describe("damage an effect deals at the start of a turn", () => {
     const events = advanceRolling(state, [1, 2, 3, 4, 5, 6]); // the behir's turn: 21 acid, halved
     expect(hero.hp.current).toBe(20);
     expect(events.map((event) => event.text)).toContain(
-      "Hero takes 10 Acid damage from Blinded by Foe (Swallow) (21 acid → 10, resistance: Acid ward)."
+      "Hero takes 10 Acid damage from Swallowed (21 acid → 10, resistance: Acid ward)."
     );
     // Ended, it deals nothing more.
     endEffect(state, IDS.hero, hero.effects[0].id);
@@ -788,7 +788,7 @@ describe("damage an effect deals at the start of a turn", () => {
     failed(state, "behir", "swallow");
     const view = projectPlayerView(state, IDS.session, () => null);
     const effect = view.actors.find((entry) => entry.id === IDS.hero)!.effects[0];
-    expect(effect.name).toBe("Blinded by Foe (Swallow)");
+    expect(effect.name).toBe("Swallowed");
     expect(effect).not.toHaveProperty("ongoingDamage");
   });
 });

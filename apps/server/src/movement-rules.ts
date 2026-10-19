@@ -250,6 +250,8 @@ export function grappledBy(state: GameState, grapplerId: string): readonly strin
 }
 
 const SIZE_RANK: Readonly<Record<string, number>> = { tiny: 0, small: 1, medium: 2, large: 3, huge: 4, gargantuan: 5 };
+/** On a grapple whose creature its grappler carries at no extra cost (a shambling mound's Engulf). */
+export const CARRIED_FREE_TAG = "carried-free";
 
 /** SRD Grappled: "The grappler can drag or carry you when it moves, but every foot of movement costs it 1 extra foot
  *  unless you are Tiny or two or more sizes smaller than it." A bugbear's Abduct: it "needn't spend extra movement to
@@ -265,9 +267,15 @@ export function dragCostsExtra(
   if (holdsFeature(definition, "abduct", "Abduct")) return false;
   const rank = (actorId: string) =>
     SIZE_RANK[state.actors.find((actor) => actor.id === actorId)?.size ?? "medium"] ?? SIZE_RANK.medium!;
+  // "When the shambling mound moves, the Grappled target moves with it, costing it no extra movement."
+  const carriedFree = (actorId: string) =>
+    state.actors
+      .find((actor) => actor.id === actorId)
+      ?.effects.some((effect) => effect.sourceActorId === grapplerId && effect.tags.includes(CARRIED_FREE_TAG)) ===
+    true;
   return grappledIds.some((actorId) => {
     const size = state.actors.find((actor) => actor.id === actorId)?.size ?? "medium";
-    return size !== "tiny" && rank(grapplerId) - rank(actorId) < 2;
+    return size !== "tiny" && rank(grapplerId) - rank(actorId) < 2 && !carriedFree(actorId);
   });
 }
 

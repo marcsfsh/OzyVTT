@@ -35,6 +35,7 @@ import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
 import { scrollOfAction } from "../scrolls.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { reachBarredBy } from "../zone-barriers.js";
+import { swallowCover } from "../swallow.js";
 import { builtinHandlerFor } from "./builtins.js";
 import {
   resolveHiddenCheck,
@@ -147,8 +148,12 @@ function combatantsOf(
     action.summons !== undefined ||
     // Taking a form, or leaving it, is the user's own (Wild Shape, a werewolf's Shape-Shift).
     (shapeShifts && action.shapeShift?.onTargets !== true && action.save === undefined);
-  // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
-  const touchesSomeone = action.endsConditions !== undefined || action.healing?.perUse === true;
+  // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone, and so is a swallow.
+  const touchesSomeone =
+    action.endsConditions !== undefined ||
+    action.healing?.perUse === true ||
+    action.swallow?.conditions !== undefined ||
+    action.pull !== undefined;
   if (targets.length === 0 && (touchesSomeone || (!structuredWithoutTargets && action.grants?.target !== "target")))
     throw new CommandRejectedError("Choose at least one target.");
   if (
@@ -170,6 +175,8 @@ function combatantsOf(
     action.teleport === undefined &&
     action.summons === undefined &&
     action.raisesCorpse === undefined &&
+    action.swallow?.conditions === undefined &&
+    action.pull === undefined &&
     input.builtin !== true
   )
     throw new CommandRejectedError("That action has no structured effect to resolve. Run it from its description.");
@@ -214,7 +221,16 @@ export function openResolve(
   const combatants = combatantsOf(state, reaching, input, deps.catalog, spell, hiddenFromInitiator);
   const { attacker } = combatants;
   const warnings: string[] = [];
-  const targets = input.areaPlaced ? onlyTargetTypes(combatants.targets, spell, deps, warnings) : combatants.targets;
+  const caught = input.areaPlaced ? onlyTargetTypes(combatants.targets, spell, deps, warnings) : combatants.targets;
+  // A swallowed creature has Total Cover from an area outside its swallower, and is left out of it.
+  const targets =
+    caught.length > 1
+      ? caught.filter((target) => {
+          if (swallowCover(state, combatants.attacker.id, target.id) === null) return true;
+          warnings.push(`${target.name} is swallowed and has Total Cover from ${declared.name}, so it is left out.`);
+          return false;
+        })
+      : caught;
   // A spell cast with a higher slot rolls that slot's dice and makes its rays (before the economy opens the action's
   // instance); a paid replay names the slot it was cast with.
   const castLevel = input.economyPaid ? input.slotLevel : castLevelOf(state, attacker, reaching, input.slotLevel);
@@ -271,7 +287,13 @@ export function openResolve(
   const fromMap = (target: LiveActor) => (input.areaPlaced === true ? null : mapCover(state, attacker.id, target.id));
   const attackCover =
     targets.length === 1
-      ? (input.cover ?? bestCover(coverFor(null, targets[0]), fromMap(targets[0]), auraCover(targets[0])))
+      ? (input.cover ??
+        bestCover(
+          coverFor(null, targets[0]),
+          fromMap(targets[0]),
+          auraCover(targets[0]),
+          swallowCover(state, attacker.id, targets[0].id)
+        ))
       : (input.cover ?? null);
   // An area's other targets still take it, so a marked creature among several is the GM's to remove.
   if (targets.length > 1)

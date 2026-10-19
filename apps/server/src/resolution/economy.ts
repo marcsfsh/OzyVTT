@@ -47,6 +47,7 @@ import { planThisTurn, usedMarkOf } from "./multiattack-after.js";
 import { END_EFFECT_ACTION_ID, hasEndingOption, NO_ENDING_OPTION } from "../ending-actions.js";
 import { castMarks, markMoveOf } from "./marks.js";
 import { actionTargetViolations } from "./action-targets.js";
+import { swallowViolations } from "../swallow.js";
 import { hitRiderOf } from "./hit-riders.js";
 import { hiddenFrom } from "../vision/audience.js";
 import { withoutSourceName } from "../hidden-source.js";
@@ -240,6 +241,8 @@ export function evaluateActionEconomy(
   // Who a non-spell action may target: its count, range and creatures (`ActionSchema.targets`).
   evaluation.violations.push(
     ...actionTargetViolations({ state, attacker, action, targetIds, definition, resolveDefinition, distanceFeet }),
+    // How many it can hold swallowed, and what it can't do while it holds one (a giant toad's Bite).
+    ...swallowViolations(state, attacker, action, siblings),
     ...raiseViolations({ state, attacker, action, targetIds })
   );
   if (spell) checkMarkMove(evaluation, spell);

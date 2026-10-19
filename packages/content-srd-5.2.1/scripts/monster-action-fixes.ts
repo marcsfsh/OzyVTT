@@ -164,6 +164,12 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
     reminder:
       "The whirlwind lasts while the djinni concentrates on it. The djinni can move it up to 20 feet at the start of each of its turns, and the Restrained creatures move with it; a creature it enters, or that enters it, makes the save once a turn."
   },
+  "shambling-mound/engulf": {
+    why: "the mound carries what it engulfs at no cost, which the save's text prints",
+    // "When the shambling mound moves, the Grappled target moves with it, costing it no extra movement."
+    save: { failureEffect: { name: "Engulfed", tags: ["carried-free"], modifiers: [] } },
+    reminder: null
+  },
   "rust-monster/antennae": {
     why: "the penalty is on one carried armor or weapon, which items don't track",
     reminder:

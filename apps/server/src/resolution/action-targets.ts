@@ -104,6 +104,16 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
         rule: "target.not-allowed",
         message: `${action.name} targets a ${rules.conditions.map(conditionLabel).join(" or ")} creature, and ${name} isn't.`
       });
+    if (
+      rules.heldByAction &&
+      !target.effects.some(
+        (effect) => effect.sourceActorId === attacker.id && effect.sourceActionId === rules.heldByAction
+      )
+    )
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} targets a creature ${attacker.name} holds with ${heldName(rules.heldByAction)}, and ${name} isn't held.`
+      });
     if (rules.atZeroHitPoints && target.hp.current > 0)
       violations.push({
         rule: "target.not-allowed",
@@ -133,6 +143,13 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
   }
   return violations;
 }
+
+/** An action's printed name from its id ("web-strand": "Web Strand"). */
+const heldName = (actionId: string) =>
+  actionId
+    .split("-")
+    .map((word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`)
+    .join(" ");
 
 const grappledBy = (target: LiveActor, source: LiveActor) =>
   target.effects.some((effect) => effect.sourceActorId === source.id && effect.linkedConditionIds.includes("grappled"));

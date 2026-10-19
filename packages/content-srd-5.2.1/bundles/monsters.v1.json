@@ -10057,14 +10057,28 @@
        }
       ],
       "at": "source-turn-start"
+     },
+     "failureEffect": {
+      "name": "Swallowed",
+      "tags": [
+       "swallowed"
+      ],
+      "modifiers": []
      }
     },
     "damage": [],
-    "reminder": "While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir.",
     "targets": {
      "count": 1,
      "maxSize": "large",
      "grappledBySource": true
+    },
+    "swallow": {
+     "capacity": 1,
+     "regurgitate": {
+      "damage": 30,
+      "dc": 14,
+      "withinFeet": 10
+     }
     }
    },
    {
@@ -18198,7 +18212,16 @@
     "name": "Reel",
     "activation": "bonus-action",
     "description": "The ettercap pulls one creature within 30 feet of itself that is Restrained by its Web Strand up to 25 feet straight toward itself.",
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 30,
+     "heldByAction": "web-strand"
+    },
+    "pull": {
+     "feet": 25,
+     "upTo": true
+    }
    },
    {
     "id": "bite",
@@ -21525,7 +21548,32 @@
     "name": "Swallow",
     "activation": "action",
     "description": "The frog swallows a Small or smaller target it is grappling. While swallowed, the target isn't Grappled but has the Blinded and Restrained conditions, and it has Total Cover against attacks and other effects outside the frog. While swallowing the target, the frog can't use Bite, and if the frog dies, the swallowed target is no longer Restrained and can escape from the corpse using 5 feet of movement, exiting with the Prone condition. At the end of the frog's next turn, the swallowed target takes 5 (2d4) Acid damage. If that damage doesn't kill it, the frog disgorges it, causing it to exit Prone.",
-    "damage": []
+    "damage": [],
+    "swallow": {
+     "capacity": 1,
+     "conditions": [
+      "blinded",
+      "restrained"
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "2d4",
+        "type": "acid"
+       }
+      ],
+      "at": "source-turn-end"
+     },
+     "disgorges": true,
+     "blocks": [
+      "bite"
+     ]
+    },
+    "targets": {
+     "count": 1,
+     "maxSize": "small",
+     "grappledBySource": true
+    }
    }
   ],
   "token": {
@@ -22843,7 +22891,31 @@
     "name": "Swallow",
     "activation": "action",
     "description": "The toad swallows a Medium or smaller target it is grappling. While swallowed, the target isn't Grappled but has the Blinded and Restrained conditions, and it has Total Cover against attacks and other effects outside the toad. In addition, the target takes 10 (3d6) Acid damage at the end of each of the toad's turns. The toad can have only one target swallowed at a time, and it can't use Bite while it has a swallowed target. If the toad dies, a swallowed creature is no longer Restrained and can escape from the corpse using 5 feet of movement, exiting with the Prone condition.",
-    "damage": []
+    "damage": [],
+    "swallow": {
+     "capacity": 1,
+     "conditions": [
+      "blinded",
+      "restrained"
+     ],
+     "ongoingDamage": {
+      "damage": [
+       {
+        "formula": "3d6",
+        "type": "acid"
+       }
+      ],
+      "at": "source-turn-end"
+     },
+     "blocks": [
+      "bite"
+     ]
+    },
+    "targets": {
+     "count": 1,
+     "maxSize": "medium",
+     "grappledBySource": true
+    }
    }
   ],
   "token": {
@@ -30031,6 +30103,13 @@
        }
       ],
       "at": "bearer-turn-start"
+     },
+     "failureEffect": {
+      "name": "Swallowed",
+      "tags": [
+       "swallowed"
+      ],
+      "modifiers": []
      }
     },
     "damage": [
@@ -30039,10 +30118,18 @@
       "type": "piercing"
      }
     ],
-    "reminder": "A swallowed creature has the Restrained condition, has Total Cover against attacks and other effects outside the kraken.",
     "targets": {
      "count": 1,
      "grappledBySource": true
+    },
+    "swallow": {
+     "capacity": 4,
+     "maxSize": "large",
+     "regurgitate": {
+      "damage": 50,
+      "dc": 25,
+      "withinFeet": 10
+     }
     }
    }
   ],
@@ -37782,14 +37869,28 @@
        }
       ],
       "at": "source-turn-start"
+     },
+     "failureEffect": {
+      "name": "Swallowed",
+      "tags": [
+       "swallowed"
+      ],
+      "modifiers": []
      }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the worm.",
     "targets": {
      "count": 1,
      "maxSize": "large",
      "grappledBySource": true
+    },
+    "swallow": {
+     "capacity": 3,
+     "regurgitate": {
+      "damage": 30,
+      "dc": 21,
+      "withinFeet": 5
+     }
     }
    },
    {
@@ -38882,14 +38983,28 @@
        }
       ],
       "at": "source-turn-start"
+     },
+     "failureEffect": {
+      "name": "Swallowed",
+      "tags": [
+       "swallowed"
+      ],
+      "modifiers": []
      }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions, it has Total Cover against attacks and other effects outside the remorhaz.",
     "targets": {
      "count": 1,
      "maxSize": "large",
      "grappledBySource": true
+    },
+    "swallow": {
+     "capacity": 2,
+     "regurgitate": {
+      "damage": 30,
+      "dc": 15,
+      "withinFeet": 5
+     }
     }
    }
   ],
@@ -39412,7 +39527,14 @@
     "name": "Reel",
     "activation": "action",
     "description": "The roper pulls each creature Grappled by it up to 30 feet straight toward it.",
-    "damage": []
+    "damage": [],
+    "targets": {
+     "grappledBySource": true
+    },
+    "pull": {
+     "feet": 30,
+     "upTo": true
+    }
    }
   ],
   "token": {
@@ -40931,15 +41053,22 @@
       ],
       "at": "bearer-turn-start"
      },
-     "rangeFeet": 5
+     "rangeFeet": 5,
+     "failureEffect": {
+      "name": "Engulfed",
+      "tags": [
+       "carried-free"
+      ],
+      "modifiers": []
+     }
     },
     "damage": [],
-    "reminder": "Until the grapple ends, the target has the Blinded and Restrained conditions.",
     "targets": {
      "count": 1,
      "maxSize": "medium",
      "rangeFeet": 5
-    }
+    },
+    "holdsAtOnce": 1
    }
   ],
   "token": {
@@ -45275,14 +45404,29 @@
        }
       ],
       "at": "source-turn-start"
+     },
+     "failureEffect": {
+      "name": "Swallowed",
+      "tags": [
+       "swallowed",
+       "no-teleport"
+      ],
+      "modifiers": []
      }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions and can't teleport, it has Total Cover against attacks and other effects outside the tarrasque.",
     "targets": {
      "count": 1,
      "maxSize": "large",
      "grappledBySource": true
+    },
+    "swallow": {
+     "capacity": 6,
+     "regurgitate": {
+      "damage": 60,
+      "dc": 20,
+      "withinFeet": 10
+     }
     }
    },
    {

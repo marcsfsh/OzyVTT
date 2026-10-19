@@ -241,6 +241,8 @@ const PENDING_SAVE_FIELDS = {
   // What a failure does at each Hit Point band names the thresholds, the stat block's text; it is narrated as it lands.
   failureByHitPoints: "never",
   failureBanishes: "never",
+  // What a swallower's failure lets out is narrated when it lands.
+  regurgitates: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
   gmApplies: "player",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.

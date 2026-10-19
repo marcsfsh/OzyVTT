@@ -51,6 +51,7 @@ import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-tra
 import { applyDamageDetailed, previewDamage, adjustableActor, healActor, killOutright } from "./hit-points.js";
 import { openDamageWindow } from "./damage-window.js";
 import { applyHitPointBand, banishOnFailure, hitPointBandOf } from "./fatal-saves.js";
+import { regurgitate, swallowLands, SWALLOWED_TAG } from "./swallow.js";
 import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
@@ -494,6 +495,9 @@ export function applyFailureEffect(
   if (applied.sizeChange) refreshSize(state, target);
   // "It drops whatever it is holding" (Fear), once, as the failure lands.
   if (onFail.tags.includes(DROPS_HELD_TAG)) events.push(...dropHeldItems(target));
+  // "The behir swallows the target, which is no longer Grappled."
+  if (onFail.tags.includes(SWALLOWED_TAG) && onFail.sourceActorId)
+    events.push(...swallowLands(state, target, onFail.sourceActorId));
   // "Is suffocating" while engulfed or whelmed: it holds its breath until what smothers it ends.
   if (onFail.tags.includes(SMOTHERING_TAG)) {
     const definition = target.definitionId ? immunities?.resolveDefinition?.(target.definitionId) : undefined;
@@ -1193,6 +1197,8 @@ export function answerSave(
   if (!success && pending.failurePush) events.push(...pushOnFailure(target, pending, deps));
   // "The target dies, and the wisp regains 10 (3d6) Hit Points."
   if (!success && pending.failureKills) events.push(...killOnFailure(state, target, pending, deps));
+  // A swallower that fails to hold on lets out what it swallowed.
+  if (!success && pending.regurgitates) events.push(...regurgitate(state, target.id, pending.regurgitates.withinFeet));
   // SRD Sleet Storm: a failure "and lose Concentration".
   if (!success && pending.breaksConcentration) events.push(...endConcentrationSustainedBy(state, target.id));
   // SRD Moonbeam: a shape-shifted creature that fails "reverts to its true form and can't shape-shift until it leaves".
