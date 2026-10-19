@@ -996,8 +996,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:thaumaturgy": enforced(
     "The cast keeps the wonder picked for a minute (resolution/grant-extras.ts), and Booming Voice gives Advantage on Intimidation checks (ability-checks.ts). Aimed at a door on the map within 30 feet, Invisible Hand flings an unlocked door open or slams it shut (resolution/cast-walls.ts). What the other wonders look and sound like is the GM's."
   ),
-  "spell:true-strike": castOnly(
-    "The weapon attack with the spellcasting ability, and its Radiant damage, are the GM's."
+  "spell:true-strike": enforced(
+    "The cast binds a carried weapon the caster is proficient with and leaves its Magic action open for one attack with that weapon, which uses the spellcasting ability for the attack and damage rolls, deals Radiant or the weapon's own type as the caster picks, and adds 1d6 Radiant at level 5, 2d6 at 11 and 3d6 at 17; the binding ends with that attack (resolution/grant-extras.ts, resolution/true-strike.ts)."
   ),
   "spell:spare-the-dying": enforced(
     "The cast makes a creature at 0 Hit Points Stable with no check (resolution/stabilize.ts), within 15 feet, 30 at level 5, 60 at level 11 and 120 at level 17 (resolution/spell-targets.ts)."

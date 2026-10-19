@@ -73,7 +73,10 @@ function combatantsOf(
   const helps = action.id === "help-check";
   // And what a lasting spell does by its caster's hand away from a fight (Dream's message to a sleeper, Geas's harm
   // to a defiant creature, Levitate's lift), so long as the spell is up.
-  const lasting = spell !== undefined && laterRowOf(spell, action.id) !== undefined && laterRowOf(spell, action.id)!.zone === undefined;
+  const lasting =
+    spell !== undefined &&
+    laterRowOf(spell, action.id) !== undefined &&
+    laterRowOf(spell, action.id)!.zone === undefined;
   if (outsideFight && !castsASpell && !shapeShifts && !itemGrant && !helps && !lasting)
     throw new CommandRejectedError("Start an encounter before resolving actions.");
   const inFight = (actorId: string) =>
@@ -291,7 +294,7 @@ export function openResolve(
   // Contingency's spell takes effect on its caster alone, while the statuette is carried.
   checkStoredRelease(attacker, action.id, input.targetIds);
   // An option or a weapon the action doesn't offer is refused before anything rolls.
-  checkChoices(action, input, attacker, deps.catalog);
+  checkChoices(action, input, attacker, deps.catalog, deps.definition);
   const derived = deriveEquipment(attacker, deps.definition, deps.catalog);
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
   const riderItemId = sourceItemOf(action, derived, attacker.inventory);

@@ -2073,6 +2073,30 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
       damageTypes: ["force"]
     }
   }),
+  // "Guided by a flash of magical insight, you make one attack with the weapon used in the spell's casting. The attack
+  // uses your spellcasting ability for the attack and damage rolls instead of using Strength or Dexterity. If the attack
+  // deals damage, it can be Radiant damage or the weapon's normal damage type (your choice)." Extra Radiant at levels 5,
+  // 11 and 17. The weapon must be one the caster is proficient with.
+  "true-strike": spellGrant({
+    name: "True Strike",
+    tags: ["true-strike"],
+    target: "self",
+    duration: { type: "until-source-turn-end" },
+    bindsWeapon: {
+      proficient: true,
+      attacksNow: true,
+      ability: "spellcasting",
+      damageTypes: ["radiant"],
+      extraDamage: {
+        type: "radiant",
+        dice: [
+          { level: 5, formula: "1d6" },
+          { level: 11, formula: "2d6" },
+          { level: 17, formula: "3d6" }
+        ]
+      }
+    }
+  }),
   // "You take the Dash action, and until the spell ends, you can take that action again as a Bonus Action."
   "expeditious-retreat": spellGrant({
     name: "Expeditious Retreat",

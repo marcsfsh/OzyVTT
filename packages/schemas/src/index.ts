@@ -2824,6 +2824,23 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
       weaponIds: z.array(RiderSlugSchema).min(1).max(6).optional(),
       nonmagical: z.literal(true).optional(),
       melee: z.literal(true).optional(),
+      /** Refuses a weapon its wielder lacks proficiency with (True Strike). */
+      proficient: z.literal(true).optional(),
+      /** The cast makes one attack with the weapon as part of its own action, and the binding ends with that attack
+       *  (True Strike). */
+      attacksNow: z.literal(true).optional(),
+      /** Extra damage of one type on its hits, by the granter's character level from each row's level up (True
+       *  Strike: 1d6 Radiant from 5, 2d6 from 11, 3d6 from 17). */
+      extraDamage: z
+        .object({
+          type: DamageTypeSchema,
+          dice: z
+            .array(z.object({ level: z.number().int().min(1).max(20), formula: DiceFormulaSchema }).strict())
+            .min(1)
+            .max(4)
+        })
+        .strict()
+        .optional(),
       /** The ability its attack and damage rolls use: the granter's spellcasting ability, or a named one. */
       ability: z.union([AbilitySchema, z.literal("spellcasting")]).optional(),
       /** Its damage dice, by the granter's character level from each row's level up (Shillelagh: d8, d10 from 5, d12

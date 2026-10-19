@@ -107,6 +107,7 @@ import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-
 import { layOutProvisions } from "./resolution/provisions.js";
 import { turnedAwayByWard } from "./resolution/ward.js";
 import { orbLeap } from "./resolution/orb-leap.js";
+import { openStrike, spendStrike } from "./resolution/true-strike.js";
 import {
   shapedAction,
   shapedOutcome,
@@ -359,6 +360,8 @@ export function resolveDefinitionAction(
   commitEconomy(ctx);
   // After the economy, which writes the action's instance that a leap continues.
   orbLeap(ctx);
+  openStrike(ctx);
+  spendStrike(ctx);
   recallSpellSlot(ctx);
   spendStoredCast(ctx);
   afterDivineWish(ctx);

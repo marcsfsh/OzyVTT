@@ -11,6 +11,7 @@ import {
   type Modifier
 } from "@vtt/schemas";
 import { spellClassOf } from "../class-features.js";
+import { trainingCovers } from "../item-actions.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
 import { spellOf } from "./concentration.js";
@@ -42,7 +43,8 @@ export function checkChoices(
   action: DefinitionAction,
   input: ResolveInput,
   attacker: LiveActor,
-  catalog: EquipmentCatalog | undefined
+  catalog: EquipmentCatalog | undefined,
+  definition: ActorDefinition | undefined
 ): void {
   const offered = optionsOf(action);
   const picks = [input.optionId, ...Object.values(input.targetOptions ?? {})].filter(
@@ -56,7 +58,7 @@ export function checkChoices(
   const binds = action.grants?.bindsWeapon;
   if (input.itemId != null && !binds) throw new CommandRejectedError(`${action.name} isn't cast on a weapon.`);
   if (binds && input.itemId != null && action.grants!.target === "self")
-    fittingRow(attacker, binds, input.itemId, catalog, action.name);
+    fittingRow(attacker, binds, input.itemId, catalog, action.name, definition);
 }
 
 /** The option picked for one recipient: its own under `optionsPerTarget`, else the resolve's, else the first. */
@@ -219,11 +221,12 @@ function fittingRow(
   binds: NonNullable<Grant["bindsWeapon"]>,
   itemId: string,
   catalog: EquipmentCatalog | undefined,
-  what: string
+  what: string,
+  definition: ActorDefinition | undefined
 ): InventoryItem {
   const row = bearer.inventory.find((entry) => entry.id === itemId && entry.quantity > 0);
   if (!row) throw new CommandRejectedError(`${bearer.name} isn't carrying that weapon.`);
-  const problem = rowProblem(row, binds, catalog);
+  const problem = rowProblem(row, binds, catalog, definition);
   if (problem) throw new CommandRejectedError(`${what} can't be cast on ${row.name}: ${problem}.`);
   return row;
 }
@@ -232,11 +235,15 @@ function fittingRow(
 function rowProblem(
   row: InventoryItem,
   binds: NonNullable<Grant["bindsWeapon"]>,
-  catalog: EquipmentCatalog | undefined
+  catalog: EquipmentCatalog | undefined,
+  definition: ActorDefinition | undefined
 ): string | null {
   const weapon = row.weapon;
   if (!weapon) return "it isn't a weapon";
   const ids = row.baseId !== undefined ? [catalogIdOf(row), row.baseId] : [catalogIdOf(row)];
+  const trained = definition?.proficiencies?.weapons;
+  if (binds.proficient && trained !== undefined && !trainingCovers(trained, weapon, ids))
+    return "its wielder isn't proficient with it";
   if (binds.weaponIds && !binds.weaponIds.some((id) => ids.includes(id)))
     return `it works only on ${binds.weaponIds.join(" or ")}`;
   if (binds.nonmagical && catalog?.equipmentRecord(catalogIdOf(row))?.isMagic === true) return "it is already magical";
@@ -265,11 +272,12 @@ export function boundWeaponOf(
   if (!binds) return null;
   const { input, deps, warnings, action } = ctx;
   let row: InventoryItem | undefined;
-  if (input.itemId != null) row = fittingRow(recipient, binds, input.itemId, deps.catalog, action.name);
+  if (input.itemId != null)
+    row = fittingRow(recipient, binds, input.itemId, deps.catalog, action.name, deps.definition);
   else {
     const carried = recipient.inventory.filter((entry) => entry.quantity > 0);
     row = [...carried.filter((entry) => entry.equipped), ...carried].find(
-      (entry) => rowProblem(entry, binds, deps.catalog) === null
+      (entry) => rowProblem(entry, binds, deps.catalog, deps.definition) === null
     );
     if (!row) {
       warnings.push(`${recipient.name} carries no weapon ${action.name} can be cast on, so nothing is bound.`);
@@ -300,9 +308,24 @@ export function boundWeaponOf(
       )
     : 0;
   const attackBonus = (slotBonus ?? 0) + abilityBonus;
+  const extraDice = [...(binds.extraDamage?.dice ?? [])]
+    .filter((entry) => entry.level <= level)
+    .sort((a, b) => b.level - a.level)[0]?.formula;
   const modifiers: Modifier[] = [
     ...(attackBonus !== 0 ? [{ type: "attack-bonus" as const, amount: attackBonus, scope: "this-item" as const }] : []),
-    ...(slotBonus ? [{ type: "damage-bonus" as const, amount: slotBonus, scope: "this-item" as const }] : [])
+    ...(slotBonus ? [{ type: "damage-bonus" as const, amount: slotBonus, scope: "this-item" as const }] : []),
+    ...(extraDice && binds.extraDamage
+      ? [
+          {
+            type: "extra-damage" as const,
+            formula: extraDice,
+            damageType: binds.extraDamage.type,
+            doubleOnCritical: true,
+            when: [{ type: "on-hit" as const }],
+            scope: "this-item" as const
+          }
+        ]
+      : [])
   ];
   return {
     fields: { itemId: row.id, ...(Object.keys(weapon).length > 0 ? { weapon } : {}) },
