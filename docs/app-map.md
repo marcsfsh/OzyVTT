@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 137 commands · 313 HTTP paths
+- 14 GameState fields · 140 commands · 316 HTTP paths
 
 ## GameState shape
 
@@ -43,8 +43,10 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `action.use` | `combat:write` |
 | `actor.add-from-definition` | `actor:write` |
 | `actor.apply-damage` | `actor:write` |
+| `actor.fall` | `combat:write` |
 | `actor.heal` | `actor:write` |
 | `actor.import-definition` | `actor:write` |
+| `actor.mount` | `combat:write` |
 | `actor.rechoose` | `actor:write` |
 | `actor.remove` | `actor:write` |
 | `actor.remove-samples` | `actor:write` |
@@ -165,6 +167,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `terrain.reset` | `scene:write` |
 | `time.pass` | `combat:write` |
 | `token.move` | `combat:write` |
+| `token.set-altitude` | `combat:write` |
 | `turn.end` | `combat:write` |
 | `turn.use` | `combat:write` |
 | `turn.use-legendary` | `combat:write` |
@@ -295,6 +298,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/death-save`
 - `POST /api/v1/game/actors/{actorId}/effects`
 - `POST /api/v1/game/actors/{actorId}/effects/{effectId}/end`
+- `POST /api/v1/game/actors/{actorId}/fall`
 - `POST /api/v1/game/actors/{actorId}/favourites`
 - `POST /api/v1/game/actors/{actorId}/finish-preparing`
 - `POST /api/v1/game/actors/{actorId}/heal`
@@ -307,6 +311,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/inventory/recover-ammunition`
 - `POST /api/v1/game/actors/{actorId}/long-rest-request`
 - `POST /api/v1/game/actors/{actorId}/long-rest-request/answer`
+- `POST /api/v1/game/actors/{actorId}/mount`
 - `GET /api/v1/game/actors/{actorId}/movement`
 - `GET /api/v1/game/actors/{actorId}/next-level`
 - `POST /api/v1/game/actors/{actorId}/prepared-spell`
@@ -413,6 +418,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/terrain/paint`
 - `POST /api/v1/game/terrain/reset`
 - `POST /api/v1/game/time/pass`
+- `POST /api/v1/game/tokens/{actorId}/altitude`
 - `POST /api/v1/game/tokens/{actorId}/move`
 - `POST /api/v1/game/turn/end`
 - `POST /api/v1/game/turn/legendary`
