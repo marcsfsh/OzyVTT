@@ -6,6 +6,7 @@ import { GameAccessDeniedError } from "../authorization.js";
 import { isIncapacitated } from "../condition-rules.js";
 import type { EffectNarration } from "../effects.js";
 import { burstEndedZones } from "../spell-zones.js";
+import { holdsAuras, settleZoneAuras, zoneAuraChanges } from "../zone-auras.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
@@ -187,6 +188,23 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     kit.publishNarrations(events);
   }
 
+  /**
+   * What a spell's area gives the creatures in it (Holy Aura, Pass without Trace) follows them in and out: after a
+   * command moves a token, an area or ends a spell, the table settles who holds it, as its own write when anything
+   * changed.
+   */
+  async function settleZoneAurasAfter() {
+    const before = context.readState();
+    if (!holdsAuras(before) || before.combat.historyCursor !== null) return;
+    const geometry = await kit.liveGeometry();
+    const changes = zoneAuraChanges(before, kit.zoneDeps(before, geometry));
+    if (changes.leaving.length === 0 && changes.entering.length === 0) return;
+    const result = await context.store.execute({ id: context.newId(), type: "spell-zone.auras" }, (draft) => {
+      settleZoneAuras(draft, kit.zoneDeps(draft, geometry));
+    });
+    await context.publishGameState(result.state);
+  }
+
   async function dispatch(
     type: GameCommandType,
     principal: GamePrincipal,
@@ -232,6 +250,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     const reply = projectReply(principal, { ...accepted, ...extras });
     if (settle && committed && !committed.duplicate) {
       await settleBurstingZones();
+      await settleZoneAurasAfter();
       await settleDownedReactions();
     }
     return reply;

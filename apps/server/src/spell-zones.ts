@@ -5,10 +5,10 @@ import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { footprintInTemplate } from "./area-targeting.js";
 import { holdsFeature } from "./class-features.js";
 import { creatureTypeOf } from "./statblock-facts.js";
-import { areEnemies } from "./creature-sides.js";
+import { areAllies, areEnemies } from "./creature-sides.js";
 import { CONCENTRATING_TAG, endEffectIfPresent, type EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
-import { applyDamageDetailed, damageAdjustmentDetail } from "./hit-points.js";
+import { applyDamageDetailed, damageAdjustmentDetail, healActor } from "./hit-points.js";
 import { laterSpellAction, upcastAction } from "./item-actions.js";
 import { creatureDistance, DISTANCE_TOLERANCE_FEET, mapDistance } from "./movement-narration.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -182,8 +182,12 @@ export function exposed(
   const caster = state.actors.find((actor) => actor.id === zone.casterId);
   const kind = trigger.terrain?.kind;
   return creaturesOnMap(state).flatMap((creature) => {
-    if (trigger.around === "caster" && creature.id === zone.casterId) return [];
+    // "You and your allies": an aura its caster carries reaches the caster too.
+    const own = creature.id === zone.casterId;
+    if (trigger.around === "caster" && own && trigger.affects !== "allies") return [];
     if (trigger.affects === "enemies" && (!caster || !areEnemies(caster, creature, deps.resolveDefinition))) return [];
+    if (trigger.affects === "allies" && !own && (!caster || !areAllies(caster, creature, deps.resolveDefinition)))
+      return [];
     if (kind && movesFreelyOn(creature, kind, deps, true)) return [];
     if (trigger.types && !trigger.types.includes(typeOf(creature, deps) ?? "")) return [];
     // A defeated creature takes no more; a dying character does (damage at 0 HP is a failed death save).
@@ -646,6 +650,14 @@ function zonesWhereItStands(
     const token = creature ? tokenOf(state, creature.id) : undefined;
     const inside = insideTest(state, zone, trigger, spell, deps.geometry);
     if (!creature || !token || !inside || !inside(token.position!, token.sizeCells)) continue;
+    // SRD Aura of Life: "When an ally with 0 Hit Points starts its turn in the aura, that ally regains 1 Hit Point."
+    if (when === "start-turn" && trigger.revives && creature.hp.current <= 0) {
+      events.push(
+        { kind: "effect", text: `${creature.name} regains ${trigger.revives} Hit Point in ${spell.name}.`, actorId },
+        ...healActor(state, creature.id, trigger.revives, { role: "gm" })
+      );
+      continue;
+    }
     act(state, zone, creature, when === "start-turn" ? "starts its turn in" : "ends its turn in", deps, events);
   }
   return events;

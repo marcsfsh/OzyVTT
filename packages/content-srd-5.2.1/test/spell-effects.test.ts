@@ -178,6 +178,24 @@ describe("what one cast of an SRD spell does", () => {
     });
   });
 
+  it("marks what an aura gives the creatures in it, and to whom", () => {
+    const zoneOf = (id: string) => effectOf(id)!.laterActions?.find((row) => row.zone)?.zone;
+    expect(zoneOf("holy-aura")).toMatchObject({ around: "caster", feet: 30, affects: "allies" });
+    expect(zoneOf("holy-aura")?.holds?.struck).toEqual({
+      creatureTypes: ["fiend", "undead"],
+      save: { ability: "con", conditions: ["blinded"] }
+    });
+    expect(zoneOf("aura-of-life")).toMatchObject({ on: ["start-turn"], affects: "allies", revives: 1 });
+    expect(zoneOf("pass-without-trace")?.holds?.modifiers).toEqual([
+      {
+        type: "check-bonus",
+        amount: 10,
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["stealth"] }]
+      }
+    ]);
+    expect(zoneOf("silence")).toEqual({ on: [], holds: { conditions: ["deafened"] } });
+  });
+
   it("marks the ground an area makes difficult, and how long the ground stays", () => {
     const zoneOf = (id: string) => effectOf(id)!.laterActions?.find((row) => row.zone)?.zone;
     expect(zoneOf("entangle")).toEqual({ on: [], terrain: { cost: 2, kind: "plants" } });

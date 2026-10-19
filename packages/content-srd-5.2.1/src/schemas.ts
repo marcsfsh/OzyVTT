@@ -17,16 +17,19 @@ import {
   ActionSchema,
   ActionTargetsSchema,
   ActorDefinitionSchema,
+  ConditionSchema,
   DamageDrainSchema,
   DamageFormulaSchema,
   DamageTypeSchema,
   DispelSchema,
+  EffectModifiersSchema,
   HealingFormulaSchema,
   ItemSlotSchema,
   OnHitRiderSchema,
   SaveFailureEffectSchema,
   SaveOutcomeFields,
-  SightEffectSchema
+  SightEffectSchema,
+  StruckSchema
 } from "@vtt/schemas";
 import {
   BackgroundReferenceSchema,
@@ -102,7 +105,8 @@ export const SpellZoneSchema = z
     oncePerTurn: z.literal(true).optional(),
     around: z.enum(["caster", "point"]).optional(),
     feet: z.number().int().min(5).max(120).optional(),
-    affects: z.literal("enemies").optional(),
+    /** Only the caster's enemies, or only the caster and its allies ("you and your allies": Aura of Life). */
+    affects: z.enum(["enemies", "allies"]).optional(),
     damageCap: z.number().int().min(1).max(1000).optional(),
     /** The creatures it affects move at half Speed inside it (Spirit Guardians). */
     halvesSpeed: z.literal(true).optional(),
@@ -148,7 +152,28 @@ export const SpellZoneSchema = z
       .strict()
       .optional(),
     /** No creature can teleport into it (Forbiddance). */
-    noTeleport: z.literal(true).optional()
+    noTeleport: z.literal(true).optional(),
+    /** What a creature it affects holds while it stands inside (Holy Aura's Advantage on saving throws, Pass without
+     *  Trace's +10 to Stealth checks, Silence's Deafened): one effect, added as the creature comes in and taken away as
+     *  it leaves. A struck save rolls against the cast's save DC. */
+    holds: z
+      .object({
+        modifiers: EffectModifiersSchema.optional(),
+        conditions: z.array(ConditionSchema).min(1).max(2).optional(),
+        struck: StruckSchema.omit({ save: true })
+          .extend({
+            save: z
+              .object({ ability: AbilityShortSchema, conditions: z.array(ConditionSchema).min(1).max(3) })
+              .strict()
+              .optional()
+          })
+          .strict()
+          .optional()
+      })
+      .strict()
+      .optional(),
+    /** A creature it affects that starts its turn there at 0 Hit Points regains this many (Aura of Life's 1). */
+    revives: z.number().int().min(1).max(10).optional()
   })
   .strict();
 export type SpellZone = z.infer<typeof SpellZoneSchema>;

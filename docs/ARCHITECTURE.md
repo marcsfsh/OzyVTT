@@ -316,7 +316,10 @@ A zone may act only on the creature types it names (Forbiddance), tell the GM wh
 its spell the first time it acts and burst over its area (Glyph of Warding, drawn for the GM and its
 caster alone), or raise a barrier at its edge (`zone-barriers.ts`): a step across it closes the path
 for the creatures it holds back (Antilife Shell, Magic Circle), a melee attack without a Reach weapon
-can't reach through Antilife Shell, and no creature teleports into Forbiddance.
+can't reach through Antilife Shell, and no creature teleports into Forbiddance. What an area gives the
+creatures in it (Holy Aura's Advantage on saves, Pass without Trace's +10 to Stealth, Silence's Deafened)
+is an effect each one holds while it stands inside (`zone-auras.ts`): the pipeline settles who holds it
+after every command, as its own write when anything changed.
 
 Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
 (`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long

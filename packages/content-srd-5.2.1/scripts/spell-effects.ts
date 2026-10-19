@@ -397,6 +397,22 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       bars: { way: "both", except: ["construct", "undead"], reach: true }
     })
   ],
+  // "While in the aura, you and your allies have Resistance to Necrotic damage", and "if an ally with 0 Hit Points
+  // starts its turn in the aura, that ally regains 1 Hit Point."
+  "aura-of-life": [
+    lasting(
+      "aura",
+      "You and your allies in the aura have Resistance to Necrotic damage; an ally at 0 Hit Points that starts its turn there regains 1 Hit Point.",
+      {
+        on: ["start-turn"],
+        around: "caster",
+        feet: 30,
+        affects: "allies",
+        holds: { modifiers: [{ type: "damage-resistance", damageTypes: ["necrotic"] }] },
+        revives: 1
+      }
+    )
+  ],
   "arcane-sword": [
     {
       name: "attack",
@@ -637,6 +653,29 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       laterTurnsOnly: true
     }
   ],
+  // "Creatures of your choice have Advantage on all saving throws, and other creatures have Disadvantage on attack
+  // rolls against them. In addition, when a Fiend or an Undead hits an affected creature with a melee attack roll, the
+  // attacker must succeed on a Constitution saving throw or have the Blinded condition until the end of its next turn."
+  // The creatures chosen are the caster and its allies.
+  "holy-aura": [
+    lasting(
+      "aura",
+      "You and your allies in the aura have Advantage on saving throws, and attack rolls against them have Disadvantage; a Fiend or an Undead that hits one with a melee attack makes a Constitution save or is Blinded.",
+      {
+        on: [],
+        around: "caster",
+        feet: 30,
+        affects: "allies",
+        holds: {
+          modifiers: [
+            { type: "roll-mode", roll: "save", mode: "advantage" },
+            { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
+          ],
+          struck: { creatureTypes: ["fiend", "undead"], save: { ability: "con", conditions: ["blinded"] } }
+        }
+      }
+    )
+  ],
   "heat-metal": [
     {
       name: "heat again",
@@ -723,6 +762,32 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       attackRange: { kind: "ranged", feet: 60 },
       damage: [{ formula: "1d8", type: "fire" }]
     }
+  ],
+  // "While in the aura, you and each creature you choose have a +10 bonus to Dexterity (Stealth) checks": the caster
+  // and its allies.
+  "pass-without-trace": [
+    lasting("aura", "You and your allies in the aura have a +10 bonus to Dexterity (Stealth) checks.", {
+      on: [],
+      around: "caster",
+      feet: 30,
+      affects: "allies",
+      holds: {
+        modifiers: [
+          {
+            type: "check-bonus",
+            amount: 10,
+            when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["stealth"] }]
+          }
+        ]
+      }
+    })
+  ],
+  // "Creatures have the Deafened condition while entirely inside it."
+  silence: [
+    lasting("aura", "A creature inside the Sphere has the Deafened condition.", {
+      on: [],
+      holds: { conditions: ["deafened"] }
+    })
   ],
   "sleet-storm": [
     {
