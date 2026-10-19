@@ -32,7 +32,7 @@ import {
   UNTYPED_DAMAGE
 } from "../hit-points.js";
 import { rechooseInLedger } from "../ledger-rechoice.js";
-import { applyRest, hitDieSizesToSpend, spendHitDice } from "../rests.js";
+import { applyRest, hitDieSizesToSpend, spendHitDice, startOwnShortRest } from "../rests.js";
 import { restoreUses, spendUses } from "../use-pools.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
@@ -368,9 +368,9 @@ export const actorHealthCommands = [
     type: "actor.rest",
     operationId: "restActor",
     description:
-      "Applies a rest to a rostered actor outside combat; a player session may take a Short Rest on their claimed character and asks the GM for a Long Rest (rest.ask), the GM rests anyone. Either rest needs at least 1 hit point (SRD) and is refused for a creature at 0 or dead, and a Long Rest is refused within 16 hours of game time after the actor's last one (the refusal says how long is left; time.pass moves the clock). Long: the actor's Concentration ends, and its other effects that would run out in the rest's 8 hours end, their on-end grants firing first. The clock itself moves only with time.pass or a party rest, so what lasts longer waits for the GM to pass those hours and they count once; effects that last until ended stay. Hit points restore to maximum, temporary HP clears, limited-use pools refresh (a charged item regains its printed dice), all spent Hit Point Dice restore, spell slots and Pact Magic refill, a caster that prepares its spells after a Long Rest gets the step to change them, and Exhaustion drops one level. Short: per-short-rest, recharge and per-encounter pools and Pact Magic slots re-arm, and features that say so give back uses of a long-rest pool (Rage, Second Wind, Channel Divinity, Wild Shape: one; Bardic Inspiration from Bard 5: all); healing is the separate spend-hit-dice call. A Short Rest leaves effects to the game clock, which the GM moves (the party Short Rest moves it an hour).",
+      "Applies a rest to a rostered actor outside combat; the GM rests anyone at once. A player session starts a Short Rest for their claimed character, which is then under way like the party's (rest.party): the player spends Hit Point Dice during it (actor.spend-hit-dice) and marks it done (rest.mark-done), and the GM ends it (rest.finish), when its benefits land and an hour passes; a Short Rest already under way takes the character in. A player asks the GM for a Long Rest (rest.ask). Either rest needs at least 1 hit point (SRD) and is refused for a creature at 0 or dead, and a Long Rest is refused within 16 hours of game time after the actor's last one (the refusal says how long is left; time.pass moves the clock). Long: the actor's Concentration ends, and its other effects that would run out in the rest's 8 hours end, their on-end grants firing first. The clock itself moves only with time.pass or a party rest, so what lasts longer waits for the GM to pass those hours and they count once; effects that last until ended stay. Hit points restore to maximum, temporary HP clears, limited-use pools refresh (a charged item regains its printed dice), all spent Hit Point Dice restore, spell slots and Pact Magic refill, a caster that prepares its spells after a Long Rest gets the step to change them, and Exhaustion drops one level. Short: per-short-rest, recharge and per-encounter pools and Pact Magic slots re-arm, and features that say so give back uses of a long-rest pool (Rage, Second Wind, Channel Divinity, Wild Shape: one; Bardic Inspiration from Bard 5: all); healing is the separate spend-hit-dice call. A Short Rest leaves effects to the game clock, which the GM moves (the party Short Rest moves it an hour).",
     summary:
-      "Take a Short Rest on your own character (GM: either rest on anyone, at 1 HP or more): short re-arms short-rest uses and Pact Magic and gives back what features say; long restores HP, hit dice, spell slots and limited uses, opens the prepare step, and drops one Exhaustion level.",
+      "Start a Short Rest for your own character, which the GM ends (GM: either rest on anyone at once, at 1 HP or more): short re-arms short-rest uses and Pact Magic and gives back what features say; long restores HP, hit dice, spell slots and limited uses, opens the prepare step, and drops one Exhaustion level.",
     schema: ActorRestSchema,
     malformed: "The rest command is malformed.",
     async run({ principal, request, execute }, kit) {
@@ -379,6 +379,28 @@ export const actorHealthCommands = [
       // A Long Rest is the GM's to give: a player asks for one (rest.ask) instead.
       if (kind === "long" && initiator.role !== "gm")
         throw new GameAccessDeniedError("Ask the GM for a Long Rest. The GM approves it.");
+      // A player's Short Rest is under way until the GM ends it, so its hour passes and Hit Dice are spent during it.
+      if (initiator.role !== "gm") {
+        let joined = false;
+        const { duplicate: again } = await execute((state) => {
+          joined = startOwnShortRest(state, actorId, initiator);
+        });
+        if (again) return;
+        kit.context.appendLog({
+          kind: "heal",
+          text: `${kit.actorName(actorId)} ${joined ? "joins the Short Rest" : "starts a Short Rest"}.`,
+          actorIds: [actorId],
+          gmOnly: kit.actorHidden(actorId)
+        });
+        kit.context.broadcastTableEvent({
+          kind: "heal",
+          text: `${kit.actorName(actorId)} ${joined ? "joins the Short Rest" : "starts a Short Rest"}. End it from Rest on the Table.`,
+          actorIds: [actorId],
+          gmOnly: true,
+          logged: false
+        });
+        return;
+      }
       let events: EffectNarration[] = [];
       const chargeLines: string[] = [];
       // Authorized inside the mutation against live state (applyRest still refuses a combatant in a running
@@ -463,7 +485,7 @@ export const actorHealthCommands = [
     type: "actor.spend-hit-dice",
     operationId: "spendHitDice",
     description:
-      "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter, and at 0 hit points or dead (a Short Rest needs at least 1). Player sessions may target only their claimed character; the dice land in the shared roll history.",
+      "Spends Hit Point Dice to heal (SRD Short Rest: each die heals its roll + Con modifier, minimum 1). Rejected while the actor is in an active encounter, and at 0 hit points or dead (a Short Rest needs at least 1). A player session may target only their claimed character, and only while it is in the Short Rest under way (the party's, or one the player started with actor.rest), since a creature spends Hit Dice during a Short Rest; the GM any time outside a fight. The dice land in the shared roll history.",
     summary: "Spend Hit Point Dice to heal on a Short Rest (roll + Con modifier each, minimum 1).",
     schema: ActorSpendHitDiceSchema,
     malformed: "The hit-dice command is malformed.",

@@ -225,6 +225,7 @@ export function CharacterSheet({
   const hp = exactHp(actor);
   const pools = poolsOf(serverActions);
   const restAsked = state?.rest?.requests.includes(actor.id) ?? false;
+  const restOpen = state?.rest?.shortRest?.actorIds.includes(actor.id) ?? false;
   const session = useSessionRoll(state, actor.id);
   const canReroll =
     rolls.lastCheck !== null &&
@@ -316,6 +317,7 @@ export function CharacterSheet({
       phoneViews={phoneViews}
       showHitDice={layout !== "wide"}
       restAsked={restAsked}
+      restOpen={restOpen}
       inFight={controller.inFight}
       savesOwed={controller.savesOwed}
       death={deathCard}
@@ -559,7 +561,13 @@ export function CharacterSheet({
           <div className="cs-col cs-col-right scroll-y" aria-label="Hit Points and details">
             <HpCard actor={actor} role={role} onFeedback={say} />
             {hitDice && hitDice.entries.length > 0 && actor.kind === "player-character" && (
-              <HitPointDice actorId={actor.id} hitDice={hitDice} constitution={constitution} onFeedback={say} />
+              <HitPointDice
+                actorId={actor.id}
+                hitDice={hitDice}
+                constitution={constitution}
+                canSpend={role === "gm" || restOpen}
+                onFeedback={say}
+              />
             )}
             {role === "gm" && <GmTools actor={actor} state={state} onFeedback={say} />}
             <div ref={setDetailHost} className="cs-detail-host" />

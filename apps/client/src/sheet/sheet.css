@@ -1511,6 +1511,14 @@ button.cs-lastroll-open {
   background: var(--grad-sun);
   box-shadow: none;
 }
+/* A player's spent pip shows the slot and takes no tap. */
+.cs-pip.is-spent {
+  display: inline-block;
+  cursor: default;
+}
+.cs-pip.is-spent::after {
+  content: none;
+}
 .cs-slotpips .cs-count {
   margin-left: var(--space-1);
 }

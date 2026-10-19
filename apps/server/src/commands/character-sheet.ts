@@ -111,8 +111,8 @@ export const characterSheetCommands = [
     type: "character.set-slot",
     operationId: "setSpellSlot",
     description:
-      "Sets a character's remaining spell slots for one level (clamped to the sheet maximum), to spend or restore a slot during play. With `pact`, it sets the Warlock's Pact Magic slots at that level instead. Player sessions may target only their claimed character.",
-    summary: "Spend or restore a character's spell slots for one level (clamped to the sheet maximum).",
+      "Sets a character's remaining spell slots for one level (clamped to the sheet maximum). With `pact`, it sets the Warlock's Pact Magic slots at that level instead. The GM sets them freely. A player session may target only their claimed character and may only spend (lower) them: a slot comes back by a rest or by a feature's own command (`actor.convert`), which checks that feature's rule.",
+    summary: "Spend a character's spell slots for one level; the GM may also restore them.",
     schema: CharacterSetSlotSchema,
     malformed: "The spell-slot command is malformed.",
     async run({ principal, request, execute }, kit) {
@@ -126,7 +126,8 @@ export const characterSheetCommands = [
           remaining,
           (definitionId) => kit.resolveDefinitionIn(state, definitionId),
           kit.equipmentCatalog(),
-          pact === true
+          pact === true,
+          isGmGrade(principal) ? "gm" : "player"
         );
       });
     }

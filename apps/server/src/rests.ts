@@ -48,7 +48,13 @@ export function hitDieSizesToSpend(entries: readonly HitDiceEntry[], count: numb
     .slice(0, count);
 }
 
+/** Whether `actorId` is in the Short Rest under way (the party's, or one its player started). */
+export const inShortRest = (state: GameState, actorId: string) =>
+  state.rest.shortRest?.actorIds.includes(actorId) ?? false;
+
 /** Spends Hit Point Dice to heal (SRD 5.2.1 Short Rest): each die heals `face + Con modifier`, minimum 1.
+ *  "A creature can spend Hit Dice during a Short Rest", so a player spends them only while their character is in the
+ *  Short Rest under way; the GM resting a creature spends them for it outside a fight.
  *  The caller rolls the faces before the store executes (so retries never reroll) and records them; this
  *  owns validation, healing (via healActor) and the pool decrement. */
 export function spendHitDice(
@@ -64,6 +70,10 @@ export function spendHitDice(
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
     throw new CommandRejectedError("Hit Dice are spent on a rest. End the fight first.");
+  if (scope.role !== "gm" && !inShortRest(state, actorId))
+    throw new CommandRejectedError(
+      `Hit Point Dice are spent during a Short Rest. Start one for ${actor.name} first, and spend them before it ends.`
+    );
   refuseRestAtZero(actor, "Hit Dice are spent on a Short Rest, which needs");
   if (!actor.hitDice)
     throw new CommandRejectedError(`${actor.name} has no Hit Dice pool (its stat block has no hit-point formula).`);
@@ -349,6 +359,25 @@ export function startPartyRest(
   events.push(...members.flatMap((actor) => longRest(state, actor.id, resolveDefinition, catalog, random, true)));
   for (const actor of members) actor.lastLongRestAt = state.rest.clockHours;
   return events;
+}
+
+/** A player starts a Short Rest for their own character. It is under way, as the party's is: its player spends Hit
+ *  Point Dice during it and marks it done, and the GM ends it, when its benefits land and an hour passes. A Short
+ *  Rest already under way takes the character in. Returns whether it joined one. */
+export function startOwnShortRest(state: GameState, actorId: string, scope: Initiator): boolean {
+  requireActorAccess(scope, state, actorId, "resource");
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  const refusal = restRefusal(state, actor, "short");
+  if (refusal) throw new CommandRejectedError(refusal);
+  const rest = state.rest.shortRest;
+  if (rest?.actorIds.includes(actorId)) throw new CommandRejectedError(`${actor.name} is already in the Short Rest.`);
+  if (rest && rest.actorIds.length >= 12) throw new CommandRejectedError("The Short Rest under way is full.");
+  state.rest = {
+    ...state.rest,
+    shortRest: rest ? { ...rest, actorIds: [...rest.actorIds, actorId] } : { actorIds: [actorId], done: [] }
+  };
+  return rest !== null;
 }
 
 /** A member of the party's Short Rest is done spending Hit Dice (or not after all). Their player or the GM. */

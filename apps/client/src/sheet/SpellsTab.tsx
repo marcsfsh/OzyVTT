@@ -61,26 +61,40 @@ const STATE_WORDS: Readonly<Record<RowState, string>> = {
   book: "Only in the spellbook"
 };
 
-/** One pool's slots as tappable pips: a filled pip spends down to it, an empty one restores up to it. */
+/** One pool's slots as tappable pips: a filled pip spends down to it, and for the GM an empty one restores up to it.
+ *  A player's empty pip only shows: a slot comes back by a rest or a feature, whose own control the server checks. A
+ *  slot made above the maximum (Font of Magic) is one more pip. */
 function SlotPips({
   label,
   pipLabel,
   pool,
   busy,
+  restore,
   onSet
-}: Readonly<{ label: string; pipLabel: string; pool: SlotPool; busy: boolean; onSet: (remaining: number) => void }>) {
+}: Readonly<{
+  label: string;
+  pipLabel: string;
+  pool: SlotPool;
+  busy: boolean;
+  restore: boolean;
+  onSet: (remaining: number) => void;
+}>) {
   return (
     <span className="cs-slotpips" role="group" aria-label={`${label} (${pool.remaining} of ${pool.max} left)`}>
-      {Array.from({ length: pool.max }, (_, index) => (
-        <button
-          key={index}
-          type="button"
-          className={`cs-pip interactive${index < pool.remaining ? " is-on" : ""}`}
-          disabled={busy}
-          aria-label={`${index < pool.remaining ? "Spend" : "Restore"} ${pipLabel}`}
-          onClick={() => onSet(index < pool.remaining ? index : index + 1)}
-        />
-      ))}
+      {Array.from({ length: Math.max(pool.max, pool.remaining) }, (_, index) =>
+        index < pool.remaining || restore ? (
+          <button
+            key={index}
+            type="button"
+            className={`cs-pip interactive${index < pool.remaining ? " is-on" : ""}`}
+            disabled={busy}
+            aria-label={`${index < pool.remaining ? "Spend" : "Restore"} ${pipLabel}`}
+            onClick={() => onSet(index < pool.remaining ? index : index + 1)}
+          />
+        ) : (
+          <span key={index} className="cs-pip is-spent" aria-hidden="true" />
+        )
+      )}
       <span className="cs-count">
         {pool.remaining}/{pool.max}
       </span>
@@ -581,6 +595,7 @@ export function SpellsTab({
             pipLabel="a Pact Magic slot"
             pool={pact}
             busy={busy}
+            restore={role === "gm"}
             onSet={(next) =>
               void edit("character:set-slot", { actorId: actor.id, level: pact.level, remaining: next, pact: true })
             }
@@ -607,6 +622,7 @@ export function SpellsTab({
                   pipLabel={`a level ${spellLevel} slot`}
                   pool={pool}
                   busy={busy}
+                  restore={role === "gm"}
                   onSet={(next) =>
                     void edit("character:set-slot", { actorId: actor.id, level: spellLevel, remaining: next })
                   }
