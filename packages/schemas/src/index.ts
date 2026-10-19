@@ -1875,6 +1875,20 @@ export const EffectInstanceSchema = z
     endsWhenUnaffected: z.literal(true).optional(),
     /** The bearer's Speed is multiplied by this after every other change (Haste: doubled), its special speeds too. */
     speedMultiplier: z.number().int().min(2).max(4).optional(),
+    /** Movement the bearer has already spent of its next turn (climbing out of a swallower's corpse off its turn),
+     *  charged as that turn starts. */
+    movementOwedFeet: z.number().int().min(1).max(1000).optional(),
+    /** Where the bearer is anchored (a Climber's Kit), in map pixels and feet of height: it can't move more than
+     *  `feet` from there, nor fall more than `feet` below it. */
+    anchor: z
+      .object({
+        x: z.number().min(0).max(1_000_000),
+        y: z.number().min(0).max(1_000_000),
+        altitudeFeet: z.number().int().min(0).max(100_000),
+        feet: z.number().int().min(5).max(300)
+      })
+      .strict()
+      .optional(),
     /** A way to work out base AC while the bearer wears no armor: this plus its Dexterity modifier, a Shield adding
      *  (Mage Armor's 13). The best of its ways counts, and AC bonuses add to it. */
     baseArmorClass: z.number().int().min(11).max(20).optional(),
@@ -2793,6 +2807,12 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   /** More actions that end it, each with who may take it and its check (bursting a Chain: a DC 20 Strength (Athletics)
    *  check; picking Manacles' lock with Thieves' Tools). */
   endedBy: z.array(EndedBySchema).min(1).max(4).optional(),
+  /** It anchors the recipient where it stands (a Climber's Kit): it can't move more than `feet` from there, nor fall
+   *  more than `feet` below it, while this lasts. */
+  anchors: z
+    .object({ feet: z.number().int().min(5).max(300) })
+    .strict()
+    .optional(),
   /** The grant binds to one weapon its recipient carries, picked on the resolve (`input.itemId`): its riders scoped
    *  `this-item` reach that weapon alone, and `weapon` changes how it swings while the grant lasts. `weaponIds`
    *  limits the pick (Shillelagh: a Club or Quarterstaff); `nonmagical` refuses a magic one (Magic Weapon); `melee`

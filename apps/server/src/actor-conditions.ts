@@ -141,6 +141,38 @@ function checkPlayerRemoval(
   );
 }
 
+/** SRD Dropping Prone: "On your turn, you can give yourself the Prone condition without using an action or any of your
+ *  Speed, but you can't do so if your Speed is 0." In a fight, a player drops its creature Prone only on its turn. */
+function dropProne(
+  state: GameState,
+  actor: Actor,
+  options: SetConditionOptions | undefined,
+  events: EffectNarration[]
+): void {
+  if (!state.combat.active || !state.combat.initiative.some((entry) => entry.actorId === actor.id)) return;
+  if (state.combat.turnActorId !== actor.id) {
+    policeConditionRule(
+      state,
+      actor,
+      "movement.drop-prone",
+      `${actor.name} can drop Prone only on its own turn.`,
+      options,
+      events
+    );
+    return;
+  }
+  const definition = actor.definitionId ? options?.resolveDefinition?.(actor.definitionId) : undefined;
+  if (currentSpeedFeet(actor, deriveEquipment(actor, definition, options?.catalog)) === 0)
+    policeConditionRule(
+      state,
+      actor,
+      "movement.drop-prone",
+      `${actor.name} can't drop Prone while its Speed is 0.`,
+      options,
+      events
+    );
+}
+
 /** SRD Prone: standing up costs half your Speed, so it happens on your own turn, with movement you have. */
 function standUp(state: GameState, actor: Actor, scope: Initiator, options: SetConditionOptions | undefined) {
   const events: EffectNarration[] = [];
@@ -253,6 +285,7 @@ export function setCondition(
   }
   const previousExhaustion = exhaustionLevel(actor);
   const events: EffectNarration[] = [];
+  if (conditionId === "prone" && !present && scope.role === "player") dropProne(state, actor, options, events);
   // Lowering Exhaustion is taking some of it off.
   if (scope.role === "player" && conditionId === "exhaustion" && level !== undefined && level < previousExhaustion)
     checkPlayerRemoval(state, actor, conditionId, options, events);

@@ -11,6 +11,7 @@ import { DESCENDS_SAFELY_TAG, descendSafely } from "./altitude.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import { restoreSuppressed } from "./suppressed-conditions.js";
 import { refreshArmorClass } from "./held-items.js";
+import { knockedProneWhileMounted } from "./mounts.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
  *  end, which clears linked conditions and fires onEnd grants. Returns narration events and writes nothing to
@@ -345,6 +346,8 @@ export function conditionGained(
 ): EffectNarration[] {
   const events: EffectNarration[] = [];
   if (conditionId === "unconscious") events.push(...dropHeldItems(actor, source));
+  // SRD Mounted Combat: a rider knocked Prone, or whose mount is, saves to stay on.
+  if (conditionId === "prone") events.push(...knockedProneWhileMounted(state, actor));
   if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
     events.push(...releaseGrapplesHeldBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));

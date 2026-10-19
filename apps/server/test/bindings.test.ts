@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { setCondition } from "../src/actor-conditions.js";
 import { builtinActionsFor } from "../src/builtin-actions.js";
-import { makeEffect } from "../src/effects.js";
+import { ageEffects, makeEffect } from "../src/effects.js";
 import { startEncounter } from "../src/encounter.js";
 import {
   actionOf,
@@ -168,7 +168,13 @@ describe("a Hunting Trap's hold", () => {
     table
       .actor(IDS.wizard)
       .effects.push(
-        makeEffect({ id: "trap", name: "Hunting Trap", duration: { type: "manual" }, speedZero: true, endedBy: save.endedBy! })
+        makeEffect({
+          id: "trap",
+          name: "Hunting Trap",
+          duration: { type: "manual" },
+          speedZero: true,
+          endedBy: save.endedBy!
+        })
       );
     fightOf(table, IDS.fighter);
     const before = table.actor(IDS.wizard).hp.current;
@@ -187,7 +193,13 @@ describe("a Hunting Trap's hold", () => {
     table
       .actor(IDS.wizard)
       .effects.push(
-        makeEffect({ id: "trap", name: "Hunting Trap", duration: { type: "manual" }, speedZero: true, endedBy: save.endedBy! })
+        makeEffect({
+          id: "trap",
+          name: "Hunting Trap",
+          duration: { type: "manual" },
+          speedZero: true,
+          endedBy: save.endedBy!
+        })
       );
     fightOf(table, IDS.fighter);
     expect(() => resolveAt(table, IDS.fighter, "end-an-effect", [12], { targetIds: [IDS.wizard] }, 15)).toThrow();
@@ -253,5 +265,19 @@ describe("a Rope of Entanglement", () => {
       activation: "bonus-action",
       endsItemEffects: true
     });
+  });
+
+  it("regains 1 Hit Point every 5 minutes while it has at least 1", () => {
+    const table = twoOfThem();
+    table.actor(IDS.wizard).effects.push(
+      makeEffect({
+        id: "rope",
+        name: "Restrained by the rope",
+        duration: { type: "manual" },
+        heldBy: { name: "Rope", armorClass: 20, hitPoints: { current: 10, maximum: 20 }, regainsEvery: 5 }
+      })
+    );
+    ageEffects(table.state, new Set([IDS.wizard]), 12);
+    expect(named(table, IDS.wizard, "Restrained by the rope")?.heldBy?.hitPoints.current).toBe(12);
   });
 });

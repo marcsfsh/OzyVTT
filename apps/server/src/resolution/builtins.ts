@@ -569,7 +569,7 @@ const unarmedDc = (definition: ActorDefinition | undefined): number =>
   Math.max(1, 8 + abilityModifier(definition, "str") + (definition?.proficiencyBonus ?? 0));
 
 /** SRD Unarmed Strike Grapple/Shove: the target saves with its better of STR and DEX against the unarmed
- *  DC. A failed save is Grappled (escape DC = that DC), Prone, or a 5-foot push the GM moves. */
+ *  DC. A failed save is Grappled (escape DC = that DC), Prone, or a 5-foot push straight away from the shover. */
 function unarmedSave(failure: "grappled" | "prone" | "pushed") {
   return (ctx: ResolveContext): void => {
     const { state, action, attacker, targets, deps } = ctx;
@@ -603,10 +603,11 @@ function unarmedSave(failure: "grappled" | "prone" | "pushed") {
             }
           }
         : {}),
+      // "You push it 5 feet away", straight away from the shover, on the live map.
+      ...(failure === "pushed" ? { failurePush: { feet: 5 } } : {}),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
-    if (failure === "pushed") ctx.warnings.push(`On a failed save, ${target.name} is pushed 5 feet. Move the token.`);
     ctx.builtinSave = { ability, dc, targets: [{ targetId: target.id, targetName: target.name }] };
   };
 }

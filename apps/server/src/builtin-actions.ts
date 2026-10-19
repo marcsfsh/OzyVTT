@@ -242,7 +242,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Unarmed Strike (Shove Push)",
     activation: "action",
     description:
-      "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or you push it 5 feet away. On a failure, the GM moves the token. Only targets no more than one size larger. (SRD 5.2.1, Unarmed Strike)",
+      "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or you push it 5 feet straight away from you. Only targets no more than one size larger. (SRD 5.2.1, Unarmed Strike)",
     damage: [],
     replacesAttack: true
   },

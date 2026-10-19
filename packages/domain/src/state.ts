@@ -363,6 +363,9 @@ export const PendingSaveSchema = z
     drain: DamageDrainSchema.optional(),
     /** Where a failure pushes the creature (Thunderwave), narrated when it lands. */
     failurePush: ForcedPushSchema.optional(),
+    /** SRD Mounted Combat: a failure throws the rider off this mount, landing Prone within 5 feet of it. GM
+     *  bookkeeping, never projected: the fall is narrated when it lands. */
+    unseats: z.uuid().optional(),
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
     /** What gives the save Advantage beyond the target's own riders, as the roll card names it: the damage that opened

@@ -15,12 +15,12 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
 
-async function table() {
+async function table(horseInventory: readonly Record<string, unknown>[] = []) {
   const state = GameStateSchema.parse({
     schemaVersion: 1,
     actors: [
       { id: RIDER, name: "Borin", kind: "player-character", speedFeet: 30 },
-      { id: HORSE, name: "Warhorse", kind: "npc", speedFeet: 60, size: "large" },
+      { id: HORSE, name: "Warhorse", kind: "npc", speedFeet: 60, size: "large", inventory: horseInventory },
       { id: DOG, name: "Mastiff", kind: "npc", speedFeet: 40, size: "medium" }
     ].map((actor) => ({ ...actor, visibility: "public", hp: { current: 20, maximum: 20 } }))
   });
@@ -67,5 +67,86 @@ describe("riding a mount", () => {
     const horse = at(HORSE)!;
     const rider = at(RIDER)!;
     expect(Math.hypot(rider.x - horse.x, rider.y - horse.y)).toBeGreaterThan(40);
+  });
+});
+
+describe("controlling a mount", () => {
+  type Booted = Awaited<ReturnType<typeof table>>;
+  const snapshot = (booted: Booted) => booted.server.store.snapshot;
+  const actorOf = (booted: Booted, id: string) => snapshot(booted).actors.find((actor) => actor.id === id)!;
+
+  it("gives a controlled mount its rider's Initiative, its turn after the rider's, and only Dash, Disengage and Dodge", async () => {
+    const booted = await table();
+    expect((await booted.mount(HORSE)).status).toBe(200);
+    const order = snapshot(booted).combat.initiative;
+    expect(order.map((entry) => entry.actorId)).toEqual([RIDER, HORSE, DOG]);
+    expect(order[1]).toMatchObject({ follows: RIDER, score: order[0]!.score });
+    expect((await booted.post(GAME_PATHS.initiativeNext, booted.gmToken, {})).status).toBe(200);
+    expect(snapshot(booted).combat.turnActorId).toBe(HORSE);
+    const resolve = (actionId: string, targetIds?: string[]) =>
+      booted.post(GAME_PATHS.actionResolve, booted.gmToken, {
+        actorId: HORSE,
+        actionId,
+        ...(targetIds ? { targetIds } : {})
+      });
+    const attack = await resolve("unarmed-strike", [DOG]);
+    expect(attack.status).toBe(409);
+    expect(await attack.text()).toContain("only the Dash, Disengage or Dodge action");
+    expect((await resolve("dash")).status).toBe(200);
+  });
+
+  it("leaves an independent mount on its own Initiative, and unlinks a controlled one when its rider dismounts", async () => {
+    const booted = await table();
+    const independent = await booted.post(GAME_PATHS.actorMount.replace("{actorId}", RIDER), booted.gmToken, {
+      actorId: RIDER,
+      mountId: HORSE,
+      control: "independent"
+    });
+    expect(independent.status).toBe(200);
+    expect(snapshot(booted).combat.initiative.find((entry) => entry.actorId === HORSE)?.follows).toBeUndefined();
+    expect((await booted.mount(null)).status).toBe(200);
+  });
+
+  it("asks the rider of a mount moved by force for a DC 10 Dexterity save; a failure drops it Prone beside the mount", async () => {
+    const booted = await table();
+    expect((await booted.mount(HORSE)).status).toBe(200);
+    const shoved = await booted.move(HORSE, booted.gmToken, { position: { x: 300, y: 100 }, mode: "forced" });
+    expect(shoved.status, await shoved.clone().text()).toBe(200);
+    // The rider goes with it while it saves.
+    expect(Math.abs(booted.at(RIDER)!.x - booted.at(HORSE)!.x)).toBeLessThan(1);
+    const save = snapshot(booted).combat.pendingSaves.find((entry) => entry.targetActorId === RIDER)!;
+    expect(save).toMatchObject({ ability: "dex", dc: 10, unseats: HORSE });
+    const failed = await booted.post(GAME_PATHS.saveAnswer.replace("{saveId}", save.id), booted.gmToken, {
+      saveId: save.id,
+      method: "manual",
+      total: 3,
+      commit: true
+    });
+    expect(failed.status, await failed.clone().text()).toBe(200);
+    const rider = actorOf(booted, RIDER);
+    expect(rider.effects.some((effect) => effect.tags.includes("riding"))).toBe(false);
+    expect(rider.conditions.map((condition) => condition.id)).toContain("prone");
+    const apart = Math.hypot(booted.at(RIDER)!.x - booted.at(HORSE)!.x, booted.at(RIDER)!.y - booted.at(HORSE)!.y);
+    expect(apart).toBeGreaterThan(40);
+    expect(apart).toBeLessThan(110);
+    expect(snapshot(booted).combat.initiative.find((entry) => entry.actorId === HORSE)?.follows).toBeUndefined();
+  });
+
+  it("asks the rider to stay on when the mount is knocked Prone, with Advantage in a Military Saddle", async () => {
+    const booted = await table([
+      { id: "saddle-military", name: "Saddle, Military", quantity: 1, equipped: true, attuned: false }
+    ]);
+    expect((await booted.mount(HORSE)).status).toBe(200);
+    const toppled = await booted.post(GAME_PATHS.actorConditions.replace("{actorId}", HORSE), booted.gmToken, {
+      actorId: HORSE,
+      conditionId: "prone",
+      active: true
+    });
+    expect(toppled.status, await toppled.clone().text()).toBe(200);
+    expect(snapshot(booted).combat.pendingSaves.find((entry) => entry.targetActorId === RIDER)).toMatchObject({
+      dc: 10,
+      unseats: HORSE,
+      advantageFrom: "Military Saddle"
+    });
   });
 });

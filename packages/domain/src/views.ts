@@ -188,6 +188,7 @@ export type PlayerPendingSave = Omit<
   | "immuneOnSuccess"
   | "drain"
   | "failurePush"
+  | "unseats"
   | "advantageAtSize"
   | "spell"
   | "confirmed"

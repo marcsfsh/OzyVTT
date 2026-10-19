@@ -22,6 +22,7 @@ import {
   type EffectNarration
 } from "../effects.js";
 import { refreshBaseArmorClass } from "../actor-roster.js";
+import { altitudeOf } from "../altitude.js";
 import { holdsFeature } from "../class-features.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
@@ -321,6 +322,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       ...grantExtras(ctx, grant, recipient, option),
       // Every other way out the grant prints (bursting a Chain), beside its own end action.
       ...(grant.endedBy ? { endedBy: structuredClone(grant.endedBy) } : {}),
+      ...anchorOf(state, recipient.id, grant.anchors),
       ...(bound?.fields ?? {})
     }),
     replaced,
@@ -376,6 +378,19 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       conditionIds: [...linkedConditionIds]
     });
   else ctx.effectGranted = { name: effect.name, tags: effect.tags };
+}
+
+/** Where a Climber's Kit anchors its user: its token's place and height now. Nothing off the map. */
+function anchorOf(
+  state: GameState,
+  recipientId: string,
+  anchors: NonNullable<DefinitionAction["grants"]>["anchors"]
+): Partial<Pick<EffectInstance, "anchor">> {
+  const token = state.combat.tokens.find((candidate) => candidate.actorId === recipientId);
+  if (!anchors || !token?.position) return {};
+  return {
+    anchor: { x: token.position.x, y: token.position.y, altitudeFeet: altitudeOf(token), feet: anchors.feet }
+  };
 }
 
 /** Takes the conditions an effect suppresses off its bearer and keeps them on the effect, as the table hears. */
@@ -478,7 +493,9 @@ export function grantOutsideFight(
       ...(action.spellId !== undefined ? { stackKey: `spell:${action.spellId}` } : {}),
       ...(grant.armorClassBonus !== undefined ? { armorClassBonus: grant.armorClassBonus } : {}),
       // Its size while it lasts (a Potion of Growth).
-      ...(grant.sizeChange ? { sizeChange: { ...grant.sizeChange }, ownSize: ownSizeOf(actor) } : {})
+      ...(grant.sizeChange ? { sizeChange: { ...grant.sizeChange }, ownSize: ownSizeOf(actor) } : {}),
+      // A Climber's Kit anchored on the way down a cliff.
+      ...anchorOf(state, actor.id, grant.anchors)
     }),
     events
   );
