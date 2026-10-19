@@ -157,6 +157,11 @@
      ]
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 30,
+     "seen": true
+    },
     "uses": {
      "limit": 2,
      "per": "long-rest"
@@ -282,6 +287,11 @@
       "type": "poison"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -322,6 +332,9 @@
      "ability": "cha",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -418,6 +431,9 @@
      "ability": "cha",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -569,6 +585,9 @@
      "ability": "cha",
      "saveDc": 18,
      "attackBonus": 10,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -634,6 +653,9 @@
      "ability": "cha",
      "saveDc": 18,
      "attackBonus": 10,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -705,6 +727,9 @@
      "ability": "cha",
      "saveDc": 18,
      "attackBonus": 10,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -845,6 +870,9 @@
      "ability": "cha",
      "saveDc": 16,
      "attackBonus": 8,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -970,6 +998,11 @@
       "type": "fire"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -1008,6 +1041,9 @@
      "ability": "cha",
      "saveDc": 16,
      "attackBonus": 8,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -1155,6 +1191,9 @@
      "ability": "cha",
      "saveDc": 17,
      "attackBonus": 10,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -1329,6 +1368,9 @@
      "ability": "cha",
      "saveDc": 17,
      "attackBonus": 10,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -1489,6 +1531,11 @@
       "type": "psychic"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 90,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -1530,6 +1577,9 @@
      "ability": "cha",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -1645,6 +1695,9 @@
      "ability": "cha",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -1801,6 +1854,11 @@
       "type": "force"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -1841,6 +1899,9 @@
      "ability": "cha",
      "saveDc": 21,
      "attackBonus": 13,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -1956,6 +2017,9 @@
      "ability": "cha",
      "saveDc": 21,
      "attackBonus": 13,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -2103,6 +2167,9 @@
      "ability": "cha",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -2248,6 +2315,9 @@
      "ability": "cha",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -2388,6 +2458,9 @@
      "ability": "cha",
      "saveDc": 20,
      "attackBonus": 12,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -2434,6 +2507,9 @@
      "ability": "cha",
      "saveDc": 20,
      "attackBonus": 12,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -2530,6 +2606,9 @@
      "ability": "cha",
      "saveDc": 20,
      "attackBonus": 12,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-command",
@@ -2660,6 +2739,9 @@
      "ability": "cha",
      "saveDc": 19,
      "attackBonus": 11,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -2832,6 +2914,9 @@
      "ability": "cha",
      "saveDc": 19,
      "attackBonus": 11,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -3090,6 +3175,9 @@
      "ability": "cha",
      "saveDc": 14,
      "attackBonus": 6,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -3247,6 +3335,11 @@
       "type": "thunder"
      }
     ],
+    "targets": {
+     "count": 1,
+     "maxSize": "medium",
+     "inSpace": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -3474,6 +3567,11 @@
       "type": "poison"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -3514,6 +3612,9 @@
      "ability": "cha",
      "saveDc": 21,
      "attackBonus": 13,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -3610,6 +3711,9 @@
      "ability": "cha",
      "saveDc": 21,
      "attackBonus": 13,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -3767,6 +3871,9 @@
      "ability": "cha",
      "saveDc": 22,
      "attackBonus": 14,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -3832,6 +3939,9 @@
      "ability": "cha",
      "saveDc": 22,
      "attackBonus": 14,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -3904,6 +4014,9 @@
      "ability": "cha",
      "saveDc": 22,
      "attackBonus": 14,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -4050,6 +4163,9 @@
      "ability": "cha",
      "saveDc": 20,
      "attackBonus": 12,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -4176,6 +4292,11 @@
       "type": "fire"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -4214,6 +4335,9 @@
      "ability": "cha",
      "saveDc": 20,
      "attackBonus": 12,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -4367,6 +4491,9 @@
      "ability": "cha",
      "saveDc": 22,
      "attackBonus": 14,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -4541,6 +4668,9 @@
      "ability": "cha",
      "saveDc": 22,
      "attackBonus": 14,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -4713,6 +4843,11 @@
       "type": "psychic"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -4754,6 +4889,9 @@
      "ability": "cha",
      "saveDc": 21,
      "attackBonus": 13,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -4869,6 +5007,9 @@
      "ability": "cha",
      "saveDc": 21,
      "attackBonus": 13,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -5031,6 +5172,11 @@
       "type": "force"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -5071,6 +5217,9 @@
      "ability": "cha",
      "saveDc": 24,
      "attackBonus": 16,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -5186,6 +5335,9 @@
      "ability": "cha",
      "saveDc": 24,
      "attackBonus": 16,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -5339,6 +5491,9 @@
      "ability": "cha",
      "saveDc": 21,
      "attackBonus": 13,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -5484,6 +5639,9 @@
      "ability": "cha",
      "saveDc": 21,
      "attackBonus": 13,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -5630,6 +5788,9 @@
      "ability": "cha",
      "saveDc": 23,
      "attackBonus": 15,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -5676,6 +5837,9 @@
      "ability": "cha",
      "saveDc": 23,
      "attackBonus": 15,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -5773,6 +5937,9 @@
      "ability": "cha",
      "saveDc": 23,
      "attackBonus": 15,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-command",
@@ -5915,6 +6082,9 @@
      "ability": "cha",
      "saveDc": 23,
      "attackBonus": 15,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -6087,6 +6257,9 @@
      "ability": "cha",
      "saveDc": 23,
      "attackBonus": 15,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -6363,6 +6536,9 @@
      "ability": "cha",
      "saveDc": 18,
      "attackBonus": 10,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -7363,6 +7539,31 @@
     }
    },
    {
+    "id": "protective-magic-counterspell",
+    "name": "Counterspell",
+    "activation": "reaction",
+    "description": "The archmage casts Counterspell or Shield in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "protective-magic"
+    },
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 17,
+     "attackBonus": 9,
+     "self": true,
+     "spells": [
+      {
+       "id": "protective-magic-counterspell",
+       "spellId": "counterspell",
+       "name": "Counterspell"
+      }
+     ]
+    }
+   },
+   {
     "id": "arcane-burst",
     "name": "Arcane Burst",
     "activation": "action",
@@ -8034,6 +8235,12 @@
       "type": "fire"
      }
     ]
+   },
+   {
+    "kind": "light",
+    "name": "Illumination",
+    "brightFeet": 10,
+    "dimFeet": 10
    }
   ],
   "extensions": {
@@ -8345,6 +8552,21 @@
       "formula": "5d6",
       "type": "fire"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "name": "Pulled",
+      "pull": {
+       "feet": 25,
+       "upTo": true
+      },
+      "maxTargetSize": "huge"
+     }
     ]
    },
    {
@@ -8364,6 +8586,18 @@
      {
       "formula": "4d10",
       "type": "lightning"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "No Reactions",
+      "tags": [
+       "no-reactions"
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
      }
     ]
    }
@@ -9210,7 +9444,10 @@
       ],
       "duration": {
        "type": "until-source-next-turn"
-      }
+      },
+      "tags": [
+       "no-healing"
+      ]
      }
     ]
    },
@@ -9388,7 +9625,12 @@
      }
     },
     "damage": [],
-    "reminder": "While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir."
+    "reminder": "While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir.",
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "grappledBySource": true
+    }
    },
    {
     "id": "bite",
@@ -9431,7 +9673,13 @@
       "formula": "5d8 + 6",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "rangeFeet": 5,
+     "seen": true
+    }
    },
    {
     "id": "lightning-breath",
@@ -10559,7 +10807,10 @@
       ],
       "duration": {
        "type": "until-source-next-turn"
-      }
+      },
+      "tags": [
+       "no-healing"
+      ]
      }
     ]
    }
@@ -11144,7 +11395,13 @@
      "escapeDc": 13,
      "rangeFeet": 10
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "maxSize": "medium",
+     "rangeFeet": 10,
+     "seen": true
+    }
    },
    {
     "id": "javelin",
@@ -11949,7 +12206,12 @@
       "formula": "2d4 + 4",
       "type": "fire"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -12313,7 +12575,11 @@
      },
      "repeatSave": true
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "grappledBySource": true
+    }
    }
   ],
   "token": {
@@ -12657,6 +12923,11 @@
      "ability": "wis",
      "saveDc": 13,
      "attackBonus": 5,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -12691,6 +12962,16 @@
     "height": 2
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Light Sensitivity",
+    "light": "bright",
+    "rolls": [
+     "attack"
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -12775,6 +13056,9 @@
      "ability": "cha",
      "saveDc": 15,
      "attackBonus": 7,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -12867,6 +13151,9 @@
      "ability": "cha",
      "saveDc": 15,
      "attackBonus": 7,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -13209,7 +13496,13 @@
       "formula": "3d4",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "maxSize": "medium",
+     "rangeFeet": 5,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -13475,6 +13768,11 @@
      "ability": "wis",
      "saveDc": 15,
      "attackBonus": 7,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "spells": [
       {
        "id": "divine-aid-2-day-bless",
@@ -13515,7 +13813,13 @@
       "formula": "1d6 + 5",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "maxSize": "medium",
+     "rangeFeet": 5,
+     "seen": true
+    }
    },
    {
     "id": "spellcasting",
@@ -13527,6 +13831,11 @@
      "ability": "wis",
      "saveDc": 15,
      "attackBonus": 7,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-evil-and-good",
@@ -14152,6 +14461,27 @@
      "limit": 1,
      "per": "long-rest"
     },
+    "grants": {
+     "name": "Darkness Aura",
+     "tags": [
+      "darkness-aura"
+     ],
+     "target": "self",
+     "duration": {
+      "type": "rounds",
+      "rounds": 100
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "voidWhileIncapacitated": false,
+     "concentration": true
+    },
+    "sight": {
+     "area": {
+      "kind": "magical-darkness",
+      "aroundSelfFeet": 15
+     }
+    },
     "area": {
      "shape": "emanation",
      "sizeFeet": 15,
@@ -14462,6 +14792,9 @@
      "ability": "cha",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "divine-aid-2-day-cure-wounds",
@@ -14524,6 +14857,9 @@
      "ability": "cha",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-evil-and-good",
@@ -14843,6 +15179,9 @@
      "ability": "cha",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-evil-and-good",
@@ -15077,6 +15416,11 @@
      "ability": "cha",
      "saveDc": 12,
      "attackBonus": 4,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -15576,6 +15920,9 @@
      "ability": "wis",
      "saveDc": 14,
      "attackBonus": 6,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "magic-of-the-spider-queen-recharge-5-6-darkness",
@@ -15651,6 +15998,17 @@
     "height": 2
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Sunlight Sensitivity",
+    "light": "sunlight",
+    "rolls": [
+     "check",
+     "attack"
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
@@ -15989,6 +16347,9 @@
      "ability": "cha",
      "saveDc": 14,
      "attackBonus": 6,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-animal-friendship",
@@ -16165,6 +16526,11 @@
      "ability": "cha",
      "saveDc": 10,
      "attackBonus": 2,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -16590,6 +16956,9 @@
      "ability": "cha",
      "saveDc": 16,
      "attackBonus": 8,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -16760,7 +17129,14 @@
       "formula": "2d10 + 6",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "conditions": [
+      "prone"
+     ],
+     "rangeFeet": 5
+    }
    },
    {
     "id": "gore",
@@ -17029,7 +17405,12 @@
       "formula": "4d6",
       "type": "force"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -17218,6 +17599,12 @@
      ]
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "rangeFeet": 30,
+     "seen": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -17369,6 +17756,25 @@
       "formula": "2d8 + 5",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Next attack at Disadvantage",
+      "tags": [
+       "until-own-attack"
+      ],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "attack",
+        "mode": "disadvantage"
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
+     }
     ]
    }
   ],
@@ -17513,6 +17919,12 @@
      }
     ],
     "hazard": "burning"
+   },
+   {
+    "kind": "light",
+    "name": "Illumination",
+    "brightFeet": 30,
+    "dimFeet": 30
    }
   ],
   "extensions": {
@@ -17653,6 +18065,25 @@
      {
       "formula": "1d8",
       "type": "fire"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Next attack at Disadvantage",
+      "tags": [
+       "until-own-attack"
+      ],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "attack",
+        "mode": "disadvantage"
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
      }
     ],
     "onHitPush": {
@@ -18156,6 +18587,21 @@
      {
       "formula": "2d6",
       "type": "cold"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Speed reduced",
+      "modifiers": [
+       {
+        "type": "speed",
+        "amount": -10
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
      }
     ]
    }
@@ -18713,6 +19159,9 @@
       "type": "psychic"
      }
     ],
+    "sight": {
+     "seenBy": "user"
+    },
     "area": {
      "shape": "cone",
      "sizeFeet": 60,
@@ -18733,6 +19182,14 @@
      ]
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "creatureTypes": [
+      "humanoid"
+     ],
+     "rangeFeet": 5,
+     "seen": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -18749,6 +19206,11 @@
      "ability": "cha",
      "saveDc": 13,
      "attackBonus": 5,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -19609,7 +20071,13 @@
       "formula": "2d8 + 4",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "rangeFeet": 10,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -20210,6 +20678,14 @@
   "damageResistances": [
    "fire"
   ],
+  "traitMechanics": [
+   {
+    "kind": "light",
+    "name": "Illumination",
+    "brightFeet": 10,
+    "dimFeet": 10
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
@@ -20728,6 +21204,12 @@
      "limit": 1,
      "per": "long-rest"
     },
+    "sight": {
+     "area": {
+      "kind": "heavily-obscured"
+     },
+     "rounds": 10
+    },
     "area": {
      "shape": "cube",
      "sizeFeet": 10,
@@ -20878,6 +21360,11 @@
      "ability": "wis",
      "saveDc": 12,
      "attackBonus": 4,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-evil-and-good",
@@ -21486,6 +21973,11 @@
      ]
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -22436,7 +22928,11 @@
       "formula": "3d6 + 5",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "grappledBySource": true
+    }
    },
    {
     "id": "spellcasting",
@@ -22448,6 +22944,9 @@
      "ability": "int",
      "saveDc": 16,
      "attackBonus": 8,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-darkness",
@@ -22653,7 +23152,12 @@
       "formula": "2d4 + 4",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -23562,7 +24066,14 @@
       "formula": "2d10 + 5",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "conditions": [
+      "prone"
+     ],
+     "rangeFeet": 5
+    }
    },
    {
     "id": "petrifying-breath",
@@ -23967,6 +24478,9 @@
      "ability": "wis",
      "saveDc": 12,
      "attackBonus": 4,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-dancing-lights",
@@ -24720,7 +25234,12 @@
       "formula": "7d8",
       "type": "poison"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    }
    },
    {
     "id": "spellcasting",
@@ -24732,6 +25251,10 @@
      "ability": "wis",
      "saveDc": 16,
      "attackBonus": 8,
+     "waives": [
+      "somatic",
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-thaumaturgy",
@@ -26351,7 +26874,12 @@
       "type": "necrotic"
      }
     ],
-    "reminder": "The infernal wound also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC 17 Wisdom (Medicine) check: end it by hand."
+    "reminder": "The infernal wound also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC 17 Wisdom (Medicine) check: end it by hand.",
+    "targets": {
+     "count": 1,
+     "rangeFeet": 10,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -26795,6 +27323,26 @@
       "formula": "3d6",
       "type": "cold"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Chilled",
+      "tags": [
+       "no-bonus-actions",
+       "no-reactions",
+       "dazed"
+      ],
+      "modifiers": [
+       {
+        "type": "speed",
+        "amount": -10
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
+     }
     ]
    },
    {
@@ -26832,6 +27380,11 @@
      "ability": "int",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -27001,6 +27554,11 @@
      "ability": "cha",
      "saveDc": 11,
      "attackBonus": 3,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -27158,6 +27716,11 @@
      "ability": "cha",
      "saveDc": 12,
      "attackBonus": 4,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -27288,6 +27851,11 @@
     },
     "damage": [],
     "reminder": "On a failed save: a target with 20 Hit Points or fewer has the Unconscious condition for 1 hour (until it takes damage or is woken); any other target takes 18 (4d8) Psychic damage.",
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -27308,6 +27876,12 @@
       "formula": "3d6 + 5",
       "type": "psychic"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "reminder": "The target is cursed for 24 hours or until the incubus dies. Until the curse ends, the target gains no benefit from finishing Short Rests."
+     }
     ]
    },
    {
@@ -27320,6 +27894,9 @@
      "ability": "cha",
      "saveDc": 15,
      "attackBonus": 7,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-disguise-self",
@@ -27504,7 +28081,12 @@
       "type": "thunder"
      }
     ],
-    "reminder": "Until the grapple ends, the target can't cast spells with a Verbal component."
+    "reminder": "Until the grapple ends, the target can't cast spells with a Verbal component.",
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "inSpace": true
+    }
    }
   ],
   "token": {
@@ -27526,6 +28108,12 @@
    "prone",
    "restrained",
    "unconscious"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "invisible",
+    "name": "Invisibility"
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -28149,6 +28737,17 @@
     "height": 1
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Sunlight Sensitivity",
+    "light": "sunlight",
+    "rolls": [
+     "check",
+     "attack"
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
@@ -28265,6 +28864,11 @@
      "dc": 23,
      "successDamage": "half",
      "failureConditions": []
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
     }
    },
    {
@@ -28364,7 +28968,12 @@
       "formula": "6d10",
       "type": "lightning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    }
    },
    {
     "id": "swallow",
@@ -28394,7 +29003,11 @@
       "type": "piercing"
      }
     ],
-    "reminder": "A swallowed creature has the Restrained condition, has Total Cover against attacks and other effects outside the kraken."
+    "reminder": "A swallowed creature has the Restrained condition, has Total Cover against attacks and other effects outside the kraken.",
+    "targets": {
+     "count": 1,
+     "grappledBySource": true
+    }
    }
   ],
   "token": {
@@ -28565,14 +29178,23 @@
      "failureConditions": [
       "charmed",
       "poisoned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "minutes",
+      "minutes": 60
+     }
     },
     "damage": [
      {
       "formula": "3d8",
       "type": "psychic"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5,
+     "seen": true
+    }
    },
    {
     "id": "spellcasting",
@@ -28584,6 +29206,9 @@
      "ability": "cha",
      "saveDc": 13,
      "attackBonus": 5,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-disguise-self",
@@ -28843,6 +29468,26 @@
      "response": "ac-bonus",
      "amount": 5,
      "untilNextTurn": true
+    }
+   },
+   {
+    "id": "protective-magic-counterspell",
+    "name": "Counterspell",
+    "activation": "reaction",
+    "description": "The lich casts Counterspell or Shield in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
+    "damage": [],
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 20,
+     "attackBonus": 12,
+     "self": true,
+     "spells": [
+      {
+       "id": "protective-magic-counterspell",
+       "spellId": "counterspell",
+       "name": "Counterspell"
+      }
+     ]
     }
    },
    {
@@ -29198,7 +29843,11 @@
       "type": "until-source-next-turn"
      }
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 15
+    }
    }
   ],
   "token": {
@@ -29435,6 +30084,31 @@
      "response": "ac-bonus",
      "amount": 5,
      "untilNextTurn": true
+    }
+   },
+   {
+    "id": "protective-magic-counterspell",
+    "name": "Counterspell",
+    "activation": "reaction",
+    "description": "The mage casts Counterspell or Shield in response to the spell's trigger, using the same spellcasting ability as Spellcasting.",
+    "damage": [],
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "protective-magic"
+    },
+    "castsSpells": {
+     "ability": "int",
+     "saveDc": 14,
+     "attackBonus": 6,
+     "self": true,
+     "spells": [
+      {
+       "id": "protective-magic-counterspell",
+       "spellId": "counterspell",
+       "name": "Counterspell"
+      }
+     ]
     }
    },
    {
@@ -29756,7 +30430,15 @@
     "name": "Ignited Illumination",
     "activation": "bonus-action",
     "description": "The magmin sets itself ablaze or extinguishes its flames. While ablaze, the magmin sheds Bright Light in a 10-foot radius and Dim Light for an additional 10 feet.",
-    "damage": []
+    "damage": [],
+    "sight": {
+     "light": {
+      "on": "caster",
+      "brightFeet": 10,
+      "dimFeet": 10
+     },
+     "toggles": true
+    }
    },
    {
     "id": "touch",
@@ -29905,7 +30587,14 @@
       "formula": "4d10 + 7",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "conditions": [
+      "prone"
+     ],
+     "rangeFeet": 5
+    }
    },
    {
     "id": "gore",
@@ -30206,7 +30895,13 @@
       "formula": "2d10 + 4",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "maxSize": "medium",
+     "rangeFeet": 5,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -30613,6 +31308,21 @@
       "formula": "1d4",
       "type": "cold"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Speed reduced",
+      "modifiers": [
+       {
+        "type": "speed",
+        "amount": -10
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
+     }
     ]
    }
   ],
@@ -30769,6 +31479,17 @@
      {
       "formula": "2d6 + 4",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Pulled",
+      "pull": {
+       "feet": 15,
+       "upTo": true
+      },
+      "maxTargetSize": "large"
      }
     ]
    }
@@ -31406,6 +32127,16 @@
       "formula": "3d6",
       "type": "necrotic"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Cursed",
+      "tags": [
+       "no-healing"
+      ],
+      "reminder": "While cursed, the target can't regain Hit Points, its Hit Point maximum doesn't return to normal when finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse. A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
+     }
     ]
    },
    {
@@ -31424,7 +32155,12 @@
       "type": "until-source-turn-end"
      }
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -31537,6 +32273,11 @@
      "failureDuration": {
       "type": "until-source-turn-end"
      }
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
     }
    },
    {
@@ -31602,6 +32343,16 @@
       "formula": "3d6",
       "type": "necrotic"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Cursed",
+      "tags": [
+       "no-healing"
+      ],
+      "reminder": "While cursed, the target can't regain Hit Points, it gains no benefit from finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse. A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
+     }
     ]
    },
    {
@@ -31634,6 +32385,9 @@
      "ability": "wis",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -31666,7 +32420,12 @@
       "formula": "6d6 + 4",
       "type": "psychic"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    }
    },
    {
     "id": "spellcasting",
@@ -31678,6 +32437,9 @@
      "ability": "wis",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-dispel-magic",
@@ -32044,6 +32806,9 @@
      "ability": "int",
      "saveDc": 14,
      "attackBonus": 6,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -32089,6 +32854,9 @@
      "ability": "int",
      "saveDc": 14,
      "attackBonus": 6,
+     "waives": [
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -32229,6 +32997,14 @@
   },
   "damageImmunities": [
    "fire"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "light",
+    "name": "Illumination",
+    "brightFeet": 10,
+    "dimFeet": 10
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -32541,6 +33317,12 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "sight": {
+     "area": {
+      "kind": "heavily-obscured"
+     },
+     "rounds": 10
     },
     "area": {
      "shape": "cube",
@@ -32890,6 +33672,11 @@
      "ability": "cha",
      "saveDc": 13,
      "attackBonus": 5,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -32992,6 +33779,9 @@
      "ability": "cha",
      "saveDc": 13,
      "attackBonus": 5,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-charm-person",
@@ -33206,7 +33996,10 @@
       "formula": "3d8 + 3",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "grappledBySource": true
+    }
    }
   ],
   "token": {
@@ -33965,7 +34758,12 @@
       "type": "until-source-next-turn"
      }
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 30,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -34056,7 +34854,12 @@
       "type": "until-source-next-turn"
      }
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 30,
+     "seen": true
+    }
    },
    {
     "id": "multiattack",
@@ -34100,6 +34903,26 @@
      {
       "formula": "2d8 + 4",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Next attack at Advantage",
+      "self": true,
+      "tags": [
+       "until-own-attack"
+      ],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "attack",
+        "mode": "advantage"
+       }
+      ],
+      "duration": {
+       "type": "until-source-turn-end"
+      }
      }
     ]
    },
@@ -34246,6 +35069,13 @@
        }
       ],
       "at": "bearer-turn-start"
+     },
+     "failureEffect": {
+      "name": "Poisoned",
+      "tags": [
+       "no-healing"
+      ],
+      "modifiers": []
      }
     },
     "damage": [
@@ -34253,8 +35083,7 @@
       "formula": "3d6 + 8",
       "type": "piercing"
      }
-    ],
-    "reminder": "While Poisoned, the target can't regain Hit Points, and it repeats the save at the end of each of its turns, ending the effect on itself on a success."
+    ]
    },
    {
     "id": "devilish-claw",
@@ -34448,6 +35277,9 @@
      "ability": "cha",
      "saveDc": 20,
      "attackBonus": 12,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "divine-aid-2-day-cure-wounds",
@@ -34546,6 +35378,9 @@
      "ability": "cha",
      "saveDc": 20,
      "attackBonus": 12,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-evil-and-good",
@@ -35374,14 +36209,23 @@
      "successDamage": "none",
      "failureConditions": [
       "poisoned"
-     ]
+     ],
+     "failureDuration": {
+      "type": "minutes",
+      "minutes": 60
+     }
     },
     "damage": [
      {
       "formula": "2d4",
       "type": "poison"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -35604,7 +36448,12 @@
      }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the worm."
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the worm.",
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "grappledBySource": true
+    }
    },
    {
     "id": "bite",
@@ -35784,6 +36633,10 @@
      "repeatSave": true
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 20
+    },
     "uses": {
      "limit": 1,
      "per": "long-rest"
@@ -35806,6 +36659,11 @@
      "ability": "cha",
      "saveDc": 10,
      "attackBonus": 2,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -35986,6 +36844,9 @@
      "ability": "cha",
      "saveDc": 18,
      "attackBonus": 10,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -36628,7 +37489,12 @@
      }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions, it has Total Cover against attacks and other effects outside the remorhaz."
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions, it has Total Cover against attacks and other effects outside the remorhaz.",
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "grappledBySource": true
+    }
    }
   ],
   "token": {
@@ -37257,7 +38123,13 @@
     "name": "Reflexive Antennae",
     "activation": "reaction",
     "description": "_Trigger:_ An attack roll hits the rust monster. _Response:_ The rust monster uses **Antennae**.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "damaged-by-creature",
+     "response": "strike-back",
+     "rangeFeet": 5,
+     "usesAction": "antennae"
+    }
    },
    {
     "id": "bite",
@@ -37703,7 +38575,13 @@
       "formula": "2d6",
       "type": "fire"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "rangeFeet": 10,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -37835,7 +38713,12 @@
       "formula": "1d6 + 2",
       "type": "psychic"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 90,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -38170,6 +39053,14 @@
     },
     "damage": [],
     "reminder": "On a failed save: a target with 20 Hit Points or fewer drops to 0 Hit Points; any other target takes 13 (3d8) Psychic damage.",
+    "targets": {
+     "count": 1,
+     "conditions": [
+      "frightened"
+     ],
+     "rangeFeet": 30,
+     "seen": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -38215,6 +39106,7 @@
      "beast",
      "humanoid"
     ],
+    "seenOnly": true,
     "save": {
      "ability": "wis",
      "dc": 11,
@@ -38412,6 +39304,12 @@
       "formula": "1d6 + 2",
       "type": "necrotic"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "reminder": "The target's Strength score decreases by 1d4. The target dies if this reduces that score to 0."
+     }
     ]
    },
    {
@@ -38450,6 +39348,18 @@
    "prone",
    "restrained",
    "unconscious"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Sunlight Weakness",
+    "light": "sunlight",
+    "rolls": [
+     "attack",
+     "check",
+     "save"
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -38568,6 +39478,16 @@
       "formula": "2d4",
       "type": "lightning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Pulled",
+      "pull": {
+       "feet": 5
+      },
+      "maxTargetSize": "medium"
+     }
     ]
    },
    {
@@ -38597,7 +39517,12 @@
      "rangeFeet": 5
     },
     "damage": [],
-    "reminder": "Until the grapple ends, the target has the Blinded and Restrained conditions."
+    "reminder": "Until the grapple ends, the target has the Blinded and Restrained conditions.",
+    "targets": {
+     "count": 1,
+     "maxSize": "medium",
+     "rangeFeet": 5
+    }
    }
   ],
   "token": {
@@ -39217,6 +40142,11 @@
      }
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -39236,6 +40166,9 @@
      "ability": "cha",
      "saveDc": 25,
      "attackBonus": 17,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "divine-aid-3-day-cure-wounds-level-2",
@@ -39339,7 +40272,12 @@
      "failureConditions": []
     },
     "damage": [],
-    "reminder": "On a failed save: a creature with 100 Hit Points or fewer dies; any other takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage."
+    "reminder": "On a failed save: a creature with 100 Hit Points or fewer dies; any other takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage.",
+    "targets": {
+     "count": 1,
+     "rangeFeet": 600,
+     "seen": true
+    }
    },
    {
     "id": "spellcasting",
@@ -39351,6 +40289,9 @@
      "ability": "cha",
      "saveDc": 25,
      "attackBonus": 17,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-evil-and-good",
@@ -39541,6 +40482,17 @@
    "restrained",
    "unconscious"
   ],
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Sunlight Sensitivity",
+    "light": "sunlight",
+    "rolls": [
+     "check",
+     "attack"
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 1,
@@ -39677,6 +40629,11 @@
      "failureConditions": []
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -39725,6 +40682,9 @@
      "ability": "int",
      "saveDc": 16,
      "attackBonus": 8,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -39958,6 +40918,11 @@
      "failureConditions": []
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -40002,6 +40967,9 @@
      "ability": "wis",
      "saveDc": 20,
      "attackBonus": 12,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-evil-and-good",
@@ -40158,6 +41126,20 @@
     "uses": {
      "limit": 2,
      "per": "long-rest"
+    },
+    "answer": {
+     "rolls": [
+      "check",
+      "save",
+      "death-save"
+     ],
+     "whose": "any",
+     "rangeFeet": 30,
+     "when": "any",
+     "effect": {
+      "kind": "add",
+      "amount": "2"
+     }
     }
    },
    {
@@ -40437,6 +41419,10 @@
      "ability": "int",
      "saveDc": 14,
      "attackBonus": 6,
+     "waives": [
+      "somatic",
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -40628,7 +41614,12 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5,
+     "seen": true
+    }
    },
    {
     "id": "invisibility",
@@ -40640,6 +41631,11 @@
      "ability": "cha",
      "saveDc": 10,
      "attackBonus": 2,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -41131,6 +42127,19 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "reduce-damage",
+     "formula": "1d10 + 6",
+     "damageTypes": [
+      "bludgeoning",
+      "piercing",
+      "slashing"
+     ],
+     "attackKinds": [
+      "ranged"
+     ]
     }
    },
    {
@@ -41302,6 +42311,11 @@
      "ability": "con",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -41549,6 +42563,9 @@
      "ability": "wis",
      "saveDc": 18,
      "attackBonus": 10,
+     "waives": [
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-magic",
@@ -41715,6 +42732,11 @@
      "ability": "cha",
      "saveDc": 15,
      "attackBonus": 7,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -41743,6 +42765,10 @@
       "type": "psychic"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
     "drain": {
      "reducesMaximum": true
     }
@@ -42459,6 +43485,10 @@
      }
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "inSpace": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -42716,7 +43746,12 @@
      }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions and can't teleport, it has Total Cover against attacks and other effects outside the tarrasque."
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions and can't teleport, it has Total Cover against attacks and other effects outside the tarrasque.",
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "grappledBySource": true
+    }
    },
    {
     "id": "bite",
@@ -44011,6 +45046,11 @@
      "ability": "cha",
      "saveDc": 14,
      "attackBonus": 6,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "spells": [
       {
        "id": "unicorn-s-blessing-3-day-cure-wounds",
@@ -44078,6 +45118,11 @@
      "ability": "cha",
      "saveDc": 14,
      "attackBonus": 6,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "spells": [
       {
        "id": "spellcasting-detect-evil-and-good",
@@ -44295,6 +45340,11 @@
      "ability": "cha",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -44320,6 +45370,11 @@
      "ability": "cha",
      "saveDc": 17,
      "attackBonus": 9,
+     "waives": [
+      "verbal",
+      "somatic",
+      "material"
+     ],
      "self": true,
      "spells": [
       {
@@ -44403,6 +45458,21 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 3
   },
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Vampire Weakness",
+    "light": "sunlight",
+    "rolls": [
+     "attack",
+     "check"
+    ],
+    "damageAtTurnStart": {
+     "amount": 20,
+     "type": "radiant"
+    }
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
@@ -44707,6 +45777,21 @@
   },
   "damageResistances": [
    "necrotic"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Vampire Weakness",
+    "light": "sunlight",
+    "rolls": [
+     "attack",
+     "check"
+    ],
+    "damageAtTurnStart": {
+     "amount": 20,
+     "type": "radiant"
+    }
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -45785,6 +46870,9 @@
      }
     ],
     "reminder": "Until the grapple ends, the target has the Restrained condition, is suffocating unless it can breathe water.",
+    "targets": {
+     "inSpace": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -47068,6 +48156,10 @@
       "type": "necrotic"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
     "drain": {
      "reducesMaximum": true
     }
@@ -47089,6 +48181,17 @@
   "conditionImmunities": [
    "exhaustion",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Sunlight Sensitivity",
+    "light": "sunlight",
+    "rolls": [
+     "check",
+     "attack"
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -47199,7 +48302,25 @@
     "name": "Vanish",
     "activation": "bonus-action",
     "description": "The wisp and its light have the Invisible condition until the wisp's Concentration ends on this effect, which ends early immediately after the wisp makes an attack roll or uses Consume Life.",
-    "damage": []
+    "damage": [],
+    "grants": {
+     "name": "Vanish",
+     "tags": [
+      "light-out",
+      "until-it-acts"
+     ],
+     "target": "self",
+     "duration": {
+      "type": "manual"
+     },
+     "conditions": [
+      "invisible"
+     ],
+     "modifiers": [],
+     "onEnd": [],
+     "voidWhileIncapacitated": false,
+     "concentration": true
+    }
    }
   ],
   "token": {
@@ -47228,6 +48349,14 @@
    "prone",
    "restrained",
    "unconscious"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "light",
+    "name": "Illumination",
+    "brightFeet": 20,
+    "dimFeet": 20
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -47570,6 +48699,25 @@
       "formula": "1d8 + 3",
       "type": "piercing"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Next attack against it at Advantage",
+      "tags": [
+       "until-attacked"
+      ],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "incoming-attack",
+        "mode": "advantage"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
+     }
     ]
    }
   ],
@@ -47702,6 +48850,17 @@
    "prone",
    "restrained",
    "unconscious"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Sunlight Sensitivity",
+    "light": "sunlight",
+    "rolls": [
+     "check",
+     "attack"
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {

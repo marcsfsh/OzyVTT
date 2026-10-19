@@ -38,7 +38,8 @@ const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) =
   rarity: item.rarity ?? null,
   attunement: item.attunement ?? null,
   ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
-  ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {})
+  ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {}),
+  ...(item.study ? { study: { ...item.study } } : {})
 }));
 /** The spell reference's fields a scroll's spell list reads. */
 const SPELLS = loadSpells().map((spell) => ({
@@ -198,6 +199,46 @@ describe("the sheet's inventory", () => {
     await user.click(give);
     expect(sent("character:give-item")).toEqual([
       expect.objectContaining({ actorId: HERO, toActorId: FRIEND, itemId: "ring-of-resistance" })
+    ]);
+  });
+
+  it("lets the GM mark a manual studied, and shows a studied copy's magic spent", async () => {
+    serve();
+    const actor = hero({
+      inventory: [
+        {
+          id: "manual-of-bodily-health",
+          name: "Manual of Bodily Health",
+          quantity: 1,
+          equipped: false,
+          attuned: false
+        },
+        {
+          id: "tome-of-clear-thought",
+          name: "Tome of Clear Thought",
+          quantity: 1,
+          equipped: false,
+          attuned: false,
+          dormant: true
+        }
+      ]
+    });
+    render(<CharacterSheet actor={actor} role="gm" state={stateWith(actor)} onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    const user = userEvent.setup();
+    await openGear(user);
+    expect(rowOf("Tome of Clear Thought").textContent).toContain("Magic spent");
+    await user.click(rowOf("Manual of Bodily Health"));
+    const drawer = within(screen.getByRole("dialog", { name: "Manual of Bodily Health" }));
+    expect(
+      await drawer.findByText("48 hours of study over 6 days or fewer raise Constitution by 2, to at most 30.")
+    ).toBeTruthy();
+    const mark = drawer.getByRole("button", { name: "Mark it studied" });
+    expect(mark.classList.contains("cs-gm-control")).toBe(true);
+    await user.click(mark);
+    expect(sent("character:study-item")).toEqual([
+      expect.objectContaining({ actorId: HERO, itemId: "manual-of-bodily-health" })
     ]);
   });
 

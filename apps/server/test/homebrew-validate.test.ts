@@ -870,6 +870,34 @@ describe("a duplicated SRD record still passes its own gate", () => {
   });
 });
 
+describe("a homebrew spell's priced material", () => {
+  const revivify = bundle.loadSpells().find((spell) => spell.id === "revivify")!;
+  const withMaterial = (itemIds: readonly string[]) => ({
+    ...revivify,
+    id: "hb-second-wind-a1b2c3",
+    name: "Second Wind",
+    source: "homebrew",
+    components: {
+      ...revivify.components,
+      costly: [{ name: "holy water", itemIds, costGp: 25, consumed: true }]
+    }
+  });
+
+  it("publishes when the items it names are on the equipment list", () => {
+    expect(validateForPublish("spell", withMaterial(["holy-water"]), contextWith()).issues).toEqual([]);
+  });
+
+  it("is refused when it names an item the table doesn't have, in plain words", () => {
+    expect(validateForPublish("spell", withMaterial(["holy-wadder"]), contextWith()).issues).toEqual([
+      expect.objectContaining({
+        path: ["components", "costly", 0, "itemIds", 0],
+        message:
+          "Second Wind's material holy water names an item this table doesn't have. Pick one from the equipment list, or leave the items out and let its name match what a character carries."
+      })
+    ]);
+  });
+});
+
 describe("the SRD's own slugs", () => {
   it("raise no warning anywhere in the bundle, so a warning always means something", () => {
     const records: ReadonlyArray<readonly [HomebrewContentType, readonly unknown[]]> = [

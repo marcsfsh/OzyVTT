@@ -13,11 +13,15 @@ type LaterRow = NonNullable<NonNullable<SpellReference["effect"]>["laterActions"
  * Concentration, or an effect of its own for a spell that needs none), and the later action is offered at that level.
  */
 
-/** The level a spell is up at on its caster, or null when it isn't. A Concentration effect from before effects named
- *  their spell counts at the spell's own level. */
-export function spellUpLevel(actor: Pick<Actor, "effects">, spell: Pick<SpellReference, "id" | "name" | "level">) {
+/** The level a spell is up at on its caster, or null when it isn't: an effect of the spell the actor itself is the
+ *  source of (another caster's spell on it is that caster's). A Concentration effect from before effects named their
+ *  spell counts at the spell's own level. */
+export function spellUpLevel(
+  actor: Pick<Actor, "id" | "effects">,
+  spell: Pick<SpellReference, "id" | "name" | "level">
+) {
   for (const effect of actor.effects) {
-    if (effect.spell?.id === spell.id) return effect.spell.level;
+    if (effect.spell?.id === spell.id && (effect.sourceActorId ?? actor.id) === actor.id) return effect.spell.level;
     if (
       effect.spell === undefined &&
       effect.tags.includes(CONCENTRATING_TAG) &&
@@ -32,14 +36,19 @@ export function spellUpLevel(actor: Pick<Actor, "effects">, spell: Pick<SpellRef
  *  the next one (Spiritual Weapon's attack, Heat Metal's heat). */
 export const castThisTurnKey = (actorId: string, spellId: string) => `${actorId}:cast:${spellId}`;
 
-/** A later action the caster takes itself (an action or a Bonus Action), which the spell must be up for. Moving a mark
- *  has its own check, and an area's trigger is no action. */
+/** A later action that is there only while the spell is up: the caster's own (an action or a Bonus Action), and what
+ *  the spell does by itself (Faithful Hound's bite, a zone's save), which the GM may also run by hand. Moving a mark has
+ *  its own check. */
 export function takenWhileUp(row: LaterRow): boolean {
-  return row.movesGrant !== true && (row.activation === "action" || row.activation === "bonus-action");
+  return row.movesGrant !== true;
 }
 
 /** A later action rolled at the level its spell was cast at (Spiritual Weapon from a level 3 spell slot hits for 2d8). */
-export function atSpellUpLevel(action: ActorAction, spell: SpellReference, actor: Pick<Actor, "effects">): ActorAction {
+export function atSpellUpLevel(
+  action: ActorAction,
+  spell: SpellReference,
+  actor: Pick<Actor, "id" | "effects">
+): ActorAction {
   if (!laterRowOf(spell, action.id)) return action;
   const level = spellUpLevel(actor, spell);
   return level !== null && level > spell.level ? upcastAction(action, spell, level) : action;

@@ -25,6 +25,7 @@ import { travelBudgetFeet, travelCostsExtra, type TravelMode } from "./speed.js"
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import type { MovementCost, MovementCostOptions } from "./terrain.js";
 import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
+import { fearSources } from "./vision/rules.js";
 import {
   effectiveModeFor,
   familyModeFor,
@@ -438,14 +439,14 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     police(state, input, "movement.teleport", `${mover.name} can teleport only with the GM's go-ahead.`, outcome);
   if ((counted || input.byPlayer || grant) && endsInOccupiedSpace(state, input, to))
     police(state, input, "movement.occupied", `${mover.name} can't end its move in another creature's space.`, outcome);
-  // SRD 5.2.1 Frightened: "You can't willingly move closer to the source of the fear."
+  // SRD 5.2.1 Frightened: "You can't willingly move closer to the source of fear."
   const feared = (counted || input.byPlayer || grant) && approachesFear(state, input, mover, from, to);
   if (feared)
     police(
       state,
       input,
-      "movement.frightened",
-      `${mover.name} is Frightened of ${feared} and can't move closer.`,
+      "movement.toward-fear",
+      `${mover.name} is Frightened and can't willingly move closer to ${feared}.`,
       outcome
     );
   // Height changes by flying, climbing, jumping or teleporting; a creature in the air moves by flying.
@@ -652,10 +653,9 @@ function approachesFear(
   to: Point
 ): string | null {
   if (!mover.conditions.some((condition) => condition.id === "frightened")) return null;
-  for (const effect of mover.effects) {
-    if (!effect.sourceActorId || !effect.linkedConditionIds.includes("frightened")) continue;
-    const source = state.actors.find((actor) => actor.id === effect.sourceActorId);
-    const at = state.combat.tokens.find((token) => token.actorId === effect.sourceActorId)?.position;
+  for (const sourceId of fearSources(mover)) {
+    const source = state.actors.find((actor) => actor.id === sourceId);
+    const at = state.combat.tokens.find((token) => token.actorId === sourceId)?.position;
     if (!source || !at) continue;
     const measure = (point: Point, altitudeFeet: number) =>
       input.creatureDistance
@@ -785,6 +785,8 @@ function fittingMoveGrant(
   if (cost === null || cost.feet > grant.feet + DISTANCE_TOLERANCE_FEET) return null;
   if (grant.straight && !endsNearerAnEnemy(state, input, mover, from, to)) return null;
   if (grant.awayFromActorId && !endsFartherFrom(state, input, grant.awayFromActorId, from, to)) return null;
+  // Toward a creature: where it began is farther from that creature than where it ends.
+  if (grant.towardActorId && !endsFartherFrom(state, input, grant.towardActorId, to, from)) return null;
   return {
     ...grant,
     chargeFeet: grant.jump ? grant.feet : cost.feet,

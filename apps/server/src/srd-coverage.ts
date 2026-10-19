@@ -61,8 +61,10 @@ const laterApplies = (later: SpellLater) =>
   later.save?.speedZero === true;
 
 /** A spell is enforced when a cast applies its numbers or leaves its effect on the targets, or the area it leaves
- *  applies them later; guided when the app spends the slot, holds Concentration, places the area or rolls a save
- *  whose outcome a person applies. */
+ *  applies them later. Every other spell is guided: each is a cast action (`character-build.ts`, `monster-spells.ts`)
+ *  that spends its casting time and slot, checks its components and targets (`resolution/components.ts`,
+ *  `resolution/spell-targets.ts`), holds Concentration, places its area and tells the table, while what it does is a
+ *  person's to apply. */
 export function spellState(spell: SpellReference): CoverageState {
   const effect = spell.effect;
   const applies =
@@ -73,6 +75,8 @@ export function spellState(spell: SpellReference): CoverageState {
       effect.grant !== undefined ||
       effect.failureEffect !== undefined ||
       effect.endsConditions !== undefined ||
+      effect.dispel !== undefined ||
+      effect.endsCurses === true ||
       effect.reaction !== undefined ||
       effect.darts !== undefined ||
       (effect.laterActions ?? []).some(laterApplies));
@@ -82,22 +86,41 @@ export function spellState(spell: SpellReference): CoverageState {
       (effect?.damage.length ?? 0) > 0 ||
       spell.save.speedZero === true ||
       spell.save.failurePush !== undefined);
-  if (applies || saveApplies) return "enforced";
-  if (spell.level > 0 || spell.concentration || spell.area !== null || spell.save !== null) return "guided";
-  return "reference";
+  // The light it sheds or the fog or Darkness it fills, which dynamic vision reads.
+  const sight = spell.sight;
+  return applies ||
+    saveApplies ||
+    sight?.light !== undefined ||
+    sight?.area !== undefined ||
+    sight?.dispels !== undefined
+    ? "enforced"
+    : "guided";
 }
 
 type ResolvingFields = Pick<
   ActorAction,
-  "damage" | "healing" | "multiattack" | "onHit" | "darts" | "reaction" | "grants" | "endsConditions"
+  | "damage"
+  | "healing"
+  | "multiattack"
+  | "onHit"
+  | "darts"
+  | "reaction"
+  | "grants"
+  | "endsConditions"
+  | "answer"
+  | "sight"
 > &
   Partial<Pick<ActorAction, "move" | "teleport" | "leap">> &
   Readonly<{ attack?: unknown; save?: unknown; damageByLevel?: unknown }>;
 
 /** An action resolves when it rolls an attack or a save, deals damage, heals, grants an effect, ends conditions,
- *  runs a structured Multiattack, is offered as a reaction prompt, or grants a move, a jump or a teleport the movement
- *  rules charge (`granted-moves.ts`). One with none of these only spends its use and its place in the turn. */
+ *  runs a structured Multiattack, places light or an area of obscurement on the map, is offered as a reaction prompt,
+ *  answers a roll (`roll-answers.ts`), or grants a move, a jump or a teleport the movement rules charge
+ *  (`granted-moves.ts`). One with none of these only spends its use and its place in the turn. */
 const actionResolves = (action: ResolvingFields) =>
+  action.sight?.light !== undefined ||
+  action.sight?.area !== undefined ||
+  action.sight?.dispels !== undefined ||
   action.attack !== undefined ||
   action.save !== undefined ||
   action.damage.length > 0 ||
@@ -109,6 +132,7 @@ const actionResolves = (action: ResolvingFields) =>
   action.reaction !== undefined ||
   action.grants !== undefined ||
   action.endsConditions !== undefined ||
+  action.answer !== undefined ||
   action.move !== undefined ||
   action.teleport !== undefined ||
   action.leap !== undefined;
@@ -149,9 +173,9 @@ const modifierApplies = (riders: Riders) => (modifier: Modifier) => {
   return modifier.type !== "short-rest-regain" || riders.actions.length === 0;
 };
 
-/** A modifier nothing reads yet (a spell attack bonus, a sense): its record applies in part at most. */
+/** A modifier nothing reads yet: its record applies in part at most. Senses are read by dynamic vision. */
 const unreadModifier = (riders: Riders) =>
-  riders.modifiers.some((modifier) => modifierDisposition(modifier.type) === "unread" || modifier.type === "sense");
+  riders.modifiers.some((modifier) => modifierDisposition(modifier.type) === "unread");
 
 const ridersApply = (riders: Riders) =>
   riders.actions.some(actionResolves) ||
@@ -182,7 +206,7 @@ export function featureState(feature: FeatureRecord): CoverageState {
   return "reference";
 }
 
-/** An item is enforced when it is a weapon or armor or carries riders, a scroll's spell or ammunition. An item that
+/** An item is enforced when it is a weapon or armor or carries riders, a scroll's spell, ammunition or a study. An item that
  *  casts spells takes the state of the spells it casts, as a stat block's casting does. Guided when the app only
  *  tracks it (attunement, charges, a curse, an action that only spends a use), uses it as a base weapon or armor
  *  without its magic, or rolls its checks (a tool). */
@@ -194,7 +218,11 @@ export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<str
     item.grantsFeatIds.length > 0 ||
     (item.ammunition ?? null) !== null ||
     item.spellScroll !== undefined ||
+    item.study !== undefined ||
     item.removesArmorDrawbacks === true ||
+    (item.onHit?.length ?? 0) > 0 ||
+    // Its light, which dynamic vision reads while it is lit.
+    item.light !== undefined ||
     ridersApply(item);
   if (applies) return unreadModifier(item) ? "guided" : "enforced";
   const casts = item.casts.map((cast) => spellStates.get(cast.spellId) ?? "reference");
@@ -344,8 +372,9 @@ const TABLE_GROUPS = new Set(["Monster traits", "Conditions", "Rules glossary"])
 /** How the rows of each kind of group get their state, for the page's opening. */
 const CLASSIFICATION = [
   "- **Spells:** a cast resolves in `action-resolution.ts` and the steps in `resolution/`, at the caster's own",
-  "  numbers. A spell is enforced when its cast applies its attack, save, damage, healing or lasting effect, or",
-  "  when the area it leaves applies them as creatures enter it or start or end a turn there (`spell-zones.ts`).",
+  "  numbers. A spell is enforced when its cast applies its attack, save, damage, healing or lasting effect, ends",
+  "  spells or curses (`resolution/dispel.ts`), or when the area it leaves applies them as creatures enter it or",
+  "  start or end a turn there (`spell-zones.ts`).",
   "  Guided when the app spends the slot and holds the Concentration, the area or a save while a person applies",
   "  what the spell does. A spell whose cast leaves a rider to the table (Storm of Vengeance's later turns) is",
   "  curated as guided, with a note.",

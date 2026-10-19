@@ -222,7 +222,9 @@ check: GM-only, or hidden by sight or the fog, for the table or for one player. 
 name a hidden creature names "A hidden threat", a rule it would bend for a visible creature doesn't
 apply, and a public roll it makes is recorded GM-only. Another player's character out of
 sight keeps its actor but loses its token. An audience's own characters are always sent, and so
-is a creature with any part of its space revealed.
+is a creature with any part of its space revealed. A player's vision block also marks the creatures
+one of their own characters senses without seeing (Divine Sense, `vision/detect.ts`): where each
+stands and its creature type, never its identity, and never to the table or another player.
 
 The rule for a new field: it may reach a player or the viewer only if everything it carries is
 already public to them, and it carries no exact quantity and no identity, position or existence
@@ -248,15 +250,28 @@ of a hidden thing. When in doubt, leave it out.
   makes the scene live in a copy of the state and runs the real projections over it, and nothing
   is committed (ADR-0035).
 - Dynamic vision (ADR-0023) is per scene and off by default: walls, doors and windows as
-  image-pixel segments, placed and carried lights, and an ambient light level
-  (`vision/edit.ts`). The server builds each viewer's visibility polygon against the walls, cuts it
-  to the creature's senses and the lights (`vision/geometry.ts`, `vision/sight.ts`), and caches
-  polygons by walls, origin and radius. Senses come from stat blocks, species and features, and
-  light from equipped items (`vision/senses.ts`). After every command the server adds what the
-  party sees to the scene's explored memory (`rememberExplored`). Players and the table screen
-  get only polygons and rectangles to paint. While vision is on, walls, closed doors and windows
-  also bar movement, and sight decides an attack's unseen Advantage and Disadvantage and whether
-  Hide is allowed.
+  image-pixel segments, placed and carried lights, an ambient light level (sunlight or not), and
+  painted areas of Bright Light, Dim Light, Darkness, light or heavy obscurement and magical
+  Darkness (`vision/edit.ts`, `vision/areas.ts`). The server builds each viewer's visibility
+  polygon against the walls, cuts it to the creature's senses, the light at each point and the
+  areas (`vision/geometry.ts`, `vision/sight.ts`), and caches polygons by walls, origin and
+  radius. Senses come from stat blocks, species, features, feats, active items and live effects,
+  and light from items lit on their row, effects and a stat block's own glow (`vision/senses.ts`,
+  `item-light.ts`, which burns a light down on the game clock). A cast or an action places its
+  light, fog or magical Darkness and dispels what it overlaps; each ends with the Concentration,
+  effect or rounds that keep it (`vision/cast-sight.ts`). After every command the server adds what
+  the party sees to the scene's explored memory (`rememberExplored`). Players and the table screen
+  get only polygons and rectangles to paint: what is in sight, the bright part of it, and what
+  has been seen. While vision is on, walls, closed doors and windows also bar movement.
+- The rules read sight through `vision/rules.ts` (`sightRules`), which answers with the map while
+  vision is on and with the conditions and Blindsight, Truesight and See Invisibility by distance
+  while it is off: an attack's unseen Advantage and Disadvantage and Invisible, Cover from walls
+  and creatures between (`cover.ts`), an area that leaves out what its origin can't reach
+  (`area-targeting.ts`), Hide's hiding place, Search finding a hidden creature, Frightened's line
+  of sight and its refused approach (`movement-rules.ts`), Dodge and other riders that name who
+  sees whom (`sees-other`, `seen-by-other`, `other-lacks-sense`), Blinded and Heavily Obscured
+  checks, a save that needs its source seen (a gaze, a pattern), and the traits and features that
+  ask for sunlight, Bright Light, or Dim Light and Darkness.
 - Difficult terrain is a GM-painted set of cell-snapped rectangles per scene (`terrain.ts`).
   A move is charged along the cheapest grid path, where terrain costs double, other creatures'
   spaces cost double or bar the way, and crawling, climbing or swimming without the speed, or
@@ -267,7 +282,9 @@ of a hidden thing. When in doubt, leave it out.
   way still in reach (`combat.heldMove`) until its prompts are answered; the settle step then finishes
   it, or leaves a mover the attack dropped, Grappled or knocked Prone where it stood and gives back the
   rest of its movement (`held-moves.ts`). The map's drag preview runs the same function,
-  and a mirror test checks the two agree. Players and the table screen get only the terrain the
+  and a mirror test checks the two agree. The `actor:movement` reply tells the preview whether the
+  mover shares spaces (Air Form, a swarm) and which swarms its viewer can see (`space-sharing.ts`),
+  so it charges those spaces as the server does. Players and the table screen get only the terrain the
   fog reveals, and with vision on only what the party has seen.
 - Height (`altitude.ts`, `@vtt/rules-5e` `altitude.ts`): a token's `altitudeFeet` is how far its lowest
   point is above the ground, and `airborne` says what holds it up in the air (flying, or a
@@ -306,13 +323,13 @@ of a hidden thing. When in doubt, leave it out.
   the Jump spell and Boots of Striding and Springing); a landing in Difficult Terrain rolls a DC 10
   Dexterity (Acrobatics) check or leaves the jumper Prone.
 - Moves the rules make or forbid: a Frightened creature can't move closer to the creature its fear comes
-  from (`movement.frightened`); an effect tagged `flees-with-reaction` (Dissonant Whispers) is turned by
+  from (`movement.toward-fear`); an effect tagged `flees-with-reaction` (Dissonant Whispers) is turned by
   the pipeline's settle step into the creature's Reaction and a granted move of its Speed that must end
   farther from the source (`compelledMoves`); a levitation (`levitating`) lifts its creature 20 feet,
   which then moves only as if climbing; and a creature that ends its turn in another's space, unless
   Tiny or larger, falls Prone (`occupied-space.ts`).
 - Off the plane (`off-plane.ts`): an effect tagged `off-plane` (Banishment, Etherealness, Maze,
-  Imprisonment, Blink's Ethereal turns) takes its creature off the map in the settle step, keeping its
+  Imprisonment, Blink's Ethereal turns, Hurl Through Hell) takes its creature off the map in the settle step, keeping its
   place in the initiative and the space it left in `combat.offPlane` (GM-only); it can't target or be
   targeted across the plane, and when the effect ends it returns to that space or the nearest
   unoccupied one. Blink's d6 is rolled by the server as the caster's turn ends.
@@ -343,7 +360,7 @@ and reactions, the action economy, release); builtin actions such as Hide and th
 add their special cases through the handler table in `resolution/builtins.ts`. Every condition
 write goes through `applyCondition` in `effects.ts`, which honours innate and item-granted
 immunities and runs what gaining a condition sets off (an Incapacitated creature drops its
-Concentration and its grapples). Effects end by their duration at turn start and turn end; the
+Concentration and its grapples). In a fight, effects count down at turn start and turn end; the
 start of a turn deals any ongoing damage, and the end opens any repeat saves
 (`turn-boundaries.ts`). What a stat block's traits do, read from their text when the bundle is built
 (`ActorDefinition.traitMechanics`), runs at those boundaries and as damage lands: Regeneration, auras,
@@ -354,6 +371,27 @@ runs as tokens move, as the area moves and at each turn's end and start (`spell-
 such a spell lets its caster do on later turns is offered while it lasts, at the level it was cast
 (`lasting-spells.ts`).
 
+Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
+(`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long
+Rest moves it 8 hours and finishing the party's Short Rest moves it an hour, and `passGameTime`
+(`game-time.ts`) counts every creature's effects down by it, 10 rounds to the minute. A fight's rounds
+don't move the clock. When a fight ends, what has a minute (10 rounds) or less left ends with it, and
+anything longer carries on in game time; a parked fight's combatants and a replay's copies wait outside
+the clock. A spell of 10 minutes or less is kept in rounds and a longer one in minutes, at the duration
+printed for the slot it was cast with (`spellDurationAt`), so Major Image from a level 4 slot lasts until
+dispelled with no Concentration. An effect can also last until its bearer's next Short or Long Rest
+(`until-rest`), which that rest ends. A creature's own Long Rest (the GM approving a request) ends what
+would run out in its 8 hours and leaves longer effects for the GM to pass those hours, so they count
+once. The clock also runs a Stable creature's 1d4 hours to 1 Hit Point and a knocked-out creature's hour.
+
+Each effect a spell leaves records the spell and the level it was cast at (`spell`), so a spell can be
+ended as a whole: Dispel Magic and Remove Curse resolve in `resolution/dispel.ts`, which ends the
+spell's effects, its area or its caster's Concentration (`spell-endings.ts`). A Concentration spell that
+only affects creatures ends once no living creature keeps any of it and no save against it is still owed
+(`endIdleConcentration` in `effects.ts`). A spell area's step can also come at its caster's turn start
+(Faithful Hound's bite) or when the spell ends (Delayed Blast Fireball's bead): the command that ends
+such a spell leaves its area bursting, and the pipeline runs the burst right after it commits.
+
 Bonuses, advantage, extra damage and defences are modifiers in one vocabulary (`ModifierSchema` in
 `packages/schemas`), shared by features, feats, chosen options, magic items and live effects, and
 read by one evaluator (`collectRiders` in `packages/rules-5e`). `deriveEquipment`
@@ -362,9 +400,20 @@ they grant, its own feats and features, its live effects) with one context of be
 each roll collects the standing modifiers plus those gated on its moment (`on-attack-roll`,
 `on-saving-throw`, ...), so a modifier's `when` gate means the same thing on every carrier. A
 carrier refuses what it cannot give back: an item refuses hit points and ability scores, an effect
-everything the sheet stores (AC, initiative, slots, senses). Riders name damage types and
+everything the sheet stores (AC, initiative, slots). Senses on any carrier are read live by dynamic
+vision. Riders name damage types and
 conditions from the SRD's closed sets, and the homebrew publish gate (`homebrew-validate.ts`)
 refuses a rider gated on a moment its reader never collects.
+
+What rides a hit is data on its action (`ridesHit`): the hits it rides, once a turn or on its user's own
+turn, the dice it gives up, its cost, the save it opens and the effects picked with it (Sneak Attack's
+Cunning Strikes, Brutal Strike, Stunning Strike, a staff's charges). The attack's preview offers it and
+the confirm checks and spends it with the hit (`resolution/hit-options.ts`); it is never tapped alone.
+What a stat block's or a magic weapon's hit leaves by itself (`onHit`: conditions, tags and modifiers on
+one effect, a pull, a save at a printed DC, only on a rolled 20 or against some creature types) lands in
+`resolution/on-hit.ts`. Who an action that isn't a spell may target (`targets`: how many, how far,
+creature types, size, sight, grappled by its user, a condition, in its space, enemies or allies) is
+checked as a spell's targets are, in `resolution/action-targets.ts`.
 
 A magic item's charges are an `actionUses` pool keyed by the carried row (`itemPool` in
 `item-actions.ts`), so two copies count separately and the count moves with the row when the GM hands
@@ -386,6 +435,18 @@ it Prone, and Fire damage on an oiled creature within the minute deals 5 more. A
 Poison are effects the item grants its user; a coat's damage lasts a set number of hits (`damageUses`), in a fight
 or out of one.
 
+Every spell a sheet or stat block knows is a cast action (`character-build.ts`, `monster-spells.ts`), so even
+one with nothing to roll (Light) spends its casting time and slot, holds its Concentration, places its area and is
+told to the table as cast (`cast-narration.ts`). Before anything is spent the economy checks the cast's components
+(`resolution/components.ts`: speech outside Silence, a free hand, a pouch, a focus the class names or a priced
+material the content build lists on the spell) and its targets (`resolution/spell-targets.ts`: the count the spell
+names, its creature type, sight with dynamic vision on, range, and for creatures of the caster's choice in an area,
+the area). A cast with components waits while a creature that sees it may answer with Counterspell
+(`resolution/counter.ts`, `counter-answers.ts`), and a reaction spell's prompt lets its caster pick the slot. A
+creature's own spell of a minute or more takes the action on each of its turns in a fight and resolves on the last
+(`resolution/long-casting.ts`). Outside a fight a creature's own cast resolves through the same path with no turn to
+spend, and a long one moves the game clock by its whole hours; an item's cast there stays on the loose route.
+
 What a save does is data on the action's save block: `successDamage` (half or none) and the
 `failureCondition` a failed save imposes. Nothing parses the description for it. They are written where the content
 is made (the SRD build, the builder, homebrew) and copied onto the pending save prompt.
@@ -399,9 +460,16 @@ pins (`character.set-favourites`) and counts each option that resolves for it (`
 Every ability check, from a sheet chip, a builtin action or the GM's call for a roll, comes from one plan
 (`checkPlan` in `ability-checks.ts`), so the number a sheet shows is the roll the server makes. A die a
 player sees before it counts (a previewed attack, save or death save) is held on the server
-(`held-rolls.ts`, ADR-0012): a second look shows the same die, and Heroic Inspiration is a player's only
-reroll. Players type die faces, never totals, and only while the table allows typed dice. On the client every
-roll prompt shares one set of controls (`RollControls.tsx`), and the GM's calls for a roll
+(`held-rolls.ts`, ADR-0012): a second look shows the same die, and a reroll needs Heroic Inspiration or an
+answer. An answer is data on an action, a grant or an effect (`RollAnswerSchema`): what a roll may take after it
+is seen and before it counts (Bardic Inspiration's die, Indomitable's reroll, Stroke of Luck's 20).
+`roll-answers.ts` offers the roller's own answers on the preview and applies the one picked to the held roll;
+another creature's answer (Cutting Words, Countercharm, Improve Fate) is a `roll-answer` reaction prompt, asked one
+creature at a time in turn order while the attack, save, check or damage waits at its roll. A hit's damage waits in
+the same way (`damage-window.ts`): another creature's answer to the damage roll, then the target's own reaction
+(Uncanny Dodge, Deflect Attacks, Stone's Endurance), and a failed save's damage waits for a reaction to taking damage.
+Players type die faces, never totals, and only while the table allows typed dice. On the client every roll prompt
+shares one set of controls (`RollControls.tsx`, with its answer buttons), and the GM's calls for a roll
 (`GameState.rollCalls`) reach each player as a card that follows them across the app (`RollCallPrompt.tsx`).
 
 How strictly rules are enforced is table policy (`GameState.rulesPolicy`): enforce, advise or
@@ -519,8 +587,8 @@ The Scenes tab asks the Codex which records point at each table scene: `GET /api
 `codex/scene-links.ts`) lists the sessions that stage it or name it in their prep's Encounters, and the pins on the
 atlas that name it.
 
-The table has one clock (ADR-0029): the Codex calendar keeps the day and the game state keeps the hour
-(`rest.clockHours`, which the 16-hour rule between Long Rests reads). A party rest or Pass time that
+The table has one clock (ADR-0029): the Codex calendar keeps the day and the game state keeps the time
+of day (`rest.clockHours`, which the 16-hour rule between Long Rests reads, and `rest.clockMinutes`). A party rest or Pass time that
 crosses midnight moves the GM's date by the days crossed (`onTimePassed` in the command context, then
 `codexStore.advanceCampaignDate`), and the players' date with it when the two were the same day. Pass time
 with a travel pace (SRD Travel Pace) logs how far the party went and what the pace does to its checks.

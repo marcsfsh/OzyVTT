@@ -25,7 +25,8 @@ const RULE_FAMILIES = {
   // Height changes by flying, climbing, jumping or teleporting, and a creature in the air moves by flying.
   "movement.altitude": "movement",
   "movement.jump": "movement",
-  "movement.frightened": "movement",
+  // Frightened: "You can't willingly move closer to the source of fear."
+  "movement.toward-fear": "movement",
   "movement.mount": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
@@ -67,6 +68,8 @@ const RULE_FAMILIES = {
   "spell.later-turn": "economy",
   // Sneak Attack, a smite and the like add to a hit: they're chosen when the hit is confirmed and never taken alone.
   "attack.rides-a-hit": "economy",
+  // Indomitable, Cutting Words and the like answer a roll once it is shown, and are never taken alone.
+  "roll.answers-a-roll": "economy",
   // ...while "no legendary actions left this round" is a spent resource, like limited uses.
   "legendary.no-actions-remaining": "resources",
   // "Can't take this action again until the start of its next turn": spent for the round, like the pool.
@@ -87,11 +90,24 @@ const RULE_FAMILIES = {
   "cover.total": "targeting",
   // SRD Hide: out of any enemy's line of sight, which dynamic vision can tell.
   "hide.seen": "targeting",
+  // SRD Hide: "while you're Heavily Obscured or behind Three-Quarters Cover or Total Cover".
+  "hide.exposed": "targeting",
+  // What works only in Dim Light or Darkness (a shadow's Shadow Stealth, One with Shadows) in Bright Light.
+  "light.too-bright": "targeting",
   // Cleave's second creature: another one, within 5 feet of the first.
   "attack.cleave-same-target": "targeting",
   "attack.cleave-too-far": "targeting",
   // A spell aimed at more creatures than it can target (Hold Person at two Humanoids from a level 2 spell slot).
   "target.too-many": "targeting",
+  // A spell aimed at a creature of a type it can't target (Hold Person at a Beast).
+  "target.wrong-type": "targeting",
+  // "A creature you can see": the map's vision says the caster can't see it.
+  "target.unseen": "targeting",
+  // A target picked among those in a spell's area that the area doesn't cover.
+  "target.outside-area": "targeting",
+  // A creature the action can't affect: the wrong creature type or size, unseen, not grappled or marked by the user,
+  // an ally where it names an enemy, or a creature gone from the plane.
+  "target.not-allowed": "targeting",
   // The hit an extra is added to can't carry it (no Advantage or ally for Sneak Attack, a ranged smite).
   "attack.hit-option-unqualified": "targeting",
   // Being Charmed by your target is a targeting restriction.
@@ -101,7 +117,11 @@ const RULE_FAMILIES = {
   "slots.below-spell-level": "slots",
   "slots.one-per-turn": "slots",
   // Casting a spell the character hasn't prepared is spellcasting bookkeeping too.
-  "slots.not-prepared": "slots"
+  "slots.not-prepared": "slots",
+  // Spell components (SRD Components) are their own family, so a table can stop checking hands and pouches alone.
+  "spell.no-verbal": "components",
+  "spell.no-free-hand": "components",
+  "spell.no-material": "components"
 } as const satisfies Record<string, RuleFamily>;
 
 export type RuleId = keyof typeof RULE_FAMILIES;
@@ -115,6 +135,16 @@ export function familyOf(rule: RuleId): RuleFamily {
 /** The mode in force for one family: its exception if the GM set one, otherwise this fight's dial. */
 export function familyModeFor(combat: Pick<CombatState, "rulesMode" | "ruleExceptions">, family: RuleFamily): RuleMode {
   return combat.ruleExceptions[family] ?? combat.rulesMode;
+}
+
+/** The rules in force: the fight's dial and exceptions while one runs, else the table's standing policy, which the
+ *  next fight starts from. */
+export function rulesInForce(
+  state: Pick<GameState, "combat" | "rulesPolicy">
+): Pick<CombatState, "rulesMode" | "ruleExceptions"> {
+  return state.combat.active
+    ? state.combat
+    : { rulesMode: state.rulesPolicy.dial, ruleExceptions: state.rulesPolicy.exceptions };
 }
 
 /** The mode in force for one rule id. The single reader: never read `combat.rulesMode` at a rule site. */

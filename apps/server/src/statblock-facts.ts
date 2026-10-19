@@ -1,6 +1,6 @@
 import type { Actor } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
-import { experienceForChallenge } from "@vtt/rules-5e";
+import { experienceForChallenge, experienceInLair } from "@vtt/rules-5e";
 
 /** The extension key challenge rating and creature type actually live under. */
 export const STATBLOCK_EXTENSION = "open5e.srd-2024";
@@ -18,12 +18,15 @@ export function statblockFacts(definition: ActorDefinition): {
   challengeRating: number | null;
   creatureType: string | null;
   experiencePoints: number | null;
+  /** The XP it is worth fought in its lair, for a legendary creature with one; else null. */
+  experiencePointsInLair: number | null;
 } {
   const extension = (definition.extensions ?? {})[STATBLOCK_EXTENSION];
   const bag = (extension && typeof extension === "object" ? extension : {}) as {
     challengeRating?: unknown;
     type?: unknown;
     experiencePoints?: unknown;
+    traits?: unknown;
   };
   // Narrowed by checks (no cast): the bag is untyped. Null means "nothing to show", which the publish gate refuses.
   const challengeRating = typeof bag.challengeRating === "number" ? bag.challengeRating : null;
@@ -36,7 +39,16 @@ export function statblockFacts(definition: ActorDefinition): {
         ? bag.experiencePoints
         : challengeRating === null
           ? null
-          : experienceForChallenge(challengeRating)
+          : experienceForChallenge(challengeRating),
+    experiencePointsInLair:
+      challengeRating === null
+        ? null
+        : experienceInLair(
+            challengeRating,
+            (Array.isArray(bag.traits) ? bag.traits : []).flatMap((trait: unknown) =>
+              typeof (trait as { name?: unknown }).name === "string" ? [(trait as { name: string }).name] : []
+            )
+          )
   };
 }
 

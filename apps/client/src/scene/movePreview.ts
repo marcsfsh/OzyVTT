@@ -61,6 +61,8 @@ export const alliesByKind = (mover: MapActor, occupant: MapActor) => {
  * extra foot per foot while crawling, climbing or swimming without the speed, or dragging. The client sees only what
  * it may (players get the revealed terrain, no hidden creatures, and no NPC's side), and the server leaves hidden
  * creatures out too, so the two agree except where unrevealed terrain lies under the fog or an NPC's side matters.
+ * A creature that shares spaces (Air Form, a swarm) and any creature crossing a swarm pay Difficult Terrain where they
+ * would be barred, as the server's movement reply says (`passesCreatures`, `swarmIds`).
  * With dynamic vision on, the walls the view has bar the way as the server's do. A spell's area that halves the
  * mover's Speed (Spirit Guardians) is charged by the server alone.
  */
@@ -92,6 +94,10 @@ export function previewMove(
     walls?: readonly MoveWall[];
     /** The mover's height as it sets off and where the move ends, in feet; on the ground when absent. */
     altitude?: Readonly<{ fromFeet: number; toFeet: number }>;
+    /** The mover may end a move in another creature's space, so none bars its way (the movement reply's). */
+    passesCreatures?: boolean;
+    /** The swarms on the map, whose spaces any creature may cross (the movement reply's). */
+    swarmIds?: readonly string[];
   }>
 ): MovePreview | null {
   const { calibration, size, terrain, tokens, actorsById, moverId } = input;
@@ -128,12 +134,15 @@ export function previewMove(
     const occupantLow = token.altitudeFeet ?? 0;
     if (!spansOverlap(lowFeet, highFeet, occupantLow, occupantLow + spaceHeightCells(token.sizeCells) * feetPerCell))
       continue;
-    const passage = spacePassage({
+    const printed = spacePassage({
       ally: isAlly(mover, occupant),
       incapacitated: occupant.conditions.some((condition) => INCAPACITATING.has(condition.id)),
       moverSize: mover.size,
       occupantSize: occupant.size
     });
+    // A space the mover may share is still another creature's, so it costs as Difficult Terrain.
+    const passage =
+      printed === "blocked" && (input.passesCreatures || input.swarmIds?.includes(occupant.id)) ? "difficult" : printed;
     if (passage === "open") continue;
     const cells = passage === "blocked" && !input.throughWalls ? closedCells : difficultCells;
     const origin = footprintOrigin(imageToGridPreview(calibration, token.position), token.sizeCells);

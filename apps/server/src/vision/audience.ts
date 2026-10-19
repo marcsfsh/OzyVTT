@@ -296,9 +296,12 @@ export function visionOf(state: GameState, viewerIds: readonly string[], content
         ...(inSight ? { open: wall.open === true } : {})
       });
     }
+    // Where in sight the light is bright, so the rest can be painted dim; none when the whole scene is bright.
+    const bright = sight.brightOf(viewerIds, (carrierId) => perceived.has(carrierId));
     return {
       enabled: true as const,
       visible: area.map((polygon): VisionPolygon => flatPolygon(polygon)),
+      ...(bright ? { bright: bright.map((polygon): VisionPolygon => flatPolygon(polygon)) } : {}),
       explored: exploredRectsOf(state),
       walls
     };

@@ -16,15 +16,18 @@ import {
   ActionReactionSchema,
   ActionTeleportSchema,
   ActionSchema,
+  ActionTargetsSchema,
   ActorDefinitionSchema,
   DamageDrainSchema,
   DamageFormulaSchema,
   DamageTypeSchema,
+  DispelSchema,
   HealingFormulaSchema,
   ItemSlotSchema,
   OnHitRiderSchema,
   SaveFailureEffectSchema,
-  SaveOutcomeFields
+  SaveOutcomeFields,
+  SightEffectSchema
 } from "@vtt/schemas";
 import {
   BackgroundReferenceSchema,
@@ -77,16 +80,17 @@ const SpellDamageSchema = z
 /**
  * Where and when what a spell leaves behind acts on a creature, so the server raises the save or deals the damage:
  * a creature entering it (or the area moving onto the creature), starting or ending its turn there, or travelling in
- * it (Spike Growth's damage for every 5 feet). The area is the one the cast places on the map, or within `feet` of
- * the caster (an Emanation) or of the point the spell is placed at (Flaming Sphere, a guardian). `oncePerTurn`: "A
- * creature makes this save only once per turn" (entering counts once a turn anyway); `affects` "enemies" spares the
- * caster's allies (Guardian of Faith; spirits that harm the creatures the caster chooses); `damageCap` ends it once
- * it has dealt that much (Guardian of Faith's 60).
+ * it (Spike Growth's damage for every 5 feet); the start of each of its caster's turns, on the one creature in it
+ * nearest its point (Faithful Hound's bite); or the spell's end, on every creature in it (Delayed Blast Fireball's
+ * bead). The area is the one the cast places on the map, or within `feet` of the caster (an Emanation) or of the point
+ * the spell is placed at (Flaming Sphere, a guardian). `oncePerTurn`: "A creature makes this save only once per turn"
+ * (entering counts once a turn anyway); `affects` "enemies" spares the caster's allies (Guardian of Faith; spirits that
+ * harm the creatures the caster chooses); `damageCap` ends it once it has dealt that much (Guardian of Faith's 60).
  */
 export const SpellZoneSchema = z
   .object({
     on: z
-      .array(z.enum(["enter", "start-turn", "end-turn", "travel"]))
+      .array(z.enum(["enter", "start-turn", "end-turn", "travel", "caster-turn-start", "spell-end"]))
       .min(1)
       .max(3),
     oncePerTurn: z.literal(true).optional(),
@@ -95,7 +99,12 @@ export const SpellZoneSchema = z
     affects: z.literal("enemies").optional(),
     damageCap: z.number().int().min(1).max(1000).optional(),
     /** The creatures it affects move at half Speed inside it (Spirit Guardians). */
-    halvesSpeed: z.literal(true).optional()
+    halvesSpeed: z.literal(true).optional(),
+    /** It acts on no one while a creature it restrained is still held (Conjure Elemental: "if the spirit has no creature
+     *  Restrained"). */
+    holdsOne: z.literal(true).optional(),
+    /** Its damage grows by one die each time its caster's turn ends while it lasts (Delayed Blast Fireball). */
+    grows: z.literal(true).optional()
   })
   .strict();
 export type SpellZone = z.infer<typeof SpellZoneSchema>;
@@ -193,10 +202,97 @@ export const SpellEffectSchema = z
     /** A reaction spell's trigger and response (Shield, Hellish Rebuke), so the table offers it as a prompt. */
     reaction: ActionReactionSchema.optional(),
     /** The teleport the cast gives its caster (Misty Step's 30 feet), taken on the map at once with no GM ask. */
-    teleport: ActionTeleportSchema.optional()
+    teleport: ActionTeleportSchema.optional(),
+    /** The caster makes the spell's save itself, at this DC whatever its own (Contact Other Plane's DC 15). */
+    selfSave: z
+      .object({ dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional(),
+    /** The cast ends spells on its target (Dispel Magic). */
+    dispel: DispelSchema.optional(),
+    /** The cast ends the curses on its target and its Attunement to cursed items (Remove Curse). */
+    endsCurses: z.literal(true).optional(),
+    /** The spell keeps something of its own besides what it leaves on creatures (Entangle's tangled ground, an
+     *  earthquake's fissures), so its Concentration holds when no creature is affected any more. */
+    persistsWithoutTargets: z.literal(true).optional(),
+    /** Its targets are creatures the caster can see ("a creature you can see within range"): with the map's vision on,
+     *  the server refuses one the caster can't see. */
+    seenTargets: z.literal(true).optional(),
+    /** The creature types it can target (Hold Person: a Humanoid). A creature of another type picked as its target is
+     *  refused, and one caught in its area is left out of it. */
+    targetTypes: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(6)
+      .optional(),
+    /** The caster picks its targets among the creatures in its area ("up to six creatures of your choice in a 40-foot
+     *  Cube", Mass Cure Wounds' Sphere), so a cast picks creatures that one such area can hold within range; `targets`
+     *  caps how many. Without it, an area's targets are every creature its template covers. */
+    picksInArea: z.literal(true).optional(),
+    /** Its targets after the first stand within this many feet of the first (Chain Lightning's leaping bolts). */
+    chainFeet: z.number().int().min(5).max(300).optional(),
+    /** The cast makes a creature at 0 Hit Points that isn't dead Stable (Spare the Dying). */
+    stabilizes: z.literal(true).optional(),
+    /** A cantrip whose range doubles at character levels 5, 11 and 17 (Spare the Dying's 15 feet). */
+    rangeDoubles: z.literal(true).optional(),
+    /** No sound can be made in the area its cast places (Silence), so a creature standing there can't cast a spell
+     *  with a Verbal component while the spell lasts. */
+    silencesArea: z.literal(true).optional()
   })
   .strict();
 export type SpellEffect = z.infer<typeof SpellEffectSchema>;
+
+/** A spell's duration from a higher spell slot, as its higher-level text prints it: from `level` up, the spell lasts
+ *  `duration` (in the grammar of the spell's own: "10 minutes", "8 hours", "until dispelled"), and needs Concentration
+ *  only when `concentration` says so (Bestow Curse from a level 5 slot needs none). */
+export const UpcastDurationSchema = z
+  .object({
+    level: z.number().int().min(1).max(9),
+    duration: z.string().min(1).max(120),
+    concentration: z.boolean()
+  })
+  .strict();
+export type UpcastDuration = z.infer<typeof UpcastDurationSchema>;
+
+/**
+ * A material a cast needs in hand that a Component Pouch or a Spellcasting Focus can't stand in for (SRD Components):
+ * one with a printed worth, or one the spell consumes. A carried item is that material when it is one of `itemIds`
+ * (Holy Water) or its name holds one of `matches` ("diamond"); the GM judges its worth. `coins` are paid from the purse
+ * instead (Gentle Repose's 2 Copper Pieces).
+ */
+export const SpellMaterialSchema = z
+  .object({
+    /** What the text names ("a diamond"), for the reason a cast is refused. */
+    name: z.string().min(1).max(80),
+    matches: z.array(z.string().min(2).max(40)).max(6).optional(),
+    itemIds: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80)
+      )
+      .max(4)
+      .optional(),
+    /** Its printed worth in GP for each one ("worth 300+ GP"); null when the text prints none. */
+    costGp: z.number().min(0).max(100_000).nullable(),
+    /** How many the cast needs ("four ivory strips"); with `perTarget`, for each creature it targets. */
+    count: z.number().int().min(1).max(20).optional(),
+    perTarget: z.literal(true).optional(),
+    /** The spell consumes it ("which the spell consumes"), so the cast uses it up. */
+    consumed: z.boolean(),
+    coins: z
+      .object({ unit: z.enum(["cp", "sp", "ep", "gp", "pp"]), amount: z.number().int().min(1).max(10_000) })
+      .strict()
+      .optional()
+  })
+  .strict();
+export type SpellMaterial = z.infer<typeof SpellMaterialSchema>;
 
 export const SpellReferenceSchema = z
   .object({
@@ -232,10 +328,22 @@ export const SpellReferenceSchema = z
       somatic: z.boolean(),
       material: z.boolean(),
       materialText: z.string().nullable(),
-      materialConsumed: z.boolean()
+      materialConsumed: z.boolean(),
+      /** The materials of `materialText` a cast needs in hand, read from it when the bundle is built: each one with a
+       *  worth or that the spell consumes. Absent, a Component Pouch or a Spellcasting Focus stands in for the material. */
+      costly: z.array(SpellMaterialSchema).min(1).max(4).optional()
     }),
     duration: z.string().min(1).max(120),
     concentration: z.boolean(),
+    /** How a higher slot changes the duration and the Concentration, lowest slot first (Dominate Beast from a level 5
+     *  slot lasts 10 minutes). Absent: every slot lasts `duration`. */
+    upcastDurations: z
+      .array(UpcastDurationSchema)
+      .max(8)
+      .optional()
+      .describe(
+        "How a higher spell slot changes the duration and whether it needs Concentration, lowest slot first. Absent: every slot lasts the spell's own duration"
+      ),
     ritual: z.boolean(),
     /** The caster makes a spell attack roll, when it casts or on a later turn: read from the cast model for the SRD,
      *  since the source marks every spell whose text mentions an attack roll (Bless, Shining Smite). */
@@ -267,6 +375,9 @@ export const SpellReferenceSchema = z
      *  describe the prose (Hex's later 1d6, Faerie Fire's "attack rolls against") and no single cast. A zone, a summons or a
      *  rider on later hits casts with none of these, and stays for the GM. Actions built from a spell read this. */
     effect: SpellEffectSchema.nullable().default(null),
+    /** What the spell does to light and sight while it lasts (Light, Darkness, Fog Cloud, Daylight), which dynamic
+     *  vision reads. */
+    sight: SightEffectSchema.optional(),
     classes: z
       .array(z.string())
       .describe(
@@ -412,7 +523,11 @@ export const ItemSpellCastSchema = z
     consumesSpellSlot: z
       .boolean()
       .default(false)
-      .describe("Whether casting it also spends one of the bearer's own spell slots")
+      .describe("Whether casting it also spends one of the bearer's own spell slots"),
+    /** Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear: Beasts only). */
+    targets: ActionTargetsSchema.optional().describe(
+      "Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear affects Beasts only), checked on the server"
+    )
   })
   .strict()
   .describe(
@@ -509,13 +624,40 @@ const EquipmentWeaponStatsSchema = z.object({
 });
 
 /** The light a lit item sheds, as its description prints it: Bright Light out to `brightFeet` and Dim Light for
- *  `dimFeet` more (Torch: 20 and 20). Dynamic vision lights a carried one while it is equipped (ADR-0023). */
+ *  `dimFeet` more (Torch: 20 and 20). Dynamic vision lights its bearer while it is lit and equipped (ADR-0023). */
 const ItemLightSchema = z
   .object({
     brightFeet: z.number().int().min(0).max(240),
-    dimFeet: z.number().int().min(0).max(240)
+    dimFeet: z.number().int().min(0).max(240),
+    /** The light is a Cone the bearer aims (a Bullseye Lantern). */
+    cone: z.literal(true).optional(),
+    /** With its hood lowered (a Hooded Lantern): "reducing the light to Dim Light in a 5-foot radius". */
+    hooded: z
+      .object({ brightFeet: z.number().int().min(0).max(240), dimFeet: z.number().int().min(0).max(240) })
+      .strict()
+      .optional(),
+    /** Its Bright Light is sunlight (a Sun Blade). */
+    sunlight: z.literal(true).optional(),
+    /** Invisible creatures in its Bright Light are seen (a Lantern of Revealing). */
+    revealsInvisible: z.literal(true).optional(),
+    /** It sheds its light whenever it is held, with nothing to light (a Mace of Disruption). */
+    always: z.literal(true).optional(),
+    /** Its other riders apply only while it is lit (a Flame Tongue's 2d6 Fire while ablaze). */
+    ridersWhileLit: z.literal(true).optional(),
+    /** How long it burns once lit, in hours: a Torch or Candle is used up, and a Lamp or Lantern spends a flask of
+     *  `fuel` (Oil). */
+    burnHours: z.number().int().min(1).max(24).optional(),
+    fuel: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional()
   })
-  .strict();
+  .strict()
+  .describe(
+    "The light the item sheds while it is lit and equipped: Bright Light out to `brightFeet` and Dim Light for `dimFeet` more, a Cone with `cone`, less with its hood down (`hooded`), sunlight with `sunlight`, and revealing Invisible creatures in its Bright Light with `revealsInvisible`. `burnHours` is how long it burns once lit, spending a `fuel` item when it names one. With `always` it shines whenever it is held, and with `ridersWhileLit` its other riders apply only while it is lit."
+  );
+export type ItemLight = z.infer<typeof ItemLightSchema>;
 
 /**
  * The base weapons or armors a template item may bind to: the SRD's printed qualifier (`label`) and
@@ -660,6 +802,21 @@ export const EquipmentReferenceSchema = z
       .describe(
         "A Spell Scroll: each carried copy bears one spell of these levels (0 is a cantrip), stored as the row's `spellId` and checked by the server when it is added. Reading it casts the spell at its level with the Spell Scroll table's save DC and attack bonus, no spell slot and no Material components, and uses it up; a reader whose spell list lacks the spell can't read it, and one above the reader's levels needs a check first. Needs `consumedOnUse`"
       ),
+    /** A manual or tome: studied for its reading time, it raises its reader's score for good, and its magic then
+     *  sleeps. */
+    study: z
+      .object({
+        ability: AbilityShortSchema,
+        amount: z.number().int().min(1).max(4),
+        maximum: z.number().int().min(20).max(30),
+        hours: z.number().int().min(1).max(1000),
+        days: z.number().int().min(1).max(365)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A manual or tome (\"If you spend 48 hours over a period of 6 days or fewer studying the book's contents and practicing its guidelines, your Constitution increases by 2, to a maximum of 30\"): `hours` of study within `days`, after which the reader's `ability` rises by `amount`, never above `maximum`, for good. The GM marks the study done (the time is downtime the GM gives); the server records it in the reader's build, so a rebuild keeps it, and the copy's magic is spent, so no one else gains from it"
+      ),
     /** "The GM chooses the type": the types the GM may pick for this item's one granted resistance, which then
      *  replaces the printed default in `grants.damageResistances` for that carried copy. */
     damageTypeChoice: z
@@ -677,6 +834,15 @@ export const EquipmentReferenceSchema = z
       .optional()
       .describe(
         "Armor of Vulnerability's curse: while the bearer is attuned, worn or not, Vulnerability to every `damageTypeChoice` type except the one it resists. Needs `cursed` and `damageTypeChoice`"
+      ),
+    /** What a hit with this weapon does beside its damage (Giant Slayer's save against Prone, a Sword of Wounding's
+     *  stopped healing, a Sword of Sharpness's Exhaustion on a rolled 20). */
+    onHit: z
+      .array(OnHitRiderSchema)
+      .max(4)
+      .optional()
+      .describe(
+        "What a hit with this weapon does beside its damage: each rider rides every attack the item makes (both grips, its Light extra attack) and lands as the monster on-hit riders do, a save at its DC (Giant Slayer), a rolled 20 only (Sword of Sharpness), a creature type only, or the coat its own action put on (Dagger of Venom). Needs a `weapon` block or `appliesTo`"
       ),
     /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
     grantsFeatIds: z
@@ -723,6 +889,13 @@ export const EquipmentReferenceSchema = z
         code: "custom",
         path: ["vulnerableToOtherChoices"],
         message: "Vulnerability to the other choices needs a cursed item whose resistance the GM chooses."
+      });
+    // A hit rider rides the item's own attacks, so the item has to make one.
+    if (item.onHit && !item.weapon && !item.appliesTo)
+      context.addIssue({
+        code: "custom",
+        path: ["onHit"],
+        message: "What a hit does needs a weapon to hit with: give the item weapon stats or a base weapon."
       });
     // Enforced on the item carrier only: the identical rider on a feat is valid.
     item.modifiers.forEach((modifier, index) => {

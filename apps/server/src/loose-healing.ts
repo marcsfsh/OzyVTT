@@ -19,7 +19,8 @@ type Actor = GameState["actors"][number];
 
 /** Whether a player may heal this creature: their own character, or another member of the party (a player character
  *  the table can see, still on the roster). */
-function partyMember(target: Actor, sessionId: string): boolean {
+export function partyMember(target: Actor | undefined, sessionId: string): boolean {
+  if (!target) return false;
   if (target.ownerSessionId === sessionId) return true;
   return (
     target.kind === "player-character" &&

@@ -1372,7 +1372,25 @@
             "name": "Stonecunning",
             "activation": "bonus-action",
             "description": "Gain Tremorsense with a range of 60 feet for 10 minutes while on or touching a stone surface.",
-            "damage": []
+            "damage": [],
+            "grants": {
+              "name": "Stonecunning",
+              "tags": [
+                "stonecunning"
+              ],
+              "target": "self",
+              "duration": {
+                "type": "rounds",
+                "rounds": 100
+              },
+              "modifiers": [
+                {
+                  "type": "sense",
+                  "sense": "tremorsense",
+                  "feet": 60
+                }
+              ]
+            }
           }
         ],
         "uses": {
@@ -1880,7 +1898,11 @@
                       "formula": "1d10",
                       "type": "fire"
                     }
-                  ]
+                  ],
+                  "ridesHit": {
+                    "rides": "attack-roll",
+                    "dealsDamage": true
+                  }
                 }
               ],
               "uses": {
@@ -1906,7 +1928,16 @@
                       "formula": "1d6",
                       "type": "cold"
                     }
-                  ]
+                  ],
+                  "ridesHit": {
+                    "rides": "attack-roll",
+                    "dealsDamage": true,
+                    "applies": {
+                      "name": "Frost's Chill",
+                      "modifiers": [{ "type": "speed", "amount": -10 }],
+                      "duration": { "type": "until-source-next-turn" }
+                    }
+                  }
                 }
               ],
               "uses": {
@@ -1927,7 +1958,13 @@
                   "name": "Hill's Tumble",
                   "activation": "other",
                   "description": "When you hit a Large or smaller creature with an attack roll and deal damage to it, give that target the Prone condition.",
-                  "damage": []
+                  "damage": [],
+                  "ridesHit": {
+                    "rides": "attack-roll",
+                    "dealsDamage": true,
+                    "maxTargetSize": "large",
+                    "applies": { "name": "Hill's Tumble", "conditions": ["prone"] }
+                  }
                 }
               ],
               "uses": {
@@ -1948,7 +1985,15 @@
                   "name": "Stone's Endurance",
                   "activation": "reaction",
                   "description": "When you take damage, roll 1d12 and add your Constitution modifier; reduce the damage you take by that total.",
-                  "damage": []
+                  "damage": [],
+                  "reaction": {
+                    "trigger": "takes-damage",
+                    "response": "reduce-damage",
+                    "formula": "1d12"
+                  },
+                  "adds": {
+                    "abilityModifier": "con"
+                  }
                 }
               ],
               "uses": {
@@ -2121,7 +2166,21 @@
       {
         "id": "halfling-luck",
         "name": "Luck",
-        "description": "When you roll a 1 on the d20 of a D20 Test, you can reroll the die, and you must use the new roll."
+        "description": "When you roll a 1 on the d20 of a D20 Test, you can reroll the die, and you must use the new roll.",
+        "actions": [
+          {
+            "id": "halfling-luck",
+            "name": "Luck",
+            "activation": "other",
+            "description": "When you roll a 1 on the d20 of a D20 Test, reroll the die. You must use the new roll.",
+            "damage": [],
+            "answer": {
+              "rolls": ["attack", "save", "check", "death-save"],
+              "when": "natural-one",
+              "effect": { "kind": "reroll", "one": true }
+            }
+          }
+        ]
       },
       {
         "id": "halfling-naturally-stealthy",

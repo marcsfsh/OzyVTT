@@ -25,7 +25,7 @@ import { useAuthorizedMapImage } from "./mapImage";
 import { MapToken } from "./MapToken";
 import { MapTokenTray } from "./MapTokenTray";
 import { MapRail } from "./MapRail";
-import { isVisionTool, LIGHT_PRESETS, type LightPresetId, type MapTool } from "./mapTools";
+import { isVisionTool, LIGHT_PRESETS, type AreaKindId, type LightPresetId, type MapTool } from "./mapTools";
 import { alliesByKind, extraPerStepFor, moveLabel, movementWallsOf, previewMove, type MoveMode } from "./movePreview";
 import { MOVE_MODE_KEYS, MOVE_MODE_NAMES, MoveModeChoice } from "./MoveModeChoice";
 import { useMovementBudget } from "./useMovementBudget";
@@ -185,6 +185,7 @@ export function EncounterMap({
   const gmVision = vision && "measure" in vision ? vision : null;
   const playerVision = vision && "visible" in vision ? vision : null;
   const [lightPreset, setLightPreset] = useState<LightPresetId>("torch");
+  const [areaKind, setAreaKind] = useState<AreaKindId>("heavily-obscured");
   /** Whose eyes the GM looks through: "party", an actor id, or nobody. The live table only. */
   const [lookThrough, setLookThrough] = useState<string | null>(null);
   const [lookedThrough, setLookedThrough] = useState<VisionPreviewReply | null>(null);
@@ -402,6 +403,7 @@ export function EncounterMap({
       const preset = LIGHT_PRESETS.find((entry) => entry.id === lightPreset) ?? LIGHT_PRESETS[0];
       commands.addLight(point, preset);
     },
+    areaKind,
     readOnly,
     armedActorId,
     onPlaceArmed: (point) => {
@@ -535,6 +537,8 @@ export function EncounterMap({
           throughWalls: draggedBudget?.throughWalls === true,
           ignoresDifficult: draggedBudget?.ignoresDifficultTerrain === true,
           walls: moveWalls,
+          ...(draggedBudget?.passesCreatures ? { passesCreatures: true } : {}),
+          ...(draggedBudget?.swarmIds ? { swarmIds: draggedBudget.swarmIds } : {}),
           // A drag keeps the creature at its height; the token menu changes it.
           altitude: {
             fromFeet: tokensById.get(dragging.actorId)?.altitudeFeet ?? 0,
@@ -613,7 +617,11 @@ export function EncounterMap({
       visionBusy={commands.visionBusy}
       onVisionEnabledChange={commands.setVisionEnabled}
       ambient={gmVision?.ambient ?? "bright"}
-      onAmbientChange={commands.setAmbient}
+      onAmbientChange={(ambient) => commands.setAmbient(ambient)}
+      sunlight={gmVision?.sunlight ?? false}
+      onSunlightChange={(sunlight) => commands.setAmbient(gmVision?.ambient ?? "bright", sunlight)}
+      areaKind={areaKind}
+      onAreaKindChange={setAreaKind}
       lightPreset={lightPreset}
       onLightPresetChange={setLightPreset}
       hasWalls={(gmVision?.walls.length ?? 0) > 0}
@@ -718,7 +726,13 @@ export function EncounterMap({
                   {/* A player's dynamic vision: dark where their characters can't see, below the tokens, since the server
                 sends only the creatures they perceive (one heard through a wall shows in the dark). */}
                   {playerVision && (
-                    <FogOverlay width={size.width} height={size.height} vision={playerVision} variant="player" />
+                    <FogOverlay
+                      width={size.width}
+                      height={size.height}
+                      vision={playerVision}
+                      variant="player"
+                      markRadius={(calibration?.cellSizePx ?? 50) * 0.35}
+                    />
                   )}
 
                   {visibleTokens.map((encounterToken) => {
@@ -755,6 +769,7 @@ export function EncounterMap({
                       role={role}
                       walls={gmVision ? gmVision.walls : (playerVision?.walls ?? [])}
                       lights={gmVision?.lights ?? []}
+                      areas={gmVision?.areas ?? []}
                       tokenPositions={
                         new Map(
                           tokens.flatMap((placed) => (placed.position ? [[placed.actorId, placed.position]] : []))
@@ -805,6 +820,16 @@ export function EncounterMap({
                       y1={gesture.origin.y}
                       x2={gesture.current.x}
                       y2={gesture.current.y}
+                    />
+                  )}
+                  {/* Live outline of the area of light or obscurement being painted (snapped to whole cells on commit). */}
+                  {gesture?.kind === "vision-area" && (
+                    <rect
+                      className={`vision-area-preview vision-area-${areaKind}`}
+                      x={Math.min(gesture.origin.x, gesture.current.x)}
+                      y={Math.min(gesture.origin.y, gesture.current.y)}
+                      width={Math.abs(gesture.origin.x - gesture.current.x)}
+                      height={Math.abs(gesture.origin.y - gesture.current.y)}
                     />
                   )}
                   {/* Live outline of the terrain stroke being dragged (snapped to whole cells on commit). */}

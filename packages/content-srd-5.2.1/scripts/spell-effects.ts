@@ -17,7 +17,6 @@ const NO_CAST_DAMAGE: Readonly<Record<string, string>> = {
   "conjure-animals": "the pack harms on later turns",
   "conjure-elemental": "the spirit harms on later turns",
   "conjure-woodland-beings": "the spirits harm on later turns",
-  "contact-other-plane": "harms the caster on a failed save",
   "delayed-blast-fireball": "detonates later",
   "dimension-door": "harms the caster when the destination is occupied",
   "divine-favor": "a rider on later weapon hits",
@@ -75,6 +74,8 @@ const CAST_DAMAGE: Readonly<Record<string, Damage>> = {
   "spiritual-weapon": [{ formula: "1d8", type: "force", addsModifier: true }],
   "arcane-sword": [{ formula: "4d12", type: "force", addsModifier: true }],
   "conjure-fey": [{ formula: "3d12", type: "psychic", addsModifier: true }],
+  // The caster's own failed save: "you take 6d6 Psychic damage" (`CAST_SELF_SAVES`).
+  "contact-other-plane": [{ formula: "6d6", type: "psychic" }],
   // A type the caster chooses (`DAMAGE_CHOICES`); the first is the default.
   "chromatic-orb": [{ formula: "3d8", type: "acid" }],
   "sorcerous-burst": [{ formula: "1d8", type: "acid" }]
@@ -106,50 +107,206 @@ const CAST_ATTACKS: Readonly<Record<string, number>> = {
 };
 
 /** How many creatures a cast targets (SRD "up to three creatures", "one additional creature for each spell slot level
- *  above 1"), for the spells a table casts in a fight. */
+ *  above 1"), for every spell whose text names a number of creatures it picks. The caster counts among them where the
+ *  text adds it ("You and up to eight willing creatures"). An area's targets are whoever its template covers, and a
+ *  spell that picks "any number" has no row. */
 const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>> = {
   aid: { count: 3 },
   "animal-friendship": { count: 1, perSlot: 1 },
+  "animal-messenger": { count: 1 },
+  antipathysympathy: { count: 1 },
+  "arcanists-magic-aura": { count: 1 },
+  "astral-projection": { count: 9 },
   bane: { count: 3, perSlot: 1 },
   banishment: { count: 1, perSlot: 1 },
+  barkskin: { count: 1 },
+  befuddlement: { count: 1 },
+  "bestow-curse": { count: 1 },
   bless: { count: 3, perSlot: 1 },
+  blight: { count: 1 },
   blindnessdeafness: { count: 1, perSlot: 1 },
+  // The first target and the three bolts that leap from it, one more for each slot level above 6.
+  "chain-lightning": { count: 4, perSlot: 1 },
   "charm-monster": { count: 1, perSlot: 1 },
   "charm-person": { count: 1, perSlot: 1 },
+  clone: { count: 1 },
   command: { count: 1, perSlot: 1 },
+  contagion: { count: 1 },
+  counterspell: { count: 1 },
   "cure-wounds": { count: 1 },
+  darkvision: { count: 1 },
+  "death-ward": { count: 1 },
+  disintegrate: { count: 1 },
+  "dispel-magic": { count: 1 },
   "dissonant-whispers": { count: 1 },
   "dominate-beast": { count: 1 },
   "dominate-monster": { count: 1 },
   "dominate-person": { count: 1 },
+  "dragons-breath": { count: 1 },
+  dream: { count: 1 },
   "enhance-ability": { count: 1, perSlot: 1 },
+  enlargereduce: { count: 1 },
+  eyebite: { count: 1 },
   // "Choose up to five falling creatures within range."
   "feather-fall": { count: 5 },
+  "finger-of-death": { count: 1 },
+  "flesh-to-stone": { count: 1 },
   fly: { count: 1, perSlot: 1 },
+  foresight: { count: 1 },
   "freedom-of-movement": { count: 1, perSlot: 1 },
   "gaseous-form": { count: 1, perSlot: 1 },
+  geas: { count: 1 },
+  "greater-invisibility": { count: 1 },
+  "greater-restoration": { count: 1 },
+  guidance: { count: 1 },
+  harm: { count: 1 },
   haste: { count: 1 },
+  heal: { count: 1 },
   "healing-word": { count: 1 },
+  "hellish-rebuke": { count: 1 },
   heroism: { count: 1, perSlot: 1 },
+  hex: { count: 1 },
   "hideous-laughter": { count: 1, perSlot: 1 },
   "hold-monster": { count: 1, perSlot: 1 },
   "hold-person": { count: 1, perSlot: 1 },
+  "hunters-mark": { count: 1 },
+  imprisonment: { count: 1 },
   "inflict-wounds": { count: 1 },
   invisibility: { count: 1, perSlot: 1 },
+  "irresistible-dance": { count: 1 },
   jump: { count: 1, perSlot: 1 },
+  "lesser-restoration": { count: 1 },
+  levitate: { count: 1 },
   longstrider: { count: 1, perSlot: 1 },
   "mage-armor": { count: 1 },
   "mass-cure-wounds": { count: 6 },
   "mass-healing-word": { count: 6 },
+  "mass-suggestion": { count: 12 },
+  maze: { count: 1 },
+  message: { count: 1 },
+  "mind-blank": { count: 1 },
+  "mind-spike": { count: 1 },
+  "modify-memory": { count: 1 },
+  nondetection: { count: 1 },
+  "phantasmal-force": { count: 1 },
   "phantasmal-killer": { count: 1 },
+  "plane-shift": { count: 9 },
   polymorph: { count: 1 },
+  "power-word-heal": { count: 1 },
+  "power-word-kill": { count: 1 },
   "power-word-stun": { count: 1 },
   "prayer-of-healing": { count: 5 },
+  "protection-from-energy": { count: 1 },
+  "protection-from-evil-and-good": { count: 1 },
+  "protection-from-poison": { count: 1 },
+  "raise-dead": { count: 1 },
+  "ray-of-enfeeblement": { count: 1 },
+  regenerate: { count: 1 },
+  reincarnate: { count: 1 },
+  "remove-curse": { count: 1 },
+  "resilient-sphere": { count: 1 },
+  resistance: { count: 1 },
+  resurrection: { count: 1 },
+  revivify: { count: 1 },
   "sacred-flame": { count: 1 },
+  sanctuary: { count: 1 },
+  slow: { count: 6 },
+  scrying: { count: 1 },
+  sending: { count: 1 },
+  sequester: { count: 1 },
   "shield-of-faith": { count: 1 },
+  "spare-the-dying": { count: 1 },
   "spider-climb": { count: 1, perSlot: 1 },
+  stoneskin: { count: 1 },
   suggestion: { count: 1 },
-  "vicious-mockery": { count: 1 }
+  telekinesis: { count: 1 },
+  "telepathic-bond": { count: 8 },
+  teleport: { count: 9 },
+  tongues: { count: 1 },
+  "true-polymorph": { count: 1 },
+  "true-resurrection": { count: 1 },
+  "true-seeing": { count: 1 },
+  "vicious-mockery": { count: 1 },
+  "warding-bond": { count: 1 },
+  "water-breathing": { count: 10 },
+  "water-walk": { count: 10 },
+  "wind-walk": { count: 11 },
+  "word-of-recall": { count: 6 }
+};
+
+/** Spells whose targets are creatures the caster can see (SRD "a creature you can see within range"). */
+const SEEN_TARGETS: ReadonlySet<string> = new Set([
+  "animal-friendship",
+  "animal-messenger",
+  "animal-shapes",
+  "bane",
+  "banishment",
+  "befuddlement",
+  "blight",
+  "blindnessdeafness",
+  "chain-lightning",
+  "charm-monster",
+  "charm-person",
+  "command",
+  "compulsion",
+  "counterspell",
+  "disintegrate",
+  "dissonant-whispers",
+  "dominate-beast",
+  "dominate-monster",
+  "dominate-person",
+  "enlargereduce",
+  "enthrall",
+  "eyebite",
+  "finger-of-death",
+  "flesh-to-stone",
+  "geas",
+  "harm",
+  "haste",
+  "heal",
+  "healing-word",
+  "hex",
+  "hideous-laughter",
+  "hold-monster",
+  "hold-person",
+  "hunters-mark",
+  "imprisonment",
+  "irresistible-dance",
+  "levitate",
+  "magic-missile",
+  "mass-heal",
+  "mass-healing-word",
+  "mass-suggestion",
+  "maze",
+  "mind-spike",
+  "modify-memory",
+  "phantasmal-force",
+  "phantasmal-killer",
+  "polymorph",
+  "power-word-heal",
+  "power-word-kill",
+  "power-word-stun",
+  "sacred-flame",
+  "seeming",
+  "suggestion",
+  "telekinesis",
+  "teleport",
+  "true-polymorph"
+]);
+
+/** The creature types a spell can target, where its text names them ("Choose a Humanoid", "Target a Beast"). */
+const TARGET_TYPES: Readonly<Record<string, readonly string[]>> = {
+  "animal-friendship": ["beast"],
+  "animal-messenger": ["beast"],
+  awaken: ["beast", "plant"],
+  // "Each Humanoid in a 20-foot-radius Sphere": the area's other creatures are left out.
+  "calm-emotions": ["humanoid"],
+  "charm-person": ["humanoid"],
+  "dominate-beast": ["beast"],
+  "dominate-person": ["humanoid"],
+  "hold-person": ["humanoid"],
+  reincarnate: ["humanoid"],
+  simulacrum: ["beast", "humanoid"]
 };
 
 /** Missiles one cast makes, each striking a creature of the caster's choice. */
@@ -274,7 +431,10 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: "A creature that enters the spirit's space or starts its turn within 5 feet of it makes the save, if the spirit has no creature Restrained; the Restrained target repeats it at the start of each of its turns, taking 4d8 on a failure.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["restrained"] },
-      damage: [{ formula: "8d8", type: "lightning" }]
+      damage: [{ formula: "8d8", type: "lightning" }],
+      // A Large spirit: its space and 5 feet around it reach 10 feet from its point. The caster's chosen element is
+      // its damage type.
+      zone: { on: ["enter", "start-turn"], around: "point", feet: 10, affects: "enemies", holdsOne: true }
     }
   ],
   "conjure-fey": [
@@ -305,7 +465,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: "The bead explodes when the spell ends: 12d6, plus 1d6 for each of your turns that ended while it lasted.",
       save: save("dex"),
       damage: [{ formula: "12d6", type: "fire" }],
-      area: { shape: "sphere", sizeFeet: 20, widthFeet: null }
+      area: { shape: "sphere", sizeFeet: 20, widthFeet: null },
+      zone: { on: ["spell-end"], grows: true }
     }
   ],
   "dragons-breath": [
@@ -324,7 +485,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "other",
       when: "At the start of each of your turns, the hound bites one enemy within 5 feet of it.",
       save: { ability: "dex", successDamage: "none", failureConditions: [] },
-      damage: [{ formula: "4d8", type: "force" }]
+      damage: [{ formula: "4d8", type: "force" }],
+      zone: { on: ["caster-turn-start"], around: "point", feet: 5, affects: "enemies" }
     }
   ],
   "flame-blade": [
@@ -584,8 +746,29 @@ const CAST_REACTIONS: Readonly<Record<string, NonNullable<SpellEffect["reaction"
   shield: { trigger: "hit-by-attack", response: "ac-bonus", amount: 5, untilNextTurn: true },
   "hellish-rebuke": { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 60 },
   // "When you or a creature you can see within 60 feet of you falls": the cast lands on the falling creature.
-  "feather-fall": { trigger: "falls", response: "cast-on-faller", rangeFeet: 60 }
+  "feather-fall": { trigger: "falls", response: "cast-on-faller", rangeFeet: 60 },
+  // "When you see a creature within 60 feet of yourself casting a spell with Verbal, Somatic, or Material components":
+  // the caster makes a Constitution saving throw.
+  counterspell: { trigger: "casts-spell", response: "counter", ability: "con", rangeFeet: 60 }
 };
+
+/** Spells that make a creature at 0 Hit Points Stable, and whose range doubles with the cantrip's tiers. */
+const STABILIZES: ReadonlySet<string> = new Set(["spare-the-dying"]);
+const RANGE_DOUBLES: ReadonlySet<string> = new Set(["spare-the-dying"]);
+/** "No sound can be created within or pass through" its area: no spell with a Verbal component is cast inside it. */
+const SILENCES_AREA: ReadonlySet<string> = new Set(["silence"]);
+/** Area spells whose caster picks the creatures in the area it affects ("each creature of your choice in a 30-foot
+ *  Sphere"), so the cast picks them; the rest of the area's creatures are spared. */
+const PICKS_IN_AREA: ReadonlySet<string> = new Set([
+  "holy-aura",
+  "mass-cure-wounds",
+  "pass-without-trace",
+  "sleep",
+  "slow",
+  "weird"
+]);
+/** "Three bolts then leap from that target to as many as three other targets ... within 30 feet of the first target." */
+const CHAIN_FEET: Readonly<Record<string, number>> = { "chain-lightning": 30 };
 
 /** What a cast's hit lands on its target besides its damage (SRD 5.2.1 text). */
 const CAST_ON_HIT: Readonly<Record<string, readonly OnHitRider[]>> = {
@@ -678,9 +861,9 @@ const markDamage = (type: DamageType): Modifier => ({
 
 /**
  * What a cast leaves on the creatures it targets (or the one its attack hits) while it lasts, in the effect vocabulary
- * the engine reads (SRD 5.2.1 text). The durations are the spells' own, "until ended" past 10 minutes (the engine keeps
- * no clock outside a fight); a Concentration spell's effects also end with the caster's Concentration. Mage Armor's AC
- * and Haste's Speed are measured on the creature when it lands (`grant.ts`).
+ * the engine reads (SRD 5.2.1 text). A grant "until ended" lasts the spell's own duration at the level it was cast
+ * (`grant.ts`), and a Concentration spell's effects also end with the caster's Concentration; a duration given here is
+ * one the text prints apart from the spell's (Guiding Bolt's light).
  */
 const CAST_GRANTS: Readonly<Record<string, Grant>> = {
   // "Its Speed is reduced by 10 feet until the start of your next turn."
@@ -708,13 +891,53 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     onHit: true,
     duration: { type: "until-source-turn-end" }
   }),
-  // "Until the end of your next turn, it ... can't benefit from the Invisible condition"; its Dim Light is the GM's.
+  // "Until the end of your next turn, it emits Dim Light in a 10-foot radius and can't benefit from the Invisible
+  // condition."
   "starry-wisp": spellGrant({
     name: "Starry Wisp",
     tags: ["outlined"],
     target: "target",
     onHit: true,
-    duration: { type: "until-source-turn-end" }
+    duration: { type: "until-source-turn-end" },
+    light: { brightFeet: 0, dimFeet: 10 }
+  }),
+  // "For the duration, you see creatures and objects that have the Invisible condition as if they were visible."
+  "see-invisibility": spellGrant({
+    name: "See Invisibility",
+    tags: ["see-invisibility"],
+    target: "self",
+    duration: { type: "manual" },
+    modifiers: [{ type: "sense", sense: "see-invisibility", feet: 0 }]
+  }),
+  // "This spell gives the willing creature you touch Truesight with a range of 120 feet."
+  "true-seeing": spellGrant({
+    name: "True Seeing",
+    tags: ["true-seeing"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [{ type: "sense", sense: "truesight", feet: 120 }]
+  }),
+  // "For the duration, you sense the location of any Aberration, Celestial, Elemental, Fey, Fiend, or Undead within 30
+  // feet of yourself. You also sense whether the Hallow spell is active there and, if so, where. The spell is blocked
+  // by 1 foot of stone, dirt, or wood; 1 inch of metal; or a thin sheet of lead."
+  "detect-evil-and-good": spellGrant({
+    name: "Detect Evil and Good",
+    tags: ["detect-evil-and-good"],
+    target: "self",
+    duration: { type: "manual" },
+    detects: {
+      creatureTypes: ["aberration", "celestial", "elemental", "fey", "fiend", "undead"],
+      feet: 30,
+      blockedByWalls: true
+    }
+  }),
+  // "For the duration, a willing creature you touch has Darkvision with a range of 150 feet."
+  darkvision: spellGrant({
+    name: "Darkvision",
+    tags: ["darkvision-spell"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [{ type: "darkvision", feet: 150 }]
   }),
   bless: spellGrant({
     name: "Bless",
@@ -730,14 +953,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: rounds(100),
     armorClassBonus: 2
   }),
-  // The next attack roll against the creature before the end of the caster's next turn, whoever makes it, which
-  // spends the light; it lasts until the start of the caster's turn after, as Vex does.
+  // "The next attack roll made against it before the end of your next turn has Advantage": whoever makes it spends the
+  // light.
   "guiding-bolt": spellGrant({
     name: "Guiding Bolt's light",
     tags: ["until-attacked"],
     target: "target",
     onHit: true,
-    duration: rounds(2),
+    duration: { type: "until-source-turn-end" },
     modifiers: [attackedWithAdvantage]
   }),
   "hunters-mark": spellGrant({
@@ -747,9 +970,10 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     modifiers: [markDamage("force")]
   }),
+  // "You place a curse on a creature", which Remove Curse ends.
   hex: spellGrant({
     name: "Hex",
-    tags: ["hexed"],
+    tags: ["hexed", "curse"],
     target: "target",
     duration: { type: "manual" },
     modifiers: [markDamage("necrotic")]
@@ -798,15 +1022,20 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     modifiers: [{ type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] }]
   }),
-  // "Any creature has Disadvantage on attack rolls against you." An attacker that perceives the caster with
-  // Blindsight or Truesight is the GM's to spare.
+  // "Any creature has Disadvantage on attack rolls against you. An attacker is immune to this effect if it perceives
+  // you with Blindsight or Truesight."
   blur: spellGrant({
     name: "Blur",
     tags: ["blur"],
     target: "self",
     duration: rounds(10),
     modifiers: [
-      { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
+      {
+        type: "roll-mode",
+        roll: "incoming-attack",
+        mode: "disadvantage",
+        when: [{ type: "on-attack-roll" }, { type: "other-lacks-sense", senses: ["blindsight", "truesight"] }]
+      }
     ]
   }),
   // "Your attacks with weapons deal an extra 1d4 Radiant damage on a hit."
@@ -839,8 +1068,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
       { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
     ]
   }),
-  // "An Armor Class of 17 if its AC is lower than that", measured as the spell lands.
-  barkskin: spellGrant({ name: "Barkskin", tags: ["barkskin"], target: "target", duration: { type: "manual" } }),
+  // "The target has an Armor Class of 17 if its AC is lower than that."
+  barkskin: spellGrant({
+    name: "Barkskin",
+    tags: ["barkskin"],
+    target: "target",
+    duration: { type: "manual" },
+    armorClassFloor: 17
+  }),
   // "The first time the target would drop to 0 Hit Points before the spell ends, the target instead drops to 1 Hit
   // Point, and the spell ends."
   "death-ward": spellGrant({
@@ -880,11 +1115,13 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     conditions: ["invisible"]
   }),
+  // "The target's base AC becomes 13 plus its Dexterity modifier", a way to work out AC that riders add to.
   "mage-armor": spellGrant({
     name: "Mage Armor",
     tags: ["mage-armor"],
     target: "target",
-    duration: { type: "manual" }
+    duration: { type: "manual" },
+    baseArmorClass: 13
   }),
   // "If a creature lands before the spell ends, the creature takes no damage from the fall, and the spell ends for
   // that creature." The engine lands a creature that carries it without damage (`falling.ts`).
@@ -959,11 +1196,13 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }]
   }),
+  // "The target's Speed is doubled", whatever its Speed is at each moment.
   haste: spellGrant({
     name: "Haste",
     tags: ["hasted"],
     target: "target",
     duration: rounds(10),
+    speedMultiplier: 2,
     armorClassBonus: 2,
     modifiers: [
       {
@@ -979,8 +1218,15 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
 /** What a failed save against the cast leaves on the creature while the spell lasts (SRD 5.2.1 text). */
 const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   bane: { name: "Bane", tags: ["baned"], duration: rounds(10), modifiers: d20Dice("-1d4") },
-  // Outlined in light: attack rolls against it have Advantage, and it can't benefit from the Invisible condition.
-  "faerie-fire": { name: "Faerie Fire", tags: ["outlined"], duration: rounds(10), modifiers: [attackedWithAdvantage] },
+  // Outlined in light: it sheds Dim Light in a 10-foot radius, attack rolls against it have Advantage "if the attacker
+  // can see it", and it can't benefit from the Invisible condition.
+  "faerie-fire": {
+    name: "Faerie Fire",
+    tags: ["outlined"],
+    duration: rounds(10),
+    modifiers: [{ ...attackedWithAdvantage, when: [{ type: "on-attack-roll" }, { type: "seen-by-other" }] }],
+    light: { brightFeet: 0, dimFeet: 10 }
+  },
   // "Speed is halved, it takes a -2 penalty to AC and Dexterity saving throws, and it can't take Reactions", with
   // one action or Bonus Action a turn, one attack with the Attack action and a chance a somatic spell fails.
   slow: {
@@ -1017,6 +1263,20 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   befuddlement: { name: "Befuddlement", tags: ["no-spells"], modifiers: [] },
   // "Another 5d4 Acid damage at the end of its next turn" (the save carries the damage).
   "vitriolic-sphere": { name: "Vitriolic Sphere", tags: ["vitriolic-sphere"], duration: rounds(1), modifiers: [] },
+  // "Has Disadvantage on ability checks and attack rolls for the duration", and the save at the end of each of its turns
+  // ends the spell on a success.
+  "phantasmal-killer": {
+    name: "Phantasmal Killer",
+    tags: ["phantasmal-killer"],
+    modifiers: [
+      { type: "roll-mode", roll: "attack", mode: "disadvantage" },
+      { type: "roll-mode", roll: "check", mode: "disadvantage" }
+    ]
+  },
+  // "Become cursed for the duration": the curse the caster picks is the GM's to apply, and Remove Curse ends it.
+  "bestow-curse": { name: "Bestow Curse", tags: ["curse"], modifiers: [] },
+  // "A Remove Curse, Greater Restoration, or Wish spell ends this spell."
+  geas: { name: "Geas", tags: ["curse"], modifiers: [] },
   // "Disadvantage on the next attack roll it makes before the end of its next turn": its own roll spends it.
   "vicious-mockery": {
     name: "Vicious Mockery",
@@ -1026,16 +1286,46 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   }
 };
 
+/** Saves the caster makes itself at a printed DC (SRD Contact Other Plane: "When you cast this spell, make a DC 15
+ *  Intelligence saving throw"). */
+const CAST_SELF_SAVES: Readonly<Record<string, NonNullable<SpellEffect["selfSave"]>>> = {
+  "contact-other-plane": { dc: 15 }
+};
+
+/** What a cast ends on its target (SRD 5.2.1 text): Dispel Magic's spells of level 3 or lower, and Remove Curse's
+ *  curses. */
+const CAST_DISPELS: Readonly<Record<string, NonNullable<SpellEffect["dispel"]>>> = {
+  "dispel-magic": { automaticLevel: 3 }
+};
+const CAST_ENDS_CURSES: ReadonlySet<string> = new Set(["remove-curse"]);
+
+/** Concentration spells that keep a part of their own besides what they leave on creatures, so they don't end when no
+ *  creature is affected any more: Entangle's tangled ground, an earthquake's shaking ground and fissures, and the storm
+ *  cloud of Storm of Vengeance. */
+const PERSISTS_WITHOUT_TARGETS: ReadonlySet<string> = new Set(["earthquake", "entangle", "storm-of-vengeance"]);
+
 /** Areas the text gives no template shape for (a wall, a thing placed at a point), so the GM can place them on the
- *  map: a straight wall as a 5-foot-wide Line (a ringed one is the GM's to draw), and a sphere, guardian or pack as the
- *  circle its later area reaches around its point. */
+ *  map: a straight wall as a Line as long and thick as the text's (5 feet wide when thinner; a ringed or bent one is
+ *  the GM's to draw), and a sphere, guardian, pack or cloud as the circle it covers around its point. */
 const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   "blade-barrier": { shape: "line", sizeFeet: 100, widthFeet: 5 },
   "conjure-animals": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  // The Large spirit and the 5 feet it reaches around it.
+  "conjure-elemental": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  // The hound and the 5 feet it bites in.
+  "faithful-hound": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "flaming-sphere": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "guardian-of-faith": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  // "Spreading to a radius of 300 feet": the creatures under the cloud.
+  "storm-of-vengeance": { shape: "cylinder", sizeFeet: 300, widthFeet: null },
+  // "Up to 300 feet long, 300 feet high, and 50 feet thick."
+  tsunami: { shape: "line", sizeFeet: 300, widthFeet: 50 },
   "wall-of-fire": { shape: "line", sizeFeet: 60, widthFeet: 5 },
-  "wall-of-thorns": { shape: "line", sizeFeet: 60, widthFeet: 5 }
+  // Ten 10-foot panels in a row; the text's "radius of up to 10 feet" names the dome, which the GM draws.
+  "wall-of-ice": { shape: "line", sizeFeet: 100, widthFeet: 5 },
+  "wall-of-thorns": { shape: "line", sizeFeet: 60, widthFeet: 5 },
+  // "Up to 50 feet long, 15 feet high, and 1 foot thick."
+  "wind-wall": { shape: "line", sizeFeet: 50, widthFeet: 5 }
 };
 
 /** The area a spell's cast covers, for the map template: the reviewed one, else what the text names. */
@@ -1067,6 +1357,8 @@ export function spellEffectFor(
   const cures = CAST_CURES[id];
   const burst = CAST_BURSTS[id];
   const teleport = CAST_TELEPORTS[id];
+  const dispel = CAST_DISPELS[id];
+  const selfSave = CAST_SELF_SAVES[id];
   return {
     attacks,
     ...(attackRange ? { attackRange } : {}),
@@ -1087,7 +1379,18 @@ export function spellEffectFor(
     ...(grant ? { grant: structuredClone(grant) } : {}),
     ...(failureEffect ? { failureEffect: structuredClone(failureEffect) } : {}),
     ...(reaction ? { reaction } : {}),
-    ...(teleport ? { teleport: { ...teleport } } : {})
+    ...(teleport ? { teleport: { ...teleport } } : {}),
+    ...(selfSave ? { selfSave: { ...selfSave } } : {}),
+    ...(dispel ? { dispel: { ...dispel } } : {}),
+    ...(CAST_ENDS_CURSES.has(id) ? { endsCurses: true as const } : {}),
+    ...(PERSISTS_WITHOUT_TARGETS.has(id) ? { persistsWithoutTargets: true as const } : {}),
+    ...(SEEN_TARGETS.has(id) ? { seenTargets: true as const } : {}),
+    ...(TARGET_TYPES[id] ? { targetTypes: [...TARGET_TYPES[id]] } : {}),
+    ...(STABILIZES.has(id) ? { stabilizes: true as const } : {}),
+    ...(RANGE_DOUBLES.has(id) ? { rangeDoubles: true as const } : {}),
+    ...(SILENCES_AREA.has(id) ? { silencesArea: true as const } : {}),
+    ...(PICKS_IN_AREA.has(id) ? { picksInArea: true as const } : {}),
+    ...(CHAIN_FEET[id] !== undefined ? { chainFeet: CHAIN_FEET[id] } : {})
   };
 }
 
@@ -1126,7 +1429,9 @@ const UPCAST_CORRECTIONS: Readonly<Record<string, Readonly<Record<number, Upcast
   // +2d6 for each slot level above 6; the source prints +1d6.
   "wall-of-ice": { 7: { roll: "12d6" }, 8: { roll: "14d6" }, 9: { roll: "16d6" } },
   // +10 Hit Points for each slot level above 6; the source prints no amounts.
-  heal: { 7: { roll: "80" }, 8: { roll: "90" }, 9: { roll: "100" } }
+  heal: { 7: { roll: "80" }, 8: { roll: "90" }, 9: { roll: "100" } },
+  // The Healing Light's 4d12 gains 1d12 for each slot level above 7; the source prints the increase alone.
+  "conjure-celestial": { 8: { roll: "5d12" }, 9: { roll: "6d12" } }
 };
 
 /** One spell's higher-slot and cantrip rows with the reviewed corrections, sorted as the source sorts them. */
@@ -1166,5 +1471,16 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_CURES),
   ...Object.keys(CAST_HEALING),
   ...Object.keys(SAVE_FAILURE_EFFECTS),
-  ...Object.keys(SPELL_AREAS)
+  ...Object.keys(SPELL_AREAS),
+  ...Object.keys(CAST_DISPELS),
+  ...Object.keys(CAST_SELF_SAVES),
+  ...CAST_ENDS_CURSES,
+  ...PERSISTS_WITHOUT_TARGETS,
+  ...SEEN_TARGETS,
+  ...Object.keys(TARGET_TYPES),
+  ...STABILIZES,
+  ...RANGE_DOUBLES,
+  ...SILENCES_AREA,
+  ...PICKS_IN_AREA,
+  ...Object.keys(CHAIN_FEET)
 ];

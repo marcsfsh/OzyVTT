@@ -6,6 +6,21 @@ import { evaluateActionEconomy } from "./resolution/economy.js";
 import type { DefinitionAction, LiveActor } from "./resolution/context.js";
 import { familyModeFor } from "./rules-families.js";
 
+/** The slot levels a reaction spell can be cast with by this reactor, lowest first (its spell slots and its Pact Magic
+ *  slot at or above the spell's level with one left), for the prompt's slot choice. Empty for a reaction with no slot. */
+export function slotChoiceOf(
+  reactor: Pick<LiveActor, "spellSlots" | "pactSlots">,
+  action: Pick<DefinitionAction, "spellSlot">
+): Partial<Readonly<{ slotLevels: number[] }>> {
+  const base = action.spellSlot?.level;
+  if (base === undefined) return {};
+  const levels = new Set<number>();
+  for (const slot of reactor.spellSlots ?? []) if (slot.level >= base && slot.remaining > 0) levels.add(slot.level);
+  const pact = reactor.pactSlots;
+  if (pact && pact.level >= base && pact.remaining > 0) levels.add(pact.level);
+  return levels.size > 0 ? { slotLevels: [...levels].sort((left, right) => left - right) } : {};
+}
+
 /** The most prompts that may wait at once; past it a trigger opens nothing and the GM rules by hand. */
 export const MAX_PENDING_REACTIONS = 20;
 

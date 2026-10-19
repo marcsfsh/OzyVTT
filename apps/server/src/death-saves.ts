@@ -59,6 +59,8 @@ export function rollDeathSave(
     naturalRoll?: number;
     modifier?: number;
     test?: SettledDeathSave;
+    /** The total once answers to the roll count (a Bardic Inspiration die); the test's own total otherwise. */
+    total?: number;
   }>,
   deps: DeathSaveRollDependencies
 ): DeathSaveRollResult {
@@ -88,7 +90,7 @@ export function rollDeathSave(
   if (options.test) {
     const test = options.test;
     face = test.natural;
-    total = test.resolution.total;
+    total = options.total ?? test.resolution.total;
     if (test.mode !== "normal") mode = test.mode;
     if (test.fresh) record(test.resolution, test.typed);
   } else if (options.naturalRoll !== undefined) {

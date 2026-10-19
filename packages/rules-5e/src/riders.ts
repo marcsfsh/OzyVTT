@@ -29,6 +29,7 @@ export type RiderMoment =
   | "on-attack-roll"
   | "on-hit"
   | "on-critical-hit"
+  | "on-natural-20"
   | "on-damage-roll"
   | "on-saving-throw"
   | "on-ability-check"
@@ -39,6 +40,7 @@ const MOMENTS: ReadonlySet<string> = new Set<RiderMoment>([
   "on-attack-roll",
   "on-hit",
   "on-critical-hit",
+  "on-natural-20",
   "on-damage-roll",
   "on-saving-throw",
   "on-ability-check",
@@ -57,7 +59,10 @@ const FILTERS: ReadonlySet<string> = new Set([
   "versus-creature-type",
   "versus-size",
   "versus-condition",
-  "by-effect-source"
+  "by-effect-source",
+  "sees-other",
+  "seen-by-other",
+  "other-lacks-sense"
 ]);
 const DYNAMIC_GATES: ReadonlySet<string> = new Set(["while-effect-tag", "while-hp-at-or-below", "while-condition"]);
 
@@ -93,6 +98,7 @@ export type RiderTrigger = Readonly<{
   spellIds?: readonly string[];
   creatureTypes?: readonly string[];
   sizes?: readonly string[];
+  senses?: readonly string[];
 }>;
 
 /** A typed numeric rider, structurally open so each consumer reads only its fields and a variant this build
@@ -199,6 +205,11 @@ export type RiderContext = Readonly<{
   /** The riders being read sit on an effect the roller put on its bearer (Hunter's Mark on the creature it hits);
    *  `by-effect-source` passes only then. */
   fromEffectSource?: boolean;
+  /** Whether the bearer can see the other creature in the roll, and it the bearer (the server's sight). */
+  seesOther?: boolean;
+  seenByOther?: boolean;
+  /** The senses the other creature perceives the bearer with, within their range ("blindsight", "truesight"). */
+  otherSenses?: readonly string[];
 }>;
 
 const overlaps = (allowed: readonly string[] | undefined, have: readonly string[] | undefined): boolean =>
@@ -293,6 +304,16 @@ function passes(trigger: RiderTrigger, context: RiderContext): boolean {
       return overlaps(trigger.conditionIds, context.targetConditionIds);
     case "by-effect-source":
       return context.fromEffectSource === true;
+    case "sees-other":
+      return context.seesOther === true;
+    case "seen-by-other":
+      return context.seenByOther === true;
+    case "other-lacks-sense":
+      return (
+        trigger.senses !== undefined &&
+        context.otherSenses !== undefined &&
+        !trigger.senses.some((sense) => context.otherSenses!.includes(sense))
+      );
     default:
       return false;
   }

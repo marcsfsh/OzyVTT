@@ -29,6 +29,7 @@ import {
   addEffect,
   applyCondition,
   DEATH_WARD_TAG,
+  endConcentrationOnTheDead,
   endConcentrationSustainedBy,
   endEffect,
   endEffectsOnDamage,
@@ -36,6 +37,7 @@ import {
   endKnockOut,
   KNOCKED_OUT_TAG,
   makeEffect,
+  STABLE_RECOVERY_TAG,
   NO_HEALING_TAG,
   reduceExhaustion,
   removeConditionDirect,
@@ -49,6 +51,7 @@ import { leaveShortRest } from "./short-rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { oilIgnition, OILED_TAG } from "./hazards.js";
+import { sightRules } from "./vision/rules.js";
 import {
   deathBurst,
   holdOnAtZero,
@@ -221,6 +224,22 @@ export function standingDefences(
   };
 }
 
+/** Boon of the Night Spirit's Shadowy Form: "While within Dim Light or Darkness, you have Resistance to all damage
+ *  except Psychic and Radiant". Only where dynamic vision knows the light at the creature's space; else the GM's. */
+function inShadowyForm(
+  state: GameState,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  deps: DamageDeps | undefined
+): boolean {
+  if (!deps || !(definition?.character?.feats ?? []).some((feat) => feat.id === "boon-of-the-night-spirit"))
+    return false;
+  const content = { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
+  const light = sightRules(state, content).lightAt(actor.id);
+  return light !== null && light.level !== "bright";
+}
+const SHADOWY_FORM_SPARES = ["psychic", "radiant"];
+
 /** What a hit would come to on this actor: each typed part through its defences, then flat reduction off
  *  the total. Pure, so a prompt can show the number Confirm will land. */
 function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: DamageDeps): DamageWeighing {
@@ -261,6 +280,9 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
     const petrified = actor.conditions.some((condition) => condition.id === "petrified");
     // SRD Underwater Combat: everything fully underwater has resistance to fire damage.
     const underwater = state.combat.active && state.combat.underwater;
+    const shadowy = inShadowyForm(state, actor, definition, deps)
+      ? typed.map((part) => normalizeDamageType(part.type)).filter((type) => !SHADOWY_FORM_SPARES.includes(type))
+      : [];
     const standing = standingDefences(definition, fromChoices, derivation);
     const types = (rows: readonly DerivedDefence[]) => rows.map((row) => row.type);
     // SRD Order of Application: flat reductions first, then Resistance, then Vulnerability.
@@ -273,7 +295,7 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
     );
     flatReduction = reduction.reduced;
     const adjusted = adjustDamageParts(reduction.parts, {
-      resistances: [...types(standing.resistances), ...(underwater ? ["fire"] : [])],
+      resistances: [...types(standing.resistances), ...(underwater ? ["fire"] : []), ...shadowy],
       immunities: types(standing.immunities),
       // Effects and items can make a target vulnerable as a stat block can; with a same-type resistance both apply.
       vulnerabilities: types(standing.vulnerabilities),
@@ -305,7 +327,20 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
         choiceSource === null
           ? "Underwater"
           : null;
-      return { ...part, adjustmentSource: derivedSource ?? choiceSource ?? petrifiedSource ?? underwaterSource };
+      const shadowSource =
+        shadowy.includes(type) &&
+        resisted(part.adjustment) &&
+        !innateHas(innate.resistances) &&
+        derivedSource === null &&
+        petrifiedSource === null &&
+        choiceSource === null &&
+        underwaterSource === null
+          ? "Shadowy Form"
+          : null;
+      return {
+        ...part,
+        adjustmentSource: derivedSource ?? choiceSource ?? petrifiedSource ?? underwaterSource ?? shadowSource
+      };
     });
     totalRequested = typed.reduce((sum, part) => sum + part.amount, 0);
     totalAdjusted = adjusted.reduce((sum, part) => sum + part.adjusted, 0);
@@ -388,6 +423,8 @@ function fallToZero(
   // concentration (SRD Concentration).
   events.push(...endEffectsSustainedBy(state, actor.id));
   events.push(...endConcentrationSustainedBy(state, actor.id));
+  // A spell whose last creature just died has nothing left.
+  events.push(...endConcentrationOnTheDead(state, actor));
   return { instantDeath, defeated };
 }
 
@@ -593,7 +630,16 @@ export function applyDamageDetailed(
     );
   // Sleep, Turn Undead and the like end the moment the bearer takes any damage, and so does a Short Rest.
   if (totalAdjusted > 0)
-    events.push(...endEffectsOnDamage(state, actor), ...leaveShortRest(state, new Set([actor.id]), "took damage"));
+    events.push(
+      ...endEffectsOnDamage(
+        state,
+        actor,
+        input.sourceActorId
+          ? { actorId: input.sourceActorId, ...(deps ? { resolveDefinition: deps.resolveDefinition } : {}) }
+          : undefined
+      ),
+      ...leaveShortRest(state, new Set([actor.id]), "took damage")
+    );
 
   let deathSaveFailuresAdded = 0;
   let instantDeath = false;
@@ -621,7 +667,9 @@ export function applyDamageDetailed(
         sourceActorId: input.sourceActorId ?? null,
         sourceName: input.sourceName ?? null,
         startedRound: state.combat.round,
-        duration: { type: "manual" },
+        // "The creature then has the Unconscious condition and starts a Short Rest": an hour of game time, after which
+        // it wakes, unless hit points or first aid wake it first.
+        duration: { type: "minutes", remaining: 60 },
         linkedConditionIds: ["unconscious"]
       }),
       events,
@@ -629,7 +677,7 @@ export function applyDamageDetailed(
     );
     events.push({
       kind: "condition",
-      text: `${actor.name} was knocked out, Unconscious at 1 HP until it regains hit points.`,
+      text: `${actor.name} was knocked out, Unconscious at 1 HP until it regains hit points or its Short Rest ends.`,
       actorId
     });
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deathWard(state, actor, events)) {
@@ -760,6 +808,9 @@ export function healActor(state: GameState, actorId: string, amount: number, sco
 function wakeOnHealing(state: GameState, actor: Actor, before: number): EffectNarration[] {
   if (actor.hp.current <= before) return [];
   const events = endKnockOut(state, actor);
+  // A Stable creature healed has no more need of its hours to recover.
+  for (const effect of actor.effects.filter((candidate) => candidate.tags.includes(STABLE_RECOVERY_TAG)))
+    events.push(...endEffect(state, actor.id, effect.id));
   // A troll healed off 0 Hit Points no longer waits on its turn to live or die.
   for (const effect of actor.effects.filter((candidate) => candidate.tags.includes(REGENERATING_AT_ZERO_TAG)))
     events.push(...endEffect(state, actor.id, effect.id));
@@ -806,6 +857,7 @@ export function setCurrentHp(state: GameState, actorId: string, current: number,
     // The same transition as damage to 0: what it sustains ends, and so does its Concentration.
     events.push(...endEffectsSustainedBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));
+    events.push(...endConcentrationOnTheDead(state, actor));
   }
   events.push(...wakeOnHealing(state, actor, before));
   return events;

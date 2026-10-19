@@ -12,6 +12,7 @@ import { blinkAway } from "./off-plane.js";
 import { timeStopGoesOn } from "./time-stop.js";
 import { familyModeFor } from "./rules-families.js";
 import { abilityCheckClaims } from "./ability-checks.js";
+import { holdsFeature } from "./class-features.js";
 import { wardedConditions } from "./paladin-auras.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -31,6 +32,8 @@ import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
 import { zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
+import { lapseLongCasts } from "./resolution/long-casting.js";
+import { checkSightFor } from "./vision/rules.js";
 
 type StartEncounterInput = Readonly<{
   mapAssetId: string;
@@ -113,7 +116,12 @@ export function initiativeRollFor(
   const warded = deps.resolveDefinition
     ? wardedConditions(state, actor, { resolveDefinition: deps.resolveDefinition })
     : [];
-  const asCheck = abilityCheckClaims(actor, derivation, { ability: "dex" }, warded);
+  // Frightened only while its source is within line of sight, and the light it stands in (Sunlight Sensitivity).
+  const sight = checkSightFor(state, actor, {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
+  const asCheck = abilityCheckClaims(actor, derivation, { ability: "dex" }, warded, [], sight);
   for (const side of ["advantage", "disadvantage"] as const)
     for (const claim of asCheck[side])
       if (!claims[side].some((held) => held.label === claim.label)) claims[side].push(claim);
@@ -551,6 +559,13 @@ function settleGatherIfComplete(state: GameState) {
 
 /** Dependencies for start-of-turn recharge rolls and ongoing damage and end-of-turn repeat saves; optional so scene
  *  bookkeeping can advance turns without them. */
+/** Whether a creature takes a Reaction on every turn, not once a round (a marilith's Reactive trait). */
+function reactsEveryTurn(state: GameState, actorId: string, deps: TurnAdvanceDeps | undefined): boolean {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor?.definitionId || !deps) return false;
+  return holdsFeature(deps.resolveDefinition(actor.definitionId), "reactive", "Reactive");
+}
+
 export type TurnAdvanceDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
   /** The item catalog, so an item's recharge pool re-arms like a stat block's. */
@@ -680,6 +695,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     ending,
     deps?.newId ? { ...deps, newId: deps.newId, now: deps.now ?? (() => new Date().toISOString()) } : undefined
   );
+  // A spell cast over several turns lapses on a turn that went without its action.
+  lapseLongCasts(state, outgoingId, ending);
   // A spell area the creature ends its turn in acts on it (Moonbeam, Spirit Guardians).
   const zones = zoneDepsOf(deps);
   if (zones) ending.push(...zonesAtTurnEnd(state, outgoingId, zones));
@@ -699,7 +716,10 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD). The turn
     // that just ended opens the window for legendary actions, until the incoming creature does something.
     turn: { ...EMPTY_TURN, ...(outgoingId && !stopped ? { afterActorId: outgoingId } : {}) },
-    reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId),
+    // A marilith's Reactive: "The marilith can take one Reaction on every turn of combat."
+    reactionsUsed: state.combat.reactionsUsed.filter(
+      (actorId) => actorId !== nextActorId && !reactsEveryTurn(state, actorId, deps)
+    ),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, nextActorId)
   };
   // A move or teleport granted for the turn that ended lapses with it.

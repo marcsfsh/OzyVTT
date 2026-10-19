@@ -47,7 +47,8 @@ export function rollsForCommand(state: GameState, commandId: string): readonly R
 export function describeRoll(record: RollRecord): string {
   const who = record.initiatorLabel ?? (record.initiatorRole === "gm" ? "The GM" : "A player");
   const what = record.label ?? PURPOSE_LABELS[record.purpose];
-  return `${who} rolled ${record.total} on ${what} (${record.normalizedFormula}).`;
+  // A player's free roll names itself, so its formula is never read as the rules' bonus.
+  return `${who} rolled ${record.total} on ${what} (${record.normalizedFormula})${record.free ? " with the free dice roller" : ""}.`;
 }
 
 const PURPOSE_LABELS: Readonly<Record<RollRecord["purpose"], string>> = {

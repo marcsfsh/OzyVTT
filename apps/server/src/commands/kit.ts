@@ -422,8 +422,12 @@ export function createKit(context: CommandContext) {
           actorIds: [actorId],
           gmOnly: hidden
         });
-      // A reaction window opened: the table hears why nothing landed yet.
-      const waiting = resolution.waitingOnReaction ? "The attack waits" : "The damage waits";
+      // A reaction window opened: the table hears why nothing landed yet (a cast waits on a Counterspell).
+      const waiting = !resolution.waitingOnReaction
+        ? "The damage waits"
+        : resolution.attack === null
+          ? "The spell waits"
+          : "The attack waits";
       for (const prompt of resolution.reactionPrompts ?? []) {
         const promptHidden = hidden || actorHidden(prompt.actorId);
         context.appendLog({

@@ -1923,7 +1923,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
   });
 
   it("keeps `when` an AND-list, not an expression language", () => {
-    // Twenty-eight triggers in four kinds, and the kind is what decides the evaluation layer.
+    // Thirty triggers in four kinds, and the kind is what decides the evaluation layer.
     expect(riderLayer([])).toBe("standing");
     expect(riderLayer([{ type: "while-hp-at-or-below", percent: 50 }])).toBe("conditional");
     expect(riderLayer([{ type: "attuned" }, { type: "while-shield", wielding: true }])).toBe("standing");

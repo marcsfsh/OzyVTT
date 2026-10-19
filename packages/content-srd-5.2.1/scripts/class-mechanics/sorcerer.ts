@@ -28,7 +28,14 @@ const AFFINITY_TYPES: ReadonlyArray<readonly [id: DamageType, name: string]> = [
 export const sorcerer: ClassMechanicsModule = {
   features: {
     // Grouping tag, as on the other casters; no consumer reads class-feature `tags` yet.
-    spellcasting: { tags: ["spellcasting"] },
+    // "Whenever you gain a Sorcerer level, you can replace one of your cantrips" and "one spell on your list".
+    spellcasting: {
+      tags: ["spellcasting"],
+      replaces: [
+        { offer: "class-cantrips", when: "level-up", amount: 1 },
+        { offer: "class-spells", when: "level-up", amount: 1 }
+      ]
+    },
     /**
      * Bonus Action, two uses per Long Rest, a 10-round `innate-sorcery` tag. The effect carries neither
      * benefit: effects have no `spell-save-dc` modifier, and an effect's roll-mode drops its `when`
@@ -66,6 +73,8 @@ export const sorcerer: ClassMechanicsModule = {
      * `grantedAtLevels`.
      */
     metamagic: {
+      // "Whenever you gain a Sorcerer level, you can replace one of your Metamagic options with one you don't know."
+      replaces: [{ offer: "feature:metamagic", when: "level-up", amount: 1 }],
       options: {
         "careful-spell": ONE_SORCERY_POINT,
         "distant-spell": ONE_SORCERY_POINT,
@@ -159,8 +168,7 @@ export const sorcerer: ClassMechanicsModule = {
           }))
         }
       },
-      // Bonus Action, once per Long Rest. The Fly Speed, 1-hour duration and restoring the use with
-      // Sorcery Points stay prose.
+      // Bonus Action, once per Long Rest, for an hour of game time. Restoring the use with Sorcery Points stays prose.
       "dragon-wings": {
         uses: { limit: 1, per: "long-rest" },
         actions: [
@@ -174,8 +182,7 @@ export const sorcerer: ClassMechanicsModule = {
             grants: {
               name: "Dragon Wings",
               tags: ["dragon-wings"],
-              // "For 1 hour": longer than a grant counts in rounds, so it lasts until dismissed on the sheet.
-              duration: { type: "manual" },
+              duration: { type: "minutes", minutes: 60 },
               modifiers: [{ type: "special-speed", movement: "fly", feet: 60 }],
               onEnd: [],
               target: "self",

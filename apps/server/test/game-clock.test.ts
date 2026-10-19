@@ -142,6 +142,7 @@ describe("travel", () => {
     expect(travelLine(3, "slow")).toContain(
       "6 miles at a Slow pace, with Advantage on Wisdom (Perception or Survival)"
     );
+    expect(travelLine(1.5, "normal")).toContain("4.5 miles at a Normal pace");
     const booted = await boot();
     const travelled = await booted.post(GAME_PATHS.timePass, booted.gmToken, {
       commandId: randomUUID(),

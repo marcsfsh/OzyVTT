@@ -59,6 +59,11 @@ function reactionWords(reaction: PlayerPendingReaction, actor: PlayerActor) {
             ? `${plainActionName(reaction.actionName)} uses your Reaction to take less damage from the fall.`
             : `${plainActionName(reaction.actionName)} uses your Reaction, and ${reaction.sourceName} lands unharmed.`
       };
+    case "casts-spell":
+      return {
+        title: `${reaction.sourceName} is casting a spell`,
+        detail: `${plainActionName(reaction.actionName)} can stop it with your Reaction. The spell waits on your answer.`
+      };
     default:
       return {
         title: `${reaction.sourceName}'s hit deals ${reaction.proposedDamage} damage to ${actor.name}`,

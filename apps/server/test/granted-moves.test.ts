@@ -169,6 +169,27 @@ describe("a granted move", () => {
     expect(blockedBy(() => move(state, HERO, cell(0, 0), cell(2, 0), { byPlayer: true }))).toBe("nothing");
   });
 
+  it("takes a move toward a creature only when it ends nearer that creature (Forceful Blow)", () => {
+    const toward = () => {
+      const state = game(HERO, { [HERO]: cell(2, 0), [ORC]: cell(2, 1), [DRAGON]: cell(6, 0) });
+      grantMove(state, actor(state, HERO), {
+        id: "blow",
+        name: "Forceful Blow",
+        feet: 15,
+        provokes: false,
+        towardActorId: DRAGON
+      });
+      return state;
+    };
+    const after = move(toward(), HERO, cell(2, 0), cell(4, 0));
+    expect(after.granted).toBe("Forceful Blow");
+    expect(after.prompts).toEqual([]);
+    // Back the other way is the turn's own movement, and leaving the orc's reach provokes.
+    const back = move(toward(), HERO, cell(2, 0), cell(0, 0));
+    expect(back.granted).toBeUndefined();
+    expect(back.prompts.map((prompt) => prompt.actorId)).toEqual([ORC]);
+  });
+
   it("lapses when the turn it belongs to ends", () => {
     const state = game(HERO, { [DRAGON]: cell(1, 0), [HERO]: cell(0, 0) });
     pounceGrant(state);
@@ -364,7 +385,7 @@ describe("a creature made to move", () => {
         linkedConditionIds: ["frightened"]
       })
     ];
-    expect(blockedBy(() => move(state, HERO, cell(0, 0), cell(3, 0)))).toBe("movement.frightened");
+    expect(blockedBy(() => move(state, HERO, cell(0, 0), cell(3, 0)))).toBe("movement.toward-fear");
     expect(blockedBy(() => move(state, HERO, cell(0, 0), cell(0, 3)))).toBe("nothing");
   });
 });

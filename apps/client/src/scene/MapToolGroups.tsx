@@ -15,8 +15,10 @@ import {
   IconX
 } from "@vtt/ui";
 import {
+  AREA_KINDS,
   drawingAudienceOptions,
   LIGHT_PRESETS,
+  type AreaKindId,
   NEEDS_GRID,
   type ClearScope,
   type LightPresetId,
@@ -329,6 +331,10 @@ export function LightGroup({
   onVisionEnabledChange,
   ambient,
   onAmbientChange,
+  sunlight,
+  onSunlightChange,
+  areaKind,
+  onAreaKindChange,
   lightPreset,
   onLightPresetChange,
   onForgetExplored,
@@ -360,7 +366,7 @@ export function LightGroup({
           className="map-toolbar-choice tap-target interactive"
           aria-pressed={tool === "vision-erase"}
           disabled={visionBusy}
-          title="Tap a light to remove it."
+          title="Tap a light or an area to remove it."
           onClick={() => onPickTool(tool === "vision-erase" ? "select" : "vision-erase")}
         >
           <span className="map-toolbar-row-icon" aria-hidden="true">
@@ -387,6 +393,39 @@ export function LightGroup({
           ? `Tap the map to place it. It sheds bright light for ${preset.brightFeet} ft and dim light for ${preset.dimFeet} ft more.`
           : "Choose Place, then tap the map."}
       </p>
+      <div className="map-toolbar-choices" role="group" aria-label="Area tools">
+        <button
+          type="button"
+          className="map-toolbar-choice tap-target interactive"
+          aria-pressed={tool === "vision-area"}
+          disabled={visionBusy}
+          title="Drag over the map to paint an area of light or obscurement."
+          onClick={() => onPickTool(tool === "vision-area" ? "select" : "vision-area")}
+        >
+          <span className="map-toolbar-row-icon" aria-hidden="true">
+            <IconTerrain />
+          </span>
+          Paint area
+        </button>
+      </div>
+      <Field label="Area to paint" htmlFor={`${id}-area`} className="map-toolbar-field">
+        <Select
+          id={`${id}-area`}
+          value={areaKind}
+          onChange={(event) => onAreaKindChange(event.target.value as AreaKindId)}
+        >
+          {AREA_KINDS.map((entry) => (
+            <option key={entry.id} value={entry.id}>
+              {entry.label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <p className="map-toolbar-note">
+        {tool === "vision-area"
+          ? "Drag over the map to paint it. Remove, then a tap on it, takes it away."
+          : "A lit room in a dark dungeon, a dark cellar in daylight, fog or foliage: choose Paint area, then drag."}
+      </p>
       <Field label="Ambient light" className="map-toolbar-field">
         <SegmentedControl
           ariaLabel="Ambient light"
@@ -401,6 +440,18 @@ export function LightGroup({
           ]}
         />
       </Field>
+      <Switch
+        className="map-toolbar-switch"
+        checked={sunlight && ambient === "bright"}
+        disabled={visionBusy || ambient !== "bright"}
+        onChange={onSunlightChange}
+        label="Sunlight"
+      />
+      <p className="map-toolbar-note">
+        {ambient === "bright"
+          ? "Daylight outdoors is sunlight. Sunlight Sensitivity and similar traits read it."
+          : "Sunlight needs bright ambient light."}
+      </p>
       <Switch
         className="map-toolbar-switch"
         checked={visionEnabled}

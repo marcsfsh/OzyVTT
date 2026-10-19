@@ -1,5 +1,13 @@
 import { endEffect, READIED_TAG, releaseReadied } from "../effects.js";
+import { laterRowOf } from "../item-actions.js";
 import { endedEffect, type ResolveContext } from "./context.js";
+
+/** The resolve casts a spell with a Verbal component: a new cast, not what the spell lets its caster do later. */
+function castsAloud(ctx: ResolveContext): boolean {
+  const spellId = ctx.action.spellId;
+  const spell = spellId ? ctx.deps.catalog?.spellRecord?.(spellId) : undefined;
+  return spell !== undefined && spell.components.verbal && laterRowOf(spell, ctx.action.id) === undefined;
+}
 
 /** Counts a ray of a released readied spell off its held rays: "held" while rays are left to make, so the ready
  *  stays; "last" for its last ray, which lets it go; null for anything else. */
@@ -19,6 +27,9 @@ function readiedRay(ctx: ResolveContext): "held" | "last" | null {
   return "held";
 }
 
+/** An effect that ends once its bearer takes an action, a Bonus Action or a Reaction (Merge with Shadows). */
+export const UNTIL_NEXT_ACTION_TAG = "until-next-action";
+
 /** Rule consequences of having acted: attacking reveals a hidden creature, and a Reaction taken off-turn uses up
  *  the ready. The economy already spent that Reaction on the readied response (`isReadiedResponse`); any other
  *  Reaction leaves none to take the readied action with. */
@@ -30,8 +41,28 @@ export function releaseHideAndReady(ctx: ResolveContext): void {
     endEffect(state, attacker.id, effect.id);
     effectsEnded.push(endedEffect(attacker, effect));
   };
-  // SRD Hide: the attack still had Invisible's advantage, then the hidden effect ends.
-  if (action.attack !== undefined || action.save !== undefined) end("hidden");
+  // SRD Hide: the attack still had Invisible's advantage, then the hidden effect ends. Casting a spell with a Verbal
+  // component ends it too. Supreme Sneak's Stealth Attack keeps it, if the Thief ends the turn behind Three-Quarters or
+  // Total Cover.
+  if (ctx.keepsHidden && attacker.effects.some((effect) => effect.tags.includes("hidden")))
+    ctx.warnings.push(
+      `Stealth Attack: ${attacker.name} stays hidden only if it ends this turn behind Three-Quarters Cover or Total Cover. If it doesn't, end its Invisible condition then.`
+    );
+  else if (action.attack !== undefined || action.save !== undefined || castsAloud(ctx)) end("hidden");
+  // "The condition ends on you immediately after you take an action, a Bonus Action, or a Reaction": any of them but
+  // the one that gave it.
+  const tookTurnAction =
+    action.activation === "action" ||
+    action.activation === "bonus-action" ||
+    action.activation === "reaction" ||
+    plan.markReaction;
+  if (tookTurnAction)
+    for (const effect of attacker.effects.filter(
+      (candidate) => candidate.tags.includes(UNTIL_NEXT_ACTION_TAG) && !candidate.id.startsWith(ctx.input.commandId)
+    )) {
+      endEffect(state, attacker.id, effect.id);
+      effectsEnded.push(endedEffect(attacker, effect));
+    }
   // A released spell of several rays (Scorching Ray) keeps its ready until its last ray, all on the one Reaction.
   const ray = readiedRay(ctx);
   if (ray === "held") return;

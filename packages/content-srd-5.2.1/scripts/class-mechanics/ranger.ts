@@ -7,6 +7,9 @@ export const ranger: ClassMechanicsModule = {
      * Hunter's Mark always prepared (not counted against the prepared budget), with free casts read off
      * the printed Favored Enemy column (2 rising to 6).
      */
+    // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": made in the Level flow until a
+    // rest offers it.
+    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "level-up", amount: 2 }] },
     "favored-enemy": {
       uses: { scaling: { type: "class-resource", id: "favored-enemy" }, per: "long-rest" },
       grants: { spells: [{ id: "hunters-mark", level: 1, alwaysPrepared: true, withoutSlot: "free" }] }
@@ -101,7 +104,8 @@ export const ranger: ClassMechanicsModule = {
             name: "Druidic Warrior",
             description:
               "You learn two Druid cantrips of your choice. Wisdom is your spellcasting ability for them. Whenever you gain a Ranger level, you can replace one of these cantrips with another Druid cantrip.",
-            choice: { kind: "cantrip", choose: 2, fromCatalog: "druid-spells", maxSpellLevel: 0 }
+            choice: { kind: "cantrip", choose: 2, fromCatalog: "druid-spells", maxSpellLevel: 0 },
+            replaces: [{ offer: "feature:druidic-warrior", when: "level-up", amount: 1 }]
           }
         ]
       }
@@ -135,6 +139,30 @@ export const ranger: ClassMechanicsModule = {
         }
       },
 
+      /**
+       * Tapped once the Ranger's damage lands on its marked creature: the mark's extra damage (1d6 Force, 1d10 from
+       * Foe Slayer at Ranger 20) to one other creature it can see, once per turn. That the mark took damage this turn
+       * and the 30 feet from it stay the table's.
+       */
+      "superior-hunters-prey": {
+        actions: [
+          {
+            id: "superior-hunters-prey",
+            name: "Superior Hunter's Prey",
+            activation: "other",
+            description:
+              "Once per turn when you deal damage to a creature marked by your Hunter's Mark, deal that spell's extra damage to a different creature you can see within 30 feet of the first creature.",
+            damage: [{ formula: "1d6", type: "force" }],
+            damageByLevel: [
+              { level: 11, formula: "1d6", type: "force" },
+              { level: 20, formula: "1d10", type: "force" }
+            ],
+            uses: { limit: 1, per: "turn", pool: "superior-hunters-prey" },
+            targets: { count: 1, seen: true, who: "others" }
+          }
+        ]
+      },
+
       // Escape the Horde's Disadvantage is read on every Opportunity Attack against the Ranger. Multiattack
       // Defense is marked on the Ranger by the engine after a hit (`resolution/struck.ts`).
       "defensive-tactics": {
@@ -163,6 +191,20 @@ export const ranger: ClassMechanicsModule = {
             }
           ]
         }
+      },
+      // Offered on damage the Ranger is about to take; using it resists the damage's largest type until the turn ends.
+      "superior-hunters-defense": {
+        actions: [
+          {
+            id: "superior-hunters-defense",
+            name: "Superior Hunter's Defense",
+            activation: "reaction",
+            description:
+              "When you take damage, take a Reaction to give yourself Resistance to that damage and any other damage of the same type until the end of the current turn.",
+            damage: [],
+            reaction: { trigger: "takes-damage", response: "resist-type" }
+          }
+        ]
       }
     }
   },

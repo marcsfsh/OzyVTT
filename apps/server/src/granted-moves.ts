@@ -56,6 +56,7 @@ export function grantMove(
     costFeet?: number;
     owedActionId?: string;
     awayFromActorId?: string;
+    towardActorId?: string;
   }>
 ): void {
   const grant: MoveGrant = {
@@ -67,7 +68,8 @@ export function grantMove(
     round: state.combat.round,
     turnActorId: state.combat.turnActorId,
     ...(input.owedActionId ? { owedActionId: input.owedActionId } : {}),
-    ...(input.awayFromActorId ? { awayFromActorId: input.awayFromActorId } : {})
+    ...(input.awayFromActorId ? { awayFromActorId: input.awayFromActorId } : {}),
+    ...(input.towardActorId ? { towardActorId: input.towardActorId } : {})
   };
   actor.effects = [
     ...actor.effects.filter((effect) => effect.grantedMove === undefined),

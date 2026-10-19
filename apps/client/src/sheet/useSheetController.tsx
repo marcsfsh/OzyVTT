@@ -108,7 +108,32 @@ export function useSheetController({
       .sort((left, right) => Number(right.kind === "player-character") - Number(left.kind === "player-character"))
       .map((other) => ({ id: other.id, name: other.name }))
   ];
+  // Whom a spell cast outside a fight may target, as the server allows: this character, the party and the creatures
+  // the player can see (for the GM, anyone on the roster).
+  const castCandidates = [
+    { id: actor.id, name: actor.name },
+    ...rosterActors<GmActor | PlayerActor>(state?.actors ?? [])
+      .filter((other) => other.id !== actor.id && !("archived" in other && other.archived))
+      .sort((left, right) => Number(right.kind === "player-character") - Number(left.kind === "player-character"))
+      .map((other) => ({ id: other.id, name: other.name }))
+  ];
   const [looseHeal, setLooseHeal] = useState<LooseHeal | null>(null);
+  /** A spell cast outside a fight at creatures it helps or makes save (Aid, Hold Person) asks whom it targets, so the
+   *  server resolves it as it would in a fight. An attack or a save-less blast rolls loose as before. */
+  const looseCastOf = (actionId: string, slotLevel?: number): LooseHeal | null => {
+    const row = serverActions.find((candidate) => candidate.id === actionId);
+    if (!row || row.healing || (row.targeting !== "single" && row.targeting !== "multi")) return null;
+    if (row.attackBonus !== null || (row.saveAbility === null && row.damage.length > 0)) return null;
+    return {
+      actionId,
+      name: row.name,
+      most: row.targeting === "single" ? 1 : castCandidates.length,
+      spendUpTo: null,
+      purpose: "cast",
+      ...(slotLevel !== undefined ? { slotLevel } : {}),
+      includeDamage: true
+    };
+  };
   // A heal outside a fight asks who regains the hit points, unless it only heals its user (Second Wind).
   const looseHealOf = (actionId: string, slotLevel?: number, includeDamage?: boolean): LooseHeal | null => {
     const own = definition?.actions.find((candidate) => candidate.id === actionId);
@@ -137,7 +162,7 @@ export function useSheetController({
   const healDialog = looseHeal ? (
     <HealTargetPicker
       heal={looseHeal}
-      candidates={healCandidates}
+      candidates={looseHeal.purpose === "cast" ? castCandidates : healCandidates}
       defaultId={actor.id}
       onClose={() => setLooseHeal(null)}
       onConfirm={(targetIds, spend) => {
@@ -150,7 +175,7 @@ export function useSheetController({
             ...(looseHeal.slotLevel !== undefined ? { slotLevel: looseHeal.slotLevel } : {}),
             ...(looseHeal.includeDamage ? { includeDamage: true } : {})
           },
-          "That could not be used."
+          looseHeal.purpose === "cast" ? "The spell could not be cast." : "That could not be used."
         );
       }}
     />
@@ -215,7 +240,7 @@ export function useSheetController({
       routeAttack(structured, slotLevel);
       return;
     }
-    const heal = inFight ? null : looseHealOf(actionId, slotLevel, true);
+    const heal = inFight ? null : (looseHealOf(actionId, slotLevel, true) ?? looseCastOf(actionId, slotLevel));
     if (heal) {
       setLooseHeal(heal);
       return;

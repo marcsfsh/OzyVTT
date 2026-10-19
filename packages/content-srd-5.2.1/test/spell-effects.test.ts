@@ -72,7 +72,13 @@ describe("what one cast of an SRD spell does", () => {
     });
     // Feather Fall answers a fall, which the server sees (`falling.ts`).
     expect(effectOf("feather-fall")!.reaction).toEqual({ trigger: "falls", response: "cast-on-faller", rangeFeet: 60 });
-    expect(effectOf("counterspell")!.reaction).toBeUndefined();
+    // "When you see a creature within 60 feet of yourself casting a spell": the cast waits on the answer.
+    expect(effectOf("counterspell")!.reaction).toEqual({
+      trigger: "casts-spell",
+      response: "counter",
+      ability: "con",
+      rangeFeet: 60
+    });
   });
 
   it("deals the damage of a spell that harms as it appears (2024 wording)", () => {

@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { GameStateSchema, type GameState } from "@vtt/domain";
+import { GameStateSchema, PendingSaveSchema, type GameState } from "@vtt/domain";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
 import { addEffect, endEffect, makeEffect } from "../src/effects.js";
 import { nextInitiativeTurn } from "../src/encounter.js";
 import { blinkAway, needsPlaneSettling, settlePlanes } from "../src/off-plane.js";
+import { applyFailureEffect } from "../src/saving-throws.js";
 import type { TokenMapGeometry } from "../src/token-placement.js";
 import { cell } from "./movement-fixtures.js";
 
-// SRD 5.2.1 leaving the plane (Banishment, Etherealness, Blink, Maze): the creature leaves the map, keeps its place in
+// SRD 5.2.1 leaving the plane (Banishment, Etherealness, Blink, Maze, Hurl Through Hell): the creature leaves the map, keeps its place in
 // the initiative, can't be targeted from the plane nor target anyone on it, and returns to the space it left or the
 // nearest unoccupied one.
 
@@ -104,10 +105,41 @@ describe("a creature off the plane", () => {
     };
     expect(() =>
       resolveDefinitionAction(state, bolt, { actorId: MAGE, targetIds: [OGRE], commandId: "c1" }, deps)
-    ).toThrow("Ogre is off this plane.");
+    ).toThrow("Ogre is gone from this plane for now and can't be targeted.");
     expect(() =>
       resolveDefinitionAction(state, bolt, { actorId: OGRE, targetIds: [MAGE], commandId: "c2" }, deps)
     ).toThrow("Ogre is off this plane and can't reach Mirena.");
+  });
+
+  it("hurls a creature through the Lower Planes until the end of the Warlock's next turn, then returns it", () => {
+    const state = game();
+    const turn = () =>
+      nextInitiativeTurn(state, [], { resolveDefinition: () => undefined, rollDie: () => 1, newId: () => "e" });
+    // Hurl Through Hell's failed save, applied on the Warlock's own turn.
+    applyFailureEffect(
+      state,
+      OGRE,
+      PendingSaveSchema.shape.onFailEffect.unwrap().parse({
+        name: "Hurled Through Hell",
+        tags: ["off-plane"],
+        linkedConditionIds: ["incapacitated"],
+        sourceActorId: MAGE,
+        sourceName: "Mirena",
+        duration: { type: "until-source-turn-end" }
+      }),
+      "hurled"
+    );
+    settlePlanes(state, GRID);
+    expect(token(state, OGRE).position).toBeNull();
+    // The end of the turn it was hurled on doesn't count, nor do the turns after it, up to the Warlock's next.
+    turn();
+    turn();
+    turn();
+    expect(state.combat.turnActorId).toBe(MAGE);
+    expect(needsPlaneSettling(state)).toBe(false);
+    turn();
+    expect(settlePlanes(state, GRID).map((event) => event.text)).toEqual(["Ogre returns to the space it left."]);
+    expect(token(state, OGRE).position).toEqual(cell(3, 0));
   });
 
   it("blinks onto the Ethereal Plane on a 4 or more at the end of its turn, and back at the start of its next", () => {

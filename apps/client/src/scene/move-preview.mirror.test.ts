@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { GameStateSchema, type GameState, type GmActor } from "@vtt/domain";
 import { movementCost } from "../../../server/src/terrain";
 import type { TokenMapGeometry } from "../../../server/src/token-placement";
+import { spaceSharingFor } from "../../../server/src/space-sharing";
 import { moveLabel, movementWallsOf, previewMove } from "./movePreview";
 
 // The drag preview and the server's charge must agree, so the preview runs the server's own scenarios.
@@ -341,5 +343,76 @@ describe("the drag preview takes jumps and granted moves as the server does", ()
       text: "Misty Step 40 ft · 10 ft too far",
       over: true
     });
+  });
+});
+
+describe("the drag preview follows the server through creatures that share spaces", () => {
+  const ELEMENTAL = "10000000-0000-4000-8000-000000000004";
+  const RATS = "10000000-0000-4000-8000-000000000005";
+  const monsters = new Map(loadMonsterDefinitions().map((definition) => [definition.source.externalId, definition]));
+  const resolve = (definitionId: string) => monsters.get(definitionId);
+  // One row of cells, so a creature that bars the way leaves no way round it.
+  const corridor = { ...GRID, height: 50 };
+
+  function hall(positions: Readonly<Record<string, { x: number; y: number }>>): GameState {
+    const actors = [
+      { id: HERO, name: "Borin", kind: "player-character" },
+      { id: FRIEND, name: "Mirena", kind: "player-character" },
+      { id: ELEMENTAL, name: "Air Elemental", kind: "monster", definitionId: "air-elemental" },
+      { id: RATS, name: "Swarm of Rats", kind: "monster", definitionId: "swarm-of-rats" }
+    ];
+    return GameStateSchema.parse({
+      schemaVersion: 1,
+      actors: actors.map((actor) => ({ ...actor, visibility: "public", hp: { current: 10, maximum: 10 } })),
+      combat: {
+        active: true,
+        round: 1,
+        turnActorId: HERO,
+        mapAssetId: MAP,
+        initiative: actors.map((actor, index) => ({ actorId: actor.id, score: 20 - index })),
+        tokens: actors
+          .filter((actor) => positions[actor.id] !== undefined)
+          .map((actor) => ({ actorId: actor.id, position: positions[actor.id], sizePx: 40, sizeCells: 1 }))
+      }
+    });
+  }
+
+  /** The server's charge and the preview's, each told what the movement reply tells the client. */
+  function both(state: GameState, moverId: string, from: { x: number; y: number }, to: { x: number; y: number }) {
+    const sharing = spaceSharingFor(state, moverId, resolve, () => false);
+    const charged = movementCost(state, corridor, moverId, from, to, {
+      resolveDefinition: resolve,
+      ...(sharing.passesCreatures ? { passesCreatures: true } : {})
+    });
+    const previewed = previewMove({
+      calibration: CALIBRATION,
+      size: { width: corridor.width, height: corridor.height },
+      terrain: [],
+      tokens: state.combat.tokens,
+      actorsById: new Map(state.actors.map((actor) => [actor.id, actor as GmActor])),
+      moverId,
+      from,
+      to,
+      ...(sharing.passesCreatures ? { passesCreatures: true } : {}),
+      ...(sharing.swarmIds ? { swarmIds: sharing.swarmIds } : {})
+    });
+    return { charged, previewed };
+  }
+
+  it("takes an air elemental through two characters, as Difficult Terrain", () => {
+    const state = hall({ [ELEMENTAL]: cell(0, 0), [HERO]: cell(2, 0), [FRIEND]: cell(3, 0) });
+    const { charged, previewed } = both(state, ELEMENTAL, cell(0, 0), cell(5, 0));
+    expect(charged).toMatchObject({ feet: 35, difficultFeet: 10 });
+    expect(previewed?.blocked).toBeUndefined();
+    expect(previewed?.feet).toBe(charged?.feet);
+    expect(previewed?.difficultFeet).toBe(charged?.difficultFeet);
+  });
+
+  it("takes a fighter through a swarm of rats at double cost", () => {
+    const state = hall({ [HERO]: cell(0, 0), [RATS]: cell(2, 0) });
+    const { charged, previewed } = both(state, HERO, cell(0, 0), cell(4, 0));
+    expect(charged).toMatchObject({ feet: 25, difficultFeet: 5 });
+    expect(previewed?.feet).toBe(charged?.feet);
+    expect(previewed?.difficultFeet).toBe(charged?.difficultFeet);
   });
 });

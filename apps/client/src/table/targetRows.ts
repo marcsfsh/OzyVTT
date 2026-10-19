@@ -1,4 +1,4 @@
-import type { EncounterToken, PlayerView } from "@vtt/domain";
+import type { ContentActionSummary, ContentSpellSummary, EncounterToken, PlayerView } from "@vtt/domain";
 import { useTargeting } from "../encounter/targeting";
 import { initialsOf } from "../scene/tokenGlyph";
 import type { GridCalibration } from "../scene/gridPreview";
@@ -15,9 +15,15 @@ export type TargetRow = Readonly<{
   number?: number;
   /** "50 ft · AC 15": the distance from the attacker, and the AC when this viewer knows it. */
   detail?: string;
+  /** The distance from the attacker in feet, where the map measures it. */
+  feet?: number;
+  /** At 0 Hit Points. */
+  down?: boolean;
+  /** Why this action can't pick it now ("Out of range: 90 ft, the reach is 60 ft"); shown, and not picked. */
+  unavailable?: string;
 }>;
 
-type Candidate = Readonly<{ id: string; name: string; kind: string; armorClass?: number }>;
+type Candidate = Readonly<{ id: string; name: string; kind: string; armorClass?: number; down?: boolean }>;
 
 /** Target rows for `attackerId`'s action. A player knows the AC of their party only; the GM knows every creature's. */
 export function targetRows(
@@ -44,16 +50,51 @@ export function targetRows(
       initials: initialsOf(candidate.name),
       kind: candidate.kind,
       ...(number !== undefined ? { number } : {}),
-      ...(parts.length > 0 ? { detail: parts.join(" · ") } : {})
+      ...(parts.length > 0 ? { detail: parts.join(" · ") } : {}),
+      ...(feet !== null ? { feet } : {}),
+      ...(candidate.down ? { down: true } : {})
     };
   });
 }
 
-/** A player's target rows for their own character's action, and who a placed area of theirs covers now. */
-export function usePlayerTargetRows(state: PlayerView, attackerId: string | null) {
-  const calibration = useTableCalibration(state.combat.mapAssetId);
-  const session = useTargeting();
-  const everyone = state.combat.initiative.flatMap((entry) => {
+/** How far an action reaches: an attack's reach or its long range, its own target range, or a spell's printed range
+ *  (Touch is 5 feet). Null when it names no distance (Self, a feature without a range). */
+export function reachOf(action: ContentActionSummary, spell?: ContentSpellSummary): number | null {
+  if (action.attackBonus !== null) {
+    const reaches = [action.reachFeet, action.rangeFeet].filter((feet): feet is number => feet !== null);
+    return reaches.length > 0 ? Math.max(...reaches) : null;
+  }
+  // An action's own target range (Lay on Hands' touch, a flask's 20 feet).
+  if (action.targetRangeFeet !== undefined) return action.targetRangeFeet;
+  if (!spell) return null;
+  return spell.rangeFeet ?? (/^touch$/i.test(spell.rangeText ?? "") ? 5 : null);
+}
+
+/**
+ * The rows an action may pick, as the server will judge them: a creature that isn't a player character and is at 0
+ * Hit Points is dead and leaves the list of what attacks, forces a save or deals damage (a heal, Spare the Dying and a
+ * revival keep it), and one beyond the action's reach stays listed with the reason. Distances are the map's, measured
+ * between the tokens this viewer already has.
+ */
+export function pickableTargets<Row extends Pick<TargetRow, "id" | "label"> & Partial<TargetRow>>(
+  rows: readonly Row[],
+  action: ContentActionSummary,
+  spell?: ContentSpellSummary
+): Row[] {
+  const harms = action.attackBonus !== null || action.saveAbility !== null || action.damage.length > 0;
+  const reach = reachOf(action, spell);
+  return rows
+    .filter((row) => !(harms && row.down && row.kind !== "player-character"))
+    .map((row) =>
+      reach !== null && row.feet !== undefined && row.feet > reach
+        ? { ...row, unavailable: `Out of range: ${row.feet} ft away, the reach is ${reach} ft.` }
+        : row
+    );
+}
+
+/** The fight's creatures as a player knows them: the party's Armor Class, and who is down. */
+export function playerTargetCandidates(state: PlayerView): Candidate[] {
+  return state.combat.initiative.flatMap((entry) => {
     const actor = state.actors.find((candidate) => candidate.id === entry.actorId);
     // A player knows the Armor Class of the party only; a monster's is the GM's.
     return actor
@@ -62,11 +103,20 @@ export function usePlayerTargetRows(state: PlayerView, attackerId: string | null
             id: actor.id,
             name: entry.name,
             kind: actor.kind,
-            ...(actor.armorClass !== undefined ? { armorClass: actor.armorClass } : {})
+            ...(actor.armorClass !== undefined ? { armorClass: actor.armorClass } : {}),
+            // A player knows a creature is down from its band; a party member's points are exact.
+            ...((actor.hp.kind === "band" ? actor.hp.band === "down" : actor.hp.current <= 0) ? { down: true } : {})
           }
         ]
       : [{ id: entry.actorId, name: entry.name, kind: "monster" }];
   });
+}
+
+/** A player's target rows for their own character's action, and who a placed area of theirs covers now. */
+export function usePlayerTargetRows(state: PlayerView, attackerId: string | null) {
+  const calibration = useTableCalibration(state.combat.mapAssetId);
+  const session = useTargeting();
+  const everyone = playerTargetCandidates(state);
   const rows = attackerId ? targetRows(attackerId, everyone, state.combat.tokens, calibration, everyone) : [];
   const area = session && session.attackerId === attackerId && session.mode === "template" ? session.template : null;
   const caught =

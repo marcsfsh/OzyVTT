@@ -33,7 +33,13 @@ describe("trait mechanics in the monster bundle", () => {
       "Gibbering",
       "Vile Appearance",
       "Berserk",
-      "Corrosive Form"
+      "Corrosive Form",
+      "Illumination",
+      "Light Sensitivity",
+      "Sunlight Sensitivity",
+      "Sunlight Weakness",
+      "Vampire Weakness",
+      "Invisibility"
     ])
       expect(ran.get(name) ?? 0, name).toBe(name === "Corrosive Form" ? 1 : printed.get(name));
   });
@@ -76,7 +82,8 @@ describe("trait mechanics in the monster bundle", () => {
         affects: "chosen",
         notWhileIncapacitated: true,
         damage: [{ formula: "1d10", type: "fire" }]
-      }
+      },
+      { kind: "light", name: "Illumination", brightFeet: 10, dimFeet: 10 }
     ]);
     expect(mechanicsOf("fire-elemental")).toContainEqual(expect.objectContaining({ rangeFeet: 10, hazard: "burning" }));
     expect(mechanicsOf("pit-fiend")).toEqual([
@@ -108,7 +115,7 @@ describe("trait mechanics in the monster bundle", () => {
       reminder: expect.stringContaining("1-4: The target does nothing.")
     });
     // "Any Beast or Humanoid that starts its turn within 30 feet of the hag and can see the hag's true form": the types
-    // are read, and the sight is the GM's.
+    // are read, and only a creature that sees the hag makes the save.
     expect(mechanicsOf("sea-hag")).toEqual([
       {
         kind: "aura",
@@ -117,6 +124,7 @@ describe("trait mechanics in the monster bundle", () => {
         rangeFeet: 30,
         affects: "all",
         creatureTypes: ["beast", "humanoid"],
+        seenOnly: true,
         save: {
           ability: "wis",
           dc: 11,
@@ -137,6 +145,40 @@ describe("trait mechanics in the monster bundle", () => {
         damage: [{ formula: "1d10", type: "piercing" }]
       }
     ]);
+  });
+
+  it("reads the light a creature sheds, the light that hinders it, and a creature that is always Invisible", () => {
+    expect(mechanicsOf("fire-elemental")).toContainEqual({
+      kind: "light",
+      name: "Illumination",
+      brightFeet: 30,
+      dimFeet: 30
+    });
+    expect(mechanicsOf("cloaker")).toContainEqual({
+      kind: "light-sensitivity",
+      name: "Light Sensitivity",
+      light: "bright",
+      rolls: ["attack"]
+    });
+    expect(mechanicsOf("drider")).toContainEqual({
+      kind: "light-sensitivity",
+      name: "Sunlight Sensitivity",
+      light: "sunlight",
+      rolls: ["check", "attack"]
+    });
+    // A shadow's Sunlight Weakness reaches every D20 Test, saves included.
+    expect(mechanicsOf("shadow")).toContainEqual(
+      expect.objectContaining({ name: "Sunlight Weakness", rolls: ["attack", "check", "save"] })
+    );
+    // "The vampire takes 20 Radiant damage if it starts its turn in sunlight."
+    expect(mechanicsOf("vampire")).toContainEqual(
+      expect.objectContaining({
+        kind: "light-sensitivity",
+        name: "Vampire Weakness",
+        damageAtTurnStart: { amount: 20, type: "radiant" }
+      })
+    );
+    expect(mechanicsOf("invisible-stalker")).toContainEqual({ kind: "invisible", name: "Invisibility" });
   });
 
   it("reads Death Burst and the balor's Death Throes", () => {

@@ -8,4 +8,5 @@ export * from "./riders.js";
 export * from "./movement.js";
 export * from "./altitude.js";
 export * from "./encounters.js";
+export * from "./advancement.js";
 export * from "./monster-stats.js";
