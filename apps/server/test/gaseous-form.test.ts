@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { builtinActionFor } from "../src/builtin-actions.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { formViolations } from "../src/transform/rules.js";
+import { spaceSharingFor } from "../src/space-sharing.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { saveRollSources } from "../src/saving-throws.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
@@ -53,6 +54,9 @@ describe("Gaseous Form", () => {
     expect(fight.actor(FOE).hp.current).toBe(before - 10);
     const derivation = deriveEquipment(fight.actor(FOE), fight.definitionOf(FOE), catalog);
     expect(saveRollSources(fight.actor(FOE), "dex", derivation).advantage.length).toBeGreaterThan(0);
+    // "The target can enter and occupy the space of another creature."
+    expect(spaceSharingFor(fight.state, FOE, resolverOf(fight.state), () => false).passesCreatures).toBe(true);
+    expect(spaceSharingFor(fight.state, HERO, resolverOf(fight.state), () => false).passesCreatures).toBeUndefined();
   });
 });
 

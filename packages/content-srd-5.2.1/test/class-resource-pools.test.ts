@@ -79,7 +79,8 @@ describe("every printed class resource is either a real pool or marked display-o
       ].sort();
     expect(keysFor("fighter")).toEqual(["action-surge", "indomitable", "second-wind"]);
     expect(keysFor("cleric")).toEqual(["blessed-strikes", "channel-divinity", "divine-intervention"]);
-    expect(keysFor("wizard")).toEqual(["arcane-recovery", "overchannel", "signature-spells"]);
+    // Overchannel and Signature Spells count their uses per cast spell on the server, not in a pool.
+    expect(keysFor("wizard")).toEqual(["arcane-recovery"]);
     const clericColumns = new Set(
       classes
         .find((entry) => entry.id === "cleric")!
