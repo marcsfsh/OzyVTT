@@ -2037,7 +2037,7 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     bonusActions: ["disengage"]
   }),
   // "Any attack you make deals an extra 2d8 damage when you hit a creature within 15 feet of yourself. This damage is
-  // Acid, Cold, Fire, or Lightning", picked at the cast.
+  // Acid, Cold, Fire, or Lightning (your choice when you make the attack)": the cast picks a default, each hit another.
   "conjure-minor-elementals": spellGrant({
     name: "Conjure Minor Elementals",
     tags: ["conjure-minor-elementals"],
@@ -2052,6 +2052,8 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
             type: "extra-damage",
             formula: "2d8",
             damageType: type,
+            // The type picked at the cast is the default; each attack may pick another.
+            damageTypes: ["acid", "cold", "fire", "lightning"],
             doubleOnCritical: true,
             when: [{ type: "on-hit" }, { type: "versus-within", feet: 15 }]
           }

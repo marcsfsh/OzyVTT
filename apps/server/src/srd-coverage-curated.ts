@@ -1842,8 +1842,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:cloudkill": enforced(
     "spell-zones.ts asks for the Constitution save against 5d8 Poison damage on the cast and when a creature enters the Sphere or ends its turn there, once a turn. At the start of each of the caster's turns it moves the Sphere 10 feet straight away from the caster, and a creature the Sphere moves onto makes the save. The Sphere is Heavily Obscured for dynamic vision (vision/cast-sight.ts)."
   ),
-  "spell:conjure-minor-elementals": guided(
-    "zone-ground.ts makes the ground in the 15-foot Emanation Difficult Terrain for the caster's enemies, and each of the caster's hits on a creature within 15 feet deals an extra 2d8 of the type picked at the cast (resolution/damage.ts). Picking the type for each attack instead, and the extra 1d8 a slot level, are the GM's."
+  "spell:conjure-minor-elementals": enforced(
+    "zone-ground.ts makes the ground in the 15-foot Emanation Difficult Terrain for the caster's enemies, and each of the caster's hits on a creature within 15 feet deals an extra 2d8, 1d8 more a slot level above 4 (item-actions.ts), of the type picked at the cast unless the attack's preview picks another of Acid, Cold, Fire or Lightning (resolution/damage.ts, resolution/hit-options.ts)."
   ),
   "spell:entangle": enforced(
     "The cast's Strength save leaves a creature in the square Restrained, escaped with a Strength (Athletics) check against the spell save DC. zone-ground.ts makes the square Difficult Terrain for the duration. Leaving the caster out of its own square is the GM's."

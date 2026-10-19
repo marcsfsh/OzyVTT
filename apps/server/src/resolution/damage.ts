@@ -283,7 +283,12 @@ export function rollRiderDamage(ctx: ResolveContext): void {
       // bearer's sheet; it rolls no die and is never crit-doubled.
       const abilityAmount =
         modifier.abilityModifier === undefined ? 0 : abilityModifier(deps.definition, modifier.abilityModifier);
-      const type = modifier.damageType ?? damage[0]?.type ?? "untyped";
+      // A type the attacker picked for this hit (Conjure Minor Elementals), else the effect's own.
+      const type =
+        pickedRiderType(ctx, rider.sourceEffectId, modifier.damageTypes) ??
+        modifier.damageType ??
+        damage[0]?.type ??
+        "untyped";
       if (modifier.formula === undefined) {
         if (abilityAmount === 0) continue; // a +0 modifier adds no entry and no noise to the card
         damage.push({ formula: String(abilityAmount), type, total: abilityAmount });
@@ -349,4 +354,14 @@ export function spendDamageUses(ctx: ResolveContext): void {
     endEffect(state, attacker.id, effectId);
     effectsEnded.push(endedEffect(attacker, effect));
   }
+}
+
+/** The id prefix of a pick of another damage type for an effect's extra damage on this hit. */
+export const RIDER_TYPE_PREFIX = "rider-type:";
+
+/** The type picked on this hit for an effect's extra damage, when the effect lets it be picked. */
+export function pickedRiderType(ctx: ResolveContext, effectId: string | undefined, types: readonly string[] | undefined) {
+  if (effectId === undefined || !types) return undefined;
+  const choice = (ctx.input.hitOptions ?? []).find((entry) => entry.id === `${RIDER_TYPE_PREFIX}${effectId}`);
+  return choice?.damageType && types.includes(choice.damageType) ? choice.damageType : undefined;
 }

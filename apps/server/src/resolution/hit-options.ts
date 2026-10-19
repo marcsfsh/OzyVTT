@@ -17,7 +17,7 @@ import { effectiveModeFor, overrideCovers, overrideWaives } from "../rules-famil
 import { useCostOf } from "../use-cost.js";
 import { recordRoll, sizeAtMost, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
 import { beginConcentration } from "./concentration.js";
-import { criticalExpression, SAVAGE_ATTACKER, savageAttackerReady } from "./damage.js";
+import { criticalExpression, RIDER_TYPE_PREFIX, SAVAGE_ATTACKER, savageAttackerReady } from "./damage.js";
 import { commitEconomy, evaluateActionEconomy, planEconomy, spendSlot } from "./economy.js";
 import { applyHitOutcome, forceMove, grantHalfSpeedMove, openRiderSave, rollPlain } from "./hit-rider-outcomes.js";
 import { hitRiderOf, type HitRider } from "./hit-riders.js";
@@ -273,7 +273,7 @@ function diceOf(ctx: ResolveContext, action: DefinitionAction, rider: HitRider, 
 /** The extras a previewed hit may carry, for the card to offer. Empty unless the attack would land. */
 export function hitOffersOf(ctx: ResolveContext): HitOffer[] {
   if (!landed(ctx) || ctx.targets.length !== 1) return [];
-  const offers: HitOffer[] = [];
+  const offers: HitOffer[] = [...riderTypeOffers(ctx)];
   const charge = chargeOf(ctx);
   if (charge)
     offers.push({
@@ -337,6 +337,26 @@ export function hitOffersOf(ctx: ResolveContext): HitOffer[] {
     });
   }
   return offers;
+}
+
+/** The extra damage the attacker's effects add whose type it picks on each hit (Conjure Minor Elementals: "your choice
+ *  when you make the attack"): one offer per effect, its types picked once it is on. */
+function riderTypeOffers(ctx: ResolveContext): HitOffer[] {
+  return ctx.attacker.effects.flatMap((effect) => {
+    const types = effect.modifiers.find(
+      (modifier) => modifier.type === "extra-damage" && (modifier.damageTypes?.length ?? 0) > 1
+    );
+    if (!types || types.type !== "extra-damage" || !types.damageTypes) return [];
+    return [
+      {
+        id: `${RIDER_TYPE_PREFIX}${effect.id}`,
+        name: `${effect.name} · damage type`,
+        dice: "",
+        cost: null,
+        damageTypes: [...types.damageTypes]
+      }
+    ];
+  });
 }
 
 /** Refuses an extra this hit can't carry, unless the GM's override covers the targeting family. */
@@ -418,8 +438,8 @@ export function rollHitOptions(ctx: ResolveContext): void {
     byPool.set(pool, action.name);
   }
   for (const choice of chosen) {
-    // Rolled with the weapon's own dice (`rollWeaponDamage`).
-    if (choice.id === SAVAGE_ATTACKER) continue;
+    // Rolled with the weapon's own dice (`rollWeaponDamage`), or a type the effect's own dice take (`damage.ts`).
+    if (choice.id === SAVAGE_ATTACKER || choice.id.startsWith(RIDER_TYPE_PREFIX)) continue;
     if (choice.id === "charge") {
       rollCharge(ctx, roll);
       continue;

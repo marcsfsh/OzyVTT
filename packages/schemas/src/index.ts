@@ -1052,6 +1052,9 @@ export const ModifierSchema = z
         ),
         abilityModifier: AbilitySchema.optional(),
         damageType: DamageTypeSchema.optional(),
+        /** The types its bearer may pick from on each hit, `damageType` being the one it deals unpicked (Conjure Minor
+         *  Elementals: "Acid, Cold, Fire, or Lightning (your choice when you make the attack)"). */
+        damageTypes: z.array(DamageTypeSchema).min(2).max(13).optional(),
         doubleOnCritical: z.boolean().default(true),
         /** It is dealt once a turn at most, whoever's turn it is (Colossus Slayer). */
         oncePerTurn: z.literal(true).optional(),
