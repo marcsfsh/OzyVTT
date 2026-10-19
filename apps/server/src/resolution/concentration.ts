@@ -1,11 +1,11 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { spellDurationAt, spellSpanOf } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { EffectInstance, SpellZone } from "@vtt/domain";
-import { MAX_EFFECT_MINUTES, type SaveFailureDuration } from "@vtt/schemas";
+import { catalogIdOf, MAX_EFFECT_MINUTES, type SaveFailureDuration } from "@vtt/schemas";
 import { addEffect, CONCENTRATING_TAG, makeEffect, turnEndDuration, type EffectNarration } from "../effects.js";
-import { laterRowOf, laterSpellActionId } from "../item-actions.js";
+import { isItemActionId, itemActionRest, laterRowOf, laterSpellActionId } from "../item-actions.js";
 import { castThisTurnKey } from "../lasting-spells.js";
-import { endZone } from "../spell-zone-state.js";
+import { areaAtLevel, endZone } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
 import { tableLineOf, type ResolveContext } from "./context.js";
 
@@ -154,11 +154,29 @@ export function markSpellUp(ctx: ResolveContext): void {
   ctx.effectsApplied.push({ targetId: attacker.id, targetName: attacker.name, name: spell.name, conditionIds: [] });
 }
 
+/** The area a cast's zone stands on: the action's own (an item that doubles Web's), else the spell's, grown with the
+ *  slot it was cast at. */
+function placedAreaOf(ctx: ResolveContext, spell: SpellReference): SpellZone["area"] {
+  const area = ctx.action.area ?? spell.area;
+  return area ? areaAtLevel(area, spell, castLevelOf(ctx, spell)) : null;
+}
+
 /** The cast's save DC, for the zone's later saves: the cast's own, the caster's later action's, or the caster's spell
  *  save DC. */
 function zoneDc(ctx: ResolveContext, spell: SpellReference, rowName: string): number {
   const later = ctx.siblings.find((action) => action.id === laterSpellActionId(spell.id, rowName));
-  return ctx.action.save?.dc ?? later?.save?.dc ?? ctx.deps.definition?.spellcasting?.saveDc ?? 10;
+  return (
+    ctx.action.save?.dc ?? itemCastDc(ctx, spell) ?? later?.save?.dc ?? ctx.deps.definition?.spellcasting?.saveDc ?? 10
+  );
+}
+
+/** The DC an item prints for the spell it casts ("Web (save DC 13)"), for a cast from that item. */
+function itemCastDc(ctx: ResolveContext, spell: SpellReference): number | undefined {
+  if (!isItemActionId(ctx.action.id)) return undefined;
+  const rest = itemActionRest(ctx.action.id);
+  const row = ctx.attacker.inventory.find((item) => rest === `${item.id}-cast-${spell.id}`);
+  const record = row ? ctx.deps.catalog?.equipmentRecord(catalogIdOf(row)) : undefined;
+  return record?.casts.find((cast) => cast.spellId === spell.id)?.saveDc;
 }
 
 /**
@@ -176,6 +194,7 @@ export function openSpellZone(ctx: ResolveContext): void {
   const aroundCaster = row.zone.around === "caster";
   const duration = spellEffectDuration(spell, castLevelOf(ctx, spell));
   const caught = ctx.action.save !== undefined || ctx.action.damage.length > 0;
+  const casterAt = state.combat.tokens.find((token) => token.actorId === attacker.id)?.position ?? null;
   const spellUp =
     ctx.castId === null ? attacker.effects.find((effect) => effect.id === `${input.commandId}:spell`) : undefined;
   const zone: SpellZone = {
@@ -191,13 +210,16 @@ export function openSpellZone(ctx: ResolveContext): void {
     level: castLevelOf(ctx, spell),
     dc: zoneDc(ctx, spell, row.name),
     annotationId: !aroundCaster && input.areaPlaced === true ? input.commandId : null,
-    area: aroundCaster ? null : (spell.area ?? null),
+    // The template it is placed with: an item's own area (a doubled Web), grown with the slot (Fog Cloud).
+    area: aroundCaster ? null : placedAreaOf(ctx, spell),
     damageDealt: 0,
     // The damage type the caster chose for it (Conjure Elemental's element).
     ...(input.damageType && (spell.effect?.damageTypes ?? []).includes(input.damageType as never)
       ? { damageType: input.damageType }
       : {}),
     ...(row.zone.on.includes("spell-end") ? { burstsOnEnd: true as const } : {}),
+    // "An immobile barrier": it stays where its caster stood.
+    ...(row.zone.stays && casterAt ? { anchor: { x: casterAt.x, y: casterAt.y } } : {}),
     entered: [],
     affected: caught ? targets.map((target) => target.id) : []
   };

@@ -86,6 +86,37 @@ export function policeBarrier(
   return message;
 }
 
+/**
+ * SRD Globe of Invulnerability: "Any spell of level 5 or lower cast from outside the barrier can't affect anything within
+ * it", one level higher for each slot level above 6. The creatures among `targetIds` such a barrier keeps a spell cast
+ * at `castLevel` by `casterId` from, with the barrier's name.
+ */
+export function spellWardedTargets(
+  state: GameState,
+  input: Readonly<{ casterId: string; castLevel: number; targetIds: readonly string[] }>,
+  deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">
+): Array<Readonly<{ actorId: string; ward: string }>> {
+  const warded: Array<Readonly<{ actorId: string; ward: string }>> = [];
+  for (const zone of liveZones(state)) {
+    const content = zoneContentOf(zone, deps.catalog);
+    const wards = content?.trigger.wardsSpells;
+    if (!content || wards === undefined) continue;
+    if (input.castLevel > wards + Math.max(0, zone.level - content.spell.level)) continue;
+    const inside = insideTest(state, zone, content.trigger, content.spell, deps.geometry);
+    if (!inside) continue;
+    const within = (actorId: string) => {
+      const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
+      return token?.position ? inside(token.position, token.sizeCells) : false;
+    };
+    // Cast from inside, the barrier is no barrier.
+    if (within(input.casterId)) continue;
+    for (const actorId of input.targetIds)
+      if (within(actorId) && !warded.some((entry) => entry.actorId === actorId))
+        warded.push({ actorId, ward: zone.name });
+  }
+  return warded;
+}
+
 /** The area a teleport may not end in (Forbiddance), by name, or null. */
 export function teleportBarredAt(
   state: GameState,

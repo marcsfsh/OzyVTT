@@ -176,7 +176,12 @@ export const SpellZoneSchema = z
     revives: z.number().int().min(1).max(10).optional(),
     /** Its area moves this many feet straight away from its caster at the start of each of the caster's turns
      *  (Cloudkill, Incendiary Cloud), acting on the creatures it moves onto. */
-    drifts: z.number().int().min(5).max(60).optional()
+    drifts: z.number().int().min(5).max(60).optional(),
+    /** An Emanation that stays where its caster stood at the cast ("an immobile barrier": Globe of Invulnerability). */
+    stays: z.literal(true).optional(),
+    /** A spell of this level or lower cast from outside it can't affect anything within, one level higher for each slot
+     *  level the spell is cast above its own (Globe of Invulnerability's 5). */
+    wardsSpells: z.number().int().min(0).max(9).optional()
   })
   .strict();
 export type SpellZone = z.infer<typeof SpellZoneSchema>;
@@ -318,7 +323,9 @@ export const SpellEffectSchema = z
     rangeDoubles: z.literal(true).optional(),
     /** No sound can be made in the area its cast places (Silence), so a creature standing there can't cast a spell
      *  with a Verbal component while the spell lasts. */
-    silencesArea: z.literal(true).optional()
+    silencesArea: z.literal(true).optional(),
+    /** Feet its area's size grows for each slot level above the spell's (Fog Cloud's radius: 20; Confusion's: 5). */
+    areaPerSlot: z.number().int().min(5).max(100).optional()
   })
   .strict();
 export type SpellEffect = z.infer<typeof SpellEffectSchema>;
@@ -603,6 +610,11 @@ export const ItemSpellCastSchema = z
     /** Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear: Beasts only). */
     targets: ActionTargetsSchema.optional().describe(
       "Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear affects Beasts only), checked on the server"
+    ),
+    /** The area the item's cast covers in place of the spell's own (Wand of Fear's 60-foot Cone, Cloak of Arachnida's
+     *  Web filling twice its area). */
+    area: ActionAreaSchema.optional().describe(
+      "The area the item's cast covers in place of the spell's own (a wand's 60-foot Cone of Fear), placed as the template"
     )
   })
   .strict()

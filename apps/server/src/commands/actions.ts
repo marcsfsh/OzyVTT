@@ -30,7 +30,9 @@ import { rollSettledCheck } from "../check-rolls.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { SCROLL_UNREADABLE, scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "../scrolls.js";
 import { castSlotLevel, untrainedArmorCast } from "../resolution/economy.js";
+import { areaAtLevel } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
+import { spellWardedTargets } from "../zone-barriers.js";
 import { areaMoveOf, moveArea, planAreaMove, type AreaMove } from "../zone-moves.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
@@ -119,6 +121,8 @@ export const actionCommands = [
       // A spell's area this action moved, what it did as it came to rest, and a rules note its move let through.
       let areaEvents: EffectNarration[] = [];
       let areaMoveNote: string | null = null;
+      // The creatures a barrier against spells kept the cast from, for the GM.
+      let wardNotes: string[] = [];
       const { state, duplicate } = await execute((draft) => {
         // Access first (the action kind is for the per-table policy hook, ADR-0021): a missing creature and someone
         // else's get one answer, so a player can't probe which ids exist.
@@ -158,8 +162,11 @@ export const actionCommands = [
           if (draft.combat.mapAssetId !== mapAssetId)
             throw new CommandRejectedError("The active encounter changed. Try again.");
           const calibration = geometry!.calibration!;
-          // The action's own area decides the shape and the size; the drag only places and points it.
-          placed = action.area ? templateOfArea(calibration, template, action.area) : template;
+          // The action's own area decides the shape and the size, grown with a cast's slot (Fog Cloud); the drag only
+          // places and points it.
+          const casting = castSpellOf(action, kit.equipmentCatalog().spellRecord);
+          const area = action.area && casting ? areaAtLevel(action.area, casting, request.slotLevel) : action.area;
+          placed = area ? templateOfArea(calibration, template, area) : template;
           // Snap the template the same way the drawn annotation will, then find who is under it.
           const snapped = shapeGeometry(calibration, placed.shape, placed.origin, placed.target);
           const spell = action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined;
@@ -234,6 +241,20 @@ export const actionCommands = [
             )
               throw new CommandRejectedError(OUTSIDE_FIGHT_TARGETS);
           }
+        }
+        // A barrier against spells (Globe of Invulnerability) leaves the creatures in it out of a lower spell cast from
+        // outside it: the spell can target them and has no effect on them.
+        const spellCast = castSpellOf(action, kit.equipmentCatalog().spellRecord);
+        if (spellCast && geometry?.calibration && resolvedTargetIds.length > 0) {
+          const warded = spellWardedTargets(
+            draft,
+            { casterId: actorId, castLevel: request.slotLevel ?? spellCast.level, targetIds: resolvedTargetIds },
+            kit.zoneDeps(draft, geometry)
+          );
+          resolvedTargetIds = resolvedTargetIds.filter((id) => !warded.some((entry) => entry.actorId === id));
+          wardNotes = warded.map(
+            (entry) => `${entry.ward} keeps ${spellCast.name} from affecting ${kit.actorName(entry.actorId)}.`
+          );
         }
         // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, measured edge to edge.
         const distanceFeet = (actorIdA: string, actorIdB: string): number | null =>
@@ -421,6 +442,8 @@ export const actionCommands = [
         kit.narrateResolution(resolution, actorId);
         kit.publishNarrations(restBroken);
         kit.publishNarrations(areaEvents);
+        for (const note of wardNotes)
+          kit.context.appendLog({ kind: "action", text: note, actorIds: [actorId], gmOnly: true });
         if (areaMoveNote)
           kit.context.appendLog({
             kind: "action",

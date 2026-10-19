@@ -1043,6 +1043,8 @@ export const SpellZoneSchema = z
     annotationId: z.string().min(1).max(120).nullable(),
     /** The template the GM places it with: the spell's own area. Null for an Emanation, which is its caster's. */
     area: ActionAreaSchema.nullable().default(null),
+    /** Where its caster stood at the cast, for an Emanation that stays there (Globe of Invulnerability). */
+    anchor: z.object({ x: z.number(), y: z.number() }).strict().optional(),
     /** Damage dealt so far, against a cap the spell prints (Guardian of Faith's 60). */
     damageDealt: z.number().int().nonnegative().max(100000).default(0),
     /** The damage type the caster chose at the cast (Conjure Elemental's element); absent, the spell's own. */

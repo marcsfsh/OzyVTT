@@ -23,9 +23,10 @@ function saveBlocksIn(file: string): Array<{ path: string; save: SaveBlock }> {
       const record = node as Record<string, unknown>;
       if (record.save && typeof record.save === "object")
         found.push({ path: `${path}${record.id ? `(${String(record.id)})` : ""}`, save: record.save as SaveBlock });
-      // A hit rider's save (a Cunning Strike's Trip, Giant Slayer's) does nothing on a success by its own shape.
+      // A hit rider's save (a Cunning Strike's Trip, Giant Slayer's) does nothing on a success by its own shape, and so
+      // does the save a melee hit on an aura's bearer costs its attacker (Holy Aura's Blinded).
       for (const [key, child] of Object.entries(record))
-        if (key !== "ridesHit" && key !== "onHit") walk(child, `${path}.${key}`);
+        if (key !== "ridesHit" && key !== "onHit" && key !== "struck") walk(child, `${path}.${key}`);
     }
   };
   walk(JSON.parse(readFileSync(join(bundlesDir, file), "utf8")), file);

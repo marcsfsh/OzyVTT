@@ -1,7 +1,21 @@
+import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState, SpellZone } from "@vtt/domain";
+import type { ActionArea } from "@vtt/schemas";
 import type { EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { laterRowOf } from "./item-actions.js";
+
+/** A spell's area at the level it is cast: its size grows by the spell's `areaPerSlot` feet for each slot level above
+ *  its own (Fog Cloud's radius by 20, Confusion's by 5, Create or Destroy Water's Cube by 5). */
+export function areaAtLevel(
+  area: ActionArea,
+  spell: Pick<SpellReference, "level" | "effect">,
+  level: number | undefined
+): ActionArea {
+  const grows = spell.effect?.areaPerSlot;
+  const above = Math.max(0, (level ?? spell.level) - spell.level);
+  return grows && above > 0 ? { ...area, sizeFeet: Math.min(1000, area.sizeFeet + grows * above) } : area;
+}
 
 /** The spell and its zone row a live zone names; undefined when the catalog no longer has them. */
 export function zoneContentOf(zone: SpellZone, catalog: EquipmentCatalog | undefined) {

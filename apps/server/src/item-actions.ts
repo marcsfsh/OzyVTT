@@ -239,7 +239,8 @@ export function castAction(
   );
   return {
     ...base,
-    ...castAreaOf(spell, mechanics),
+    // The item's own area, where it prints one (a wand's 60-foot Cone), else the spell's.
+    ...(cast.area ? { area: structuredClone(cast.area) } : castAreaOf(spell, mechanics)),
     ...mechanics,
     // A Reaction spell (Shield, Hellish Rebuke) is cast from the item as a Reaction, offered when its trigger happens.
     ...(spell.effect?.reaction

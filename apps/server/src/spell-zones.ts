@@ -1,14 +1,14 @@
 import type { SpellReference, SpellZone as ZoneTrigger } from "@vtt/content-srd-5.2.1";
 import type { GameState, SpellZone } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
-import type { ActorAction, ActorDefinition } from "@vtt/schemas";
+import { catalogIdOf, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { shapeGeometry } from "./annotations.js";
 import { footprintInTemplate } from "./area-targeting.js";
 import { holdsFeature } from "./class-features.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import { areAllies, areEnemies } from "./creature-sides.js";
 import { CONCENTRATING_TAG, endEffectIfPresent, type EffectNarration } from "./effects.js";
-import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
 import { applyDamageDetailed, damageAdjustmentDetail, healActor } from "./hit-points.js";
 import { laterSpellAction, upcastAction } from "./item-actions.js";
 import { creatureDistance, DISTANCE_TOLERANCE_FEET, mapDistance } from "./movement-narration.js";
@@ -130,9 +130,11 @@ export function insideTest(
     };
   if (trigger.around === "caster") {
     const caster = tokenOf(state, zone.casterId);
-    if (!caster?.position) return null;
+    // An Emanation that stays where its caster stood is measured from there, wherever the caster goes.
+    const at = zone.anchor ?? casterAt ?? caster?.position;
+    if (!at) return null;
     return within(
-      { position: casterAt ?? caster.position, sizeCells: caster.sizeCells, sizePx: caster.sizePx },
+      { position: at, sizeCells: caster?.sizeCells ?? 1, sizePx: caster?.sizePx ?? calibration.cellSizePx },
       trigger.feet ?? 5
     );
   }
@@ -155,16 +157,25 @@ const FREE_ON: Readonly<Record<string, Readonly<{ id: string; name: string; unca
 };
 
 /** Whether the creature crosses this kind of ground at no extra cost; with `caught`, whether the ground can't hold it
- *  either. */
+ *  either. A worn item tagged with the trait's id frees its wearer from being held, as Cloak of Arachnida's Spider Walk
+ *  does ("You can't be caught in webs of any sort"), and leaves the ground as costly as it is. */
 export function movesFreelyOn(
   creature: Actor,
   kind: string,
-  deps: Pick<ZoneDeps, "resolveDefinition">,
+  deps: Pick<ZoneDeps, "resolveDefinition"> & Readonly<{ catalog?: EquipmentCatalog }>,
   caught = false
 ): boolean {
   const trait = FREE_ON[kind];
-  if (!trait || !creature.definitionId || (caught && !trait.uncaught)) return false;
-  return holdsFeature(deps.resolveDefinition(creature.definitionId), trait.id, trait.name);
+  if (!trait || (caught && !trait.uncaught)) return false;
+  if (creature.definitionId && holdsFeature(deps.resolveDefinition(creature.definitionId), trait.id, trait.name))
+    return true;
+  return (
+    caught &&
+    creature.inventory.some((row) => {
+      const record = deps.catalog?.equipmentRecord(catalogIdOf(row));
+      return record?.tags.includes(trait.id) === true && itemIsActive(row, record);
+    })
+  );
 }
 
 /** A creature's type, as its stat block prints it ("humanoid" for a character). */
@@ -178,7 +189,7 @@ export function exposed(
   state: GameState,
   zone: SpellZone,
   trigger: ZoneTrigger,
-  deps: Pick<ZoneDeps, "resolveDefinition">
+  deps: Pick<ZoneDeps, "resolveDefinition" | "catalog">
 ): Actor[] {
   const caster = state.actors.find((actor) => actor.id === zone.casterId);
   const kind = trigger.terrain?.kind;
@@ -407,7 +418,7 @@ export function zonesAfterMove(
     if (!content) continue;
     const { spell, trigger } = content;
     // An Emanation moves with its caster, over whoever it reaches.
-    if (trigger.around === "caster" && zone.casterId === mover.id) {
+    if (trigger.around === "caster" && zone.casterId === mover.id && !zone.anchor) {
       const tests = path.map((point) => insideTest(state, zone, trigger, spell, deps.geometry, point));
       if (!trigger.on.includes("enter") || tests.some((test) => test === null)) continue;
       for (const creature of exposed(state, zone, trigger, deps)) {

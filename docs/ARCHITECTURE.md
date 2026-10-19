@@ -323,7 +323,9 @@ after every command, as its own write when anything changed. A later action that
 (Moonbeam's Magic action, Flaming Sphere's ram) takes a template like a cast: the area moves there if that
 is within the spell's reach of where it stood, its save falls on the creatures the area moves onto, and no
 new shape is drawn (`zone-moves.ts`). A cloud that drifts (Cloudkill) moves straight away from its caster as
-the caster's turn starts.
+the caster's turn starts. A cast's template grows with its slot where the spell says so (Fog Cloud), an
+item's cast may place its own area (Cloak of Arachnida's doubled Web), and an Emanation that stays where
+its caster stood (Globe of Invulnerability) keeps lower spells cast from outside off the creatures in it.
 
 Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
 (`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long

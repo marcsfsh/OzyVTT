@@ -621,6 +621,17 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       zone: { on: ["enter", "end-turn"], terrain: DIFFICULT }
     }
   ],
+  // "An immobile, shimmering barrier appears in a 10 foot Emanation around you", and "any spell of level 5 or lower cast
+  // from outside the barrier can't affect anything within it".
+  "globe-of-invulnerability": [
+    lasting("barrier", "A spell of level 5 or lower cast from outside the barrier can't affect anything within it.", {
+      on: [],
+      around: "caster",
+      feet: 10,
+      stays: true,
+      wardsSpells: 5
+    })
+  ],
   // Explosive Rune: a creature that sets the glyph off (stepping on it) makes it erupt in a "20-foot-radius Sphere
   // centered on the glyph", and "once a glyph is triggered, this spell ends". The glyph is nearly imperceptible.
   "glyph-of-warding": [
@@ -952,6 +963,9 @@ const PICKS_IN_AREA: ReadonlySet<string> = new Set([
 ]);
 /** "Three bolts then leap from that target to as many as three other targets ... within 30 feet of the first target." */
 const CHAIN_FEET: Readonly<Record<string, number>> = { "chain-lightning": 30 };
+/** "Using a Higher-Level Spell Slot": the feet an area grows for each slot level above the spell's (Fog Cloud's radius by
+ *  20 feet, Confusion's by 5, Create or Destroy Water's Cube by 5). */
+const AREA_PER_SLOT: Readonly<Record<string, number>> = { "fog-cloud": 20, confusion: 5, "create-or-destroy-water": 5 };
 
 /** What a cast's hit lands on its target besides its damage (SRD 5.2.1 text). */
 const CAST_ON_HIT: Readonly<Record<string, readonly OnHitRider[]>> = {
@@ -1433,6 +1447,8 @@ const PERSISTS_WITHOUT_TARGETS: ReadonlySet<string> = new Set(["earthquake", "en
  *  the GM's to draw), and a sphere, guardian, pack or cloud as the circle it covers around its point. */
 const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   "blade-barrier": { shape: "line", sizeFeet: 100, widthFeet: 5 },
+  // The bolt's point and the 5 feet around it: "Each creature within 5 feet of that point".
+  "call-lightning": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "conjure-animals": { shape: "sphere", sizeFeet: 10, widthFeet: null },
   // The Large spirit and the 5 feet it reaches around it.
   "conjure-elemental": { shape: "sphere", sizeFeet: 10, widthFeet: null },
@@ -1516,7 +1532,8 @@ export function spellEffectFor(
     ...(RANGE_DOUBLES.has(id) ? { rangeDoubles: true as const } : {}),
     ...(SILENCES_AREA.has(id) ? { silencesArea: true as const } : {}),
     ...(PICKS_IN_AREA.has(id) ? { picksInArea: true as const } : {}),
-    ...(CHAIN_FEET[id] !== undefined ? { chainFeet: CHAIN_FEET[id] } : {})
+    ...(CHAIN_FEET[id] !== undefined ? { chainFeet: CHAIN_FEET[id] } : {}),
+    ...(AREA_PER_SLOT[id] !== undefined ? { areaPerSlot: AREA_PER_SLOT[id] } : {})
   };
 }
 
@@ -1607,5 +1624,6 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...RANGE_DOUBLES,
   ...SILENCES_AREA,
   ...PICKS_IN_AREA,
-  ...Object.keys(CHAIN_FEET)
+  ...Object.keys(CHAIN_FEET),
+  ...Object.keys(AREA_PER_SLOT)
 ];
