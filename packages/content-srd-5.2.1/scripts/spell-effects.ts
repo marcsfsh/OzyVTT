@@ -151,6 +151,7 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   "enhance-ability": { count: 1, perSlot: 1 },
   enlargereduce: { count: 1 },
   eyebite: { count: 1 },
+  // "Choose up to five falling creatures within range."
   "feather-fall": { count: 5 },
   "finger-of-death": { count: 1 },
   "flesh-to-stone": { count: 1 },
@@ -935,12 +936,24 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   ]
 };
 
-/** Reaction spells the table offers as prompts: what triggers each and what casting it does. Counterspell and Feather
- *  Fall answer triggers the engine doesn't see (a spell being cast, a fall), so they stay with the GM. */
+/** Spells whose cast teleports the caster on the map, taken at once with no GM ask (`granted-moves.ts`). Teleport,
+ *  Plane Shift and Word of Recall go somewhere off the map, which stays with the GM. */
+const CAST_TELEPORTS: Readonly<Record<string, NonNullable<SpellEffect["teleport"]>>> = {
+  // "You teleport up to 30 feet to an unoccupied space you can see."
+  "misty-step": { feet: 30 },
+  // "You teleport to a location within range": seen or not. "If you ... would arrive in a space occupied by a
+  // creature ... you ... each take 4d6 Force damage, and the teleportation fails."
+  "dimension-door": { feet: 500, unseen: true, failDamage: "4d6" }
+};
+
+/** Reaction spells the table offers as prompts: what triggers each and what casting it does. Counterspell answers a
+ *  trigger the engine doesn't see (a spell being cast), so it stays with the GM. */
 const CAST_REACTIONS: Readonly<Record<string, NonNullable<SpellEffect["reaction"]>>> = {
   // +5 AC until the start of the caster's next turn, including against the triggering attack.
   shield: { trigger: "hit-by-attack", response: "ac-bonus", amount: 5, untilNextTurn: true },
   "hellish-rebuke": { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 60 },
+  // "When you or a creature you can see within 60 feet of you falls": the cast lands on the falling creature.
+  "feather-fall": { trigger: "falls", response: "cast-on-faller", rangeFeet: 60 },
   // "When you see a creature within 60 feet of yourself casting a spell with Verbal, Somatic, or Material components":
   // the caster makes a Constitution saving throw.
   counterspell: { trigger: "casts-spell", response: "counter", ability: "con", rangeFeet: 60 }
@@ -1320,6 +1333,47 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     baseArmorClass: 13
   }),
+  // "If a creature lands before the spell ends, the creature takes no damage from the fall, and the spell ends for
+  // that creature." The engine lands a creature that carries it without damage (`falling.ts`).
+  "feather-fall": spellGrant({
+    name: "Feather Fall",
+    tags: ["feather-fall"],
+    target: "targets",
+    duration: rounds(10)
+  }),
+  // "Once on each of its turns until the spell ends, that creature can jump up to 30 feet by spending 10 feet of
+  // movement": a jump the movement rules take once a turn (`jumping.ts`).
+  jump: spellGrant({
+    name: "Jump",
+    tags: ["jump"],
+    target: "targets",
+    duration: rounds(10),
+    modifiers: [{ type: "movement", rule: "leap", feet: 30, costFeet: 10 }]
+  }),
+  // "You step into the border regions of the Ethereal Plane": off the map, unseen and untouchable from this plane,
+  // until the caster ends it (8 hours); it returns to the space it left or the nearest unoccupied one.
+  etherealness: spellGrant({
+    name: "Etherealness",
+    tags: ["off-plane"],
+    target: "self",
+    duration: { type: "manual" }
+  }),
+  // "You banish a creature ... into a labyrinthine demiplane": off the map while the caster concentrates; its escape
+  // check is the GM's.
+  maze: spellGrant({
+    name: "Maze",
+    tags: ["off-plane"],
+    target: "target",
+    duration: rounds(100)
+  }),
+  // "Roll 1d6 at the end of each of your turns": the server rolls it, and on a 4 or more the caster is off the map
+  // until the start of its next turn (`off-plane.ts`).
+  blink: spellGrant({
+    name: "Blink",
+    tags: ["blink"],
+    target: "self",
+    duration: rounds(10)
+  }),
   // "Gains a Fly Speed of 60 feet and can hover."
   fly: spellGrant({
     name: "Fly",
@@ -1396,6 +1450,24 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
         when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
       }
     ]
+  },
+  // "Rises vertically up to 20 feet and remains suspended there for the duration", moving only "as if it were
+  // climbing"; when it ends the target "floats gently to the ground" (`falling.ts` raises and lowers it).
+  levitate: { name: "Levitate", tags: ["levitating"], modifiers: [] },
+  // "Transported to a harmless demiplane for the duration ... When the spell ends, the target reappears in the space it
+  // left or in the nearest unoccupied space": it leaves the map until the effect ends (`off-plane.ts`). An
+  // extraplanar target that stays gone for the full minute is the GM's.
+  banishment: { name: "Banished", tags: ["off-plane"], modifiers: [] },
+  // Imprisoned "until the spell is dispelled": off the map until the GM ends it. Its form, and the trigger that frees
+  // it, are the GM's.
+  imprisonment: { name: "Imprisoned", tags: ["off-plane"], modifiers: [] },
+  // "Must immediately use its Reaction, if available, to move as far away from you as it can, using the safest route":
+  // the server spends the Reaction and gives the creature a move of its Speed that must end farther away.
+  "dissonant-whispers": {
+    name: "Dissonant Whispers",
+    tags: ["flees-with-reaction"],
+    duration: rounds(1),
+    modifiers: []
   },
   // "Can't cast spells or take the Magic action", until a repeated save every 30 days or a spell ends it.
   befuddlement: { name: "Befuddlement", tags: ["no-spells"], modifiers: [] },
@@ -1500,6 +1572,7 @@ export function spellEffectFor(
   const drain = CAST_DRAINS[id];
   const cures = CAST_CURES[id];
   const burst = CAST_BURSTS[id];
+  const teleport = CAST_TELEPORTS[id];
   const dispel = CAST_DISPELS[id];
   const selfSave = CAST_SELF_SAVES[id];
   return {
@@ -1522,6 +1595,7 @@ export function spellEffectFor(
     ...(grant ? { grant: structuredClone(grant) } : {}),
     ...(failureEffect ? { failureEffect: structuredClone(failureEffect) } : {}),
     ...(reaction ? { reaction } : {}),
+    ...(teleport ? { teleport: { ...teleport } } : {}),
     ...(selfSave ? { selfSave: { ...selfSave } } : {}),
     ...(dispel ? { dispel: { ...dispel } } : {}),
     ...(CAST_ENDS_CURSES.has(id) ? { endsCurses: true as const } : {}),
@@ -1605,6 +1679,7 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_TARGETS),
   ...Object.keys(UPCAST_CORRECTIONS),
   ...Object.keys(CAST_REACTIONS),
+  ...Object.keys(CAST_TELEPORTS),
   ...Object.keys(CAST_GRANTS),
   ...Object.keys(CAST_ON_HIT),
   ...Object.keys(CAST_MISS_DAMAGE),

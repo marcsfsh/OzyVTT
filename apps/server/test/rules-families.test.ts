@@ -48,7 +48,10 @@ describe("rule families", () => {
       ["movement.occupied", "movement"],
       ["movement.no-speed", "movement"],
       ["movement.blocked-path", "movement"],
+      ["movement.altitude", "movement"],
+      ["movement.jump", "movement"],
       ["movement.toward-fear", "movement"],
+      ["movement.mount", "movement"],
       ["economy.action-used", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
@@ -67,6 +70,7 @@ describe("rule families", () => {
       ["condition.no-reactions", "economy"],
       ["condition.no-spells", "economy"],
       ["legendary.own-turn", "economy"],
+      ["legendary.after-a-turn", "economy"],
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],
       ["attack.cleave-needs-hit", "economy"],
@@ -125,6 +129,13 @@ describe("rule families", () => {
       ["slots.below-spell-level", "slots"],
       ["slots.one-per-turn", "slots"],
       ["slots.not-prepared", "slots"],
+      // Metamagic shapes a cast: spellcasting rules, its picks' creatures a cast's targeting, its own row a rider.
+      ["metamagic.unknown", "slots"],
+      ["metamagic.unfit", "slots"],
+      ["metamagic.too-many", "slots"],
+      ["metamagic.quickened", "slots"],
+      ["metamagic.choice", "targeting"],
+      ["metamagic.with-a-cast", "economy"],
       // "Check spell components" relaxes speech, hands and materials alone.
       ["spell.no-verbal", "components"],
       ["spell.no-free-hand", "components"],

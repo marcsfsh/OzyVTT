@@ -20,13 +20,12 @@ export function zoneMovementOptions(
   state: GameState,
   actorId: string,
   deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">
-): Pick<MovementCostOptions, "difficultAt" | "halvedAt" | "barredStep"> {
+): Pick<MovementCostOptions, "difficultAt" | "halvedAt" | "costlyGroundAt" | "barredStep"> {
   const mover = state.actors.find((actor) => actor.id === actorId);
   if (!mover) return {};
   const difficult: Inside[] = [];
   const doubled: Inside[] = [];
   const halving = speedHalvingAt(state, actorId, deps);
-  if (halving) doubled.push(halving);
   for (const zone of liveZones(state)) {
     const content = zoneContentOf(zone, deps.catalog);
     const terrain = content?.trigger.terrain;
@@ -44,8 +43,9 @@ export function zoneMovementOptions(
   return {
     ...(barredStep ? { barredStep } : {}),
     ...(difficult.length > 0 ? { difficultAt: (point: Point) => difficult.some((inside) => inside(point, 1)) } : {}),
+    ...(halving ? { halvedAt: halving } : {}),
     ...(doubled.length > 0
-      ? { halvedAt: (point: Point, sizeCells: number) => doubled.some((inside) => inside(point, sizeCells)) }
+      ? { costlyGroundAt: (point: Point, sizeCells: number) => doubled.some((inside) => inside(point, sizeCells)) }
       : {})
   };
 }

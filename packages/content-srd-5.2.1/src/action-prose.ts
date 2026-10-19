@@ -2,7 +2,15 @@
  * What an action's prose says that play needs as data. Read where an action enters the system (the content
  * build, a homebrew save, an import), so the engine never reads prose while a fight runs.
  */
-import type { ActionArea, ActionReaction, ActorAction, DamageDrain, ForcedPush } from "@vtt/schemas";
+import type {
+  ActionArea,
+  ActionMove,
+  ActionReaction,
+  ActionTeleport,
+  ActorAction,
+  DamageDrain,
+  ForcedPush
+} from "@vtt/schemas";
 
 /**
  * The area of effect a description names. SRD 2024 phrasing is consistent enough to pattern-match ("60-foot
@@ -220,9 +228,66 @@ export function hitPushOfProse(description: string): ForcedPush | null {
   return push ? { feet: Number.parseInt(push[2]!, 10), ...(push[1] ? { upTo: true as const } : {}) } : null;
 }
 
+const SPEED_MODES = { fly: "fly", swim: "swim", climb: "climb", burrow: "burrow" } as const;
+
+/** Where an action's text makes an attack or calls for a saving throw. */
+const ATTACK_OR_SAVE = /\bmakes? (?:one|two|an?) [^.]*?attack|Saving Throw:/i;
+
+/**
+ * The move an action makes its own creature take, from its SRD 2024 text: "The dragon moves up to half its Speed, and
+ * it makes one Rend attack", "the roc flies up to half its Fly Speed without provoking Opportunity Attacks", "The
+ * sahuagin swims up to its Swim Speed straight toward an enemy it can see". `first` when the move comes before the
+ * attack or the save the action makes. A move of "its Speed or Burrow Speed" may be either. Null when it prints none.
+ */
+export function moveOfProse(description: string): ActionMove | null {
+  const found =
+    /\b(?:the (?!target\b)[a-z -]+?|it) (?:can |then )?(move|moves|fly|flies|swim|swims|climb|climbs|burrow|burrows) up to (half )?its (?:(Fly|Swim|Climb|Burrow) )?Speed( or [A-Z][a-z]+ Speed)?([^.]*)/i.exec(
+      description
+    );
+  if (!found) return null;
+  const verb = found[1]!.toLowerCase().replace(/ies$/, "y").replace(/s$/, "");
+  const named = found[3]?.toLowerCase() ?? verb;
+  const mode = found[4] ? undefined : SPEED_MODES[named as keyof typeof SPEED_MODES];
+  const rest = found[5] ?? "";
+  const first =
+    ATTACK_OR_SAVE.test(description.slice(found.index)) && !ATTACK_OR_SAVE.test(description.slice(0, found.index));
+  return {
+    speed: found[2] ? "half" : "full",
+    ...(mode ? { mode } : {}),
+    provokes: !/without provoking Opportunity Attacks/i.test(rest),
+    ...(/straight toward/i.test(rest) ? { straight: true as const } : {}),
+    ...(first ? { first: true as const } : {})
+  };
+}
+
+/**
+ * The teleport an action makes its creature take: "The dog teleports up to 40 feet to an unoccupied space it can see";
+ * the balor's "teleports itself or a willing demon within 10 feet of itself up to 60 feet"; a dryad's Tree Stride, 5
+ * feet from a tree up to 60 feet from the last, at most 65 feet. Null when it prints none.
+ */
+export function teleportOfProse(description: string): ActionTeleport | null {
+  const plain =
+    /\bteleports(?: itself(?: or a willing [a-z ]+ within \d+ feet of itself)?)? up to (\d+) feet to an unoccupied space\b/i.exec(
+      description
+    );
+  if (plain) return { feet: Number.parseInt(plain[1]!, 10) };
+  const stride =
+    /\bteleports to an unoccupied space within (\d+) feet of a second [^.]*? within (\d+) feet of the previous\b/i.exec(
+      description
+    );
+  return stride ? { feet: Number.parseInt(stride[1]!, 10) + Number.parseInt(stride[2]!, 10) } : null;
+}
+
+/** A jump an action allows: "The bulette jumps up to 30 feet by spending 10 feet of movement." Null when none. */
+export function leapOfProse(description: string): { feet: number; costFeet: number } | null {
+  const leap = /\bjumps up to (\d+) feet by spending (\d+) feet of movement\b/i.exec(description);
+  return leap ? { feet: Number.parseInt(leap[1]!, 10), costFeet: Number.parseInt(leap[2]!, 10) } : null;
+}
+
 /** The action with its prose facts filled: the area (an authored one wins), whether it is a Multiattack whose
- *  attacks nothing structured names, a Parry's AC reaction (an authored reaction wins), what its damage drains and
- *  how far its hit pushes (an authored one wins). The same object when nothing changes. */
+ *  attacks nothing structured names, a Parry's AC reaction (an authored reaction wins), what its damage drains, how
+ *  far its hit pushes, and the move, teleport or jump it makes its creature take (an authored one wins). The same
+ *  object when nothing changes. */
 export function withProseFacts<Action extends ActorAction>(action: Action): Action {
   const area = action.area ?? areaOfProse(action.description);
   const untracked = /multiattack/i.test(action.name) && !action.multiattack;
@@ -230,12 +295,18 @@ export function withProseFacts<Action extends ActorAction>(action: Action): Acti
   const drain = action.drain ?? (action.damage.length > 0 ? drainOfProse(action.description) : null);
   // A save's push is the save's (`failurePush`); an attack's lands with the hit.
   const push = action.onHitPush ?? (action.attack && !action.save ? hitPushOfProse(action.description) : null);
+  const move = action.move ?? moveOfProse(action.description);
+  const teleport = action.teleport ?? teleportOfProse(action.description);
+  const leap = action.leap ?? leapOfProse(action.description);
   if (
     area === (action.area ?? null) &&
     untracked === (action.untrackedMultiattack === true) &&
     reaction === (action.reaction ?? null) &&
     drain === (action.drain ?? null) &&
-    push === (action.onHitPush ?? null)
+    push === (action.onHitPush ?? null) &&
+    move === (action.move ?? null) &&
+    teleport === (action.teleport ?? null) &&
+    leap === (action.leap ?? null)
   )
     return action;
   const { untrackedMultiattack: _previous, ...rest } = action;
@@ -245,6 +316,9 @@ export function withProseFacts<Action extends ActorAction>(action: Action): Acti
     ...(untracked ? { untrackedMultiattack: true as const } : {}),
     ...(reaction ? { reaction } : {}),
     ...(drain ? { drain } : {}),
-    ...(push ? { onHitPush: push } : {})
+    ...(push ? { onHitPush: push } : {}),
+    ...(move ? { move } : {}),
+    ...(teleport ? { teleport } : {}),
+    ...(leap ? { leap } : {})
   } as Action;
 }

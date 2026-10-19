@@ -64,6 +64,20 @@ export const monk: ClassMechanicsModule = {
         }
       ]
     },
+    // Offered when the Monk falls (`falling.ts`): the answer takes five times its Monk level off the fall's damage.
+    "slow-fall": {
+      actions: [
+        {
+          id: "slow-fall",
+          name: "Slow Fall",
+          activation: "reaction",
+          description:
+            "When you fall, take a Reaction to reduce any damage you take from the fall by an amount equal to five times your Monk level.",
+          damage: [],
+          reaction: { trigger: "falls", response: "reduce-fall-damage", perLevel: 5, classId: "monk" }
+        }
+      ]
+    },
     /**
      * Offered when a hit's damage includes Bludgeoning, Piercing or Slashing (any type from Deflect Energy at 13); the
      * builder adds the Dexterity modifier and Monk level to the 1d10. The Focus Point redirect after reducing the
@@ -188,7 +202,7 @@ export const monk: ClassMechanicsModule = {
     }
     // Not modeled here: Martial Arts' Unarmed Strike is minted by the builder (`martialArtsStrike`),
     // but its die and Dexterity do not reach inventory Monk weapons. Martial-Arts-die features (Deflect
-    // Attacks' redirect, temp HP amounts), and Slow Fall, Acrobatic Movement, Empowered Strikes, Self-Restoration
+    // Attacks' redirect, temp HP amounts), and Acrobatic Movement, Empowered Strikes, Self-Restoration
     // and Perfect Focus stay prose. Evasion is read by the save outcome (`hasEvasion` in the server) from the
     // held feature.
   },

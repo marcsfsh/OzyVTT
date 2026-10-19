@@ -13,15 +13,8 @@ import { RulesBlockedError } from "../src/game-store.js";
 import { mapDistance } from "../src/movement-narration.js";
 import { applyMovementRules } from "../src/movement-rules.js";
 import { traitsAtTurnStart } from "../src/trait-turns.js";
-import {
-  checkSightFor,
-  frightenedApplies,
-  frightenedApproach,
-  hidingPlace,
-  lightSensitivities,
-  sightRules
-} from "../src/vision/rules.js";
-import { cell, DIVIDER, FRIEND, GEOMETRY, GOBLIN, HERO, ORC, visionGame, wall } from "./vision-fixtures.js";
+import { checkSightFor, frightenedApplies, hidingPlace, lightSensitivities, sightRules } from "../src/vision/rules.js";
+import { cell, DIVIDER, GEOMETRY, GOBLIN, HERO, ORC, visionGame, wall } from "./vision-fixtures.js";
 
 // The rules that read sight (SRD 5.2.1): Cover from walls and creatures, areas that stop at walls, Hide's hiding
 // place, Search finding a hidden creature, Frightened's line of sight, Dodge against a seen attacker, Blinded's failed
@@ -273,14 +266,7 @@ describe("Frightened and line of sight", () => {
     expect(swing(seen, GOBLIN, "goblin-warrior").rollMode?.disadvantage).toContain("Attacker is Frightened");
   });
 
-  it("names the source a willing move brings it closer to", () => {
-    const state = visionGame({ actors: { [HERO]: frightenedBy(GOBLIN) } });
-    expect(frightenedApproach(state, HERO, cell(1, 5), cell(3, 5))).toBe("Skulking Goblin");
-    expect(frightenedApproach(state, HERO, cell(1, 5), cell(0, 5))).toBeNull();
-    expect(frightenedApproach(state, FRIEND, cell(1, 5), cell(3, 5))).toBeNull();
-  });
-
-  it("refuses a willing move closer to the source, saying so", () => {
+  it("refuses a willing move closer to the source, naming it", () => {
     const state = visionGame({ actors: { [HERO]: frightenedBy(GOBLIN) } });
     const move = (to: { x: number; y: number }) =>
       applyMovementRules(state, {
@@ -302,6 +288,7 @@ describe("Frightened and line of sight", () => {
       )
     );
     expect(move(cell(1, 7)).warning).toBeNull();
+    expect(move(cell(0, 5)).warning).toBeNull();
   });
 });
 

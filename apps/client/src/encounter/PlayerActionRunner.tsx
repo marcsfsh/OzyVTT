@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { choosesAbility, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
+import type { CastShaping } from "@vtt/schemas";
 import { command, read } from "../lib/command";
 import { ActionList } from "../sheet/ActionList";
 import { CastDetail } from "../sheet/CastDetail";
@@ -285,12 +286,18 @@ export function PlayerActionRunner({
     if (!ok && message) onFeedback(message);
   };
   /** A tap on an option: one with nothing to aim resolves at once; the rest go to targeting. */
-  const take = (action: ContentActionSummary, slotLevel?: number, darts?: number) => {
+  const take = (
+    action: ContentActionSummary,
+    slotLevel?: number,
+    darts?: number,
+    shaping: readonly CastShaping[] = []
+  ) => {
     if (isTargetlessOwn(action))
       resolveActionDirect(actorId, action.id, revision, onOutcome, undefined, undefined, {
-        ...(slotLevel !== undefined ? { slotLevel } : {})
+        ...(slotLevel !== undefined ? { slotLevel } : {}),
+        ...(shaping.length > 0 ? { shaping } : {})
       });
-    else beginTargeting(action, actorId, slotLevel, darts);
+    else beginTargeting(action, actorId, slotLevel, darts, shaping);
   };
   /** The ways a spell option can be cast now. The fight's own rules decide; the list only offers what it can. */
   const castChoices = (option: TurnOption): CastOption[] =>
@@ -305,14 +312,14 @@ export function PlayerActionRunner({
         })
       : [];
   /** Casts a spell option the chosen way: at a slot level (Magic Missile's darts grow with it), without a slot, or
-   *  as a Ritual. */
-  const castWith = (option: TurnOption, choice: CastOption) => {
+   *  as a Ritual, shaped as its caster chose (Metamagic). */
+  const castWith = (option: TurnOption, choice: CastOption, shaping: readonly CastShaping[] = []) => {
     const spell = option.spell!;
     const variant =
       choice.kind === "free" ? spell.freeActionId : choice.kind === "ritual" ? spell.ritualActionId : undefined;
     if (variant) {
       const summary = ownSummaries.get(variant);
-      if (summary) take(summary);
+      if (summary) take(summary, undefined, undefined, shaping);
       return;
     }
     const own = definition.actions.find((candidate) => candidate.id === option.id);
@@ -320,7 +327,7 @@ export function PlayerActionRunner({
       own?.darts !== undefined && own.spellSlot && choice.kind === "slot"
         ? own.darts + Math.max(0, choice.level - own.spellSlot.level)
         : undefined;
-    take(option.summary, choice.kind === "slot" ? choice.level : undefined, darts);
+    take(option.summary, choice.kind === "slot" ? choice.level : undefined, darts, shaping);
   };
 
   /** The turn card's pins, stored on the character; the server checks each is one of its options now. */
@@ -332,7 +339,9 @@ export function PlayerActionRunner({
   const pickOption = (option: TurnOption) => {
     setTargetingResult(null);
     const choices = option.spell ? castChoices(option) : [];
-    if (option.spell && (choices.length > 1 || (choices.length === 1 && !choices[0]!.available))) {
+    // A spell its caster may shape (Metamagic) opens its cast, where the options are offered.
+    const shapeable = (option.summary.shaping?.options.length ?? 0) > 0;
+    if (option.spell && (choices.length > 1 || shapeable || (choices.length === 1 && !choices[0]!.available))) {
       setCasting(option);
       return;
     }
@@ -352,9 +361,9 @@ export function PlayerActionRunner({
         aimed
         busy={busy}
         onBack={() => setCasting(null)}
-        onCast={(choice) => {
+        onCast={(choice, shaping) => {
           setCasting(null);
-          castWith(casting, choice);
+          castWith(casting, choice, shaping);
         }}
       />
     ) : null;

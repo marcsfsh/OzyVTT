@@ -45,6 +45,7 @@ function sheet(
 ): ActorDefinition {
   return {
     character: { features, feats: feats.map((id) => ({ id, name: id })) },
+    actions: [],
     extensions: {}
   } as unknown as ActorDefinition;
 }
@@ -239,6 +240,10 @@ describe("One with Shadows", () => {
       spellId: "invisibility"
     } as ActorAction;
     const state = visionGame({ actors: { [HERO]: { definitionId: SHEET } } });
+    // Invisibility's Material component comes from a Component Pouch, so only the light can refuse the cast.
+    state.actors
+      .find((actor) => actor.id === HERO)!
+      .inventory.push({ id: "component-pouch", name: "Component Pouch", quantity: 1, equipped: true, attuned: false });
     expect(() =>
       resolveDefinitionAction(
         state,

@@ -91,6 +91,22 @@ describe("the GM's rest panel", () => {
     expect(RestPartySchema.parse({ ...payload, ...COMMAND })).toMatchObject({ kind: "long", actorIds: [TORVA] });
   });
 
+  it("passes time on the road at the pace the GM picks", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <PartyRest state={gmView({ clockHours: 38 })} />
+      </ToastProvider>
+    );
+    await user.click(screen.getByRole("button", { name: "Rest" }));
+    const dialog = screen.getByRole("dialog", { name: "Rest" });
+    await user.click(within(dialog).getByRole("button", { name: "Normal" }));
+    await user.click(within(dialog).getByRole("button", { name: "Travel 8 hours" }));
+    const [event, payload] = emitted().at(-1)!;
+    expect(event).toBe("time:pass");
+    expect(TimePassSchema.parse({ ...payload, ...COMMAND })).toMatchObject({ hours: 8, pace: "normal" });
+  });
+
   it("shows the clock's minutes and passes hours and minutes together", async () => {
     const user = userEvent.setup();
     render(

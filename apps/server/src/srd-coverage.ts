@@ -117,11 +117,13 @@ type ResolvingFields = Pick<
   | "answer"
   | "sight"
 > &
+  Partial<Pick<ActorAction, "move" | "teleport" | "leap">> &
   Readonly<{ attack?: unknown; save?: unknown; damageByLevel?: unknown }>;
 
 /** An action resolves when it rolls an attack or a save, deals damage, heals, grants an effect, ends conditions,
- *  runs a structured Multiattack, places light or an area of obscurement on the map, is offered as a reaction prompt
- *  or answers a roll (`roll-answers.ts`). One with none of these only spends its use and its place in the turn. */
+ *  runs a structured Multiattack, places light or an area of obscurement on the map, is offered as a reaction prompt,
+ *  answers a roll (`roll-answers.ts`), or grants a move, a jump or a teleport the movement rules charge
+ *  (`granted-moves.ts`). One with none of these only spends its use and its place in the turn. */
 const actionResolves = (action: ResolvingFields) =>
   action.sight?.light !== undefined ||
   action.sight?.area !== undefined ||
@@ -137,7 +139,10 @@ const actionResolves = (action: ResolvingFields) =>
   action.reaction !== undefined ||
   action.grants !== undefined ||
   action.endsConditions !== undefined ||
-  action.answer !== undefined;
+  action.answer !== undefined ||
+  action.move !== undefined ||
+  action.teleport !== undefined ||
+  action.leap !== undefined;
 
 /**
  * A stat block action is enforced when its attack, save, damage, healing, grant or structured Multiattack resolves,

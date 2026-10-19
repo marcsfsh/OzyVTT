@@ -360,6 +360,8 @@ function act(
     },
     // A creature can owe this zone a second save before answering the first (entering, then ending its turn there).
     replaceExisting: false,
+    // Heightened Spell's target has Disadvantage on every save against the spell.
+    ...(zone.heightened === creature.id ? { disadvantage: { targetId: creature.id, from: "Heightened Spell" } } : {}),
     newSaveId: deps.newId,
     createdAt: Date.parse(deps.now())
   });
