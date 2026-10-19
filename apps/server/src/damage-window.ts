@@ -67,6 +67,17 @@ export function reducedParts(parts: readonly Part[], amount: number): Part[] {
   return reduced;
 }
 
+/** Whether a hit was made as `kind`. A stat block's attack swings no carried weapon, so its ranged or melee attack
+ *  that deals Bludgeoning, Piercing or Slashing damage and is no spell or Unarmed Strike counts as a weapon's (a
+ *  goblin's Shortbow, a giant's Rock); a mage's Force bolt does not. */
+function hitAs(kind: string, hitKinds: readonly string[], types: readonly string[]): boolean {
+  if (hitKinds.includes(kind)) return true;
+  if (kind !== "ranged-weapon" && kind !== "melee-weapon") return false;
+  if (hitKinds.some((other) => other === "weapon" || other === "spell" || other === "unarmed")) return false;
+  if (!types.some((type) => type === "bludgeoning" || type === "piercing" || type === "slashing")) return false;
+  return hitKinds.includes(kind === "ranged-weapon" ? "ranged" : "melee");
+}
+
 /** The damaged creature's own reaction this damage opens, if any: on a hit, one limited to its damage types and how
  *  it was made; on any damage, one that answers taking damage. */
 function ownReactionFor(state: GameState, held: HeldDamage, deps: DamageWindowDeps) {
@@ -80,7 +91,7 @@ function ownReactionFor(state: GameState, held: HeldDamage, deps: DamageWindowDe
       if (reaction.response === "half-damage") return true;
       if (reaction.response !== "reduce-damage") return false;
       if (reaction.damageTypes && !reaction.damageTypes.some((type) => types.includes(type))) return false;
-      return !reaction.attackKinds || reaction.attackKinds.some((kind) => held.hitKinds.includes(kind));
+      return !reaction.attackKinds || reaction.attackKinds.some((kind) => hitAs(kind, held.hitKinds, types));
     },
     { resolveDefinition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) }
   );

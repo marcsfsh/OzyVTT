@@ -48,7 +48,10 @@ function reactionLine(outcome: ReactionOutcome): { kind: "reaction" | "damage"; 
           }
         : {
             kind: "damage",
-            text: `${outcome.actorName} declined ${outcome.actionName}, and ${outcome.sourceName} hit for ${outcome.appliedDamage} damage${detail}.`
+            text:
+              outcome.kind === "takes-damage"
+                ? `${outcome.actorName} declined ${outcome.actionName} and took ${outcome.appliedDamage} damage${detail}.`
+                : `${outcome.actorName} declined ${outcome.actionName}, and ${outcome.sourceName} hit for ${outcome.appliedDamage} damage${detail}.`
           };
     case "attack-would-hit": {
       if (!resolution) return null;

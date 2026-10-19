@@ -64,6 +64,33 @@ export const monk: ClassMechanicsModule = {
         }
       ]
     },
+    /**
+     * Offered when a hit's damage includes Bludgeoning, Piercing or Slashing (any type from Deflect Energy at 13); the
+     * builder adds the Dexterity modifier and Monk level to the 1d10. The Focus Point redirect after reducing the
+     * damage to 0 stays prose.
+     */
+    "deflect-attacks": {
+      actions: [
+        {
+          id: "deflect-attacks",
+          name: "Deflect Attacks",
+          activation: "reaction",
+          description:
+            "When an attack roll hits you and its damage includes Bludgeoning, Piercing, or Slashing damage, take a Reaction to reduce the attack's total damage against you by 1d10 plus your Dexterity modifier and Monk level.",
+          damage: [],
+          reaction: {
+            trigger: "hit-by-attack",
+            response: "reduce-damage",
+            formula: "1d10",
+            damageTypes: ["bludgeoning", "piercing", "slashing"]
+          },
+          reactionByLevel: [
+            { level: 13, reaction: { trigger: "hit-by-attack", response: "reduce-damage", formula: "1d10" } }
+          ],
+          adds: { classLevel: 1, abilityModifier: "dex" }
+        }
+      ]
+    },
     // The once-per-Long-Rest permission only; the GM gives the Focus Points back from the sheet's Limited uses.
     "uncanny-metabolism": {
       uses: { limit: 1, per: "long-rest" }
@@ -160,7 +187,7 @@ export const monk: ClassMechanicsModule = {
     }
     // Not modeled here: Martial Arts' Unarmed Strike is minted by the builder (`martialArtsStrike`),
     // but its die and Dexterity do not reach inventory Monk weapons. Martial-Arts-die features (Deflect
-    // Attacks/Energy, temp HP amounts), and Slow Fall, Acrobatic Movement, Empowered Strikes, Self-Restoration
+    // Attacks' redirect, temp HP amounts), and Slow Fall, Acrobatic Movement, Empowered Strikes, Self-Restoration
     // and Perfect Focus stay prose. Evasion is read by the save outcome (`hasEvasion` in the server) from the
     // held feature.
   },

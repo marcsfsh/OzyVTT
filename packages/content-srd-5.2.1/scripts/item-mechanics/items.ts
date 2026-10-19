@@ -324,11 +324,24 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Not modeled: Acrobatic Assist (gated on the item's current form), Attack Deflection, the form changes.
+  // Attack Deflection's +5 AC is offered on a hit, once per rest. Not modeled: the form changes, which would gate it
+  // and Acrobatic Assist (prose) to the Quarterstaff form.
   "quarterstaff-of-the-acrobat": {
     modifiers: [
       { type: "attack-bonus", amount: 2 },
       { type: "damage-bonus", amount: 2 }
+    ],
+    actions: [
+      {
+        id: "attack-deflection",
+        name: "Attack Deflection",
+        activation: "reaction",
+        description:
+          "When you are hit by an attack while holding the weapon, take a Reaction to twirl it around you and gain a +5 bonus to your Armor Class against the triggering attack, potentially causing it to miss. You can't use this property again until you finish a Short or Long Rest.",
+        damage: [],
+        uses: { limit: 1, per: "short-rest" },
+        reaction: { trigger: "hit-by-attack", response: "ac-bonus", amount: 5 }
+      }
     ]
   },
 
@@ -982,8 +995,30 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // `gauntlets-of-ogre-power` - sets Strength (`ability-score`, refused).
-  // `gloves-of-missile-snaring` - the reduction is rolled (1d10 + Dex), needs a free hand, and costs a
-  //     Reaction; `damage-reduction` is a flat, free, standing amount.
+
+  // Offered on a weapon's hit from range, a thrown one's included (a Thrown weapon swung in melee is no missile); the
+  // wearer's Dexterity modifier is added to the 1d10 when the action is derived. The free hand and catching the
+  // missile stay prose.
+  "gloves-of-missile-snaring": {
+    actions: [
+      {
+        id: "snare-missile",
+        name: "Snare Missile",
+        activation: "reaction",
+        description:
+          "If you're hit by an attack roll made with a Ranged or Thrown weapon while wearing these gloves, you can take a Reaction to reduce the damage by 1d10 plus your Dexterity modifier if you have a free hand. If you reduce the damage to 0, you can catch the ammunition or weapon if it is small enough for you to hold in that hand.",
+        damage: [],
+        reaction: {
+          trigger: "hit-by-attack",
+          response: "reduce-damage",
+          formula: "1d10",
+          attackKinds: ["ranged-weapon"]
+        },
+        adds: { abilityModifier: "dex" }
+      }
+    ]
+  },
+
   // `gloves-of-swimming-and-climbing` - movement speeds, and the +5 is limited to climbing or swimming
   //     within Athletics, which `skill-is` cannot narrow.
 

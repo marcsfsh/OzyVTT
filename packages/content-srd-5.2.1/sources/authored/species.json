@@ -1947,7 +1947,15 @@
                   "name": "Stone's Endurance",
                   "activation": "reaction",
                   "description": "When you take damage, roll 1d12 and add your Constitution modifier; reduce the damage you take by that total.",
-                  "damage": []
+                  "damage": [],
+                  "reaction": {
+                    "trigger": "takes-damage",
+                    "response": "reduce-damage",
+                    "formula": "1d12"
+                  },
+                  "adds": {
+                    "abilityModifier": "con"
+                  }
                 }
               ],
               "uses": {

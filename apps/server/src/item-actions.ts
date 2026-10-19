@@ -127,6 +127,15 @@ export function itemAction(
       }
     : undefined;
   const uses = usesOf(declared.uses, definition, item);
+  // "1d10 + your Dexterity modifier" taken off the damage (Gloves of Missile Snaring), read off the bearer.
+  const added = declared.adds
+    ? (declared.adds.abilityModifier ? scoreModifierOf(definition, declared.adds.abilityModifier) : 0) +
+      (declared.adds.proficiencyBonus ? caster.proficiencyBonus : 0)
+    : 0;
+  const reaction =
+    declared.reaction?.response === "reduce-damage" && added !== 0
+      ? { ...declared.reaction, formula: formulaPlus(declared.reaction.formula, added) }
+      : declared.reaction;
   return {
     id: itemActionId(itemId, declared.id),
     name: declared.name,
@@ -145,7 +154,7 @@ export function itemAction(
     ...(declared.area ? { area: { ...declared.area } } : {}),
     // A roll it answers (a Ring of Evasion's Evade) and the trigger it is offered on (a Reaction's).
     ...(declared.answer ? { answer: structuredClone(declared.answer) } : {}),
-    ...(declared.reaction ? { reaction: { ...declared.reaction } } : {})
+    ...(reaction ? { reaction: { ...reaction } } : {})
   };
 }
 

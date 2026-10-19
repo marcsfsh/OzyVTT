@@ -305,6 +305,8 @@ export type SaveAnswerResult = MutationResult & {
     /** Flat reduction taken off before Resistance. */ flatReduction?: number;
     /** What answered the save, already in its numbers. */ answered?: readonly RollAnswered[];
     /** On a preview, the answers the saving creature may still give it. */ answers?: readonly RollAnswerOffer[];
+    /** The confirm waits on another creature's answer to the roll (Countercharm). */ awaitingAnswer?: true;
+    /** The damage waits on the target's own reaction to taking it (Stone's Endurance). */ damageHeld?: true;
   };
 };
 /** A loose saving throw (none was owed): its total and d20, or the condition that failed it without a roll. */

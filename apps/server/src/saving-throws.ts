@@ -45,6 +45,7 @@ import {
 } from "./roll-answers.js";
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
+import { openDamageWindow } from "./damage-window.js";
 import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
@@ -108,6 +109,8 @@ export type SaveOutcome = Readonly<{
   answers?: readonly RollAnswerOffer[];
   /** The confirm waits on another creature's answer to the roll (Countercharm); nothing is applied yet. */
   awaitingAnswer?: true;
+  /** The damage waits on the target's reaction to taking it (Stone's Endurance); the answer lands it. */
+  damageHeld?: true;
 }>;
 
 /** Advantage/disadvantage sources for a save: Restrained gives disadvantage on DEX saves (SRD), and every
@@ -931,7 +934,39 @@ export function answerSave(
   let appliedDamage = 0;
   let application: DamageApplication | null = null;
   let conditionApplied = false;
-  if (outcomeDamage > 0) {
+  // Harm drains only on a failed save; a Life Drain whose save halves the damage drains either way.
+  const drain = pending.drain && (!success || pending.drain.failedSaveOnly !== true) ? pending.drain : undefined;
+  // Damage the target may answer before it lands (Stone's Endurance, Superior Hunter's Defense) waits on a prompt that
+  // holds it, and the answer lands it (reactions.ts). Damage a spell area counts (Guardian of Faith) lands at once.
+  const held =
+    outcomeDamage > 0 && outcomeParts !== null && pending.zoneId === undefined
+      ? openDamageWindow(
+          state,
+          {
+            source: state.actors.find((actor) => actor.id === pending.sourceActorId) ?? null,
+            sourceName: pending.sourceName,
+            target,
+            parts: outcomeParts,
+            critical: false,
+            hit: false,
+            hitKinds: [],
+            ...(drain ? { drain } : {}),
+            asked: []
+          },
+          {
+            resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
+            ...(deps.catalog ? { catalog: deps.catalog } : {}),
+            random: deps.random,
+            newId: deps.newRollId,
+            now: deps.now,
+            sessionId: deps.sessionId,
+            role: deps.role,
+            commandId,
+            ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+          }
+        )
+      : null;
+  if (outcomeDamage > 0 && held === null) {
     const outcome = applyDamageDetailed(
       state,
       target.id,
@@ -939,8 +974,7 @@ export function answerSave(
         amount: outcomeDamage,
         ...(outcomeParts !== null ? { parts: outcomeParts } : {}),
         sourceActorId: pending.sourceActorId,
-        // Harm drains only on a failed save; a Life Drain whose save halves the damage drains either way.
-        ...(pending.drain && (!success || pending.drain.failedSaveOnly !== true) ? { drain: pending.drain } : {})
+        ...(drain ? { drain } : {})
       },
       { role: "gm" },
       {
@@ -1052,7 +1086,8 @@ export function answerSave(
             ...(application.flatReduction ? { flatReduction: application.flatReduction } : {})
           }
         : {}),
-      ...(answered.length > 0 ? { answered } : {})
+      ...(answered.length > 0 ? { answered } : {}),
+      ...(held ? { damageHeld: true as const } : {})
     },
     events
   };

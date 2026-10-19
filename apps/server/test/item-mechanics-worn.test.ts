@@ -798,11 +798,8 @@ describe("the worn items left as prose, by name", () => {
     }
   });
 
-  it("leaves the two RESERVED items and the four ability-score refusals entirely to prose", () => {
+  it("leaves the RESERVED item and the four ability-score refusals entirely to prose", () => {
     for (const id of [
-      // The gloves need a rolled reduction ("1d10 plus your Dexterity modifier"), a free-hand gate and a
-      // Reaction cost; `on-taking-damage` + `damage-reduction` alone cannot express it.
-      "gloves-of-missile-snaring",
       "periapt-of-wound-closure", // rolled amount
       "amulet-of-health",
       "belt-of-giant-strength", // ITEM_REFUSED_MODIFIER_TYPES

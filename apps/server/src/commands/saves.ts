@@ -325,7 +325,10 @@ export const saveCommands = [
         let test = throwDeathSave(
           request.answer
             ? {}
-            : { ...(naturalRoll !== undefined ? { face: naturalRoll } : {}), ...(reroll === true ? { reroll: true } : {}) }
+            : {
+                ...(naturalRoll !== undefined ? { face: naturalRoll } : {}),
+                ...(reroll === true ? { reroll: true } : {})
+              }
         );
         rollModeSources = test.typed ? undefined : shownRollMode(aggregated, forced);
         // What answered the death save on an earlier look counts in this one, the confirm included.
