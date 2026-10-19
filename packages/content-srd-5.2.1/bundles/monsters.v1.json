@@ -12298,7 +12298,9 @@
     "move": {
      "speed": "full",
      "provokes": false,
-     "first": true
+     "entersSpaces": {
+      "size": "medium"
+     }
     }
    },
    {
@@ -15511,7 +15513,8 @@
     "area": {
      "shape": "cylinder",
      "sizeFeet": 20,
-     "widthFeet": null
+     "widthFeet": null,
+     "heightFeet": 60
     }
    },
    {
@@ -18306,6 +18309,16 @@
     "hazard": "burning"
    },
    {
+    "kind": "enters-space",
+    "name": "Fire Form",
+    "damage": [
+     {
+      "formula": "1d10",
+      "type": "fire"
+     }
+    ]
+   },
+   {
     "kind": "light",
     "name": "Illumination",
     "brightFeet": 30,
@@ -19266,7 +19279,9 @@
     "move": {
      "speed": "full",
      "provokes": false,
-     "first": true
+     "entersSpaces": {
+      "size": "large"
+     }
     }
    }
   ],
@@ -23923,7 +23938,17 @@
     "name": "Redirect Attack",
     "activation": "reaction",
     "description": "_Trigger:_ A creature the goblin can see makes an attack roll against it. _Response:_ The goblin chooses a Small or Medium ally within 5 feet of itself. The goblin and that ally swap places, and the ally becomes the target of the attack instead.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "targeted-by-attack",
+     "response": "redirect-to-ally",
+     "rangeFeet": 5,
+     "allySizes": [
+      "small",
+      "medium"
+     ],
+     "swap": true
+    }
    },
    {
     "id": "scimitar",
@@ -40449,7 +40474,13 @@
     "name": "Protection",
     "activation": "reaction",
     "description": "_Trigger:_ An attack roll hits the wearer of the guardian’s amulet while the wearer is within 5 feet of the guardian. _Response:_ The wearer gains a +5 bonus to AC, including against the triggering attack and possibly causing it to miss, until the start of the guardian’s next turn.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "ward-hit-by-attack",
+     "response": "ward-ac-bonus",
+     "amount": 5,
+     "rangeFeet": 5
+    }
    },
    {
     "id": "fist",
@@ -43408,7 +43439,8 @@
     "area": {
      "shape": "cylinder",
      "sizeFeet": 10,
-     "widthFeet": null
+     "widthFeet": null,
+     "heightFeet": 40
     }
    },
    {

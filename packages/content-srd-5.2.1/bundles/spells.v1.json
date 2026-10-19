@@ -1837,7 +1837,7 @@
     {
      "name": "aura",
      "activation": "other",
-     "when": "You and your allies in the aura have Resistance to Necrotic damage; an ally at 0 Hit Points that starts its turn there regains 1 Hit Point.",
+     "when": "You and your allies in the aura have Resistance to Necrotic damage, and your Hit Point maximums can't be reduced; an ally at 0 Hit Points that starts its turn there regains 1 Hit Point.",
      "damage": [],
      "zone": {
       "on": [
@@ -1854,7 +1854,8 @@
           "necrotic"
          ]
         }
-       ]
+       ],
+       "keepsMaximum": true
       },
       "revives": 1
      }
@@ -5420,7 +5421,8 @@
   "area": {
    "shape": "cylinder",
    "sizeFeet": 10,
-   "widthFeet": null
+   "widthFeet": null,
+   "heightFeet": 40
   },
   "effect": {
    "attacks": 0,
@@ -9271,7 +9273,8 @@
       ],
       "terrain": {
        "cost": 2
-      }
+      },
+      "grounded": true
      }
     }
    ],
@@ -11461,7 +11464,9 @@
   "area": {
    "shape": "cube",
    "sizeFeet": 10,
-   "widthFeet": null
+   "widthFeet": null,
+   "count": 10,
+   "contiguous": true
   },
   "effect": {
    "attacks": 0,
@@ -11745,7 +11750,8 @@
   "area": {
    "shape": "cylinder",
    "sizeFeet": 10,
-   "widthFeet": null
+   "widthFeet": null,
+   "heightFeet": 40
   },
   "effect": {
    "attacks": 0,
@@ -14627,6 +14633,44 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "gust",
+     "activation": "other",
+     "when": "A creature that ends its turn in the Line makes the save, and a failure pushes it 15 feet away from you. Moving closer to you in the Line costs 2 feet for every foot.",
+     "save": {
+      "ability": "str",
+      "successDamage": "none",
+      "failureConditions": [],
+      "failurePush": {
+       "feet": 15
+      }
+     },
+     "damage": [],
+     "zone": {
+      "on": [
+       "end-turn"
+      ],
+      "towardCaster": true
+     }
+    },
+    {
+     "name": "turn",
+     "activation": "bonus-action",
+     "when": "As a Bonus Action on your later turns, you point the Line another way from you.",
+     "laterTurnsOnly": true,
+     "damage": [],
+     "area": {
+      "shape": "line",
+      "sizeFeet": 60,
+      "widthFeet": 10
+     },
+     "movesArea": {
+      "feet": 60,
+      "fromCaster": true
+     }
+    }
+   ],
    "healing": null
   },
   "sight": {
@@ -16506,7 +16550,8 @@
   "area": {
    "shape": "cylinder",
    "sizeFeet": 20,
-   "widthFeet": null
+   "widthFeet": null,
+   "heightFeet": 40
   },
   "effect": {
    "attacks": 0,
@@ -18391,7 +18436,8 @@
   "area": {
    "shape": "cylinder",
    "sizeFeet": 10,
-   "widthFeet": null
+   "widthFeet": null,
+   "heightFeet": 20
   },
   "effect": {
    "attacks": 0,
@@ -19583,7 +19629,8 @@
   "area": {
    "shape": "sphere",
    "sizeFeet": 40,
-   "widthFeet": null
+   "widthFeet": null,
+   "count": 4
   },
   "effect": {
    "attacks": 0,
@@ -20221,7 +20268,8 @@
   "area": {
    "shape": "cylinder",
    "sizeFeet": 5,
-   "widthFeet": null
+   "widthFeet": null,
+   "heightFeet": 40
   },
   "effect": {
    "attacks": 0,
@@ -23502,7 +23550,8 @@
   "area": {
    "shape": "cylinder",
    "sizeFeet": 50,
-   "widthFeet": null
+   "widthFeet": null,
+   "heightFeet": 100
   },
   "effect": {
    "attacks": 0,
@@ -25049,11 +25098,19 @@
     {
      "name": "aura",
      "activation": "other",
-     "when": "A creature inside the Sphere has the Deafened condition.",
+     "when": "A creature inside the Sphere has the Deafened condition and Immunity to Thunder damage.",
      "damage": [],
      "zone": {
       "on": [],
       "holds": {
+       "modifiers": [
+        {
+         "type": "damage-immunity",
+         "damageTypes": [
+          "thunder"
+         ]
+        }
+       ],
        "conditions": [
         "deafened"
        ]
@@ -25316,7 +25373,8 @@
   "area": {
    "shape": "cylinder",
    "sizeFeet": 20,
-   "widthFeet": null
+   "widthFeet": null,
+   "heightFeet": 40
   },
   "effect": {
    "attacks": 0,

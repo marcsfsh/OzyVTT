@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 15 GameState fields · 159 commands · 335 HTTP paths
+- 15 GameState fields · 160 commands · 336 HTTP paths
 
 ## GameState shape
 
@@ -187,6 +187,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `token.move` | `combat:write` |
 | `token.set-altitude` | `combat:write` |
 | `turn.end` | `combat:write` |
+| `turn.order` | `combat:write` |
 | `turn.use` | `combat:write` |
 | `turn.use-legendary` | `combat:write` |
 | `turn.use-reaction` | `combat:write` |
@@ -459,6 +460,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/tokens/{actorId}/move`
 - `POST /api/v1/game/turn/end`
 - `POST /api/v1/game/turn/legendary`
+- `POST /api/v1/game/turn/order`
 - `POST /api/v1/game/turn/reaction`
 - `POST /api/v1/game/turn/use`
 - `POST /api/v1/game/vision/ambient`
