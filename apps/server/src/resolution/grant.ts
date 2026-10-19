@@ -24,6 +24,7 @@ import {
 } from "../effects.js";
 import { refreshBaseArmorClass } from "../actor-roster.js";
 import { teleportsEachTurn } from "../granted-moves.js";
+import { planeTravelBarred, travelsPlanes } from "../ethereal.js";
 import { holdsFeature } from "../class-features.js";
 import { GIFT_OF_THE_PROTECTORS_TAG, refuseFullPage } from "../book-of-shadows.js";
 import { deriveEquipment } from "../equipment-derivation.js";
@@ -151,6 +152,9 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       `${recipient.name} already has ${grant.name ?? action.name}, and a creature can have only one at a time.`
     );
   if (grant.tags.includes(GIFT_OF_THE_PROTECTORS_TAG)) refuseFullPage(state, attacker, recipient, deps.definition);
+  // Dimensional Shackles bar a bound creature's own way to another plane (Etherealness, an Ethereal Jaunt).
+  if (recipient.id === attacker.id && travelsPlanes(grant.tags) && planeTravelBarred(recipient))
+    throw new CommandRejectedError(`${recipient.name} is bound by Dimensional Shackles and can't leave this plane.`);
   // A concentration grant may end the granter's previous concentration; surfaced as a warning line.
   const replaced: EffectNarration[] = [];
   const recipientDefinition =

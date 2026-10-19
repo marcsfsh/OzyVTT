@@ -3290,7 +3290,50 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "shackle",
+    "name": "Place the Dimensional Shackles",
+    "activation": "action",
+    "description": "Place the shackles on an Incapacitated Small, Medium or Large creature within reach: it can't teleport or travel to another plane while bound. Take this action again on it to remove them. The bound creature can break them with a DC 30 Strength (Athletics) check.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5,
+     "maxSize": "large",
+     "conditions": [
+      "incapacitated",
+      "paralyzed",
+      "stunned",
+      "unconscious"
+     ]
+    },
+    "grants": {
+     "name": "Dimensional Shackles",
+     "tags": [
+      "no-teleport",
+      "dimensional-shackles"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "target",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "toggles": true,
+     "endAction": {
+      "activation": "action",
+      "kind": "check",
+      "ability": "str",
+      "skill": "athletics",
+      "dc": 30,
+      "label": "Break the shackles"
+     }
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },

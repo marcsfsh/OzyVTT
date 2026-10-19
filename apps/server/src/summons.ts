@@ -687,25 +687,50 @@ function leavesBecause(
   return null;
 }
 
-/** Whether a creature's command lapsed: its time is up, or its commander is gone. */
-function commandLapsed(state: GameState, actor: Actor): boolean {
+/** Whether a creature's command lapsed: its time is up, its commander is gone, or it is beyond the reach its
+ *  commanding effect names. */
+function commandLapsed(
+  state: GameState,
+  actor: Actor,
+  distanceFeet: ((a: string, b: string) => number | null) | null
+): boolean {
   const control = actor.control;
   if (!control) return false;
   if (!state.actors.some((candidate) => candidate.id === control.by)) return true;
-  return control.keptBy !== undefined && !effectHeld(state, control.keptBy);
+  if (control.keptBy !== undefined && !effectHeld(state, control.keptBy)) return true;
+  const keeping = actor.effects.find((effect) => effect.id === control.keptBy);
+  return keeping !== undefined && beyondCommand(keeping, actor.id, distanceFeet);
+}
+
+/** An aboleth's Dominate Mind: "under its control while within 60 feet of it". A commanding effect tagged
+ *  `commanded-within-<feet>` commands its creature only that near its source. */
+function beyondCommand(
+  effect: EffectInstance,
+  actorId: string,
+  distanceFeet: ((a: string, b: string) => number | null) | null
+): boolean {
+  const tag = effect.tags.find((candidate) => /^commanded-within-\d+$/.test(candidate));
+  if (!tag || !distanceFeet || effect.sourceActorId === null) return false;
+  const apart = distanceFeet(effect.sourceActorId, actorId);
+  return apart !== null && apart > Number(tag.slice("commanded-within-".length)) + DISTANCE_TOLERANCE_FEET;
 }
 
 /** On a creature, an effect that puts it under its source's command while it lasts (Dominate Person's Charmed, Planar
  *  Binding's service). */
 export const COMMANDED_TAG = "commanded";
 
-/** A commanding effect on the creature that doesn't command it yet. */
-function commandStarting(actor: Actor): EffectInstance | undefined {
+/** A commanding effect on the creature that doesn't command it yet, within any reach it names. */
+function commandStarting(
+  actor: Actor,
+  distanceFeet: ((a: string, b: string) => number | null) | null
+): EffectInstance | undefined {
   const effect = actor.effects.find(
     (candidate) =>
       candidate.tags.includes(COMMANDED_TAG) && candidate.sourceActorId !== null && candidate.sourceActorId !== actor.id
   );
-  return effect && actor.control?.keptBy !== effect.id ? effect : undefined;
+  return effect && actor.control?.keptBy !== effect.id && !beyondCommand(effect, actor.id, distanceFeet)
+    ? effect
+    : undefined;
 }
 
 export type RaiseDeps = Readonly<{
@@ -804,8 +829,8 @@ export function needsSummonSettling(
   return state.actors.some(
     (actor) =>
       leavesBecause(state, actor, distanceFeet) !== null ||
-      commandLapsed(state, actor) ||
-      commandStarting(actor) !== undefined
+      commandLapsed(state, actor, distanceFeet) ||
+      commandStarting(actor, distanceFeet) !== undefined
   );
 }
 
@@ -831,7 +856,7 @@ export function settleSummons(state: GameState, deps: SettleSummonDeps): EffectN
     );
   }
   for (const actor of state.actors) {
-    if (!commandLapsed(state, actor)) continue;
+    if (!commandLapsed(state, actor, deps.distanceFeet)) continue;
     const commander = state.actors.find((candidate) => candidate.id === actor.control?.by);
     delete actor.control;
     events.push({
@@ -841,7 +866,7 @@ export function settleSummons(state: GameState, deps: SettleSummonDeps): EffectN
     });
   }
   for (const actor of state.actors) {
-    const effect = commandStarting(actor);
+    const effect = commandStarting(actor, deps.distanceFeet);
     const commander = effect ? state.actors.find((candidate) => candidate.id === effect.sourceActorId) : undefined;
     if (!effect || !commander) continue;
     actor.control = { by: commander.id, side: sideOf(commander, deps.resolveDefinition) ?? "party", keptBy: effect.id };

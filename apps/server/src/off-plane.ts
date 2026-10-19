@@ -1,8 +1,8 @@
 import type { GameState } from "@vtt/domain";
 import { footprintOrigin } from "@vtt/rules-5e";
 import { setAltitude } from "./altitude.js";
-import { addEffect, makeEffect, type EffectNarration } from "./effects.js";
-import { ETHEREAL_SHUNT_TAG, ETHEREAL_TAG, isEthereal, onOtherPlanes } from "./ethereal.js";
+import { addEffect, endEffect, makeEffect, type EffectNarration } from "./effects.js";
+import { ETHEREAL_SHUNT_TAG, ETHEREAL_TAG, isEthereal, onOtherPlanes, planeTravelBarred } from "./ethereal.js";
 import type { FallDeps } from "./falling.js";
 import { removeCombatant } from "./encounter.js";
 import { clockMinutesOf } from "./game-time.js";
@@ -42,9 +42,25 @@ type OffPlaneEntry = GameState["combat"]["offPlane"][number];
 export const isOffPlane = (actor: Pick<Actor, "effects">): boolean =>
   actor.effects.some((effect) => effect.tags.includes(OFF_PLANE_TAG));
 
+/** On an effect: it ends once its bearer and its source are on different planes (an aboleth's Dominate Mind lasts
+ *  "until the aboleth dies or is on a different plane of existence from the target"). */
+export const ENDS_ACROSS_PLANES_TAG = "ends-across-planes";
+
+/** The effects whose bearer and source are on different planes now, which end. */
+function splitAcrossPlanes(state: GameState): Array<{ actorId: string; effectId: string }> {
+  return state.actors.flatMap((actor) =>
+    actor.effects.flatMap((effect) => {
+      if (!effect.tags.includes(ENDS_ACROSS_PLANES_TAG)) return [];
+      const source = state.actors.find((candidate) => candidate.id === effect.sourceActorId);
+      return source && onOtherPlanes(source, actor) ? [{ actorId: actor.id, effectId: effect.id }] : [];
+    })
+  );
+}
+
 /** Whether a creature must leave the map, come back to it, or cross to or from the Border Ethereal now. */
 export function needsPlaneSettling(state: GameState): boolean {
   if (!state.combat.mapAssetId) return false;
+  if (splitAcrossPlanes(state).length > 0) return true;
   return state.actors.some((actor) => {
     const kept = state.combat.offPlane.find((entry) => entry.actorId === actor.id);
     const token = state.combat.tokens.find((candidate) => candidate.actorId === actor.id);
@@ -58,6 +74,7 @@ export function needsPlaneSettling(state: GameState): boolean {
  *  Border Ethereal; returns what the table hears. Without `deps` a shunt deals no damage. */
 export function settlePlanes(state: GameState, geometry: TokenMapGeometry, deps?: FallDeps): EffectNarration[] {
   const events: EffectNarration[] = [];
+  for (const { actorId, effectId } of splitAcrossPlanes(state)) events.push(...endEffect(state, actorId, effectId));
   for (const actor of state.actors) {
     const token = state.combat.tokens.find((candidate) => candidate.actorId === actor.id);
     if (!token) continue;
@@ -309,6 +326,7 @@ export function blinkAway(
     !actor ||
     isOffPlane(actor) ||
     isEthereal(actor) ||
+    planeTravelBarred(actor) ||
     !actor.effects.some((effect) => effect.tags.includes(BLINK_TAG))
   )
     return;

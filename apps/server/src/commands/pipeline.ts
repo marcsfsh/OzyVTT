@@ -361,6 +361,8 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
       await settleDownedReactions();
       await settleSummoned();
       await settleFalls();
+      // A creature that left the plane ends what it commanded across it (an aboleth's Dominate Mind).
+      await settleSummoned();
     }
     return reply;
   }

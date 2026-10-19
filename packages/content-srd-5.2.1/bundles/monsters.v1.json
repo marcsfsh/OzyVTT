@@ -176,7 +176,9 @@
      "failureEffect": {
       "name": "Dominated by the Aboleth",
       "tags": [
-       "commanded"
+       "commanded",
+       "commanded-within-60",
+       "ends-across-planes"
       ],
       "modifiers": []
      }

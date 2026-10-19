@@ -3041,7 +3041,48 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // `deck-of-illusions` - illusions and card state are not modeled.
-  // `dimensional-shackles` - prevents extradimensional movement, which is not modeled.
+  // "Use a Utilize action to place these shackles on an Incapacitated creature ... the shackles prevent a creature bound
+  // by them from using any method of extradimensional movement, including teleportation or travel to a different plane
+  // of existence": no teleport and no plane travel of its own (`ethereal.ts`). The Utilize action again removes them;
+  // the bound creature's DC 30 Strength (Athletics) check breaks them. Its once in 30 days and the shackles' loss are the
+  // GM's.
+  "dimensional-shackles": {
+    actions: [
+      {
+        id: "shackle",
+        name: "Place the Dimensional Shackles",
+        activation: "action",
+        description:
+          "Place the shackles on an Incapacitated Small, Medium or Large creature within reach: it can't teleport or travel to another plane while bound. Take this action again on it to remove them. The bound creature can break them with a DC 30 Strength (Athletics) check.",
+        damage: [],
+        targets: {
+          count: 1,
+          rangeFeet: 5,
+          maxSize: "large",
+          conditions: ["incapacitated", "paralyzed", "stunned", "unconscious"]
+        },
+        grants: {
+          name: "Dimensional Shackles",
+          tags: ["no-teleport", "dimensional-shackles"],
+          target: "target",
+          toggles: true,
+          duration: { type: "manual" },
+          modifiers: [],
+          onEnd: [],
+          voidWhileIncapacitated: false,
+          concentration: false,
+          endAction: {
+            activation: "action",
+            kind: "check",
+            ability: "str",
+            skill: "athletics",
+            dc: 30,
+            label: "Break the shackles"
+          }
+        }
+      }
+    ]
+  },
   // `dragon-orb` - multi-charge spells, a healing cast, a self-charm on attunement and a curse.
 
   // `dust-of-disappearance` - single use, rolled duration, area effect.

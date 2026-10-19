@@ -698,7 +698,13 @@ const PROTECTIVE_MAGIC: Pick<ActorAction, "reaction"> = {
  *  Mind: "the target acts as an ally to the aboleth and is under its control"): the `commanded` tag the server's
  *  summons settle reads. Keyed like `ACTION_ENRICHMENTS`. */
 const COMMANDING_SAVES: Readonly<Record<string, { name: string; tags: string[]; modifiers: [] }>> = {
-  "aboleth/dominate-mind": { name: "Dominated by the Aboleth", tags: ["commanded"], modifiers: [] }
+  // "Under its control while within 60 feet of it ... until the aboleth dies or is on a different plane of existence
+  // from the target" (`summons.ts`, `off-plane.ts`).
+  "aboleth/dominate-mind": {
+    name: "Dominated by the Aboleth",
+    tags: ["commanded", "commanded-within-60", "ends-across-planes"],
+    modifiers: []
+  }
 };
 
 const ACTION_ENRICHMENTS: Record<

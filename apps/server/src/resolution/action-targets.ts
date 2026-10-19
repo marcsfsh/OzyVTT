@@ -125,7 +125,15 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
         rule: "target.grappled-by-source",
         message: `${action.name} targets a creature ${attacker.name} is grappling, and ${name} isn't.`
       });
-    if (rules.conditions && !target.conditions.some((condition) => rules.conditions!.includes(condition.id as never)))
+    // Taken again on the creature it holds to end it (Dimensional Shackles removed), it needs only that creature.
+    const ending =
+      action.grants?.toggles === true &&
+      target.effects.some((effect) => effect.sourceActionId === action.id && effect.sourceActorId === attacker.id);
+    if (
+      rules.conditions &&
+      !ending &&
+      !target.conditions.some((condition) => rules.conditions!.includes(condition.id as never))
+    )
       violations.push({
         rule: "target.not-allowed",
         message: `${action.name} targets a ${rules.conditions.map(conditionLabel).join(" or ")} creature, and ${name} isn't.`

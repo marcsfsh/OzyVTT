@@ -20,6 +20,16 @@ export const SEEN_ACROSS_PLANES_TAG = "seen-across-planes";
 export const ETHEREAL_SHUNT_TAG = "ethereal-shunt";
 /** An effect tagged so takes its creature off the map entirely (`off-plane.ts`). */
 const OFF_PLANE = "off-plane";
+/** Dimensional Shackles: "prevent a creature bound by them from using any method of extradimensional movement,
+ *  including teleportation or travel to a different plane of existence". */
+export const DIMENSIONAL_SHACKLES_TAG = "dimensional-shackles";
+
+/** Whether a creature is bound so that it can't leave the plane by any means of its own. */
+export const planeTravelBarred = (actor: Pick<Actor, "effects">): boolean => tagged(actor, DIMENSIONAL_SHACKLES_TAG);
+
+/** Whether an effect's tags take its creature to another plane or the Border Ethereal. */
+export const travelsPlanes = (tags: readonly string[]): boolean =>
+  tags.includes(OFF_PLANE) || tags.includes(ETHEREAL_TAG);
 
 /** Where a creature is: on the fight's plane, on the Border Ethereal over it, or off the map elsewhere. */
 export type Plane = "material" | "ethereal" | "away";
