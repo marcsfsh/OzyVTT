@@ -1,4 +1,4 @@
-import type { SpellReference, SpellZone as ZoneTrigger } from "@vtt/content-srd-5.2.1";
+import { CREATURE_TYPE_IDS, type SpellReference, type SpellZone as ZoneTrigger } from "@vtt/content-srd-5.2.1";
 import type { GameState, SpellZone } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import { catalogIdOf, type ActorAction, type ActorDefinition } from "@vtt/schemas";
@@ -21,6 +21,7 @@ import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js"
 import { withArticle } from "@vtt/domain";
 import { altitudeOf, heightSpan } from "./altitude.js";
 import { bandTest, ringTest } from "./zone-shapes.js";
+import { AURA_IMMUNE_TAG } from "./statblock-traits.js";
 import { breakTimeStop } from "./time-stop.js";
 import { applyCastSight } from "./vision/cast-sight.js";
 
@@ -76,23 +77,46 @@ export function actOnCast(
   return events;
 }
 
+/** The plural a picked creature type is offered as ("Antipathy (humanoids)"). */
+const TYPE_PLURALS: Readonly<Record<string, string>> = { fey: "fey", monstrosity: "monstrosities", undead: "undead" };
+const pluralOf = (type: string) => TYPE_PLURALS[type] ?? `${type}s`;
+
+/** The zone rows a spell's cast picks among, with the creature type picked with it (`picksType`: Antipathy/Sympathy's
+ *  "specify a kind of creature" makes one option per type). */
+type LaterRow = NonNullable<NonNullable<SpellReference["effect"]>["laterActions"]>[number];
+type ZonePick = Readonly<{ id: string; name: string; row: LaterRow; type?: string }>;
+function zoneRowPicks(spell: SpellReference): ZonePick[] {
+  return (spell.effect?.laterActions ?? []).flatMap((row): ZonePick[] => {
+    const option = row.option;
+    if (!row.zone || !option) return [];
+    if (!row.zone.picksType) return [{ id: option.id, name: option.name, row }];
+    return CREATURE_TYPE_IDS.map((type) => ({
+      id: `${option.id}-${type}`,
+      name: `${option.name} (${pluralOf(type)})`,
+      row,
+      type
+    }));
+  });
+}
+
 /** The later action whose zone this spell leaves, if any: the one its cast picked among the spell's options (Wall of
  *  Fire's ring), else the first. */
 export function zoneRowOf(spell: SpellReference, optionId?: string) {
   const rows = (spell.effect?.laterActions ?? []).filter((row) => row.zone !== undefined);
-  return (optionId !== undefined ? rows.find((row) => row.option?.id === optionId) : undefined) ?? rows[0];
+  const picked = optionId !== undefined ? zoneRowPicks(spell).find((pick) => pick.id === optionId) : undefined;
+  return picked?.row ?? rows[0];
 }
+
+/** The creature type a cast's option picked for its zone to act on (Antipathy/Sympathy's goblins), if any. */
+export const pickedZoneType = (spell: SpellReference, optionId: string | undefined): string | undefined =>
+  optionId === undefined ? undefined : zoneRowPicks(spell).find((pick) => pick.id === optionId)?.type;
 
 /** The options a spell's cast picks its zone by (Wall of Fire's forms, a Symbol's glyphs), each with the area the
  *  cast is placed as when it differs from the spell's own (a ring). Empty for a spell with none. */
 export function zoneOptionsOf(
   spell: SpellReference
 ): Array<Readonly<{ id: string; name: string; area?: NonNullable<SpellReference["area"]> }>> {
-  return (spell.effect?.laterActions ?? []).flatMap((row) =>
-    row.zone && row.option
-      ? [{ id: row.option.id, name: row.option.name, ...(row.area ? { area: row.area } : {}) }]
-      : []
-  );
+  return zoneRowPicks(spell).map(({ id, name, row }) => ({ id, name, ...(row.area ? { area: row.area } : {}) }));
 }
 
 /** What a use offers its user to pick, as the sheet lists it: the effects it picks one of (Enlarge or Reduce), or for a
@@ -169,7 +193,8 @@ function creaturesOnMap(state: GameState): Actor[] {
 }
 
 /** "Is a creature of this size, this high, at this point inside the zone?", or null when the map can't say (no grid,
- *  the area not placed, its caster off the map). `casterAt` stands the caster of an Emanation somewhere else. A
+ *  the area not placed, its caster off the map). `casterAt` stands the caster of an Emanation, or the target an area
+ *  is round, somewhere else. A
  *  creature's height is 0 when the caller doesn't give it: on the ground. */
 export function insideTest(
   state: GameState,
@@ -227,6 +252,21 @@ function wholeAreaTest(
         sizeCells: caster?.sizeCells ?? 1,
         sizePx: caster?.sizePx ?? calibration.cellSizePx,
         altitudeFeet: zone.anchor ? 0 : altitudeOf(caster)
+      },
+      trigger.feet ?? 5
+    );
+  }
+  // Round the creature its cast targeted, wherever it goes (Antipathy/Sympathy's 120 feet).
+  if (trigger.around === "target") {
+    const anchor = zone.targetId ? tokenOf(state, zone.targetId) : undefined;
+    const at = casterAt ?? anchor?.position;
+    if (!anchor || !at) return null;
+    return within(
+      {
+        position: at,
+        sizeCells: anchor.sizeCells,
+        sizePx: anchor.sizePx,
+        altitudeFeet: altitudeOf(anchor)
       },
       trigger.feet ?? 5
     );
@@ -335,13 +375,17 @@ export function exposed(
     if (trigger.around === "caster" && own && trigger.affects !== "allies") return [];
     // A Line that blasts from its caster (Gust of Wind) starts beside it, not on it.
     if (own && trigger.towardCaster) return [];
+    // The creature an area is round (Antipathy/Sympathy's target) is the one it keeps others from or draws them to.
+    if (creature.id === zone.targetId) return [];
     if (trigger.affects === "enemies" && (!caster || !areEnemies(caster, creature, deps.resolveDefinition))) return [];
     if (trigger.affects === "allies" && !own && (!caster || !areAllies(caster, creature, deps.resolveDefinition)))
       return [];
     if (kind && movesFreelyOn(creature, kind, deps, true)) return [];
     // "Each creature on the ground in the area": one in the air above it is spared.
     if (trigger.grounded && altitudeOf(tokenOf(state, creature.id)) > 0) return [];
-    if (trigger.types && !trigger.types.includes(typeOf(creature, deps) ?? "")) return [];
+    // The kind its caster picked as it cast (Antipathy/Sympathy), else the types the spell names.
+    const types = zone.types ?? trigger.types;
+    if (types && !types.includes(typeOf(creature, deps) ?? "")) return [];
     if (trigger.sizes && !trigger.sizes.includes(creature.size ?? "medium")) return [];
     // A defeated creature takes no more; a dying character does (damage at 0 HP is a failed death save).
     if (creature.hp.current <= 0 && (creature.kind !== "player-character" || (creature.deathSaves?.failures ?? 0) >= 3))
@@ -399,6 +443,9 @@ function act(
     events.push(...breakTimeStop(state, zone.casterId, `made ${content.name}, which affected another creature`));
   // "If the spirit has no creature Restrained": while one is still held by the cast, the zone waits.
   if (trigger.holdsOne && zone.castId !== null && holdsACreature(state, zone.castId)) return;
+  // Round a target (Antipathy/Sympathy): a creature already under its effect, or immune after saving, is left be.
+  const anchorId = trigger.around === "target" ? (zone.targetId ?? null) : null;
+  if (anchorId !== null && heldByAnchor(creature, zone, anchorId)) return;
   const travelling = meeting === "moves through";
   // Outside a fight there are no turns to count once in: each time a creature comes into the area counts.
   const marks = state.combat.active;
@@ -500,8 +547,16 @@ function act(
     return;
   }
   const conditionIds = save.failureConditions;
+  // Frightened of, or Charmed by, the target the area is round, which its repeat saves measure from.
+  const anchor = anchorId !== null ? state.actors.find((actor) => actor.id === anchorId) : undefined;
   const onFail = failureEffectFor(
-    { action, attacker: caster, castId: zone.castId, riderItemId: null, deps: { catalog: deps.catalog } },
+    {
+      action,
+      attacker: anchor ?? caster,
+      castId: zone.castId,
+      riderItemId: null,
+      deps: { catalog: deps.catalog }
+    },
     conditionIds,
     content.spell ? { spell: content.spell, level: zone.level } : undefined
   );
@@ -531,6 +586,8 @@ function act(
     replaceExisting: false,
     // Gust of Wind's push away from its caster.
     ...(save.failurePush ? { failurePush: save.failurePush } : {}),
+    // "A creature that successfully saves against this effect is immune to it" (Antipathy/Sympathy).
+    ...(save.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
     // Heightened Spell's target has Disadvantage on every save against the spell.
     ...(zone.heightened === creature.id ? { disadvantage: { targetId: creature.id, from: "Heightened Spell" } } : {}),
     newSaveId: deps.newId,
@@ -601,6 +658,18 @@ function withMoreDice(formula: string, extra: number): string {
   return count > 0 ? `${count}d${match[2]}${match[3]}` : "0";
 }
 
+/** Whether a creature already bears what an area round a target leaves (Frightened of it), or saved against it and is
+ *  immune for now. */
+function heldByAnchor(creature: Actor, zone: SpellZone, anchorId: string): boolean {
+  return creature.effects.some(
+    (effect) =>
+      (effect.sourceActorId === anchorId && effect.sourceActionId === zone.laterActionId) ||
+      (effect.tags.includes(AURA_IMMUNE_TAG) &&
+        (effect.sourceActorId === anchorId || effect.sourceActorId === zone.casterId) &&
+        effect.name.includes(zone.name))
+  );
+}
+
 /** Whether a creature still bears what the cast restrained it with (Conjure Elemental's spirit holds one). */
 function holdsACreature(state: GameState, castId: string): boolean {
   return state.actors.some((actor) =>
@@ -643,8 +712,14 @@ export function zonesAfterMove(
         events.push(...glow(state, zone, mover, deps));
       continue;
     }
-    // An Emanation moves with its caster, over whoever it reaches.
-    if (trigger.around === "caster" && zone.casterId === mover.id && !zone.anchor) {
+    // An Emanation moves with its caster, and an area round a target with the target, over whoever it reaches.
+    const carrier =
+      trigger.around === "caster" && !zone.anchor
+        ? zone.casterId
+        : trigger.around === "target"
+          ? zone.targetId
+          : undefined;
+    if (carrier === mover.id) {
       const tests = path.map((point) => insideTest(state, zone, trigger, content, deps.geometry, point));
       if (!trigger.on.includes("enter") || tests.some((test) => test === null)) continue;
       for (const creature of exposed(state, zone, trigger, deps)) {

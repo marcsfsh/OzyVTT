@@ -599,6 +599,42 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       }
     )
   ],
+  // "A creature of the chosen kind makes a Wisdom saving throw when it comes within 120 feet of the target": the area is
+  // round the targeted creature and moves with it, acting on the creature type picked with the form. A creature that
+  // ends its turn more than 120 feet from the target saves again; a success frees it and leaves it immune for now.
+  antipathysympathy: [
+    {
+      name: "antipathy",
+      activation: "other",
+      when: "A creature of the chosen kind that comes within 120 feet of the target makes a Wisdom save or is Frightened of the target, and must use its movement to get as far from it as it can.",
+      save: {
+        ability: "wis",
+        successDamage: "none",
+        failureConditions: ["frightened"],
+        repeatBeyondFeet: 120,
+        immuneOnSuccess: true
+      },
+      damage: [],
+      zone: { on: ["enter"], around: "target", feet: 120, picksType: true },
+      option: { id: "antipathy", name: "Antipathy" }
+    },
+    {
+      name: "sympathy",
+      activation: "other",
+      when: "A creature of the chosen kind that comes within 120 feet of the target makes a Wisdom save or is Charmed by the target, and must use its movement to get as close to it as it can.",
+      save: {
+        ability: "wis",
+        successDamage: "none",
+        failureConditions: ["charmed"],
+        repeatBeyondFeet: 120,
+        repeatOnDamage: { fromSourceOnly: true },
+        immuneOnSuccess: true
+      },
+      damage: [],
+      zone: { on: ["enter"], around: "target", feet: 120, picksType: true },
+      option: { id: "sympathy", name: "Sympathy" }
+    }
+  ],
   // "When you cast the spell and as a Bonus Action on your later turns, you can move the hand up to 60 feet and then
   // cause one of the following effects": each reaches from the hand (`spell-summons.ts`). Forceful Hand's push and
   // Interposing Hand's cover are the table's.

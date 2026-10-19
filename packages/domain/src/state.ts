@@ -1410,6 +1410,19 @@ export const SpellZoneSchema = z
     flammable: z.literal(true).optional(),
     /** Its heal, rolled with its caster's numbers (Conjure Celestial's "4d12 + 4"). */
     healing: z.string().min(1).max(60).optional(),
+    /** The creature it is round, which it moves with (Antipathy/Sympathy's target). */
+    targetId: z.uuid().optional(),
+    /** The creature type its caster picked for it to act on (Antipathy/Sympathy's "kind of creature"). */
+    types: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(14)
+      .optional(),
     /** It acts when its spell ends (Delayed Blast Fireball's bead), so ending it leaves it `bursting` until the server
      *  has raised the saves. */
     burstsOnEnd: z.literal(true).optional(),

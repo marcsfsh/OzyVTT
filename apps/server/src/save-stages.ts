@@ -30,9 +30,11 @@ export type RepeatFields = Readonly<{
   repeatSave?: boolean;
   repeatOnce?: true;
   repeatAtTurnStart?: true;
-  repeatOnDamage?: Readonly<{ advantage?: true; notFromSource?: true }>;
+  repeatOnDamage?: Readonly<{ advantage?: true; notFromSource?: true; fromSourceOnly?: true }>;
   repeatByAction?: true;
   repeatUnseenSource?: true;
+  repeatBeyondFeet?: number;
+  immuneOnSuccess?: true;
   repeatFailureDamage?: RepeatSave["failureDamage"];
   repeatTally?: number;
   secondFailure?: Readonly<{
@@ -57,7 +59,8 @@ export function repeatSaveOf(
     save.repeatSave === true ||
     save.repeatOnce === true ||
     save.repeatTally !== undefined ||
-    save.repeatUnseenSource === true;
+    save.repeatUnseenSource === true ||
+    save.repeatBeyondFeet !== undefined;
   if (!atTurns && !save.repeatOnDamage && !save.repeatByAction && !save.repeatAtTurnStart) return undefined;
   const second = save.secondFailure;
   return {
@@ -68,6 +71,8 @@ export function repeatSaveOf(
     ...(save.repeatOnDamage ? { onDamage: { ...save.repeatOnDamage } } : {}),
     ...(save.repeatByAction ? { byAction: true as const } : {}),
     ...(save.repeatUnseenSource ? { unseenSource: true as const } : {}),
+    ...(save.repeatBeyondFeet !== undefined ? { beyondFeet: save.repeatBeyondFeet } : {}),
+    ...(save.immuneOnSuccess && save.repeatBeyondFeet !== undefined ? { immuneOnSuccess: true as const } : {}),
     ...(save.repeatFailureDamage
       ? { failureDamage: save.repeatFailureDamage.map((part) => ({ ...part })) }
       : again && again.length > 0
@@ -119,6 +124,8 @@ export type EndingSaveDeps = Readonly<{
   now: () => string;
   rollDie?: (sides: number) => number;
   sees?: (viewerId: string, targetId: string) => boolean;
+  /** Creature-to-creature distance on the map; null when it can't tell. */
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 
 /** The repeat saves `actorId` owes as its turn starts or ends: one per effect that repeats then. A once-only repeat
@@ -142,6 +149,12 @@ export function openRepeatSaves(
     // "If the creature ends its turn in a space where it doesn't have line of sight to you" (Fear).
     if (repeat.unseenSource && (effect.sourceActorId === null || seesSource(deps, actor.id, effect.sourceActorId)))
       continue;
+    // "If the Frightened or Charmed creature ends its turn more than 120 feet away from the target" (Antipathy).
+    if (repeat.beyondFeet !== undefined) {
+      const apart =
+        effect.sourceActorId === null ? null : (deps.distanceFeet?.(actor.id, effect.sourceActorId) ?? null);
+      if (apart === null || apart <= repeat.beyondFeet) continue;
+    }
     events.push(openEndingSave(state, actor, effect, repeat, "repeats", deps));
   }
   return events;
@@ -180,6 +193,7 @@ export function openRepeatSavesOnDamage(
     const onDamage = effect.repeatSave?.onDamage;
     if (!onDamage) continue;
     if (onDamage.notFromSource && dealerId !== undefined && dealerId === effect.sourceActorId) continue;
+    if (onDamage.fromSourceOnly && (dealerId === undefined || dealerId !== effect.sourceActorId)) continue;
     events.push(
       openEndingSave(
         state,
@@ -232,6 +246,8 @@ export function openEndingSave(
     repeatOf: { actorId: bearer.id, effectId: effect.id, ...(repeat ? { repeat: true as const } : {}) },
     // Repeated against a spell's effect (Hold Person), it is still a save against magic.
     magical: effect.magical === true,
+    // A success leaves the bearer immune to the effect's source (Antipathy/Sympathy).
+    ...(repeat?.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
     ...(advantageFrom ? { advantageFrom } : {}),
     newSaveId: deps.newId,
     createdAt: Date.parse(deps.now())

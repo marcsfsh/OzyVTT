@@ -9,7 +9,7 @@ import { itemRowOfAction } from "../item-charges.js";
 import { castThisTurnKey } from "../lasting-spells.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { areaAtLevel, endZone } from "../spell-zone-state.js";
-import { actOnCast, pickedZoneRow, zoneRowOf } from "../spell-zones.js";
+import { actOnCast, pickedZoneRow, pickedZoneType, zoneRowOf } from "../spell-zones.js";
 import { abilityModifier, tableLineOf, type ResolveContext } from "./context.js";
 import { shapedZone, shapingOf } from "./metamagic.js";
 import { castWithoutConcentration } from "./summon.js";
@@ -226,7 +226,10 @@ export function openSpellZone(ctx: ResolveContext): void {
   const row = spell ? (pickedZoneRow(spell, ctx.input.option) ?? zoneRowOf(spell)) : undefined;
   if (!spell || !row?.zone || isLaterAction(ctx, spell)) return;
   const { state, attacker, input, targets } = ctx;
-  const aroundCaster = row.zone.around === "caster";
+  // An Emanation, or an area round the creature the cast targets: neither is placed as a template.
+  const aroundCaster = row.zone.around === "caster" || row.zone.around === "target";
+  const anchorId = row.zone.around === "target" ? targets[0]?.id : undefined;
+  const pickedType = pickedZoneType(spell, input.option);
   const duration = spellEffectDuration(spell, castLevelOf(ctx, spell));
   const caught = ctx.action.save !== undefined || ctx.action.damage.length > 0;
   const casterAt = state.combat.tokens.find((token) => token.actorId === attacker.id)?.position ?? null;
@@ -272,6 +275,8 @@ export function openSpellZone(ctx: ResolveContext): void {
             : row.zone.heals.formula
         }
       : {}),
+    ...(anchorId ? { targetId: anchorId } : {}),
+    ...(pickedType ? { types: [pickedType] } : {}),
     entered: [],
     affected: caught ? targets.map((target) => target.id) : []
   };

@@ -1449,12 +1449,20 @@ export const RepeatSaveSchema = z
     once: z.literal(true).optional(),
     skipsCurrentTurn: z.literal(true).optional(),
     onDamage: z
-      .object({ advantage: z.literal(true).optional(), notFromSource: z.literal(true).optional() })
+      .object({
+        advantage: z.literal(true).optional(),
+        notFromSource: z.literal(true).optional(),
+        fromSourceOnly: z.literal(true).optional()
+      })
       .strict()
       .optional(),
     byAction: z.literal(true).optional(),
     /** Only when the bearer ends its turn where it can't see the effect's source (Fear). */
     unseenSource: z.literal(true).optional(),
+    /** Only when the bearer ends its turn more than this many feet from the effect's source (Antipathy/Sympathy). */
+    beyondFeet: z.number().int().min(5).max(5280).optional(),
+    /** A success makes the bearer immune to the effect's source for the rest of the fight (Antipathy/Sympathy). */
+    immuneOnSuccess: z.literal(true).optional(),
     failureDamage: RepeatFailureDamageSchema.optional(),
     tally: z
       .object({
@@ -3013,13 +3021,18 @@ export const SaveOutcomeFields = {
     .optional()
     .describe("The target repeats the save at the start of each of its turns, not the end"),
   /** The target also repeats the save each time it takes damage (Dominate Person), with Advantage (Hideous Laughter),
-   *  or only for damage from another source (a harpy's Luring Song). */
+   *  only for damage from another source (a harpy's Luring Song), or only for its source's (Sympathy: "If the target
+   *  damages the Charmed creature"). */
   repeatOnDamage: z
-    .object({ advantage: z.literal(true).optional(), notFromSource: z.literal(true).optional() })
+    .object({
+      advantage: z.literal(true).optional(),
+      notFromSource: z.literal(true).optional(),
+      fromSourceOnly: z.literal(true).optional()
+    })
     .strict()
     .optional()
     .describe(
-      "The target repeats the save each time it takes damage: with Advantage (advantage), or only for damage from another source (notFromSource)"
+      "The target repeats the save each time it takes damage: with Advantage (advantage), only for damage from another source (notFromSource), or only for its source's (fromSourceOnly)"
     ),
   /** The target can take an action to repeat the save (Irresistible Dance: "collect itself"). */
   repeatByAction: z.literal(true).optional().describe("The target can take an action on its turn to repeat the save"),
@@ -3064,6 +3077,15 @@ export const SaveOutcomeFields = {
     .literal(true)
     .optional()
     .describe("Each failed repeat save deals the first failure's damage again"),
+  /** The target repeats the save at the end of its turns only when it ends one more than this many feet from the
+   *  source (Antipathy/Sympathy: "ends its turn more than 120 feet away from the target"). */
+  repeatBeyondFeet: z
+    .number()
+    .int()
+    .min(5)
+    .max(5280)
+    .optional()
+    .describe("The target repeats the save only when it ends its turn more than this many feet from the source"),
   /** The target repeats the save only when it ends its turn out of the source's line of sight (Fear). */
   repeatUnseenSource: z
     .literal(true)
@@ -3890,7 +3912,12 @@ export const AreaTriggerSchema = z
       .array(z.enum(["enter", "start-turn", "end-turn", "travel", "caster-turn-start", "caster-turn-end", "spell-end"]))
       .max(3),
     oncePerTurn: z.literal(true).optional(),
-    around: z.enum(["caster", "point"]).optional(),
+    /** Measured from its caster (an Emanation), from the point it is placed at, or from the creature its cast targets
+     *  (`target`: Antipathy/Sympathy's 120 feet round its target, which moves with it). */
+    around: z.enum(["caster", "point", "target"]).optional(),
+    /** Its caster picks, as it casts, the one creature type it acts on (Antipathy/Sympathy: "specify a kind of
+     *  creature"). */
+    picksType: z.literal(true).optional(),
     feet: z.number().int().min(5).max(120).optional(),
     /** Only the caster's enemies, or only the caster and its allies ("you and your allies": Aura of Life). */
     affects: z.enum(["enemies", "allies"]).optional(),
