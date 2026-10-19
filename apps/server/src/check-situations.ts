@@ -3,7 +3,7 @@ import { gatePasses, triggerKind, type RiderModifier } from "@vtt/rules-5e";
 import type { EquipmentDerivation } from "./equipment-derivation.js";
 
 // SRD gear that helps a check only in a situation the roller names (a Book's topic, a Map's place, a Costume's
-// part, a Crowbar's leverage, a Magnifying Glass's detail, a Pole's vault): each rider waits on `situation-is`, the
+// part, prying with a Crowbar, a Magnifying Glass's detail, a Pole's vault): each rider waits on `situation-is`, the
 // sheet offers the situation as a toggle, and a check roll that names it gets the rider.
 
 type DerivedSituation = ActorDerivedSheet["situations"][number];

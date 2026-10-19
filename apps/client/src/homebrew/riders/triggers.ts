@@ -376,7 +376,7 @@ export const whenField = (): FieldDef => ({
       kind: "tags",
       visibleWhen: hasType("versus-creature-type", "source-creature-type-is"),
       suggestions: (ctx) => ctx.creatureTypes,
-      help: "Read from the other creature's stat block."
+      help: "Read from the stat block of the target, or of the attacker. A character has no kind recorded, so it never matches one."
     },
     {
       key: "feet",

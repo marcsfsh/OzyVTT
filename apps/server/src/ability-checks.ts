@@ -194,7 +194,7 @@ export type CheckContext = Readonly<{
   stakes?: readonly string[];
   /** What sight decides about it (Frightened's line of sight, the light, how obscured `finding` is). */
   sight?: CheckSight;
-  /** The situations the roller says it fits (a Book's topic, a Crowbar's leverage), for `situation-is` riders. */
+  /** The situations the roller says it fits (a Book's topic, prying with a Crowbar), for `situation-is` riders. */
   situations?: readonly string[];
 }>;
 

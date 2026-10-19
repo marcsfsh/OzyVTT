@@ -741,7 +741,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     'While it is worn (equipped), the sheet offers "impersonating whom the Costume represents" beside the checks (check-situations.ts), and a check that names it has Advantage (ability-checks.ts).'
   ),
   "item:crowbar": enforced(
-    "While it is equipped, the sheet offers \"where the Crowbar's leverage applies\" beside the checks (check-situations.ts), and a Strength check that names it has Advantage (ability-checks.ts). Whether its leverage applies is the GM's."
+    'While it is equipped, the sheet offers "prying with the Crowbar" beside the checks (check-situations.ts), and a Strength check that names it has Advantage (ability-checks.ts). Whether the Crowbar can pry there is the GM\'s.'
   ),
   "item:magnifying-glass": enforced(
     'While it is equipped, the sheet offers "appraising or inspecting a highly detailed item" beside the checks (check-situations.ts), and a check that names it has Advantage (ability-checks.ts). Lighting a fire with it is the GM\'s.'

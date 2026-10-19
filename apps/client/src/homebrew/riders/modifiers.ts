@@ -516,7 +516,7 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       kind: "switch",
       ...trueOnly("self"),
       visibleWhen: hasType("healing-bonus"),
-      help: "Once the healing reaches another creature."
+      help: "Once the healing reaches someone else."
     },
     {
       key: "amount",

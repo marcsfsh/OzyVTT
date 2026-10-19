@@ -86,7 +86,7 @@ export function SkillButton({
   );
 }
 
-/** The situations the character's gear and features name (a Book's topic, a Crowbar's leverage), each a toggle the
+/** The situations the character's gear and features name (a Book's topic, prying with a Crowbar), each a toggle the
  *  next check it fits carries to the server. The GM judges whether the check really fits. */
 export function CheckSituations({
   situations,

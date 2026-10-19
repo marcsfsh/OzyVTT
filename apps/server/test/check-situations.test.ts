@@ -11,7 +11,7 @@ import {
 import { deriveEquipment } from "../src/equipment-derivation.js";
 import { catalog, library } from "./equipment-table.js";
 
-// SRD gear that helps a check only in a situation the roller names (a Book's topic, a Crowbar's leverage): the
+// SRD gear that helps a check only in a situation the roller names (a Book's topic, prying with a Crowbar): the
 // rider waits on `situation-is`, the sheet lists the situation, and only a roll that names it gets the rider.
 
 const SAGE = "10000000-0000-4000-8000-0000000000d1";
@@ -19,7 +19,7 @@ const SESSION = "30000000-0000-4000-8000-0000000000d1";
 const COMMAND = "50000000-0000-4000-8000-0000000000d1";
 const SKILLS = library.skillSummaries();
 const BOOK_TOPIC = "consulting an accurate Book about its topic";
-const LEVERAGE = "where the Crowbar's leverage applies";
+const PRYING = "prying with the Crowbar";
 
 /** Int 14 (+2), Str 12 (+1), PB 2, proficient in History (+4). */
 const SAGE_SHEET = {
@@ -110,25 +110,25 @@ describe("a situation the roller names", () => {
     expect(athletics.outcome).toMatchObject({ label: "Strength (Athletics)", total: 11 });
   });
 
-  it("gives a Crowbar's Advantage to a Strength check that names its leverage, and keeps it through a reroll", () => {
+  it("gives a Crowbar's Advantage to a Strength check that names prying with it, and keeps it through a reroll", () => {
     const state = tableWith([gear("crowbar", "Crowbar")]);
     const forced = rollAbilityCheck(
       state,
       OWNER,
-      history({ subject: { ability: "str" }, situations: [LEVERAGE] }),
+      history({ subject: { ability: "str" }, situations: [PRYING] }),
       depsFor([3, 17])
     );
     expect(forced.outcome.rollMode?.mode).toBe("advantage");
     expect(forced.outcome.natural).toBe(17);
-    expect(state.heldRolls.at(-1)?.check?.situations).toEqual([LEVERAGE]);
-    // The GM rerolls the check: the leverage still counts.
+    expect(state.heldRolls.at(-1)?.check?.situations).toEqual([PRYING]);
+    // The GM rerolls the check: prying still counts.
     const again = rerollAbilityCheck(state, { role: "gm" }, { commandId: COMMAND, actorId: SAGE }, depsFor([2, 15]));
     expect(again.outcome.rollMode?.mode).toBe("advantage");
     // A Dexterity check is not the Strength check the Crowbar helps.
     const dexterity = rollAbilityCheck(
       state,
       OWNER,
-      history({ subject: { ability: "dex" }, situations: [LEVERAGE] }),
+      history({ subject: { ability: "dex" }, situations: [PRYING] }),
       depsFor([3])
     );
     expect(dexterity.outcome.rollMode).toBeUndefined();
@@ -144,7 +144,7 @@ describe("a situation the roller names", () => {
         abilities: ["int"],
         skills: ["arcana", "history", "nature", "religion"]
       },
-      { situation: LEVERAGE, source: "Crowbar", effect: "Advantage", abilities: ["str"], skills: [] }
+      { situation: PRYING, source: "Crowbar", effect: "Advantage", abilities: ["str"], skills: [] }
     ]);
     // A Book left in the pack offers nothing, and naming its topic adds nothing.
     const packed = tableWith([gear("book", "Book", false)]);

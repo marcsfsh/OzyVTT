@@ -610,7 +610,7 @@ const DerivedToolRowSchema = z.strictObject({
   reliableTalent: z.boolean()
 });
 export type DerivedToolRow = Wire<z.infer<typeof DerivedToolRowSchema>>;
-/** A situation the character's riders name for its checks (a Book's topic, a Crowbar's leverage), offered as a toggle
+/** A situation the character's riders name for its checks (a Book's topic, prying with a Crowbar), offered as a toggle
  *  beside the checks. */
 const DerivedSituationSchema = z.strictObject({
   situation: z.string().describe('The plain words, e.g. "consulting an accurate Book about its topic"'),
@@ -708,7 +708,7 @@ const ActorDerivedSheetSchema = z.strictObject({
   situations: z
     .array(DerivedSituationSchema)
     .describe(
-      "The situations the character's equipped items, features and effects name for its checks (a Book's topic, a Crowbar's leverage), each with what it gives and the checks it can fit. A check roll that names one gets its rider; the GM judges whether the roll fits."
+      "The situations the character's equipped items, features and effects name for its checks (a Book's topic, prying with a Crowbar), each with what it gives and the checks it can fit. A check roll that names one gets its rider; the GM judges whether the roll fits."
     )
 });
 export type ActorDerivedSheet = Wire<z.infer<typeof ActorDerivedSheetSchema>>;

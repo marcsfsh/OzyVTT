@@ -40,7 +40,7 @@ function flatPart(formula: string): number {
 const withBonus = (value: number, bonus: number) =>
   bonus === 0 ? String(value) : `${value} ${bonus > 0 ? "+" : "-"} ${Math.abs(bonus)}`;
 
-/** A situation the roller can say a check fits (a Book's topic, a Crowbar's leverage), as the server lists it. */
+/** A situation the roller can say a check fits (a Book's topic, prying with a Crowbar), as the server lists it. */
 export type CheckSituation = ActorDerivedSheet["situations"][number];
 
 /** Whether a situation can fit this check: its abilities and skills, where it names any. */

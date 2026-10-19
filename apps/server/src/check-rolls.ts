@@ -65,7 +65,7 @@ export type CheckRollInput = Readonly<{
   findActorId?: string;
   /** The GM's call this check answers. */
   callId?: string;
-  /** The situations the roller says the check fits (a Book's topic, a Crowbar's leverage). */
+  /** The situations the roller says the check fits (a Book's topic, prying with a Crowbar). */
   situations?: readonly string[];
 }>;
 

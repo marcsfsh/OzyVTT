@@ -161,14 +161,14 @@ describe("the sheet's checks", () => {
   });
 
   it("sends a situation the player turns on with the next check it fits, then turns it off", async () => {
-    const leverage = {
-      situation: "where the Crowbar's leverage applies",
+    const prying = {
+      situation: "prying with the Crowbar",
       source: "Crowbar",
       effect: "Advantage",
       abilities: ["str" as const],
       skills: []
     };
-    serve(derivedSheet({ situations: [leverage] }), {
+    serve(derivedSheet({ situations: [prying] }), {
       "check:roll": {
         ok: true,
         check: { label: "Strength check", natural: 12, total: 13, dc: null, success: null, rollId: "r1" }
@@ -177,7 +177,7 @@ describe("the sheet's checks", () => {
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
     await openTab(user, "Checks");
-    const toggle = await screen.findByRole("button", { name: "Where the Crowbar's leverage applies (Advantage)" });
+    const toggle = await screen.findByRole("button", { name: "Prying with the Crowbar (Advantage)" });
     expect(toggle.getAttribute("aria-pressed")).toBe("false");
     await user.click(toggle);
     expect(toggle.getAttribute("aria-pressed")).toBe("true");
@@ -186,7 +186,7 @@ describe("the sheet's checks", () => {
     await user.click(screen.getByRole("button", { name: "Roll a Strength check, +1" }));
     expect(sent("check:roll")).toEqual([
       { actorId: HERO, ability: "dex", visibility: "public" },
-      { actorId: HERO, ability: "str", visibility: "public", situations: ["where the Crowbar's leverage applies"] }
+      { actorId: HERO, ability: "str", visibility: "public", situations: ["prying with the Crowbar"] }
     ]);
     await waitFor(() => expect(toggle.getAttribute("aria-pressed")).toBe("false"));
   });
