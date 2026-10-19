@@ -75,7 +75,8 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
   const byId = (actorId: string) => state.actors.find((actor) => actor.id === actorId);
   const requests = rest.requests.map(byId).filter((actor): actor is GmActor => actor !== undefined);
   const shortRest = rest.shortRest;
-  const longRest = rest.longRest ?? null;
+  // A player-shaped first state carries its own cut of the Long Rest, with no members.
+  const longRest = rest.longRest && "members" in rest.longRest ? rest.longRest : null;
   const projects = state.crafting?.projects ?? [];
   const picked = party.filter((actor) => !unpicked.has(actor.id));
   const calendar = useGmCalendar(token, open);
