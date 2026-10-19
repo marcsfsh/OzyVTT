@@ -9,7 +9,9 @@ import {
   SaveConditionSchema,
   type DamageType,
   type EndedBy,
+  type FailureMargin,
   type ForcedPush,
+  type Modifier,
   type ObjectPrint,
   type OngoingDamage,
   type SaveCondition,
@@ -54,6 +56,10 @@ export type SaveOutcome = {
   failureEndsForm?: true;
   breaksConcentration?: true;
   heldBy?: ObjectPrint;
+  failureMaxSize?: "tiny" | "small" | "medium" | "large" | "huge";
+  sparesCreatureTypes?: string[];
+  sparesSpecies?: string[];
+  failureByMargin?: FailureMargin;
 };
 
 /** The damage types a stat block lists after "Vulnerability to" or "Immunity to" ("Bludgeoning, Poison, and Psychic"),
@@ -194,7 +200,10 @@ export function failureDurationOf(clause: string): SaveFailureDuration | undefin
     return minutes <= 10 ? { type: "rounds", rounds: minutes * 10 } : { type: "minutes", minutes };
   }
   if (timed[1] === "start") return { type: "until-source-next-turn" };
-  return timed[2] === "its" ? { type: "until-bearer-turn-end" } : { type: "until-source-turn-end" };
+  // "Until the end of the target's next turn" is the bearer's, as "its" is.
+  return timed[2] === "its" || /^the target[\u2019']s$/.test(timed[2]!)
+    ? { type: "until-bearer-turn-end" }
+    : { type: "until-source-turn-end" };
 }
 
 /** "Until you or your allies damage it", "If you or one of your allies deals damage to the target": the failure ends
@@ -360,6 +369,13 @@ export function statBlockSaveOutcome(description: string): SaveOutcome {
     );
   // "If the target is a Humanoid, it is subjected to the following effect."
   const only = /\bIf the target is an? ([A-Z][a-z]+), it is subjected to the following effect\b/.exec(description);
+  const spared = sparedOf(description);
+  // "If the target is a Large or smaller creature, it has the Prone condition": a larger one takes the damage alone.
+  const sized =
+    /\bIf the target is an? (Tiny|Small|Medium|Large|Huge) or smaller creature, it has the [A-Z][a-z]+ condition\b/.exec(
+      failure
+    );
+  const margin = failureMarginOf(description);
   const onDamage = /\bwhenever it takes damage from a source other than\b/.test(description)
     ? { notFromSource: true as const }
     : /\brepeats the save whenever it takes damage\b/.test(description)
@@ -380,6 +396,9 @@ export function statBlockSaveOutcome(description: string): SaveOutcome {
       : {}),
     ...(dies ? { failureKills: dies[1] ? { sourceRegains: dies[1] } : {} } : {}),
     ...(only && only[1] !== "Creature" ? { onlyCreatureTypes: [only[1]!.toLowerCase()] } : {}),
+    ...spared,
+    ...(sized ? { failureMaxSize: sized[1]!.toLowerCase() as NonNullable<SaveOutcome["failureMaxSize"]> } : {}),
+    ...(margin ? { failureByMargin: margin } : {}),
     // "Each creature that isn't currently affected by this breath".
     ...(/\bthat isn[\u2019']t currently affected by this\b/.test(description) ? { sparesAffected: true as const } : {}),
     // "Or until it ends its turn with the nalfeshnee out of line of sight".
@@ -390,6 +409,79 @@ export function statBlockSaveOutcome(description: string): SaveOutcome {
     // "Until the aboleth dies".
     ...(/\buntil the [a-z' -]+? dies\b/.test(failure) && lifetime.failureConditions.length > 0
       ? { endsWhenSourceDies: true as const }
+      : {})
+  };
+}
+
+/** The SRD's creature types, which a spared clause tells apart from a species ("isn't an Undead or elf"). */
+const CREATURE_TYPES: ReadonlySet<string> = new Set([
+  "aberration",
+  "beast",
+  "celestial",
+  "construct",
+  "dragon",
+  "elemental",
+  "fey",
+  "fiend",
+  "giant",
+  "humanoid",
+  "monstrosity",
+  "ooze",
+  "plant",
+  "undead"
+]);
+
+/** "If the target is a creature that isn't an Undead or elf, it is subjected to the following effect": the creature
+ *  types and species the save spares. */
+export function sparedOf(description: string): Pick<SaveOutcome, "sparesCreatureTypes" | "sparesSpecies"> {
+  const clause =
+    /\bIf the target is a creature that isn[\u2019']t an? ([A-Za-z]+(?:,? (?:or )?(?:an? )?[A-Za-z]+)*), it is subjected to the following effect\b/.exec(
+      description
+    )?.[1];
+  if (!clause) return {};
+  const words = clause
+    .split(/,? or |, /)
+    .map((word) => word.replace(/^an? /, "").toLowerCase())
+    .filter((word) => word.length > 0);
+  const types = words.filter((word) => CREATURE_TYPES.has(word));
+  const species = words.filter((word) => !CREATURE_TYPES.has(word));
+  return {
+    ...(types.length > 0 ? { sparesCreatureTypes: types } : {}),
+    ...(species.length > 0 ? { sparesSpecies: species } : {})
+  };
+}
+
+/**
+ * "Failure by 5 or More: The target has the Poisoned condition for 1 minute. While Poisoned, the target has the
+ * Unconscious condition, which ends early if the target takes any damage." The band's own conditions and duration
+ * stand in for the failure's; a "While X" sentence adds conditions that last with the failure's and may end sooner.
+ * Undefined when the stat block prints no such band, or one the reader can't read whole.
+ */
+export function failureMarginOf(description: string): FailureMargin | undefined {
+  const label = /\bFailure by (\d+) or More:?\s*/.exec(description);
+  if (!label) return undefined;
+  const tail = description.slice(label.index + label[0].length);
+  const end = tail.search(STAT_BLOCK_LABEL);
+  const clause = end === -1 ? tail : tail.slice(0, end);
+  const first = clause.split(/(?<=\.)\s+/)[0] ?? "";
+  const own = /^The target has the /.test(first) ? namedConditions(first).conditions : [];
+  const duration = own.length > 0 ? failureDurationOf(first) : undefined;
+  const companion =
+    /\bWhile ([A-Z][a-z]+), the target (?:also )?has the ([A-Z][a-z]+(?: and [A-Z][a-z]+)?) conditions?/.exec(clause);
+  const conditions = companion ? conditionIdsOf(companion[2]!) : [];
+  if (own.length === 0 && conditions.length === 0) return undefined;
+  return {
+    by: Number.parseInt(label[1]!, 10),
+    ...(own.length > 0 ? { conditions: own } : {}),
+    ...(duration ? { duration } : {}),
+    ...(conditions.length > 0
+      ? {
+          whileFailed: {
+            conditions,
+            ...(ENDS_ON_DAMAGE.test(clause) ? { endsOnDamage: true as const } : {}),
+            ...(WAKE.test(clause) ? { endedBy: { ...WAKE_ACTION } } : {})
+          }
+        }
       : {})
   };
 }
@@ -412,18 +504,39 @@ const STRENGTH_TESTS = [
 
 /** What a failure leaves besides conditions, as one effect named for its action. */
 export type FailureRestrictions = Readonly<{
-  failureEffect: { name: string; tags: string[]; modifiers: Array<(typeof STRENGTH_TESTS)[number] | DamagePenalty> };
+  failureEffect: { name: string; tags: string[]; modifiers: Modifier[]; speedZero?: true };
   failureDuration?: SaveFailureDuration;
   repeatSave?: true;
 }>;
 
-/** "Subtracts 3 (1d6) from its damage rolls": the die taken off each of the bearer's damage rolls. */
-type DamagePenalty = Readonly<{
-  type: "damage-bonus";
-  amount: 0;
-  dice: string;
-  when: Array<{ type: "on-damage-roll" }>;
-}>;
+/** "Its Speed decreases by 10 feet": the feet a failure takes off the bearer's Speed. */
+const speedCutOf = (clause: string): Modifier[] => {
+  const cut = /\b(?:its|the target[\u2019']s) Speed decreases by (\d+) feet\b/.exec(clause);
+  return cut ? [{ type: "speed", amount: -Number.parseInt(cut[1]!, 10) }] : [];
+};
+
+const DISADVANTAGE_ROLLS = [
+  ["ability checks", "check", "on-ability-check"],
+  ["attack rolls", "attack", "on-attack-roll"],
+  ["saving throws", "save", "on-saving-throw"]
+] as const;
+
+/** "Disadvantage on ability checks and attack rolls", "on saving throws to maintain Concentration": a roll-mode rider
+ *  for each roll the sentence names. */
+const disadvantagesOf = (clause: string): Modifier[] => {
+  if (/\bDisadvantage on saving throws to maintain Concentration\b/.test(clause))
+    return [{ type: "roll-mode", roll: "concentration", mode: "disadvantage" }];
+  const rolls =
+    /\bhas Disadvantage on ((?:ability checks|attack rolls|saving throws)(?:,? (?:and )?(?:ability checks|attack rolls|saving throws))*)\b/.exec(
+      clause
+    )?.[1];
+  if (!rolls) return [];
+  return DISADVANTAGE_ROLLS.flatMap(([words, roll, moment]) =>
+    rolls.includes(words)
+      ? [{ type: "roll-mode" as const, roll, mode: "disadvantage" as const, when: [{ type: moment }] }]
+      : []
+  );
+};
 
 /**
  * A stat-block failure that names no condition but restricts the target, as one effect named for the action: a
@@ -442,12 +555,13 @@ export function failureRestrictionsOf(description: string, name: string): Failur
   if (namedConditions(clause).conditions.length > 0) return null;
   const tags = [
     ...(/\bcan[\u2019']t take Reactions\b/.test(clause) ? ["no-reactions"] : []),
-    ...(/\bits Speed is halved\b/.test(clause) ? ["speed-halved"] : []),
+    ...(/\b(?:its|the target[\u2019']s) Speed is halved\b/.test(clause) ? ["speed-halved"] : []),
     ...(/\bcan take either an action or a Bonus Action on its turn, not both\b/.test(clause) ? ["action-or-bonus"] : [])
   ];
   const penalty = /\bsubtracts \d+ \((\d+d\d+)\) from its damage rolls\b/.exec(clause);
-  const modifiers = [
-    ...(/\bDisadvantage on Strength-based D20 Tests?\b/.test(clause) ? STRENGTH_TESTS : []),
+  const modifiers: Modifier[] = [
+    ...(/\bDisadvantage on Strength-based D20 Tests?\b/.test(clause) ? STRENGTH_TESTS : disadvantagesOf(clause)),
+    ...speedCutOf(clause),
     ...(penalty
       ? [
           {
@@ -459,17 +573,46 @@ export function failureRestrictionsOf(description: string, name: string): Failur
         ]
       : [])
   ];
-  if (tags.length === 0 && modifiers.length === 0) return null;
+  // "The target's Speed is 0 until the end of the target's next turn" (a white dragon's Freezing Burst).
+  const speedZero = /\b(?:its|the target[\u2019']s) Speed is 0\b/.test(clause);
+  if (tags.length === 0 && modifiers.length === 0 && !speedZero) return null;
   const duration = /\bThis effect lasts until the end of its next turn\b/.test(clause)
     ? ({ type: "until-bearer-turn-end" } as const)
     : failureDurationOf(clause);
   return {
-    failureEffect: { name, tags, modifiers },
+    failureEffect: { name, tags, modifiers, ...(speedZero ? { speedZero: true as const } : {}) },
     ...(duration ? { failureDuration: duration } : {}),
     ...(repeatsEachTurn(clause) || /\bIt repeats the save at the end of each of its turns\b/.test(clause)
       ? { repeatSave: true as const }
       : {})
   };
+}
+
+/**
+ * What a failure's condition brings with it while it lasts, as one effect named for the action that rides the
+ * condition's: a dretch's Fetid Cloud ("While Poisoned, the creature can take either an action or a Bonus Action on its
+ * turn, not both, and it can't take Reactions") and a swarm of ravens' Cacophony ("While Deafened, the target also has
+ * Disadvantage on ability checks and attack rolls"). Null when the failure prints none.
+ */
+export function failureCompanionRidersOf(
+  description: string,
+  name: string
+): Readonly<{ name: string; tags: string[]; modifiers: Modifier[] }> | null {
+  const start = description.search(/\b(?:First Failure|Failure:)/);
+  if (start === -1) return null;
+  const tail = description.slice(start);
+  const end = tail.search(STAT_BLOCK_LABEL);
+  const clause = end === -1 ? tail : tail.slice(0, end);
+  const conditions = namedConditions(clause).conditions;
+  const sentence = /\bWhile ([A-Z][a-z]+), the (?:target|creature) [^.]*\./.exec(clause);
+  if (!sentence || !conditions.includes(sentence[1]!.toLowerCase() as SaveCondition)) return null;
+  const riders = sentence[0];
+  const tags = [
+    ...(/\bcan[\u2019']t take Reactions\b/.test(riders) ? ["no-reactions"] : []),
+    ...(/\bcan take either an action or a Bonus Action on its turn, not both\b/.test(riders) ? ["action-or-bonus"] : [])
+  ];
+  const modifiers = [...disadvantagesOf(riders), ...speedCutOf(riders)];
+  return tags.length > 0 || modifiers.length > 0 ? { name, tags, modifiers } : null;
 }
 
 /** "Or a creature within 5 feet of it takes an action to wake it", "someone within 5 feet of it takes an action to shake

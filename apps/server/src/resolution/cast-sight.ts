@@ -45,7 +45,10 @@ export function placeCastSight(ctx: ResolveContext): void {
     targetIds: ctx.targets.map((target) => target.id),
     areaPlaced: input.areaPlaced === true,
     widthFeet: ctx.action.area?.widthFeet ?? spell?.area?.widthFeet ?? null,
-    ...(ringed ? { ringFeet: RING_FEET } : {})
+    ...(ringed ? { ringFeet: RING_FEET } : {}),
+    ...(input.areaAt && ctx.action.area
+      ? { centredAt: { x: input.areaAt.x, y: input.areaAt.y, sizeFeet: ctx.action.area.sizeFeet } }
+      : {})
   });
   for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
 }

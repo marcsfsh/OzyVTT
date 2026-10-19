@@ -59,6 +59,8 @@ export type CastSightInput = Readonly<{
   widthFeet?: number | null;
   /** A ringed wall's thickness: the area is the circle's edge alone (Wall of Fire's ring). */
   ringFeet?: number;
+  /** The area is a Cube centred where its user stands, with no template (an octopus's ink): its centre and side. */
+  centredAt?: Readonly<{ x: number; y: number; sizeFeet: number }>;
 }>;
 
 /**
@@ -155,6 +157,16 @@ export function applyCastSight(state: GameState, input: CastSightInput): EffectN
         widthFeet: input.widthFeet ?? null,
         ...(input.ringFeet !== undefined ? { ringFeet: input.ringFeet } : {})
       };
+    else if (input.centredAt) {
+      // Fixed where it was made: the octopus swims off and leaves its ink behind. Without the map's scale, a circle.
+      const { x, y, sizeFeet } = input.centredAt;
+      const pixelsPerFoot = vision.measure?.pixelsPerFoot;
+      const side = pixelsPerFoot ? sizeFeet * pixelsPerFoot : 0;
+      shape =
+        side > 0
+          ? { type: "rect", x: Math.max(0, x - side / 2), y: Math.max(0, y - side / 2), width: side, height: side }
+          : { type: "circle", x: Math.max(0, x), y: Math.max(0, y), radiusFeet: sizeFeet / 2 };
+    }
     if (shape) {
       const made: VisionArea = {
         id: derivedUuid(commandId, "area"),

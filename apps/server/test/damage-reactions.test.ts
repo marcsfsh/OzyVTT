@@ -436,15 +436,34 @@ describe("a stone giant's Deflect Missile", () => {
       response: "reduce-damage",
       formula: "1d10 + 6",
       damageTypes: ["bludgeoning", "piercing", "slashing"],
-      attackKinds: ["ranged"]
+      attackKinds: ["ranged"],
+      redirect: true
     });
     const game = table(giant, [], 126);
     goblinUses(game, SHORTBOW, [19, 4], 30);
     expect(game.combat.pendingReactions[0]).toMatchObject({ actionName: "Deflect Missile (Recharge 5-6)" });
-    expect(answer(game, true, [1])).toMatchObject({ used: true, appliedDamage: 0 });
+    expect(answer(game, true, [1, 5])).toMatchObject({ used: true, appliedDamage: 0 });
     const melee = table(giant, [], 126);
     goblinUses(melee, SCIMITAR, [19, 4]);
     expect(melee.combat.pendingReactions).toEqual([]);
+  });
+
+  it("turns the force on a creature it picks when it takes the damage to 0: a DC 17 Dexterity save", () => {
+    const game = table(giant, [], 126);
+    goblinUses(game, SHORTBOW, [19, 4], 30);
+    expect(game.combat.pendingReactions[0]?.redirectChoices).toEqual([{ actorId: IDS.goblin, name: "Goblin" }]);
+    // 6 Piercing less 1d10 + 6 is 0, so the goblin that shot makes the save.
+    const used = answer(game, true, [1, 5]);
+    expect(used.resolution?.save).toMatchObject({ ability: "dex", dc: 17 });
+    expect(game.combat.pendingSaves).toMatchObject([{ targetActorId: IDS.goblin, dc: 17, ability: "dex" }]);
+  });
+
+  it("keeps the force when some of the damage gets through", () => {
+    const game = table(giant, [], 126);
+    goblinUses(game, SHORTBOW, [19, 6], 30);
+    const used = answer(game, true, [1]);
+    expect(used.appliedDamage).toBe(1);
+    expect(game.combat.pendingSaves).toEqual([]);
   });
 });
 
@@ -542,7 +561,7 @@ describe("a marilith's Reactive", () => {
 });
 
 describe("a rust monster's Reflexive Antennae", () => {
-  it("uses Antennae on the creature that damaged it, opening its DC 11 Dexterity save", () => {
+  it("waits for an attack roll that hits: damage with no roll opens nothing", () => {
     const game = table(monster("Hero", []));
     game.definitions = game.definitions.map((entry) =>
       entry.id === "def-goblin" ? { ...entry, definition: view.monster("rust-monster")! } : entry
@@ -561,14 +580,6 @@ describe("a rust monster's Reflexive Antennae", () => {
         distanceFeet: () => 5
       }
     );
-    expect(game.combat.pendingReactions[0]).toMatchObject({
-      kind: "damaged-by-creature",
-      actorId: IDS.goblin,
-      actionName: "Reflexive Antennae",
-      targetActorId: IDS.hero
-    });
-    answer(game, true);
-    expect(game.combat.pendingSaves).toMatchObject([{ targetActorId: IDS.hero, ability: "dex", dc: 11 }]);
-    expect(game.combat.reactionsUsed).toContain(IDS.goblin);
+    expect(game.combat.pendingReactions).toEqual([]);
   });
 });

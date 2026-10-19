@@ -475,6 +475,8 @@ const SAVE_LIFETIME_KEYS = [
 
 /** The save-block keys that make a failure act by the target's Hit Points or send it home (`SaveOutcomeFields`). */
 const DEATH_SAVE_KEYS = ["failureByHitPoints[].**", "failureBanishes"] as const;
+/** The save-block keys for a failure by a margin and the creatures a failure spares (`SaveOutcomeFields`). */
+const MARGIN_SAVE_KEYS = ["failureByMargin.**", "sparesCreatureTypes", "sparesSpecies"] as const;
 
 /** The exemption table. First match wins, so specific rows sit above general ones. */
 export const EXEMPTIONS: readonly ExemptionRow[] = [
@@ -665,6 +667,41 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
       "what a failed save does by the target's Hit Points and the creature types it sends home (Divine Word) - authored in the content scripts",
     status: "gap"
   })),
+  ...MARGIN_SAVE_KEYS.map((key): ExemptionRow => ({
+    at: `actions[].save.${key}`,
+    types: ACTION_CARRIERS,
+    reason:
+      "what a failure by 5 or more does instead (a homunculus's Bite) and the creatures a failure spares by type or species (a ghoul's Claw: an Undead or an elf) - read from the stat block's text; no editor control yet",
+    status: "gap"
+  })),
+  ...MARGIN_SAVE_KEYS.map((key): ExemptionRow => ({
+    at: `save.${key}`,
+    types: ["spell"],
+    reason:
+      "what a failure by a margin does and the creatures a failure spares, read from the spell's description as the catalog is built",
+    status: "gap"
+  })),
+  {
+    at: "actions[].underwaterOnly",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action usable only in an underwater fight (a seahorse's Bubble Dash), read from the action's description as the catalog is built",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].object.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the target's armor or weapon a failed save corrodes (a rust monster's Antennae), authored in the stat-block enrichments; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].damage[].pick",
+    types: ACTION_CARRIERS,
+    reason:
+      "a damage part whose type is the one picked for the creature (a half-dragon's Claw and its Draconic Origin), read from the stat block's text; no editor control yet",
+    status: "gap"
+  },
   {
     at: "actions[].save.heldBy.**",
     types: ACTION_CARRIERS,

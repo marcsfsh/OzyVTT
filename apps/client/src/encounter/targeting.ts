@@ -58,6 +58,8 @@ export type TargetingSession = Readonly<
     targetOptions?: Readonly<Record<string, string>>;
     /** The carried weapon a grant binds to (Magic Weapon, Shillelagh). */
     itemId?: string;
+    /** The target's armor or weapon the action acts on (a rust monster's Antennae); absent, the server's default. */
+    objectItemId?: string;
     /** The GM places a spell's lingering area and resolves no action: the zone it is for. */
     placeZoneId?: string;
     /** How the caster shapes the cast (Metamagic, Sculpt Spells), with the creatures each pick names once chosen. */
@@ -327,6 +329,13 @@ export function setBoundItem(itemId: string | undefined) {
   session = itemId === undefined ? rest : { ...rest, itemId };
   emit();
 }
+/** Picks the target's armor or weapon the action acts on; undefined leaves it to the server (worn armor first). */
+export function setObjectItem(objectItemId: string | undefined) {
+  if (!session?.action.choices?.object) return;
+  const { objectItemId: _previous, ...rest } = session;
+  session = objectItemId === undefined ? rest : { ...rest, objectItemId };
+  emit();
+}
 /** Picks the skill a check action is made with; undefined lets Escape a Grapple use the better one. */
 export function setCheckSkill(skill: string | undefined) {
   if (!session) return;
@@ -540,7 +549,8 @@ export function resolveTargeting(
     summonType,
     optionId,
     targetOptions,
-    itemId
+    itemId,
+    objectItemId
   } = session;
   const shapeChoice = shapeChoicePayload(session, selected);
   if (session.placeZoneId !== undefined) {
@@ -601,6 +611,7 @@ export function resolveTargeting(
         }
       : {}),
     ...(itemId !== undefined ? { itemId } : {}),
+    ...(objectItemId !== undefined ? { objectItemId } : {}),
     ...(shaping && shaping.length > 0 ? { shaping: shaping.map((entry) => ({ ...entry })) } : {}),
     ...(summonPick || summonType
       ? {

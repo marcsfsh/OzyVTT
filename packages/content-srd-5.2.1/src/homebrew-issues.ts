@@ -228,6 +228,30 @@ const LABELS: Readonly<Record<string, string>> = {
   failureExhaustion: "Exhaustion a failure adds",
   advantageIfFighting: "Advantage in a fight with the source",
   immuneOnSuccess: "immunity after a success",
+  sparesCreatureTypes: "creature types a failure spares",
+  sparesSpecies: "species a failure spares",
+  failureByMargin: "what a failure by a margin does",
+  whileFailed: "what comes with the failure's condition",
+  conditionsFromSource: "conditions the user must have given it",
+  underwaterOnly: "usable only underwater",
+  stableAtZero: "Stable at 0 Hit Points",
+  lowersScore: "ability score it lowers",
+  pick: "choice it deals",
+  statBlockPicks: "choices made for this creature",
+  armorPenalty: "penalty to the armor the target wears",
+  object: "armor or weapon it acts on",
+  metal: "metal objects only",
+  does: "what it does to the object",
+  penalty: "penalty from acid or rust",
+  abilityReduction: "ability score lowered",
+  landing: "what its arrival does nearby",
+  withinFeet: "distance from where it lands",
+  anyHit: "offered on every hit",
+  redirect: "force turned on a creature it picks",
+  nearFeet: "distance from the creature it follows",
+  minHitPoints: "fewest Hit Points it splits with",
+  underwater: "underwater only",
+  skillAdvantage: "Advantage on checks with the skill",
   endsWhenSourceDies: "end when the source dies",
   onlyCreatureTypes: "creature types that save",
   sparesAffected: "creatures already affected left out",
@@ -331,7 +355,14 @@ const LABELS: Readonly<Record<string, string>> = {
   activation: "action it takes"
 };
 /** A key whose words depend on what holds it: a weapon's category is its weapon kind, as the editor labels it. */
-const NESTED_LABELS: Readonly<Record<string, string>> = { "weapon.category": "weapon kind" };
+const NESTED_LABELS: Readonly<Record<string, string>> = {
+  "weapon.category": "weapon kind",
+  "failureByMargin.by": "how far short the save falls",
+  "object.kinds": "kinds of object",
+  "reaction.bloodied": "when it becomes Bloodied",
+  "traitMechanics.weapons": "weapons it corrodes",
+  "traitMechanics.ammunition": "ammunition it destroys"
+};
 /** Keys that say nothing alone: their parent names the field. */
 const GENERIC = new Set(["value", "maximum", "text", "id", "min", "max", "kind"]);
 

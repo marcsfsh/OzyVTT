@@ -541,11 +541,14 @@ export const ActionAvailabilitySchema = z.strictObject({
       optionsPerTarget: z.literal(true).optional(),
       bindsWeapon: z
         .strictObject({ weaponIds: z.array(z.string()).optional(), melee: z.literal(true).optional() })
+        .optional(),
+      object: z
+        .strictObject({ kinds: z.array(z.enum(["armor", "weapon"])), metal: z.literal(true).optional() })
         .optional()
     })
     .optional()
     .describe(
-      "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), and `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`)"
+      "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`), and `object`, the target's armor or weapon it acts on (sent as `objectItemId`; absent, the target's worn armor, else its weapon in hand)"
     ),
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple), and
    *  the tools its user may help with through Help with a Check, which carry their name. */

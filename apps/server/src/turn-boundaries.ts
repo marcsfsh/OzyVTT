@@ -31,6 +31,7 @@ import {
   type TurnStep
 } from "./simultaneous-effects.js";
 import { disgorge, regurgitationSaves } from "./swallow.js";
+import { offerNearbyReactions } from "./triggered-reactions.js";
 
 type Actor = GameState["actors"][number];
 type Effect = Actor["effects"][number];
@@ -91,6 +92,10 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
   // "If the behir takes 30 damage or more on a single turn from the swallowed creature, the behir must succeed on a
   // DC 14 Constitution saving throw at the end of that turn".
   events.push(...regurgitationSaves(state, { ...deps, resolveDefinition: deps.resolveDefinition }));
+  // "A creature ends its turn within 5 feet of the octopus" (Ink Cloud).
+  events.push(
+    ...offerNearbyReactions(state, actorId, "ends-turn-near", { ...deps, resolveDefinition: deps.resolveDefinition })
+  );
 }
 
 /**
@@ -206,6 +211,9 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
     events.push(waitingNarration(state, state.combat.turnSteps!));
   else events.push(...runSteps(steps));
   events.push(...aurasAtTurnStart(state, actorId, deps));
+  // "A creature the devil can see starts its turn within 30 feet of the devil" (Unnerving Gaze).
+  if (deps.newId)
+    events.push(...offerNearbyReactions(state, actorId, "starts-turn-near", { ...deps, newId: deps.newId }));
 }
 
 /**

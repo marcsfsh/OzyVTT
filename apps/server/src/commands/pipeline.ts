@@ -9,6 +9,7 @@ import { needsSettling, settleFalls as settleFallsIn } from "../falling.js";
 import { compelledMoves, fleesNow } from "../granted-moves.js";
 import { needsPlaneSettling, settlePlanes } from "../off-plane.js";
 import { heldMoveReady, settleHeldMove } from "../held-moves.js";
+import { offerNearbyReactions } from "../triggered-reactions.js";
 import { movementCost } from "../terrain.js";
 import { burstEndedZones } from "../spell-zones.js";
 import { planNextTurn } from "../combat-history.js";
@@ -205,6 +206,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     const result = await context.store.execute({ id, type: "positions.settle", principal: "table" }, (draft) => {
       const deps = kit.fallDeps(draft, distance, id);
       const sameMap = geometry !== null && draft.combat.mapAssetId === mapAssetId;
+      const heldId = draft.combat.heldMove?.actorId;
       const held = sameMap
         ? settleHeldMove(draft, geometry, {
             zones: kit.zoneDeps(draft, geometry),
@@ -214,8 +216,20 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
             }
           })
         : [];
+      // A held move that went on to its end can open another creature's reaction to it (a nalfeshnee's Pursuit).
+      const pursued =
+        heldId && held.length > 0 && draft.combat.heldMove?.actorId !== heldId
+          ? offerNearbyReactions(draft, heldId, "ends-move-near", {
+              newId: context.newId,
+              now: () => new Date().toISOString(),
+              resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+              catalog: kit.equipmentCatalog(),
+              distanceFeet: (a, b) => distance(draft, a, b),
+              commandId: id
+            })
+          : [];
       const planes = sameMap ? settlePlanes(draft, geometry) : [];
-      events = [...held, ...compelledMoves(draft, deps), ...planes, ...settleFallsIn(draft, deps)];
+      events = [...held, ...pursued, ...compelledMoves(draft, deps), ...planes, ...settleFallsIn(draft, deps)];
     });
     if (result.duplicate) return;
     await context.publishGameState(result.state);
