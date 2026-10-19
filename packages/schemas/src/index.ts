@@ -1735,6 +1735,13 @@ export const EffectInstanceSchema = z
      * effect lasts; a penalty is negative (Slow's -2). Kept apart from `modifiers`, whose `armor-class` is written onto
      * the sheet and would outlast it. */
     armorClassBonus: z.number().int().min(-10).max(10).optional(),
+    /** What it takes off one of the bearer's ability scores while it lasts (a shadow's Draining Swipe), read live with
+     *  the scores every rule uses and given back when it ends. Kept apart from `modifiers`, whose `ability-score` is
+     *  written onto the sheet. */
+    abilityReduction: z
+      .object({ ability: AbilitySchema, amount: z.number().int().min(1).max(30) })
+      .strict()
+      .optional(),
     /** Hit points this effect took off the bearer's Hit Point maximum (a Life Drain), given back when it ends. */
     hitPointMaximumLoss: z.number().int().min(1).max(10000).optional(),
     /** What this effect adds to the bearer's Hit Point maximum (Aid), taken back when it ends. */
@@ -3597,6 +3604,12 @@ export const OnHitRiderSchema = z
       ),
     /** What the engine leaves to the GM, said with the hit: a curse that acts at rests, a creature killed outright. */
     reminder: z.string().min(1).max(400).optional(),
+    /** The hit lowers one of the target's ability scores by `dice`, cumulatively and until ended (a shadow's Draining
+     *  Swipe: "the target's Strength score decreases by 1d4"); with `killsAtZero` the target dies if it reaches 0. */
+    lowersScore: z
+      .object({ ability: AbilitySchema, dice: DiceFormulaSchema, killsAtZero: z.literal(true).optional() })
+      .strict()
+      .optional(),
     /** An action that ends the effect ("The target or a creature within 5 feet of it can detach the stirge as an
      *  action"). */
     endedBy: EndedBySchema.optional(),

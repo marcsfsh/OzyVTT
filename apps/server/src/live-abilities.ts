@@ -14,8 +14,9 @@ import { isFormDefinitionId } from "./transform/forms.js";
 
 /**
  * Ability scores a magic item sets or raises while it is worn ("Your Strength is 19 while you wear these gauntlets",
- * an Ioun Stone's "Your Dexterity increases by 2, to a maximum of 20") and an effect sets while it lasts (a Potion of
- * Giant Strength), read live: the character's stored definition keeps its own scores, and the definition every rule
+ * an Ioun Stone's "Your Dexterity increases by 2, to a maximum of 20") and an effect sets or lowers while it lasts (a
+ * Potion of Giant Strength, a shadow's Strength drain), read live: the character's stored definition keeps its own
+ * scores, and the definition every rule
  * reads (`withLiveAbilityScores`, which the command kit's definition lookup applies) has the raised ones, with the
  * numbers the build baked from them moved to match (spell save DC and attack bonus, Initiative, the Hit Point maximum).
  * Taking the item off, or the effect ending, gives the scores back.
@@ -67,6 +68,14 @@ export function liveAbilityScores(
   catalog: EquipmentCatalog | undefined
 ): Scores {
   const scores = baseAbilityScoresOf(definition);
+  // What an effect took off a score (a shadow's Strength drain) comes off first, to 1 at least; an item that sets a
+  // score still sets it.
+  for (const effect of actor.effects)
+    if (effect.abilityReduction)
+      scores[effect.abilityReduction.ability] = Math.max(
+        1,
+        scores[effect.abilityReduction.ability] - effect.abilityReduction.amount
+      );
   const carriers = scoreCarriers(actor, catalog);
   if (carriers.length === 0) return scores;
   const riders = collectRiders(carriers, {

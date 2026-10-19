@@ -9,6 +9,7 @@ import { spellCastOf } from "./pending.js";
 import { forceMove, openRiderSave, rollPlain } from "./hit-rider-outcomes.js";
 import { effectNameOf } from "../effect-names.js";
 import { applyKillingHit } from "./kill.js";
+import { lowerScore } from "./score-drain.js";
 import { HAZARDS } from "../hazards.js";
 
 /** Whether this hit deals its target any damage after the target's defences: what Slow and Vex need. */
@@ -73,6 +74,8 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
       applyKillingHit(ctx, rider, index);
       return;
     }
+    // A score the hit lowers (a shadow's Strength), which kills at 0.
+    if (rider.lowersScore) lowerScore(ctx, rider, index);
     if (rider.pull) forceMove(ctx, target, action.name, rider.pull, true);
     if (rider.hazard === "burning") setBurning(ctx, index);
     if (rider.save) {

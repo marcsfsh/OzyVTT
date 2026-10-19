@@ -357,6 +357,7 @@ type OnHitRider = {
   self?: true;
   reminder?: string;
   hazard?: "burning";
+  lowersScore?: { ability: "str" | "dex" | "con" | "int" | "wis" | "cha"; dice: string; killsAtZero?: true };
 };
 /** "takes 5 (2d4) Necrotic damage at the start of each of the stirge's turns" (the source's) or "... of its turns". */
 function riderOngoingDamage(text: string): OngoingDamage | undefined {
@@ -551,14 +552,25 @@ function effectRiders(desc: string, maxTargetSize: OnHitRider["maxTargetSize"], 
   // hit's own (`drain.killsAtZero`).
   const cursed = /\bit is cursed\. (While cursed, the target can[\u2019']t regain Hit Points[^.]*\.)/.exec(desc);
   if (cursed) found.push({ conditions: [], name: "Cursed", tags: ["no-healing"], reminder: cursed[1]! });
-  // An incubus's curse acts at rests, and a shadow's touch drains a score: both the GM's.
+  // A curse that acts at rests the hit's reviewed fix runs (an incubus's); this reminder stands for one with none.
   const restCurse = /\bthe target is cursed for [^.]*\. Until the curse ends, [^.]*\./.exec(desc);
   if (restCurse) found.push({ conditions: [], reminder: restCurse[0]!.replace(/^the target/, "The target") });
+  // "The target's Strength score decreases by 1d4. The target dies if this reduces that score to 0" (a shadow's
+  // Draining Swipe).
   const drain =
-    /\bthe target's (?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) score decreases by \d+d\d+\.(?: The target dies if this reduces that score to 0\.)?/.exec(
+    /\bthe target's (Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) score decreases by (\d+d\d+)\.( The target dies if this reduces that score to 0\.)?/.exec(
       desc
     );
-  if (drain) found.push({ conditions: [], reminder: drain[0]!.replace(/^the target/, "The target") });
+  if (drain)
+    found.push({
+      conditions: [],
+      name: `${drain[1]} drained`,
+      lowersScore: {
+        ability: ABILITY_BY_NAME[drain[1] as keyof typeof ABILITY_BY_NAME],
+        dice: drain[2]!,
+        ...(drain[3] ? { killsAtZero: true as const } : {})
+      }
+    });
   return found;
 }
 
@@ -2190,5 +2202,4 @@ const unconsumed = monsters.flatMap((monster) =>
       : [];
   })
 );
-if (unconsumed.length > 0)
-  console.log(`printed clauses left unread (${unconsumed.length}): ${unconsumed.join("; ")}`);
+if (unconsumed.length > 0) console.log(`printed clauses left unread (${unconsumed.length}): ${unconsumed.join("; ")}`);

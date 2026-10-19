@@ -79,6 +79,10 @@ const READERS: readonly Check[] = [
     read: (action) => action.drain?.stableAtZero !== undefined
   },
   {
+    pattern: /\bscore decreases by \d+d\d+\b|\bThe target dies if this reduces that score to 0\b/,
+    read: (action) => (action.onHit ?? []).some((rider) => rider.lowersScore !== undefined)
+  },
+  {
     pattern: /\bHit Point maximum decreases by an amount equal to the damage taken\b/,
     read: (action) => action.drain?.reducesMaximum === true
   },
