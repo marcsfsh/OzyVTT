@@ -204,7 +204,7 @@ export function openEndingSave(
   state: GameState,
   bearer: Actor,
   effect: Effect,
-  save: Readonly<{ ability: AbilityId; dc: number }>,
+  save: Readonly<{ ability: AbilityId; dc: number; disadvantageFrom?: string }>,
   verb: "repeats" | "makes",
   deps: EndingSaveDeps,
   advantageFrom?: string
@@ -218,6 +218,7 @@ export function openEndingSave(
         }))
       : [];
   createPendingSaves(state, {
+    ...(save.disadvantageFrom ? { disadvantage: { targetId: bearer.id, from: save.disadvantageFrom } } : {}),
     sourceActorId: effect.sourceActorId,
     sourceName: effect.sourceName ?? effect.name,
     actionName: `${effect.name} - ${verb === "repeats" ? "repeat save" : "save"}`.slice(0, 120),

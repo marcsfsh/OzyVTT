@@ -106,6 +106,7 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
   "armor-class": "standing",
   "attunement-slots": "standing",
   "special-speed": "standing",
+  movement: "standing",
   "roll-mode": "at-its-moment",
   "extra-damage": "at-its-moment",
   "damage-bonus": "standing",

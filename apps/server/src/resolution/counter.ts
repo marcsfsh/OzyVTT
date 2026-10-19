@@ -7,6 +7,7 @@ import { hiddenFrom } from "../vision/audience.js";
 import { sceneSight } from "../vision/sight.js";
 import { spellOf } from "./concentration.js";
 import type { ResolveContext } from "./context.js";
+import { shapingOf } from "./metamagic.js";
 type CounterReaction = Extract<ActionReaction, { response: "counter" }>;
 
 /** The components a cast is made with, after what its stat block or item goes without: Counterspell needs at least one
@@ -23,8 +24,13 @@ function castWithComponents(ctx: ResolveContext): boolean {
         : []
     )
   );
+  // A Subtle Spell is cast with no components but a consumed or priced material, which can still be seen.
+  const subtle = shapingOf(ctx.input.shaping, "subtle-spell") !== undefined;
   return (["verbal", "somatic", "material"] as const).some(
-    (component) => spell.components[component] && !waived.has(component)
+    (component) =>
+      spell.components[component] &&
+      !waived.has(component) &&
+      (!subtle || (component === "material" && (spell.components.costly ?? []).length > 0))
   );
 }
 
@@ -79,7 +85,8 @@ export function parkForCounterspell(ctx: ResolveContext): boolean {
     ability: input.ability ?? null,
     holdKey: input.holdKey ?? null,
     initiatorRole: deps.initiatorRole ?? "gm",
-    initiatorSessionId: deps.initiatorSessionId ?? deps.gmSessionId
+    initiatorSessionId: deps.initiatorSessionId ?? deps.gmSessionId,
+    ...(input.shaping && input.shaping.length > 0 ? { shaping: input.shaping.map((entry) => ({ ...entry })) } : {})
   } as const;
   state.combat = {
     ...state.combat,

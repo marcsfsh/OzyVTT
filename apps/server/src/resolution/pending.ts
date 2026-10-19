@@ -23,6 +23,7 @@ import { creatureTypeOf } from "../statblock-facts.js";
 import { holdsFeature } from "../class-features.js";
 import { openDamageWindow, type DamageWindowDeps } from "../damage-window.js";
 import { answerKeyOf, answersFromOthers, askAnswer } from "../roll-answers.js";
+import { heightenedTarget, shieldedFromSave } from "./metamagic.js";
 import { effectNameOf } from "../effect-names.js";
 import { sightRules } from "../vision/rules.js";
 import { sceneSight } from "../vision/sight.js";
@@ -128,7 +129,9 @@ function parkedAttackOf(ctx: ResolveContext, untilNextTurn: boolean): NonNullabl
     })),
     // A roll that forwent its Advantage for Brutal Strike still offers its hit when it lands.
     ...(ctx.forgoneAdvantageBy !== null ? { forgoneAdvantageBy: ctx.forgoneAdvantageBy } : {}),
-    ...(input.knockOut === true ? { knockOut: true as const } : {})
+    ...(input.knockOut === true ? { knockOut: true as const } : {}),
+    // A shaped spell's attack lands shaped (Transmuted Spell's type, Empowered Spell's dice).
+    ...(input.shaping && input.shaping.length > 0 ? { shaping: input.shaping.map((entry) => ({ ...entry })) } : {})
   };
 }
 
@@ -419,8 +422,8 @@ const SPEED_ZERO_OVER_THE_GATE: ReadonlySet<string> = new Set(["power-word-stun"
  */
 /** The targets a save reaches: all of them, or with `sight.seenBy` only those that can see the user (a gaze) or a
  *  point of its area where they stand (Hypnotic Pattern). With dynamic vision off, a Blinded creature sees neither. */
-function seeingTargets(ctx: ResolveContext): ResolveContext["targets"] {
-  const { state, action, attacker, targets, deps } = ctx;
+function seeingTargets(ctx: ResolveContext, targets: ResolveContext["targets"]): ResolveContext["targets"] {
+  const { state, action, attacker, deps } = ctx;
   const seenBy = (action.sight ?? spellOf(ctx)?.sight)?.seenBy;
   if (!seenBy) return targets;
   const content = {
@@ -445,7 +448,7 @@ function seeingTargets(ctx: ResolveContext): ResolveContext["targets"] {
 }
 
 export function parkActionSave(ctx: ResolveContext): void {
-  const { state, action, attacker, targets, input, deps, attack } = ctx;
+  const { state, action, attacker, input, deps, attack } = ctx;
   if (!action.save) return;
   const rider = attack !== null;
   if (rider && attack.outcome !== "hit" && attack.outcome !== "crit") return;
@@ -457,11 +460,13 @@ export function parkActionSave(ctx: ResolveContext): void {
   ].slice(0, 4);
   const cast = spellCastOf(ctx);
   const onFailEffect = failureEffectFor(ctx, conditionIds, cast);
+  // Careful Spell's and Sculpt Spells' creatures succeed with no roll and take no damage (`metamagic.ts`).
+  const targets = shieldFromSave(ctx, cast);
   // A save its user makes (Contact Other Plane) is the user's alone, whatever was aimed at. A creature that succeeded
   // against this action before is immune to it ("immune to this cloaker's Moan for the next 24 hours").
   let saving = action.save.bySelf
     ? [attacker]
-    : seeingTargets(ctx).filter((target) => !immuneToAction(ctx, target) && subjectToSave(ctx, target));
+    : seeingTargets(ctx, targets).filter((target) => !immuneToAction(ctx, target) && subjectToSave(ctx, target));
   const threshold = action.save.failsAtHitPoints;
   if (threshold !== undefined) {
     saving = [];
@@ -516,8 +521,9 @@ export function parkActionSave(ctx: ResolveContext): void {
   // Prismatic Spray's d8 picks a ray, and a save of its own, for each creature.
   if (prismaticSpray(ctx, saving)) return;
   const parts = rider ? [] : damagePartsOf(ctx);
+  const heightened = heightenedTarget(ctx);
   const onSuccessEffect = successEffectFor(ctx, cast);
-  // A spell's save whose outcome the engine applies nothing of (Levitate, Polymorph): the card and the GM's result say
+  // A spell's save whose outcome the engine applies nothing of (Command, Polymorph): the card and the GM's result say
   // the GM applies it, so it never reads as if the server had.
   const gmApplies =
     action.spellId !== undefined &&
@@ -574,7 +580,7 @@ export function parkActionSave(ctx: ResolveContext): void {
         id: spell.id,
         school: spell.school,
         level: ctx.plan.castLevel ?? spell.level,
-        singleTarget: targets.length === 1 && action.area === undefined && spell.area === null
+        singleTarget: ctx.targets.length === 1 && action.area === undefined && spell.area === null
       }
     : undefined;
   for (const { saveBonus, advantageFrom, autoSucceeds, targetIds } of groups.values())
@@ -600,6 +606,8 @@ export function parkActionSave(ctx: ResolveContext): void {
       ...(autoSucceeds !== "" ? { autoSucceeds } : {}),
       ...(action.save.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
       ...(action.save.failureKills ? { failureKills: { ...action.save.failureKills } } : {}),
+      // Heightened Spell: "one target of the spell [has] Disadvantage on saves against the spell", its repeats too.
+      ...(heightened !== null ? { disadvantage: { targetId: heightened, from: "Heightened Spell" } } : {}),
       magical: isMagicalAction(ctx),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
@@ -678,6 +686,36 @@ function immuneToAction(ctx: ResolveContext, target: ResolveContext["targets"][n
   );
   if (immune) ctx.warnings.push(`${target.name} is immune to ${attacker.name}'s ${action.name}, so it makes no save.`);
   return immune;
+}
+
+/** The cast's targets that make its save: Careful Spell's and Sculpt Spells' chosen creatures "automatically succeed
+ *  on [their] saving throw against the spell", take no damage, and get what a success leaves. Each is told to the
+ *  table. */
+function shieldFromSave(ctx: ResolveContext, cast: SpellCast | undefined): ResolveContext["targets"] {
+  const shielded = shieldedFromSave(ctx);
+  if (shielded.size === 0 || ctx.action.save?.bySelf === true) return ctx.targets;
+  const onSuccess = successEffectFor(ctx, cast);
+  for (const target of ctx.targets) {
+    const by = shielded.get(target.id);
+    if (by === undefined) continue;
+    ctx.tableNarration.push(
+      tableLineOf(ctx, {
+        kind: "effect",
+        actorId: target.id,
+        text: `${target.name} succeeds on the ${ctx.action.save!.ability.toUpperCase()} save against ${ctx.action.name} without a roll (${by}) and takes no damage.`
+      })
+    );
+    if (onSuccess)
+      for (const event of applyFailureEffect(
+        ctx.state,
+        target.id,
+        onSuccess,
+        `${ctx.input.commandId}:${target.id}:success`,
+        conditionDeps(ctx.deps)
+      ))
+        ctx.tableNarration.push(tableLineOf(ctx, event));
+  }
+  return ctx.targets.filter((target) => !shielded.has(target.id));
 }
 
 /**

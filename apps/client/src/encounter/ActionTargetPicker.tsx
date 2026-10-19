@@ -16,8 +16,10 @@ import {
   setChosenAbility,
   setConditionChoice,
   setDamageType,
+  setShapingCreatures,
   setTargetDarts,
   setTargetingSpend,
+  SHAPING_CREATURE_PICKS,
   targetingReady,
   toggleTarget,
   type TargetingSession
@@ -49,7 +51,8 @@ export function ActionTargetPicker({
   busy,
   onRoll,
   onInvalidFace,
-  insideNow
+  insideNow,
+  onMoveFirst
 }: Readonly<{
   picking: TargetingSession;
   targets: ReadonlyArray<Pick<TargetRow, "id" | "label"> & Partial<TargetRow>>;
@@ -61,6 +64,8 @@ export function ActionTargetPicker({
   onInvalidFace?: (message: string) => void;
   /** For an area: who it covers where it is placed, of the creatures this viewer can see. The server decides. */
   insideNow?: readonly TargetRow[];
+  /** Take the action's own move first (Pounce), when it has one that comes before the rest. */
+  onMoveFirst?: () => void;
 }>) {
   const { mayType } = useRollPreference();
   // On a phone the panel under the map is short, so the picker scrolls up to show its first rows.
@@ -215,6 +220,15 @@ export function ActionTargetPicker({
           </Select>
         </label>
       )}
+      <ShapingPicks
+        picking={picking}
+        group={group}
+        rows={
+          picking.mode === "template"
+            ? (insideNow ?? [])
+            : targets.filter((target) => picking.selected.includes(target.id))
+        }
+      />
       {picking.action.conditionChoices && picking.action.conditionChoices.length > 1 && (
         <label className="action-damage-type">
           <span>{picking.action.saveAbility ? "Condition on a failed save" : "Condition to end"}</span>
@@ -236,6 +250,11 @@ export function ActionTargetPicker({
           <Button type="button" variant="secondary" disabled={busy} onClick={() => clearTargeting()}>
             Cancel
           </Button>
+          {picking.action.moveFirst && onMoveFirst && (
+            <Button type="button" variant="secondary" disabled={busy} onClick={onMoveFirst}>
+              Move first
+            </Button>
+          )}
           <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>
             {verb} {name}
           </button>
@@ -252,6 +271,75 @@ export function ActionTargetPicker({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The creatures a cast's shaping names among its targets: who Careful Spell or Sculpt Spells protects (up to its
+ * count), and Heightened Spell's one target when the spell has several. Picked from the chosen targets, or from who the
+ * placed area covers of the creatures this viewer can see. The server checks the picks.
+ */
+function ShapingPicks({
+  picking,
+  group,
+  rows
+}: Readonly<{
+  picking: TargetingSession;
+  group: string;
+  rows: ReadonlyArray<Pick<TargetRow, "id" | "label">>;
+}>) {
+  const picks = (picking.shaping ?? []).filter(
+    (entry) => SHAPING_CREATURE_PICKS.has(entry.id) && !(entry.id === "heightened-spell" && picking.mode === "single")
+  );
+  if (picks.length === 0) return null;
+  const others = rows.filter((row) => row.id !== picking.attackerId);
+  return (
+    <>
+      {picks.map((entry) => {
+        const offer = picking.action.shaping?.options.find((candidate) => candidate.id === entry.id);
+        const name = offer?.name ?? entry.id;
+        const one = entry.id === "heightened-spell";
+        const creatures = offer?.creatures;
+        const limit = one
+          ? 1
+          : creatures?.plusLevel && picking.slotLevel !== undefined
+            ? 1 + picking.slotLevel
+            : (creatures?.count ?? 1);
+        const chosen = entry.creatureIds ?? [];
+        const flip = (id: string) =>
+          setShapingCreatures(
+            entry.id,
+            one ? [id] : chosen.includes(id) ? chosen.filter((picked) => picked !== id) : [...chosen, id]
+          );
+        return (
+          <fieldset key={entry.id} className="action-shaping">
+            <legend>{one ? `${name} · its one target` : `${name} protects · up to ${limit}`}</legend>
+            {others.length === 0 ? (
+              <p className="action-targeting-hint">
+                {picking.mode === "template" ? "Place the area first." : "Choose the targets first."}
+              </p>
+            ) : (
+              <ul className="action-target-list">
+                {others.map((row) => (
+                  <li key={row.id}>
+                    <label className={`action-target${chosen.includes(row.id) ? " is-picked" : ""}`}>
+                      <input
+                        type={one ? "radio" : "checkbox"}
+                        name={`${group}-${entry.id}`}
+                        checked={chosen.includes(row.id)}
+                        disabled={!one && !chosen.includes(row.id) && chosen.length >= limit}
+                        onChange={() => flip(row.id)}
+                      />
+                      <span className="action-target-name">{row.label}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </fieldset>
+        );
+      })}
+    </>
   );
 }
 

@@ -314,8 +314,12 @@ describe("a failure with no condition", () => {
 
   it("adds an Exhaustion level for a failed save against a sphinx's Weight of Years", () => {
     const built = table("sphinx-of-lore");
-    // A legendary action comes on another creature's turn.
-    built.state.combat = { ...built.state.combat, turnActorId: IDS.ally };
+    // A legendary action comes right after another creature's turn ends.
+    built.state.combat = {
+      ...built.state.combat,
+      turnActorId: IDS.ally,
+      turn: { ...built.state.combat.turn, afterActorId: IDS.hero }
+    };
     use(built, "weight-of-years");
     answer(built, 5);
     expect(hero(built).conditions).toEqual([{ id: "exhaustion", level: 1 }]);

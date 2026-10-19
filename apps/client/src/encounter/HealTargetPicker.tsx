@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { CastShaping } from "@vtt/schemas";
 import { Button, Modal, Stepper } from "@vtt/ui";
 import "./pickers.css";
 
@@ -15,6 +16,8 @@ export type LooseHeal = Readonly<{
   includeDamage?: boolean;
   /** A spell cast outside a fight at creatures (Aid, Hold Person) picks its targets here as well. */
   purpose?: "heal" | "cast";
+  /** How the caster shapes the spell (Metamagic), sent with its targets. */
+  shaping?: readonly CastShaping[];
 }>;
 
 /** What the picker asks, by what the pick is for and how many it takes. */

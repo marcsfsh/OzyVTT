@@ -155,6 +155,8 @@ export function ReactionPrompt({
               : "The attack misses"
           }.`
         );
+      } else if (reaction.kind === "falls") {
+        onFeedback(use ? `${actorName} used ${reaction.actionName}.` : `${actorName} kept the reaction.`);
       } else if (reaction.kind === "casts-spell") {
         onFeedback(
           use
@@ -227,6 +229,11 @@ export function ReactionPrompt({
         ) : reaction.kind === "damaged-by-creature" ? (
           <>
             <strong>{name}</strong> · {reaction.sourceName} damaged {actorName}
+          </>
+        ) : reaction.kind === "falls" ? (
+          <>
+            <strong>{name}</strong> · {reaction.sourceName} is falling
+            {reaction.fallFeet !== undefined ? ` ${reaction.fallFeet} ft` : ""}
           </>
         ) : reaction.kind === "casts-spell" ? (
           <>
@@ -357,6 +364,27 @@ export function ReactionPrompt({
                 onClick={() => answer(false)}
               >
                 {letGo}
+              </button>
+            </>
+          ) : reaction.kind === "falls" ? (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                title="Keep the reaction. The fall lands as it is."
+                onClick={() => answer(false)}
+              >
+                Decline
+              </Button>
+              <button
+                type="button"
+                className="encounter-primary reaction-use"
+                disabled={busy}
+                title={`Spend the reaction on ${reaction.sourceName}'s fall.`}
+                onClick={() => answer(true)}
+              >
+                {useLabel}
               </button>
             </>
           ) : reaction.kind === "roll-answer" ? (

@@ -33,6 +33,7 @@ const MODIFIER_LABELS: Readonly<
   "ability-score": ["The character", "Ability score"],
   speed: ["The character", "Speed"],
   "special-speed": ["The character", "Fly, swim, climb or burrow speed"],
+  movement: ["The character", "Falling and jumping"],
   "extra-attack": ["The character", "Extra attack"],
   darkvision: ["The character", "Darkvision"],
   sense: ["The character", "Another sense"],
@@ -62,6 +63,8 @@ function blankModifier(type: string): Draft {
       return { type, amount: 10 };
     case "special-speed":
       return { type, movement: "fly", feet: 30 };
+    case "movement":
+      return { type, rule: "safe-fall" };
     case "armor-class":
       return { type, amount: 1, whileArmored: false };
     case "initiative":
@@ -176,6 +179,52 @@ export const specialSpeedFields = (): FieldDef[] => [
   }
 ];
 
+const MOVEMENT_RULES: readonly SelectOption[] = [
+  opt("safe-fall", "Takes no damage from falling"),
+  opt("leap", "Leaps for a set cost"),
+  opt("jump-by-dexterity", "Jumps with Dexterity"),
+  opt("jump-multiplier", "Jumps farther")
+];
+
+/** The row's words for a falling or jumping rule: "Leap 30 ft for 10 ft", "Jump distance x2". */
+function movementRuleLabel(modifier: Readonly<Record<string, unknown>>): string {
+  if (modifier.rule === "leap")
+    return `Leap ${Number(modifier.feet ?? 30)} ft for ${Number(modifier.costFeet ?? 10)} ft`;
+  if (modifier.rule === "jump-multiplier") return `Jump distance x${Number(modifier.times ?? 2)}`;
+  return MOVEMENT_RULES.find((entry) => entry.value === modifier.rule)?.label ?? "Falling and jumping";
+}
+
+/** The fields of a falling or jumping rule (Ring of Feather Falling, Boots of Striding and Springing). */
+const movementRuleFields = (): FieldDef[] => [
+  { key: "rule", label: "Rule", kind: "select", options: MOVEMENT_RULES, visibleWhen: hasType("movement") },
+  {
+    key: "feet",
+    label: "Jump up to",
+    kind: "number",
+    min: 5,
+    max: 120,
+    unit: "ft",
+    visibleWhen: (row) => row.type === "movement" && row.rule === "leap"
+  },
+  {
+    key: "costFeet",
+    label: "Movement it spends",
+    kind: "number",
+    min: 0,
+    max: 60,
+    unit: "ft",
+    visibleWhen: (row) => row.type === "movement" && row.rule === "leap"
+  },
+  {
+    key: "times",
+    label: "Times as far",
+    kind: "number",
+    min: 2,
+    max: 4,
+    visibleWhen: (row) => row.type === "movement" && row.rule === "jump-multiplier"
+  }
+];
+
 export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
   key: "modifiers",
   label,
@@ -196,6 +245,7 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
     if (modifier.type === "spell-slot")
       return `${name} ${signed(Number(modifier.amount ?? 0))} at level ${modifier.level ?? 1}`;
     if (modifier.type === "special-speed") return specialSpeedLabel(modifier);
+    if (modifier.type === "movement") return movementRuleLabel(modifier);
     const amount = modifier.amount ?? modifier.count ?? modifier.feet ?? modifier.threshold;
     return typeof amount === "number" ? `${name} ${signed(amount)}` : name;
   },
@@ -344,6 +394,7 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       note: "Display only."
     },
     ...specialSpeedFields(),
+    ...movementRuleFields(),
     { key: "whileArmored", label: "Only while wearing armour", kind: "switch", visibleWhen: hasType("armor-class") },
     {
       key: "proficiencyBonus",

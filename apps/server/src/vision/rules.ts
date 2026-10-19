@@ -1,7 +1,7 @@
 import type { GameState } from "@vtt/domain";
 import type { CheckSight } from "../ability-checks.js";
 import { crossesSpace, mapCover } from "../cover.js";
-import { distance, type Point } from "./geometry.js";
+import { distance } from "./geometry.js";
 import { definitionOf, sensesOf, type Senses, type SightContent } from "./senses.js";
 import { sceneSight, type LightAt, type Obscurement } from "./sight.js";
 
@@ -126,8 +126,8 @@ function obscurementFor(fog: Obscurement, light: LightAt, senses: Senses | null,
   return OBSCUREMENT_ORDER[Math.max(OBSCUREMENT_ORDER.indexOf(seen), OBSCUREMENT_ORDER.indexOf(fog))]!;
 }
 
-/** The creature a Frightened creature fears, read from the effect that gave it the condition; null when the GM set it
- *  by hand or no effect names its source. */
+/** The creatures a Frightened creature fears, read from the effects that gave it the condition (the GM's hand-set
+ *  condition names one when the GM picks it); empty when no effect names a source. */
 export function fearSources(actor: Actor): string[] {
   return actor.effects
     .filter((effect) => effect.linkedConditionIds.includes("frightened") && effect.sourceActorId !== null)
@@ -137,29 +137,13 @@ export function fearSources(actor: Actor): string[] {
 /**
  * SRD Frightened: "Disadvantage on ability checks and attack rolls while the source of fear is within line of sight."
  * With dynamic vision on and a source the effect names, only while a line of sight joins them; otherwise (vision off,
- * a source set by hand, a token off the map) whenever the condition is on.
+ * a condition set by hand with no source, a token off the map) whenever the condition is on.
  */
 export function frightenedApplies(actor: Actor, rules: SightRules): boolean {
   if (!has(actor, "frightened")) return false;
   const sources = fearSources(actor);
   if (sources.length === 0 || !rules.visionOn) return true;
   return sources.some((sourceId) => rules.lineOfSight(actor.id, sourceId) !== false);
-}
-
-/**
- * SRD Frightened, Can't Approach: "You can't willingly move closer to the source of fear." The source a willing move
- * from `from` to `to` brings the creature closer to, by name, or null. Read for the movement rules.
- */
-export function frightenedApproach(state: GameState, actorId: string, from: Point, to: Point): string | null {
-  const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor || !has(actor, "frightened")) return null;
-  for (const sourceId of fearSources(actor)) {
-    const at = state.combat.tokens.find((token) => token.actorId === sourceId)?.position;
-    if (!at) continue;
-    if (distance(to, at) < distance(from, at) - 1e-6)
-      return state.actors.find((candidate) => candidate.id === sourceId)?.name ?? "the source of its fear";
-  }
-  return null;
 }
 
 /** The light-sensitivity traits that bear on one kind of roll where the creature stands (Sunlight Sensitivity, Light

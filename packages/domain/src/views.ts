@@ -45,6 +45,8 @@ export type PlayerEffect = Omit<
   | "hitPointMaximumGain"
   | "temporaryHitPointsEachTurn"
   | "conditionImmunities"
+  | "grantedMove"
+  | "grantedTeleport"
   | "endsWhenUnaffected"
   | "longCast"
   | "struck"

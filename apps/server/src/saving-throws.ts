@@ -691,6 +691,9 @@ export function answerSave(
     // "A Large or larger creature has Advantage on this save" (Ensnaring Strike).
     if (pending.advantageAtSize && sizeRank(target.size) >= sizeRank(pending.advantageAtSize))
       sources.advantage.push({ source: "size", label: `${pending.actionName}: its size` });
+    // Heightened Spell's target, on the cast's save and each it repeats.
+    if (pending.disadvantageFrom)
+      sources.disadvantage.push({ source: "disadvantage-from", label: pending.disadvantageFrom });
     sources.advantage.push(...traitSaveClaims(state, target, definition, deps));
     // Sunlight Weakness: Disadvantage on D20 Tests while it stands in sunlight.
     const sightContent = { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };

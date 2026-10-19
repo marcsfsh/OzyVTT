@@ -1872,7 +1872,9 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
     ).toHaveLength(8);
     // A granted Fly, Swim, Climb or Burrow Speed rides the same vocabulary.
     expect(feat([{ type: "special-speed", movement: "climb", equalToSpeed: true }]).feature.modifiers).toHaveLength(1);
-    expect(ModifierSchema.options).toHaveLength(27);
+    // So does a movement rule: a jump by Dexterity, a safe fall, a cheap leap.
+    expect(feat([{ type: "movement", rule: "jump-by-dexterity" }]).feature.modifiers).toHaveLength(1);
+    expect(ModifierSchema.options).toHaveLength(28);
   });
 
   it("15. an item that grants a feat", () => {

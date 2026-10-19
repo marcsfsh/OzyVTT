@@ -232,6 +232,7 @@ const PENDING_SAVE_FIELDS = {
   // What a failure does beyond conditions is narrated when it lands, and an automatic success when it is answered.
   failureKills: "never",
   autoSucceeds: "never",
+  disadvantageFrom: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
   gmApplies: "player",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
@@ -248,7 +249,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   escapeDc: "player",
   modifiers: "player",
   duration: "player",
-  // What a second failure brings and a failed repeat's damage dice are the stat block's text (`playerRepeatSave`).
+  // What a second failure brings, a failed repeat's damage dice and what gives the repeats Disadvantage (Heightened
+  // Spell) stay with the GM (`playerRepeatSave`): each is read when the save is answered.
   repeatSave: "derived",
   endsOnDamage: "player",
   endsOnSourceSideDamage: "player",
@@ -291,6 +293,8 @@ const PENDING_REACTION_FIELDS = {
   weighed: "player",
   acBonus: "player",
   rollsAttack: "player",
+  // How far the falling creature falls: its height, which is as public as the token it answers for.
+  fallFeet: "player",
   // The reactor's own slots, which its owner already reads on the sheet; only the reactor's owner gets the prompt.
   slotLevels: "player",
   createdAt: "player",
@@ -509,6 +513,10 @@ function playerEffect(
     hitPointMaximumGain: _hitPointMaximumGain,
     temporaryHitPointsEachTurn: _temporaryHitPointsEachTurn,
     conditionImmunities: _conditionImmunities,
+    // A granted move names the turn it belongs to and the creature it must flee, which can be hidden; its own
+    // character's grant reaches a player through `actor:movement`.
+    grantedMove: _grantedMove,
+    grantedTeleport: _grantedTeleport,
     // Whether a Concentration spell ends once no creature keeps it is the engine's bookkeeping.
     endsWhenUnaffected: _endsWhenUnaffected,
     // A long casting's targets and slot are the caster's plan; its name says what is being cast.
@@ -524,7 +532,9 @@ function playerEffect(
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
-  const yours = mine ? { yours: true as const, ...(readiedSpell ? { readiedSpell: { ...readiedSpell } } : {}) } : {};
+  // A readied spell's Metamagic picks are the engine's to apply at its release.
+  const held = readiedSpell ? (({ shaping: _shaping, ...kept }) => kept)(readiedSpell) : undefined;
+  const yours = mine ? { yours: true as const, ...(held ? { readiedSpell: held } : {}) } : {};
   const repeat = visible.repeatSave ? { repeatSave: playerRepeatSave(visible.repeatSave) } : {};
   if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...repeat, ...yours };
   return {
@@ -536,9 +546,9 @@ function playerEffect(
 }
 
 /** A repeat save as a player reads it: the save, when it comes and the count so far. What a failed one turns the effect
- *  into, and the dice it deals, are the stat block's text and stay with the GM. */
+ *  into, the dice it deals and what gives it Disadvantage stay with the GM. */
 function playerRepeatSave(repeat: RepeatSave): RepeatSave {
-  const { next: _next, failureDamage: _failureDamage, ...shown } = repeat;
+  const { next: _next, failureDamage: _failureDamage, disadvantageFrom: _disadvantageFrom, ...shown } = repeat;
   return structuredClone(shown);
 }
 

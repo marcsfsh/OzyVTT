@@ -1,4 +1,5 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
+import { isOffPlane } from "../off-plane.js";
 import type { GameState } from "@vtt/domain";
 import { effectiveActions } from "../effective-actions.js";
 import { withShotAmmunitionOnly } from "../ammunition.js";
@@ -49,7 +50,8 @@ function combatantsOf(
   action: DefinitionAction,
   input: ResolveInput,
   catalog: ResolveDependencies["catalog"],
-  spell: SpellReference | undefined
+  spell: SpellReference | undefined,
+  hidden: (actorId: string) => boolean
 ): { attacker: LiveActor; targets: LiveActor[] } {
   // Casting a spell is something done even when it rolls nothing (Light, Guidance): it spends its casting time and is
   // told to the table. What a spell lets its caster do later is no new cast.
@@ -66,6 +68,8 @@ function combatantsOf(
   const attacker = state.actors.find((item) => item.id === input.actorId);
   if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
   if (!inFight(input.actorId)) throw new CommandRejectedError("That combatant is not in this encounter.");
+  // A creature off the plane affects and is affected only by what is there with it (Banishment, Blink).
+  const awayFrom = (target: LiveActor) => isOffPlane(attacker) !== isOffPlane(target);
   // A target named twice is one target (a second dart is the only reason to name it again).
   const targets = [...new Set(input.targetIds)].map((targetId) => {
     const target = state.actors.find((item) => item.id === targetId);
@@ -75,10 +79,23 @@ function combatantsOf(
           ? "Choose members of the party or creatures you can see."
           : "Every target must be in this encounter."
       );
+    // A refusal names the target only when the user's side can see it.
+    const name = hidden(target.id) ? "that creature" : target.name;
+    if (awayFrom(target))
+      throw new CommandRejectedError(
+        isOffPlane(attacker)
+          ? `${attacker.name} is off this plane and can't reach ${name}.`
+          : `${name[0]!.toUpperCase()}${name.slice(1)} is gone from this plane for now and can't be targeted.`
+      );
     return target;
   });
-  // A readied spell is cast now and aimed when its trigger comes (SRD Ready), so it names no target yet.
+  // A readied spell is cast now and aimed when its trigger comes (SRD Ready), so it names no target yet; nor does an
+  // action whose move is taken before the rest of it.
   if (input.ready === true) return { attacker, targets };
+  if (input.moveFirst === true) {
+    if (!action.move) throw new CommandRejectedError(`${action.name} makes no move of its own to take first.`);
+    return { attacker, targets };
+  }
   if (action.attack && targets.length !== 1)
     throw new CommandRejectedError("An attack roll resolves against exactly one target.");
   // A grant aimed at the action's target (Help) needs exactly one recipient; one for each target (Bless), at least one.
@@ -108,6 +125,10 @@ function combatantsOf(
     action.multiattack !== undefined ||
     spendsALimitedUse ||
     startsALastingSpell ||
+    // A move, jump or teleport of its own (a troll's Charge, a bulette's Leap) is something done.
+    action.move !== undefined ||
+    action.leap !== undefined ||
+    action.teleport !== undefined ||
     (castsASpell && !rollsOnTargets) ||
     input.builtin === true ||
     // A light or a cloud is something done, with no creature under it (a magmin's flames, a darkmantle's aura).
@@ -128,6 +149,9 @@ function combatantsOf(
     !spendsALimitedUse &&
     !castsASpell &&
     action.sight === undefined &&
+    action.move === undefined &&
+    action.leap === undefined &&
+    action.teleport === undefined &&
     input.builtin !== true
   )
     throw new CommandRejectedError("That action has no structured effect to resolve. Run it from its description.");
@@ -169,7 +193,7 @@ export function openResolve(
   const hiddenFromInitiator = resolveHiddenCheck(state, deps, true);
   const spell = declared.spellId ? deps.catalog?.spellRecord?.(declared.spellId) : undefined;
   const reaching = withSpellEffects(withSpellAttackReach(declared, spell), spell);
-  const combatants = combatantsOf(state, reaching, input, deps.catalog, spell);
+  const combatants = combatantsOf(state, reaching, input, deps.catalog, spell, hiddenFromInitiator);
   const { attacker } = combatants;
   const warnings: string[] = [];
   const targets = input.areaPlaced ? onlyTargetTypes(combatants.targets, spell, deps, warnings) : combatants.targets;
@@ -190,22 +214,23 @@ export function openResolve(
     throw new CommandRejectedError(
       `${action.name} makes ${action.darts} darts; ${input.targetIds.length} were assigned.`
     );
-  const economy = input.economyPaid
-    ? { plan: paidPlan(state, input.slotLevel), overridden: null }
-    : planEconomy(
-        state,
-        attacker,
-        action,
-        input,
-        deps.definition,
-        warnings,
-        deps.distanceFeet,
-        siblings,
-        false,
-        deps.catalog,
-        spell,
-        deps.resolveDefinition
-      );
+  const economy =
+    input.economyPaid || input.owedPaid
+      ? { plan: paidPlan(state, input.slotLevel), overridden: null }
+      : planEconomy(
+          state,
+          attacker,
+          action,
+          input,
+          deps.definition,
+          warnings,
+          deps.distanceFeet,
+          siblings,
+          false,
+          deps.catalog,
+          spell,
+          deps.resolveDefinition
+        );
   let overridden = economy.overridden;
 
   // SRD Cover: the GM's choice for this resolve, else the best of the cover the GM marked the target with and what the

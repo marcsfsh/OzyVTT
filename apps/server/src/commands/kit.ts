@@ -29,6 +29,8 @@ import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../
 import type { ZoneDeps } from "../spell-zones.js";
 import type { TokenMapGeometry } from "../token-placement.js";
 import { hiddenFrom, playerSight } from "../vision/audience.js";
+import { sceneSight } from "../vision/sight.js";
+import type { FallDeps } from "../falling.js";
 import type { SightContent } from "../vision/senses.js";
 
 /** Who is acting. Integration credentials are the GM's own automation and act with GM authority
@@ -265,6 +267,29 @@ export function createKit(context: CommandContext) {
       newId: context.newId,
       now: () => new Date().toISOString()
     }),
+
+    /** What a fall reads in `state` (`falling.ts`): stat blocks and items, the server's dice, where creatures stand
+     *  for a Feather Fall's range, and who sees whom with dynamic vision on. */
+    fallDeps: (
+      state: GameState,
+      distance: (state: GameState, actorIdA: string, actorIdB: string) => number | null,
+      commandId: string
+    ): FallDeps => {
+      let sight: ReturnType<typeof sceneSight> | null = null;
+      return {
+        resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
+        catalog: equipmentCatalogOf(playCatalog()),
+        random: (sides) => context.random(sides),
+        newId: context.newId,
+        now: () => new Date().toISOString(),
+        commandId,
+        distanceFeet: (actorIdA, actorIdB) => distance(state, actorIdA, actorIdB),
+        sees: (viewerId, targetId) => {
+          sight ??= sceneSight(state, sightContent());
+          return !sight.enabled || sight.sees(viewerId, targetId);
+        }
+      };
+    },
 
     /** The deps a turn change runs with in `state`: recharge and ongoing-damage dice, repeat saves, the spell areas
      *  on the live map, and where creatures stand for the auras that reach them. */

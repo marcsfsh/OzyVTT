@@ -9,6 +9,7 @@ import {
   type PlayerPendingSave,
   type PlayerView
 } from "@vtt/domain";
+import type { CastShaping } from "@vtt/schemas";
 import { useToast } from "@vtt/ui";
 import { regainedText } from "../encounter/ActionResultHead";
 import { HealTargetPicker, type LooseHeal } from "../encounter/HealTargetPicker";
@@ -120,7 +121,7 @@ export function useSheetController({
   const [looseHeal, setLooseHeal] = useState<LooseHeal | null>(null);
   /** A spell cast outside a fight at creatures it helps or makes save (Aid, Hold Person) asks whom it targets, so the
    *  server resolves it as it would in a fight. An attack or a save-less blast rolls loose as before. */
-  const looseCastOf = (actionId: string, slotLevel?: number): LooseHeal | null => {
+  const looseCastOf = (actionId: string, slotLevel?: number, shaping?: readonly CastShaping[]): LooseHeal | null => {
     const row = serverActions.find((candidate) => candidate.id === actionId);
     if (!row || row.healing || (row.targeting !== "single" && row.targeting !== "multi")) return null;
     if (row.attackBonus !== null || (row.saveAbility === null && row.damage.length > 0)) return null;
@@ -131,6 +132,7 @@ export function useSheetController({
       spendUpTo: null,
       purpose: "cast",
       ...(slotLevel !== undefined ? { slotLevel } : {}),
+      ...(shaping && shaping.length > 0 ? { shaping } : {}),
       includeDamage: true
     };
   };
@@ -173,6 +175,7 @@ export function useSheetController({
             targetIds,
             ...(spend !== null ? { spend } : {}),
             ...(looseHeal.slotLevel !== undefined ? { slotLevel: looseHeal.slotLevel } : {}),
+            ...(looseHeal.shaping ? { shaping: looseHeal.shaping.map((entry) => ({ ...entry })) } : {}),
             ...(looseHeal.includeDamage ? { includeDamage: true } : {})
           },
           looseHeal.purpose === "cast" ? "The spell could not be cast." : "That could not be used."
@@ -181,19 +184,22 @@ export function useSheetController({
     />
   ) : null;
 
-  /** Hands a stat-block action to targeting (pick target, roll, resolve), with the slot a spell is cast at. */
-  const routeAttack = (action: DefinitionAction, slotLevel?: number) => {
+  /** Hands a stat-block action to targeting (pick target, roll, resolve), with the slot a spell is cast at and how its
+   *  caster shapes it. */
+  const routeAttack = (action: DefinitionAction, slotLevel?: number, shaping?: readonly CastShaping[]) => {
     setTargetingResult(null);
     // Magic Missile makes one more dart for each slot level above its own; the server counts them again.
     const darts =
       action.darts !== undefined && slotLevel !== undefined && action.spellSlot
         ? action.darts + Math.max(0, slotLevel - action.spellSlot.level)
         : undefined;
-    // A cast with nothing to aim at (Spirit Guardians' Emanation) picks no targets, as the server says.
-    const own = summaryOfOwnAction(action);
+    // A cast with nothing to aim at (Spirit Guardians' Emanation) picks no targets, as the server says, and its
+    // Metamagic's picks are named among its targets with the server's counts.
+    const offers = serverActions.find((row) => row.id === action.id)?.shaping;
+    const own = { ...summaryOfOwnAction(action), ...(offers ? { shaping: offers } : {}) };
     const aimless =
       own.targeting === undefined && serverActions.some((row) => row.id === action.id && row.targeting === "none");
-    beginTargeting(aimless ? { ...own, targeting: "none" } : own, actor.id, slotLevel, darts);
+    beginTargeting(aimless ? { ...own, targeting: "none" } : own, actor.id, slotLevel, darts, shaping);
     if (attackMode === "jump") onJumpToInitiative?.();
   };
   /** A server-derived action (an item's) handed to targeting by its id; the numbers are for display only. */
@@ -229,7 +235,7 @@ export function useSheetController({
    * A spell's cast through its action: on the player's turn it goes through targeting with its slot; otherwise the
    * server routes it, spending the slot and rolling its dice outside a fight, or refusing off turn.
    */
-  const castSpellAction = (actionId: string, slotLevel?: number) => {
+  const castSpellAction = (actionId: string, slotLevel?: number, shaping?: readonly CastShaping[]) => {
     const note = hitExtraNote(actionId);
     if (note) {
       toast(note);
@@ -237,17 +243,25 @@ export function useSheetController({
     }
     const structured = structuredAttacks ? definition?.actions.find((action) => action.id === actionId) : undefined;
     if (structured) {
-      routeAttack(structured, slotLevel);
+      routeAttack(structured, slotLevel, shaping);
       return;
     }
-    const heal = inFight ? null : (looseHealOf(actionId, slotLevel, true) ?? looseCastOf(actionId, slotLevel));
+    const shaped = shaping && shaping.length > 0 ? shaping : undefined;
+    const healing = inFight ? null : looseHealOf(actionId, slotLevel, true);
+    const heal = inFight
+      ? null
+      : ((healing && shaped ? { ...healing, shaping: shaped } : healing) ?? looseCastOf(actionId, slotLevel, shaped));
     if (heal) {
       setLooseHeal(heal);
       return;
     }
     sendLoose(
       actionId,
-      { includeDamage: true, ...(slotLevel !== undefined ? { slotLevel } : {}) },
+      {
+        includeDamage: true,
+        ...(slotLevel !== undefined ? { slotLevel } : {}),
+        ...(shaped ? { shaping: shaped.map((entry) => ({ ...entry })) } : {})
+      },
       "The spell could not be cast."
     );
   };

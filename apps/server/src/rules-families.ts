@@ -22,8 +22,12 @@ const RULE_FAMILIES = {
   // Flying or burrowing without the speed, and a path that hostile creatures shut.
   "movement.no-speed": "movement",
   "movement.blocked-path": "movement",
+  // Height changes by flying, climbing, jumping or teleporting, and a creature in the air moves by flying.
+  "movement.altitude": "movement",
+  "movement.jump": "movement",
   // Frightened: "You can't willingly move closer to the source of fear."
   "movement.toward-fear": "movement",
+  "movement.mount": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",
@@ -42,8 +46,9 @@ const RULE_FAMILIES = {
   // An effect that takes away Reactions (Slow).
   "condition.no-reactions": "economy",
   "condition.no-spells": "economy",
-  // "Legendary actions are taken on other creatures' turns" is a timing/economy rule...
+  // "Legendary actions are taken right after other creatures' turns" is a timing/economy rule...
   "legendary.own-turn": "economy",
+  "legendary.after-a-turn": "economy",
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.
   "attack.light-needs-attack": "economy",
   "attack.cleave-needs-hit": "economy",
@@ -113,6 +118,16 @@ const RULE_FAMILIES = {
   "slots.one-per-turn": "slots",
   // Casting a spell the character hasn't prepared is spellcasting bookkeeping too.
   "slots.not-prepared": "slots",
+  // Metamagic and Sculpt Spells shape a cast: an option the caster doesn't have, one the spell can't take, more options
+  // than one spell carries, and Quickened Spell's "can't cast a level 1+ spell on this turn" are spellcasting rules.
+  "metamagic.unknown": "slots",
+  "metamagic.unfit": "slots",
+  "metamagic.too-many": "slots",
+  "metamagic.quickened": "slots",
+  // The creatures or the type a pick names (Careful Spell's, Heightened Spell's target) are a cast's targeting.
+  "metamagic.choice": "targeting",
+  // A Metamagic option's own row is chosen with a cast and never taken alone, as a hit rider is.
+  "metamagic.with-a-cast": "economy",
   // Spell components (SRD Components) are their own family, so a table can stop checking hands and pouches alone.
   "spell.no-verbal": "components",
   "spell.no-free-hand": "components",

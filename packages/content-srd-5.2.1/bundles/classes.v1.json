@@ -5918,7 +5918,22 @@
     "id": "slow-fall",
     "name": "Slow Fall",
     "level": 4,
-    "description": "You can take a Reaction when you fall to reduce any damage you take from the fall by an amount equal to five times your Monk level."
+    "description": "You can take a Reaction when you fall to reduce any damage you take from the fall by an amount equal to five times your Monk level.",
+    "actions": [
+     {
+      "id": "slow-fall",
+      "name": "Slow Fall",
+      "activation": "reaction",
+      "description": "When you fall, take a Reaction to reduce any damage you take from the fall by an amount equal to five times your Monk level.",
+      "damage": [],
+      "reaction": {
+       "trigger": "falls",
+       "response": "reduce-fall-damage",
+       "perLevel": 5,
+       "classId": "monk"
+      }
+     }
+    ]
    },
    {
     "id": "extra-attack",
@@ -9894,7 +9909,26 @@
         },
         "per": "long-rest",
         "pool": "sorcery-points"
-       }
+       },
+       "actions": [
+        {
+         "id": "seeking-spell",
+         "name": "Seeking Spell",
+         "activation": "other",
+         "description": "When you miss with an attack roll for a spell, spend 1 Sorcery Point to reroll the d20. You must use the new roll.",
+         "damage": [],
+         "answer": {
+          "rolls": [
+           "attack"
+          ],
+          "when": "failure",
+          "spellAttacks": true,
+          "effect": {
+           "kind": "reroll"
+          }
+         }
+        }
+       ]
       },
       {
        "id": "subtle-spell",

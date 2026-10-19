@@ -135,6 +135,9 @@ export function readComponents(
     catalog: EquipmentCatalog | undefined;
     /** The caster stands in an area where no sound can be made (Silence). Measured on the map by the caller. */
     silenced?: boolean;
+    /** Subtle Spell: "without any Verbal, Somatic, or Material components, except Material components that are consumed
+     *  by the spell or that have a cost specified in the spell". */
+    subtle?: boolean;
     targetCount: number;
   }>
 ): ComponentReading {
@@ -144,7 +147,9 @@ export function readComponents(
   // "Requires no components unless the item's description notes otherwise"; a scroll is read without Material ones.
   if (isItemActionId(action.id) && !scroll) return NONE;
   const waived = waivedBy(definition, action);
-  const needs = (component: Component) => spell.components[component] && !waived.has(component);
+  const subtle = input.subtle === true;
+  const needs = (component: Component) =>
+    spell.components[component] && !waived.has(component) && !(subtle && component !== "material");
   const gaps: ComponentGap[] = [];
   const spends: ComponentSpend[] = [];
   const name = attacker.name;
@@ -173,7 +178,7 @@ export function readComponents(
   const emblem = hands.shield && focuses.some((row) => equipped(row) && catalogIdOf(row) === EMBLEM_ID);
   const costly = material ? (spell.components.costly ?? []) : [];
 
-  if (material && costly.length === 0) {
+  if (material && costly.length === 0 && !subtle) {
     const pouch = attacker.inventory.some((row) => carried(row) && catalogIdOf(row) === POUCH_ID);
     if (!pouch && focuses.length === 0)
       gaps.push({

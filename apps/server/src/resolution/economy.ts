@@ -1,7 +1,8 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, CastShaping } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
+import { RIDING_TAG } from "../mounts.js";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { wardingAura } from "../paladin-auras.js";
 import { areAllies } from "../creature-sides.js";
@@ -48,6 +49,15 @@ import { withoutSourceName } from "../hidden-source.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 import { readComponents, spendComponents, type ComponentSpend } from "./components.js";
 import { spellTargetViolations } from "./spell-targets.js";
+import {
+  castInstanceOf,
+  commitShaping,
+  isMetamagicOption,
+  levelBonusOf,
+  shapingCheck,
+  shapingOf,
+  type ShapingPlan
+} from "./metamagic.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
 
@@ -64,9 +74,15 @@ export type EconomyPlan = Readonly<{
     slotLevel?: number;
     parentId?: string;
     replacements?: Record<string, number>;
+    shaping?: readonly CastShaping[];
   }> | null;
-  /** The same for a compound Bonus Action (Flurry of Blows). */
-  bonusInstance: Readonly<{ actorId: string; components: Record<string, number> }> | null;
+  /** The same for a compound Bonus Action (Flurry of Blows), or a spell's rays cast as one (Quickened Spell). */
+  bonusInstance: Readonly<{
+    actorId: string;
+    components: Record<string, number>;
+    slotLevel?: number;
+    shaping?: readonly CastShaping[];
+  }> | null;
   /** Limited-use spend to record, keyed per scope: `amount` uses of it (one, or the action's cost). */
   spendUse: Readonly<{ key: string; per: NonNullable<DefinitionAction["uses"]>["per"]; amount: number }> | null;
   /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions), and the mark of one it
@@ -87,6 +103,10 @@ export type EconomyPlan = Readonly<{
   oncePerTurn?: string | null;
   /** The consumed materials and coins the cast uses up (SRD Components). */
   componentSpends?: readonly ComponentSpend[];
+  /** The Sorcery Points the cast's Metamagic spends and what it marks on the turn (`metamagic.ts`). */
+  shaping?: ShapingPlan | null;
+  /** It casts a level 1+ spell anew, which Quickened Spell reads on its caster's turn. */
+  leveledCast?: boolean;
 }>;
 
 type EconomyEvaluation = Readonly<{
@@ -148,8 +168,12 @@ export function evaluateActionEconomy(
   /** Any combatant's stat block, for the side a creature fights on (Help distracts an enemy). */
   resolveDefinition?: (definitionId: string) => ActorDefinition | undefined,
   /** What the map says of the cast: the caster stands where no sound can be made (Silence), and the targets are a
-   *  placed template's catch. */
-  cast: Readonly<{ silenced?: boolean; areaPlaced?: boolean }> = {}
+   *  placed template's catch. And how its caster shapes it (Metamagic). */
+  cast: Readonly<{
+    silenced?: boolean;
+    areaPlaced?: boolean;
+    shaping?: readonly CastShaping[];
+  }> = {}
 ): EconomyEvaluation {
   const evaluation: Evaluation = {
     state,
@@ -198,6 +222,14 @@ export function evaluateActionEconomy(
   if (spell) checkMarkMove(evaluation, spell);
   if (spell) checkSpellUp(evaluation, spell);
   if (spell) checkLaterTurn(evaluation, spell);
+  // Its caster shapes a spell cast anew (Metamagic); a later ray keeps its cast's shaping, and a later action has none.
+  const newCast =
+    spell !== undefined &&
+    continued === null &&
+    castInstanceOf(state, attacker, action) === null &&
+    laterRowOf(spell, action.id) === undefined;
+  const shaping = newCast ? (cast.shaping ?? []) : [];
+  const levelBonus = levelBonusOf(shaping);
   if (spell)
     evaluation.violations.push(
       ...spellTargetViolations({
@@ -206,7 +238,7 @@ export function evaluateActionEconomy(
         action,
         spell,
         targetIds,
-        castLevel: spendSpellSlot?.level ?? continued ?? spell.level,
+        castLevel: (spendSpellSlot?.level ?? continued ?? spell.level) + levelBonus,
         areaPlaced: cast.areaPlaced === true,
         characterLevel: (definition?.character?.classes ?? []).reduce((sum, entry) => sum + entry.level, 0),
         distanceFeet,
@@ -214,6 +246,22 @@ export function evaluateActionEconomy(
         catalog
       })
     );
+  const shaped = newCast
+    ? shapingCheck({
+        state,
+        attacker,
+        action,
+        spell,
+        castLevel: spendSpellSlot?.level ?? spell.level,
+        definition,
+        shaping,
+        targetIds,
+        siblings,
+        resolveDefinition,
+        catalog
+      })
+    : null;
+  if (shaped) evaluation.violations.push(...shaped.violations);
   // A later ray of a spell already cast this action is no new cast, so it needs no components again.
   const components =
     continued === null
@@ -224,25 +272,39 @@ export function evaluateActionEconomy(
           definition,
           catalog,
           ...(cast.silenced ? { silenced: true } : {}),
+          ...(shapingOf(shaping, "subtle-spell") ? { subtle: true } : {}),
           targetCount: new Set(targetIds).size
         })
       : { gaps: [], spends: [] };
   evaluation.violations.push(...components.gaps);
-  const opensSpell = spendSpellSlot !== null && slots.markAction && slots.instance?.components[action.id] !== undefined;
+  // A spell's rays keep the slot and the shaping of the cast that opened them.
+  const castRecord = {
+    ...(spendSpellSlot !== null ? { slotLevel: spendSpellSlot.level } : {}),
+    ...(shaping.length > 0 ? { shaping: [...shaping] } : {})
+  };
+  const opensRays =
+    action.spellId !== undefined && slots.markAction && slots.instance?.components[action.id] !== undefined;
+  const opensBonusRays =
+    action.spellId !== undefined && slots.markBonus && slots.bonusInstance?.components[action.id] !== undefined;
+  const slotCast = spendSpellSlot?.level ?? continued;
   return {
     violations: evaluation.violations,
     softViolations: evaluation.softViolations,
     plan: {
       ...slots,
-      ...(opensSpell ? { instance: { ...slots.instance!, slotLevel: spendSpellSlot.level } } : {}),
+      ...(opensRays ? { instance: { ...slots.instance!, ...castRecord } } : {}),
+      ...(opensBonusRays ? { bonusInstance: { ...slots.bonusInstance!, ...castRecord } } : {}),
       spendUse,
       spendLegendary,
       spendSpellSlot,
-      castLevel: spendSpellSlot?.level ?? continued,
+      // Twinned Spell raises the level the cast counts as, never the slot it spends.
+      castLevel: levelBonus > 0 && spell ? (slotCast ?? spell.level) + levelBonus : slotCast,
       magicAction: evaluation.onOwnTurn && isMagicAction(action),
       surge,
       oncePerTurn,
-      ...(components.spends.length > 0 ? { componentSpends: components.spends } : {})
+      ...(components.spends.length > 0 ? { componentSpends: components.spends } : {}),
+      ...(shaped?.plan ? { shaping: shaped.plan } : {}),
+      ...(newCast && spell.level >= 1 ? { leveledCast: true } : {})
     },
     proseMultiattack: evaluation.proseMultiattack,
     notes: evaluation.notes
@@ -566,10 +628,13 @@ export function untrainedArmorCast(
 }
 
 /** SRD: a Two-Handed weapon "requires two hands when you attack with it", and a Shield is strapped to one arm. Read
- *  from the row, since a magic shield's slot travels on its marker. The Lance's "unless mounted" is the GM's call. */
+ *  from the row, since a magic shield's slot travels on its marker. A Lance is "Two-Handed (unless mounted)": one hand
+ *  holds it while its wielder rides (`mounts.ts`). */
 function checkHands({ attacker, action, violations }: Evaluation): void {
   const item = swingItemOf(attacker, action);
   if (!item) return;
+  const mounted = attacker.effects.some((effect) => effect.tags.includes(RIDING_TAG));
+  if (mounted && (item.recordId ?? item.id) === "lance") return;
   const twoHands =
     item.weapon?.properties?.includes("two-handed") === true ||
     itemActionRest(action.id) === `${item.id}-${TWO_HANDED_SUFFIX}`;
@@ -637,6 +702,12 @@ function checkTakenAlone({ state, attacker, action, onOwnTurn, violations }: Eva
     violations.push({
       rule: "roll.answers-a-roll",
       message: `${action.name} answers a roll: use it on the roll's result, once the roll is shown.`
+    });
+  // A Metamagic option's own row spends its points with the spell it shapes (`metamagic.ts`).
+  else if (isMetamagicOption(action.id) && action.spellId === undefined)
+    violations.push({
+      rule: "metamagic.with-a-cast",
+      message: `${action.name} shapes a spell: choose it on the spell's cast.`
     });
   const rider = hitRiderOf(action);
   if (!rider) return;
@@ -814,6 +885,10 @@ function continuedSpellSlot({
   // A readied spell is released at the level its slot was spent at when it was readied (SRD Ready).
   const held = onOwnTurn ? undefined : heldReadiedSpell(attacker, action.id);
   if (action.spellSlot && held) return held.level;
+  // A spell's rays cast as a Bonus Action (Quickened Spell) continue the Bonus Action's own instance.
+  const bonusOpen = state.combat.turn.bonusActionInstance;
+  if (action.spellSlot && onOwnTurn && state.combat.turn.bonusActionUsed && bonusOpen?.actorId === attacker.id)
+    if ((bonusOpen.components[action.id] ?? 0) > 0) return bonusOpen.slotLevel ?? action.spellSlot.level;
   if (!action.spellSlot || !onOwnTurn || !state.combat.turn.actionUsed || open?.actorId !== attacker.id) return null;
   return (open.components[action.id] ?? 0) > 0 ? (open.slotLevel ?? action.spellSlot.level) : null;
 }
@@ -892,7 +967,7 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
       (components[action.id] ?? 0) > 0 ? action.id : action.attack && (components.attack ?? 0) > 0 ? "attack" : null;
     if (key) {
       components[key] -= 1;
-      return { ...unchanged, bonusInstance: { actorId: attacker.id, components } };
+      return { ...unchanged, bonusInstance: { ...bonusOpen, components } };
     }
   }
   checkDazed(evaluation);
@@ -917,13 +992,16 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
         rule: "economy.bonus-action-used",
         message: `${attacker.name} has already used a Bonus Action this turn.`
       });
-    // A compound Bonus Action opens its plan, which later swings spend (no rolls are consumed opening it).
+    // A compound Bonus Action opens its plan, which later swings spend (no rolls are consumed opening it); a spell's
+    // rays cast as one (Quickened Scorching Ray) open the rest of its rays.
     return {
       ...unchanged,
       markBonus: true,
       ...(action.multiattack
         ? { bonusInstance: { actorId: attacker.id, components: componentMap(action.multiattack) } }
-        : {})
+        : action.spellId !== undefined && (action.attack?.count ?? 1) > 1
+          ? { bonusInstance: { actorId: attacker.id, components: attackPool(action) } }
+          : {})
     };
   }
   if (onOwnTurn && action.activation === "action") return checkActionSlot(evaluation);
@@ -1065,6 +1143,7 @@ function checkActionSlot(evaluation: Evaluation): SlotPlan {
       actorId: attacker.id,
       components: open.components,
       ...(active.slotLevel !== undefined ? { slotLevel: active.slotLevel } : {}),
+      ...(active.shaping !== undefined ? { shaping: active.shaping } : {}),
       ...(active.parentId !== undefined ? planRecord(active.parentId, open.replacements) : {})
     }
   });
@@ -1145,7 +1224,13 @@ function checkLegendary(
   if (onOwnTurn)
     violations.push({
       rule: "legendary.own-turn",
-      message: `Legendary actions are taken on other creatures' turns, and this is ${attacker.name}'s own.`
+      message: `Legendary actions are taken right after other creatures' turns, and this is ${attacker.name}'s own.`
+    });
+  // "Immediately after another creature's turn": the window a turn's end opens, one action a window.
+  if (!onOwnTurn && state.combat.active && !legendaryWindowOpen(state, attacker.id))
+    violations.push({
+      rule: "legendary.after-a-turn",
+      message: `${attacker.name} takes a legendary action right after another creature's turn ends, one each time, before the next creature acts.`
     });
   if (spent + cost > perRound)
     violations.push({
@@ -1160,6 +1245,23 @@ function checkLegendary(
       message: `${attacker.name} can't take ${action.name} again until the start of its next turn.`
     });
   return { cost, ...(onceKey !== null ? { onceKey } : {}) };
+}
+
+/** Whether a creature may take a legendary action now: a turn other than its own has just ended, it hasn't taken one
+ *  since, and the creature whose turn it is now hasn't done anything yet. */
+export function legendaryWindowOpen(state: GameState, actorId: string): boolean {
+  const turn = state.combat.turn;
+  if (turn.afterActorId === undefined || turn.afterActorId === actorId) return false;
+  if (turn.legendaryTakenBy?.includes(actorId)) return false;
+  const current = state.combat.turnActorId;
+  return !(
+    turn.actionUsed ||
+    turn.bonusActionUsed ||
+    turn.movementUsedFeet > 0 ||
+    turn.attackRolled === true ||
+    turn.actionInstance !== null ||
+    Object.keys(turn.turnUses).some((key) => key.startsWith(`${current}:`))
+  );
 }
 
 /** Where `combat.legendaryUsed` marks a legendary action taken once until the creature's next turn, beside the
@@ -1454,7 +1556,8 @@ export function planEconomy(
     resolveDefinition,
     {
       ...(input.silenced === true ? { silenced: true } : {}),
-      ...(input.areaPlaced === true ? { areaPlaced: true } : {})
+      ...(input.areaPlaced === true ? { areaPlaced: true } : {}),
+      ...(input.shaping && input.shaping.length > 0 ? { shaping: input.shaping } : {})
     }
   );
   warnings.push(...notes);
@@ -1495,6 +1598,9 @@ export function commitEconomy({
         actorId: plan.instance.actorId,
         components: { ...plan.instance.components },
         ...(plan.instance.slotLevel !== undefined ? { slotLevel: plan.instance.slotLevel } : {}),
+        ...(plan.instance.shaping !== undefined
+          ? { shaping: plan.instance.shaping.map((entry) => ({ ...entry })) }
+          : {}),
         ...(plan.instance.parentId !== undefined
           ? planRecord(plan.instance.parentId, plan.instance.replacements ?? {})
           : {})
@@ -1515,7 +1621,14 @@ export function commitEconomy({
   }
   if (plan.bonusInstance !== state.combat.turn.bonusActionInstance) {
     const bonusInstance = plan.bonusInstance
-      ? { actorId: plan.bonusInstance.actorId, components: { ...plan.bonusInstance.components } }
+      ? {
+          actorId: plan.bonusInstance.actorId,
+          components: { ...plan.bonusInstance.components },
+          ...(plan.bonusInstance.slotLevel !== undefined ? { slotLevel: plan.bonusInstance.slotLevel } : {}),
+          ...(plan.bonusInstance.shaping !== undefined
+            ? { shaping: plan.bonusInstance.shaping.map((entry) => ({ ...entry })) }
+            : {})
+        }
       : null;
     state.combat = { ...state.combat, turn: { ...state.combat.turn, bonusActionInstance: bonusInstance } };
   }
@@ -1559,6 +1672,10 @@ export function commitEconomy({
         ...state.combat.legendaryUsed,
         [attacker.id]: (state.combat.legendaryUsed[attacker.id] ?? 0) + plan.spendLegendary.cost,
         ...(plan.spendLegendary.onceKey !== undefined ? { [plan.spendLegendary.onceKey]: 1 } : {})
+      },
+      turn: {
+        ...state.combat.turn,
+        legendaryTakenBy: [...new Set([...(state.combat.turn.legendaryTakenBy ?? []), attacker.id])]
       }
     };
   }
@@ -1573,6 +1690,7 @@ export function commitEconomy({
   }
   // A consumed material is used up as the cast happens ("which the spell consumes").
   if (plan.componentSpends) spendComponents(attacker, plan.componentSpends);
+  commitShaping(state, attacker, plan.shaping, plan.leveledCast === true);
   if (plan.oncePerTurn) {
     const key = plan.oncePerTurn;
     state.combat = {

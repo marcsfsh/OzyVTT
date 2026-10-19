@@ -278,13 +278,77 @@ of a hidden thing. When in doubt, leave it out.
   A move is charged along the cheapest grid path, where terrain costs double, other creatures'
   spaces cost double or bar the way, and crawling, climbing or swimming without the speed, or
   dragging a grappled creature, add a foot per foot (`movementPath` and `spacePassage` in
-  `@vtt/rules-5e`). How a token travels (walking, a special speed, teleporting, moved by force)
+  `@vtt/rules-5e`). How a token travels (walking, a special speed, jumping, teleporting, moved by force)
   rides on `token.move`, each speed with its own budget (`speed.ts`), and opportunity attacks are
-  read along the whole path (`movement-rules.ts`). The map's drag preview runs the same function,
+  read along the whole path (`movement-rules.ts`). A move that provokes waits at the last point of its
+  way still in reach (`combat.heldMove`) until its prompts are answered; the settle step then finishes
+  it, or leaves a mover the attack dropped, Grappled or knocked Prone where it stood and gives back the
+  rest of its movement (`held-moves.ts`). The map's drag preview runs the same function,
   and a mirror test checks the two agree. The `actor:movement` reply tells the preview whether the
   mover shares spaces (Air Form, a swarm) and which swarms its viewer can see (`space-sharing.ts`),
   so it charges those spaces as the server does. Players and the table screen get only the terrain the
   fog reveals, and with vision on only what the party has seen.
+- Height (`altitude.ts`, `@vtt/rules-5e` `altitude.ts`): a token's `altitudeFeet` is how far its lowest
+  point is above the ground, and `airborne` says what holds it up in the air (flying, or a
+  levitation); a creature on a ledge or a wall it climbs is up without being airborne. A space is as
+  tall as it is wide. Height counts by the grid's own diagonal rule, the one the floor uses (every
+  diagonal step is one square): on a grid the distance between two creatures is the larger of the
+  squares across and the squares up, and on a gridless map it is straight through the air
+  (`creatureDistance`), so reach, range, auras, grapples and opportunity attacks read it. A move pays
+  for the height it gains or loses the same way, a mover off the ground passes over painted terrain
+  and over creatures wholly below it, and only flying, climbing, jumping, teleporting or a forced
+  move changes height (`movement.altitude`). An area reaches only as high as its shape does
+  (`withinAreaHeight`). The GM sets any creature's height free of movement (`token.set-altitude`).
+  Height is as public as position, so it travels with the token in every projection.
+- Falling (`falling.ts`): after every command the pipeline lands whoever can no longer stay in the
+  air (`settleFalls`, its own commit): a flier that is Prone, Incapacitated or at a Fly Speed of 0
+  without hover, or left with nothing to fly with, falls; a levitation that ended, or a flight that
+  ends safely (`descends-safely`), lowers it gently. The GM starts any other fall with `actor.fall`.
+  A fall in a fight first offers the reactions that answer it (a `falls` prompt: Feather Fall from a
+  creature that sees the faller in range, the faller's own Slow Fall) and waits on them in
+  `combat.pendingFalls`; then the server rolls 1d6 per 10 feet to 20d6 through the damage rules and
+  leaves the creature Prone unless it took no damage.
+- Granted moves (`granted-moves.ts`, `resolution/movement-grants.ts`): a move or teleport an action
+  or feature gives beside the turn's own ("moves up to half its Speed", Tactical Shift, Misty Step)
+  is an effect on the creature that belongs to the turn it was granted in and lapses with it. The
+  movement rules charge a move to its grant when it fits, on the creature's turn or off it, and it
+  provokes unless the grant says otherwise; a granted teleport is checked for range, an unoccupied
+  space and sight, and needs no GM go-ahead. An action whose move comes first (Pounce) can be taken
+  `moveFirst`: its cost is spent and the move granted, and the action picked again pays nothing more.
+  Monster moves, teleports and leaps are read from the action's prose where it enters the system
+  (`action-prose.ts`). Other moves off the creature's turn are the GM's repositioning and spend
+  nothing.
+- Jumping (`jumping.ts`): the `jump` way of moving goes straight over what lies between, up to the
+  Strength score across and 3 + the Strength modifier up, half from a standing start (no 10 feet
+  moved this turn), a foot of movement for each foot. Riders change the numbers (`movement`
+  modifiers: Dexterity for Second-Story Work, Step of the Wind's doubling, the once-a-turn leap of
+  the Jump spell and Boots of Striding and Springing); a landing in Difficult Terrain rolls a DC 10
+  Dexterity (Acrobatics) check or leaves the jumper Prone.
+- Moves the rules make or forbid: a Frightened creature can't move closer to the creature its fear comes
+  from (`movement.toward-fear`); an effect tagged `flees-with-reaction` (Dissonant Whispers) is turned by
+  the pipeline's settle step into the creature's Reaction and a granted move of its Speed that must end
+  farther from the source (`compelledMoves`); a levitation (`levitating`) lifts its creature 20 feet,
+  which then moves only as if climbing; and a creature that ends its turn in another's space, unless
+  Tiny or larger, falls Prone (`occupied-space.ts`).
+- Off the plane (`off-plane.ts`): an effect tagged `off-plane` (Banishment, Etherealness, Maze,
+  Imprisonment, Blink's Ethereal turns, Hurl Through Hell) takes its creature off the map in the settle step, keeping its
+  place in the initiative and the space it left in `combat.offPlane` (GM-only); it can't target or be
+  targeted across the plane, and when the effect ends it returns to that space or the nearest
+  unoccupied one. Blink's d6 is rolled by the server as the caster's turn ends.
+- Mounts (`mounts.ts`, `actor.mount`): a rider carries an effect tagged `riding` whose source is its
+  mount. Mounting a creature within 5 feet and at least one size larger, or dismounting, costs half the
+  rider's Speed; the rider shares the mount's space and height, the mount's moves carry it, and it moves
+  only by its mount until it dismounts. A mount that teleports or is moved by force leaves its rider
+  behind. A Lance is held in one hand while riding.
+- Time Stop (`time-stop.ts`): the cast rolls 1d4 + 1 and `combat.timeStop` hands the caster that many
+  turns in a row; a resolve of its that reaches another creature, or a move more than 1,000 feet from
+  where it cast the spell, ends it.
+- Squeezing and passing walls: a footprint that fits a gap only as a creature one size smaller squeezes
+  through it as through Difficult Terrain (`footprintStepPassage`), and Incorporeal Movement passes walls
+  and creatures the same way.
+- Legendary actions are taken right after another creature's turn (`legendary.after-a-turn`): a turn
+  change records the creature whose turn ended (`turn.afterActorId`), and the window stays open, one
+  action a legendary creature, until the creature whose turn it is does something.
 
 ## Rules engine
 
@@ -387,6 +451,15 @@ the area). A cast with components waits while a creature that sees it may answer
 creature's own spell of a minute or more takes the action on each of its turns in a fight and resolves on the last
 (`resolution/long-casting.ts`). Outside a fight a creature's own cast resolves through the same path with no turn to
 spend, and a long one moves the game clock by its whole hours; an item's cast there stays on the loose route.
+
+A cast can carry Metamagic options and Sculpt Spells' picks (`ResolveInput.shaping`, `resolution/metamagic.ts`).
+The economy checks each pick against the options the caster knows, the spell and the Sorcery Points left, and spends
+the points with the cast. A pick changes what later steps read: the spell's range and duration (Distant, Extended),
+the action's casting time and damage type (Quickened, Transmuted), the cast's level (Twinned), its components
+(Subtle), its saves (Careful, Heightened, Sculpt Spells) and its damage dice (Empowered). Seeking Spell is a roll
+answer on a missed spell attack. The shaping stays on the cast's open action instance for its later rays, on a
+readied spell for its release and on a spell area for the saves it calls for later. `actor:available-actions` offers
+each known option with its cost and why it can't be used now, and the sheet's cast detail sends the picks.
 
 What a save does is data on the action's save block: `successDamage` (half or none) and the
 `failureCondition` a failed save imposes. Nothing parses the description for it. They are written where the content
@@ -531,7 +604,8 @@ atlas that name it.
 The table has one clock (ADR-0029): the Codex calendar keeps the day and the game state keeps the time
 of day (`rest.clockHours`, which the 16-hour rule between Long Rests reads, and `rest.clockMinutes`). A party rest or Pass time that
 crosses midnight moves the GM's date by the days crossed (`onTimePassed` in the command context, then
-`codexStore.advanceCampaignDate`), and the players' date with it when the two were the same day.
+`codexStore.advanceCampaignDate`), and the players' date with it when the two were the same day. Pass time
+with a travel pace (SRD Travel Pace) logs how far the party went and what the pace does to its checks.
 
 ## Public HTTP API
 

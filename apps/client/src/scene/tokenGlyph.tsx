@@ -301,3 +301,26 @@ export function TokenStatusBadges({
     </>
   );
 }
+
+/** How high a creature is, as a pill above the token: an up chevron and the feet ("20 ft"). Absent on the ground. */
+export function TokenAltitudeBadge({ sizePx, altitudeFeet }: Readonly<{ sizePx: number; altitudeFeet?: number }>) {
+  if (!altitudeFeet || altitudeFeet <= 0) return null;
+  const text = `${altitudeFeet} ft`;
+  const height = Math.max(10, sizePx * 0.3);
+  const fontSize = height * 0.62;
+  // Space Mono's glyphs are about 0.6em wide; the chevron takes about one em on the left.
+  const width = height * 0.9 + text.length * fontSize * 0.6;
+  const chevron = height * 0.22;
+  return (
+    <g className="token-altitude" transform={`translate(0 ${-sizePx * 0.5 - height * 0.55})`}>
+      <title>{`${altitudeFeet} feet up`}</title>
+      <rect x={-width / 2} y={-height / 2} width={width} height={height} rx={height / 2} />
+      <path
+        d={`M${-width / 2 + height * 0.55 - chevron} ${chevron * 0.5} L${-width / 2 + height * 0.55} ${-chevron * 0.7} L${-width / 2 + height * 0.55 + chevron} ${chevron * 0.5} Z`}
+      />
+      <text x={height * 0.45} style={{ fontSize }}>
+        {text}
+      </text>
+    </g>
+  );
+}

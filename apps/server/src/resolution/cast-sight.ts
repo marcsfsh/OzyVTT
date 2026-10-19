@@ -23,7 +23,10 @@ export function placeCastSight(ctx: ResolveContext): void {
       ? `${input.commandId}:grant`
       : null;
   // With nothing else to keep it, a spell's light lasts its printed rounds (Fire Shield's 10 minutes).
-  const duration = spell && ctx.castId === null && effectId === null ? spellEffectDuration(spell, ctx.plan.castLevel ?? spell.level) : null;
+  const duration =
+    spell && ctx.castId === null && effectId === null
+      ? spellEffectDuration(spell, ctx.plan.castLevel ?? spell.level)
+      : null;
   const sight =
     declared.rounds === undefined && duration?.type === "rounds" && duration.remaining > 0
       ? { ...declared, rounds: duration.remaining }
