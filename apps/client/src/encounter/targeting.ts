@@ -61,6 +61,8 @@ export type TargetingSession = Readonly<
     /** The creature a summon brings, and its creature type, where its user picks (Find Familiar's form). */
     summonPick?: Readonly<{ monsterId: string; form?: string }>;
     summonType?: string;
+    /** A Thief's Fast Hands takes this item action as a Bonus Action. */
+    fastHands?: true;
   } & ShapeChoice
 >;
 
@@ -134,7 +136,8 @@ export function beginTargeting(
   attackerId: string,
   slotLevel?: number,
   dartsAtSlot?: number,
-  shaping?: readonly CastShaping[]
+  shaping?: readonly CastShaping[],
+  options: Readonly<{ fastHands?: boolean }> = {}
 ) {
   const area = action.area;
   const dartTotal = dartsAtSlot ?? action.darts;
@@ -149,6 +152,7 @@ export function beginTargeting(
     ...(action.useCost === "chosen" ? { spend: 1 } : {}),
     // An option starts on the first, as the server reads none.
     ...(action.choices?.options?.[0] ? { optionId: action.choices.options[0].id } : {}),
+    ...(options.fastHands ? { fastHands: true as const } : {}),
     ...startingShapeChoice(action)
   };
   if (area) {
@@ -508,6 +512,7 @@ export function resolveTargeting(
   // A look at the damage is a preview of it, whatever the action.
   const commit = opts.damageLook ? false : (opts.commit ?? !isAttack);
   const extra = {
+    ...(session.fastHands ? { fastHands: true } : {}),
     ...(opts.override ? { override: opts.override } : {}),
     ...(opts.rollMode ? { rollMode: opts.rollMode } : {}),
     ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}),

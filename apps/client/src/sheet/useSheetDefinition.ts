@@ -67,6 +67,8 @@ export type AvailabilityRow = Readonly<{
   forms?: ContentActionSummary["forms"];
   /** The effects a use picks one of (Enlarge or Reduce). */
   options?: ContentActionSummary["options"];
+  /** A Thief's Fast Hands can take this item action as a Bonus Action: whether now, and why not. */
+  fastHands?: Readonly<{ available: boolean; reason?: string }>;
 }>;
 
 /** What the server says of one row now: whether it can be used, why not, and what a weapon's swing masters. */
@@ -75,6 +77,8 @@ export type RowFacts = Readonly<{
   reason: string | null;
   passive: AvailabilityRow["passive"] | null;
   mastery: string | null;
+  /** Fast Hands' Bonus Action form of an item's action: whether it can be used now, and why not. */
+  fastHands?: Readonly<{ available: boolean; reason: string | null }>;
 }>;
 
 /** The row's facts, with the first rule's message for an older server that sends no reason. */
@@ -82,7 +86,8 @@ export const factsOf = (row: AvailabilityRow): RowFacts => ({
   available: row.available,
   reason: row.available ? null : (row.reason ?? row.violations?.[0]?.message ?? null),
   passive: row.passive ?? null,
-  mastery: row.mastery?.name ?? null
+  mastery: row.mastery?.name ?? null,
+  ...(row.fastHands ? { fastHands: { available: row.fastHands.available, reason: row.fastHands.reason ?? null } } : {})
 });
 
 /** A spell's later action whose spell isn't up on its caster (Spiritual Weapon's attack before the cast), which

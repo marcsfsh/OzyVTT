@@ -339,6 +339,8 @@ export function CharacterSheet({
       edit={edit}
       onEdited={showEdited}
       helping={controller.inFight ? undefined : state}
+      inFight={controller.inFight}
+      party={state}
       onFeedback={say}
     />
   ) : null;

@@ -67,6 +67,8 @@ function derivedSheet(over: Partial<ActorDerivedSheet> = {}): ActorDerivedSheet 
       }
     ],
     tools: [],
+    gearUses: [],
+    fastHands: false,
     passivePerception: 11,
     speedFeet: 30,
     defences: { resistances: [], immunities: [], vulnerabilities: [] },
@@ -192,27 +194,39 @@ describe("the sheet's checks", () => {
     await waitFor(() => expect(toggle.getAttribute("aria-pressed")).toBe("false"));
   });
 
-  it("rolls a tool's Utilize use at its printed DC", async () => {
-    const thieves = {
-      id: "thieves-tools",
-      name: "Thieves' Tools",
-      ability: "dex" as const,
-      bonus: 5,
-      mode: NORMAL,
-      reliableTalent: false,
-      uses: [
-        { label: "Pick a lock", dc: 15 },
-        { label: "Disarm a trap", dc: 15 }
-      ]
-    };
-    serve(derivedSheet({ tools: [thieves] }));
+  const thieves = (carried = true) => ({
+    id: "thieves-tools",
+    name: "Thieves' Tools",
+    ability: "dex" as const,
+    bonus: 5,
+    mode: NORMAL,
+    reliableTalent: false,
+    proficient: true,
+    carried,
+    uses: [
+      { label: "Pick a lock", dc: 15, skill: "sleight-of-hand" },
+      { label: "Disarm a trap", dc: 15, skill: "sleight-of-hand" }
+    ]
+  });
+
+  it("rolls a tool's Utilize use by its place in the tool's list, for the server's DC", async () => {
+    serve(derivedSheet({ tools: [thieves()] }));
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     const user = userEvent.setup();
     await openTab(user, "Checks");
-    await user.click(await screen.findByRole("button", { name: "Roll Pick a lock with Thieves' Tools, DC 15" }));
+    await user.click(await screen.findByRole("button", { name: "Roll Disarm a trap with Thieves' Tools, DC 15" }));
     expect(sent("check:roll")).toEqual([
-      { actorId: HERO, ability: "dex", tool: "thieves-tools", visibility: "public", dc: 15 }
+      { actorId: HERO, ability: "dex", tool: "thieves-tools", use: 1, visibility: "public" }
     ]);
+  });
+
+  it("holds back a use whose tool isn't in the pack, and says so", async () => {
+    serve(derivedSheet({ tools: [thieves(false)] }));
+    render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    await openTab(userEvent.setup(), "Checks");
+    const pick = await screen.findByRole("button", { name: "Roll Pick a lock with Thieves' Tools, DC 15" });
+    expect((pick as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getAllByText("Not in your pack").length).toBe(2);
   });
 
   it("says an before a vowel: Roll an Intelligence check", async () => {

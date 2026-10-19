@@ -119,7 +119,8 @@ export function GearTab({
   others?: readonly Readonly<{ id: string; name: string }>[];
   /** Why an item's action can't be used from here now ("It isn't your turn."), or null. */
   actionBlocked?: string | null;
-  onUseAction: (row: ContentActionSummary) => void;
+  /** Uses an item's action; with `fastHands`, a Thief takes it as a Bonus Action. */
+  onUseAction: (row: ContentActionSummary, options?: Readonly<{ fastHands?: boolean }>) => void;
 }>) {
   const inventory = actor.inventory ?? [];
   const [openId, setOpenId] = useState<string | null>(null);
@@ -517,6 +518,22 @@ export function GearTab({
                         {action.id === `item-${open.id}` && open.weapon ? `Attack with the ${open.name}` : action.name}
                       </Button>
                       {why && actionBlocked === null && <span className="cs-sub">{why}</span>}
+                      {/* Fast Hands: an item's Utilize or Magic action as a Bonus Action, on the Thief's turn. */}
+                      {inFight && facts.get(action.id)?.fastHands && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            block
+                            disabled={busy || actionBlocked !== null || !facts.get(action.id)!.fastHands!.available}
+                            onClick={() => onUseAction(action, { fastHands: true })}
+                          >
+                            {action.name} as a Bonus Action
+                          </Button>
+                          {facts.get(action.id)!.fastHands!.reason && actionBlocked === null && (
+                            <span className="cs-sub">{facts.get(action.id)!.fastHands!.reason}</span>
+                          )}
+                        </>
+                      )}
                     </span>
                   );
                 })}
