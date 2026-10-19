@@ -1769,7 +1769,11 @@ export const EffectInstanceSchema = z
           .strict()
           .optional(),
         /** What its arrival does near the destination (a mummy lord's Whirlwind of Sand). */
-        landing: TeleportLandingSchema.optional()
+        landing: TeleportLandingSchema.optional(),
+        /** The willing creature that goes with it, to a space within 5 feet of its destination (Dimension Door). */
+        passengerId: z.uuid().optional(),
+        /** It leaves smoke in the space it left (a Cape of the Mountebank). */
+        smoke: z.literal(true).optional()
       })
       .strict()
       .optional(),
@@ -4238,7 +4242,13 @@ export const ActionTeleportSchema = z
      *  demon within 10 feet of itself"). */
     orAnother: z.literal(true).optional(),
     /** What its arrival does to the enemies near its destination (a mummy lord's Whirlwind of Sand). */
-    landing: TeleportLandingSchema.optional()
+    landing: TeleportLandingSchema.optional(),
+    /** One willing creature its targets name, within 5 feet of its user, goes too and arrives within 5 feet of its
+     *  user's destination; if either can't, both take `failDamage` and stay (Dimension Door). */
+    passenger: z.literal(true).optional(),
+    /** The space its user leaves is Lightly Obscured by smoke until the end of its user's next turn (a Cape of the
+     *  Mountebank). */
+    smoke: z.literal(true).optional()
   })
   .strict();
 export type ActionTeleport = z.infer<typeof ActionTeleportSchema>;

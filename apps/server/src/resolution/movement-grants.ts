@@ -1,8 +1,27 @@
 import { holdsFeature } from "../class-features.js";
+import { areAllies } from "../creature-sides.js";
 import { RAGING_TAG } from "../effects.js";
+import { CommandRejectedError } from "../game-store.js";
 import { grantFeet, grantMove, grantTeleport, payOwedAction } from "../granted-moves.js";
-import type { ResolveContext } from "./context.js";
+import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
+import type { LiveActor, ResolveContext } from "./context.js";
 import { isMagicAction } from "./economy.js";
+
+/** Dimension Door: "You can also teleport one willing creature. The creature must be within 5 feet of you when you
+ *  teleport": the one creature the cast names beside its caster, on its side and within 5 feet. */
+function passengerOf(ctx: ResolveContext, name: string): LiveActor | undefined {
+  const { attacker, deps } = ctx;
+  const others = ctx.targets.filter((target) => target.id !== attacker.id);
+  if (others.length === 0) return undefined;
+  if (others.length > 1) throw new CommandRejectedError(`${name} takes one other creature along.`);
+  const passenger = others[0]!;
+  if (!areAllies(attacker, passenger, deps.resolveDefinition))
+    throw new CommandRejectedError(`${name} takes only a willing creature along, and ${passenger.name} isn't willing.`);
+  const apart = deps.distanceFeet?.(attacker.id, passenger.id) ?? null;
+  if (apart !== null && apart > 5 + DISTANCE_TOLERANCE_FEET)
+    throw new CommandRejectedError(`${passenger.name} must be within 5 ft of ${attacker.name} to go along.`);
+  return passenger;
+}
 
 /**
  * What a resolve gives its creature to move or teleport with, beside the turn's own movement (SRD 5.2.1):
@@ -74,8 +93,16 @@ export function applyMovementGrants(ctx: ResolveContext): void {
     // "The balor teleports itself or a willing demon within 10 feet of itself": the creature it names instead.
     const other = teleport.orAnother ? ctx.targets.find((target) => target.id !== attacker.id) : undefined;
     const traveler = other ?? attacker;
-    grantTeleport(state, traveler, { id: `${input.commandId}:teleport`, name: action.name, teleport });
-    say(`${traveler.name} may teleport up to ${teleport.feet} ft to an unoccupied space ${attacker.name} can see.`);
+    const passenger = teleport.passenger ? passengerOf(ctx, action.name) : undefined;
+    grantTeleport(state, traveler, {
+      id: `${input.commandId}:teleport`,
+      name: action.name,
+      teleport,
+      ...(passenger ? { passengerId: passenger.id } : {})
+    });
+    say(
+      `${traveler.name} may teleport up to ${teleport.feet} ft to an unoccupied space ${attacker.name} can see${passenger ? `, ${passenger.name} arriving beside it` : ""}.`
+    );
   }
   // "Whenever you activate your Second Wind with a Bonus Action, you can move up to half your Speed without
   // provoking Opportunity Attacks."

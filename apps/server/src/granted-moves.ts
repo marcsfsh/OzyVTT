@@ -98,7 +98,7 @@ export function grantMove(
 export function grantTeleport(
   state: GameState,
   actor: Actor,
-  input: Readonly<{ id: string; name: string; teleport: ActionTeleport }>
+  input: Readonly<{ id: string; name: string; teleport: ActionTeleport; passengerId?: string }>
 ): void {
   actor.effects = [
     ...actor.effects.filter((effect) => effect.grantedTeleport === undefined),
@@ -113,7 +113,9 @@ export function grantTeleport(
         turnActorId: state.combat.turnActorId,
         ...(input.teleport.unseen ? { unseen: true as const } : {}),
         ...(input.teleport.failDamage ? { failDamage: input.teleport.failDamage } : {}),
-        ...(input.teleport.landing ? { landing: structuredClone(input.teleport.landing) } : {})
+        ...(input.teleport.landing ? { landing: structuredClone(input.teleport.landing) } : {}),
+        ...(input.passengerId ? { passengerId: input.passengerId } : {}),
+        ...(input.teleport.smoke ? { smoke: true as const } : {})
       }
     })
   ];

@@ -2457,7 +2457,17 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // "You can use it to cast Dimension Door", once a dawn: the cast teleports its wearer (`granted-moves.ts`), the 4d6
   // falling only on an arrival in a filled space. The smoke cloud is the GM's.
-  "cape-of-the-mountebank": { casts: [{ spellId: "dimension-door", uses: { limit: 1, per: "long-rest" } }] },
+  // "When you disappear, you leave behind a cloud of smoke ... the space you left Lightly Obscured until the end of your
+  // next turn" (`teleport-company.ts`).
+  "cape-of-the-mountebank": {
+    casts: [
+      {
+        spellId: "dimension-door",
+        uses: { limit: 1, per: "long-rest" },
+        teleport: { feet: 500, unseen: true, failDamage: "4d6", passenger: true, smoke: true }
+      }
+    ]
+  },
 
   // Spider Climb's Climb Speed; Spider Walk: "You can't be caught in webs of any sort" (the Web Walker tag a web's area
   // reads); and Web at save DC 13 once a dawn, filling twice its normal area: a 40-foot Cube.

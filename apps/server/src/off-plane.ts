@@ -133,9 +133,7 @@ function staysGoneAt(state: GameState, actor: Actor, deps: FallDeps | undefined)
   const definition = actor.definitionId ? deps?.resolveDefinition(actor.definitionId) : undefined;
   const type = creatureTypeOf(actor, definition);
   if (type === null || !HOME_PLANE_TYPES.has(type)) return undefined;
-  return state.combat.active
-    ? { round: banished.startedRound + 10 }
-    : { minute: clockMinutesOf(state) + 1 };
+  return state.combat.active ? { round: banished.startedRound + 10 } : { minute: clockMinutesOf(state) + 1 };
 }
 
 const minuteRanOut = (state: GameState, at: NonNullable<OffPlaneEntry["staysGone"]>) =>
@@ -147,7 +145,11 @@ const minuteRanOut = (state: GameState, at: NonNullable<OffPlaneEntry["staysGone
  *  type": it stays off the map and leaves the fight. */
 function sentHome(state: GameState, actor: Actor, deps: FallDeps | undefined): EffectNarration[] {
   const events: EffectNarration[] = [
-    { kind: "effect", text: `${actor.name} doesn't return: the banishment held for its full minute.`, actorId: actor.id }
+    {
+      kind: "effect",
+      text: `${actor.name} doesn't return: the banishment held for its full minute.`,
+      actorId: actor.id
+    }
   ];
   const fighting = state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id);
   if (fighting && deps && state.combat.turnActorId !== actor.id && state.combat.initiative.length > 1)
@@ -208,7 +210,7 @@ function returnFromEthereal(
 }
 
 /** Feet between two points as the grid counts them, each diagonal step one square. */
-function feetBetween(geometry: TokenMapGeometry, from: Point, to: Point): number {
+export function feetBetween(geometry: TokenMapGeometry, from: Point, to: Point): number {
   const calibration = geometry.calibration;
   if (!calibration) return 0;
   const a = imageToGrid(calibration, from);

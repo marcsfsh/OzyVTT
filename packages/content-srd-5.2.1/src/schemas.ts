@@ -667,6 +667,11 @@ export const ItemSpellCastSchema = z
       .describe(
         "A flat printed attack bonus for the cast's spell attacks (Circlet of Blasting's +5). It overrides any derivation"
       ),
+    /** The teleport its cast gives in place of the spell's own, with what the item adds (a Cape of the Mountebank's
+     *  Dimension Door leaves smoke in the space it left). */
+    teleport: ActionTeleportSchema.optional().describe(
+      "The teleport the item's cast gives in place of the spell's own, with what the item adds (a Cape of the Mountebank's smoke)"
+    ),
     /** It is cast as this, whatever the spell's casting time says (a Necklace of Prayer Beads' bead: a Bonus Action). */
     activation: z
       .enum(["action", "bonus-action"])

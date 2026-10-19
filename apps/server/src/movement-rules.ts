@@ -126,6 +126,11 @@ export type MovementRulesOutcome = Readonly<{
   teleportFails?: string;
   /** What the granted teleport's arrival does near its destination (a mummy lord's Whirlwind of Sand). */
   teleportLanding?: TeleportLanding;
+  /** The willing creature the granted teleport takes along (Dimension Door), and whether it leaves smoke behind. */
+  teleportPassengerId?: string;
+  teleportSmoke?: true;
+  /** The granted teleport's damage when it fails, for a passenger that can't arrive. */
+  teleportFailDamage?: string;
   /** The mover waits here, at the edge of the reach it leaves, while the Opportunity Attacks it provoked are answered
    *  (`held-moves.ts`); `refundFeet` is what the rest of the way cost, given back if it never goes on. */
   heldAt?: Readonly<{ position: Point; altitudeFeet: number; promptIds: readonly string[]; refundFeet: number }>;
@@ -436,6 +441,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   let landsOnDifficult = false;
   let failDamage: string | undefined;
   let landing: TeleportLanding | undefined;
+  let passengerId: string | undefined;
+  let failOn: string | undefined;
+  let smoke = false;
   let heldAt: MovementRulesOutcome["heldAt"];
   const travelled: { path?: readonly Point[] } = {};
   const done = (crawled = false): MovementRulesOutcome => ({
@@ -448,6 +456,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     ...(landsOnDifficult ? { landsOnDifficult: true as const } : {}),
     ...(failDamage ? { teleportFails: failDamage } : {}),
     ...(landing ? { teleportLanding: landing } : {}),
+    ...(passengerId ? { teleportPassengerId: passengerId, ...(failOn ? { teleportFailDamage: failOn } : {}) } : {}),
+    ...(smoke ? { teleportSmoke: true as const } : {}),
     ...(heldAt ? { heldAt } : {}),
     ...(travelled.path ? { path: travelled.path } : {})
   });
@@ -474,6 +484,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       spendTeleportGrant(mover, teleport.effectId);
       granted = teleport.name;
       landing = teleport.landing;
+      passengerId = teleport.passengerId;
+      failOn = teleport.failDamage;
+      smoke = teleport.smoke === true;
       // A space filled by a creature the mover didn't know of fails the teleport that says so (Dimension Door).
       if (teleport.failDamage && endsInOccupiedSpace(state, input, to, true)) failDamage = teleport.failDamage;
       return done();

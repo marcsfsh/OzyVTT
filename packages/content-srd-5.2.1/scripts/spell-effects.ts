@@ -1080,7 +1080,7 @@ const CAST_TELEPORTS: Readonly<Record<string, NonNullable<SpellEffect["teleport"
   "misty-step": { feet: 30 },
   // "You teleport to a location within range": seen or not. "If you ... would arrive in a space occupied by a
   // creature ... you ... each take 4d6 Force damage, and the teleportation fails."
-  "dimension-door": { feet: 500, unseen: true, failDamage: "4d6" }
+  "dimension-door": { feet: 500, unseen: true, failDamage: "4d6", passenger: true }
 };
 
 /** Reaction spells the table offers as prompts: what triggers each and what casting it does. Counterspell answers a

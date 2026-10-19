@@ -2132,7 +2132,14 @@
      "limit": 1,
      "per": "long-rest"
     },
-    "consumesSpellSlot": false
+    "consumesSpellSlot": false,
+    "teleport": {
+     "feet": 500,
+     "unseen": true,
+     "failDamage": "4d6",
+     "passenger": true,
+     "smoke": true
+    }
    }
   ],
   "grantsFeatIds": [],

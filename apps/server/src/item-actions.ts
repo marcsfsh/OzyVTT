@@ -219,7 +219,8 @@ export function castAction(
     // The bearer's own slot is spent on top of the item's charges when the item says so.
     ...(cast.consumesSpellSlot && level >= 1 ? { spellSlot: { level: Math.min(9, level) } } : {}),
     // Who the item's cast may affect beside the spell's own targets (a ring's Fear: Beasts only).
-    ...(cast.targets ? { targets: structuredClone(cast.targets) } : {})
+    ...(cast.targets ? { targets: structuredClone(cast.targets) } : {}),
+    ...(cast.teleport ? { teleport: structuredClone(cast.teleport) } : {})
   };
   if (!spell) return base;
 

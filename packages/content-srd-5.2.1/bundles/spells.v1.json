@@ -8016,7 +8016,8 @@
    "teleport": {
     "feet": 500,
     "unseen": true,
-    "failDamage": "4d6"
+    "failDamage": "4d6",
+    "passenger": true
    }
   },
   "classes": [
