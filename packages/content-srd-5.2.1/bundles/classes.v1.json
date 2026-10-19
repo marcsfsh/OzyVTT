@@ -740,7 +740,7 @@
     "choice": {
      "kind": "weapon-mastery",
      "choose": 2,
-     "fromCatalog": "weapons"
+     "fromCatalog": "melee-weapons"
     },
     "extraPicks": [
      {
@@ -754,7 +754,7 @@
     "replaces": [
      {
       "offer": "feature:weapon-mastery",
-      "when": "level-up",
+      "when": "long-rest",
       "amount": 1
      }
     ]
@@ -4875,7 +4875,7 @@
     "replaces": [
      {
       "offer": "feature:weapon-mastery",
-      "when": "level-up",
+      "when": "long-rest",
       "amount": 1
      }
     ]
@@ -7037,7 +7037,7 @@
     "replaces": [
      {
       "offer": "feature:weapon-mastery",
-      "when": "level-up",
+      "when": "long-rest",
       "amount": 2
      }
     ]
@@ -7305,7 +7305,115 @@
     "id": "restoring-touch",
     "name": "Restoring Touch",
     "level": 14,
-    "description": "When you use Lay On Hands on a creature, you can also remove one or more of the following conditions from the creature: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. You must expend 5 Hit Points from the healing pool of Lay On Hands for each of these conditions you remove; those points don't also restore Hit Points to the creature."
+    "description": "When you use Lay On Hands on a creature, you can also remove one or more of the following conditions from the creature: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. You must expend 5 Hit Points from the healing pool of Lay On Hands for each of these conditions you remove; those points don't also restore Hit Points to the creature.",
+    "uses": {
+     "scaling": {
+      "type": "by-level",
+      "table": [
+       {
+        "level": 1,
+        "limit": 5
+       },
+       {
+        "level": 2,
+        "limit": 10
+       },
+       {
+        "level": 3,
+        "limit": 15
+       },
+       {
+        "level": 4,
+        "limit": 20
+       },
+       {
+        "level": 5,
+        "limit": 25
+       },
+       {
+        "level": 6,
+        "limit": 30
+       },
+       {
+        "level": 7,
+        "limit": 35
+       },
+       {
+        "level": 8,
+        "limit": 40
+       },
+       {
+        "level": 9,
+        "limit": 45
+       },
+       {
+        "level": 10,
+        "limit": 50
+       },
+       {
+        "level": 11,
+        "limit": 55
+       },
+       {
+        "level": 12,
+        "limit": 60
+       },
+       {
+        "level": 13,
+        "limit": 65
+       },
+       {
+        "level": 14,
+        "limit": 70
+       },
+       {
+        "level": 15,
+        "limit": 75
+       },
+       {
+        "level": 16,
+        "limit": 80
+       },
+       {
+        "level": 17,
+        "limit": 85
+       },
+       {
+        "level": 18,
+        "limit": 90
+       },
+       {
+        "level": 19,
+        "limit": 95
+       },
+       {
+        "level": 20,
+        "limit": 100
+       }
+      ]
+     },
+     "per": "long-rest",
+     "pool": "lay-on-hands"
+    },
+    "actions": [
+     {
+      "id": "lay-on-hands-restoring-touch",
+      "name": "Lay on Hands: Restoring Touch",
+      "activation": "bonus-action",
+      "description": "As a Bonus Action, touch a creature and expend 5 Hit Points from the pool of healing to remove one of these conditions from it: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. Those points don't also restore Hit Points to the creature.",
+      "damage": [],
+      "useCost": 5,
+      "endsConditions": [
+       "blinded",
+       "charmed",
+       "deafened",
+       "frightened",
+       "paralyzed",
+       "stunned"
+      ],
+      "endsOneCondition": true
+     }
+    ]
    },
    {
     "id": "aura-expansion",
@@ -8042,7 +8150,7 @@
     "replaces": [
      {
       "offer": "feature:weapon-mastery",
-      "when": "level-up",
+      "when": "long-rest",
       "amount": 2
      }
     ]
@@ -8953,12 +9061,12 @@
     "choice": {
      "kind": "weapon-mastery",
      "choose": 2,
-     "fromCatalog": "weapons"
+     "fromCatalog": "simple-weapons-or-martial-finesse-weapons-or-martial-light-weapons"
     },
     "replaces": [
      {
       "offer": "feature:weapon-mastery",
-      "when": "level-up",
+      "when": "long-rest",
       "amount": 2
      }
     ]
@@ -11142,7 +11250,7 @@
     "id": "mystic-arcanum-level-7-spell",
     "name": "Mystic Arcanum (level 7 spell)",
     "level": 13,
-    "description": "Your patron grants you a magical secret called an arcanum. Choose one level 6 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. As shown in the Warlock Features table, you gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
+    "description": "Your patron grants you a magical secret called an arcanum. Choose one level 7 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. As shown in the Warlock Features table, you gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
     "choice": {
      "kind": "spell",
      "choose": 1,
@@ -11166,7 +11274,7 @@
     "id": "mystic-arcanum-level-8-spell",
     "name": "Mystic Arcanum (level 8 spell)",
     "level": 15,
-    "description": "Your patron grants you a magical secret called an arcanum. Choose one level 6 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. As shown in the Warlock Features table, you gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
+    "description": "Your patron grants you a magical secret called an arcanum. Choose one level 8 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. As shown in the Warlock Features table, you gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
     "choice": {
      "kind": "spell",
      "choose": 1,
@@ -11190,7 +11298,7 @@
     "id": "mystic-arcanum-level-9-spell",
     "name": "Mystic Arcanum (level 9 spell)",
     "level": 17,
-    "description": "Your patron grants you a magical secret called an arcanum. Choose one level 6 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. As shown in the Warlock Features table, you gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
+    "description": "Your patron grants you a magical secret called an arcanum. Choose one level 9 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. As shown in the Warlock Features table, you gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
     "choice": {
      "kind": "spell",
      "choose": 1,
@@ -11872,7 +11980,7 @@
     "replaces": [
      {
       "offer": "class-cantrips",
-      "when": "level-up",
+      "when": "long-rest",
       "amount": 1
      }
     ]
@@ -11995,10 +12103,6 @@
      "fromCatalog": "wizard-spells",
      "minSpellLevel": 3,
      "maxSpellLevel": 3
-    },
-    "uses": {
-     "limit": 2,
-     "per": "short-rest"
     }
    }
   ]
