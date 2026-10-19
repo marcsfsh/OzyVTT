@@ -1773,7 +1773,9 @@ export const EffectInstanceSchema = z
         /** The willing creature that goes with it, to a space within 5 feet of its destination (Dimension Door). */
         passengerId: z.uuid().optional(),
         /** It leaves smoke in the space it left (a Cape of the Mountebank). */
-        smoke: z.literal(true).optional()
+        smoke: z.literal(true).optional(),
+        /** Taking it spends this many feet of the bearer's movement (Tree Stride). */
+        costFeet: z.number().int().min(5).max(60).optional()
       })
       .strict()
       .optional(),
@@ -1796,6 +1798,16 @@ export const EffectInstanceSchema = z
     conditionImmunities: z.array(ConditionIdSchema).max(6).optional(),
     /** Temporary Hit Points the bearer gains at the start of each of its turns while this lasts (Heroism). */
     temporaryHitPointsEachTurn: z.number().int().min(1).max(100).optional(),
+    /** A teleport the bearer may take once on each of its turns while this lasts, spending `costFeet` of its movement
+     *  (Tree Stride: 500 feet for 10 feet of movement). */
+    teleportEachTurn: z
+      .object({
+        feet: z.number().int().min(5).max(10000),
+        unseen: z.literal(true).optional(),
+        costFeet: z.number().int().min(5).max(60).optional()
+      })
+      .strict()
+      .optional(),
     modifiers: EffectModifiersSchema.default([]),
     /** Conditions this effect applied to the same actor; removed automatically when the effect ends. */
     linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),
@@ -2785,6 +2797,16 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   suppressesConditions: z.array(ConditionSchema).min(1).max(6).optional(),
   /** Generic actions the recipient may take as a Bonus Action while it lasts (Expeditious Retreat: Dash). */
   bonusActions: z.array(BonusActionBaseSchema).min(1).max(3).optional(),
+  /** A teleport the recipient may take once on each of its turns while it lasts (Tree Stride: up to 500 feet into
+   *  another tree, for 10 feet of movement). */
+  teleportEachTurn: z
+    .object({
+      feet: z.number().int().min(5).max(10000),
+      unseen: z.literal(true).optional(),
+      costFeet: z.number().int().min(5).max(60).optional()
+    })
+    .strict()
+    .optional(),
   /** The spell's later action, by name, that the recipient may take while it lasts at the cast's numbers (Dragon's
    *  Breath: "exhale"); the caster's own sheet doesn't offer it. */
   grantsLaterAction: z.string().min(1).max(60).optional(),
@@ -4248,7 +4270,9 @@ export const ActionTeleportSchema = z
     passenger: z.literal(true).optional(),
     /** The space its user leaves is Lightly Obscured by smoke until the end of its user's next turn (a Cape of the
      *  Mountebank). */
-    smoke: z.literal(true).optional()
+    smoke: z.literal(true).optional(),
+    /** Taking it spends this many feet of its user's movement (Tree Stride: 5 to enter a tree and 5 to step out). */
+    costFeet: z.number().int().min(5).max(60).optional()
   })
   .strict();
 export type ActionTeleport = z.infer<typeof ActionTeleportSchema>;

@@ -486,6 +486,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       landing = teleport.landing;
       passengerId = teleport.passengerId;
       failOn = teleport.failDamage;
+      if (teleport.costFeet !== undefined)
+        chargeTeleport(state, input, mover, teleport.costFeet, teleport.name, outcome);
       smoke = teleport.smoke === true;
       // A space filled by a creature the mover didn't know of fails the teleport that says so (Dimension Door).
       if (teleport.failDamage && endsInOccupiedSpace(state, input, to, true)) failDamage = teleport.failDamage;
@@ -781,6 +783,32 @@ function approachesFear(
         : source.name;
   }
   return null;
+}
+
+/** A granted teleport that costs movement (Tree Stride: "You must use 5 feet of movement to enter a tree ... using
+ *  another 5 feet of movement"), charged on the creature's own turn like a move. */
+function chargeTeleport(
+  state: GameState,
+  input: MovementRulesInput,
+  mover: GameState["actors"][number],
+  costFeet: number,
+  name: string,
+  outcome: Policing
+): void {
+  if (!movementCounts(state, mover.id)) return;
+  const definition = moverDefinitionOf(mover, input);
+  const budget = travelBudgetFeet(mover, deriveEquipment(mover, definition, input.catalog), definition, "walk");
+  const used = state.combat.turn.movementUsedFeet;
+  if (budget !== null && used + costFeet > budget + 1e-6)
+    police(
+      state,
+      input,
+      "movement.exceeds-speed",
+      `${mover.name} has ${Math.max(0, budget - used)} ft of movement left, and ${name} spends ${costFeet} ft.`,
+      outcome,
+      true
+    );
+  state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: used + costFeet } };
 }
 
 /** A readied move spends the creature's Reaction and uses up the ready, and a spell it held with it. */

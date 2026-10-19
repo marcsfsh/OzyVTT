@@ -7,6 +7,8 @@ import { resolveDefinitionAction } from "../src/action-resolution.js";
 import { makeEffect } from "../src/effects.js";
 import { activeTeleportGrant } from "../src/granted-moves.js";
 import { spellCastMechanics } from "../src/item-actions.js";
+import { applyMovementRules } from "../src/movement-rules.js";
+import { startOfTurn } from "../src/turn-boundaries.js";
 import { bootMovementServer, cell } from "./movement-fixtures.js";
 import { catalog, view } from "./spell-casters.js";
 
@@ -164,5 +166,66 @@ describe("a teleport that takes a creature along", () => {
     expect(tokenAt(state, HERO)).toEqual(cell(1, 1));
     expect(tokenAt(state, ALLY)).toEqual(cell(2, 1));
     for (const id of [HERO, ALLY]) expect(state.actors.find((actor) => actor.id === id)!.hp.current).toBeLessThan(30);
+  });
+});
+
+// SRD 5.2.1 Tree Stride: "move from inside it to inside another tree of the same kind within 500 feet ... You must use
+// 5 feet of movement to enter a tree ... using another 5 feet of movement. You can use this transportation ability only
+// once on each of your turns."
+describe("Tree Stride", () => {
+  const stride = spellCastMechanics(
+    loadSpells().find((entry) => entry.id === "tree-stride")!,
+    {
+      attackBonus: 7,
+      saveDc: 15,
+      bearersDc: false,
+      modifier: 4
+    }
+  );
+  const teleport = (state: GameState, to: { x: number; y: number }) =>
+    applyMovementRules(state, {
+      actorId: HERO,
+      from: tokenAt(state, HERO),
+      to,
+      mode: "teleport",
+      byPlayer: true,
+      distance: (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) / 10,
+      calibration: { kind: "square", origin: { x: 0, y: 0 }, cellSizePx: 50, rotationRadians: 0, distancePerCell: 5 },
+      override: null,
+      resolveDefinition: () => undefined,
+      newPromptId: randomUUID,
+      now: () => 0,
+      commandId: randomUUID()
+    });
+
+  it("strides once on each of the caster's turns, 300 feet for 10 feet of movement", () => {
+    const state = game(cell(2, 1));
+    const hero = () => state.actors.find((actor) => actor.id === HERO)!;
+    resolveDefinitionAction(
+      state,
+      {
+        id: "spell-tree-stride",
+        name: "Tree Stride",
+        activation: "action",
+        description: "",
+        spellId: "tree-stride",
+        ...stride
+      },
+      { actorId: HERO, targetIds: [], commandId: randomUUID() },
+      {
+        random: () => 3,
+        newRollId: randomUUID,
+        gmSessionId: "30000000-0000-4000-8000-00000000000a",
+        now: () => "2026-10-19T00:00:00.000Z",
+        catalog
+      }
+    );
+    expect(activeTeleportGrant(state, hero())).toMatchObject({ name: "Tree Stride", feet: 500, costFeet: 10 });
+    teleport(state, { x: 25, y: 3025 });
+    expect(state.combat.turn.movementUsedFeet).toBe(10);
+    expect(() => teleport(state, cell(1, 1))).toThrow("Borin can teleport only with the GM's go-ahead.");
+    state.combat = { ...state.combat, round: 2 };
+    startOfTurn(state, HERO, [], { rollDie: () => 1, resolveDefinition: () => undefined, newId: randomUUID });
+    expect(activeTeleportGrant(state, hero())).toMatchObject({ name: "Tree Stride", feet: 500 });
   });
 });

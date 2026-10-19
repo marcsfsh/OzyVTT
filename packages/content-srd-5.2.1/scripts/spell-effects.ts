@@ -1642,6 +1642,16 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "self",
     duration: rounds(10)
   }),
+  // "Move from inside it to inside another tree of the same kind within 500 feet ... You must use 5 feet of movement to
+  // enter a tree ... using another 5 feet of movement ... only once on each of your turns": a 500-foot teleport, seen
+  // or not, for 10 feet of movement, on each of the caster's turns while it concentrates (`granted-moves.ts`).
+  "tree-stride": spellGrant({
+    name: "Tree Stride",
+    tags: ["tree-stride"],
+    target: "self",
+    duration: rounds(10),
+    teleportEachTurn: { feet: 500, unseen: true, costFeet: 10 }
+  }),
   // "Gains a Fly Speed of 60 feet and can hover."
   fly: spellGrant({
     name: "Fly",

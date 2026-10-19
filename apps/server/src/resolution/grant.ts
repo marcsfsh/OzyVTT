@@ -23,6 +23,7 @@ import {
   type EffectNarration
 } from "../effects.js";
 import { refreshBaseArmorClass } from "../actor-roster.js";
+import { teleportsEachTurn } from "../granted-moves.js";
 import { holdsFeature } from "../class-features.js";
 import { GIFT_OF_THE_PROTECTORS_TAG, refuseFullPage } from "../book-of-shadows.js";
 import { deriveEquipment } from "../equipment-derivation.js";
@@ -103,6 +104,9 @@ export function applyGrant(ctx: ResolveContext): void {
           : [attacker];
   if (grant.toggles && endToggled(ctx, recipients)) return;
   for (const recipient of recipients) grantTo(ctx, recipient);
+  // Tree Stride's once-a-turn teleport is there on the turn it is cast too.
+  if (grant.teleportEachTurn)
+    for (const recipient of recipients) teleportsEachTurn(ctx.state, recipient.id, `${ctx.input.commandId}:stride`);
 }
 
 /** "From the Material Plane to the Ethereal Plane or vice versa": a toggling grant taken again while what it gave
@@ -326,6 +330,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       // Heroism: immune to Frightened, and Temporary Hit Points at the start of each of the bearer's turns.
       ...(conditionImmunities.length > 0 ? { conditionImmunities: conditionImmunities.slice(0, 6) } : {}),
       ...turnStartTemporaryHitPoints(grant.temporaryHitPointsEachTurn, deps.definition),
+      ...(grant.teleportEachTurn ? { teleportEachTurn: { ...grant.teleportEachTurn } } : {}),
       // Aid: the Hit Point maximum and current hit points rise while it lasts (`addEffect`); Heroes' Feast rolls its
       // 2d10 for each creature.
       ...hitPointMaximumGainOf(ctx, grant.hitPointMaximumGain, recipient.name),

@@ -32,6 +32,7 @@ import {
 } from "./simultaneous-effects.js";
 import { disgorge, regurgitationSaves } from "./swallow.js";
 import { offerNearbyReactions } from "./triggered-reactions.js";
+import { teleportsEachTurn } from "./granted-moves.js";
 
 type Actor = GameState["actors"][number];
 type Effect = Actor["effects"][number];
@@ -192,6 +193,8 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
       })
     );
   heroicWarrior(state, actorId, events, deps);
+  // "You can use this transportation ability only once on each of your turns" (Tree Stride).
+  if (deps.newId) teleportsEachTurn(state, actorId, deps.newId());
   // "At the start of each of its turns, the Restrained target repeats the save" (Conjure Elemental).
   if (deps.newId)
     events.push(
