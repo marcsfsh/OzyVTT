@@ -161,7 +161,9 @@ export function PlayerActionRunner({
   castPlace = { kind: "inline" },
   look = "list",
   round = null,
-  acting = null
+  acting = null,
+  turnTitle,
+  pinnable = true
 }: Readonly<{
   actorId: string;
   definition: ActorDefinition;
@@ -196,6 +198,10 @@ export function PlayerActionRunner({
   /** The fight's round, and who acts off this character's turn, for the turn card's heading. */
   round?: number | null;
   acting?: string | null;
+  /** The turn card's heading when the turn isn't the character's own (a creature its character commands). */
+  turnTitle?: string;
+  /** Whether the player may pin favourites on this card: only on their own character. */
+  pinnable?: boolean;
 }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
@@ -414,12 +420,13 @@ export function PlayerActionRunner({
               myTurn={myTurn}
               round={round}
               acting={acting}
+              {...(turnTitle ? { title: turnTitle } : {})}
               busy={busy}
               {...(unavailable ? { unavailable } : {})}
               header={header}
               pins={pinsOf(actor)}
               counts={optionCountsOf(actor)}
-              {...(actor ? { onSetPins: setPins } : {})}
+              {...(actor && pinnable ? { onSetPins: setPins } : {})}
               onUse={pickOption}
             />
           ) : (

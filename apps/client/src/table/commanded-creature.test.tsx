@@ -142,6 +142,8 @@ describe("a creature the player's character commands", () => {
     expect(turn.getByRole("heading", { name: "Owl's turn" })).toBeTruthy();
     expect(turn.getByText("Mira commands it: you act for it.")).toBeTruthy();
     expect(await turn.findByRole("button", { name: /Talons/ })).toBeTruthy();
+    // Its favourites are its commander's player's to read, not to pin on a stat block.
+    expect(turn.queryByRole("button", { name: "Edit favourites" })).toBeNull();
     expect(sent("actor:available-actions")).toContainEqual(expect.objectContaining({ actorId: OWL }));
     expect(screen.getByRole("button", { name: "End turn" })).toBeTruthy();
   });

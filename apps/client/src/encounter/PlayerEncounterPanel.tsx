@@ -334,6 +334,8 @@ export function PlayerEncounterPanel({
       look={phone ? "card" : "list"}
       round={combat.round}
       acting={acting}
+      turnTitle={`${actingFor.name}'s turn`}
+      pinnable={false}
     />
   ) : inFight && myId !== null && myActor?.definition && !dying ? (
     <PlayerActionRunner
@@ -358,7 +360,13 @@ export function PlayerEncounterPanel({
       aria-label={myTurn ? "Your turn" : actingFor ? `${actingFor.name}'s turn` : "The turn"}
     >
       {/* On a phone the turn card carries its own heading; a laptop's list sits under this one. */}
-      {(!phone || !runner || actingFor) && (
+      {/* A phone's turn card names the creature; the note under it says whose orders it follows. */}
+      {phone && actingFor && runner && (
+        <p className="encounter-quiet-note">
+          {myActor ? `${myActor.name} commands it: you act for it.` : "You act for it."}
+        </p>
+      )}
+      {(!phone || !runner) && (
         <div className="player-turn-head">
           {actingFor ? (
             <>
@@ -391,7 +399,6 @@ export function PlayerEncounterPanel({
       {/* The death save waits in the prompt slot above the tabs; this tab says what Unconscious leaves. */}
       {inFight && dying && myActor && <UnconsciousNote name={myActor.name} />}
       {runner}
-      {creatureList}
       {myActor && inFight && (
         <OwnFeedback className="own-effect-row" empty={myActor.effects.length === 0}>
           {(onFeedback) => (
@@ -406,6 +413,7 @@ export function PlayerEncounterPanel({
           )}
         </OwnFeedback>
       )}
+      {creatureList}
       {/* On your turn your character can give a dying or knocked-out ally aid: that is its action. */}
       {myTurn &&
         myActor &&
