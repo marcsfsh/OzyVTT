@@ -151,7 +151,10 @@ audience. There are five:
   (`commanded`, `orders`); who summoned it and what keeps it stay the GM's. That player acts for it, and
   sees through it when it lends its sight (`playerViewerIds`).
   A creature's `attitude`, which the GM sets for Influence, never reaches a player; a character's food and water
-  for the day (`nourishment`) goes wherever its sheet resources go.
+  for the day (`nourishment`) goes wherever its sheet resources go. A creature a player's own Hunter marks with
+  Hunter's Mark, while that Hunter has Hunter's Lore, carries `knownDefences` in that player's projection alone:
+  its damage Immunities, Resistances and Vulnerabilities and its condition Immunities, read live, gone when the mark
+  ends (`hunters-lore.ts`).
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
   room that may hold non-players. It follows the live scene, before and during its fight, unless
   the GM paused it. Only public actors with a position become tokens; annotations
@@ -271,9 +274,12 @@ of a hidden thing. When in doubt, leave it out.
 - The rules read sight through `vision/rules.ts` (`sightRules`), which answers with the map while
   vision is on and with the conditions and Blindsight, Truesight and See Invisibility by distance
   while it is off: an attack's unseen Advantage and Disadvantage and Invisible, Cover from walls
-  and creatures between (`cover.ts`), an area that leaves out what its origin can't reach
+  and creatures between (`cover.ts`; a placed area's save reads it from the area's point of origin,
+  `resolution/pending.ts`), an area that leaves out what its origin can't reach
   (`area-targeting.ts`), Hide's hiding place and the Passive Perception it tells the GM meets it (5
-  less where the hider is Lightly Obscured), Search finding a hidden creature, Frightened's line
+  less where the hider is Lightly Obscured), Search finding each hidden creature (its one roll read per
+  hider, with Disadvantage against one Lightly Obscured to the searcher), Truesight's save against a
+  visual illusion, which succeeds with no roll, Frightened's line
   of sight and its refused approach (`movement-rules.ts`), Dodge and other riders that name who
   sees whom (`sees-other`, `seen-by-other`, `other-lacks-sense`), Blinded and Heavily Obscured
   checks, a save that needs its source seen (a gaze, a pattern), and the traits and features that
@@ -364,7 +370,11 @@ of a hidden thing. When in doubt, leave it out.
   where it cast the spell, ends it.
 - Squeezing and passing walls: a footprint that fits a gap only as a creature one size smaller squeezes
   through it as through Difficult Terrain (`footprintStepPassage`), and Incorporeal Movement passes walls
-  and creatures the same way. A stat block's traits widen that (`wall-passage.ts`): Amorphous, Compression
+  and creatures the same way. A one-cell footprint has no narrower one, so its opening is measured between
+  the walls across its way (`laneWidth`): a Small or Medium creature walks through three quarters of a square,
+  squeezes through half of one (a Tiny creature's space) and is barred by less, and a Tiny one needs the half.
+  Walls running alongside the way, as a corridor's do, make no opening. Halfling Nimbleness passes the space
+  of any larger creature as Difficult Terrain (`spacePassage`'s `nimble`, from the `actor:movement` reply). A stat block's traits widen that (`wall-passage.ts`): Amorphous, Compression
   and the elementals' forms slip through a gap an inch wide and a swarm through one a Tiny creature fits, at
   no extra cost (`slipsThroughStep`); Earth Glide burrows through walls freely and Tunneler at double cost.
   A wall a spell raised stops every one of them. The `actor:movement` reply carries the opening and the
@@ -394,7 +404,9 @@ rests, death saves, weapon masteries and movement budgets. Entry points are
 sequence of steps over one shared context, one module per step in `apps/server/src/resolution/`
 (validation, attack roll, damage, masteries, on-hit effects, grants, concentration, pending saves
 and reactions, the action economy, release); builtin actions such as Hide and the unarmed Grapple
-add their special cases through the handler table in `resolution/builtins.ts`. Every condition
+add their special cases through the handler table in `resolution/builtins.ts`. Hiding ends only as the SRD
+says: on an attack roll or a spell cast with a Verbal component (`resolution/release.ts`), or when a Search meets
+the Hide total; a sound louder than a whisper is the GM's. Every condition
 write goes through `applyCondition` in `effects.ts`, which honours innate and item-granted
 immunities and runs what gaining a condition sets off (an Incapacitated creature drops its
 Concentration and its grapples). In a fight, effects count down at turn start and turn end; the
@@ -533,8 +545,22 @@ the confirm checks and spends it with the hit (`resolution/hit-options.ts`); it 
 What a stat block's or a magic weapon's hit leaves by itself (`onHit`: conditions, tags and modifiers on
 one effect, a pull, a save at a printed DC, only on a rolled 20 or against some creature types) lands in
 `resolution/on-hit.ts`. Who an action that isn't a spell may target (`targets`: how many, how far,
-creature types, size, sight, grappled by its user, a condition, in its space, enemies or allies) is
-checked as a spell's targets are, in `resolution/action-targets.ts`.
+size, sight, grappled by its user, a condition, in its space, enemies or allies) is
+checked as a spell's targets are, in `resolution/action-targets.ts`. Sight there and in a spell's targets is
+`sightRules().canSee`, so a Blinded user or an Invisible target counts with dynamic vision off too. The creature types an
+action or spell affects follow the Spells chapter's invalid target (`resolution/type-gates.ts`): a creature of another
+type is still a target, the use or slot is spent, nothing happens to it, and its player is told only that (the GM's line
+names the type). An ability cap on the target (Awaken's Intelligence of 3 or less) is read the same way. A creature's
+type there is `creatureTypeOf` (`statblock-facts.ts`), which reads an Arcanist's Magic Aura mask (a `masked-as-<type>`
+tag) for spells and other magic, and the true type for skills and a stat block's own traits. A ward its target bears
+(`spell-ward` modifier: Nondetection, Mind Blank, an Amulet of Proof against Detection and Location, a Ring of Mind
+Shielding) refuses a spell of its schools or ids aimed at it, leaves it out of such a spell's area and zone, and hides
+it from such a spell's sense (`resolution/spell-wards.ts`); one with `typeSenses` also hides it from every magical sense
+that tells a creature's type, Divine Sense included (`vision/detect.ts`). A picked target is also held to the spell's size limit,
+and to the caster or its own side for a spell on a willing creature (Light, Nondetection). Several picked targets are
+each checked for Total Cover. A heal that divides a pool (Preserve Life) takes the shares the user sets
+(`healingShares`), and one that also ends conditions for points of its pool (Restoring Touch, `conditionPicks`) takes
+the conditions picked (`conditionIds`); both are offered in the target picker (`resolution/heal.ts`).
 
 A magic item's charges are an `actionUses` pool keyed by the carried row (`itemPool` in
 `item-actions.ts`), so two copies count separately and the count moves with the row when the GM hands
@@ -590,8 +616,7 @@ one with nothing to roll (Light) spends its casting time and slot, holds its Con
 told to the table as cast (`cast-narration.ts`). Before anything is spent the economy checks the cast's components
 (`resolution/components.ts`: speech outside Silence, a free hand, a pouch, a focus the class names or a priced
 material the content build lists on the spell) and its targets (`resolution/spell-targets.ts`: the count the spell
-names, its creature type, sight with dynamic vision on, range, and for creatures of the caster's choice in an area,
-the area). A cast with components waits while a creature that sees it may answer with Counterspell
+names, sight, range, and for creatures of the caster's choice in an area, the area). A cast with components waits while a creature that sees it may answer with Counterspell
 (`resolution/counter.ts`, `counter-answers.ts`), and a reaction spell's prompt lets its caster pick the slot. A Spell
 Scroll's cast is seen (a wand's needs no components and isn't), a spell readied with the Ready action is seen as it is
 cast and not when it is let go, and a long casting as it begins. A

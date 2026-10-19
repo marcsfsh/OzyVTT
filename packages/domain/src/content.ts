@@ -976,6 +976,13 @@ export type ContentActionSummary = Readonly<{
   /** Damage types the caster picks from (Chromatic Orb); see `ActorAction.damageTypes`. */ damageTypes?: readonly DamageType[];
   /** The conditions the caster picks one of for a failed save (Blindness/Deafness); `action.resolve`'s
    *  `conditionId`. */ conditionChoices?: readonly string[];
+  /** Conditions its user may also end on the target, each for `pointsEach` of its pool (Restoring Touch);
+   *  `action.resolve`'s `conditionIds`. */ conditionPicks?: Readonly<{
+    conditions: readonly string[];
+    pointsEach: number;
+  }>;
+  /** The Hit Points a heal its user divides among its targets (Preserve Life's five times the Cleric level);
+   *  `action.resolve`'s `healingShares`. */ dividesHealing?: number;
   /** The creature and creature type its user picks when it summons (Find Familiar's forms); `action.resolve`'s
    *  `summon`. */ summonChoices?: SummonChoices;
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple),

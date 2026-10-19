@@ -52,7 +52,7 @@ export type SaveOutcome = {
   repeatDamageAgain?: true;
   repeatUnseenSource?: true;
   endsOutOfSight?: true;
-  autoSuccess?: { creatureTypes?: string[]; sleepless?: true };
+  autoSuccess?: { creatureTypes?: string[]; sleepless?: true; truesight?: true; challengeRatingAbove?: number };
   failureEndsForm?: true;
   breaksConcentration?: true;
   heldBy?: ObjectPrint;
@@ -732,9 +732,16 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   },
   // "The target can take a Study action to examine the phantasm with an Intelligence (Investigation) check against your
   // spell save DC. If the check succeeds, ... the spell ends."
+  // SRD Truesight: "Visual illusions appear transparent to you, and you automatically succeed on saving throws against
+  // them." The phantasm is perceived by its target alone, so the target's own Truesight sees through it.
   "phantasmal-force": {
-    endedBy: { name: "Study the illusion", by: "bearer", check: { ability: "int", skill: "investigation" } }
+    endedBy: { name: "Study the illusion", by: "bearer", check: { ability: "int", skill: "investigation" } },
+    autoSuccess: { truesight: true }
   },
+  // "Each creature in the area who can see the pattern."
+  "hypnotic-pattern": { autoSuccess: { truesight: true } },
+  // "If the target's Challenge Rating isn't 0, it automatically succeeds."
+  "animal-messenger": { autoSuccess: { challengeRatingAbove: 0 } },
   // "A Frightened target makes a Wisdom saving throw at the end of each of its turns. On a failed save, it takes 5d10
   // Psychic damage."
   weird: { repeatFailureDamage: [{ formula: "5d10", type: "psychic" }] },
@@ -767,8 +774,8 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   "contact-other-plane": { failureDuration: { type: "until-rest", rest: "long" } },
   // "For the duration, the target makes a Wisdom saving throw at the end of each of its turns. On a failed save, it takes
   // the Psychic damage again. On a successful save, the spell ends." The failure leaves no condition for the reader to
-  // hang it on.
-  "phantasmal-killer": { repeatSave: true, repeatDamageAgain: true },
+  // hang it on. Its illusion is "visible only to that creature", which the target's Truesight sees through.
+  "phantasmal-killer": { repeatSave: true, repeatDamageAgain: true, autoSuccess: { truesight: true } },
   // "While Restrained, the target takes 1d6 Piercing damage at the start of each of its turns", and "A Large or larger
   // creature has Advantage on this save".
   "ensnaring-strike": {

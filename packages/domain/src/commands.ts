@@ -602,8 +602,27 @@ export const ActionResolveSchema = z
     /** Extras to add to this hit, from the preview's `hitOffers` (Sneak Attack, a smite and its slot, Divine Strike's
      *  type, a charge). Each is checked and spent with the hit; on a miss nothing is spent. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
-    /** How much of its pool an action that lets its user choose spends (Lay on Hands' points); refused otherwise. */
-    spend: z.number().int().min(1).max(100).optional(),
+    /** How much of its pool an action that lets its user choose spends (Lay on Hands' points); refused otherwise. 0 only
+     *  beside `conditionIds`, which cost points of their own. */
+    spend: z.number().int().min(0).max(100).optional(),
+    /** The conditions an action with `conditionPicks` also ends on its target (Restoring Touch), each costing the
+     *  points it names on top of `spend`. */
+    conditionIds: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(60)
+      )
+      .min(1)
+      .max(8)
+      .optional(),
+    /** The Hit Points each target regains from a heal its user divides (Preserve Life, Mass Heal), by target id; they
+     *  add up to the pool at most, and none past what the heal lets a target regain. Absent, the pool is split evenly. */
+    healingShares: z
+      .record(z.uuid(), z.number().int().min(0).max(1000))
+      .refine((shares) => Object.keys(shares).length <= 20, "At most 20 targets share a heal.")
+      .optional(),
     /** Knocking out a creature (SRD): a melee hit that drops the target to 0 leaves it at 1 Hit Point and Unconscious
      *  instead. Refused on any other attack. */
     knockOut: z.boolean().optional(),

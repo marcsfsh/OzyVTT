@@ -95,6 +95,8 @@ export type MovementCostOptions = Readonly<{
   passesCreatures?: boolean;
   /** The mover may pass through the spaces of creatures this size or smaller (a gelatinous cube's Engulf). */
   passesCreaturesUpTo?: string;
+  /** The mover may pass through the space of any creature larger than itself (Halfling Nimbleness). */
+  nimble?: boolean;
   /** The path keeps to the straight line drawn, so a move through creatures enters the spaces along it rather than
    *  going round them. */
   alongLine?: boolean;
@@ -194,7 +196,8 @@ export function movementCost(
       ally: areAllies(mover, occupant, options.resolveDefinition),
       incapacitated: isIncapacitated(occupant),
       moverSize: mover.size,
-      occupantSize: occupant.size
+      occupantSize: occupant.size,
+      nimble: options.nimble === true
     });
     // A mover that can stop in a creature's space, or a swarm's or a gelatinous cube's space, is never barred; it is
     // still another creature's space, so it costs as Difficult Terrain.
@@ -219,6 +222,8 @@ export function movementCost(
   const passesWalls = options.throughWalls === true || options.throughWallsFree === true;
   const fixedWalls = passesWalls ? movementWalls(state, calibration, true) : [];
   const fixedCrosses = wallCrossing(fixedWalls);
+  // A Tiny creature fits an opening half a square wide; a bigger one squeezes through it.
+  const lane = { tiny: mover?.size === "tiny" };
   const halvedAt = options.halvedAt;
   const costlyGroundAt = aloft ? undefined : options.costlyGroundAt;
   const fromCell = footprintOrigin(imageToGrid(calibration, from), sizeCells);
@@ -252,8 +257,8 @@ export function movementCost(
     isStepOpen: (stepFrom, stepTo) =>
       (options.alongLine !== true || nearLine(stepTo)) &&
       (passesWalls
-        ? footprintStepPassage(stepFrom, stepTo, sizeCells, fixedCrosses, fixedWalls) !== "blocked"
-        : footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls) !== "blocked" ||
+        ? footprintStepPassage(stepFrom, stepTo, sizeCells, fixedCrosses, fixedWalls, lane) !== "blocked"
+        : footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls, lane) !== "blocked" ||
           (options.opening !== undefined && slipsThroughStep(stepFrom, stepTo, sizeCells, crosses, options.opening))) &&
       // A spell's barrier holds back even a mover that passes walls.
       options.barredStep?.(
@@ -267,7 +272,7 @@ export function movementCost(
       // Through a gap it slips through, or through earth and stone it glides in, a step costs nothing extra.
       if (options.ignoresDifficult === true || options.throughWallsFree === true) return false;
       if (options.opening && slipsThroughStep(stepFrom, stepTo, sizeCells, crosses, options.opening)) return false;
-      const passage = footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls);
+      const passage = footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, walls, lane);
       return passage === "squeeze" || (options.throughWalls === true && passage === "blocked");
     },
     extraPerStep: extra,

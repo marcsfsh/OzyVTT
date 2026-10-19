@@ -647,6 +647,7 @@ const MOMENTS_READ: Partial<Record<Modifier["type"], readonly string[]>> = {
   "carrying-capacity-larger": [],
   "ignores-cover": ["on-attack-roll"],
   "no-critical-hits": ["on-attack-roll"],
+  "spell-ward": [],
   "healing-received-maximized": [],
   "healing-dice-maximized": HEALING_MOMENTS,
   "healing-bonus": HEALING_MOMENTS,

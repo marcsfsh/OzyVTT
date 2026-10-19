@@ -494,6 +494,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].conditionPicks.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "conditions a chosen-cost action also ends for points of its pool (Restoring Touch) - authored in the class overlays with `useCost`; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].endsConditions",
     types: ACTION_CARRIERS,
     reason:

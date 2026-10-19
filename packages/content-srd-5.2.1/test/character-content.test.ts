@@ -1907,7 +1907,12 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
       ]).feature.modifiers
     ).toHaveLength(8);
     expect(feat([{ type: "healing-received-maximized" }]).feature.modifiers).toHaveLength(1);
-    expect(ModifierSchema.options).toHaveLength(43);
+    // A ward against spells and the senses that tell a creature's type (Nondetection, a Ring of Mind Shielding).
+    expect(
+      feat([{ type: "spell-ward", schools: ["divination"], spellIds: ["zone-of-truth"], typeSenses: true }]).feature
+        .modifiers
+    ).toHaveLength(1);
+    expect(ModifierSchema.options).toHaveLength(44);
   });
 
   it("15. an item that grants a feat", () => {

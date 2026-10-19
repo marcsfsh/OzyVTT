@@ -31,7 +31,6 @@ import { areEnemies } from "../creature-sides.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
 import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
-import { creatureTypeOf } from "../statblock-facts.js";
 import { reachBarredBy } from "../zone-barriers.js";
 import { swallowCover } from "../swallow.js";
 import { enclosureBlocks } from "../enclosures.js";
@@ -47,6 +46,7 @@ import {
 import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
 import { actionTargetViolations } from "./action-targets.js";
 import { withPickedDamageTypes } from "../statblock-picks.js";
+import { typeGated } from "./type-gates.js";
 
 /** The attacker and targets, refused unless the action has something structured to resolve against them. */
 function combatantsOf(
@@ -230,7 +230,20 @@ export function openResolve(
   const combatants = combatantsOf(state, reaching, input, deps.catalog, spell, hiddenFromInitiator);
   const { attacker } = combatants;
   const warnings: string[] = [];
-  const caught = input.areaPlaced ? onlyTargetTypes(combatants.targets, spell, deps, warnings) : combatants.targets;
+  // A creature of a type the action can't affect is a target that nothing happens to, picked or caught in an area.
+  const gated = typeGated({
+    state,
+    casterId: combatants.attacker.id,
+    action: reaching,
+    spell,
+    targets: combatants.targets,
+    areaPlaced: input.areaPlaced === true,
+    resolveDefinition: deps.resolveDefinition,
+    catalog: deps.catalog,
+    hidden: hiddenFromInitiator
+  });
+  warnings.push(...gated.warnings);
+  const caught = gated.affected;
   // A swallowed creature has Total Cover from an area outside its swallower, and is left out of it.
   const targets =
     caught.length > 1
@@ -316,16 +329,31 @@ export function openResolve(
         ))
       : (input.cover ?? null);
   // An area's other targets still take it, so a marked creature among several is the GM's to remove.
-  if (targets.length > 1)
+  if (targets.length > 1 && input.areaPlaced === true)
     for (const target of targets)
       if ((input.cover ?? null) === null && coverFor(null, target) === "total")
         warnings.push(`${target.name} has Total Cover. Leave it out if the effect can't reach it.`);
-  if (attackCover === "total" && coverMode !== "freeform") {
+  // "A Clear Path to the Target": each creature picked for a spell of several targets (Magic Missile, Bless) needs one,
+  // so the GM's mark or the walls on the map leaving it Total Cover bar it as they bar a single target.
+  const covered =
+    targets.length > 1 && input.areaPlaced !== true && (input.cover ?? null) === null
+      ? targets.filter(
+          (target) =>
+            target.id !== attacker.id &&
+            bestCover(coverFor(null, target), fromMap(target), swallowCover(state, attacker.id, target.id)) === "total"
+        )
+      : [];
+  if ((attackCover === "total" || covered.length > 0) && coverMode !== "freeform") {
+    const named = covered.map((target) => (hiddenFromInitiator(target.id) ? "A target" : target.name));
+    const message =
+      covered.length > 0
+        ? `${named.join(" and ")} ${covered.length === 1 ? "has" : "have"} Total Cover and can't be targeted directly.`
+        : "The target has Total Cover and can't be targeted directly.";
     const waived = overrideWaives(input.override, "cover.total");
     if (coverMode === "strict" && !waived && !overrideCovers(state.combat.turn, "cover.total"))
-      throw new RulesBlockedError("cover.total", "The target has Total Cover and can't be targeted directly.");
+      throw new RulesBlockedError("cover.total", message);
     if (waived && overridden === null) overridden = { rule: "cover.total", reason: overrideReason(input.override) };
-    else warnings.push("The target has Total Cover. The rules mode allows it.");
+    else warnings.push(`${message.replace(" and can't be targeted directly.", ".")} The rules mode allows it.`);
   }
 
   const sightContent = {
@@ -343,7 +371,8 @@ export function openResolve(
       targetIds: input.targetIds,
       definition: deps.definition,
       resolveDefinition: deps.resolveDefinition,
-      distanceFeet: deps.distanceFeet
+      distanceFeet: deps.distanceFeet,
+      catalog: deps.catalog
     }))
       sightBlocks.push([violation.rule, violation.message]);
   // SRD Hide: "you must be out of any enemy's line of sight". With dynamic vision on the engine knows who sees whom;
@@ -427,7 +456,7 @@ export function openResolve(
       createdAt: deps.now()
     },
     warnings,
-    tableNarration: [],
+    tableNarration: [...gated.gmLines],
     healing: null,
     rollMode: undefined,
     check: null,
@@ -453,27 +482,6 @@ export function openResolve(
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
   if (!input.economyPaid) warnings.push(...laterActionReminders(spell, action));
   return ctx;
-}
-
-/** An area's catch, less the creatures of a type the spell doesn't affect ("Each Humanoid in a 20-foot-radius
- *  Sphere"), each named to the GM. A type the stat block doesn't print stays in. */
-function onlyTargetTypes(
-  targets: LiveActor[],
-  spell: SpellReference | undefined,
-  deps: ResolveDependencies,
-  warnings: string[]
-): LiveActor[] {
-  const types = spell?.effect?.targetTypes;
-  if (!types || !deps.resolveDefinition) return targets;
-  return targets.filter((target) => {
-    const definition = target.definitionId ? deps.resolveDefinition!(target.definitionId) : undefined;
-    const type = creatureTypeOf(target, definition);
-    if (type === null || types.includes(type)) return true;
-    warnings.push(
-      `${target.name} isn't affected by ${spell!.name}, which affects only ${types.join(" or ")} creatures.`
-    );
-    return false;
-  });
 }
 
 /** An action whose caster picks the damage type (Chromatic Orb) deals the one picked, every part of it. */

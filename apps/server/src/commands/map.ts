@@ -55,7 +55,7 @@ import {
 import { releaseGrapplesOutOfRange, type EffectNarration } from "../effects.js";
 import { endZoneAndItsSpell, placeZone, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
 import { spaceEntryAfterMove } from "../space-entry.js";
-import { passesCreatures } from "../space-sharing.js";
+import { isNimble, passesCreatures } from "../space-sharing.js";
 import { fireFormBurns } from "../wall-passage.js";
 import { teleportOutOfCage } from "../forcecage.js";
 import { zoneContentOf } from "../spell-zone-state.js";
@@ -87,10 +87,11 @@ function entryPathOf(
   deps: Readonly<{ resolveDefinition: (definitionId: string) => ActorDefinition | undefined }>
 ): ReadonlyArray<Readonly<{ x: number; y: number }>> {
   const definitionId = state.actors.find((actor) => actor.id === actorId)?.definitionId;
-  const passes = definitionId ? passesCreatures(deps.resolveDefinition(definitionId)) : false;
+  const definition = definitionId ? deps.resolveDefinition(definitionId) : undefined;
   const cost = movementCost(state, geometry, actorId, from, to, {
     resolveDefinition: deps.resolveDefinition,
-    ...(passes ? { passesCreatures: true } : {})
+    ...(passesCreatures(definition) ? { passesCreatures: true } : {}),
+    ...(isNimble(definition) ? { nimble: true } : {})
   });
   return cost?.path && cost.path.length > 1 ? cost.path : [from, to];
 }

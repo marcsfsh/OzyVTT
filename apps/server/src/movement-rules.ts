@@ -16,7 +16,7 @@ import {
 import { holdsFeature } from "./class-features.js";
 import { creaturesEntered } from "./space-entry.js";
 import { sizeAtMost } from "./resolution/context.js";
-import { opensItsSpace } from "./space-sharing.js";
+import { isNimble, opensItsSpace } from "./space-sharing.js";
 import { HIDDEN_SOURCE } from "./hidden-source.js";
 import { ridesWith } from "./mounts.js";
 import { isIncapacitated } from "./condition-rules.js";
@@ -804,6 +804,7 @@ function costOptions(
       resolveDefinition: input.resolveDefinition,
       ...(input.perceives ? { perceives: input.perceives } : {}),
       ...(sharesSpace(state, input.actorId, input) || incorporeal(moverDefinition) ? { passesCreatures: true } : {}),
+      ...(isNimble(moverDefinition) ? { nimble: true } : {}),
       // A ghost through walls as Difficult Terrain; a burrower through earth and stone: freely (Earth Glide), or at
       // half its Burrow Speed (Tunneler).
       ...(incorporeal(moverDefinition) || (travel === "burrow" && burrowsThroughWalls(moverDefinition) === "half")

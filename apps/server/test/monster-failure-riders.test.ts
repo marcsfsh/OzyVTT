@@ -170,20 +170,11 @@ describe("a failure by 5 or more", () => {
 });
 
 describe("whom an action reaches", () => {
-  it("leaves an Undead out of a lich's Disrupt Life and refuses it as a target", () => {
+  it("leaves an Undead under a lich's Disrupt Life out of its save", () => {
     const built = table("lich", { allySlug: "zombie" });
-    const disrupt = built.definition.actions.find((entry) => entry.id === "disrupt-life")!;
-    expect([
-      ...areaLeavesOut({
-        state: built.state,
-        attacker: actor(built, IDS.monster),
-        action: disrupt,
-        targetIds: [IDS.hero, IDS.ally],
-        resolveDefinition: built.resolveDefinition
-      })
-    ]).toEqual([IDS.ally]);
     legendaryWindow(built);
-    expect(() => use(built, "disrupt-life", [IDS.ally])).toThrow(/has no effect on a Undead/);
+    use(built, "disrupt-life", [IDS.hero, IDS.ally]);
+    expect(built.state.combat.pendingSaves.map((save) => save.targetActorId)).toEqual([IDS.hero]);
   });
 
   it("leaves a planetar's own side out of its Holy Burst", () => {

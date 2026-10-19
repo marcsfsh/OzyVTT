@@ -3,6 +3,7 @@ import type {
   CommandedOrders,
   GameState,
   GmView,
+  KnownDefences,
   PendingReaction,
   PendingRuleAsk,
   PendingSave,
@@ -29,6 +30,7 @@ import { OFF_PLANE_TAG } from "./off-plane.js";
 import { visibleTerrain } from "./terrain.js";
 import { exploredRectsOf, playerSight, tokenShown, visionOf, type AudienceSight } from "./vision/audience.js";
 import { sensedBy } from "./vision/detect.js";
+import { huntersLoreOf } from "./hunters-lore.js";
 import type { SightContent } from "./vision/senses.js";
 
 type PresenceLookup = (sessionId: string) => PresenceStatus | null;
@@ -1037,11 +1039,26 @@ export function projectPlayerView(
           // The turn card's pins and counts are the owner's alone, so even the top party tier leaves them out.
           ...(mine && favouriteOptionIds ? { favouriteOptionIds: [...favouriteOptionIds] } : {}),
           ...(mine && optionUseCounts ? { optionUseCounts: { ...optionUseCounts } } : {}),
-          ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
+          ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {}),
+          // Hunter's Lore: what this player's own Hunter knows of the creature its Hunter's Mark marks, for this player
+          // alone and while the mark lasts. A creature they can't perceive was left out above.
+          ...knownDefencesFor(state, source, yourActorIds, content)
         };
       }),
     rolls: state.rolls.filter((roll) => visibleToPlayer(state, roll, playerSessionId, sight)).map(playerRoll)
   };
+}
+
+/** The `knownDefences` field for one player's read of a creature, built from an explicit list in `hunters-lore.ts`. */
+function knownDefencesFor(
+  state: GameState,
+  source: Actor,
+  yourActorIds: ReadonlySet<string>,
+  content: SightContent
+): { knownDefences?: KnownDefences } {
+  if (yourActorIds.size === 0 || source.kind === "player-character") return {};
+  const known = huntersLoreOf(state, source, yourActorIds, content);
+  return known ? { knownDefences: known } : {};
 }
 
 export function projectGmView(state: GameState, presenceFor: PresenceLookup, now = Date.now()): GmView {
