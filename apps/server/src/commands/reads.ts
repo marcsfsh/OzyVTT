@@ -21,6 +21,7 @@ import {
   BuilderOffersSchema,
   CharacterNextLevelSchema,
   ContentActionsSchema,
+  ContentMonsterActionsSchema,
   ScenePreviewSchema,
   VisionPreviewSchema
 } from "@vtt/domain/commands";
@@ -110,15 +111,30 @@ export const gameReads = [
     event: "content:monster-actions",
     route: contentRoutes.getContentMonsterActions,
     gmOnly: "Only the GM can browse stat blocks.",
-    schema: ContentActionsSchema,
+    schema: ContentMonsterActionsSchema,
+    httpInput: ({ params, query }) => ({
+      definitionId: params.definitionId,
+      ...(typeof query.actorId === "string" ? { actorId: query.actorId } : {})
+    }),
     malformed: "The action lookup is malformed.",
     run: (principal, input, kit) => {
-      const { definitionId } = input as z.output<typeof ContentActionsSchema>;
+      const { definitionId, actorId } = input as z.output<typeof ContentMonsterActionsSchema>;
       const catalog = kit.catalogFor(principal);
       const imported = storedDefinition(kit.read(), definitionId);
+      // A combatant built from the stat block acts with what it carries too (a wand, a potion, a magic weapon), as
+      // its own sheet's list has it; it reads the play-time stat block, so one on the table stays runnable.
+      const combatant = actorId
+        ? kit.read().actors.find((candidate) => candidate.id === actorId && candidate.definitionId === definitionId)
+        : undefined;
+      const played = combatant ? kit.resolveDefinition(definitionId) : undefined;
       // Browse uses the catalog's own lookup (honours draft/published/deleted), and leaves the play-time resolver out.
-      const definition = imported ?? catalog.monster(definitionId);
-      const actions = imported ? actionSummariesOf(imported.actions) : catalog.monsterActionSummaries(definitionId);
+      const definition = played ?? imported ?? catalog.monster(definitionId);
+      const actions =
+        combatant && played
+          ? actionSummariesOf([...effectiveActions(played, combatant, kit.equipmentCatalog())])
+          : imported
+            ? actionSummariesOf(imported.actions)
+            : catalog.monsterActionSummaries(definitionId);
       if (!actions) throw new GameNotFoundError("That stat block is not in the bundled content.");
       // SRD generic actions (Dodge, Dash, Help, ...) follow the stat block's own; a declared id shadows its builtin.
       const builtins = builtinActionsFor(definition)

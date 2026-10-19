@@ -501,7 +501,7 @@ export interface ClientToServerEvents {
     acknowledgement: (result: ContentCompendiumResult) => void
   ) => void;
   "content:monster-actions": (
-    payload: { definitionId: string },
+    payload: { definitionId: string; actorId?: string },
     acknowledgement: (result: ContentActionsResult) => void
   ) => void;
   "content:monster-sheet": (

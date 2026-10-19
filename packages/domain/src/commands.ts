@@ -510,6 +510,14 @@ export const ContentActionsSchema = z
       .max(200)
   })
   .strict();
+/** A stat block's actions to run, for one combatant built from it when `actorId` names one. */
+export const ContentMonsterActionsQuerySchema = z
+  .object({
+    /** A combatant built from the stat block: its actions as it has them now, with what its items give. */
+    actorId: z.uuid().optional()
+  })
+  .strict();
+export const ContentMonsterActionsSchema = ContentActionsSchema.extend(ContentMonsterActionsQuerySchema.shape);
 export const TurnReactionSchema = z
   .object({
     commandId: z.uuid(),
