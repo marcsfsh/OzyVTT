@@ -2567,8 +2567,16 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // never come back, and the last destroys it; the rebuke's save (Disadvantage for some creature types, a failure
   // destroying the target, a success dealing 4d6 Psychic) and the damage the talisman deals to the creatures it
   // repels are the GM's.
-  "talisman-of-pure-good": talisman("Pure Rebuke", 7, "If the target is a Fiend or an Undead, it has Disadvantage on the save."),
-  "talisman-of-ultimate-evil": talisman("Ultimate End", 6, "If the target is a Celestial, it has Disadvantage on the save."),
+  "talisman-of-pure-good": talisman(
+    "Pure Rebuke",
+    7,
+    "If the target is a Fiend or an Undead, it has Disadvantage on the save."
+  ),
+  "talisman-of-ultimate-evil": talisman(
+    "Ultimate End",
+    6,
+    "If the target is a Celestial, it has Disadvantage on the save."
+  ),
   // `talisman-of-the-sphere` - Arcana advantage only against a Sphere of Annihilation, which the engine does not hold.
 
   // ---- Shoulders -------------------------------------------------------------------------------

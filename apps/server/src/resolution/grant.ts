@@ -277,11 +277,11 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
             : timed
               ? timed
               : grantDuration(
-                state,
-                grant.duration,
-                attacker.id,
-                spell && castLevel !== null ? { spell, castLevel } : null
-              ),
+                  state,
+                  grant.duration,
+                  attacker.id,
+                  spell && castLevel !== null ? { spell, castLevel } : null
+                ),
       // A spell's effect outlasts its caster's fall; only Concentration ends it early. A die given to another creature
       // (Bardic Inspiration) is its own once given.
       endsWhenSourceDefeated: action.spellId === undefined && grant.answer === undefined,

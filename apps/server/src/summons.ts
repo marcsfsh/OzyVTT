@@ -149,7 +149,9 @@ function itemBecomes(
   if (!row) return [];
   if (becomes === "nonmagical") {
     const definition = user.definitionId ? deps.resolveDefinition(user.definitionId) : undefined;
-    return [{ kind: "effect", text: endItemMagic(user, row, "nonmagical", definition, deps.catalog), actorId: user.id }];
+    return [
+      { kind: "effect", text: endItemMagic(user, row, "nonmagical", definition, deps.catalog), actorId: user.id }
+    ];
   }
   user.inventory = user.inventory.map((entry) =>
     entry.id === row.id ? { ...entry, variantId: becomes.variantId } : entry
