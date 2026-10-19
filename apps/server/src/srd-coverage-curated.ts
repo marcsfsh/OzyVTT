@@ -260,7 +260,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "held-rolls.ts spends it to reroll the d20 of an attack, a check, a save or a death save while the roll is shown, initiative-reroll.ts an initiative die before the character's first turn, and resolution/held-damage.ts one die of an action's damage looked at before it counts. Only the GM gives it by hand. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. A character who gains a second one passes it to a player character without it or lets it go (heroic-inspiration.ts). The dice of a hit's extras (Sneak Attack, a smite), a reaction's strike, healing and Hit Point Dice are the GM's to reroll."
   ),
   hide: enforced(
-    "resolution/builtins.ts rolls a DC 15 Dexterity (Stealth) check and makes the creature Invisible on a success, until it attacks, casts a spell with a Verbal component or an enemy's Search meets its total. With dynamic vision on, resolution/validate.ts asks that it be Heavily Obscured or behind Three-Quarters or Total Cover and out of every enemy's sight (vision/rules.ts). A sound louder than a whisper is the GM's call."
+    "resolution/builtins.ts rolls a DC 15 Dexterity (Stealth) check and makes the creature Invisible on a success, until it makes an attack roll or casts a spell with a Verbal component (resolution/release.ts), or an enemy's Search meets its total; a throw that asks for a save (a Net, a flask) keeps it hidden. With dynamic vision on, resolution/validate.ts asks that it be Heavily Obscured or behind Three-Quarters or Total Cover and out of every enemy's sight (vision/rules.ts). A sound louder than a whisper is the GM's call."
   ),
   "high-jump": enforced(
     "jumping.ts lets a jump rise up to 3 plus the Strength modifier with 10 feet moved this turn before it, half from a standing start, a foot of movement for each foot. Reaching up half its height more is the GM's."
@@ -300,7 +300,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "A melee hit's confirm offers Knock out (resolution/knock-out.ts), and every apply path then lands it: hit-points.ts leaves a creature it drops at 1 Hit Point and Unconscious until it regains Hit Points, stabilize.ts gives it first aid, or an hour passes on the game clock and its Short Rest ends (game-time.ts)."
   ),
   "lightly-obscured": enforced(
-    "With dynamic vision on, vision/sight.ts knows Lightly Obscured points (Dim Light, a painted light fog or foliage area), and ability-checks.ts gives a Perception check to find a creature there Disadvantage, and a Passive Perception compared with a Hide total 5 less (resolution/builtins.ts)."
+    "With dynamic vision on, vision/sight.ts knows Lightly Obscured points (Dim Light, a painted light fog or foliage area), and ability-checks.ts gives a Perception check to find a creature there Disadvantage: a check naming it, and the Search action, whose one roll is read against each hidden creature with the lower of two d20s where that creature is Lightly Obscured (resolution/builtins.ts). A Passive Perception compared with a Hide total is 5 less."
   ),
   line: areaShape("a Line has a fixed width, and the point it starts from isn't in it."),
   "long-jump": enforced(
@@ -362,7 +362,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "saving-throws.ts opens a save prompt for each target and rolls it on the server, with the proficiency, riders, Advantage and Disadvantage that apply. A creature may choose to fail it without a roll (save.answer)."
   ),
   search: guided(
-    "resolution/builtins.ts rolls the chosen Wisdom check. With dynamic vision on, a Perception search finds each hidden creature in its line of sight whose Hide total it meets and ends its hiding. The GM sets any other DC and says what else the creature finds."
+    "resolution/builtins.ts rolls the chosen Wisdom check. With dynamic vision on, a Perception search finds each hidden creature in its line of sight whose Hide total it meets and ends its hiding, read with Disadvantage against one Lightly Obscured to the searcher and Advantage against one its Hunter's Mark marks. The GM sets the DC of an Insight, Medicine or Survival search and says what the creature finds, and with dynamic vision off who the searcher can see is the GM's."
   ),
   "shape-shifting": enforced(
     "transform/assume.ts takes a form as an effect on the creature: a stat block's statistics replace its own, with what the effect says it keeps (transform/compose.ts), or one of its printed forms changes its size and speeds. Its Hit Points stay its own, conditions and effects carry over, and the token takes the form's size (transform/forms.ts). It reverts when the effect ends or it dies (transform/rules.ts)."
