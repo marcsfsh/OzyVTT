@@ -874,6 +874,8 @@ export type ContentActionArea = Readonly<{
   count?: number;
   /** Each area must touch another. */
   contiguous?: true;
+  /** A Line that ends where it is aimed, no longer than `sizeFeet`. */
+  toTarget?: true;
 }>;
 /** A cast whose granted effect carries this tag takes an ability its caster chooses (Hex: the target has Disadvantage on
  *  ability checks made with it). */

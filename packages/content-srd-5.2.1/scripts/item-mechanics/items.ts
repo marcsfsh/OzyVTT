@@ -94,7 +94,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // The dragon's kind sets the type; fire (a red dragon) until the GM picks. "Advantage on saving throws against the
-  // Breath Weapons of Dragons" is read as Advantage on a save a Dragon forces; the dragon sense is the GM's.
+  // breath weapons of Dragons": a save a Dragon's breath forces. Sensing the nearest dragon is a Magic action once a
+  // dawn; the distance and direction it tells are the GM's.
   "dragon-scale-mail": {
     grants: { damageResistances: ["fire"] },
     damageTypeChoice: ["acid", "cold", "fire", "lightning", "poison"],
@@ -104,7 +105,22 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         type: "roll-mode",
         roll: "save",
         mode: "advantage",
-        when: [{ type: "on-saving-throw" }, { type: "source-creature-type-is", creatureTypes: ["dragon"] }]
+        when: [
+          { type: "on-saving-throw" },
+          { type: "source-creature-type-is", creatureTypes: ["dragon"] },
+          { type: "versus-breath-weapon" }
+        ]
+      }
+    ],
+    actions: [
+      {
+        id: "sense-dragon",
+        name: "Sense the Nearest Dragon",
+        activation: "action",
+        description:
+          "Focus your senses to discern the distance and direction to the closest dragon within 30 miles of yourself that is of the same type as the armor. This action can't be used again until the next dawn.",
+        damage: [],
+        uses: { limit: 1, per: "long-rest" }
       }
     ]
   },
@@ -360,15 +376,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // "You can transfer some or all of the weapon's bonus to your Armor Class": one form for each split, picked by its
-  // wielder as it attacks. When it picks one (the first attack of its turn) and holding it to the start of its next
-  // turn are the wielder's to keep.
+  // "The first time you attack with the weapon on each of your turns, you can transfer some or all of the weapon's
+  // bonus to your Armor Class": one form for each split, picked on its wielder's turn before it attacks and held until
+  // its next turn starts, and the AC only while it holds the weapon.
   defender: {
     modifiers: [
       { type: "attack-bonus", amount: 3 },
       { type: "damage-bonus", amount: 3 }
     ],
-    variantChoice: { by: "holder" },
+    variantChoice: { by: "holder", untilTurnStart: true },
     variants: [
       {
         id: "ac-1",
@@ -657,8 +673,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // "Each time you ... hit, you can have it deal Lightning damage instead of Piercing damage." Lightning Bolt, once a
-  // dawn: a 5-foot-wide Line of 120 feet (to a target no farther), DC 13 Dexterity, 4d6 Lightning, half on a success,
-  // with the javelin back in hand.
+  // dawn: a 5-foot-wide Line from its thrower to a target no farther than 120 feet, ending there, DC 13 Dexterity,
+  // 4d6 Lightning, half on a success, with the javelin back in hand.
   "javelin-of-lightning": {
     weaponChanges: { damageTypeOptions: ["lightning"] },
     actions: [
@@ -670,7 +686,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "Throw the javelin at a target no farther than 120 feet and turn it into a bolt of lightning: a 5-foot-wide Line from you to the target. The target and each other creature in the Line make a DC 13 Dexterity saving throw, taking 4d6 Lightning damage on a failed save or half as much on a success. The javelin reappears in your hand. It can't be used this way again until the next dawn.",
         damage: [{ formula: "4d6", type: "lightning" }],
         save: { ability: "dex", dc: 13, successDamage: "half", failureConditions: [] },
-        area: { shape: "line", sizeFeet: 120, widthFeet: 5 },
+        area: { shape: "line", sizeFeet: 120, widthFeet: 5, toTarget: true },
         uses: { limit: 1, per: "long-rest" }
       }
     ]
@@ -1092,8 +1108,22 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   /** "When you fall while wearing this ring, you descend 60 feet per round and take no damage from falling." */
   "ring-of-feather-falling": { modifiers: [{ type: "movement", rule: "safe-fall" }] },
 
-  // `ring-of-free-action` - a condition immunity cannot be limited to magical sources, and an absolute
-  // one would refuse ordinary Restrained/Paralyzed effects. Ignoring difficult terrain is not modeled.
+  // "Difficult Terrain doesn't cost you extra movement": the Freedom of Movement tag the movement rules read. Magic
+  // neither reducing its Speeds nor Paralyzing or Restraining its wearer wait on a magical-source immunity, which an
+  // absolute one would overreach (a net would no longer restrain).
+  "ring-of-free-action": {
+    effects: [
+      {
+        name: "Free Action",
+        tags: ["freedom-of-movement"],
+        duration: { type: "manual" },
+        modifiers: [],
+        onEnd: [],
+        voidWhileIncapacitated: false,
+        concentration: false
+      }
+    ]
+  },
 
   // "You can take a Magic action to give yourself the Invisible condition. You remain Invisible until the ring is
   // removed or until you take a Bonus Action to become visible again": its wearer ends it from the sheet.
@@ -2881,9 +2911,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // "It hovers beneath you and can be ridden in the air. It has a Fly Speed of 50 feet"; 30 feet carrying over 200
-  // pounds, which carried weight doesn't track. The carpet's speed depends on its size, so it stays the GM's, and so do
-  // the horseshoes.
+  // "It hovers beneath you and can be ridden in the air. It has a Fly Speed of 50 feet", and "The broom stops hovering
+  // when you land": a flight that ends once its rider comes down to the ground. Its 30 feet carrying over 200 pounds
+  // needs its rider's body weight, which no sheet records.
   "broom-of-flying": {
     actions: [
       {
@@ -2891,11 +2921,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         name: "Ride the Broom",
         activation: "action",
         description:
-          "Stand astride the broom and speak its command word: it hovers beneath you with a Fly Speed of 50 feet (30 feet while carrying over 200 pounds). It stops hovering when you land; end it on your sheet.",
+          "Stand astride the broom and speak its command word: it hovers beneath you with a Fly Speed of 50 feet (30 feet while carrying over 200 pounds). It stops hovering when you land or when you're no longer riding it.",
         damage: [],
         grants: {
           name: "Broom of Flying",
-          tags: ["broom-of-flying"],
+          tags: ["broom-of-flying", "ends-on-landing"],
           duration: { type: "manual" },
           modifiers: [{ type: "special-speed", movement: "fly", feet: 50, hover: true }]
         }
@@ -3572,7 +3602,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       }
     ]
   },
-  // `horseshoes-of-a-zephyr` - movement and travel are not modeled.
+  // All four worn by a horse (its own token, as the Horseshoes of Speed): it "ignores Difficult Terrain". Floating over
+  // water or lava waits on water areas on the map; leaving no tracks and the 12 hours of travel are overland travel.
+  "horseshoes-of-a-zephyr": {
+    effects: [
+      {
+        name: "Horseshoes of a Zephyr",
+        tags: ["ignores-difficult-terrain"],
+        duration: { type: "manual" },
+        modifiers: [],
+        onEnd: [],
+        voidWhileIncapacitated: false,
+        concentration: false
+      }
+    ]
+  },
   // "While all four horseshoes are attached to the same creature, its Speed is increased by 30 feet": the horse carries
   // them, worn, on its own token.
   "horseshoes-of-speed": { modifiers: [{ type: "speed", amount: 30 }] },

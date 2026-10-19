@@ -846,8 +846,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:wings-of-flying": enforced(
     "The action gives a Fly Speed of 60 feet for an hour, or until the wearer ends it on the sheet; a creature in the air when it ends falls (falling.ts). clock-pools.ts keeps the wings from being used again until 1d12 + 1 hours of game time have passed from their use (the hour they last, then the wait)."
   ),
-  "item:broom-of-flying": guided(
-    "The action gives the rider a Fly Speed of 50 feet with hover until it ends it on the sheet. The slower 30 feet while it carries over 200 pounds is the GM's."
+  "item:broom-of-flying": enforced(
+    "The action gives the rider a Fly Speed of 50 feet with hover, which ends when it lands (falling.ts) or when it gets off on the sheet. Its slower 30 feet while it carries over 200 pounds needs the rider's body weight, which no sheet records, and sending it alone to a place within a mile is story."
   ),
   "item:cape-of-the-mountebank": guided(
     "The cast of Dimension Door, once a dawn, teleports the wearer on the map (granted-moves.ts). The smoke cloud is the GM's."
@@ -1354,14 +1354,23 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:dagger-of-venom": enforced(
     "The +1 to attack and damage rolls is applied. Coating the blade is a Bonus Action once a day, and the dagger's next hit spends it on a DC 15 Constitution save against 2d10 Poison and Poisoned for 1 minute (resolution/on-hit.ts)."
   ),
-  "item:defender": guided(
-    "The +3 to attack and damage rolls is applied, and its wielder moves 1, 2 or 3 of it to AC as a form on the sheet (inventory.ts setItemForm). Picking it with the first attack of a turn, and holding it to the next, are the wielder's."
+  "item:defender": enforced(
+    "The +3 to attack and damage rolls is applied, and its wielder moves 1, 2 or 3 of it to AC as a form on the sheet before its first attack of a turn, held until its next turn starts and giving AC only while it holds the weapon (inventory.ts setItemForm, turn-boundaries.ts)."
+  ),
+  "item:ring-of-free-action": guided(
+    "Difficult Terrain costs its wearer no extra movement (movement-rules.ts). That magic can't reduce its Speeds or give it the Paralyzed or Restrained condition is the GM's to apply, since the engine doesn't yet tell a magical source from another."
+  ),
+  "item:horseshoes-of-a-zephyr": guided(
+    "The creature wearing all four ignores Difficult Terrain (movement-rules.ts). Floating over water or lava is the GM's until the map holds water and lava areas; its tracks and its 12 hours of travel a day are overland travel the app doesn't run."
   ),
   "item:demon-armor": guided(
     "The +1 AC and the curse's lock on Attunement are applied. The clawed Unarmed Strikes and the Disadvantage against demons are the GM's."
   ),
-  "item:dragon-scale-mail": guided(
-    "The +1 AC and the Resistance to the type the GM picks are applied, with Advantage on a save a Dragon forces (riders.ts), its breath's and any other. Sensing dragons is the GM's."
+  "item:dragon-scale-mail": enforced(
+    "The +1 AC and the Resistance to the type the GM picks are applied, with Advantage on saves against a Dragon's breath weapon (saving-throws.ts). Its Magic action to sense the nearest dragon is counted once a dawn; the distance and direction it tells are the GM's."
+  ),
+  "item:javelin-of-lightning": enforced(
+    "It may deal Lightning damage on a hit, and once a dawn it becomes a bolt: a 5-foot Line from its thrower that ends at a target within 120 feet (annotations.ts), DC 13 Dexterity save for 4d6 Lightning, half on a success."
   ),
   "item:dwarven-plate": guided("The +2 AC is applied. The Reaction against forced movement is the GM's."),
   "item:dwarven-thrower": enforced(

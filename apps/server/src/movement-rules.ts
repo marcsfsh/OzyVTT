@@ -30,7 +30,7 @@ import {
   READIED_TAG,
   releaseReadied
 } from "./effects.js";
-import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
+import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
 import { jumpLimits, leapRider } from "./jumping.js";
 import { travelBudgetFeet, travelCostsExtra, type TravelMode } from "./speed.js";
@@ -225,7 +225,7 @@ export function movementStatus(
     ...(incorporeal(definition) ? { throughWalls: true } : {}),
     ...(openingPassage(definition) ? { opening: openingPassage(definition)! } : {}),
     ...(burrowsThroughWalls(definition) ? { burrowsThroughWalls: burrowsThroughWalls(definition)! } : {}),
-    ...(actor && freeOfDifficultTerrain(actor) ? { ignoresDifficultTerrain: true } : {})
+    ...(actor && freeOfDifficultTerrain(actor, derivation ?? undefined) ? { ignoresDifficultTerrain: true } : {})
   };
 }
 
@@ -772,9 +772,14 @@ const moverDefinitionOf = (mover: GameState["actors"][number], input: Pick<Movem
 const incorporeal = (definition: ActorDefinition | undefined) =>
   holdsFeature(definition, "incorporeal-movement", "Incorporeal Movement");
 
-/** Freedom of Movement: "The target's movement is unaffected by Difficult Terrain." */
-const freeOfDifficultTerrain = (mover: GameState["actors"][number]) =>
-  mover.effects.some((effect) => effect.tags.includes("freedom-of-movement"));
+/** The tags that free a mover from Difficult Terrain: Freedom of Movement's ("The target's movement is unaffected by
+ *  Difficult Terrain", a Ring of Free Action's too) and a creature that otherwise ignores it (Horseshoes of a Zephyr). */
+const DIFFICULT_TERRAIN_FREE_TAGS: readonly string[] = ["freedom-of-movement", "ignores-difficult-terrain"];
+
+/** Whether a live effect or a worn item's own effect frees the mover from Difficult Terrain. */
+const freeOfDifficultTerrain = (mover: GameState["actors"][number], derivation: EquipmentDerivation | undefined) =>
+  mover.effects.some((effect) => effect.tags.some((tag) => DIFFICULT_TERRAIN_FREE_TAGS.includes(tag))) ||
+  (derivation?.context.effectTags ?? []).some((tag) => DIFFICULT_TERRAIN_FREE_TAGS.includes(tag));
 
 /** What each foot of a move costs beside itself, and the options the path's cost is measured with. */
 function costOptions(
@@ -807,7 +812,7 @@ function costOptions(
       ...(travel === "burrow" && burrowsThroughWalls(moverDefinition) === "free" ? { throughWallsFree: true } : {}),
       // Amorphous, Compression and the elementals' forms slip through any gap; a swarm through one a Tiny creature fits.
       ...(openingPassage(moverDefinition) ? { opening: openingPassage(moverDefinition)! } : {}),
-      ...(freeOfDifficultTerrain(mover) ? { ignoresDifficult: true } : {}),
+      ...(freeOfDifficultTerrain(mover, derivation) ? { ignoresDifficult: true } : {}),
       ...(fromAltitude !== 0 || toAltitude !== 0 ? { altitude: { fromFeet: fromAltitude, toFeet: toAltitude } } : {})
     }
   };

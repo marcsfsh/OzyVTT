@@ -862,7 +862,16 @@ export type ItemVariant = z.infer<typeof ItemVariantSchema>;
 export const ItemVariantChoiceSchema = z
   .object({
     by: z.enum(["gm", "holder"]),
-    activation: z.enum(["bonus-action", "action"]).optional()
+    activation: z.enum(["bonus-action", "action"]).optional(),
+    /** In a fight its holder picks a form only on its own turn before it has made an attack roll, and the form lasts
+     *  until the start of its next turn (a Defender's bonus moved to AC "the first time you attack with the weapon on
+     *  each of your turns"). */
+    untilTurnStart: z
+      .literal(true)
+      .optional()
+      .describe(
+        "In a fight its holder picks a form only on its own turn before its first attack roll, and the form lasts until the start of its next turn (a Defender)"
+      )
   })
   .strict()
   .describe(

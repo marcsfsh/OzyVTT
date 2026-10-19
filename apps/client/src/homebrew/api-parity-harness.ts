@@ -1236,10 +1236,17 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "casts[].optionIds",
+    types: ["equipment"],
+    reason:
+      "the spell's options an item's cast may pick (Wand of Fear's Command: flee or grovel only) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "charges.lastCharge.**",
     types: ["equipment"],
     reason:
-      "what the last charge does to the item (destroyed, or a plain item it becomes) - authored in the item overlay; no editor control yet",
+      "what the last charge does to the item (destroyed, nonmagical, or an item it becomes) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {

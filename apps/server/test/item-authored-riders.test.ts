@@ -4,7 +4,8 @@ import { GAME_PATHS } from "@vtt/api-contract";
 import { endEncounter } from "../src/encounter.js";
 import { passGameTime } from "../src/game-time.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
-import { answerSave } from "../src/saving-throws.js";
+import { deriveEquipment } from "../src/equipment-derivation.js";
+import { answerSave, saveRollSources, saveSourceOf } from "../src/saving-throws.js";
 import {
   actionOf,
   catalog,
@@ -304,6 +305,24 @@ describe("Well of Many Worlds", () => {
     expect((await served.log()).some((text) => /Open a Portal can be used again in \d+ hours?\./.test(text))).toBe(
       true
     );
+  });
+});
+
+describe("Dragon Scale Mail", () => {
+  it("gives Advantage on a save against a Dragon's breath weapon, and on no other save a Dragon forces", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() });
+    write(table, IDS.fighter, catalogRow("dragon-scale-mail", { attuned: true }), "gm");
+    const fighter = table.actor(IDS.fighter);
+    const derivation = deriveEquipment(fighter, table.definition(IDS.fighter), catalog);
+    const against = (actionName: string, creatureType: string) =>
+      saveRollSources(fighter, "dex", derivation, false, [], creatureType, saveSourceOf({ actionName })).advantage;
+    expect(against("Fire Breath (Recharge 5-6)", "dragon")).toHaveLength(1);
+    expect(against("Rend", "dragon")).toEqual([]);
+    expect(against("Fire Breath (Recharge 5-6)", "monstrosity")).toEqual([]);
+    expect(actionOf(table, IDS.fighter, "item-dragon-scale-mail-sense-dragon").uses).toEqual({
+      limit: 1,
+      per: "long-rest"
+    });
   });
 });
 

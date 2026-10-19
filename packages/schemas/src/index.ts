@@ -500,6 +500,14 @@ export const RiderTriggerSchema = z
       .describe(
         "Filter. Narrows a moment to the creature on the other side being one of these types: the attacker, for an attack against the bearer (`incoming-attack`), or the creature whose effect forces the bearer's save. Read from the stat block, so a character never matches."
       ),
+    /** The save is against a breath weapon (Dragon Scale Mail: "Advantage on saving throws against the breath weapons
+     *  of Dragons"), as its stat block names the action ("Fire Breath", "Breath Weapon"). */
+    z
+      .object({ type: z.literal("versus-breath-weapon") })
+      .strict()
+      .describe(
+        'Filter. Narrows a saving throw to one against a breath weapon, an action its stat block names "... Breath" or "Breath Weapon" (a Dragon\'s Fire Breath)'
+      ),
     /** On an effect, its rider fires only on a roll against the creature that put the effect on its bearer (Bestow
      *  Curse: "Disadvantage on attack rolls against you"). */
     z
@@ -611,6 +619,7 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "versus-condition": "filter",
   "by-effect-source": "filter",
   "source-creature-type-is": "filter",
+  "versus-breath-weapon": "filter",
   "versus-effect-source": "filter",
   "versus-marked": "filter",
   "versus-hurt": "filter",
@@ -3175,7 +3184,13 @@ export const ActionAreaSchema = z
     /** Each area must touch another ("Each Cube must be contiguous with at least one other Cube"). */
     contiguous: z.literal(true).optional(),
     /** How high a Cylinder rises from the ground it stands on ("5-foot-radius, 40-foot-high Cylinder"). */
-    heightFeet: z.number().int().min(1).max(1000).optional()
+    heightFeet: z.number().int().min(1).max(1000).optional(),
+    /** A Line that ends where it is aimed, no longer than `sizeFeet` ("a 5-foot-wide Line between you and the target",
+     *  a Javelin of Lightning's bolt). */
+    toTarget: z
+      .literal(true)
+      .optional()
+      .describe("A Line that ends where it is aimed, no longer than its size (a Javelin of Lightning's bolt)")
   })
   .strict();
 export type ActionArea = z.infer<typeof ActionAreaSchema>;

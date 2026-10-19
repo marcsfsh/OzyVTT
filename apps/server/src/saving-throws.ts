@@ -162,6 +162,8 @@ export function saveRollSources(
       // A save against a spell or another magical effect (Spellguard Shield), and against a spell, with its school and
       // level (Mantle of Spell Resistance).
       ...(against.magical ? { magicalSource: true } : {}),
+      // A save against a breath weapon (Dragon Scale Mail's Advantage).
+      ...(against.breathWeapon ? { breathWeaponSource: true } : {}),
       ...(against.spell
         ? {
             spellSource: true,
@@ -175,16 +177,21 @@ export function saveRollSources(
   );
 }
 
-/** What a save is against, for a rider that reads it: magic, and the spell. */
+/** What a save is against, for a rider that reads it: magic, the spell, and a breath weapon. */
 export type SaveSource = Readonly<{
   magical?: boolean;
   spell?: Readonly<{ id: string; school: string; level: number }>;
+  breathWeapon?: boolean;
 }>;
 
+/** A breath weapon as the SRD's stat blocks name it: a Dragon's "Fire Breath", a dragonborn's "Breath Weapon". */
+export const isBreathWeapon = (actionName: string): boolean => /\bbreath(?: weapon)?\b/i.test(actionName);
+
 /** What a pending save is against: a spell is magic too. */
-export const saveSourceOf = (pending: Pick<PendingSave, "magical" | "spell">): SaveSource => ({
+export const saveSourceOf = (pending: Pick<PendingSave, "magical" | "spell" | "actionName">): SaveSource => ({
   ...(pending.magical === true || pending.spell !== undefined ? { magical: true } : {}),
-  ...(pending.spell ? { spell: pending.spell } : {})
+  ...(pending.spell ? { spell: pending.spell } : {}),
+  ...(isBreathWeapon(pending.actionName) ? { breathWeapon: true } : {})
 });
 
 /**
