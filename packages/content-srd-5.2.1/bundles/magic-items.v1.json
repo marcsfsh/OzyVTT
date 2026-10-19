@@ -3711,9 +3711,44 @@
   },
   "cursed": false,
   "casts": [],
+  "attunementHeldBy": "dragon-orb-charmed",
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "peer",
+    "name": "Peer into the Orb",
+    "activation": "action",
+    "description": "Peer into the orb's depths and make a DC 15 Charisma saving throw. On a successful save, you control the orb for as long as you remain attuned to it. On a failed save, the orb imposes the Charmed condition on you for as long as you remain attuned to it. While you are Charmed by the orb, you can't voluntarily end your Attunement to it.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "who": "self"
+    },
+    "save": {
+     "ability": "cha",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [
+      "charmed"
+     ],
+     "failureEffect": {
+      "name": "Charmed by the Dragon Orb",
+      "tags": [
+       "dragon-orb-charmed"
+      ],
+      "modifiers": []
+     },
+     "successEffect": {
+      "name": "Controls the Dragon Orb",
+      "tags": [
+       "dragon-orb-control"
+      ],
+      "modifiers": []
+     }
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
