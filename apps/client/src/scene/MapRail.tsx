@@ -54,7 +54,7 @@ const DIRECT_TOOLS: ReadonlyArray<{ id: MapTool; label: string; title: string; i
 function groupOf(tool: MapTool): GroupId | null {
   if (tool.startsWith("fog-")) return "fog";
   if (tool.startsWith("terrain-")) return "terrain";
-  if (tool === "vision-light") return "light";
+  if (tool === "vision-light" || tool === "vision-area") return "light";
   if (isVisionTool(tool)) return "walls";
   if (tool === "circle" || tool === "cone" || tool === "line" || tool === "square") return "draw";
   return null;

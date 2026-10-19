@@ -48,6 +48,7 @@ describe("rule families", () => {
       ["movement.occupied", "movement"],
       ["movement.no-speed", "movement"],
       ["movement.blocked-path", "movement"],
+      ["movement.toward-fear", "movement"],
       ["economy.action-used", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
@@ -105,6 +106,8 @@ describe("rule families", () => {
       ["cover.total", "targeting"],
       // Hiding in an enemy's sight: where the creature stands relative to the others, like cover.
       ["hide.seen", "targeting"],
+      ["hide.exposed", "targeting"],
+      ["light.too-bright", "targeting"],
       ["condition.charmed-charmer", "targeting"],
       ["target.too-many", "targeting"],
       // Whom a spell may pick: a creature of a type it targets, one the caster sees, all in one of its areas.

@@ -67,6 +67,9 @@ export const RollRecordSchema = z.object({
   total: z.number().int(),
   /** The d20 was typed from a physical die; the server threw nothing. */
   typed: z.literal(true).optional(),
+  /** A player's roll from the free dice roller: its formula and label are the player's own, where a rule's roll
+   *  (a check, a save, an attack) works out its bonuses on the server. */
+  free: z.literal(true).optional(),
   createdAt: z.iso.datetime()
 });
 export type RollVisibility = z.infer<typeof RollVisibilitySchema>;
@@ -234,6 +237,8 @@ const PendingSaveEffectSchema = z
     modifiers: EffectModifiersSchema.default([]),
     /** What it adds to AC while it lasts (Slow's -2). */
     armorClassBonus: EffectInstanceSchema.shape.armorClassBonus,
+    /** The light the creature sheds while it lasts (Faerie Fire's outline). */
+    light: EffectInstanceSchema.shape.light,
     /** "Until the end of the current turn" for a save made at the start of the bearer's own turn (Stinking Cloud),
      *  where "until the end of its next turn" would run a turn longer. */
     currentTurn: z.literal(true).optional()
@@ -861,21 +866,111 @@ export const VisionWallSchema = z
   .strict();
 export type VisionWall = z.infer<typeof VisionWallSchema>;
 
-/** A light: placed on the map (`position`) or carried by a token (`actorId`), never both. Radii are in feet as the SRD
- * prints them: Bright Light out to `brightFeet`, and Dim Light for `dimFeet` more. */
+/** What made a light or an area on the map (a spell, a feature), so it lasts as long as what keeps it: the cast's
+ * Concentration (`castId`) or an effect (`effectId`, on any creature). `spellId` and `level` let a later spell dispel
+ * it (Darkness dispels spell light of level 2 or lower). GM-only, like the rest of the vision layer. */
+export const VisionSourceSchema = z
+  .object({
+    casterId: z.uuid(),
+    spellId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
+    /** The action that made it, when no spell did (a magmin's flames). */
+    actionId: z.string().min(1).max(120).optional(),
+    level: z.number().int().min(0).max(9).optional(),
+    castId: z.string().min(1).max(120).optional(),
+    effectId: z.string().min(1).max(120).optional(),
+    /** The last round of the fight it lasts through, when nothing else keeps it (an octopus's ink). */
+    untilRound: z.number().int().positive().optional()
+  })
+  .strict();
+export type VisionSource = z.infer<typeof VisionSourceSchema>;
+
+/** A light: placed on the map (`position`), carried by a token (`actorId`), or at the centre of a spell's placed area
+ * as the area moves (`annotationId`: Moonbeam's Cylinder), exactly one of them. Radii are in feet as the SRD prints
+ * them: Bright Light out to `brightFeet`, and Dim Light for `dimFeet` more. With `sunlight`, the Bright Light is
+ * sunlight (Daylight). */
 export const VisionLightSchema = z
   .object({
     id: z.uuid(),
     position: VisionPointSchema.nullable().default(null),
     actorId: z.uuid().nullable().default(null),
+    annotationId: z.uuid().optional(),
     brightFeet: z.number().min(0).max(1000),
-    dimFeet: z.number().min(0).max(1000)
+    dimFeet: z.number().min(0).max(1000),
+    sunlight: z.literal(true).optional(),
+    source: VisionSourceSchema.optional()
   })
   .strict()
-  .refine((light) => (light.position === null) !== (light.actorId === null), {
-    message: "A light is either placed on the map or carried by a token."
-  });
+  .refine(
+    (light) =>
+      [light.position !== null, light.actorId !== null, light.annotationId !== undefined].filter(Boolean).length === 1,
+    { message: "A light is placed on the map, carried by a token, or fills a spell's area: exactly one of them." }
+  );
 export type VisionLight = z.infer<typeof VisionLightSchema>;
+
+/**
+ * What an area does to light and sight (SRD Rules Glossary). `bright`, `dim` and `dark` set its light level over the
+ * scene's (a lit room in a dark dungeon, a shadowed cellar in daylight); lights still shine into a dark one.
+ * `lightly-obscured` (patchy fog, moderate foliage) gives Disadvantage on Perception by sight; `heavily-obscured`
+ * (dense fog or foliage, a Fog Cloud) blocks sight into and through it. `magical-darkness` (the Darkness spell) is dark
+ * whatever light reaches it, and only Blindsight, Truesight and Devil's Sight see into or through it.
+ */
+export const VisionAreaKindSchema = z.enum([
+  "bright",
+  "dim",
+  "dark",
+  "lightly-obscured",
+  "heavily-obscured",
+  "magical-darkness"
+]);
+export type VisionAreaKind = z.infer<typeof VisionAreaKindSchema>;
+
+/** An area of light or obscurement: a rect or circle the GM paints, a spell's placed template (`annotationId`, moving
+ * with it; a line's width in `widthFeet`), or an Emanation around a creature that moves with its token. */
+export const VisionAreaSchema = z
+  .object({
+    id: z.uuid(),
+    kind: VisionAreaKindSchema,
+    /** A `bright` area lit by sunlight (a sunlit courtyard). */
+    sunlight: z.literal(true).optional(),
+    shape: z.discriminatedUnion("type", [
+      z
+        .object({
+          type: z.literal("rect"),
+          x: z.number().min(0).max(100000),
+          y: z.number().min(0).max(100000),
+          width: z.number().positive().max(100000),
+          height: z.number().positive().max(100000)
+        })
+        .strict(),
+      z
+        .object({
+          type: z.literal("circle"),
+          x: z.number().min(0).max(100000),
+          y: z.number().min(0).max(100000),
+          radiusFeet: z.number().positive().max(1000)
+        })
+        .strict(),
+      z
+        .object({
+          type: z.literal("template"),
+          annotationId: z.uuid(),
+          widthFeet: z.number().positive().max(1000).nullable().default(null)
+        })
+        .strict(),
+      z
+        .object({ type: z.literal("emanation"), actorId: z.uuid(), radiusFeet: z.number().positive().max(1000) })
+        .strict()
+    ]),
+    /** The one creature that sees through it (Insect Cloud: "Heavily Obscured for creatures other than you"). */
+    sparedActorId: z.uuid().optional(),
+    source: VisionSourceSchema.optional()
+  })
+  .strict();
+export type VisionArea = z.infer<typeof VisionAreaSchema>;
 
 /** The scene's dynamic vision (ADR-0023). Off by default, so a scene without it behaves as before. `measure` is the
  * map's size and scale, written by the server whenever the GM edits it, so feet convert to pixels without the map
@@ -885,8 +980,12 @@ export const SceneVisionSchema = z
   .object({
     enabled: z.boolean().default(false),
     ambient: z.enum(["bright", "dim", "dark"]).default("bright"),
+    /** The bright ambient light is sunlight (daylight outdoors), which Sunlight Sensitivity reads. */
+    sunlight: z.boolean().default(false),
     walls: z.array(VisionWallSchema).max(1000).default([]),
     lights: z.array(VisionLightSchema).max(100).default([]),
+    /** Areas of light and obscurement over the ambient light, later ones over earlier ones. */
+    areas: z.array(VisionAreaSchema).max(100).default([]),
     measure: z
       .object({
         width: z.number().positive().max(100000),
@@ -912,8 +1011,10 @@ export type SceneVision = z.infer<typeof SceneVisionSchema>;
 export const EMPTY_SCENE_VISION: SceneVision = {
   enabled: false,
   ambient: "bright",
+  sunlight: false,
   walls: [],
   lights: [],
+  areas: [],
   measure: null,
   explored: null
 };
@@ -1242,6 +1343,7 @@ export const CombatStateSchema = z
         active.combat.vision.enabled ||
         active.combat.vision.walls.length > 0 ||
         active.combat.vision.lights.length > 0 ||
+        active.combat.vision.areas.length > 0 ||
         active.combat.vision.explored !== null ||
         active.combat.pendingSaves.length > 0 ||
         active.combat.pendingReactions.length > 0 ||

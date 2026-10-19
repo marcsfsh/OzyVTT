@@ -11,13 +11,16 @@ import { HIDDEN_SOURCE } from "../hidden-source.js";
 import { rollDice } from "@vtt/rules-5e";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { recordRoll, tableLineOf, type ResolveContext } from "./context.js";
-import { coverBonusOf, coverFor } from "../cover.js";
+import { bestCover, coverBonusOf, coverFor, mapCover } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf } from "./damage.js";
 import { spellOf, spellSaveDuration } from "./concentration.js";
 import { openDamageWindow, type DamageWindowDeps } from "../damage-window.js";
 import { answerKeyOf, answersFromOthers, askAnswer } from "../roll-answers.js";
 import { heightenedTarget, shieldedFromSave } from "./metamagic.js";
+import { effectNameOf } from "../effect-names.js";
+import { sightRules } from "../vision/rules.js";
+import { sceneSight } from "../vision/sight.js";
 
 type AcBonusReaction = Extract<ActionReaction, { response: "ac-bonus" }>;
 
@@ -317,7 +320,9 @@ export function failureEffectFor(
   return {
     name: (
       declared?.name ??
-      (linked.length > 0 ? `${conditionLabel(linked[0]!)} by ${attacker.name} (${action.name})` : hazard!.name)
+      (linked.length > 0
+        ? `${conditionLabel(linked[0]!)} by ${attacker.name} (${effectNameOf(action.name)})`
+        : hazard!.name)
     ).slice(0, 120),
     tags: [
       ...(grapple ? ["grapple"] : []),
@@ -328,6 +333,7 @@ export function failureEffectFor(
     ].slice(0, 8),
     modifiers: [...(declared?.modifiers ?? [])],
     ...(declared?.armorClassBonus !== undefined ? { armorClassBonus: declared.armorClassBonus } : {}),
+    ...(declared?.light ? { light: { ...declared.light } } : {}),
     linkedConditionIds: linked,
     // An escape DC the text doesn't print is the grapple's own DC, as the 2024 rules set it; a spell's restraint is
     // escaped against the spell save DC.
@@ -386,6 +392,33 @@ const SPEED_ZERO_OVER_THE_GATE: ReadonlySet<string> = new Set(["power-word-stun"
  * the damage already rode the hit, so the save proposes none of its own. A save that a low enough target fails
  * outright (Power Word Stun) lands at once, and only its repeated save can end it.
  */
+/** The targets a save reaches: all of them, or with `sight.seenBy` only those that can see the user (a gaze) or a
+ *  point of its area where they stand (Hypnotic Pattern). With dynamic vision off, a Blinded creature sees neither. */
+function seeingTargets(ctx: ResolveContext, targets: ResolveContext["targets"]): ResolveContext["targets"] {
+  const { state, action, attacker, deps } = ctx;
+  const seenBy = (action.sight ?? spellOf(ctx)?.sight)?.seenBy;
+  if (!seenBy) return targets;
+  const content = {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  };
+  const rules = sightRules(state, content, deps.distanceFeet);
+  const sight = sceneSight(state, content);
+  return targets.filter((target) => {
+    const sees =
+      seenBy === "user"
+        ? rules.canSee(target.id, attacker.id)
+        : rules.visionOn && sight.positionOf(target.id) !== null
+          ? sight.seesPoint(target.id, sight.positionOf(target.id)!)
+          : !target.conditions.some((condition) => condition.id === "blinded");
+    if (!sees)
+      ctx.warnings.push(
+        `${target.name} can't see ${seenBy === "user" ? attacker.name : "it"}, so ${action.name} doesn't affect it.`
+      );
+    return sees;
+  });
+}
+
 export function parkActionSave(ctx: ResolveContext): void {
   const { state, action, attacker, input, deps, attack } = ctx;
   if (!action.save) return;
@@ -398,7 +431,7 @@ export function parkActionSave(ctx: ResolveContext): void {
   // Careful Spell's and Sculpt Spells' creatures succeed with no roll and take no damage (`metamagic.ts`).
   const targets = shieldFromSave(ctx, cast);
   // A save its user makes (Contact Other Plane) is the user's alone, whatever was aimed at.
-  let saving = action.save.bySelf ? [attacker] : targets;
+  let saving = action.save.bySelf ? [attacker] : seeingTargets(ctx, targets);
   const threshold = action.save.failsAtHitPoints;
   if (threshold !== undefined) {
     saving = [];
@@ -410,7 +443,7 @@ export function parkActionSave(ctx: ResolveContext): void {
             target.id,
             makeEffect({
               id: `${input.commandId}:${target.id}:speed`,
-              name: action.name,
+              name: effectNameOf(action.name),
               sourceActorId: attacker.id,
               sourceName: attacker.name,
               sourceActionId: action.id,
@@ -469,17 +502,22 @@ export function parkActionSave(ctx: ResolveContext): void {
     );
   // Cover adds to Dexterity saving throws (SRD Cover), each target's own: the GM's choice for this resolve, else the
   // cover the GM marked it with, unless the save ignores it (Sacred Flame). Carried on the prompt.
+  // With dynamic vision on, the walls and creatures between the caster and a single target cover it too (`mapCover`).
   const saveBonusOf = (target: (typeof targets)[number]) =>
     action.save!.ability === "dex" && !action.save!.ignoresCover
       ? coverBonusOf(
-          coverFor(input.cover, target) ??
-            (deps.resolveDefinition
-              ? smiteOfProtectionCover(state, target, {
-                  resolveDefinition: deps.resolveDefinition,
-                  ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
-                  ...(deps.catalog ? { catalog: deps.catalog } : {})
-                })
-              : null)
+          input.cover ??
+            bestCover(
+              coverFor(null, target),
+              input.areaPlaced === true ? null : mapCover(state, attacker.id, target.id),
+              deps.resolveDefinition
+                ? smiteOfProtectionCover(state, target, {
+                    resolveDefinition: deps.resolveDefinition,
+                    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
+                    ...(deps.catalog ? { catalog: deps.catalog } : {})
+                  })
+                : null
+            )
         )
       : 0;
   const groups = new Map<number, string[]>();

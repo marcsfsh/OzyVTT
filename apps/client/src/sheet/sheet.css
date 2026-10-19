@@ -1938,6 +1938,44 @@ button.cs-circle::after {
   color: var(--text-dim);
   font-weight: 600;
 }
+.cs-xp {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+}
+.cs-xp-total {
+  color: var(--text);
+  font: 700 var(--fs-h3) / 1.2 var(--font-numeric);
+}
+.cs-xp.is-ready .cs-xp-total {
+  color: var(--cyan-hi);
+}
+.cs-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--space-1);
+  margin: 0;
+}
+.cs-column {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--track-edge);
+  background: var(--track);
+}
+.cs-column dt {
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1.2 var(--font-label);
+}
+.cs-column dd {
+  margin: 0;
+  color: var(--text);
+  font: 700 var(--fs-sm) / 1.2 var(--font-numeric);
+}
 .cs-masteries {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

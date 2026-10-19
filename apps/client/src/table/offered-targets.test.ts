@@ -1,34 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { offeredTargets, targetReachFeet } from "./targetRows";
+import type { ContentActionSummary } from "@vtt/domain";
+import { pickableTargets, reachOf, type TargetRow } from "./targetRows";
 
-// The target picker offers only the creatures an action can take (#152): none beyond its reach or range where the
-// map measures it, and none that is dead for an action that harms. The server still decides.
+// A picker reads an action's own target range when it makes no attack (Lay on Hands' touch, a flask's 20 feet), so a
+// creature beyond it is listed with why. The server still decides.
 
-const rows = [{ id: "near", feet: 5 }, { id: "far", feet: 40 }, { id: "unmeasured" }, { id: "dead", feet: 5 }];
-const dead = (id: string) => id === "dead";
-const ids = (list: ReadonlyArray<{ id: string }>) => list.map((row) => row.id);
+const touch = {
+  id: "lay-on-hands",
+  name: "Lay On Hands",
+  attackBonus: null,
+  reachFeet: null,
+  rangeFeet: null,
+  saveAbility: null,
+  damage: [],
+  targetRangeFeet: 5
+} as unknown as ContentActionSummary;
+const row = (id: string, feet: number): TargetRow => ({
+  id,
+  label: id,
+  initials: id.slice(0, 2),
+  kind: "monster",
+  feet
+});
 
-describe("the creatures a picker offers", () => {
-  it("leaves out a creature beyond a melee reach, and a dead one, from an attack", () => {
-    const sword = { reachFeet: 5, rangeFeet: null, attackBonus: 5, saveAbility: null, damage: [{}] };
-    expect(ids(offeredTargets(rows, sword, dead))).toEqual(["near", "unmeasured"]);
-  });
-
-  it("keeps a creature within a bow's long range", () => {
-    const bow = { reachFeet: null, rangeFeet: 600, attackBonus: 5, saveAbility: null, damage: [{}] };
-    expect(ids(offeredTargets(rows, bow, dead))).toEqual(["near", "far", "unmeasured"]);
-  });
-
-  it("reads a touch from the action's own target range, and offers the dead to what doesn't harm", () => {
-    const touch = {
-      reachFeet: null,
-      rangeFeet: null,
-      targetRangeFeet: 5,
-      attackBonus: null,
-      saveAbility: null,
-      damage: []
-    };
-    expect(targetReachFeet(touch)).toBe(5);
-    expect(ids(offeredTargets(rows, touch, dead))).toEqual(["near", "unmeasured", "dead"]);
+describe("an action's own target range", () => {
+  it("is the reach a touch action's picker measures against", () => {
+    expect(reachOf(touch)).toBe(5);
+    const [near, far] = pickableTargets([row("near", 5), row("far", 30)], touch);
+    expect(near!.unavailable).toBeUndefined();
+    expect(far!.unavailable).toBe("Out of range: 30 ft away, the reach is 5 ft.");
   });
 });

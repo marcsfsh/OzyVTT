@@ -61,11 +61,15 @@ export const fighter: ClassMechanicsModule = {
         }
       ]
     },
-    // Weapon Mastery grows with the printed column: 3 -> 4 at level 4 -> 5 at 10 -> 6 at 16.
+    // "Whenever you gain a Fighter level, you can replace the feat you chose with a different Fighting Style feat."
+    "fighting-style": { replaces: [{ offer: "feature:fighting-style", when: "level-up", amount: 1 }] },
+    // Weapon Mastery grows with the printed column: 3 -> 4 at level 4 -> 5 at 10 -> 6 at 16. Its Long Rest change of
+    // one weapon is made in the Level flow until a rest offers it.
     "weapon-mastery": {
       extraPicks: [
         { offer: "feature:weapon-mastery", scaling: { type: "class-resource-growth", id: "weapon-mastery" } }
-      ]
+      ],
+      replaces: [{ offer: "feature:weapon-mastery", when: "level-up", amount: 1 }]
     }
     // Not modeled: Tactical Mind (retroactive check bonus with a refund), Tactical Shift and Tactical
     // Master (movement, mastery swap) and Studied Attacks (needs memory of the missed target).

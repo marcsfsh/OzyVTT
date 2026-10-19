@@ -364,7 +364,10 @@ function instantiate(
     armorClass: storedArmorClass(seed, definition, catalog),
     initiative: definition.initiativeBonus + derivation.initiative,
     ownerSessionId: null,
-    conditions: [],
+    // A stat block that says it "has the Invisible condition" (an invisible stalker) joins the roster with it.
+    conditions: (definition.traitMechanics ?? []).some((trait) => trait.kind === "invisible")
+      ? [{ id: "invisible" as const }]
+      : [],
     effects: [],
     deathSaves: null,
     actionUses: {},
@@ -473,6 +476,17 @@ export function assertNotArchived(state: GameState, actorId: string) {
   if (actor?.archived) throw new CommandRejectedError(`${actor.name} is archived. Restore ${actor.name} first.`);
 }
 
+/** The fight a combatant is in: the live one, a paused one in a prepared scene (whose action ids and pools a rebuild
+ *  would invalidate), or none. */
+export function fightHolding(state: GameState, actorId: string): "live" | "paused" | null {
+  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) return "live";
+  return state.combat.scenes.some(
+    (scene) => scene.combat.active && scene.combat.initiative.some((entry) => entry.actorId === actorId)
+  )
+    ? "paused"
+    : null;
+}
+
 /**
  * Rebuilds one character in place (level up/down, respec) from a definition built by
  * `buildCharacterDefinition`. Keeps table identity and campaign state (conditions, effects, notes,
@@ -500,17 +514,10 @@ export function rebuildActorDefinition(
       "Finish reviewing the combat history before rebuilding a character.",
       "history_review"
     );
-  if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId)) {
-    throw new CommandRejectedError("End the encounter before rebuilding a character who is in it.");
-  }
-  // A parked scene can hold a paused fight whose action ids and pools this rebuild would invalidate.
-  if (
-    state.combat.scenes.some(
-      (scene) => scene.combat.active && scene.combat.initiative.some((entry) => entry.actorId === actorId)
-    )
-  ) {
+  const fight = fightHolding(state, actorId);
+  if (fight === "live") throw new CommandRejectedError("End the encounter before rebuilding a character who is in it.");
+  if (fight === "paused")
     throw new CommandRejectedError("End the paused encounter in the prepared scene that uses this character first.");
-  }
 
   // Carry over the old sheet's `hp-roll` rows for levels the new build doesn't cover, so levelling back
   // up restores the original rolls.

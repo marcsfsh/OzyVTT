@@ -18,6 +18,7 @@ import { passGameTime } from "./game-time.js";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { openPreparation } from "./spellcasting.js";
 import { healActor } from "./hit-points.js";
+import { gainHeroicInspiration } from "./heroic-inspiration.js";
 import { chargesAfterDawn } from "./item-charges.js";
 
 /** SRD Resting: a Short Rest is 1 hour and a Long Rest at least 8. */
@@ -251,7 +252,7 @@ export function applyRest(
     holdsFeature(longRestDefinition, "human-resourceful", "Resourceful") ||
     longRestDefinition?.character?.race?.id === "human"
   )
-    actor.heroicInspiration = true;
+    gainHeroicInspiration(actor);
   return events;
 }
 

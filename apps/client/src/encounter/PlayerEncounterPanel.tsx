@@ -12,7 +12,6 @@ import { EffectChips } from "./EffectChips";
 import { DyingTracker } from "./DyingTracker";
 import { aidGiverOf, isKnockedOut, StabilizeControl } from "./StabilizeControl";
 import { PlayerActionRunner } from "./PlayerActionRunner";
-import { isDeadOnSheet } from "./mortality";
 import { UnconsciousNote } from "../sheet/PlayFight";
 import { isDying, owesDeathSave } from "../table/playerPrompts";
 import { hasPlayerPrompt } from "../table/PromptSlot";
@@ -319,7 +318,6 @@ export function PlayerEncounterPanel({
         round={combat.round}
         acting={acting}
         targetRows={targetHints.rows}
-        deadIds={new Set(state.actors.filter(isDeadOnSheet).map((actor) => actor.id))}
         {...(targetHints.insideNow ? { insideNow: targetHints.insideNow } : {})}
       />
     ) : null;

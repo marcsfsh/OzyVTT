@@ -44,6 +44,7 @@ import { auraOfAuthority } from "../statblock-traits.js";
 import { hitRiderOf } from "./hit-riders.js";
 import { wardedConditions } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
+import { frightenedApplies, lightSensitivities, sightRules, type SightRules } from "../vision/rules.js";
 import {
   answeredLines,
   answersOffered,
@@ -125,9 +126,10 @@ function attackAbilityOf(ctx: ResolveContext): "str" | "dex" | undefined {
 }
 
 /** Conditions that by themselves give an attack advantage or disadvantage (SRD conditions appendix), in
- *  the order the roll card lists them. Frightened applies only while its source is in sight; it applies whenever
- *  active, and the GM's explicit roll mode covers the rest. Invisible (Hide grants it as a linked effect) cuts both
- *  ways; with dynamic vision on, who sees through it is decided by `sightClaims`, else by the GM. */
+ *  the order the roll card lists them. Frightened applies while its source is within line of sight (`frightenedApplies`,
+ *  always with vision off). Invisible (Hide grants it as a linked effect) cuts both ways, except against a creature
+ *  that sees it: with dynamic vision on `sightClaims` decides, else Blindsight, Truesight and See Invisibility by
+ *  distance. */
 const CONDITION_ROLL_MODES: ReadonlyArray<
   Readonly<{ side: "attacker" | "target"; condition: string; mode: "advantage" | "disadvantage" }>
 > = [
@@ -147,9 +149,6 @@ const CONDITION_ROLL_MODES: ReadonlyArray<
 ];
 
 const has = (actor: LiveActor, id: string) => actor.conditions.some((condition) => condition.id === id);
-/** Whether a creature's token stands on the map, so sight can say what it sees. */
-const placedOnMap = (state: ResolveContext["state"], actorId: string) =>
-  state.combat.tokens.some((token) => token.actorId === actorId && token.position !== null);
 
 /** Faerie Fire's outline: a creature carrying it can't benefit from the Invisible condition. */
 export const OUTLINED_TAG = "outlined";
@@ -182,9 +181,29 @@ function riderClaims(
   targetDerivation: EquipmentDerivation,
   sources: RollModeClaims
 ): void {
-  rollModeClaims(ctx.derivation, ["attack"], "on-attack-roll", ctx.riderFilters, sources);
+  // Who sees whom, for a rider that asks (Dodge against an attacker its bearer can see, Faerie Fire's Advantage for an
+  // attacker that can see the outlined creature, Blur against one without Blindsight or Truesight).
+  const rules = sightRulesOf(ctx);
+  const sensing = (viewerId: string, bearerId: string) => sensesReaching(ctx, rules, viewerId, bearerId);
+  rollModeClaims(
+    ctx.derivation,
+    ["attack"],
+    "on-attack-roll",
+    {
+      ...ctx.riderFilters,
+      seesOther: rules.canSee(ctx.attacker.id, target.id),
+      seenByOther: rules.canSee(target.id, ctx.attacker.id),
+      otherSenses: sensing(target.id, ctx.attacker.id)
+    },
+    sources
+  );
   const kinds = ctx.riderFilters.attackKinds;
-  const filters = kinds ? { attackKinds: kinds } : {};
+  const filters = {
+    ...(kinds ? { attackKinds: kinds } : {}),
+    seesOther: rules.canSee(target.id, ctx.attacker.id),
+    seenByOther: rules.canSee(ctx.attacker.id, target.id),
+    otherSenses: sensing(ctx.attacker.id, target.id)
+  };
   rollModeClaims(targetDerivation, ["incoming-attack"], "on-attack-roll", filters, sources, "Target: ");
   // What this attacker left on the target against itself alone (Multiattack Defense after its hit), read only for
   // `by-effect-source` riders so nothing counts twice.
@@ -205,6 +224,37 @@ function riderClaims(
       sources,
       "Target: "
     );
+}
+
+const sightRulesMemo = new WeakMap<ResolveContext, SightRules>();
+
+const sightContentOf = ({ deps }: ResolveContext) => ({
+  ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+  ...(deps.catalog ? { catalog: deps.catalog } : {})
+});
+
+/** The rules' sight for this resolve: the map's with dynamic vision on, else the conditions and senses by distance. */
+function sightRulesOf(ctx: ResolveContext): SightRules {
+  let rules = sightRulesMemo.get(ctx);
+  if (!rules) {
+    rules = sightRules(ctx.state, sightContentOf(ctx), ctx.deps.distanceFeet);
+    sightRulesMemo.set(ctx, rules);
+  }
+  return rules;
+}
+
+/** The senses `viewerId` perceives `bearerId` with, within their range (Blur reads Blindsight and Truesight). */
+function sensesReaching(ctx: ResolveContext, rules: SightRules, viewerId: string, bearerId: string): string[] {
+  const senses = rules.sensesOf(viewerId);
+  const feet = ctx.deps.distanceFeet?.(viewerId, bearerId) ?? null;
+  if (!senses || feet === null) return [];
+  const reaches = (range: number) => range > 0 && feet <= range + DISTANCE_TOLERANCE_FEET;
+  return [
+    ...(reaches(senses.blindsight) ? ["blindsight"] : []),
+    ...(reaches(senses.truesight) ? ["truesight"] : []),
+    ...(reaches(senses.tremorsense) ? ["tremorsense"] : []),
+    ...(reaches(senses.seeInvisibility) ? ["see-invisibility"] : [])
+  ];
 }
 
 /** With dynamic vision on, who sees whom (SRD "Unseen Attackers and Targets"): an attack against a target you can't
@@ -250,16 +300,26 @@ function conditionClaims(ctx: ResolveContext, target: LiveActor, distance: numbe
         ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {})
       })
     : [];
+  const rules = sightRulesOf(ctx);
   for (const entry of CONDITION_ROLL_MODES) {
     const side = entry.side === "attacker" ? attacker : target;
     if (!has(side, entry.condition)) continue;
     if (entry.side === "attacker" && warded.includes(entry.condition)) continue;
     if (entry.condition === "invisible" && (outlined(side) || sighted)) continue;
+    // "If a creature can somehow see you, you don't gain this benefit against that creature": with vision off, its
+    // Blindsight, Truesight or See Invisibility reaching you.
+    if (entry.condition === "invisible" && entry.side === "attacker" && rules.canSee(target.id, attacker.id)) continue;
+    if (entry.condition === "invisible" && entry.side === "target" && rules.canSee(attacker.id, target.id)) continue;
+    // Frightened: only "while the source of fear is within line of sight".
+    if (entry.condition === "frightened" && !frightenedApplies(attacker, rules)) continue;
     sources[entry.mode].push({
       source: `${entry.side}-${entry.condition}`,
       label: `${entry.side === "attacker" ? "Attacker" : "Target"} is ${conditionLabel(entry.condition)}`
     });
   }
+  // Sunlight Sensitivity and Light Sensitivity: Disadvantage on its attack rolls where it stands in the light.
+  for (const name of lightSensitivities(ctx.state, attacker, "attack", rules, sightContentOf(ctx)))
+    sources.disadvantage.push({ source: "light-sensitivity", label: `${name} (attacker in the light)` });
   // Grappled: disadvantage against anyone but the grappler, known only via a source-linked effect; a
   // hand-set Grappled applies against everyone (the GM's rollMode overrides).
   if (has(attacker, "grappled")) {
@@ -317,26 +377,15 @@ function positionClaims(ctx: ResolveContext, distance: number | null, sources: R
   if (normal !== undefined && distance !== null && distance > normal + 1e-6) {
     sources.disadvantage.push({ source: "long-range", label: `Long range (beyond ${normal} ft)` });
   }
-  // SRD Ranged Attacks in Close Combat: "a hostile creature within 5 feet of you that can see you and that doesn't
-  // have the Incapacitated condition". A creature at 0 HP is dead or dying, and an ally is no enemy whatever its
-  // kind. A Blinded enemy can't see the attacker, and with dynamic vision on, neither can one the map says doesn't;
-  // with it off, sight stays the GM's call.
-  const sight = sceneSight(state, {
-    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
-    ...(deps.catalog ? { catalog: deps.catalog } : {})
-  });
-  const seesAttacker = (enemy: LiveActor) =>
-    !has(enemy, "blinded") &&
-    (!sight.enabled ||
-      !placedOnMap(state, enemy.id) ||
-      !placedOnMap(state, attacker.id) ||
-      sight.sees(enemy.id, attacker.id));
+  // An able enemy within 5 feet "who can see you" spoils the shot. A creature at 0 HP is dead or dying, and an ally is
+  // no enemy whatever its kind.
+  const rules = sightRulesOf(ctx);
   for (const entry of state.combat.initiative) {
     if (entry.actorId === attacker.id) continue;
     const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!enemy || enemy.hp.current <= 0 || isIncapacitated(enemy)) continue;
     if (!areEnemies(attacker, enemy, deps.resolveDefinition)) continue;
-    if (!seesAttacker(enemy)) continue;
+    if (!rules.canSee(enemy.id, attacker.id)) continue;
     // A creature hidden from the table (GM-only, out of every character's sight, or under the fog) never spoils a
     // visible attacker's shot on its own: the Disadvantage would show in the public dice. The GM can still impose it.
     if (ctx.hiddenFromTable(enemy.id) && !ctx.hiddenFromTable(attacker.id)) continue;

@@ -6,6 +6,7 @@ import { refreshBaseArmorClass, spellSlotMaxima, storedArmorClass } from "./acto
 import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
 import { castAction, itemAction } from "./item-actions.js";
 import { keepAmmunitionCount } from "./ammunition.js";
+import { keepLightState } from "./item-light.js";
 import { endConditionsImmuneTo, endEffect, MAGE_ARMOR_TAG, type EffectNarration } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
 import { scrollSpellProblem } from "./scrolls.js";
@@ -344,6 +345,12 @@ function armorStatsFrom(stats: CatalogRecord["armor"]): InventoryItem["armor"] {
 
 /** Upserts one inventory item by id; quantity 0 removes it. Owner-scoped by the caller. Re-derives the
  *  equipment contribution (AC, slot maxima) from the resulting loadout. */
+/** A studied book's spent magic is the server's record: an edit keeps it as stored and can't set it. */
+function keepDormant(stored: InventoryItem | undefined, item: InventoryItem): InventoryItem {
+  const { dormant: _sent, ...rest } = item;
+  return stored?.dormant ? { ...rest, dormant: true } : rest;
+}
+
 export function setInventoryItem(
   state: GameState,
   actorId: string,
@@ -376,6 +383,16 @@ export function setInventoryItem(
     actor.inventory.find((entry) => entry.id === item.id),
     item,
     deps.catalog
+  );
+  item = keepDormant(
+    actor.inventory.find((entry) => entry.id === item.id),
+    item
+  );
+  // Whether a light burns is the server's: lit with item.set-light, put out by stowing it.
+  item = keepLightState(
+    actor.inventory.find((entry) => entry.id === item.id),
+    item,
+    state.rest.clockHours
   );
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   enforceCurse(actor, item, deps);

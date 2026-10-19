@@ -224,7 +224,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
       per: "long-rest",
       pool: "mystic-arcanum-level-6-spell"
     });
-    // True Seeing consumes "mushroom powder worth 25+ GP".
+    // True Seeing consumes "mushroom powder worth 25+ GP", and touches one willing creature, here the Warlock itself.
     built.hero.inventory.push({
       id: "mushroom-powder",
       name: "Mushroom powder",
@@ -235,7 +235,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
     resolveDefinitionAction(
       built.state,
       actionOf(built, "spell-true-seeing-free"),
-      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000001" },
+      { actorId: IDS.hero, targetIds: [IDS.hero], commandId: "50000000-0000-4000-8000-000000000001" },
       deps(built, [])
     );
     expect(built.hero.actionUses["mystic-arcanum-level-6-spell"]).toBe(1);
@@ -243,7 +243,7 @@ describe("Warlock: Mystic Arcanum is a real pick and a real once-per-day casting
       resolveDefinitionAction(
         built.state,
         actionOf(built, "spell-true-seeing-free"),
-        { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000002" },
+        { actorId: IDS.hero, targetIds: [IDS.hero], commandId: "50000000-0000-4000-8000-000000000002" },
         deps(built, [])
       )
     ).toThrow();

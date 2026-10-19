@@ -3,7 +3,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { ContentLibrary } from "../src/content-library.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { sceneSight } from "../src/vision/sight.js";
-import { carriedLightOf, sensesOf, type SightContent } from "../src/vision/senses.js";
+import { carriedLightsOf, sensesOf, type SightContent } from "../src/vision/senses.js";
 import { cell, DIVIDER, GOBLIN, HERO, visionGame, wall } from "./vision-fixtures.js";
 
 // SRD 5.2.1 Rules Glossary: Darkvision, Blindsight, Tremorsense, Truesight, Bright Light, Dim Light, Darkness, and the
@@ -83,15 +83,17 @@ describe("dynamic vision: light and darkness", () => {
     expect(sceneSight(torchLight([shade])).perceives(HERO, GOBLIN)).toBe(false);
   });
 
-  it("lights a carried Torch while it is equipped", () => {
-    const torch = (equipped: boolean) => ({
-      inventory: [{ id: "torch", name: "Torch", quantity: 1, equipped, attuned: false }]
+  it("lights a Torch in hand while it burns", () => {
+    const torch = (lit: boolean) => ({
+      inventory: [{ id: "torch", name: "Torch", quantity: 1, equipped: true, attuned: false, lit }]
     });
     // The goblin stands 3 cells (15 ft) from the hero, inside a Torch's 40 feet.
     const near = { positions: { [GOBLIN]: cell(4, 5) }, ambient: "dark" as const };
     const lit = visionGame({ ...near, actors: { [HERO]: torch(true) } });
     const unlit = visionGame({ ...near, actors: { [HERO]: torch(false) } });
-    expect(carriedLightOf(lit.actors[0]!, { catalog })).toEqual({ brightFeet: 20, dimFeet: 20 });
+    expect(carriedLightsOf(lit, lit.actors[0]!, { catalog })).toEqual([
+      { brightFeet: 20, dimFeet: 20, sunlight: false, reveals: false, coneFacingDegrees: null }
+    ]);
     expect(sceneSight(lit, { catalog }).perceives(HERO, GOBLIN)).toBe(true);
     expect(sceneSight(unlit, { catalog }).perceives(HERO, GOBLIN)).toBe(false);
   });

@@ -51,6 +51,7 @@ import { leaveShortRest } from "./short-rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { oilIgnition, OILED_TAG } from "./hazards.js";
+import { sightRules } from "./vision/rules.js";
 import {
   deathBurst,
   holdOnAtZero,
@@ -223,6 +224,22 @@ export function standingDefences(
   };
 }
 
+/** Boon of the Night Spirit's Shadowy Form: "While within Dim Light or Darkness, you have Resistance to all damage
+ *  except Psychic and Radiant". Only where dynamic vision knows the light at the creature's space; else the GM's. */
+function inShadowyForm(
+  state: GameState,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  deps: DamageDeps | undefined
+): boolean {
+  if (!deps || !(definition?.character?.feats ?? []).some((feat) => feat.id === "boon-of-the-night-spirit"))
+    return false;
+  const content = { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
+  const light = sightRules(state, content).lightAt(actor.id);
+  return light !== null && light.level !== "bright";
+}
+const SHADOWY_FORM_SPARES = ["psychic", "radiant"];
+
 /** What a hit would come to on this actor: each typed part through its defences, then flat reduction off
  *  the total. Pure, so a prompt can show the number Confirm will land. */
 function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: DamageDeps): DamageWeighing {
@@ -263,6 +280,9 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
     const petrified = actor.conditions.some((condition) => condition.id === "petrified");
     // SRD Underwater Combat: everything fully underwater has resistance to fire damage.
     const underwater = state.combat.active && state.combat.underwater;
+    const shadowy = inShadowyForm(state, actor, definition, deps)
+      ? typed.map((part) => normalizeDamageType(part.type)).filter((type) => !SHADOWY_FORM_SPARES.includes(type))
+      : [];
     const standing = standingDefences(definition, fromChoices, derivation);
     const types = (rows: readonly DerivedDefence[]) => rows.map((row) => row.type);
     // SRD Order of Application: flat reductions first, then Resistance, then Vulnerability.
@@ -275,7 +295,7 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
     );
     flatReduction = reduction.reduced;
     const adjusted = adjustDamageParts(reduction.parts, {
-      resistances: [...types(standing.resistances), ...(underwater ? ["fire"] : [])],
+      resistances: [...types(standing.resistances), ...(underwater ? ["fire"] : []), ...shadowy],
       immunities: types(standing.immunities),
       // Effects and items can make a target vulnerable as a stat block can; with a same-type resistance both apply.
       vulnerabilities: types(standing.vulnerabilities),
@@ -307,7 +327,20 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
         choiceSource === null
           ? "Underwater"
           : null;
-      return { ...part, adjustmentSource: derivedSource ?? choiceSource ?? petrifiedSource ?? underwaterSource };
+      const shadowSource =
+        shadowy.includes(type) &&
+        resisted(part.adjustment) &&
+        !innateHas(innate.resistances) &&
+        derivedSource === null &&
+        petrifiedSource === null &&
+        choiceSource === null &&
+        underwaterSource === null
+          ? "Shadowy Form"
+          : null;
+      return {
+        ...part,
+        adjustmentSource: derivedSource ?? choiceSource ?? petrifiedSource ?? underwaterSource ?? shadowSource
+      };
     });
     totalRequested = typed.reduce((sum, part) => sum + part.amount, 0);
     totalAdjusted = adjusted.reduce((sum, part) => sum + part.adjusted, 0);

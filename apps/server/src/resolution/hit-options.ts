@@ -22,6 +22,7 @@ import { applyHitOutcome, forceMove, grantHalfSpeedMove, openRiderSave, rollPlai
 import { hitRiderOf, type HitRider } from "./hit-riders.js";
 import { dealsDamage } from "./on-hit.js";
 import { spendHitPointDie } from "./hit-point-die.js";
+import { OUTLINED_TAG } from "./attack.js";
 
 /**
  * Extras a hit can carry, which the attacker chooses on the attack's preview and spends with the hit (SRD Sneak
@@ -587,7 +588,7 @@ function markOn(
     makeEffect({
       id: `${ctx.input.commandId}:${action.id}:${target.id}`,
       name: marks.name,
-      tags: [marks.tag],
+      tags: [marks.tag, ...(marks.outlined ? [OUTLINED_TAG] : [])],
       sourceActorId: ctx.attacker.id,
       sourceName: ctx.attacker.name,
       sourceActionId: action.id,
@@ -595,6 +596,8 @@ function markOn(
       duration: { type: "rounds", remaining: marks.rounds },
       concentration: true,
       ...(castId !== undefined ? { castId } : {}),
+      // The light the mark sheds (Shining Smite's 5 feet of Bright Light).
+      ...(marks.light ? { light: { ...marks.light } } : {}),
       modifiers: [{ type: "roll-mode", roll: "incoming-attack", mode: "advantage" }]
     }),
     ended,

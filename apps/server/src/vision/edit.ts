@@ -1,4 +1,4 @@
-import type { GameState, SceneVision, VisionLight, VisionWall } from "@vtt/domain";
+import type { GameState, SceneVision, VisionArea, VisionLight, VisionWall } from "@vtt/domain";
 import { CommandRejectedError } from "../game-store.js";
 import { gridToImage, imageToGrid } from "../grid-calibration.js";
 import { layerSlice } from "../map-layers.js";
@@ -57,9 +57,84 @@ export function setVisionAmbient(
   state: GameState,
   sceneId: string | undefined,
   geometry: TokenMapGeometry,
-  ambient: SceneVision["ambient"]
+  ambient: SceneVision["ambient"],
+  sunlight?: boolean
 ) {
-  slice(state, sceneId, geometry).write({ ambient });
+  slice(state, sceneId, geometry).write({ ambient, ...(sunlight !== undefined ? { sunlight } : {}) });
+}
+
+const MAX_AREAS = 100;
+
+/** Snaps a painted rect to whole cells on a calibrated grid (as terrain is), clamped to the map. */
+function snappedRect(
+  geometry: TokenMapGeometry,
+  rect: Readonly<{ x: number; y: number; width: number; height: number }>
+) {
+  const x1 = clamp(Math.min(rect.x, rect.x + rect.width), geometry.width);
+  const y1 = clamp(Math.min(rect.y, rect.y + rect.height), geometry.height);
+  const x2 = clamp(Math.max(rect.x, rect.x + rect.width), geometry.width);
+  const y2 = clamp(Math.max(rect.y, rect.y + rect.height), geometry.height);
+  const calibration = geometry.calibration;
+  if (!calibration) return { x: rounded(x1), y: rounded(y1), width: rounded(x2 - x1), height: rounded(y2 - y1) };
+  const from = imageToGrid(calibration, { x: x1, y: y1 });
+  const to = imageToGrid(calibration, { x: x2, y: y2 });
+  const a = gridToImage(calibration, { column: Math.floor(from.column + 0.25), row: Math.floor(from.row + 0.25) });
+  const b = gridToImage(calibration, { column: Math.ceil(to.column - 0.25), row: Math.ceil(to.row - 0.25) });
+  const left = clamp(Math.min(a.x, b.x), geometry.width);
+  const top = clamp(Math.min(a.y, b.y), geometry.height);
+  return {
+    x: rounded(left),
+    y: rounded(top),
+    width: rounded(clamp(Math.max(a.x, b.x), geometry.width) - left),
+    height: rounded(clamp(Math.max(a.y, b.y), geometry.height) - top)
+  };
+}
+
+/** Paints an area of light or obscurement over the ambient light: a rect snapped to whole cells, or for fog and
+ *  magical Darkness a circle of `radiusFeet` about a point. */
+export function addVisionArea(
+  state: GameState,
+  sceneId: string | undefined,
+  geometry: TokenMapGeometry,
+  input: Readonly<{
+    id: string;
+    kind: VisionArea["kind"];
+    sunlight?: boolean;
+    rect?: Readonly<{ x: number; y: number; width: number; height: number }>;
+    circle?: Readonly<{ x: number; y: number; radiusFeet: number }>;
+  }>
+) {
+  const target = slice(state, sceneId, geometry);
+  if (target.vision.areas.length >= MAX_AREAS)
+    throw new CommandRejectedError(`A scene holds up to ${MAX_AREAS} areas of light and fog. Remove some first.`);
+  const levelKind = input.kind === "bright" || input.kind === "dim" || input.kind === "dark";
+  let shape: VisionArea["shape"];
+  if (input.rect) {
+    const rect = snappedRect(geometry, input.rect);
+    if (rect.width < 1 || rect.height < 1) throw new CommandRejectedError("Drag a larger area.");
+    shape = { type: "rect", ...rect };
+  } else if (input.circle && !levelKind) {
+    shape = {
+      type: "circle",
+      x: rounded(clamp(input.circle.x, geometry.width)),
+      y: rounded(clamp(input.circle.y, geometry.height)),
+      radiusFeet: input.circle.radiusFeet
+    };
+  } else throw new CommandRejectedError("Drag a rectangle for an area of light or darkness.");
+  const area: VisionArea = {
+    id: input.id,
+    kind: input.kind,
+    ...(input.sunlight === true && input.kind === "bright" ? { sunlight: true as const } : {}),
+    shape
+  };
+  target.write({ areas: [...target.vision.areas, area] });
+}
+
+export function removeVisionArea(state: GameState, sceneId: string | undefined, areaId: string) {
+  const target = slice(state, sceneId, null);
+  if (!target.vision.areas.some((area) => area.id === areaId))
+    throw new CommandRejectedError("That area is no longer there.");
+  target.write({ areas: target.vision.areas.filter((area) => area.id !== areaId) });
 }
 
 export function resetExplored(state: GameState, sceneId: string | undefined) {
@@ -69,7 +144,7 @@ export function resetExplored(state: GameState, sceneId: string | undefined) {
 /** Keeps the map's measure current when the live map changes under the vision layer (a fight started elsewhere). */
 export function refreshVisionMeasure(state: GameState, geometry: TokenMapGeometry) {
   const vision = state.combat.vision;
-  if (!vision.enabled && vision.walls.length === 0 && vision.lights.length === 0) return;
+  if (!vision.enabled && vision.walls.length === 0 && vision.lights.length === 0 && vision.areas.length === 0) return;
   slice(state, undefined, geometry).write({});
 }
 

@@ -7,6 +7,7 @@ import { characterSheetCommands } from "./character-sheet.js";
 import { characterCommands } from "./characters.js";
 import { effectCommands } from "./effects.js";
 import { encounterCommands } from "./encounter.js";
+import { experienceCommands } from "./experience.js";
 import { createKit, type CommandContext, type GamePrincipal } from "./kit.js";
 import { mapCommands } from "./map.js";
 import { createCommandRunner, runRead, type AnyCommand, type ReadSpec, type SocketEventOf } from "./pipeline.js";
@@ -37,6 +38,7 @@ export const gameCommands: readonly AnyCommand[] = [
   ...actionCommands,
   ...saveCommands,
   ...rollCommands,
+  ...experienceCommands,
   ...reactionCommands,
   ...effectCommands,
   ...rulingCommands,

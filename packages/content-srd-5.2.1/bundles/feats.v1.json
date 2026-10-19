@@ -67,7 +67,19 @@
       "uses": {
         "limit": 1,
         "per": "long-rest"
-      }
+      },
+      "replaces": [
+        {
+          "offer": "feature:magic-initiate-cleric",
+          "when": "level-up",
+          "amount": 1
+        },
+        {
+          "offer": "feature:magic-initiate-cleric/2",
+          "when": "level-up",
+          "amount": 1
+        }
+      ]
     }
   },
   {
@@ -116,7 +128,19 @@
       "uses": {
         "limit": 1,
         "per": "long-rest"
-      }
+      },
+      "replaces": [
+        {
+          "offer": "feature:magic-initiate-druid",
+          "when": "level-up",
+          "amount": 1
+        },
+        {
+          "offer": "feature:magic-initiate-druid/2",
+          "when": "level-up",
+          "amount": 1
+        }
+      ]
     }
   },
   {
@@ -165,7 +189,19 @@
       "uses": {
         "limit": 1,
         "per": "long-rest"
-      }
+      },
+      "replaces": [
+        {
+          "offer": "feature:magic-initiate-wizard",
+          "when": "level-up",
+          "amount": 1
+        },
+        {
+          "offer": "feature:magic-initiate-wizard/2",
+          "when": "level-up",
+          "amount": 1
+        }
+      ]
     }
   },
   {
@@ -619,6 +655,31 @@
       "tags": [
         "epic-boon"
       ],
+      "actions": [
+        {
+          "id": "merge-with-shadows",
+          "name": "Merge with Shadows",
+          "activation": "bonus-action",
+          "description": "While within Dim Light or Darkness, you give yourself the Invisible condition. The condition ends on you immediately after you take an action, a Bonus Action, or a Reaction.",
+          "damage": [],
+          "sight": {
+            "inDimLightOrDarkness": true
+          },
+          "grants": {
+            "name": "Merge with Shadows",
+            "tags": [
+              "until-next-action"
+            ],
+            "target": "self",
+            "duration": {
+              "type": "manual"
+            },
+            "conditions": [
+              "invisible"
+            ]
+          }
+        }
+      ],
       "choice": {
         "kind": "ability-score",
         "choose": 1,
@@ -651,6 +712,13 @@
       "description": "You gain the following benefits. Ability Score Increase: Increase one ability score of your choice by 1, to a maximum of 30. Truesight: You have Truesight with a range of 60 feet.",
       "tags": [
         "epic-boon"
+      ],
+      "modifiers": [
+        {
+          "type": "sense",
+          "sense": "truesight",
+          "feet": 60
+        }
       ],
       "choice": {
         "kind": "ability-score",
