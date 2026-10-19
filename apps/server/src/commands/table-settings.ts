@@ -9,6 +9,8 @@ import {
   TableSetPartyVisibilitySchema,
   TableSetStagingDefaultsSchema
 } from "@vtt/domain/commands";
+import { HOLDING_BREATH_TAG, startHoldingBreath } from "../breath.js";
+import { endEffect, type EffectNarration } from "../effects.js";
 import type { Kit } from "./kit.js";
 import { defineCommand, type Committed } from "./pipeline.js";
 
@@ -203,7 +205,7 @@ export const tableSettingCommands = [
     type: "encounter.set-environment",
     operationId: "setEnvironment",
     description:
-      "Toggles the underwater environment on the live encounter (GM-grade only; SRD Underwater Combat): melee attacks take Disadvantage unless they deal piercing damage, ranged attacks automatically miss beyond normal range, and every combatant resists fire damage.",
+      "Toggles the underwater environment on the live encounter (GM-grade only; SRD Underwater Combat): melee attacks take Disadvantage unless they deal piercing damage, ranged attacks automatically miss beyond normal range, and every combatant resists fire damage. Each combatant that can't breathe water starts holding its breath (SRD Suffocation), and turning it off lets them all breathe again.",
     summary:
       "Toggle the underwater environment: melee disadvantage unless piercing, ranged auto-miss beyond normal range, fire resistance for all (GM).",
     schema: SetEnvironmentSchema,
@@ -211,8 +213,23 @@ export const tableSettingCommands = [
     gmOnly: "Only the GM can change the encounter environment.",
     async run({ request, execute }, kit) {
       const { underwater } = request;
+      let events: EffectNarration[] = [];
       const committed = await execute((state) => {
         state.combat = { ...state.combat, underwater };
+        // SRD Suffocation: under the water each combatant that can't breathe it holds its breath; out of it, all
+        // breathe again.
+        events = state.combat.initiative.flatMap((entry) => {
+          const actor = state.actors.find((candidate) => candidate.id === entry.actorId);
+          if (!actor) return [];
+          if (underwater)
+            return startHoldingBreath(
+              state,
+              actor,
+              actor.definitionId ? kit.resolveDefinitionIn(state, actor.definitionId) : undefined
+            );
+          const held = actor.effects.find((effect) => effect.tags.includes(HOLDING_BREATH_TAG));
+          return held ? endEffect(state, actor.id, held.id) : [];
+        });
       });
       // Public: the whole table fights under these rules.
       audit(
@@ -223,6 +240,7 @@ export const tableSettingCommands = [
           : "The fight is no longer underwater.",
         false
       );
+      if (!committed.duplicate) kit.publishNarrations(events);
     }
   })
 ];

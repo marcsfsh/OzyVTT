@@ -193,11 +193,16 @@ describe("a monster's hit leaves an effect beyond conditions", () => {
 });
 
 describe("what a monster's hit leaves to the GM is said with it", () => {
-  it("curses with a mummy's Rotting Fist: no healing, and what it does at rests in the reminder", () => {
+  it("curses with a mummy's Rotting Fist: no healing and a daily loss, and the death to dust is the hit's own", () => {
     const built = table("mummy");
-    const hit = strike(built, "rotting-fist");
-    expect(built.hero.effects).toMatchObject([{ tags: ["no-healing"], duration: { type: "manual" } }]);
-    expect(hit.warnings?.join(" ")).toMatch(/Hit Point maximum decreases by 10 \(3d6\) every 24 hours/);
+    strike(built, "rotting-fist");
+    expect(built.hero.effects).toMatchObject([
+      {
+        tags: ["no-healing", "curse"],
+        duration: { type: "manual" },
+        atRest: { at: "day", maximumLoss: "3d6", holdsMaximum: true }
+      }
+    ]);
     // The death to dust is the hit's own (`kill-outright.test.ts`).
     expect(built.definition.actions.find((action) => action.id === "rotting-fist")?.drain).toEqual({
       killsAtZero: { cause: "Rotting Fist", bodyGone: true }

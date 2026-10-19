@@ -1228,6 +1228,126 @@ export const OngoingDamageSchema = z
   .strict();
 export type OngoingDamage = z.infer<typeof OngoingDamageSchema>;
 
+/** Damage a failed repeat save deals ("Each time the target fails this save, it takes 5d10 Psychic damage"). */
+const RepeatFailureDamageSchema = z
+  .array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict())
+  .min(1)
+  .max(2);
+
+/**
+ * An action that ends an effect, and who may take it: the bearer, other creatures within 5 feet of the bearer (`near`
+ * "bearer", the default) or of the effect's source (`near` "source": pulling a creature out of a gelatinous cube), or
+ * either. With `check`, the action is an ability check that must succeed, against `dc` or the save's own DC; without,
+ * the action alone ends it ("a creature within 5 feet of it takes an action to wake it"). `takerDamage` is what the
+ * creature that succeeds takes (the cube's acid).
+ */
+export const EndedBySchema = z
+  .object({
+    name: z.string().min(1).max(60),
+    by: z.enum(["bearer", "others", "either"]),
+    near: z.enum(["bearer", "source"]).optional(),
+    /** How near another creature must be, in feet; 5 when absent. */
+    withinFeet: z.number().int().min(5).max(300).optional(),
+    check: z
+      .object({
+        ability: AbilitySchema,
+        skill: RiderSlugSchema.optional(),
+        dc: z.number().int().min(1).max(40).optional()
+      })
+      .strict()
+      .optional(),
+    takerDamage: RepeatFailureDamageSchema.optional()
+  })
+  .strict()
+  .describe(
+    "An action that ends the effect: who may take it (the bearer, others within 5 feet of the bearer or the source, or either), the ability check it needs if any, and the damage the one who succeeds takes"
+  );
+export type EndedBy = z.infer<typeof EndedBySchema>;
+
+/**
+ * What an effect does as its bearer rests or as days pass (a mummy's curse, an otyugh's poison):
+ * - `at`: as the bearer finishes a Long Rest (`long-rest`), or as each 24 hours of game time pass (`day`).
+ * - `save`: the save it makes then, a success ending the effect.
+ * - `maximumLoss`: what the bearer's Hit Point maximum loses then (on a failed save, or each time when there is no
+ *   save), held until the effect ends.
+ * - `noBenefit`: the rests that give the bearer nothing ("gains no benefit from finishing a Short or Long Rest").
+ * - `holdsMaximum`: "its Hit Point maximum doesn't return to normal when finishing a Long Rest".
+ */
+export const RestTriggerSchema = z
+  .object({
+    at: z.enum(["long-rest", "day"]).optional(),
+    save: z
+      .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional(),
+    maximumLoss: DiceFormulaSchema.optional(),
+    noBenefit: z.enum(["short", "long", "both"]).optional(),
+    holdsMaximum: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "What the effect does as its bearer finishes a Long Rest or as each day passes: a save that ends it, a Hit Point maximum loss, the rests that give no benefit, and a maximum a Long Rest doesn't restore"
+  );
+export type RestTrigger = z.infer<typeof RestTriggerSchema>;
+
+/** What an effect turns into when its repeat save fails ("Second Failure: The target has the Petrified condition
+ *  instead"): its name and conditions, how long they last (absent: until ended, or with the caster's Concentration),
+ *  whether damage ends them, and whether the target keeps repeating the save at the end of each of its turns. */
+export const EffectStageSchema = z
+  .object({
+    name: z.string().min(1).max(120),
+    linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),
+    duration: SaveFailureDurationSchema.optional(),
+    endsOnDamage: z.literal(true).optional(),
+    repeats: z.literal(true).optional(),
+    endedBy: EndedBySchema.optional()
+  })
+  .strict();
+export type EffectStage = z.infer<typeof EffectStageSchema>;
+
+/**
+ * The save an effect's bearer repeats to end it (Hold Person), and when:
+ * - `timing`: at the end of each of its turns (absent), at the start of each (`turn-start`, Conjure Elemental's
+ *   restraint), or only when something else opens it (`none`: Dominate Person's damage).
+ * - `once`: only at the end of its next turn (a basilisk's gaze); `skipsCurrentTurn` marks one that began during that
+ *   creature's own turn, so the end of that turn doesn't count.
+ * - `onDamage`: each time the bearer takes damage too, with Advantage (`advantage`, Hideous Laughter), or only damage
+ *   from another source than the effect's (`notFromSource`, a harpy's Luring Song).
+ * - `byAction`: the bearer may take an action to repeat it (Irresistible Dance).
+ * - `unseenSource`: at its turn's end only when it can't see the effect's source (Fear).
+ * - `failureDamage`: what a failure deals (Weird's 5d10 Psychic).
+ * - `tally`: successes and failures counted apart until one reaches `needed` (Flesh to Stone's three).
+ * - `next`: what a failure (the last counted one, with a tally) turns the effect into.
+ */
+export const RepeatSaveSchema = z
+  .object({
+    ability: AbilitySchema,
+    dc: z.number().int().min(1).max(40),
+    timing: z.enum(["turn-start", "none"]).optional(),
+    once: z.literal(true).optional(),
+    skipsCurrentTurn: z.literal(true).optional(),
+    onDamage: z
+      .object({ advantage: z.literal(true).optional(), notFromSource: z.literal(true).optional() })
+      .strict()
+      .optional(),
+    byAction: z.literal(true).optional(),
+    /** Only when the bearer ends its turn where it can't see the effect's source (Fear). */
+    unseenSource: z.literal(true).optional(),
+    failureDamage: RepeatFailureDamageSchema.optional(),
+    tally: z
+      .object({
+        needed: z.number().int().min(2).max(5),
+        successes: z.number().int().min(0).max(5).default(0),
+        failures: z.number().int().min(0).max(5).default(0)
+      })
+      .strict()
+      .optional(),
+    next: EffectStageSchema.optional(),
+    /** What gives each repeat Disadvantage, as the roll names it (Heightened Spell). */
+    disadvantageFrom: z.string().min(1).max(60).optional()
+  })
+  .strict();
+export type RepeatSave = z.infer<typeof RepeatSaveSchema>;
 /** Conditions a creature of these types can't give the bearer (Protection from Evil and Good). */
 export const ConditionWardSchema = z
   .object({
@@ -1505,16 +1625,9 @@ export const EffectInstanceSchema = z
     escapeDc: z.number().int().min(1).max(40).nullable().default(null),
     onEnd: z.array(EffectOnEndSchema).max(2).default([]),
     /** "Repeats the save at the end of each of its turns": the bearer owes this save as each of its turns ends, and
-     * a success ends the effect (Hold Person, a ghast's claws). `disadvantageFrom` names what gives each repeat
-     * Disadvantage (Heightened Spell). */
-    repeatSave: z
-      .object({
-        ability: AbilitySchema,
-        dc: z.number().int().min(1).max(40),
-        disadvantageFrom: z.string().min(1).max(60).optional()
-      })
-      .strict()
-      .optional(),
+     * a success ends the effect (Hold Person, a ghast's claws). When and how often, what a failure does, and what
+     * gives each repeat Disadvantage (Heightened Spell), are `RepeatSaveSchema`'s. */
+    repeatSave: RepeatSaveSchema.optional(),
     /** Ends early when the bearer takes any damage (Sleep, Turn Undead, Hypnotic Pattern, a knocked-out creature). */
     endsOnDamage: z.boolean().optional(),
     /** Ends early when its source or one of the source's allies deals damage to the bearer (Charm Person). */
@@ -1568,6 +1681,30 @@ export const EffectInstanceSchema = z
     magical: z.literal(true).optional(),
     /** It ends when a spell restores the bearer's hit points (an infernal wound). */
     endsOnSpellHealing: z.literal(true).optional(),
+    /** It ends when the bearer ends its turn where it can't see the effect's source (Horror Nimbus). */
+    endsOutOfSight: z.literal(true).optional(),
+    /** A creature that targets the bearer with an attack roll or a damaging spell first makes this save (Sanctuary). */
+    ward: z
+      .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional(),
+    /** SRD Suffocation: the rounds of breath the bearer has left (each of its turns' ends spends one), then the
+     *  Exhaustion levels suffocating gave it (one at the end of each of its turns), which go when it breathes again
+     *  and this ends. */
+    breath: z
+      .object({
+        roundsLeft: z.number().int().min(0).max(100_000),
+        exhaustionGained: z.number().int().min(0).max(6).default(0)
+      })
+      .strict()
+      .optional(),
+    /** An action that ends it: waking a sleeper, stanching a wound, studying an illusion, detaching a stirge. */
+    endedBy: EndedBySchema.optional(),
+    /** What it does as its bearer rests or days pass (a mummy's curse); `dayMark` is the game-clock minute its next 24
+     *  hours count from. */
+    atRest: RestTriggerSchema.extend({ dayMark: z.number().int().min(0).optional() })
+      .strict()
+      .optional(),
     /** On a caster's Concentration: the spell is nothing but what it leaves on creatures (Hold Person's paralysis,
      *  Bless's d4), so it ends once no living creature keeps any of it. */
     endsWhenUnaffected: z.literal(true).optional(),
@@ -1811,6 +1948,9 @@ export const InventoryItemSchema = z
     /** Ammunition pieces left in a row sold in bundles ("Arrows (20)"), when some are spent; absent = every bundle
      *  full. The server keeps it: shots spend it and a quantity change moves it by whole bundles. */
     ammunitionLeft: z.number().int().min(0).max(1_000_000).optional(),
+    /** A Waterskin row's water left, in pints; absent means every skin in the row is full (4 pints each). Drinking
+     *  as a day ends lowers it, and drinking one's fill at a source fills the skins again. The server keeps it. */
+    waterPints: z.number().int().min(0).max(100_000).optional(),
     /** Pieces fired from this row in the running fight that can be picked up after it (half come back). The
      *  server keeps it. */
     ammunitionFired: z.number().int().min(0).max(10_000).optional(),
@@ -2128,6 +2268,22 @@ export const ActorSchema = z.object({
     .default({}),
   /** Conditions this actor is immune to (seeded from its definition). GM knowledge, stripped from player projections. */
   conditionImmunities: z.array(ConditionIdSchema).max(20).default([]),
+  /** SRD Influence: a monster's or NPC's attitude toward the party, Indifferent when absent. The GM sets it; an
+   *  Influence check against it has Advantage when Friendly and Disadvantage when Hostile. GM-only in projections. */
+  attitude: z.enum(["friendly", "indifferent", "hostile"]).optional(),
+  /** SRD Malnutrition and Dehydration, while the table tracks food and water (`rest.survival`): what the creature ate
+   *  and drank this game day, the days in a row it ate nothing, and the Exhaustion levels hunger and thirst gave it,
+   *  which no rest removes until it eats or drinks its full need for a day. The server keeps it. Owner and GM only. */
+  nourishment: z
+    .object({
+      foodPounds: z.number().min(0).max(1000).default(0),
+      waterPints: z.number().int().min(0).max(10_000).default(0),
+      daysUnfed: z.number().int().min(0).max(10_000).default(0),
+      hungerLevels: z.number().int().min(0).max(6).default(0),
+      thirstLevels: z.number().int().min(0).max(6).default(0)
+    })
+    .strict()
+    .optional(),
   /** Walking speed in feet (seeded from the definition, GM-editable). Absent = unknown, so movement rules skip. */
   speedFeet: z.number().int().min(0).max(500).optional(),
   /** Legendary actions per round and Legendary Resistance per day (SRD 2024). GM knowledge, stripped from player projections. */
@@ -2477,6 +2633,12 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   onlyOne: z.literal(true).optional(),
   /** Only another creature may receive it ("inspire another creature"). */
   notSelf: z.literal(true).optional(),
+  /** A creature that targets the recipient with an attack roll or a damaging spell first makes this save, against the
+   *  caster's spell save DC when the grant prints none (Sanctuary); a failure turns it away from the recipient. */
+  ward: z
+    .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40).optional() })
+    .strict()
+    .optional(),
   /** The recipient's size while it lasts (Large Form: Large), where there is room for it. */
   sizeChange: SizeChangeSchema.optional(),
   /** It lasts this many hours, rolled as it lands (Potion of Diminution: 1d4), in place of `duration`. */
@@ -2685,6 +2847,126 @@ export const SaveOutcomeFields = {
   /** A creature this size or larger has Advantage on the save (Ensnaring Strike: "A Large or larger creature has
    *  Advantage on this save"). */
   advantageAtSize: SizeSchema.optional(),
+  /** "Repeats the save at the end of its next turn", once (a basilisk's gaze, Sleep): the failure holds until then, a
+   *  success ends it, and a failure brings `secondFailure`. */
+  repeatOnce: z
+    .literal(true)
+    .optional()
+    .describe(
+      "The target repeats the save once, at the end of its next turn: a success ends the failure, a failure brings the second failure"
+    ),
+  /** The repeat comes at the start of each of the target's turns (Conjure Elemental's restraint). */
+  repeatAtTurnStart: z
+    .literal(true)
+    .optional()
+    .describe("The target repeats the save at the start of each of its turns, not the end"),
+  /** The target also repeats the save each time it takes damage (Dominate Person), with Advantage (Hideous Laughter),
+   *  or only for damage from another source (a harpy's Luring Song). */
+  repeatOnDamage: z
+    .object({ advantage: z.literal(true).optional(), notFromSource: z.literal(true).optional() })
+    .strict()
+    .optional()
+    .describe(
+      "The target repeats the save each time it takes damage: with Advantage (advantage), or only for damage from another source (notFromSource)"
+    ),
+  /** The target can take an action to repeat the save (Irresistible Dance: "collect itself"). */
+  repeatByAction: z.literal(true).optional().describe("The target can take an action on its turn to repeat the save"),
+  /** Damage each failed repeat deals (Weird: "it takes 5d10 Psychic damage"). */
+  repeatFailureDamage: RepeatFailureDamageSchema.optional().describe(
+    "Damage each failed repeat save deals, rolled by the engine"
+  ),
+  /** Successes and failures counted apart until one reaches this many (Flesh to Stone's three): that many successes
+   *  end it, that many failures bring `secondFailure`. */
+  repeatTally: z
+    .number()
+    .int()
+    .min(2)
+    .max(5)
+    .optional()
+    .describe(
+      "Repeated saves counted apart until this many successes (ending it) or failures (bringing the second failure)"
+    ),
+  /** What a failed repeat (the last counted one, with a tally) leaves in place of the failure: "Second Failure: The
+   *  target has the Unconscious condition for 10 minutes". */
+  secondFailure: z
+    .object({
+      name: z.string().min(1).max(120).optional(),
+      conditions: z.array(SaveConditionSchema).max(4).default([]),
+      duration: SaveFailureDurationSchema.optional(),
+      endsOnDamage: z.literal(true).optional(),
+      repeatSave: z.literal(true).optional(),
+      endedBy: EndedBySchema.optional()
+    })
+    .strict()
+    .optional()
+    .describe(
+      "What a failed repeat save leaves in place of the first failure: its conditions, how long they last, whether damage ends them and whether the save repeats each turn"
+    ),
+  /** An action that ends the failure's effect ("a creature within 5 feet of it takes an action to wake it", "stanch the
+   *  wound ... DC 12 Wisdom (Medicine) check"). */
+  endedBy: EndedBySchema.optional(),
+  /** What the failure's effect does as its bearer rests or days pass (a death dog's poison). */
+  atRest: RestTriggerSchema.optional(),
+  /** A failed repeat deals the cast's damage again (Phantasmal Killer: "it takes the Psychic damage again"). */
+  repeatDamageAgain: z
+    .literal(true)
+    .optional()
+    .describe("Each failed repeat save deals the first failure's damage again"),
+  /** The target repeats the save only when it ends its turn out of the source's line of sight (Fear). */
+  repeatUnseenSource: z
+    .literal(true)
+    .optional()
+    .describe("The target repeats the save only when it ends its turn where it can't see the source"),
+  /** The failure ends when the target ends its turn out of the source's line of sight (Horror Nimbus). */
+  endsOutOfSight: z
+    .literal(true)
+    .optional()
+    .describe("The failure ends when the target ends its turn where it can't see the source"),
+  /** Creatures that succeed without rolling: of these types (Flesh to Stone's Constructs), or that don't sleep (Sleep:
+   *  "Creatures that don't sleep, such as elves, or that have Immunity to the Exhaustion condition"). */
+  autoSuccess: z
+    .object({
+      creatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
+      sleepless: z.literal(true).optional()
+    })
+    .strict()
+    .optional()
+    .describe("Creatures that succeed without rolling: of these creature types, or that don't sleep"),
+  /** Exhaustion levels a failure adds (Weight of Years: "The target gains 1 Exhaustion level"). */
+  failureExhaustion: z.number().int().min(1).max(6).optional().describe("Exhaustion levels a failed save adds"),
+  /** In a fight, the target has Advantage when the source or its allies are fighting it (Charm Person). */
+  advantageIfFighting: z
+    .literal(true)
+    .optional()
+    .describe("In a fight, the target has Advantage on the save when the source's side is fighting it"),
+  /** "Success: The target is immune to this ghast's Stench for 24 hours" (held for the rest of the fight). */
+  immuneOnSuccess: z
+    .literal(true)
+    .optional()
+    .describe("A success makes the target immune to this action of its source, held for the rest of the fight"),
+  /** The failure's conditions end when the source dies ("until the aboleth dies"). */
+  endsWhenSourceDies: z
+    .literal(true)
+    .optional()
+    .describe("The failure's conditions end when the source dies or is defeated"),
+  /** Only creatures of these types make the save ("If the target is a Humanoid, it is subjected to the following
+   *  effect"); any other is spared it. */
+  onlyCreatureTypes: z
+    .array(RiderSlugSchema)
+    .min(1)
+    .max(6)
+    .optional()
+    .describe("Only creatures of these types make the save; any other is spared it"),
+  /** A creature that still bears this action's failure is left out ("each creature that isn't currently affected by
+   *  this breath"). */
+  sparesAffected: z.literal(true).optional().describe("A creature still under this action's failure makes no new save"),
+  /** A failure kills the target outright, and the source may regain hit points from it (a will-o'-wisp's Consume
+   *  Life: "The target dies, and the wisp regains 10 (3d6) Hit Points"). */
+  failureKills: z
+    .object({ sourceRegains: DiceFormulaSchema.optional() })
+    .strict()
+    .optional()
+    .describe("A failure kills the target outright; the source regains the rolled hit points, if any"),
   /** A failure returns a shape-shifted creature to its true form, and it can't shape-shift while the spell lasts
    *  (Moonbeam). */
   failureEndsForm: z
@@ -2904,7 +3186,7 @@ export const SaveFailureEffectSchema = z
       .strict()
       .optional(),
     /** The bearer can't move from its space while it lasts (Irresistible Dance: "must use all its movement to dance in
-     *  place"). */
+     *  place"; Flesh to Stone's success: "its Speed is 0 until the start of your next turn"). */
     speedZero: z.literal(true).optional(),
     /** The light the creature sheds while it lasts (Faerie Fire: "Each creature ... sheds Dim Light"). */
     light: CarriedLightSchema.optional(),
@@ -3048,6 +3330,13 @@ export const OnHitRiderSchema = z
     spendsEffectTag: EffectTagSchema.optional(),
     /** What the engine leaves to the GM, said with the hit: a curse that acts at rests, a creature killed outright. */
     reminder: z.string().min(1).max(400).optional(),
+    /** An action that ends the effect ("The target or a creature within 5 feet of it can detach the stirge as an
+     *  action"). */
+    endedBy: EndedBySchema.optional(),
+    /** What the effect does as its bearer rests or days pass (a mummy's curse, an otyugh's poison). */
+    atRest: RestTriggerSchema.optional(),
+    /** It ends when the attacker dies ("cursed for 24 hours or until the incubus dies"). */
+    endsWhenSourceDies: z.literal(true).optional(),
     /** The hit can kill outright (Nine Lives Stealer, Mace of Disruption, Mace of Smiting, Vorpal Sword): only against a
      *  target with fewer than `hitPointsUnder` Hit Points as it is hit, or `afterHitAtOrBelow` or fewer once the hit's
      *  damage lands, and never against `exceptCreatureTypes`. With the rider's `save` a failure kills and a success
@@ -4315,8 +4604,8 @@ const TraitSaveSchema = z
     ability: AbilitySchema,
     dc: z.number().int().min(1).max(40),
     ...SaveOutcomeFields,
-    /** "Success: The target is immune to this ghast's Stench for 24 hours" (held for the rest of the fight). */
-    immuneOnSuccess: z.literal(true).optional()
+    /** What a failure leaves beyond conditions (an aboleth's Mucus Cloud curse). */
+    failureEffect: SaveFailureEffectSchema.optional()
   })
   .strict();
 
@@ -4370,11 +4659,15 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       notWhileIncapacitated: z.literal(true).optional(),
       /** Only a creature that can see the bearer is affected ("and can see the hag's true form"). */
       seenOnly: z.literal(true).optional(),
+      /** It acts only while the fight is underwater (an aboleth's Mucus Cloud). */
+      underwaterOnly: z.literal(true).optional(),
       damage: TraitDamageSchema.optional(),
       save: TraitSaveSchema.optional(),
       /** The fire it sets (a fire elemental's Emanation): "start burning" (SRD Burning). */
       hazard: z.literal("burning").optional(),
-      /** What a failed save does that the engine leaves to the GM (a gibbering mouther's d8 table). */
+      /** A failed save rolls on a table the server reads for the creature's turn (a gibbering mouther's d8). */
+      failureTable: z.literal("gibbering").optional(),
+      /** What a failed save does that the engine leaves to the GM. */
       reminder: z.string().min(1).max(600).optional()
     })
     .strict(),
@@ -4421,7 +4714,13 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       kind: z.literal("berserk"),
       name: TraitNameSchema,
       /** The d6 face, or higher, that sends it berserk. */
-      on: z.number().int().min(1).max(6)
+      on: z.number().int().min(1).max(6),
+      /** Another creature within `withinFeet` calms it with an action and a Charisma (Persuasion) check against `dc`
+       *  (the flesh golem's creator). */
+      calm: z
+        .object({ dc: z.number().int().min(1).max(40), withinFeet: z.number().int().min(5).max(300) })
+        .strict()
+        .optional()
     })
     .strict(),
   /** "The stalker has the Invisible condition": the creature joins the roster with it. */

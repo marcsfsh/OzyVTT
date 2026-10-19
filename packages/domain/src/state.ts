@@ -245,6 +245,12 @@ const PendingSaveEffectSchema = z
     magical: EffectInstanceSchema.shape.magical,
     /** It ends when a spell restores the bearer's hit points (an infernal wound). */
     endsOnSpellHealing: EffectInstanceSchema.shape.endsOnSpellHealing,
+    /** It ends when the bearer ends its turn where it can't see its source (Horror Nimbus). */
+    endsOutOfSight: EffectInstanceSchema.shape.endsOutOfSight,
+    /** An action that ends it (waking a sleeper, stanching a wound). */
+    endedBy: EffectInstanceSchema.shape.endedBy,
+    /** What it does as its bearer rests or days pass (a death dog's poison). */
+    atRest: EffectInstanceSchema.shape.atRest,
     /** What the effect does while it lasts (Bane's -1d4 on attack rolls and saves). */
     modifiers: EffectModifiersSchema.default([]),
     /** What it adds to AC while it lasts (Slow's -2). */
@@ -327,7 +333,14 @@ export const PendingSaveSchema = z
     zoneId: z.string().min(1).max(120).optional(),
     /** A save the bearer repeats at the end of its turn: a success ends this effect. Stripped from player projections. */
     repeatOf: z
-      .object({ actorId: z.uuid(), effectId: z.string().min(1).max(120) })
+      .object({
+        actorId: z.uuid(),
+        effectId: z.string().min(1).max(120),
+        /** The effect's own repeat save, so a failure counts toward its tally or brings its next stage. */
+        repeat: z.literal(true).optional(),
+        /** The save it asks as its bearer rests or a day passes: a failure costs Hit Point maximum (`atRest`). */
+        rest: z.literal(true).optional()
+      })
       .strict()
       .optional(),
     /** The GM's call for a roll this save answers; the outcome is written back to the call. */
@@ -343,6 +356,23 @@ export const PendingSaveSchema = z
     failurePush: ForcedPushSchema.optional(),
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
+    /** What gives the save Advantage beyond the target's own riders, as the roll card names it: the damage that opened
+     *  it (Hideous Laughter), or a fight with its source's side (Charm Person). */
+    advantageFrom: z.string().min(1).max(120).optional(),
+    /** Why the target succeeds without rolling (a Construct against Flesh to Stone, an elf against Sleep). GM
+     *  bookkeeping, never projected: the result says it when the save is answered. */
+    autoSucceeds: z.string().min(1).max(120).optional(),
+    /** A failure kills the target outright, and the source regains these hit points (Consume Life). GM bookkeeping,
+     *  never projected. */
+    failureKills: z
+      .object({
+        sourceRegains: z
+          .string()
+          .regex(/^\d+d(?:4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?$/)
+          .optional()
+      })
+      .strict()
+      .optional(),
     /** A failure that acts by the target's Hit Points as it fails (Divine Word, Slaying Bow). GM bookkeeping, never
      *  projected: the result says what landed. */
     failureByHitPoints: z.array(HitPointBandSchema).min(1).max(4).optional(),
@@ -409,7 +439,10 @@ export const CheckSubjectSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(80)
-      .optional()
+      .optional(),
+    /** What the check relies on, when the GM says: SRD Blinded and Deafened fail a check "that requires sight" or
+     *  "hearing". */
+    sense: z.enum(["sight", "hearing"]).optional()
   })
   .strict();
 export type CheckSubject = z.infer<typeof CheckSubjectSchema>;
@@ -1579,7 +1612,10 @@ export const RestStateSchema = z
     /** The hour of the day dawn comes, when the GM keeps the clock: what "regains at dawn" (a wand's charges) comes
      *  back as the clock passes it. Null: at each Long Rest. GM-set. */
     dawnHour: z.number().int().min(0).max(23).nullable().default(null),
-    shortRest: PartyShortRestSchema.nullable().default(null)
+    shortRest: PartyShortRestSchema.nullable().default(null),
+    /** The table tracks food and water: as each game day ends, every character eats and drinks what it carries and
+     *  what it lacks costs it (SRD Malnutrition, Dehydration). Off by default. */
+    survival: z.boolean().default(false)
   })
   .strict();
 export type RestState = z.infer<typeof RestStateSchema>;

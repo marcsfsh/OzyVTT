@@ -131,6 +131,7 @@ import type {
   InitiativeRollSelfSchema,
   InitiativeScoreSchema,
   InitiativeSwapSchema,
+  InitiativeOrderTieSchema,
   ReactionAnswerSchema,
   ReactionDismissSchema,
   ReplayLaunchSchema,
@@ -154,6 +155,7 @@ import type {
   SceneReorderSchema,
   SceneSetCombatantsSchema,
   SetActorArchivedSchema,
+  SetActorAttitudeSchema,
   SetActorHealthDisplaySchema,
   SetActorSheetPreviewSchema,
   SetActorSizeSchema,
@@ -170,6 +172,9 @@ import type {
   TableSetStagingDefaultsSchema,
   TempHpSchema,
   TimePassSchema,
+  SurvivalSetTrackingSchema,
+  ActorNourishSchema,
+  ActorHoldBreathSchema,
   TimeSetDawnSchema,
   TokenMoveSchema,
   TokenSetAltitudeSchema,
@@ -582,6 +587,10 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof SetActorHealthDisplaySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "actor:set-attitude": (
+    payload: CommandPayload<typeof SetActorAttitudeSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "encounter:set-environment": (
     payload: CommandPayload<typeof SetEnvironmentSchema>,
     acknowledgement: (result: MutationResult) => void
@@ -647,6 +656,18 @@ export interface ClientToServerEvents {
   /** GM-only: move game time forward. */
   "time:pass": (
     payload: CommandPayload<typeof TimePassSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "survival:set-tracking": (
+    payload: CommandPayload<typeof SurvivalSetTrackingSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "actor:nourish": (
+    payload: CommandPayload<typeof ActorNourishSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "actor:hold-breath": (
+    payload: CommandPayload<typeof ActorHoldBreathSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM-only: set the hour dawn comes, or let a Long Rest stand in for it. */
@@ -785,6 +806,10 @@ export interface ClientToServerEvents {
   ) => void;
   "initiative:swap": (
     payload: CommandPayload<typeof InitiativeSwapSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "initiative:order-tie": (
+    payload: CommandPayload<typeof InitiativeOrderTieSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "initiative:roll-self": (

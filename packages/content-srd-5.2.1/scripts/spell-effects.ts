@@ -542,7 +542,15 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "save",
       activation: "other",
       when: "A creature that enters the spirit's space or starts its turn within 5 feet of it makes the save, if the spirit has no creature Restrained; the Restrained target repeats it at the start of each of its turns, taking 4d8 on a failure.",
-      save: { ability: "dex", successDamage: "none", failureConditions: ["restrained"] },
+      // "At the start of each of its turns, the Restrained target repeats the save. On a failed save, the target takes
+      // 4d8 damage of the spirit's type. On a successful save, the target isn't Restrained by the spirit."
+      save: {
+        ability: "dex",
+        successDamage: "none",
+        failureConditions: ["restrained"],
+        repeatAtTurnStart: true,
+        repeatFailureDamage: [{ formula: "4d8", type: "lightning" }]
+      },
       damage: [{ formula: "8d8", type: "lightning" }],
       // A Large spirit: its space and 5 feet around it reach 10 feet from its point. The caster's chosen element is
       // its damage type.
@@ -1488,6 +1496,24 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     conditions: ["invisible"]
   }),
+  // "Grants up to ten willing creatures of your choice within range the ability to breathe underwater until the spell
+  // ends": a creature holding its breath breathes again.
+  "water-breathing": spellGrant({
+    name: "Water Breathing",
+    tags: ["water-breathing"],
+    target: "targets",
+    duration: { type: "manual" }
+  }),
+  // "Any creature who targets the warded creature with an attack roll or a damaging spell must succeed on a Wisdom
+  // saving throw or either choose a new target or lose the attack or spell", and it ends "if the warded creature
+  // makes an attack roll, casts a spell, or deals damage".
+  sanctuary: spellGrant({
+    name: "Sanctuary",
+    tags: ["sanctuary", "until-it-acts"],
+    target: "target",
+    duration: rounds(10),
+    ward: { ability: "wis" }
+  }),
   // "The target's base AC becomes 13 plus its Dexterity modifier", a way to work out AC that riders add to.
   "mage-armor": spellGrant({
     name: "Mage Armor",
@@ -2084,6 +2110,12 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   sleep: { name: "Sleep", tags: ["wakeable"], modifiers: [] },
   // "A Remove Curse, Greater Restoration, or Wish spell ends this spell."
   geas: { name: "Geas", tags: ["curse"], modifiers: [] },
+  // "You create a phantasmal object, creature, or other phenomenon ... perceivable only to the target for the duration."
+  "phantasmal-force": { name: "Phantasmal Force", tags: [], modifiers: [] },
+  // "Each target ... drops whatever it is holding and has the Frightened condition for the duration."
+  fear: { name: "Fear", tags: ["drops-held"], modifiers: [] },
+  // "Can't take Bonus Actions or Reactions, and it rolls 1d10 at the start of each of its turns" (`random-outcomes.ts`).
+  confusion: { name: "Confusion", tags: ["confused", "no-bonus-actions", "no-reactions"], modifiers: [] },
   // "Disadvantage on the next attack roll it makes before the end of its next turn": its own roll spends it.
   "vicious-mockery": {
     name: "Vicious Mockery",
@@ -2095,6 +2127,14 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
 
 /** What a successful save against the cast still leaves on the creature (SRD 5.2.1 text). */
 const SAVE_SUCCESS_EFFECTS: Readonly<Record<string, FailureEffect>> = {
+  // "On a successful save, its Speed is 0 until the start of your next turn."
+  "flesh-to-stone": {
+    name: "Flesh to Stone",
+    tags: [],
+    speedZero: true,
+    duration: { type: "until-source-next-turn" },
+    modifiers: []
+  },
   // "On a successful save, the target has Disadvantage on the next attack roll it makes until the start of your next
   // turn."
   "ray-of-enfeeblement": {

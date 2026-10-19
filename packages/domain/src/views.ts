@@ -129,6 +129,9 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     /** Hit Point Dice pool (per-die `entries` plus the derived total summary). Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ hitDice?: NonNullable<
       Actor["hitDice"]
     >;
+    /** What the character ate and drank today, while the table tracks food and water. Same gate as `hitDice`. */ nourishment?: NonNullable<
+      Actor["nourishment"]
+    >;
     /** Sheet resources (spell slots, prepared spells, inventory, currency). Your own claimed character always; another player's only at `partyVisibility` `sheet-and-resources`. */ spellSlots?: Actor["spellSlots"];
     pactSlots?: Actor["pactSlots"];
     preparedSpellIds?: Actor["preparedSpellIds"];

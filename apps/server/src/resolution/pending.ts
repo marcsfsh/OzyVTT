@@ -1,6 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
+import { prismaticSpray } from "./prismatic.js";
 import type { PendingReaction, PendingSave } from "@vtt/domain";
-import { catalogIdOf, type ActionReaction, type GrantOption } from "@vtt/schemas";
+import { catalogIdOf, DamageTypeSchema, type ActionReaction, type GrantOption } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
 import { holdsFeature } from "../class-features.js";
 import { conditionLabel } from "../condition-rules.js";
@@ -17,6 +18,10 @@ import { bestCover, coverBonusOf, coverFor, mapCover } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf, potentCantrip } from "./damage.js";
 import { spellOf, spellSaveDuration } from "./concentration.js";
+import { endedByAt, repeatSaveOf } from "../save-stages.js";
+import { areEnemies } from "../creature-sides.js";
+import { AURA_IMMUNE_TAG, traitActionId } from "../statblock-traits.js";
+import { creatureTypeOf } from "../statblock-facts.js";
 import { openDamageWindow, type DamageWindowDeps } from "../damage-window.js";
 import { answerKeyOf, answersFromOthers, askAnswer } from "../roll-answers.js";
 import { heightenedTarget, shieldedFromSave } from "./metamagic.js";
@@ -337,6 +342,20 @@ export function failureEffectFor(
     hazard?.duration ??
     (cast ? spellSaveDuration(cast.spell, cast.level) : undefined);
   const ongoingDamage = save.ongoingDamage ?? hazard?.ongoingDamage;
+  // When the target repeats the save, and what a failed repeat does (a basilisk's second failure Petrifies).
+  // "On a failed save, it takes the Psychic damage again" (Phantasmal Killer): the cast's own damage, at its level.
+  const again = save.repeatDamageAgain
+    ? action.damage.flatMap((part) =>
+        /d/.test(part.formula) && DamageTypeSchema.safeParse(part.type).success
+          ? [{ formula: part.formula, type: DamageTypeSchema.parse(part.type) }]
+          : []
+      )
+    : undefined;
+  const repeat = repeatSaveOf(
+    save,
+    (conditionId) => `${conditionLabel(conditionId)} by ${attacker.name} (${action.name})`,
+    again
+  );
   return {
     name: withOptionName(
       shaped.name ??
@@ -375,12 +394,19 @@ export function failureEffectFor(
     sourceActorId: attacker.id,
     sourceName: attacker.name,
     ...(duration ? { duration } : {}),
-    ...(save.repeatSave ? { repeatSave: { ability: save.ability, dc: save.dc } } : {}),
+    ...(repeat ? { repeatSave: repeat } : {}),
     ...(save.endsOnDamage || option?.endsOnDamage ? { endsOnDamage: true } : {}),
     ...(save.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
     ...(declared?.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
     ...(save.speedZero || declared?.speedZero || option?.speedZero ? { speedZero: true } : {}),
+    ...(save.endsOutOfSight ? { endsOutOfSight: true as const } : {}),
+    // The action that ends it: waking a sleeper, stanching a wound, studying an illusion.
+    ...(save.endedBy ? { endedBy: endedByAt(save.endedBy, save.dc) } : {}),
+    // What it does as its bearer rests or days pass (a death dog's poison).
+    ...(save.atRest ? { atRest: structuredClone(save.atRest) } : {}),
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
+    // "Until the aboleth dies".
+    ...(save.endsWhenSourceDies && !grapple ? { endsWhenSourceDefeated: true } : {}),
     ...(ongoingDamage ? { ongoingDamage } : {}),
     ...(castId !== null ? { castId } : {}),
     ...(cast ? { spell: { id: cast.spell.id, level: cast.level } } : {}),
@@ -403,6 +429,7 @@ export function successEffectFor(
     tags: [...declared.tags],
     modifiers: [...declared.modifiers],
     ...(declared.armorClassBonus !== undefined ? { armorClassBonus: declared.armorClassBonus } : {}),
+    ...(declared.speedZero ? { speedZero: true } : {}),
     linkedConditionIds: [],
     escapeDc: null,
     sourceActorId: attacker.id,
@@ -473,7 +500,11 @@ export function parkActionSave(ctx: ResolveContext): void {
     ctx.warnings.push(`Contact Patron: ${attacker.name} succeeds on the Intelligence saving throw.`);
     return;
   }
-  const conditionIds = input.conditionId ? [input.conditionId] : action.save.failureConditions;
+  // Exhaustion stacks, a level per entry (Weight of Years: "The target gains 1 Exhaustion level").
+  const conditionIds = [
+    ...(input.conditionId ? [input.conditionId] : action.save.failureConditions),
+    ...Array.from({ length: action.save.failureExhaustion ?? 0 }, () => "exhaustion")
+  ].slice(0, 4);
   const cast = spellCastOf(ctx);
   // The caster's pick of what the failure does (Bestow Curse's curse), one for each target where the text says so.
   const offered = action.save.failureEffect?.options
@@ -493,8 +524,11 @@ export function parkActionSave(ctx: ResolveContext): void {
     option ? failureEffectFor(ctx, conditionIds, cast, option, shaped) : onFailEffect;
   // Careful Spell's and Sculpt Spells' creatures succeed with no roll and take no damage (`metamagic.ts`).
   const targets = shieldFromSave(ctx, cast);
-  // A save its user makes (Contact Other Plane) is the user's alone, whatever was aimed at.
-  let saving = action.save.bySelf ? [attacker] : seeingTargets(ctx, targets);
+  // A save its user makes (Contact Other Plane) is the user's alone, whatever was aimed at. A creature that succeeded
+  // against this action before is immune to it ("immune to this cloaker's Moan for the next 24 hours").
+  let saving = action.save.bySelf
+    ? [attacker]
+    : seeingTargets(ctx, targets).filter((target) => !immuneToAction(ctx, target) && subjectToSave(ctx, target));
   // "If the target is an unwilling creature, it can make a saving throw": a creature on the user's side is willing and
   // takes the effect with no save.
   if (action.save.unwillingOnly) {
@@ -572,10 +606,12 @@ export function parkActionSave(ctx: ResolveContext): void {
     }
   }
   if (saving.length === 0) return;
+  // Prismatic Spray's d8 picks a ray, and a save of its own, for each creature.
+  if (prismaticSpray(ctx, saving)) return;
   const parts = rider ? [] : damagePartsOf(ctx);
   const heightened = heightenedTarget(ctx);
   const onSuccessEffect = successEffectFor(ctx, cast);
-  // A spell's save whose outcome the engine applies nothing of (Phantasmal Force, Polymorph): the card and the GM's
+  // A spell's save whose outcome the engine applies nothing of (Resilient Sphere, Telekinesis): the card and the GM's
   // result say the GM applies it, so it never reads as if the server had.
   const fatal = fatalFailureOf(action.save);
   const gmApplies =
@@ -611,12 +647,22 @@ export function parkActionSave(ctx: ResolveContext): void {
             )
         )
       : 0;
-  // One prompt group for each cover bonus and pick.
-  const groups = new Map<string, { saveBonus: number; option: GrantOption | null; targetIds: string[] }>();
+  // "It does so with Advantage if you or your allies are fighting it" (Charm Person): in a fight, a target on the other
+  // side from the source.
+  const fightingOf = (target: (typeof targets)[number]) =>
+    action.save!.advantageIfFighting === true && fightingSides(ctx, target) ? FIGHTING_ADVANTAGE : "";
+  // One prompt group for each cover bonus, pick, Advantage and success without a roll.
+  const groups = new Map<
+    string,
+    { saveBonus: number; option: GrantOption | null; advantageFrom: string; autoSucceeds: string; targetIds: string[] }
+  >();
   for (const target of saving) {
+    const saveBonus = saveBonusOf(target);
     const option = optionOf(target);
-    const key = `${saveBonusOf(target)}|${option?.id ?? ""}`;
-    const group = groups.get(key) ?? { saveBonus: saveBonusOf(target), option, targetIds: [] };
+    const advantageFrom = fightingOf(target);
+    const autoSucceeds = autoSuccessOf(ctx, target);
+    const key = `${saveBonus}|${option?.id ?? ""}|${advantageFrom}|${autoSucceeds}`;
+    const group = groups.get(key) ?? { saveBonus, option, advantageFrom, autoSucceeds, targetIds: [] };
     group.targetIds.push(target.id);
     groups.set(key, group);
   }
@@ -637,7 +683,7 @@ export function parkActionSave(ctx: ResolveContext): void {
     ...(action.save.failureEndsForm ? { endsForm: true as const } : {}),
     ...fatal
   };
-  for (const { saveBonus, option, targetIds } of groups.values()) {
+  for (const { saveBonus, option, advantageFrom, autoSucceeds, targetIds } of groups.values()) {
     const onFailEffect = onFailFor(option);
     createPendingSaves(state, {
       sourceActorId: attacker.id,
@@ -658,6 +704,10 @@ export function parkActionSave(ctx: ResolveContext): void {
       ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
       ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),
       ...(against ? { spell: against } : {}),
+      ...(advantageFrom !== "" ? { advantageFrom } : {}),
+      ...(autoSucceeds !== "" ? { autoSucceeds } : {}),
+      ...(action.save.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
+      ...(action.save.failureKills ? { failureKills: { ...action.save.failureKills } } : {}),
       // Heightened Spell: "one target of the spell [has] Disadvantage on saves against the spell", its repeats too.
       ...(heightened !== null ? { disadvantage: { targetId: heightened, from: "Heightened Spell" } } : {}),
       magical: isMagicalAction(ctx),
@@ -665,6 +715,80 @@ export function parkActionSave(ctx: ResolveContext): void {
       createdAt: Date.parse(deps.now())
     });
   }
+}
+
+/** Why a target succeeds on this save without rolling, or "" when it rolls: its creature type (Flesh to Stone's
+ *  Constructs), or that it doesn't sleep (Sleep: an elf's Trance, an Immunity to Exhaustion). */
+function autoSuccessOf(ctx: ResolveContext, target: ResolveContext["targets"][number]): string {
+  const rule = ctx.action.save?.autoSuccess;
+  if (!rule) return "";
+  const definition = target.definitionId ? ctx.deps.resolveDefinition?.(target.definitionId) : undefined;
+  const type = creatureTypeOf(target, definition);
+  if (rule.creatureTypes && type !== null && rule.creatureTypes.includes(type))
+    return `${type[0]!.toUpperCase()}${type.slice(1)}`;
+  if (
+    rule.sleepless &&
+    (holdsFeature(definition, "elf-trance", "Trance") ||
+      definition?.character?.race?.id === "elf" ||
+      target.conditionImmunities.includes("exhaustion"))
+  )
+    return "doesn't sleep";
+  return "";
+}
+
+/** How a save's roll card names the Advantage a fight with its source's side gives it. */
+const FIGHTING_ADVANTAGE = "Fighting the source's side";
+
+/** In a running fight, the target and the action's user are both in it and on opposite sides. */
+function fightingSides(ctx: ResolveContext, target: ResolveContext["targets"][number]): boolean {
+  const { state, attacker, deps } = ctx;
+  if (!state.combat.active) return false;
+  const inFight = new Set(state.combat.initiative.map((entry) => entry.actorId));
+  return inFight.has(attacker.id) && inFight.has(target.id) && areEnemies(attacker, target, deps.resolveDefinition);
+}
+
+/** Whether the target is one the save is for: a creature of the type the text names ("If the target is a Humanoid"),
+ *  and not one still under this action's failure ("each creature that isn't currently affected by this breath"). The
+ *  GM is told why a target makes no save. */
+function subjectToSave(ctx: ResolveContext, target: ResolveContext["targets"][number]): boolean {
+  const { action, attacker, deps } = ctx;
+  const save = action.save!;
+  if (save.onlyCreatureTypes) {
+    const definition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
+    const type = creatureTypeOf(target, definition);
+    if (type !== null && !save.onlyCreatureTypes.includes(type)) {
+      ctx.warnings.push(`${target.name} isn't a ${save.onlyCreatureTypes.join(" or ")}, so it makes no save.`);
+      return false;
+    }
+  }
+  // The same failure from this action, or one of the same name from any source ("doesn't already have an infernal
+  // wound").
+  const same = save.failureEffect?.name;
+  if (
+    save.sparesAffected &&
+    target.effects.some(
+      (effect) =>
+        (effect.sourceActorId === attacker.id && effect.sourceActionId === action.id) ||
+        (same !== undefined && effect.name === same)
+    )
+  ) {
+    ctx.warnings.push(`${target.name} is still under ${attacker.name}'s ${action.name}, so it makes no save.`);
+    return false;
+  }
+  return true;
+}
+
+/** The target succeeded against this action of this source earlier, which keeps it immune for the fight; the GM is
+ *  told it makes no save. */
+function immuneToAction(ctx: ResolveContext, target: ResolveContext["targets"][number]): boolean {
+  const { action, attacker } = ctx;
+  const key = traitActionId(action.name);
+  const immune = target.effects.some(
+    (effect) =>
+      effect.tags.includes(AURA_IMMUNE_TAG) && effect.sourceActorId === attacker.id && effect.sourceActionId === key
+  );
+  if (immune) ctx.warnings.push(`${target.name} is immune to ${attacker.name}'s ${action.name}, so it makes no save.`);
+  return immune;
 }
 
 /** The cast's targets that make its save: Careful Spell's and Sculpt Spells' chosen creatures "automatically succeed

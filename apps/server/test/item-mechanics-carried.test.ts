@@ -10,7 +10,7 @@ import { effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { setInventoryItem } from "../src/inventory.js";
 import { answerSave, createPendingSaves, saveTotalFor } from "../src/saving-throws.js";
-import { startEncounter } from "../src/encounter.js";
+import { initiativeRollFor, startEncounter } from "../src/encounter.js";
 import { builtinAction } from "../src/builtin-actions.js";
 import { looseRollPlan, spendLooseUses } from "../src/tap-routing.js";
 
@@ -376,6 +376,36 @@ describe("the Stone of Good Luck: both halves reach the roll", () => {
       deps([10], definition)
     );
     expect(hide.check!.total).toBe(13); // d20 10 + Dex 2 + the stone's 1
+  });
+
+  it("reaches Initiative, a Dexterity check, on the roll and on the sheet", () => {
+    const definition = definitionOf();
+    const content = { resolveDefinition: () => definition, catalog };
+    const bare = stateWith([]);
+    const lucky = stateWith([carried("stone-of-good-luck-luckstone", "Stone of Good Luck")]);
+    expect(initiativeRollFor(bare, IDS.hero, false, content).checkBonus).toBe(0);
+    expect(initiativeRollFor(lucky, IDS.hero, false, content).checkBonus).toBe(1);
+    const sheetOf = (state: GameState) =>
+      deriveActorSheet(
+        state.actors[0],
+        definition,
+        deriveEquipment(state.actors[0], definition, catalog),
+        skillCatalog
+      );
+    expect(sheetOf(lucky).initiative).toBe(sheetOf(bare).initiative + 1);
+    // The roll adds it: d20 10, the stored Dexterity +2, the stone's +1.
+    startEncounter(
+      lucky,
+      { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero }, { actorId: IDS.foe, score: 1 }] },
+      () => 10,
+      GEOMETRY,
+      () => definition,
+      0,
+      catalog
+    );
+    expect(lucky.combat.initiative.find((entry) => entry.actorId === IDS.hero)?.score).toBe(
+      10 + (lucky.actors[0].initiative ?? 0) + 1
+    );
   });
 });
 

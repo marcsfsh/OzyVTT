@@ -270,6 +270,20 @@
 .save-legendary:hover:not(:disabled) {
   border-color: var(--violet);
 }
+/* A willing target's failure without a roll: quieter than Roll and Confirm. */
+.save-choose-fail {
+  min-height: 2.25rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.save-choose-fail:hover:not(:disabled) {
+  color: var(--text);
+}
 /* A save whose outcome the server leaves to the GM says so under its label. */
 .save-prompt-gm {
   color: var(--text-dim);
