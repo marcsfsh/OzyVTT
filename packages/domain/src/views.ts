@@ -44,6 +44,7 @@ export type PlayerEffect = Omit<
   | "hitPointMaximumGain"
   | "temporaryHitPointsEachTurn"
   | "conditionImmunities"
+  | "struck"
 > & {
   yours?: true;
 };

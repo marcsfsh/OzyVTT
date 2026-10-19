@@ -8,6 +8,7 @@ import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
+import { addEffect, makeEffect } from "../src/effects.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { answerReaction } from "../src/reactions.js";
 import { answerSave, createPendingSaves } from "../src/saving-throws.js";
@@ -469,5 +470,52 @@ describe("a Quarterstaff of the Acrobat's Attack Deflection", () => {
     hero(again).actionUses = { ...hero(game).actionUses };
     goblinUses(again, SCIMITAR, [12, 4]);
     expect(again.combat.pendingReactions).toEqual([]);
+  });
+});
+
+describe("an effect that strikes back at a melee hit", () => {
+  const shield = (game: GameState, struck: Record<string, unknown>) =>
+    addEffect(
+      game,
+      IDS.hero,
+      makeEffect({
+        id: "70000000-0000-4000-8000-000000000001",
+        name: "Fire Shield",
+        sourceActorId: IDS.hero,
+        sourceName: "Hero",
+        duration: { type: "rounds", remaining: 100 },
+        struck: struck as never
+      })
+    );
+  const goblin = (game: GameState) => game.actors.find((candidate) => candidate.id === IDS.goblin)!;
+
+  it("deals its damage to an attacker within 5 feet that hits in melee, and not to a shot from 30 feet", () => {
+    const game = table(monster("Wizard", []));
+    shield(game, { withinFeet: 5, damage: [{ formula: "2d8", type: "cold" }] });
+    goblinUses(game, SCIMITAR, [15, 4, 3, 5]);
+    expect(goblin(game).hp.current).toBe(52);
+    const far = table(monster("Wizard", []));
+    shield(far, { withinFeet: 5, damage: [{ formula: "2d8", type: "cold" }] });
+    goblinUses(far, SHORTBOW, [15, 4], 30);
+    expect(goblin(far).hp.current).toBe(60);
+  });
+
+  it("owes a save to an attacker of the named creature type only", () => {
+    const blinding = { save: { ability: "con", dc: 15, conditions: ["blinded"] }, creatureTypes: ["undead"] };
+    const game = table(monster("Cleric", []));
+    shield(game, blinding);
+    goblinUses(game, SCIMITAR, [15, 4]);
+    expect(game.combat.pendingSaves).toEqual([]);
+    const undead = table(monster("Cleric", []));
+    undead.definitions = undead.definitions.map((entry) =>
+      entry.id === "def-goblin"
+        ? { ...entry, definition: { ...entry.definition, extensions: { "open5e.srd-2024": { type: "Undead" } } } }
+        : entry
+    );
+    shield(undead, blinding);
+    goblinUses(undead, SCIMITAR, [15, 4]);
+    expect(undead.combat.pendingSaves).toMatchObject([
+      { targetActorId: IDS.goblin, ability: "con", dc: 15, conditionIds: ["blinded"], actionName: "Fire Shield" }
+    ]);
   });
 });

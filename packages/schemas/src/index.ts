@@ -136,6 +136,36 @@ export const DamageTypeSchema = z.enum([
   "thunder"
 ]);
 export type DamageType = z.infer<typeof DamageTypeSchema>;
+
+/**
+ * What a melee hit on an effect's bearer costs the attacker (SRD Fire Shield: "Whenever a creature within 5 feet of
+ * you hits you with a melee attack roll, the shield erupts"; Holy Aura's light blinding a Fiend or an Undead): damage it
+ * takes, and a save it makes or has the conditions until the end of its next turn. Only an attacker within
+ * `withinFeet`, and of `creatureTypes` when set, is answered.
+ */
+export const StruckSchema = z
+  .object({
+    withinFeet: z.number().int().min(5).max(120).optional(),
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(8).optional(),
+    damage: z
+      .array(z.object({ formula: DamageFormulaSchema, type: DamageTypeSchema }).strict())
+      .min(1)
+      .max(3)
+      .optional(),
+    save: z
+      .object({
+        ability: AbilitySchema,
+        dc: z.number().int().min(1).max(40),
+        conditions: z.array(ConditionIdSchema).min(1).max(3)
+      })
+      .strict()
+      .optional()
+  })
+  .strict()
+  .describe(
+    "What a melee hit on the bearer costs the attacker: damage, and a save against conditions that last until the end of the attacker's next turn, for an attacker within withinFeet and of creatureTypes"
+  );
+export type Struck = z.infer<typeof StruckSchema>;
 /** The SRD's 15 conditions, closed in riders for the same reason. Exhaustion is a condition, levels and all. */
 export const ConditionSchema = z.enum([
   "blinded",
@@ -990,7 +1020,9 @@ export const EffectInstanceSchema = z
     /** It ends when a spell restores the bearer's hit points (an infernal wound). */
     endsOnSpellHealing: z.literal(true).optional(),
     /** A roll its bearer may answer with it, which ends it (a Bardic Inspiration die). */
-    answer: RollAnswerSchema.optional()
+    answer: RollAnswerSchema.optional(),
+    /** What a melee hit on its bearer costs the attacker (Fire Shield's 2d8). */
+    struck: StruckSchema.optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -1508,6 +1540,8 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
     .optional(),
   /** A roll the recipient may answer with it, which ends it (Bardic Inspiration: add the die to a failed D20 Test). */
   answer: RollAnswerSchema.optional(),
+  /** What a melee hit on the recipient costs the attacker while it lasts (Fire Shield's 2d8). */
+  struck: StruckSchema.optional(),
   /** The recipient may hold only one effect with these tags at a time ("A creature can have only one Bardic
    *  Inspiration die at a time"): a grant to a creature that holds one is refused. */
   onlyOne: z.literal(true).optional(),

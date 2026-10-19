@@ -209,6 +209,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
       modifiers: [...modifiers, ...hasteSpeed, ...hexDisadvantage, ...enhancedAdvantage, ...chosenResistance],
       ...(grant.answer ? { answer: structuredClone(grant.answer) } : {}),
+      ...(grant.struck ? { struck: structuredClone(grant.struck) } : {}),
       // Greater Invisibility's Invisible condition, which ends with the effect.
       ...(grant.conditions ? { linkedConditionIds: [...grant.conditions] } : {}),
       onEnd: grant.onEnd,
