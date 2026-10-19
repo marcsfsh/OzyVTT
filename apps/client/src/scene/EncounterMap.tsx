@@ -895,6 +895,7 @@ export function EncounterMap({
                         busy={busyActorId === actor.id}
                         onMove={(feet) => void commands.submitMove(actor.id, at, feet)}
                         onSet={(feet, airborne) => void commands.setAltitude(actor.id, feet, airborne)}
+                        onFall={(intoWater) => void commands.fall(actor.id, intoWater)}
                       />
                     );
                   })()}

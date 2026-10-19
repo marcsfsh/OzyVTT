@@ -19,7 +19,8 @@ export function HeightControl({
   gm,
   busy,
   onMove,
-  onSet
+  onSet,
+  onFall
 }: Readonly<{
   name: string;
   altitudeFeet: number;
@@ -32,9 +33,12 @@ export function HeightControl({
   busy: boolean;
   onMove: (altitudeFeet: number) => void;
   onSet: (altitudeFeet: number, airborne: "fly" | "levitate" | null) => void;
+  /** The GM drops a creature that is up from the height it is at; the server rolls the fall. */
+  onFall?: (intoWater: boolean) => void;
 }>) {
   const [target, setTarget] = useState(altitudeFeet);
   const [inTheAir, setInTheAir] = useState(airborne !== undefined);
+  const [intoWater, setIntoWater] = useState(false);
   useEffect(() => setTarget(altitudeFeet), [altitudeFeet]);
   useEffect(() => setInTheAir(airborne !== undefined), [airborne]);
   const verb = RISES[mode];
@@ -80,6 +84,20 @@ export function HeightControl({
           >
             Set height
           </button>
+          {onFall && altitudeFeet > 0 && (
+            <>
+              <Switch checked={intoWater} disabled={busy} label="Into water" onChange={setIntoWater} />
+              <button
+                type="button"
+                className="token-context-item"
+                disabled={busy}
+                title="Rolls 1d6 Bludgeoning for every 10 feet, and the creature lands Prone if it takes any"
+                onClick={() => onFall(intoWater)}
+              >
+                Fall {altitudeFeet} ft
+              </button>
+            </>
+          )}
         </>
       )}
     </div>

@@ -209,9 +209,11 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   expertise: enforced(
     "ability-checks.ts doubles the Proficiency Bonus on a check with a skill the sheet has Expertise in."
   ),
-  falling: reference("Falls and their damage are the GM's to apply."),
-  flying: guided(
-    "movement-rules.ts lets a creature with a Fly Speed fly a move. Whether it falls when Incapacitated, Prone or at Fly Speed 0 is the GM's."
+  falling: enforced(
+    "falling.ts rolls 1d6 Bludgeoning for every 10 feet fallen, to 20d6, through the damage rules, and lands the creature Prone unless it took no damage. Into water it uses its Reaction for a DC 15 Strength (Athletics) or Dexterity (Acrobatics) check, the better of the two, a success halving the damage. The GM starts a fall with actor.fall, and a creature that can't stay in the air falls by itself; Feather Fall and Slow Fall are offered as Reactions to it. What it fell from and where it lands are the GM's."
+  ),
+  flying: enforced(
+    "altitude.ts keeps the height a fly move or the GM gives a token, and every distance counts it. falling.ts drops a flier that is Prone, Incapacitated or at a Fly Speed of 0 unless it can hover, and one left with nothing to fly with, after any command."
   ),
   "fly-speed": enforced("speed.ts gives a creature with a Fly Speed its own budget for flying."),
   friendly: reference("Attitudes aren't tracked; the GM applies the Advantage on Influence."),
@@ -242,7 +244,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "hit-points.ts keeps Hit Points between 0 and the maximum, and a creature at 0 falls Unconscious or dies."
   ),
   hostile: reference("Attitudes aren't tracked; the GM applies the Disadvantage on Influence."),
-  hover: guided("speed.ts records whether a creature hovers. Falling while flying is the GM's to apply."),
+  hover: enforced(
+    "speed.ts records whether a creature hovers, and falling.ts keeps a hovering flier in the air while it is Prone, Incapacitated or at a Fly Speed of 0."
+  ),
   illusions: reference("Illusions are the GM's to run."),
   immunity: enforced(
     "hit-points.ts ignores damage of an immune type, and effects.ts refuses a condition the creature is immune to."

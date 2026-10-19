@@ -483,7 +483,11 @@ export const PendingReactionSchema = z
     id: z.uuid(),
     /** What opened the window: an attack that hit the reactor, an enemy leaving its reach (opportunity attack), an
      *  attack that would hit before its damage (`attack-would-hit`), or a creature damaging the reactor. */
-    kind: z.enum(["hit-by-attack", "leaves-reach", "attack-would-hit", "damaged-by-creature"]).default("hit-by-attack"),
+    kind: z
+      .enum(["hit-by-attack", "leaves-reach", "attack-would-hit", "damaged-by-creature", "falls"])
+      .default("hit-by-attack"),
+    /** falls: how far the falling creature (`targetActorId`) is falling, in feet. */
+    fallFeet: z.number().int().min(0).max(10000).optional(),
     actorId: z.uuid(),
     actionId: z
       .string()
@@ -525,6 +529,25 @@ export const PendingReactionSchema = z
   })
   .strict();
 export type PendingReaction = z.infer<typeof PendingReactionSchema>;
+
+/** A fall held while the reactions it opened (Feather Fall, Slow Fall) wait for their answers (SRD Falling). Its
+ *  damage is rolled once they are answered. GM-only. */
+export const PendingFallSchema = z
+  .object({
+    /** The id the fall's prompts carry as their `triggerCommandId`. */
+    id: z.uuid(),
+    actorId: z.uuid(),
+    feet: z.number().int().min(0).max(10000),
+    /** It falls into water or another liquid, which can halve the damage. */
+    intoWater: z.boolean().default(false),
+    /** The height it lands at: 0 is the ground. */
+    landingAltitudeFeet: z.number().int().min(0).max(10000).default(0),
+    /** Damage taken off the fall by the answers given so far (Slow Fall). */
+    reduction: z.number().int().min(0).max(1000).default(0),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type PendingFall = z.infer<typeof PendingFallSchema>;
 
 /** A player's hit awaiting the GM's Apply (proposal mode, the default), so players never change HP on a creature
  * they don't own. GM-only: never projected to players or the viewer. */
@@ -986,6 +1009,8 @@ export const CombatStateSchema = z
     /** Prepared scenes the GM parks and resumes. The active scene's own `combat` stays empty; its live copy is the top-level fields. */
     scenes: z.array(SceneSchema).max(20).default([]),
     activeSceneId: z.uuid().nullable().default(null),
+    /** Falls waiting on the reactions they opened, on the live table only. GM-only (see PendingFallSchema). */
+    pendingFalls: z.array(PendingFallSchema).max(20).default([]),
     /** Turn time-travel (live fight only): `historyCursor` is the snapshot index being viewed (null = live);
      * `historyDirty` means state changed while rewound, so moving on needs GM confirmation. */
     historyCursor: z.number().int().nonnegative().nullable().default(null),

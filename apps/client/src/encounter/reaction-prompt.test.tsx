@@ -54,6 +54,24 @@ describe("the reaction prompt's buttons", () => {
 });
 
 describe("the prompt for each trigger", () => {
+  it("offers Feather Fall for a falling creature, with how far it falls", () => {
+    mount({
+      ...DODGE,
+      kind: "falls",
+      actionId: "spell-feather-fall",
+      actionName: "Feather Fall (1st, Reaction)",
+      sourceName: "Kesh",
+      targetActorId: "10000000-0000-4000-8000-000000000003",
+      proposedDamage: 0,
+      proposedDamageParts: [],
+      weighed: null,
+      fallFeet: 40
+    });
+    expect(screen.getByText(/Kesh is falling 40 ft/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cast Feather Fall" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Decline" })).toBeTruthy();
+  });
+
   it("offers Parry's AC bonus before the attack lands", () => {
     mount({
       ...DODGE,

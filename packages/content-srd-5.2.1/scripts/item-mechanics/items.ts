@@ -466,7 +466,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `ring-of-feather-falling` - no falling model.
+  /** "When you fall while wearing this ring, you descend 60 feet per round and take no damage from falling." */
+  "ring-of-feather-falling": { modifiers: [{ type: "movement", rule: "safe-fall" }] },
 
   // `ring-of-free-action` - a condition immunity cannot be limited to magical sources, and an absolute
   // one would refuse ordinary Restrained/Paralyzed effects. Ignoring difficult terrain is not modeled.
@@ -904,7 +905,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `boots-of-levitation` - the Levitate cast would prompt the wearer to save against their own boots.
   // `boots-of-speed` - doubled speed, a 10-minute budget, and opportunity-attack disadvantage (the
   //     defender's incoming-attack riders get no attack-kind filters).
-  // `boots-of-striding-and-springing` - a speed floor, encumbrance and jumping are not modeled.
+  // `boots-of-striding-and-springing` - the speed floor and encumbrance are not modeled. "Once on each of your turns,
+  // you can jump up to 30 feet by spending only 10 feet of movement": a leap the jump rules read.
+  "boots-of-striding-and-springing": { modifiers: [{ type: "movement", rule: "leap", feet: 30, costFeet: 10 }] },
   /** "You have a Climb Speed equal to your Speed." Walls, ceilings and slippery surfaces are the GM's. */
   "slippers-of-spider-climbing": { modifiers: [{ type: "special-speed", movement: "climb", equalToSpeed: true }] },
 
@@ -924,7 +927,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         uses: { limit: 4, per: "long-rest", pool: "winged-boots-charges" },
         grants: {
           name: "Winged Flight (1 hour)",
-          tags: ["winged-flight"],
+          // "You descend at a rate of 30 feet per round until you land": the engine lowers a flier gently.
+          tags: ["winged-flight", "descends-safely"],
           duration: { type: "manual" },
           modifiers: [{ type: "special-speed", movement: "fly", feet: 30 }]
         }

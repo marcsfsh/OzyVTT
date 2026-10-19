@@ -65,6 +65,17 @@ function reactionLine(outcome: ReactionOutcome): { kind: "reaction" | "damage"; 
           : (damage ?? "no damage");
       return { kind: "reaction", text: `${outcome.actorName} ${what} - ${result}.` };
     }
+    case "falls":
+      // The landing itself is told by the fall's own line.
+      return outcome.used
+        ? {
+            kind: "reaction",
+            text:
+              outcome.actorName === outcome.sourceName
+                ? `${outcome.actorName} used ${outcome.actionName}.`
+                : `${outcome.actorName} used ${outcome.actionName} for ${outcome.sourceName}.`
+          }
+        : null;
   }
 }
 

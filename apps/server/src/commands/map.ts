@@ -22,11 +22,13 @@ import {
   AnnotationVisibilitySetSchema,
   SpellZoneEndSchema,
   SpellZonePlaceSchema,
+  ActorFallSchema,
   TokenMoveSchema,
   TokenSetAltitudeSchema
 } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import { airborneAfter, altitudeOf, setAltitude } from "../altitude.js";
+import { startFall } from "../falling.js";
 import { applyMovementRules, dragAlong, dragCostsExtra, grappledBy } from "../movement-rules.js";
 import {
   creatureDistance,
@@ -317,6 +319,42 @@ export const mapCommands = [
         actorIds: [actorId],
         gmOnly: kit.actorHidden(actorId)
       });
+    }
+  }),
+
+  defineCommand({
+    type: "actor.fall",
+    operationId: "fallActor",
+    description:
+      "Makes a creature fall (GM-grade only), SRD Falling: 1d6 Bludgeoning damage for every 10 feet, to a maximum of 20d6, rolled by the server, and the Prone condition unless it takes no damage. It falls from the height it is at unless `feet` says how far, and lands on the ground or at `landingAltitudeFeet`. With `intoWater` it may use its Reaction for a DC 15 Strength (Athletics) or Dexterity (Acrobatics) check, which the server rolls with the better of the two, a success halving the damage. In a fight, a creature that can answer the fall with its Reaction (Feather Fall within range and sight, the faller's own Slow Fall) gets a `falls` prompt, and the fall waits for the answers. A creature that can't stay in the air falls this way by itself after any command.",
+    summary: "Make a creature fall; the server rolls the damage once any reaction to it is answered (GM).",
+    schema: ActorFallSchema,
+    malformed: "The fall is malformed.",
+    gmOnly: "Only the GM makes a creature fall.",
+    async run({ request, execute }, kit) {
+      const { commandId, actorId } = request;
+      const distance = await kit.creatureDistance();
+      let events: EffectNarration[] = [];
+      const { state, duplicate } = await execute((draft) => {
+        const actor = draft.actors.find((candidate) => candidate.id === actorId);
+        if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+        const height = altitudeOf(draft.combat.tokens.find((token) => token.actorId === actorId));
+        const feet = request.feet ?? height - (request.landingAltitudeFeet ?? 0);
+        if (feet <= 0) throw new CommandRejectedError(`${actor.name} is on the ground. Say how far it falls.`);
+        events = startFall(
+          draft,
+          {
+            actorId,
+            feet,
+            ...(request.intoWater ? { intoWater: true } : {}),
+            ...(request.landingAltitudeFeet !== undefined ? { landingAltitudeFeet: request.landingAltitudeFeet } : {})
+          },
+          kit.fallDeps(draft, distance, commandId)
+        );
+      });
+      if (duplicate) return;
+      kit.publishRolls(state, commandId);
+      kit.publishNarrations(events);
     }
   }),
 

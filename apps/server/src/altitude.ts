@@ -178,6 +178,17 @@ export function creatureAtPoint(
   return best?.actorId ?? null;
 }
 
+/** A flight whose end lowers its creature gently (Winged Boots, Wind Walk). */
+export const DESCENDS_SAFELY_TAG = "descends-safely";
+
+/** Its flight ended gently: a creature in the air drifts down instead of falling. It is held up as by a levitation
+ *  until the next settle lands it, or keeps flying if it still can. */
+export function descendSafely(state: GameState, actorId: string): void {
+  const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
+  if (!token?.position || token.airborne !== "fly" || altitudeOf(token) <= 0) return;
+  setAltitude(state, actorId, altitudeOf(token), "levitate");
+}
+
 /** The mover's height at each point of its path, rising or falling evenly from start to end. */
 export function altitudesAlong(count: number, fromFeet: number, toFeet: number): number[] {
   if (count <= 1) return [toFeet];

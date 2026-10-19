@@ -265,6 +265,8 @@ const PENDING_REACTION_FIELDS = {
   weighed: "player",
   acBonus: "player",
   rollsAttack: "player",
+  // How far the falling creature falls: its height, which is as public as the token it answers for.
+  fallFeet: "player",
   createdAt: "player",
   sourceName: "derived",
   sourceActorId: "never",

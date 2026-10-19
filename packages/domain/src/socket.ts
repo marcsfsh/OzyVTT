@@ -165,6 +165,7 @@ import type {
   TimePassSchema,
   TokenMoveSchema,
   TokenSetAltitudeSchema,
+  ActorFallSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
   TurnUseSchema,
@@ -752,6 +753,11 @@ export interface ClientToServerEvents {
   "token:move": (
     payload: CommandPayload<typeof TokenMoveSchema>,
     acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** GM makes a creature fall: the server rolls the damage once any reaction to it is answered. */
+  "actor:fall": (
+    payload: CommandPayload<typeof ActorFallSchema>,
+    acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM sets how high a creature is, free of movement. */
   "token:set-altitude": (

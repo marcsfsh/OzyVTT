@@ -1496,6 +1496,20 @@ export const TokenSetAltitudeSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** The GM makes a creature fall (SRD Falling): from its height, or `feet` given, onto the ground or a lower ledge. */
+export const ActorFallSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    /** How far it falls; absent, from the height it is at. */
+    feet: z.number().int().min(1).max(10000).optional(),
+    /** It falls into water or another liquid, which can halve the damage. */
+    intoWater: z.boolean().optional(),
+    /** The height it lands at; the ground when absent. */
+    landingAltitudeFeet: z.number().int().min(0).max(10000).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** GM-set walking speed; null clears to unknown (movement rules then skip for that combatant). */
 export const ActorSetSpeedSchema = z
   .object({

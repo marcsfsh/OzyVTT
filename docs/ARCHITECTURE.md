@@ -278,6 +278,14 @@ of a hidden thing. When in doubt, leave it out.
   move changes height (`movement.altitude`). An area reaches only as high as its shape does
   (`withinAreaHeight`). The GM sets any creature's height free of movement (`token.set-altitude`).
   Height is as public as position, so it travels with the token in every projection.
+- Falling (`falling.ts`): after every command the pipeline lands whoever can no longer stay in the
+  air (`settleFalls`, its own commit): a flier that is Prone, Incapacitated or at a Fly Speed of 0
+  without hover, or left with nothing to fly with, falls; a levitation that ended, or a flight that
+  ends safely (`descends-safely`), lowers it gently. The GM starts any other fall with `actor.fall`.
+  A fall in a fight first offers the reactions that answer it (a `falls` prompt: Feather Fall from a
+  creature that sees the faller in range, the faller's own Slow Fall) and waits on them in
+  `combat.pendingFalls`; then the server rolls 1d6 per 10 feet to 20d6 through the damage rules and
+  leaves the creature Prone unless it took no damage.
 
 ## Rules engine
 

@@ -123,6 +123,8 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   "dominate-monster": { count: 1 },
   "dominate-person": { count: 1 },
   "enhance-ability": { count: 1, perSlot: 1 },
+  // "Choose up to five falling creatures within range."
+  "feather-fall": { count: 5 },
   fly: { count: 1, perSlot: 1 },
   "freedom-of-movement": { count: 1, perSlot: 1 },
   "gaseous-form": { count: 1, perSlot: 1 },
@@ -565,12 +567,14 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   ]
 };
 
-/** Reaction spells the table offers as prompts: what triggers each and what casting it does. Counterspell and Feather
- *  Fall answer triggers the engine doesn't see (a spell being cast, a fall), so they stay with the GM. */
+/** Reaction spells the table offers as prompts: what triggers each and what casting it does. Counterspell answers a
+ *  trigger the engine doesn't see (a spell being cast), so it stays with the GM. */
 const CAST_REACTIONS: Readonly<Record<string, NonNullable<SpellEffect["reaction"]>>> = {
   // +5 AC until the start of the caster's next turn, including against the triggering attack.
   shield: { trigger: "hit-by-attack", response: "ac-bonus", amount: 5, untilNextTurn: true },
-  "hellish-rebuke": { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 60 }
+  "hellish-rebuke": { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 60 },
+  // "When you or a creature you can see within 60 feet of you falls": the cast lands on the falling creature.
+  "feather-fall": { trigger: "falls", response: "cast-on-faller", rangeFeet: 60 }
 };
 
 /** What a cast's hit lands on its target besides its damage (SRD 5.2.1 text). */
@@ -871,6 +875,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     tags: ["mage-armor"],
     target: "target",
     duration: { type: "manual" }
+  }),
+  // "If a creature lands before the spell ends, the creature takes no damage from the fall, and the spell ends for
+  // that creature." The engine lands a creature that carries it without damage (`falling.ts`).
+  "feather-fall": spellGrant({
+    name: "Feather Fall",
+    tags: ["feather-fall"],
+    target: "targets",
+    duration: rounds(10)
   }),
   // "Gains a Fly Speed of 60 feet and can hover."
   fly: spellGrant({

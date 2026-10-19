@@ -4,6 +4,8 @@ import type { ApiRoute } from "@vtt/api-contract/routes";
 import type { ClientToServerEvents, GameState } from "@vtt/domain";
 import { GameAccessDeniedError } from "../authorization.js";
 import { isIncapacitated } from "../condition-rules.js";
+import type { EffectNarration } from "../effects.js";
+import { needsSettling, settleFalls as settleFallsIn } from "../falling.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
@@ -169,6 +171,28 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     }
   }
 
+  /**
+   * Whoever is in the air and can no longer stay there comes down (SRD Flying, Falling): a Prone or Incapacitated
+   * flier without hover, one whose flight ended, a levitation that ran out. It is its own commit after the command
+   * that caused it, told like any other, so every way a creature loses its flight (a condition, an effect ending, a
+   * broken Concentration) lands it the same way.
+   */
+  async function settleFalls() {
+    const state = context.readState();
+    const lookup = { resolveDefinition: (definitionId: string) => kit.resolveDefinitionIn(state, definitionId) };
+    if (!needsSettling(state, { ...lookup, catalog: kit.equipmentCatalog() })) return;
+    const distance = await kit.creatureDistance();
+    const id = context.newId();
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute({ id, type: "positions.settle", principal: "table" }, (draft) => {
+      events = settleFallsIn(draft, kit.fallDeps(draft, distance, id));
+    });
+    if (result.duplicate) return;
+    await context.publishGameState(result.state);
+    kit.publishRolls(result.state, id);
+    kit.publishNarrations(events);
+  }
+
   async function dispatch(
     type: GameCommandType,
     principal: GamePrincipal,
@@ -212,7 +236,10 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     );
     const accepted = committed ? { revision: committed.state.revision, duplicate: committed.duplicate } : {};
     const reply = projectReply(principal, { ...accepted, ...extras });
-    if (settle && committed && !committed.duplicate) await settleDownedReactions();
+    if (settle && committed && !committed.duplicate) {
+      await settleDownedReactions();
+      await settleFalls();
+    }
     return reply;
   }
 

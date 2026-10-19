@@ -116,6 +116,15 @@ export function useMapCommands({
     setMessage(result.ok ? "Height set." : (result.message ?? "The height could not be set."));
     setBusyActorId(null);
   };
+  /** The GM drops a creature from the height it is at; the server rolls the damage. */
+  const fall = async (actorId: string, intoWater: boolean) => {
+    if (busyActorId) return;
+    setBusyActorId(actorId);
+    setMessage("");
+    const result = await command("actor:fall", { actorId, ...(intoWater ? { intoWater } : {}) });
+    setMessage(result.ok ? "The fall is rolled." : (result.message ?? "The fall could not be rolled."));
+    setBusyActorId(null);
+  };
   /** The GM's ruling on a refused move: the same move again, with an audited override. */
   const moveAnyway = async () => {
     if (!blockedMove || busyActorId) return;
@@ -371,6 +380,7 @@ export function useMapCommands({
     busyActorId,
     submitMove,
     setAltitude,
+    fall,
     placeAtCenter,
     blockedMove,
     moveAnyway,
