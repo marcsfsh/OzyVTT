@@ -71,7 +71,15 @@ import {
   recordLoadingShot
 } from "./resolution/extra-attacks.js";
 import { recordAttackDealings } from "./resolution/dealings.js";
-import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
+import {
+  applyMasteryForces,
+  checkTacticalMaster,
+  masterySwingOf,
+  offeredPush,
+  spendSap,
+  spendVex,
+  tacticalMasterOffer
+} from "./resolution/masteries.js";
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { endTargetMarks } from "./resolution/action-targets.js";
@@ -167,6 +175,7 @@ export function resolveDefinitionAction(
   if (input.damageAnswer && !look)
     throw new CommandRejectedError("Answer the damage on a look at it, before it is dealt.");
   checkOverchannel(ctx);
+  checkTacticalMaster(ctx);
   checkWallTarget(ctx);
   ctx.builtin?.check?.(ctx);
   // A form the action can't give is refused before anything is spent.
@@ -437,6 +446,7 @@ function previewOf(ctx: ResolveContext): ActionResolution {
     ...(ctx.warnings.length > 0 ? { warnings: ctx.warnings } : {}),
     overridden: ctx.overridden,
     push: offeredPush(ctx),
+    ...withMasteryOptions(tacticalMasterOffer(ctx)),
     preview: true,
     ...withOffers(hitOffersOf(ctx)),
     // A hit's damage may be looked at before it counts, for an answer to it.
@@ -451,6 +461,8 @@ function previewOf(ctx: ResolveContext): ActionResolution {
 }
 
 const withOffers = (offers: ReturnType<typeof hitOffersOf>) => (offers.length > 0 ? { hitOffers: offers } : {});
+const withMasteryOptions = (options: ActionResolution["masteryOptions"] | undefined) =>
+  options ? { masteryOptions: options } : {};
 
 /** With no attack roll and no save, every target takes the damage, owed like a hit's: the GM's Apply, or a player's
  *  proposal or direct damage. A darts action owes each creature what its own darts dealt (SRD Magic Missile: "A dart

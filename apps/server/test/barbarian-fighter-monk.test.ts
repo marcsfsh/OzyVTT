@@ -933,6 +933,63 @@ describe("healing features heal what they print", () => {
   });
 });
 
+describe("Fighter: Tactical Master swaps a mastery for Push, Sap or Slow on one attack", () => {
+  const swingWith = (
+    built: Built,
+    actionId: string,
+    faces: number[],
+    mastery: "push" | "sap" | "slow",
+    commit = false
+  ) =>
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, actionId),
+      {
+        actorId: IDS.hero,
+        targetIds: [IDS.foe],
+        commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
+        mastery,
+        commit
+      },
+      deps(built, faces)
+    );
+
+  it("offers Push, Sap and Slow beside the Greatsword's Graze, and a Push pick offers the push", () => {
+    const built = onTheTable(build(fighterInput(9)));
+    const plain = swing(built, "item-greatsword", [15], { commit: false });
+    expect(plain.masteryOptions).toEqual({
+      own: { id: "graze", name: "Graze" },
+      alternatives: [
+        { id: "push", name: "Push" },
+        { id: "sap", name: "Sap" },
+        { id: "slow", name: "Slow" }
+      ]
+    });
+    expect(plain.push ?? null).toBeNull();
+    const pushed = swingWith(built, "item-greatsword", [15], "push");
+    expect(pushed.push).toEqual({ targetName: "Foe", maxFeet: 10 });
+    expect(pushed.masteryOptions?.picked).toBe("push");
+  });
+
+  it("saps the target in place of grazing it", () => {
+    const built = onTheTable(build(fighterInput(9)));
+    swingWith(built, "item-greatsword", [15, 3, 3, 3, 3], "sap", true);
+    const foe = built.state.actors.find((actor) => actor.id === IDS.foe)!;
+    expect(foe.effects.some((effect) => effect.tags.includes("sap"))).toBe(true);
+  });
+
+  it("refuses the pick from a Fighter 8, and on an attack with no mastery the Fighter can use", () => {
+    const eighth = onTheTable(build(fighterInput(8)));
+    expect(swing(eighth, "item-greatsword", [15], { commit: false }).masteryOptions).toBeUndefined();
+    expect(() => swingWith(eighth, "item-greatsword", [15], "push")).toThrowError(/doesn't have Tactical Master/);
+    const ninth = onTheTable(build(fighterInput(9)));
+    // Javelins (Slow) aren't among this Fighter's four masteries.
+    expect(() => swingWith(ninth, "item-javelin", [15], "push")).toThrowError(
+      /can't use the mastery property of Javelin/
+    );
+  });
+});
+
 describe("Boon of Irresistible Offense: Overwhelming Strike on a rolled 20", () => {
   // Strength 15 + 2 (Soldier) + 2 (level 4) + 1 (level 6) = 20, and the boon's increase makes it 21.
   const boonFighter = () => {

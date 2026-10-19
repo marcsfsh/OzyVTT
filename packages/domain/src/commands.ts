@@ -569,6 +569,9 @@ export const ActionResolveSchema = z
       .optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
+    /** Tactical Master (Fighter 9): the Push, Sap or Slow property this attack takes in place of its weapon's own
+     *  mastery, sent with every look at the attack and its confirm. Refused for a swing that can't take it. */
+    mastery: z.enum(["push", "sap", "slow"]).optional(),
     /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest
      *  above it with a slot left. */
     slotLevel: z.number().int().min(1).max(9).optional(),

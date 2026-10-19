@@ -224,6 +224,13 @@ export type ActionResolution = Readonly<{
   }> | null;
   /** On a previewed hit, the push its weapon mastery offers (SRD "up to 10 feet"); the confirm says how far with `pushFeet`. */
   push?: Readonly<{ targetName: string; maxFeet: number }> | null;
+  /** Tactical Master: the weapon's own mastery, the properties that may take its place for this attack, and the one
+   *  this look took. */
+  masteryOptions?: Readonly<{
+    own: Readonly<{ id: string; name: string }>;
+    alternatives: ReadonlyArray<Readonly<{ id: "push" | "sap" | "slow"; name: string }>>;
+    picked?: "push" | "sap" | "slow";
+  }>;
   /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer. */
   reactionPrompts?: ReadonlyArray<
     Readonly<{ actorId: string; actorName: string; actionName: string; holdsDamage?: true }>

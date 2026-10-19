@@ -439,6 +439,7 @@ export const actionCommands = [
             ...(request.healingShares !== undefined ? { healingShares: request.healingShares } : {}),
             ...(request.itemId !== undefined ? { itemId: request.itemId } : {}),
             ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
+            ...(request.mastery !== undefined ? { mastery: request.mastery } : {}),
             ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),
             ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),

@@ -473,6 +473,8 @@ export type ResolveOptions = Readonly<{
   reroll?: boolean;
   /** How far Push mastery shoves on the confirmed hit (0 declines); absent pushes the full distance. */
   pushFeet?: number;
+  /** Tactical Master's Push, Sap or Slow in place of the weapon's own mastery, on every look and the confirm. */
+  mastery?: "push" | "sap" | "slow";
   /** Extras the confirmed hit carries (Sneak Attack, a smite), from the preview's offers. */
   hitOptions?: readonly HitOptionChoice[];
   /** The confirmed melee hit knocks its target out if it drops it to 0 (SRD Knocking Out a Creature). */
@@ -543,6 +545,7 @@ export function resolveTargeting(
     ...(opts.attackNatural !== undefined ? { attackNatural: opts.attackNatural } : {}),
     ...(opts.reroll ? { reroll: true } : {}),
     ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
+    ...(opts.mastery !== undefined ? { mastery: opts.mastery } : {}),
     ...(opts.hitOptions && opts.hitOptions.length > 0 ? { hitOptions: [...opts.hitOptions] } : {}),
     ...(opts.knockOut ? { knockOut: true } : {}),
     ...(opts.answer ? { answer: { ...opts.answer } } : {}),
