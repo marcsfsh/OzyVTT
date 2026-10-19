@@ -300,9 +300,9 @@ export const actionCommands = [
             throw new CommandRejectedError(
               isPlayer ? "No creatures you can see are inside that area." : "No combatants are inside that area."
             );
-          // Caltrops spread under a creature catch it only as it moves in; ground left out of a spell's area (Plant
-          // Growth) catches no one.
-          if (leavesArea || areaRow?.cutsArea) resolvedTargetIds = [];
+          // Caltrops spread under a creature catch it only as it moves in, though a djinni's whirlwind catches whoever
+          // it appears on; ground left out of a spell's area (Plant Growth) catches no one.
+          if ((leavesArea && !action.zone?.atCast) || areaRow?.cutsArea) resolvedTargetIds = [];
           // What moves the spell's area (Moonbeam's move, Flaming Sphere's ram) places that area there instead, and
           // its save falls on the creatures the area moves onto.
           const moving = areaMoveOf(action, kit.equipmentCatalog());

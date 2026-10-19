@@ -4066,6 +4066,13 @@ export const AreaTriggerSchema = z
     /** As it drifts it carries the creatures in it, and each creature it holds or moves onto then makes its save, once
      *  a round (Tsunami: "the wall, along with any creatures in it, moves 50 feet away from you"). */
     carries: z.literal(true).optional(),
+    /** Moved, it carries the creatures its failed save holds (a djinni's whirlwind: "the target has the Restrained
+     *  condition and moves with the whirlwind"). */
+    carriesHeld: z.literal(true).optional(),
+    /** A creature's action area that lasts while its user keeps Concentration on it (a djinni's whirlwind). */
+    concentration: z.literal(true).optional(),
+    /** Its user is unaffected by it ("the djinni is unaffected"). */
+    sparesUser: z.literal(true).optional(),
     /** At the end of each of its caster's turns on which it drifted, it loses this much height and one die of its
      *  damage; the spell ends when no height is left (Tsunami's 50 feet and 1d10). */
     fadesFeet: z.number().int().min(5).max(300).optional(),

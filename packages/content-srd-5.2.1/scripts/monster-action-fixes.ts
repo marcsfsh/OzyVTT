@@ -16,6 +16,8 @@ export type MonsterActionFix = Readonly<{
   onHit?: OnHitRider[];
   /** The GM's reminder in place of the reader's; null drops it. */
   reminder?: string | null;
+  /** The area the action leaves, which the server runs (a djinni's whirlwind). */
+  zone?: ActorAction["zone"];
 }>;
 
 export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = {
@@ -199,11 +201,14 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
     reminder: null
   },
   "djinni/create-whirlwind": {
-    why: "the thunder on each of the Restrained target's turns is printed after the failure's own sentence",
+    why: "the thunder on each of the Restrained target's turns is printed after the failure's own sentence, and the whirlwind stays on the map",
     // "At the start of each of its turns, the Restrained target takes 21 (6d6) Thunder damage."
     save: { ongoingDamage: { damage: [{ formula: "6d6", type: "thunder" }], at: "bearer-turn-start" } },
+    // "The whirlwind lasts until the djinni's Concentration on it ends", and "Whenever the whirlwind enters a creature's
+    // space or a creature enters the whirlwind", the save, "only once per turn, and the djinni is unaffected".
+    zone: { on: ["enter"], oncePerTurn: true, atCast: true, concentration: true, carriesHeld: true, sparesUser: true },
     reminder:
-      "The whirlwind lasts while the djinni concentrates on it. The djinni can move it up to 20 feet at the start of each of its turns, and the Restrained creatures move with it; a creature it enters, or that enters it, makes the save once a turn."
+      "The djinni can move the whirlwind up to 20 feet at the start of each of its turns: drag its area, and the Restrained creatures move with it."
   },
   "shambling-mound/engulf": {
     why: "the mound carries what it engulfs at no cost, which the save's text prints",
@@ -225,6 +230,7 @@ export function fixedFields(fix: MonsterActionFix | undefined): Partial<ActorAct
     ...(fix.damage ? { damage: fix.damage.map((part) => ({ ...part })) } : {}),
     ...(fix.damageTypes ? { damageTypes: [...fix.damageTypes] } : {}),
     ...(fix.onHit ? { onHit: structuredClone(fix.onHit) } : {}),
-    ...(typeof fix.reminder === "string" ? { reminder: fix.reminder } : {})
+    ...(typeof fix.reminder === "string" ? { reminder: fix.reminder } : {}),
+    ...(fix.zone ? { zone: structuredClone(fix.zone) } : {})
   };
 }

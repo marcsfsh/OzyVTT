@@ -288,22 +288,28 @@ export function openSpellZone(ctx: ResolveContext): void {
   if (!aroundCaster && zone.annotationId === null)
     ctx.warnings.push(`Place ${spell.name}'s area on the map (Spell areas), and the server will run it.`);
   // An area that acts as it is cast acts on the creatures the cast caught (Conjure Celestial's lights).
-  if (row.zone.atCast && targets.length > 0) {
-    const events = actOnCast(
-      state,
-      zone,
-      targets.map((target) => target.id),
-      {
-        geometry: null,
-        resolveDefinition: ctx.deps.resolveDefinition ?? (() => undefined),
-        ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {}),
-        rollDie: ctx.deps.random,
-        newId: ctx.deps.newRollId,
-        now: ctx.deps.now
-      }
-    );
-    for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
-  }
+  if (row.zone.atCast) actAtCast(ctx, zone, "is bathed in");
+}
+
+/** An area that acts as it is made acts on the creatures its use caught (Conjure Celestial's lights, a djinni's
+ *  whirlwind). */
+function actAtCast(ctx: ResolveContext, zone: SpellZone, meeting: Parameters<typeof actOnCast>[4]): void {
+  if (ctx.targets.length === 0) return;
+  const events = actOnCast(
+    ctx.state,
+    zone,
+    ctx.targets.map((target) => target.id),
+    {
+      geometry: null,
+      resolveDefinition: ctx.deps.resolveDefinition ?? (() => undefined),
+      ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {}),
+      rollDie: ctx.deps.random,
+      newId: ctx.deps.newRollId,
+      now: ctx.deps.now
+    },
+    meeting
+  );
+  for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
 }
 
 /** "4d12" with a modifier added: "4d12 + 4", "4d12 - 1". */
@@ -339,13 +345,37 @@ export function openActionZone(ctx: ResolveContext): boolean {
     throw new CommandRejectedError(
       `${name}: ${attacker.name} has none left to set down. Gather up the ones on the map first.`
     );
+  // A djinni's whirlwind lasts while the djinni keeps Concentration on it, and what its save holds ends with it.
+  if (trigger.concentration) {
+    ctx.castId = input.commandId;
+    const ended: EffectNarration[] = [];
+    addEffect(
+      state,
+      attacker.id,
+      makeEffect({
+        id: `${input.commandId}:concentration`,
+        name: `Concentrating on ${name}`.slice(0, 120),
+        tags: [CONCENTRATING_TAG],
+        sourceActorId: attacker.id,
+        sourceName: attacker.name,
+        startedRound: state.combat.round,
+        duration: { type: "manual" },
+        endsWhenSourceDefeated: true,
+        concentration: true,
+        castId: input.commandId
+      }),
+      ended,
+      deps
+    );
+    for (const event of ended) ctx.tableNarration.push(tableLineOf(ctx, event));
+  }
   const zone: SpellZone = {
     id: input.commandId,
     spellId: record?.id ?? "area",
     name,
     laterActionId: action.id.slice(0, 120),
     casterId: attacker.id,
-    castId: null,
+    castId: trigger.concentration ? input.commandId : null,
     rounds: null,
     startedRound: state.combat.round,
     level: 0,
@@ -365,5 +395,7 @@ export function openActionZone(ctx: ResolveContext): boolean {
   state.combat = { ...state.combat, spellZones: [...state.combat.spellZones, zone].slice(-20) };
   if (!aroundCaster && zone.annotationId === null)
     ctx.warnings.push(`Place ${name}'s area on the map (Spell areas), and the server will run it.`);
+  // A whirlwind conjured onto creatures catches them as it appears.
+  if (trigger.atCast) actAtCast(ctx, zone, "is caught by");
   return true;
 }

@@ -67,13 +67,14 @@ export function actOnCast(
   state: GameState,
   zone: SpellZone,
   creatureIds: readonly string[],
-  deps: ZoneDeps
+  deps: ZoneDeps,
+  meeting: Extract<Meeting, "is bathed in" | "is caught by"> = "is bathed in"
 ): EffectNarration[] {
   const events: EffectNarration[] = [];
   const content = zoneContentOf(zone, deps.catalog);
   if (!content) return events;
   for (const creature of exposed(state, zone, content.trigger, deps))
-    if (creatureIds.includes(creature.id)) act(state, zone, creature, "is bathed in", deps, events);
+    if (creatureIds.includes(creature.id)) act(state, zone, creature, meeting, deps, events);
   return events;
 }
 
@@ -373,8 +374,8 @@ export function exposed(
     // "You and your allies": an aura its caster carries reaches the caster too.
     const own = creature.id === zone.casterId;
     if (trigger.around === "caster" && own && trigger.affects !== "allies") return [];
-    // A Line that blasts from its caster (Gust of Wind) starts beside it, not on it.
-    if (own && trigger.towardCaster) return [];
+    // A Line that blasts from its caster (Gust of Wind) starts beside it, and a djinni's whirlwind spares the djinni.
+    if (own && (trigger.towardCaster || trigger.sparesUser)) return [];
     // The creature an area is round (Antipathy/Sympathy's target) is the one it keeps others from or draws them to.
     if (creature.id === zone.targetId) return [];
     if (trigger.affects === "enemies" && (!caster || !areEnemies(caster, creature, deps.resolveDefinition))) return [];
@@ -870,7 +871,12 @@ export function zonesAfterAreaMove(
   for (const zone of liveZones(state)) {
     if (zone.annotationId !== annotationId) continue;
     const content = zoneContentOf(zone, deps.catalog);
-    if (!content || !content.trigger.on.includes("enter")) continue;
+    const carry = () =>
+      content?.trigger.carriesHeld ? carryHeld(state, zone, before.origin, area.geometry.origin, deps) : [];
+    if (!content || !content.trigger.on.includes("enter")) {
+      events.push(...carry());
+      continue;
+    }
     const { trigger } = content;
     const now = insideTest(state, zone, trigger, content, deps.geometry);
     const after = area.geometry;
@@ -887,6 +893,8 @@ export function zonesAfterAreaMove(
             .map((creature) => creature.id)
     );
     area.geometry = after;
+    // What it holds goes with it, and so is in it still.
+    events.push(...carry());
     if (!now) continue;
     for (const creature of exposed(state, zone, trigger, deps)) {
       const token = tokenOf(state, creature.id)!;
@@ -896,6 +904,37 @@ export function zonesAfterAreaMove(
   }
   events.push(...leashedZones(state, deps));
   return events;
+}
+
+/** Moves the creatures an area holds with it (a djinni's whirlwind: "the target has the Restrained condition and moves
+ *  with the whirlwind"), by as far as the area moved. */
+function carryHeld(state: GameState, zone: SpellZone, from: Point, to: Point, deps: ZoneDeps): EffectNarration[] {
+  const shift = { x: to.x - from.x, y: to.y - from.y };
+  if (!deps.geometry || (shift.x === 0 && shift.y === 0)) return [];
+  const held = state.actors.filter(
+    (actor) =>
+      tokenOf(state, actor.id) &&
+      actor.effects.some(
+        (effect) =>
+          effect.linkedConditionIds.includes("restrained") &&
+          (zone.castId !== null
+            ? effect.castId === zone.castId
+            : effect.sourceActorId === zone.casterId && effect.sourceActionId === zone.laterActionId)
+      )
+  );
+  for (const creature of held) {
+    const at = tokenOf(state, creature.id)!.position!;
+    moveEncounterToken(state, creature.id, { x: at.x + shift.x, y: at.y + shift.y }, deps.geometry);
+  }
+  return held.length > 0
+    ? [
+        {
+          kind: "effect",
+          text: `${zone.name} carries ${held.map((creature) => creature.name).join(", ")} with it.`,
+          actorId: zone.casterId
+        }
+      ]
+    : [];
 }
 
 /** The zones a creature ending its turn inside sets off, before the next turn begins. A zone whose damage grows as its
