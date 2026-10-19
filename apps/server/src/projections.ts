@@ -766,6 +766,8 @@ const PLAYER_ACTOR_FIELDS = {
   conditionImmunities: "never",
   // A creature's attitude is the GM's: players learn it from how the GM has them roll.
   attitude: "never",
+  // What the GM chose where a stat block leaves a choice (a half-dragon's damage type) is the GM's until it shows.
+  statBlockPicks: "never",
   legendary: "never",
   lastUsedAt: "never",
   firstClaimedAt: "never",

@@ -10,8 +10,6 @@ export type MonsterActionFix = Readonly<{
   save?: Partial<NonNullable<ActorAction["save"]>>;
   /** The damage in place of the reader's. */
   damage?: ActorAction["damage"];
-  /** The damage types a use picks from (Chromatic Orb's shape). */
-  damageTypes?: ActorAction["damageTypes"];
   /** What a hit leaves, in place of the reader's. */
   onHit?: OnHitRider[];
   /** The GM's reminder in place of the reader's; null drops it. */
@@ -19,11 +17,6 @@ export type MonsterActionFix = Readonly<{
 }>;
 
 export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = {
-  "half-dragon/dragon-s-breath": {
-    why: "the damage is of the type chosen for the Draconic Origin trait, which each use picks",
-    damage: [{ formula: "8d6", type: "fire" }],
-    damageTypes: ["acid", "cold", "fire", "lightning", "poison"]
-  },
   "gelatinous-cube/engulf": {
     why: "the escape and the pull from outside are printed in the action and the Ooze Cube trait",
     save: {
@@ -227,7 +220,6 @@ export function fixedFields(fix: MonsterActionFix | undefined): Partial<ActorAct
   if (!fix) return {};
   return {
     ...(fix.damage ? { damage: fix.damage.map((part) => ({ ...part })) } : {}),
-    ...(fix.damageTypes ? { damageTypes: [...fix.damageTypes] } : {}),
     ...(fix.onHit ? { onHit: structuredClone(fix.onHit) } : {}),
     ...(typeof fix.reminder === "string" ? { reminder: fix.reminder } : {})
   };

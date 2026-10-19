@@ -19,6 +19,7 @@ import { holdsFeature } from "./class-features.js";
 import { conditionLabel, exhaustionPenalty } from "./condition-rules.js";
 import { RAGING_TAG } from "./effects.js";
 import { toolHelp } from "./help-assist.js";
+import { trainedSkillOf } from "./statblock-picks.js";
 import {
   checkRiderBonus,
   effectiveSkillTier,
@@ -334,7 +335,7 @@ function plainCheckPlan(
     ...(context.situations !== undefined && context.situations.length > 0 ? { situations: context.situations } : {})
   };
   const toolProficient = subject.tool !== undefined && toolProficiencies(definition, derivation).includes(subject.tool);
-  const { base, proficient } =
+  const skilled =
     subject.skill !== undefined
       ? skillBase(definition, derivation, { ...subject, skill: subject.skill }, toolProficient)
       : {
@@ -343,7 +344,15 @@ function plainCheckPlan(
             (toolProficient ? (definition?.proficiencyBonus ?? 0) : 0),
           proficient: toolProficient
         };
+  // A commoner's Training: "proficiency in one skill of the DM's choice and Advantage whenever it makes an ability
+  // check using that skill".
+  const trained = subject.skill !== undefined && trainedSkillOf(actor, definition) === subject.skill;
+  const { base, proficient } =
+    trained && !skilled.proficient
+      ? { base: skilled.base + (definition?.proficiencyBonus ?? 0), proficient: true }
+      : skilled;
   const claims = abilityCheckClaims(actor, derivation, narrow, context.warded, context.stakes, context.sight);
+  if (trained) claims.advantage.push({ source: "training", label: "Training" });
   if (context.versus) socialClaims(actor, subject, context.versus, claims);
   // A Wisdom (Perception) check to find a creature relies on sight unless the GM says it listens: Disadvantage when
   // it is Lightly Obscured to the roller, and a failure whatever the roll when the roller is Blinded or it is Heavily

@@ -387,7 +387,40 @@ function engulfsEntrants(trait: Trait): TraitMechanic | null {
     : null;
 }
 
+/** The key a creature's pick is stored under: the trait's name as a slug ("Draconic Origin": draconic-origin). */
+export const pickKeyOf = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+/** "Related to a type of dragon associated with one of the following damage types (DM's choice): Acid, Cold, Fire,
+ *  Lightning, or Poison" (a half-dragon's Draconic Origin): the GM's pick for each creature, which its actions deal. */
+function damageTypePick(trait: Trait): TraitMechanic | null {
+  const listed = /\bone of the following damage types \(DM[’']s choice\): ([A-Za-z, ]+)\./.exec(trait.description)?.[1];
+  if (!listed) return null;
+  const options = listed
+    .split(/,\s*(?:or\s+)?|\s+or\s+/)
+    .map(damageTypeOf)
+    .filter((type): type is DamageType => type !== null);
+  return options.length >= 2
+    ? { kind: "pick", name: trait.name, key: pickKeyOf(trait.name), of: "damage-type", options }
+    : null;
+}
+
+/** "The commoner has proficiency in one skill of the DM's choice and has Advantage whenever it makes an ability check
+ *  using that skill" (Training). */
+function skillPick(trait: Trait): TraitMechanic | null {
+  return /\bproficiency in one skill of the DM[’']s choice and has Advantage whenever it makes an ability check using that skill\b/.test(
+    trait.description
+  )
+    ? { kind: "pick", name: trait.name, key: pickKeyOf(trait.name), of: "skill", skillAdvantage: true }
+    : null;
+}
+
 const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
+  damageTypePick,
+  skillPick,
   regeneration,
   undeadFortitude,
   turnEndAura,

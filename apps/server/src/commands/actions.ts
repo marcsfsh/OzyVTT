@@ -8,6 +8,7 @@ import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { requireStartOrdered } from "../simultaneous-effects.js";
 import { withSeenTargets } from "../resolution/seen-targets.js";
 import { areaLeavesOut } from "../resolution/action-targets.js";
+import { withPickedDamageTypes } from "../statblock-picks.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import { pushTokenAway } from "../forced-movement.js";
@@ -798,11 +799,15 @@ export const actionCommands = [
       // A spell cast with a higher slot rolls that slot's dice, on the loose route as in the fight.
       const castLevel = listed.spellSlot ? castSlotLevel(actor, listed.spellSlot.level, slotLevel) : undefined;
       const spell = listed.spellId ? kit.equipmentCatalog().spellRecord?.(listed.spellId) : undefined;
-      const action = withChosenDamageType(
-        castLevel !== undefined && spell && castLevel > listed.spellSlot!.level
-          ? upcastAction(listed, spell, castLevel)
-          : listed,
-        damageType ?? null
+      const action = withPickedDamageTypes(
+        withChosenDamageType(
+          castLevel !== undefined && spell && castLevel > listed.spellSlot!.level
+            ? upcastAction(listed, spell, castLevel)
+            : listed,
+          damageType ?? null
+        ),
+        actor,
+        definition
       );
 
       // Loose: the server rolls the action's dice, attributed to the character, and spends what the action

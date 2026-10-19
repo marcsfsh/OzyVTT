@@ -2419,6 +2419,9 @@ export const ActorSchema = z.object({
   /** SRD Influence: a monster's or NPC's attitude toward the party, Indifferent when absent. The GM sets it; an
    *  Influence check against it has Advantage when Friendly and Disadvantage when Hostile. GM-only in projections. */
   attitude: z.enum(["friendly", "indifferent", "hostile"]).optional(),
+  /** What the GM chose for this creature where its stat block leaves a choice (a half-dragon's Draconic Origin: a
+   *  damage type; a commoner's Training: a skill), keyed by the pick its trait names. GM-only in projections. */
+  statBlockPicks: z.record(RiderSlugSchema, RiderSlugSchema).optional(),
   /** SRD Malnutrition and Dehydration, while the table tracks food and water (`rest.survival`): what the creature ate
    *  and drank this game day, the days in a row it ate nothing, and the Exhaustion levels hunger and thirst gave it,
    *  which no rest removes until it eats or drinks its full need for a day. The server keeps it. Owner and GM only. */
@@ -4402,7 +4405,12 @@ export const ActionSchema = z
           formula: DamageFormulaSchema.describe(
             'One die term plus at most one flat modifier ("1d8 + 3"), or a fixed amount that uses no roll ("1", a Blowgun), which a crit leaves as it is. Anything richer stays prose (ADR-0008)'
           ),
-          type: z.string().min(1).max(40)
+          type: z.string().min(1).max(40),
+          /** The part's type is the one this creature's stat-block pick chose ("damage of the type chosen for the
+           *  Draconic Origin trait"); `type` is the first it may be. */
+          pick: RiderSlugSchema.optional().describe(
+            "The key of the stat-block pick whose damage type this part takes (a half-dragon's Draconic Origin); the action is refused until the creature has one"
+          )
         })
       )
       .max(8)
@@ -5175,6 +5183,20 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
   /** "Attack rolls against the mephit are made with Disadvantage unless the mephit has the Incapacitated condition"
    *  (Blurred Form). */
   z.object({ kind: z.literal("blurred"), name: TraitNameSchema }).strict(),
+  /** A choice the stat block leaves to the GM for each creature (a half-dragon's Draconic Origin: "one of the following
+   *  damage types (DM's choice)"; a commoner's Training: "proficiency in one skill of the DM's choice"), stored on the
+   *  creature under `key`. A damage-type pick is what the actions' parts with this `pick` deal; a skill pick with
+   *  `skillAdvantage` gives proficiency in the skill and Advantage on ability checks with it. */
+  z
+    .object({
+      kind: z.literal("pick"),
+      name: TraitNameSchema,
+      key: RiderSlugSchema,
+      of: z.enum(["damage-type", "skill"]),
+      options: z.array(RiderSlugSchema).min(2).max(18).optional(),
+      skillAdvantage: z.literal(true).optional()
+    })
+    .strict(),
   /** "Other creatures can enter that space, but a creature that does so is subjected to the cube's Engulf and has
    *  Disadvantage on the saving throw" (Ooze Cube): the action whose save a creature entering its space makes. */
   z

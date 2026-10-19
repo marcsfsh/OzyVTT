@@ -19,7 +19,8 @@ import {
   type ActorDefinition,
   type AmmunitionKind,
   type OngoingDamage,
-  type SaveFailureDuration
+  type SaveFailureDuration,
+  type TraitMechanic
 } from "@vtt/schemas";
 import { experienceForChallenge } from "@vtt/rules-5e";
 import {
@@ -907,6 +908,26 @@ const ACTION_ENRICHMENTS: Record<
 
 const PRINTED_NAME = "[A-Z][A-Za-z'\u2019-]*(?: [A-Z][A-Za-z'\u2019-]*)*";
 
+/** "Plus 7 (2d6) damage of the type chosen for the Draconic Origin trait": a part whose type is the creature's pick
+ *  (`TraitMechanic` "pick"), in place of any part the readers took for it. */
+function withPickedDamage(actions: ActorAction[], mechanics: readonly TraitMechanic[]): ActorAction[] {
+  return actions.map((action) => {
+    const parts = [
+      ...action.description.matchAll(
+        /\b\d+ \((\d+d\d+(?: [+-] \d+)?)\) damage of the type chosen for the ([A-Z][A-Za-z' ]+?) trait\b/g
+      )
+    ].flatMap(([, formula, trait]) => {
+      const pick = mechanics.find(
+        (mechanic) => mechanic.kind === "pick" && mechanic.of === "damage-type" && mechanic.name === trait
+      );
+      return pick?.kind === "pick" ? [{ formula: formula!, type: pick.options?.[0] ?? "untyped", pick: pick.key }] : [];
+    });
+    if (parts.length === 0) return action;
+    const kept = action.damage.filter((part) => !parts.some((picked) => picked.formula === part.formula));
+    return { ...action, damage: [...kept, ...parts] };
+  });
+}
+
 /** What a linked action takes from the action it makes or uses: its attack or save and what they deal and leave. */
 function withActionOf(next: ActorAction, source: ActorAction): ActorAction {
   const { attack, save, damage, onHit, conditionalDamage, reminder, area, targetRules, targets } = source;
@@ -1658,7 +1679,7 @@ const monsters: ActorDefinition[] = creatures
       },
       initiativeBonus: fields.initiative_bonus,
       speedFeet: fields.walk ?? 0,
-      actions,
+      actions: withPickedDamage(actions, traitMechanics),
       token: { disposition: "hostile" as const, footprint: { width: footprint, height: footprint } },
       ...(damageResistances.length > 0 ? { damageResistances } : {}),
       ...(damageImmunities.length > 0 ? { damageImmunities } : {}),

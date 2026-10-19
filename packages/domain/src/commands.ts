@@ -270,6 +270,24 @@ export const SetActorLairSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** GM picks what a creature's stat block leaves to the GM (a half-dragon's Draconic Origin damage type, a commoner's
+ *  Training skill); null clears it. */
+export const SetActorPickSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    key: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    value: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const HpAmountSchema = z
   .object({
     commandId: z.uuid(),
