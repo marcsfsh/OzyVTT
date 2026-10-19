@@ -17,6 +17,7 @@ import {
 import { passGameTime } from "./game-time.js";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { openPreparation } from "./spellcasting.js";
+import { HIT_DICE_DOUBLED_TAG } from "./death-saves.js";
 import { healActor } from "./hit-points.js";
 import { gainHeroicInspiration } from "./heroic-inspiration.js";
 import { chargesAfterDawn } from "./item-charges.js";
@@ -58,7 +59,8 @@ export function spendHitDice(
   faces: readonly number[],
   scope: Initiator,
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
-  count: number = faces.length
+  count: number = faces.length,
+  catalog?: EquipmentCatalog
 ): { healed: number; events: EffectNarration[]; conModifier: number } {
   requireActorAccess(scope, state, actorId, "resource");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
@@ -74,7 +76,10 @@ export function spendHitDice(
     );
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   const conModifier = definition ? scoreModifier(definition.abilityScores.con) : 0;
-  const healed = faces.reduce((sum, face) => sum + Math.max(1, face + conModifier), 0);
+  // A Periapt of Wound Closure doubles what each die restores.
+  const doubled =
+    deriveEquipment(actor, definition, catalog).context.effectTags?.includes(HIT_DICE_DOUBLED_TAG) === true;
+  const healed = faces.reduce((sum, face) => sum + Math.max(1, face + conModifier) * (doubled ? 2 : 1), 0);
   const events = healActor(state, actorId, healed, scope);
   // Decrement the pool die by die: a Fighter 3 / Wizard 2 spends its d10s before its d6s.
   actor.hitDice = makeHitDicePool(spendFromPool(actor.hitDice.entries, faces.length));

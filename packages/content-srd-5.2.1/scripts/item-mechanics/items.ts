@@ -1449,7 +1449,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     grants: { damageImmunities: ["poison"], conditionImmunities: ["poisoned"] }
   },
 
-  // `periapt-of-wound-closure` - death-save roll changes have no reader; doubling Hit Die healing is healing.
+  // Life Preservation: a death save's d20 of 9 or lower counts as 10 (death-saves.ts). Natural Healing Boost: each Hit
+  // Point Die rolled to regain Hit Points restores double (rests.ts, resolution/hit-point-die.ts).
+  "periapt-of-wound-closure": {
+    effects: [
+      {
+        name: "Wound Closure",
+        tags: ["death-save-floor", "hit-dice-doubled"],
+        duration: { type: "manual" },
+        modifiers: [],
+        onEnd: [],
+        voidWhileIncapacitated: false,
+        concentration: false
+      }
+    ]
+  },
 
   // AC only. Preservation (save outcome, crumbles when spent) and spell-save advantage are not expressible.
   "scarab-of-protection": { modifiers: [{ type: "armor-class", amount: 1 }] },

@@ -5535,7 +5535,23 @@
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
-  "effects": [],
+  "effects": [
+   {
+    "name": "Wound Closure",
+    "tags": [
+     "death-save-floor",
+     "hit-dice-doubled"
+    ],
+    "duration": {
+     "type": "manual"
+    },
+    "modifiers": [],
+    "onEnd": [],
+    "target": "self",
+    "voidWhileIncapacitated": false,
+    "concentration": false
+   }
+  ],
   "modifiers": []
  },
  {
