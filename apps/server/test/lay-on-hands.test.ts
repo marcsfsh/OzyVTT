@@ -79,6 +79,25 @@ describe("Lay on Hands", () => {
     expect(pools.find((entry) => entry.id === "paladins-smite")?.name).toBe("Divine Smite (no slot)");
   });
 
+  // SRD Restoring Touch (Paladin 14): "When you use Lay On Hands on a creature, you can also remove one or more of the
+  // following conditions from the creature: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. You must
+  // expend 5 Hit Points from the healing pool of Lay On Hands for each of these conditions you remove".
+  it("ends one of six more conditions for 5 points from Paladin 14, and not before", () => {
+    const at = (level: number) =>
+      buildCharacterDefinition(
+        generateCharacterRequest({ classId: "paladin", level }, library, policy, seeded(5)).request,
+        library,
+        policy
+      ).actions.find((action) => action.id === "lay-on-hands-restoring-touch");
+    expect(at(14)).toMatchObject({
+      useCost: 5,
+      endsOneCondition: true,
+      endsConditions: ["blinded", "charmed", "deafened", "frightened", "paralyzed", "stunned"],
+      uses: { pool: "lay-on-hands", limit: 70 }
+    });
+    expect(at(13)).toBeUndefined();
+  });
+
   /** The Paladin and Bryn in a fight, the Paladin's turn first. */
   async function inAFight(state: GameState) {
     const booted = await bootServer(state);

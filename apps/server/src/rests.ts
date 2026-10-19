@@ -18,7 +18,7 @@ import { passGameTime } from "./game-time.js";
 import { dawnPoolKeys, timedSpent, type ClockDeps } from "./clock-pools.js";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { openPreparation } from "./spellcasting.js";
-import { healActor } from "./hit-points.js";
+import { healActor, RELENTLESS_RAGE_KEY } from "./hit-points.js";
 import { chargesAfterDawn, neverRegained } from "./item-charges.js";
 
 /** SRD Resting: a Short Rest is 1 hour and a Long Rest at least 8. */
@@ -203,6 +203,9 @@ export function applyRest(
       effectiveActions(definition, actor, catalog),
       shortRestRegains(deriveEquipment(actor, definition, catalog))
     );
+    // SRD Relentless Rage: "When you finish a Short or Long Rest, the DC resets to 10."
+    const { [RELENTLESS_RAGE_KEY]: _relentless, ...uses } = actor.actionUses;
+    actor.actionUses = uses;
     // A pick re-made on a rest stands until the character chooses again (Fiendish Resilience: "until you choose a
     // different one"), so the rest leaves `choiceOverrides` as they are.
     restorePactSlots(actor, definition);

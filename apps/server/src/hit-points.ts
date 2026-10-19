@@ -39,12 +39,15 @@ import {
   makeEffect,
   STABLE_RECOVERY_TAG,
   NO_HEALING_TAG,
+  RAGING_TAG,
   reduceExhaustion,
   removeConditionDirect,
   sourceOf,
   type EffectNarration
 } from "./effects.js";
 import { reconcileEquipment } from "./inventory.js";
+import { holdsFeature } from "./class-features.js";
+import { rollSaveAtOnce } from "./saving-throws.js";
 import { offerDamageReaction } from "./damage-reactions.js";
 import { releaseSwallowedBy } from "./swallow.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
@@ -432,6 +435,39 @@ function relentlessEndurance(
   return true;
 }
 
+/** Counts the uses of Relentless Rage since the last rest; each one raises its DC by 5. */
+export const RELENTLESS_RAGE_KEY = "relentless-rage";
+
+/** SRD Relentless Rage (Barbarian 11): "If you drop to 0 Hit Points while your Rage is active and don't die outright,
+ *  you can make a DC 10 Constitution saving throw. If you succeed, your Hit Points instead change to a number equal to
+ *  twice your Barbarian level. Each time you use this feature after the first, the DC increases by 5." The server
+ *  rolls the save. True when it held the creature up. */
+function relentlessRage(
+  state: GameState,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  overflow: number,
+  deps: DamageDeps | undefined,
+  events: EffectNarration[]
+): boolean {
+  if (overflow >= actor.hp.maximum || !deps?.rollDie) return false;
+  if (!actor.effects.some((effect) => effect.tags.includes(RAGING_TAG))) return false;
+  if (!holdsFeature(definition, "relentless-rage", "Relentless Rage")) return false;
+  const used = actor.actionUses[RELENTLESS_RAGE_KEY] ?? 0;
+  const dc = 10 + 5 * used;
+  const save = rollSaveAtOnce(state, actor, "con", { ...deps, rollDie: deps.rollDie });
+  actor.actionUses = { ...actor.actionUses, [RELENTLESS_RAGE_KEY]: used + 1 };
+  const held = save.total >= dc;
+  const level = definition?.character?.classes.find((entry) => entry.id === "barbarian")?.level ?? 0;
+  if (held) actor.hp = { ...actor.hp, current: Math.min(actor.hp.maximum, Math.max(1, level * 2)) };
+  events.push({
+    kind: "condition",
+    text: `${actor.name}'s Relentless Rage: CON save ${save.total} (d20 ${save.natural}) vs DC ${dc}: ${held ? `up at ${actor.hp.current} HP` : "it falls"}.`,
+    actorId: actor.id
+  });
+  return held;
+}
+
 /** Marks the effect that holds what drained damage took off a creature's Hit Point maximum. */
 export const DRAINED_TAG = "drained";
 
@@ -654,7 +690,8 @@ export function applyDamageDetailed(
     !wasAtZero &&
     actor.hp.current === 0 &&
     damageToHp > 0 &&
-    relentlessEndurance(actor, definition, damageToHp - hpBefore, events)
+    (relentlessRage(state, actor, definition, damageToHp - hpBefore, deps, events) ||
+      relentlessEndurance(actor, definition, damageToHp - hpBefore, events))
   ) {
     // Up at 1 Hit Point: nothing falls.
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
