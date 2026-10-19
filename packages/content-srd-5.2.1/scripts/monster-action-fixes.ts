@@ -66,7 +66,9 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
       {
         conditions: [],
         name: "Attached",
-        tags: ["attached"],
+        // "While attached to a target, the darkmantle can attack only the target but has Advantage on its attack
+        // rolls."
+        tags: ["attached", "source-attacks-only-bearer"],
         endsWhenSourceDies: true,
         // "A creature can take an action to try to detach the darkmantle from itself, doing so with a successful DC 13
         // Strength (Athletics) check."
@@ -74,7 +76,40 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
       }
     ],
     reminder:
-      "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target, which is Blinded and suffocating (hold its breath) while the darkmantle is attached."
+      "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target, which is Blinded and suffocating (hold its breath) while the darkmantle is attached. While attached, the darkmantle's Speed is 0 and it moves with the target, and it detaches itself with 5 feet of its movement."
+  },
+  "stirge/proboscis": {
+    why: "while attached the stirge can't use its Proboscis again, which the hit's text prints",
+    onHit: [
+      {
+        conditions: [],
+        name: "Attached",
+        // "While attached, the stirge can't make Proboscis attacks."
+        tags: ["attached", "source-no-repeat"],
+        ongoingDamage: { damage: [{ formula: "2d4", type: "necrotic" }], at: "source-turn-start" },
+        // "The target or a creature within 5 feet of it can detach the stirge as an action."
+        endedBy: { name: "Detach", by: "either" }
+      }
+    ],
+    reminder: "The stirge detaches itself by spending 5 feet of its movement."
+  },
+  "cloaker/attach": {
+    why: "while attached the cloaker can Attach only to its target, and it is pulled off with an action and a check",
+    onHit: [
+      {
+        conditions: [{ id: "blinded" }],
+        name: "Attached",
+        maxTargetSize: "large",
+        // "The cloaker can't make Attach attacks against other targets."
+        tags: ["attached", "source-target-only"],
+        endsWhenSourceDies: true,
+        // "The target or a creature within 5 feet of it can take an action to try to detach the cloaker, doing so by
+        // succeeding on a DC 14 Strength (Athletics) check."
+        endedBy: { name: "Detach the cloaker", by: "either", check: { ability: "str", skill: "athletics", dc: 14 } }
+      }
+    ],
+    reminder:
+      "While attached, the cloaker halves the damage it takes (round down), and the target takes the same amount; the cloaker detaches itself by spending 5 feet of movement."
   },
   "otyugh/bite": {
     why: "the save comes after each Long Rest, and its failure lowers the Hit Point maximum until the poison ends",

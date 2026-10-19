@@ -6,6 +6,7 @@ import { CommandRejectedError } from "../game-store.js";
 import { endEffect } from "../effects.js";
 import { deadCantHealLine, healActor } from "../hit-points.js";
 import { useCostOf } from "../use-cost.js";
+import { holdsFeature } from "../class-features.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { isItemActionId } from "../item-actions.js";
 import { recordRoll, tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
@@ -52,6 +53,17 @@ export function applyHealing(ctx: ResolveContext): void {
     // A dead target among living ones regains nothing until it is revived; the others still heal.
     if (isDead(target)) {
       tableNarration.push({ kind: "heal", text: deadCantHealLine(target.name), actorIds: [target.id] });
+      return { targetId: target.id, targetName: target.name, regained: 0 };
+    }
+    // SRD Swarm: "The swarm can't regain Hit Points or gain Temporary Hit Points."
+    if (
+      holdsFeature(target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined, "swarm", "Swarm")
+    ) {
+      tableNarration.push({
+        kind: "heal",
+        text: `${target.name} is a swarm and can't regain Hit Points or gain Temporary Hit Points.`,
+        actorIds: [target.id]
+      });
       return { targetId: target.id, targetName: target.name, regained: 0 };
     }
     // False Life, Tireless: Temporary Hit Points, which don't add up; the creature keeps the higher.

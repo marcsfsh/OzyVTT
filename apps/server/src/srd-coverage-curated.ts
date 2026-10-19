@@ -632,7 +632,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   "Sunlight Weakness": sunlightHinders("D20 Tests", "resolution/attack.ts, ability-checks.ts and saving-throws.ts"),
   Swarm: guided(
-    "movement-rules.ts and terrain.ts let the swarm and other creatures share a space, and the map's drag preview (movePreview.ts) charges the same path. Refusing it Hit Points and Temporary Hit Points is the GM's."
+    "movement-rules.ts and terrain.ts let the swarm and other creatures share a space, and the map's drag preview (movePreview.ts) charges the same path; healing gives it no Hit Points or Temporary Hit Points (resolution/heal.ts). Squeezing through an opening large enough for a Tiny creature is the GM's."
   ),
   "Telepathic Bond": senses,
   Training: reference("The GM picks the skill and applies its Advantage."),
@@ -780,7 +780,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Insect Cloud fills a 30-foot Emanation that is Heavily Obscured for everyone but its holder for 10 minutes (vision/cast-sight.ts). Giant Insect costs 4 charges and brings the insect (summons.ts), and Insect Plague costs 5. A strong wind dispersing the cloud is the GM's."
   ),
   "action:Aboleth/dominate-mind": guided(
-    "The DC 16 Wisdom save and Charmed are applied, and a failure puts the target under the aboleth's command and on its side (summons.ts), so its player can't move it or act for it. The repeat save when it takes damage, the end when the aboleth dies, and the 60 feet the control reaches are the GM's."
+    "The DC 16 Wisdom save and Charmed are applied, and a failure puts the target under the aboleth's command and on its side (summons.ts), so its player can't move it or act for it; it repeats the save whenever it takes damage, and the Charm ends when the aboleth dies (save-stages.ts). That the control reaches only 60 feet, and the save after each day spent a mile away, are the GM's."
   ),
   "action:Treant/animate-trees": enforced(
     "Two trees animate within 60 feet from the Treant stat block with Intelligence and Charisma 1 and no Animate Trees, under the treant's command and on its side, acting right after it (summons.ts). They stop after a day, at 0 Hit Points, when the treant dies or more than 120 feet from it. Which trees stand where is the GM's."

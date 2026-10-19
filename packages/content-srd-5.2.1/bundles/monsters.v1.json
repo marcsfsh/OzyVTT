@@ -13425,10 +13425,24 @@
        }
       ],
       "name": "Attached",
-      "maxTargetSize": "large"
+      "maxTargetSize": "large",
+      "tags": [
+       "attached",
+       "source-target-only"
+      ],
+      "endsWhenSourceDies": true,
+      "endedBy": {
+       "name": "Detach the cloaker",
+       "by": "either",
+       "check": {
+        "ability": "str",
+        "skill": "athletics",
+        "dc": 14
+       }
+      }
      }
     ],
-    "reminder": "While attached, the cloaker can't make Attach attacks against other targets, and it halves the damage it takes (round down) while the target takes the same amount. It detaches with 5 feet of its movement, and the target or a creature within 5 feet can detach it with an action and a DC 14 Strength (Athletics) check."
+    "reminder": "While attached, the cloaker halves the damage it takes (round down), and the target takes the same amount; the cloaker detaches itself by spending 5 feet of movement."
    },
    {
     "id": "phantasms-recharge-after-a-short-or-long-rest",
@@ -15016,7 +15030,8 @@
       "conditions": [],
       "name": "Attached",
       "tags": [
-       "attached"
+       "attached",
+       "source-attacks-only-bearer"
       ],
       "endsWhenSourceDies": true,
       "endedBy": {
@@ -15030,7 +15045,7 @@
       }
      }
     ],
-    "reminder": "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target, which is Blinded and suffocating (hold its breath) while the darkmantle is attached. While attached, the darkmantle moves with the target at Speed 0 and can attack only it, with Advantage. It detaches itself with 5 feet of its movement."
+    "reminder": "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target, which is Blinded and suffocating (hold its breath) while the darkmantle is attached. While attached, the darkmantle's Speed is 0 and it moves with the target, and it detaches itself with 5 feet of its movement."
    },
    {
     "id": "darkness-aura",
@@ -43776,6 +43791,10 @@
      {
       "conditions": [],
       "name": "Attached",
+      "tags": [
+       "attached",
+       "source-no-repeat"
+      ],
       "ongoingDamage": {
        "damage": [
         {
@@ -43791,7 +43810,7 @@
       }
      }
     ],
-    "reminder": "While attached, the stirge can't make Proboscis attacks. It detaches with 5 feet of its movement, and the target or a creature within 5 feet can detach it with an action."
+    "reminder": "The stirge detaches itself by spending 5 feet of its movement."
    }
   ],
   "token": {

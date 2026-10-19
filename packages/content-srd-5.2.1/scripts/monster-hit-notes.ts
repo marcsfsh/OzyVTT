@@ -20,12 +20,6 @@ const HIT_NOTES: Readonly<Record<string, string>> = {
     "The rug smothers one creature at a time. While it grapples the target, the target is suffocating, and the rug halves the damage it takes (round down) while the target takes the same amount.",
   "barbed-devil/hurl-flame": HURL_FLAME,
   "black-pudding/dissolving-pseudopod": ARMOR_PENALTY,
-  "darkmantle/crush":
-    "While attached, the darkmantle moves with the target at Speed 0 and can attack only it, with Advantage. It detaches itself with 5 feet of its movement.",
-  "stirge/proboscis":
-    "While attached, the stirge can't make Proboscis attacks. It detaches with 5 feet of its movement, and the target or a creature within 5 feet can detach it with an action.",
-  "cloaker/attach":
-    "While attached, the cloaker can't make Attach attacks against other targets, and it halves the damage it takes (round down) while the target takes the same amount. It detaches with 5 feet of its movement, and the target or a creature within 5 feet can detach it with an action and a DC 14 Strength (Athletics) check.",
   "gray-ooze/pseudopod": ARMOR_PENALTY,
   "horned-devil/hurl-flame": HURL_FLAME,
   "phase-spider/bite": STABLE_POISON,

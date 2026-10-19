@@ -420,3 +420,70 @@ describe("a will-o'-wisp's Ephemeral", () => {
     ).toThrow(CommandRejectedError);
   });
 });
+
+describe("a creature attached to another", () => {
+  const fresh = (built: Table) => {
+    built.state.combat = {
+      ...built.state.combat,
+      turnActorId: IDS.monster,
+      turn: { ...built.state.combat.turn, actionUsed: false, actionInstance: null }
+    };
+  };
+
+  it("keeps a stirge from using its Proboscis again while it is attached", () => {
+    const built = table("stirge");
+    use(built, "proboscis", IDS.hero, [15, 3, 3]);
+    expect(actor(built, IDS.hero).effects[0]?.tags).toContain("source-no-repeat");
+    fresh(built);
+    expect(() => use(built, "proboscis", IDS.ally, [15, 3, 3])).toThrow(/can't use Proboscis while it is attached/);
+  });
+
+  it("lets a cloaker Attach only to the creature it holds", () => {
+    const built = table("cloaker");
+    use(built, "attach", IDS.hero, [15, 3, 3, 3]);
+    fresh(built);
+    expect(() => use(built, "attach", IDS.ally, [15, 3, 3, 3])).toThrow(/can use Attach only on Hero/);
+  });
+
+  it("lets a darkmantle attack only the creature it holds, with Advantage", () => {
+    const built = table("darkmantle");
+    use(built, "crush", IDS.hero, [15, 3]);
+    fresh(built);
+    expect(() => use(built, "crush", IDS.ally, [15, 3])).toThrow(/can attack only Hero/);
+    const again = use(built, "crush", IDS.hero, [15, 3, 3]);
+    expect(again.rollMode?.advantage).toContain("Darkmantle attached to Hero");
+  });
+});
+
+describe("a swarm", () => {
+  it("regains no Hit Points from healing", () => {
+    const built = table("swarm-of-rats");
+    const heal = {
+      id: "cure",
+      name: "Cure",
+      activation: "action",
+      description: "A heal.",
+      damage: [],
+      healing: { formula: "2d8" }
+    } as never;
+    const before = actor(built, IDS.monster).hp.current;
+    built.state.combat = { ...built.state.combat, turnActorId: IDS.hero };
+    const healed = resolveDefinitionAction(
+      built.state,
+      heal,
+      { actorId: IDS.hero, targetIds: [IDS.monster], commandId: nextId() },
+      {
+        random: () => 4,
+        newRollId: nextId,
+        gmSessionId: IDS.gm,
+        now: NOW,
+        definition: heroDefinition,
+        resolveDefinition: resolveDefinition(built)
+      }
+    );
+    expect(actor(built, IDS.monster).hp.current).toBe(before);
+    expect(healed.tableNarration?.map((line) => line.text)).toContain(
+      "Swarm of Rats is a swarm and can't regain Hit Points or gain Temporary Hit Points."
+    );
+  });
+});

@@ -49,6 +49,7 @@ import { holdsFeature, spellClassOf } from "../class-features.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { creatureTypeOf, swimSpeedFeet } from "../statblock-facts.js";
 import { auraOfAuthority, traitOf } from "../statblock-traits.js";
+import { attachedAdvantage } from "../attachments.js";
 import { hitRiderOf } from "./hit-riders.js";
 import { wardedConditions } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
@@ -489,6 +490,9 @@ function traitClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeCl
     sources.advantage.push({ source: "printed", label: `${ctx.action.name} (first round)` });
   const authority = auraOfAuthority(state, attacker, deps);
   if (authority) sources.advantage.push(authority);
+  // "While attached to a target, the darkmantle can attack only the target but has Advantage on its attack rolls."
+  if (attachedAdvantage(state, attacker.id, target.id))
+    sources.advantage.push({ source: "attached", label: `${attacker.name} attached to ${target.name}` });
   // SRD Blurred Form (a steam mephit): "Attack rolls against the mephit are made with Disadvantage unless the mephit
   // has the Incapacitated condition."
   const blurred = traitOf(target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined, "blurred");

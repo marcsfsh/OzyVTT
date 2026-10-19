@@ -263,7 +263,7 @@ Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
-| Aboleth: Dominate Mind (2/Day) | guided | The DC 16 Wisdom save and Charmed are applied, and a failure puts the target under the aboleth's command and on its side (summons.ts), so its player can't move it or act for it. The repeat save when it takes damage, the end when the aboleth dies, and the 60 feet the control reaches are the GM's. |
+| Aboleth: Dominate Mind (2/Day) | guided | The DC 16 Wisdom save and Charmed are applied, and a failure puts the target under the aboleth's command and on its side (summons.ts), so its player can't move it or act for it; it repeats the save whenever it takes damage, and the Charm ends when the aboleth dies (save-stages.ts). That the control reaches only 60 feet, and the save after each day spent a mile away, are the GM's. |
 | Adult Black Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Fear applies only as its own row says. |
 | Adult Brass Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Minor Illusion applies only as its own row says. |
 | Adult Copper Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Minor Illusion, Greater Restoration, Major Image apply only as their own rows say. |
@@ -444,7 +444,7 @@ The number after each trait is how many stat blocks print it.
 | Succubus Form (1) | reference | Changing to the other stat block after a Long Rest is the GM's: place that stat block on the map in this one's stead. |
 | Sunlight Sensitivity (5) | enforced | resolution/attack.ts and ability-checks.ts give it Disadvantage on attack rolls and ability checks while it stands in sunlight (vision/rules.ts). With dynamic vision off, the light is the GM's. |
 | Sunlight Weakness (1) | enforced | resolution/attack.ts, ability-checks.ts and saving-throws.ts give it Disadvantage on D20 Tests while it stands in sunlight (vision/rules.ts). With dynamic vision off, the light is the GM's. |
-| Swarm (7) | guided | movement-rules.ts and terrain.ts let the swarm and other creatures share a space, and the map's drag preview (movePreview.ts) charges the same path. Refusing it Hit Points and Temporary Hit Points is the GM's. |
+| Swarm (7) | guided | movement-rules.ts and terrain.ts let the swarm and other creatures share a space, and the map's drag preview (movePreview.ts) charges the same path; healing gives it no Hit Points or Temporary Hit Points (resolution/heal.ts). Squeezing through an opening large enough for a Tiny creature is the GM's. |
 | Telepathic Bond (1) | reference | Communication and senses like this are the GM's to run. |
 | Training (1) | reference | The GM picks the skill and applies its Advantage. |
 | Transparent (1) | reference | Noticing the cube is the GM's call, with the DC the trait prints. |
