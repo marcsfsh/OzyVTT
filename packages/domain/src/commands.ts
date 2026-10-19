@@ -1658,12 +1658,65 @@ export const TimePassSchema = z
     hours: z.number().int().min(0).max(720).default(0),
     /** Minutes on top of the hours, so a group can skip the minute or the 10 minutes a spell lasts. */
     minutes: z.number().int().min(0).max(59).default(0),
-    /** The party travels for that time at this pace (SRD 5.2.1 Travel Pace): the log says how far it went. */
+    /** The party travels for that time at this pace (SRD 5.2.1 Travel Pace): the log says how far it went, and each
+     *  traveller's checks read the pace until time passes without one. */
     pace: z.enum(["fast", "normal", "slow"]).optional(),
+    /** The time is downtime: each character works up to 8 hours a day on its crafting projects. */
+    downtime: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
   .refine((request) => request.hours > 0 || request.minutes > 0, "Choose at least 1 minute.");
+const CraftIdSchema = z
+  .string()
+  .regex(/^[a-z0-9-]+$/)
+  .max(80);
+/** A character starts making something in its downtime (SRD 5.2.1 Crafting): a catalog item, a Spell Scroll of a
+ *  spell, or a magic item on its base, with the tool that makes it. */
+export const CraftingStartSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    itemId: CraftIdSchema,
+    /** The spell a Spell Scroll bears. */
+    spellId: CraftIdSchema.optional(),
+    /** What a magic weapon or armor is made on (a +1 Longsword's Longsword). */
+    baseId: CraftIdSchema.optional(),
+    /** The tool to make it with, when more than one can; absent, the first the character can work with. */
+    toolId: CraftIdSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A character joins a project as a helper, or leaves it. */
+export const CraftingHelpSchema = z
+  .object({
+    commandId: z.uuid(),
+    projectId: z.uuid(),
+    actorId: z.uuid(),
+    helping: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM logs days of downtime work on a project, with no time passing on the clock. */
+export const CraftingWorkSchema = z
+  .object({
+    commandId: z.uuid(),
+    projectId: z.uuid(),
+    days: z.number().int().min(1).max(250),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A project is called off. */
+export const CraftingCancelSchema = z
+  .object({
+    commandId: z.uuid(),
+    projectId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** What a character could start crafting now. */
+export const ActorCraftingOffersSchema = z.object({ actorId: z.uuid() }).strict();
+
 /** The hour of the day dawn comes on the game clock, or null for a Long Rest to stand in for the day. */
 export const TimeSetDawnSchema = z
   .object({

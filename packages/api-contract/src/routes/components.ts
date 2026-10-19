@@ -327,6 +327,7 @@ nameAll([
   ["ActorAvailableActionsData", wire.AvailableActionsReplySchema],
   ["ActorMovementData", wire.ActorMovementReplySchema],
   ["CharacterNextLevelData", wire.NextLevelReplySchema],
+  ["ActorCraftingOffersData", wire.CraftingOffersReplySchema],
   ["VisionPreviewData", wire.VisionPreviewReplySchema],
   ["ScenePreviewData", wire.ScenePreviewReplySchema],
   ["CharacterDraftData", wire.CharacterDraftReplySchema],

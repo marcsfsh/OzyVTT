@@ -1847,6 +1847,66 @@ export const RestStateSchema = z
   .strict();
 export type RestState = z.infer<typeof RestStateSchema>;
 
+const CraftSlugSchema = z
+  .string()
+  .regex(/^[a-z0-9-]+$/)
+  .max(80);
+
+/** One thing a character is making as downtime (SRD 5.2.1 Crafting Nonmagical Items, Brewing Potions of Healing,
+ *  Scribing Spell Scrolls, Crafting Magic Items): its raw materials are paid as it starts, and each 8-hour day of work
+ *  moves it on, a helper's day too, until it is done and joins its crafter's pack. */
+export const CraftingProjectSchema = z
+  .object({
+    id: z.uuid(),
+    crafterId: z.uuid(),
+    /** What it makes, by catalog id, and its name as it started. */
+    itemId: CraftSlugSchema,
+    itemName: z.string().min(1).max(120),
+    kind: z.enum(["item", "potion-of-healing", "spell-scroll", "magic-item"]),
+    /** The tool it is made with. */
+    toolId: CraftSlugSchema,
+    /** A magic weapon's or armor's base (a +1 Longsword's Longsword). */
+    baseId: CraftSlugSchema.optional(),
+    /** The spell a Spell Scroll bears, and the scribe's numbers the scroll keeps. */
+    spellId: CraftSlugSchema.optional(),
+    scroll: z
+      .object({
+        saveDc: z.number().int().min(1).max(40),
+        attackBonus: z.number().int().min(-5).max(30),
+        casterLevel: z.number().int().min(1).max(20)
+      })
+      .strict()
+      .optional(),
+    /** The spells the crafter must have prepared on each day of work. */
+    preparedSpellIds: z.array(CraftSlugSchema).max(24).default([]),
+    /** Other characters helping, each with the tool's proficiency. */
+    helperIds: z.array(z.uuid()).max(6).default([]),
+    /** Minutes of one worker's time the item takes (8 hours a day), and the minutes worked so far, helpers' included. */
+    workMinutes: z
+      .number()
+      .int()
+      .min(1)
+      .max(250 * 8 * 60),
+    doneMinutes: z.number().int().min(0).default(0),
+    /** What the raw materials cost, in copper pieces, paid as it started. */
+    paidCp: z.number().int().min(0).max(100_000_000),
+    /** When it started, in minutes of game time. */
+    startedAt: z.number().int().min(0)
+  })
+  .strict();
+export type CraftingProject = z.infer<typeof CraftingProjectSchema>;
+
+/** The projects under way and the work each character has done on the current game day (8 hours at most). */
+export const CraftingStateSchema = z
+  .object({
+    projects: z.array(CraftingProjectSchema).max(100).default([]),
+    /** The game day `worked` counts (minutes of game time / 1440), and each worker's minutes on it. */
+    day: z.number().int().min(0).default(0),
+    worked: z.record(z.uuid(), z.number().int().min(0).max(1440)).default({})
+  })
+  .strict();
+export type CraftingState = z.infer<typeof CraftingStateSchema>;
+
 export const GameStateSchema = z.object({
   schemaVersion: z.literal(1),
   revision: z.number().int().nonnegative().default(0),
@@ -1881,6 +1941,8 @@ export const GameStateSchema = z.object({
   /** The GM's open calls for a roll. A player reads only their own part of each. */
   rollCalls: z.array(RollCallSchema).max(20).default([]),
   /** Game time, Long Rest requests and the party's Short Rest. Players see only their own characters' part. */
-  rest: RestStateSchema.prefault({})
+  rest: RestStateSchema.prefault({}),
+  /** What the characters are making in their downtime. Players see the projects their own characters work on. */
+  crafting: CraftingStateSchema.prefault({})
 });
 export type GameState = z.infer<typeof GameStateSchema>;

@@ -1035,6 +1035,60 @@ export const NextLevelReplySchema = z.strictObject({
 export type NextLevelReply = Wire<z.infer<typeof NextLevelReplySchema>>;
 export type NextLevelResult = MutationResult & Partial<NextLevelReply>;
 
+/** One thing a character could start making: its raw materials and the 8-hour days of work it takes alone. */
+const CraftOfferSchema = z.strictObject({
+  id: z.string().describe("The catalog item, sent as `crafting.start`'s `itemId`"),
+  name: z.string(),
+  kind: z.enum(["item", "potion-of-healing", "spell-scroll", "magic-item"]),
+  materialsCp: z.number().int().min(0).describe("What its raw materials cost, in copper pieces"),
+  days: z.number().min(0).describe("The 8-hour days of work it takes one worker; helpers divide them"),
+  baseIds: z
+    .array(z.string())
+    .optional()
+    .describe("A magic weapon's or armor's choice of base, sent as `baseId`; the base's price is paid unless carried")
+});
+/** What `actor:crafting-offers` answers its owner or the GM (SRD 5.2.1 Crafting). */
+export const CraftingOffersReplySchema = z.strictObject({
+  tools: z
+    .array(
+      z.strictObject({
+        toolId: z.string(),
+        name: z.string(),
+        carried: z.boolean().describe("The tool is in the pack, which crafting with it needs"),
+        items: z.array(CraftOfferSchema)
+      })
+    )
+    .describe("The tools the character is proficient with, each with what its Craft line makes and the price"),
+  scrolls: z
+    .strictObject({
+      carried: z.boolean().describe("Calligrapher's Supplies are in the pack"),
+      spells: z.array(
+        z.strictObject({
+          id: z.string(),
+          name: z.string(),
+          level: z.number().int().min(0).max(9),
+          days: z.number(),
+          materialsCp: z.number().int().min(0)
+        })
+      )
+    })
+    .nullable()
+    .describe(
+      "Scribing Spell Scrolls with proficiency in Arcana or with Calligrapher's Supplies: the prepared spells it can scribe, with the Spell Scroll Costs table's days and gold; null without the proficiency"
+    ),
+  magicItems: z
+    .array(
+      CraftOfferSchema.extend({
+        rarity: z.string(),
+        toolIds: z.array(z.string()).describe("The tools it can be made with that the character is proficient with")
+      })
+    )
+    .describe("Magic items it can craft with Arcana proficiency and a tool it is proficient with"),
+  purseCp: z.number().int().min(0).describe("What its purse holds, in copper pieces")
+});
+export type CraftingOffersReply = Wire<z.infer<typeof CraftingOffersReplySchema>>;
+export type CraftingOffersResult = MutationResult & Partial<CraftingOffersReply>;
+
 /** What `vision:preview` answers the GM: where one creature (or the whole party) sees now, as image-pixel polygons
  *  (`[x0, y0, x1, y1, ...]`), and the creatures it perceives. Empty while the scene's vision is off. */
 export const VisionPreviewReplySchema = z.strictObject({

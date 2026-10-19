@@ -713,6 +713,33 @@ function playerRest(state: GameState, yourActorIds: ReadonlySet<string>): Player
   };
 }
 
+/** The crafting projects a player's characters make or help with, from an allow-list: when one started and a scroll's
+ *  numbers stay with the GM, and a helper is named only when it is one of theirs or a visible party character. */
+function playerCrafting(state: GameState, yourActorIds: ReadonlySet<string>): PlayerView["crafting"] {
+  const named = (actorId: string) =>
+    yourActorIds.has(actorId) ||
+    state.actors.some(
+      (actor) =>
+        actor.id === actorId && actor.kind === "player-character" && actor.visibility === "public" && !actor.archived
+    );
+  return state.crafting.projects
+    .filter((project) => yourActorIds.has(project.crafterId) || project.helperIds.some((id) => yourActorIds.has(id)))
+    .filter((project) => named(project.crafterId))
+    .map((project) => ({
+      id: project.id,
+      crafterId: project.crafterId,
+      itemId: project.itemId,
+      itemName: project.itemName,
+      kind: project.kind,
+      toolId: project.toolId,
+      ...(project.spellId !== undefined ? { spellId: project.spellId } : {}),
+      helperIds: project.helperIds.filter(named),
+      workMinutes: project.workMinutes,
+      doneMinutes: project.doneMinutes,
+      paidCp: project.paidCp
+    }));
+}
+
 /** "Fighter 5 / Rogue 2" for the identity card; null (field omitted) when the sheet records no class. */
 function classLineOf(definition: GameState["definitions"][number]["definition"] | undefined): string | null {
   const classes = definition?.character?.classes ?? [];
@@ -905,6 +932,7 @@ export function projectPlayerView(
     rollCalls: projectPlayerRollCalls(state, playerSessionId),
     combat: projectPlayerCombat(state, playerSessionId, now, content, sight),
     rest: playerRest(state, yourActorIds),
+    crafting: playerCrafting(state, yourActorIds),
     // Tiers subtract fields. An actor is removed only by gm-only visibility, archiving or sight.
     actors: state.actors
       .filter((actor) => actor.visibility === "public" && !actor.archived && !sight.hidden.has(actor.id))

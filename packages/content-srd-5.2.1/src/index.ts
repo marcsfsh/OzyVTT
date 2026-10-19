@@ -154,7 +154,7 @@ export function loadEquipment(): readonly EquipmentReference[] {
       source: weapon.source,
       category: "weapon",
       slot: "weapon",
-      costGp: null,
+      costGp: weapon.costGp ?? null,
       weightLb: null,
       description: null,
       weapon: {
@@ -178,7 +178,7 @@ export function loadEquipment(): readonly EquipmentReference[] {
     source: piece.source,
     category: piece.acBase <= 3 ? "shield" : "armor",
     slot: piece.acBase <= 3 ? "shield" : "armor",
-    costGp: null,
+    costGp: piece.costGp ?? null,
     weightLb: null,
     description: null,
     weapon: null,

@@ -30,6 +30,9 @@ import {
 import { interruptByGm, resumeLongRest } from "../long-rest.js";
 import { restApplier } from "../rest-interruptions.js";
 import { setTravelPace } from "../travel.js";
+import { workDuringDowntime } from "../crafting.js";
+import { clockMinutesOf } from "../game-time.js";
+import { craftingDeps } from "./crafting.js";
 import { initiatorOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -353,12 +356,12 @@ export const restingCommands = [
     type: "time.pass",
     operationId: "passTime",
     description:
-      "GM-only: moves the game clock forward by hours and minutes. The clock is what the 16-hour rule between Long Rests reads; a party rest moves it too (8 hours for a Long Rest, 1 for a Short Rest). A round is 6 seconds, so 10 rounds make a minute: the time counts down every creature's effects (an effect measured in rounds loses 10 a minute, one measured in minutes or hours loses them, and one that lasts until a turn ends is over), and what runs out ends with its on-end grants, as at a turn boundary. A fight doesn't move the clock; a parked fight's combatants wait outside it. Each midnight it crosses moves the Codex calendar's date a day, and the players' date with it when the two were the same day. With `pace` the party travels for that time (SRD Travel Pace: 4, 3 or 2 miles an hour), and the log says how far it went: each player character out of a fight holds the pace as an effect its checks read (Fast: Disadvantage on Wisdom (Perception or Survival) and Dexterity (Stealth) checks; Normal: Disadvantage on Dexterity (Stealth) checks; Slow: Advantage on Wisdom (Perception or Survival) checks), Passive Perception included, until time passes without a pace, it rests or it rolls Initiative.",
+      "GM-only: moves the game clock forward by hours and minutes. The clock is what the 16-hour rule between Long Rests reads; a party rest moves it too (8 hours for a Long Rest, 1 for a Short Rest). A round is 6 seconds, so 10 rounds make a minute: the time counts down every creature's effects (an effect measured in rounds loses 10 a minute, one measured in minutes or hours loses them, and one that lasts until a turn ends is over), and what runs out ends with its on-end grants, as at a turn boundary. A fight doesn't move the clock; a parked fight's combatants wait outside it. Each midnight it crosses moves the Codex calendar's date a day, and the players' date with it when the two were the same day. With `pace` the party travels for that time (SRD Travel Pace: 4, 3 or 2 miles an hour), and the log says how far it went: each player character out of a fight holds the pace as an effect its checks read (Fast: Disadvantage on Wisdom (Perception or Survival) and Dexterity (Stealth) checks; Normal: Disadvantage on Dexterity (Stealth) checks; Slow: Advantage on Wisdom (Perception or Survival) checks), Passive Perception included, until time passes without a pace, it rests or it rolls Initiative. With `downtime` the time is downtime (SRD 5.2.1 Crafting): each game day every character with a crafting project works up to 8 hours on it, oldest first, and each helper beside it, while alive, conscious and out of a fight; a finished project's item joins its crafter's pack.",
     summary: "Move game time forward by some hours and minutes.",
     schema: TimePassSchema,
     malformed: "Choose between 1 minute and 720 hours.",
     gmOnly: "Only the GM moves game time.",
-    async run({ request, execute }, kit) {
+    async run({ principal, request, execute }, kit) {
       const minutes = (request.hours ?? 0) * 60 + (request.minutes ?? 0);
       const { pace } = request;
       let events: EffectNarration[] = [];
@@ -367,6 +370,7 @@ export const restingCommands = [
         timed(
           state,
           () => {
+            const from = clockMinutesOf(state);
             events = passTime(state, request.hours ?? 0, request.minutes ?? 0, {
               resolveDefinition: kit.resolveDefinition,
               catalog: kit.equipmentCatalog(),
@@ -374,6 +378,11 @@ export const restingCommands = [
             });
             // The party stays on the road at this pace, which its checks read, until time passes without one.
             setTravelPace(state, pace ?? null);
+            // Downtime: the crafters work through it.
+            if (request.downtime === true)
+              events.push(
+                ...workDuringDowntime(state, from, clockMinutesOf(state), craftingDeps(kit, principal, state))
+              );
           },
           span
         )

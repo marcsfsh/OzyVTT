@@ -19,6 +19,7 @@ import { receivedSpellChoices, spellChoicesOf } from "../spell-choices.js";
 import { withMasteries } from "../weapon-masteries.js";
 import {
   ActorAvailableActionsSchema,
+  ActorCraftingOffersSchema,
   ActorMovementSchema,
   BuilderOffersSchema,
   CharacterNextLevelSchema,
@@ -38,6 +39,8 @@ import { areaGroundFor } from "../zone-preview.js";
 import { visibleToPlayerAnnotation } from "../projections.js";
 import { previewScene } from "../scene-preview.js";
 import { nextLevelOf } from "../next-level.js";
+import { craftingOffers } from "../crafting.js";
+import { craftingDeps } from "./crafting.js";
 import { GameNotFoundError } from "./failures.js";
 import { initiatorOf, isGmGrade, type GamePrincipal, type Kit } from "./kit.js";
 import type { ReadSpec } from "./pipeline.js";
@@ -347,6 +350,22 @@ export const gameReads = [
       if (!actor) throw new GameNotFoundError("That character no longer exists.");
       const definition = actor.definitionId ? storedDefinition(state, actor.definitionId) : undefined;
       return nextLevelOf(actor, definition, kit.catalogFor(principal), state.builderPolicy);
+    }
+  },
+
+  {
+    event: "actor:crafting-offers",
+    route: gameRoutes.getActorCraftingOffers,
+    schema: ActorCraftingOffersSchema,
+    malformed: "The crafting lookup is malformed.",
+    // Its owner or the GM, from the reader's own catalog, so a player sees only what they may craft.
+    run: (principal, input, kit) => {
+      const state = kit.read();
+      const actorId = (input as z.output<typeof ActorCraftingOffersSchema>).actorId;
+      requireActorAccess(initiatorOf(principal), state, actorId, "resource", "You can only read your own character.");
+      const actor = state.actors.find((candidate) => candidate.id === actorId);
+      if (!actor) throw new GameNotFoundError("That character no longer exists.");
+      return craftingOffers(actor, craftingDeps(kit, principal, state));
     }
   },
 

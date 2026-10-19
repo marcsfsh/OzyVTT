@@ -27,6 +27,7 @@ import type {
   ActorActionsAvailabilityResult,
   ActorAddResult,
   ActorMovementResult,
+  CraftingOffersResult,
   NextLevelResult,
   AnnotationAddResult,
   CharacterDraftResult,
@@ -58,6 +59,10 @@ import type { SoundBoardResult, SoundBoardView, SoundCommandResult } from "./sou
 import type {
   ActionResolveSchema,
   ActionUseSchema,
+  CraftingCancelSchema,
+  CraftingHelpSchema,
+  CraftingStartSchema,
+  CraftingWorkSchema,
   CharacterDraftDiscardSchema,
   CharacterDraftSaveSchema,
   ActorAddFromDefinitionSchema,
@@ -791,6 +796,28 @@ export interface ClientToServerEvents {
   "actor:movement": (payload: { actorId: string }, acknowledgement: (result: ActorMovementResult) => void) => void;
   /** What a character's next level brings; only when the caller may level that character. */
   "character:next-level": (payload: { actorId: string }, acknowledgement: (result: NextLevelResult) => void) => void;
+  /** What a character could start crafting now; its owner or the GM. */
+  "actor:crafting-offers": (
+    payload: { actorId: string },
+    acknowledgement: (result: CraftingOffersResult) => void
+  ) => void;
+  "crafting:start": (
+    payload: CommandPayload<typeof CraftingStartSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "crafting:help": (
+    payload: CommandPayload<typeof CraftingHelpSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: log days of downtime work on a project. */
+  "crafting:work": (
+    payload: CommandPayload<typeof CraftingWorkSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "crafting:cancel": (
+    payload: CommandPayload<typeof CraftingCancelSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "turn:use": (
     payload: CommandPayload<typeof TurnUseSchema>,
     acknowledgement: (result: MutationResult) => void
