@@ -2473,8 +2473,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `horn-of-blasting` - authorable except its 20% chance to explode and damage the user; authoring
   //     only the blast would make it strictly better than printed.
   // One action for each metal: its number of Berserkers within 60 feet for 1 hour, obeying the user who meets the
-  // horn's requirement (checked on the sheet) and attacking one who doesn't; then 7 days before it sounds again. Their
-  // Immunity to Charmed and Frightened is the table's.
+  // horn's requirement (checked on the sheet) and attacking one who doesn't, immune to Charmed and Frightened; then 7
+  // days before it sounds again.
   "horn-of-valhalla": {
     actions: [
       {
@@ -2485,7 +2485,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "Blow the silver horn: 2 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: none. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
         uses: { limit: 1, per: "time", afterHours: "168" },
         summons: {
-          creatures: [{ monsterId: "berserker", count: 2 }],
+          creatures: [{ monsterId: "berserker", count: 2, except: { conditionImmunities: ["charmed", "frightened"] } }],
           rangeFeet: 60,
           lasts: { type: "minutes", minutes: 60 }
         }
@@ -2498,7 +2498,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "Blow the brass horn: 3 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: Proficiency with all Simple weapons. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
         uses: { limit: 1, per: "time", afterHours: "168" },
         summons: {
-          creatures: [{ monsterId: "berserker", count: 3 }],
+          creatures: [{ monsterId: "berserker", count: 3, except: { conditionImmunities: ["charmed", "frightened"] } }],
           rangeFeet: 60,
           lasts: { type: "minutes", minutes: 60 },
           obeysWith: { weapons: "simple" }
@@ -2512,7 +2512,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "Blow the bronze horn: 4 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: Training with all Medium armor. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
         uses: { limit: 1, per: "time", afterHours: "168" },
         summons: {
-          creatures: [{ monsterId: "berserker", count: 4 }],
+          creatures: [{ monsterId: "berserker", count: 4, except: { conditionImmunities: ["charmed", "frightened"] } }],
           rangeFeet: 60,
           lasts: { type: "minutes", minutes: 60 },
           obeysWith: { armor: "medium" }
@@ -2526,7 +2526,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "Blow the iron horn: 5 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: Proficiency with all Martial weapons. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
         uses: { limit: 1, per: "time", afterHours: "168" },
         summons: {
-          creatures: [{ monsterId: "berserker", count: 5 }],
+          creatures: [{ monsterId: "berserker", count: 5, except: { conditionImmunities: ["charmed", "frightened"] } }],
           rangeFeet: 60,
           lasts: { type: "minutes", minutes: 60 },
           obeysWith: { weapons: "martial" }

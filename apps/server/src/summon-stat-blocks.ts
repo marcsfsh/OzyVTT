@@ -164,6 +164,13 @@ function withExceptions(definition: ActorDefinition, except: NonNullable<SummonC
     ...(except.name ? { name: except.name } : {}),
     ...(except.speedFeet !== undefined ? { speedFeet: except.speedFeet } : {}),
     abilityScores: { ...definition.abilityScores, ...except.abilityScores },
+    ...(except.conditionImmunities
+      ? {
+          conditionImmunities: [
+            ...new Set([...(definition.conditionImmunities ?? []), ...except.conditionImmunities])
+          ].slice(0, 20)
+        }
+      : {}),
     actions: definition.actions
       .filter((action) => !dropped.has(action.id))
       .map((action) =>

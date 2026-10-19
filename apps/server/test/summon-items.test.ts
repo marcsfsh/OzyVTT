@@ -77,6 +77,8 @@ describe("Horn of Valhalla", () => {
     const friendly = table.named("Berserker");
     expect(friendly).toHaveLength(2);
     expect(friendly.every((berserker) => berserker.control?.by === CASTER)).toBe(true);
+    // "They have Immunity to the Charmed and Frightened conditions."
+    expect(friendly[0]!.conditionImmunities).toEqual(expect.arrayContaining(["charmed", "frightened"]));
   });
 
   it("the iron horn's five Berserkers attack a user without Martial weapons", async () => {

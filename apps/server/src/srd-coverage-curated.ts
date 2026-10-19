@@ -548,7 +548,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Lightning Absorption": absorbs("Lightning"),
   "Limited Amphibiousness": breath,
   "Loathsome Limbs": enforced(
-    "death-traits.ts severs a limb when the troll ends any turn Bloodied after taking 15 Slashing damage or more in it, four times a day. The limb joins the fight as a Troll Limb on the troll's side in its space and acts right after the troll (risen.ts). The troll has 1 Exhaustion level for each missing limb until it next regains Hit Points, when they grow back."
+    "death-traits.ts severs a limb when the troll ends any turn Bloodied after taking 15 Slashing damage or more in it, four times a day. The limb joins the fight as a Troll Limb under the troll's command and on its side in its space, and acts right after the troll (summons.ts). The troll has 1 Exhaustion level for each missing limb until it next regains Hit Points, when they grow back."
   ),
   "Magic Resistance": enforced(
     "saving-throws.ts gives it Advantage on saves against spells and magic items, saves a spell asks it to repeat included."
@@ -640,6 +640,109 @@ const studied = (ability: string) =>
  * `feature:`, `item:` or `action:<monster>/<action id>`.
  */
 export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
+  // Summoned and commanded creatures (summons.ts, summon-orders.ts, summon-turns.ts, summon-strikes.ts).
+  "spell:animate-dead": enforced(
+    "Each dead Humanoid corpse it targets within 10 feet rises as a Zombie (or a Skeleton), two more for each slot level above 3 (summons.ts), on the caster's side on its own Initiative. A Bonus Action commands every one within 60 feet (summon-orders.ts); uncommanded, one takes the Dodge action (summon-turns.ts). After 24 hours it obeys no one, and casting it again on up to four of them renews that. A pile of bones, and how an order is carried out, are the GM's."
+  ),
+  "spell:animate-objects": enforced(
+    "Animated Objects of the sizes picked, up to the caster's spellcasting modifier with a Large one counting as two and a Huge one as three (summons.ts), act right after the caster with its spell attack modifier and the slot's Slam damage. A Bonus Action commands them within 500 feet; uncommanded, they take the Dodge action. Which objects lie near is the GM's."
+  ),
+  "spell:arcane-eye": enforced(
+    "An Invisible, invulnerable eye appears within 30 feet (summons.ts) with Darkvision 30 feet, and the caster's player sees what it sees (vision/audience.ts). A Bonus Action moves it up to 30 feet (summon-orders.ts). Gaps an inch wide are the GM's."
+  ),
+  "spell:arcane-hand": guided(
+    "The hand appears within 120 feet with AC 20 and the caster's Hit Point maximum, and the spell ends when it drops to 0 (summons.ts). Clenched Fist's attack and Grasping Hand's Dexterity save reach a creature within 5 feet of the hand, which moves up to 60 feet first (summon-strikes.ts), and the crush deals its damage. Forceful Hand's push, Interposing Hand's cover, the grapple's escape DC and the size limits are the GM's."
+  ),
+  "spell:arcane-sword": enforced(
+    "The sword appears within 90 feet (summons.ts) and the cast's attack reaches a creature within 5 feet of it; each later Bonus Action moves it up to 30 feet first and strikes from there (summon-strikes.ts)."
+  ),
+  "spell:conjure-fey": enforced(
+    "The spirit appears within 60 feet (summons.ts) and the cast's attack reaches a creature within 5 feet of it, Frightening on a hit; each later Bonus Action teleports it up to 30 feet first and strikes from there (summon-strikes.ts). The space being unoccupied is the GM's."
+  ),
+  "spell:create-undead": enforced(
+    "Up to three Ghouls rise from dead Humanoid corpses within 10 feet, more from higher slots, or Ghasts, Wights or Mummies from levels 8 and 9 (summons.ts). A Bonus Action commands them within 120 feet (summon-orders.ts); uncommanded, they take the Dodge action. After 24 hours they obey no one, and casting it again renews that."
+  ),
+  "spell:find-familiar": enforced(
+    "The familiar takes one of the spell's forms or another Challenge Rating 0 Beast, as a Celestial, Fey or Fiend, within 10 feet (summons.ts). It rolls its own Initiative and can't attack. A Bonus Action lets the caster's player see through its eyes until the start of the caster's next turn (vision/audience.ts), and a Magic action dismisses it or sends it to its pocket dimension and calls it back (summon-orders.ts). A touch spell is delivered from its space with its Reaction within 100 feet (summons.ts). Casting it again changes its form. Its telepathy is the GM's."
+  ),
+  "spell:find-steed": enforced(
+    "The Otherworldly Steed at the slot's level, a Celestial, Fey or Fiend, appears within 30 feet and acts right after the caster (summons.ts); it can be ridden (mounts.ts). It disappears at 0 Hit Points or when the caster dies, and a new casting replaces it."
+  ),
+  "spell:floating-disk": castOnly(
+    "The disk, what it carries and how it follows the caster are the GM's: weight isn't tracked."
+  ),
+  "spell:giant-insect": enforced(
+    "A Giant Insect at the slot's level in the form picked appears within 60 feet and acts right after the caster with its spell attack modifier and save DC (summons.ts); uncommanded, it takes the Dodge action (summon-turns.ts). It disappears at 0 Hit Points or when the Concentration ends."
+  ),
+  "spell:mislead": enforced(
+    "The caster turns Invisible until it attacks, deals damage or casts a spell, and its illusory double appears in its space (summons.ts): invulnerable and in no one's way, seeing for the caster's player (vision/audience.ts), moved twice the caster's Speed with a Magic action (summon-orders.ts). How the double behaves is the player's to describe."
+  ),
+  "spell:phantom-steed": enforced(
+    "A Riding Horse with a Speed of 100 feet appears within 30 feet for the hour (summons.ts) and can be ridden (mounts.ts); any damage ends it."
+  ),
+  "spell:planar-binding": enforced(
+    "Only a Celestial, an Elemental, a Fey or a Fiend can be the target. A failed Charisma save binds it to serve the caster for the spell's duration (resolution/concentration.ts), under the caster's command and on its side (summons.ts). What it is told to do, and lengthening another spell's summoning, are the GM's."
+  ),
+  "spell:project-image": enforced(
+    "The illusory copy appears anywhere on the map (summons.ts), seeing for the caster's player (vision/audience.ts) and moved 60 feet with a Magic action (summon-orders.ts). Any damage to it ends it and the spell. Its intangibility to touch and a Study action to discern it are the GM's."
+  ),
+  "spell:spiritual-weapon": enforced(
+    "The force appears within 60 feet (summons.ts) and the cast's attack reaches a creature within 5 feet of it; each later Bonus Action moves it up to 20 feet first and strikes from there (summon-strikes.ts). The force can't be harmed and fills no space."
+  ),
+  "spell:summon-dragon": enforced(
+    "The Draconic Spirit at the slot's level appears within 60 feet and acts right after the caster with its spell attack modifier and save DC, its Rends half the slot's level (summons.ts); uncommanded, it takes the Dodge action (summon-turns.ts). The caster shares the Resistance picked while it lasts. It disappears at 0 Hit Points or when the Concentration ends."
+  ),
+  "spell:unseen-servant": enforced(
+    "The Invisible servant appears within 60 feet with AC 10, 1 Hit Point and Strength 2 and can't attack (summons.ts). A Bonus Action sends it 15 feet (summon-orders.ts), and it ends more than 60 feet from the caster. Its tasks are the GM's."
+  ),
+  "feature:wild-companion": guided(
+    "Find Familiar is always prepared and cast as a Magic action with a slot or a use of Wild Shape; the familiar is Fey and leaves when the Druid finishes a Long Rest (character-build.ts, summons.ts). Going without the Material component is the GM's."
+  ),
+  "feature:dragon-companion": guided(
+    "Summon Dragon is cast free once a Long Rest, and any casting may go without Concentration, lasting 1 minute then (character-build.ts, summons.ts). Going without the Material component is the GM's."
+  ),
+  "item:bag-of-tricks": enforced(
+    "One action for each bag colour: the server rolls the d8 on that colour's table, and the creature appears within 20 feet acting right after its user until the next Long Rest or 0 Hit Points (summons.ts). A Bonus Action commands it (summon-orders.ts). Three pulls a day."
+  ),
+  "item:bowl-of-commanding-water-elementals": enforced(
+    "Once a dawn, a Water Elemental appears near its user, acts right after it, and leaves after 1 hour, at 0 Hit Points or when a Bonus Action dismisses it (summons.ts, summon-orders.ts). Filling the bowl is the GM's."
+  ),
+  "item:brazier-of-commanding-fire-elementals": enforced(
+    "Once a dawn, a Fire Elemental appears near its user, acts right after it, and leaves after 1 hour, at 0 Hit Points or when a Bonus Action dismisses it (summons.ts, summon-orders.ts)."
+  ),
+  "item:censer-of-controlling-air-elementals": enforced(
+    "Once a dawn, an Air Elemental appears near its user, acts right after it, and leaves after 1 hour, at 0 Hit Points or when a Bonus Action dismisses it (summons.ts, summon-orders.ts)."
+  ),
+  "item:stone-of-controlling-earth-elementals": enforced(
+    "Once a dawn, an Earth Elemental appears within 30 feet, acts right after its user, and leaves after 1 hour, at 0 Hit Points or when a Bonus Action dismisses it (summons.ts, summon-orders.ts)."
+  ),
+  "item:elemental-gem": enforced(
+    "One action for each gem: breaking it uses it up, and its elemental appears beside its user, acts right after it and leaves after 1 hour, at 0 Hit Points or when a Bonus Action dismisses it (summons.ts)."
+  ),
+  "item:efreeti-bottle": guided(
+    "Opened, an Efreeti appears within 30 feet and the server rolls the d10 (summons.ts): on a 1 it attacks its user and leaves after 5 rounds, on 2 to 9 it obeys for 1 hour, on a 10 it stays up to an hour to grant a Wish. The first roll setting every later opening, the 24 hours between openings and the Wish are the GM's."
+  ),
+  "item:feather-token": guided(
+    "The Bird token is used up for a Roc that can't attack and obeys its user until it is dismissed with a Magic action or drops to 0 Hit Points (summons.ts). The Anchor, Fan, Swan Boat, Tree and Whip are the GM's."
+  ),
+  "item:figurine-of-wondrous-power": guided(
+    "One action for each figurine (the Ivory Goats picked by goat): its creature appears within 60 feet for its time, acts right after its user and defends itself when uncommanded, and a Magic action turns it back (summons.ts). clock-pools.ts holds each figurine for its days, except the Ivory Goats. The goats' waits and charges, the Goat of Terror's fear, the Onyx Dog's Blindsight, the Obsidian Steed's disobedience and the Silver Raven are the GM's."
+  ),
+  "item:ring-of-djinni-summoning": enforced(
+    "The djinni appears within 120 feet while its wearer keeps Concentration, up to 1 hour, defending itself when uncommanded (summons.ts); clock-pools.ts holds the ring for 24 hours. The ring losing its magic when the djinni dies is the GM's."
+  ),
+  "item:staff-of-the-python": guided(
+    "Thrown within 10 feet, it becomes a Giant Constrictor Snake that acts right after its user, commanded within 60 feet and defending itself otherwise; a Bonus Action turns it back (summons.ts, summon-orders.ts). The hour before it works again, and the staff shattering when the snake dies, are the GM's."
+  ),
+  "item:staff-of-swarming-insects": enforced(
+    "Insect Cloud fills a 30-foot Emanation that is Heavily Obscured for everyone but its holder for 10 minutes (vision/cast-sight.ts). Giant Insect costs 4 charges and brings the insect (summons.ts), and Insect Plague costs 5. A strong wind dispersing the cloud is the GM's."
+  ),
+  "action:Aboleth/dominate-mind": guided(
+    "The DC 16 Wisdom save and Charmed are applied, and a failure puts the target under the aboleth's command and on its side (summons.ts), so its player can't move it or act for it. The repeat save when it takes damage, the end when the aboleth dies, and the 60 feet the control reaches are the GM's."
+  ),
+  "action:Treant/animate-trees": enforced(
+    "Two trees animate within 60 feet from the Treant stat block with Intelligence and Charisma 1 and no Animate Trees, under the treant's command and on its side, acting right after it (summons.ts). They stop after a day, at 0 Hit Points, when the treant dies or more than 120 feet from it. Which trees stand where is the GM's."
+  ),
   // Moves, jumps, teleports and leaving the plane (granted-moves.ts, jumping.ts, off-plane.ts, time-stop.ts).
   "spell:misty-step": enforced(
     "granted-moves.ts gives the caster a 30-foot teleport for the turn, which movement-rules.ts takes at once to an unoccupied space it can see and refuses beyond its range."
@@ -714,7 +817,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "On a failed DC 21 Dexterity save a creature with 100 Hit Points or fewer dies outright, a character with no death saves, and Death Ward turns it aside; any other takes the Piercing and Radiant damage (fatal-saves.ts)."
   ),
   "action:Wraith/create-specter": enforced(
-    "resolution/revival.ts takes a Humanoid corpse within 10 feet dead no longer than 1 minute, and refuses an eighth specter. Its spirit rises as a Specter on the wraith's side in the corpse's space, acting right after the wraith (risen.ts), and the corpse leaves the fight."
+    "resolution/revival.ts takes a Humanoid corpse within 10 feet dead no longer than 1 minute, and refuses an eighth specter. Its spirit rises as a Specter under the wraith's command and on its side in the corpse's space, acting right after the wraith (summons.ts), and the corpse leaves the fight."
   ),
   "action:Gibbering Mouther/bite": enforced(
     "The hit's damage, and Prone on a Medium or smaller target, are applied. A creature it drops to 0 Hit Points dies outright with nothing left of its body (hit-points.ts)."
@@ -736,7 +839,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   // Cantrips with nothing to roll: the cast is the server's, what it does is the table's.
   "spell:light": castOnly("The light and the object it shines from are the GM's."),
-  "spell:mage-hand": castOnly("The hand and what it does are the GM's."),
+  "spell:mage-hand": enforced(
+    "The hand appears as a token at a point within 30 feet (summons.ts); a Magic action moves it up to 30 feet (summon-orders.ts), and it vanishes more than 30 feet from the caster or when the spell is cast again. What it handles is the GM's."
+  ),
   "spell:mending": castOnly("The repair is the GM's."),
   "spell:message": castOnly("The whisper and its reply are the table's."),
   "spell:prestidigitation": castOnly("Its minor tricks are the GM's."),
@@ -884,7 +989,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Protector's training and Thaumaturge's extra cantrip are applied. Thaumaturge's bonus to Arcana and Religion checks is the GM's."
   ),
   "feature:eldritch-invocations": guided(
-    "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied, and level-up-picks.ts lets a level up replace one invocation. Eldritch Smite's Pact Magic slot dice and Prone, and Lifedrinker's damage and Hit Point Die, ride a pact weapon's hit (resolution/hit-options.ts). Devil's Sight and Witch Sight are senses dynamic vision reads (vision/senses.ts), and One with Shadows' Invisibility is refused in Bright Light (resolution/validate.ts). Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
+    "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied, and level-up-picks.ts lets a level up replace one invocation. Eldritch Smite's Pact Magic slot dice and Prone, and Lifedrinker's damage and Hit Point Die, ride a pact weapon's hit (resolution/hit-options.ts). Devil's Sight and Witch Sight are senses dynamic vision reads (vision/senses.ts), and One with Shadows' Invisibility is refused in Bright Light (resolution/validate.ts). Pact of the Chain casts Find Familiar as a Magic action and adds its special forms (character-build.ts, summons.ts); forgoing an attack so the familiar attacks with its Reaction is the GM's. Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
   ),
   "feature:elemental-fury": enforced(
     "Primal Strike's extra damage, of the type the Druid picks, is applied once a turn. Potent Spellcasting adds the Druid's Wisdom modifier to the damage of Poison Spray, Produce Flame and Starry Wisp."
@@ -1236,7 +1341,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/kill.ts kills a target with 100 Hit Points or fewer outright, a character with no death saves, and deals 12d12 Psychic damage to any other. Death Ward turns the death aside."
   ),
   "spell:finger-of-death": enforced(
-    "The save and its Necrotic damage are applied. A Humanoid it kills rises as a Zombie on the caster's side at the start of the caster's next turn, in the corpse's space and acting after the caster (risen.ts). Its orders are the GM's to give."
+    "The save and its Necrotic damage are applied. A Humanoid it kills rises as a Zombie at the start of the caster's next turn (risen.ts), under the caster's command and on its side, in the corpse's space and acting right after the caster (summons.ts): a player's caster runs it."
   ),
   "spell:divine-word": enforced(
     "A failed Charisma save acts by the target's Hit Points (fatal-saves.ts): 20 or fewer dies, 30 or fewer is Blinded, Deafened and Stunned for 1 hour, 40 or fewer Blinded and Deafened for 10 minutes, and 50 or fewer Deafened for 1 minute. A Celestial, an Elemental, a Fey or a Fiend that fails leaves the map for 24 hours (off-plane.ts)."
@@ -1245,13 +1350,13 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The save and its Psychic damage are applied. On a failure the target spends its Reaction, when it can take one, on a move of its Speed that must end farther from the caster (granted-moves.ts), provoking as any move does; the route is the mover's."
   ),
   "spell:dominate-beast": guided(
-    "A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts). The repeat save each time the target takes damage, and its orders, are the GM's."
+    "Only a Beast can be the target. A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts), and puts the target under the caster's command and on its side while it lasts (summons.ts): the caster's player acts for it on its turns. The repeat save each time the target takes damage, Advantage on the save while fighting it, and what the commands say are the GM's."
   ),
   "spell:dominate-monster": guided(
-    "A failed save imposes Charmed for the spell's duration, longer from a level 9 slot (resolution/concentration.ts). The repeat save each time the target takes damage, and its orders, are the GM's."
+    "Only any creature can be the target. A failed save imposes Charmed for the spell's duration, longer from a level 9 slot (resolution/concentration.ts), and puts the target under the caster's command and on its side while it lasts (summons.ts): the caster's player acts for it on its turns. The repeat save each time the target takes damage, Advantage on the save while fighting it, and what the commands say are the GM's."
   ),
   "spell:dominate-person": guided(
-    "A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts). The repeat save each time the target takes damage, and its orders, are the GM's."
+    "Only a Humanoid can be the target. A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts), and puts the target under the caster's command and on its side while it lasts (summons.ts): the caster's player acts for it on its turns. The repeat save each time the target takes damage, Advantage on the save while fighting it, and what the commands say are the GM's."
   ),
   "spell:earthquake": guided(
     "The cast places the 100-foot circle, and its Dexterity save leaves a creature Prone with its Concentration broken on a failure. spell-zones.ts repeats the save for each creature in the circle at the end of each of the caster's turns, and zone-ground.ts makes the circle Difficult Terrain. Sparing a creature off the ground is the GM's. So are the fissures and the damage to structures."
@@ -1538,8 +1643,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:pearl-of-power": enforced(
     "Its Magic action restores one expended slot of level 3 or lower, once per Long Rest (conversions.ts)."
   ),
-  "item:horn-of-valhalla": guided(
-    "Blowing it is counted, and clock-pools.ts keeps it from being blown again until 7 days have passed on the game clock. The Berserkers it calls, and the requirement of its metal, are the GM's."
+  "item:horn-of-valhalla": enforced(
+    "Each metal is its own action: 2 to 5 Berserkers appear within 60 feet for 1 hour, immune to Charmed and Frightened (summons.ts). They obey a user whose sheet has the metal's training and attack one whose sheet lacks it. clock-pools.ts keeps it from being blown again until 7 days have passed on the game clock."
   ),
   "item:necklace-of-fireballs": enforced(
     "inventory.ts rolls its 1d6 + 3 beads when it is added, and each bead casts a level 3 Fireball at DC 15 and never comes back. Hurling several beads at once is the GM's."

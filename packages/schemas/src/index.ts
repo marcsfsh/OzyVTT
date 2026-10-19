@@ -2908,7 +2908,9 @@ export const SummonCreatureSchema = z
           .array(z.string().regex(/^[a-z0-9-]+$/))
           .min(1)
           .max(6)
-          .optional()
+          .optional(),
+        /** Conditions it is immune to beside its stat block's (a Horn of Valhalla's spirits: Charmed and Frightened). */
+        conditionImmunities: z.array(ConditionIdSchema).min(1).max(6).optional()
       })
       .strict()
       .optional()
