@@ -5,6 +5,7 @@ import { sharesHeight } from "./altitude.js";
 import { holdsFeature } from "./class-features.js";
 import { applyCondition, type EffectNarration } from "./effects.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
+import { ridesWith } from "./mounts.js";
 import { sizeRank } from "./resolution/context.js";
 
 /**
@@ -54,6 +55,7 @@ export function proneInSharedSpace(
     if (!occupant || (occupant.hp.current <= 0 && occupant.kind === "monster")) return false;
     if (sizeRank(actor.size) > sizeRank(occupant.size)) return false;
     if (sharer(other.actorId) || holds(actorId, other.actorId) || holds(other.actorId, actorId)) return false;
+    if (ridesWith(state, actorId, other.actorId)) return false;
     if (!sharesHeight(token, other, calibration.distancePerCell)) return false;
     for (const cell of cellsOf(calibration, other.position, other.sizeCells ?? 1)) if (mine.has(cell)) return true;
     return false;

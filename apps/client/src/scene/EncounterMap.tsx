@@ -33,6 +33,7 @@ import { ShapeEditor } from "./ShapeEditor";
 import { TerrainOverlay } from "./TerrainOverlay";
 import { TokenContextMenu } from "./TokenContextMenu";
 import { HeightControl } from "./HeightControl";
+import { MountControl } from "./MountControl";
 import { useMapCommands } from "./useMapCommands";
 import { useMapGestures } from "./useMapGestures";
 import { useMapView } from "./useMapView";
@@ -43,10 +44,12 @@ import { MapSpotMenu, type SpotChoice } from "./MapSpotMenu";
 import { GridLines } from "./GridLines";
 import { selectToken } from "./selectedToken";
 import { creatureNumbers, tokenLabel } from "../table/numbering";
-import { caughtByArea } from "../table/targetHints";
+import { caughtByArea, creatureDistanceFeet } from "../table/targetHints";
 import "./encounter-map.css";
 
 type Actor = GmActor | PlayerActor;
+
+const SIZE_ORDER = ["tiny", "small", "medium", "large", "huge", "gargantuan"];
 type AnyAnnotation = Annotation | PlayerAnnotation;
 
 type FogState = Readonly<{
@@ -892,19 +895,47 @@ export function EncounterMap({
                     const placedToken = tokensById.get(actor.id);
                     const at = placedToken?.position;
                     if (!at || moveSceneId) return undefined;
+                    // Creatures within 5 feet and at least one size larger, to ride (the server decides).
+                    const mayRide = role === "gm" || actor.id === moverId;
+                    const riding = mayRide
+                      ? actor.effects?.find((effect) => effect.tags.includes("riding"))
+                      : undefined;
+                    const mounts =
+                      state?.combat.active && mayRide
+                        ? tokens.flatMap((other) => {
+                            const candidate = actorsById.get(other.actorId);
+                            if (!candidate || candidate.id === actor.id || !other.position) return [];
+                            if (
+                              SIZE_ORDER.indexOf(candidate.size ?? "medium") <=
+                              SIZE_ORDER.indexOf(actor.size ?? "medium")
+                            )
+                              return [];
+                            const apart = creatureDistanceFeet(calibration ?? null, placedToken, other);
+                            return apart !== null && apart <= 5 ? [{ id: candidate.id, name: candidate.name }] : [];
+                          })
+                        : [];
                     return (
-                      <HeightControl
-                        name={actor.name}
-                        altitudeFeet={placedToken.altitudeFeet ?? 0}
-                        airborne={placedToken.airborne}
-                        mode={actor.id === moverId ? moveMode : "walk"}
-                        canMove={actor.id === moverId && state?.combat.active === true}
-                        gm={role === "gm"}
-                        busy={busyActorId === actor.id}
-                        onMove={(feet) => void commands.submitMove(actor.id, at, feet)}
-                        onSet={(feet, airborne) => void commands.setAltitude(actor.id, feet, airborne)}
-                        onFall={(intoWater) => void commands.fall(actor.id, intoWater)}
-                      />
+                      <>
+                        <MountControl
+                          name={actor.name}
+                          riding={riding ? (riding.sourceName ?? "its mount") : null}
+                          mounts={mounts}
+                          busy={busyActorId === actor.id}
+                          onMount={(mountId) => void commands.mount(actor.id, mountId)}
+                        />
+                        <HeightControl
+                          name={actor.name}
+                          altitudeFeet={placedToken.altitudeFeet ?? 0}
+                          airborne={placedToken.airborne}
+                          mode={actor.id === moverId ? moveMode : "walk"}
+                          canMove={actor.id === moverId && state?.combat.active === true}
+                          gm={role === "gm"}
+                          busy={busyActorId === actor.id}
+                          onMove={(feet) => void commands.submitMove(actor.id, at, feet)}
+                          onSet={(feet, airborne) => void commands.setAltitude(actor.id, feet, airborne)}
+                          onFall={(intoWater) => void commands.fall(actor.id, intoWater)}
+                        />
+                      </>
                     );
                   })()}
                   onOpenSheet={() => setSheetActorId(actor.id)}

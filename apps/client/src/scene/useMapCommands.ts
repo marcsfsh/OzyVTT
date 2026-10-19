@@ -116,6 +116,21 @@ export function useMapCommands({
     setMessage(result.ok ? "Height set." : (result.message ?? "The height could not be set."));
     setBusyActorId(null);
   };
+  /** A creature climbs onto a mount, or off the one it rides with null. */
+  const mount = async (actorId: string, mountId: string | null) => {
+    if (busyActorId) return;
+    setBusyActorId(actorId);
+    setMessage("");
+    const result = await command("actor:mount", { actorId, mountId, expectedRevision: revision });
+    setMessage(
+      result.ok
+        ? mountId
+          ? "Mounted."
+          : "Dismounted."
+        : (result.message ?? (mountId ? "That creature can't be mounted now." : "It can't dismount now."))
+    );
+    setBusyActorId(null);
+  };
   /** The GM drops a creature from the height it is at; the server rolls the damage. */
   const fall = async (actorId: string, intoWater: boolean) => {
     if (busyActorId) return;
@@ -380,6 +395,7 @@ export function useMapCommands({
     busyActorId,
     submitMove,
     setAltitude,
+    mount,
     fall,
     placeAtCenter,
     blockedMove,

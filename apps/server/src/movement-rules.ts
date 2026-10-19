@@ -13,6 +13,7 @@ import {
 } from "./granted-moves.js";
 import { holdsFeature } from "./class-features.js";
 import { HIDDEN_SOURCE } from "./hidden-source.js";
+import { ridesWith } from "./mounts.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
 import { effectiveActions } from "./effective-actions.js";
@@ -356,6 +357,8 @@ function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Po
   return state.combat.tokens.some((token) => {
     if (token.actorId === input.actorId || !token.position || input.dragging?.actorIds.includes(token.actorId))
       return false;
+    // A rider shares its mount's space.
+    if (ridesWith(state, input.actorId, token.actorId)) return false;
     // A creature above or below the mover's space at the end isn't in it (a flier over a goblin).
     if (moverToken && !sharesHeight(moverToken, token, feetPerCell, input.toAltitudeFeet ?? 0)) return false;
     if (sharesSpace(state, token.actorId, input, true)) return false;

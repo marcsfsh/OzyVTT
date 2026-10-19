@@ -166,6 +166,7 @@ import type {
   TokenMoveSchema,
   TokenSetAltitudeSchema,
   ActorFallSchema,
+  ActorMountSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
   TurnUseSchema,
@@ -758,6 +759,11 @@ export interface ClientToServerEvents {
   "actor:fall": (
     payload: CommandPayload<typeof ActorFallSchema>,
     acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A creature climbs onto a mount or off the one it rides. */
+  "actor:mount": (
+    payload: CommandPayload<typeof ActorMountSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
   ) => void;
   /** GM sets how high a creature is, free of movement. */
   "token:set-altitude": (

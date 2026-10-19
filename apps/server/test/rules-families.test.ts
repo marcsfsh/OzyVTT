@@ -51,6 +51,7 @@ describe("rule families", () => {
       ["movement.altitude", "movement"],
       ["movement.jump", "movement"],
       ["movement.frightened", "movement"],
+      ["movement.mount", "movement"],
       ["economy.action-used", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],

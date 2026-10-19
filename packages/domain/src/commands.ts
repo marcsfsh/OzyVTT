@@ -1516,6 +1516,17 @@ export const ActorFallSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** A creature climbs onto a mount (`mountId`) or off the one it rides (`mountId: null`), SRD 5.2.1 Mounted Combat. */
+export const ActorMountSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    mountId: z.uuid().nullable(),
+    /** GM-grade bypass of a movement-rule rejection (the half Speed it costs, a mount too small or too far). */
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** GM-set walking speed; null clears to unknown (movement rules then skip for that combatant). */
 export const ActorSetSpeedSchema = z
   .object({

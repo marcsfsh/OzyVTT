@@ -316,6 +316,11 @@ of a hidden thing. When in doubt, leave it out.
   place in the initiative and the space it left in `combat.offPlane` (GM-only); it can't target or be
   targeted across the plane, and when the effect ends it returns to that space or the nearest
   unoccupied one. Blink's d6 is rolled by the server as the caster's turn ends.
+- Mounts (`mounts.ts`, `actor.mount`): a rider carries an effect tagged `riding` whose source is its
+  mount. Mounting a creature within 5 feet and at least one size larger, or dismounting, costs half the
+  rider's Speed; the rider shares the mount's space and height, the mount's moves carry it, and it moves
+  only by its mount until it dismounts. A mount that teleports or is moved by force leaves its rider
+  behind. A Lance is held in one hand while riding.
 - Time Stop (`time-stop.ts`): the cast rolls 1d4 + 1 and `combat.timeStop` hands the caster that many
   turns in a row; a resolve of its that reaches another creature, or a move more than 1,000 feet from
   where it cast the spell, ends it.

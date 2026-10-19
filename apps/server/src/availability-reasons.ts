@@ -99,6 +99,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "movement.altitude": () => "Fly, climb or jump to change height.",
   "movement.jump": () => "A jump goes as far as the creature's Strength allows.",
   "movement.frightened": () => "A Frightened creature can't move closer to what frightens it.",
+  "movement.mount": () => "Mount a creature within 5 feet that is at least one size larger.",
   "economy.action-used": actionSpentReason,
   "economy.bonus-action-used": ({ state, attacker }) =>
     hasEffectTag(attacker, SLOWED_TAG) && state.combat.turn.actionUsed && !state.combat.turn.bonusActionUsed

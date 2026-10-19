@@ -79,7 +79,7 @@ export function settlePlanes(state: GameState, geometry: TokenMapGeometry): Effe
 }
 
 /** The space it left, or on a grid the nearest one no other creature fills, searched ring by ring. */
-function nearestOpenSpace(state: GameState, actorId: string, at: Point, geometry: TokenMapGeometry): Point {
+export function nearestOpenSpace(state: GameState, actorId: string, at: Point, geometry: TokenMapGeometry): Point {
   const calibration = geometry.calibration;
   if (!calibration) return at;
   const sizeCells = state.combat.tokens.find((token) => token.actorId === actorId)?.sizeCells ?? 1;

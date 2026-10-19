@@ -3,6 +3,7 @@ import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
+import { RIDING_TAG } from "../mounts.js";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { wardingAura } from "../paladin-auras.js";
 import { areAllies } from "../creature-sides.js";
@@ -503,10 +504,13 @@ function checkArmorTraining(
 }
 
 /** SRD: a Two-Handed weapon "requires two hands when you attack with it", and a Shield is strapped to one arm. Read
- *  from the row, since a magic shield's slot travels on its marker. The Lance's "unless mounted" is the GM's call. */
+ *  from the row, since a magic shield's slot travels on its marker. A Lance is "Two-Handed (unless mounted)": one hand
+ *  holds it while its wielder rides (`mounts.ts`). */
 function checkHands({ attacker, action, violations }: Evaluation): void {
   const item = swingItemOf(attacker, action);
   if (!item) return;
+  const mounted = attacker.effects.some((effect) => effect.tags.includes(RIDING_TAG));
+  if (mounted && (item.recordId ?? item.id) === "lance") return;
   const twoHands =
     item.weapon?.properties?.includes("two-handed") === true ||
     itemActionRest(action.id) === `${item.id}-${TWO_HANDED_SUFFIX}`;

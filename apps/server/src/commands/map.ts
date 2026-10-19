@@ -24,6 +24,7 @@ import {
   SpellZoneEndSchema,
   SpellZonePlaceSchema,
   ActorFallSchema,
+  ActorMountSchema,
   TokenMoveSchema,
   TokenSetAltitudeSchema
 } from "@vtt/domain/commands";
@@ -33,6 +34,7 @@ import { startFall } from "../falling.js";
 import { failedTeleport } from "../granted-moves.js";
 import { holdMove } from "../held-moves.js";
 import { landJump } from "../jumping.js";
+import { carryRiders, mountOf, mountOrDismount, ridersOf, RIDING_TAG } from "../mounts.js";
 import { timeStopOutOfRange } from "../time-stop.js";
 import { applyMovementRules, dragAlong, dragCostsExtra, grappledBy } from "../movement-rules.js";
 import {
@@ -127,6 +129,12 @@ export const mapCommands = [
         // Before a fight the GM sets the scene; players move their own tokens once it starts.
         if (!state.combat.active && !isGmGrade(principal))
           throw new CommandRejectedError("Your GM places the tokens before the fight starts.");
+        // A rider goes where its mount takes it (SRD Mounted Combat), until it dismounts.
+        const riding = position !== null && state.combat.active ? mountOf(state, actorId) : undefined;
+        if (riding && mode !== "forced" && mode !== "teleport")
+          throw new CommandRejectedError(
+            `${kit.actorName(actorId)} is riding ${riding.name}. Move ${riding.name}, or dismount first.`
+          );
         // A mover waiting on its Opportunity Attacks that moves again gives up the rest of the held move.
         if (state.combat.heldMove?.actorId === actorId) state.combat = { ...state.combat, heldMove: null };
         const startToken = state.combat.tokens.find((token) => token.actorId === actorId);
@@ -182,7 +190,8 @@ export const mapCommands = [
           },
           calibration: geometry.calibration,
           dragging: {
-            actorIds: dragged,
+            // Its riders move with it too, and their space is no obstacle.
+            actorIds: [...dragged, ...ridersOf(state, actorId)],
             costsExtra: dragCostsExtra(state, actorId, dragged, (definitionId) =>
               kit.resolveDefinitionIn(state, definitionId)
             )
@@ -318,6 +327,17 @@ export const mapCommands = [
                 )
               );
           }
+        // A mount carries its riders; one that teleports or is moved by force leaves them where they were, off it.
+        if (mode === "teleport" || mode === "forced")
+          for (const riderId of ridersOf(state, actorId)) {
+            const rider = state.actors.find((actor) => actor.id === riderId)!;
+            rider.effects = rider.effects.filter((effect) => !effect.tags.includes(RIDING_TAG));
+          }
+        else carryRiders(state, actorId, geometry);
+        if (riding && (mode === "teleport" || mode === "forced")) {
+          const rider = state.actors.find((actor) => actor.id === actorId)!;
+          rider.effects = rider.effects.filter((effect) => !effect.tags.includes(RIDING_TAG));
+        }
         // SRD Grappling: a grapple ends once the two are farther apart than its range.
         released = releaseGrapplesOutOfRange(
           state,
@@ -427,6 +447,61 @@ export const mapCommands = [
       if (duplicate) return;
       kit.publishRolls(state, commandId);
       kit.publishNarrations(events);
+    }
+  }),
+
+  defineCommand({
+    type: "actor.mount",
+    operationId: "mountActor",
+    description:
+      "A creature climbs onto a mount (`mountId`) or gets off the one it rides (`mountId: null`), SRD 5.2.1 Mounted Combat: the mount must be within 5 feet and at least one size larger, and either costs half the rider's Speed on its turn in a fight. The rider shares the mount's space and height, the mount's moves carry it, and it moves only by its mount until it dismounts; a dismounted rider stands in the nearest unoccupied space. A mount that teleports or is moved by force leaves its rider behind, off it. A player may mount or dismount only their own character; the GM may `override` a movement rule.",
+    summary: "Mount a creature or dismount; the mount's moves carry its rider.",
+    schema: ActorMountSchema,
+    malformed: "The mount request is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const { actorId, mountId } = request;
+      if (request.override && !isGmGrade(principal))
+        throw new GameAccessDeniedError("Only the GM can override movement rules.");
+      const { mapAssetId, geometry } = await liveMap(kit, "Make a scene live before mounting a creature.");
+      const distance = await kit.creatureDistance();
+      let mountName: string | null = null;
+      let outcome: ReturnType<typeof mountOrDismount> = { warnings: [], overridden: null };
+      const { duplicate } = await execute((state) => {
+        requireSameMap(state.combat.mapAssetId, mapAssetId);
+        requireActorAccess(initiatorOf(principal), state, actorId, "move", "You may only move your claimed character.");
+        mountName = (mountId ? kit.actorName(mountId) : mountOf(state, actorId)?.name) ?? null;
+        outcome = mountOrDismount(
+          state,
+          {
+            riderId: actorId,
+            mountId,
+            override: isGmGrade(principal) ? (request.override ?? null) : null,
+            distanceFeet: (a, b) => distance(state, a, b),
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+            catalog: kit.equipmentCatalog(),
+            newId: kit.context.newId
+          },
+          geometry
+        );
+      });
+      if (duplicate) return;
+      const name = kit.actorName(actorId);
+      kit.context.appendLog({
+        kind: "movement",
+        text: mountId
+          ? `${name} mounts ${mountName ?? "a creature"}.`
+          : `${name} dismounts from ${mountName ?? "its mount"}.`,
+        actorIds: [actorId, ...(mountId ? [mountId] : [])],
+        gmOnly: kit.actorHidden(actorId) || (mountId !== null && kit.actorHidden(mountId))
+      });
+      for (const warning of outcome.warnings)
+        kit.context.appendLog({ kind: "movement", text: `Rules note: ${warning}`, actorIds: [actorId], gmOnly: true });
+      if (outcome.overridden)
+        kit.context.appendLog({
+          kind: "override",
+          text: `OVERRIDE (movement): ${name} mounted past a movement rule · ${outcome.overridden}`,
+          actorIds: [actorId]
+        });
     }
   }),
 
