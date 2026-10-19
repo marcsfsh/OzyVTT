@@ -10,6 +10,7 @@ import { effectiveActions } from "../src/effective-actions.js";
 import { addEffect, makeEffect } from "../src/effects.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
+import { applyRest } from "../src/rests.js";
 
 // SRD 5.2.1 class features that change how a caster's spells work.
 
@@ -29,7 +30,9 @@ function tableWith(classId: string, level: number, subclassId?: string) {
   );
   const state: GameState = GameStateSchema.parse({
     schemaVersion: 1,
-    actors: [{ id: FOE, name: "Foe", kind: "monster", visibility: "public", hp: { current: 60, maximum: 60 } }]
+    actors: [
+      { id: FOE, name: "Foe", kind: "monster", visibility: "public", hp: { current: 60, maximum: 60 }, armorClass: 10 }
+    ]
   });
   importActorDefinition(state, definition, HERO, "public", catalog);
   const resolveDefinition = (id: string): ActorDefinition | undefined =>
@@ -210,5 +213,86 @@ describe("Improved Potent Spellcasting", () => {
   it("adds 300 feet to a Druid 15's cantrip of 10 feet or more, and nothing without the feature", () => {
     expect(wispRange(15, true)).toBe(360);
     expect(wispRange(14, false)).toBe(60);
+  });
+});
+
+// Commune: "If you cast the spell more than once before finishing a Long Rest, there is a cumulative 25 percent chance
+// for each casting after the first that you get no answer."
+describe("an asking spell cast again before a Long Rest", () => {
+  it("rolls the d100 from the second cast, the chance growing, and a Long Rest starts the count again", () => {
+    const table = tableWith("cleric", 5);
+    table.definition.actions.push({
+      id: "spell-commune",
+      name: "Commune",
+      activation: "action",
+      description: "",
+      damage: [],
+      spellId: "commune"
+    } as (typeof table.definition.actions)[number]);
+    expect(cast(table, "spell-commune", []).warnings?.join(" ") ?? "").not.toMatch(/d100/);
+    expect(cast(table, "spell-commune", [20]).warnings?.join(" ")).toMatch(
+      /gets no answer: the d100 shows 20 against a 25% chance/
+    );
+    expect(cast(table, "spell-commune", [60]).warnings?.join(" ")).toMatch(
+      /An answer comes: the d100 shows 60 against a 50% chance/
+    );
+    applyRest(table.state, HERO, "long", table.resolveDefinition, catalog);
+    expect(cast(table, "spell-commune", []).warnings?.join(" ") ?? "").not.toMatch(/d100/);
+  });
+});
+
+// Prayer of Healing: "Up to five creatures of your choice ... gain the benefits of a Short Rest and also regain 2d8 Hit
+// Points. A creature can't be affected by this spell again until that creature finishes a Long Rest."
+describe("Prayer of Healing", () => {
+  it("gives a Short Rest with the healing, and refuses the same creature again until its Long Rest", () => {
+    const table = tableWith("cleric", 5);
+    table.definition.actions.push({
+      id: "spell-prayer-of-healing",
+      name: "Prayer of Healing",
+      activation: "action",
+      description: "",
+      damage: [],
+      spellId: "prayer-of-healing",
+      healing: { formula: "2d8" }
+    } as (typeof table.definition.actions)[number]);
+    table.hero.hp = { ...table.hero.hp, current: 1 };
+    const first = cast(table, "spell-prayer-of-healing", [4, 4], [HERO]);
+    expect(table.hero.hp.current).toBeGreaterThan(1);
+    expect(first.warnings?.join(" ")).toMatch(/gains the benefits of a Short Rest/);
+    expect(table.hero.restStep).toEqual({ after: "short-rest" });
+    expect(() => cast(table, "spell-prayer-of-healing", [4, 4], [HERO])).toThrow(
+      /can't be affected by Prayer of Healing again until finishing a Long Rest/
+    );
+    applyRest(table.state, HERO, "long", table.resolveDefinition, catalog);
+    expect(() => cast(table, "spell-prayer-of-healing", [4, 4], [HERO])).not.toThrow();
+  });
+});
+
+// Mirror Image: "Each time a creature hits you with an attack roll during the spell's duration, roll a d6 for each of
+// your remaining duplicates. If any of the d6s rolls a 3 or higher, one of the duplicates is hit instead of you".
+describe("Mirror Image", () => {
+  it("turns a hit into a hit on a duplicate on a 3 or higher, and ends with the last duplicate", () => {
+    const table = tableWith("wizard", 2);
+    const foe = table.state.actors.find((actor) => actor.id === FOE)!;
+    addEffect(
+      table.state,
+      FOE,
+      makeEffect({
+        id: newId(),
+        name: "Mirror Image",
+        tags: ["mirror-image", "mirror-image-1"],
+        sourceActorId: FOE,
+        duration: { type: "rounds", remaining: 10 }
+      })
+    );
+    const cantrip = effectiveActions(table.definition, table.hero, catalog).find(
+      (action) => action.attack !== undefined && action.spellId && library.spellRecord(action.spellId)?.level === 0
+    )!;
+    // A 19 hits; the last duplicate's d6 shows 4.
+    const result = cast(table, cantrip.id, [19, 4, ...Array<number>(10).fill(3)], [FOE]);
+    expect(result.attack?.outcome).toBe("miss");
+    expect(result.warnings?.join(" ")).toMatch(/hits Foe's last duplicate, and the spell ends/);
+    expect(foe.effects.some((effect) => effect.tags.includes("mirror-image"))).toBe(false);
+    expect(foe.hp.current).toBe(60);
   });
 });

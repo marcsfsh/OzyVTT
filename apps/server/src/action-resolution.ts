@@ -28,6 +28,9 @@ import {
 } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
 import { recallSpellSlot } from "./resolution/spell-recall.js";
+import { rollForAnAnswer } from "./resolution/divinations.js";
+import { prayerShortRest, refuseThePrayedFor } from "./resolution/prayer-of-healing.js";
+import { strikeADuplicate } from "./resolution/mirror-image.js";
 import type {
   DefinitionAction,
   EndedEffect,
@@ -165,6 +168,8 @@ export function resolveDefinitionAction(
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
 
+  // A duplicate of Mirror Image may take the settled hit.
+  if (input.commit !== false) strikeADuplicate(ctx);
   spendSundering(ctx);
   rollWeaponDamage(ctx);
   ctx.masterySwing = masterySwingOf(ctx);
@@ -187,7 +192,9 @@ export function resolveDefinitionAction(
   openSpellZone(ctx);
   applyGrant(ctx);
   placeCastSight(ctx);
+  refuseThePrayedFor(ctx);
   applyHealing(ctx);
+  prayerShortRest(ctx);
   applyConditionCures(ctx);
   applySpellEndings(ctx);
   stabilizeOnCast(ctx);
@@ -202,6 +209,7 @@ export function resolveDefinitionAction(
 
   commitEconomy(ctx);
   recallSpellSlot(ctx);
+  rollForAnAnswer(ctx);
   spendHitOptions(ctx);
   spendDamageUses(ctx);
   rollLastCharge(ctx);
