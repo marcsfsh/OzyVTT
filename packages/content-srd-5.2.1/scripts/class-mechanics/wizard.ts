@@ -64,7 +64,7 @@ export const wizard: ClassMechanicsModule = {
         ]
       }
     }
-    // Potent Cantrip is the server's (`resolution/damage.ts`). Not modeled: Evocation Savant's later free spells,
-    // Sculpt Spells, and Overchannel's max-damage and backlash (its counter is on the record).
+    // The server applies the rest: Potent Cantrip (`resolution/damage.ts`), Evocation Savant's later free spells
+    // (`spell-choices.ts`), Sculpt Spells (`resolution/metamagic.ts`) and Overchannel (`resolution/overchannel.ts`).
   }
 };

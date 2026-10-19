@@ -2043,6 +2043,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:signature-spells": enforced(
     "Two level 3 spells from the spellbook (spellbook.ts checks the pick as a build or a level up makes it) are always prepared, and each is cast once at level 3 with no slot, back on a Short or Long Rest, on its own counter (character-build.ts)."
   ),
+  "feature:evocation-savant": enforced(
+    "Two Evocation spells of level 2 or lower go into the spellbook at Wizard 3 (character-build.ts), and one more Evocation spell goes in free each time a new level of spell slots opens, beside the two a Wizard level gives (spell-choices.ts)."
+  ),
   "feature:spell-mastery": enforced(
     "The level 1 and level 2 picks, spells from the spellbook with a casting time of an action (character-offers.ts filters the casting time, spellbook.ts checks the book), are always prepared and cast at will at their own level with no slot (character-build.ts); one is swapped for another of the same level from the book in the step a Long Rest opens (ledger-rechoice.ts)."
   ),
