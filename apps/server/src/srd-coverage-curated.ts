@@ -120,7 +120,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   "bonus-action": enforced(
     "resolution/economy.ts allows one Bonus Action on a turn, and only from a feature, spell or item that offers one."
   ),
-  "breaking-objects": reference("Objects have no AC or Hit Points in the app."),
+  "breaking-objects": enforced(
+    "A door or wall on the map, and what holds a creature (a Net, a web, a rope), can be an object with an Armor Class, Hit Points and a damage threshold (objects.ts); the GM's door editor sets them from the substance and size tables. object.attack rolls a creature's attack against it (object-strikes.ts) and object.damage deals the GM's damage. Poison and Psychic damage do nothing, and at 0 Hit Points a wall or door is gone and a held creature is freed."
+  ),
   "bright-light": enforced(
     "With dynamic vision on, vision/sight.ts gives Bright Light under the scene's bright ambient light, in a painted bright area and within a light's bright radius, and a creature sees normally there."
   ),
@@ -154,7 +156,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   ),
   cone: areaShape("its width at any point equals that point's distance from the origin."),
   cover: enforced(
-    "With dynamic vision on, cover.ts works out Half, Three-Quarters and Total Cover from the walls between the attacker or the effect's origin and the target, and Half Cover from a creature in the way; the GM can mark more. The server adds 2 or 5 to AC and Dexterity saves, and resolution/validate.ts refuses an attack against Total Cover."
+    "With dynamic vision on, cover.ts works out Half, Three-Quarters and Total Cover from the walls between the attacker or the effect's origin and the target, and Half Cover from a creature in the way; a spell's wall gives the cover its text names (Blade Barrier's Three-Quarters, zone-walls.ts), and the GM can mark more. The server adds 2 or 5 to AC and Dexterity saves, and resolution/validate.ts refuses an attack against Total Cover, or across a sphere of force (enclosures.ts)."
   ),
   crawling: enforced("movement-rules.ts charges an extra foot per foot while a creature is Prone."),
   creature: reference("A definition; there is nothing to apply."),
@@ -174,7 +176,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   ),
   damage: enforced("hit-points.ts takes damage off Temporary Hit Points first and then Hit Points."),
   "damage-roll": enforced("The server rolls damage dice and adds the modifiers the action carries."),
-  "damage-threshold": reference("Nothing in the app has a damage threshold."),
+  "damage-threshold": enforced(
+    "An object on the map with a damage threshold takes no damage from a hit or effect below it, and the whole of one at or above it (objects.ts). No SRD stat block prints one."
+  ),
   "damage-types": enforced(
     "Damage carries one of the 13 types, and hit-points.ts applies Immunity, Resistance and Vulnerability by type."
   ),
@@ -302,7 +306,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   malnutrition: reference("Food isn't tracked."),
   monster: reference("A definition; there is nothing to apply."),
   "nonplayer-character": reference("A definition; there is nothing to apply."),
-  object: reference("Objects have no game statistics in the app."),
+  object: enforced(
+    "Doors and walls on the map, and the nets, webs and ropes that hold creatures, can carry an object's Armor Class and Hit Points (objects.ts). An object takes damage from attacks (object.attack). It fails every saving throw, so an area's full damage on one is the GM's to deal with object.damage."
+  ),
   "occupied-space": enforced(
     "movement-rules.ts refuses a move that ends in another creature's space, unless one of them can share it, and occupied-space.ts leaves a creature that ends its turn in another's space Prone unless it is Tiny or larger than the other."
   ),
@@ -424,18 +430,13 @@ const sunlightHinders = (rolls: string, files: string) =>
   );
 /** A trait about communicating or sensing, which play doesn't read. */
 const senses = reference("Communication and senses like this are the GM's to run.");
-/** A trait about squeezing through narrow gaps, which the map doesn't model. */
-const squeezes = reference(
-  "A gap sized for one size smaller is passed as Difficult Terrain (terrain.ts); one narrower still, an inch wide, is the GM's to allow."
+/** A trait about squeezing through narrow gaps, an inch wide (wall-passage.ts). */
+const squeezes = enforced(
+  "With dynamic vision on, terrain.ts lets the creature through any gap in the walls its body can follow, however narrow, at no extra cost (wall-passage.ts, slipsThroughStep in rules-5e), and the map's drag preview (movePreview.ts) charges the same path. A closed door still stops it."
 );
 /** A trait about jumping, which the app doesn't measure. */
 /** A trait about changing into another stat block, which the app doesn't do. */
 const changesForm = reference("Changing form is the GM's to run; the token keeps this stat block.");
-/** A trait the server reads by name for movement (movement-rules.ts). */
-const sharesSpace = (who: string) =>
-  enforced(
-    `movement-rules.ts lets ${who} end a move in another creature's space, and the map's drag preview (movePreview.ts) charges the same path. Fitting through a narrow gap is the GM's to allow.`
-  );
 /** A trait that regains Hit Points from damage of one type, which the creature is also immune to. */
 const absorbs = (type: string) =>
   reference(
@@ -450,7 +451,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Acid Absorption": absorbs("Acid"),
   Adhesive: reference("Sticking to what touches it is the GM's to apply with the Grappled condition."),
   Agile: enforced("movement-rules.ts opens no Opportunity Attack when it moves out of an enemy's reach."),
-  "Air Form": sharesSpace("the elemental"),
+  "Air Form": enforced(
+    "movement-rules.ts lets the air elemental end a move in another creature's space, and terrain.ts lets it through any gap in the walls an inch wide at no extra cost (wall-passage.ts). The map's drag preview (movePreview.ts) charges the same path."
+  ),
   Amorphous: squeezes,
   Amphibious: breath,
   "Aura of Authority": enforced(
@@ -489,8 +492,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Diabolical Restoration": revives,
   "Divine Awareness": senses,
   "Draconic Origin": reference("The GM picks the damage type and edits the stat block to match."),
-  "Earth Glide": reference(
-    "Its Burrow Speed moves it on the map; passing through stone without a trace is the GM's to allow."
+  "Earth Glide": enforced(
+    "A burrowing move passes it through the map's walls at no extra cost (terrain.ts, wall-passage.ts), and a wall a spell raised still stops it. Leaving no trace is the GM's."
   ),
   "Eldritch Restoration": revives,
   "Elemental Restoration": revives,
@@ -508,8 +511,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Fire Aura": enforced(
     "trait-turns.ts deals the Fire damage at the end of the bearer's turns to each creature in the Emanation, or to an azer's enemies there. A fire elemental's aura also sets them burning."
   ),
-  "Fire Form": guided(
-    "movement-rules.ts lets the elemental end a move in a creature's space, and the map's drag preview (movePreview.ts) charges the same path. The 1d10 Fire damage when it first enters a space on a turn is the GM's to deal."
+  "Fire Form": enforced(
+    "movement-rules.ts lets the elemental end a move in a creature's space and terrain.ts lets it through any gap in the walls an inch wide, which the map's drag preview (movePreview.ts) charges the same way. A move of its own deals 1d10 Fire damage to each creature whose space it enters, once a turn per creature (wall-passage.ts)."
   ),
   Flyby: enforced("movement-rules.ts opens no Opportunity Attack when it flies out of an enemy's reach."),
   Freeze: reference("The slower Speed after Cold damage is the GM's to apply."),
@@ -530,7 +533,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   Illumination: sheds,
   "Immutable Form": reference("Shape-changing isn't modeled, so there is nothing to refuse."),
   "Incorporeal Movement": guided(
-    "terrain.ts passes it through walls and creatures as Difficult Terrain. The Force damage for ending a turn inside an object is the GM's, since walls are lines with no inside."
+    "terrain.ts passes it through walls and creatures as Difficult Terrain, and a wall a spell raised (Wall of Force) still stops it. The Force damage for ending a turn inside an object is the GM's, since walls are lines with no inside."
   ),
   "Incubus Form": changesForm,
   Inscrutable: reference("The Disadvantage on Insight checks about it is the GM's to apply."),
@@ -549,7 +552,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Magic Resistance": enforced(
     "saving-throws.ts gives it Advantage on saves against spells and magic items, saves a spell asks it to repeat included."
   ),
-  "Magic Rope": reference("The rope and its statistics are the GM's to run."),
+  "Magic Rope": guided(
+    "The erinyes' Entangling Rope leaves its target Restrained and held by the rope, an object with AC 20, 90 Hit Points and Immunity to Poison and Psychic damage that an attack can break, which frees it (objects.ts). Restoring the rope on a rest is the GM's."
+  ),
   Mimicry: senses,
   "Misty Escape": reference("Turning to mist at 0 Hit Points is the GM's to run."),
   "Mucus Cloud": reference("The save at the end of the aboleth's turn and its curse are the GM's to run."),
@@ -571,7 +576,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Sense Magic": senses,
   "Shark Telepathy": senses,
   "Shielded Mind": senses,
-  "Siege Monster": reference("Objects and structures have no Hit Points in the app."),
+  "Siege Monster": enforced(
+    "objects.ts doubles the creature's damage to a door, a wall or another object before its threshold and immunities are read."
+  ),
   "Soul Bag": reference("The bag and its statistics are the GM's to run."),
   "Speak with Beasts and Plants": senses,
   "Spell Storing": reference("Storing and casting the spell is the GM's to run."),
@@ -591,15 +598,17 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "resolution/attack.ts and ability-checks.ts"
   ),
   "Sunlight Weakness": sunlightHinders("D20 Tests", "resolution/attack.ts, ability-checks.ts and saving-throws.ts"),
-  Swarm: guided(
-    "movement-rules.ts and terrain.ts let the swarm and other creatures share a space, and the map's drag preview (movePreview.ts) charges the same path. Refusing it Hit Points and Temporary Hit Points is the GM's."
+  Swarm: enforced(
+    "movement-rules.ts and terrain.ts let the swarm and other creatures share a space, and let it through any gap in the walls a Tiny creature fits at no extra cost (wall-passage.ts). The map's drag preview (movePreview.ts) charges the same path. Healing a swarm restores nothing (resolution/heal.ts)."
   ),
   "Telepathic Bond": senses,
   Training: reference("The GM picks the skill and applies its Advantage."),
   Transparent: reference("Noticing the cube is the GM's call, with the DC the trait prints."),
   "Treasure Sense": senses,
   "Troll Spawn": reference("What becomes of a severed limb is the GM's to run."),
-  Tunneler: reference("Tunnels aren't drawn on the map; the GM places them."),
+  Tunneler: guided(
+    "A burrowing move passes it through the map's walls at double cost, as through solid rock (terrain.ts, wall-passage.ts), and a wall a spell raised still stops it. The tunnel it leaves is the GM's to draw."
+  ),
   "Undead Fortitude": enforced(
     "statblock-traits.ts rolls the Constitution save of DC 5 plus the damage when damage drops it to 0, and leaves it at 1 Hit Point on a success. Radiant damage and Critical Hits get no save."
   ),
@@ -612,7 +621,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "trait-turns.ts opens the Wisdom save for each Beast or Humanoid that starts its turn within 30 feet of the hag. A failure is Frightened until the start of its next turn, and a success makes it immune for the fight. With dynamic vision on, only a creature that sees the hag (vision/sight.ts) makes the save; whether the hag is disguised is the GM's."
   ),
   "Water Breathing": breath,
-  "Water Form": sharesSpace("the elemental"),
+  "Water Form": enforced(
+    "movement-rules.ts lets the water elemental end a move only in an enemy's space, and terrain.ts lets it through any gap in the walls an inch wide at no extra cost (wall-passage.ts). The map's drag preview (movePreview.ts) charges the same path."
+  ),
   "Water Susceptibility": reference("Water on the map isn't tracked, so the Cold damage is the GM's to deal."),
   "Web Walker": enforced(
     "Web's webs cost the creature nothing extra (zone-ground.ts), and spell-zones.ts asks it for no save there. Webs the GM paints as Difficult Terrain still cost it, so the GM waives that cost."
@@ -713,12 +724,16 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   // Cantrips with nothing to roll: the cast is the server's, what it does is the table's.
   "spell:light": castOnly("The light and the object it shines from are the GM's."),
-  "spell:mage-hand": castOnly("The hand and what it does are the GM's."),
+  "spell:mage-hand": castOnly(
+    "Its Magic action on later turns opens or shuts an unlocked door on the map within 30 feet of the caster (resolution/cast-walls.ts), and a door held shut stays shut. The hand's other uses are the GM's."
+  ),
   "spell:mending": castOnly("The repair is the GM's."),
   "spell:message": castOnly("The whisper and its reply are the table's."),
   "spell:prestidigitation": castOnly("Its minor tricks are the GM's."),
   "spell:shillelagh": castOnly("The weapon's spellcasting ability, larger damage die and Force damage are the GM's."),
-  "spell:thaumaturgy": castOnly("Its wonders are the GM's."),
+  "spell:thaumaturgy": castOnly(
+    "Aimed at a door on the map within 30 feet, its Invisible Hand flings an unlocked door open or slams it shut (resolution/cast-walls.ts). Its other wonders are the GM's."
+  ),
   "spell:true-strike": castOnly(
     "The weapon attack with the spellcasting ability, and its Radiant damage, are the GM's."
   ),
@@ -1069,7 +1084,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Advantage on Initiative and Wisdom (Perception) checks, and its detection casts, are applied. The Protective Aura's benefit to allies is the GM's."
   ),
   "item:rope-of-entanglement": guided(
-    "The save against Restrained is applied. The check to escape the rope is the GM's."
+    "The save against Restrained is applied, and the rope that holds the target is an object with AC 20 and 20 Hit Points that an attack can break, which frees it (objects.ts). The check to escape the rope, its release and its regrowth are the GM's."
   ),
   "item:scarab-of-protection": guided(
     "The +1 AC is applied. Advantage on saves against spells, and its Preservation, are the GM's."
@@ -1113,8 +1128,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:sun-blade": guided(
     "It swings as a +2 Finesse Longsword that deals Radiant damage, with 1d8 Radiant more against an Undead. The Bonus Action that makes the blade appear, and its sunlight, are the GM's."
   ),
-  "item:sword-of-sharpness": guided(
-    "A rolled 20 against a creature adds 14 Slashing damage and a level of Exhaustion (resolution/damage.ts, resolution/on-hit.ts). Maximized damage against an object is the GM's."
+  "item:sword-of-sharpness": enforced(
+    "A rolled 20 against a creature adds 14 Slashing damage and a level of Exhaustion (resolution/damage.ts, resolution/on-hit.ts), and its damage dice against an object are maximized (object-strikes.ts)."
   ),
   "item:talisman-of-pure-good": guided(
     "The +2 to spell attack rolls is applied. The 8d6 Radiant it deals a Fiend or an Undead that touches it, and Pure Rebuke's fissure on its charges, are the GM's."
@@ -1197,7 +1212,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts). The repeat save each time the target takes damage, and its orders, are the GM's."
   ),
   "spell:earthquake": guided(
-    "The cast places the 100-foot circle, and its Dexterity save leaves a creature Prone with its Concentration broken on a failure. spell-zones.ts repeats the save for each creature in the circle at the end of each of the caster's turns, and zone-ground.ts makes the circle Difficult Terrain. Sparing a creature off the ground is the GM's. So are the fissures and the damage to structures."
+    "The cast places the 100-foot circle, and its Dexterity save leaves a creature Prone with its Concentration broken on a failure. spell-zones.ts repeats the save for each creature in the circle at the end of each of the caster's turns, and zone-ground.ts makes the circle Difficult Terrain. Sparing a creature off the ground is the GM's. So are the fissures, and the 50 Bludgeoning damage to structures, which the GM deals to the walls and doors that are objects with object.damage (objects.ts)."
   ),
   "spell:fear": guided(
     "A failed save imposes Frightened. The Dash away on each of its turns, and the save out of the caster's sight, are the GM's."
@@ -1254,7 +1269,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The 2d8 Hit Points are applied, each target gains a Short Rest's benefits, and a creature it healed is refused until it finishes a Long Rest (resolution/prayer-of-healing.ts)."
   ),
   "spell:prismatic-wall": guided(
-    "The save against Blinded for a creature near the wall is applied. Each layer's save and effect are the GM's."
+    "The cast places the wall on its Line, which blocks sight and sheds its Bright and Dim Light for dynamic vision (vision/cast-sight.ts). The save against Blinded near it, each layer's save and effect, and breaking the layers are the GM's."
   ),
   "spell:protection-from-poison": enforced(
     "The cast ends Poisoned and leaves Resistance to Poison damage and Advantage on saves to avoid or end Poisoned, for an hour counted on the game clock (game-time.ts)."
@@ -1283,8 +1298,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:black-tentacles": enforced(
     "spell-zones.ts asks for the Strength save on the cast and when a creature enters the square or ends its turn there, once a turn: 3d6 Bludgeoning damage and Restrained, escaped with a Strength (Athletics) check against the spell save DC. zone-ground.ts makes the square Difficult Terrain."
   ),
-  "spell:blade-barrier": guided(
-    "spell-zones.ts asks for the Dexterity save against 6d10 Force damage on the cast and when a creature enters the wall or ends its turn there, once a turn. zone-ground.ts makes the wall's space Difficult Terrain. Its Three-Quarters Cover and its ring form are the GM's."
+  "spell:blade-barrier": enforced(
+    "spell-zones.ts asks for the Dexterity save against 6d10 Force damage on the cast and when a creature enters the wall or ends its turn there, once a turn. zone-ground.ts makes the wall's space Difficult Terrain, and zone-walls.ts gives a creature on its far side Three-Quarters Cover against attacks and Dexterity saves across it. Its ring form is the GM's."
   ),
   "spell:call-lightning": guided(
     "The cast and each later Magic action strike a 5-foot Sphere with the Dexterity save against 3d10 Lightning damage, at the cast's slot level. Keeping the bolts under the cloud, and the extra 1d10 in a storm, are the GM's."
@@ -1347,7 +1362,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "spell-zones.ts deals 2d4 Piercing damage for every 5 feet a creature travels into or within the Sphere, and zone-ground.ts makes the Sphere Difficult Terrain. Whether a creature saw the danger before it moved in is the GM's."
   ),
   "spell:wall-of-thorns": enforced(
-    "spell-zones.ts asks for the Dexterity save against 7d8 Slashing damage when a creature enters the wall or ends its turn there, once a turn, after the cast's 7d8 Piercing. zone-ground.ts makes a creature spend 4 feet of movement for every foot it moves through the wall. The wall's block on sight and its circle form are the GM's."
+    "spell-zones.ts asks for the Dexterity save against 7d8 Slashing damage when a creature enters the wall or ends its turn there, once a turn, after the cast's 7d8 Piercing. zone-ground.ts makes a creature spend 4 feet of movement for every foot it moves through the wall, and the wall blocks sight for dynamic vision (vision/cast-sight.ts). Its circle form is the GM's."
   ),
   "spell:web": enforced(
     "spell-zones.ts asks for the Dexterity save the first time a creature enters the webs on a turn or starts its turn there, and a failure leaves it Restrained, escaped with a Strength (Athletics) check against the spell save DC. zone-ground.ts makes the webs Difficult Terrain, and they are Lightly Obscured for dynamic vision (vision/cast-sight.ts). Burning the webs away is the GM's, who ends the area."
@@ -1370,14 +1385,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:tsunami": guided(
     "The wall's first save and damage are applied. Its movement and the damage on later turns are the GM's."
   ),
-  "spell:wall-of-ice": guided(
-    "The save and its Cold damage for creatures in the wall's space are applied. The wall itself and its frigid air are the GM's."
+  "spell:wall-of-ice": enforced(
+    "The save and its Cold damage for creatures in the wall's space are applied, and they are moved out of it. The wall rises on its placed Line as 10-foot sections that stop movement and leave sight through (spell-walls.ts), each an object with AC 12 and 30 Hit Points, Immunity to Cold damage and Vulnerability to Fire damage that is gone at 0 Hit Points (objects.ts). It goes when the Concentration ends. The frigid air a broken section leaves, and the dome and sphere forms, are the GM's."
   ),
   "spell:weird": guided(
     "The save, its Psychic damage and Frightened are applied, with the repeat save at the end of each turn. The 5d10 Psychic damage on a failed repeat is the GM's."
   ),
-  "spell:wind-wall": guided(
-    "The save and its Bludgeoning damage are applied. The projectiles the wall turns aside are the GM's."
+  "spell:wind-wall": enforced(
+    "The save and its Bludgeoning damage are applied. While the caster concentrates, zone-walls.ts makes an arrow, a bolt or a thrown weapon miss a target across the wall, and zone-barriers.ts bars a Small or smaller creature in the air from crossing it. A giant's Rock and spells go through. Its hold on gases is the GM's."
   ),
 
   // Resources, rests, conversions and charges.
@@ -1498,5 +1513,70 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "item:rod-of-resurrection": enforced(
     "Its casts spend their printed charges, and it regains 1 charge at dawn or at a Long Rest (item-charges.ts)."
+  ),
+
+  // Walls, doors and objects on the map (spell-walls.ts, doors.ts, objects.ts, enclosures.ts, zone-walls.ts).
+  "spell:wall-of-force": enforced(
+    "The cast raises the wall on its placed Line as walls that stop movement and leave sight through (spell-walls.ts). A creature in its space is moved out of it, the caster's allies to the caster's side and the rest to the far side. Nothing damages it, Disintegrate destroys it whole and ends the spell, and it goes when the Concentration ends. Its hemisphere and globe forms are the GM's to draw."
+  ),
+  "spell:wall-of-stone": enforced(
+    "The cast raises the wall on its placed Line as 10-foot stone panels that stop movement and sight, each an object with AC 15 and 180 Hit Points that is gone at 0 Hit Points (spell-walls.ts, objects.ts). A creature in its space is moved out of it. The wall stays for good once the caster holds Concentration for the full 10 minutes, and goes if the Concentration ends sooner. Its other shapes, and the save of a creature it would shut in, are the GM's."
+  ),
+  "spell:forcecage": enforced(
+    "The cast raises the 20-foot cage on its placed Cube as bars that stop movement and leave sight, attacks and spells through (spell-walls.ts), and moves a creature standing in the bars out of them. A creature that teleports out first makes a Charisma save against the caster's spell save DC, which the server rolls, and a failure keeps it in and wastes the teleport (forcecage.ts). Disintegrate destroys the cage, and it goes when the spell ends. The solid 10-foot box and its reach into the Ethereal Plane are the GM's."
+  ),
+  "spell:wall-of-fire": enforced(
+    "spell-zones.ts deals 5d8 Fire damage to a creature that enters the wall for the first time on a turn or ends its turn in it, after the cast's Dexterity save, and the wall blocks sight for dynamic vision (vision/cast-sight.ts). The burning side's damage within 10 feet and the ring form are the GM's."
+  ),
+  "spell:knock": enforced(
+    "Aimed at a door on the map that the caster sees within 60 feet, it takes away one of what holds it shut, a lock, a stuck or barred state or a spike, and holds an Arcane Lock off for 10 minutes (doors.ts). A door Stone Shape sealed stays shut. The knock heard 300 feet away is the table's."
+  ),
+  "spell:arcane-lock": enforced(
+    "Aimed at a door on the map the caster touches, it locks the door against everyone but the caster and the creatures named as the cast's targets (doors.ts). Thieves' Tools can't pick it, a Strength check can't force it, and Knock holds it off for 10 minutes. The password and the higher DC to break it are the GM's."
+  ),
+  "spell:passwall": guided(
+    "Aimed at a wall on the map within 30 feet that the caster sees, it cuts a 5-foot passage that sight and movement pass through for the hour (spell-walls.ts). Moving the creatures still in the passage when it closes is the GM's."
+  ),
+  "spell:stone-shape": guided(
+    "Aimed at a door on the map the caster touches, it seals the door shut so that no check opens it; aimed at a wall, it cuts a lasting 5-foot passage through it (spell-walls.ts, doors.ts). The other shapes it makes are the GM's."
+  ),
+  "spell:elementalism": guided(
+    "Beckon Air aimed at a door on the map within 30 feet slams it shut (resolution/cast-walls.ts). The other options are the GM's."
+  ),
+  "spell:resilient-sphere": enforced(
+    "A failed Dexterity save shuts the target in the sphere while the caster concentrates (enclosures.ts). An attack or spell on it from outside, or from it on anything outside, meets Total Cover's refusal, and an area leaves it out. Disintegrate aimed at it destroys the sphere, harms nothing inside and ends the spell. Rolling the sphere along, and a willing target, are the GM's."
+  ),
+  "spell:tiny-hut": guided(
+    "The dome stays where it was cast (zone-barriers.ts): only the creatures inside it at the cast pass through it, and a spell of level 3 or lower cast from outside can't reach inside. Its light, its one-way sight and its end when the caster leaves are the GM's."
+  ),
+  "item:bead-of-force": enforced(
+    "Throwing a bead uses it up: each creature in the 10-foot-radius Sphere makes the DC 15 Dexterity save or takes 5d4 Force damage, and one that fails is shut in the sphere for a minute, which no attack or effect passes (enclosures.ts). Pushing out the creatures that saved, and rolling the sphere, are the GM's."
+  ),
+  "item:net": enforced(
+    "Thrown in place of an attack at a Large or smaller creature the thrower sees within 15 feet, a failed Dexterity save leaves it Restrained, escaped with a DC 10 Strength (Athletics) check. The Net is an object with AC 10 and 5 Hit Points, immune to Bludgeoning damage, and an attack that breaks it frees the creature (objects.ts)."
+  ),
+  "item:thieves-tools": guided(
+    "door.use's pick rolls a Dexterity (Sleight of Hand) check with the tools against a lock on a door of the map, DC 15 unless the GM sets another, and unlocks it on a success (doors.ts). It takes the Utilize action in a fight. Disarming a trap is the GM's."
+  ),
+  "item:carpenters-tools": guided(
+    "door.use pries a door on the map open, or seals a closed one, with a DC 20 Strength check with the tools (doors.ts). A sealed door is forced open at DC 20. Crafting is the GM's."
+  ),
+  "item:smiths-tools": guided(
+    "door.use pries a door on the map open with a DC 20 Strength check with the tools (doors.ts). Crafting is the GM's."
+  ),
+  "item:lock": enforced(
+    "A door on the map can be locked (the GM's door editor): it stays shut against everyone but the creatures holding its key, and Thieves' Tools pick it with a DC 15 Dexterity (Sleight of Hand) check (doors.ts)."
+  ),
+  "item:portable-ram": enforced(
+    "Forcing a door with door.use adds 4 to the Strength (Athletics) check while the creature carries the ram, and another creature beside the door helping gives Advantage (doors.ts)."
+  ),
+  "item:iron-spikes": enforced(
+    "door.use's jam hammers one spike of the bundle into a closed door on the map, which then forces open only with a DC 15 Strength (Athletics) check (doors.ts)."
+  ),
+  "action:Giant Spider/web": enforced(
+    "The DC 13 Dexterity save leaves a target Restrained, held by a web that is an object with AC 10, 5 Hit Points and Vulnerability to Fire damage. An attack that breaks it frees the target (objects.ts)."
+  ),
+  "action:Ettercap/web-strand": enforced(
+    "The DC 12 Dexterity save leaves a target Restrained, held by a strand that is an object with AC 10, 5 Hit Points, Vulnerability to Fire damage and Immunity to Bludgeoning damage. An attack that breaks it frees the target (objects.ts)."
   )
 };
