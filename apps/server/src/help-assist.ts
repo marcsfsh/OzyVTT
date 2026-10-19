@@ -1,6 +1,6 @@
-import type { Actor, GameState } from "@vtt/domain";
+import type { Actor, GameState, HeldRoll } from "@vtt/domain";
 import type { CheckSubject } from "./ability-checks.js";
-import { endEffectIfPresent, type EffectNarration } from "./effects.js";
+import { endEffectIfPresent, makeEffect, type EffectNarration } from "./effects.js";
 
 // SRD Help, Assist an Ability Check: "That ally has Advantage on the next ability check they make with the chosen
 // skill or tool. This benefit expires if the ally doesn't use it before the start of your next turn." The effect on
@@ -62,4 +62,57 @@ export function useHelp(state: GameState, actor: Actor, subject: CheckSubject, e
       );
   }
   return events;
+}
+
+/** The tag on the effect Cobbler's Tools' modified footwear leaves on its wearer. */
+export const FOOTWEAR_TAG = "modified-footwear";
+
+/**
+ * SRD Cobbler's Tools: "Modify footwear to give Advantage on the wearer's next Dexterity (Acrobatics) check (DC 10)".
+ * While the use's check succeeds its wearer holds the Advantage, used up by its next Acrobatics check as Help is; a
+ * reroll or an answer that turns the check settles it again.
+ */
+export function settleUseOutcome(
+  state: GameState,
+  roller: Actor,
+  outcome: NonNullable<NonNullable<HeldRoll["check"]>["onSuccess"]>,
+  success: boolean
+): EffectNarration[] {
+  const wearer = state.actors.find((actor) => actor.id === outcome.actorId);
+  if (!wearer) return [];
+  const id = `footwear-${roller.id}`;
+  const held = wearer.effects.find((effect) => effect.id === id);
+  if (held && !success) return endEffectIfPresent(state, wearer.id, id);
+  if (held || !success) return [];
+  wearer.effects = [
+    ...wearer.effects,
+    makeEffect({
+      id,
+      name: "Modified footwear",
+      duration: { type: "manual" },
+      tags: [HELPED_TAG, FOOTWEAR_TAG],
+      sourceActorId: roller.id,
+      sourceName: roller.name,
+      startedRound: state.combat.round,
+      modifiers: [
+        {
+          type: "roll-mode",
+          roll: "check",
+          mode: "advantage",
+          when: [
+            { type: "on-ability-check" },
+            { type: "ability-is", abilities: ["dex"] },
+            { type: "skill-is", skills: ["acrobatics"] }
+          ]
+        }
+      ]
+    })
+  ];
+  return [
+    {
+      kind: "effect",
+      text: `${wearer.name}'s next Dexterity (Acrobatics) check has Advantage from the footwear ${roller.name} modified.`,
+      actorId: wearer.id
+    }
+  ];
 }

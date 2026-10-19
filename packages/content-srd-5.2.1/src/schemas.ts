@@ -1119,6 +1119,26 @@ export const EquipmentReferenceSchema = z
       .describe(
         "What the item holds, which it is unpacked into wherever a character comes by it (its starting equipment, or adding it to the sheet): each record id and how many (an Explorer's Pack's 10 Torches)"
       ),
+    /** What the item does when its carrier takes the Utilize action, with the check it takes ("As a Utilize action,
+     *  you can throw the Grappling Hook ... DC 13 Dexterity (Acrobatics) check"). A tool's own Utilize line is read
+     *  from its description. */
+    utilize: z
+      .array(
+        z
+          .object({
+            label: z.string().min(1).max(80),
+            ability: AbilityShortSchema,
+            skill: ContentIdSchema.optional(),
+            dc: z.number().int().min(1).max(40)
+          })
+          .strict()
+      )
+      .min(1)
+      .max(4)
+      .optional()
+      .describe(
+        "What the item does when its carrier takes the Utilize action, each with the check it takes and its DC (a Grappling Hook's catch: DC 13 Dexterity (Acrobatics)). The sheet offers each one while the item is carried; in a fight it takes the Utilize action. A tool's own Utilize line is read from its description"
+      ),
     /** "You can make one attack with it as a Bonus Action on each of your turns" (Scimitar of Speed). */
     bonusActionAttack: z
       .literal(true)

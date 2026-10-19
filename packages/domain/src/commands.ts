@@ -585,6 +585,9 @@ export const ActionResolveSchema = z
     /** An Evoker's Overchannel (Wizard 14): a Wizard spell cast with a level 1 to 5 slot deals its maximum damage, the
      *  caster taking Necrotic damage for each use after the first before a Long Rest. Refused for anything else. */
     overchannel: z.boolean().optional(),
+    /** A Thief's Fast Hands: an item's Utilize action, or a magic item's Magic action, taken as a Bonus Action.
+     *  Refused for anyone without the feature and for any other action. */
+    fastHands: z.boolean().optional(),
     shaping: CastShapingListSchema.optional(),
     /** What the user picks for an action that brings creatures onto the map (Find Familiar's form, Giant Insect's
      *  spider, Summon Dragon's breath and the Resistance it shares), and the point they appear at, within the action's
@@ -920,9 +923,26 @@ export const CheckRollSchema = z
     sense: z.enum(["sight", "hearing"]).optional(),
     /** The situations the roller says the check fits, from the sheet's list (a Book's topic, prying with a Crowbar). */
     situations: z.array(z.string().trim().min(3).max(80)).max(6).optional(),
+    /** A piece of gear whose printed Utilize use this is (a Grappling Hook), with `use`. A tool's use names `tool`. */
+    item: SkillOrToolIdSchema.optional(),
+    /** Which of the tool's or gear's printed Utilize uses this is, by its place in the list: the server takes the
+     *  record's DC, ability and skill. */
+    use: z.number().int().min(0).max(9).optional(),
+    /** Fast Hands (Thief): the Utilize use, or a Dexterity (Sleight of Hand) check, takes the Bonus Action. */
+    bonusAction: z.boolean().optional(),
+    /** The creature a use works for (the wearer of the footwear Cobbler's Tools modify); absent, the roller. */
+    forActorId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
-  .strict();
+  .strict()
+  .refine((request) => request.use === undefined || request.tool !== undefined || request.item !== undefined, {
+    message: "Name the tool or the item whose use this is.",
+    path: ["use"]
+  })
+  .refine((request) => request.item === undefined || request.use !== undefined, {
+    message: "An item's check is one of its uses: say which.",
+    path: ["item"]
+  });
 
 /** Reroll one die of a character's latest check (the lowest), while it is still their latest roll: a player spends
  *  Heroic Inspiration; the GM rerolls freely. */
@@ -1374,6 +1394,8 @@ export const DoorUseSchema = z
     how: z.enum(["pick", "force", "jam", "pry", "seal"]),
     /** Another character helping with a Portable Ram (Advantage on the check). */
     helperId: z.uuid().optional(),
+    /** Fast Hands (Thief): the use takes the Bonus Action. */
+    bonusAction: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

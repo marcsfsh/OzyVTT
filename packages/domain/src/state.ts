@@ -517,7 +517,15 @@ export const HeldRollSchema = z
         callId: z.uuid().optional(),
         findActorId: z.uuid().optional(),
         /** The situations the roller said it fits, which a reroll or an answer keeps. */
-        situations: z.array(z.string().min(3).max(80)).max(6).optional()
+        situations: z.array(z.string().min(3).max(80)).max(6).optional(),
+        /** The name a tool's or gear's Utilize use rolls under ("Pick a lock (Thieves' Tools)"), which a reroll keeps. */
+        label: z.string().min(1).max(80).optional(),
+        /** What the use leaves on a creature while the check succeeds (Cobbler's Tools' footwear), settled again after a
+         *  reroll or an answer. */
+        onSuccess: z
+          .object({ kind: z.literal("next-acrobatics-advantage"), actorId: z.uuid() })
+          .strict()
+          .optional()
       })
       .strict()
       .optional(),

@@ -44,6 +44,7 @@ import { enclosedFrom } from "../enclosures.js";
 import { areaMoveOf, moveArea, planAreaMove, type AreaMove } from "../zone-moves.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
+import { withFastHands } from "../fast-hands.js";
 import { applyLooseHealing, looseHealTargets, partyMember } from "../loose-healing.js";
 import { countOptionUse } from "../option-uses.js";
 import { castLine, castSpellOf } from "../cast-narration.js";
@@ -152,8 +153,10 @@ export const actionCommands = [
         );
         const listed = statBlockAction ?? builtinActionFor(definition, actionId, attacker);
         if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
-        // An action whose user picks its cost (Lay on Hands) resolves at the amount picked.
-        const action = withChosenCost(listed, request.spend);
+        // An action whose user picks its cost (Lay on Hands) resolves at the amount picked; a Thief's Fast Hands takes
+        // an item's Utilize or Magic action as a Bonus Action.
+        const costed = withChosenCost(listed, request.spend);
+        const action = request.fastHands === true ? withFastHands(costed, attacker, definition) : costed;
         // The GM may impose any condition; a player picks only among the ones the action lets its caster choose
         // (Blindness/Deafness), read from the spell too for a sheet built before the action carried them.
         const offered = conditionChoicesOf(
