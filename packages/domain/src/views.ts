@@ -185,6 +185,7 @@ export type PlayerPendingSave = Omit<
   | "failureNote"
   | "breaksConcentration"
   | "successEndsSpell"
+  | "dropsRowId"
   | "zoneId"
   | "magical"
   | "immuneOnSuccess"

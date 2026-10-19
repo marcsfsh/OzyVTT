@@ -1,3 +1,4 @@
+import { dropHeldRow } from "./effects.js";
 import { ownSizeOf, takeForm } from "./transform/assume.js";
 import { revertOnFailure } from "./transform/rules.js";
 import { refreshSize } from "./transform/forms.js";
@@ -1288,6 +1289,8 @@ export function answerSave(
   if (!success && pending.regurgitates) events.push(...regurgitate(state, target.id, pending.regurgitates.withinFeet));
   // SRD Sleet Storm: a failure "and lose Concentration".
   if (!success && pending.breaksConcentration) events.push(...endConcentrationSustainedBy(state, target.id));
+  // Heat Metal: "the target must succeed on a Constitution saving throw or drop the object if it can".
+  if (!success && pending.dropsRowId) events.push(...dropHeldRow(target, pending.dropsRowId, immunities));
   // "On a successful save, the spell ends" (Detect Thoughts' probe).
   if (success && pending.successEndsSpell && pending.sourceActorId && pending.spell)
     events.push(...endCasterSpell(state, pending.sourceActorId, pending.spell.id));

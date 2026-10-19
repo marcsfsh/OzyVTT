@@ -33,6 +33,7 @@ export function createPendingSaves(
       | "failureNote"
       | "breaksConcentration"
       | "successEndsSpell"
+      | "dropsRowId"
       | "zoneId"
       | "gmApplies"
       | "failureByHitPoints"
@@ -102,6 +103,7 @@ export function createPendingSaves(
     ...(input.extra?.failureNote ? { failureNote: input.extra.failureNote } : {}),
     ...(input.extra?.breaksConcentration ? { breaksConcentration: true as const } : {}),
     ...(input.extra?.successEndsSpell ? { successEndsSpell: true as const } : {}),
+    ...(input.extra?.dropsRowId ? { dropsRowId: input.extra.dropsRowId } : {}),
     ...(input.extra?.zoneId !== undefined ? { zoneId: input.extra.zoneId } : {}),
     ...(input.extra?.gmApplies ? { gmApplies: true as const } : {}),
     ...(input.extra?.endsForm ? { endsForm: true as const } : {}),

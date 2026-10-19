@@ -332,6 +332,15 @@ export function dropHeldItems(actor: Actor, source?: ConditionImmunitySource): E
   return [{ kind: "condition", text: `${actor.name} drops ${list}.`, actorId: actor.id }];
 }
 
+/** One held row dropped (Heat Metal's object): still carried, out of the creature's hands. Nothing when it isn't held. */
+export function dropHeldRow(actor: Actor, rowId: string, source?: ConditionImmunitySource): EffectNarration[] {
+  const row = actor.inventory.find((entry) => entry.id === rowId && entry.equipped && entry.armor === undefined);
+  if (!row) return [];
+  actor.inventory = actor.inventory.map((entry) => (entry.id === rowId ? { ...entry, equipped: false } : entry));
+  refreshArmorClass(actor, source);
+  return [{ kind: "condition", text: `${actor.name} drops ${row.name}.`, actorId: actor.id }];
+}
+
 /**
  * What gaining a condition does beyond itself, shared by every path that can impose one (a GM chip, a failed save,
  * an on-hit rider, an effect's linked conditions): an Incapacitated creature's grapples release and its
