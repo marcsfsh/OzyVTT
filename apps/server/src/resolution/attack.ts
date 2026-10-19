@@ -138,6 +138,9 @@ const CONDITION_ROLL_MODES: ReadonlyArray<
 ];
 
 const has = (actor: LiveActor, id: string) => actor.conditions.some((condition) => condition.id === id);
+/** Whether a creature's token stands on the map, so sight can say what it sees. */
+const placedOnMap = (state: ResolveContext["state"], actorId: string) =>
+  state.combat.tokens.some((token) => token.actorId === actorId && token.position !== null);
 
 /** Faerie Fire's outline: a creature carrying it can't benefit from the Invisible condition. */
 export const OUTLINED_TAG = "outlined";
@@ -305,13 +308,26 @@ function positionClaims(ctx: ResolveContext, distance: number | null, sources: R
   if (normal !== undefined && distance !== null && distance > normal + 1e-6) {
     sources.disadvantage.push({ source: "long-range", label: `Long range (beyond ${normal} ft)` });
   }
-  // An able enemy within 5 feet spoils the shot; "who can see you" stays GM adjudication. A creature at 0 HP is
-  // dead or dying, and an ally is no enemy whatever its kind.
+  // SRD Ranged Attacks in Close Combat: "a hostile creature within 5 feet of you that can see you and that doesn't
+  // have the Incapacitated condition". A creature at 0 HP is dead or dying, and an ally is no enemy whatever its
+  // kind. A Blinded enemy can't see the attacker, and with dynamic vision on, neither can one the map says doesn't;
+  // with it off, sight stays the GM's call.
+  const sight = sceneSight(state, {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
+  const seesAttacker = (enemy: LiveActor) =>
+    !has(enemy, "blinded") &&
+    (!sight.enabled ||
+      !placedOnMap(state, enemy.id) ||
+      !placedOnMap(state, attacker.id) ||
+      sight.sees(enemy.id, attacker.id));
   for (const entry of state.combat.initiative) {
     if (entry.actorId === attacker.id) continue;
     const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (!enemy || enemy.hp.current <= 0 || isIncapacitated(enemy)) continue;
     if (!areEnemies(attacker, enemy, deps.resolveDefinition)) continue;
+    if (!seesAttacker(enemy)) continue;
     // A creature hidden from the table (GM-only, out of every character's sight, or under the fog) never spoils a
     // visible attacker's shot on its own: the Disadvantage would show in the public dice. The GM can still impose it.
     if (ctx.hiddenFromTable(enemy.id) && !ctx.hiddenFromTable(attacker.id)) continue;
