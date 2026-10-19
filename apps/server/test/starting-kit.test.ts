@@ -147,6 +147,26 @@ describe("the starting kits", () => {
     expect(draft("bard-b")).toBeUndefined();
   });
 
+  it("reads the kit's instrument back from a stored ledger, so a level up keeps it", () => {
+    const proficient = ["instrument-drum", "instrument-flute", "instrument-viol"];
+    const kitPick: CharacterChoice = { level: 1, classId: "bard", kind: "kit-item", id: "instrument-horn" };
+    const reply = builderOffers(
+      {
+        speciesId: "human",
+        backgroundId: "acolyte",
+        classId: "bard",
+        level: 2,
+        // As the builder records them: the class's kit under the class.
+        choices: [
+          ...bard(proficient).choices.map((row) => (row.id === "bard-a" ? { ...row, classId: "bard" } : row)),
+          kitPick
+        ]
+      },
+      library
+    );
+    expect(reply.picks["class-equipment-item"]).toEqual(["instrument-horn"]);
+  });
+
   it("puts the Monk's chosen tool in its kit", () => {
     expect(carried(monk("smiths-tools"))).toContainEqual(["smiths-tools", 1]);
   });

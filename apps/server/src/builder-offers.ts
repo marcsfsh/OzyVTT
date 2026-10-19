@@ -71,11 +71,11 @@ export function builderOffers(request: BuilderOffersRequest, library: ContentVie
   if (request.choices) {
     // A stored ledger: one survey places every row, then each row is read back onto the card it answers.
     const rows = request.choices.filter((row) => row.level <= request.level);
-    offers = offersFor(
-      surveyDraft({ ...identity, ...subclassesInLedger(rows, request.classId), choices: rows }, library),
-      library,
-      {}
-    );
+    const survey = surveyDraft({ ...identity, ...subclassesInLedger(rows, request.classId), choices: rows }, library);
+    offers = offersFor(survey, library, {});
+    picks = answersFromLedger(rows, offers).picks;
+    // A card an answer opens (the instrument a chosen kit asks for) is read back once that answer is in.
+    offers = offersFor(survey, library, picks);
     ({ picks, increases } = answersFromLedger(rows, offers));
   } else {
     offers = offersFor(surveyDraft({ ...identity, choices: [] }, library), library, {});
