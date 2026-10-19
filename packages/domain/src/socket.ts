@@ -68,6 +68,7 @@ import type {
   ActorSetArmorClassSchema,
   ActorSetHeroicInspirationSchema,
   ActorGiveHeroicInspirationSchema,
+  ActorAwardExperienceSchema,
   ActorStabilizeSchema,
   ActorSpendHitDiceSchema,
   ActorSpendUsesSchema,
@@ -393,6 +394,17 @@ export interface ClientToServerEvents {
   "actor:give-heroic-inspiration": (
     payload: CommandPayload<typeof ActorGiveHeroicInspirationSchema>,
     acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM: award XP to player characters, each an amount and a share of the defeated creatures' XP. */
+  "actor:award-experience": (
+    payload: CommandPayload<typeof ActorAwardExperienceSchema>,
+    acknowledgement: (
+      result: MutationResult & {
+        each?: number;
+        creatures?: number;
+        ready?: Array<{ actorId: string; name: string; level: number }>;
+      }
+    ) => void
   ) => void;
   /** The server first re-runs the command as the player; only a still-blocked one is parked for the GM (`askId`). */
   "rules:ask": (

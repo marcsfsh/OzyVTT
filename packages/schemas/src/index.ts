@@ -1230,6 +1230,9 @@ export const ActorSchema = z.object({
   /** A second Heroic Inspiration gained while holding one (SRD: "the excess is lost unless you give it to a player
    *  character who lacks it"): its player gives it or lets it go. Player characters only. */
   heroicInspirationToGive: z.boolean().optional(),
+  /** A player character's Experience Points, which the GM awards (`actor.award-experience`). Absent until the first
+   *  award, when it starts at the least XP the character's level needs. */
+  experiencePoints: z.number().int().min(0).max(10_000_000).optional(),
   /** Picks re-made on a rest, keyed by offer key; no rebuild needed. `per` is the rest that clears the override,
    * after which the build's recorded answer applies again. */
   choiceOverrides: z

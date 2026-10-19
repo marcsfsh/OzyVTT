@@ -311,6 +311,7 @@ export const GAME_PATHS = {
   checkReroll: `${API_NAMESPACE}/game/actors/{actorId}/check/reroll`,
   actorHeroicInspiration: `${API_NAMESPACE}/game/actors/{actorId}/heroic-inspiration`,
   actorGiveHeroicInspiration: `${API_NAMESPACE}/game/actors/{actorId}/heroic-inspiration/give`,
+  awardExperience: `${API_NAMESPACE}/game/experience/award`,
   rollCalls: `${API_NAMESPACE}/game/roll-calls`,
   rollCallAnswer: `${API_NAMESPACE}/game/roll-calls/{callId}/answer`,
   rollCallClose: `${API_NAMESPACE}/game/roll-calls/{callId}/close`,
@@ -677,6 +678,7 @@ export const GAME_COMMANDS = {
     method: "post",
     path: GAME_PATHS.actorGiveHeroicInspiration
   },
+  "actor.award-experience": { scope: "actor:write", method: "post", path: GAME_PATHS.awardExperience },
   "rules.ask": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesAsk },
   "rules.answer": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesAnswer },
   "table.set-staging-defaults": { scope: "combat:write", method: "post", path: GAME_PATHS.stagingDefaults },

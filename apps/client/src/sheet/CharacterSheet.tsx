@@ -33,6 +33,7 @@ import { useMediaQuery } from "../lib/useMediaQuery";
 import { TokenLibrary } from "../tokens/TokenLibrary";
 import { ChecksTab } from "./ChecksTab";
 import { FeaturesTab, NextLevel } from "./FeaturesTab";
+import { experienceOf } from "./Experience";
 import { GearTab } from "./GearTab";
 import { GmTools } from "./GmTools";
 import { HitPointDice } from "./HitPointDice";
@@ -219,6 +220,7 @@ export function CharacterSheet({
   const level = characterLevel(definition);
   const canLevel = mayLevel(role, state, actor) && onLevel !== undefined && level !== null;
   const levelUpTo = levelUpTarget(level, state);
+  const experience = experienceOf(actor);
   // What the next level brings, asked only of a viewer who may take it there.
   const next = useNextLevel(actor.id, canLevel && levelUpTo !== null, `${level}:${definitionId ?? ""}`);
   const inspired = heroicInspirationOf(actor);
@@ -412,6 +414,15 @@ export function CharacterSheet({
       pools={pools}
       serverActions={serverActions}
       onUse={(actionId) => controller.sendThroughServer(actionId)}
+      experience={
+        experience !== undefined && level !== null
+          ? {
+              points: experience,
+              level,
+              ...(canLevel && levelUpTo === level + 1 ? { onLevelUp: onLevel! } : {})
+            }
+          : undefined
+      }
       {...(controller.inFight
         ? {}
         : {

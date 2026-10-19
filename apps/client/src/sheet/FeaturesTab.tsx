@@ -6,6 +6,7 @@ import type { SrdExtension } from "../encounter/sheet-extension";
 import type { SheetActor } from "./sheet-model";
 import { plainActionName } from "../encounter/format";
 import { UseList, type Pool, type Spender } from "./Uses";
+import { ExperienceLine } from "./Experience";
 
 /** What a use costs on a turn, in the SRD's words. */
 const ACTIVATION_WORDS: Readonly<Record<string, string>> = {
@@ -205,6 +206,7 @@ export function FeaturesTab({
   serverActions,
   onUse,
   rest,
+  experience,
   next
 }: Readonly<{
   actor: SheetActor;
@@ -223,6 +225,8 @@ export function FeaturesTab({
     busy: boolean;
     onRechoose: (choice: Rechoice, option: Rechoice["options"][number]) => void;
   }>;
+  /** The character's XP and level once the GM has awarded XP, with the level up when the viewer may take it. */
+  experience?: Readonly<{ points: number; level: number; onLevelUp?: () => void }> | undefined;
   /** What the next level brings and the way to it, when the caller may level the character. */
   next?: ReactNode;
 }>) {
@@ -267,6 +271,7 @@ export function FeaturesTab({
   const columns = derived?.classColumns ?? [];
   return (
     <div className="cs-features">
+      {experience && <ExperienceLine {...experience} />}
       {columns.length > 0 && <ClassColumns columns={columns} />}
       {pools.length > 0 && (
         <section className="cs-group" aria-label="Uses">

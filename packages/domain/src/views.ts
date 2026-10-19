@@ -72,6 +72,7 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     /** Whether the character holds Heroic Inspiration. Same gate as `actionUses`. */ heroicInspiration?: boolean;
     /** A second Heroic Inspiration your own character gained, to give to a player character who lacks one or let go.
      *  Your own claimed character only. */ heroicInspirationToGive?: boolean;
+    /** The character's Experience Points, once the GM has awarded any. Same gate as `actionUses`. */ experiencePoints?: number;
     /** Picks re-made on a rest, keyed by offer key (Circle of the Land's land type). Same gate as `actionUses`. */ choiceOverrides?: Record<
       string,
       { id: string; per: "short-rest" | "long-rest" }

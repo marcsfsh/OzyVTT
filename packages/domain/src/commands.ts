@@ -780,6 +780,18 @@ export const ActorGiveHeroicInspirationSchema = z
   })
   .strict();
 
+/** The GM awards XP: an amount to each recipient, and an even share of the defeated creatures' stat block XP. */
+export const ActorAwardExperienceSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorIds: z.array(z.uuid()).min(1).max(12),
+    amount: z.number().int().min(-1_000_000).max(1_000_000).default(0),
+    defeatedIds: z.array(z.uuid()).max(60).default([]),
+    inLairIds: z.array(z.uuid()).max(60).default([]),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
 /** Ask the GM. `payload` is the original command, revalidated with its own schema before use. */
 export const RulesAskSchema = z
   .object({

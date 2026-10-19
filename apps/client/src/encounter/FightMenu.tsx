@@ -80,7 +80,8 @@ export function FightMenu({
   run,
   onFeedback,
   onAddMonsters,
-  onEnd
+  onEnd,
+  onAwardExperience
 }: Readonly<{
   state: GmView;
   busy: boolean;
@@ -89,6 +90,8 @@ export function FightMenu({
   onFeedback: (text: string) => void;
   onAddMonsters: () => void;
   onEnd: () => void;
+  /** Shares the defeated monsters' XP among the characters in the fight; absent until there is something to share. */
+  onAwardExperience?: (() => void) | undefined;
 }>) {
   const [menuOpen, setMenuOpen] = useState(false);
   // Close the ⋯ popover on Escape (outside clicks hit the backdrop). Rich content keeps it a bespoke
@@ -391,6 +394,19 @@ export function FightMenu({
                     + Add monsters
                   </button>
                 </div>
+                {onAwardExperience && (
+                  <button
+                    type="button"
+                    className="encounter-award-xp"
+                    disabled={busy}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onAwardExperience();
+                    }}
+                  >
+                    Award the fight's XP
+                  </button>
+                )}
                 <button
                   type="button"
                   className="encounter-end"
