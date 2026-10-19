@@ -745,6 +745,34 @@ export function resolveAtWall(
   });
 }
 
+/** Aims the live spell at a flame set on the map (`action:resolve` with `lightId`: Druidcraft's Fire Play). The server
+ *  checks the spell lights flames, the range and whether it can snuff one. */
+export function resolveAtLight(
+  lightId: string,
+  revision: number | undefined,
+  onResult: (ok: boolean, message?: string) => void
+) {
+  if (!session || busy) return;
+  const { attackerId, action, slotLevel } = session;
+  busy = true;
+  blockedPrompt = null;
+  emit();
+  void command("action:resolve", {
+    actorId: attackerId,
+    actionId: action.id,
+    lightId,
+    commit: true,
+    ...(slotLevel !== undefined ? { slotLevel } : {}),
+    ...(revision !== undefined ? { expectedRevision: revision } : {})
+  }).then((response) => {
+    if (response.ok && response.resolution) result = response.resolution;
+    busy = false;
+    if (response.ok) session = null;
+    emit();
+    onResult(response.ok, response.message);
+  });
+}
+
 /** Aims the live attack at what holds a creature (a Net, a web, a rope): `object:attack` on the effect that holds it.
  *  Breaking it frees the creature. */
 export function resolveAtHeld(

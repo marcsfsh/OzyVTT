@@ -2178,6 +2178,9 @@ export const InventoryItemSchema = z
     burnsOutAtHour: z.number().int().min(0).max(10_000_000).optional(),
     /** Hours of burning left in a light that was put out before it burned down. */
     burnHoursLeft: z.number().int().min(0).max(24).optional(),
+    /** Feet its light's Bright and Dim radii are set wider (or, negative, narrower) than the record's (a Sun Blade's
+     *  Magic action). Server-owned, like `lit`. */
+    lightStepFeet: z.number().int().min(-60).max(60).optional(),
     /** Display-only marker so the sheet can offer Attune without the catalog; never the riders. */
     magic: ItemMagicMarkerSchema.optional(),
     /** A copy whose magic is spent for now: a manual or tome after its study (`character.study-item`), until it
@@ -3360,6 +3363,9 @@ export const SightEffectSchema = z
       .object({
         kind: z.enum(["lightly-obscured", "heavily-obscured", "magical-darkness"]),
         aroundSelfFeet: z.number().int().min(5).max(120).optional(),
+        /** Cast on a creature in place of a point, it is an Emanation this many feet round the object that creature
+         *  carries, moving with it (Darkness on an object: 15). */
+        onTargetFeet: z.number().int().min(5).max(120).optional(),
         /** Its user sees through it ("Heavily Obscured for creatures other than you": Insect Cloud). */
         sparesUser: z.literal(true).optional()
       })
@@ -4817,6 +4823,28 @@ export const ActionSchema = z
     /** A teleport the action grants ("teleports up to 60 feet to an unoccupied space it can see"), see
      *  `ActionTeleportSchema`. */
     teleport: ActionTeleportSchema.optional(),
+    /** It puts out every nonmagical flame within `feet` of its user: lights set on the map that no spell made, and the
+     *  burning lights creatures carry (a Frost Brand drawn). */
+    douses: z
+      .object({ feet: z.number().int().min(5).max(120) })
+      .strict()
+      .optional()
+      .describe(
+        "It puts out every nonmagical flame within `feet` of its user: lights set on the map that no spell made, and the burning lights creatures carry (a Frost Brand drawn)"
+      ),
+    /** It widens (or, negative, narrows) the light of the item it is on by `stepFeet`, its Bright Light kept between
+     *  `minFeet` and `maxFeet` (a Sun Blade: 5 feet at a time, 10 to 30). */
+    adjustsLight: z
+      .object({
+        stepFeet: z.number().int().min(-30).max(30),
+        minFeet: z.number().int().min(0).max(120),
+        maxFeet: z.number().int().min(5).max(240)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "It widens (or, negative, narrows) its item's light by `stepFeet`, the Bright Light kept between `minFeet` and `maxFeet` (a Sun Blade)"
+      ),
     /** It holds the creatures its failed save takes off the map, `capacity` at a time, by the effect tagged `tag` (an
      *  Iron Flask: one at a time); used while it holds that many, it is refused. */
     holds: z

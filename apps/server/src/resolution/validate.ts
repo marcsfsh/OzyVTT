@@ -146,8 +146,10 @@ function combatantsOf(
     action.move !== undefined ||
     action.leap !== undefined ||
     action.teleport !== undefined ||
-    // Opening a flask frees the creature it holds.
+    // Opening a flask frees the creature it holds; a drawn Frost Brand's cold and a Sun Blade's light act round it.
     action.releases !== undefined ||
+    action.douses !== undefined ||
+    action.adjustsLight !== undefined ||
     (castsASpell && !rollsOnTargets) ||
     input.builtin === true ||
     // A light or a cloud is something done, with no creature under it (a magmin's flames, a darkmantle's aura).
@@ -184,6 +186,8 @@ function combatantsOf(
     action.leap === undefined &&
     action.teleport === undefined &&
     action.releases === undefined &&
+    action.douses === undefined &&
+    action.adjustsLight === undefined &&
     action.summons === undefined &&
     action.raisesCorpse === undefined &&
     action.swallow?.conditions === undefined &&

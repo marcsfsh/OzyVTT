@@ -1119,6 +1119,15 @@ const CHAIN_FEET: Readonly<Record<string, number>> = { "chain-lightning": 30 };
  *  20 feet, Confusion's by 5, Create or Destroy Water's Cube by 5). */
 const AREA_PER_SLOT: Readonly<Record<string, number>> = { "fog-cloud": 20, confusion: 5, "create-or-destroy-water": 5 };
 
+/** Cantrips that light or snuff a flame (`resolution/cast-lights.ts`): Fire Play ("light or snuff out a candle, a
+ *  torch, or a small campfire") within Druidcraft's 30 feet and Prestidigitation's 10, and Beckon Fire's embers that
+ *  "can light candles, torches, or lamps" within Elementalism's 30. */
+const KINDLES: Readonly<Record<string, NonNullable<SpellEffect["kindles"]>>> = {
+  druidcraft: { feet: 30, snuffs: true },
+  prestidigitation: { feet: 10, snuffs: true },
+  elementalism: { feet: 30 }
+};
+
 /** A Self spell's other creatures stand this near its caster ("The creatures must be within 10 feet of you"). */
 const COMPANION_FEET: Readonly<Record<string, number>> = { etherealness: 10 };
 
@@ -2646,6 +2655,7 @@ export function spellEffectFor(
     ...(WILLING_TARGETS.has(id) ? { willingTargets: true as const } : {}),
     ...(AREA_PER_SLOT[id] !== undefined ? { areaPerSlot: AREA_PER_SLOT[id] } : {}),
     ...(COMPANION_FEET[id] !== undefined ? { companionFeet: COMPANION_FEET[id] } : {}),
+    ...(KINDLES[id] ? { kindles: { ...KINDLES[id] } } : {}),
     // The creatures it brings and the commands it gives (`spell-summons.ts`).
     ...spellSummonFieldsFor(id)
   };

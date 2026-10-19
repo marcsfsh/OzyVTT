@@ -1218,6 +1218,8 @@ export const VisionLightSchema = z
     brightFeet: z.number().min(0).max(1000),
     dimFeet: z.number().min(0).max(1000),
     sunlight: z.literal(true).optional(),
+    /** A flame set on the map that is out for now (a torch in a sconce snuffed by Fire Play): it sheds nothing until lit. */
+    out: z.literal(true).optional(),
     source: VisionSourceSchema.optional()
   })
   .strict()

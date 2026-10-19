@@ -102,6 +102,7 @@ import {
 import { parkForCounterspell } from "./resolution/counter.js";
 import { placeCastSight } from "./resolution/cast-sight.js";
 import { applyCastWalls, checkWallTarget } from "./resolution/cast-walls.js";
+import { applyAdjustsLight, applyDouses, applyKindles, checkLightTarget } from "./resolution/cast-lights.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
@@ -176,6 +177,7 @@ export function resolveDefinitionAction(
     throw new CommandRejectedError("Answer the damage on a look at it, before it is dealt.");
   checkOverchannel(ctx);
   checkWallTarget(ctx);
+  checkLightTarget(ctx);
   ctx.builtin?.check?.(ctx);
   // A form the action can't give is refused before anything is spent, and so is a full flask.
   checkShapeShift(ctx);
@@ -348,6 +350,9 @@ export function resolveDefinitionAction(
   orbLeap(ctx);
   placeCastSight(ctx);
   applyCastWalls(ctx);
+  applyKindles(ctx);
+  applyDouses(ctx);
+  applyAdjustsLight(ctx);
   refuseThePrayedFor(ctx);
   applyHealing(ctx);
   prayerShortRest(ctx);

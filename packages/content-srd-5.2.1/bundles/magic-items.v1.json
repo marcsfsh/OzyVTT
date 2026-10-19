@@ -4969,7 +4969,23 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "extinguish",
+    "name": "Extinguish Flames",
+    "activation": "other",
+    "description": "As you draw the sword, put out every nonmagical flame within 30 feet of you. Once used, this can't be used again for 1 hour.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "time",
+     "afterHours": "1"
+    },
+    "douses": {
+     "feet": 30
+    }
+   }
+  ],
   "effects": [],
   "grants": {
    "skills": [],
@@ -14356,7 +14372,32 @@
   },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "widen-light",
+    "name": "Widen the Sunlight",
+    "activation": "action",
+    "description": "Expand the blade's Bright Light and Dim Light radii by 5 feet each, to at most 30 feet each.",
+    "damage": [],
+    "adjustsLight": {
+     "stepFeet": 5,
+     "minFeet": 10,
+     "maxFeet": 30
+    }
+   },
+   {
+    "id": "narrow-light",
+    "name": "Narrow the Sunlight",
+    "activation": "action",
+    "description": "Reduce the blade's Bright Light and Dim Light radii by 5 feet each, to at least 10 feet each.",
+    "damage": [],
+    "adjustsLight": {
+     "stepFeet": -5,
+     "minFeet": 10,
+     "maxFeet": 30
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {

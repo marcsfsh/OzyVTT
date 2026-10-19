@@ -28,6 +28,7 @@ export function keepLightState(
     facingDegrees: _facing,
     burnsOutAtHour: _burns,
     burnHoursLeft: _left,
+    lightStepFeet: _step,
     ...rest
   } = incoming;
   if (!stored || incoming.quantity <= 0) return rest;
@@ -42,6 +43,7 @@ export function keepLightState(
     ...(stillLit ? { lit: true } : {}),
     ...(stored.hoodLowered ? { hoodLowered: true as const } : {}),
     ...(stored.facingDegrees !== undefined ? { facingDegrees: stored.facingDegrees } : {}),
+    ...(stored.lightStepFeet !== undefined ? { lightStepFeet: stored.lightStepFeet } : {}),
     ...(stillLit && stored.burnsOutAtHour !== undefined ? { burnsOutAtHour: stored.burnsOutAtHour } : {}),
     ...(left !== undefined ? { burnHoursLeft: left } : {})
   };
@@ -138,6 +140,41 @@ export function setItemLight(
   }
   actor.inventory = actor.inventory.map((entry) => (entry.id === row.id ? next : entry));
   return said;
+}
+
+/** A flame a spell or a blade lights or puts out with no flame or action of its own (Fire Play, a Frost Brand): a
+ *  burning light on the row, lit with what fuel it has left or a fresh flask. Returns the line for the table, or null
+ *  when nothing changed. */
+export function setRowFlame(
+  state: GameState,
+  actor: Actor,
+  rowId: string,
+  lit: boolean,
+  catalog: EquipmentCatalog | undefined
+): string | null {
+  const row = actor.inventory.find((entry) => entry.id === rowId && entry.quantity > 0);
+  const light = row ? rowRecord(catalog, row)?.light : undefined;
+  if (!row || light?.burnHours === undefined || (row.lit === true) === lit) return null;
+  const now = state.rest.clockHours;
+  let next: InventoryItem;
+  if (lit) {
+    let hours = row.burnHoursLeft !== undefined && row.burnHoursLeft > 0 ? row.burnHoursLeft : undefined;
+    if (hours === undefined && light.fuel) {
+      const fuel = actor.inventory.find((entry) => catalogIdOf(entry) === light.fuel && entry.quantity > 0);
+      if (!fuel) return null;
+      actor.inventory = actor.inventory
+        .map((entry) => (entry.id === fuel.id ? { ...entry, quantity: entry.quantity - 1 } : entry))
+        .filter((entry) => entry.quantity > 0 || entry.id !== fuel.id);
+    }
+    hours ??= light.burnHours;
+    const { burnHoursLeft: _left, ...rest } = row;
+    next = { ...rest, lit: true, equipped: true, burnsOutAtHour: now + hours };
+  } else {
+    const { lit: _lit, burnsOutAtHour, ...rest } = row;
+    next = { ...rest, ...(burnsOutAtHour !== undefined ? { burnHoursLeft: Math.max(1, burnsOutAtHour - now) } : {}) };
+  }
+  actor.inventory = actor.inventory.map((entry) => (entry.id === row.id ? next : entry));
+  return lit ? `${row.name} carried by ${actor.name} flares alight.` : `${row.name} carried by ${actor.name} goes out.`;
 }
 
 /**

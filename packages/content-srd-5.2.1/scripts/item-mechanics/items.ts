@@ -302,7 +302,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Not modeled: the light in freezing temperatures and extinguishing flames once per hour.
   "frost-brand": {
     grants: { damageResistances: ["fire"] },
-    modifiers: [{ type: "extra-damage", formula: "1d6", damageType: "cold", doubleOnCritical: true }]
+    modifiers: [{ type: "extra-damage", formula: "1d6", damageType: "cold", doubleOnCritical: true }],
+    // "When you draw this weapon, you can extinguish all nonmagical flames within 30 feet of yourself. Once used, this
+    // property can't be used again for 1 hour" (`resolution/cast-lights.ts`). Its light in freezing cold is the GM's.
+    actions: [
+      {
+        id: "extinguish",
+        name: "Extinguish Flames",
+        activation: "other",
+        description:
+          "As you draw the sword, put out every nonmagical flame within 30 feet of you. Once used, this can't be used again for 1 hour.",
+        damage: [],
+        uses: { limit: 1, per: "time", afterHours: "1" },
+        douses: { feet: 30 }
+      }
+    ]
   },
 
   // Three charges, 1d3 back at dawn: Dominate Beast at DC 15 "on a Beast that has a Swim Speed".
@@ -643,9 +657,28 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // A Longsword with Finesse that deals Radiant damage (its weapon block), +2, and 1d8 Radiant more against an Undead.
   // "While grasping the hilt, you can take a Bonus Action to cause a blade of pure radiance to spring into existence or
   // make the blade disappear": the hilt is a form with no blade, no light and no bonus. "While the blade exists, it
-  // sheds Bright Light in a 15-foot radius and Dim Light for an additional 15 feet. The light is sunlight." Not
-  // modeled: the radius its Magic action adjusts.
+  // sheds Bright Light in a 15-foot radius and Dim Light for an additional 15 feet. The light is sunlight." "While the
+  // blade exists, you can take a Magic action to expand the Bright Light and Dim Light radii by 5 feet each or reduce
+  // them by 5 feet each, to a maximum of 30 feet each or a minimum of 10 feet each" (`resolution/cast-lights.ts`).
   "sun-blade": {
+    actions: [
+      {
+        id: "widen-light",
+        name: "Widen the Sunlight",
+        activation: "action",
+        description: "Expand the blade's Bright Light and Dim Light radii by 5 feet each, to at most 30 feet each.",
+        damage: [],
+        adjustsLight: { stepFeet: 5, minFeet: 10, maxFeet: 30 }
+      },
+      {
+        id: "narrow-light",
+        name: "Narrow the Sunlight",
+        activation: "action",
+        description: "Reduce the blade's Bright Light and Dim Light radii by 5 feet each, to at least 10 feet each.",
+        damage: [],
+        adjustsLight: { stepFeet: -5, minFeet: 10, maxFeet: 30 }
+      }
+    ],
     modifiers: [
       { type: "attack-bonus", amount: 2 },
       { type: "damage-bonus", amount: 2 },

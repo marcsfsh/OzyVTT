@@ -810,6 +810,11 @@
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
+/* A flame set on the map and snuffed out: a hollow glyph until it is lit again. */
+.vision-light.out .vision-light-glyph {
+  fill: var(--void);
+  stroke: var(--violet-hi);
+}
 /* The GM's painted areas of light and obscurement, and the one being dragged: violet, shaded darker the less light
    or sight they leave. */
 .vision-area,

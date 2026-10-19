@@ -42,7 +42,7 @@ export function carryPassenger(
     moveEncounterToken(state, passenger.id, spot, geometry);
     setAltitude(state, passenger.id, arrived.altitudeFeet ?? 0, arrived.airborne);
     events.push({
-      kind: "movement",
+      kind: "effect",
       text: `${passenger.name} arrives beside ${traveler.name}.`,
       actorId: passenger.id
     });
@@ -52,7 +52,7 @@ export function carryPassenger(
   setAltitude(state, traveler.id, input.fromAltitudeFeet, undefined);
   if (!input.failDamage) {
     events.push({
-      kind: "movement",
+      kind: "effect",
       text: `${passenger.name} has no space beside ${traveler.name}: the teleport fails.`,
       actorId: traveler.id
     });

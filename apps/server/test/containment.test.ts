@@ -97,7 +97,7 @@ describe("Rope Trick", () => {
 // creature at a time ... release the creature in the flask. The creature then obeys your commands for 1 hour."
 describe("an Iron Flask", () => {
   const flask = view.equipmentRecord("iron-flask")!;
-  const actionOf = (id: string): ActorAction => ({ ...flask.actions.find((action) => action.id === id)! });
+  const actionOf = (id: string) => ({ ...flask.actions.find((action) => action.id === id)! }) as unknown as ActorAction;
   const deps = {
     random: () => 3,
     newRollId: randomUUID,
@@ -175,7 +175,7 @@ describe("a Rod of Security", () => {
   const use = (state: GameState, targetIds: string[]) =>
     resolveDefinitionAction(
       state,
-      { ...rod, id: "item-rod-of-security-demiplane" },
+      { ...rod, id: "item-rod-of-security-demiplane" } as unknown as ActorAction,
       { actorId: HERO, targetIds, commandId: randomUUID() },
       {
         random: () => 3,

@@ -433,7 +433,8 @@ export function EncounterMap({
     ...(readOnly || moveSceneId
       ? {}
       : {
-          onWallAim: commands.aimAtWall
+          onWallAim: commands.aimAtWall,
+          onLightAim: commands.aimAtLight
         })
   });
 

@@ -337,6 +337,12 @@ export const SpellEffectSchema = z
     /** Its target is the caster or a willing creature, which the server takes to be one on the caster's side (Light:
      *  "an object that isn't being worn or carried by someone else"; Nondetection: "a willing creature"). */
     willingTargets: z.literal(true).optional(),
+    /** It lights (with `snuffs`, or puts out) one nonmagical flame within `feet`: a light set on the map, or the light a
+     *  creature it targets carries (Druidcraft's and Prestidigitation's Fire Play, Elementalism's Beckon Fire). */
+    kindles: z
+      .object({ feet: z.number().int().min(5).max(120), snuffs: z.literal(true).optional() })
+      .strict()
+      .optional(),
     /** A spell of Self range whose other targets stand within this many feet of the caster as it casts (Etherealness from
      *  a higher slot: "The creatures must be within 10 feet of you"). */
     companionFeet: z.number().int().min(5).max(60).optional(),

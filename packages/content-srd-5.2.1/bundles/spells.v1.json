@@ -7373,7 +7373,8 @@
   },
   "sight": {
    "area": {
-    "kind": "magical-darkness"
+    "kind": "magical-darkness",
+    "onTargetFeet": 15
    },
    "dispels": {
     "kind": "light",
@@ -9373,7 +9374,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "kindles": {
+    "feet": 30,
+    "snuffs": true
+   }
   },
   "classes": [
    "druid"
@@ -9590,7 +9595,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "kindles": {
+    "feet": 30
+   }
   },
   "walls": {
    "door": "close"
@@ -21946,7 +21954,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "kindles": {
+    "feet": 10,
+    "snuffs": true
+   }
   },
   "classes": [
    "bard",

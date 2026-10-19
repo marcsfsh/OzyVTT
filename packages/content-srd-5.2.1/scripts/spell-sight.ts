@@ -22,7 +22,9 @@ const SPELL_SIGHT: Readonly<Record<string, SightEffect>> = {
   },
   // "Magical Darkness ... fills a 15-foot-radius Sphere. Darkvision can't see through it, and nonmagical light can't
   // illuminate it", and it dispels spell light of level 2 or lower that it overlaps.
-  darkness: { area: { kind: "magical-darkness" }, dispels: { kind: "light", upToLevel: 2 } },
+  // "Alternatively, you cast the spell on an object that isn't being worn or carried, causing the Darkness to fill a
+  // 15-foot Emanation originating from that object": cast on a creature, round the object it then carries.
+  darkness: { area: { kind: "magical-darkness", onTargetFeet: 15 }, dispels: { kind: "light", upToLevel: 2 } },
   // "This spell dispels Darkness in its area that was created by any spell."
   sunburst: { dispels: { kind: "darkness" } },
   "fog-cloud": { area: { kind: "heavily-obscured" } },

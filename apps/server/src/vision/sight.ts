@@ -328,7 +328,7 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
     });
   };
   for (const light of vision.lights) {
-    if (!sourceLive(state, light.source)) continue;
+    if (!sourceLive(state, light.source) || light.out === true) continue;
     const annotation =
       light.annotationId === undefined ? undefined : annotations.find((entry) => entry.id === light.annotationId);
     const at =

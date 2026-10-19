@@ -148,6 +148,9 @@ export function applyCastSight(state: GameState, input: CastSightInput): EffectN
     let shape: VisionArea["shape"] | null = null;
     if (area.aroundSelfFeet !== undefined)
       shape = { type: "emanation", actorId: casterId, radiusFeet: area.aroundSelfFeet };
+    // Darkness on an object a creature carries: it goes where that creature goes.
+    else if (area.onTargetFeet !== undefined && !input.areaPlaced && input.targetIds.length > 0)
+      shape = { type: "emanation", actorId: input.targetIds[0]!, radiusFeet: area.onTargetFeet };
     else if (input.areaPlaced)
       shape = { type: "template", annotationId: commandId, widthFeet: input.widthFeet ?? null };
     else if (input.centredAt) {

@@ -491,6 +491,7 @@ export const actionCommands = [
                 }
               : {}),
             ...(request.wallId !== undefined ? { wallId: request.wallId } : {}),
+            ...(request.lightId !== undefined ? { lightId: request.lightId } : {}),
             ...(request.ready === true ? { ready: true } : {}),
             ...(request.moveFirst === true ? { moveFirst: true } : {}),
             // The rest of an action whose move was taken first was paid for then.
