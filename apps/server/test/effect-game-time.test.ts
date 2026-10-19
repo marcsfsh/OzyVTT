@@ -94,7 +94,8 @@ describe("what lasts in game time", () => {
   });
 
   it("ends Contact Other Plane's Incapacitated at the caster's next Long Rest, and not at a Short Rest", () => {
-    const table = caster();
+    // Its 1 minute casting time runs across turns in a fight, so it is cast outside one, where it lands at once.
+    const table = caster({ combat: false });
     cast(table, "contact-other-plane", { targetIds: [] }, [3, 3, 3, 3, 3, 3]);
     expect(table.state.combat.pendingSaves).toMatchObject([{ targetActorId: HERO, ability: "int", dc: 15 }]);
     answer(table.state, HERO, 1);
@@ -102,7 +103,6 @@ describe("what lasts in game time", () => {
       linkedConditionIds: ["incapacitated"],
       duration: { type: "until-rest", rest: "long" }
     });
-    endFight(table.state);
     passTime(table.state, 30);
     applyRest(table.state, HERO, "short", resolveDefinition);
     expect(actorOf(table.state, HERO).conditions.map((condition) => condition.id)).toContain("incapacitated");
