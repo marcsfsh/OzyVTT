@@ -29,17 +29,23 @@ const MODIFIER_LABELS: Readonly<
   "damage-die-minimum": ["Damage and defence", "Lowest damage die"],
   "ignores-resistance": ["Damage and defence", "Damage that ignores Resistance"],
   "advantage-denied": ["Damage and defence", "No Advantage on attacks against it"],
+  "ignores-cover": ["Damage and defence", "Attacks that ignore cover"],
+  "no-critical-hits": ["Damage and defence", "Critical hits against it become normal hits"],
   "healing-received-maximized": ["Healing", "Healing received at its most"],
   "healing-dice-maximized": ["Healing", "Healing dice at their most"],
   "healing-bonus": ["Healing", "More healing"],
   "armor-class": ["Damage and defence", "Armour class"],
+  "base-armor-class": ["Damage and defence", "Base armour class without armour"],
   "unarmored-defense": ["Damage and defence", "Unarmoured defence"],
   "hit-points-per-level": ["Damage and defence", "Hit points per level"],
   "spell-save-dc": ["Spellcasting", "Spell save DC"],
   "spell-attack-bonus": ["Spellcasting", "Spell attack rolls"],
   "spell-slot": ["Spellcasting", "Spell slots"],
   "ability-score": ["The character", "Ability score"],
+  "ability-score-minimum": ["The character", "Ability score of at least"],
   speed: ["The character", "Speed"],
+  "speed-minimum": ["The character", "Speed of at least"],
+  "carrying-capacity-larger": ["The character", "Carries as one size larger"],
   "special-speed": ["The character", "Fly, swim, climb or burrow speed"],
   movement: ["The character", "Falling and jumping"],
   "extra-attack": ["The character", "Extra attack"],
@@ -65,16 +71,24 @@ function blankModifier(type: string): Draft {
   switch (type) {
     case "ability-score":
       return { type, ability: "str", amount: 1 };
+    case "ability-score-minimum":
+      return { type, ability: "str", score: 19 };
     case "hit-points-per-level":
       return { type, amount: 1 };
     case "speed":
       return { type, amount: 10 };
+    case "speed-minimum":
+      return { type, feet: 30 };
+    case "ignores-cover":
+      return { type, degree: "half" };
     case "special-speed":
       return { type, movement: "fly", feet: 30 };
     case "movement":
       return { type, rule: "safe-fall" };
     case "armor-class":
       return { type, amount: 1, whileArmored: false };
+    case "base-armor-class":
+      return { type, base: 13 };
     case "initiative":
       return { type, amount: 1 };
     case "extra-attack":
@@ -307,7 +321,41 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       label: "Ability",
       kind: "select",
       options: ABILITIES,
-      visibleWhen: hasType("ability-score", "unarmored-defense")
+      visibleWhen: hasType("ability-score", "ability-score-minimum", "unarmored-defense")
+    },
+    {
+      key: "score",
+      label: "Score",
+      kind: "number",
+      min: 1,
+      max: 30,
+      visibleWhen: hasType("ability-score-minimum"),
+      help: "A lower score counts as this while it lasts, as Gauntlets of Ogre Power make Strength 19."
+    },
+    {
+      key: "feet",
+      label: "At least",
+      kind: "number",
+      min: 5,
+      max: 120,
+      unit: "ft",
+      visibleWhen: hasType("speed-minimum")
+    },
+    {
+      key: "ignoresArmor",
+      label: "Heavy armour takes nothing from it",
+      kind: "switch",
+      visibleWhen: hasType("speed-minimum"),
+      ...trueOnly("ignoresArmor"),
+      help: "On when armour whose Strength the bearer lacks still leaves this Speed."
+    },
+    {
+      key: "degree",
+      label: "Cover it ignores",
+      kind: "select",
+      options: [opt("half", "Half cover"), opt("three-quarters", "Half and three-quarters cover")],
+      visibleWhen: hasType("ignores-cover"),
+      help: "Total cover still blocks. Add a condition for the kind of attack, such as a spell attack."
     },
     /* One `amount` field per bound set, because each variant declares its own server-side range;
        `visibleWhen` makes them mutually exclusive. All amounts are signed (negative for curses). */
@@ -567,6 +615,15 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
     ...specialSpeedFields(),
     ...movementRuleFields(),
     { key: "whileArmored", label: "Only while wearing armour", kind: "switch", visibleWhen: hasType("armor-class") },
+    {
+      key: "base",
+      label: "Base AC",
+      kind: "number",
+      min: 11,
+      max: 20,
+      visibleWhen: hasType("base-armor-class"),
+      help: "Plus Dexterity, while no armour is worn. A shield still adds. The best way to work out AC counts."
+    },
     {
       key: "proficiencyBonus",
       label: "Also add the Proficiency Bonus",

@@ -10,6 +10,7 @@ import { refreshSize, revertForm } from "./transform/forms.js";
 import { DESCENDS_SAFELY_TAG, descendSafely } from "./altitude.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import { restoreSuppressed } from "./suppressed-conditions.js";
+import { refreshArmorClass } from "./held-items.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
  *  end, which clears linked conditions and fires onEnd grants. Returns narration events and writes nothing to
@@ -306,14 +307,19 @@ const HELD_CATEGORIES: ReadonlySet<string> = new Set(["weapon", "wand", "staff",
 /**
  * SRD Unconscious ("you drop whatever you're holding") and Fear ("drops whatever it is holding"): the creature's held
  * rows stay carried but are no longer in hand, so taking one up again is an object interaction (equipping it). Worn
- * armor and a strapped Shield stay on.
+ * armor and a strapped Shield stay on. What a held item gave its Armor Class goes with it when `source` has the sheet
+ * and the catalog.
  */
-export function dropHeldItems(actor: Actor): EffectNarration[] {
+export function dropHeldItems(actor: Actor, source?: ConditionImmunitySource): EffectNarration[] {
   const held = actor.inventory.filter(
-    (row) => row.equipped && (row.weapon !== undefined || HELD_CATEGORIES.has(row.category ?? ""))
+    (row) =>
+      row.equipped &&
+      row.armor === undefined &&
+      (row.weapon !== undefined || HELD_CATEGORIES.has(row.category ?? "") || row.magic?.slot === "held")
   );
   if (held.length === 0) return [];
   actor.inventory = actor.inventory.map((row) => (held.includes(row) ? { ...row, equipped: false } : row));
+  refreshArmorClass(actor, source);
   const names = held.map((row) => row.name);
   const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
   return [{ kind: "condition", text: `${actor.name} drops ${list}.`, actorId: actor.id }];
@@ -329,10 +335,11 @@ export function conditionGained(
   state: GameState,
   actor: Actor,
   conditionId: string,
-  previousExhaustion = 0
+  previousExhaustion = 0,
+  source?: ConditionImmunitySource
 ): EffectNarration[] {
   const events: EffectNarration[] = [];
-  if (conditionId === "unconscious") events.push(...dropHeldItems(actor));
+  if (conditionId === "unconscious") events.push(...dropHeldItems(actor, source));
   if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
     events.push(...releaseGrapplesHeldBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));
@@ -417,7 +424,7 @@ export function addEffect(
     writeCondition(actor, { id: conditionId, ...level });
     if (conditionId === "unconscious" && !hasCondition(actor, "prone")) applyCondition(actor, "prone", { immunities });
     if (conditionId === "petrified") removeConditionDirect(actor, "poisoned");
-    const gained = conditionGained(state, actor, conditionId);
+    const gained = conditionGained(state, actor, conditionId, 0, immunities);
     events?.push(...gained);
   }
   return effect;

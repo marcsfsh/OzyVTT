@@ -207,7 +207,7 @@ describe("ending an effect by the action its text prints", () => {
     failHerosSave(built);
     // "Is suffocating": the engulfed hero holds its breath, and breathes again once pulled free.
     expect(hero(built).effects).toMatchObject([
-      { tags: ["escape-athletics", "cant-speak", "smothering"], escapeDc: 12 },
+      { tags: ["escape-athletics", "cant-speak", "smothering", "swallowed"], escapeDc: 12 },
       { name: "Holding Breath" }
     ]);
     const before = ally(built).hp.current;

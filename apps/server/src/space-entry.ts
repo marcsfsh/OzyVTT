@@ -1,7 +1,6 @@
 import type { GameState } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { EffectNarration } from "./effects.js";
-import { applyDamageDetailed, damageAdjustmentDetail } from "./hit-points.js";
 import { ridesWith } from "./mounts.js";
 import { createPendingSaves } from "./pending-saves.js";
 import { failureEffectFor } from "./resolution/pending.js";
@@ -9,10 +8,9 @@ import type { ZoneDeps } from "./spell-zones.js";
 import { traitOf } from "./statblock-traits.js";
 
 /**
- * What a move sets off as the mover's space enters other creatures' spaces (SRD 5.2.1): a fire elemental's Fire Form
- * ("The first time it enters a creature's space on a turn, that creature takes 5 (1d10) Fire damage") and a gelatinous
- * cube's Ooze Cube ("Other creatures can enter that space, but a creature that does so is subjected to the cube's
- * Engulf and has Disadvantage on the saving throw"). A teleport passes through no one.
+ * What a move sets off as the mover's space enters other creatures' spaces (SRD 5.2.1): a gelatinous cube's Ooze Cube
+ * ("Other creatures can enter that space, but a creature that does so is subjected to the cube's Engulf and has
+ * Disadvantage on the saving throw"). A teleport passes through no one. Fire Form's burn is `wall-passage.ts`'s.
  */
 
 type Point = Readonly<{ x: number; y: number }>;
@@ -64,48 +62,6 @@ export function spaceEntryAfterMove(
     return actor ? [actor] : [];
   });
   const events: EffectNarration[] = [];
-  const burns = traitOf(definitionOf(mover), "enters-spaces");
-  if (burns && mover.hp.current > 0)
-    for (const creature of entered) {
-      // "The first time it enters a creature's space on a turn."
-      const key = `${mover.id}:enters:${creature.id}`;
-      if ((state.combat.turn.turnUses[key] ?? 0) > 0) continue;
-      state.combat = {
-        ...state.combat,
-        turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
-      };
-      const parts = burns.damage.map((part) => ({
-        amount: Math.max(0, resolveDice(parseDiceFormula(part.formula), deps.rollDie).total),
-        type: part.type
-      }));
-      const { application, events: landed } = applyDamageDetailed(
-        state,
-        creature.id,
-        {
-          amount: parts.reduce((sum, part) => sum + part.amount, 0),
-          parts,
-          sourceName: burns.name,
-          sourceActorId: mover.id
-        },
-        { role: "gm" },
-        {
-          resolveDefinition: deps.resolveDefinition,
-          ...(deps.catalog ? { catalog: deps.catalog } : {}),
-          rollDie: deps.rollDie,
-          newId: deps.newId,
-          now: deps.now
-        }
-      );
-      events.push(
-        {
-          kind: "damage",
-          text: `${creature.name} takes ${application.totalApplied} damage from ${mover.name}'s ${burns.name}${damageAdjustmentDetail(application)}.`,
-          actorId: creature.id,
-          source: { actorId: mover.id, name: mover.name }
-        },
-        ...landed
-      );
-    }
   for (const host of entered) engulfEntrant(state, host, mover, definitionOf(host), deps, events);
   return events;
 }

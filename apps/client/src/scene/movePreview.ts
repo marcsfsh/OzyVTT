@@ -10,6 +10,7 @@ import {
   spaceHeightCells,
   spacePassage,
   spansOverlap,
+  slipsThroughStep,
   wallCrossing
 } from "@vtt/rules-5e";
 import { gridToImagePreview, imageToGridPreview, type GridCalibration } from "./gridPreview";
@@ -89,6 +90,10 @@ export function previewMove(
     straight?: boolean;
     /** The mover passes through walls and creatures as through Difficult Terrain (Incorporeal Movement). */
     throughWalls?: boolean;
+    /** The mover passes through walls at no extra cost (Earth Glide, burrowing). */
+    throughWallsFree?: boolean;
+    /** How narrow an opening the mover passes with no extra movement (the movement reply's). */
+    opening?: "point" | "tiny";
     /** Difficult Terrain costs the mover nothing extra (Freedom of Movement). */
     ignoresDifficult?: boolean;
     /** Walls that bar the way while the scene's dynamic vision is on (`movementWallsOf`). */
@@ -157,6 +162,7 @@ export function previewMove(
     b: imageToGridPreview(calibration, wall.b)
   }));
   const crosses = wallCrossing(gridWalls);
+  const passesWalls = input.throughWalls === true || input.throughWallsFree === true;
   const path = movementPath({
     from,
     to,
@@ -170,12 +176,14 @@ export function previewMove(
       return point.x >= 0 && point.y >= 0 && point.x <= size.width && point.y <= size.height;
     },
     isStepOpen: (stepFrom, stepTo) =>
-      input.throughWalls === true ||
-      footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, gridWalls) !== "blocked",
+      passesWalls ||
+      footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, gridWalls) !== "blocked" ||
+      (input.opening !== undefined && slipsThroughStep(stepFrom, stepTo, sizeCells, crosses, input.opening)),
     // A footprint that fits only as a creature one size smaller squeezes through, as through Difficult Terrain, and
     // so does a wall an incorporeal mover passes.
     isStepSqueezed: (stepFrom, stepTo) => {
-      if (input.ignoresDifficult === true) return false;
+      if (input.ignoresDifficult === true || input.throughWallsFree === true) return false;
+      if (input.opening && slipsThroughStep(stepFrom, stepTo, sizeCells, crosses, input.opening)) return false;
       const passage = footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, gridWalls);
       return passage === "squeeze" || (input.throughWalls === true && passage === "blocked");
     },

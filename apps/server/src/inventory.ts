@@ -1,18 +1,33 @@
 import type { Actor, GameState } from "@vtt/domain";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
-import { catalogIdOf, type ActorDefinition, type Currency, type InventoryItem } from "@vtt/schemas";
+import { catalogIdOf, rowUsesKey, type ActorDefinition, type Currency, type InventoryItem } from "@vtt/schemas";
 import { effectiveSlot, wornBodyArmor } from "@vtt/rules-5e";
 import { refreshBaseArmorClass, spellSlotMaxima, storedArmorClass } from "./actor-roster.js";
 import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
-import { castAction, itemAction } from "./item-actions.js";
+import { castAction, isItemActionId, itemAction } from "./item-actions.js";
 import { keepAmmunitionCount } from "./ammunition.js";
 import { keepLightState } from "./item-light.js";
 import { endConditionsImmuneTo, endEffect, MAGE_ARMOR_TAG, type EffectNarration } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
 import { holdsFeature } from "./class-features.js";
-import { rollStartingCharges } from "./item-charges.js";
+import { itemRowOfAction, rollStartingCharges } from "./item-charges.js";
+import { liveHitPointBonus } from "./live-abilities.js";
 import { scrollSpellProblem } from "./scrolls.js";
 import { endBindingsOfGoneRows } from "./bound-weapons.js";
+import {
+  copyKeyOf,
+  rowRecord,
+  rowWeaponFor,
+  variantOf,
+  variantPickedBy,
+  withVariant,
+  withWeaponChanges
+} from "./item-records.js";
+import { requireActorAccess, type Initiator } from "./authorization.js";
+import { spendBonusAction } from "./item-light.js";
+import { withVariantPick } from "./item-variants.js";
+import { attunementRefusal } from "./attunement.js";
+import { donInFight } from "./held-items.js";
 
 const MAX_ITEMS = 200;
 /** SRD: "a creature can't be attuned to more than three magic items at a time"; Use Magic Device raises it. */
@@ -104,6 +119,13 @@ function enforceEquipRules(
   if (deps.role === "gm") return;
   const others = actor.inventory.filter((entry) => entry.id !== incoming.id);
   if (incoming.attuned && incoming.quantity > 0 && needsAttunement(incoming, deps)) {
+    // SRD Attunement: "You can't attune to more than one copy of an item."
+    const record = deps.catalog?.equipmentRecord(catalogIdOf(incoming));
+    const copy = others.find((entry) => entry.attuned && copyKeyOf(record, entry) === copyKeyOf(record, incoming));
+    if (copy && record)
+      throw new CommandRejectedError(
+        `${actor.name} is already attuned to a ${copy.name}. A creature can't attune to more than one copy of an item.`
+      );
     const attuned = others.filter((entry) => entry.attuned && needsAttunement(entry, deps));
     const limit = attunementLimit(actor, definition, deps);
     if (attuned.length >= limit) {
@@ -241,7 +263,9 @@ function withMagicMarker(item: InventoryItem, deps: InventoryDeps): InventoryIte
 }
 
 function bindTemplateStats(item: InventoryItem, deps: InventoryDeps, stored?: InventoryItem): InventoryItem {
-  const record = deps.catalog?.equipmentRecord(catalogIdOf(item));
+  // The copy's kind or form can change how it swings (a Rod of Lordly Might's battleaxe).
+  const printed = deps.catalog?.equipmentRecord(catalogIdOf(item));
+  const record = printed ? withVariant(printed, item) : undefined;
   const appliesTo = record?.appliesTo;
   if (!record || !appliesTo) {
     // A non-template row never carries a baseId (it would self-grant proficiency and mastery). Its stats
@@ -310,9 +334,13 @@ function bindTemplateStats(item: InventoryItem, deps: InventoryDeps, stored?: In
     );
   }
   const { weapon: _clientWeapon, armor: _clientArmor, ...bare } = item;
-  return record.category === "weapon"
-    ? { ...bare, baseId, weapon: weaponStatsFrom(base!.weapon)! }
-    : { ...bare, baseId, armor: withoutDrawbacks(armorStatsFrom(base!.armor)!, record) };
+  if (record.category !== "weapon")
+    return { ...bare, baseId, armor: withoutDrawbacks(armorStatsFrom(base!.armor)!, record) };
+  // A form with no weapon leaves the row none; one with its own block swings as that.
+  const form = variantOf(printed, item);
+  if (form?.weapon === null) return { ...bare, baseId };
+  const formed = form?.weapon ? weaponStatsFrom(form.weapon) : undefined;
+  return { ...bare, baseId, weapon: formed ?? withWeaponChanges(weaponStatsFrom(base!.weapon)!, record.weaponChanges) };
 }
 
 type CatalogRecord = NonNullable<ReturnType<NonNullable<InventoryDeps["catalog"]>["equipmentRecord"]>>;
@@ -378,6 +406,29 @@ export function setInventoryItem(
     const { recordId: _same, ...plain } = item;
     item = plain;
   }
+  // A pack added to the sheet is the things it holds, each joining its stack or starting one.
+  const contents = deps.catalog?.equipmentRecord(catalogIdOf(item))?.contents;
+  if (contents && item.quantity > 0 && !actor.inventory.some((entry) => entry.id === item.id))
+    return contents.flatMap((content) => {
+      const record = deps.catalog!.equipmentRecord(content.id);
+      const stack = actor.inventory.find((entry) => entry.id === content.id);
+      const quantity = content.quantity * item.quantity;
+      const row: InventoryItem = stack
+        ? { ...stack, quantity: stack.quantity + quantity }
+        : {
+            id: content.id,
+            name: record?.name ?? content.id,
+            quantity,
+            equipped: false,
+            attuned: false,
+            ...(record ? { category: record.category } : {}),
+            ...(record?.weightLb !== null && record?.weightLb !== undefined ? { weightEach: record.weightLb } : {})
+          };
+      return setInventoryItem(state, actorId, row, resolveDefinition, deps);
+    });
+  // What the item is (a found copy's kind, which the GM says) is read before it binds, since a form can change how it
+  // swings.
+  item = withVariantPick(actor, item, deps);
   // A removal never binds, so a row whose base left the catalog can still be removed.
   if (item.quantity > 0)
     item = bindTemplateItem(
@@ -410,6 +461,30 @@ export function setInventoryItem(
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   enforceCurse(actor, item, deps);
   enforceEquipRules(actor, item, definition, deps);
+  // Armor goes on and comes off on the clock: body armor not at all in a fight, a Shield with the Utilize action.
+  donInFight(
+    state,
+    actor,
+    actor.inventory.find((entry) => entry.id === item.id),
+    item,
+    deps.catalog?.equipmentRecord(catalogIdOf(item))?.slot ?? item.magic?.slot,
+    deps.role
+  );
+  // When attunement may start or end is a player's rule; the GM attunes anyone at any time.
+  if (deps.role === "player") {
+    const refusal = attunementRefusal(
+      state,
+      actor,
+      item,
+      actor.inventory.find((entry) => entry.id === item.id),
+      definition,
+      deps.catalog?.equipmentRecord(catalogIdOf(item))
+    );
+    if (refusal) throw new CommandRejectedError(refusal);
+  }
+  // What a worn item does to Constitution moves the Hit Point maximum; measured before and after the write.
+  const hitPointsBefore = definition ? liveHitPointBonus(actor, definition, deps.catalog) : 0;
+  const before = actor.inventory.find((entry) => entry.id === item.id);
   if (item.quantity <= 0) {
     // The charges a row spent leave with it, so a new copy under the same id starts full.
     const removed = actor.inventory.find((entry) => entry.id === item.id);
@@ -432,11 +507,48 @@ export function setInventoryItem(
     }
   }
   reconcileEquipment(actor, definition, deps);
+  if (definition) moveHitPointMaximum(actor, liveHitPointBonus(actor, definition, deps.catalog) - hitPointsBefore);
   return [
     ...immuneConditionsEnd(actor, definition, deps),
     ...donningEndsMageArmor(state, actor),
-    ...endBindingsOfGoneRows(state, actor)
+    ...endBindingsOfGoneRows(state, actor),
+    ...(before ? endGrantsOfPutAway(state, actor, before, deps) : [])
   ];
+}
+
+/** A Hit Point maximum that a changed Constitution raises or lowers: current Hit Points move with a gain, and stay
+ *  within the maximum after a loss. */
+function moveHitPointMaximum(actor: Actor, change: number): void {
+  if (change === 0) return;
+  const maximum = Math.max(1, actor.hp.maximum + change);
+  const current = change > 0 && actor.hp.current > 0 ? actor.hp.current + change : actor.hp.current;
+  actor.hp = { ...actor.hp, maximum, current: Math.min(maximum, current) };
+}
+
+/**
+ * What a worn item's own action gave its user ends once the item is no longer worn (Cloak of Invisibility: "The effect
+ * ends early if you ... cease wearing the cloak"; a Ring of Invisibility's until "you remove the ring"): taken off,
+ * unattuned or put away. A potion or flask, used up by its use, leaves what it gave, and so does a spell the item cast.
+ */
+function endGrantsOfPutAway(
+  state: GameState,
+  actor: Actor,
+  before: InventoryItem,
+  deps: InventoryDeps
+): EffectNarration[] {
+  const record = rowRecord(deps.catalog, before);
+  if (!record || record.consumedOnUse || !itemIsActive(before, record)) return [];
+  const now = actor.inventory.find((entry) => entry.id === before.id);
+  if (now && itemIsActive(now, rowRecord(deps.catalog, now))) return [];
+  const gone = actor.effects.filter(
+    (effect) =>
+      effect.sourceActorId === actor.id &&
+      effect.spell === undefined &&
+      effect.sourceActionId !== null &&
+      isItemActionId(effect.sourceActionId) &&
+      itemRowOfAction(effect.sourceActionId, [before, ...actor.inventory])?.id === before.id
+  );
+  return gone.flatMap((effect) => endEffect(state, actor.id, effect.id));
 }
 
 /** SRD Immunity: an item that now makes its bearer immune to a condition (a Periapt of Proof against Poison put on)
@@ -478,7 +590,7 @@ function donningEndsMageArmor(state: GameState, actor: Actor): EffectNarration[]
 
 /** The charge pools a row's own actions and casts count in, in the record's order, whether or not the row is worn. */
 function chargeKeysOf(item: InventoryItem, definition: ActorDefinition | undefined, deps: InventoryDeps): string[] {
-  const record = deps.catalog?.equipmentRecord(catalogIdOf(item));
+  const record = rowRecord(deps.catalog, item);
   if (!record) return [];
   const actions = [
     ...record.actions.map((declared) => itemAction(item, declared, definition)),
@@ -487,6 +599,7 @@ function chargeKeysOf(item: InventoryItem, definition: ActorDefinition | undefin
   const keys = actions.flatMap((action) =>
     action.uses && action.uses.per !== "turn" ? [action.uses.pool ?? action.id] : []
   );
+  if (record.uses) keys.push(rowUsesKey(item));
   return keys.filter((key, index) => keys.indexOf(key) === index);
 }
 
@@ -542,6 +655,8 @@ export function giveItem(
   reconcileEquipment(from, fromDefinition, deps);
   reconcileEquipment(to, toDefinition, deps);
   endBindingsOfGoneRows(state, from);
+  // What the item gave its old holder ends as it leaves them.
+  endGrantsOfPutAway(state, from, row, deps);
   return { name: row.name };
 }
 
@@ -553,3 +668,41 @@ export function setCurrency(state: GameState, actorId: string, currency: Currenc
 }
 
 export { itemIsActive };
+
+export type ItemFormChange = Readonly<{ actorId: string; itemId: string; variantId: string | null }>;
+
+/** Its holder puts the item in another form (a Rod of Lordly Might's button, a Quarterstaff of the Acrobat turned into
+ *  a pole), or back in its own with null, spending what the record says it costs. Returns the table's sentence. */
+export function setItemForm(
+  state: GameState,
+  change: ItemFormChange,
+  initiator: Initiator,
+  catalog: EquipmentCatalog,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): string {
+  requireActorAccess(initiator, state, change.actorId, "inventory");
+  const actor = state.actors.find((candidate) => candidate.id === change.actorId);
+  if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  const row = actor.inventory.find((entry) => entry.id === change.itemId && entry.quantity > 0);
+  if (!row) throw new CommandRejectedError("That item isn't carried.");
+  const record = catalog.equipmentRecord(catalogIdOf(row));
+  if (!record?.variants || variantPickedBy(record) !== "holder")
+    throw new CommandRejectedError(`${row.name} has no forms its holder can change.`);
+  if (!row.equipped) throw new CommandRejectedError(`${actor.name} must hold ${row.name} to change its form.`);
+  const variant =
+    change.variantId === null ? null : record.variants.find((candidate) => candidate.id === change.variantId);
+  if (variant === undefined) throw new CommandRejectedError(`${row.name} has no form "${change.variantId}".`);
+  if ((row.variantId ?? null) === (variant?.id ?? null))
+    throw new CommandRejectedError(`${row.name} is already in that form.`);
+  if (record.variantChoice?.activation === "bonus-action")
+    spendBonusAction(state, actor, initiator, `Change the form of ${row.name}`);
+  const { variantId: _old, weapon: _weapon, ...rest } = row;
+  const formed: InventoryItem = variant ? { ...rest, variantId: variant.id } : rest;
+  // The form's weapon block, or none, replaces the row's; the item's own comes back with its own form.
+  const weapon = rowWeaponFor(catalog, record, formed);
+  const next: InventoryItem = weapon ? { ...formed, weapon } : formed;
+  actor.inventory = actor.inventory.map((entry) => (entry.id === row.id ? next : entry));
+  // A form can move the bearer's Armor Class (a Defender's bonus moved to AC).
+  reconcileEquipment(actor, actor.definitionId ? resolveDefinition(actor.definitionId) : undefined, { catalog });
+  return `${actor.name} turns ${row.name} into ${variant ? variant.name : "its own form"}.`;
+}

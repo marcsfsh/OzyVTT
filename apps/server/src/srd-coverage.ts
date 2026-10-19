@@ -93,8 +93,8 @@ type SpellLater = NonNullable<NonNullable<SpellReference["effect"]>["laterAction
 
 /** A later action applies when it deals damage, makes an attack or imposes conditions on a failed save; with a `zone`
  *  the server raises it as creatures enter or start or end a turn in the area (`spell-zones.ts`). An area also applies
- *  when it charges the ground it makes difficult (`zone-ground.ts`), bars or wards (`zone-barriers.ts`), alerts its
- *  caster, or gives the creatures inside what it holds (`zone-auras.ts`). */
+ *  when it charges the ground it makes difficult (`zone-ground.ts`), bars or wards (`zone-barriers.ts`), covers or turns
+ *  shots (`zone-walls.ts`), alerts its caster, or gives the creatures inside what it holds (`zone-auras.ts`). */
 const laterApplies = (later: SpellLater) =>
   later.damage.length > 0 ||
   later.attackRange !== undefined ||
@@ -102,6 +102,8 @@ const laterApplies = (later: SpellLater) =>
   later.save?.speedZero === true ||
   later.zone?.terrain !== undefined ||
   later.zone?.bars !== undefined ||
+  later.zone?.cover !== undefined ||
+  later.zone?.deflects === true ||
   later.zone?.wardsSpells !== undefined ||
   later.zone?.alerts === true ||
   later.zone?.holds !== undefined;
@@ -140,8 +142,10 @@ export function spellState(spell: SpellReference): CoverageState {
       spell.save.failurePush !== undefined);
   // The light it sheds or the fog or Darkness it fills, which dynamic vision reads.
   const sight = spell.sight;
+  // The walls it raises, cuts or destroys and the doors it opens or locks on the map (`spell-walls.ts`).
   return applies ||
     saveApplies ||
+    spell.walls !== undefined ||
     sight?.light !== undefined ||
     sight?.area !== undefined ||
     sight?.dispels !== undefined
@@ -342,6 +346,7 @@ export function featureState(feature: FeatureRecord): CoverageState {
 export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<string, CoverageState>): CoverageState {
   // A magic weapon or armor with no rider of its own is only its base, so its magic is the GM's.
   const base = (item.weapon ?? null) !== null || (item.armor ?? null) !== null;
+  const kinds = (item.variants ?? []).map((kind) => ({ ...kind, uses: undefined, tags: [] }));
   const applies =
     (base && !item.isMagic) ||
     item.grantsFeatIds.length > 0 ||
@@ -352,9 +357,20 @@ export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<str
     (item.onHit?.length ?? 0) > 0 ||
     // Its light, which dynamic vision reads while it is lit.
     item.light !== undefined ||
-    ridersApply(item);
-  if (applies) return unreadModifier(item) ? "guided" : "enforced";
-  const casts = item.casts.map((cast) => spellStates.get(cast.spellId) ?? "reference");
+    item.weaponChanges !== undefined ||
+    item.bonusActionAttack === true ||
+    item.magicSaveAura !== undefined ||
+    ridersApply(item) ||
+    // A kind or form that carries riders of its own (an Ioun Stone's, a Rod of Lordly Might's battleaxe).
+    kinds.some((kind) => ridersApply(kind) || kind.weapon !== undefined || (kind.onHit?.length ?? 0) > 0);
+  // An item that casts is no more than the weakest of its casts: a cast the GM runs leaves the item in part theirs.
+  const casts = [...item.casts, ...kinds.flatMap((kind) => kind.casts)].map(
+    (cast) => spellStates.get(cast.spellId) ?? "reference"
+  );
+  if (applies) {
+    const own: CoverageState = unreadModifier(item) || kinds.some(unreadModifier) ? "guided" : "enforced";
+    return casts.length === 0 ? own : least([own, most([least(casts), "guided"])]);
+  }
   // A tool's checks roll with the ability its entry names and the sheet's proficiency; the GM sets what they do.
   const tool = item.category === "tool" && toolAbility(item.description) !== null;
   const tracked =
@@ -366,7 +382,7 @@ export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<str
     item.cursed ||
     item.uses !== undefined ||
     item.actions.length > 0;
-  return most([...casts, tracked ? "guided" : "reference"]);
+  return most([...(casts.length > 0 ? [least(casts)] : []), tracked ? "guided" : "reference"]);
 }
 
 /** A monster trait's kind: its name without the uses or lair suffix ("Legendary Resistance (3/Day)"). */
@@ -506,7 +522,8 @@ const CLASSIFICATION = [
   "- **Spells:** a cast resolves in `action-resolution.ts` and the steps in `resolution/`, at the caster's own",
   "  numbers. A spell is enforced when its cast applies its attack, save, damage, healing or lasting effect, ends",
   "  spells or curses (`resolution/dispel.ts`), or when the area it leaves applies them as creatures enter it or",
-  "  start or end a turn there (`spell-zones.ts`).",
+  "  start or end a turn there (`spell-zones.ts`), or when it raises, cuts or breaks the map's walls or works its",
+  "  doors (`spell-walls.ts`).",
   "  Guided when the app spends the slot and holds the Concentration, the area or a save while a person applies",
   "  what the spell does. A spell whose cast leaves a rider to the table (Storm of Vengeance's later turns) is",
   "  curated as guided, with a note.",

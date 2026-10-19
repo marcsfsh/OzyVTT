@@ -13,12 +13,16 @@ afterEach(async () => {
 });
 
 /** The summoning table with the Wizard carrying these items, equipped and attuned. */
+/** The caster carrying these items; "id#kind" is a copy the GM says is that kind (an Elemental Gem's red corundum). */
 async function carrying(...ids: string[]) {
   const state = summonTable();
   const caster = state.actors.find((actor) => actor.id === CASTER)!;
   caster.inventory = [
     ...caster.inventory,
-    ...ids.map((id): InventoryItem => catalogRow(id, { attuned: true, equipped: true }))
+    ...ids.map((entry): InventoryItem => {
+      const [id, variantId] = entry.split("#") as [string, string | undefined];
+      return catalogRow(id, { attuned: true, equipped: true, ...(variantId ? { variantId } : {}) });
+    })
   ];
   return bootSummons(cleanups, state);
 }
@@ -44,7 +48,7 @@ describe("Bowl of Commanding Water Elementals and its kin", () => {
   });
 
   it("an Elemental Gem is used up as its elemental comes", async () => {
-    const table = await carrying("elemental-gem");
+    const table = await carrying("elemental-gem#red-corundum");
     const used = await table.resolve({ actionId: "item-elemental-gem-break-red-corundum" });
     expect(used.status, await used.clone().text()).toBe(200);
     expect(table.named("Fire Elemental")).toHaveLength(1);
@@ -54,7 +58,7 @@ describe("Bowl of Commanding Water Elementals and its kin", () => {
 
 describe("Bag of Tricks", () => {
   it("rolls the d8 on the bag's table for a creature that stays until its user's Long Rest", async () => {
-    const table = await carrying("bag-of-tricks");
+    const table = await carrying("bag-of-tricks#gray");
     const used = await table.resolve({ actionId: "item-bag-of-tricks-pull-gray" });
     expect(used.status, await used.clone().text()).toBe(200);
     const gray = ["Weasel", "Giant Rat", "Badger", "Boar", "Panther", "Giant Badger", "Dire Wolf", "Giant Elk"];
@@ -71,7 +75,7 @@ describe("Bag of Tricks", () => {
 
 describe("Horn of Valhalla", () => {
   it("the silver horn's two Berserkers obey its user", async () => {
-    const table = await carrying("horn-of-valhalla");
+    const table = await carrying("horn-of-valhalla#silver");
     const silver = await table.resolve({ actionId: "item-horn-of-valhalla-blow-silver" });
     expect(silver.status, await silver.clone().text()).toBe(200);
     const friendly = table.named("Berserker");
@@ -82,7 +86,7 @@ describe("Horn of Valhalla", () => {
   });
 
   it("the iron horn's five Berserkers attack a user without Martial weapons", async () => {
-    const table = await carrying("horn-of-valhalla");
+    const table = await carrying("horn-of-valhalla#iron");
     const iron = await table.resolve({ actionId: "item-horn-of-valhalla-blow-iron" });
     expect(iron.status, await iron.clone().text()).toBe(200);
     const hostile = table.named("Berserker").filter((berserker) => berserker.control === undefined);
@@ -118,7 +122,7 @@ describe("Efreeti Bottle, Figurines and the Staff of the Python", () => {
   });
 
   it("an Ivory Goat becomes the goat picked, for 3 hours", async () => {
-    const table = await carrying("figurine-of-wondrous-power");
+    const table = await carrying("figurine-of-wondrous-power#ivory-goats");
     const used = await table.resolve({
       actionId: "item-figurine-of-wondrous-power-ivory-goats",
       summon: { picks: [{ monsterId: "giant-goat", form: "travail" }] }

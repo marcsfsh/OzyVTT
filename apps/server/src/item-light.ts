@@ -4,6 +4,7 @@ import { GameAccessDeniedError, requireActorAccess, type Initiator } from "./aut
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import { effectiveModeFor, overrideCovers } from "./rules-families.js";
+import { rowRecord } from "./item-records.js";
 
 /**
  * Light sources in hand (SRD Adventuring Gear: Candle, Lamp, Lanterns, Torch, Tinderbox, Oil; and magic items that
@@ -64,7 +65,7 @@ const hasFlame = (actor: Actor, itemId: string) =>
   );
 
 /** Spends the creature's Bonus Action when it is its turn in the fight; a player may not do this off its turn. */
-function spendBonusAction(state: GameState, actor: Actor, initiator: Initiator, what: string): void {
+export function spendBonusAction(state: GameState, actor: Actor, initiator: Initiator, what: string): void {
   const combat = state.combat;
   if (!combat.active || !combat.initiative.some((entry) => entry.actorId === actor.id)) return;
   if (combat.turnActorId !== actor.id) {
@@ -93,7 +94,7 @@ export function setItemLight(
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   const row = actor.inventory.find((entry) => entry.id === change.itemId && entry.quantity > 0);
   if (!row) throw new CommandRejectedError("That item isn't carried.");
-  const light = catalog.equipmentRecord(catalogIdOf(row))?.light;
+  const light = rowRecord(catalog, row)?.light;
   if (!light) throw new CommandRejectedError(`${row.name} sheds no light.`);
   const now = state.rest.clockHours;
   let next: InventoryItem = { ...row };
@@ -153,7 +154,7 @@ export function burnOutLights(state: GameState, catalog: EquipmentCatalog | unde
       continue;
     actor.inventory = actor.inventory.flatMap((row) => {
       if (row.lit !== true || row.burnsOutAtHour === undefined || row.burnsOutAtHour > now) return [row];
-      const light = catalog?.equipmentRecord(catalogIdOf(row))?.light;
+      const light = rowRecord(catalog, row)?.light;
       const { lit: _lit, burnsOutAtHour: _burns, burnHoursLeft: _left, ...rest } = row;
       if (light?.fuel) {
         lines.push(`${row.name} carried by ${actor.name} burns out its Oil.`);

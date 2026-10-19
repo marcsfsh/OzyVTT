@@ -401,17 +401,16 @@ export const FeatureGrantsSchema = FeatureGrantsFieldsSchema.superRefine((grants
 );
 
 /**
- * Rider types an item may not carry: they are baked into the sheet and cannot be reversed on unequip
- * (`hp.maximum` with current HP tracked against it; ability scores feeding everything). Feats and
- * features may use them.
+ * Rider types an item may not carry: hit points per level are baked into the sheet and can't be reversed on unequip
+ * (`hp.maximum` with current HP tracked against it), and the attunement limit would decide the item's own attunement.
+ * Feats and features may use them. An item's ability score is read live while it is worn.
  */
 export const ITEM_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze([
   "hit-points-per-level",
-  "ability-score",
   "attunement-slots"
 ]);
 export const ITEM_REFUSED_MODIFIER_MESSAGE =
-  "An item cannot change hit points, an ability score or the attunement limit. Those are baked into the sheet or decide the item's own attunement, and cannot be un-granted when the item comes off. Use a specific bonus instead: armor-class, save-bonus, check-bonus, or spell-save-dc. (All three stay available on a feat.)";
+  "An item can't change hit points per level or the attunement limit: the first is baked into the sheet and can't be un-granted when the item comes off, and the second decides the item's own attunement. Both stay available on a feat.";
 
 /** The rider fields shared by `FeatureRecord`, `FeatureOption` and magic items (spread into `EquipmentReferenceSchema`). */
 export const featureRiders = {

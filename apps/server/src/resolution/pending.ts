@@ -29,6 +29,7 @@ import { effectNameOf } from "../effect-names.js";
 import { fatalFailureOf } from "../fatal-saves.js";
 import { sightRules } from "../vision/rules.js";
 import { sceneSight } from "../vision/sight.js";
+import { objectFrom } from "../objects.js";
 import { areAllies } from "../creature-sides.js";
 import { chosenEffectOption } from "./effect-options.js";
 import { failureFormOf } from "./shape-shift.js";
@@ -411,6 +412,7 @@ export function failureEffectFor(
     ...(castId !== null ? { castId } : {}),
     ...(cast ? { spell: { id: cast.spell.id, level: cast.level } } : {}),
     ...(isMagicalAction(ctx) ? { magical: true as const } : {}),
+    ...(save.heldBy ? { heldBy: objectFrom(save.heldBy) } : {}),
     sourceActionId: action.id
   };
 }
@@ -637,6 +639,7 @@ export function parkActionSave(ctx: ResolveContext): void {
             bestCover(
               coverFor(null, target),
               input.areaPlaced === true ? null : mapCover(state, attacker.id, target.id),
+              input.areaPlaced === true ? null : deps.zoneCover?.(attacker.id, target.id),
               deps.resolveDefinition
                 ? smiteOfProtectionCover(state, target, {
                     resolveDefinition: deps.resolveDefinition,

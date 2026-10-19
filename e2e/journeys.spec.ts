@@ -559,6 +559,39 @@ test("the GM paints darkness over part of the live map, and bright light that is
   await expectPageFits(gm);
 });
 
+test("the GM draws a door on the live map and locks it from the door's menu", async ({ open, request, hasTouch }) => {
+  await ensureGmPassword(request);
+  const gm = await open("/");
+  await signInAsGm(gm);
+  await liveSceneOnNewMap(gm, "Smoke vault.png", battleMap(700, 532));
+
+  const rail = gm.getByRole("toolbar", { name: "Map tools" });
+  await press(rail.getByRole("button", { name: "Walls" }));
+  await press(gm.getByRole("group", { name: "Walls" }).getByRole("button", { name: "Door" }));
+  await gm.keyboard.press("Escape");
+  const map = gm.getByRole("group", { name: /Interactive tokens are layered above this map/ });
+  await drag(gm, map, { x: 0, y: 70 });
+  const handle = gm.locator("[data-door-id]");
+  await expect(handle).toHaveCount(1);
+
+  // With Select, the handle opens the door's menu. The handle is a map mark, so its size follows the zoom.
+  await press(rail.getByRole("button", { name: "Select" }));
+  if (hasTouch) await handle.tap();
+  else await handle.click();
+  const menu = gm.getByRole("menu", { name: "Door" });
+  await expect(menu.getByRole("menuitem", { name: "Open the door" })).toBeVisible();
+  await expectPageFits(gm);
+  await press(menu.getByRole("menuitem", { name: "Edit lock and strength" }));
+  await press(menu.getByRole("switch", { name: "Locked" }));
+  await expectPageFits(gm);
+  await press(menu.getByRole("button", { name: "Save door" }));
+  await expect(menu).toBeHidden();
+  // The GM sees the door held shut and its hit points; players get neither.
+  await expect(gm.locator("[data-door-id] .vision-door-lock")).toHaveCount(1);
+  await expect(gm.locator(".vision-object-hp")).toHaveText("18/18 HP");
+  await expectPageFits(gm);
+});
+
 test("the GM presents a map on a paired table screen", async ({ open, request }) => {
   // Start from a paused presentation of an uploaded map, whichever journeys ran before this one.
   await ensureGmPassword(request);

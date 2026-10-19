@@ -483,7 +483,7 @@ describe("a swarm", () => {
     );
     expect(actor(built, IDS.monster).hp.current).toBe(before);
     expect(healed.tableNarration?.map((line) => line.text)).toContain(
-      "Swarm of Rats is a swarm and can't regain Hit Points or gain Temporary Hit Points."
+      "Swarm of Rats is a swarm and can't regain hit points or gain Temporary Hit Points."
     );
   });
 });

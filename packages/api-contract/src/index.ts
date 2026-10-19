@@ -388,12 +388,18 @@ export const GAME_PATHS = {
   wallById: `${API_NAMESPACE}/game/walls/{wallId}`,
   wallMove: `${API_NAMESPACE}/game/walls/{wallId}/move`,
   doorOpen: `${API_NAMESPACE}/game/doors/{wallId}/open`,
+  doorState: `${API_NAMESPACE}/game/doors/{wallId}/state`,
+  doorUse: `${API_NAMESPACE}/game/doors/{wallId}/use`,
+  wallObject: `${API_NAMESPACE}/game/walls/{wallId}/object`,
+  objectDamage: `${API_NAMESPACE}/game/objects/damage`,
+  objectAttack: `${API_NAMESPACE}/game/objects/attack`,
   lights: `${API_NAMESPACE}/game/lights`,
   lightById: `${API_NAMESPACE}/game/lights/{lightId}`,
   lightMove: `${API_NAMESPACE}/game/lights/{lightId}/move`,
   visionAreas: `${API_NAMESPACE}/game/vision/areas`,
   visionAreaById: `${API_NAMESPACE}/game/vision/areas/{areaId}`,
-  itemLight: `${API_NAMESPACE}/game/actors/{actorId}/items/{itemId}/light`
+  itemLight: `${API_NAMESPACE}/game/actors/{actorId}/items/{itemId}/light`,
+  itemForm: `${API_NAMESPACE}/game/actors/{actorId}/items/{itemId}/form`
 } as const;
 
 /** Session issuance for headless/alternate player clients: the HTTP mirror of the socket's open join. */
@@ -818,13 +824,20 @@ export const GAME_COMMANDS = {
   "wall.clear": { scope: "scene:write", method: "post", path: GAME_PATHS.wallsClear },
   // Players open doors beside their own character, so it is a combat command.
   "door.set-open": { scope: "combat:write", method: "post", path: GAME_PATHS.doorOpen },
+  "door.set-state": { scope: "scene:write", method: "post", path: GAME_PATHS.doorState },
+  // Players pick, force and jam doors beside their own character, and attack objects with it.
+  "door.use": { scope: "combat:write", method: "post", path: GAME_PATHS.doorUse },
+  "object.set": { scope: "scene:write", method: "post", path: GAME_PATHS.wallObject },
+  "object.damage": { scope: "combat:write", method: "post", path: GAME_PATHS.objectDamage },
+  "object.attack": { scope: "combat:write", method: "post", path: GAME_PATHS.objectAttack },
   "light.add": { scope: "scene:write", method: "post", path: GAME_PATHS.lights },
   "light.move": { scope: "scene:write", method: "post", path: GAME_PATHS.lightMove },
   "light.remove": { scope: "scene:write", method: "delete", path: GAME_PATHS.lightById },
   "vision.add-area": { scope: "scene:write", method: "post", path: GAME_PATHS.visionAreas },
   "vision.remove-area": { scope: "scene:write", method: "delete", path: GAME_PATHS.visionAreaById },
   // A player lights a Torch in their own character's hand, so it is a combat command.
-  "item.set-light": { scope: "combat:write", method: "post", path: GAME_PATHS.itemLight }
+  "item.set-light": { scope: "combat:write", method: "post", path: GAME_PATHS.itemLight },
+  "item.set-form": { scope: "combat:write", method: "post", path: GAME_PATHS.itemForm }
 } as const satisfies Record<
   string,
   Readonly<{ scope: z.infer<typeof IntegrationScopeSchema>; method: "post" | "delete"; path: string }>

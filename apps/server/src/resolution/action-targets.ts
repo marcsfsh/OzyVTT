@@ -66,11 +66,15 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
   const rules = action.targets;
   if (!rules) return violations;
   const sight = rules.seen ? sceneSight(state, resolveDefinition ? { definition: resolveDefinition } : {}) : null;
+  // Taken move first, it reaches only the creatures its move entered; taken where it stands, the GM picks them.
+  const entered = rules.entered ? enteredOnMoveOf(attacker, action.id) : null;
   for (const target of targets) {
     const name = nameOf(target);
     const self = target.id === attacker.id;
     if (rules.who === "others" && self)
       violations.push({ rule: "target.not-allowed", message: `${action.name} can't target ${attacker.name}.` });
+    if (rules.who === "self" && !self)
+      violations.push({ rule: "target.not-allowed", message: `${action.name} can target only ${attacker.name}.` });
     if (rules.who === "enemies" && (self || !areEnemies(attacker, target, resolveDefinition)))
       violations.push({
         rule: "target.not-an-enemy",
@@ -120,7 +124,7 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
         rule: "target.not-allowed",
         message: `${action.name} targets a ${rules.typeTag}, and ${name} isn't one.`
       });
-    if (rules.entered && !(enteredOnMoveOf(attacker, action.id) ?? []).includes(target.id))
+    if (entered !== null && !entered.includes(target.id))
       violations.push({
         rule: "target.not-allowed",
         message: `${action.name} targets the creatures whose spaces ${attacker.name} entered on its move, and ${name} isn't one.`

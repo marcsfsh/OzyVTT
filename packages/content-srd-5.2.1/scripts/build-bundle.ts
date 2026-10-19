@@ -34,6 +34,7 @@ import {
 import { outDir, sourcePath } from "./paths.js";
 import {
   failureDurationOf,
+  heldByFromTraits,
   hitPointLossOf,
   SPELL_SAVE_OVERRIDE_IDS,
   spellSaveOutcomeFor,
@@ -45,6 +46,7 @@ import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
 import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } from "./spell-effects.js";
 import { costlyMaterialsFor } from "./spell-materials.js";
 import { spellSightFor } from "./spell-sight.js";
+import { spellWallsFor } from "./spell-walls.js";
 import { spellDeathFor, spellDeathSaveFor } from "./spell-death.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { UPCAST_DURATION_IDS, upcastDurationsFor } from "./spell-durations.js";
@@ -265,6 +267,15 @@ for (const trait of traits) {
   const list = traitsByCreature.get(trait.fields.parent) ?? [];
   list.push(trait);
   traitsByCreature.set(trait.fields.parent, list);
+}
+
+/** What a creature's trait says holds the creature its action restrains (the erinyes' Magic Rope). */
+function heldByFromTraitsOf(creaturePk: string, description: string) {
+  const held = heldByFromTraits(
+    description,
+    (traitsByCreature.get(creaturePk) ?? []).map((trait) => trait.fields.desc)
+  );
+  return held ? { heldBy: held } : {};
 }
 
 const slugOf = (pk: string) => pk.replace(/^srd-2024_/, "");
@@ -1405,6 +1416,9 @@ const monsters: ActorDefinition[] = creatures
                 ability: ABILITY_BY_NAME[save[1] as keyof typeof ABILITY_BY_NAME],
                 dc: Number.parseInt(save[2], 10),
                 ...saveOutcome!,
+                ...(saveOutcome?.heldBy === undefined && saveOutcome?.failureConditions.includes("restrained")
+                  ? heldByFromTraitsOf(creature.pk, action.fields.desc)
+                  : {}),
                 ...(loss
                   ? {
                       failureEffect: loss.failureEffect,
@@ -1764,6 +1778,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
     area: spellAreaFor(slugOf(spell.pk), fields.desc),
     effect,
     ...(spellSightFor(slugOf(spell.pk)) ? { sight: spellSightFor(slugOf(spell.pk)) } : {}),
+    ...(spellWallsFor(slugOf(spell.pk)) ? { walls: spellWallsFor(slugOf(spell.pk)) } : {}),
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
     higherLevel: fields.higher_level || null,

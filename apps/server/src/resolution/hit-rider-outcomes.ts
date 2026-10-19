@@ -102,8 +102,9 @@ export type RiderSave = Readonly<{
   failureEffect?: NonNullable<DefinitionAction["save"]>["failureEffect"];
   successEffect?: NonNullable<DefinitionAction["save"]>["successEffect"];
   failurePush?: ForcedPush;
-  /** Damage a failure deals, none on a success (Hurl Through Hell's 8d10 Psychic). */
+  /** Damage a failure deals, none on a success (Hurl Through Hell's 8d10 Psychic), or half with `halfOnSuccess`. */
   failureDamage?: ReadonlyArray<Readonly<{ amount: number; type: string }>>;
+  halfOnSuccess?: true;
 }>;
 
 /** Opens the save on the target as its own prompt, sourced by the attacker: what a failure and a success leave are
@@ -115,7 +116,7 @@ export function openRiderSave(ctx: ResolveContext, target: LiveActor, action: De
     save: {
       ability: save.ability,
       dc: save.dc,
-      successDamage: "none",
+      successDamage: save.halfOnSuccess ? "half" : "none",
       failureConditions: [...(save.failureConditions as NonNullable<DefinitionAction["save"]>["failureConditions"])],
       ...(save.failureDuration ? { failureDuration: save.failureDuration } : {}),
       ...(save.repeatSave ? { repeatSave: true as const } : {}),
@@ -143,7 +144,7 @@ export function openRiderSave(ctx: ResolveContext, target: LiveActor, action: De
     targetIds: [target.id],
     proposedDamage: parts.reduce((sum, part) => sum + part.amount, 0),
     proposedDamageParts: parts,
-    halfOnSuccess: false,
+    halfOnSuccess: save.halfOnSuccess === true,
     conditionIds: [...save.failureConditions],
     ...(onFailEffect ? { onFailEffect } : {}),
     ...(onSuccessEffect ? { extra: { onSuccessEffect } } : {}),

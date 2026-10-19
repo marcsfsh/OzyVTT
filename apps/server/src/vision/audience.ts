@@ -14,7 +14,8 @@ import {
   type ExploredGrid
 } from "./explored.js";
 import type { SightContent } from "./senses.js";
-import { sceneSight, sightIsCached } from "./sight.js";
+import { derivedUuid } from "./cast-sight.js";
+import { sceneSight, sightIsCached, wallPieces } from "./sight.js";
 
 /**
  * What each audience may know of the creatures on the map (ADR-0023): a player sees through their own characters, the
@@ -322,15 +323,21 @@ export function visionOf(state: GameState, viewerIds: readonly string[], content
       isMarked(grid, now, point) || (memory ? isMarked(grid, memory.bytes, point) : false);
     const walls: PlayerVisionWall[] = [];
     for (const wall of state.combat.vision.walls) {
-      const samples = wallSamples(wall.a, wall.b, grid.cellPx);
-      if (!samples.some(known)) continue;
-      const inSight = wall.kind === "door" && samples.some((point) => isMarked(grid, now, point));
-      walls.push({
-        id: wall.id,
-        kind: wall.kind,
-        a: { ...wall.a },
-        b: { ...wall.b },
-        ...(inSight ? { open: wall.open === true } : {})
+      // A secret door is wall to players until the GM reveals it; a gap cut in a wall shows as the parts that stand.
+      const secret = wall.kind === "door" && wall.door?.hidden === true;
+      const pieces = wallPieces(wall);
+      pieces.forEach((piece, index) => {
+        const samples = wallSamples(piece.a, piece.b, grid.cellPx);
+        if (!samples.some(known)) return;
+        const door = wall.kind === "door" && !secret;
+        const inSight = door && samples.some((point) => isMarked(grid, now, point));
+        walls.push({
+          id: index === 0 ? wall.id : derivedUuid(wall.id, `piece-${index}`),
+          kind: secret ? "wall" : wall.kind,
+          a: { ...piece.a },
+          b: { ...piece.b },
+          ...(inSight ? { open: wall.open === true } : {})
+        });
       });
     }
     // Where in sight the light is bright, so the rest can be painted dim; none when the whole scene is bright.

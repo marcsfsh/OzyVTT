@@ -1,5 +1,6 @@
 import {
   DoorSetOpenSchema,
+  ItemSetFormSchema,
   ItemSetLightSchema,
   VisionAreaAddSchema,
   VisionAreaRemoveSchema,
@@ -17,6 +18,7 @@ import {
 import { GameAccessDeniedError } from "../authorization.js";
 import { CommandRejectedError } from "../game-store.js";
 import { setItemLight } from "../item-light.js";
+import { setItemForm } from "../inventory.js";
 import {
   addLight,
   addVisionArea,
@@ -34,6 +36,7 @@ import {
   setVisionEnabled
 } from "../vision/edit.js";
 import { playerViewerIds } from "../vision/audience.js";
+import { heldShutAgainst, isHiddenDoor } from "../doors.js";
 import { initiatorOf, isGmGrade, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -165,6 +168,32 @@ export const visionCommands = [
   }),
 
   defineCommand({
+    type: "item.set-form",
+    operationId: "setItemForm",
+    description:
+      "Puts a carried item in one of the forms its holder chooses (a Rod of Lordly Might's flame blade, a Quarterstaff of the Acrobat's pole), or back in its own form with a null `variantId`. The item must be held (equipped), and a form the item says takes a Bonus Action takes the creature's Bonus Action on its turn in a fight. The kinds the GM says a found item is (an Ioun Stone's) are set with character.set-inventory instead. GM-grade for any creature; a player session for their own claimed character.",
+    summary: "Change the form of a carried item.",
+    schema: ItemSetFormSchema,
+    malformed: "The item form command is malformed.",
+    issueMessage: true,
+    async run({ principal, request, execute }, kit) {
+      const { actorId, itemId, variantId } = request;
+      let said = "";
+      const { duplicate } = await execute((state) => {
+        said = setItemForm(
+          state,
+          { actorId, itemId, variantId },
+          initiatorOf(principal),
+          kit.equipmentCatalog(),
+          (id) => kit.resolveDefinitionIn(state, id)
+        );
+      });
+      if (!duplicate)
+        kit.context.appendLog({ kind: "action", text: said, actorIds: [actorId], gmOnly: kit.actorHidden(actorId) });
+    }
+  }),
+
+  defineCommand({
     type: "vision.reset-explored",
     operationId: "resetVisionExplored",
     description:
@@ -256,11 +285,19 @@ export const visionCommands = [
       const { duplicate } = await execute((state) => {
         if (player) {
           const mine = playerViewerIds(state, player.sessionId);
-          // Out of reach and unknown look the same, so a door the player hasn't found isn't confirmed.
-          const reachable = mine.find((actorId) => doorWithinReach(state, wallId, [actorId]));
-          if (reachable === undefined)
+          const door = state.combat.vision.walls.find((wall) => wall.id === wallId);
+          // Out of reach, unknown and secret look the same, so a door the player hasn't found isn't confirmed.
+          const reachable =
+            door && !isHiddenDoor(door) ? mine.filter((actorId) => doorWithinReach(state, wallId, [actorId])) : [];
+          if (reachable.length === 0)
             throw new GameAccessDeniedError("Move your character next to the door to open or close it.");
-          opener = reachable;
+          // A locked, stuck, barred or jammed door opens only for a creature it doesn't hold shut against: one with
+          // the key, or one an Arcane Lock names.
+          const free = open
+            ? reachable.find((actorId) => heldShutAgainst(state, door!, actorId) === null)
+            : reachable[0];
+          if (free === undefined) throw new CommandRejectedError(heldShutAgainst(state, door!, reachable[0]!)!);
+          opener = free;
         }
         setDoorOpen(state, sceneId, wallId, open);
       });

@@ -24,8 +24,10 @@ import {
   DamageFormulaSchema,
   DamageTypeSchema,
   DispelSchema,
+  EffectGrantSchema,
   HealingFormulaSchema,
   ItemSlotSchema,
+  ObjectPrintSchema,
   OnHitRiderSchema,
   SaveFailureEffectSchema,
   SaveOutcomeFields,
@@ -38,9 +40,12 @@ import {
   ContentIdSchema,
   ContentSourceSchema,
   FeatReferenceSchema,
+  FeatureActionSchema,
+  FeatureGrantsSchema,
   FeatureUsesSchema,
   ITEM_REFUSED_MODIFIER_MESSAGE,
   ITEM_REFUSED_MODIFIER_TYPES,
+  ModifierSchema,
   SpeciesReferenceSchema,
   SpellListReferenceSchema,
   SubclassReferenceSchema,
@@ -83,6 +88,43 @@ const SpellDamageSchema = z
 /** Where and when the area a spell leaves acts (`AreaTriggerSchema`, shared with the actions of items and creatures). */
 export const SpellZoneSchema = AreaTriggerSchema;
 export type SpellZone = AreaTrigger;
+
+/**
+ * What a spell does to the map's walls and doors (SRD 5.2.1 Wall of Force, Wall of Stone, Knock, Passwall), which the
+ * server applies on the live map (`apps/server/src/spell-walls.ts`). `raises`: the walls its placed area raises while
+ * it lasts: along a Line's far side, round a circle's edge or a Cube's sides, as `wall` (sight, light and movement:
+ * Wall of Stone), `window` (movement, and the lines an attack or an area needs: Wall of Force's Invisible force) or
+ * `bars` (movement alone: Forcecage's cage). `door`: what its cast does to the door it is aimed at. `cuts`: the gap it
+ * opens in the wall it is aimed at, for its duration (Passwall) or for good (Stone Shape). `disintegrates`: it destroys
+ * the object or creation of force it is aimed at (Disintegrate).
+ */
+export const SpellWallsSchema = z
+  .object({
+    raises: z
+      .object({
+        kind: z.enum(["wall", "window", "bars"]),
+        /** Each panel's length in feet, each its own object (Wall of Ice's 10-foot sections). */
+        panelFeet: z.number().int().min(5).max(100).optional(),
+        /** Each panel's statistics as an object; absent, nothing but what names it (Disintegrate) breaks it. */
+        panel: ObjectPrintSchema.optional(),
+        /** A creature whose space it cuts is pushed to one side. */
+        pushes: z.literal(true).optional(),
+        /** It stays for good once its caster's Concentration lasts the spell's full duration (Wall of Stone). */
+        permanentAfterFull: z.literal(true).optional(),
+        /** A creation of magical force, which Disintegrate destroys whole (Wall of Force). */
+        force: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    door: z.enum(["knock", "arcane-lock", "open-or-close", "close", "seal"]).optional(),
+    cuts: z
+      .object({ feet: z.number().int().min(1).max(20), lasting: z.boolean() })
+      .strict()
+      .optional(),
+    disintegrates: z.literal(true).optional()
+  })
+  .strict();
+export type SpellWalls = z.infer<typeof SpellWallsSchema>;
 
 /** Something a spell lets its caster do after the cast, as an action of its own: Produce Flame's hurl, Spiritual
  *  Weapon's later attacks, or the save a creature makes when it enters Spirit Guardians (`activation` "other": no
@@ -415,6 +457,8 @@ export const SpellReferenceSchema = z
     /** What the spell does to light and sight while it lasts (Light, Darkness, Fog Cloud, Daylight), which dynamic
      *  vision reads. */
     sight: SightEffectSchema.optional(),
+    /** What the spell does to the map's walls and doors (Wall of Force, Knock, Passwall). */
+    walls: SpellWallsSchema.optional(),
     classes: z
       .array(z.string())
       .describe(
@@ -588,7 +632,24 @@ export const ItemSpellCastSchema = z
      *  Web filling twice its area). */
     area: ActionAreaSchema.optional().describe(
       "The area the item's cast covers in place of the spell's own (a wand's 60-foot Cone of Fear), placed as the template"
-    )
+    ),
+    /** A flat printed attack bonus for the cast's spell attacks ("with a +5 bonus to hit", Circlet of Blasting). */
+    attackBonus: z
+      .number()
+      .int()
+      .min(-5)
+      .max(20)
+      .optional()
+      .describe(
+        "A flat printed attack bonus for the cast's spell attacks (Circlet of Blasting's +5). It overrides any derivation"
+      ),
+    /** It is cast as this, whatever the spell's casting time says (a Necklace of Prayer Beads' bead: a Bonus Action). */
+    activation: z
+      .enum(["action", "bonus-action"])
+      .optional()
+      .describe(
+        "What casting it from the item takes, where the item says so in place of the spell's casting time (a prayer bead: a Bonus Action)"
+      )
   })
   .strict()
   .describe(
@@ -636,7 +697,7 @@ export const ItemChargesSchema = z
   .strict();
 export type ItemCharges = z.infer<typeof ItemChargesSchema>;
 
-/** Attunement. `restrictedTo` is advisory: shown on the sheet, never enforced. */
+/** Attunement, and who may attune: a player attunes only a creature that meets one of `restrictedTo`. */
 export const ItemAttunementSchema = z
   .object({
     required: z.boolean().default(false),
@@ -644,11 +705,13 @@ export const ItemAttunementSchema = z
       .array(ContentIdSchema)
       .max(8)
       .default([])
-      .describe("Class or species ids the item is meant for. Advisory only")
+      .describe(
+        "Who may attune, any one of: a class id, a species id, spellcaster, or creature-attuned-to-a-<item id>. Empty: anyone"
+      )
   })
   .strict()
   .describe(
-    'Attunement. `restrictedTo` matches class ids or a species id and is advisory: shown on the sheet ("Requires attunement by a cleric"), never a block: it is an open slug set, blocking on a fuzzy match would be wrong, and a GM handing a player a restricted item on purpose is a normal table event, with nothing to refuse.'
+    'Attunement. `restrictedTo` is the printed prerequisite ("Requires Attunement by a Cleric or Paladin"), any one of which lets a creature attune: a class it has a level in, its species or lineage id, `spellcaster` (a sheet with spellcasting), or `creature-attuned-to-a-<item id>` (attuned to that item). The sheet shows it beside the Attune control, and a player\'s attune is refused when the character meets none. The GM may attune anyone, so handing a restricted item over on purpose still works.'
   );
 export type ItemAttunement = z.infer<typeof ItemAttunementSchema>;
 
@@ -742,6 +805,85 @@ const ItemLightSchema = z
     "The light the item sheds while it is lit and equipped: Bright Light out to `brightFeet` and Dim Light for `dimFeet` more, a Cone with `cone`, less with its hood down (`hooded`), sunlight with `sunlight`, and revealing Invisible creatures in its Bright Light with `revealsInvisible`. `burnHours` is how long it burns once lit, spending a `fuel` item when it names one. With `always` it shines whenever it is held, and with `ridersWhileLit` its other riders apply only while it is lit."
   );
 export type ItemLight = z.infer<typeof ItemLightSchema>;
+
+/**
+ * One kind of an item whose record covers several (an Ioun Stone's fourteen stones, a Belt of Giant Strength's six
+ * giants), or one form its holder can put it in (a Rod of Lordly Might's buttons). Its riders join the record's while a
+ * carried copy is that kind (`InventoryItem.variantId`); a `weapon` block is how the copy swings in that form, and
+ * null leaves it no weapon there.
+ */
+export const ItemVariantSchema = z
+  .object({
+    id: ContentIdSchema,
+    name: z.string().min(1).max(80),
+    modifiers: z.array(ModifierSchema).max(8).default([]),
+    grants: FeatureGrantsSchema.optional(),
+    actions: z.array(FeatureActionSchema).max(8).default([]),
+    casts: z.array(ItemSpellCastSchema).max(12).default([]),
+    effects: z.array(EffectGrantSchema).max(4).default([]),
+    light: ItemLightSchema.optional(),
+    weapon: EquipmentWeaponStatsSchema.nullable().optional(),
+    onHit: z.array(OnHitRiderSchema).max(4).optional(),
+    /** In this form its own modifiers, hit riders and light stand in for the record's (a Rod of Lordly Might's flame
+     *  blade: 2d6 Fire, not the Mace's +3); the record's actions and casts stay. */
+    replacesRiders: z.literal(true).optional(),
+    /** The record's own actions and casts can't be used in this form (a Quarterstaff of the Acrobat's Attack
+     *  Deflection is in its Quarterstaff form only). */
+    suspendsActions: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "One kind or form of the item, with the riders it adds to the record's own while a carried copy is that kind. With `replacesRiders` its modifiers, hit riders and light stand in for the record's instead, and the record's actions, casts, effects and grants stay; with `suspendsActions` the record's actions and casts are not offered in this form. A `weapon` block is how the copy swings in that form; null leaves it no weapon there."
+  );
+export type ItemVariant = z.infer<typeof ItemVariantSchema>;
+
+/** Who picks a copy's kind: the GM ("The GM chooses the type", what was found) or its holder, at the action it costs
+ *  (pressing one of the rod's buttons is a Bonus Action). */
+export const ItemVariantChoiceSchema = z
+  .object({
+    by: z.enum(["gm", "holder"]),
+    activation: z.enum(["bonus-action", "action"]).optional()
+  })
+  .strict()
+  .describe(
+    "Who picks which of the item's kinds a copy is: the GM (what was found) or its holder, who changes it at the cost of `activation` in a fight"
+  );
+
+/** What a magic weapon changes about the base it is bound to: its damage type (an Energy Bow's Force), properties it
+ *  adds or loses (a Dwarven Thrower's Thrown, an Energy Bow needing no ammunition) and its range. */
+export const ItemWeaponChangesSchema = z
+  .object({
+    damageType: DamageTypeSchema.optional(),
+    addProperties: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(40)
+      )
+      .min(1)
+      .max(4)
+      .optional(),
+    removeProperties: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(40)
+      )
+      .min(1)
+      .max(4)
+      .optional(),
+    rangeFeet: z.number().int().min(5).max(600).optional(),
+    longRangeFeet: z.number().int().min(5).max(1200).optional(),
+    /** Damage types its wielder may deal on a hit in place of the weapon's own (a Javelin of Lightning: Lightning). */
+    damageTypeOptions: z.array(DamageTypeSchema).min(1).max(2).optional()
+  })
+  .strict()
+  .describe(
+    "What the item changes about the base weapon it is bound to, copied onto the bound row: its damage type, properties added or taken away, and a normal and long range (a Dwarven Thrower's Thrown 20/60). `damageTypeOptions` are types its wielder may pick on each hit in place of the weapon's own (a Javelin of Lightning's Lightning)"
+  );
+export type ItemWeaponChanges = z.infer<typeof ItemWeaponChangesSchema>;
 
 /**
  * The base weapons or armors a template item may bind to: the SRD's printed qualifier (`label`) and
@@ -929,6 +1071,60 @@ export const EquipmentReferenceSchema = z
       .describe(
         "What a hit with this weapon does beside its damage: each rider rides every attack the item makes (both grips, its Light extra attack) and lands as the monster on-hit riders do, a save at its DC (Giant Slayer), a rolled 20 only (Sword of Sharpness), a creature type only, or the coat its own action put on (Dagger of Venom). Needs a `weapon` block or `appliesTo`"
       ),
+    /** The kinds one record covers, one per carried copy (an Ioun Stone's fourteen), or the forms its holder can put
+     *  it in (a Rod of Lordly Might's buttons). */
+    variants: z
+      .array(ItemVariantSchema)
+      .min(2)
+      .max(16)
+      .optional()
+      .describe(
+        "The kinds this record covers, of which each carried copy is one (an Ioun Stone's fourteen stones, a Potion of Resistance's ten types), or the forms its holder puts it in (a Rod of Lordly Might's buttons). The copy's pick is `InventoryItem.variantId`; until one is picked the copy has the record's own riders alone"
+      ),
+    variantChoice: ItemVariantChoiceSchema.optional().describe(
+      "Who picks a copy's kind: the GM (absent, or by gm) or its holder (by holder), paying `activation` in a fight"
+    ),
+    /** "While you hold the drawn weapon, it creates a 10-foot Emanation originating from you. You and all creatures
+     *  Friendly to you in the Emanation have Advantage on saving throws against spells and other magical effects"
+     *  (Holy Avenger). */
+    magicSaveAura: z
+      .object({
+        feet: z.number().int().min(5).max(60),
+        /** A wider Emanation from a class level ("If you have 17 or more levels in the Paladin class, the size of the
+         *  Emanation increases to 30 feet"). */
+        widerAt: z
+          .object({
+            classId: ContentIdSchema,
+            level: z.number().int().min(1).max(20),
+            feet: z.number().int().min(5).max(120)
+          })
+          .strict()
+          .optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "While the item is in use, its bearer and the creatures allied with it within `feet` have Advantage on saving throws against spells and other magical effects (Holy Avenger); `widerAt` widens it from a class level. Read as each save is rolled, from the map's distances"
+      ),
+    /** What an equipment pack holds ("A Dungeoneer's Pack contains ... 10 Torches"): carried, it is these rows. */
+    contents: z
+      .array(z.object({ id: ContentIdSchema, quantity: z.number().int().min(1).max(100) }).strict())
+      .min(1)
+      .max(16)
+      .optional()
+      .describe(
+        "What the item holds, which it is unpacked into wherever a character comes by it (its starting equipment, or adding it to the sheet): each record id and how many (an Explorer's Pack's 10 Torches)"
+      ),
+    /** "You can make one attack with it as a Bonus Action on each of your turns" (Scimitar of Speed). */
+    bonusActionAttack: z
+      .literal(true)
+      .optional()
+      .describe(
+        "Its wielder can make one attack with it as a Bonus Action on each of their turns (Scimitar of Speed), offered beside its own attack. Needs a `weapon` block or `appliesTo`"
+      ),
+    weaponChanges: ItemWeaponChangesSchema.optional().describe(
+      "What a magic weapon changes about its base: the bound row deals this damage type, gains or loses these properties and has this range (a Dwarven Thrower is Thrown 20/60, an Energy Bow deals Force and needs no ammunition)"
+    ),
     /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
     grantsFeatIds: z
       .array(ContentIdSchema)
@@ -974,6 +1170,17 @@ export const EquipmentReferenceSchema = z
         code: "custom",
         path: ["vulnerableToOtherChoices"],
         message: "Vulnerability to the other choices needs a cursed item whose resistance the GM chooses."
+      });
+    if (item.variants) {
+      const ids = item.variants.map((variant) => variant.id);
+      if (new Set(ids).size !== ids.length)
+        context.addIssue({ code: "custom", path: ["variants"], message: "Each kind of the item needs its own id." });
+    }
+    if (item.variantChoice && !item.variants)
+      context.addIssue({
+        code: "custom",
+        path: ["variantChoice"],
+        message: "Who picks the item's kind needs kinds to pick from: give it variants."
       });
     // A hit rider rides the item's own attacks, so the item has to make one.
     if (item.onHit && !item.weapon && !item.appliesTo)

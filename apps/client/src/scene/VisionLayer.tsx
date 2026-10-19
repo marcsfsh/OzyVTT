@@ -1,7 +1,33 @@
 import { AREA_KINDS } from "./mapTools";
 
 type Point = Readonly<{ x: number; y: number }>;
-type Wall = Readonly<{ id: string; kind: "wall" | "door" | "window"; a: Point; b: Point; open?: boolean }>;
+/** A wall as this view has it: the GM's carry what holds a door shut and the statistics of one that is an object. */
+export type MapWall = Readonly<{
+  id: string;
+  kind: "wall" | "door" | "window";
+  a: Point;
+  b: Point;
+  open?: boolean;
+  door?: Readonly<{
+    fastenings: ReadonlyArray<Readonly<{ kind: string; dc?: number; forceDc?: number }>>;
+    arcaneLock?: unknown;
+    hidden?: true;
+  }>;
+  object?: Readonly<{ armorClass: number; hitPoints: Readonly<{ current: number; maximum: number }> }>;
+}>;
+type Wall = MapWall;
+
+/** Whether something holds the door shut: a fastening or an Arcane Lock. Only the GM's walls carry it. */
+export const fastened = (wall: MapWall): boolean =>
+  (wall.door?.fastenings.length ?? 0) > 0 || wall.door?.arcaneLock !== undefined;
+
+/** What a door's handle is called: open or closed, and for the GM what holds it and whether players see it. */
+function doorLabel(wall: MapWall): string {
+  const parts = [wall.open === true ? "Open door" : "Closed door"];
+  if (fastened(wall)) parts.push("held shut");
+  if (wall.door?.hidden) parts.push("secret");
+  return parts.join(" · ");
+}
 type Light = Readonly<{
   id: string;
   position: Point | null;
@@ -21,9 +47,10 @@ type Area = Readonly<{
 }>;
 
 /**
- * Dynamic vision's marks on the map: for the GM, every wall, door, window and light (tap targets for the Remove tool);
- * for a player, the doors in sight, whose handle opens or closes one beside their character. Handles keep a 44-pixel
- * touch ring whatever the zoom.
+ * Dynamic vision's marks on the map: for the GM, every wall, door, window and light (tap targets for the Remove tool),
+ * which doors are held shut and the hit points of the walls that are objects; for a player, the doors in sight. A
+ * door's handle opens its menu (`DoorMenu`). While an action is being aimed, every wall in view takes a tap, so an
+ * attack or a spell can be aimed at it. Handles keep a 44-pixel touch ring whatever the zoom.
  */
 export function VisionLayer({
   role,
@@ -35,7 +62,8 @@ export function VisionLayer({
   cellSizePx,
   showWalls,
   erasing,
-  onToggleDoor
+  aiming = false,
+  onDoorMenu
 }: Readonly<{
   role: "gm" | "player";
   walls: readonly Wall[];
@@ -50,8 +78,10 @@ export function VisionLayer({
   showWalls: boolean;
   /** The Remove tool is on: walls and lights take taps. */
   erasing: boolean;
-  /** A door's handle from the keyboard; taps reach the map's gestures. */
-  onToggleDoor: (wallId: string, open: boolean) => void;
+  /** An action is being aimed: walls take taps as its target. */
+  aiming?: boolean;
+  /** A door's handle from the keyboard opens its menu there; taps reach the map's gestures. */
+  onDoorMenu: (wallId: string, x: number, y: number) => void;
 }>) {
   const handle = Math.max(6, cellSizePx * 0.18);
   return (
@@ -104,9 +134,13 @@ export function VisionLayer({
           );
         })}
       {walls.map((wall) => {
-        if (wall.kind !== "door" && !showWalls) return null;
+        if (wall.kind !== "door" && !showWalls && !aiming) return null;
         const middle = { x: (wall.a.x + wall.b.x) / 2, y: (wall.a.y + wall.b.y) / 2 };
-        const state = wall.kind === "door" ? (wall.open === true ? " open" : wall.open === false ? " closed" : "") : "";
+        const state =
+          wall.kind === "door"
+            ? `${wall.open === true ? " open" : wall.open === false ? " closed" : ""}${fastened(wall) ? " fastened" : ""}${wall.door?.hidden ? " secret" : ""}`
+            : "";
+        const label = doorLabel(wall);
         return (
           <g
             key={wall.id}
@@ -119,6 +153,27 @@ export function VisionLayer({
             {role === "gm" && erasing && (
               <line className="vision-hit" x1={wall.a.x} y1={wall.a.y} x2={wall.b.x} y2={wall.b.y} />
             )}
+            {aiming && !erasing && (
+              <line
+                className="vision-aim-hit"
+                data-wall-target={wall.id}
+                x1={wall.a.x}
+                y1={wall.a.y}
+                x2={wall.b.x}
+                y2={wall.b.y}
+              />
+            )}
+            {role === "gm" && wall.object && (
+              <text
+                className="vision-object-hp"
+                x={middle.x}
+                y={middle.y - handle * 1.6}
+                textAnchor="middle"
+                style={{ fontSize: Math.max(10, cellSizePx * 0.24) }}
+              >
+                {`${wall.object.hitPoints.current}/${wall.object.hitPoints.maximum} HP`}
+              </text>
+            )}
             {wall.kind === "door" && !erasing && (
               <g
                 className="vision-door-handle"
@@ -126,15 +181,25 @@ export function VisionLayer({
                 data-door-open={wall.open === true ? "true" : "false"}
                 role="button"
                 tabIndex={0}
-                aria-label={wall.open === true ? "Close the door" : "Open the door"}
+                aria-label={label}
                 onKeyDown={(event) => {
                   if (event.key !== "Enter" && event.key !== " ") return;
                   event.preventDefault();
-                  onToggleDoor(wall.id, wall.open !== true);
+                  const box = event.currentTarget.getBoundingClientRect();
+                  onDoorMenu(wall.id, box.left, box.bottom);
                 }}
               >
-                <title>{wall.open === true ? "Close the door" : "Open the door"}</title>
+                <title>{label}</title>
                 <circle className="vision-door-ring" cx={middle.x} cy={middle.y} r={handle} />
+                {fastened(wall) && (
+                  <rect
+                    className="vision-door-lock"
+                    x={middle.x - handle * 0.35}
+                    y={middle.y - handle * 0.35}
+                    width={handle * 0.7}
+                    height={handle * 0.7}
+                  />
+                )}
                 <circle className="vision-hit" cx={middle.x} cy={middle.y} r={handle} />
               </g>
             )}

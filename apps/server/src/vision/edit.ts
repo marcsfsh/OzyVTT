@@ -4,7 +4,7 @@ import { gridToImage, imageToGrid } from "../grid-calibration.js";
 import { layerSlice } from "../map-layers.js";
 import type { TokenMapGeometry } from "../token-placement.js";
 import { clearLine, distance, nearestOnSegment, type Point } from "./geometry.js";
-import { blocksSight, pixelsPerFootOf, segmentOf } from "./sight.js";
+import { blocksSight, pixelsPerFootOf, segmentOf, segmentsOf } from "./sight.js";
 
 /**
  * The GM's edits to a scene's dynamic vision (ADR-0023): the switch, the ambient light, walls, doors, windows and
@@ -254,7 +254,9 @@ export function doorWithinReach(state: GameState, wallId: string, actorIds: read
   const wall = vision.walls.find((candidate) => candidate.id === wallId);
   const pixelsPerFoot = vision.measure?.pixelsPerFoot;
   if (!wall || wall.kind !== "door" || !pixelsPerFoot) return false;
-  const others = vision.walls.filter((candidate) => candidate.id !== wallId && blocksSight(candidate)).map(segmentOf);
+  const others = vision.walls
+    .filter((candidate) => candidate.id !== wallId && blocksSight(candidate))
+    .flatMap(segmentsOf);
   return actorIds.some((actorId) => {
     const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
     if (!token?.position) return false;

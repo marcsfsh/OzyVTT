@@ -10,6 +10,7 @@ import {
   type DamageType,
   type EndedBy,
   type ForcedPush,
+  type ObjectPrint,
   type OngoingDamage,
   type SaveCondition,
   type SaveFailureDuration
@@ -52,7 +53,59 @@ export type SaveOutcome = {
   autoSuccess?: { creatureTypes?: string[]; sleepless?: true };
   failureEndsForm?: true;
   breaksConcentration?: true;
+  heldBy?: ObjectPrint;
 };
+
+/** The damage types a stat block lists after "Vulnerability to" or "Immunity to" ("Bludgeoning, Poison, and Psychic"),
+ *  less Poison and Psychic, which every object ignores anyway. */
+function objectDefences(clause: string, label: string): DamageType[] {
+  const listed = new RegExp(`${label} to ([A-Za-z, ]+?) damage`).exec(clause)?.[1] ?? "";
+  return listed
+    .split(/,\s*(?:and\s+)?|\s+and\s+/)
+    .map((word) => DamageTypeSchema.safeParse(word.trim().toLowerCase()))
+    .flatMap((parsed) =>
+      parsed.success && parsed.data !== "poison" && parsed.data !== "psychic" ? [parsed.data] : []
+    );
+}
+
+/** What holds the creature a failure restrains when a trait prints its statistics: "until the rope is destroyed", with
+ *  the erinyes' Magic Rope: "The rope has AC 20, HP 90, and Immunity to Poison and Psychic damage." */
+export function heldByFromTraits(clause: string, traits: readonly string[]): ObjectPrint | undefined {
+  const named = /until the (\w+) is destroyed\b/.exec(clause)?.[1];
+  if (!named) return undefined;
+  for (const text of traits) {
+    const printed = new RegExp(`The ${named} has AC (\\d+), HP (\\d+)`).exec(text);
+    if (!printed) continue;
+    const immunities = objectDefences(text, "Immunity");
+    return {
+      name: `${named[0]!.toUpperCase()}${named.slice(1)}`,
+      armorClass: Number.parseInt(printed[1]!, 10),
+      hitPoints: Number.parseInt(printed[2]!, 10),
+      ...(immunities.length > 0 ? { immunities } : {})
+    };
+  }
+  return undefined;
+}
+
+/** What holds the creature a failure restrains, when the clause prints its statistics: "Restrained condition until the
+ *  web is destroyed (AC 10; HP 5; Vulnerability to Fire damage; Immunity to Poison and Psychic damage)". */
+export function heldByOf(clause: string): ObjectPrint | undefined {
+  const printed = /until the (\w+) is destroyed \(AC (\d+); HP (\d+)((?:; [^)]*)?)\)/.exec(clause);
+  if (!printed) return undefined;
+  const name = printed[1]!;
+  const rest = printed[4] ?? "";
+  const immunities = objectDefences(rest, "Immunity");
+  const vulnerabilities = objectDefences(rest, "Vulnerability");
+  const resistances = objectDefences(rest, "Resistance");
+  return {
+    name: `${name[0]!.toUpperCase()}${name.slice(1)}`,
+    armorClass: Number.parseInt(printed[2]!, 10),
+    hitPoints: Number.parseInt(printed[3]!, 10),
+    ...(immunities.length > 0 ? { immunities } : {}),
+    ...(resistances.length > 0 ? { resistances } : {}),
+    ...(vulnerabilities.length > 0 ? { vulnerabilities } : {})
+  };
+}
 
 /** What a failed repeat leaves in place of the first failure ("Second Failure"). */
 export type SecondFailure = {
@@ -293,6 +346,7 @@ export function statBlockSaveOutcome(description: string): SaveOutcome {
   const lifetime = failureLifetime(failure, namedConditions(failure));
   const reach =
     lifetime.escapeDc !== undefined ? description.slice(0, Math.max(0, start)).match(/\bwithin (\d+) feet\b/) : null;
+  const heldBy = lifetime.failureConditions.includes("restrained") ? heldByOf(failure) : undefined;
   const second = secondFailureOf(description);
   // "Until the end of its next turn, at which point it repeats the save", "repeats the save at the end of its next turn".
   const once =
@@ -315,6 +369,7 @@ export function statBlockSaveOutcome(description: string): SaveOutcome {
     successDamage: success ? "half" : "none",
     ...lifetime,
     ...(reach ? { rangeFeet: Number.parseInt(reach[1]!, 10) } : {}),
+    ...(heldBy ? { heldBy } : {}),
     ...(once && lifetime.repeatSave !== true ? { repeatOnce: true as const } : {}),
     ...(second ? { secondFailure: second } : {}),
     ...(exhaustion ? { failureExhaustion: Number.parseInt(exhaustion[1]!, 10) } : {}),

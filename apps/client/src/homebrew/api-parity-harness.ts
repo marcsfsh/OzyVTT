@@ -658,6 +658,27 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   })),
   {
+    at: "actions[].save.heldBy.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the object that holds a creature a failure restrains (a Net, a giant spider's web) with its Armor Class and Hit Points - read from the stat block's text or authored in the gear and item overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.heldBy.**",
+    types: ["spell"],
+    reason:
+      "the object that holds a creature a spell's failure restrains, read from the spell's text as the catalog is built; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "walls.**",
+    types: ["spell"],
+    reason:
+      "the walls a spell raises, cuts or destroys and what it does to a door (Wall of Force, Knock) - a reviewed table in the content build; the spell form has no control for them",
+    status: "gap"
+  },
+  {
     at: "actions[].raisesCorpse.**",
     types: ACTION_CARRIERS,
     reason:
@@ -1357,6 +1378,62 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "^study.**",
     types: ["equipment"],
     reason: "a manual's or tome's study, the score it raises for good once the GM marks it done; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^variants[].**",
+    types: ["equipment"],
+    reason:
+      "the kinds one record covers (an Ioun Stone's stones) or the forms its holder picks (a Rod of Lordly Might's buttons), each with riders of its own - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^variantChoice.**",
+    types: ["equipment"],
+    reason:
+      "who picks a copy's kind, and what changing a form costs - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^weaponChanges.**",
+    types: ["equipment"],
+    reason:
+      "what a magic weapon changes about its bound base (a Dwarven Thrower's Thrown 20/60, an Energy Bow's Force) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^bonusActionAttack",
+    types: ["equipment"],
+    reason:
+      "an attack with the weapon as a Bonus Action (Scimitar of Speed) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^contents[].**",
+    types: ["equipment"],
+    reason:
+      "what an equipment pack holds, unpacked where a character comes by it (an Explorer's Pack's 10 Torches) - authored in the gear source; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^magicSaveAura.**",
+    types: ["equipment"],
+    reason:
+      "an aura of Advantage on saves against magic for the bearer and its allies (Holy Avenger) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].attackBonus",
+    types: ["equipment"],
+    reason:
+      "a cast's printed bonus to hit (Circlet of Blasting's +5) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].activation",
+    types: ["equipment"],
+    reason:
+      "what casting from the item takes in place of the spell's casting time (a prayer bead's Bonus Action) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {

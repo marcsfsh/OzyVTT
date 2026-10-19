@@ -5,8 +5,8 @@ import { conditionLabel } from "../condition-rules.js";
 import { CommandRejectedError } from "../game-store.js";
 import { endEffect } from "../effects.js";
 import { deadCantHealLine, healActor } from "../hit-points.js";
+import { isSwarm } from "../space-sharing.js";
 import { useCostOf } from "../use-cost.js";
-import { holdsFeature } from "../class-features.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { isItemActionId } from "../item-actions.js";
 import { recordRoll, tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
@@ -56,12 +56,11 @@ export function applyHealing(ctx: ResolveContext): void {
       return { targetId: target.id, targetName: target.name, regained: 0 };
     }
     // SRD Swarm: "The swarm can't regain Hit Points or gain Temporary Hit Points."
-    if (
-      holdsFeature(target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined, "swarm", "Swarm")
-    ) {
+    const definition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
+    if (isSwarm(definition)) {
       tableNarration.push({
         kind: "heal",
-        text: `${target.name} is a swarm and can't regain Hit Points or gain Temporary Hit Points.`,
+        text: `${target.name} is a swarm and can't regain hit points or gain Temporary Hit Points.`,
         actorIds: [target.id]
       });
       return { targetId: target.id, targetName: target.name, regained: 0 };

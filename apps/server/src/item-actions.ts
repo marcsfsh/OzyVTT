@@ -139,37 +139,33 @@ export function itemAction(
     declared.reaction?.response === "reduce-damage" && added !== 0
       ? { ...declared.reaction, formula: formulaPlus(declared.reaction.formula, added) }
       : declared.reaction;
+  // Everything the action schema says passes through (an Elixir's cures, a rod's light, a teleport); what a feature
+  // grows by level, and what is read off the bearer, is resolved here.
+  const {
+    attack: _attack,
+    save: _save,
+    uses: _uses,
+    reaction: _reaction,
+    ridesHit,
+    spendsNoUses: _spendsNoUses,
+    damageByLevel: _damageByLevel,
+    healingByLevel: _healingByLevel,
+    adds: _adds,
+    grantScaling: _grantScaling,
+    answerAmountByLevel: _answerAmountByLevel,
+    reactionByLevel: _reactionByLevel,
+    multiattackByLevel: _multiattackByLevel,
+    ...rest
+  } = structuredClone(declared);
   return {
+    ...rest,
     id: itemActionId(itemId, declared.id),
-    name: declared.name,
-    activation: declared.activation,
-    description: declared.description,
     ...(attack ? { attack } : {}),
     ...(save ? { save } : {}),
-    damage: declared.damage.map((part) => ({ ...part })),
-    // A Potion of Healing's 2d4 + 2.
-    ...(declared.healing ? { healing: { ...declared.healing } } : {}),
     ...(uses ? { uses } : {}),
-    // Charges one use spends (a Staff of Striking's 2 or 3).
-    ...(declared.useCost !== undefined ? { useCost: declared.useCost } : {}),
-    // A thrown flask uses one attack of the Attack action; the action's other attacks stay open.
-    ...(declared.replacesAttack ? { replacesAttack: true } : {}),
-    // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
-    ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
-    // The form drinking it gives (a Potion of Gaseous Form).
-    ...(declared.shapeShift ? { shapeShift: structuredClone(declared.shapeShift) } : {}),
-    ...(declared.area ? { area: { ...declared.area } } : {}),
-    // The area it leaves to act later (spread Caltrops).
-    ...(declared.zone ? { zone: structuredClone(declared.zone) } : {}),
-    // Who it may target (a flask's one creature within 20 feet) and the hit it rides (a staff's charge on a hit).
-    ...(declared.targets ? { targets: structuredClone(declared.targets) } : {}),
-    ...(declared.ridesHit ? { ridesHit: itemHitRider(declared.ridesHit, definition) } : {}),
-    ...(declared.onHit ? { onHit: structuredClone(declared.onHit) } : {}),
-    // A roll it answers (a Ring of Evasion's Evade) and the trigger it is offered on (a Reaction's).
-    ...(declared.answer ? { answer: structuredClone(declared.answer) } : {}),
     ...(reaction ? { reaction: { ...reaction } } : {}),
-    // The creatures it brings (a Horn of Valhalla's Berserkers).
-    ...(declared.summons ? { summons: structuredClone(declared.summons) } : {})
+    // The hit it rides (a staff's charge on a hit), with its DC as the bearer's number.
+    ...(ridesHit ? { ridesHit: itemHitRider(ridesHit, definition) } : {})
   };
 }
 
@@ -210,7 +206,9 @@ export function castAction(
   const base: ActorAction = {
     id: itemActionId(itemId, `cast-${cast.spellId}`),
     name: `Cast ${spellName} (${itemName})`,
-    activation: "action",
+    // SRD "Spells Cast from Items": the spell uses its normal casting time (Ring of Jumping's Bonus Action Jump),
+    // unless the item says otherwise (a prayer bead's Bonus Action).
+    activation: cast.activation ?? (spell ? spellActivationOf(spell.castingTime) : "action"),
     description: spell?.description ?? `Cast ${spellName} from ${itemName}.`,
     damage: [],
     // Set even when the catalog cannot resolve the record, since `spell-id-is` gates on the authored id.
@@ -228,10 +226,12 @@ export function castAction(
   const caster = casterNumbers(definition);
   // An authored `ability` powers the item; absent, the wielder's own.
   const ability = cast.ability ?? caster.ability;
+  // A printed bonus to hit is the item's own (Circlet of Blasting's +5), whoever wears it.
   const attackBonus =
-    cast.ability !== undefined || caster.attackBonus === null
+    cast.attackBonus ??
+    (cast.ability !== undefined || caster.attackBonus === null
       ? scoreModifierOf(definition, ability) + caster.proficiencyBonus
-      : caster.attackBonus;
+      : caster.attackBonus);
   // Only the wielder's own spell save DC is theirs to raise; a printed DC or the item's own ability is not.
   const bearersDc = cast.saveDc === undefined && cast.ability === undefined && caster.saveDc !== null;
   const saveDc =
@@ -448,6 +448,16 @@ export const ritualSpellActionId = (spellId: string): string => `spell-${spellId
 
 /** A casting time of a minute or more ("10 minutes", "8 hours"). */
 export const isLongCastingTime = (castingTime: string): boolean => /\b\d+\s*(?:minute|hour)s?\b/i.test(castingTime);
+
+/** The action economy a casting time names ("Action", "Bonus Action", "Reaction, which you take when..."). A casting
+ *  time of a minute or more takes the Magic action on each turn of it (SRD "Longer Casting Times"), so it is an action
+ *  too, refused while Incapacitated. A spell cast from a sheet, an item or a scroll uses its normal casting time. */
+export function spellActivationOf(castingTime: string): ActorAction["activation"] {
+  if (/bonus/i.test(castingTime)) return "bonus-action";
+  if (/reaction/i.test(castingTime)) return "reaction";
+  if (/^(?:1 )?action\b/i.test(castingTime.trim()) || isLongCastingTime(castingTime)) return "action";
+  return "other";
+}
 
 /** The id of the action a spell's later action is minted as ("spell-spirit-guardians-then-save"). */
 export const laterSpellActionId = (spellId: string, name: string): string =>

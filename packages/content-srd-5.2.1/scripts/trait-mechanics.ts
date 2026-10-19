@@ -375,16 +375,6 @@ function blurredForm(trait: Trait): TraitMechanic | null {
     : null;
 }
 
-/** "The first time it enters a creature's space on a turn, that creature takes 5 (1d10) Fire damage." */
-function entersSpaces(trait: Trait): TraitMechanic | null {
-  const match =
-    /\bThe first time it enters a creature[\u2019']s space on a turn, that creature takes (\d+ \([^)]+\) [A-Z][a-z]+ damage)\./.exec(
-      trait.description
-    );
-  const damage = match ? typedDamage(match[1]!) : undefined;
-  return match && damage ? { kind: "enters-spaces", name: trait.name, damage } : null;
-}
-
 /** "Other creatures can enter that space, but a creature that does so is subjected to the cube's Engulf and has
  *  Disadvantage on the saving throw." */
 function engulfsEntrants(trait: Trait): TraitMechanic | null {
@@ -413,7 +403,6 @@ const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
   absorption,
   damageWeakens,
   blurredForm,
-  entersSpaces,
   engulfsEntrants
 ];
 

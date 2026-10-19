@@ -117,7 +117,6 @@ const zoneDeps = (state: GameState) => ({
   newId: nextId,
   now: () => "2026-10-19T00:00:00.000Z"
 });
-const hpOf = (state: GameState, id: string) => state.actors.find((actor) => actor.id === id)!.hp.current;
 
 describe("a move through creatures", () => {
   it("lets a centaur's Trampling Charge pass through a creature and target only the ones it entered", () => {
@@ -169,17 +168,6 @@ describe("a move through creatures", () => {
 });
 
 describe("a creature's space entered on a move", () => {
-  it("burns a creature a fire elemental enters, once a turn", () => {
-    const state = game("fire-elemental");
-    const path = [cell(0, 0), cell(1, 0), cell(2, 0), cell(3, 0)];
-    const events = spaceEntryAfterMove(state, { moverId: MONSTER, path }, zoneDeps(state));
-    expect(hpOf(state, HERO)).toBe(46);
-    expect(hpOf(state, BYSTANDER)).toBe(50);
-    expect(events[0]?.text).toBe("Borin takes 4 damage from Fire Elemental's Fire Form.");
-    spaceEntryAfterMove(state, { moverId: MONSTER, path: [...path].reverse() }, zoneDeps(state));
-    expect(hpOf(state, HERO)).toBe(46);
-  });
-
   it("opens a gelatinous cube's space to a creature, which makes its Engulf save with Disadvantage", () => {
     const state = game("gelatinous-cube");
     const from = cell(2, 0);

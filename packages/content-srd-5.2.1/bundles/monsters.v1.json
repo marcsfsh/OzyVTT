@@ -18095,7 +18095,12 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "heldBy": {
+      "name": "Rope",
+      "armorClass": 20,
+      "hitPoints": 90
+     }
     },
     "damage": [
      {
@@ -18312,7 +18317,18 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "heldBy": {
+      "name": "Web",
+      "armorClass": 10,
+      "hitPoints": 5,
+      "immunities": [
+       "bludgeoning"
+      ],
+      "vulnerabilities": [
+       "fire"
+      ]
+     }
     },
     "damage": [],
     "targets": {
@@ -18643,16 +18659,6 @@
      }
     ],
     "hazard": "burning"
-   },
-   {
-    "kind": "enters-spaces",
-    "name": "Fire Form",
-    "damage": [
-     {
-      "formula": "1d10",
-      "type": "fire"
-     }
-    ]
    },
    {
     "kind": "light",
@@ -22851,7 +22857,15 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "heldBy": {
+      "name": "Web",
+      "armorClass": 10,
+      "hitPoints": 5,
+      "vulnerabilities": [
+       "fire"
+      ]
+     }
     },
     "damage": [],
     "targets": {

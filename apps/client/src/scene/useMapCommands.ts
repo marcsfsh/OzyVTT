@@ -2,12 +2,15 @@ import { useState } from "react";
 import type {
   AnnotationShapeKind,
   AnnotationVisibility,
+  DoorState,
   EncounterTokenPosition,
   MutationResult,
+  ObjectStats,
   RulesBlocked
 } from "@vtt/domain";
 import { command } from "../lib/command";
 import { newId } from "../lib/ids";
+import { resolveAtWall } from "../encounter/targeting";
 import type { MoveMode } from "./movePreview";
 import type { Point } from "./useMapView";
 import type { AreaKindId } from "./mapTools";
@@ -28,6 +31,9 @@ export type BlockedMove = Readonly<{
 }>;
 
 const ASKED = "Asked the GM. Waiting for their call.";
+
+/** How a creature works on a door (`door:use`). */
+export type DoorWork = "pick" | "force" | "jam" | "pry" | "seal";
 
 export function useMapCommands({
   revision,
@@ -395,6 +401,31 @@ export function useMapCommands({
       open ? "The door could not be opened." : "The door could not be closed.",
       open ? "Door opened." : "Door closed."
     );
+  /** A creature beside a door picks, forces, pries, jams or seals it; the server rolls the check and says how it went. */
+  const workDoor = (wallId: string, actorId: string, how: DoorWork) => {
+    setVisionBusy(true);
+    void command("door:use", { wallId, actorId, how, expectedRevision: revision }).then((result) => {
+      setVisionBusy(false);
+      setMessage(result.ok ? (result.text ?? "") : (result.message ?? "That could not be done to the door."));
+    });
+  };
+  /** The attack or spell being aimed lands on a door or a wall (`resolveAtWall`); the server says how it went. */
+  const aimAtWall = (wallId: string) =>
+    resolveAtWall(wallId, revision, (ok, text) =>
+      setMessage(text ?? (ok ? "" : "That could not be aimed at the wall."))
+    );
+  /** The GM sets what keeps a door shut and its statistics as an object, in that order: the second write follows the
+   *  first one's revision, so it carries none of its own. */
+  const saveDoor = (wallId: string, door: DoorState | null, object: ObjectStats | null) =>
+    runVision(
+      async () => {
+        const held = await command("door:set-state", { wallId, door, ...scene, expectedRevision: revision });
+        if (!held.ok) return held;
+        return command("object:set", { wallId, object, ...scene });
+      },
+      "The door could not be changed.",
+      "Door saved."
+    );
   const addLight = (position: Point, light: Readonly<{ brightFeet: number; dimFeet: number }>) =>
     runVision(
       () =>
@@ -457,6 +488,9 @@ export function useMapCommands({
     removeWall,
     clearWalls,
     setDoorOpen,
+    workDoor,
+    aimAtWall,
+    saveDoor,
     addLight,
     removeLight,
     forgetExplored

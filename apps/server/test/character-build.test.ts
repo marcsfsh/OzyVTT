@@ -365,7 +365,8 @@ describe("buildCharacterDefinition: Fighter 5 (human soldier, Champion)", () => 
       "greatsword",
       "flail",
       "javelin",
-      "dungeoneers-pack",
+      "crowbar",
+      "torch",
       "spear",
       "shortbow",
       "arrows-20",
@@ -377,6 +378,9 @@ describe("buildCharacterDefinition: Fighter 5 (human soldier, Champion)", () => 
       expect(ids, id).toContain(id);
     }
     expect((definition.startingInventory ?? []).find((item) => item.id === "javelin")?.quantity).toBe(8);
+    // The Dungeoneer's Pack is unpacked into what it holds.
+    expect(ids).not.toContain("dungeoneers-pack");
+    expect((definition.startingInventory ?? []).find((item) => item.id === "torch")?.quantity).toBe(10);
     expect((definition.startingInventory ?? []).find((item) => item.id === "greatsword")?.weapon?.damageDice).toBe(
       "2d6"
     );

@@ -398,6 +398,7 @@ describe("the eligibility column", () => {
       "dragon-slayer": "Any Simple or Martial",
       "dwarven-plate": "Half Plate Armor or Plate Armor",
       "dwarven-thrower": "Warhammer",
+      "energy-bow": "Longbow or Shortbow",
       "elven-chain": "Chain Mail or Chain Shirt",
       "flame-tongue": "Any Melee Weapon",
       "frost-brand": "Glaive, Greatsword, Longsword, Rapier, Scimitar, or Shortsword",
@@ -605,14 +606,14 @@ describe("the eligibility column", () => {
 
   it("is total on weapons, body armor and ammunition, and absent everywhere else", () => {
     const templates = new Set(["weapon", "armor", "ammunition"]);
-    // Sun Blade and Energy Bow are more than their base (damage type conversion), so binding them to a
-    // bare base would derive a wrong attack. Not bound until weapon-swing overrides exist.
+    // The Sun Blade is a hilt that is its own blade, not a base made magic. The Energy Bow binds to its bow and changes
+    // what it shoots (`weaponChanges`).
     expect(
       rows
         .filter((row) => templates.has(row.category) && !row.appliesTo)
         .map((row) => row.id)
         .sort()
-    ).toEqual(["energy-bow", "sun-blade"]);
+    ).toEqual(["sun-blade"]);
     expect(rows.filter((row) => !templates.has(row.category) && row.appliesTo)).toEqual([]);
     // Magic ammunition is a piece of one kind, picked like a magic weapon's base; a shield carries its own block.
     expect(

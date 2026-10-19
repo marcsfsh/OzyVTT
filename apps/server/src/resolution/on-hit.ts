@@ -219,7 +219,8 @@ function openOnHitSave(
       ...(tags.length > 0 || modifiers.length > 0
         ? { failureEffect: { name: rider.name ?? action.name, tags: [...tags], modifiers: [...modifiers] } }
         : {}),
-      ...(failureDamage.length > 0 ? { failureDamage } : {})
+      ...(failureDamage.length > 0 ? { failureDamage } : {}),
+      ...(save.halfOnSuccess ? { halfOnSuccess: true as const } : {})
     }
   );
 }
