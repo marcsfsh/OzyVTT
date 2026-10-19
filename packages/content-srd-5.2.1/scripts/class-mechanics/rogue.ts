@@ -222,7 +222,9 @@ export const rogue: ClassMechanicsModule = {
           { type: "movement", rule: "jump-by-dexterity" }
         ]
       },
-      // Adds the Bonus Action activation; the Sleight of Hand check is rolled from the skill block.
+      // The server reads the feature itself (`fast-hands.ts`, `utilize.ts`): tool and gear uses, door work, a magic
+      // item's Magic action and a Sleight of Hand check each take the Bonus Action. This row is for an object the app
+      // doesn't model.
       "fast-hands": {
         actions: [
           {
