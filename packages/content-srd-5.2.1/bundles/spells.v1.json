@@ -19483,7 +19483,8 @@
     "hitPoints": "one",
     "withinMinutes": 14400,
     "notUndead": true,
-    "endsPoison": true
+    "endsPoison": true,
+    "d20Penalty": -4
    }
   },
   "classes": [
@@ -20098,6 +20099,8 @@
     "withinMinutes": 52560000,
     "notUndead": true,
     "endsPoison": true,
+    "restoresParts": true,
+    "d20Penalty": -4,
     "taxesCasterAfterMinutes": 525600
    }
   },

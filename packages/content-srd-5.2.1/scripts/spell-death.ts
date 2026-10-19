@@ -15,16 +15,20 @@ const SPELL_REVIVALS: Readonly<Record<string, SpellRevival>> = {
   // "You touch a creature that has died within the last minute. That creature revives with 1 Hit Point."
   revivify: { hitPoints: "one", withinMinutes: 1 },
   // "... if it has been dead no longer than 10 days and it wasn't Undead when it died. The creature returns to life with
-  // 1 Hit Point. This spell also neutralizes any poisons that affected the creature at the time of death."
-  "raise-dead": { hitPoints: "one", withinMinutes: 10 * DAY, notUndead: true, endsPoison: true },
+  // 1 Hit Point. This spell also neutralizes any poisons that affected the creature at the time of death ... If the
+  // creature is lacking body parts or organs integral for its survival (its head, for instance) the spell
+  // automatically fails ... The target takes a -4 penalty to D20 Tests."
+  "raise-dead": { hitPoints: "one", withinMinutes: 10 * DAY, notUndead: true, endsPoison: true, d20Penalty: -4 },
   // "... dead for no more than a century, didn't die of old age, and wasn't Undead when it died. The creature returns to
-  // life with all its Hit Points ... Casting this spell to revive a creature that has been dead for 365 days or longer
-  // taxes you."
+  // life with all its Hit Points ... restores any missing body parts ... The target takes a -4 penalty to D20 Tests ...
+  // Casting this spell to revive a creature that has been dead for 365 days or longer taxes you."
   resurrection: {
     hitPoints: "all",
     withinMinutes: 100 * YEAR,
     notUndead: true,
     endsPoison: true,
+    restoresParts: true,
+    d20Penalty: -4,
     taxesCasterAfterMinutes: 365 * DAY
   },
   // "... dead for no longer than 200 years ... revived with all its Hit Points ... neutralizes any poison, cures all

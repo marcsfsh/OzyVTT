@@ -2,7 +2,7 @@ import { isDead, ROUNDS_PER_MINUTE, type GameState } from "@vtt/domain";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { ActorDefinition } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
-import { limitWords, returnToLife, roundsDead, timeWords } from "../death.js";
+import { limitWords, ORDEAL_TAG, returnToLife, roundsDead, timeWords } from "../death.js";
 import { addEffect, endEffect, makeEffect, type EffectNarration } from "../effects.js";
 import { laterRowOf } from "../item-actions.js";
 import type { RuleId } from "../rules-families.js";
@@ -71,6 +71,8 @@ export function revivalViolations(
       refuse(
         `Nothing is left of ${name}'s body${death.cause ? ` (${death.cause})` : ""}. Only a spell that makes a new body, such as True Resurrection, brings ${name} back.`
       );
+    else if (death?.headLost && !revives.newBody && !revives.restoresParts)
+      refuse(`${name}'s head is gone, and ${spell.name} restores no missing body parts.`);
     const rounds = roundsDead(state, target);
     if (rounds !== null && rounds > revives.withinMinutes * ROUNDS_PER_MINUTE)
       refuse(
@@ -116,6 +118,7 @@ export function reviveOnCast(ctx: ResolveContext): void {
         gmOnly: true
       });
     if (revives.rollsSpecies) events.push(...newSpecies(ctx, target));
+    if (revives.d20Penalty !== undefined) events.push(...ordeal(ctx, target, spell.name, revives.d20Penalty));
     if (
       revives.taxesCasterAfterMinutes !== undefined &&
       rounds !== null &&
@@ -163,6 +166,36 @@ function newSpecies(ctx: ResolveContext, target: LiveActor): EffectNarration[] {
     {
       kind: "effect",
       text: `${target.name}'s new body is a ${species} (d10: ${face}). The sheet takes the ${species} traits when the GM rebuilds it.`,
+      actorId: target.id
+    }
+  ];
+}
+
+/** "Coming back from the dead is an ordeal. The target takes a -4 penalty to D20 Tests. Every time the target finishes
+ *  a Long Rest, the penalty is reduced by 1 until it becomes 0" (`easeOrdeals`). */
+function ordeal(ctx: ResolveContext, target: LiveActor, spellName: string, amount: number): EffectNarration[] {
+  addEffect(
+    ctx.state,
+    target.id,
+    makeEffect({
+      id: `${ctx.input.commandId}:${target.id}:ordeal`,
+      name: `${spellName}'s ordeal`,
+      tags: [ORDEAL_TAG],
+      sourceActorId: ctx.attacker.id,
+      sourceName: ctx.attacker.name,
+      startedRound: ctx.state.combat.round,
+      duration: { type: "manual" },
+      modifiers: [
+        { type: "attack-bonus", amount, when: [{ type: "on-attack-roll" }] },
+        { type: "save-bonus", amount, when: [{ type: "on-saving-throw" }] },
+        { type: "check-bonus", amount, when: [{ type: "on-ability-check" }] }
+      ]
+    })
+  );
+  return [
+    {
+      kind: "effect",
+      text: `${target.name} takes a ${amount} penalty to D20 Tests, eased by 1 with each Long Rest.`,
       actorId: target.id
     }
   ];

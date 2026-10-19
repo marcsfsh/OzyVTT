@@ -1,6 +1,6 @@
 import { isDead, ROUNDS_PER_MINUTE, type GameState } from "@vtt/domain";
 import type { ActorDefinition, DeathRecord } from "@vtt/schemas";
-import { reduceExhaustion, removeConditionDirect, type EffectNarration } from "./effects.js";
+import { endEffect, reduceExhaustion, removeConditionDirect, type EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { clockMinutesOf } from "./game-time.js";
 import { reconcileEquipment } from "./inventory.js";
@@ -32,7 +32,7 @@ function fightRoundIn(state: GameState, sceneId: string | null): number | null {
 export function stampDeath(
   state: GameState,
   actor: Actor,
-  details: Readonly<{ cause?: string; bodyGone?: boolean }> = {}
+  details: Readonly<{ cause?: string; bodyGone?: boolean; headLost?: boolean }> = {}
 ): void {
   const fighting = state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id);
   const record: DeathRecord = actor.death ?? {
@@ -42,7 +42,8 @@ export function stampDeath(
   actor.death = {
     ...record,
     ...(details.cause !== undefined ? { cause: details.cause.slice(0, 120) } : {}),
-    ...(details.bodyGone ? { bodyGone: true as const } : {})
+    ...(details.bodyGone ? { bodyGone: true as const } : {}),
+    ...(details.headLost ? { headLost: true as const } : {})
   };
 }
 
@@ -138,4 +139,36 @@ export function returnToLife(
       actorId: actor.id
     }
   ];
+}
+
+/** The tag on the D20 Test penalty a revival leaves (Raise Dead's and Resurrection's -4). */
+export const ORDEAL_TAG = "ordeal";
+
+/** The D20 Test bonuses an ordeal carries. */
+const D20_PENALTIES: ReadonlySet<string> = new Set(["attack-bonus", "save-bonus", "check-bonus"]);
+
+/**
+ * SRD Raise Dead: "The target takes a -4 penalty to D20 Tests. Every time the target finishes a Long Rest, the penalty
+ * is reduced by 1 until it becomes 0." Moves each ordeal on `actor` one toward 0 as a Long Rest ends, and ends it at 0.
+ */
+export function easeOrdeals(state: GameState, actor: Actor): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const effect of [...actor.effects]) {
+    if (!effect.tags.includes(ORDEAL_TAG)) continue;
+    const penaltyOf = (modifier: (typeof effect.modifiers)[number]) =>
+      D20_PENALTIES.has(modifier.type) && "amount" in modifier ? (modifier.amount ?? 0) : 0;
+    const modifiers = effect.modifiers.map((modifier) =>
+      penaltyOf(modifier) < 0 ? { ...modifier, amount: penaltyOf(modifier) + 1 } : modifier
+    );
+    const left = modifiers.map(penaltyOf).find((amount) => amount < 0);
+    if (left === undefined) {
+      events.push(...endEffect(state, actor.id, effect.id));
+      continue;
+    }
+    actor.effects = actor.effects.map((candidate) =>
+      candidate.id === effect.id ? { ...effect, modifiers } : candidate
+    );
+    events.push({ kind: "effect", text: `${actor.name}'s ${effect.name} eases to ${left}.`, actorId: actor.id });
+  }
+  return events;
 }

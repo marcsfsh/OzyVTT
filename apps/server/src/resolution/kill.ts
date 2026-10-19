@@ -215,6 +215,6 @@ function behead(ctx: ResolveContext, target: LiveActor): void {
     })
   );
   ctx.warnings.push(`${action.name}: a creature that can live without its head is the GM's to revive.`);
-  for (const event of killOutright(state, target.id, action.name, killDeps(ctx)))
+  for (const event of killOutright(state, target.id, action.name, { ...killDeps(ctx), headLost: true }))
     ctx.tableNarration.push(tableLineOf(ctx, event));
 }

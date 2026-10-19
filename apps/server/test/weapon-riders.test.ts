@@ -252,6 +252,7 @@ describe("what only a rolled 20 does", () => {
     const hit = swing(built, "item-vorpal", [20, 4, 4]);
     expect(hit.tableNarration?.map((line) => line.text)).toContain("Vorpal Sword cuts off Foe's head.");
     expect(isDead(built.foe)).toBe(true);
+    expect(built.foe.death).toMatchObject({ cause: "Vorpal Sword", headLost: true });
     const plain = table(bound("vorpal", "Vorpal Sword", "longsword"));
     swing(plain, "item-vorpal", [19, 4]);
     expect(isDead(plain.foe)).toBe(false);

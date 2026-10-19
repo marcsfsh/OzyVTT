@@ -18,6 +18,7 @@ import { passGameTime } from "./game-time.js";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { openPreparation } from "./spellcasting.js";
 import { HIT_DICE_DOUBLED_TAG } from "./death-saves.js";
+import { easeOrdeals } from "./death.js";
 import { healActor } from "./hit-points.js";
 import { gainHeroicInspiration } from "./heroic-inspiration.js";
 import { chargesAfterDawn } from "./item-charges.js";
@@ -214,7 +215,11 @@ export function applyRest(
     return events;
   }
   // Eight hours with sleep: Concentration ends and what lasts less runs out; "until ended" ones (a curse) stay.
-  events.push(...endEffectsAtLongRest(state, actorId, clockMoved), ...endEffectsAtRest(state, actorId, "long"));
+  events.push(
+    ...endEffectsAtLongRest(state, actorId, clockMoved),
+    ...endEffectsAtRest(state, actorId, "long"),
+    ...easeOrdeals(state, actor)
+  );
   actor.hp.current = actor.hp.maximum;
   actor.hp.temporary = 0;
   // Every die size in the pool comes back (SRD 5.2.1 "Regain All HP").

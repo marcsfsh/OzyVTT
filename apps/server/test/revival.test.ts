@@ -163,6 +163,51 @@ describe("Raise Dead", () => {
   });
 });
 
+describe("coming back from the dead is an ordeal", () => {
+  it("leaves a -4 penalty to D20 Tests that eases by 1 with each Long Rest", () => {
+    const table = caster({ combat: false });
+    table.hero.inventory.push(diamond(500));
+    kill(table.state);
+    const result = cast(table, "raise-dead", { targetIds: [ALLY] });
+    expect(result.tableNarration?.map((line) => line.text)).toContain(
+      "Bran takes a -4 penalty to D20 Tests, eased by 1 with each Long Rest."
+    );
+    const amounts = () =>
+      actorOf(table.state, ALLY)
+        .effects.find((effect) => effect.name === "Raise Dead's ordeal")
+        ?.modifiers.map((modifier) => ("amount" in modifier ? modifier.amount : null));
+    expect(amounts()).toEqual([-4, -4, -4]);
+    // A day passes before each rest, as one Long Rest a day allows.
+    const rest = () => {
+      passGameTime(table.state, DAY);
+      return applyRest(table.state, ALLY, "long", () => undefined);
+    };
+    expect(rest().map((event) => event.text)).toContain("Bran's Raise Dead's ordeal eases to -3.");
+    expect(amounts()).toEqual([-3, -3, -3]);
+    rest();
+    rest();
+    rest();
+    expect(effectNames(table.state, ALLY)).not.toContain("Raise Dead's ordeal");
+  });
+});
+
+describe("a creature that lost its head", () => {
+  it("is beyond Raise Dead, and Resurrection restores what is missing", () => {
+    const table = caster({ combat: false });
+    table.hero.inventory.push(diamond(500), diamond(1000));
+    command(table.state, () => {
+      const ally = actorOf(table.state, ALLY);
+      ally.hp = { ...ally.hp, current: 0 };
+      stampDeath(table.state, ally, { cause: "Vorpal Sword", headLost: true });
+    });
+    expect(() => cast(table, "raise-dead", { targetIds: [ALLY] })).toThrowError(
+      /Bran's head is gone, and Raise Dead restores no missing body parts/
+    );
+    cast(table, "resurrection", { targetIds: [ALLY] });
+    expect(isDead(actorOf(table.state, ALLY))).toBe(false);
+  });
+});
+
 describe("Gentle Repose", () => {
   it("is refused on a living creature", () => {
     const table = caster({ combat: false });

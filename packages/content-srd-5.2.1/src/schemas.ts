@@ -156,6 +156,12 @@ export const SpellRevivalSchema = z
     notUndead: z.literal(true).optional(),
     /** It makes a new body, so a creature whose body is gone comes back (True Resurrection). */
     newBody: z.literal(true).optional(),
+    /** It restores missing body parts, so a creature that lost its head comes back (Resurrection). Without this or
+     *  `newBody`, such a creature can't be revived (Raise Dead: "the spell automatically fails"). */
+    restoresParts: z.literal(true).optional(),
+    /** "Coming back from the dead is an ordeal": the creature takes this penalty to D20 Tests, reduced by 1 each time
+     *  it finishes a Long Rest (Raise Dead's and Resurrection's -4). */
+    d20Penalty: z.number().int().min(-10).max(-1).optional(),
     /** It neutralizes the poison that affected the creature: its Poisoned condition ends (Raise Dead). */
     endsPoison: z.literal(true).optional(),
     /** It lifts the curses on the creature and cures its magical contagions (True Resurrection). */

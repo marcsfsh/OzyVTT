@@ -1273,6 +1273,8 @@ export const DeathRecordSchema = z
     cause: z.string().min(1).max(120).optional(),
     /** Nothing is left of its body (Disintegrate's gray dust): only a revival that makes a new body brings it back. */
     bodyGone: z.literal(true).optional(),
+    /** Its head is gone (a Vorpal Sword): a revival that restores no missing body parts can't bring it back. */
+    headLost: z.literal(true).optional(),
     /** Rounds of game time its body spent under Gentle Repose, which no revival's time limit counts. */
     reposedRounds: z.number().int().min(0).max(CLOCK_ROUNDS_LIMIT).optional()
   })

@@ -449,7 +449,7 @@ export function killOutright(
   state: GameState,
   actorId: string,
   cause: string,
-  options: Readonly<{ withoutDamage?: boolean; bodyGone?: boolean; deps?: DamageDeps }> = {}
+  options: Readonly<{ withoutDamage?: boolean; bodyGone?: boolean; headLost?: boolean; deps?: DamageDeps }> = {}
 ): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor || isDead(actor)) return [];
@@ -467,7 +467,11 @@ export function killOutright(
   actor.hp = { ...actor.hp, current: 0, temporary: 0 };
   events.push({ kind: "condition", text: `${actor.name} dies (${cause}).`, actorId });
   fallToZero(state, actor, definition, actor.hp.maximum, deps, events, true);
-  stampDeath(state, actor, { cause, ...(options.bodyGone ? { bodyGone: true } : {}) });
+  stampDeath(state, actor, {
+    cause,
+    ...(options.bodyGone ? { bodyGone: true } : {}),
+    ...(options.headLost ? { headLost: true } : {})
+  });
   return events;
 }
 
