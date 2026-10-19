@@ -19,6 +19,13 @@ export function holdsFeature(definition: ActorDefinition | undefined, id: string
   });
 }
 
+/** The class a creature casts a spell as (its sheet entry's class), for riders on that class's spells (Innate
+ *  Sorcery's Sorcerer spells); null for a spell from a species or a feat, or a sheet that names none. */
+export function spellClassOf(definition: ActorDefinition | undefined, spellId: string | undefined): string | null {
+  if (!definition || spellId === undefined) return null;
+  return definition.spellcasting?.spells.find((entry) => entry.id === spellId)?.classId ?? null;
+}
+
 /** The feet Improved Potent Spellcasting adds to a Druid cantrip's range, or 0. */
 export function potentRangeFeet(
   definition: ActorDefinition | undefined,

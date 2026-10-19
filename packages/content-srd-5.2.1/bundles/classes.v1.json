@@ -1071,7 +1071,41 @@
     "id": "indomitable-might",
     "name": "Indomitable Might",
     "level": 18,
-    "description": "If your total for a Strength check or Strength saving throw is less than your Strength score, you can use that score in place of the total."
+    "description": "If your total for a Strength check or Strength saving throw is less than your Strength score, you can use that score in place of the total.",
+    "modifiers": [
+     {
+      "type": "total-minimum",
+      "roll": "check",
+      "abilityScore": "str",
+      "when": [
+       {
+        "type": "on-ability-check"
+       },
+       {
+        "type": "ability-is",
+        "abilities": [
+         "str"
+        ]
+       }
+      ]
+     },
+     {
+      "type": "total-minimum",
+      "roll": "save",
+      "abilityScore": "str",
+      "when": [
+       {
+        "type": "on-saving-throw"
+       },
+       {
+        "type": "ability-is",
+        "abilities": [
+         "str"
+        ]
+       }
+      ]
+     }
+    ]
    },
    {
     "id": "epic-boon",
@@ -2798,6 +2832,32 @@
          "offer": "class-cantrips",
          "amount": 1
         }
+       ],
+       "modifiers": [
+        {
+         "type": "check-bonus",
+         "amount": 0,
+         "abilityModifier": "wis",
+         "minimum": 1,
+         "when": [
+          {
+           "type": "on-ability-check"
+          },
+          {
+           "type": "ability-is",
+           "abilities": [
+            "int"
+           ]
+          },
+          {
+           "type": "skill-is",
+           "skills": [
+            "arcana",
+            "religion"
+           ]
+          }
+         ]
+        }
        ]
       }
      ]
@@ -3834,6 +3894,32 @@
         {
          "offer": "class-cantrips",
          "amount": 1
+        }
+       ],
+       "modifiers": [
+        {
+         "type": "check-bonus",
+         "amount": 0,
+         "abilityModifier": "wis",
+         "minimum": 1,
+         "when": [
+          {
+           "type": "on-ability-check"
+          },
+          {
+           "type": "ability-is",
+           "abilities": [
+            "int"
+           ]
+          },
+          {
+           "type": "skill-is",
+           "skills": [
+            "arcana",
+            "nature"
+           ]
+          }
+         ]
         }
        ]
       },
@@ -5093,7 +5179,25 @@
     "id": "studied-attacks",
     "name": "Studied Attacks",
     "level": 13,
-    "description": "You study your opponents and learn from each attack you make. If you make an attack roll against a creature and miss, you have Advantage on your next attack roll against that creature before the end of your next turn."
+    "description": "You study your opponents and learn from each attack you make. If you make an attack roll against a creature and miss, you have Advantage on your next attack roll against that creature before the end of your next turn.",
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "attack",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       },
+       {
+        "type": "versus-marked",
+        "tags": [
+         "studied"
+        ]
+       }
+      ]
+     }
+    ]
    },
    {
     "id": "epic-boon",
@@ -8378,7 +8482,25 @@
     "id": "precise-hunter",
     "name": "Precise Hunter",
     "level": 17,
-    "description": "You have Advantage on attack rolls against the creature currently marked by your Hunter's Mark."
+    "description": "You have Advantage on attack rolls against the creature currently marked by your Hunter's Mark.",
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "attack",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       },
+       {
+        "type": "versus-marked",
+        "tags": [
+         "hunters-mark"
+        ]
+       }
+      ]
+     }
+    ]
    },
    {
     "id": "feral-senses",
@@ -9220,7 +9342,22 @@
     "id": "elusive",
     "name": "Elusive",
     "level": 18,
-    "description": "You're so evasive that attackers rarely gain the upper hand against you. No attack roll can have Advantage against you unless you have the Incapacitated condition."
+    "description": "You're so evasive that attackers rarely gain the upper hand against you. No attack roll can have Advantage against you unless you have the Incapacitated condition.",
+    "modifiers": [
+     {
+      "type": "advantage-denied",
+      "roll": "incoming-attack",
+      "when": [
+       {
+        "type": "while-condition",
+        "conditionIds": [
+         "incapacitated"
+        ],
+        "present": false
+       }
+      ]
+     }
+    ]
    },
    {
     "id": "epic-boon",
@@ -9940,7 +10077,36 @@
        "duration": {
         "type": "rounds",
         "rounds": 10
-       }
+       },
+       "modifiers": [
+        {
+         "type": "spell-save-dc",
+         "amount": 1,
+         "classId": "sorcerer"
+        },
+        {
+         "type": "roll-mode",
+         "roll": "attack",
+         "mode": "advantage",
+         "when": [
+          {
+           "type": "on-attack-roll"
+          },
+          {
+           "type": "attack-kind-is",
+           "kinds": [
+            "spell"
+           ]
+          },
+          {
+           "type": "spell-class-is",
+           "classIds": [
+            "sorcerer"
+           ]
+          }
+         ]
+        }
+       ]
       }
      }
     ]

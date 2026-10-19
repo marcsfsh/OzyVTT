@@ -49,6 +49,13 @@ const RULE_FAMILIES = {
   // An effect that takes away Reactions (Slow).
   "condition.no-reactions": "economy",
   "condition.no-spells": "economy",
+  // Effects that take away Bonus Actions (Confusion), attacks (Gaseous Form), every action but Dash (Wind Walk), or
+  // all but one of moving, an action and a Bonus Action a turn (Abjure Foes).
+  "condition.cant-attack": "economy",
+  "condition.dash-only": "economy",
+  "condition.one-thing-a-turn": "economy",
+  // A creature that can't end the Prone condition on itself (Hideous Laughter).
+  "movement.cant-stand": "movement",
   // A form forbids it: spells (Wild Shape, Polymorph), actions (a vampire's mist), or another form's attack.
   "form.no-spells": "economy",
   "form.no-actions": "economy",

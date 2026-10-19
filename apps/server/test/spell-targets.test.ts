@@ -60,7 +60,10 @@ describe("how many creatures a spell targets", () => {
   it("caps Power Word Heal, Heal and Regenerate at one creature, and Mass Suggestion at twelve", () => {
     for (const spellId of ["power-word-heal", "heal", "regenerate"]) {
       const { state } = beasts();
-      expect(() => cast(state, spellId, { targetIds: [HERO, ALLY] }), spellId).toThrowError(/targets one creature/);
+      // A spell whose effect lands on its one target is refused by the grant's own target as well.
+      expect(() => cast(state, spellId, { targetIds: [HERO, ALLY] }), spellId).toThrowError(
+        /targets one creature|exactly one target/
+      );
     }
     expect(view.spellRecord("mass-suggestion")!.effect?.targets).toEqual({ count: 12 });
   });
@@ -164,9 +167,9 @@ describe("a spell's range", () => {
 describe("a save the engine applies nothing of", () => {
   it("tells the GM and the save card that the GM applies it", () => {
     const { state } = beasts();
-    const resolution = cast(state, "command", { targetIds: [FOE2] });
+    const resolution = cast(state, "phantasmal-force", { targetIds: [FOE2] });
     expect(resolution.warnings).toContain(
-      "The server applies nothing of Command's save. Apply what a failure or a success does from the spell's text."
+      "The server applies nothing of Phantasmal Force's save. Apply what a failure or a success does from the spell's text."
     );
     const pending = state.combat.pendingSaves.find((save) => save.targetActorId === FOE2)!;
     expect(pending.gmApplies).toBe(true);

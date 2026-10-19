@@ -131,6 +131,10 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "summon.command": () => "Your command doesn't reach that far.",
   "condition.no-reactions": () => "You can't take Reactions now.",
   "condition.no-spells": () => "You can't cast spells now.",
+  "condition.cant-attack": () => "You can't attack now.",
+  "condition.dash-only": () => "You can take only the Dash action now.",
+  "condition.one-thing-a-turn": () => "This turn you can only move, take an action or take a Bonus Action.",
+  "movement.cant-stand": () => "You can't stand up now.",
   "form.no-spells": ({ spell }) =>
     spell && (spell.components.materialConsumed || (spell.components.costly ?? []).length > 0)
       ? "Beast Spells leaves out a spell with a costly or consumed Material component."

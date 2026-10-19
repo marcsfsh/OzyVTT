@@ -3,8 +3,9 @@ import { wardedConditions } from "../paladin-auras.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import { checkPlan, totalCheck, type CheckSubject } from "../ability-checks.js";
 import { checkSightFor, couldSpot } from "../vision/rules.js";
-import { builtinBaseId } from "../builtin-actions.js";
-import { addEffect, endEffect, ESCAPE_ATHLETICS_TAG, makeEffect } from "../effects.js";
+import { builtinBaseId, END_EFFECT_ID } from "../builtin-actions.js";
+import { addEffect, endEffect, ESCAPE_ATHLETICS_TAG, makeEffect, WAKEABLE_TAG } from "../effects.js";
+import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { putOutFire } from "../hazards.js";
 import { CommandRejectedError } from "../game-store.js";
 import { createPendingSaves, saveModifierFor, shownRollMode } from "../saving-throws.js";
@@ -236,6 +237,78 @@ function rollOnTheGround(ctx: ResolveContext): void {
   for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
 }
 
+/** An action an effect offers to end it (Irresistible Dance: "take an action to collect itself"; Maze's DC 20
+ *  Intelligence (Investigation) check): a check is rolled now, and a save is owed now, as a prompt its owner answers.
+ *  A success ends the effect. */
+function endOwnEffect(ctx: ResolveContext): void {
+  const { state, action, attacker, input, deps } = ctx;
+  const effect =
+    (input.effectId ? attacker.effects.find((candidate) => candidate.id === input.effectId) : undefined) ??
+    attacker.effects.find((candidate) => candidate.endAction?.activation === action.activation);
+  const end = effect?.endAction;
+  if (!effect || !end) throw new CommandRejectedError(`${attacker.name} has nothing it can end that way.`);
+  if (end.kind === "check") {
+    if (rollCheck(ctx, { ability: end.ability, ...(end.skill ? { skill: end.skill } : {}) }, end.dc)) {
+      endEffect(state, attacker.id, effect.id);
+      ctx.effectsEnded.push(endedEffect(attacker, effect));
+    }
+    return;
+  }
+  createPendingSaves(state, {
+    sourceActorId: effect.sourceActorId,
+    sourceName: effect.sourceName ?? effect.name,
+    actionName: `${effect.name} - ${end.label}`.slice(0, 120),
+    ability: end.ability,
+    dc: end.dc,
+    targetIds: [attacker.id],
+    proposedDamage: 0,
+    halfOnSuccess: false,
+    conditionIds: [],
+    repeatOf: { actorId: attacker.id, effectId: effect.id },
+    magical: effect.magical === true,
+    newSaveId: deps.newRollId,
+    createdAt: Date.parse(deps.now())
+  });
+  ctx.builtinSave = {
+    ability: end.ability,
+    dc: end.dc,
+    targets: [{ targetId: attacker.id, targetName: attacker.name }]
+  };
+}
+
+/** SRD Sleep: "someone within 5 feet of it takes an action to shake it out of the spell's effect". Ends each effect on
+ *  the target a shake ends (Eyebite's Asleep too). */
+function shakeAwake(ctx: ResolveContext): void {
+  const { state, attacker, targets, deps } = ctx;
+  if (targets.length !== 1) throw new CommandRejectedError("Choose exactly one creature to shake awake.");
+  const target = targets[0]!;
+  if (target.id === attacker.id) throw new CommandRejectedError("A creature can't shake itself awake.");
+  const sleeping = target.effects.filter((effect) => effect.tags.includes(WAKEABLE_TAG));
+  if (sleeping.length === 0) throw new CommandRejectedError(`${target.name} isn't in a sleep a shake can end.`);
+  const distance = deps.distanceFeet?.(attacker.id, target.id) ?? null;
+  if (distance !== null && distance > 5 + DISTANCE_TOLERANCE_FEET)
+    throw new CommandRejectedError(`${target.name} is more than 5 feet away.`);
+  for (const effect of sleeping) {
+    endEffect(state, target.id, effect.id);
+    ctx.effectsEnded.push(endedEffect(target, effect));
+  }
+}
+
+/** An effect's natural weapon for the Unarmed Strike (Alter Self): its die and type, and the ability it uses "rather
+ *  than using Strength". */
+function naturalWeaponOf(
+  attacker: ResolveContext["attacker"],
+  definition: ActorDefinition | undefined
+): Readonly<{ dice: string; type: string; modifier: number }> | null {
+  const strike = attacker.effects.find((effect) => effect.unarmedStrike?.dice)?.unarmedStrike;
+  if (!strike?.dice || !strike.damageTypes?.[0]) return null;
+  return {
+    dice: strike.dice,
+    type: strike.damageTypes[0],
+    modifier: abilityModifier(definition, strike.ability ?? "str")
+  };
+}
+
 /** The DC of an unarmed Grapple or Shove: 8 + Strength modifier + Proficiency Bonus. */
 const unarmedDc = (definition: ActorDefinition | undefined): number =>
   Math.max(1, 8 + abilityModifier(definition, "str") + (definition?.proficiencyBonus ?? 0));
@@ -290,12 +363,22 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   study: { check: searchOrStudy("int") },
   "escape-grapple": { check: escapeGrapple },
   "extinguish-fire": { apply: rollOnTheGround },
+  [END_EFFECT_ID]: { check: endOwnEffect },
+  "shake-awake": { apply: shakeAwake },
 
   /** Strength + Proficiency Bonus to hit, then flat 1 + Strength Bludgeoning damage. A Monk's Martial Arts strike taken
    *  as a Bonus Action brings its own numbers, which stand. */
   "unarmed-strike": {
-    prepare: ({ action, deps }) =>
-      action.attack !== undefined
+    prepare: ({ action, attacker, deps }) => {
+      // Alter Self's claws: the effect's die, type and ability.
+      const grown = naturalWeaponOf(attacker, deps.definition);
+      if (grown)
+        return {
+          ...action,
+          attack: { bonus: grown.modifier + (deps.definition?.proficiencyBonus ?? 0), reachFeet: 5 },
+          damage: [{ formula: `${grown.dice} + ${grown.modifier}`.replace("+ -", "- "), type: grown.type }]
+        };
+      return action.attack !== undefined
         ? action
         : {
             ...action,
@@ -303,7 +386,8 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
               bonus: abilityModifier(deps.definition, "str") + (deps.definition?.proficiencyBonus ?? 0),
               reachFeet: 5
             }
-          },
+          };
+    },
     hitDamage: (ctx) => {
       if (ctx.action.damage.length > 0) return;
       if (ctx.attack === null || (ctx.attack.outcome !== "crit" && ctx.attack.outcome !== "hit")) return;

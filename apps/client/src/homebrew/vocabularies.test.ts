@@ -60,10 +60,12 @@ describe("enumerated fields offer the complete SRD list", () => {
 
   it("every rider damage-type field is a closed choice over the canonical list", () => {
     // A rider names `DamageTypeSchema`, so a homebrew word could never publish there. `whenField()` is walked
-    // three times: bare, inside `modifiersField` and inside an effect's modifiers.
+    // three times: bare, inside `modifiersField` and inside an effect's modifiers. The second is the damage types a
+    // hit ignores Resistance to.
     const fields = everyField().filter(({ field }) => field.key === "damageType" || field.key === "damageTypes");
     const closed = fields.filter(({ field }) => field.options !== undefined);
     expect(closed.map(({ field }) => `${field.kind}.${field.key}`)).toEqual([
+      "multiselect.damageTypes",
       "multiselect.damageTypes",
       "select.damageType",
       "multiselect.damageTypes",

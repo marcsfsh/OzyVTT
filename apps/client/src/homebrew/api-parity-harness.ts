@@ -1025,10 +1025,9 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
-    at: "modifiers[].**",
+    at: "modifiers[].when[].senses",
     types: FEATURE_CARRIERS,
-    reason:
-      "the modifier rows beyond the editor's offered subset: a type the form does not offer has no field for its keys",
+    reason: "the senses of `other-lacks-sense` (Blur), a trigger the content authors and the editor doesn't offer",
     status: "gap"
   },
 

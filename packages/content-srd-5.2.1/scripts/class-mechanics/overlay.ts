@@ -82,6 +82,22 @@ export function potentSpellcasting(spellIds: readonly string[]): NonNullable<Opt
   };
 }
 
+/** "A bonus to your Intelligence (Arcana or Religion) checks. The bonus equals your Wisdom modifier (minimum of +1)"
+ *  (Thaumaturge, Magician). */
+export function wisdomOnChecks(skills: readonly string[]): NonNullable<OptionInput["modifiers"]>[number] {
+  return {
+    type: "check-bonus",
+    amount: 0,
+    abilityModifier: "wis",
+    minimum: 1,
+    when: [
+      { type: "on-ability-check" },
+      { type: "ability-is", abilities: ["int"] },
+      { type: "skill-is", skills: [...skills] }
+    ]
+  };
+}
+
 /** What one class file contributes: class features, its subclass's features, and live resource columns. */
 export type ClassMechanicsModule = Readonly<{
   /** Riders keyed by this class's own feature ids. */

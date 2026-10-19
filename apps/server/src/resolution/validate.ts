@@ -1,6 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { isOffPlane } from "../off-plane.js";
 import type { GameState } from "@vtt/domain";
+import { checkChoices } from "./grant-extras.js";
 import { effectiveActions } from "../effective-actions.js";
 import { withShotAmmunitionOnly } from "../ammunition.js";
 import { consumableRowFor } from "../consumables.js";
@@ -222,6 +223,8 @@ export function openResolve(
       ? upcastAction(reaching, spell, castLevel)
       : reaching;
   const action = withChosenDamageType(upcast, input.damageType ?? null);
+  // An option or a weapon the action doesn't offer is refused before anything rolls.
+  checkChoices(action, input, attacker, deps.catalog);
   const derived = deriveEquipment(attacker, deps.definition, deps.catalog);
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
   const riderItemId = sourceItemOf(action, derived, attacker.inventory);

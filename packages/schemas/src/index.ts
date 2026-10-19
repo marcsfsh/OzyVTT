@@ -340,6 +340,8 @@ export const RiderTriggerSchema = z
     z.object({ type: z.literal("on-ability-check") }).strict(),
     z.object({ type: z.literal("on-initiative-roll") }).strict(),
     z.object({ type: z.literal("on-taking-damage") }).strict(),
+    /** The bearer's healing lands (a spell's, a feature's): read by the healing modifiers. */
+    z.object({ type: z.literal("on-healing") }).strict(),
     // ---- filters ----
     /** `spell` is an attack that casts a spell; `weapon` one made with a weapon (not a spell, an Unarmed Strike or a
      * monster's natural attack), and `melee-weapon` and `ranged-weapon` such an attack made in melee or at range (a
@@ -360,15 +362,17 @@ export const RiderTriggerSchema = z
               "unarmed",
               "thrown",
               "reaction",
-              "opportunity"
+              "opportunity",
+              "two-handed",
+              "ranged-weapon-kind"
             ])
           )
           .min(1)
-          .max(10)
+          .max(11)
       })
       .strict()
       .describe(
-        "Filter. Narrows a moment to these attack kinds. melee, ranged and thrown come from the attack's reach, range and distance; `spell` is an attack that casts a spell (its action names a `spellId`); `reaction` and `opportunity` require the resolver to announce the trigger."
+        "Filter. Narrows a moment to these attack kinds. melee, ranged and thrown come from the attack's reach, range and distance; `spell` is an attack that casts a spell (its action names a `spellId`); `two-handed` is a melee attack with a weapon held in two hands (a Two-Handed weapon, or a Versatile one swung with both); `ranged-weapon-kind` is an attack with a weapon of the Ranged kind (a bow, a Dart, a Net), where `ranged-weapon` is any weapon attack made at range, a thrown Dagger included; `reaction` and `opportunity` require the resolver to announce the trigger."
       ),
     z
       .object({ type: z.literal("weapon-property-is"), properties: z.array(RiderSlugSchema).min(1).max(12) })
@@ -430,6 +434,50 @@ export const RiderTriggerSchema = z
     /** On an effect, its riders fire only for the creature that put the effect on its bearer, never for the bearer:
      * Hunter's Mark's extra damage when its caster hits the marked creature. */
     z.object({ type: z.literal("by-effect-source") }).strict(),
+    /** The creature making the attack against the bearer, or forcing its save, is one of these types (Protection from
+     *  Evil and Good: "Creatures of those types have Disadvantage on attack rolls against the target"). */
+    z
+      .object({ type: z.literal("source-creature-type-is"), creatureTypes: z.array(RiderSlugSchema).min(1).max(12) })
+      .strict()
+      .describe(
+        "Filter. Narrows a moment to the creature on the other side being one of these types: the attacker, for an attack against the bearer (`incoming-attack`), or the creature whose effect forces the bearer's save. Read from the stat block, so a character never matches."
+      ),
+    /** On an effect, its rider fires only on a roll against the creature that put the effect on its bearer (Bestow
+     *  Curse: "Disadvantage on attack rolls against you"). */
+    z
+      .object({ type: z.literal("versus-effect-source") })
+      .strict()
+      .describe(
+        "Filter. On an effect, narrows an attack roll by the bearer to one against the creature that put the effect on it (Bestow Curse's Disadvantage on attack rolls against the caster)."
+      ),
+    /** The target bears an effect of the bearer's carrying one of these tags (Grappler: a creature it grapples; Precise
+     *  Hunter: the creature its Hunter's Mark marks; Studied Attacks: the creature it missed). */
+    z
+      .object({ type: z.literal("versus-marked"), tags: z.array(EffectTagSchema).min(1).max(4) })
+      .strict()
+      .describe(
+        "Filter. Narrows to a target that bears an effect the bearer put on it with any of these tags: `grapple` for a creature it grapples (Grappler), `hunters-mark` for the creature its Hunter's Mark marks (Precise Hunter)."
+      ),
+    /** The target is missing any of its Hit Points (Colossus Slayer). */
+    z
+      .object({ type: z.literal("versus-hurt") })
+      .strict()
+      .describe("Filter. Narrows to a target that is missing any of its Hit Points (Colossus Slayer)."),
+    /** The target stands within this many feet of the bearer, as the map measures (Conjure Minor Elementals' 15-foot
+     *  Emanation). Without a map it never matches. */
+    z
+      .object({ type: z.literal("versus-within"), feet: z.number().int().min(5).max(300) })
+      .strict()
+      .describe(
+        "Filter. Narrows to a target within this many feet of the bearer, as the map measures (Conjure Minor Elementals: a creature in its 15-foot Emanation). Where the map can't measure, it doesn't match."
+      ),
+    /** The spell is one the bearer casts as this class (its sheet entry's class): Innate Sorcery's Sorcerer spells. */
+    z
+      .object({ type: z.literal("spell-class-is"), classIds: z.array(RiderSlugSchema).min(1).max(8) })
+      .strict()
+      .describe(
+        "Filter. Narrows a spell moment to a spell the bearer casts as one of these classes (the class its sheet lists the spell under): Innate Sorcery's Sorcerer spells, Empowered Evocation's Wizard spells."
+      ),
     /** The bearer can see the other creature in the roll (Dodge: "if you can see the attacker"), as the server's sight
      *  answers it. */
     z
@@ -452,10 +500,18 @@ export const RiderTriggerSchema = z
       .strict()
       .describe(
         "Filter. On an attack roll, the other creature in it perceives the bearer with none of these senses within their range (Blur: an attacker that perceives you with Blindsight or Truesight is immune)."
+      ),
+    /** The roller says the check fits this situation (a Book's topic, a Crowbar's leverage). The sheet offers it as a
+     *  toggle beside the checks, and the GM judges whether the roll fits. */
+    z
+      .object({ type: z.literal("situation-is"), situation: z.string().trim().min(3).max(80) })
+      .strict()
+      .describe(
+        "Filter. Narrows an ability check to one the roller says fits this situation, in plain words that follow the check's name after a comma (\"consulting an accurate Book about its topic\"). The sheet offers each situation the bearer's riders name as a toggle beside its checks; the rider applies only to a roll that names it, and the GM judges whether the roll fits. Needs the `on-ability-check` moment."
       )
   ])
   .describe(
-    "When a rider applies. Thirty-three named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
+    "When a rider applies. Forty-one named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
   );
 export type RiderTrigger = z.infer<typeof RiderTriggerSchema>;
 export type RiderTriggerKind = "static-gate" | "dynamic-gate" | "moment" | "filter";
@@ -480,6 +536,7 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "on-ability-check": "moment",
   "on-initiative-roll": "moment",
   "on-taking-damage": "moment",
+  "on-healing": "moment",
   "attack-kind-is": "filter",
   "weapon-property-is": "filter",
   "damage-type-is": "filter",
@@ -492,10 +549,20 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "versus-size": "filter",
   "versus-condition": "filter",
   "by-effect-source": "filter",
+  "source-creature-type-is": "filter",
+  "versus-effect-source": "filter",
+  "versus-marked": "filter",
+  "versus-hurt": "filter",
+  "versus-within": "filter",
+  "spell-class-is": "filter",
   "sees-other": "filter",
   "seen-by-other": "filter",
-  "other-lacks-sense": "filter"
+  "other-lacks-sense": "filter",
+  "situation-is": "filter"
 });
+
+/** The moments the healing step collects (`resolution/heal.ts`): a healing modifier gated on another never fires. */
+export const HEALING_MOMENTS: readonly RiderTrigger["type"][] = Object.freeze(["on-healing"]);
 
 /** The moments the damage roll collects (`rollRiderDamage`). A damage rider gated on any other moment would never
  * fire, so content and homebrew refuse it. */
@@ -548,6 +615,15 @@ export const RiderWhenSchema = z
       context.addIssue({
         code: "custom",
         message: "A filter needs a moment to narrow. Add the roll or event it applies to."
+      });
+    }
+    if (
+      triggers.some((trigger) => trigger.type === "situation-is") &&
+      !triggers.some((trigger) => trigger.type === "on-ability-check")
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "A situation the roller names fits only an ability check. Make the rider apply on an ability check."
       });
     }
     checkSharedTriggerRules(triggers, context);
@@ -783,34 +859,82 @@ export const ModifierSchema = z
       .describe(
         'A flat bonus to saving throws. Narrow it with `when: [{"type": "ability-is", "abilities": ["dex"]}]` (a Cloak of Protection is the unnarrowed form).'
       ),
-    /** A flat bonus to ability and skill checks. Gloves of Thievery (+5 Sleight of Hand) is literally this. */
+    /** A bonus to ability and skill checks: flat, `dice` on top (Guidance's 1d4), or the bearer's modifier in
+     *  `abilityModifier`, counted as at least `minimum` (Thaumaturge's Wisdom, minimum +1). */
     z
-      .object({ type: z.literal("check-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate })
+      .object({
+        type: z.literal("check-bonus"),
+        amount: z.number().int().min(-10).max(10),
+        dice: SignedDiceSchema.optional(),
+        abilityModifier: AbilitySchema.optional(),
+        minimum: z.number().int().min(-5).max(10).optional(),
+        ...riderGate
+      })
       .strict()
       .describe(
-        "A flat bonus to ability and skill checks. Gloves of Thievery (+5 Sleight of Hand) is this plus a `skill-is` filter."
+        "A bonus to ability and skill checks. Gloves of Thievery (+5 Sleight of Hand) is this plus a `skill-is` filter. `dice` rolls on top (Guidance's 1d4), and with a minus takes them off. `abilityModifier` adds the bearer's modifier in that ability, counted as at least `minimum` (Thaumaturge: the Wisdom modifier, minimum of +1, on Arcana and Religion checks)."
+      ),
+    /** A d20 that shows less than `minimum` counts as `minimum` (Glibness's 15 on Charisma checks; Reliable Talent's
+     *  10 on a check that uses a proficiency, `proficientOnly`). */
+    z
+      .object({
+        type: z.literal("d20-minimum"),
+        roll: z.enum(["check", "save"]),
+        minimum: z.number().int().min(2).max(20),
+        proficientOnly: z.literal(true).optional(),
+        ...riderGate
+      })
+      .strict()
+      .describe(
+        'The d20 of a check or a save counts as `minimum` when it shows less ("you can replace the number you roll with a 15", Glibness). `proficientOnly` limits it to a check that uses one of the bearer\'s skill or tool proficiencies (Reliable Talent: "treat a d20 roll of 9 or lower as a 10"). Narrow it with `ability-is` or `skill-is`.'
+      ),
+    /** A check's or a save's total counts as the bearer's score in `abilityScore` when it comes out lower
+     *  (Indomitable Might: a Strength check or save "less than your Strength score"). */
+    z
+      .object({
+        type: z.literal("total-minimum"),
+        roll: z.enum(["check", "save"]),
+        abilityScore: AbilitySchema,
+        ...riderGate
+      })
+      .strict()
+      .describe(
+        "A check's or a save's total counts as the bearer's score in `abilityScore` when it is lower (Indomitable Might: \"If your total for a Strength check or Strength saving throw is less than your Strength score, you can use that score in place of the total\"). Narrow it with `ability-is`."
       ),
     /** Advantage or disadvantage on a named roll; `aggregateRollMode` applies 5e cancellation. `concentration` is the
      * Constitution save that keeps a spell going. */
     z
       .object({
         type: z.literal("roll-mode"),
-        roll: z.enum(["attack", "incoming-attack", "save", "check", "initiative", "concentration"]),
+        roll: z.enum(["attack", "incoming-attack", "save", "check", "initiative", "concentration", "death-save"]),
         mode: z.enum(["advantage", "disadvantage"]),
         ...riderGate
       })
       .strict()
       .describe(
-        'Advantage or disadvantage on a named roll: one branch per roll kind, with a `mode` field. It feeds the same aggregation that already implements 5e cancellation (any advantage plus any disadvantage is normal) and labels each source on the roll card, so a curse is `mode: "disadvantage"` and needs no separate machinery. `concentration` is the Constitution save that keeps a spell going; `incoming-attack` is attacks made against the bearer (Dodge).'
+        'Advantage or disadvantage on a named roll: one branch per roll kind, with a `mode` field. It feeds the same aggregation that already implements 5e cancellation (any advantage plus any disadvantage is normal) and labels each source on the roll card, so a curse is `mode: "disadvantage"` and needs no separate machinery. `concentration` is the Constitution save that keeps a spell going; `incoming-attack` is attacks made against the bearer (Dodge); `death-save` is a Death Saving Throw alone (Beacon of Hope), where `save` reaches every saving throw.'
       ),
     // ---- damage and defence ----
     /** Flat damage, the other half of a "+1 weapon". Weapon-scoped by default on an item with a weapon block, so two
      * magic weapons never stack. Standing, it folds into the action's damage formula; on a moment it is its own line. */
     z
-      .object({ type: z.literal("damage-bonus"), amount: z.number().int().min(-10).max(10), ...riderGate })
+      .object({
+        type: z.literal("damage-bonus"),
+        amount: z.number().int().min(-10).max(10),
+        dice: SignedDiceSchema.optional(),
+        leavesOne: z.literal(true).optional(),
+        ...riderGate
+      })
       .strict()
       .describe(
-        'A flat bonus to damage rolls: the other half of a "+1 weapon" (`attack-bonus` is the to-hit half). Standing, it folds into the swing\'s printed damage formula; gated on a moment ("+7 on a critical hit", Rage\'s "+2 on a melee damage roll") it lands as its own labelled line at resolution, and only the damage roll\'s moments (`on-hit`, `on-critical-hit`, `on-damage-roll`) are accepted. Weapon-scoped by default on an item with a weapon block, so two magic weapons never stack.'
+        'A flat bonus to damage rolls: the other half of a "+1 weapon" (`attack-bonus` is the to-hit half). Standing, it folds into the swing\'s printed damage formula; gated on a moment ("+7 on a critical hit", Rage\'s "+2 on a melee damage roll") it lands as its own labelled line at resolution, and only the damage roll\'s moments (`on-hit`, `on-critical-hit`, `on-damage-roll`) are accepted. Weapon-scoped by default on an item with a weapon block, so two magic weapons never stack. `dice` are rolled on every damage roll it reaches, and with a minus taken off (Ray of Enfeeblement\'s -1d8); `leavesOne` keeps the damage at 1 or more ("this can\'t reduce the damage below 1", Reduce).'
+      ),
+    /** Each damage die of the roll that shows less than `minimum` counts as `minimum` (Great Weapon Fighting's 3). */
+    z
+      .object({ type: z.literal("damage-die-minimum"), minimum: z.number().int().min(2).max(12), ...riderGate })
+      .strict()
+      .describe(
+        'Each die of the attack\'s own damage that shows less than `minimum` counts as `minimum` (Great Weapon Fighting: "treat any 1 or 2 on a damage die as a 3"). Narrow it with `attack-kind-is` (`two-handed`: a melee swing with both hands), and gate it on the damage roll (`on-damage-roll`).'
       ),
     /** Extra typed damage as dice (`formula`), the bearer's ability modifier (`abilityModifier`), or both.
      * `damageType` absent takes the attack's own type (Empowered Evocation follows the spell). `doubleOnCritical`
@@ -824,6 +948,8 @@ export const ModifierSchema = z
         abilityModifier: AbilitySchema.optional(),
         damageType: DamageTypeSchema.optional(),
         doubleOnCritical: z.boolean().default(true),
+        /** It is dealt once a turn at most, whoever's turn it is (Colossus Slayer). */
+        oncePerTurn: z.literal(true).optional(),
         ...riderGate
       })
       .strict()
@@ -844,10 +970,74 @@ export const ModifierSchema = z
       ),
     /** Flat reduction of incoming damage, taken off before resistance (SRD Order of Application). */
     z
-      .object({ type: z.literal("damage-reduction"), amount: z.number().int().min(1).max(30), ...riderGate })
+      .object({
+        type: z.literal("damage-reduction"),
+        amount: z.number().int().min(0).max(30),
+        dice: DiceFormulaSchema.optional(),
+        oncePerTurn: z.literal(true).optional(),
+        ...riderGate
+      })
       .strict()
       .describe(
-        "Flat reduction of incoming damage, taken off the hit once before resistance and vulnerability (SRD Order of Application), from the largest part it covers first."
+        'Reduction of incoming damage, taken off the hit once before resistance and vulnerability (SRD Order of Application), from the largest part it covers first: `amount`, plus `dice` rolled as the damage lands (Resistance: "reduces the total damage taken by 1d4"). `oncePerTurn` on an effect lets it reduce one hit a turn ("A creature can benefit from this spell only once per turn").'
+      ),
+    /** Immunity to the listed damage types while it holds (Mind Blank's Psychic). Read standing, like resistance. */
+    z
+      .object({
+        type: z.literal("damage-immunity"),
+        damageTypes: z.array(DamageTypeSchema).min(1).max(13),
+        ...riderGate
+      })
+      .strict()
+      .describe(
+        "Immunity to the listed damage types (Mind Blank's Psychic): damage of those types does nothing. Read standing, before any roll, as resistance is, so a moment gate is refused at publish."
+      ),
+    /** The bearer's own damage of these types ignores the target's Resistance (Boon of Irresistible Offense). */
+    z
+      .object({
+        type: z.literal("ignores-resistance"),
+        damageTypes: z.array(DamageTypeSchema).min(1).max(13),
+        ...riderGate
+      })
+      .strict()
+      .describe(
+        "The bearer's damage of these types ignores the target's Resistance (\"The Bludgeoning, Piercing, and Slashing damage you deal always ignores Resistance\"). Read standing on the creature dealing the damage."
+      ),
+    /** No attack roll against the bearer has Advantage (Elusive), while its gates hold. */
+    z
+      .object({ type: z.literal("advantage-denied"), roll: z.enum(["incoming-attack"]), ...riderGate })
+      .strict()
+      .describe(
+        'No attack roll against the bearer can have Advantage while it holds (Elusive: "unless you have the Incapacitated condition", a `while-condition` gate with `present: false`). Disadvantage still counts.'
+      ),
+    /** Healing the bearer receives counts each die at its highest face (Beacon of Hope). */
+    z
+      .object({ type: z.literal("healing-received-maximized"), ...riderGate })
+      .strict()
+      .describe(
+        'Every healing roll the bearer receives counts each die at its highest face ("regains the maximum number of Hit Points possible from any healing", Beacon of Hope).'
+      ),
+    /** Healing the bearer gives counts each die at its highest face (Supreme Healing), narrowed by `on-healing` filters. */
+    z
+      .object({ type: z.literal("healing-dice-maximized"), ...riderGate })
+      .strict()
+      .describe(
+        "Healing the bearer gives counts each die at its highest face (Supreme Healing: spells and Channel Divinity). Gate it on `on-healing`, narrowed by `spell-level-is` or the like."
+      ),
+    /** More hit points from the bearer's healing: `amount`, plus the spell slot's level when `perSlotLevel` (Disciple of
+     *  Life: 2 plus the slot's level, on a spell cast with a slot). `self`: the bearer regains it instead, once a cast
+     *  heals another creature (Blessed Healer). */
+    z
+      .object({
+        type: z.literal("healing-bonus"),
+        amount: z.number().int().min(0).max(20),
+        perSlotLevel: z.literal(true).optional(),
+        self: z.literal(true).optional(),
+        ...riderGate
+      })
+      .strict()
+      .describe(
+        "More hit points from the bearer's healing: `amount`, plus the slot's level with `perSlotLevel`, which applies only to a spell cast with a spell slot (Disciple of Life: \"additional Hit Points equal to 2 plus the spell slot's level\"). With `self` the bearer regains it itself once a slot spell restores hit points to another creature (Blessed Healer). Gate it on `on-healing`."
       ),
     z
       .object({
@@ -1038,6 +1228,58 @@ export const OngoingDamageSchema = z
   .strict();
 export type OngoingDamage = z.infer<typeof OngoingDamageSchema>;
 
+/** Conditions a creature of these types can't give the bearer (Protection from Evil and Good). */
+export const ConditionWardSchema = z
+  .object({
+    conditionIds: z.array(ConditionSchema).min(1).max(6),
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(12)
+  })
+  .strict();
+/** A condition held off while an effect lasts, kept as it was (an Exhaustion level, a player's own mark). */
+export const SuppressedConditionSchema = z
+  .object({
+    id: ConditionIdSchema,
+    level: z.number().int().min(1).max(6).optional(),
+    selfApplied: z.literal(true).optional(),
+    standalone: z.literal(true).optional()
+  })
+  .strict();
+/** How a weapon an effect is bound to swings while it lasts. */
+export const EffectWeaponSchema = z
+  .object({
+    ability: AbilitySchema.optional(),
+    dice: DiceFormulaSchema.optional(),
+    damageTypes: z.array(DamageTypeSchema).min(1).max(3).optional()
+  })
+  .strict();
+/** The generic actions an effect or a feature can let its bearer take as a Bonus Action. */
+export const BonusActionBaseSchema = z.enum(["dash", "disengage", "hide"]);
+/** A spell's later action another creature may take, at the cast's numbers (Dragon's Breath's exhale). */
+export const GrantedSpellActionSchema = z
+  .object({
+    spellId: RiderSlugSchema,
+    /** The later action's name on the spell ("exhale"). */
+    name: z.string().min(1).max(60),
+    level: z.number().int().min(0).max(9),
+    saveDc: z.number().int().min(1).max(40),
+    attackBonus: z.number().int().min(-10).max(30),
+    modifier: z.number().int().min(-5).max(15),
+    /** The damage type picked when the spell was cast, which every use deals. */
+    damageType: DamageTypeSchema.optional()
+  })
+  .strict();
+/** An action an effect's bearer may take to end it: a save or a check at a DC. */
+export const EffectEndActionSchema = z
+  .object({
+    activation: z.enum(["action", "bonus-action"]),
+    kind: z.enum(["save", "check"]),
+    ability: AbilitySchema,
+    skill: RiderSlugSchema.optional(),
+    dc: z.number().int().min(1).max(40),
+    /** What the sheet calls it ("Collect itself", "Find the way out"). */
+    label: z.string().min(1).max(60)
+  })
+  .strict();
 /** The speeds a form moves with, in place of the creature's own (a quasit's toad: Speed 40, Swim 40). */
 export const FormSpeedsSchema = z
   .object({
@@ -1347,10 +1589,48 @@ export const EffectInstanceSchema = z
         areaPlaced: z.boolean().default(false),
         shaping: z.array(CastShapingSchema).max(4).optional(),
         turnsLeft: z.number().int().min(0).max(15000),
-        lastRound: z.number().int().positive()
+        lastRound: z.number().int().positive(),
+        /** The option picked when the casting began (Bestow Curse's curse), which the finished cast applies. */
+        optionId: RiderSlugSchema.optional()
       })
       .strict()
       .optional(),
+    /** Hit points the bearer regains at the start of each of its turns while this lasts (Regenerate's 1). */
+    hitPointsEachTurn: z.number().int().min(1).max(100).optional(),
+    /** Conditions a creature of these types can't give the bearer while this lasts (Protection from Evil and Good:
+     *  Charmed and Frightened from Aberrations, Celestials, Elementals, Fey, Fiends and Undead). */
+    conditionWards: ConditionWardSchema.optional(),
+    /** Conditions the bearer had when this began, held off while it lasts and given back when it ends, if what imposed
+     *  them still holds (Calm Emotions). */
+    suppressedConditions: z.array(SuppressedConditionSchema).max(6).optional(),
+    /** The inventory row this effect is bound to (Magic Weapon, Shillelagh): its `this-item` riders reach only that
+     *  row's rolls, `weapon` changes how it swings, and it ends once the row is no longer carried. */
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
+    /** How the bound weapon swings while this lasts: the ability for its attack and damage rolls (Shillelagh's
+     *  spellcasting ability), its damage dice, and the damage types its wielder may pick on a hit (Force or its own). */
+    weapon: EffectWeaponSchema.optional(),
+    /** The option picked when this began (Bestow Curse's curse, Alter Self's form). */
+    optionId: RiderSlugSchema.optional(),
+    /** Generic actions the bearer may take as a Bonus Action while this lasts (Expeditious Retreat's Dash). */
+    bonusActions: z.array(BonusActionBaseSchema).min(1).max(3).optional(),
+    /** A spell's later action its bearer may take while this lasts, at the numbers it was cast with (Dragon's Breath:
+     *  the touched creature exhales, with the damage type picked at the cast). */
+    grantedSpellAction: GrantedSpellActionSchema.optional(),
+    /** An action the bearer may take to end this: a save (Irresistible Dance: "take an action to collect itself") or
+     *  a check (Maze's DC 20 Intelligence (Investigation)). */
+    endAction: EffectEndActionSchema.optional(),
+    /** The turn a once-a-turn part of this last applied (`round:actorId`), so it applies once a turn (Resistance). */
+    usedOnTurn: z.string().max(160).optional(),
+    /** Its attack, save, check and Initiative penalties move one toward 0 as each of the bearer's Long Rests ends, and
+     *  it ends when none is left: a penalty that eases with rest, as Raise Dead's ordeal does in death.ts. */
+    shrinksEachLongRest: z.literal(true).optional(),
+    /** How the bearer's Unarmed Strike lands while this lasts: the ability for its attack and damage rolls, its die
+     *  and its damage type (Alter Self's claws: 1d6 Slashing with the spellcasting ability). */
+    unarmedStrike: EffectWeaponSchema.optional(),
     /** A roll its bearer may answer with it, which ends it (a Bardic Inspiration die). */
     answer: RollAnswerSchema.optional(),
     /** What a melee hit on its bearer costs the attacker (Fire Shield's 2d8). */
@@ -2053,6 +2333,41 @@ export const EffectGrantSchema = z
     "An effect a feature or action grants, in the same vocabulary the live rules engine already resolves on an actor, reused as it is, so a homebrew Rage behaves exactly like the bundled one."
   );
 
+/** One choice a grant or a failed save offers, and what picking it adds to the effect (Fire Shield's chill shield:
+ *  Resistance to Fire; Bestow Curse's ability curse: Disadvantage on Strength checks and saves). */
+export const GrantOptionSchema = z
+  .object({
+    id: RiderSlugSchema,
+    name: z.string().min(1).max(60),
+    tags: z.array(EffectTagSchema).max(4).default([]),
+    modifiers: EffectModifiersSchema.default([]),
+    /** Conditions it adds while the effect lasts, which end with it (Eyebite's Asleep: Unconscious). */
+    conditions: z.array(ConditionSchema).min(1).max(3).optional(),
+    conditionImmunities: z.array(ConditionSchema).min(1).max(6).optional(),
+    /** Conditions the bearer already has that stop applying while it lasts and come back after (Calm Emotions). */
+    suppressesConditions: z.array(ConditionSchema).min(1).max(6).optional(),
+    /** The bearer's Speed is 0 while it lasts (Command's Halt). */
+    speedZero: z.literal(true).optional(),
+    /** It ends early when the bearer takes damage (Eyebite's Asleep). */
+    endsOnDamage: z.literal(true).optional(),
+    /** Generic actions the bearer may take as a Bonus Action while it lasts. */
+    bonusActions: z.array(BonusActionBaseSchema).min(1).max(3).optional(),
+    /** The damage type this option sets for what the effect deals (Dragon's Breath's acid, Fire Shield's cold). */
+    damageType: DamageTypeSchema.optional(),
+    /** The bearer's Unarmed Strike deals this die of this type while it lasts, using this ability, or the granter's
+     *  spellcasting ability, for its attack and damage rolls (Alter Self's claws: 1d6 Slashing). */
+    unarmedStrike: z
+      .object({
+        dice: DiceFormulaSchema,
+        damageType: DamageTypeSchema,
+        ability: z.union([AbilitySchema, z.literal("spellcasting")])
+      })
+      .strict()
+      .optional()
+  })
+  .strict();
+export type GrantOption = z.infer<typeof GrantOptionSchema>;
+
 /** An action's grant: the effect shape, which may also go to every creature the action targets (Bless), land only
  *  when its attack hits (Guiding Bolt's light), and add to AC while it lasts (Shield of Faith). */
 export const ActionGrantSchema = EffectGrantSchema.extend({
@@ -2070,9 +2385,13 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
     .union([z.number().int().min(1).max(100), z.literal("spellcasting-modifier")])
     .optional(),
   /** What the recipient's Hit Point maximum and current hit points rise by while it lasts (Aid's 5), `perSlot` more for
-   *  each slot level above the spell's. */
+   *  each slot level above the spell's; with `formula`, a roll made for each recipient (Heroes' Feast's 2d10). */
   hitPointMaximumGain: z
-    .object({ amount: z.number().int().min(1).max(100), perSlot: z.number().int().min(1).max(50).optional() })
+    .object({
+      amount: z.number().int().min(0).max(100),
+      perSlot: z.number().int().min(1).max(50).optional(),
+      formula: DiceFormulaSchema.optional()
+    })
     .strict()
     .optional(),
   /** The recipient's Speed is multiplied by this while it lasts, after every other change (Haste: 2). */
@@ -2082,6 +2401,73 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   baseArmorClass: z.number().int().min(11).max(20).optional(),
   /** The recipient's AC is at least this while it lasts (Barkskin: 17). */
   armorClassFloor: z.number().int().min(10).max(25).optional(),
+  /** Hit points the recipient regains at the start of each of its turns (Regenerate: 1). */
+  hitPointsEachTurn: z.number().int().min(1).max(100).optional(),
+  /** Conditions a creature of these types can't give the recipient (Protection from Evil and Good). */
+  conditionWards: ConditionWardSchema.optional(),
+  /** Conditions the recipient already has that stop applying while it lasts and come back after (Calm Emotions). */
+  suppressesConditions: z.array(ConditionSchema).min(1).max(6).optional(),
+  /** Generic actions the recipient may take as a Bonus Action while it lasts (Expeditious Retreat: Dash). */
+  bonusActions: z.array(BonusActionBaseSchema).min(1).max(3).optional(),
+  /** The spell's later action, by name, that the recipient may take while it lasts at the cast's numbers (Dragon's
+   *  Breath: "exhale"); the caster's own sheet doesn't offer it. */
+  grantsLaterAction: z.string().min(1).max(60).optional(),
+  /** An action the recipient may take to end it: a save at the caster's spell save DC (`dc: "spellcasting"`) or a
+   *  printed DC (Irresistible Dance: a Wisdom save as an action; Maze: DC 20 Intelligence (Investigation)). */
+  endAction: EffectEndActionSchema.extend({
+    dc: z.union([z.number().int().min(1).max(40), z.literal("spellcasting")])
+  })
+    .strict()
+    .optional(),
+  /** The grant binds to one weapon its recipient carries, picked on the resolve (`input.itemId`): its riders scoped
+   *  `this-item` reach that weapon alone, and `weapon` changes how it swings while the grant lasts. `weaponIds`
+   *  limits the pick (Shillelagh: a Club or Quarterstaff); `nonmagical` refuses a magic one (Magic Weapon); `melee`
+   *  refuses a ranged one (Sacred Weapon). */
+  bindsWeapon: z
+    .object({
+      weaponIds: z.array(RiderSlugSchema).min(1).max(6).optional(),
+      nonmagical: z.literal(true).optional(),
+      melee: z.literal(true).optional(),
+      /** The ability its attack and damage rolls use: the granter's spellcasting ability, or a named one. */
+      ability: z.union([AbilitySchema, z.literal("spellcasting")]).optional(),
+      /** Its damage dice, by the granter's character level from each row's level up (Shillelagh: d8, d10 from 5, d12
+       *  from 11, 2d6 from 17). */
+      dice: z
+        .array(z.object({ level: z.number().int().min(1).max(20), formula: DiceFormulaSchema }).strict())
+        .min(1)
+        .max(4)
+        .optional(),
+      /** The damage types its wielder may pick on a hit besides the weapon's own (Shillelagh: Force). */
+      damageTypes: z.array(DamageTypeSchema).min(1).max(2).optional(),
+      /** The granter's modifier in this ability, at least `minimum`, added to its attack rolls (Sacred Weapon's
+       *  Charisma, minimum +1). */
+      attackBonusAbility: z
+        .object({ ability: AbilitySchema, minimum: z.number().int().min(0).max(5) })
+        .strict()
+        .optional(),
+      /** A flat bonus to its attack and damage rolls by the slot it was cast with, from each row's level up (Magic
+       *  Weapon: +1, +2 from a level 3 slot, +3 from level 6). */
+      bonusBySlot: z
+        .array(z.object({ level: z.number().int().min(1).max(9), bonus: z.number().int().min(1).max(3) }).strict())
+        .min(1)
+        .max(3)
+        .optional()
+    })
+    .strict()
+    .optional(),
+  /** Choices the granter makes as it grants, each adding its own part to the effect (Alter Self's form, Enhance
+   *  Ability's ability, Fire Shield's warm or chill). With `optionsPerTarget`, a choice for each recipient. */
+  options: z.array(GrantOptionSchema).min(2).max(20).optional(),
+  optionsPerTarget: z.literal(true).optional(),
+  /** Its attack, save, check and Initiative penalties shrink by one with each of the recipient's Long Rests: a
+   *  penalty that eases with rest. */
+  shrinksEachLongRest: z.literal(true).optional(),
+  /** It ends early when the recipient takes damage (Sequester: "This spell also ends if the target takes any
+   *  damage"). */
+  endsOnDamage: z.literal(true).optional(),
+  /** The recipient also takes the Dash action as it is granted (Expeditious Retreat: "You take the Dash action, and
+   *  until the spell ends, you can take that action again as a Bonus Action"). */
+  dashesNow: z.literal(true).optional(),
   /** A roll the recipient may answer with it, which ends it (Bardic Inspiration: add the die to a failed D20 Test). */
   answer: RollAnswerSchema.optional(),
   /** What a melee hit on the recipient costs the attacker while it lasts (Fire Shield's 2d8). */
@@ -2507,6 +2893,19 @@ export const SaveFailureEffectSchema = z
     armorClassBonus: z.number().int().min(-10).max(10).optional(),
     /** It ends when a spell restores the bearer's hit points ("The wound closes after ... a spell restores Hit Points"). */
     endsOnSpellHealing: z.literal(true).optional(),
+    /** The caster picks what the failure does, and the pick adds its part (Bestow Curse's curse, Eyebite's Asleep,
+     *  Panicked or Sickened); with `optionsPerTarget`, a pick for each target. */
+    options: z.array(GrantOptionSchema).min(2).max(20).optional(),
+    optionsPerTarget: z.literal(true).optional(),
+    /** An action the bearer may take to end it (Irresistible Dance: a Wisdom save at the spell save DC). */
+    endAction: EffectEndActionSchema.extend({
+      dc: z.union([z.number().int().min(1).max(40), z.literal("spellcasting")])
+    })
+      .strict()
+      .optional(),
+    /** The bearer can't move from its space while it lasts (Irresistible Dance: "must use all its movement to dance in
+     *  place"). */
+    speedZero: z.literal(true).optional(),
     /** The light the creature sheds while it lasts (Faerie Fire: "Each creature ... sheds Dim Light"). */
     light: CarriedLightSchema.optional(),
     /** The creature's size while it lasts (Enlarge/Reduce: one size larger or smaller). */

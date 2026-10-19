@@ -254,6 +254,22 @@ const PendingSaveEffectSchema = z
     /** "Until the end of the current turn" for a save made at the start of the bearer's own turn (Stinking Cloud),
      *  where "until the end of its next turn" would run a turn longer. */
     currentTurn: z.literal(true).optional(),
+    /** An action the bearer may take to end it (Irresistible Dance's "collect itself"). */
+    endAction: EffectInstanceSchema.shape.endAction,
+    /** The option the caster picked for the failure (Bestow Curse's curse). */
+    optionId: EffectInstanceSchema.shape.optionId,
+    /** Conditions the bearer is immune to while it lasts (Calm Emotions' Charmed and Frightened). */
+    conditionImmunities: EffectInstanceSchema.shape.conditionImmunities,
+    /** Conditions the bearer already has that stop applying while it lasts and come back after (Calm Emotions). */
+    suppressesConditions: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(60)
+      )
+      .max(6)
+      .optional(),
     /** The form a failure shape-shifts the creature into (Polymorph's Beast), taken as the effect lands. */
     form: EffectInstanceSchema.shape.form,
     /** The creature's size while it lasts (Enlarge/Reduce). */
@@ -457,7 +473,9 @@ export const HeldRollSchema = z
         /** The GM's forced mode, which a reroll keeps. */
         rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
         callId: z.uuid().optional(),
-        findActorId: z.uuid().optional()
+        findActorId: z.uuid().optional(),
+        /** The situations the roller said it fits, which a reroll or an answer keeps. */
+        situations: z.array(z.string().min(3).max(80)).max(6).optional()
       })
       .strict()
       .optional(),

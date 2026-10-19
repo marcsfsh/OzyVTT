@@ -593,7 +593,7 @@ function parkedAttackOf(answer: Answer) {
   const action =
     attacker && parked
       ? parked.builtin
-        ? builtinActionFor(attackerDefinition, parked.actionId)
+        ? builtinActionFor(attackerDefinition, parked.actionId, attacker)
         : effectiveActions(attackerDefinition, attacker, deps.catalog).find(
             (candidate) => candidate.id === parked.actionId
           )

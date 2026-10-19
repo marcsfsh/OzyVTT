@@ -65,6 +65,8 @@ export type CheckRollInput = Readonly<{
   findActorId?: string;
   /** The GM's call this check answers. */
   callId?: string;
+  /** The situations the roller says the check fits (a Book's topic, prying with a Crowbar). */
+  situations?: readonly string[];
 }>;
 
 /** A check as it was rolled, and whether its numbers are kept from the one who rolled it (a blind roll), with what
@@ -106,6 +108,7 @@ function planFor(state: GameState, scope: Initiator, input: CheckRollInput, deps
     ...(deps.names ? { names: deps.names } : {}),
     ...(finding ? { finding } : {}),
     ...(warded.length > 0 ? { warded } : {}),
+    ...(input.situations !== undefined && input.situations.length > 0 ? { situations: input.situations } : {}),
     // Frightened's line of sight, the light the roller stands in, and how obscured the creature it seeks is.
     sight: checkSightFor(
       state,
@@ -135,7 +138,7 @@ function recordCheck(
   const roll = totalCheck(plan, faces, readAs, deps.random, options.others ?? []);
   const visibility = checkVisibility(state, scope, actor.id, input.visibility);
   const rollId = deps.newId();
-  const label = `${options.label ?? plan.label}${roll.reliableTalent ? " (Reliable Talent)" : ""}`;
+  const label = `${options.label ?? plan.label}${roll.reliableTalent ? " (Reliable Talent)" : ""}${roll.raisedBy ? ` (${roll.raisedBy})` : ""}`;
   const record: RollRecord = {
     id: rollId,
     commandId: input.commandId,
@@ -168,7 +171,8 @@ function recordCheck(
       visibility: input.visibility,
       ...(!typed && input.forcedMode !== undefined ? { rollMode: input.forcedMode } : {}),
       ...(input.callId !== undefined ? { callId: input.callId } : {}),
-      ...(input.findActorId !== undefined ? { findActorId: input.findActorId } : {})
+      ...(input.findActorId !== undefined ? { findActorId: input.findActorId } : {}),
+      ...(input.situations !== undefined && input.situations.length > 0 ? { situations: [...input.situations] } : {})
     }
   });
   return heldCheckResult(state, scope, actor, plan, typed ? "normal" : readAs, deps, input.commandId);
@@ -343,7 +347,8 @@ export function answerAbilityCheck(
     visibility: check.visibility,
     ...(check.rollMode !== undefined ? { forcedMode: check.rollMode } : {}),
     ...(check.findActorId !== undefined ? { findActorId: check.findActorId } : {}),
-    ...(check.callId !== undefined ? { callId: check.callId } : {})
+    ...(check.callId !== undefined ? { callId: check.callId } : {}),
+    ...(check.situations !== undefined ? { situations: check.situations } : {})
   };
   const { plan } = planFor(state, scope, rollInput, deps);
   const readAs = held.typed ? "normal" : (check.rollMode ?? plan.rollMode.mode);
@@ -387,7 +392,11 @@ export function rollSettledCheck(
     initiatorSessionId: record.sessionId,
     initiatorRole: record.role,
     initiatorLabel: actor.name,
-    label: `${record.label}${roll.reliableTalent ? " (Reliable Talent)" : ""}`.slice(0, 80),
+    label:
+      `${record.label}${roll.reliableTalent ? " (Reliable Talent)" : ""}${roll.raisedBy ? ` (${roll.raisedBy})` : ""}`.slice(
+        0,
+        80
+      ),
     actorId: actor.id,
     purpose: "check",
     visibility: record.visibility,
@@ -452,7 +461,8 @@ export function rerollAbilityCheck(
     visibility: check.visibility,
     ...(check.rollMode !== undefined ? { forcedMode: check.rollMode } : {}),
     ...(check.findActorId !== undefined ? { findActorId: check.findActorId } : {}),
-    ...(check.callId !== undefined ? { callId: check.callId } : {})
+    ...(check.callId !== undefined ? { callId: check.callId } : {}),
+    ...(check.situations !== undefined ? { situations: check.situations } : {})
   };
   const { plan } = planFor(state, scope, rollInput, deps);
   const label = `${plan.label} reroll`;
