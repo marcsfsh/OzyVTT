@@ -211,6 +211,8 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       modifiers: [...modifiers, ...hexDisadvantage, ...enhancedAdvantage, ...chosenResistance],
       ...(grant.answer ? { answer: structuredClone(grant.answer) } : {}),
       ...(grant.struck ? { struck: structuredClone(grant.struck) } : {}),
+      // Sanctuary: who targets the bearer saves first.
+      ...(grant.ward?.dc !== undefined ? { ward: { ability: grant.ward.ability, dc: grant.ward.dc } } : {}),
       // Greater Invisibility's Invisible condition, which ends with the effect.
       ...(grant.conditions ? { linkedConditionIds: [...grant.conditions] } : {}),
       onEnd: grant.onEnd,

@@ -1118,6 +1118,16 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "targets",
     duration: { type: "manual" }
   }),
+  // "Any creature who targets the warded creature with an attack roll or a damaging spell must succeed on a Wisdom
+  // saving throw or either choose a new target or lose the attack or spell", and it ends "if the warded creature
+  // makes an attack roll, casts a spell, or deals damage".
+  sanctuary: spellGrant({
+    name: "Sanctuary",
+    tags: ["sanctuary", "until-it-acts"],
+    target: "target",
+    duration: rounds(10),
+    ward: { ability: "wis" }
+  }),
   // "The target's base AC becomes 13 plus its Dexterity modifier", a way to work out AC that riders add to.
   "mage-armor": spellGrant({
     name: "Mage Armor",

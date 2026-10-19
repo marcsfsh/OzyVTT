@@ -255,8 +255,14 @@ export function castAreaOf(spell: SpellReference, mechanics: Pick<ActorAction, "
 }
 
 /** A cast's grant, its "spellcasting ability modifier" fixed at the caster's for this spell. */
-function castGrant(grant: NonNullable<ActorAction["grants"]>, modifier: number): NonNullable<ActorAction["grants"]> {
+function castGrant(
+  grant: NonNullable<ActorAction["grants"]>,
+  modifier: number,
+  saveDc: number
+): NonNullable<ActorAction["grants"]> {
   const copy = structuredClone(grant);
+  // A ward's save is against the caster's spell save DC (Sanctuary).
+  if (copy.ward && copy.ward.dc === undefined) copy.ward = { ...copy.ward, dc: saveDc };
   if (copy.temporaryHitPointsEachTurn !== "spellcasting-modifier") return copy;
   const { temporaryHitPointsEachTurn: _each, ...rest } = copy;
   return modifier >= 1 ? { ...rest, temporaryHitPointsEachTurn: Math.min(100, modifier) } : rest;
@@ -338,7 +344,7 @@ export function spellCastMechanics(
         : {}),
     // What the cast leaves on its targets (Bless, Hunter's Mark), sourced by the caster; Heroism's Temporary Hit Points
     // are the caster's modifier for this spell.
-    ...(effect.grant ? { grants: castGrant(effect.grant, numbers.modifier) } : {}),
+    ...(effect.grant ? { grants: castGrant(effect.grant, numbers.modifier, numbers.saveDc) } : {}),
     ...(effect.healing
       ? {
           healing: {

@@ -10,6 +10,8 @@ import { addEffect, makeEffect } from "../src/effects.js";
 import { applyDamageDetailed, healActor } from "../src/hit-points.js";
 import { answerSave } from "../src/saving-throws.js";
 import { traitsAtTurnEnd, traitsAtTurnStart } from "../src/trait-turns.js";
+import { actorOf, cast, caster } from "./spell-lifetimes-kit.js";
+import { ALLY } from "./spell-casters.js";
 
 // Saves that open on something other than the end of a creature's own turn, and the actions that end what they leave:
 // an aboleth's Mucus Cloud at the end of its turn, a Berserker Axe's curse when its bearer is damaged, a darkmantle
@@ -211,5 +213,50 @@ describe("Water Breathing", () => {
     );
     built.state.combat = { ...built.state.combat, underwater: true };
     expect(built.hero.effects.map((effect) => effect.name)).toEqual(["Water Breathing"]);
+  });
+});
+
+describe("Sanctuary", () => {
+  it("wards its target at the caster's spell save DC until the target acts", () => {
+    const fight = caster();
+    cast(fight, "sanctuary", { targetIds: [ALLY] });
+    expect(actorOf(fight.state, ALLY).effects).toMatchObject([
+      { name: "Sanctuary", tags: ["sanctuary", "until-it-acts"], ward: { ability: "wis", dc: 15 } }
+    ]);
+  });
+
+  it("turns away a creature that fails its save, spending nothing, and refuses it the same target this turn", () => {
+    const built = table("bandit");
+    built.hero.effects = [
+      makeEffect({
+        id: "ward",
+        name: "Sanctuary",
+        tags: ["sanctuary", "until-it-acts"],
+        duration: { type: "rounds", remaining: 10 },
+        ward: { ability: "wis", dc: 30 }
+      })
+    ];
+    const scimitar = built.definition.actions.find((entry) => entry.id === "scimitar")!;
+    const swing = () =>
+      resolveDefinitionAction(
+        built.state,
+        scimitar,
+        { actorId: IDS.monster, targetIds: [IDS.hero], commandId: nextId() },
+        {
+          random: () => 10,
+          newRollId: nextId,
+          gmSessionId: IDS.gm,
+          now: NOW,
+          definition: built.definition,
+          resolveDefinition: built.resolveDefinition
+        }
+      );
+    const turned = swing();
+    expect(turned.attack).toBeNull();
+    expect((turned.tableNarration ?? []).map((line) => line.text).join(" ")).toMatch(
+      /DC 30 WIS save, 10 \(d20 10\), a failure: it chooses a new target or loses the attack\./
+    );
+    expect(built.state.combat.turn.actionUsed).toBe(false);
+    expect(swing).toThrow(/turned away from Hero by Sanctuary this turn/);
   });
 });

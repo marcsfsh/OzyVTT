@@ -1235,6 +1235,11 @@ export const EffectInstanceSchema = z
     endsOnSpellHealing: z.literal(true).optional(),
     /** It ends when the bearer ends its turn where it can't see the effect's source (Horror Nimbus). */
     endsOutOfSight: z.literal(true).optional(),
+    /** A creature that targets the bearer with an attack roll or a damaging spell first makes this save (Sanctuary). */
+    ward: z
+      .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional(),
     /** SRD Suffocation: the rounds of breath the bearer has left (each of its turns' ends spends one), then the
      *  Exhaustion levels suffocating gave it (one at the end of each of its turns), which go when it breathes again
      *  and this ends. */
@@ -1864,7 +1869,13 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
    *  Inspiration die at a time"): a grant to a creature that holds one is refused. */
   onlyOne: z.literal(true).optional(),
   /** Only another creature may receive it ("inspire another creature"). */
-  notSelf: z.literal(true).optional()
+  notSelf: z.literal(true).optional(),
+  /** A creature that targets the recipient with an attack roll or a damaging spell first makes this save, against the
+   *  caster's spell save DC when the grant prints none (Sanctuary); a failure turns it away from the recipient. */
+  ward: z
+    .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40).optional() })
+    .strict()
+    .optional()
 }).strict();
 
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
