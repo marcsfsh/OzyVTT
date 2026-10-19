@@ -15,6 +15,10 @@ import { coverBonusOf, coverFor } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf } from "./damage.js";
 import { spellOf, spellSaveDuration } from "./concentration.js";
+import { repeatSaveOf } from "../save-stages.js";
+import { areEnemies } from "../creature-sides.js";
+import { AURA_IMMUNE_TAG, traitActionId } from "../statblock-traits.js";
+import { creatureTypeOf } from "../statblock-facts.js";
 import { openDamageWindow, type DamageWindowDeps } from "../damage-window.js";
 import { answerKeyOf, answersFromOthers, askAnswer } from "../roll-answers.js";
 
@@ -311,6 +315,11 @@ export function failureEffectFor(
     hazard?.duration ??
     (cast ? spellSaveDuration(cast.spell, cast.level) : undefined);
   const ongoingDamage = save.ongoingDamage ?? hazard?.ongoingDamage;
+  // When the target repeats the save, and what a failed repeat does (a basilisk's second failure Petrifies).
+  const repeat = repeatSaveOf(
+    save,
+    (conditionId) => `${conditionLabel(conditionId)} by ${attacker.name} (${action.name})`
+  );
   return {
     name: (
       declared?.name ??
@@ -333,12 +342,14 @@ export function failureEffectFor(
     sourceActorId: attacker.id,
     sourceName: attacker.name,
     ...(duration ? { duration } : {}),
-    ...(save.repeatSave ? { repeatSave: { ability: save.ability, dc: save.dc } } : {}),
+    ...(repeat ? { repeatSave: repeat } : {}),
     ...(save.endsOnDamage ? { endsOnDamage: true } : {}),
     ...(save.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
     ...(declared?.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
     ...(save.speedZero ? { speedZero: true } : {}),
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
+    // "Until the aboleth dies".
+    ...(save.endsWhenSourceDies && !grapple ? { endsWhenSourceDefeated: true } : {}),
     ...(ongoingDamage ? { ongoingDamage } : {}),
     ...(castId !== null ? { castId } : {}),
     ...(cast ? { spell: { id: cast.spell.id, level: cast.level } } : {}),
@@ -388,12 +399,19 @@ export function parkActionSave(ctx: ResolveContext): void {
   if (!action.save) return;
   const rider = attack !== null;
   if (rider && attack.outcome !== "hit" && attack.outcome !== "crit") return;
-  // The GM's explicit choice wins over the condition the action declares.
-  const conditionIds = input.conditionId ? [input.conditionId] : action.save.failureConditions;
+  // The GM's explicit choice wins over the condition the action declares. Exhaustion stacks, a level per entry (Weight
+  // of Years: "The target gains 1 Exhaustion level").
+  const conditionIds = [
+    ...(input.conditionId ? [input.conditionId] : action.save.failureConditions),
+    ...Array.from({ length: action.save.failureExhaustion ?? 0 }, () => "exhaustion")
+  ].slice(0, 4);
   const cast = spellCastOf(ctx);
   const onFailEffect = failureEffectFor(ctx, conditionIds, cast);
-  // A save its user makes (Contact Other Plane) is the user's alone, whatever was aimed at.
-  let saving = action.save.bySelf ? [attacker] : targets;
+  // A save its user makes (Contact Other Plane) is the user's alone, whatever was aimed at. A creature that succeeded
+  // against this action before is immune to it ("immune to this cloaker's Moan for the next 24 hours").
+  let saving = action.save.bySelf
+    ? [attacker]
+    : targets.filter((target) => !immuneToAction(ctx, target) && subjectToSave(ctx, target));
   const threshold = action.save.failsAtHitPoints;
   if (threshold !== undefined) {
     saving = [];
@@ -476,8 +494,18 @@ export function parkActionSave(ctx: ResolveContext): void {
               : null)
         )
       : 0;
-  const groups = new Map<number, string[]>();
-  for (const target of saving) groups.set(saveBonusOf(target), [...(groups.get(saveBonusOf(target)) ?? []), target.id]);
+  // "It does so with Advantage if you or your allies are fighting it" (Charm Person): in a fight, a target on the other
+  // side from the source.
+  const fightingOf = (target: (typeof targets)[number]) =>
+    action.save!.advantageIfFighting === true && fightingSides(ctx, target) ? FIGHTING_ADVANTAGE : "";
+  const groups = new Map<string, { saveBonus: number; advantageFrom: string; targetIds: string[] }>();
+  for (const target of saving) {
+    const saveBonus = saveBonusOf(target);
+    const advantageFrom = fightingOf(target);
+    const key = `${saveBonus}:${advantageFrom}`;
+    const group = groups.get(key) ?? { saveBonus, advantageFrom, targetIds: [] };
+    groups.set(key, { ...group, targetIds: [...group.targetIds, target.id] });
+  }
   // The spell the save is against, and whether it aimed at one creature alone (Staff of Charming's Resist Enchantment).
   const spell = action.spellId !== undefined ? deps.catalog?.spellRecord?.(action.spellId) : undefined;
   const against = spell
@@ -488,7 +516,7 @@ export function parkActionSave(ctx: ResolveContext): void {
         singleTarget: targets.length === 1 && action.area === undefined && spell.area === null
       }
     : undefined;
-  for (const [saveBonus, targetIds] of groups)
+  for (const { saveBonus, advantageFrom, targetIds } of groups.values())
     createPendingSaves(state, {
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -507,10 +535,61 @@ export function parkActionSave(ctx: ResolveContext): void {
       ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
       ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),
       ...(against ? { spell: against } : {}),
+      ...(advantageFrom !== "" ? { advantageFrom } : {}),
+      ...(action.save.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
+      ...(action.save.failureKills ? { failureKills: { ...action.save.failureKills } } : {}),
       magical: isMagicalAction(ctx),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
+}
+
+/** How a save's roll card names the Advantage a fight with its source's side gives it. */
+const FIGHTING_ADVANTAGE = "Fighting the source's side";
+
+/** In a running fight, the target and the action's user are both in it and on opposite sides. */
+function fightingSides(ctx: ResolveContext, target: ResolveContext["targets"][number]): boolean {
+  const { state, attacker, deps } = ctx;
+  if (!state.combat.active) return false;
+  const inFight = new Set(state.combat.initiative.map((entry) => entry.actorId));
+  return inFight.has(attacker.id) && inFight.has(target.id) && areEnemies(attacker, target, deps.resolveDefinition);
+}
+
+/** Whether the target is one the save is for: a creature of the type the text names ("If the target is a Humanoid"),
+ *  and not one still under this action's failure ("each creature that isn't currently affected by this breath"). The
+ *  GM is told why a target makes no save. */
+function subjectToSave(ctx: ResolveContext, target: ResolveContext["targets"][number]): boolean {
+  const { action, attacker, deps } = ctx;
+  const save = action.save!;
+  if (save.onlyCreatureTypes) {
+    const definition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
+    const type = creatureTypeOf(target, definition);
+    if (type !== null && !save.onlyCreatureTypes.includes(type)) {
+      ctx.warnings.push(`${target.name} isn't a ${save.onlyCreatureTypes.join(" or ")}, so it makes no save.`);
+      return false;
+    }
+  }
+  if (
+    save.sparesAffected &&
+    target.effects.some((effect) => effect.sourceActorId === attacker.id && effect.sourceActionId === action.id)
+  ) {
+    ctx.warnings.push(`${target.name} is still under ${attacker.name}'s ${action.name}, so it makes no save.`);
+    return false;
+  }
+  return true;
+}
+
+/** The target succeeded against this action of this source earlier, which keeps it immune for the fight; the GM is
+ *  told it makes no save. */
+function immuneToAction(ctx: ResolveContext, target: ResolveContext["targets"][number]): boolean {
+  const { action, attacker } = ctx;
+  const key = traitActionId(action.name);
+  const immune = target.effects.some(
+    (effect) =>
+      effect.tags.includes(AURA_IMMUNE_TAG) && effect.sourceActorId === attacker.id && effect.sourceActionId === key
+  );
+  if (immune) ctx.warnings.push(`${target.name} is immune to ${attacker.name}'s ${action.name}, so it makes no save.`);
+  return immune;
 }
 
 /**

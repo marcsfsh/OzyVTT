@@ -16,6 +16,7 @@ import type {
   PresenceStatus,
   RollRecord
 } from "@vtt/domain";
+import type { RepeatSave } from "@vtt/schemas";
 import { actionPools } from "./effective-actions.js";
 import { HASTED_TAG } from "./effects.js";
 import { healthBandOf } from "./hit-points.js";
@@ -223,6 +224,9 @@ const PENDING_SAVE_FIELDS = {
   failurePush: "never",
   // The save's own roll mode is read when it is answered.
   advantageAtSize: "never",
+  advantageFrom: "never",
+  // What a failure does beyond conditions is narrated when it lands.
+  failureKills: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
   gmApplies: "player",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
@@ -239,7 +243,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   escapeDc: "player",
   modifiers: "player",
   duration: "player",
-  repeatSave: "player",
+  // What a second failure brings and a failed repeat's damage dice are the stat block's text (`playerRepeatSave`).
+  repeatSave: "derived",
   endsOnDamage: "player",
   endsOnSourceSideDamage: "player",
   speedZero: "player",
@@ -424,6 +429,7 @@ export function projectPlayerCombat(
             ? {
                 onFailEffect: {
                   ...copyPlayerFields(onFail, ON_FAIL_EFFECT_FIELDS),
+                  ...(onFail.repeatSave ? { repeatSave: playerRepeatSave(onFail.repeatSave) } : {}),
                   name: onFailHidden ? withoutSourceName(onFail.name, onFail.sourceName) : onFail.name,
                   sourceName: onFailHidden ? HIDDEN_SOURCE : onFail.sourceName,
                   sourceActorId: null
@@ -486,8 +492,21 @@ function playerEffect(
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
   const yours = mine ? { yours: true as const, ...(readiedSpell ? { readiedSpell: { ...readiedSpell } } : {}) } : {};
-  if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...yours };
-  return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
+  const repeat = visible.repeatSave ? { repeatSave: playerRepeatSave(visible.repeatSave) } : {};
+  if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...repeat, ...yours };
+  return {
+    ...visible,
+    ...repeat,
+    name: withoutSourceName(visible.name, effect.sourceName),
+    sourceName: HIDDEN_SOURCE
+  };
+}
+
+/** A repeat save as a player reads it: the save, when it comes and the count so far. What a failed one turns the effect
+ *  into, and the dice it deals, are the stat block's text and stay with the GM. */
+function playerRepeatSave(repeat: RepeatSave): RepeatSave {
+  const { next: _next, failureDamage: _failureDamage, ...shown } = repeat;
+  return structuredClone(shown);
 }
 
 /** The GM's calls for a roll as one player sees them: only the calls naming their own characters, only those

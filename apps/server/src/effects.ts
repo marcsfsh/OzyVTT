@@ -34,6 +34,8 @@ export const NO_ACTIONS_TAG = "no-actions";
 export const NO_REACTIONS_TAG = "no-reactions";
 /** The bearer can't take a Bonus Action while this lasts (an ice devil's Ice Spear). */
 export const NO_BONUS_ACTIONS_TAG = "no-bonus-actions";
+/** On its turn the bearer can take an action or a Bonus Action, not both (a copper dragon's Slowing Breath). */
+export const ACTION_OR_BONUS_TAG = "action-or-bonus";
 /** The bearer can't make Opportunity Attacks while this lasts (Shocking Grasp). */
 export const NO_OPPORTUNITY_ATTACKS_TAG = "no-opportunity-attacks";
 /** The bearer can't regain Hit Points while this lasts (Chill Touch). */
@@ -332,6 +334,36 @@ export function addEffect(
     events?.push(...gained);
   }
   return effect;
+}
+
+/** Puts `replacement` in place of one effect (a failed repeat save's next stage: Petrified instead of Restrained). The
+ *  old effect's conditions the new one doesn't hold end; nothing else of an ending happens, so the Concentration and the
+ *  area of the cast it belongs to stay. */
+export function swapEffect(
+  state: GameState,
+  actorId: string,
+  effectId: string,
+  replacement: EffectInstance,
+  events: EffectNarration[],
+  immunities?: ConditionImmunitySource
+): EffectInstance | null {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const old = actor?.effects.find((candidate) => candidate.id === effectId);
+  if (!actor || !old) return null;
+  actor.effects = actor.effects.filter((candidate) => candidate.id !== effectId);
+  for (const conditionId of old.linkedConditionIds) {
+    if (replacement.linkedConditionIds.includes(conditionId) || linkedByAnEffect(actor, conditionId)) continue;
+    const entry = actor.conditions.find((condition) => condition.id === conditionId);
+    if (!entry) continue;
+    if (entry.standalone) {
+      const { standalone: _held, ...rest } = entry;
+      writeCondition(actor, rest);
+      continue;
+    }
+    removeConditionDirect(actor, conditionId);
+    events.push({ kind: "condition", text: `${actor.name} is no longer ${conditionLabel(conditionId)}.`, actorId });
+  }
+  return addEffect(state, actorId, replacement, events, immunities);
 }
 
 /** SRD Immunity: "it doesn't affect you in any way". Ends each of `conditionIds` the creature has, now that `cause`

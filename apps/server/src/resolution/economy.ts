@@ -12,6 +12,7 @@ import {
   NO_BONUS_ACTIONS_TAG,
   NO_REACTIONS_TAG,
   SLOWED_TAG,
+  ACTION_OR_BONUS_TAG,
   NO_SPELLS_TAG,
   RAGING_TAG,
   READIED_TAG,
@@ -891,8 +892,11 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
     }
   }
   checkDazed(evaluation);
-  // SRD Slow: "On its turns, it can take either an action or a Bonus Action, not both."
-  const slowed = onOwnTurn ? attacker.effects.find((effect) => effect.tags.includes(SLOWED_TAG)) : undefined;
+  // SRD Slow: "On its turns, it can take either an action or a Bonus Action, not both." A copper dragon's Slowing
+  // Breath says the same.
+  const slowed = onOwnTurn
+    ? attacker.effects.find((effect) => effect.tags.includes(SLOWED_TAG) || effect.tags.includes(ACTION_OR_BONUS_TAG))
+    : undefined;
   if (slowed && action.activation === "bonus-action" && state.combat.turn.actionUsed)
     violations.push({
       rule: "economy.bonus-action-used",

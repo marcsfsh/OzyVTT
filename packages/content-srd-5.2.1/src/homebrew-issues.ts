@@ -197,6 +197,21 @@ const LABELS: Readonly<Record<string, string>> = {
   coins: "coins",
   waives: "components it goes without",
   targetTypes: "creature types it affects",
+  repeatOnce: "one repeated save",
+  repeatAtTurnStart: "save repeated as its turn starts",
+  repeatOnDamage: "save repeated on damage",
+  repeatByAction: "save repeated by an action",
+  repeatFailureDamage: "damage of a failed repeat",
+  repeatTally: "successes and failures counted",
+  secondFailure: "second failure",
+  failureExhaustion: "Exhaustion a failure adds",
+  advantageIfFighting: "Advantage in a fight with the source",
+  immuneOnSuccess: "immunity after a success",
+  endsWhenSourceDies: "end when the source dies",
+  onlyCreatureTypes: "creature types that save",
+  sparesAffected: "creatures already affected left out",
+  failureKills: "a failure that kills",
+  sourceRegains: "hit points the source regains",
   chainFeet: "distance between targets"
 };
 /** A key whose words depend on what holds it: a weapon's category is its weapon kind, as the editor labels it. */

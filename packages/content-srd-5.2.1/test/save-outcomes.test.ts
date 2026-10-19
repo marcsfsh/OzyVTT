@@ -263,3 +263,80 @@ describe("a failure's push", () => {
     expect(giant.actions.find((action) => action.id === "hammer-throw")?.onHitPush).toEqual({ feet: 15, upTo: true });
   });
 });
+
+describe("what a stat block's failure does beyond its first conditions", () => {
+  it("reads a second failure, after one repeat at the end of the target's next turn", () => {
+    expect(monsterAction("adult-brass-dragon", "sleep-breath").save).toMatchObject({
+      failureConditions: ["incapacitated"],
+      failureDuration: { type: "until-bearer-turn-end" },
+      repeatOnce: true,
+      secondFailure: { conditions: ["unconscious"], duration: { type: "rounds", rounds: 100 }, endsOnDamage: true }
+    });
+    expect(monsterAction("silver-dragon-wyrmling", "paralyzing-breath").save?.secondFailure).toEqual({
+      conditions: ["paralyzed"],
+      duration: { type: "rounds", rounds: 10 },
+      repeatSave: true
+    });
+    expect(monsterAction("basilisk", "petrifying-gaze-recharge-4-6").save).toMatchObject({
+      failureConditions: ["restrained"],
+      repeatOnce: true,
+      secondFailure: { conditions: ["petrified"] }
+    });
+    expect(monsterAction("cockatrice", "petrifying-bite").save?.secondFailure).toEqual({
+      conditions: ["petrified"],
+      duration: { type: "minutes", minutes: 1440 }
+    });
+  });
+
+  it("reads immunity after a success, a repeat on damage, an Exhaustion level and a kill", () => {
+    expect(monsterAction("cloaker", "moan").save?.immuneOnSuccess).toBe(true);
+    expect(monsterAction("harpy", "luring-song").save).toMatchObject({
+      immuneOnSuccess: true,
+      repeatOnDamage: { notFromSource: true }
+    });
+    expect(monsterAction("aboleth", "dominate-mind").save).toMatchObject({
+      repeatOnDamage: {},
+      endsWhenSourceDies: true
+    });
+    expect(monsterAction("sphinx-of-valor", "weight-of-years").save?.failureExhaustion).toBe(1);
+    expect(monsterAction("will-o-wisp", "consume-life").save?.failureKills).toEqual({ sourceRegains: "3d6" });
+  });
+
+  it("reads a failure that restricts with no condition as one effect", () => {
+    expect(monsterAction("young-copper-dragon", "slowing-breath").save).toMatchObject({
+      failureEffect: { name: "Slowing Breath", tags: ["no-reactions", "speed-halved", "action-or-bonus"] },
+      failureDuration: { type: "until-bearer-turn-end" }
+    });
+    const weakening = monsterAction("ancient-gold-dragon", "weakening-breath");
+    expect(weakening.save).toMatchObject({
+      sparesAffected: true,
+      repeatSave: true,
+      failureDuration: { type: "rounds", rounds: 10 },
+      failureEffect: { name: "Weakening Breath" }
+    });
+    expect(weakening.save?.failureEffect?.modifiers).toHaveLength(3);
+    expect(weakening.reminder).toMatch(/subtracts 1d10 from its damage rolls/);
+  });
+
+  it("reads a lycanthrope's curse, which only a Humanoid is subjected to", () => {
+    for (const [slug, id] of [
+      ["werebear", "bite"],
+      ["wereboar", "gore"],
+      ["wererat", "bite"],
+      ["weretiger", "bite"],
+      ["werewolf", "bite"]
+    ] as const)
+      expect(monsterAction(slug, id).save).toMatchObject({
+        onlyCreatureTypes: ["humanoid"],
+        immuneOnSuccess: true,
+        failureEffect: { tags: ["curse", "lycanthropy"] }
+      });
+  });
+
+  it("keeps the words a source tag stood beside", () => {
+    expect(monsterAction("rakshasa", "cursed-touch").description).toMatch(
+      /While cursed, the target gains no benefit from finishing a Short or Long Rest\.$/
+    );
+    expect(monsterAction("behir", "swallow").description).toMatch(/Restrained conditions, has Total Cover against/);
+  });
+});

@@ -930,6 +930,65 @@ export const OngoingDamageSchema = z
   .strict();
 export type OngoingDamage = z.infer<typeof OngoingDamageSchema>;
 
+/** Damage a failed repeat save deals ("Each time the target fails this save, it takes 5d10 Psychic damage"). */
+const RepeatFailureDamageSchema = z
+  .array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict())
+  .min(1)
+  .max(2);
+
+/** What an effect turns into when its repeat save fails ("Second Failure: The target has the Petrified condition
+ *  instead"): its name and conditions, how long they last (absent: until ended, or with the caster's Concentration),
+ *  whether damage ends them, and whether the target keeps repeating the save at the end of each of its turns. */
+export const EffectStageSchema = z
+  .object({
+    name: z.string().min(1).max(120),
+    linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),
+    duration: SaveFailureDurationSchema.optional(),
+    endsOnDamage: z.literal(true).optional(),
+    repeats: z.literal(true).optional()
+  })
+  .strict();
+export type EffectStage = z.infer<typeof EffectStageSchema>;
+
+/**
+ * The save an effect's bearer repeats to end it (Hold Person), and when:
+ * - `timing`: at the end of each of its turns (absent), at the start of each (`turn-start`, Conjure Elemental's
+ *   restraint), or only when something else opens it (`none`: Dominate Person's damage).
+ * - `once`: only at the end of its next turn (a basilisk's gaze); `skipsCurrentTurn` marks one that began during that
+ *   creature's own turn, so the end of that turn doesn't count.
+ * - `onDamage`: each time the bearer takes damage too, with Advantage (`advantage`, Hideous Laughter), or only damage
+ *   from another source than the effect's (`notFromSource`, a harpy's Luring Song).
+ * - `byAction`: the bearer may take an action to repeat it (Irresistible Dance).
+ * - `failureDamage`: what a failure deals (Weird's 5d10 Psychic).
+ * - `tally`: successes and failures counted apart until one reaches `needed` (Flesh to Stone's three).
+ * - `next`: what a failure (the last counted one, with a tally) turns the effect into.
+ */
+export const RepeatSaveSchema = z
+  .object({
+    ability: AbilitySchema,
+    dc: z.number().int().min(1).max(40),
+    timing: z.enum(["turn-start", "none"]).optional(),
+    once: z.literal(true).optional(),
+    skipsCurrentTurn: z.literal(true).optional(),
+    onDamage: z
+      .object({ advantage: z.literal(true).optional(), notFromSource: z.literal(true).optional() })
+      .strict()
+      .optional(),
+    byAction: z.literal(true).optional(),
+    failureDamage: RepeatFailureDamageSchema.optional(),
+    tally: z
+      .object({
+        needed: z.number().int().min(2).max(5),
+        successes: z.number().int().min(0).max(5).default(0),
+        failures: z.number().int().min(0).max(5).default(0)
+      })
+      .strict()
+      .optional(),
+    next: EffectStageSchema.optional()
+  })
+  .strict();
+export type RepeatSave = z.infer<typeof RepeatSaveSchema>;
+
 /** A live rules-engine effect on an actor (Rage, a grapple), with source links, duration and typed modifiers.
  * Ids derive from the commandId so retries mint the same effect. */
 export const EffectInstanceSchema = z
@@ -997,11 +1056,9 @@ export const EffectInstanceSchema = z
     escapeDc: z.number().int().min(1).max(40).nullable().default(null),
     onEnd: z.array(EffectOnEndSchema).max(2).default([]),
     /** "Repeats the save at the end of each of its turns": the bearer owes this save as each of its turns ends, and
-     * a success ends the effect (Hold Person, a ghast's claws). */
-    repeatSave: z
-      .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
-      .strict()
-      .optional(),
+     * a success ends the effect (Hold Person, a ghast's claws). When and how often, and what a failure does, are
+     * `RepeatSaveSchema`'s. */
+    repeatSave: RepeatSaveSchema.optional(),
     /** Ends early when the bearer takes any damage (Sleep, Turn Undead, Hypnotic Pattern, a knocked-out creature). */
     endsOnDamage: z.boolean().optional(),
     /** Ends early when its source or one of the source's allies deals damage to the bearer (Charm Person). */
@@ -1786,7 +1843,96 @@ export const SaveOutcomeFields = {
   failurePush: ForcedPushSchema.optional(),
   /** A creature this size or larger has Advantage on the save (Ensnaring Strike: "A Large or larger creature has
    *  Advantage on this save"). */
-  advantageAtSize: SizeSchema.optional()
+  advantageAtSize: SizeSchema.optional(),
+  /** "Repeats the save at the end of its next turn", once (a basilisk's gaze, Sleep): the failure holds until then, a
+   *  success ends it, and a failure brings `secondFailure`. */
+  repeatOnce: z
+    .literal(true)
+    .optional()
+    .describe(
+      "The target repeats the save once, at the end of its next turn: a success ends the failure, a failure brings the second failure"
+    ),
+  /** The repeat comes at the start of each of the target's turns (Conjure Elemental's restraint). */
+  repeatAtTurnStart: z
+    .literal(true)
+    .optional()
+    .describe("The target repeats the save at the start of each of its turns, not the end"),
+  /** The target also repeats the save each time it takes damage (Dominate Person), with Advantage (Hideous Laughter),
+   *  or only for damage from another source (a harpy's Luring Song). */
+  repeatOnDamage: z
+    .object({ advantage: z.literal(true).optional(), notFromSource: z.literal(true).optional() })
+    .strict()
+    .optional()
+    .describe(
+      "The target repeats the save each time it takes damage: with Advantage (advantage), or only for damage from another source (notFromSource)"
+    ),
+  /** The target can take an action to repeat the save (Irresistible Dance: "collect itself"). */
+  repeatByAction: z.literal(true).optional().describe("The target can take an action on its turn to repeat the save"),
+  /** Damage each failed repeat deals (Weird: "it takes 5d10 Psychic damage"). */
+  repeatFailureDamage: RepeatFailureDamageSchema.optional().describe(
+    "Damage each failed repeat save deals, rolled by the engine"
+  ),
+  /** Successes and failures counted apart until one reaches this many (Flesh to Stone's three): that many successes
+   *  end it, that many failures bring `secondFailure`. */
+  repeatTally: z
+    .number()
+    .int()
+    .min(2)
+    .max(5)
+    .optional()
+    .describe(
+      "Repeated saves counted apart until this many successes (ending it) or failures (bringing the second failure)"
+    ),
+  /** What a failed repeat (the last counted one, with a tally) leaves in place of the failure: "Second Failure: The
+   *  target has the Unconscious condition for 10 minutes". */
+  secondFailure: z
+    .object({
+      name: z.string().min(1).max(120).optional(),
+      conditions: z.array(SaveConditionSchema).max(4).default([]),
+      duration: SaveFailureDurationSchema.optional(),
+      endsOnDamage: z.literal(true).optional(),
+      repeatSave: z.literal(true).optional()
+    })
+    .strict()
+    .optional()
+    .describe(
+      "What a failed repeat save leaves in place of the first failure: its conditions, how long they last, whether damage ends them and whether the save repeats each turn"
+    ),
+  /** Exhaustion levels a failure adds (Weight of Years: "The target gains 1 Exhaustion level"). */
+  failureExhaustion: z.number().int().min(1).max(6).optional().describe("Exhaustion levels a failed save adds"),
+  /** In a fight, the target has Advantage when the source or its allies are fighting it (Charm Person). */
+  advantageIfFighting: z
+    .literal(true)
+    .optional()
+    .describe("In a fight, the target has Advantage on the save when the source's side is fighting it"),
+  /** "Success: The target is immune to this ghast's Stench for 24 hours" (held for the rest of the fight). */
+  immuneOnSuccess: z
+    .literal(true)
+    .optional()
+    .describe("A success makes the target immune to this action of its source, held for the rest of the fight"),
+  /** The failure's conditions end when the source dies ("until the aboleth dies"). */
+  endsWhenSourceDies: z
+    .literal(true)
+    .optional()
+    .describe("The failure's conditions end when the source dies or is defeated"),
+  /** Only creatures of these types make the save ("If the target is a Humanoid, it is subjected to the following
+   *  effect"); any other is spared it. */
+  onlyCreatureTypes: z
+    .array(RiderSlugSchema)
+    .min(1)
+    .max(6)
+    .optional()
+    .describe("Only creatures of these types make the save; any other is spared it"),
+  /** A creature that still bears this action's failure is left out ("each creature that isn't currently affected by
+   *  this breath"). */
+  sparesAffected: z.literal(true).optional().describe("A creature still under this action's failure makes no new save"),
+  /** A failure kills the target outright, and the source may regain hit points from it (a will-o'-wisp's Consume
+   *  Life: "The target dies, and the wisp regains 10 (3d6) Hit Points"). */
+  failureKills: z
+    .object({ sourceRegains: DiceFormulaSchema.optional() })
+    .strict()
+    .optional()
+    .describe("A failure kills the target outright; the source regains the rolled hit points, if any")
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */
@@ -2795,9 +2941,7 @@ const TraitSaveSchema = z
   .object({
     ability: AbilitySchema,
     dc: z.number().int().min(1).max(40),
-    ...SaveOutcomeFields,
-    /** "Success: The target is immune to this ghast's Stench for 24 hours" (held for the rest of the fight). */
-    immuneOnSuccess: z.literal(true).optional()
+    ...SaveOutcomeFields
   })
   .strict();
 

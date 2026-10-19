@@ -1,4 +1,4 @@
-import type { AbilityId, GameState } from "@vtt/domain";
+import type { GameState } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { holdsFeature } from "./class-features.js";
@@ -6,7 +6,7 @@ import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
 import { applyDamageDetailed, damageAdjustmentDetail, loseHitPoints, UNTYPED_DAMAGE } from "./hit-points.js";
 import { holyNimbusBurns } from "./paladin-auras.js";
-import { createPendingSaves } from "./saving-throws.js";
+import { openEndingSave, openRepeatSaves } from "./save-stages.js";
 import { traitsAtTurnEnd, traitsAtTurnStart } from "./trait-turns.js";
 
 type Actor = GameState["actors"][number];
@@ -37,14 +37,14 @@ export type TurnStartDeps = Readonly<{
 /**
  * SRD: "at the end of its turn". When `actorId`'s turn ends, before the next begins:
  * 1. "until the end of its/your next turn" durations it owns end (`expireEffectsAtTurnEnd`);
- * 2. each effect it bears that "repeats the save at the end of each of its turns" opens that save, a success ending
- *    the effect (`openRepeatSaves`);
+ * 2. each effect it bears that "repeats the save at the end of each of its turns" opens that save (`openRepeatSaves`:
+ *    a success ends the effect, unless the text counts them or makes the failure worse);
  * 3. its stat block's traits that act as its turn ends (Fire Aura) do (`traitsAtTurnEnd`), and the ongoing damage
  *    printed for the end of a turn lands.
  */
 export function endOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps?: TurnEndDeps): void {
   events.push(...expireEffectsAtTurnEnd(state, actorId));
-  if (deps) events.push(...openRepeatSaves(state, actorId, deps));
+  if (deps) events.push(...openRepeatSaves(state, actorId, "turn-end", deps));
   if (!deps?.rollDie || !deps.resolveDefinition) return;
   const dice = { ...deps, rollDie: deps.rollDie, resolveDefinition: deps.resolveDefinition };
   events.push(...traitsAtTurnEnd(state, actorId, dice));
@@ -62,6 +62,15 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
  */
 export function startOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps: TurnStartDeps): void {
   heroicWarrior(state, actorId, events, deps);
+  // "At the start of each of its turns, the Restrained target repeats the save" (Conjure Elemental).
+  if (deps.newId)
+    events.push(
+      ...openRepeatSaves(state, actorId, "turn-start", {
+        newId: deps.newId,
+        now: deps.now ?? (() => new Date().toISOString()),
+        rollDie: deps.rollDie
+      })
+    );
   temporaryHitPointsEachTurn(state, actorId, events);
   events.push(...traitsAtTurnStart(state, actorId, deps));
   holyNimbus(state, actorId, events, deps);
@@ -218,47 +227,4 @@ function dealOngoingDamage(state: GameState, bearer: Actor, effect: Effect, deps
     },
     ...events
   ];
-}
-
-/** One pending save per repeating effect the creature bears. An unanswered one from its last turn is replaced. */
-export function openRepeatSaves(state: GameState, actorId: string, deps: TurnEndDeps): EffectNarration[] {
-  const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor) return [];
-  return actor.effects.flatMap((effect) =>
-    effect.repeatSave ? [openEndingSave(state, actor, effect, effect.repeatSave, "repeats", deps)] : []
-  );
-}
-
-/** A save the bearer owes against one of its effects, a success ending it (`repeatOf`): repeated at the end of its
- *  turn, or made once its ongoing damage lands. */
-function openEndingSave(
-  state: GameState,
-  bearer: Actor,
-  effect: Effect,
-  save: Readonly<{ ability: AbilityId; dc: number }>,
-  verb: "repeats" | "makes",
-  deps: TurnEndDeps
-): EffectNarration {
-  createPendingSaves(state, {
-    sourceActorId: effect.sourceActorId,
-    sourceName: effect.sourceName ?? effect.name,
-    actionName: `${effect.name} - ${verb === "repeats" ? "repeat save" : "save"}`.slice(0, 120),
-    ability: save.ability,
-    dc: save.dc,
-    targetIds: [bearer.id],
-    proposedDamage: 0,
-    halfOnSuccess: false,
-    conditionIds: [],
-    repeatOf: { actorId: bearer.id, effectId: effect.id },
-    // Repeated against a spell's effect (Hold Person), it is still a save against magic.
-    magical: effect.magical === true,
-    newSaveId: deps.newId,
-    createdAt: Date.parse(deps.now())
-  });
-  return {
-    kind: "condition",
-    text: `${bearer.name} ${verb} the ${save.ability.toUpperCase()} save against ${effect.name} (DC ${save.dc}); a success ends it.`,
-    actorId: bearer.id,
-    ...sourceOf(effect)
-  };
 }

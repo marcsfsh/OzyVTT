@@ -289,7 +289,12 @@ export const PendingSaveSchema = z
     zoneId: z.string().min(1).max(120).optional(),
     /** A save the bearer repeats at the end of its turn: a success ends this effect. Stripped from player projections. */
     repeatOf: z
-      .object({ actorId: z.uuid(), effectId: z.string().min(1).max(120) })
+      .object({
+        actorId: z.uuid(),
+        effectId: z.string().min(1).max(120),
+        /** The effect's own repeat save, so a failure counts toward its tally or brings its next stage. */
+        repeat: z.literal(true).optional()
+      })
       .strict()
       .optional(),
     /** The GM's call for a roll this save answers; the outcome is written back to the call. */
@@ -305,6 +310,20 @@ export const PendingSaveSchema = z
     failurePush: ForcedPushSchema.optional(),
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
+    /** What gives the save Advantage beyond the target's own riders, as the roll card names it: the damage that opened
+     *  it (Hideous Laughter), or a fight with its source's side (Charm Person). */
+    advantageFrom: z.string().min(1).max(120).optional(),
+    /** A failure kills the target outright, and the source regains these hit points (Consume Life). GM bookkeeping,
+     *  never projected. */
+    failureKills: z
+      .object({
+        sourceRegains: z
+          .string()
+          .regex(/^\d+d(?:4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?$/)
+          .optional()
+      })
+      .strict()
+      .optional(),
     /** Nothing the server applies rides the save's outcome (Levitate, Polymorph): the GM applies what it does. The save
      *  card says so, so it never reads as if the engine did. */
     gmApplies: z.literal(true).optional(),

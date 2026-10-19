@@ -448,7 +448,21 @@ const SAVE_LIFETIME_KEYS = [
   "failureHazard",
   "failurePush.**",
   "advantageAtSize",
-  "escapeAthletics"
+  "escapeAthletics",
+  "repeatOnce",
+  "repeatAtTurnStart",
+  "repeatOnDamage.**",
+  "repeatByAction",
+  "repeatFailureDamage[].**",
+  "repeatTally",
+  "secondFailure.**",
+  "failureExhaustion",
+  "advantageIfFighting",
+  "immuneOnSuccess",
+  "endsWhenSourceDies",
+  "onlyCreatureTypes",
+  "sparesAffected",
+  "failureKills.**"
 ] as const;
 
 /** The exemption table. First match wins, so specific rows sit above general ones. */

@@ -47,6 +47,8 @@ import {
 import { reconcileEquipment } from "./inventory.js";
 import { offerDamageReaction } from "./damage-reactions.js";
 import { releaseSwallowedBy } from "./swallow.js";
+import { openRepeatSavesOnDamage } from "./save-stages.js";
+import { lycanthropyAtZero } from "./curses.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
@@ -395,6 +397,27 @@ function fallToZero(
   return { instantDeath, defeated };
 }
 
+/**
+ * A creature killed outright, whatever its hit points (a will-o'-wisp's Consume Life: "The target dies"): a character's
+ * death saves read three failures, anything else lies at 0 Hit Points, and what it sustained ends as a death ends it.
+ */
+export function killOutright(state: GameState, actorId: string, cause: string): EffectNarration[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || isDead(actor)) return [];
+  actor.hp = { ...actor.hp, current: 0, temporary: 0 };
+  if (actor.kind === "player-character") {
+    actor.deathSaves = { successes: 0, failures: 3, stable: false };
+    applyCondition(actor, "unconscious");
+    applyCondition(actor, "prone");
+  } else removeConditionDirect(actor, "unconscious");
+  return [
+    { kind: "condition", text: `${actor.name} dies (${cause}).`, actorId },
+    ...endEffectsSustainedBy(state, actor.id),
+    ...endConcentrationSustainedBy(state, actor.id),
+    ...endConcentrationOnTheDead(state, actor)
+  ];
+}
+
 /** SRD Death Ward: "The first time the target would drop to 0 Hit Points before the spell ends, the target instead
  *  drops to 1 Hit Point, and the spell ends." True when it held the creature at 1. */
 function deathWard(state: GameState, actor: Actor, events: EffectNarration[]): boolean {
@@ -608,6 +631,16 @@ export function applyDamageDetailed(
       ...leaveShortRest(state, new Set([actor.id]), "took damage")
     );
 
+  // "Whenever the target takes damage, it repeats the save" (Dominate Person, Hideous Laughter).
+  if (totalAdjusted > 0 && actor.hp.current > 0 && deps?.newId)
+    events.push(
+      ...openRepeatSavesOnDamage(state, actor, input.sourceActorId ?? undefined, {
+        newId: deps.newId,
+        now: deps.now ?? (() => new Date().toISOString()),
+        ...(deps.rollDie ? { rollDie: deps.rollDie } : {})
+      })
+    );
+
   let deathSaveFailuresAdded = 0;
   let instantDeath = false;
   let defeated = false;
@@ -649,6 +682,8 @@ export function applyDamageDetailed(
     });
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deathWard(state, actor, events)) {
     // Death Ward held the creature at 1 Hit Point: nothing falls.
+  } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && lycanthropyAtZero(state, actor, events)) {
+    // A lycanthrope's curse turned it instead, at 10 Hit Points.
   } else if (
     isPlayerCharacter &&
     !wasAtZero &&

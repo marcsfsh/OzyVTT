@@ -5,7 +5,7 @@ import { loadMonsterDefinitions, loadSpells } from "@vtt/content-srd-5.2.1";
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { addEffect, endEffect, makeEffect } from "../src/effects.js";
-import { openRepeatSaves } from "../src/turn-boundaries.js";
+import { openRepeatSaves } from "../src/save-stages.js";
 import { startEncounter } from "../src/encounter.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { answerSave, type SaveAnswerDependencies } from "../src/saving-throws.js";
@@ -273,7 +273,7 @@ describe("a hidden source stays hidden", () => {
         repeatSave: { ability: "wis", dc: 15 }
       })
     );
-    openRepeatSaves(state, IDS.wizard, { newId: nextId, now: NOW });
+    openRepeatSaves(state, IDS.wizard, "turn-end", { newId: nextId, now: NOW });
     const view = projectPlayerView(state, IDS.session, () => null);
     expect(view.combat.pendingSaves).toMatchObject([
       { actionName: "Paralyzed by A hidden threat (Hold Person) - repeat save", sourceName: "A hidden threat" }

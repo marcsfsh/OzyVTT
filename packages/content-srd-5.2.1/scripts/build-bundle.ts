@@ -38,6 +38,8 @@ import {
   SPELL_SAVE_OVERRIDE_IDS,
   spellSaveOutcomeFor,
   statBlockSaveOutcome,
+  failureRestrictionsOf,
+  lycanthropyCurseOf,
   withoutOngoingDamage
 } from "./save-outcomes.js";
 import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
@@ -45,9 +47,10 @@ import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } fro
 import { costlyMaterialsFor } from "./spell-materials.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { UPCAST_DURATION_IDS, upcastDurationsFor } from "./spell-durations.js";
-import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
+import { printedHitDamage, printedSaveDamage, withoutSourceTags } from "./monster-damage.js";
 import { traitMechanicsOf } from "./trait-mechanics.js";
 import { withSpellcasting } from "./monster-spells.js";
+import { fixedFields, MONSTER_ACTION_FIXES } from "./monster-action-fixes.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -876,12 +879,6 @@ function skillBonuses(fields: CreatureFields): Record<string, number> {
   return skills;
 }
 
-/** 5etools cross-reference tags that leaked into open5e's text ("[Area of Effect]|XPHB|Sphere",
- *  "Cover|XPHB|Total Cover"): the readable word is the last part. */
-function withoutSourceTags(text: string): string {
-  return text.replace(/\[[^\]]*\]\|XPHB\|/g, "").replace(/[\w ]+\|XPHB\|/g, "");
-}
-
 /**
  * Corrections for upstream fixture bugs, applied before adaptation so the vendored sources stay
  * byte-identical to open5e. Values are the printed SRD 5.2.1 ones.
@@ -955,6 +952,9 @@ const SRD_SPELL_IDS: ReadonlySet<string> = new Set(
   spells.filter((spell) => spell.fields.document === "srd-2024").map((spell) => slugOf(spell.pk))
 );
 
+/** The reviewed fixes the build used, so one naming no action fails the build out loud. */
+const fixedActions = new Set<string>();
+
 const monsters: ActorDefinition[] = creatures
   .filter((creature) => creature.fields.document === "srd-2024" && !EXCLUSIONS.has(creature.pk))
   .sort((left, right) => left.pk.localeCompare(right.pk))
@@ -1010,6 +1010,10 @@ const monsters: ActorDefinition[] = creatures
         : null;
       // Hit points a failure takes each turn (an infernal wound) are the failure's own effect; stanching it is the GM's.
       const loss = save && fix?.drop !== "outcome" ? hitPointLossOf(action.fields.desc) : null;
+      // A failure that restricts with no condition (Slowing Breath, Weakening Breath), or a lycanthrope's curse.
+      const restriction =
+        save && fix?.drop !== "outcome" ? failureRestrictionsOf(action.fields.desc, action.fields.name.trim()) : null;
+      const lycanthropy = save && fix?.drop !== "outcome" ? lycanthropyCurseOf(action.fields.desc) : null;
       // Later-turn damage the engine deals itself (`ongoingDamage`) leaves the GM's reminder.
       const laterDamage = saveDamage?.laterDamage ?? null;
       // "While Poisoned, the target can't regain Hit Points" (a pit fiend's Bite): the poison's own effect stops healing,
@@ -1030,7 +1034,7 @@ const monsters: ActorDefinition[] = creatures
         /^While Poisoned, the target can[\u2019']t regain Hit Points, and it repeats the save at the end of each of its turns, ending the effect on itself on a success\.$/.test(
           later
         );
-      const reminder = fix?.reminder ?? loss?.reminder ?? (stale ? null : later) ?? undefined;
+      const reminder = fix?.reminder ?? loss?.reminder ?? restriction?.reminder ?? (stale ? null : later) ?? undefined;
       const fromRows = row
         ? [
             ...(row.damage_die_count && row.damage_die_type
@@ -1082,6 +1086,8 @@ const monsters: ActorDefinition[] = creatures
       const onHit = attack !== null && !save ? parseOnHitRiders(action.fields.desc) : null;
       const uses = usesOf(action.fields);
       const enrichment = ACTION_ENRICHMENTS[`${slug}/${actionId}`];
+      const actionFix = MONSTER_ACTION_FIXES[`${slug}/${actionId}`];
+      if (actionFix) fixedActions.add(`${slug}/${actionId}`);
       report.actionsTotal += 1;
       if (row) report.structuredAttacks += 1;
       if (prose) report.proseAttacks += 1;
@@ -1093,7 +1099,7 @@ const monsters: ActorDefinition[] = creatures
       if (uses?.per === "recharge") report.rechargeUses += 1;
       else if (uses) report.restUses += 1;
       for (const part of damage) if (part.type === "untyped") report.untypedDamage.push(action.pk);
-      return withProseFacts({
+      const built = withProseFacts({
         id: actionId,
         name: `${ACTION_NAME_CORRECTIONS[action.pk] ?? action.fields.name}${usesSuffix(action.fields)}`.slice(0, 120),
         activation:
@@ -1115,7 +1121,15 @@ const monsters: ActorDefinition[] = creatures
                 ...(loss ? { failureEffect: loss.failureEffect, ongoingDamage: loss.ongoingDamage } : {}),
                 ...(poisonStopsHealing
                   ? { failureEffect: { name: "Poisoned", tags: ["no-healing"], modifiers: [] } }
-                  : {})
+                  : {}),
+                ...(restriction
+                  ? {
+                      failureEffect: restriction.failureEffect,
+                      ...(restriction.failureDuration ? { failureDuration: restriction.failureDuration } : {}),
+                      ...(restriction.repeatSave ? { repeatSave: true as const } : {})
+                    }
+                  : {}),
+                ...(lycanthropy ? { failureEffect: lycanthropy } : {})
               }
             }
           : {}),
@@ -1143,8 +1157,11 @@ const monsters: ActorDefinition[] = creatures
               }
             }
           : {}),
-        ...(enrichment ?? {})
+        ...(enrichment ?? {}),
+        ...fixedFields(actionFix)
       });
+      if (actionFix?.reminder === null) delete built.reminder;
+      return built;
     });
     // The spells its actions cast, each a cast action in play; only spells the SRD spell list holds.
     const actions = withSpellcasting(
@@ -1274,6 +1291,10 @@ const monsters: ActorDefinition[] = creatures
       }
     };
   });
+
+for (const key of Object.keys(MONSTER_ACTION_FIXES))
+  if (!fixedActions.has(key))
+    throw new Error(`Monster action fix ${key} names no action - check for a typo or an upstream rename.`);
 
 for (const monster of monsters) {
   const parsed = ActorDefinitionSchema.safeParse(monster);

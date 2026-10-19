@@ -25,7 +25,7 @@ import {
   type DiceResolution,
   type RandomSource
 } from "@vtt/rules-5e";
-import type { ActorDefinition, DamageDrain, ForcedPush } from "@vtt/schemas";
+import type { ActorDefinition } from "@vtt/schemas";
 import { CommandRejectedError } from "./game-store.js";
 import { withoutSameHazard } from "./hazards.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
@@ -44,7 +44,7 @@ import {
   type AnswerTarget
 } from "./roll-answers.js";
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
-import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
+import { applyDamageDetailed, previewDamage, adjustableActor, healActor, killOutright } from "./hit-points.js";
 import { openDamageWindow } from "./damage-window.js";
 import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
@@ -69,6 +69,7 @@ import {
   type RollModeClaims
 } from "./equipment-derivation.js";
 import { countZoneDamage } from "./spell-zone-state.js";
+import { armedRepeat, durationUntilRepeat, settleEndingSave } from "./save-stages.js";
 import { sizeAtMost, sizeRank } from "./resolution/context.js";
 
 export type SaveAnswerDependencies = Readonly<{
@@ -342,99 +343,7 @@ export function hasEvasion(definition: ActorDefinition | undefined): boolean {
   return holdsFeature(definition, "evasion", "Evasion");
 }
 
-/** Create one pending save per target when a save action resolves. Called inside the action:resolve mutation. */
-export function createPendingSaves(
-  state: GameState,
-  input: Readonly<{
-    sourceActorId: string | null;
-    sourceName: string;
-    actionName: string;
-    ability: AbilityId;
-    dc: number;
-    targetIds: readonly string[];
-    proposedDamage: number;
-    proposedDamageParts?: ReadonlyArray<{ amount: number; type: string }>;
-    halfOnSuccess: boolean;
-    conditionIds: readonly string[];
-    saveBonus?: number;
-    onFailEffect?: Omit<NonNullable<PendingSave["onFailEffect"]>, "modifiers"> &
-      Partial<Pick<NonNullable<PendingSave["onFailEffect"]>, "modifiers">>;
-    /** A save repeated at the end of the bearer's turn: a success ends this effect. */
-    repeatOf?: PendingSave["repeatOf"];
-    /** Replace an older prompt with the same (target, actionName, source) key. Default true; per-hit riders
-     *  pass false since Extra Attack can owe two saves. */
-    replaceExisting?: boolean;
-    /** The GM's call for a roll these saves answer. */
-    callId?: string;
-    /** What else each save carries: what a success leaves, a line for a failure, the spell area that raised it. */
-    extra?: Pick<PendingSave, "onSuccessEffect" | "failureNote" | "breaksConcentration" | "zoneId" | "gmApplies">;
-    /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
-    magical?: boolean;
-    /** A success makes the target immune to this trait of its source for the fight (a ghast's Stench). */
-    immuneOnSuccess?: boolean;
-    /** What the save's damage drains as it lands (Harm's lower Hit Point maximum). */
-    drain?: DamageDrain;
-    /** Where a failure pushes the creature (Thunderwave). */
-    failurePush?: ForcedPush;
-    /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
-    advantageAtSize?: PendingSave["advantageAtSize"];
-    /** The spell the save is against, for what answers a save against a spell. */
-    spell?: PendingSave["spell"];
-    newSaveId: () => string;
-    createdAt: number;
-  }>
-) {
-  const additions: PendingSave[] = input.targetIds.map((targetActorId) => ({
-    id: input.newSaveId(),
-    targetActorId,
-    ability: input.ability,
-    dc: input.dc,
-    sourceActorId: input.sourceActorId,
-    sourceName: input.sourceName,
-    actionName: input.actionName,
-    proposedDamage: input.proposedDamage,
-    ...(input.proposedDamageParts && input.proposedDamageParts.length > 0
-      ? { proposedDamageParts: [...input.proposedDamageParts] }
-      : {}),
-    halfOnSuccess: input.halfOnSuccess,
-    conditionIds: [...input.conditionIds],
-    saveBonus: input.saveBonus ?? 0,
-    ...(input.onFailEffect
-      ? { onFailEffect: { ...input.onFailEffect, modifiers: [...(input.onFailEffect.modifiers ?? [])] } }
-      : {}),
-    ...(input.repeatOf ? { repeatOf: input.repeatOf } : {}),
-    ...(input.callId !== undefined ? { callId: input.callId } : {}),
-    ...(input.extra?.onSuccessEffect ? { onSuccessEffect: structuredClone(input.extra.onSuccessEffect) } : {}),
-    ...(input.extra?.failureNote ? { failureNote: input.extra.failureNote } : {}),
-    ...(input.extra?.breaksConcentration ? { breaksConcentration: true as const } : {}),
-    ...(input.extra?.zoneId !== undefined ? { zoneId: input.extra.zoneId } : {}),
-    ...(input.extra?.gmApplies ? { gmApplies: true as const } : {}),
-    ...(input.magical ? { magical: true as const } : {}),
-    ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
-    ...(input.drain ? { drain: { ...input.drain } } : {}),
-    ...(input.failurePush ? { failurePush: { ...input.failurePush } } : {}),
-    ...(input.advantageAtSize ? { advantageAtSize: input.advantageAtSize } : {}),
-    ...(input.spell ? { spell: { ...input.spell } } : {}),
-    createdAt: input.createdAt
-  }));
-  // A re-cast against the same target replaces its older prompt.
-  const remaining =
-    input.replaceExisting === false
-      ? state.combat.pendingSaves
-      : state.combat.pendingSaves.filter(
-          (entry) =>
-            !additions.some(
-              (added) =>
-                added.targetActorId === entry.targetActorId &&
-                added.actionName === entry.actionName &&
-                added.sourceActorId === entry.sourceActorId
-            )
-        );
-  const pendingSaves = [...remaining, ...additions];
-  if (pendingSaves.length > 100)
-    throw new CommandRejectedError("Too many unanswered saving throws. Resolve or dismiss some first.");
-  state.combat = { ...state.combat, pendingSaves };
-}
+export { createPendingSaves } from "./pending-saves.js";
 
 /**
  * Puts a failed save's effect on its target (see `failureEffectFor`). A Concentration cast's effect lands only while
@@ -480,13 +389,18 @@ export function applyFailureEffect(
       duration:
         onFail.currentTurn && onFail.duration?.type === "until-bearer-turn-end"
           ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
-          : effectDurationOf(state, onFail.duration, target.id, onFail.sourceActorId),
+          : effectDurationOf(
+              state,
+              durationUntilRepeat(onFail.duration, onFail.repeatSave),
+              target.id,
+              onFail.sourceActorId
+            ),
       // Saves parked before failures carried their own lifetime were all grapples.
       endsWhenSourceDefeated: onFail.endsWhenSourceDefeated ?? onFail.tags.includes("grapple"),
       concentration: onFail.castId !== undefined,
       linkedConditionIds: [...onFail.linkedConditionIds],
       escapeDc: onFail.escapeDc,
-      ...(onFail.repeatSave ? { repeatSave: { ...onFail.repeatSave } } : {}),
+      ...(onFail.repeatSave ? { repeatSave: armedRepeat(state, target.id, onFail.repeatSave) } : {}),
       ...(onFail.endsOnDamage ? { endsOnDamage: true } : {}),
       ...(onFail.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
       ...(onFail.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
@@ -543,6 +457,31 @@ function pushOnFailure(
       source: { actorId: sourceId, name: pending.sourceName }
     }
   ];
+}
+
+/** A failure that kills (Consume Life): the target dies, and its source regains the rolled hit points. */
+function killOnFailure(
+  state: GameState,
+  target: GameState["actors"][number],
+  pending: PendingSave,
+  deps: SaveAnswerDependencies
+): EffectNarration[] {
+  const events = killOutright(state, target.id, pending.actionName);
+  const formula = pending.failureKills?.sourceRegains;
+  const source = state.actors.find((actor) => actor.id === pending.sourceActorId);
+  if (!formula || !source || source.hp.current <= 0) return events;
+  const regained = Math.max(0, resolveDice(parseDiceFormula(formula), deps.random).total);
+  const before = source.hp.current;
+  events.push(...healActor(state, source.id, regained, { role: "gm" }));
+  const gained = source.hp.current - before;
+  if (gained > 0)
+    events.push({
+      kind: "effect",
+      text: `${source.name} regains ${gained} hit points (${pending.actionName}).`,
+      actorId: source.id,
+      gmOnly: true
+    });
+  return events;
 }
 
 /** Records a save roll in the shared history, attributed to the creature saving; a hidden creature's stays GM-only. */
@@ -714,6 +653,8 @@ export function answerSave(
     );
     if (magicResistance === "advantage")
       sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
+    // What opened the save gives it Advantage (damage, for Hideous Laughter), or the fight it is in (Charm Person).
+    if (pending.advantageFrom) sources.advantage.push({ source: "trigger", label: pending.advantageFrom });
     // "A Large or larger creature has Advantage on this save" (Ensnaring Strike).
     if (pending.advantageAtSize && sizeRank(target.size) >= sizeRank(pending.advantageAtSize))
       sources.advantage.push({ source: "size", label: `${pending.actionName}: its size` });
@@ -1068,6 +1009,8 @@ export function answerSave(
       ...(pending.sourceActorId ? { source: { actorId: pending.sourceActorId, name: pending.sourceName } } : {})
     });
   if (!success && pending.failurePush) events.push(...pushOnFailure(target, pending, deps));
+  // "The target dies, and the wisp regains 10 (3d6) Hit Points."
+  if (!success && pending.failureKills) events.push(...killOnFailure(state, target, pending, deps));
   // SRD Sleet Storm: a failure "and lose Concentration".
   if (!success && pending.breaksConcentration) events.push(...endConcentrationSustainedBy(state, target.id));
   if (outcomeCondition)
@@ -1091,9 +1034,9 @@ export function answerSave(
         duration: { type: "encounter" }
       })
     );
-  // A repeated save that succeeds ends the effect it was repeated for (Hold Person ends on that target).
-  if (success && pending.repeatOf)
-    events.push(...endEffectIfPresent(state, pending.repeatOf.actorId, pending.repeatOf.effectId));
+  // A repeated save that succeeds ends the effect it was repeated for (Hold Person ends on that target), unless the text
+  // counts successes; a failure may count or bring the effect's next stage (a basilisk's second failure).
+  if (pending.repeatOf) events.push(...settleEndingSave(state, pending, success, `${commandId}:${saveId}`, immunities));
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };
   // A spell whose last target saved has nothing left (Hold Person, Phantasmal Killer's "the spell ends").
   const castId = pending.onFailEffect?.castId;
