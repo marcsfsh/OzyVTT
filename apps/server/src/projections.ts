@@ -546,6 +546,7 @@ const PLAYER_ACTOR_FIELDS = {
   replaySceneId: "derived",
   actionUses: "derived",
   heroicInspiration: "derived",
+  heroicInspirationToGive: "derived",
   choiceOverrides: "derived",
   hitDice: "derived",
   lastLongRestAt: "never",
@@ -678,6 +679,7 @@ export function projectPlayerView(
           ownerSessionId,
           actionUses,
           heroicInspiration,
+          heroicInspirationToGive,
           choiceOverrides,
           hitDice,
           spellSlots,
@@ -727,6 +729,8 @@ export function projectPlayerView(
           ...(species !== null ? { species } : {}),
           ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
           ...(resourcesVisible ? { actionUses: { ...actionUses }, heroicInspiration } : {}),
+          // A gift to make is the owner's decision alone.
+          ...(mine && heroicInspirationToGive ? { heroicInspirationToGive } : {}),
           // Same gate as actionUses: a private sheet resource. Copied, never a live reference into GameState.
           ...(resourcesVisible
             ? {

@@ -67,6 +67,7 @@ import type {
   ActorSetSpeedSchema,
   ActorSetArmorClassSchema,
   ActorSetHeroicInspirationSchema,
+  ActorGiveHeroicInspirationSchema,
   ActorStabilizeSchema,
   ActorSpendHitDiceSchema,
   ActorSpendUsesSchema,
@@ -386,6 +387,11 @@ export interface ClientToServerEvents {
   /** GM: give or take a character's Heroic Inspiration. */
   "actor:set-heroic-inspiration": (
     payload: CommandPayload<typeof ActorSetHeroicInspirationSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A character's player or the GM: give its second Heroic Inspiration to a player character who lacks one, or let it go. */
+  "actor:give-heroic-inspiration": (
+    payload: CommandPayload<typeof ActorGiveHeroicInspirationSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** The server first re-runs the command as the player; only a still-blocked one is parked for the GM (`askId`). */

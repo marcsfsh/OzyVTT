@@ -36,6 +36,7 @@ import { FeaturesTab, NextLevel } from "./FeaturesTab";
 import { GearTab } from "./GearTab";
 import { GmTools } from "./GmTools";
 import { HitPointDice } from "./HitPointDice";
+import { HeroicGift, hasGift } from "./HeroicGift";
 import { HpCard } from "./HitPoints";
 import { IdentityEditor } from "./IdentityEditor";
 import { LatestRoll, useSessionRoll } from "./LatestRoll";
@@ -489,6 +490,7 @@ export function CharacterSheet({
       tabIndex={0}
     >
       {missing}
+      {hasGift(actor) && <HeroicGift actor={actor} state={state} onFeedback={say} />}
       {aimedHere && definition && controller.liveCombat && role === "player" && (
         <PlayerActionRunner
           actorId={actor.id}

@@ -310,6 +310,7 @@ export const GAME_PATHS = {
   checkRoll: `${API_NAMESPACE}/game/actors/{actorId}/check`,
   checkReroll: `${API_NAMESPACE}/game/actors/{actorId}/check/reroll`,
   actorHeroicInspiration: `${API_NAMESPACE}/game/actors/{actorId}/heroic-inspiration`,
+  actorGiveHeroicInspiration: `${API_NAMESPACE}/game/actors/{actorId}/heroic-inspiration/give`,
   rollCalls: `${API_NAMESPACE}/game/roll-calls`,
   rollCallAnswer: `${API_NAMESPACE}/game/roll-calls/{callId}/answer`,
   rollCallClose: `${API_NAMESPACE}/game/roll-calls/{callId}/close`,
@@ -670,6 +671,11 @@ export const GAME_COMMANDS = {
     scope: "actor:write",
     method: "post",
     path: GAME_PATHS.actorHeroicInspiration
+  },
+  "actor.give-heroic-inspiration": {
+    scope: "actor:write",
+    method: "post",
+    path: GAME_PATHS.actorGiveHeroicInspiration
   },
   "rules.ask": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesAsk },
   "rules.answer": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesAnswer },

@@ -1227,6 +1227,9 @@ export const ActorSchema = z.object({
   /** SRD Heroic Inspiration: held or not (never more than one). Spent to reroll one die; the GM gives it, and a Human
    * gains it on finishing a Long Rest. */
   heroicInspiration: z.boolean().default(false),
+  /** A second Heroic Inspiration gained while holding one (SRD: "the excess is lost unless you give it to a player
+   *  character who lacks it"): its player gives it or lets it go. Player characters only. */
+  heroicInspirationToGive: z.boolean().optional(),
   /** Picks re-made on a rest, keyed by offer key; no rebuild needed. `per` is the rest that clears the override,
    * after which the build's recorded answer applies again. */
   choiceOverrides: z

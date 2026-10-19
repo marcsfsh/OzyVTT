@@ -761,6 +761,17 @@ export const ActorSetHeroicInspirationSchema = z
   })
   .strict();
 
+/** A character's player (or the GM) gives its second Heroic Inspiration to a player character who lacks one, or lets
+ *  it go (`recipientId` null). */
+export const ActorGiveHeroicInspirationSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    recipientId: z.uuid().nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
 /** Ask the GM. `payload` is the original command, revalidated with its own schema before use. */
 export const RulesAskSchema = z
   .object({
