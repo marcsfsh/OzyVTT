@@ -563,8 +563,10 @@ describe("Bardic Inspiration: the counter the class is built around", () => {
 
   it("gives a d8 from level 5, and a d12 from level 15", () => {
     const dieAt = (level: number) =>
-      actionOf(build(bard(level, 15, level >= 3 ? loreSkills("history", "arcana", "nature") : [])), "bardic-inspiration")
-        ?.grants?.answer?.effect;
+      actionOf(
+        build(bard(level, 15, level >= 3 ? loreSkills("history", "arcana", "nature") : [])),
+        "bardic-inspiration"
+      )?.grants?.answer?.effect;
     expect(dieAt(5)).toEqual({ kind: "add", amount: "1d8" });
     expect(dieAt(15)).toEqual({ kind: "add", amount: "1d12" });
   });
