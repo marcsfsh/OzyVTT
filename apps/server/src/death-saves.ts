@@ -11,6 +11,12 @@ import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.j
 
 export type DeathSaveMode = "advantage" | "disadvantage" | "normal";
 
+/** The tag on an item's effect that makes a death save's d20 of 9 or lower count as 10 (Periapt of Wound Closure). */
+export const DEATH_SAVE_FLOOR_TAG = "death-save-floor";
+/** The tag on an item's effect that doubles what each Hit Point Die rolled to heal restores (Periapt of Wound
+ *  Closure). */
+export const HIT_DICE_DOUBLED_TAG = "hit-dice-doubled";
+
 export type DeathSaveRollDependencies = Readonly<{
   random: RandomSource;
   rollId: string;
@@ -61,6 +67,8 @@ export function rollDeathSave(
     test?: SettledDeathSave;
     /** The total once answers to the roll count (a Bardic Inspiration die); the test's own total otherwise. */
     total?: number;
+    /** A d20 under this counts as it (a Periapt of Wound Closure's 10). */
+    floor?: number;
   }>,
   deps: DeathSaveRollDependencies
 ): DeathSaveRollResult {
@@ -103,6 +111,11 @@ export function rollDeathSave(
     total = face + (options.modifier ?? 0);
     if (chosen !== "normal") mode = chosen;
     record(resolution, false);
+  }
+  // "Whenever you make a Death Saving Throw, you can change a roll of 9 or lower to a 10" (Periapt of Wound Closure).
+  if (options.floor !== undefined && face < options.floor) {
+    total += options.floor - face;
+    face = options.floor;
   }
   const outcome = resolveDeathSave(actor.deathSaves, face, total);
   if (options.commit) actor.deathSaves = outcome.state;

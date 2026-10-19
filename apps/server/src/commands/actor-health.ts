@@ -576,7 +576,8 @@ export const actorHealthCommands = [
           faces,
           initiator,
           (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
-          count
+          count,
+          kit.equipmentCatalog()
         );
         healed = outcome.healed;
         events = outcome.events;

@@ -451,6 +451,9 @@ const SAVE_LIFETIME_KEYS = [
   "escapeAthletics"
 ] as const;
 
+/** The save-block keys that make a failure act by the target's Hit Points or send it home (`SaveOutcomeFields`). */
+const DEATH_SAVE_KEYS = ["failureByHitPoints[].**", "failureBanishes"] as const;
+
 /** The exemption table. First match wins, so specific rows sit above general ones. */
 export const EXEMPTIONS: readonly ExemptionRow[] = [
   // ---- action rider surface (every carrier that mounts actions) ----
@@ -598,6 +601,27 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
       "how a failed save's conditions end, where it pushes and who has Advantage on it, read from the spell's description as the catalog is built",
     status: "gap"
   })),
+  ...DEATH_SAVE_KEYS.map((key): ExemptionRow => ({
+    at: `actions[].save.${key}`,
+    types: ACTION_CARRIERS,
+    reason:
+      "what a failed save does by the target's Hit Points (a Slaying Bow's death, a Death Glare's drop to 0) and the creature types it sends home - authored in the content scripts; no editor control yet",
+    status: "gap"
+  })),
+  ...DEATH_SAVE_KEYS.map((key): ExemptionRow => ({
+    at: `save.${key}`,
+    types: ["spell"],
+    reason:
+      "what a failed save does by the target's Hit Points and the creature types it sends home (Divine Word) - authored in the content scripts",
+    status: "gap"
+  })),
+  {
+    at: "actions[].raisesCorpse.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a corpse an action raises as a new creature (a wraith's Create Specter): the stat block, how long dead and how many at once - authored in the content scripts; no editor control yet",
+    status: "gap"
+  },
   {
     at: "actions[].save.breaksConcentration",
     types: ACTION_CARRIERS,

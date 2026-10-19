@@ -36,7 +36,6 @@ const NO_CAST_DAMAGE: Readonly<Record<string, string>> = {
   "hunters-mark": "a rider on later hits",
   "meld-into-stone": "harms the caster if the stone is destroyed",
   "phantasmal-force": "harms on later turns",
-  "power-word-kill": "kills outright, or harms only above 100 Hit Points",
   "prismatic-spray": "a random ray per creature",
   "prismatic-wall": "a wall",
   "produce-flame": "the flame is hurled on later turns",
@@ -1157,12 +1156,6 @@ const physicalResistance: Modifier = {
   type: "damage-resistance",
   damageTypes: ["bludgeoning", "piercing", "slashing"]
 };
-/** A D20 Test penalty: attack rolls, saving throws and ability checks. */
-const d20Penalty = (amount: number): Modifier[] => [
-  { type: "attack-bonus", amount, when: [{ type: "on-attack-roll" }] },
-  { type: "save-bonus", amount, when: [{ type: "on-saving-throw" }] },
-  { type: "check-bonus", amount, when: [{ type: "on-ability-check" }] }
-];
 /** Alter Self's natural weapon: the Unarmed Strike deals 1d6 of this type with the spellcasting ability. */
 const naturalWeapon = (id: string, name: string, damageType: DamageType) =>
   option(id, name, { unarmedStrike: { dice: "1d6", damageType, ability: "spellcasting" } });
@@ -1830,25 +1823,6 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "self",
     duration: { type: "manual" },
     conditions: ["invisible"]
-  }),
-  // "The target takes a -4 penalty to D20 Tests. Every time the target finishes a Long Rest, the penalty is reduced by
-  // 1 until it becomes 0."
-  "raise-dead": spellGrant({
-    name: "Raise Dead",
-    tags: ["raise-dead"],
-    target: "target",
-    duration: { type: "manual" },
-    modifiers: d20Penalty(-4),
-    shrinksEachLongRest: true
-  }),
-  // Resurrection's ordeal is Raise Dead's: -4 on D20 Tests, one less after each Long Rest.
-  resurrection: spellGrant({
-    name: "Resurrection",
-    tags: ["resurrection"],
-    target: "target",
-    duration: { type: "manual" },
-    modifiers: d20Penalty(-4),
-    shrinksEachLongRest: true
   }),
   // "The target has the Invisible condition ... it has the Unconscious condition ... This spell also ends if the target
   // takes any damage." The end the caster sets is the GM's.

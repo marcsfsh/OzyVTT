@@ -861,7 +861,7 @@ export function endEffectsAtLongRest(state: GameState, actorId: string, clockMov
       (effect.hitPointMaximumGain !== undefined && effect.duration.type === "manual")
     )
       endEffectInternal(state, actor, effect.id, events, true);
-  // SRD Raise Dead: "Each time the target finishes a Long Rest, the penalty is reduced by 1 until it becomes 0."
+  // A penalty that eases with rest moves one toward 0 (Raise Dead's ordeal is death.ts's own, `easeOrdeals`).
   for (const effect of [...actor.effects]) if (effect.shrinksEachLongRest) shrinkPenalty(state, actor, effect, events);
   // The rest restores its hit points, and a knocked-out creature wakes when it regains any.
   events.push(...endKnockOut(state, actor));

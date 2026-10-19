@@ -371,7 +371,7 @@ describe("healing and saving throw riders", () => {
     expect(events.map((event) => event.text)).toContain("Wren regains 1 hit point (Regenerate).");
   });
 
-  it("shrinks a D20 Test penalty by one each Long Rest until it is gone (Raise Dead)", () => {
+  it("shrinks a D20 Test penalty by one each Long Rest until it is gone", () => {
     const built = table();
     giveEffect(
       built,
@@ -381,12 +381,12 @@ describe("healing and saving throw riders", () => {
         { type: "save-bonus", amount: -2, when: [{ type: "on-saving-throw" }] },
         { type: "check-bonus", amount: -2, when: [{ type: "on-ability-check" }] }
       ],
-      { shrinksEachLongRest: true, name: "Raise Dead" }
+      { shrinksEachLongRest: true, name: "Weakened" }
     );
     endEffectsAtLongRest(built.state, WREN);
-    const shrunk = actorOf(built.state, WREN).effects.find((effect) => effect.name === "Raise Dead")!;
+    const shrunk = actorOf(built.state, WREN).effects.find((effect) => effect.name === "Weakened")!;
     expect(shrunk.modifiers.map((modifier) => ("amount" in modifier ? modifier.amount : null))).toEqual([-1, -1, -1]);
     endEffectsAtLongRest(built.state, WREN);
-    expect(actorOf(built.state, WREN).effects.some((effect) => effect.name === "Raise Dead")).toBe(false);
+    expect(actorOf(built.state, WREN).effects.some((effect) => effect.name === "Weakened")).toBe(false);
   });
 });

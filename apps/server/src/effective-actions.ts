@@ -13,6 +13,7 @@ import {
 import { spellbookRituals } from "./ritual-adept.js";
 import { spellClassOf } from "./class-features.js";
 import { grantedSpellActions } from "./granted-actions.js";
+import { withHeadCount } from "./death-traits.js";
 
 /** The action list every actor-scoped consumer must read in place of `definition.actions`: item-derived
  *  actions plus standing riders (items, feats, features, live effects) folded into the numbers the resolver
@@ -26,13 +27,17 @@ export function effectiveActions(
   const declared = definition?.actions ?? [];
   // A spell's later action rolls at the level the spell is up at (Spiritual Weapon from a level 3 spell slot).
   const taken = declared.map((action) =>
-    withPotentRange(
-      withEmpoweredStrikes(
-        withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition),
-        definition
+    withHeadCount(
+      withPotentRange(
+        withEmpoweredStrikes(
+          withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition),
+          definition
+        ),
+        definition,
+        catalog
       ),
       definition,
-      catalog
+      actor
     )
   );
   // A Wizard's Ritual Adept casts a ritual from its book that the sheet doesn't list.

@@ -291,13 +291,6 @@ describe("spells that grant what the vocabulary now says", () => {
     resolve(built, spellAction("thaumaturgy"), { targetIds: [], optionId: "booming-voice" });
     expect(checkWith(built, { ability: "cha", skill: "intimidation" }, [3, 18]).plan.rollMode.mode).toBe("advantage");
   });
-
-  it("leaves a shrinking -4 on D20 Tests after Raise Dead", () => {
-    const built = outsideFight(caster());
-    resolve(built, spellAction("raise-dead"), { targetIds: [WREN], override: { reason: "Diamond" } });
-    expect(effectNamed(built, WREN, "Raise Dead")).toMatchObject({ shrinksEachLongRest: true });
-    expect(checkWith(built, { ability: "str", skill: "athletics" }, [10]).roll.total).toBe(13);
-  });
 });
 
 /** Wren with one more feature on her sheet. */
