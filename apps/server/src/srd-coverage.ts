@@ -61,8 +61,10 @@ const laterApplies = (later: SpellLater) =>
   later.save?.speedZero === true;
 
 /** A spell is enforced when a cast applies its numbers or leaves its effect on the targets, or the area it leaves
- *  applies them later; guided when the app spends the slot, holds Concentration, places the area or rolls a save
- *  whose outcome a person applies. */
+ *  applies them later. Every other spell is guided: each is a cast action (`character-build.ts`, `monster-spells.ts`)
+ *  that spends its casting time and slot, checks its components and targets (`resolution/components.ts`,
+ *  `resolution/spell-targets.ts`), holds Concentration, places its area and tells the table, while what it does is a
+ *  person's to apply. */
 export function spellState(spell: SpellReference): CoverageState {
   const effect = spell.effect;
   const applies =
@@ -82,9 +84,7 @@ export function spellState(spell: SpellReference): CoverageState {
       (effect?.damage.length ?? 0) > 0 ||
       spell.save.speedZero === true ||
       spell.save.failurePush !== undefined);
-  if (applies || saveApplies) return "enforced";
-  if (spell.level > 0 || spell.concentration || spell.area !== null || spell.save !== null) return "guided";
-  return "reference";
+  return applies || saveApplies ? "enforced" : "guided";
 }
 
 type ResolvingFields = Pick<
