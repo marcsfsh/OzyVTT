@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AbilityId, CheckRollOutcome, CheckSubject, RollVisibility } from "@vtt/domain";
+import type { AbilityId, ActorDerivedSheet, CheckRollOutcome, CheckSubject, RollVisibility } from "@vtt/domain";
 import { parseDiceFormula } from "@vtt/rules-5e";
 import { usePrompt } from "../components/feedback";
 import { useRollPreference } from "../dice/roll-preference";
@@ -40,6 +40,15 @@ function flatPart(formula: string): number {
 const withBonus = (value: number, bonus: number) =>
   bonus === 0 ? String(value) : `${value} ${bonus > 0 ? "+" : "-"} ${Math.abs(bonus)}`;
 
+/** A situation the roller can say a check fits (a Book's topic, prying with a Crowbar), as the server lists it. */
+export type CheckSituation = ActorDerivedSheet["situations"][number];
+
+/** Whether a situation can fit this check: its abilities and skills, where it names any. */
+export function situationFits(situation: CheckSituation, subject: CheckSubject): boolean {
+  if (situation.abilities.length > 0 && !situation.abilities.includes(subject.ability)) return false;
+  return situation.skills.length === 0 || (subject.skill !== undefined && situation.skills.includes(subject.skill));
+}
+
 /**
  * Rolls from the sheet. A check or a save is named, never composed: the server works out its bonus and its Advantage or
  * Disadvantage, so the chip can't disagree with the roll (ADR-0012). A player who rolls physical dice types the face
@@ -60,6 +69,14 @@ export function useSheetRolls(
   const [visibility, setVisibility] = useState<RollVisibility>("public");
   // The check this sheet rolled last, which a reroll throws again while it is still the character's latest roll.
   const [lastCheck, setLastCheck] = useState<CheckRollOutcome | null>(null);
+  // The situations the roller says the next check fits. Each is spent by the first check it can fit.
+  const [declared, setDeclared] = useState<readonly CheckSituation[]>([]);
+  const toggleSituation = (situation: CheckSituation) =>
+    setDeclared((held) =>
+      held.some((entry) => entry.situation === situation.situation)
+        ? held.filter((entry) => entry.situation !== situation.situation)
+        : [...held, situation]
+    );
   const { prompt, dialog } = usePrompt();
 
   /** Asks for the face a physical d20 shows; null when cancelled or not a face. */
@@ -83,6 +100,7 @@ export function useSheetRolls(
   const rollCheck = async (subject: CheckSubject, label: string, findActorId?: string) => {
     const face = rollMode === "manual" ? await typedFace(`Roll ${label}`) : undefined;
     if (face === null) return;
+    const fitting = declared.filter((situation) => situationFits(situation, subject)).map((entry) => entry.situation);
     setRolling(true);
     const result = await command("check:roll", {
       actorId,
@@ -91,9 +109,12 @@ export function useSheetRolls(
       ...(subject.tool ? { tool: subject.tool } : {}),
       visibility,
       ...(face !== undefined ? { face } : {}),
-      ...(findActorId ? { findActorId } : {})
+      ...(findActorId ? { findActorId } : {}),
+      ...(fitting.length > 0 ? { situations: fitting } : {})
     });
     setRolling(false);
+    if (result.ok && fitting.length > 0)
+      setDeclared((held) => held.filter((entry) => !fitting.includes(entry.situation)));
     setLastCheck(result.ok && result.check ? result.check : null);
     noteSheetRolls(result.check?.rollId);
     if (!result.ok) onFeedback(result.message ?? "The check was refused.");
@@ -208,6 +229,8 @@ export function useSheetRolls(
     visibility,
     setVisibility,
     lastCheck,
+    declared,
+    toggleSituation,
     rollCheck,
     rerollCheck,
     answerCheck,

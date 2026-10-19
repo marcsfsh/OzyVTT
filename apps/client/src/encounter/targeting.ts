@@ -45,6 +45,12 @@ export type TargetingSession = Readonly<
     ability?: AbilityId;
     /** The condition picked for a failed save whose caster chooses one (Blindness/Deafness); absent, the first. */
     conditionId?: string;
+    /** The option picked for an action that offers several (Fire Shield's warm or chill); it starts on the first. */
+    optionId?: string;
+    /** The option picked for each target, for an action that asks for one per target (Eyebite). */
+    targetOptions?: Readonly<Record<string, string>>;
+    /** The carried weapon a grant binds to (Magic Weapon, Shillelagh). */
+    itemId?: string;
     /** The GM places a spell's lingering area and resolves no action: the zone it is for. */
     placeZoneId?: string;
     /** How the caster shapes the cast (Metamagic, Sculpt Spells), with the creatures each pick names once chosen. */
@@ -135,6 +141,8 @@ export function beginTargeting(
     ...(usualSkill !== undefined ? { skill: usualSkill } : {}),
     // A picked cost starts at one; the picker raises it.
     ...(action.useCost === "chosen" ? { spend: 1 } : {}),
+    // An option starts on the first, as the server reads none.
+    ...(action.choices?.options?.[0] ? { optionId: action.choices.options[0].id } : {}),
     ...startingShapeChoice(action)
   };
   if (area) {
@@ -245,6 +253,22 @@ export function setDamageType(damageType: string) {
 export function setConditionChoice(conditionId: string) {
   if (!session?.action.conditionChoices?.includes(conditionId)) return;
   session = { ...session, conditionId };
+  emit();
+}
+/** Picks the option an action resolves with (Fire Shield's chill shield); with a target, that target's own. */
+export function setChoiceOption(optionId: string, targetId?: string) {
+  if (!session?.action.choices?.options?.some((option) => option.id === optionId)) return;
+  session =
+    targetId === undefined
+      ? { ...session, optionId }
+      : { ...session, targetOptions: { ...session.targetOptions, [targetId]: optionId } };
+  emit();
+}
+/** Picks the carried weapon a grant binds to; undefined leaves it to the server (the first that fits). */
+export function setBoundItem(itemId: string | undefined) {
+  if (!session?.action.choices?.bindsWeapon) return;
+  const { itemId: _previous, ...rest } = session;
+  session = itemId === undefined ? rest : { ...rest, itemId };
   emit();
 }
 /** Picks the skill a check action is made with; undefined lets Escape a Grapple use the better one. */
@@ -407,6 +431,9 @@ export function resolveTargeting(
     skill,
     ability,
     conditionId,
+    optionId,
+    targetOptions,
+    itemId,
     shaping
   } = session;
   const shapeChoice = shapeChoicePayload(session, selected);
@@ -447,6 +474,14 @@ export function resolveTargeting(
     ...(skill !== undefined ? { skill } : {}),
     ...(ability !== undefined ? { ability } : {}),
     ...(conditionId !== undefined ? { conditionId } : {}),
+    ...(optionId !== undefined ? { optionId } : {}),
+    // Only the picks for creatures still selected.
+    ...(targetOptions && action.choices?.optionsPerTarget
+      ? {
+          targetOptions: Object.fromEntries(Object.entries(targetOptions).filter(([id]) => selected.includes(id)))
+        }
+      : {}),
+    ...(itemId !== undefined ? { itemId } : {}),
     ...(shaping && shaping.length > 0 ? { shaping: shaping.map((entry) => ({ ...entry })) } : {}),
     ...shapeChoice,
     commit,

@@ -1,4 +1,5 @@
 import {
+  actionChoicesOf,
   owedDamageParts,
   owedDamageTotal,
   type ActionAvailability,
@@ -43,6 +44,7 @@ import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
+import { spendStudy, studyAMiss } from "./resolution/studied.js";
 import { applyShapeShift, checkShapeShift } from "./resolution/shape-shift.js";
 import { formsOffer } from "./transform/offer.js";
 import { applyMovementGrants } from "./resolution/movement-grants.js";
@@ -186,6 +188,9 @@ export function resolveDefinitionAction(
     spendUntilOwnAttack(ctx);
     spendSteadyAim(ctx);
     spendForgoneDeclaration(ctx);
+    // Studied Attacks: this roll spends the Fighter's mark on its target, and a miss leaves a new one.
+    spendStudy(ctx);
+    studyAMiss(ctx);
   }
   // A roll another creature may still answer (Cutting Words), or a hit the target's Parry or Shield may still turn into
   // a miss: the attack is spent, and the answer finishes it.
@@ -466,6 +471,8 @@ export function actionAvailability(
       ...(conditionChoicesOf(action, spell).length > 0
         ? { conditionChoices: [...conditionChoicesOf(action, spell)] as SaveCondition[] }
         : {}),
+      // An option, one for each target, or the weapon a grant binds to (Fire Shield, Bestow Curse, Magic Weapon).
+      ...(actionChoicesOf(action) ? { choices: structuredClone(actionChoicesOf(action)!) } : {}),
       // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.
       ...(builtin && builtinCheckSkills(action.id).length > 0 ? { checkSkills: builtinCheckSkills(action.id) } : {})
     };

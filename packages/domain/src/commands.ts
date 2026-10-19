@@ -457,6 +457,31 @@ export const ActionResolveSchema = z
       .optional(),
     /** The ability a cast chooses: Hex's target has Disadvantage on ability checks made with it. */
     ability: AbilitySchema.optional(),
+    /** The option picked for an action that offers several (Fire Shield's warm or chill, Bestow Curse's curse);
+     *  absent, the first. */
+    optionId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
+    /** An option for each target, for an action that asks for one per target (Enhance Ability's ability for each
+     *  creature); a target left out takes `optionId`. */
+    targetOptions: z
+      .record(
+        z.uuid(),
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80)
+      )
+      .refine((options) => Object.keys(options).length <= 20, "At most 20 targets are given options.")
+      .optional(),
+    /** The carried weapon an action binds to (Magic Weapon's touched weapon, Shillelagh's club). */
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest
@@ -789,6 +814,8 @@ export const CheckRollSchema = z
     /** The creature a Wisdom (Perception or Survival) check is made to find: the roller's Hunter's Mark on it gives
      *  Advantage. */
     findActorId: z.uuid().optional(),
+    /** The situations the roller says the check fits, from the sheet's list (a Book's topic, prying with a Crowbar). */
+    situations: z.array(z.string().trim().min(3).max(80)).max(6).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

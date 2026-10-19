@@ -215,7 +215,7 @@ export const gameReads = [
       // Stat-block rows, then builtins. The effective list, so item-derived actions and raised pool limits show.
       const catalog = kit.equipmentCatalog();
       const available = effectiveActions(definition, actor, catalog);
-      const builtins = builtinActionsFor(definition).filter(
+      const builtins = builtinActionsFor(definition, actor).filter(
         (candidate) => !available.some((declared) => declared.id === candidate.id)
       );
       const derivation = deriveEquipment(actor, definition, catalog);

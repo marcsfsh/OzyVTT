@@ -74,11 +74,11 @@ describe("durations by spell slot", () => {
     const level5 = caster();
     cast(level5, "hold-person", { targetIds: [FOE2] });
     heroTurnAgain(level5.state);
-    cast(level5, "bestow-curse", { slotLevel: 5 });
+    cast(level5, "bestow-curse", { slotLevel: 5, optionId: "wis" });
     answer(level5.state, FOE, 2);
     expect(concentration(level5.state)?.name).toBe("Concentrating on Hold Person");
     expect(actorOf(level5.state, FOE).effects[0]).toMatchObject({
-      name: "Bestow Curse",
+      name: "Bestow Curse (Wisdom curse)",
       tags: ["curse"],
       concentration: false,
       duration: { type: "minutes", remaining: 480 }

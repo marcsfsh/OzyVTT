@@ -240,9 +240,9 @@ export const paladin: ClassMechanicsModule = {
         }
       },
 
-      // A subclass spender of the class's Channel Divinity pool. The Charisma-modifier attack bonus is
-      // not expressible (`attack-bonus` is a flat integer); the weapon's light rides an effect on the Paladin, who
-      // holds it.
+      // A subclass spender of the class's Channel Divinity pool, bound to the Melee weapon picked: its attack rolls add
+      // the Charisma modifier (at least +1), its hits deal Radiant or the weapon's own type, and the weapon's light
+      // rides the effect on the Paladin, who holds it.
       "sacred-weapon": {
         uses: {
           scaling: { type: "class-resource", id: "channel-divinity" },
@@ -261,6 +261,16 @@ export const paladin: ClassMechanicsModule = {
               name: "Sacred Weapon",
               tags: ["sacred-weapon"],
               duration: { type: "rounds", rounds: 100 },
+              modifiers: [],
+              onEnd: [],
+              target: "self",
+              voidWhileIncapacitated: false,
+              concentration: false,
+              bindsWeapon: {
+                melee: true,
+                attackBonusAbility: { ability: "cha", minimum: 1 },
+                damageTypes: ["radiant"]
+              },
               light: { brightFeet: 20, dimFeet: 20 }
             }
           }

@@ -8,6 +8,8 @@ import { wardingAura } from "./paladin-auras.js";
 import { endZonesOfCast } from "./spell-zone-state.js";
 import { refreshSize, revertForm } from "./transform/forms.js";
 import { DESCENDS_SAFELY_TAG, descendSafely } from "./altitude.js";
+import { creatureTypeOf } from "./statblock-facts.js";
+import { restoreSuppressed } from "./suppressed-conditions.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
  *  end, which clears linked conditions and fires onEnd grants. Returns narration events and writes nothing to
@@ -34,8 +36,22 @@ export const MAGE_ARMOR_TAG = "mage-armor";
 export const NO_ACTIONS_TAG = "no-actions";
 /** The bearer can't take Reactions while this lasts. */
 export const NO_REACTIONS_TAG = "no-reactions";
-/** The bearer can't take a Bonus Action while this lasts (an ice devil's Ice Spear). */
+/** The bearer can't take a Bonus Action while this lasts (an ice devil's Ice Spear, Confusion). */
 export const NO_BONUS_ACTIONS_TAG = "no-bonus-actions";
+/** The bearer can't make attacks while this lasts (Gaseous Form's cloud). */
+export const CANT_ATTACK_TAG = "cant-attack";
+/** The bearer's only actions are Dash and the Magic action that ends this (Wind Walk's cloud form). */
+export const DASH_ONLY_TAG = "dash-only";
+/** The bearer can't end the Prone condition on itself while this lasts (Hideous Laughter). */
+export const CANT_STAND_TAG = "cant-stand";
+/** An Unconscious bearer another creature can shake awake with an action (Sleep, Eyebite's Asleep). */
+export const WAKEABLE_TAG = "wakeable";
+/** Outlined only against its source: the bearer can't hide from the effect's source, and its Invisible condition
+ *  gives no benefit against it (Mind Spike). */
+export const OUTLINED_TO_SOURCE_TAG = "outlined-to-source";
+/** Its Invisible condition ends once its bearer makes an attack roll, deals damage or casts a spell, and the effect
+ *  goes on (Mislead). */
+export const INVISIBLE_UNTIL_IT_ACTS_TAG = "invisible-until-it-acts";
 /** The bearer can't make Opportunity Attacks while this lasts (Shocking Grasp). */
 export const NO_OPPORTUNITY_ATTACKS_TAG = "no-opportunity-attacks";
 /** The bearer can't regain Hit Points while this lasts (Chill Touch). */
@@ -178,6 +194,23 @@ function immuneToCondition(actor: Actor, conditionId: string, source?: Condition
   return deriveEquipment(actor, definition, source.catalog).conditionImmunities.some(
     (entry) => entry.id === conditionId
   );
+}
+
+/** Whether one of the bearer's effects wards it against this condition from a creature of the source's type
+ *  (Protection from Evil and Good: no Charmed or Frightened from Aberrations, Celestials, ...). */
+export function wardedFrom(
+  state: GameState,
+  actor: Actor,
+  conditionId: string,
+  sourceActorId: string | null,
+  resolveDefinition: ((definitionId: string) => ActorDefinition | undefined) | undefined
+): boolean {
+  const wards = actor.effects.filter((effect) => effect.conditionWards?.conditionIds.includes(conditionId as never));
+  if (wards.length === 0 || sourceActorId === null) return false;
+  const source = state.actors.find((candidate) => candidate.id === sourceActorId);
+  if (!source) return false;
+  const type = creatureTypeOf(source, source.definitionId ? resolveDefinition?.(source.definitionId) : undefined);
+  return type !== null && wards.some((effect) => effect.conditionWards!.creatureTypes.includes(type));
 }
 
 const hasCondition = (actor: Actor, conditionId: string) =>
@@ -328,6 +361,8 @@ export function addEffect(
       continue;
     }
     if (immuneToCondition(actor, conditionId, { ...immunities, state })) continue;
+    // A ward against the kind of creature that imposes it (Protection from Evil and Good).
+    if (wardedFrom(state, actor, conditionId, effect.sourceActorId, immunities?.resolveDefinition)) continue;
     if (actor.conditions.length >= 20) continue;
     const level = conditionId === "exhaustion" ? { level: 1 } : {};
     writeCondition(actor, { id: conditionId, ...level });
@@ -454,6 +489,8 @@ function endEffectInternal(
       actorId: actor.id
     });
   }
+  // Calm Emotions: what it held off comes back where it still applies.
+  for (const text of restoreSuppressed(actor, effect)) events.push({ kind: "condition", text, actorId: actor.id });
   for (const grant of effect.onEnd) {
     const before = exhaustionLevel(actor);
     const level = grant.conditionId === "exhaustion" ? Math.min(6, before + (grant.level ?? 1)) : grant.level;
@@ -834,9 +871,34 @@ export function endEffectsAtLongRest(state: GameState, actorId: string, clockMov
       (effect.hitPointMaximumGain !== undefined && effect.duration.type === "manual")
     )
       endEffectInternal(state, actor, effect.id, events, true);
+  // A penalty that eases with rest moves one toward 0 (Raise Dead's ordeal is death.ts's own, `easeOrdeals`).
+  for (const effect of [...actor.effects]) if (effect.shrinksEachLongRest) shrinkPenalty(state, actor, effect, events);
   // The rest restores its hit points, and a knocked-out creature wakes when it regains any.
   events.push(...endKnockOut(state, actor));
   return events;
+}
+
+/** The D20 Test bonuses a shrinking penalty carries. */
+const D20_PENALTY_TYPES: ReadonlySet<string> = new Set(["attack-bonus", "save-bonus", "check-bonus"]);
+
+/** Moves a shrinking penalty's D20 Test amounts one toward 0, and ends it when none is left. */
+function shrinkPenalty(state: GameState, actor: Actor, effect: EffectInstance, events: EffectNarration[]): void {
+  const penaltyOf = (modifier: EffectInstance["modifiers"][number]) =>
+    D20_PENALTY_TYPES.has(modifier.type) && "amount" in modifier ? (modifier.amount ?? 0) : 0;
+  const modifiers = effect.modifiers.map((modifier) =>
+    penaltyOf(modifier) < 0 ? { ...modifier, amount: penaltyOf(modifier) + 1 } : modifier
+  );
+  const left = modifiers.find((modifier) => penaltyOf(modifier) < 0);
+  if (!left) {
+    endEffectInternal(state, actor, effect.id, events, true);
+    return;
+  }
+  actor.effects = actor.effects.map((candidate) => (candidate.id === effect.id ? { ...effect, modifiers } : candidate));
+  events.push({
+    kind: "effect",
+    text: `${actor.name}'s penalty from ${effect.name} shrinks to ${penaltyOf(left)}.`,
+    actorId: actor.id
+  });
 }
 
 /**

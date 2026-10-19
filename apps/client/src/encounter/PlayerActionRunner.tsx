@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { choosesAbility, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
+import { actionChoicesOf, choosesAbility, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
 import type { CastShaping } from "@vtt/schemas";
 import { command, read } from "../lib/command";
 import { ActionList } from "../sheet/ActionList";
@@ -67,6 +67,9 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     // A cure that ends one condition of several asks which (Lesser Restoration).
     ...(action.endsOneCondition && action.endsConditions ? { conditionChoices: [...action.endsConditions] } : {}),
     ...(choosesAbility(action) ? { choosesAbility: true } : {}),
+    // What it asks for as it resolves; a self grant that asks is aimed at no one, so the pick comes before the tap.
+    ...(actionChoicesOf(action) ? { choices: actionChoicesOf(action)! } : {}),
+    ...(actionChoicesOf(action) && action.grants?.target === "self" ? { targeting: "none" as const } : {}),
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool.
     ...(action.healing && !action.healing.self
       ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }
@@ -239,6 +242,8 @@ export function PlayerActionRunner({
   // A self heal (Second Wind) is a direct tap; a heal for others picks its targets first. An item's action carries the
   // server's word on it (a scroll of Detect Magic is a tap, a potion picks its drinker).
   const isTargetlessOwn = (action: ContentActionSummary) => {
+    // A pick comes first (Fire Shield's warm or chill, the weapon Magic Weapon is cast on).
+    if (action.choices) return false;
     if (action.targeting === "none") return true;
     // A touch that ends a condition picks who it touches.
     if (action.targeting === "single" || action.targeting === "multi") return false;
@@ -496,6 +501,7 @@ export function PlayerActionRunner({
           )}
           onMap
           {...(insideNow ? { insideNow } : {})}
+          carried={actor?.inventory ?? []}
           busy={busy}
           onInvalidFace={onFeedback}
           onRoll={(face) => resolveTargeting(revision, onOutcome, face !== undefined ? { attackNatural: face } : {})}

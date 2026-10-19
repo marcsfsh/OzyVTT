@@ -1,6 +1,10 @@
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, EffectInstance } from "@vtt/schemas";
 
 type BuiltinAction = ActorDefinition["actions"][number];
+
+/** The live creature taking the action, whose effects can offer actions of their own (Expeditious Retreat's Dash as a
+ *  Bonus Action, Irresistible Dance's "collect itself"). */
+export type ActionBearer = Readonly<{ effects: readonly EffectInstance[] }>;
 
 /**
  * The SRD 5.2.1 generic actions every combatant can take (rules glossary "[Action]" entries) plus the
@@ -211,6 +215,14 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     damage: []
   },
   {
+    id: "shake-awake",
+    name: "Shake Awake",
+    activation: "action",
+    description:
+      "Shake or slap a creature within 5 feet out of a magical sleep, which ends it (SRD 5.2.1 Sleep: someone within 5 feet of it takes an action to shake it out of the spell's effect).",
+    damage: []
+  },
+  {
     id: "extinguish-fire",
     name: "Put Out the Fire",
     activation: "action",
@@ -309,7 +321,7 @@ export function withTakenActions(action: BuiltinAction): BuiltinAction {
  * Patient Defense, and Martial Arts' Unarmed Strike (SRD 5.2.1). Read from the sheet's features and actions, so a
  * sheet built before this list gets them too. The first feature offering one names it.
  */
-function bonusSources(definition: ActorDefinition | undefined): ReadonlyMap<BonusBase, string> {
+function bonusSources(definition: ActorDefinition | undefined, bearer?: ActionBearer): ReadonlyMap<BonusBase, string> {
   const offered = new Map<BonusBase, string>();
   const offer = (bases: readonly BonusBase[], source: string) => {
     for (const base of bases) if (!offered.has(base)) offered.set(base, source);
@@ -324,7 +336,57 @@ function bonusSources(definition: ActorDefinition | undefined): ReadonlyMap<Bonu
   if (holds("patient-defense")) offer(["disengage"], "Patient Defense");
   for (const action of actions)
     if (action.activation === "bonus-action") offer(offeredActions(action.description), action.name);
+  // A live effect's own: Expeditious Retreat's Dash, Conjure Woodland Beings' Disengage.
+  for (const effect of bearer?.effects ?? []) offer(effect.bonusActions ?? [], effect.name);
   return offered;
+}
+
+/** The id of the action that ends one of the bearer's effects (Irresistible Dance's "collect itself"); a Bonus Action
+ *  one takes `BONUS_SUFFIX`. */
+export const END_EFFECT_ID = "end-effect";
+
+/** The actions the bearer's effects offer to end them, one for each activation: the first effect needing it names it. */
+function endEffectActions(bearer: ActionBearer | undefined): BuiltinAction[] {
+  const byActivation = new Map<"action" | "bonus-action", EffectInstance>();
+  for (const effect of bearer?.effects ?? [])
+    if (effect.endAction && !byActivation.has(effect.endAction.activation))
+      byActivation.set(effect.endAction.activation, effect);
+  return [...byActivation].map(([activation, effect]) => {
+    const end = effect.endAction!;
+    const roll = `${ABILITY_WORDS[end.ability]}${end.skill ? ` (${skillWords(end.skill)})` : ""} ${end.kind === "save" ? "saving throw" : "check"}`;
+    return {
+      id: activation === "action" ? END_EFFECT_ID : `${END_EFFECT_ID}${BONUS_SUFFIX}`,
+      name: `${end.label} (${effect.name})`.slice(0, 120),
+      activation,
+      description: `End ${effect.name} with a DC ${end.dc} ${roll}. A success ends it.`,
+      damage: [],
+      // Brought forward on the sheet while the effect lasts.
+      ...(effect.tags[0] !== undefined ? { requiresEffectTag: effect.tags[0] } : {})
+    };
+  });
+}
+
+const ABILITY_WORDS = {
+  str: "Strength",
+  dex: "Dexterity",
+  con: "Constitution",
+  int: "Intelligence",
+  wis: "Wisdom",
+  cha: "Charisma"
+} as const;
+const skillWords = (skill: string) =>
+  skill
+    .split("-")
+    .map((word) => `${word[0]!.toUpperCase()}${word.slice(1)}`)
+    .join(" ");
+
+/** SRD Empowered Strikes: "Whenever you deal damage with your Unarmed Strike, it can deal your choice of Force damage or
+ *  its normal damage type." A Monk 6's own Unarmed Strike offers both; anything else stays as it is. */
+export function withEmpoweredStrikes(action: BuiltinAction, definition: ActorDefinition | undefined): BuiltinAction {
+  if (builtinBaseId(action.id) !== "unarmed-strike" || action.damage.length === 0 || action.damageTypes) return action;
+  if (!(definition?.character?.features ?? []).some((feature) => feature.id === "empowered-strikes")) return action;
+  const own = action.damage[0]!.type as NonNullable<BuiltinAction["damageTypes"]>[number];
+  return own === "force" ? action : { ...action, damageTypes: [own, "force"] };
 }
 
 /** A generic action taken as a Bonus Action through a feature. Martial Arts' strike keeps the Monk's own numbers
@@ -336,7 +398,7 @@ function bonusVariant(base: BonusBase, source: string, definition: ActorDefiniti
     base === "unarmed-strike"
       ? definition?.actions.find((action) => action.id === base && action.attack !== undefined)
       : undefined;
-  const { replacesAttack: _attack, ...shape } = own ?? generic;
+  const { replacesAttack: _attack, ...shape } = withEmpoweredStrikes(own ?? generic, definition);
   const { count: _count, ...attack } = shape.attack ?? { bonus: 0 };
   return {
     ...shape,
@@ -361,15 +423,25 @@ export function bonusNeedsDarkness(definition: ActorDefinition | undefined, acti
   );
 }
 
-/** The generic actions every combatant has, then the Bonus Action forms its features give it. */
-export function builtinActionsFor(definition: ActorDefinition | undefined): readonly BuiltinAction[] {
-  const variants = [...bonusSources(definition)].map(([base, source]) => bonusVariant(base, source, definition));
-  return [...BUILTIN_ACTIONS, ...variants];
+/** The generic actions every combatant has, then the Bonus Action forms its features and effects give it, and the
+ *  actions its effects offer to end them. */
+export function builtinActionsFor(
+  definition: ActorDefinition | undefined,
+  bearer?: ActionBearer
+): readonly BuiltinAction[] {
+  const variants = [...bonusSources(definition, bearer)].map(([base, source]) =>
+    bonusVariant(base, source, definition)
+  );
+  return [...BUILTIN_ACTIONS, ...variants, ...endEffectActions(bearer)];
 }
 
 /** One generic action this combatant can take, by id. */
-export function builtinActionFor(definition: ActorDefinition | undefined, actionId: string): BuiltinAction | undefined {
-  return builtinActionsFor(definition).find((action) => action.id === actionId);
+export function builtinActionFor(
+  definition: ActorDefinition | undefined,
+  actionId: string,
+  bearer?: ActionBearer
+): BuiltinAction | undefined {
+  return builtinActionsFor(definition, bearer).find((action) => action.id === actionId);
 }
 
 /** The id of the generic action a Bonus Action form is taken from ("hide" for "hide-bonus"), or the id itself. */
@@ -389,5 +461,6 @@ export const BUILTIN_TARGETING: Readonly<Record<string, "single">> = {
   "unarmed-strike-bonus": "single",
   "unarmed-grapple-bonus": "single",
   "unarmed-shove-prone-bonus": "single",
-  "unarmed-shove-push-bonus": "single"
+  "unarmed-shove-push-bonus": "single",
+  "shake-awake": "single"
 };

@@ -310,6 +310,9 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   // "An affected target repeats the save at the end of each of its turns, ending the spell on itself on a success."
   // The spell names no condition, so the reader leaves the repeat out.
   slow: { repeatSave: true },
+  // "The target repeats the save at the end of each of its turns, ending the spell on a success." No condition names
+  // it for the reader.
+  "ray-of-enfeeblement": { repeatSave: true },
   // "Another 5d4 Acid damage at the end of its next turn", with no condition for the reader to hang it on.
   "vitriolic-sphere": {
     ongoingDamage: { damage: [{ formula: "5d4", type: "acid" }], at: "bearer-turn-end" }

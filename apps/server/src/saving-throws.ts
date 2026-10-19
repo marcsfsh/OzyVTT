@@ -34,6 +34,7 @@ import { withoutSameHazard } from "./hazards.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 import { requireGm, type Initiator } from "./authorization.js";
 import { holdsFeature } from "./class-features.js";
+import { d20MinimumOf, totalMinimumOf } from "./ability-checks.js";
 import { heldRollFor, holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
 import {
   answeredLines,
@@ -58,6 +59,7 @@ import {
   CONCENTRATING_TAG,
   effectDurationOf,
   endConcentrationSustainedBy,
+  endConditionsImmuneTo,
   endEffectIfPresent,
   endIdleConcentration,
   makeEffect,
@@ -73,6 +75,8 @@ import {
   type RollModeClaims
 } from "./equipment-derivation.js";
 import { countZoneDamage } from "./spell-zone-state.js";
+import { creatureTypeOf } from "./statblock-facts.js";
+import { suppressConditions } from "./suppressed-conditions.js";
 import { sizeAtMost, sizeRank } from "./resolution/context.js";
 import { lightSensitivities, sightRules } from "./vision/rules.js";
 
@@ -128,7 +132,8 @@ export function saveRollSources(
   ability: AbilityId,
   derivation: EquipmentDerivation,
   concentration = false,
-  stakes: readonly string[] = []
+  stakes: readonly string[] = [],
+  sourceCreatureType: string | null = null
 ): RollModeClaims {
   const claims: RollModeClaims = { advantage: [], disadvantage: [] };
   if (ability === "dex" && target.conditions.some((condition) => condition.id === "restrained")) {
@@ -138,9 +143,48 @@ export function saveRollSources(
     derivation,
     concentration ? ["save", "concentration"] : ["save"],
     "on-saving-throw",
-    { ability, ...(stakes.length > 0 ? { targetConditionIds: stakes } : {}) },
+    {
+      ability,
+      ...(stakes.length > 0 ? { targetConditionIds: stakes } : {}),
+      // The creature whose effect forces the save, for a rider against its kind (Protection from Evil and Good).
+      ...(sourceCreatureType !== null ? { sourceCreatureType } : {})
+    },
     claims
   );
+}
+
+/**
+ * A save's total once its riders' floors apply: a d20 under a `d20-minimum` counts as it, and a total under a
+ * `total-minimum` counts as that ability score (Indomitable Might's Strength). With the carrier that raised it, or
+ * null when nothing did.
+ */
+export function flooredSaveTotal(
+  derivation: EquipmentDerivation,
+  definition: ActorDefinition | undefined,
+  ability: AbilityId,
+  natural: number,
+  total: number
+): Readonly<{ total: number; raisedBy: string | null }> {
+  const riders = [
+    ...collectRiders(derivation.carriers, { ...derivation.context, moment: null }),
+    ...collectRiders(derivation.carriers, { ...derivation.context, ability, moment: "on-saving-throw" })
+  ];
+  const floor = d20MinimumOf(riders, "save", true);
+  const raised = floor !== null && natural < floor.face ? total + floor.face - natural : total;
+  const lifted = totalMinimumOf(riders, "save", definition);
+  if (lifted !== null && lifted.total > raised) return { total: lifted.total, raisedBy: lifted.label };
+  return { total: raised, raisedBy: raised > total ? floor!.label : null };
+}
+
+/** The creature type of the creature whose effect forces a save, for riders against its kind; null when unknown. */
+function sourceCreatureTypeOf(
+  state: GameState,
+  sourceActorId: string | null,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): string | null {
+  const source = sourceActorId === null ? undefined : state.actors.find((actor) => actor.id === sourceActorId);
+  if (!source) return null;
+  return creatureTypeOf(source, source.definitionId ? resolveDefinition(source.definitionId) : undefined);
 }
 
 /** The conditions a pending save is about: what its failure imposes, or what the effect it would end holds. */
@@ -181,9 +225,10 @@ export function saveRiderDiceTermsForAnySave(derivation: EquipmentDerivation): s
   return diceRiderTerms(diceRiders([...standing, ...atSave], "save-bonus"));
 }
 
-/** Advantage and Disadvantage on a saving throw that names no ability (a death save): riders on every save. */
+/** Advantage and Disadvantage on a saving throw that names no ability (a death save): riders on every save, and those
+ *  on Death Saving Throws alone (Beacon of Hope). */
 export function anySaveRollSources(derivation: EquipmentDerivation): RollModeClaims {
-  return rollModeClaims(derivation, ["save"], "on-saving-throw");
+  return rollModeClaims(derivation, ["save", "death-save"], "on-saving-throw");
 }
 
 export type { AuraContext };
@@ -528,6 +573,9 @@ export function applyFailureEffect(
     ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {}),
     ...(onFail.magical ? { magical: true as const } : {}),
     ...(onFail.armorClassBonus !== undefined ? { armorClassBonus: onFail.armorClassBonus } : {}),
+    ...(onFail.endAction ? { endAction: { ...onFail.endAction } } : {}),
+    ...(onFail.optionId !== undefined ? { optionId: onFail.optionId } : {}),
+    ...(onFail.conditionImmunities ? { conditionImmunities: [...onFail.conditionImmunities] } : {}),
     // The light it sheds while it lasts (Faerie Fire's Dim Light).
     ...(onFail.light ? { light: { ...onFail.light } } : {}),
     // What it does while it lasts (Bane's -1d4).
@@ -551,6 +599,21 @@ export function applyFailureEffect(
   }
   const applied = addEffect(state, target.id, failed, events, immunities);
   if (applied.sizeChange) refreshSize(state, target);
+  // Calm Emotions: a Charmed or Frightened it holds off is kept on the effect for later; one it makes the creature
+  // immune to and doesn't hold off ends.
+  const held = suppressConditions(target, onFail.suppressesConditions ?? []);
+  if (held.length > 0) {
+    target.effects = target.effects.map((effect) =>
+      effect.id === applied.id ? { ...effect, suppressedConditions: held } : effect
+    );
+    events.push({
+      kind: "condition",
+      text: `${target.name} is no longer ${held.map((entry) => conditionLabel(entry.id)).join(" or ")} while ${applied.name} lasts.`,
+      actorId: target.id
+    });
+  }
+  if (onFail.conditionImmunities)
+    events.push(...endConditionsImmuneTo(target, onFail.conditionImmunities, applied.name));
   return [
     { kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id, ...sourceOf(applied) },
     ...events
@@ -721,6 +784,8 @@ export function answerSave(
   let autoFailed: string | null = null;
   let autoSucceeded: string | null = null;
   let rollMode: AggregatedRollMode | undefined;
+  /** What raised the roll past its dice (Indomitable Might), named on the table's line. */
+  let raisedBy: string | null = null;
   // What answered the rolled save (`roll-answers.ts`), and what may still answer it on a preview.
   let answerSucceeds = false;
   let answered: RollAnswered[] = [];
@@ -758,7 +823,8 @@ export function answerSave(
       pending.ability,
       derivation,
       pending.endsEffects !== undefined,
-      conditionsAtStake(state, pending)
+      conditionsAtStake(state, pending),
+      sourceCreatureTypeOf(state, pending.sourceActorId, deps.resolveDefinition)
     );
     if (magicResistance === "advantage")
       sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
@@ -907,6 +973,10 @@ export function answerSave(
     answerSucceeds = read.succeed;
     answered = answeredLines(held);
     if (!commit) offered = answersOffered(state, answerTarget(held), answerDepsOf(deps, commandId));
+    // A floor under the d20 or the total (Indomitable Might's Strength score) counts as more.
+    const floored = flooredSaveTotal(derivation, definition, pending.ability, natural, total);
+    total = floored.total;
+    if (floored.raisedBy !== null) raisedBy = floored.raisedBy;
   }
   // Waiting on an answer, the confirm reads as a look: nothing lands until the answer finishes it.
   const applying = commit && !awaitingAnswer;
@@ -1024,6 +1094,12 @@ export function answerSave(
     events.push({
       kind: "condition",
       text: `${target.name} automatically succeeds on the ${pending.ability.toUpperCase()} save (${autoSucceeded}).`,
+      actorId: target.id
+    });
+  if (raisedBy !== null)
+    events.push({
+      kind: "condition",
+      text: `${target.name}'s ${pending.ability.toUpperCase()} save counts as ${total} (${raisedBy}).`,
       actorId: target.id
     });
   let appliedDamage = 0;

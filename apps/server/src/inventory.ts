@@ -11,6 +11,7 @@ import { endConditionsImmuneTo, endEffect, MAGE_ARMOR_TAG, type EffectNarration 
 import { CommandRejectedError } from "./game-store.js";
 import { rollStartingCharges } from "./item-charges.js";
 import { scrollSpellProblem } from "./scrolls.js";
+import { endBindingsOfGoneRows } from "./bound-weapons.js";
 
 const MAX_ITEMS = 200;
 /** SRD: "a creature can't be attuned to more than three magic items at a time"; Use Magic Device raises it. */
@@ -422,7 +423,11 @@ export function setInventoryItem(
     }
   }
   reconcileEquipment(actor, definition, deps);
-  return [...immuneConditionsEnd(actor, definition, deps), ...donningEndsMageArmor(state, actor)];
+  return [
+    ...immuneConditionsEnd(actor, definition, deps),
+    ...donningEndsMageArmor(state, actor),
+    ...endBindingsOfGoneRows(state, actor)
+  ];
 }
 
 /** SRD Immunity: an item that now makes its bearer immune to a condition (a Periapt of Proof against Poison put on)
@@ -526,6 +531,7 @@ export function giveItem(
   to.inventory = [...to.inventory, moved];
   reconcileEquipment(from, fromDefinition, deps);
   reconcileEquipment(to, toDefinition, deps);
+  endBindingsOfGoneRows(state, from);
   return { name: row.name };
 }
 

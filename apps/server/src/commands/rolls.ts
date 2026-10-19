@@ -84,12 +84,13 @@ export const rollCommands = [
     type: "check.roll",
     operationId: "rollCheck",
     description:
-      "Rolls an ability check on the server: an ability, a skill, or a tool (with the skill it uses, when one does). The server works out the bonus (proficiency or Expertise, Jack of All Trades, a stat block's printed skill, check riders, Exhaustion) and the Advantage or Disadvantage the rules give (items, armor's Stealth Disadvantage, armor worn without training, Poisoned, Frightened, Hex, Hunter's Mark on the creature named by `findActorId`, a tool used with a proficient skill), applies Reliable Talent, records the roll and, with a `dc`, says whether it succeeded. `face` is a typed d20 (a player only while the table's typedRolls is open); `rollMode` is the GM's alone. A player can't roll GM-only, a hidden creature's roll is always the GM's, and a blind roll's numbers stay with the GM. GM-grade for anyone; a player session only for their own claimed character. The response carries `check`.",
+      "Rolls an ability check on the server: an ability, a skill, or a tool (with the skill it uses, when one does). The server works out the bonus (proficiency or Expertise, Jack of All Trades, a stat block's printed skill, check riders, Exhaustion) and the Advantage or Disadvantage the rules give (items, armor's Stealth Disadvantage, armor worn without training, Poisoned, Frightened, Hex, Hunter's Mark on the creature named by `findActorId`, a tool used with a proficient skill, and the riders of the `situations` the roller says it fits, from the sheet's list, such as a Book's topic), applies Reliable Talent, records the roll and, with a `dc`, says whether it succeeded. `face` is a typed d20 (a player only while the table's typedRolls is open); `rollMode` is the GM's alone. A player can't roll GM-only, a hidden creature's roll is always the GM's, and a blind roll's numbers stay with the GM. GM-grade for anyone; a player session only for their own claimed character. The response carries `check`.",
     summary: "Roll an ability, skill or tool check on the server, with the rules' bonus and Advantage or Disadvantage.",
     schema: CheckRollSchema,
     malformed: "The check is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { commandId, actorId, ability, skill, tool, dc, visibility, face, rollMode, findActorId } = request;
+      const { commandId, actorId, ability, skill, tool, dc, visibility, face, rollMode, findActorId, situations } =
+        request;
       const initiator = initiatorOf(principal);
       let result: CheckResult | undefined;
       const geometry = await kit.liveGeometry();
@@ -105,7 +106,8 @@ export const rollCommands = [
             visibility,
             ...(face !== undefined ? { face } : {}),
             ...(rollMode !== undefined ? { forcedMode: rollMode } : {}),
-            ...(findActorId !== undefined ? { findActorId } : {})
+            ...(findActorId !== undefined ? { findActorId } : {}),
+            ...(situations !== undefined ? { situations } : {})
           },
           checkDeps(kit, principal, draft, geometry)
         );

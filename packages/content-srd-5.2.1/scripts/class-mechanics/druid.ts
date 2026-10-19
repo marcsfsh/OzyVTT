@@ -1,5 +1,5 @@
 // Druid and Circle of the Land mechanics, merged over the ETL-generated prose.
-import { potentSpellcasting, type ClassMechanicsModule, type TableSpell } from "./overlay.js";
+import { potentSpellcasting, wisdomOnChecks, type ClassMechanicsModule, type TableSpell } from "./overlay.js";
 
 /** The SRD Druid cantrips that deal damage, which Potent Spellcasting adds to. */
 const DRUID_DAMAGE_CANTRIPS = ["poison-spray", "produce-flame", "starry-wisp"];
@@ -106,7 +106,8 @@ export const druid: ClassMechanicsModule = {
             name: "Magician",
             description:
               "You know one extra cantrip from the Druid spell list. In addition, your mystical connection to nature gives you a bonus to your Intelligence (Arcana or Nature) checks. The bonus equals your Wisdom modifier (minimum bonus of +1).",
-            extraPicks: [{ offer: "class-cantrips", amount: 1 }]
+            extraPicks: [{ offer: "class-cantrips", amount: 1 }],
+            modifiers: [wisdomOnChecks(["arcana", "nature"])]
           },
           {
             id: "warden",

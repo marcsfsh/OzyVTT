@@ -23,7 +23,8 @@ const derivedWith = (defences: ActorDerivedSheet["defences"]) =>
     spellSaveDcBonus: 0,
     attunementSlots: 3,
     weaponMasteries: [],
-    classColumns: []
+    classColumns: [],
+    situations: []
   }) as ActorDerivedSheet;
 
 const rowText = (label: string) => screen.getByText(label).nextElementSibling?.textContent;

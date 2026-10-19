@@ -487,7 +487,7 @@ describe("actor definition v1", () => {
     expect(RiderWhenSchema.safeParse([{ type: "while-condition", conditionIds: ["poisonned"] }]).success).toBe(false);
   });
 
-  it("declares thirty named triggers, every one classified and accepted by the JSON twin", () => {
+  it("declares forty-one named triggers, every one classified and accepted by the JSON twin", () => {
     // One sample per trigger: the JSON twin folds parameterless moments into one enum branch, so a branch count would
     // not prove agreement.
     const samples: Record<string, Record<string, unknown>> = {
@@ -509,6 +509,7 @@ describe("actor definition v1", () => {
       "on-ability-check": {},
       "on-initiative-roll": {},
       "on-taking-damage": {},
+      "on-healing": {},
       "attack-kind-is": { kinds: ["opportunity"] },
       "weapon-property-is": { properties: ["finesse"] },
       "damage-type-is": { damageTypes: ["fire"] },
@@ -523,25 +524,32 @@ describe("actor definition v1", () => {
       "by-effect-source": {},
       "sees-other": {},
       "seen-by-other": {},
-      "other-lacks-sense": { senses: ["blindsight"] }
+      "other-lacks-sense": { senses: ["blindsight"] },
+      "source-creature-type-is": { creatureTypes: ["fiend"] },
+      "versus-effect-source": {},
+      "versus-marked": { tags: ["grapple"] },
+      "versus-hurt": {},
+      "versus-within": { feet: 15 },
+      "spell-class-is": { classIds: ["sorcerer"] },
+      "situation-is": { situation: "where the Crowbar's leverage applies" }
     };
     const declared = RiderTriggerSchema.options.map((option) => option.shape.type.value as string);
-    expect(declared).toHaveLength(33);
+    expect(declared).toHaveLength(41);
     expect(Object.keys(samples).sort()).toEqual([...declared].sort());
     // Every trigger must be classified, or it would evaluate in the wrong layer.
     const kinds = declared.map((type) => RIDER_TRIGGER_KINDS[type as keyof typeof RIDER_TRIGGER_KINDS]);
     expect(kinds.filter((kind) => kind === undefined)).toEqual([]);
     expect(kinds.filter((kind) => kind === "static-gate")).toHaveLength(6);
     expect(kinds.filter((kind) => kind === "dynamic-gate")).toHaveLength(3);
-    expect(kinds.filter((kind) => kind === "moment")).toHaveLength(9);
-    expect(kinds.filter((kind) => kind === "filter")).toHaveLength(15);
+    expect(kinds.filter((kind) => kind === "moment")).toHaveLength(10);
+    expect(kinds.filter((kind) => kind === "filter")).toHaveLength(22);
 
     for (const type of declared) {
       const trigger = { type, ...samples[type] };
-      // A filter needs a moment beside it.
+      // A filter needs a moment beside it; a situation fits only an ability check.
       const when =
         RIDER_TRIGGER_KINDS[type as keyof typeof RIDER_TRIGGER_KINDS] === "filter"
-          ? [{ type: "on-hit" }, trigger]
+          ? [{ type: type === "situation-is" ? "on-ability-check" : "on-hit" }, trigger]
           : [trigger];
       expect(RiderWhenSchema.safeParse(when).success, type).toBe(true);
       const definition = structuredClone(legacyDefinition) as Record<string, any>;
