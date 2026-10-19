@@ -8,7 +8,7 @@ import {
   type DamageType
 } from "@vtt/schemas";
 import type { Wire } from "./wire.js";
-import type { CastShapingOffers } from "./results.js";
+import type { ActionAvailability, CastShapingOffers } from "./results.js";
 
 /** An open identity slug; ids are never closed enums, so homebrew stays additive. */
 const slug = (max = 80) =>
@@ -906,6 +906,9 @@ export type ContentActionSummary = Readonly<{
   /** The spell list this cast belongs to, by its action id; it is shown under that list. */ castFrom?: string;
   /** The spell it casts. */ spellId?: string;
   /** The ways its caster may shape the cast (Metamagic, Sculpt Spells), from the server's availability read. */ shaping?: CastShapingOffers;
+  /** The forms a shape-shift may take (Wild Shape, Polymorph), from the server's availability read; `action.resolve`'s
+   *  `form`, or `targetForms` when each target takes its own. */ forms?: ActionAvailability["forms"];
+  /** The effects a use picks one of (Enlarge or Reduce); `action.resolve`'s `option`. */ options?: ActionAvailability["options"];
 }>;
 export type ContentActionsResult = {
   ok: boolean;

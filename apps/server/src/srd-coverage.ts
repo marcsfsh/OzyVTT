@@ -79,6 +79,9 @@ export function spellState(spell: SpellReference): CoverageState {
       effect.endsCurses === true ||
       effect.reaction !== undefined ||
       effect.darts !== undefined ||
+      // The form it gives (Polymorph's Beast) or the effect it picks (Enlarge or Reduce).
+      effect.shapeShift !== undefined ||
+      effect.effectOptions !== undefined ||
       (effect.laterActions ?? []).some(laterApplies));
   const saveApplies =
     spell.save !== null &&
@@ -109,6 +112,9 @@ type ResolvingFields = Pick<
   | "endsConditions"
   | "answer"
   | "sight"
+  | "shapeShift"
+  | "endsForm"
+  | "effectOptions"
 > &
   Readonly<{ attack?: unknown; save?: unknown; damageByLevel?: unknown }>;
 
@@ -130,7 +136,10 @@ const actionResolves = (action: ResolvingFields) =>
   action.reaction !== undefined ||
   action.grants !== undefined ||
   action.endsConditions !== undefined ||
-  action.answer !== undefined;
+  action.answer !== undefined ||
+  action.shapeShift !== undefined ||
+  action.endsForm !== undefined ||
+  action.effectOptions !== undefined;
 
 /**
  * A stat block action is enforced when its attack, save, damage, healing, grant or structured Multiattack resolves,
@@ -144,7 +153,9 @@ export function monsterActionState(
   definition: ActorDefinition,
   spellStates: ReadonlyMap<string, CoverageState>
 ): CoverageState {
-  const tracked = action.untrackedMultiattack || action.reminder || action.legendary || action.uses;
+  // An action printed for some forms only is refused in the others.
+  const tracked =
+    action.untrackedMultiattack || action.reminder || action.legendary || action.uses || action.formOnly !== undefined;
   const floor: CoverageState = tracked ? "guided" : "reference";
   if (action.castsSpells) {
     const casts = action.castsSpells.spells.map((entry) => spellStates.get(entry.spellId) ?? "reference");

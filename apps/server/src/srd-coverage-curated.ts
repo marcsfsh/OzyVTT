@@ -334,7 +334,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   search: guided(
     "resolution/builtins.ts rolls the chosen Wisdom check. With dynamic vision on, a Perception search finds each hidden creature in its line of sight whose Hide total it meets and ends its hiding. The GM sets any other DC and says what else the creature finds."
   ),
-  "shape-shifting": reference("Changing form is the GM's to run; the sheet keeps the creature's own statistics."),
+  "shape-shifting": enforced(
+    "transform/assume.ts takes a form as an effect on the creature: a stat block's statistics replace its own, with what the effect says it keeps (transform/compose.ts), or one of its printed forms changes its size and speeds. Its Hit Points stay its own, conditions and effects carry over, and the token takes the form's size (transform/forms.ts). It reverts when the effect ends or it dies (transform/rules.ts)."
+  ),
   "short-rest": enforced(
     "rests.ts needs 1 Hit Point, lets Hit Point Dice be spent, gives back what a Short Rest restores and ends what lasts until one. The party's Short Rest moves the game clock an hour when the GM finishes it. short-rest-interruptions.ts ends it for anyone who rolls Initiative, takes damage or casts a spell above a cantrip."
   ),
@@ -418,8 +420,10 @@ const senses = reference("Communication and senses like this are the GM's to run
 const squeezes = reference("The map has no walls or gaps, so squeezing through is the GM's to allow.");
 /** A trait about jumping, which the app doesn't measure. */
 const jumps = reference("Jumps aren't measured.");
-/** A trait about changing into another stat block, which the app doesn't do. */
-const changesForm = reference("Changing form is the GM's to run; the token keeps this stat block.");
+/** A trait about changing into another stat block after a Long Rest, which is a swap of stat blocks. */
+const changesForm = reference(
+  "Changing to the other stat block after a Long Rest is the GM's: place that stat block on the map in this one's stead."
+);
 /** A trait the server reads by name for movement (movement-rules.ts). */
 const sharesSpace = (who: string) =>
   enforced(
@@ -538,7 +542,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   "Magic Rope": reference("The rope and its statistics are the GM's to run."),
   Mimicry: senses,
-  "Misty Escape": reference("Turning to mist at 0 Hit Points is the GM's to run."),
+  "Misty Escape": enforced(
+    "transform/at-zero.ts turns the vampire to mist with no action when it drops to 0 Hit Points, unless it stands in sunlight, and the mist keeps it alive at 0 for 2 hours (death.ts reads it), refusing a change of form meanwhile. Reaching its resting place, its Paralyzed condition there and the Hit Point it regains are the GM's."
+  ),
   "Mucus Cloud": reference("The save at the end of the aboleth's turn and its curse are the GM's to run."),
   "Multiple Heads": reference("Heads lost and regrown, and the Hit Points that come with them, are the GM's to track."),
   "Ooze Cube": reference("Entering the cube, and pulling a creature out, are the GM's to run with its Engulf."),
@@ -598,6 +604,16 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Web Walker": reference("Webs aren't marked on the map; the GM waives what they would cost it."),
   Wishes: reference("The djinni's wishes are the GM's to run.")
 };
+
+/** A stat block's Shape-Shift into its printed forms. */
+const printedForms = (forms: string) =>
+  `transform/assume.ts takes ${forms}, or returns to the true form, as a Bonus Action or an action as printed; the rest of its statistics stay its own.`;
+
+/** A lycanthrope's attack that curses a Humanoid. */
+const lycanthropeBite = (name: string) =>
+  guided(
+    `It works only in the animal and hybrid forms (transform/rules.ts). A hit opens the curse's Constitution save on a Humanoid, and a cursed creature that drops to 0 Hit Points becomes a ${name} with 10 Hit Points instead (transform/at-zero.ts). The 24 hours of immunity after a success, and the GM's control of the cursed creature, are the GM's.`
+  );
 
 /** A manual or tome, whose study the GM marks done. */
 const studied = (ability: string) =>
@@ -698,8 +714,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:orc-relentless-endurance": enforced(
     "hit-points.ts holds an Orc reduced to 0 Hit Points, but not killed outright, at 1 Hit Point instead, once a Long Rest. It is taken the first time it can be."
   ),
-  "feature:goliath-large-form": guided(
-    "The Bonus Action gives +10 feet of Speed and Advantage on Strength checks for 10 minutes. Becoming Large on the map, and whether the space is big enough, are the GM's."
+  "feature:goliath-large-form": enforced(
+    "The Bonus Action makes the Goliath Large for 10 minutes, with +10 feet of Speed and Advantage on Strength checks, and its token takes the bigger space (transform/forms.ts). resolution/grant.ts refuses it while a creature stands in that space."
   ),
   "feature:goliath-powerful-build": enforced(
     "The escape from a grapple rolls with Advantage (resolution/builtins.ts). The app doesn't track carrying capacity, so counting one size larger for it is the GM's."
@@ -764,7 +780,13 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied, and level-up-picks.ts lets a level up replace one invocation. Eldritch Smite's Pact Magic slot dice and Prone, and Lifedrinker's damage and Hit Point Die, ride a pact weapon's hit (resolution/hit-options.ts). Devil's Sight and Witch Sight are senses dynamic vision reads (vision/senses.ts), and One with Shadows' Invisibility is refused in Bright Light (resolution/validate.ts). Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
   ),
   "feature:elemental-fury": enforced(
-    "Primal Strike's extra damage, of the type the Druid picks, is applied once a turn. Potent Spellcasting adds the Druid's Wisdom modifier to the damage of Poison Spray, Produce Flame and Starry Wisp."
+    "Primal Strike's extra damage, of the type the Druid picks, rides a weapon attack or a Beast form's attack in Wild Shape once a turn (resolution/hit-riders.ts). Potent Spellcasting adds the Druid's Wisdom modifier to the damage of Poison Spray, Produce Flame and Starry Wisp."
+  ),
+  "feature:wild-shape": enforced(
+    "The Druid picks its known forms on the sheet, as many as its level allows and within its Challenge Rating and Fly Speed limits, and replaces one after a Long Rest (transform/known-forms.ts). The Bonus Action takes one for hours equal to half its Druid level: the Beast's statistics with the Druid's Hit Points, mind, features and proficiencies, Temporary Hit Points equal to its Druid level, no spells, Concentration kept and gear melded or worn as it picks (transform/compose.ts). It ends as a Bonus Action, on another use, on the Incapacitated condition or at 0 Hit Points (transform/rules.ts)."
+  ),
+  "feature:beast-spells": enforced(
+    "transform/rules.ts lets a Druid 18 cast spells in a Wild Shape form, except one whose Material component has a cost or is consumed."
   ),
   "feature:lands-aid": guided(
     "The save and its Necrotic damage against the Druid's spell save DC are applied, and a use of Wild Shape is spent. Healing the creature it picks is the GM's."
@@ -1182,5 +1204,71 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "spell:wind-wall": guided(
     "The save and its Bludgeoning damage are applied. The projectiles the wall turns aside are the GM's."
-  )
+  ),
+
+  // Shape-shifting and size (transform/): each form is an effect, and its stat block or printed form is what the
+  // creature reads while it lasts.
+  "spell:polymorph": enforced(
+    "A failed Wisdom save turns the target into a Beast of its Challenge Rating or lower that the caster picks (transform/options.ts): the Beast's statistics with the target's own Hit Points and creature type, Temporary Hit Points equal to the Beast's Hit Points, no speech or spells, and gear melded. It ends with Concentration, when those Temporary Hit Points run out, or at death (transform/rules.ts)."
+  ),
+  "spell:true-polymorph": guided(
+    "Creature into Creature is applied: an unwilling target saves, a willing one doesn't, and it takes a stat block of its Challenge Rating or lower with Temporary Hit Points equal to its Hit Points, no speech or spells. Object into Creature, Creature into Object and the transformation made permanent after an hour of Concentration are the GM's."
+  ),
+  "spell:shapechange": enforced(
+    "The caster takes a form of its level or Challenge Rating or lower, not a Construct or an Undead, keeping its mind, proficiencies and Spellcasting, with Temporary Hit Points from the first form. A Magic action takes a new form while the spell lasts, and the caster picks whether its gear is worn or melds."
+  ),
+  "spell:animal-shapes": enforced(
+    "Each willing target takes a Large or smaller Beast of Challenge Rating 4 or lower, picked for each, keeping its mind and creature type, with Temporary Hit Points from its first form and its gear melded. A Magic action on a later turn gives new forms, and each target can end its own as a Bonus Action."
+  ),
+  "spell:enlargereduce": guided(
+    "A willing target takes the effect with no save, an unwilling one on a failed Constitution save. Enlarge makes it one size larger with Advantage on Strength checks and saves and 1d4 more weapon damage; Reduce one size smaller with Disadvantage on Strength checks and saves. The token takes the new size (transform/forms.ts). Reduce's 1d4 less damage is the GM's."
+  ),
+  "spell:moonbeam": enforced(
+    "spell-zones.ts asks for the Constitution save as a creature enters the Cylinder or ends its turn there, with half the Radiant damage on a success. A shape-shifted creature that fails returns to its true form and can't shape-shift while the spell lasts (transform/rules.ts); the GM ends that sooner when it leaves the Cylinder."
+  ),
+  "spell:gaseous-form": enforced(
+    "The willing target becomes a misty cloud: its only speed is a Fly Speed of 10 feet that hovers, it can share a creature's space, has Resistance to Bludgeoning, Piercing and Slashing damage, Immunity to Prone and Advantage on Strength, Dexterity and Constitution saves, and it can't attack, speak or cast spells. A Magic action or 0 Hit Points ends it. Narrow openings and liquids are the GM's."
+  ),
+  "spell:wind-walk": guided(
+    "Each willing target becomes a cloud with a Fly Speed of 300 feet that hovers, Immunity to Prone and Resistance to Bludgeoning, Piercing and Slashing damage; it can only Dash or take the Magic action that ends the form, which leaves it Stunned for 1 minute. Turning back into a cloud while the spell lasts, and the descent when it ends, are the GM's."
+  ),
+  "spell:magic-jar": castOnly(
+    "The container, the possession of a host and the return to the body are the GM's: control of one creature passing to another is not modeled."
+  ),
+  "item:potion-of-growth": enforced(
+    "Drinking it makes the drinker one size larger for 10 minutes, with Advantage on Strength checks and saves and 1d4 more damage with weapons and Unarmed Strikes. The token takes the new size (transform/forms.ts)."
+  ),
+  "item:potion-of-diminution": guided(
+    "Drinking it makes the drinker one size smaller for 1d4 hours, rolled by the server, with Disadvantage on Strength checks and saves. The 1d4 less damage is the GM's."
+  ),
+  "item:potion-of-gaseous-form": enforced(
+    "Drinking it gives Gaseous Form's misty cloud for 1 hour with no Concentration, ended early as a Bonus Action or at 0 Hit Points."
+  ),
+  "action:Doppelganger/shape-shift": enforced(printedForms("a Medium or Small Humanoid, its size changing on the map")),
+  "action:Night Hag/shape-shift": enforced(printedForms("a Small or Medium Humanoid, its size changing on the map")),
+  "action:Oni/shape-shift": enforced(
+    printedForms("a Small or Medium Humanoid or a Large Giant, its size changing on the map")
+  ),
+  "action:Imp/shape-shift": enforced(printedForms("a rat, a raven or a spider, each with its own speeds")),
+  "action:Quasit/shape-shift": enforced(printedForms("a bat, a centipede or a toad, each with its own speeds")),
+  "action:Succubus/shape-shift": enforced(printedForms("a Medium or Small Humanoid with no Fly Speed")),
+  "action:Mimic/shape-shift": guided(
+    `${printedForms("a Medium or Small object")} Its Adhesive in object form is the GM's.`
+  ),
+  "action:Vampire/shape-shift": guided(
+    "transform/assume.ts takes the Tiny bat (no speech) or the Medium mist (no actions or speech, Resistance to all damage, and it can share a space), each with its speeds, and returns to the vampire form. It is refused in sunlight with dynamic vision on, and its Multiattack and Grave Strike work only in the vampire form. Running water, and the sunlight's own damage getting through the mist's Resistance, are the GM's."
+  ),
+  "action:Werebear/shape-shift": enforced(printedForms("the Large hybrid or the Large bear")),
+  "action:Wereboar/shape-shift": enforced(printedForms("the Medium hybrid or the Small boar")),
+  "action:Wererat/shape-shift": enforced(printedForms("the Medium hybrid or the Small rat")),
+  "action:Weretiger/shape-shift": enforced(printedForms("the Large hybrid or the Large tiger")),
+  "action:Werewolf/shape-shift": enforced(printedForms("the Large hybrid or the Medium wolf")),
+  "action:Weretiger/prowl-tiger-or-hybrid-form-only": guided(
+    "transform/rules.ts refuses it outside the tiger and hybrid forms. The move without Opportunity Attacks and the Hide after it are the GM's."
+  ),
+  "action:Werebear/bite": lycanthropeBite("Werebear"),
+  "action:Wereboar/gore": lycanthropeBite("Wereboar"),
+  "action:Wererat/bite": lycanthropeBite("Wererat"),
+  "action:Weretiger/bite": lycanthropeBite("Weretiger"),
+  "action:Werewolf/bite": lycanthropeBite("Werewolf")
 };

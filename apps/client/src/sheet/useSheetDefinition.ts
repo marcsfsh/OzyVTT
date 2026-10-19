@@ -58,6 +58,10 @@ export type AvailabilityRow = Readonly<{
   mastery?: Readonly<{ id: string; name: string }>;
   /** The ways the caster may shape this spell's cast (Metamagic, Sculpt Spells). */
   shaping?: ContentActionSummary["shaping"];
+  /** The forms a shape-shift may take now, and for Wild Shape the Beasts its user may learn. */
+  forms?: ContentActionSummary["forms"];
+  /** The effects a use picks one of (Enlarge or Reduce). */
+  options?: ContentActionSummary["options"];
 }>;
 
 /** What the server says of one row now: whether it can be used, why not, and what a weapon's swing masters. */
@@ -118,7 +122,10 @@ export function summaryOfAvailability(row: AvailabilityRow): ContentActionSummar
     // Search, Study and the like pick the skill they are made with.
     ...(row.checkSkills ? { checkSkills: row.checkSkills } : {}),
     // A spell's cast offers the Metamagic its caster knows.
-    ...(row.shaping ? { shaping: row.shaping } : {})
+    ...(row.shaping ? { shaping: row.shaping } : {}),
+    // A shape-shift picks its form (Wild Shape), and Enlarge/Reduce which of its effects.
+    ...(row.forms ? { forms: row.forms } : {}),
+    ...(row.options ? { options: row.options } : {})
   };
 }
 

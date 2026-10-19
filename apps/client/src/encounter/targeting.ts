@@ -23,32 +23,73 @@ export type TargetingTemplate = Readonly<{
   widthFeet: number | null;
   placed: Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }> | null;
 }>;
-export type TargetingSession = Readonly<{
-  action: ContentActionSummary;
-  attackerId: string;
-  /** "none": no target to pick (Search, Study), only the skill it is made with. */
-  mode: "single" | "multi" | "template" | "none";
-  selected: readonly string[];
-  template: TargetingTemplate | null;
-  /** The spell slot a spell is cast with, sent with every resolve of this session. */
-  slotLevel?: number;
-  /** How much of its pool an action whose user picks the cost spends (Lay on Hands' points). */
-  spend?: number;
-  /** A darts action's darts (Magic Missile at this slot) and how many each selected target takes. */
-  darts?: Readonly<{ total: number; counts: Readonly<Record<string, number>> }>;
-  /** The damage type picked for an action whose caster chooses one (Chromatic Orb). */
-  damageType?: NonNullable<ContentActionSummary["damageTypes"]>[number];
-  /** The skill a check action is made with (Search, Influence); absent, Escape a Grapple uses the better one. */
-  skill?: string;
-  /** The ability a cast chooses (Hex); it is not rolled until one is chosen. */
-  ability?: AbilityId;
-  /** The condition picked for a failed save whose caster chooses one (Blindness/Deafness); absent, the first. */
-  conditionId?: string;
-  /** The GM places a spell's lingering area and resolves no action: the zone it is for. */
-  placeZoneId?: string;
-  /** How the caster shapes the cast (Metamagic, Sculpt Spells), with the creatures each pick names once chosen. */
-  shaping?: readonly CastShaping[];
+export type TargetingSession = Readonly<
+  {
+    action: ContentActionSummary;
+    attackerId: string;
+    /** "none": no target to pick (Search, Study), only the skill it is made with. */
+    mode: "single" | "multi" | "template" | "none";
+    selected: readonly string[];
+    template: TargetingTemplate | null;
+    /** The spell slot a spell is cast with, sent with every resolve of this session. */
+    slotLevel?: number;
+    /** How much of its pool an action whose user picks the cost spends (Lay on Hands' points). */
+    spend?: number;
+    /** A darts action's darts (Magic Missile at this slot) and how many each selected target takes. */
+    darts?: Readonly<{ total: number; counts: Readonly<Record<string, number>> }>;
+    /** The damage type picked for an action whose caster chooses one (Chromatic Orb). */
+    damageType?: NonNullable<ContentActionSummary["damageTypes"]>[number];
+    /** The skill a check action is made with (Search, Influence); absent, Escape a Grapple uses the better one. */
+    skill?: string;
+    /** The ability a cast chooses (Hex); it is not rolled until one is chosen. */
+    ability?: AbilityId;
+    /** The condition picked for a failed save whose caster chooses one (Blindness/Deafness); absent, the first. */
+    conditionId?: string;
+    /** The GM places a spell's lingering area and resolves no action: the zone it is for. */
+    placeZoneId?: string;
+    /** How the caster shapes the cast (Metamagic, Sculpt Spells), with the creatures each pick names once chosen. */
+    shaping?: readonly CastShaping[];
+  } & ShapeChoice
+>;
+
+/** What a shape-shifting use picks: its form (Wild Shape's Wolf) or each target's own (Animal Shapes), whether the
+ *  user's gear melds into the form or is worn, and which of its effects it takes (Enlarge or Reduce). */
+export type ShapeChoice = Readonly<{
+  form?: string;
+  targetForms?: Readonly<Record<string, string>>;
+  gear?: "merged" | "worn";
+  option?: string;
 }>;
+
+/** The picks a shape-shift starts with: its one form when it has only one, gear melded, and the first effect. */
+export function startingShapeChoice(action: ContentActionSummary): ShapeChoice {
+  const forms = action.forms;
+  const only = forms && !forms.perTarget && forms.options.length === 1 ? forms.options[0] : undefined;
+  return {
+    ...(only ? { form: only.id } : {}),
+    ...(forms?.gearChoice ? { gear: "merged" as const } : {}),
+    ...(action.options && action.options.length > 0 ? { option: action.options[0]!.id } : {})
+  };
+}
+
+/** Whether a shape-shift still waits for its form: one form, or one for each chosen target. */
+export function formUnchosen(action: ContentActionSummary, choice: ShapeChoice, targetIds: readonly string[]): boolean {
+  const forms = action.forms;
+  if (!forms || forms.options.length === 0) return false;
+  if (forms.perTarget) return targetIds.some((id) => choice.targetForms?.[id] === undefined);
+  return choice.form === undefined;
+}
+
+/** The picks as `action:resolve` and `action:use` take them, for the targets chosen. */
+export function shapeChoicePayload(choice: ShapeChoice, targetIds: readonly string[]) {
+  const perTarget = Object.entries(choice.targetForms ?? {}).filter(([id]) => targetIds.includes(id));
+  return {
+    ...(choice.form !== undefined ? { form: choice.form } : {}),
+    ...(perTarget.length > 0 ? { targetForms: perTarget.map(([targetId, form]) => ({ targetId, form })) } : {}),
+    ...(choice.gear !== undefined ? { gear: choice.gear } : {}),
+    ...(choice.option !== undefined ? { option: choice.option } : {})
+  };
+}
 
 let session: TargetingSession | null = null;
 let result: ActionResolution | null = null;
@@ -93,7 +134,8 @@ export function beginTargeting(
     ...(dartTotal !== undefined ? { darts: { total: dartTotal, counts: {} } } : {}),
     ...(usualSkill !== undefined ? { skill: usualSkill } : {}),
     // A picked cost starts at one; the picker raises it.
-    ...(action.useCost === "chosen" ? { spend: 1 } : {})
+    ...(action.useCost === "chosen" ? { spend: 1 } : {}),
+    ...startingShapeChoice(action)
   };
   if (area) {
     // Map the SRD area shape onto a drawable annotation shape (sphere/cylinder/emanation → circle, cube → square).
@@ -213,6 +255,27 @@ export function setCheckSkill(skill: string | undefined) {
   session = skill === undefined ? rest : { ...rest, skill };
   emit();
 }
+/** Picks a shape-shift's form, or one target's own when each takes its own (Animal Shapes). */
+export function setShapeForm(form: string, targetId?: string) {
+  if (!session?.action.forms?.options.some((option) => option.id === form)) return;
+  session =
+    targetId === undefined
+      ? { ...session, form }
+      : { ...session, targetForms: { ...(session.targetForms ?? {}), [targetId]: form } };
+  emit();
+}
+/** Picks whether the user's gear melds into the form or is worn by it. */
+export function setShapeGear(gear: "merged" | "worn") {
+  if (!session?.action.forms?.gearChoice) return;
+  session = { ...session, gear };
+  emit();
+}
+/** Picks which of its effects a use takes (Enlarge or Reduce). */
+export function setEffectOption(option: string) {
+  if (!session?.action.options?.some((entry) => entry.id === option)) return;
+  session = { ...session, option };
+  emit();
+}
 /** Picks the ability a cast chooses (Hex). */
 export function setChosenAbility(ability: AbilityId) {
   if (!session?.action.choosesAbility) return;
@@ -252,6 +315,7 @@ const shapingUnchosen = (picking: TargetingSession) =>
 export function targetingReady(picking: TargetingSession): boolean {
   if (picking.action.choosesAbility && picking.ability === undefined) return false;
   if (shapingUnchosen(picking)) return false;
+  if (formUnchosen(picking.action, picking, picking.selected)) return false;
   if (picking.mode === "template") return Boolean(picking.template?.placed);
   if (picking.mode === "none") return true;
   return picking.selected.length > 0;
@@ -345,6 +409,7 @@ export function resolveTargeting(
     conditionId,
     shaping
   } = session;
+  const shapeChoice = shapeChoicePayload(session, selected);
   if (session.placeZoneId !== undefined) {
     if (!template?.placed) return;
     const zoneId = session.placeZoneId;
@@ -383,6 +448,7 @@ export function resolveTargeting(
     ...(ability !== undefined ? { ability } : {}),
     ...(conditionId !== undefined ? { conditionId } : {}),
     ...(shaping && shaping.length > 0 ? { shaping: shaping.map((entry) => ({ ...entry })) } : {}),
+    ...shapeChoice,
     commit,
     ...(revision !== undefined ? { expectedRevision: revision } : {})
   };

@@ -4,6 +4,7 @@ import { Button, IconLevelUp, Select } from "@vtt/ui";
 import { RichText } from "../encounter/RichText";
 import type { SrdExtension } from "../encounter/sheet-extension";
 import type { SheetActor } from "./sheet-model";
+import { KnownForms } from "./KnownForms";
 import { plainActionName } from "../encounter/format";
 import { UseList, type Pool, type Spender } from "./Uses";
 import { ExperienceLine } from "./Experience";
@@ -247,7 +248,8 @@ export function FeaturesTab({
                 action.save !== undefined ||
                 action.damage.length > 0 ||
                 action.grants !== undefined ||
-                action.spellId !== undefined
+                action.spellId !== undefined ||
+                action.shapeShift !== undefined
             )
             .map((action) => ({ id: action.id, name: plainActionName(action.name) }))
         : serverActions
@@ -266,6 +268,9 @@ export function FeaturesTab({
     const word = row ? ACTIVATION_WORDS[row.activation] : undefined;
     if (word) costs.set(pool.id, word);
   }
+  // Wild Shape's known forms, picked here and used from the action.
+  const shapeShifter = serverActions.find((row) => row.forms?.learnable !== undefined);
+  const knownForms = actor.knownForms?.ids ?? [];
   // The monster's own actions, which have no uses to count but say what it can do.
   const monsterActions = actor.kind === "player-character" ? [] : definition.actions;
   const columns = derived?.classColumns ?? [];
@@ -285,6 +290,16 @@ export function FeaturesTab({
             onUse={onUse}
           />
         </section>
+      )}
+      {shapeShifter?.forms && (
+        <KnownForms
+          key={knownForms.join(",")}
+          actorId={actor.id}
+          role={role}
+          name={plainActionName(shapeShifter.name)}
+          forms={shapeShifter.forms}
+          known={knownForms}
+        />
       )}
       {rest && rest.rechoices.length > 0 && <RestChoices {...rest} />}
       {masteries.length > 0 && <MasteryBlock masteries={masteries} />}

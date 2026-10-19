@@ -485,6 +485,15 @@ export function CharacterSheet({
       onFeedback={say}
     />
   );
+  // A creature in a form (Wild Shape's Wolf, Polymorph's Beast) reads the form's statistics, so the sheet says so.
+  const inForm = (actor.effects as ReadonlyArray<Readonly<{ name: string; form?: Readonly<{ name: string }> }>>).find(
+    (effect) => effect.form !== undefined
+  );
+  const formBanner = inForm?.form ? (
+    <p className="cs-form-banner" role="status">
+      {actor.name} is in {inForm.form.name} form. The sheet shows the form's statistics.
+    </p>
+  ) : null;
   const missing =
     !definition && role === "gm" && definitionId && !unloaded ? (
       <p className="cs-note">Loading the stat block.</p>
@@ -501,6 +510,7 @@ export function CharacterSheet({
       tabIndex={0}
     >
       {missing}
+      {formBanner}
       {hasGift(actor) && <HeroicGift actor={actor} state={state} onFeedback={say} />}
       {aimedHere && definition && controller.liveCombat && role === "player" && (
         <PlayerActionRunner

@@ -438,6 +438,8 @@ function tapTargeting(
   usesUpItem: boolean,
   spell: SpellReference | undefined
 ): "none" | "single" | "multi" | null {
+  // A shape-shift on its user (Wild Shape, a werewolf's Shape-Shift), and leaving a form, aim at no one.
+  if (action.endsForm || (action.shapeShift && !action.shapeShift.onTargets && !action.save)) return "none";
   if (action.attack || action.grants?.target === "target" || action.targets?.count === 1) return "single";
   if (action.save || action.damage.length > 0 || action.grants?.target === "targets") return "multi";
   if (action.healing) return action.healing.self ? "none" : action.healing.divided ? "multi" : "single";
