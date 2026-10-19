@@ -343,6 +343,11 @@ export function withProseFacts<Action extends ActorAction>(action: Action): Acti
   const move = action.move ?? moveOfProse(action.description);
   const teleport = action.teleport ?? teleportOfProse(action.description);
   const leap = action.leap ?? leapOfProse(action.description);
+  // "While underwater, the seahorse moves", "each creature in a 15-foot Emanation ... while it is underwater"; a
+  // reaction's "takes damage while underwater" is its trigger.
+  const underwaterOnly =
+    action.underwaterOnly === true ||
+    (action.activation !== "reaction" && /^While underwater,|\bwhile it is underwater\b/.test(action.description));
   if (
     area === (action.area ?? null) &&
     untracked === (action.untrackedMultiattack === true) &&
@@ -351,7 +356,8 @@ export function withProseFacts<Action extends ActorAction>(action: Action): Acti
     push === (action.onHitPush ?? null) &&
     move === (action.move ?? null) &&
     teleport === (action.teleport ?? null) &&
-    leap === (action.leap ?? null)
+    leap === (action.leap ?? null) &&
+    underwaterOnly === (action.underwaterOnly === true)
   )
     return action;
   const { untrackedMultiattack: _previous, ...rest } = action;
@@ -364,6 +370,7 @@ export function withProseFacts<Action extends ActorAction>(action: Action): Acti
     ...(push ? { onHitPush: push } : {}),
     ...(move ? { move } : {}),
     ...(teleport ? { teleport } : {}),
-    ...(leap ? { leap } : {})
+    ...(leap ? { leap } : {}),
+    ...(underwaterOnly ? { underwaterOnly: true as const } : {})
   } as Action;
 }

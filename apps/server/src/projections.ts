@@ -244,6 +244,8 @@ const PENDING_SAVE_FIELDS = {
   endsForm: "never",
   // What a failure does at each Hit Point band names the thresholds, the stat block's text; it is narrated as it lands.
   failureByHitPoints: "never",
+  // What a failure by a margin does is the stat block's text; it is narrated as it lands.
+  failureByMargin: "never",
   failureBanishes: "never",
   // What a swallower's failure lets out is narrated when it lands.
   regurgitates: "never",

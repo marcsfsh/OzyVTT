@@ -7,6 +7,7 @@ import { areaOriginHeight, creatureAtPoint, withinAreaHeight } from "../altitude
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { requireStartOrdered } from "../simultaneous-effects.js";
 import { withSeenTargets } from "../resolution/seen-targets.js";
+import { areaLeavesOut } from "../resolution/action-targets.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import { pushTokenAway } from "../forced-movement.js";
@@ -322,6 +323,21 @@ export const actionCommands = [
               throw new CommandRejectedError(OUTSIDE_FIGHT_TARGETS);
           }
         }
+        // An area's own rules leave some creatures under it out ("each enemy", "each creature that isn't an Undead").
+        if ((template || templates) && action.targets && resolvedTargetIds.length > 0) {
+          const out = areaLeavesOut({
+            state: draft,
+            attacker,
+            action,
+            targetIds: resolvedTargetIds,
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId)
+          });
+          resolvedTargetIds = resolvedTargetIds.filter((id) => !out.has(id));
+          wardNotes = [
+            ...wardNotes,
+            ...[...out].map((id) => `${action.name} doesn't affect ${kit.actorName(id)}, which is under its area.`)
+          ];
+        }
         // A spell's force (Spiritual Weapon's, an Arcane Eye) can't be harmed: an area passes over it, and nothing
         // harmful targets it.
         const untouchable = resolvedTargetIds.find(
@@ -343,9 +359,12 @@ export const actionCommands = [
             kit.zoneDeps(draft, geometry)
           );
           resolvedTargetIds = resolvedTargetIds.filter((id) => !warded.some((entry) => entry.actorId === id));
-          wardNotes = warded.map(
-            (entry) => `${entry.ward} keeps ${spellCast.name} from affecting ${kit.actorName(entry.actorId)}.`
-          );
+          wardNotes = [
+            ...wardNotes,
+            ...warded.map(
+              (entry) => `${entry.ward} keeps ${spellCast.name} from affecting ${kit.actorName(entry.actorId)}.`
+            )
+          ];
         }
         // A sphere of force lets no area in or out (Resilient Sphere); a single target across one is refused later.
         if (template && resolvedTargetIds.length > 0) {

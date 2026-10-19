@@ -35,6 +35,7 @@ export function createPendingSaves(
       | "zoneId"
       | "gmApplies"
       | "failureByHitPoints"
+      | "failureByMargin"
       | "failureBanishes"
       | "endsForm"
       | "regurgitates"
@@ -105,6 +106,7 @@ export function createPendingSaves(
     ...(input.extra?.endsForm ? { endsForm: true as const } : {}),
     ...(input.extra?.failureByHitPoints ? { failureByHitPoints: structuredClone(input.extra.failureByHitPoints) } : {}),
     ...(input.extra?.failureBanishes ? { failureBanishes: [...input.extra.failureBanishes] } : {}),
+    ...(input.extra?.failureByMargin ? { failureByMargin: structuredClone(input.extra.failureByMargin) } : {}),
     ...(input.extra?.regurgitates ? { regurgitates: { ...input.extra.regurgitates } } : {}),
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),

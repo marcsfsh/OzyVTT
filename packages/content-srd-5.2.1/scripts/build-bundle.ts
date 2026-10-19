@@ -39,10 +39,12 @@ import {
   SPELL_SAVE_OVERRIDE_IDS,
   spellSaveOutcomeFor,
   statBlockSaveOutcome,
+  failureCompanionRidersOf,
   failureRestrictionsOf,
   withoutOngoingDamage
 } from "./save-outcomes.js";
 import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
+import { unconsumedClauses } from "../src/action-clauses.js";
 import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } from "./spell-effects.js";
 import { costlyMaterialsFor } from "./spell-materials.js";
 import { spellSightFor } from "./spell-sight.js";
@@ -563,21 +565,52 @@ function effectRiders(desc: string, maxTargetSize: OnHitRider["maxTargetSize"], 
 const SAVE_TARGET_CONDITIONS = ["Frightened", "Charmed", "Prone", "Grappled", "Restrained", "Incapacitated"];
 const SAVE_TARGET_TYPES = ["Humanoid", "Beast", "Undead", "Fiend", "Giant", "Dragon", "Construct", "Elemental"];
 
+/** "That isn't an Undead": the creature types an area's clause leaves out. */
+const notTypesOf = (clause: string): string[] =>
+  [...clause.matchAll(new RegExp(`\\bisn[’']t an? (${SAVE_TARGET_TYPES.join("|")})\\b`, "g"))].map((match) =>
+    match[1]!.toLowerCase()
+  );
+
+/**
+ * Who an area's save reaches among the creatures under it: "each enemy in a 20-foot-radius Sphere", "each creature that
+ * isn't an Undead in a 20-foot Emanation", and "each creature in a 60-foot Cone that can see the ghost" (`sight.seenBy`).
+ */
+function areaSaveTargets(clause: string): Pick<ActorAction, "targets" | "sight"> {
+  const notTypes = notTypesOf(clause);
+  const targets: NonNullable<ActorAction["targets"]> = {
+    ...(/^each enemy\b/.test(clause) ? { who: "enemies" as const } : {}),
+    ...(notTypes.length > 0 ? { notCreatureTypes: notTypes } : {})
+  };
+  return {
+    ...(Object.keys(targets).length > 0 ? { targets } : {}),
+    ...(/\bthat can see the [a-z' -]+?\b(?: and\b|$)/.test(clause) ? { sight: { seenBy: "user" as const } } : {})
+  };
+}
+
 /**
  * Who a save action may target, from the stock clause after its DC ("Strength Saving Throw: DC 15, one Large or smaller
- * creature Grappled by the behir"): one creature or each, its size, a condition it must have, its creature type, a
- * range, "the X can see", "Grappled by the X" and "in the X's space". An area's creatures come from its template, and a
- * clause the reader doesn't know whole (willing, "Charmed or Grappled", 0 Hit Points) stays the GM's.
+ * creature Grappled by the behir"): one creature or each, its size, a condition it must have (or one it has from the
+ * creature: "Charmed or Grappled by the aboleth"), its creature type, a range, "the X can see", "Grappled by the X" and
+ * "in the X's space". An area's creatures come from its template, less those its clause leaves out (`areaSaveTargets`),
+ * and a clause the reader doesn't know whole (willing, 0 Hit Points) stays the GM's.
  */
-function withSaveTargets(desc: string): Pick<ActorAction, "targets"> {
+function withSaveTargets(desc: string): Pick<ActorAction, "targets" | "sight"> {
   // "Each creature whose space the centaur enters", "each creature whose space the cube enters for the first time
   // during this move": the creatures its move went through.
   if (/\bwhose space the [a-z' -]+? enters\b/i.test(desc)) return { targets: { entered: true } };
   const clause = /Saving Throw: DC \d+, ((?:one|each) [^.(]*)/.exec(desc)?.[1]?.trim();
   if (!clause) return {};
-  if (/\bin an? \d+-foot\b|\bdestination\b|\bwhose space\b|\bwilling\b| or Grappled\b|\bHit Points\b/.test(clause))
-    return {};
+  if (/\bin an? \d+-foot\b/.test(clause)) return areaSaveTargets(clause);
+  if (/\bdestination\b|\bwhose space\b|\bwilling\b|\bHit Points\b/.test(clause)) return {};
   const targets: NonNullable<ActorAction["targets"]> = {};
+  // "One creature within 30 feet that is Charmed or Grappled by the aboleth".
+  const held = new RegExp(
+    `\\bthat is (${SAVE_TARGET_CONDITIONS.join("|")}) or (${SAVE_TARGET_CONDITIONS.join("|")}) by the\\b`
+  ).exec(clause);
+  if (held)
+    targets.conditionsFromSource = [held[1]!, held[2]!].map(
+      (name) => name.toLowerCase() as NonNullable<typeof targets.conditionsFromSource>[number]
+    );
   if (/^one\b/.test(clause)) targets.count = 1;
   const size = /\b(Tiny|Small|Medium|Large|Huge) or smaller\b/.exec(clause);
   if (size) targets.maxSize = size[1]!.toLowerCase() as NonNullable<typeof targets.maxSize>;
@@ -592,7 +625,7 @@ function withSaveTargets(desc: string): Pick<ActorAction, "targets"> {
   const range = /\bwithin (\d+) feet\b/.exec(clause);
   if (range) targets.rangeFeet = Number(range[1]);
   if (/\b(?:the [a-z' -]+|it) can see\b/.test(clause)) targets.seen = true;
-  if (/\bGrappled by the\b/.test(clause)) targets.grappledBySource = true;
+  if (/\bGrappled by the\b/.test(clause) && !held) targets.grappledBySource = true;
   if (/\bin the [a-z' -]+?'s space\b/.test(clause)) targets.inSpace = true;
   return Object.keys(targets).length > 0 ? { targets } : {};
 }
@@ -1299,6 +1332,14 @@ const monsters: ActorDefinition[] = creatures
       // A failure that restricts with no condition (Slowing Breath, Weakening Breath).
       const restriction =
         save && fix?.drop !== "outcome" ? failureRestrictionsOf(action.fields.desc, action.fields.name.trim()) : null;
+      // What a failure's condition brings while it lasts (Fetid Cloud's no Reactions, Cacophony's Disadvantage).
+      const companion =
+        save && fix?.drop !== "outcome"
+          ? failureCompanionRidersOf(
+              action.fields.desc,
+              printedName(slug, action.fields.name).replace(/\s*\([^)]*\)$/, "")
+            )
+          : null;
       // Later-turn damage the engine deals itself (`ongoingDamage`) leaves the GM's reminder.
       const laterDamage = saveDamage?.laterDamage ?? null;
       // "While Poisoned, the target can't regain Hit Points" (a pit fiend's Bite): the poison's own effect stops healing,
@@ -1445,6 +1486,9 @@ const monsters: ActorDefinition[] = creatures
                   : {}),
                 ...(poisonStopsHealing
                   ? { failureEffect: { name: "Poisoned", tags: ["no-healing"], modifiers: [] } }
+                  : {}),
+                ...(companion && !loss && !poisonStopsHealing
+                  ? { failureEffect: { ...companion, tags: [...companion.tags], modifiers: [...companion.modifiers] } }
                   : {}),
                 ...(COMMANDING_SAVES[`${slug}/${actionId}`]
                   ? { failureEffect: structuredClone(COMMANDING_SAVES[`${slug}/${actionId}`]!) }
@@ -2137,3 +2181,14 @@ if (report.saveActionFixes.length > 0)
   console.log(`reviewed save actions (${report.saveActionFixes.length}): ${report.saveActionFixes.join("; ")}`);
 if (report.untypedDamage.length > 0)
   console.log(`untyped damage fallbacks (${report.untypedDamage.length}): ${report.untypedDamage.join(", ")}`);
+// Printed clauses no reader or reviewed fix turned into data: the GM's, from the action's reminder where it has one.
+const unconsumed = monsters.flatMap((monster) =>
+  monster.actions.flatMap((action) => {
+    const clauses = unconsumedClauses(action);
+    return clauses.length > 0
+      ? [`${monster.source.externalId}/${action.id} (${clauses.join(", ")}${action.reminder ? ", reminded" : ""})`]
+      : [];
+  })
+);
+if (unconsumed.length > 0)
+  console.log(`printed clauses left unread (${unconsumed.length}): ${unconsumed.join("; ")}`);

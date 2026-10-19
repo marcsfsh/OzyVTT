@@ -2898,6 +2898,33 @@ export const HitPointBandSchema = z
 export type HitPointBand = z.infer<typeof HitPointBandSchema>;
 
 /**
+ * What a save failed by `by` or more does ("Failure by 5 or More"). Its `conditions` and `duration` stand in for the
+ * failure's (a homunculus's Bite: Poisoned for 1 minute in place of until its next turn); without them the failure stands
+ * as printed. `whileFailed` adds conditions that last while the failure's own do and may end sooner: on damage, or by
+ * another creature's action ("While Poisoned, the target also has the Unconscious condition, which ends early if the
+ * target takes damage or a creature within 5 feet of it takes an action to wake it").
+ */
+export const FailureMarginSchema = z
+  .object({
+    by: z.number().int().min(2).max(20),
+    conditions: z.array(SaveConditionSchema).min(1).max(4).optional(),
+    duration: SaveFailureDurationSchema.optional(),
+    whileFailed: z
+      .object({
+        conditions: z.array(SaveConditionSchema).min(1).max(3),
+        endsOnDamage: z.literal(true).optional(),
+        endedBy: EndedBySchema.optional()
+      })
+      .strict()
+      .optional()
+  })
+  .strict()
+  .describe(
+    "What a save failed by `by` or more does: its conditions and duration in place of the failure's, and conditions that last while the failure's do and may end sooner (on damage, or by another creature's action)"
+  );
+export type FailureMargin = z.infer<typeof FailureMarginSchema>;
+
+/**
  * What a saving throw does, as data: the damage a success takes ("half" for Fireball, "none" for Sacred
  * Flame) and the condition a failure imposes. Every save block (stat-block action, feature action, spell)
  * spreads these fields. Unset, they take the common printing: half damage on a success, no condition.
@@ -3109,6 +3136,24 @@ export const SaveOutcomeFields = {
     .max(6)
     .optional()
     .describe("Only creatures of these types make the save; any other is spared it"),
+  /** Creatures of these types are spared the save and all it does ("If the target is a creature that isn't an Undead or
+   *  elf, it is subjected to the following effect": a ghoul's Claw). */
+  sparesCreatureTypes: z
+    .array(RiderSlugSchema)
+    .min(1)
+    .max(6)
+    .optional()
+    .describe("Creatures of these types make no save and take nothing a failure does"),
+  /** Characters of these species are spared it too (a ghoul's Claw spares an elf). */
+  sparesSpecies: z
+    .array(RiderSlugSchema)
+    .min(1)
+    .max(4)
+    .optional()
+    .describe("Characters of these species make no save and take nothing a failure does"),
+  /** What a failure by `by` or more does ("Failure by 5 or More"): its conditions and duration replace the failure's,
+   *  and `whileFailed` adds conditions that last while the failure's do and may end sooner. */
+  failureByMargin: FailureMarginSchema.optional(),
   /** A creature that still bears this action's failure is left out ("each creature that isn't currently affected by
    *  this breath"). */
   sparesAffected: z.literal(true).optional().describe("A creature still under this action's failure makes no new save"),
@@ -3724,6 +3769,9 @@ export const ActionTargetsSchema = z
     grappledBySource: z.literal(true).optional(),
     /** Only a creature with one of these conditions (a Trample's Prone, Death Glare's Frightened). */
     conditions: z.array(ConditionSchema).min(1).max(4).optional(),
+    /** Only a creature with one of these conditions from this creature's own effect ("one creature within 30 feet
+     *  that is Charmed or Grappled by the aboleth"). */
+    conditionsFromSource: z.array(ConditionSchema).min(1).max(4).optional(),
     /** Only a creature whose space this creature shares or is in (a Vortex, a Whelm). */
     inSpace: z.literal(true).optional(),
     /** "Each enemy", "an ally", "another creature" (not the user itself), or only the user ("can target only
@@ -3747,7 +3795,7 @@ export const ActionTargetsSchema = z
   })
   .strict()
   .describe(
-    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions, in the user's space, enemies, allies, others or only the user itself, a creature the user marked, or one at 0 Hit Points."
+    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions (or conditions from the user's own effect), in the user's space, enemies, allies, others or only the user itself, a creature the user marked, or one at 0 Hit Points."
   );
 export type ActionTargets = z.infer<typeof ActionTargetsSchema>;
 
@@ -4552,6 +4600,8 @@ export const ActionSchema = z
     useNumber: z.number().int().min(1).max(10).optional(),
     /** Its saves are against magic (a sphinx's "magical roar"), which Magic Resistance meets with Advantage. */
     magical: z.literal(true).optional(),
+    /** It can be used only in a fight underwater ("While underwater, the seahorse moves", a kraken's Toxic Ink). */
+    underwaterOnly: z.literal(true).optional().describe("It can be used only in a fight the GM marked as underwater"),
     /** What it does to each target with no roll: conditions, on creatures of `maxTargetSize` or smaller, standing
      *  until ended or for `duration`; and a lost Concentration (a tarrasque's shock wave: "Creatures in that area lose
      *  Concentration and, if Medium or smaller, have the Prone condition"). */

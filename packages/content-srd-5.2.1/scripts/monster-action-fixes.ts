@@ -211,6 +211,10 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
     save: { failureEffect: { name: "Engulfed", tags: ["carried-free"], modifiers: [] } },
     reminder: null
   },
+  "chain-devil/conjure-infernal-chain": {
+    why: "a failure's pull toward the devil is a forced move no save failure makes yet",
+    reminder: "If the target is Large or smaller, move it up to 30 feet straight toward the devil."
+  },
   "rust-monster/antennae": {
     why: "the penalty is on one carried armor or weapon, which items don't track",
     reminder:

@@ -51,6 +51,7 @@ import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-tra
 import { applyDamageDetailed, previewDamage, adjustableActor, healActor, killOutright } from "./hit-points.js";
 import { openDamageWindow } from "./damage-window.js";
 import { applyHitPointBand, banishOnFailure, hitPointBandOf } from "./fatal-saves.js";
+import { applyMarginCompanion, marginBandOf, withMarginBand } from "./save-margins.js";
 import { regurgitate, swallowLands, SWALLOWED_TAG } from "./swallow.js";
 import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
@@ -1248,10 +1249,16 @@ export function answerSave(
         `${commandId}:${saveId}:banished`
       )
     );
-  if (!success && band === null && pending.onFailEffect)
-    events.push(
-      ...applyFailureEffect(state, target.id, pending.onFailEffect, `${commandId}:${saveId}:fail`, immunities)
-    );
+  // "Failure by 5 or More": the band's conditions and duration stand in for the failure's, with what lasts while they do.
+  const margin = !success && band === null ? marginBandOf(pending, total) : null;
+  if (!success && band === null && pending.onFailEffect) {
+    const onFail = margin ? withMarginBand(pending.onFailEffect, margin) : pending.onFailEffect;
+    events.push(...applyFailureEffect(state, target.id, onFail, `${commandId}:${saveId}:fail`, immunities));
+    if (margin)
+      events.push(
+        ...applyMarginCompanion(state, target.id, onFail, margin, `${commandId}:${saveId}:margin`, immunities)
+      );
+  }
   // A gibbering mouther's d8 decides what the creature does this turn.
   if (!success && pending.onFailEffect?.tags.includes(GIBBERING_TAG))
     events.push(...gibberingTurn(target, deps.random));

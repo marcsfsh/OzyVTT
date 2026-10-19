@@ -750,6 +750,8 @@ export function parkActionSave(ctx: ResolveContext): void {
     ...(action.save.breaksConcentration ? { breaksConcentration: true as const } : {}),
     // Moonbeam: a shape-shifted creature that fails reverts to its true form.
     ...(action.save.failureEndsForm ? { endsForm: true as const } : {}),
+    // "Failure by 5 or More": what a failure by that much does instead.
+    ...(action.save.failureByMargin ? { failureByMargin: structuredClone(action.save.failureByMargin) } : {}),
     ...fatal
   };
   for (const { saveBonus, option, advantageFrom, autoSucceeds, swallows, targetIds } of groups.values()) {
@@ -822,13 +824,25 @@ function fightingSides(ctx: ResolveContext, target: ResolveContext["targets"][nu
 function subjectToSave(ctx: ResolveContext, target: ResolveContext["targets"][number]): boolean {
   const { action, attacker, deps } = ctx;
   const save = action.save!;
-  if (save.onlyCreatureTypes) {
-    const definition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
-    const type = creatureTypeOf(target, definition);
-    if (type !== null && !save.onlyCreatureTypes.includes(type)) {
-      ctx.warnings.push(`${target.name} isn't a ${save.onlyCreatureTypes.join(" or ")}, so it makes no save.`);
-      return false;
-    }
+  const definition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
+  const type = creatureTypeOf(target, definition);
+  if (save.onlyCreatureTypes && type !== null && !save.onlyCreatureTypes.includes(type)) {
+    ctx.warnings.push(`${target.name} isn't a ${save.onlyCreatureTypes.join(" or ")}, so it makes no save.`);
+    return false;
+  }
+  // "If the target is a creature that isn't an Undead or elf": the creature types and species it spares.
+  const species = definition?.character?.race?.id;
+  const spared =
+    type !== null && save.sparesCreatureTypes?.includes(type)
+      ? type
+      : species !== undefined && save.sparesSpecies?.includes(species)
+        ? species
+        : null;
+  if (spared !== null) {
+    ctx.warnings.push(
+      `${target.name} is ${/^[aeiou]/.test(spared) ? "an" : "a"} ${spared}, so ${action.name} spares it.`
+    );
+    return false;
   }
   // The same failure from this action, or one of the same name from any source ("doesn't already have an infernal
   // wound").

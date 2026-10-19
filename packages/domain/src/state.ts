@@ -10,6 +10,7 @@ import {
   CastShapingSchema,
   EffectInstanceSchema,
   EffectModifiersSchema,
+  FailureMarginSchema,
   HealthDisplaySchema,
   HitPointBandSchema,
   ObjectStatsSchema,
@@ -385,6 +386,9 @@ export const PendingSaveSchema = z
     /** A failure that acts by the target's Hit Points as it fails (Divine Word, Slaying Bow). GM bookkeeping, never
      *  projected: the result says what landed. */
     failureByHitPoints: z.array(HitPointBandSchema).min(1).max(4).optional(),
+    /** What a failure by this much or more does instead ("Failure by 5 or More"). GM bookkeeping, never projected: the
+     *  result says what landed. */
+    failureByMargin: FailureMarginSchema.optional(),
     /** A creature of these types that fails leaves for its home plane for 24 hours (Divine Word). GM bookkeeping. */
     failureBanishes: z
       .array(
