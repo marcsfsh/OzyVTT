@@ -635,7 +635,10 @@ export const actionCommands = [
         usedUp = consumable !== null;
         // What an item puts on its user lasts beyond the moment: Antitoxin drunk, a blade coated before a fight.
         if (isItemActionId(action.id))
-          narrations = [...narrations, ...grantOutsideFight(draft, live, action, commandId)];
+          narrations = [
+            ...narrations,
+            ...grantOutsideFight(draft, live, action, commandId, (sides) => kit.context.random(sides))
+          ];
         // SRD charged items: spending the last charge rolls a d20, whose 1 is the item's own text.
         const due = spend.usesLeft === 0 ? lastChargeRollFor(action, live.inventory, kit.equipmentCatalog()) : null;
         lastCharge = null;

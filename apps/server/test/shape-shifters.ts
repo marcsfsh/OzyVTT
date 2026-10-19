@@ -71,6 +71,7 @@ export function druid(level: number, extra: readonly Row[] = []): ActorDefinitio
       { level: 1, kind: "spell", id: "entangle" },
       { level: 1, kind: "spell", id: "cure-wounds" },
       ...(level >= 3 ? [{ level: 1, kind: "spell", id: "moonbeam" }] : []),
+      ...(level >= 3 ? [{ level: 1, kind: "spell", id: "enlargereduce" }] : []),
       ...(level >= 5 ? [{ level: 1, kind: "spell", id: "revivify" }] : []),
       ...(level >= 7 ? [{ level: 1, kind: "spell", id: "polymorph" }] : []),
       ...(level >= 15 ? [{ level: 1, kind: "spell", id: "animal-shapes" }] : []),
@@ -111,6 +112,62 @@ export function druid(level: number, extra: readonly Row[] = []): ActorDefinitio
     ]
   } as CharacterCreateRequestInput;
   return buildCharacterDefinition(input, view, POLICY);
+}
+
+/** A Goliath Fighter (Champion) of any level, with Cloud's Jaunt for its ancestry and a Longsword among its gear. */
+export function goliathFighter(level: number): ActorDefinition {
+  return buildCharacterDefinition(
+    {
+      name: "Brakka",
+      speciesId: "goliath",
+      backgroundId: "soldier",
+      classId: "fighter",
+      level,
+      ...(level >= 3 ? { subclassId: "champion" } : {}),
+      abilityMethod: "standard-array",
+      baseScores: { str: 15, dex: 14, con: 12, int: 10, wis: 8, cha: 13 },
+      backgroundBonusAllocation: [
+        { ability: "str", amount: 2 },
+        { ability: "con", amount: 1 }
+      ],
+      hp: { mode: "average" },
+      choices: [
+        { level: 1, kind: "language", id: "dwarvish" },
+        { level: 1, kind: "language", id: "giant" },
+        { level: 1, classId: "fighter", kind: "skill", id: "survival" },
+        { level: 1, classId: "fighter", kind: "skill", id: "perception" },
+        {
+          level: 1,
+          classId: "fighter",
+          kind: "fighting-style",
+          id: "defense",
+          payload: { featureId: "fighting-style" }
+        },
+        { level: 1, classId: "fighter", kind: "weapon-mastery", id: "greatsword" },
+        { level: 1, classId: "fighter", kind: "weapon-mastery", id: "flail" },
+        { level: 1, classId: "fighter", kind: "weapon-mastery", id: "longbow" },
+        ...(level >= 3 ? [{ level: 3, classId: "fighter", kind: "subclass", id: "champion" }] : []),
+        ...(level >= 4
+          ? [
+              { level: 4, classId: "fighter", kind: "weapon-mastery", id: "rapier" },
+              {
+                level: 4,
+                classId: "fighter",
+                kind: "asi-or-feat",
+                id: "asi",
+                payload: { increases: [{ ability: "dex", amount: 2 }] }
+              }
+            ]
+          : []),
+        { level: 1, kind: "equipment", id: "fighter-a" },
+        { level: 1, kind: "equipment", id: "soldier-a" },
+        { level: 1, kind: "tool", id: "gaming-set-dice" },
+        { level: 1, kind: "giant-ancestry", id: "clouds-jaunt", payload: { featureId: "goliath-giant-ancestry" } }
+      ]
+    } as CharacterCreateRequestInput,
+    view,
+    POLICY
+  );
 }
 
 /** A built character's input, built with the table's content. */
@@ -166,7 +223,7 @@ export function table(
     );
   ids.forEach((actorId, index) => {
     const token = state.combat.tokens.find((entry) => entry.actorId === actorId);
-    if (token) token.position = { x: 125 + index * 100, y: 125 };
+    if (token) token.position = { x: 125 + index * 200, y: 125 };
   });
   const resolve = resolverOf(state);
   const actor = (id: string) => state.actors.find((entry) => entry.id === id)!;
@@ -192,7 +249,7 @@ export function table(
         found,
         { actorId, targetIds: [], commandId: `cmd-${(rollId += 1)}`, ...input },
         {
-          random: () => faces.shift() ?? 10,
+          random: (sides) => Math.min(sides, faces.shift() ?? 10),
           newRollId: () => `40000000-0000-4000-8000-${String((rollId += 1)).padStart(12, "0")}`,
           gmSessionId: "30000000-0000-4000-8000-00000000000a",
           now: () => "2026-10-19T00:00:00.000Z",

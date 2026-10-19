@@ -1883,7 +1883,12 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   /** Only another creature may receive it ("inspire another creature"). */
   notSelf: z.literal(true).optional(),
   /** The recipient's size while it lasts (Large Form: Large), where there is room for it. */
-  sizeChange: SizeChangeSchema.optional()
+  sizeChange: SizeChangeSchema.optional(),
+  /** It lasts this many hours, rolled as it lands (Potion of Diminution: 1d4), in place of `duration`. */
+  hoursRolled: z
+    .string()
+    .regex(/^[1-4]d(?:4|6|8|10|12)$/, "Use dice such as 1d4.")
+    .optional()
 }).strict();
 
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */

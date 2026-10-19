@@ -160,3 +160,40 @@ export function revertForm(state: GameState, actor: Actor, effect: EffectInstanc
     ? `${actor.name} returns to its true form, and the Temporary Hit Points of ${form.name} vanish.`
     : `${actor.name} returns to its true form.`;
 }
+
+/** The size a size change gives a creature of `size` (Large Form: Large; Enlarge: one larger). */
+export function changedSize(size: CreatureSize, change: Readonly<{ to?: string; step?: number }>): CreatureSize {
+  if (change.to) return change.to as CreatureSize;
+  return SIZES[Math.max(0, Math.min(SIZES.length - 1, SIZES.indexOf(size) + (change.step ?? 0)))]!;
+}
+
+/**
+ * Whether a creature has room on the live map to grow to `cells` across (Large Form: "if you're in a big enough
+ * space"): the space it would take, spreading right and down from its own, must hold no other creature's token. The
+ * name of a creature in the way, or null. `ignored` leaves out creatures the asker can't know are there.
+ */
+export function blockerOfGrowth(
+  state: GameState,
+  actorId: string,
+  cells: number,
+  ignored: (actorId: string) => boolean = () => false
+): string | null {
+  const token = state.combat.tokens.find((entry) => entry.actorId === actorId);
+  if (!token?.position || token.gridSizePx === null || cells <= token.sizeCells) return null;
+  const grid = token.gridSizePx;
+  const left = token.position.x - (token.sizeCells * grid) / 2;
+  const top = token.position.y - (token.sizeCells * grid) / 2;
+  const box = { left, top, right: left + cells * grid, bottom: top + cells * grid };
+  const slack = grid * 0.05;
+  for (const other of state.combat.tokens) {
+    if (other.actorId === actorId || !other.position || ignored(other.actorId)) continue;
+    const half = (other.sizeCells * grid) / 2;
+    const overlaps =
+      other.position.x + half > box.left + slack &&
+      other.position.x - half < box.right - slack &&
+      other.position.y + half > box.top + slack &&
+      other.position.y - half < box.bottom - slack;
+    if (overlaps) return state.actors.find((actor) => actor.id === other.actorId)?.name ?? "Another creature";
+  }
+  return null;
+}

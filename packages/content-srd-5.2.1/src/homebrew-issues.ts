@@ -197,7 +197,25 @@ const LABELS: Readonly<Record<string, string>> = {
   coins: "coins",
   waives: "components it goes without",
   targetTypes: "creature types it affects",
-  chainFeet: "distance between targets"
+  chainFeet: "distance between targets",
+  shapeShift: "shape-shift",
+  printed: "printed forms",
+  keeps: "what the creature keeps of its own",
+  challengeOf: "whose Challenge Rating limits the form",
+  maxChallenge: "highest Challenge Rating",
+  noFly: "no Fly Speed",
+  onTargets: "a form for each target",
+  leaveAs: "action that leaves the form",
+  hoursPerTwoLevelsOf: "class whose half level counts its hours",
+  gear: "what becomes of its gear",
+  endsForm: "returns its user to its true form",
+  formOnly: "forms it works in",
+  effectOptions: "effects to pick from",
+  unwillingOnly: "save for unwilling creatures only",
+  failureEndsForm: "a failure ends a shape-shift",
+  sizeChange: "size change",
+  step: "size step",
+  hoursRolled: "hours rolled as it lands"
 };
 /** A key whose words depend on what holds it: a weapon's category is its weapon kind, as the editor labels it. */
 const NESTED_LABELS: Readonly<Record<string, string>> = { "weapon.category": "weapon kind" };
