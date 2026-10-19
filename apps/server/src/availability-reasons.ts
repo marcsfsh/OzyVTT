@@ -123,6 +123,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
       ? "Beast Spells leaves out a spell with a costly or consumed Material component."
       : "You can't cast spells in this form.",
   "form.no-actions": () => "You can't take actions in this form.",
+  "form.no-attacks": () => "You can't attack in this form.",
   "form.wrong-form": ({ action }) => `Only in ${action.formOnly?.length === 1 ? "one" : "some"} of your forms.`,
   "legendary.own-turn": () => "Take it at the end of another creature's turn.",
   "attack.light-needs-attack": () => "Attack with another Light weapon first.",

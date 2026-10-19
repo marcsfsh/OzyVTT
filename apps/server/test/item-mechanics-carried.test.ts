@@ -671,13 +671,14 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
 // The absences, pinned so none is authored by accident.
 
 describe("what no carried item can carry", () => {
-  it("of the potions and oils, the Potions of Healing, Flying, Growth and Diminution act", () => {
+  it("of the potions and oils, the Potions of Healing, Flying, Gaseous Form, Growth and Diminution act", () => {
     // A consumed item is sayable (`consumedOnUse`); the rest of the potions and the oils stay prose.
     const consumables = CARRIED_ROWS.filter((row) => row.category === "consumable");
     expect(consumables.length).toBeGreaterThan(0);
     expect(consumables.filter(carries).map((row) => row.id)).toEqual([
       "potion-of-diminution",
       "potion-of-flying",
+      "potion-of-gaseous-form",
       "potion-of-growth",
       "potion-of-healing-greater",
       "potion-of-healing-superior",

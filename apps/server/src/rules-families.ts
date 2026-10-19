@@ -45,6 +45,7 @@ const RULE_FAMILIES = {
   // A form forbids it: spells (Wild Shape, Polymorph), actions (a vampire's mist), or another form's attack.
   "form.no-spells": "economy",
   "form.no-actions": "economy",
+  "form.no-attacks": "economy",
   "form.wrong-form": "economy",
   // "Legendary actions are taken on other creatures' turns" is a timing/economy rule...
   "legendary.own-turn": "economy",

@@ -6,7 +6,10 @@ import { isIncapacitated } from "../condition-rules.js";
 import { currentFormId, formEffectOf } from "./forms.js";
 
 /** What a form forbids, rule by rule (rule ids from `rules-families.ts`). */
-type FormViolation = Readonly<{ rule: "form.no-spells" | "form.no-actions" | "form.wrong-form"; message: string }>;
+type FormViolation = Readonly<{
+  rule: "form.no-spells" | "form.no-actions" | "form.no-attacks" | "form.wrong-form";
+  message: string;
+}>;
 
 /** A spell whose Material component has a cost or is consumed, which Beast Spells leaves out. */
 const costlyMaterial = (spell: SpellReference | undefined): boolean =>
@@ -48,8 +51,16 @@ export function formViolations(
         message: `${actor.name} can't cast ${spell?.name ?? action.name} in ${form.name} form: Beast Spells leaves out a spell whose Material component has a cost or is consumed.`
       });
   }
-  if (form?.noActions && action.activation === "action")
+  // Leaving the form is always open (Wind Walk: "or a Magic action to begin reverting").
+  if (
+    form?.noActions &&
+    action.activation === "action" &&
+    !action.endsForm &&
+    !(form.allowsActions ?? []).includes(action.id)
+  )
     violations.push({ rule: "form.no-actions", message: `${actor.name} can't take actions in ${form.name} form.` });
+  if (form?.noAttacks && action.attack !== undefined)
+    violations.push({ rule: "form.no-attacks", message: `${actor.name} can't attack in ${form.name} form.` });
   if (action.formOnly && !action.formOnly.includes(currentFormId(actor))) {
     const names = action.formOnly.map((id) => formName(definition, id));
     violations.push({
@@ -71,13 +82,16 @@ export function formsAfterDamage(state: GameState, actor: Actor): EffectNarratio
   const ends =
     isDead(actor) ||
     (form.endsWithoutTemporaryHitPoints === true && actor.hp.temporary <= 0) ||
+    (form.endsAtZeroHitPoints === true && actor.hp.current <= 0) ||
     (form.endsOnIncapacitated === true && (isIncapacitated(actor) || actor.hp.current <= 0));
   if (!ends) return [];
   const reason = isDead(actor)
     ? `${actor.name} dies and returns to its true form.`
     : form.endsWithoutTemporaryHitPoints && actor.hp.temporary <= 0
       ? `${actor.name} has no Temporary Hit Points left, so ${held.name} ends.`
-      : `${actor.name} is Incapacitated, so ${held.name} ends.`;
+      : actor.hp.current <= 0
+        ? `${actor.name} drops to 0 HP, so ${held.name} ends.`
+        : `${actor.name} is Incapacitated, so ${held.name} ends.`;
   return [{ kind: "effect", text: reason, actorId: actor.id }, ...endEffect(state, actor.id, held.id)];
 }
 

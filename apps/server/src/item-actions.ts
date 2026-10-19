@@ -153,6 +153,8 @@ export function itemAction(
     ...(declared.replacesAttack ? { replacesAttack: true } : {}),
     // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
     ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
+    // The form drinking it gives (a Potion of Gaseous Form).
+    ...(declared.shapeShift ? { shapeShift: structuredClone(declared.shapeShift) } : {}),
     ...(declared.area ? { area: { ...declared.area } } : {}),
     // Who it may target (a flask's one creature within 20 feet) and the hit it rides (a staff's charge on a hit).
     ...(declared.targets ? { targets: structuredClone(declared.targets) } : {}),

@@ -1,7 +1,7 @@
 import { ALIVE_AT_ZERO_TAG, type EffectInstance, type PendingSave } from "@vtt/domain";
 import type { ActorDefinition, Form } from "@vtt/schemas";
 import { holdsFeature } from "../class-features.js";
-import { CANT_SPEAK_TAG, makeEffect } from "../effects.js";
+import { addEffect, CANT_SPEAK_TAG, makeEffect } from "../effects.js";
 import { effectNameOf } from "../effect-names.js";
 import { CommandRejectedError } from "../game-store.js";
 import { endForm, takeForm } from "../transform/assume.js";
@@ -99,6 +99,7 @@ function formDuration(ctx: ResolveContext): EffectInstance["duration"] {
     const level = classLevelOf(trueDefinitionOf(ctx, ctx.attacker), shift.hoursPerTwoLevelsOf);
     return { type: "minutes", remaining: Math.max(60, Math.floor(level / 2) * 60) };
   }
+  if (shift.durationMinutes !== undefined) return { type: "minutes", remaining: shift.durationMinutes };
   const spell = spellOf(ctx);
   return spell ? spellEffectDuration(spell, ctx.plan.castLevel ?? spell.level) : { type: "manual" };
 }
@@ -131,7 +132,24 @@ const formEffectName = (ctx: ResolveContext, form: Form) =>
 export function applyShapeShift(ctx: ResolveContext): void {
   const { state, action, attacker, input } = ctx;
   if (action.endsForm) {
+    const revertRounds = formEffectOf(attacker)?.form?.revertRounds;
     for (const event of endForm(state, attacker)) ctx.tableNarration.push(tableLineOf(ctx, event));
+    // Wind Walk: "Reverting takes 1 minute, during which the target has the Stunned condition."
+    if (revertRounds !== undefined)
+      addEffect(
+        state,
+        attacker.id,
+        makeEffect({
+          id: `${input.commandId}:reverting`,
+          name: "Reverting to its normal form",
+          sourceActorId: attacker.id,
+          sourceName: attacker.name,
+          sourceActionId: action.id,
+          startedRound: state.combat.round,
+          duration: { type: "rounds", remaining: revertRounds },
+          linkedConditionIds: ["stunned"]
+        })
+      );
     return;
   }
   const shift = action.shapeShift;
@@ -154,6 +172,7 @@ export function applyShapeShift(ctx: ResolveContext): void {
       name: formEffectName(ctx, form),
       tags: form.noSpeech ? [CANT_SPEAK_TAG] : [],
       ...(printed && printed.modifiers.length > 0 ? { modifiers: structuredClone(printed.modifiers) } : {}),
+      ...(printed?.conditionImmunities ? { conditionImmunities: [...printed.conditionImmunities] } : {}),
       sourceActorId: attacker.id,
       sourceName: attacker.name,
       sourceActionId: kept?.sourceActionId ?? action.id,

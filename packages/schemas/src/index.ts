@@ -1051,12 +1051,18 @@ export const PrintedFormSchema = z
     name: z.string().min(1).max(60),
     size: SizeSchema.optional(),
     speeds: FormSpeedsSchema.optional(),
-    /** It can't take actions or Bonus Actions (a vampire's mist); it can still move. */
+    /** It can't take actions (a vampire's mist); it can still move. */
     noActions: z.literal(true).optional(),
+    /** The actions it can still take when it can take no others (Wind Walk's cloud: Dash). */
+    allowsActions: z.array(RiderSlugSchema).min(1).max(4).optional(),
+    /** It can't attack (Gaseous Form). */
+    noAttacks: z.literal(true).optional(),
     /** It can't speak, so it casts no spell with a Verbal component (a vampire's bat). */
     noSpeech: z.literal(true).optional(),
     /** It can enter another creature's space and stop there (a vampire's mist). */
     sharesSpaces: z.literal(true).optional(),
+    /** Conditions it is immune to while in the form (Gaseous Form: Prone). */
+    conditionImmunities: z.array(ConditionIdSchema).min(1).max(6).optional(),
     /** What the form has while it lasts (the mist's Resistance to all damage). */
     modifiers: EffectModifiersSchema.default([])
   })
@@ -1105,9 +1111,15 @@ export const FormSchema = z
     beastSpells: z.literal(true).optional(),
     noSpeech: z.literal(true).optional(),
     noActions: z.literal(true).optional(),
+    allowsActions: z.array(RiderSlugSchema).min(1).max(4).optional(),
+    noAttacks: z.literal(true).optional(),
     sharesSpaces: z.literal(true).optional(),
     /** It ends once the bearer has no Temporary Hit Points left (Polymorph). */
     endsWithoutTemporaryHitPoints: z.literal(true).optional(),
+    /** It ends when the bearer drops to 0 Hit Points (Gaseous Form). */
+    endsAtZeroHitPoints: z.literal(true).optional(),
+    /** Leaving it early takes this many rounds, with the Stunned condition (Wind Walk: 1 minute). */
+    revertRounds: z.number().int().min(1).max(100).optional(),
     /** It ends when the bearer has the Incapacitated condition (Wild Shape). */
     endsOnIncapacitated: z.literal(true).optional(),
     /** The Temporary Hit Points the form gave, any left of which vanish when it ends. */
@@ -2602,7 +2614,11 @@ export const ShapeShiftSchema = z
     temporaryHitPoints: z.enum(["each-form", "first-form"]).optional(),
     endsWithoutTemporaryHitPoints: z.literal(true).optional(),
     endsOnIncapacitated: z.literal(true).optional(),
+    endsAtZeroHitPoints: z.literal(true).optional(),
     leaveAs: z.enum(["bonus-action", "action"]).optional(),
+    revertRounds: z.number().int().min(1).max(100).optional(),
+    /** It lasts this many minutes (a Potion of Gaseous Form's hour). */
+    durationMinutes: z.number().int().min(1).max(1440).optional(),
     /** It lasts hours equal to half the user's level in this class (Wild Shape). Absent: the spell's duration, or until
      *  ended. */
     hoursPerTwoLevelsOf: RiderSlugSchema.optional(),

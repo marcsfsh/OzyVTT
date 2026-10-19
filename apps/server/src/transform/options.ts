@@ -130,7 +130,10 @@ export function formOptions(
   if (shift.from === "printed") {
     const size = own?.size ?? "medium";
     return [
-      { id: "true", name: "True form", challengeRating: null, size, fly: fliesIn(own) },
+      // A stat block's Shape-Shift returns to its true form too; a single form (Gaseous Form) ends as its effect ends.
+      ...(singlePrintedForm(shift)
+        ? []
+        : [{ id: "true", name: "True form", challengeRating: null, size, fly: fliesIn(own) }]),
       ...(shift.printed ?? []).map((printed) => ({
         id: printed.id,
         name: printed.name,
@@ -155,6 +158,10 @@ export function formOptions(
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
+/** The one form a shape-shift prints, when it prints only one (Gaseous Form, a Potion of Gaseous Form). */
+const singlePrintedForm = (shift: ShapeShift): PrintedForm | undefined =>
+  shift.from === "printed" && shift.printed?.length === 1 ? shift.printed[0] : undefined;
+
 /** The form a choice names, checked against what the action allows: what the effect should record and, for a stat
  *  block, which one. `true` (a printed form's user returning) is null. */
 export function formChoice(
@@ -170,9 +177,12 @@ export function formChoice(
     actionName: string;
   }>
 ): Readonly<{ name: string; statBlockId?: string; printed?: PrintedForm }> | null {
+  // One printed form is the one it gives (Gaseous Form's misty cloud).
+  const only = singlePrintedForm(shift);
+  if (only && (choice === undefined || choice === only.id)) return { name: only.name, printed: only };
   if (choice === undefined) throw new CommandRejectedError(`Choose a form for ${context.actionName}.`);
   if (shift.from === "printed") {
-    if (choice === "true") return null;
+    if (choice === "true" && !only) return null;
     const printed = (shift.printed ?? []).find((entry) => entry.id === choice);
     if (!printed) throw new CommandRejectedError(`${context.actionName} has no ${choice} form.`);
     return { name: printed.name, printed };
@@ -224,9 +234,13 @@ export function formRecord(
     ...(extras.beastSpells ? { beastSpells: true as const } : {}),
     ...(shift.noSpeech || printed?.noSpeech ? { noSpeech: true as const } : {}),
     ...(printed?.noActions ? { noActions: true as const } : {}),
+    ...(printed?.allowsActions ? { allowsActions: [...printed.allowsActions] } : {}),
+    ...(printed?.noAttacks ? { noAttacks: true as const } : {}),
     ...(printed?.sharesSpaces ? { sharesSpaces: true as const } : {}),
     ...(shift.endsWithoutTemporaryHitPoints ? { endsWithoutTemporaryHitPoints: true as const } : {}),
     ...(shift.endsOnIncapacitated ? { endsOnIncapacitated: true as const } : {}),
+    ...(shift.endsAtZeroHitPoints ? { endsAtZeroHitPoints: true as const } : {}),
+    ...(shift.revertRounds !== undefined ? { revertRounds: shift.revertRounds } : {}),
     ...(extras.temporaryHitPoints !== undefined && extras.temporaryHitPoints > 0
       ? { temporaryHitPoints: Math.min(1000, extras.temporaryHitPoints) }
       : {}),

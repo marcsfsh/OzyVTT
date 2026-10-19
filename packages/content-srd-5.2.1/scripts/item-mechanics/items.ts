@@ -7,6 +7,7 @@
  */
 import type { DamageType, Modifier } from "@vtt/schemas";
 import type { ItemMechanics, ItemMechanicsModule } from "./overlay.js";
+import { MISTY_CLOUD } from "../spell-effects.js";
 
 /** The d10 table Armor of Resistance and Ring of Resistance roll on for their type. */
 /** Extra damage when the weapon hits a creature of one of these types ("an extra 3d6 damage of the weapon's type if the
@@ -2020,6 +2021,32 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           hoursRolled: "1d4",
           sizeChange: { step: -1 },
           modifiers: strengthRolls("disadvantage")
+        }
+      }
+    ]
+  },
+
+  // "When you drink this potion, you gain the effect of the Gaseous Form spell for 1 hour (no Concentration required) or
+  // until you end the effect as a Bonus Action."
+  "potion-of-gaseous-form": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "drink",
+        name: "Drink Potion of Gaseous Form",
+        activation: "bonus-action",
+        description:
+          "Drink it: for 1 hour you are a misty cloud, as the Gaseous Form spell, with no Concentration. End it early as a Bonus Action.",
+        damage: [],
+        shapeShift: {
+          from: "printed",
+          printed: [MISTY_CLOUD],
+          keeps: [],
+          noSpells: true,
+          gear: "worn",
+          endsAtZeroHitPoints: true,
+          leaveAs: "bonus-action",
+          durationMinutes: 60
         }
       }
     ]

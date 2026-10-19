@@ -1251,11 +1251,32 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
 };
 
 type ShapeShift = NonNullable<SpellEffect["shapeShift"]>;
+type PrintedForm = NonNullable<ShapeShift["printed"]>[number];
 
 /**
  * The forms a cast shape-shifts creatures into (SRD 5.2.1 text): where they come from, what each creature keeps of its
  * own statistics, and what ends the form. Every one keeps its Hit Points and Hit Point Dice.
  */
+/** Gaseous Form's misty cloud, which a Potion of Gaseous Form gives too. */
+export const MISTY_CLOUD: PrintedForm = {
+  id: "misty-cloud",
+  name: "Misty cloud",
+  speeds: { walk: 0, fly: 10, hover: true },
+  noSpeech: true,
+  noAttacks: true,
+  sharesSpaces: true,
+  conditionImmunities: ["prone"],
+  modifiers: [
+    { type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] },
+    ...(["str", "dex", "con"] as const).map((ability): Modifier => ({
+      type: "roll-mode",
+      roll: "save",
+      mode: "advantage",
+      when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: [ability] }]
+    }))
+  ]
+};
+
 const CAST_SHAPE_SHIFTS: Readonly<Record<string, ShapeShift>> = {
   // "Any Beast you choose that has a Challenge Rating equal to or less than the target's ... retains its alignment,
   // personality, creature type, Hit Points, and Hit Point Dice ... gains a number of Temporary Hit Points equal to the
@@ -1311,6 +1332,44 @@ const CAST_SHAPE_SHIFTS: Readonly<Record<string, ShapeShift>> = {
     gear: "merged",
     temporaryHitPoints: "first-form",
     leaveAs: "bonus-action"
+  },
+  // "A willing creature you touch shape-shifts ... into a misty cloud ... ends on the target if it drops to 0 Hit Points
+  // or if it takes a Magic action to end the spell on itself ... only method of movement is a Fly Speed of 10 feet, and
+  // it can hover ... can enter and occupy the space of another creature ... Resistance to Bludgeoning, Piercing, and
+  // Slashing damage ... Immunity to the Prone condition ... Advantage on Strength, Dexterity, and Constitution saving
+  // throws ... can't talk ... can't attack or cast spells." Narrow openings and liquids stay the GM's.
+  "gaseous-form": {
+    from: "printed",
+    onTargets: true,
+    printed: [MISTY_CLOUD],
+    keeps: [],
+    noSpells: true,
+    gear: "worn",
+    endsAtZeroHitPoints: true,
+    leaveAs: "action"
+  },
+  // "You and up to ten willing creatures ... assume gaseous forms ... a Fly Speed of 300 feet and can hover ... Immunity
+  // to the Prone condition ... Resistance to Bludgeoning, Piercing, and Slashing damage. The only actions a target can
+  // take in this form are the Dash action or a Magic action to begin reverting ... Reverting takes 1 minute, during
+  // which the target has the Stunned condition." Turning back into a cloud, and the descent when it ends, are the GM's.
+  "wind-walk": {
+    from: "printed",
+    onTargets: true,
+    printed: [
+      {
+        id: "cloud",
+        name: "Cloud",
+        speeds: { walk: 0, fly: 300, hover: true },
+        noActions: true,
+        allowsActions: ["dash"],
+        conditionImmunities: ["prone"],
+        modifiers: [{ type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] }]
+      }
+    ],
+    keeps: [],
+    gear: "worn",
+    leaveAs: "action",
+    revertRounds: 10
   }
 };
 
