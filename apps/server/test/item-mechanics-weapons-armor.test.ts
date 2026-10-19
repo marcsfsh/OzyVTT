@@ -488,7 +488,15 @@ describe("the authored riders are present in the shipped bundle", () => {
       "weapon-1": ["attack-bonus +1", "damage-bonus +1"],
       "weapon-2": ["attack-bonus +2", "damage-bonus +2"],
       "weapon-3": ["attack-bonus +3", "damage-bonus +3"],
-      "dwarven-thrower": ["attack-bonus +3", "damage-bonus +3"],
+      "dwarven-thrower": [
+        "attack-bonus +3",
+        "damage-bonus +3",
+        "extra-damage 1d8 force",
+        "extra-damage 1d8 force vs giant"
+      ],
+      "energy-bow": ["attack-bonus +1", "damage-bonus +1"],
+      "thunderous-greatclub": ["extra-damage 1d8 thunder"],
+      oathbow: ["extra-damage 3d6 piercing"],
       defender: ["attack-bonus +3", "damage-bonus +3"],
       "vorpal-sword": ["attack-bonus +3", "damage-bonus +3"],
       "holy-avenger": ["attack-bonus +3", "damage-bonus +3", "extra-damage 2d10 radiant vs fiend, undead"],
@@ -561,7 +569,15 @@ describe("the authored riders are present in the shipped bundle", () => {
     // weapon", and `scope: "bearer"` would let two magic weapons in a pack stack. A rider gated on the hit, a
     // critical hit or the target's creature type is the item's own printed condition.
     const printedGate = (trigger: { type: string }) =>
-      ["on-hit", "on-attack-roll", "on-critical-hit", "on-natural-20", "versus-creature-type"].includes(trigger.type);
+      [
+        "on-hit",
+        "on-attack-roll",
+        "on-critical-hit",
+        "on-natural-20",
+        "versus-creature-type",
+        "attack-kind-is",
+        "versus-marked"
+      ].includes(trigger.type);
     for (const row of weapons) {
       for (const modifier of row.modifiers ?? []) {
         if (!WEAPON_SCOPED.includes(modifier.type)) continue;
@@ -575,23 +591,29 @@ describe("the authored riders are present in the shipped bundle", () => {
     }
   });
 
-  it("leaves every RESERVED item bare, so a later unit finds an unauthored carrier", () => {
-    // Rows whose printed effects need mechanics the engine does not model yet.
-    for (const id of ["energy-bow", "thunderous-greatclub"]) {
-      const row = shipped(id) as unknown as { modifiers: unknown[]; casts: unknown[]; cursed: boolean };
-      expect(row.modifiers, `${id} is reserved and must carry no modifiers`).toEqual([]);
-      expect(row.casts, `${id} is reserved and must carry no casts`).toEqual([]);
-      expect(row.cursed, `${id} is reserved and must not be cursed`).toBe(false);
-    }
+  it("binds the Energy Bow to its bow with Force arrows and none to spend, and sets the Thunderous Greatclub's Strength", () => {
+    expect(shipped("energy-bow").appliesTo?.baseIds).toEqual(["longbow", "shortbow"]);
+    expect(shipped("energy-bow").weaponChanges).toEqual({ damageType: "force", removeProperties: ["ammunition"] });
+    expect(shipped("thunderous-greatclub").modifiers[0]).toEqual({
+      type: "ability-score-minimum",
+      ability: "str",
+      score: 20
+    });
   });
 
-  it("gives Spellguard Shield its Disadvantage on spell attacks alone", () => {
+  it("gives Spellguard Shield its Disadvantage on spell attacks and Advantage on saves against magic", () => {
     expect(shipped("spellguard-shield").modifiers).toEqual([
       {
         type: "roll-mode",
         roll: "incoming-attack",
         mode: "disadvantage",
         when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["spell"] }]
+      },
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "advantage",
+        when: [{ type: "on-saving-throw" }, { type: "versus-magic" }]
       }
     ]);
   });

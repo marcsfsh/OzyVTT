@@ -25,6 +25,18 @@ type Coins = Record<(typeof COINS)[number], number>;
 
 const words = (slug: string) => slug.split("-").map(titleCase).join(" ");
 
+/** One printed attunement prerequisite in words, as the server checks it: "a Paladin", "a Spellcaster", "a creature
+ *  attuned to a Belt of Dwarvenkind". */
+export function prerequisiteWords(prerequisite: string): string {
+  const named = (slug: string) =>
+    slug
+      .split("-")
+      .map((word) => (word === "of" || word === "the" ? word : titleCase(word)))
+      .join(" ");
+  const attunedTo = /^creature-attuned-to-an?-(.+)$/.exec(prerequisite)?.[1];
+  return attunedTo !== undefined ? `a creature attuned to a ${named(attunedTo)}` : `a ${named(prerequisite)}`;
+}
+
 /** The server's rows an item gives: its swing (and two-handed and Light forms), a wand's casts, a potion's drink. */
 const itemActions = (item: InventoryItem, serverActions: readonly ContentActionSummary[]) =>
   serverActions.filter((row) => row.id === `item-${item.id}` || row.id.startsWith(`item-${item.id}-`));
@@ -136,7 +148,12 @@ export function GearTab({
     const spellName = item.spellId
       ? (spells.find((spell) => spell.id === item.spellId)?.name ?? words(item.spellId))
       : null;
-    return `${item.name}${baseName ? ` (${baseName})` : ""}${spellName ? ` (${spellName})` : ""}`;
+    const variantName = item.variantId
+      ? (summaryOf(item)?.variants?.find((variant) => variant.id === item.variantId)?.name ?? words(item.variantId))
+      : null;
+    return `${item.name}${baseName ? ` (${baseName})` : ""}${spellName ? ` (${spellName})` : ""}${
+      variantName ? ` (${variantName})` : ""
+    }`;
   };
   const save = (item: InventoryItem) => void edit("character:set-inventory", { actorId: actor.id, item });
 
@@ -234,6 +251,9 @@ export function GearTab({
         const mastery = facts.get(`item-${open.id}`)?.mastery ?? null;
         const choices = summary?.damageTypeChoice;
         const study = summary?.study;
+        const kinds = summary?.variants && summary.variantChoice?.by !== "holder" ? summary.variants : null;
+        const forms = summary?.variants && summary.variantChoice?.by === "holder" ? summary.variants : null;
+        const prerequisites = summary?.attunement?.required ? summary.attunement.restrictedTo : [];
         return (
           <ItemCard
             item={open}
@@ -306,6 +326,44 @@ export function GearTab({
                 onChange={(quantity) => save({ ...open, quantity })}
               />
             </div>
+            {(open.magic?.attunementRequired || open.attuned) && (
+              <p className="cs-sub">
+                {prerequisites.length > 0
+                  ? `Requires attunement by ${prerequisites.map(prerequisiteWords).join(" or ")}. `
+                  : ""}
+                {role === "player" ? "Attune or end it during a Short Rest." : "You can attune anyone at any time."}
+              </p>
+            )}
+            {forms && (
+              <div className="cs-item-forms" role="group" aria-label={`Form of ${open.name}`}>
+                <span className="cs-eyebrow">Form</span>
+                <div className="cs-chiprow">
+                  {[{ id: null, name: "Its own" }, ...forms].map((form) => {
+                    const current = (open.variantId ?? null) === form.id;
+                    return (
+                      <button
+                        key={form.id ?? "own"}
+                        type="button"
+                        className={`cs-toggle interactive${current ? " is-on" : ""}`}
+                        aria-pressed={current}
+                        disabled={busy || current || !open.equipped}
+                        onClick={() =>
+                          void edit("item:set-form", { actorId: actor.id, itemId: open.id, variantId: form.id })
+                        }
+                      >
+                        {form.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="cs-sub">
+                  {open.equipped ? "" : `Hold it to change its form. `}
+                  {summary?.variantChoice?.activation === "bonus-action"
+                    ? "Changing it takes a Bonus Action in a fight."
+                    : ""}
+                </span>
+              </div>
+            )}
             {summary?.light && !summary.light.always && (
               <LightControls
                 item={open}
@@ -324,7 +382,12 @@ export function GearTab({
                 Choose what it is
               </Button>
             )}
-            {role === "gm" && (choices || others.length > 0 || (study && !open.dormant)) && (
+            {role === "player" && kinds && open.variantId && (
+              <p className="cs-sub">
+                It is {kinds.find((kind) => kind.id === open.variantId)?.name ?? words(open.variantId)}.
+              </p>
+            )}
+            {role === "gm" && (choices || kinds || others.length > 0 || (study && !open.dormant)) && (
               <div className="cs-gmbox cs-item-gm" aria-label="GM tools for this item">
                 <span className="cs-section-head">
                   <span className="cs-eyebrow">GM tools</span>
@@ -347,6 +410,27 @@ export function GearTab({
                     {choices.map((type) => (
                       <option key={type} value={type}>
                         Resists {titleCase(type)}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+                {/* What a found copy is (an Ioun Stone's stone) is the GM's to say; the player learns it on attuning. */}
+                {kinds && (
+                  <Select
+                    className="cs-gm-select"
+                    aria-label={`Kind of ${open.name}`}
+                    disabled={busy}
+                    value={open.variantId ?? ""}
+                    onChange={(event) => {
+                      const { variantId: _old, ...rest } = open;
+                      const picked = kinds.find((kind) => kind.id === event.target.value);
+                      save(picked ? { ...rest, variantId: picked.id } : rest);
+                    }}
+                  >
+                    <option value="">Kind: not chosen</option>
+                    {kinds.map((kind) => (
+                      <option key={kind.id} value={kind.id}>
+                        {kind.name}
                       </option>
                     ))}
                   </Select>

@@ -130,6 +130,8 @@ export type RiderModifier = Readonly<{
   whileArmored?: boolean;
   /** `unarmored-defense`: does the benefit survive a shield? */
   allowShield?: boolean;
+  /** `base-armor-class`: the base AC it gives while no armor is worn (Robe of the Archmagi's 15). */
+  base?: number;
   count?: number;
   feet?: number;
   formula?: string;

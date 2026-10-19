@@ -49,6 +49,8 @@ const curatedOr = (key: string, computed: CoverageState): Readonly<{ state: Cove
 const RANK: Readonly<Record<CoverageState, number>> = { reference: 0, guided: 1, enforced: 2 };
 const most = (states: readonly CoverageState[]): CoverageState =>
   states.reduce<CoverageState>((best, state) => (RANK[state] > RANK[best] ? state : best), "reference");
+const least = (states: readonly CoverageState[]): CoverageState =>
+  states.reduce<CoverageState>((worst, state) => (RANK[state] < RANK[worst] ? state : worst), "enforced");
 
 type SpellLater = NonNullable<NonNullable<SpellReference["effect"]>["laterActions"]>[number];
 
@@ -236,6 +238,7 @@ export function featureState(feature: FeatureRecord): CoverageState {
 export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<string, CoverageState>): CoverageState {
   // A magic weapon or armor with no rider of its own is only its base, so its magic is the GM's.
   const base = (item.weapon ?? null) !== null || (item.armor ?? null) !== null;
+  const kinds = (item.variants ?? []).map((kind) => ({ ...kind, uses: undefined, tags: [] }));
   const applies =
     (base && !item.isMagic) ||
     item.grantsFeatIds.length > 0 ||
@@ -246,9 +249,20 @@ export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<str
     (item.onHit?.length ?? 0) > 0 ||
     // Its light, which dynamic vision reads while it is lit.
     item.light !== undefined ||
-    ridersApply(item);
-  if (applies) return unreadModifier(item) ? "guided" : "enforced";
-  const casts = item.casts.map((cast) => spellStates.get(cast.spellId) ?? "reference");
+    item.weaponChanges !== undefined ||
+    item.bonusActionAttack === true ||
+    item.magicSaveAura !== undefined ||
+    ridersApply(item) ||
+    // A kind or form that carries riders of its own (an Ioun Stone's, a Rod of Lordly Might's battleaxe).
+    kinds.some((kind) => ridersApply(kind) || kind.weapon !== undefined || (kind.onHit?.length ?? 0) > 0);
+  // An item that casts is no more than the weakest of its casts: a cast the GM runs leaves the item in part theirs.
+  const casts = [...item.casts, ...kinds.flatMap((kind) => kind.casts)].map(
+    (cast) => spellStates.get(cast.spellId) ?? "reference"
+  );
+  if (applies) {
+    const own: CoverageState = unreadModifier(item) || kinds.some(unreadModifier) ? "guided" : "enforced";
+    return casts.length === 0 ? own : least([own, most([least(casts), "guided"])]);
+  }
   // A tool's checks roll with the ability its entry names and the sheet's proficiency; the GM sets what they do.
   const tool = item.category === "tool" && toolAbility(item.description) !== null;
   const tracked =
@@ -260,7 +274,7 @@ export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<str
     item.cursed ||
     item.uses !== undefined ||
     item.actions.length > 0;
-  return most([...casts, tracked ? "guided" : "reference"]);
+  return most([...(casts.length > 0 ? [least(casts)] : []), tracked ? "guided" : "reference"]);
 }
 
 /** A monster trait's kind: its name without the uses or lair suffix ("Legendary Resistance (3/Day)"). */

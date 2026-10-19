@@ -751,17 +751,25 @@ describe("the spell save DC a legendary robe does NOT raise", () => {
     expect(dcs([wand, robe])).toEqual(bare);
   });
 
-  it("carries no rider at all on the robe, and no row in the whole bundle carries `spell-save-dc`", () => {
+  it("gives the robe its base AC, Advantage against magic, and +2 to its wearer's own DC and spell attacks", () => {
     const record = view.equipmentRecord("robe-of-the-archmagi")!;
-    expect(record.modifiers ?? []).toEqual([]);
-    expect(record.casts ?? []).toEqual([]);
-    expect(record.actions ?? []).toEqual([]);
-    // The robe was the only carrier, so no shipped item carries `spell-save-dc`; a new one must justify it.
+    expect(record.modifiers).toEqual([
+      { type: "base-armor-class", base: 15 },
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "advantage",
+        when: [{ type: "on-saving-throw" }, { type: "versus-magic" }]
+      },
+      { type: "spell-save-dc", amount: 2 },
+      { type: "spell-attack-bonus", amount: 2 }
+    ]);
+    // `spell-save-dc` raises the wearer's own DC only; the robe is the one shipped carrier.
     expect(
       loadMagicItems()
         .filter((row) => (row.modifiers ?? []).some((modifier) => modifier.type === "spell-save-dc"))
         .map((row) => row.id)
-    ).toEqual([]);
+    ).toEqual(["robe-of-the-archmagi"]);
   });
 
   it("moves the Robe of Stars' +1 into the save the server rolls, and off again", () => {
@@ -814,29 +822,29 @@ describe("the worn items left as prose, by name", () => {
     expect(view.spellRecord?.("dimension-door")?.effect?.damage).toEqual([]);
     const boots = view.equipmentRecord("boots-of-levitation")!.actions ?? [];
     expect(boots.map((action) => [action.grants?.tags, action.save])).toEqual([[["levitating"], undefined]]);
-    // And the two blocked on healing carry nothing at all.
-    for (const id of ["periapt-of-health", "necklace-of-prayer-beads"]) {
-      const row = view.equipmentRecord(id)!;
-      expect(row.casts ?? []).toEqual([]);
-      expect(row.actions ?? []).toEqual([]);
-      expect(row.modifiers ?? []).toEqual([]);
-    }
+    // The Periapt of Health heals its wearer as an action of its own; the prayer beads, a set per copy, stay prose.
+    expect(view.equipmentRecord("periapt-of-health")!.actions.map((action) => action.healing)).toEqual([
+      { formula: "2d4 + 2", self: true }
+    ]);
+    const beads = view.equipmentRecord("necklace-of-prayer-beads")!;
+    expect([beads.casts, beads.actions, beads.modifiers]).toEqual([[], [], []]);
   });
 
-  it("leaves the RESERVED item and the four ability-score refusals entirely to prose", () => {
-    for (const id of [
-      "periapt-of-wound-closure", // rolled amount
-      "amulet-of-health",
-      "belt-of-giant-strength", // ITEM_REFUSED_MODIFIER_TYPES
-      "gauntlets-of-ogre-power",
-      "headband-of-intellect"
-    ]) {
-      const row = view.equipmentRecord(id)!;
-      expect(row.modifiers ?? [], `${id} must stay prose`).toEqual([]);
-      expect(row.casts ?? []).toEqual([]);
-      expect(row.actions ?? []).toEqual([]);
-      expect(Object.values(row.grants ?? {}).flat()).toEqual([]);
-    }
+  it("sets the scores the amulet, gauntlets and headband print, and a belt's by the giant the GM names", () => {
+    const floors = (id: string) => view.equipmentRecord(id)!.modifiers;
+    expect(floors("amulet-of-health")).toEqual([{ type: "ability-score-minimum", ability: "con", score: 19 }]);
+    expect(floors("gauntlets-of-ogre-power")).toEqual([{ type: "ability-score-minimum", ability: "str", score: 19 }]);
+    expect(floors("headband-of-intellect")).toEqual([{ type: "ability-score-minimum", ability: "int", score: 19 }]);
+    const belt = view.equipmentRecord("belt-of-giant-strength")!;
+    expect(belt.modifiers).toEqual([]);
+    expect(belt.variants!.map((kind) => [kind.id, kind.modifiers[0]])).toEqual([
+      ["hill", { type: "ability-score-minimum", ability: "str", score: 21 }],
+      ["frost", { type: "ability-score-minimum", ability: "str", score: 23 }],
+      ["stone", { type: "ability-score-minimum", ability: "str", score: 23 }],
+      ["fire", { type: "ability-score-minimum", ability: "str", score: 25 }],
+      ["cloud", { type: "ability-score-minimum", ability: "str", score: 27 }],
+      ["storm", { type: "ability-score-minimum", ability: "str", score: 29 }]
+    ]);
   });
 
   it("authors the talismans' +2 to spell attack rolls and nothing else", () => {
@@ -848,7 +856,7 @@ describe("the worn items left as prose, by name", () => {
     }
   });
 
-  it("splits the eight 'Advantage on a check' rows 3 authored / 5 prose, and says why for each", () => {
+  it("splits the eight 'Advantage on a check' rows 4 authored / 4 prose, and says why for each", () => {
     // Of the eight "Advantage on ... checks" rows, only those whose clause the engine can express exactly
     // are authored; authoring the rest would over-grant.
     const advantageOnChecks = worn
@@ -883,11 +891,16 @@ describe("the worn items left as prose, by name", () => {
       });
     }
 
-    // Still prose (5), each for its own reason, which the failure message names.
+    // The Eyes of the Eagle's "checks that rely on sight" is a situation the roller names beside the check.
+    expect(view.equipmentRecord("eyes-of-the-eagle")!.modifiers[0]?.when).toContainEqual({
+      type: "situation-is",
+      situation: "relying on sight"
+    });
+
+    // Still prose (4), each for its own reason, which the failure message names.
     for (const [id, why] of [
       ["belt-of-dwarvenkind", "Persuasion narrowed to dwarves and duergar - no trigger names who you are influencing"],
       ["eyes-of-minute-seeing", "Investigation within ONE FOOT - nothing measures a distance"],
-      ["eyes-of-the-eagle", "Perception 'that rely on sight' - Search does not know what it relied on"],
       ["robe-of-eyes", "Perception 'that rely on sight', on a robe whose own Drawbacks Blind you"],
       ["talisman-of-the-sphere", "Arcana to control a Sphere of Annihilation, which the engine does not hold"]
     ] as const) {

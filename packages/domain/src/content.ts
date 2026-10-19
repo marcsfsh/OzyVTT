@@ -233,7 +233,12 @@ export const ContentEquipmentSummarySchema = z.strictObject({
   attunement: z
     .strictObject({
       required: z.boolean(),
-      restrictedTo: z.array(slug()).max(8).describe("Class or species ids the item is meant for; advisory only")
+      restrictedTo: z
+        .array(slug())
+        .max(8)
+        .describe(
+          "Who may attune, any one of: a class id, a species id, spellcaster, or creature-attuned-to-a-<item id>. A player's attune is refused when the character meets none"
+        )
     })
     .nullable()
     .describe(
@@ -266,6 +271,24 @@ export const ContentEquipmentSummarySchema = z.strictObject({
     .optional()
     .describe(
       "A manual or tome: `hours` of study within `days` raise the reader's `ability` by `amount`, never above `maximum`, as its text prints it; absent on anything else"
+    ),
+  /** The kinds a carried copy can be (an Ioun Stone's stones) or the forms its holder puts it in (a Rod's buttons). */
+  variants: z
+    .array(z.strictObject({ id: slug(60), name: z.string().max(80) }))
+    .max(16)
+    .optional()
+    .describe(
+      "The kinds the record covers, of which one carried copy is one (an Ioun Stone's fourteen stones), or the forms its holder puts it in (a Rod of Lordly Might's buttons); the copy's pick is its row's `variantId`. Absent on anything else"
+    ),
+  /** Who picks a copy's kind: the GM (what was found) or its holder, at the cost of `activation` in a fight. */
+  variantChoice: z
+    .strictObject({
+      by: z.enum(["gm", "holder"]),
+      activation: z.enum(["action", "bonus-action"]).optional()
+    })
+    .optional()
+    .describe(
+      "Who picks a copy's kind: the GM says what a found copy is (`gm`), or its holder changes its form with item.set-form (`holder`), which takes `activation` on its turn in a fight. Present with `variants`"
     ),
   /** A light source: lit and put out on the row unless it always glows, with a hood to lower or a Cone to aim. */
   light: z

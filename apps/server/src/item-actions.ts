@@ -139,37 +139,33 @@ export function itemAction(
     declared.reaction?.response === "reduce-damage" && added !== 0
       ? { ...declared.reaction, formula: formulaPlus(declared.reaction.formula, added) }
       : declared.reaction;
+  // Everything the action schema says passes through (an Elixir's cures, a rod's light, a teleport); what a feature
+  // grows by level, and what is read off the bearer, is resolved here.
+  const {
+    attack: _attack,
+    save: _save,
+    uses: _uses,
+    reaction: _reaction,
+    ridesHit,
+    spendsNoUses: _spendsNoUses,
+    damageByLevel: _damageByLevel,
+    healingByLevel: _healingByLevel,
+    adds: _adds,
+    grantScaling: _grantScaling,
+    answerAmountByLevel: _answerAmountByLevel,
+    reactionByLevel: _reactionByLevel,
+    multiattackByLevel: _multiattackByLevel,
+    ...rest
+  } = structuredClone(declared);
   return {
+    ...rest,
     id: itemActionId(itemId, declared.id),
-    name: declared.name,
-    activation: declared.activation,
-    description: declared.description,
     ...(attack ? { attack } : {}),
     ...(save ? { save } : {}),
-    damage: declared.damage.map((part) => ({ ...part })),
-    // A Potion of Healing's 2d4 + 2.
-    ...(declared.healing ? { healing: { ...declared.healing } } : {}),
     ...(uses ? { uses } : {}),
-    // Charges one use spends (a Staff of Striking's 2 or 3).
-    ...(declared.useCost !== undefined ? { useCost: declared.useCost } : {}),
-    // A thrown flask uses one attack of the Attack action; the action's other attacks stay open.
-    ...(declared.replacesAttack ? { replacesAttack: true } : {}),
-    // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
-    ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
-    // The form drinking it gives (a Potion of Gaseous Form).
-    ...(declared.shapeShift ? { shapeShift: structuredClone(declared.shapeShift) } : {}),
-    ...(declared.area ? { area: { ...declared.area } } : {}),
-    // The area it leaves to act later (spread Caltrops).
-    ...(declared.zone ? { zone: structuredClone(declared.zone) } : {}),
-    // Who it may target (a flask's one creature within 20 feet) and the hit it rides (a staff's charge on a hit).
-    ...(declared.targets ? { targets: structuredClone(declared.targets) } : {}),
-    ...(declared.ridesHit ? { ridesHit: itemHitRider(declared.ridesHit, definition) } : {}),
-    ...(declared.onHit ? { onHit: structuredClone(declared.onHit) } : {}),
-    // A roll it answers (a Ring of Evasion's Evade) and the trigger it is offered on (a Reaction's).
-    ...(declared.answer ? { answer: structuredClone(declared.answer) } : {}),
     ...(reaction ? { reaction: { ...reaction } } : {}),
-    // The creatures it brings (a Horn of Valhalla's Berserkers).
-    ...(declared.summons ? { summons: structuredClone(declared.summons) } : {})
+    // The hit it rides (a staff's charge on a hit), with its DC as the bearer's number.
+    ...(ridesHit ? { ridesHit: itemHitRider(ridesHit, definition) } : {})
   };
 }
 

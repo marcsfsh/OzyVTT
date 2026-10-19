@@ -1260,6 +1260,55 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "^variants[].**",
+    types: ["equipment"],
+    reason:
+      "the kinds one record covers (an Ioun Stone's stones) or the forms its holder picks (a Rod of Lordly Might's buttons), each with riders of its own - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^variantChoice.**",
+    types: ["equipment"],
+    reason:
+      "who picks a copy's kind, and what changing a form costs - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^weaponChanges.**",
+    types: ["equipment"],
+    reason:
+      "what a magic weapon changes about its bound base (a Dwarven Thrower's Thrown 20/60, an Energy Bow's Force) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^bonusActionAttack",
+    types: ["equipment"],
+    reason:
+      "an attack with the weapon as a Bonus Action (Scimitar of Speed) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^magicSaveAura.**",
+    types: ["equipment"],
+    reason:
+      "an aura of Advantage on saves against magic for the bearer and its allies (Holy Avenger) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].attackBonus",
+    types: ["equipment"],
+    reason:
+      "a cast's printed bonus to hit (Circlet of Blasting's +5) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].activation",
+    types: ["equipment"],
+    reason:
+      "what casting from the item takes in place of the spell's casting time (a prayer bead's Bonus Action) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "^uses.scaling.id",
     types: ["equipment"],
     reason:

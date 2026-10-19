@@ -6,10 +6,10 @@ import {
   type RiderCarrier,
   type RiderModifier
 } from "@vtt/rules-5e";
-import { catalogIdOf, resolveSpellcasting, type ActorDefinition } from "@vtt/schemas";
+import { resolveSpellcasting, type ActorDefinition } from "@vtt/schemas";
 import { spellClassOf } from "./class-features.js";
 import { itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
-import { rowRecord } from "./item-records.js";
+import { copyKeyOf, rowRecord } from "./item-records.js";
 import { isFormDefinitionId } from "./transform/forms.js";
 
 /**
@@ -45,8 +45,9 @@ function scoreCarriers(actor: Actor, catalog: EquipmentCatalog | undefined): Rid
     if (item.quantity <= 0) continue;
     const record = rowRecord(catalog, item);
     // One copy of an item can be attuned (SRD Attunement), so a second gives nothing.
-    const secondCopy = item.attuned && record?.attunement?.required === true && attunedRecords.has(catalogIdOf(item));
-    if (item.attuned && record?.attunement?.required === true) attunedRecords.add(catalogIdOf(item));
+    const copy = copyKeyOf(record, item);
+    const secondCopy = item.attuned && record?.attunement?.required === true && attunedRecords.has(copy);
+    if (item.attuned && record?.attunement?.required === true) attunedRecords.add(copy);
     if (!record || secondCopy || !itemIsActive(item, record)) continue;
     const modifiers = record.modifiers.filter((modifier) => RIDER_TYPES.has(modifier.type));
     if (modifiers.length > 0) carriers.push({ label: record.name, modifiers, sourceItemId: item.id });

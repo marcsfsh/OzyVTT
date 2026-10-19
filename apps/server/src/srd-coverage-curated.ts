@@ -716,7 +716,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Summon Dragon is cast free once a Long Rest, and any casting may go without Concentration, lasting 1 minute then (character-build.ts, summons.ts). Going without the Material component is the GM's."
   ),
   "item:bag-of-tricks": enforced(
-    "One action for each bag colour: the server rolls the d8 on that colour's table, and the creature appears within 20 feet acting right after its user until the next Long Rest or 0 Hit Points (summons.ts). A Bonus Action commands it (summon-orders.ts). Three pulls a day."
+    "The GM says which bag a found one is (item-records.ts); its pull rolls the d8 on that bag's table, and the creature appears within 20 feet acting right after its user until the next Long Rest or 0 Hit Points (summons.ts). A Bonus Action commands it (summon-orders.ts)."
   ),
   "item:bowl-of-commanding-water-elementals": enforced(
     "Once a dawn, a Water Elemental appears near its user, acts right after it, and leaves after 1 hour, at 0 Hit Points or when a Bonus Action dismisses it (summons.ts, summon-orders.ts). Filling the bowl is the GM's."
@@ -731,16 +731,16 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Once a dawn, an Earth Elemental appears within 30 feet, acts right after its user, and leaves after 1 hour, at 0 Hit Points or when a Bonus Action dismisses it (summons.ts, summon-orders.ts)."
   ),
   "item:elemental-gem": enforced(
-    "One action for each gem: breaking it uses it up, and its elemental appears beside its user, acts right after it and leaves after 1 hour, at 0 Hit Points or when a Bonus Action dismisses it (summons.ts)."
+    "The GM says which gem a found one is (item-records.ts): breaking it uses it up, and its elemental appears beside its user, acts right after it and leaves after 1 hour, at 0 Hit Points or when a Bonus Action dismisses it (summons.ts)."
   ),
   "item:efreeti-bottle": guided(
     "Opened, an Efreeti appears within 30 feet and the server rolls the d10 (summons.ts): on a 1 it attacks its user and leaves after 5 rounds, on 2 to 9 it obeys for 1 hour, on a 10 it stays up to an hour to grant a Wish. The first roll setting every later opening, the 24 hours between openings and the Wish are the GM's."
   ),
   "item:feather-token": guided(
-    "The Bird token is used up for a Roc that can't attack and obeys its user until it is dismissed with a Magic action or drops to 0 Hit Points (summons.ts). The Anchor, Fan, Swan Boat, Tree and Whip are the GM's."
+    "The GM says which token a found one is (item-records.ts). The Bird token is used up for a Roc that can't attack and obeys its user until it is dismissed with a Magic action or drops to 0 Hit Points (summons.ts). The Anchor, Fan, Swan Boat, Tree and Whip are the GM's."
   ),
   "item:figurine-of-wondrous-power": guided(
-    "One action for each figurine (the Ivory Goats picked by goat): its creature appears within 60 feet for its time, acts right after its user and defends itself when uncommanded, and a Magic action turns it back (summons.ts). clock-pools.ts holds each figurine for its days, except the Ivory Goats. The goats' waits and charges, the Goat of Terror's fear, the Onyx Dog's Blindsight, the Obsidian Steed's disobedience and the Silver Raven are the GM's."
+    "The GM says which figurine a found one is (item-records.ts): its creature appears within 60 feet for its time, acts right after its user and defends itself when uncommanded, and a Magic action turns it back (summons.ts); clock-pools.ts holds it for its days. The Silver Raven, the goats' own waits and powers and the Obsidian Steed ignoring orders are the GM's."
   ),
   "item:ring-of-djinni-summoning": enforced(
     "The djinni appears within 120 feet while its wearer keeps Concentration, up to 1 hour, defending itself when uncommanded (summons.ts); clock-pools.ts holds the ring for 24 hours. The ring losing its magic when the djinni dies is the GM's."
@@ -789,7 +789,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "time-stop.ts rolls 1d4 + 1 and gives the caster that many turns in a row; an action of its that targets another creature, or a move more than 1,000 feet from where it cast the spell, ends it. An effect it created that later reaches another creature is the GM's to end it on."
   ),
   "item:boots-of-striding-and-springing": guided(
-    "The once-a-turn leap of 30 feet for 10 feet of movement is applied (jumping.ts). The Speed of at least 30 feet, unreduced by armor or weight, is the GM's."
+    "Its wearer's Speed is at least 30 feet and armor's Strength requirement takes none of it (speed.ts), and the once-a-turn leap of 30 feet for 10 feet of movement is applied (jumping.ts). Carried weight is the GM's."
   ),
   "item:boots-of-levitation": guided(
     "The action levitates the wearer with no save for the spell's 10 minutes: it rises 20 feet, moves only as if climbing, and floats down when the levitation ends (falling.ts). Concentration on it is the wearer's to end sooner on the sheet."
@@ -1153,8 +1153,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:berserker-axe": guided(
     "The +1 to attack and damage rolls and the curse's lock on Attunement are applied. The extra Hit Points and the curse's save are the GM's."
   ),
-  "item:bracers-of-archery": guided(
-    "Proficiency with the Longbow and Shortbow is applied. The +2 damage with them is the GM's."
+  "item:bracers-of-archery": enforced(
+    "Proficiency with the Longbow and Shortbow, and +2 to damage rolls made with either (a magic one bound to it included), are applied (riders.ts)."
   ),
   "item:brooch-of-shielding": guided("Resistance to Force damage is applied. Immunity to Magic Missile is the GM's."),
   "item:cloak-of-arachnida": enforced(
@@ -1175,16 +1175,18 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:dagger-of-venom": enforced(
     "The +1 to attack and damage rolls is applied. Coating the blade is a Bonus Action once a day, and the dagger's next hit spends it on a DC 15 Constitution save against 2d10 Poison and Poisoned for 1 minute (resolution/on-hit.ts)."
   ),
-  "item:defender": guided("The +3 to attack and damage rolls is applied. Moving the bonus to AC is the GM's."),
+  "item:defender": guided(
+    "The +3 to attack and damage rolls is applied, and its wielder moves 1, 2 or 3 of it to AC as a form on the sheet (inventory.ts setItemForm). Picking it with the first attack of a turn, and holding it to the next, are the wielder's."
+  ),
   "item:demon-armor": guided(
     "The +1 AC and the curse's lock on Attunement are applied. The clawed Unarmed Strikes and the Disadvantage against demons are the GM's."
   ),
   "item:dragon-scale-mail": guided(
-    "The +1 AC and the Resistance to one type are applied. Advantage on saves against a dragon's breath, and sensing dragons, are the GM's."
+    "The +1 AC and the Resistance to the type the GM picks are applied, with Advantage on a save a Dragon forces (riders.ts), its breath's and any other. Sensing dragons is the GM's."
   ),
   "item:dwarven-plate": guided("The +2 AC is applied. The Reaction against forced movement is the GM's."),
-  "item:dwarven-thrower": guided(
-    "The +3 to attack and damage rolls is applied. Throwing it, its return and the extra damage against Giants are the GM's."
+  "item:dwarven-thrower": enforced(
+    "The +3 to attack and damage rolls is applied, it is thrown 20/60 (inventory.ts weapon changes), and a ranged hit deals 1d8 Force more, 2d8 against a Giant. Only a Dwarf or a creature attuned to a Belt of Dwarvenkind attunes to it (attunement.ts); it flies back to its thrower's hand."
   ),
   "item:giant-slayer": enforced(
     "The +1 to attack and damage rolls and the extra 2d6 against Giants are applied, and a hit on a Giant opens its DC 15 Strength save against Prone (resolution/on-hit.ts)."
@@ -1195,8 +1197,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:helm-of-telepathy": guided(
     "Its Detect Thoughts and Suggestion casts are cast actions. The telepathy itself is the GM's."
   ),
-  "item:holy-avenger": guided(
-    "The +3 to attack and damage rolls and the extra 2d10 Radiant against Fiends and Undead are applied. The aura's Advantage on saves against spells for its wielder's allies is the GM's."
+  "item:holy-avenger": enforced(
+    "The +3 to attack and damage rolls and the extra 2d10 Radiant against Fiends and Undead are applied, and its 10-foot Emanation (30 feet for a level 17 Paladin) gives its wielder and its allies Advantage on saves against magic (saving-throws.ts magicSaveAuraClaims). Only a Paladin attunes to it (attunement.ts)."
   ),
   "item:iron-bands": guided(
     "The throw's attack roll is applied. Restraining the target on a hit, and the check to break free, are the GM's."
@@ -1220,8 +1222,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:pipes-of-haunting": guided(
     "The save against Frightened, with its repeat at the end of each turn, is applied. The immunity after a success is the GM's."
   ),
-  "item:quarterstaff-of-the-acrobat": guided(
-    "The +2 to attack and damage rolls is applied, and Attack Deflection is offered once a rest when a hit would land, adding 5 to AC against it (resolution/pending.ts). Its forms, its throw and Acrobatic Assist are the GM's."
+  "item:quarterstaff-of-the-acrobat": enforced(
+    "The +2 to attack and damage rolls and Advantage on Dexterity (Acrobatics) checks are applied, it is thrown 30/120, and Attack Deflection is offered once a rest when a hit would land (resolution/pending.ts). A Bonus Action makes it a rod or a pole (inventory.ts setItemForm), where it neither swings nor deflects."
   ),
   "item:ring-of-shooting-stars": guided(
     "Its at-will cantrips and the one-charge Shooting Stars are applied. Faerie Fire, the Lightning Spheres and the larger Shooting Stars are the GM's."
@@ -1238,14 +1240,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:rope-of-entanglement": guided(
     "The save against Restrained is applied. The check to escape the rope is the GM's."
   ),
-  "item:scarab-of-protection": guided(
-    "The +1 AC is applied. Advantage on saves against spells, and its Preservation, are the GM's."
+  "item:scarab-of-protection": enforced(
+    "The +1 AC and Advantage on saves against spells are applied, and Preservation turns a failed save against a Necromancy spell or an Undead into a success for a Reaction and one of its 12 charges, which never come back; the last crumbles it (roll-answers.ts, resolution/charges.ts)."
   ),
-  "item:scimitar-of-speed": guided(
-    "The +2 to attack and damage rolls is applied. The extra attack as a Bonus Action is the GM's."
+  "item:scimitar-of-speed": enforced(
+    "The +2 to attack and damage rolls is applied, and it offers an attack as a Bonus Action beside its own (equipment-derivation.ts)."
   ),
-  "item:spellguard-shield": guided(
-    "Spell attack rolls against its holder have Disadvantage (resolution/attack.ts). Advantage on saves against spells and other magical effects is the GM's."
+  "item:spellguard-shield": enforced(
+    "Spell attack rolls against its holder have Disadvantage (resolution/attack.ts), and its holder has Advantage on saves against spells and other magical effects (riders.ts)."
   ),
   "item:staff-of-charming": guided(
     "Its one-charge casts are cast actions, and roll-answers.ts offers to turn a failed save against an Enchantment spell aimed only at the holder into a success once a day. Turning the spell back on its caster is the GM's."
@@ -1275,10 +1277,10 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "It swings as a Quarterstaff, and a hit can spend a charge for 2d10 Necrotic and a DC 15 Constitution save against Disadvantage on Strength and Constitution checks and saves (resolution/hit-options.ts). The hour it lasts is the GM's."
   ),
   "item:rod-of-lordly-might": guided(
-    "It swings as a +3 Mace. Drain Life and Paralyze ride a melee hit and Terrify is an action, each once a day. The buttons' other forms, and Drain Life's healing, are the GM's."
+    "It swings as a +3 Mace; Drain Life and Paralyze ride a melee hit and Terrify is an action, each once a day. Its buttons are forms its holder picks for a Bonus Action (inventory.ts setItemForm): a flaming Longsword or Shortsword with 2d6 Fire and its light, a +3 Battleaxe or Spear, a pole or a battering ram (+10 to break through). Drain Life's healing, the pole's length and the north it finds are the GM's."
   ),
-  "item:sun-blade": guided(
-    "It swings as a +2 Finesse Longsword that deals Radiant damage, with 1d8 Radiant more against an Undead. The Bonus Action that makes the blade appear, and its sunlight, are the GM's."
+  "item:sun-blade": enforced(
+    "It swings as a +2 Finesse Longsword that deals Radiant damage, with 1d8 Radiant more against an Undead, and its blade sheds its sunlight. A Bonus Action puts the blade away to the hilt or brings it back (inventory.ts setItemForm). The radius its Magic action adjusts is the GM's."
   ),
   "item:sword-of-sharpness": guided(
     "A rolled 20 against a creature adds 14 Slashing damage and a level of Exhaustion (resolution/damage.ts, resolution/on-hit.ts). Maximized damage against an object is the GM's."
@@ -1304,14 +1306,50 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:wand-of-lightning-bolts": enforced(
     "Lightning Bolt at DC 15 on its charges, each charge past the first raising its level by 1 up to 3 (item-actions.ts); a 1 on the last charge's d20 destroys it (resolution/charges.ts)."
   ),
-  "item:wand-of-the-war-mage-1": guided(
-    "The +1 to spell attack rolls is applied. Ignoring Half Cover on a spell attack is the GM's, who sets the cover."
+  "item:wand-of-the-war-mage-1": enforced(
+    "The +1 to spell attack rolls is applied, and a spell attack roll sets the target's Half Cover aside (resolution/attack.ts)."
   ),
-  "item:wand-of-the-war-mage-2": guided(
-    "The +2 to spell attack rolls is applied. Ignoring Half Cover on a spell attack is the GM's, who sets the cover."
+  "item:wand-of-the-war-mage-2": enforced(
+    "The +2 to spell attack rolls is applied, and a spell attack roll sets the target's Half Cover aside (resolution/attack.ts)."
   ),
-  "item:wand-of-the-war-mage-3": guided(
-    "The +3 to spell attack rolls is applied. Ignoring Half Cover on a spell attack is the GM's, who sets the cover."
+  "item:wand-of-the-war-mage-3": enforced(
+    "The +3 to spell attack rolls is applied, and a spell attack roll sets the target's Half Cover aside (resolution/attack.ts)."
+  ),
+  "item:sword-of-life-stealing": guided(
+    "A rolled 20 is said with the hit (resolution/on-hit.ts). Its 15 Necrotic damage to a creature that is neither a Construct nor an Undead, and the Temporary Hit Points it gives, are the GM's."
+  ),
+  "item:potion-of-poison": guided(
+    "Drinking it deals its 4d6 Poison damage to the drinker. The DC 13 Constitution save against an hour of Poisoned, and its disguise, are the GM's: the GM names the row."
+  ),
+  "item:boots-of-speed": guided(
+    "A Bonus Action doubles its wearer's Speed (speed.ts) and gives Opportunity Attacks against it Disadvantage, for 10 minutes once a Long Rest. The minutes left when it ends early are the GM's to count."
+  ),
+  "item:thunderous-greatclub": guided(
+    "Its wearer's Strength is at least 20 (live-abilities.ts), a hit deals 1d8 Thunder more, Clap of Thunder's 30-foot Cone asks for the DC 15 Strength save against Prone, and Earthquake's once-a-day DC 20 Dexterity save against Prone is applied. Earthquake's Concentration save, its fissure and the damage to objects are the GM's."
+  ),
+  "item:oathbow": guided(
+    "Naming a sworn enemy marks it for 7 days, once a day, and the bow's ranged attacks against it have Advantage, set Half and Three-Quarters Cover aside and deal 3d6 Piercing more. Ignoring long range's Disadvantage, and the Disadvantage with other weapons while it lives, are the GM's."
+  ),
+  "item:energy-bow": guided(
+    "It binds to its Longbow or Shortbow with +1 to attack and damage rolls, and its arrows deal Force damage with no ammunition to spend (inventory.ts weapon changes). The arrows' light, Arrow of Restraint, Arrow of Transport and the Energy Ladder are the GM's."
+  ),
+  "item:ioun-stone": guided(
+    "The GM says which stone a found one is (item-records.ts), the bearer learns it on attuning, and two stones of different kinds attune as two items. Agility, Fortitude, Insight, Intellect, Leadership and Strength raise their score live (live-abilities.ts); Awareness and Protection are applied. Absorption, Greater Absorption, Mastery, Regeneration, Reserve and Sustenance are the GM's."
+  ),
+  "item:mace-of-terror": guided(
+    "Its 3 charges come back 1d3 at dawn, and each opens the DC 15 Wisdom save against Frightened for a minute on the creatures its wielder picks within 30 feet, repeated at the end of each turn. That a Frightened creature flees and only Dashes is the GM's."
+  ),
+  "item:bead-of-force": guided(
+    "Thrown up to 60 feet, it bursts in a 10-foot-radius Sphere: the DC 15 Dexterity save against 5d4 Force is applied, and the bead is used up. The sphere of force that traps those who failed is the GM's."
+  ),
+  "item:dust-of-sneezing-and-choking": guided(
+    "Thrown, it opens the DC 15 Constitution save against Incapacitated on its thrower and every creature in its 30-foot Emanation but Constructs, Elementals, Oozes, Plants and Undead, repeated at the end of each turn, and is used up. Suffocating is the GM's."
+  ),
+  "item:potion-of-vitality": guided(
+    "Drinking it ends the drinker's Exhaustion and the Poisoned condition. The next 24 hours of Hit Point Dice at their most are the GM's."
+  ),
+  "item:ring-of-elemental-command": guided(
+    "Elemental Bane's Advantage on attacks against Elementals and their Disadvantage against its wearer, and Elemental Compulsion's DC 18 save against Charmed, are applied. The GM says which plane a found ring is (item-records.ts): its Resistance, Immunity or speed, and its spells at DC 18 on 5 charges with their printed costs. The languages, breathing water and moving through earth are the GM's."
   ),
   "item:weapon-of-warning": guided(
     "Advantage on Initiative for its wielder is applied. The same for allies within 30 feet, and waking them, are the GM's."

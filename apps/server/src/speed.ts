@@ -43,13 +43,23 @@ function multipliedSpeed(actor: Actor, feet: number): number {
     : multiplied;
 }
 
-/** Current Speed in feet, before Dash: base minus 5 x exhaustion (floored at 0, so no debt carries), plus the
- *  standing `speed` riders, floored again, then doubled or halved where an effect does so. A Speed-0 condition returns
- *  0. Never writes `actor.speedFeet`. Null when base speed is unknown. */
+/** The Speed a standing `speed-minimum` rider sets when the creature's own is lower ("Your Speed becomes 30 feet unless
+ *  your Speed is higher", Boots of Striding and Springing), or 0. */
+function speedFloor(derivation: EquipmentDerivation): number {
+  const riders = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
+  return Math.max(
+    0,
+    ...riders.map((rider) => (rider.modifier.type === "speed-minimum" ? (rider.modifier.feet ?? 0) : 0))
+  );
+}
+
+/** Current Speed in feet, before Dash: base (raised to any `speed-minimum`) minus 5 x exhaustion (floored at 0, so no
+ *  debt carries), plus the standing `speed` riders, floored again, then doubled or halved where an effect does so. A
+ *  Speed-0 condition returns 0. Never writes `actor.speedFeet`. Null when base speed is unknown. */
 export function currentSpeedFeet(actor: Actor, derivation: EquipmentDerivation): number | null {
   if (actor.speedFeet === undefined) return null;
   if (speedZeroed(actor)) return 0;
-  const base = Math.max(0, actor.speedFeet - 5 * exhaustionLevel(actor));
+  const base = Math.max(0, Math.max(actor.speedFeet, speedFloor(derivation)) - 5 * exhaustionLevel(actor));
   return multipliedSpeed(actor, Math.max(0, base + riderSpeed(derivation)));
 }
 

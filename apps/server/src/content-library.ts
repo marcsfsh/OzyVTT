@@ -689,6 +689,17 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {}),
     // A manual's or tome's study, as its text prints it, so the GM's sheet can offer it.
     ...(item.study ? { study: { ...item.study } } : {}),
+    // The kinds its text lists (an Ioun Stone's stones) or the forms its holder picks (a Rod of Lordly Might's), by
+    // name only: what a carried copy is stays on its row.
+    ...(item.variants
+      ? {
+          variants: item.variants.map((variant) => ({ id: variant.id, name: variant.name })),
+          variantChoice: {
+            by: item.variantChoice?.by ?? ("gm" as const),
+            ...(item.variantChoice?.activation ? { activation: item.variantChoice.activation } : {})
+          }
+        }
+      : {}),
     // How it sheds light, as its own text says: whether it is lit on the row, has a hood to lower or a Cone to aim.
     ...(item.light
       ? {

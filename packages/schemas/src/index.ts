@@ -800,6 +800,14 @@ export const ModifierSchema = z
       .describe(
         'A flat AC rider, read live from every carrier (a feature or feat as much as an item), so it follows the armor worn now. `whileArmored` is the one bounded condition the SRD\'s printed bonuses need (the Defense fighting style reads "While you\'re wearing Light, Medium, or Heavy armor"); it is a plain boolean with no condition language, and defaults to the unconditional bonus every earlier record meant. `when: [{"type": "while-armored"}]` now says the same thing in the general vocabulary; the boolean stays because shipped bundles author it, and a collector normalises it into that trigger.'
       ),
+    /** "If you aren't wearing armor, your base Armor Class is 15 plus your Dexterity modifier" (Robe of the Archmagi): a
+     *  way to work out AC while no body armor is worn, a Shield adding, chosen like Unarmored Defense. */
+    z
+      .object({ type: z.literal("base-armor-class"), base: z.number().int().min(11).max(20), ...riderGate })
+      .strict()
+      .describe(
+        "A way to work out the bearer's AC while it wears no body armor: `base` plus its Dexterity modifier, a Shield adding (Robe of the Archmagi: 15). It is chosen like Unarmored Defense, so the best way counts, and other AC bonuses add to it. Read live from items; refused on an effect, whose grant says `baseArmorClass` instead."
+      ),
     /** `proficiencyBonus` adds the creature's Proficiency Bonus on top of `amount` (Alert's Initiative Proficiency). */
     z
       .object({
@@ -1179,6 +1187,7 @@ export type Modifier = z.infer<typeof ModifierSchema>;
  */
 export const EFFECT_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze([
   "attunement-slots",
+  "base-armor-class",
   "ability-score",
   "hit-points-per-level",
   "armor-class",
@@ -3112,6 +3121,8 @@ export const OnHitRiderSchema = z
           .array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict())
           .max(2)
           .optional(),
+        /** A success takes half the failure's damage (Ammunition of Slaying's 6d10 Force). */
+        halfOnSuccess: z.literal(true).optional(),
         repeatSave: z.literal(true).optional(),
         endsOnDamage: z.literal(true).optional()
       })

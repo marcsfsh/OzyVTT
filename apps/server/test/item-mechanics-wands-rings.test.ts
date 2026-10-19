@@ -300,7 +300,15 @@ describe("an item action with a printed DC, a condition read off its prose, and 
     const action = effectiveActions(definition, actor, catalog).find(
       (entry) => entry.id === "item-rod-of-rulership-command-obedience"
     )!;
-    expect(action.save).toEqual({ ability: "wis", dc: 15, successDamage: "none", failureConditions: ["charmed"] });
+    // Charmed for 8 hours, ended early by harm from its user's side.
+    expect(action.save).toEqual({
+      ability: "wis",
+      dc: 15,
+      successDamage: "none",
+      failureConditions: ["charmed"],
+      failureDuration: { type: "minutes", minutes: 480 },
+      endsOnSourceSideDamage: true
+    });
     expect(action.uses).toEqual({ limit: 1, per: "long-rest" });
 
     resolveDefinitionAction(

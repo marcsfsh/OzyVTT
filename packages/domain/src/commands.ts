@@ -1188,6 +1188,24 @@ export const ItemSetLightSchema = z
     (change) => change.lit !== undefined || change.hoodLowered !== undefined || change.facingDegrees !== undefined,
     { message: "Say whether to light it, hood it or aim it." }
   );
+/** Its holder puts a carried item in one of its forms (a Rod of Lordly Might's flame blade), or back in its own form
+ *  with null. */
+export const ItemSetFormSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    variantId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const VisionResetExploredSchema = z
   .object({
     commandId: z.uuid(),

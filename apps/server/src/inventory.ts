@@ -1,5 +1,5 @@
 import type { Actor, GameState } from "@vtt/domain";
-import type { ItemWeaponChanges, SpellReference } from "@vtt/content-srd-5.2.1";
+import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { catalogIdOf, type ActorDefinition, type Currency, type InventoryItem } from "@vtt/schemas";
 import { effectiveSlot, wornBodyArmor } from "@vtt/rules-5e";
 import { refreshBaseArmorClass, spellSlotMaxima, storedArmorClass } from "./actor-roster.js";
@@ -13,8 +13,19 @@ import { itemRowOfAction, rollStartingCharges } from "./item-charges.js";
 import { liveHitPointBonus } from "./live-abilities.js";
 import { scrollSpellProblem } from "./scrolls.js";
 import { endBindingsOfGoneRows } from "./bound-weapons.js";
-import { rowRecord, variantOf, withVariant } from "./item-records.js";
+import {
+  copyKeyOf,
+  rowRecord,
+  rowWeaponFor,
+  variantOf,
+  variantPickedBy,
+  withVariant,
+  withWeaponChanges
+} from "./item-records.js";
+import { requireActorAccess, type Initiator } from "./authorization.js";
+import { spendBonusAction } from "./item-light.js";
 import { withVariantPick } from "./item-variants.js";
+import { attunementRefusal } from "./attunement.js";
 
 const MAX_ITEMS = 200;
 /** SRD: "a creature can't be attuned to more than three magic items at a time"; Use Magic Device raises it. */
@@ -107,8 +118,9 @@ function enforceEquipRules(
   const others = actor.inventory.filter((entry) => entry.id !== incoming.id);
   if (incoming.attuned && incoming.quantity > 0 && needsAttunement(incoming, deps)) {
     // SRD Attunement: "You can't attune to more than one copy of an item."
-    const copy = others.find((entry) => entry.attuned && catalogIdOf(entry) === catalogIdOf(incoming));
-    if (copy && deps.catalog?.equipmentRecord(catalogIdOf(incoming)))
+    const record = deps.catalog?.equipmentRecord(catalogIdOf(incoming));
+    const copy = others.find((entry) => entry.attuned && copyKeyOf(record, entry) === copyKeyOf(record, incoming));
+    if (copy && record)
       throw new CommandRejectedError(
         `${actor.name} is already attuned to a ${copy.name}. A creature can't attune to more than one copy of an item.`
       );
@@ -329,25 +341,6 @@ function bindTemplateStats(item: InventoryItem, deps: InventoryDeps, stored?: In
   return { ...bare, baseId, weapon: formed ?? withWeaponChanges(weaponStatsFrom(base!.weapon)!, record.weaponChanges) };
 }
 
-/** What a magic weapon changes about its bound base (SRD: a Dwarven Thrower "has the Thrown property with a normal range
- *  of 20 feet and a long range of 60 feet"; an Energy Bow's arrows deal Force damage and need no ammunition). */
-export function withWeaponChanges(
-  weapon: NonNullable<InventoryItem["weapon"]>,
-  changes: ItemWeaponChanges | undefined
-): NonNullable<InventoryItem["weapon"]> {
-  if (!changes) return weapon;
-  const properties = [...(weapon.properties ?? []), ...(changes.addProperties ?? [])].filter(
-    (property, index, all) => all.indexOf(property) === index && !(changes.removeProperties ?? []).includes(property)
-  );
-  return {
-    ...weapon,
-    ...(changes.damageType ? { damageType: changes.damageType } : {}),
-    ...(changes.rangeFeet !== undefined ? { rangeFeet: changes.rangeFeet } : {}),
-    ...(changes.longRangeFeet !== undefined ? { longRangeFeet: changes.longRangeFeet } : {}),
-    ...(changes.addProperties || changes.removeProperties ? { properties } : {})
-  };
-}
-
 type CatalogRecord = NonNullable<ReturnType<NonNullable<InventoryDeps["catalog"]>["equipmentRecord"]>>;
 
 /** An inventory row's weapon block from a catalog record, or undefined when the record has no usable one. */
@@ -438,6 +431,18 @@ export function setInventoryItem(
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   enforceCurse(actor, item, deps);
   enforceEquipRules(actor, item, definition, deps);
+  // When attunement may start or end is a player's rule; the GM attunes anyone at any time.
+  if (deps.role === "player") {
+    const refusal = attunementRefusal(
+      state,
+      actor,
+      item,
+      actor.inventory.find((entry) => entry.id === item.id),
+      definition,
+      deps.catalog?.equipmentRecord(catalogIdOf(item))
+    );
+    if (refusal) throw new CommandRejectedError(refusal);
+  }
   // What a worn item does to Constitution moves the Hit Point maximum; measured before and after the write.
   const hitPointsBefore = definition ? liveHitPointBonus(actor, definition, deps.catalog) : 0;
   const before = actor.inventory.find((entry) => entry.id === item.id);
@@ -622,3 +627,41 @@ export function setCurrency(state: GameState, actorId: string, currency: Currenc
 }
 
 export { itemIsActive };
+
+export type ItemFormChange = Readonly<{ actorId: string; itemId: string; variantId: string | null }>;
+
+/** Its holder puts the item in another form (a Rod of Lordly Might's button, a Quarterstaff of the Acrobat turned into
+ *  a pole), or back in its own with null, spending what the record says it costs. Returns the table's sentence. */
+export function setItemForm(
+  state: GameState,
+  change: ItemFormChange,
+  initiator: Initiator,
+  catalog: EquipmentCatalog,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): string {
+  requireActorAccess(initiator, state, change.actorId, "inventory");
+  const actor = state.actors.find((candidate) => candidate.id === change.actorId);
+  if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  const row = actor.inventory.find((entry) => entry.id === change.itemId && entry.quantity > 0);
+  if (!row) throw new CommandRejectedError("That item isn't carried.");
+  const record = catalog.equipmentRecord(catalogIdOf(row));
+  if (!record?.variants || variantPickedBy(record) !== "holder")
+    throw new CommandRejectedError(`${row.name} has no forms its holder can change.`);
+  if (!row.equipped) throw new CommandRejectedError(`${actor.name} must hold ${row.name} to change its form.`);
+  const variant =
+    change.variantId === null ? null : record.variants.find((candidate) => candidate.id === change.variantId);
+  if (variant === undefined) throw new CommandRejectedError(`${row.name} has no form "${change.variantId}".`);
+  if ((row.variantId ?? null) === (variant?.id ?? null))
+    throw new CommandRejectedError(`${row.name} is already in that form.`);
+  if (record.variantChoice?.activation === "bonus-action")
+    spendBonusAction(state, actor, initiator, `Change the form of ${row.name}`);
+  const { variantId: _old, weapon: _weapon, ...rest } = row;
+  const formed: InventoryItem = variant ? { ...rest, variantId: variant.id } : rest;
+  // The form's weapon block, or none, replaces the row's; the item's own comes back with its own form.
+  const weapon = rowWeaponFor(catalog, record, formed);
+  const next: InventoryItem = weapon ? { ...formed, weapon } : formed;
+  actor.inventory = actor.inventory.map((entry) => (entry.id === row.id ? next : entry));
+  // A form can move the bearer's Armor Class (a Defender's bonus moved to AC).
+  reconcileEquipment(actor, actor.definitionId ? resolveDefinition(actor.definitionId) : undefined, { catalog });
+  return `${actor.name} turns ${row.name} into ${variant ? variant.name : "its own form"}.`;
+}

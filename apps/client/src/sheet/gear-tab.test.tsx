@@ -39,7 +39,16 @@ const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) =
   attunement: item.attunement ?? null,
   ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
   ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {}),
-  ...(item.study ? { study: { ...item.study } } : {})
+  ...(item.study ? { study: { ...item.study } } : {}),
+  ...(item.variants
+    ? {
+        variants: item.variants.map((variant) => ({ id: variant.id, name: variant.name })),
+        variantChoice: {
+          by: item.variantChoice?.by ?? ("gm" as const),
+          ...(item.variantChoice?.activation ? { activation: item.variantChoice.activation } : {})
+        }
+      }
+    : {})
 }));
 /** The spell reference's fields a scroll's spell list reads. */
 const SPELLS = loadSpells().map((spell) => ({
@@ -546,5 +555,88 @@ describe("an item's charge pools", () => {
     await user.click(await screen.findByText("Staff of Thunder and Lightning"));
     expect(await screen.findByText(/Lightning · 1 of 1 left/)).toBeTruthy();
     expect(screen.getByText(/Thunder · 0 of 1 left/)).toBeTruthy();
+  });
+});
+
+describe("an item's kinds, forms and attunement prerequisites", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const holding = (row: Record<string, unknown>) =>
+    hero({ inventory: [{ quantity: 1, equipped: true, attuned: false, ...row }] });
+
+  it("says who may attune a Holy Avenger, and that attuning takes a Short Rest", async () => {
+    serve();
+    const actor = holding({
+      id: "holy-avenger",
+      name: "Holy Avenger",
+      baseId: "longsword",
+      magic: { isMagic: true, attunementRequired: true, slot: "weapon" }
+    });
+    render(<CharacterSheet actor={actor} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await openGear(user);
+    await user.click(rowOf(/Holy Avenger/));
+    expect(
+      await screen.findByText("Requires attunement by a Paladin. Attune or end it during a Short Rest.")
+    ).toBeTruthy();
+  });
+
+  it("lets the GM say which stone an Ioun Stone is, in violet", async () => {
+    serve();
+    const actor = holding({
+      id: "ioun-stone",
+      name: "Ioun Stone",
+      magic: { isMagic: true, attunementRequired: true, slot: "wondrous" }
+    });
+    render(<CharacterSheet actor={actor} role="gm" state={stateWith(actor)} onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    const user = userEvent.setup();
+    await openGear(user);
+    await user.click(rowOf("Ioun Stone"));
+    const drawer = within(screen.getByRole("dialog", { name: "Ioun Stone" }));
+    await user.selectOptions(await drawer.findByRole("combobox", { name: "Kind of Ioun Stone" }), "protection");
+    expect(sent("character:set-inventory").at(-1)).toMatchObject({
+      actorId: HERO,
+      item: { id: "ioun-stone", variantId: "protection" }
+    });
+  });
+
+  it("names the stone on its row once the bearer knows it", async () => {
+    serve();
+    render(
+      <CharacterSheet
+        actor={holding({ id: "ioun-stone", name: "Ioun Stone", attuned: true, variantId: "insight" })}
+        role="player"
+        onClose={() => {}}
+      />,
+      { wrapper: ToastProvider }
+    );
+    await openGear(userEvent.setup());
+    expect(await screen.findByText("Ioun Stone (Insight)")).toBeTruthy();
+  });
+
+  it("offers a Rod of Lordly Might's forms to its holder, and sends the one picked", async () => {
+    serve();
+    const actor = holding({
+      id: "rod-of-lordly-might",
+      name: "Rod of Lordly Might",
+      attuned: true,
+      variantId: "spear",
+      magic: { isMagic: true, attunementRequired: true, slot: "held" }
+    });
+    render(<CharacterSheet actor={actor} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await openGear(user);
+    await user.click(rowOf(/Rod of Lordly Might/));
+    const forms = within(await screen.findByRole("group", { name: "Form of Rod of Lordly Might" }));
+    expect(forms.getByRole("button", { name: "Spear" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("Changing it takes a Bonus Action in a fight.")).toBeTruthy();
+    await user.click(forms.getByRole("button", { name: "Battleaxe" }));
+    expect(sent("item:set-form")).toEqual([
+      expect.objectContaining({ actorId: HERO, itemId: "rod-of-lordly-might", variantId: "battleaxe" })
+    ]);
+    await user.click(forms.getByRole("button", { name: "Its own" }));
+    expect(sent("item:set-form").at(-1)).toMatchObject({ variantId: null });
   });
 });

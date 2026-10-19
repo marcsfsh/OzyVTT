@@ -67,8 +67,11 @@ import {
   type ConditionImmunitySource,
   type EffectNarration
 } from "./effects.js";
+import { areAllies } from "./creature-sides.js";
+import { rowRecord } from "./item-records.js";
 import {
   deriveEquipment,
+  itemIsActive,
   rollModeClaims,
   type EquipmentCatalog,
   type EquipmentDerivation,
@@ -337,6 +340,48 @@ function traitSaveClaims(
       : []),
     ...(authority ? [authority] : [])
   ];
+}
+
+/**
+ * An item's aura of Advantage on saves against magic (SRD Holy Avenger: "You and all creatures Friendly to you in the
+ * Emanation have Advantage on saving throws against spells and other magical effects"), for a save against magic: the
+ * bearer's own, or an ally's within its reach on the map. A bearer hidden from the table gives a visible creature
+ * nothing, which would reveal it.
+ */
+export function magicSaveAuraClaims(
+  state: GameState,
+  target: Actor,
+  against: SaveSource,
+  context: AuraContext
+): Array<{ source: string; label: string }> {
+  if (!against.magical || !context.catalog) return [];
+  const claims: Array<{ source: string; label: string }> = [];
+  let hidden: ((actorId: string) => boolean) | null = null;
+  for (const bearer of state.actors) {
+    if (bearer.archived || bearer.hp.current <= 0) continue;
+    for (const row of bearer.inventory) {
+      const record = rowRecord(context.catalog, row);
+      const aura = record?.magicSaveAura;
+      if (!aura || !itemIsActive(row, record)) continue;
+      if (bearer.id !== target.id) {
+        if (!areAllies(bearer, target, context.resolveDefinition)) continue;
+        hidden ??= tableHiddenCheck(state, context);
+        if (hidden(bearer.id) && !hidden(target.id)) continue;
+        const definition = bearer.definitionId ? context.resolveDefinition(bearer.definitionId) : undefined;
+        const level = aura.widerAt
+          ? (definition?.character?.classes.find((entry) => entry.id === aura.widerAt!.classId)?.level ?? 0)
+          : 0;
+        const feet = aura.widerAt && level >= aura.widerAt.level ? aura.widerAt.feet : aura.feet;
+        const distance = context.distanceFeet?.(bearer.id, target.id) ?? null;
+        if (distance === null || distance > feet + 1e-6) continue;
+      }
+      claims.push({
+        source: "item-aura",
+        label: bearer.id === target.id ? record!.name : `${bearer.name}'s ${record!.name}`
+      });
+    }
+  }
+  return claims;
 }
 
 /** SRD Magic Resistance: "Advantage on saving throws against spells and other magical effects"; Greater Magic
@@ -862,6 +907,7 @@ export function answerSave(
     if (pending.disadvantageFrom)
       sources.disadvantage.push({ source: "disadvantage-from", label: pending.disadvantageFrom });
     sources.advantage.push(...traitSaveClaims(state, target, definition, deps));
+    sources.advantage.push(...magicSaveAuraClaims(state, target, saveSourceOf(pending), deps));
     // Sunlight Weakness: Disadvantage on D20 Tests while it stands in sunlight.
     const sightContent = { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
     for (const name of lightSensitivities(state, target, "save", sightRules(state, sightContent), sightContent))

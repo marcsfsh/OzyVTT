@@ -221,6 +221,7 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "ability-score-minimum": "standing", // live-abilities.ts raises the score every rule reads, from items and effects
   "speed-minimum": "standing", // speed.ts, a floor under the movement budget
   "ignores-cover": "at-its-moment", // resolution/attack.ts sets the target's cover aside on the attack roll
+  "base-armor-class": "standing", // actor-roster.ts storedArmorClass offers it like Unarmored Defense
   "no-critical-hits": "at-its-moment", // resolution/attack.ts turns a Critical Hit on the bearer into a hit
   sense: "vision" // vision/senses.ts reads it live for dynamic vision, from every carrier
 };

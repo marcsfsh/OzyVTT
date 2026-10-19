@@ -656,7 +656,7 @@ export const ItemChargesSchema = z
   .strict();
 export type ItemCharges = z.infer<typeof ItemChargesSchema>;
 
-/** Attunement. `restrictedTo` is advisory: shown on the sheet, never enforced. */
+/** Attunement, and who may attune: a player attunes only a creature that meets one of `restrictedTo`. */
 export const ItemAttunementSchema = z
   .object({
     required: z.boolean().default(false),
@@ -664,11 +664,13 @@ export const ItemAttunementSchema = z
       .array(ContentIdSchema)
       .max(8)
       .default([])
-      .describe("Class or species ids the item is meant for. Advisory only")
+      .describe(
+        "Who may attune, any one of: a class id, a species id, spellcaster, or creature-attuned-to-a-<item id>. Empty: anyone"
+      )
   })
   .strict()
   .describe(
-    'Attunement. `restrictedTo` matches class ids or a species id and is advisory: shown on the sheet ("Requires attunement by a cleric"), never a block: it is an open slug set, blocking on a fuzzy match would be wrong, and a GM handing a player a restricted item on purpose is a normal table event, with nothing to refuse.'
+    'Attunement. `restrictedTo` is the printed prerequisite ("Requires Attunement by a Cleric or Paladin"), any one of which lets a creature attune: a class it has a level in, its species or lineage id, `spellcaster` (a sheet with spellcasting), or `creature-attuned-to-a-<item id>` (attuned to that item). The sheet shows it beside the Attune control, and a player\'s attune is refused when the character meets none. The GM may attune anyone, so handing a restricted item over on purpose still works.'
   );
 export type ItemAttunement = z.infer<typeof ItemAttunementSchema>;
 
@@ -781,12 +783,16 @@ export const ItemVariantSchema = z
     light: ItemLightSchema.optional(),
     weapon: EquipmentWeaponStatsSchema.nullable().optional(),
     onHit: z.array(OnHitRiderSchema).max(4).optional(),
-    /** In this form only its own riders apply, none of the record's (a Quarterstaff of the Acrobat folded into a rod). */
-    replacesRiders: z.literal(true).optional()
+    /** In this form its own modifiers, hit riders and light stand in for the record's (a Rod of Lordly Might's flame
+     *  blade: 2d6 Fire, not the Mace's +3); the record's actions and casts stay. */
+    replacesRiders: z.literal(true).optional(),
+    /** The record's own actions and casts can't be used in this form (a Quarterstaff of the Acrobat's Attack
+     *  Deflection is in its Quarterstaff form only). */
+    suspendsActions: z.literal(true).optional()
   })
   .strict()
   .describe(
-    "One kind or form of the item, with the riders it adds to the record's own while a carried copy is that kind, or in place of them with `replacesRiders`. A `weapon` block is how the copy swings in that form; null leaves it no weapon there."
+    "One kind or form of the item, with the riders it adds to the record's own while a carried copy is that kind. With `replacesRiders` its modifiers, hit riders and light stand in for the record's instead, and the record's actions, casts, effects and grants stay; with `suspendsActions` the record's actions and casts are not offered in this form. A `weapon` block is how the copy swings in that form; null leaves it no weapon there."
   );
 export type ItemVariant = z.infer<typeof ItemVariantSchema>;
 
@@ -828,11 +834,13 @@ export const ItemWeaponChangesSchema = z
       .max(4)
       .optional(),
     rangeFeet: z.number().int().min(5).max(600).optional(),
-    longRangeFeet: z.number().int().min(5).max(1200).optional()
+    longRangeFeet: z.number().int().min(5).max(1200).optional(),
+    /** Damage types its wielder may deal on a hit in place of the weapon's own (a Javelin of Lightning: Lightning). */
+    damageTypeOptions: z.array(DamageTypeSchema).min(1).max(2).optional()
   })
   .strict()
   .describe(
-    "What the item changes about the base weapon it is bound to, copied onto the bound row: its damage type, properties added or taken away, and a normal and long range (a Dwarven Thrower's Thrown 20/60)"
+    "What the item changes about the base weapon it is bound to, copied onto the bound row: its damage type, properties added or taken away, and a normal and long range (a Dwarven Thrower's Thrown 20/60). `damageTypeOptions` are types its wielder may pick on each hit in place of the weapon's own (a Javelin of Lightning's Lightning)"
   );
 export type ItemWeaponChanges = z.infer<typeof ItemWeaponChangesSchema>;
 
@@ -1035,6 +1043,35 @@ export const EquipmentReferenceSchema = z
     variantChoice: ItemVariantChoiceSchema.optional().describe(
       "Who picks a copy's kind: the GM (absent, or by gm) or its holder (by holder), paying `activation` in a fight"
     ),
+    /** "While you hold the drawn weapon, it creates a 10-foot Emanation originating from you. You and all creatures
+     *  Friendly to you in the Emanation have Advantage on saving throws against spells and other magical effects"
+     *  (Holy Avenger). */
+    magicSaveAura: z
+      .object({
+        feet: z.number().int().min(5).max(60),
+        /** A wider Emanation from a class level ("If you have 17 or more levels in the Paladin class, the size of the
+         *  Emanation increases to 30 feet"). */
+        widerAt: z
+          .object({
+            classId: ContentIdSchema,
+            level: z.number().int().min(1).max(20),
+            feet: z.number().int().min(5).max(120)
+          })
+          .strict()
+          .optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "While the item is in use, its bearer and the creatures allied with it within `feet` have Advantage on saving throws against spells and other magical effects (Holy Avenger); `widerAt` widens it from a class level. Read as each save is rolled, from the map's distances"
+      ),
+    /** "You can make one attack with it as a Bonus Action on each of your turns" (Scimitar of Speed). */
+    bonusActionAttack: z
+      .literal(true)
+      .optional()
+      .describe(
+        "Its wielder can make one attack with it as a Bonus Action on each of their turns (Scimitar of Speed), offered beside its own attack. Needs a `weapon` block or `appliesTo`"
+      ),
     weaponChanges: ItemWeaponChangesSchema.optional().describe(
       "What a magic weapon changes about its base: the bound row deals this damage type, gains or loses these properties and has this range (a Dwarven Thrower is Thrown 20/60, an Energy Bow deals Force and needs no ammunition)"
     ),

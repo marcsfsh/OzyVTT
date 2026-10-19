@@ -255,7 +255,24 @@ const LABELS: Readonly<Record<string, string>> = {
   holds: "what a creature in it holds",
   revives: "Hit Points regained at 0",
   drifts: "feet it drifts each turn",
-  untilCasterNextTurnEnd: "lasts until the end of the caster's next turn"
+  untilCasterNextTurnEnd: "lasts until the end of the caster's next turn",
+  variants: "kinds of the item",
+  variantChoice: "who picks its kind",
+  replacesRiders: "kind replaces the item's own modifiers",
+  suspendsActions: "item's actions set aside in this form",
+  weaponChanges: "changes to its weapon",
+  damageTypeOptions: "damage types it can deal instead",
+  bonusActionAttack: "Bonus Action attack",
+  magicSaveAura: "aura of Advantage on saves against magic",
+  widerAt: "wider aura from a class level",
+  addProperties: "properties it adds",
+  removeProperties: "properties it removes",
+  longRangeFeet: "long range",
+  score: "score",
+  base: "base Armor Class",
+  ignoresArmor: "armor takes no Speed",
+  degree: "cover it ignores",
+  activation: "action it takes"
 };
 /** A key whose words depend on what holds it: a weapon's category is its weapon kind, as the editor labels it. */
 const NESTED_LABELS: Readonly<Record<string, string>> = { "weapon.category": "weapon kind" };
@@ -327,6 +344,11 @@ const CUSTOM_REWRITES: ReadonlyArray<readonly [RegExp, (owner: string | null, la
     (owner) => `${owner ?? "This part"} has both one choice and a list of choices. Keep one of the two.`
   ],
   [/^Author `options` alone/, () => "The options already name what can be picked, so remove the separate list."],
+  [/^Each kind of the item needs its own id/, () => "Two kinds of the item share one id. Give each its own."],
+  [
+    /^Who picks the item's kind needs kinds/,
+    () => "The item says who picks its kind but has no kinds to pick from. Add its kinds, or remove who picks."
+  ],
   [/^Duplicate option id/, (owner) => `Two options ${owner ? `of ${owner} ` : ""}share one id. Give each its own.`],
   [/^Level table row \d+ must be level/, () => "The level table must list levels 1 to 20 in order."],
   [

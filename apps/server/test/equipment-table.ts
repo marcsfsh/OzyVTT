@@ -175,9 +175,18 @@ export function catalogRow(id: string, over: Partial<InventoryItem> = {}): Inven
   });
 }
 
-/** Writes one row as the given role would. */
+/** Writes one row as the given role would. A player attunes or ends attunement during a Short Rest, as the rules
+ *  ask, so a write that changes it is made in one. */
 export function write(table: Table, actorId: string, item: InventoryItem, role: "gm" | "player" = "player"): void {
-  setInventoryItem(table.state, actorId, item, table.resolve, { catalog, role });
+  const stored = table.state.actors.find((actor) => actor.id === actorId)?.inventory.find((row) => row.id === item.id);
+  const rest = table.state.rest;
+  if (role === "player" && item.attuned !== (stored?.attuned ?? false))
+    table.state.rest = { ...rest, shortRest: { actorIds: [actorId], done: [] } };
+  try {
+    setInventoryItem(table.state, actorId, item, table.resolve, { catalog, role });
+  } finally {
+    table.state.rest = rest;
+  }
 }
 
 /** The stored row, changed by `over` (Equip, Attune, quantity). */
