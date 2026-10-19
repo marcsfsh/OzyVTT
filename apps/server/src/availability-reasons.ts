@@ -167,6 +167,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "target.unseen": () => "You can't see that creature.",
   "target.outside-area": () => "Those creatures don't fit in one of its areas.",
   "target.not-allowed": () => "It can't affect that creature.",
+  "target.revival": () => "It can't bring that creature back.",
   "attack.hit-option-unqualified": () => "That hit can't carry it.",
   "condition.charmed-charmer": () => "You can't attack the creature that charmed you.",
   "slots.none-remaining": slotsReason,

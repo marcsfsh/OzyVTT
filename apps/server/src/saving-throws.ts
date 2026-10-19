@@ -46,6 +46,7 @@ import {
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
 import { applyDamageDetailed, previewDamage, adjustableActor, healActor, killOutright } from "./hit-points.js";
 import { openDamageWindow } from "./damage-window.js";
+import { applyHitPointBand, banishOnFailure, hitPointBandOf } from "./fatal-saves.js";
 import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
@@ -486,7 +487,14 @@ function killOnFailure(
   pending: PendingSave,
   deps: SaveAnswerDependencies
 ): EffectNarration[] {
-  const events = killOutright(state, target.id, pending.actionName);
+  const events = killOutright(state, target.id, pending.actionName, {
+    withoutDamage: true,
+    deps: {
+      resolveDefinition: deps.resolveDefinition,
+      rollDie: deps.random,
+      ...(deps.catalog ? { catalog: deps.catalog } : {})
+    }
+  });
   const formula = pending.failureKills?.sourceRegains;
   const source = state.actors.find((actor) => actor.id === pending.sourceActorId);
   if (!formula || !source || source.hp.current <= 0) return events;
@@ -877,8 +885,11 @@ export function answerSave(
     !isIncapacitated(target) &&
     hasEvasion(target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined);
   const halved = success !== evasion;
-  const outcomeParts =
-    parts && parts.length > 0
+  // A failure that acts by the target's Hit Points (Divine Word, Slaying Bow) does its band's outcome instead.
+  const band = success ? null : hitPointBandOf(pending, target);
+  const outcomeParts = band
+    ? []
+    : parts && parts.length > 0
       ? success && (!pending.halfOnSuccess || evasion)
         ? []
         : halved
@@ -894,7 +905,9 @@ export function answerSave(
           ? Math.floor(proposedTotal / 2)
           : proposedTotal;
   const outcomeCondition =
-    !success && (pending.conditionIds.length > 0 || (pending.onFailEffect?.linkedConditionIds.length ?? 0) > 0);
+    !success &&
+    band === null &&
+    (pending.conditionIds.length > 0 || (pending.onFailEffect?.linkedConditionIds.length ?? 0) > 0);
 
   // Preview (commit=false): the roll is recorded so everyone sees it, but nothing is applied and the
   // save stays open until the answerer confirms. The damage is weighed through the target's defences, so the
@@ -1037,7 +1050,34 @@ export function answerSave(
       events.push(...endEffectIfPresent(state, reference.actorId, reference.effectId));
   }
   // A committed failure applies the declared source-linked effect (a grapple, a timed or Concentration condition).
-  if (!success && pending.onFailEffect)
+  if (band)
+    events.push(
+      ...applyHitPointBand(
+        state,
+        target,
+        band,
+        pending,
+        {
+          resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
+          ...(deps.catalog ? { catalog: deps.catalog } : {}),
+          newId: deps.newRollId,
+          now: deps.now,
+          rollDie: deps.random
+        },
+        `${commandId}:${saveId}:band`
+      )
+    );
+  if (!success && pending.failureBanishes)
+    events.push(
+      ...banishOnFailure(
+        state,
+        target,
+        pending,
+        target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined,
+        `${commandId}:${saveId}:banished`
+      )
+    );
+  if (!success && band === null && pending.onFailEffect)
     events.push(
       ...applyFailureEffect(state, target.id, pending.onFailEffect, `${commandId}:${saveId}:fail`, immunities)
     );

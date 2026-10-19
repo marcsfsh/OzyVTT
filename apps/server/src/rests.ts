@@ -20,6 +20,8 @@ import { passGameTime } from "./game-time.js";
 import { dawnPoolKeys, timedSpent, type ClockDeps } from "./clock-pools.js";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { openPreparation } from "./spellcasting.js";
+import { HIT_DICE_DOUBLED_TAG } from "./death-saves.js";
+import { easeOrdeals } from "./death.js";
 import { healActor, RELENTLESS_RAGE_KEY } from "./hit-points.js";
 import { gainHeroicInspiration } from "./heroic-inspiration.js";
 import { chargesAfterDawn, neverRegained } from "./item-charges.js";
@@ -68,7 +70,8 @@ export function spendHitDice(
   faces: readonly number[],
   scope: Initiator,
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
-  count: number = faces.length
+  count: number = faces.length,
+  catalog?: EquipmentCatalog
 ): { healed: number; events: EffectNarration[]; conModifier: number } {
   requireActorAccess(scope, state, actorId, "resource");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
@@ -88,7 +91,10 @@ export function spendHitDice(
     );
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   const conModifier = definition ? scoreModifier(definition.abilityScores.con) : 0;
-  const healed = faces.reduce((sum, face) => sum + Math.max(1, face + conModifier), 0);
+  // A Periapt of Wound Closure doubles what each die restores.
+  const doubled =
+    deriveEquipment(actor, definition, catalog).context.effectTags?.includes(HIT_DICE_DOUBLED_TAG) === true;
+  const healed = faces.reduce((sum, face) => sum + Math.max(1, face + conModifier) * (doubled ? 2 : 1), 0);
   const events = healActor(state, actorId, healed, scope);
   // Decrement the pool die by die: a Fighter 3 / Wizard 2 spends its d10s before its d6s.
   actor.hitDice = makeHitDicePool(spendFromPool(actor.hitDice.entries, faces.length));
@@ -242,7 +248,8 @@ export function applyRest(
   // Eight hours with sleep: Concentration ends and what lasts less runs out; "until ended" ones (a curse) stay.
   events.push(
     ...endEffectsAtLongRest(state, actorId, clockMoved, holdsMaximumAtRest(actor)),
-    ...endEffectsAtRest(state, actorId, "long")
+    ...endEffectsAtRest(state, actorId, "long"),
+    ...easeOrdeals(state, actor)
   );
   // A curse that bars healing ("The target can't regain Hit Points", a mummy's) outlasts the rest and keeps them.
   const barred = actor.effects.find(

@@ -154,9 +154,7 @@
      "successDamage": "none",
      "failureConditions": [
       "charmed"
-     ],
-     "repeatOnDamage": {},
-     "endsWhenSourceDies": true
+     ]
     },
     "damage": [],
     "targets": {
@@ -183,28 +181,8 @@
   },
   "traitMechanics": [
    {
-    "kind": "aura",
-    "name": "Mucus Cloud",
-    "trigger": "bearer-turn-end",
-    "rangeFeet": 5,
-    "affects": "all",
-    "underwaterOnly": true,
-    "save": {
-     "ability": "con",
-     "dc": 14,
-     "successDamage": "none",
-     "failureConditions": [],
-     "failureEffect": {
-      "name": "Cursed (slimy skin)",
-      "tags": [
-       "curse",
-       "water-breathing",
-       "no-healing-on-land"
-      ],
-      "modifiers": []
-     }
-    },
-    "reminder": "Out of water, the cursed creature takes 6 (1d12) Acid damage at the end of every 10 minutes unless moisture is applied to its skin."
+    "kind": "restoration",
+    "name": "Eldritch Restoration"
    }
   ],
   "extensions": {
@@ -1050,21 +1028,6 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
-     },
-     "repeatOnce": true,
-     "secondFailure": {
-      "conditions": [
-       "unconscious"
-      ],
-      "duration": {
-       "type": "rounds",
-       "rounds": 100
-      },
-      "endsOnDamage": true,
-      "endedBy": {
-       "name": "Wake",
-       "by": "others"
-      }
      }
     },
     "damage": [],
@@ -1719,19 +1682,7 @@
      "ability": "con",
      "dc": 18,
      "successDamage": "none",
-     "failureConditions": [],
-     "failureEffect": {
-      "name": "Slowing Breath",
-      "tags": [
-       "no-reactions",
-       "speed-halved",
-       "action-or-bonus"
-      ],
-      "modifiers": []
-     },
-     "failureDuration": {
-      "type": "until-bearer-turn-end"
-     }
+     "failureConditions": []
     },
     "damage": [],
     "area": {
@@ -2053,70 +2004,9 @@
      "ability": "str",
      "dc": 21,
      "successDamage": "none",
-     "failureConditions": [],
-     "sparesAffected": true,
-     "failureEffect": {
-      "name": "Weakening Breath",
-      "tags": [],
-      "modifiers": [
-       {
-        "type": "roll-mode",
-        "roll": "attack",
-        "mode": "disadvantage",
-        "when": [
-         {
-          "type": "on-attack-roll"
-         },
-         {
-          "type": "ability-is",
-          "abilities": [
-           "str"
-          ]
-         }
-        ]
-       },
-       {
-        "type": "roll-mode",
-        "roll": "save",
-        "mode": "disadvantage",
-        "when": [
-         {
-          "type": "on-saving-throw"
-         },
-         {
-          "type": "ability-is",
-          "abilities": [
-           "str"
-          ]
-         }
-        ]
-       },
-       {
-        "type": "roll-mode",
-        "roll": "check",
-        "mode": "disadvantage",
-        "when": [
-         {
-          "type": "on-ability-check"
-         },
-         {
-          "type": "ability-is",
-          "abilities": [
-           "str"
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     "failureDuration": {
-      "type": "rounds",
-      "rounds": 10
-     },
-     "repeatSave": true
+     "failureConditions": []
     },
     "damage": [],
-    "reminder": "While Weakening Breath lasts, the target subtracts 1d6 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 60,
@@ -3011,17 +2901,6 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
-     },
-     "repeatOnce": true,
-     "secondFailure": {
-      "conditions": [
-       "paralyzed"
-      ],
-      "duration": {
-       "type": "rounds",
-       "rounds": 10
-      },
-      "repeatSave": true
      }
     },
     "damage": [],
@@ -4443,21 +4322,6 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
-     },
-     "repeatOnce": true,
-     "secondFailure": {
-      "conditions": [
-       "unconscious"
-      ],
-      "duration": {
-       "type": "rounds",
-       "rounds": 100
-      },
-      "endsOnDamage": true,
-      "endedBy": {
-       "name": "Wake",
-       "by": "others"
-      }
      }
     },
     "damage": [],
@@ -5130,19 +4994,7 @@
      "ability": "con",
      "dc": 22,
      "successDamage": "none",
-     "failureConditions": [],
-     "failureEffect": {
-      "name": "Slowing Breath",
-      "tags": [
-       "no-reactions",
-       "speed-halved",
-       "action-or-bonus"
-      ],
-      "modifiers": []
-     },
-     "failureDuration": {
-      "type": "until-bearer-turn-end"
-     }
+     "failureConditions": []
     },
     "damage": [],
     "area": {
@@ -5470,70 +5322,9 @@
      "ability": "str",
      "dc": 24,
      "successDamage": "none",
-     "failureConditions": [],
-     "sparesAffected": true,
-     "failureEffect": {
-      "name": "Weakening Breath",
-      "tags": [],
-      "modifiers": [
-       {
-        "type": "roll-mode",
-        "roll": "attack",
-        "mode": "disadvantage",
-        "when": [
-         {
-          "type": "on-attack-roll"
-         },
-         {
-          "type": "ability-is",
-          "abilities": [
-           "str"
-          ]
-         }
-        ]
-       },
-       {
-        "type": "roll-mode",
-        "roll": "save",
-        "mode": "disadvantage",
-        "when": [
-         {
-          "type": "on-saving-throw"
-         },
-         {
-          "type": "ability-is",
-          "abilities": [
-           "str"
-          ]
-         }
-        ]
-       },
-       {
-        "type": "roll-mode",
-        "roll": "check",
-        "mode": "disadvantage",
-        "when": [
-         {
-          "type": "on-ability-check"
-         },
-         {
-          "type": "ability-is",
-          "abilities": [
-           "str"
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     "failureDuration": {
-      "type": "rounds",
-      "rounds": 10
-     },
-     "repeatSave": true
+     "failureConditions": []
     },
     "damage": [],
-    "reminder": "While Weakening Breath lasts, the target subtracts 1d10 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 90,
@@ -6453,17 +6244,6 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
-     },
-     "repeatOnce": true,
-     "secondFailure": {
-      "conditions": [
-       "paralyzed"
-      ],
-      "duration": {
-       "type": "rounds",
-       "rounds": 10
-      },
-      "repeatSave": true
      }
     },
     "damage": [],
@@ -9332,6 +9112,11 @@
       "type": "piercing"
      }
     ]
+   },
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
    }
   ],
   "extensions": {
@@ -9449,13 +9234,7 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ],
-     "repeatOnce": true,
-     "secondFailure": {
-      "conditions": [
-       "petrified"
-      ]
-     }
+     ]
     },
     "damage": [],
     "uses": {
@@ -9715,24 +9494,15 @@
       ],
       "at": "bearer-turn-start",
       "hitPointLoss": true
-     },
-     "endedBy": {
-      "name": "Stanch the wound",
-      "by": "either",
-      "check": {
-       "ability": "wis",
-       "skill": "medicine",
-       "dc": 12
-      }
-     },
-     "sparesAffected": true
+     }
     },
     "damage": [
      {
       "formula": "1d10 + 3",
       "type": "slashing"
      }
-    ]
+    ],
+    "reminder": "The infernal wound also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC 12 Wisdom (Medicine) check: end it by hand."
    }
   ],
   "token": {
@@ -9846,7 +9616,7 @@
     "id": "swallow",
     "name": "Swallow",
     "activation": "bonus-action",
-    "description": "Dexterity Saving Throw: DC 18, one Large or smaller creature Grappled by the behir (the behir can have only one creature swallowed at a time). Failure: The behir swallows the target, which is no longer Grappled. While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir, and takes 21 (6d6) Acid damage at the start of each of the behir's turns. If the behir takes 30 damage or more on a single turn from the swallowed creature, the behir must succeed on a DC 14 Constitution saving throw at the end of that turn or regurgitate the creature, which falls in a space within 10 feet of the behir and has the Prone condition. If the behir dies, a swallowed creature is no longer Restrained and can escape from the corpse by using 15 feet of movement, exiting Prone.",
+    "description": "Dexterity Saving Throw: DC 18, one Large or smaller creature Grappled by the behir (the behir can have only one creature swallowed at a time). Failure: The behir swallows the target, which is no longer Grappled. While swallowed, a creature has the Blinded and Restrained conditions,Total Cover against attacks and other effects outside the behir, and takes 21 (6d6) Acid damage at the start of each of the behir's turns. If the behir takes 30 damage or more on a single turn from the swallowed creature, the behir must succeed on a DC 14 Constitution saving throw at the end of that turn or regurgitate the creature, which falls in a space within 10 feet of the behir and has the Prone condition. If the behir dies, a swallowed creature is no longer Restrained and can escape from the corpse by using 15 feet of movement, exiting Prone.",
     "save": {
      "ability": "dex",
      "dc": 18,
@@ -11073,6 +10843,13 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
@@ -11210,21 +10987,6 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
-     },
-     "repeatOnce": true,
-     "secondFailure": {
-      "conditions": [
-       "unconscious"
-      ],
-      "duration": {
-       "type": "rounds",
-       "rounds": 10
-      },
-      "endsOnDamage": true,
-      "endedBy": {
-       "name": "Wake",
-       "by": "others"
-      }
      }
     },
     "damage": [],
@@ -12487,6 +12249,13 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -13112,8 +12881,7 @@
      ],
      "failureDuration": {
       "type": "until-source-turn-end"
-     },
-     "immuneOnSuccess": true
+     }
     },
     "damage": [],
     "area": {
@@ -13539,17 +13307,7 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ],
-     "repeatOnce": true,
-     "secondFailure": {
-      "conditions": [
-       "petrified"
-      ],
-      "duration": {
-       "type": "minutes",
-       "minutes": 1440
-      }
-     }
+     ]
     },
     "damage": [
      {
@@ -13902,19 +13660,7 @@
      "ability": "con",
      "dc": 11,
      "successDamage": "none",
-     "failureConditions": [],
-     "failureEffect": {
-      "name": "Slowing Breath",
-      "tags": [
-       "no-reactions",
-       "speed-halved",
-       "action-or-bonus"
-      ],
-      "modifiers": []
-     },
-     "failureDuration": {
-      "type": "until-bearer-turn-end"
-     }
+     "failureConditions": []
     },
     "damage": [],
     "area": {
@@ -14728,27 +14474,7 @@
       "formula": "1d6 + 3",
       "type": "bludgeoning"
      }
-    ],
-    "onHit": [
-     {
-      "conditions": [],
-      "name": "Attached",
-      "tags": [
-       "attached"
-      ],
-      "endsWhenSourceDies": true,
-      "endedBy": {
-       "name": "Detach the darkmantle",
-       "by": "bearer",
-       "check": {
-        "ability": "str",
-        "skill": "athletics",
-        "dc": 13
-       }
-      }
-     }
-    ],
-    "reminder": "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target, which is Blinded and suffocating (hold its breath) while the darkmantle is attached."
+    ]
    },
    {
     "id": "darkness-aura",
@@ -14892,16 +14618,7 @@
      "successDamage": "none",
      "failureConditions": [
       "poisoned"
-     ],
-     "atRest": {
-      "at": "day",
-      "save": {
-       "ability": "con",
-       "dc": 12
-      },
-      "maximumLoss": "1d10",
-      "holdsMaximum": true
-     }
+     ]
     },
     "damage": [
      {
@@ -15204,6 +14921,13 @@
   },
   "damageResistances": [
    "radiant"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Exalted Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -15563,6 +15287,13 @@
   "damageImmunities": [
    "lightning",
    "thunder"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Elemental Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -17328,6 +17059,13 @@
   "damageImmunities": [
    "fire"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Elemental Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -17738,6 +17476,13 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 12,
@@ -17787,7 +17532,7 @@
      },
      {
       "name": "Magic Rope",
-      "description": "The erinyes has a magic rope. While bearing it, the erinyes can use the Entangling Rope action. The rope has AC 20, HP 90, and Immunity to Poison and Psychic damage. The rope turns to dust if reduced to 0 Hit Points, if it is 5+ feet away from the erinyes for 1 hour or more, or if the erinyes dies. If the rope is damaged or destroyed, the erinyes can fully restore it when finishing a Short or Long Rest."
+      "description": "The erinyes has a magic rope. While bearing it, the erinyes can use the Entangling Rope action. The rope has AC 20, HP 90, and Immunity to Poison and Psychic damage. The rope turns to dust if reduced to 0 Hit Points, if it is 5+ feet away from the erinyes for 1 hour or more, or if the erinyes dies. If the rope is damaged or destroyed,Short or Long Rest."
      }
     ]
    }
@@ -18535,11 +18280,7 @@
    {
     "kind": "berserk",
     "name": "Berserk",
-    "on": 6,
-    "calm": {
-     "dc": 15,
-     "withinFeet": 60
-    }
+    "on": 6
    }
   ],
   "extensions": {
@@ -19151,32 +18892,6 @@
        }
       ],
       "at": "source-turn-start"
-     },
-     "escapeDc": 12,
-     "escapeAthletics": true,
-     "failureEffect": {
-      "name": "Engulfed",
-      "tags": [
-       "cant-speak",
-       "smothering"
-      ],
-      "modifiers": []
-     },
-     "endedBy": {
-      "name": "Pull free",
-      "by": "others",
-      "near": "source",
-      "check": {
-       "ability": "str",
-       "skill": "athletics",
-       "dc": 12
-      },
-      "takerDamage": [
-       {
-        "formula": "3d6",
-        "type": "acid"
-       }
-      ]
      }
     },
     "damage": [
@@ -19185,7 +18900,7 @@
       "type": "acid"
      }
     ],
-    "reminder": "The cube moves up to its Speed first; an engulfed creature moves with it and has Total Cover from attacks outside the cube.",
+    "reminder": "An engulfed target is suffocating, can't cast spells with a Verbal component, has the Restrained condition.",
     "move": {
      "speed": "full",
      "provokes": false,
@@ -19249,7 +18964,7 @@
     "traits": [
      {
       "name": "Ooze Cube",
-      "description": "The cube fills its entire space and is transparent. Other creatures can enter that space, but a creature that does so is subjected to the cube's Engulf and has Disadvantage on the saving throw. Creatures inside the cube have Total Cover, and the cube can hold one Large creature or up to four Medium or Small creatures inside itself at a time. As an action, a creature within 5 feet of the cube can pull a creature or an object out of the cube by succeeding on a DC 12 Strength (Athletics) check, and the puller takes 10 (3d6) Acid damage."
+      "description": "The cube fills its entire space and is transparent. Other creatures can enter that space, but a creature that does so is subjected to the cube's Engulf and has Disadvantage on the saving throw.Total Cover, and the cube can hold one Large creature or up to four Medium or Small creatures inside itself at a time. As an action, a creature within 5 feet of the cube can pull a creature or an object out of the cube by succeeding on a DC 12 Strength (Athletics) check, and the puller takes 10 (3d6) Acid damage."
      },
      {
       "name": "Transparent",
@@ -19489,8 +19204,7 @@
      ],
      "failureDuration": {
       "type": "until-source-next-turn"
-     },
-     "immuneOnSuccess": true
+     }
     },
     "damage": [
      {
@@ -19518,8 +19232,7 @@
      "successDamage": "none",
      "failureConditions": [
       "incapacitated"
-     ],
-     "immuneOnSuccess": true
+     ]
     },
     "damage": [],
     "targets": {
@@ -21129,7 +20842,7 @@
     "id": "swallow",
     "name": "Swallow",
     "activation": "action",
-    "description": "The frog swallows a Small or smaller target it is grappling. While swallowed, the target isn't Grappled but has the Blinded and Restrained conditions, and it has Total Cover against attacks and other effects outside the frog. While swallowing the target, the frog can't use Bite, and if the frog dies, the swallowed target is no longer Restrained and can escape from the corpse using 5 feet of movement, exiting with the Prone condition. At the end of the frog's next turn, the swallowed target takes 5 (2d4) Acid damage. If that damage doesn't kill it, the frog disgorges it, causing it to exit Prone.",
+    "description": "The frog swallows a Small or smaller target it is grappling. While swallowed, the target isn't Grappled but has the Blinded and Restrained conditions,Total Cover against attacks and other effects outside the frog. While swallowing the target, the frog can't use Bite, and if the frog dies, the swallowed target is no longer Restrained and can escape from the corpse using 5 feet of movement, exiting with the Prone condition. At the end of the frog's next turn, the swallowed target takes 5 (2d4) Acid damage. If that damage doesn't kill it, the frog disgorges it, causing it to exit Prone.",
     "damage": []
    }
   ],
@@ -22446,7 +22159,7 @@
     "id": "swallow",
     "name": "Swallow",
     "activation": "action",
-    "description": "The toad swallows a Medium or smaller target it is grappling. While swallowed, the target isn't Grappled but has the Blinded and Restrained conditions, and it has Total Cover against attacks and other effects outside the toad. In addition, the target takes 10 (3d6) Acid damage at the end of each of the toad's turns. The toad can have only one target swallowed at a time, and it can't use Bite while it has a swallowed target. If the toad dies, a swallowed creature is no longer Restrained and can escape from the corpse using 5 feet of movement, exiting with the Prone condition.",
+    "description": "The toad swallows a Medium or smaller target it is grappling. While swallowed, the target isn't Grappled but has the Blinded and Restrained conditions,Total Cover against attacks and other effects outside the toad. In addition, the target takes 10 (3d6) Acid damage at the end of each of the toad's turns. The toad can have only one target swallowed at a time, and it can't use Bite while it has a swallowed target. If the toad dies, a swallowed creature is no longer Restrained and can escape from the corpse using 5 feet of movement, exiting with the Prone condition.",
     "damage": []
    }
   ],
@@ -23064,7 +22777,13 @@
       ],
       "maxTargetSize": "medium"
      }
-    ]
+    ],
+    "drain": {
+     "killsAtZero": {
+      "cause": "Bite",
+      "bodyGone": true
+     }
+    }
    },
    {
     "id": "blinding-spittle",
@@ -23121,7 +22840,7 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "failureTable": "gibbering"
+    "reminder": "On a failed save: The target rolls 1d8 to determine what it does during the current turn:\n\n- 1-4: The target does nothing.\n- 5-6: The target takes no action or Bonus Action and uses all its movement to move in a random direction.\n- 7-8: The target makes a melee attack against a randomly determined creature within its reach or does nothing if it can't make such an attack."
    }
   ],
   "extensions": {
@@ -23342,6 +23061,13 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -24278,70 +24004,9 @@
      "ability": "str",
      "dc": 13,
      "successDamage": "none",
-     "failureConditions": [],
-     "sparesAffected": true,
-     "failureEffect": {
-      "name": "Weakening Breath",
-      "tags": [],
-      "modifiers": [
-       {
-        "type": "roll-mode",
-        "roll": "attack",
-        "mode": "disadvantage",
-        "when": [
-         {
-          "type": "on-attack-roll"
-         },
-         {
-          "type": "ability-is",
-          "abilities": [
-           "str"
-          ]
-         }
-        ]
-       },
-       {
-        "type": "roll-mode",
-        "roll": "save",
-        "mode": "disadvantage",
-        "when": [
-         {
-          "type": "on-saving-throw"
-         },
-         {
-          "type": "ability-is",
-          "abilities": [
-           "str"
-          ]
-         }
-        ]
-       },
-       {
-        "type": "roll-mode",
-        "roll": "check",
-        "mode": "disadvantage",
-        "when": [
-         {
-          "type": "on-ability-check"
-         },
-         {
-          "type": "ability-is",
-          "abilities": [
-           "str"
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     "failureDuration": {
-      "type": "rounds",
-      "rounds": 10
-     },
-     "repeatSave": true
+     "failureConditions": []
     },
     "damage": [],
-    "reminder": "While Weakening Breath lasts, the target subtracts 1d4 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 15,
@@ -24487,13 +24152,7 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ],
-     "repeatOnce": true,
-     "secondFailure": {
-      "conditions": [
-       "petrified"
-      ]
-     }
+     ]
     },
     "damage": [],
     "uses": {
@@ -25718,6 +25377,12 @@
    "poisoned",
    "restrained"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Celestial Restoration"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
@@ -25845,24 +25510,12 @@
      "successDamage": "half",
      "failureConditions": []
     },
-    "damage": [
-     {
-      "formula": "8d6",
-      "type": "fire"
-     }
-    ],
+    "damage": [],
     "uses": {
      "limit": 1,
      "per": "recharge",
      "recharge": 5
     },
-    "damageTypes": [
-     "acid",
-     "cold",
-     "fire",
-     "lightning",
-     "poison"
-    ],
     "area": {
      "shape": "cone",
      "sizeFeet": 30,
@@ -25983,11 +25636,7 @@
       "charmed",
       "incapacitated"
      ],
-     "repeatSave": true,
-     "repeatOnDamage": {
-      "notFromSource": true
-     },
-     "immuneOnSuccess": true
+     "repeatSave": true
     },
     "damage": [],
     "area": {
@@ -26387,6 +26036,11 @@
       "type": "until-bearer-next-turn"
      }
     }
+   },
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
    }
   ],
   "extensions": {
@@ -27289,15 +26943,6 @@
       ],
       "at": "bearer-turn-start",
       "hitPointLoss": true
-     },
-     "endedBy": {
-      "name": "Stanch the wound",
-      "by": "either",
-      "check": {
-       "ability": "wis",
-       "skill": "medicine",
-       "dc": 17
-      }
      }
     },
     "damage": [
@@ -27306,6 +26951,7 @@
       "type": "necrotic"
      }
     ],
+    "reminder": "The infernal wound also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC 17 Wisdom (Medicine) check: end it by hand.",
     "targets": {
      "count": 1,
      "rangeFeet": 10,
@@ -27326,6 +26972,13 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -27533,6 +27186,20 @@
     "height": 3
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "multiple-heads",
+    "name": "Multiple Heads",
+    "heads": 5,
+    "damagePerHead": 25,
+    "regrowHitPoints": 20,
+    "stoppedBy": [
+     "fire"
+    ],
+    "attackId": "bite",
+    "reactiveHeads": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -27842,6 +27509,13 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -28311,18 +27985,7 @@
     "onHit": [
      {
       "conditions": [],
-      "name": "Cursed",
-      "tags": [
-       "curse"
-      ],
-      "duration": {
-       "type": "minutes",
-       "minutes": 1440
-      },
-      "endsWhenSourceDies": true,
-      "atRest": {
-       "noBenefit": "short"
-      }
+      "reminder": "The target is cursed for 24 hours or until the incubus dies. Until the curse ends, the target gains no benefit from finishing Short Rests."
      }
     ]
    },
@@ -29421,7 +29084,7 @@
     "id": "swallow",
     "name": "Swallow",
     "activation": "action",
-    "description": "Dexterity Saving Throw: DC 25, one creature Grappled by the kraken (it can have up to four creatures swallowed at a time). Failure: 23 (3d8 + 10) Piercing damage. If the target is Large or smaller, it is swallowed and no longer Grappled. A swallowed creature has the Restrained condition, has Total Cover against attacks and other effects outside the kraken, and takes 24 (7d6) Acid damage at the start of each of its turns. If the kraken takes 50 damage or more on a single turn from a creature inside it, the kraken must succeed on a DC 25 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 10 feet of the kraken with the Prone condition. If the kraken dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 15 feet of movement, exiting Prone.",
+    "description": "Dexterity Saving Throw: DC 25, one creature Grappled by the kraken (it can have up to four creatures swallowed at a time). Failure: 23 (3d8 + 10) Piercing damage. If the target is Large or smaller, it is swallowed and no longer Grappled. A swallowed creature has the Restrained condition,Total Cover against attacks and other effects outside the kraken, and takes 24 (7d6) Acid damage at the start of each of its turns. If the kraken takes 50 damage or more on a single turn from a creature inside it, the kraken must succeed on a DC 25 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 10 feet of the kraken with the Prone condition. If the kraken dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 15 feet of movement, exiting Prone.",
     "save": {
      "ability": "dex",
      "dc": 25,
@@ -29798,6 +29461,12 @@
    "frightened",
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Hellish Restoration"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
@@ -30151,6 +29820,12 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 4
   },
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Spirit Jar"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
@@ -31364,6 +31039,13 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 16,
@@ -31585,13 +31267,7 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ],
-     "repeatOnce": true,
-     "secondFailure": {
-      "conditions": [
-       "petrified"
-      ]
-     }
+     ]
     },
     "damage": [],
     "uses": {
@@ -32581,17 +32257,17 @@
       "conditions": [],
       "name": "Cursed",
       "tags": [
-       "no-healing",
-       "curse"
+       "no-healing"
       ],
-      "atRest": {
-       "at": "day",
-       "maximumLoss": "3d6",
-       "holdsMaximum": true
-      }
+      "reminder": "While cursed, the target can't regain Hit Points, its Hit Point maximum doesn't return to normal when finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse."
      }
     ],
-    "reminder": "A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
+    "drain": {
+     "killsAtZero": {
+      "cause": "Rotting Fist",
+      "bodyGone": true
+     }
+    }
    },
    {
     "id": "dreadful-glare",
@@ -32607,8 +32283,7 @@
      ],
      "failureDuration": {
       "type": "until-source-turn-end"
-     },
-     "immuneOnSuccess": true
+     }
     },
     "damage": [],
     "targets": {
@@ -32804,17 +32479,17 @@
       "conditions": [],
       "name": "Cursed",
       "tags": [
-       "no-healing",
-       "curse"
+       "no-healing"
       ],
-      "atRest": {
-       "at": "day",
-       "maximumLoss": "3d6",
-       "noBenefit": "long"
-      }
+      "reminder": "While cursed, the target can't regain Hit Points, it gains no benefit from finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse."
      }
     ],
-    "reminder": "A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
+    "drain": {
+     "killsAtZero": {
+      "cause": "Rotting Fist",
+      "bodyGone": true
+     }
+    }
    },
    {
     "id": "channel-negative-energy",
@@ -32956,6 +32631,12 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 3
   },
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Undead Restoration"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 15,
@@ -33056,9 +32737,7 @@
       "type": "rounds",
       "rounds": 10
      },
-     "endsOnDamage": true,
-     "immuneOnSuccess": true,
-     "endsOutOfSight": true
+     "endsOnDamage": true
     },
     "damage": [
      {
@@ -33146,6 +32825,13 @@
   "conditionImmunities": [
    "frightened",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -34400,22 +34086,14 @@
       "type": "piercing"
      }
     ],
+    "reminder": "The hit gives the target the Poisoned condition. Whenever the Poisoned target finishes a Long Rest, it makes a DC 15 Constitution save: on a failure its Hit Point maximum decreases by 5 (1d10); on a success the Poisoned condition ends.",
     "onHit": [
      {
       "conditions": [
        {
         "id": "poisoned"
        }
-      ],
-      "name": "Poisoned",
-      "atRest": {
-       "at": "long-rest",
-       "save": {
-        "ability": "con",
-        "dc": 15
-       },
-       "maximumLoss": "1d10"
-      }
+      ]
      }
     ]
    },
@@ -35645,6 +35323,11 @@
      },
      "immuneOnSuccess": true
     }
+   },
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
    }
   ],
   "extensions": {
@@ -35895,6 +35578,13 @@
   },
   "damageResistances": [
    "radiant"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Exalted Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -36899,7 +36589,7 @@
     "id": "swallow",
     "name": "Swallow",
     "activation": "bonus-action",
-    "description": "Strength Saving Throw: DC 19, one Large or smaller creature Grappled by the worm (it can have up to three creatures swallowed at a time). Failure: The target is swallowed by the worm, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the worm, and takes 17 (5d6) Acid damage at the start of each of the worm's turns. If the worm takes 30 damage or more on a single turn from a creature inside it, the worm must succeed on a DC 21 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 5 feet of the worm and has the Prone condition. If the worm dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 20 feet of movement, exiting Prone.",
+    "description": "Strength Saving Throw: DC 19, one Large or smaller creature Grappled by the worm (it can have up to three creatures swallowed at a time). Failure: The target is swallowed by the worm, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions,Total Cover against attacks and other effects outside the worm, and takes 17 (5d6) Acid damage at the start of each of the worm's turns. If the worm takes 30 damage or more on a single turn from a creature inside it, the worm must succeed on a DC 21 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 5 feet of the worm and has the Prone condition. If the worm dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 20 feet of movement, exiting Prone.",
     "save": {
      "ability": "str",
      "dc": 19,
@@ -37255,7 +36945,7 @@
     "id": "cursed-touch",
     "name": "Cursed Touch",
     "activation": "action",
-    "description": "Melee Attack Roll: +10, reach 5 ft. 12 (2d6 + 5) Slashing damage plus 19 (3d12) Necrotic damage. If the target is a creature, it is cursed. While cursed, the target gains no benefit from finishing a Short or Long Rest.",
+    "description": "Melee Attack Roll: +10, reach 5 ft. 12 (2d6 + 5) Slashing damage plus 19 (3d12) Necrotic damage. If the target is a creature, it is cursed. While cursed,Short or Long Rest.",
     "attack": {
      "bonus": 10,
      "reachFeet": 5
@@ -37268,18 +36958,6 @@
      {
       "formula": "3d12",
       "type": "necrotic"
-     }
-    ],
-    "onHit": [
-     {
-      "conditions": [],
-      "name": "Cursed",
-      "tags": [
-       "curse"
-      ],
-      "atRest": {
-       "noBenefit": "both"
-      }
      }
     ]
    },
@@ -37391,6 +37069,13 @@
     "height": 1
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Fiendish Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
@@ -37948,7 +37633,7 @@
     "id": "swallow",
     "name": "Swallow",
     "activation": "bonus-action",
-    "description": "Strength Saving Throw: DC 19, one Large or smaller creature Grappled by the remorhaz (it can have up to two creatures swallowed at a time). Failure: The target is swallowed by the remorhaz, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions, it has Total Cover against attacks and other effects outside the remorhaz, and it takes 10 (3d6) Acid damage plus 10 (3d6) Fire damage at the start of each of the remorhaz's turns. If the remorhaz takes 30 damage or more on a single turn from a creature inside it, the remorhaz must succeed on a DC 15 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 5 feet of the remorhaz and has the Prone condition. If the remorhaz dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse by using 15 feet of movement, exiting Prone.",
+    "description": "Strength Saving Throw: DC 19, one Large or smaller creature Grappled by the remorhaz (it can have up to two creatures swallowed at a time). Failure: The target is swallowed by the remorhaz, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions,Total Cover against attacks and other effects outside the remorhaz, and it takes 10 (3d6) Acid damage plus 10 (3d6) Fire damage at the start of each of the remorhaz's turns. If the remorhaz takes 30 damage or more on a single turn from a creature inside it, the remorhaz must succeed on a DC 15 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 5 feet of the remorhaz and has the Prone condition. If the remorhaz dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse by using 15 feet of movement, exiting Prone.",
     "save": {
      "ability": "str",
      "dc": 19,
@@ -38641,8 +38326,7 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "damage": [],
-    "reminder": "On a failure, the armor or weapon the rust monster targeted takes a cumulative -1 penalty: to the AC it offers, or to its attack rolls. Change the item by hand. Armor whose AC falls to 10, or a weapon at -5, is destroyed, and Mending removes the penalty."
+    "damage": []
    },
    {
     "id": "destroy-metal",
@@ -39533,10 +39217,20 @@
      "ability": "wis",
      "dc": 11,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureByHitPoints": [
+      {
+       "atOrBelow": 20,
+       "dropsToZero": true
+      }
+     ]
     },
-    "damage": [],
-    "reminder": "On a failed save: a target with 20 Hit Points or fewer drops to 0 Hit Points; any other target takes 13 (3d8) Psychic damage.",
+    "damage": [
+     {
+      "formula": "3d8",
+      "type": "psychic"
+     }
+    ],
     "targets": {
      "count": 1,
      "conditions": [
@@ -40402,17 +40096,6 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
-     },
-     "repeatOnce": true,
-     "secondFailure": {
-      "conditions": [
-       "paralyzed"
-      ],
-      "duration": {
-       "type": "rounds",
-       "rounds": 10
-      },
-      "repeatSave": true
      }
     },
     "damage": [],
@@ -40764,10 +40447,24 @@
      "ability": "dex",
      "dc": 21,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureByHitPoints": [
+      {
+       "atOrBelow": 100,
+       "dies": true
+      }
+     ]
     },
-    "damage": [],
-    "reminder": "On a failed save: a creature with 100 Hit Points or fewer dies; any other takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage.",
+    "damage": [
+     {
+      "formula": "4d8 + 6",
+      "type": "piercing"
+     },
+     {
+      "formula": "8d8",
+      "type": "radiant"
+     }
+    ],
     "targets": {
      "count": 1,
      "rangeFeet": 600,
@@ -40842,6 +40539,13 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 4
   },
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Exalted Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
@@ -41121,8 +40825,7 @@
      "ability": "con",
      "dc": 16,
      "successDamage": "none",
-     "failureConditions": [],
-     "failureExhaustion": 1
+     "failureConditions": []
     },
     "damage": [],
     "targets": {
@@ -41411,8 +41114,7 @@
      "ability": "con",
      "dc": 16,
      "successDamage": "none",
-     "failureConditions": [],
-     "failureExhaustion": 1
+     "failureConditions": []
     },
     "damage": [],
     "targets": {
@@ -41983,6 +41685,12 @@
    "charmed",
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Fiendish Restoration"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -42535,10 +42243,6 @@
         }
        ],
        "at": "source-turn-start"
-      },
-      "endedBy": {
-       "name": "Detach",
-       "by": "either"
       }
      }
     ]
@@ -44227,7 +43931,7 @@
     "id": "swallow",
     "name": "Swallow",
     "activation": "bonus-action",
-    "description": "Strength Saving Throw: DC 27, one Large or smaller creature Grappled by the tarrasque (it can have up to six creatures swallowed at a time). Failure: The target is swallowed, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions and can't teleport, it has Total Cover against attacks and other effects outside the tarrasque, and it takes 56 (16d6) Acid damage at the start of each of the tarrasque's turns. If the tarrasque takes 60 damage or more on a single turn from a creature inside it, the tarrasque must succeed on a DC 20 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 10 feet of the tarrasque and has the Prone condition. If the tarrasque dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 20 feet of movement, exiting Prone.",
+    "description": "Strength Saving Throw: DC 27, one Large or smaller creature Grappled by the tarrasque (it can have up to six creatures swallowed at a time). Failure: The target is swallowed, and the Grappled condition ends. A swallowed creature has the Blinded and Restrained conditions and can't teleport,Total Cover against attacks and other effects outside the tarrasque, and it takes 56 (16d6) Acid damage at the start of each of the tarrasque's turns. If the tarrasque takes 60 damage or more on a single turn from a creature inside it, the tarrasque must succeed on a DC 20 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, each of which falls in a space within 10 feet of the tarrasque and has the Prone condition. If the tarrasque dies, any swallowed creature no longer has the Restrained condition and can escape from the corpse using 20 feet of movement, exiting Prone.",
     "save": {
      "ability": "str",
      "dc": 27,
@@ -45149,6 +44853,13 @@
      "fire"
     ],
     "deathWaitsForTurn": true
+   },
+   {
+    "kind": "severed-limbs",
+    "name": "Loathsome Limbs",
+    "uses": 4,
+    "slashing": 15,
+    "limbMonsterId": "troll-limb"
    }
   ],
   "extensions": {
@@ -45972,6 +45683,10 @@
      "amount": 20,
      "type": "radiant"
     }
+   },
+   {
+    "kind": "misty-escape",
+    "name": "Misty Escape"
    }
   ],
   "extensions": {
@@ -46691,6 +46406,13 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
@@ -47362,23 +47084,6 @@
        }
       ],
       "at": "source-turn-start"
-     },
-     "failureEffect": {
-      "name": "Whelmed",
-      "tags": [
-       "smothering"
-      ],
-      "modifiers": []
-     },
-     "endedBy": {
-      "name": "Pull free",
-      "by": "others",
-      "near": "source",
-      "check": {
-       "ability": "str",
-       "skill": "athletics",
-       "dc": 14
-      }
      }
     },
     "damage": [
@@ -47637,19 +47342,7 @@
      "ability": "con",
      "dc": 14,
      "successDamage": "none",
-     "failureConditions": [],
-     "immuneOnSuccess": true,
-     "onlyCreatureTypes": [
-      "humanoid"
-     ],
-     "failureEffect": {
-      "name": "Lycanthropy (Werebear)",
-      "tags": [
-       "curse",
-       "lycanthropy"
-      ],
-      "modifiers": []
-     }
+     "failureConditions": []
     },
     "damage": [
      {
@@ -47813,19 +47506,7 @@
      "ability": "con",
      "dc": 12,
      "successDamage": "none",
-     "failureConditions": [],
-     "immuneOnSuccess": true,
-     "onlyCreatureTypes": [
-      "humanoid"
-     ],
-     "failureEffect": {
-      "name": "Lycanthropy (Wereboar)",
-      "tags": [
-       "curse",
-       "lycanthropy"
-      ],
-      "modifiers": []
-     }
+     "failureConditions": []
     },
     "damage": [
      {
@@ -48004,19 +47685,7 @@
      "ability": "con",
      "dc": 11,
      "successDamage": "none",
-     "failureConditions": [],
-     "immuneOnSuccess": true,
-     "onlyCreatureTypes": [
-      "humanoid"
-     ],
-     "failureEffect": {
-      "name": "Lycanthropy (Wererat)",
-      "tags": [
-       "curse",
-       "lycanthropy"
-      ],
-      "modifiers": []
-     }
+     "failureConditions": []
     },
     "damage": [
      {
@@ -48184,19 +47853,7 @@
      "ability": "con",
      "dc": 13,
      "successDamage": "none",
-     "failureConditions": [],
-     "immuneOnSuccess": true,
-     "onlyCreatureTypes": [
-      "humanoid"
-     ],
-     "failureEffect": {
-      "name": "Lycanthropy (Weretiger)",
-      "tags": [
-       "curse",
-       "lycanthropy"
-      ],
-      "modifiers": []
-     }
+     "failureConditions": []
     },
     "damage": [
      {
@@ -48367,19 +48024,7 @@
      "ability": "con",
      "dc": 12,
      "successDamage": "none",
-     "failureConditions": [],
-     "immuneOnSuccess": true,
-     "onlyCreatureTypes": [
-      "humanoid"
-     ],
-     "failureEffect": {
-      "name": "Lycanthropy (Werewolf)",
-      "tags": [
-       "curse",
-       "lycanthropy"
-      ],
-      "modifiers": []
-     }
+     "failureConditions": []
     },
     "damage": [
      {
@@ -48855,10 +48500,7 @@
      "ability": "con",
      "dc": 10,
      "successDamage": "none",
-     "failureConditions": [],
-     "failureKills": {
-      "sourceRegains": "3d6"
-     }
+     "failureConditions": []
     },
     "damage": []
    },
@@ -49402,7 +49044,19 @@
     "name": "Create Specter",
     "activation": "action",
     "description": "The wraith targets a Humanoid corpse within 10 feet of itself that has been dead for no longer than 1 minute. The target's spirit rises as a Specter in the space of its corpse or in the nearest unoccupied space. The specter is under the wraith's control. The wraith can have no more than seven specters under its control at a time.",
-    "damage": []
+    "damage": [],
+    "raisesCorpse": {
+     "monsterId": "specter",
+     "withinMinutes": 1,
+     "most": 7
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 10,
+     "creatureTypes": [
+      "humanoid"
+     ]
+    }
    }
   ],
   "token": {
@@ -50188,21 +49842,6 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
-     },
-     "repeatOnce": true,
-     "secondFailure": {
-      "conditions": [
-       "unconscious"
-      ],
-      "duration": {
-       "type": "rounds",
-       "rounds": 10
-      },
-      "endsOnDamage": true,
-      "endedBy": {
-       "name": "Wake",
-       "by": "others"
-      }
      }
     },
     "damage": [],
@@ -50546,19 +50185,7 @@
      "ability": "con",
      "dc": 14,
      "successDamage": "none",
-     "failureConditions": [],
-     "failureEffect": {
-      "name": "Slowing Breath",
-      "tags": [
-       "no-reactions",
-       "speed-halved",
-       "action-or-bonus"
-      ],
-      "modifiers": []
-     },
-     "failureDuration": {
-      "type": "until-bearer-turn-end"
-     }
+     "failureConditions": []
     },
     "damage": [],
     "area": {
@@ -50724,70 +50351,9 @@
      "ability": "str",
      "dc": 17,
      "successDamage": "none",
-     "failureConditions": [],
-     "sparesAffected": true,
-     "failureEffect": {
-      "name": "Weakening Breath",
-      "tags": [],
-      "modifiers": [
-       {
-        "type": "roll-mode",
-        "roll": "attack",
-        "mode": "disadvantage",
-        "when": [
-         {
-          "type": "on-attack-roll"
-         },
-         {
-          "type": "ability-is",
-          "abilities": [
-           "str"
-          ]
-         }
-        ]
-       },
-       {
-        "type": "roll-mode",
-        "roll": "save",
-        "mode": "disadvantage",
-        "when": [
-         {
-          "type": "on-saving-throw"
-         },
-         {
-          "type": "ability-is",
-          "abilities": [
-           "str"
-          ]
-         }
-        ]
-       },
-       {
-        "type": "roll-mode",
-        "roll": "check",
-        "mode": "disadvantage",
-        "when": [
-         {
-          "type": "on-ability-check"
-         },
-         {
-          "type": "ability-is",
-          "abilities": [
-           "str"
-          ]
-         }
-        ]
-       }
-      ]
-     },
-     "failureDuration": {
-      "type": "rounds",
-      "rounds": 10
-     },
-     "repeatSave": true
+     "failureConditions": []
     },
     "damage": [],
-    "reminder": "While Weakening Breath lasts, the target subtracts 1d6 from its damage rolls. Take it off by hand.",
     "area": {
      "shape": "cone",
      "sizeFeet": 30,
@@ -51257,17 +50823,6 @@
      ],
      "failureDuration": {
       "type": "until-bearer-turn-end"
-     },
-     "repeatOnce": true,
-     "secondFailure": {
-      "conditions": [
-       "paralyzed"
-      ],
-      "duration": {
-       "type": "rounds",
-       "rounds": 10
-      },
-      "repeatSave": true
      }
     },
     "damage": [],

@@ -27,7 +27,16 @@ export function createPendingSaves(
     /** The GM's call for a roll these saves answer. */
     callId?: string;
     /** What else each save carries: what a success leaves, a line for a failure, the spell area that raised it. */
-    extra?: Pick<PendingSave, "onSuccessEffect" | "failureNote" | "breaksConcentration" | "zoneId" | "gmApplies">;
+    extra?: Pick<
+      PendingSave,
+      | "onSuccessEffect"
+      | "failureNote"
+      | "breaksConcentration"
+      | "zoneId"
+      | "gmApplies"
+      | "failureByHitPoints"
+      | "failureBanishes"
+    >;
     /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
     magical?: boolean;
     /** A success makes the target immune to this trait of its source for the fight (a ghast's Stench). */
@@ -91,6 +100,8 @@ export function createPendingSaves(
     ...(input.extra?.breaksConcentration ? { breaksConcentration: true as const } : {}),
     ...(input.extra?.zoneId !== undefined ? { zoneId: input.extra.zoneId } : {}),
     ...(input.extra?.gmApplies ? { gmApplies: true as const } : {}),
+    ...(input.extra?.failureByHitPoints ? { failureByHitPoints: structuredClone(input.extra.failureByHitPoints) } : {}),
+    ...(input.extra?.failureBanishes ? { failureBanishes: [...input.extra.failureBanishes] } : {}),
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
     ...(input.drain ? { drain: { ...input.drain } } : {}),

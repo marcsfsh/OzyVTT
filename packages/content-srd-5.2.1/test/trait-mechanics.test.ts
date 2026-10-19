@@ -52,7 +52,8 @@ describe("trait mechanics in the monster bundle", () => {
         hitPoints: 15,
         stoppedBy: ["acid", "fire"],
         deathWaitsForTurn: true
-      }
+      },
+      { kind: "severed-limbs", name: "Loathsome Limbs", uses: 4, slashing: 15, limbMonsterId: "troll-limb" }
     ]);
     expect(mechanicsOf("oni")).toEqual([
       { kind: "regeneration", name: "Regeneration", hitPoints: 10, needsHitPoints: true }
@@ -102,7 +103,8 @@ describe("trait mechanics in the monster bundle", () => {
           failureDuration: { type: "until-bearer-next-turn" },
           immuneOnSuccess: true
         }
-      }
+      },
+      { kind: "restoration", name: "Diabolical Restoration", bodyGoes: true }
     ]);
     // The hezrou's Stench grants no immunity on a success, the ghast's does.
     expect(mechanicsOf("hezrou")[0]).toMatchObject({ rangeFeet: 10, save: { dc: 16 } });
@@ -144,6 +146,24 @@ describe("trait mechanics in the monster bundle", () => {
         rangeFeet: 5,
         affects: "grapple-partners",
         damage: [{ formula: "1d10", type: "piercing" }]
+      },
+      { kind: "restoration", name: "Diabolical Restoration", bodyGoes: true }
+    ]);
+  });
+
+  it("reads the traits that cheat death: mist, a new body, heads and limbs", () => {
+    expect(mechanicsOf("vampire")).toContainEqual({ kind: "misty-escape", name: "Misty Escape" });
+    expect(mechanicsOf("lich")).toContainEqual({ kind: "restoration", name: "Spirit Jar" });
+    expect(mechanicsOf("hydra")).toEqual([
+      {
+        kind: "multiple-heads",
+        name: "Multiple Heads",
+        heads: 5,
+        damagePerHead: 25,
+        regrowHitPoints: 20,
+        stoppedBy: ["fire"],
+        attackId: "bite",
+        reactiveHeads: true
       }
     ]);
   });

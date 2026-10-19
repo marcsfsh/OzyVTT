@@ -413,6 +413,19 @@ While the GM tracks food and water (`rest.survival`), each midnight it crosses e
 character, which eats and drinks what it carries and meets the hunger and thirst rules (`survival.ts`).
 A creature out of air counts its held breath down on the clock as it does at its turns' ends (`breath.ts`).
 
+Death is a record on the creature (`Actor.death`, `death.ts`). After every command the server stamps when a
+creature died: the fight's round while its fight runs, then the game clock. A rule that kills also says what killed
+it and what is left of the body (Disintegrate's dust, a Vorpal Sword's lost head). A revival spell's conditions are
+data on the spell (`effect.revives`: its time limit, no Undead, a new body, the Hit Points it gives back). They are
+checked before anything is spent and applied as the cast resolves (`resolution/revival.ts`). Time under Gentle
+Repose doesn't count against the limit, and Raise Dead's ordeal is a penalty to D20 Tests that eases with each Long
+Rest. What kills outright is data too: damage that kills at 0 (`drain.killsAtZero`), a corpse that rises
+(`drain.slainRise`, `risen.ts`), a hit that kills (`onHit.kills`, `resolution/kill.ts`), a cast that kills by Hit
+Points (`killsAtHitPoints`) and a save whose failure acts by the target's Hit Points (`failureByHitPoints`,
+`fatal-saves.ts`). All of them die through `killOutright` in `hit-points.ts`: a character makes no death saves, and
+Death Ward turns aside a death that deals no damage. Stat block traits that cheat death (Misty Escape, the
+Restoration traits, Multiple Heads, Loathsome Limbs) run from `death-traits.ts` as damage lands and as turns end.
+
 Each effect a spell leaves records the spell and the level it was cast at (`spell`), so a spell can be
 ended as a whole: Dispel Magic and Remove Curse resolve in `resolution/dispel.ts`, which ends the
 spell's effects, its area or its caster's Concentration (`spell-endings.ts`). A Concentration spell that

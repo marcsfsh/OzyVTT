@@ -101,8 +101,7 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
         tags: ["no-healing", "curse"],
         atRest: { at: "day", maximumLoss: "3d6", holdsMaximum: true }
       }
-    ],
-    reminder: "A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
+    ]
   },
   "mummy-lord/rotting-fist": {
     why: "the curse lowers the Hit Point maximum every 24 hours, and the creature gains no benefit from a Long Rest",
@@ -113,8 +112,7 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
         tags: ["no-healing", "curse"],
         atRest: { at: "day", maximumLoss: "3d6", noBenefit: "long" }
       }
-    ],
-    reminder: "A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
+    ]
   },
   "rakshasa/cursed-touch": {
     why: "the curse takes the benefit of every rest, which the reader has no phrase for",

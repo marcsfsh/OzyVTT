@@ -12,6 +12,8 @@ import { holyNimbusBurns } from "./paladin-auras.js";
 import { endEffectsOutOfSight, openEndingSave, openRepeatSaves } from "./save-stages.js";
 import { sceneSight, type SceneSight } from "./vision/sight.js";
 import { traitsAtTurnEnd, traitsAtTurnStart } from "./trait-turns.js";
+import { deathTraitsAtTurnEnd } from "./death-traits.js";
+import { riseAtTurnStart } from "./risen.js";
 
 type Actor = GameState["actors"][number];
 type Effect = Actor["effects"][number];
@@ -59,6 +61,8 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
   if (!deps?.rollDie || !deps.resolveDefinition) return;
   const dice = { ...deps, rollDie: deps.rollDie, resolveDefinition: deps.resolveDefinition };
   events.push(...traitsAtTurnEnd(state, actorId, dice));
+  // A hydra grows back its heads and a Bloodied troll loses a limb (Multiple Heads, Loathsome Limbs).
+  events.push(...deathTraitsAtTurnEnd(state, actorId, dice));
   // "Takes 10 (3d6) Acid damage at the end of each of the toad's turns."
   dealOngoingAt(state, actorId, "end", events, dice);
 }
@@ -85,6 +89,15 @@ function sightOf(state: GameState, deps: TurnEndDeps): (viewerId: string, target
  * (`traitsAtTurnStart`: Regeneration, Berserk, Barbed Hide) and the auras it starts its turn in ask their saves.
  */
 export function startOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps: TurnStartDeps): void {
+  // "A Humanoid killed by this spell rises at the start of your next turn as a Zombie" (Finger of Death).
+  if (deps.newId)
+    events.push(
+      ...riseAtTurnStart(state, actorId, {
+        resolveDefinition: deps.resolveDefinition,
+        newId: deps.newId,
+        ...(deps.catalog ? { catalog: deps.catalog } : {})
+      })
+    );
   heroicWarrior(state, actorId, events, deps);
   // "At the start of each of its turns, the Restrained target repeats the save" (Conjure Elemental).
   if (deps.newId)

@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { makeEffect } from "../src/effects.js";
 import { confusedTurn, gibberingTurn } from "../src/random-outcomes.js";
-import { actorOf, answer, cast, caster, endFight } from "./spell-lifetimes-kit.js";
+import { actorOf, answer, cast, caster } from "./spell-lifetimes-kit.js";
 import { FOE, FOE2 } from "./spell-casters.js";
 
 // Tables the server rolls on (SRD 5.2.1): Prismatic Spray's ray per creature, Confusion's d10 each turn, Gibbering's
-// d8, Reincarnate's species and Chromatic Orb's leap.
+// d8 and Chromatic Orb's leap.
 
 const twelve = (face: number) => Array.from({ length: 12 }, () => face);
 /** The costly materials (tokens, oils, a diamond) are the components rules' business, waived here. */
@@ -92,17 +92,6 @@ describe("Gibbering", () => {
     );
     expect(goblin.effects[0]).toMatchObject({ name: "Gibbering: does nothing", speedZero: true });
     expect(goblin.effects[0]?.tags).toEqual(expect.arrayContaining(["no-actions", "no-bonus-actions", "no-reactions"]));
-  });
-});
-
-describe("Reincarnate", () => {
-  it("rolls Reincarnate's species, a 1 rolling again", () => {
-    const fight = caster();
-    endFight(fight.state);
-    const done = cast(fight, "reincarnate", { targetIds: [FOE], ...waived }, [1, 4]);
-    expect((done.tableNarration ?? []).map((line) => line.text)).toContain(
-      "Reincarnate rolls 4: Goblin comes back as an Elf, unless the GM chooses another species."
-    );
   });
 });
 

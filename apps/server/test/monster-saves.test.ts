@@ -5,6 +5,7 @@ import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
+import { addEffect, DEATH_WARD_TAG, makeEffect } from "../src/effects.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { answerSave } from "../src/saving-throws.js";
 import { currentSpeedFeet } from "../src/speed.js";
@@ -353,6 +354,23 @@ describe("a failure with no condition", () => {
     answer(built, 3, [4, 4, 4]);
     expect(hero(built).deathSaves).toEqual({ successes: 0, failures: 3, stable: false });
     expect(monster(built).hp.current).toBe(212);
+    // The death is recorded with what killed it.
+    expect(hero(built).death).toMatchObject({ cause: "Consume Life" });
+  });
+
+  it("lets Death Ward turn Consume Life aside, since it kills without damage", () => {
+    const built = table("will-o-wisp", 0);
+    hero(built).deathSaves = { successes: 1, failures: 0, stable: false };
+    addEffect(
+      built.state,
+      IDS.hero,
+      makeEffect({ id: "ward", name: "Death Ward", tags: [DEATH_WARD_TAG], duration: { type: "manual" } })
+    );
+    use(built, "consume-life");
+    answer(built, 3, [4, 4, 4]);
+    expect(hero(built).deathSaves.failures).toBe(0);
+    expect(hero(built).death).toBeUndefined();
+    expect(hero(built).effects.some((effect) => effect.tags.includes(DEATH_WARD_TAG))).toBe(false);
   });
 });
 

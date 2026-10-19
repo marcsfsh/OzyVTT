@@ -193,9 +193,9 @@ describe("a monster's hit leaves an effect beyond conditions", () => {
 });
 
 describe("what a monster's hit leaves to the GM is said with it", () => {
-  it("curses with a mummy's Rotting Fist: no healing, a daily loss, and the death to dust in the reminder", () => {
+  it("curses with a mummy's Rotting Fist: no healing and a daily loss, and the death to dust is the hit's own", () => {
     const built = table("mummy");
-    const hit = strike(built, "rotting-fist");
+    strike(built, "rotting-fist");
     expect(built.hero.effects).toMatchObject([
       {
         tags: ["no-healing", "curse"],
@@ -203,7 +203,10 @@ describe("what a monster's hit leaves to the GM is said with it", () => {
         atRest: { at: "day", maximumLoss: "3d6", holdsMaximum: true }
       }
     ]);
-    expect(hit.warnings?.join(" ")).toMatch(/A creature dies and turns to dust if reduced to 0 Hit Points/);
+    // The death to dust is the hit's own (`kill-outright.test.ts`).
+    expect(built.definition.actions.find((action) => action.id === "rotting-fist")?.drain).toEqual({
+      killsAtZero: { cause: "Rotting Fist", bodyGone: true }
+    });
   });
 
   it("names a shadow's Strength drain", () => {

@@ -126,6 +126,19 @@ describe("SRD monster save damage is what the failure deals at once", () => {
     expect(nightmare.damage).toEqual([]);
     expect(nightmare.save?.failureConditions).toEqual([]);
     expect(nightmare.reminder).toMatch(/20 Hit Points or fewer/);
+    // One that kills or drops the target by its hit points does it, and deals its damage to a target above them.
+    expect(action("solar", "slaying-bow")).toMatchObject({
+      damage: [
+        { formula: "4d8 + 6", type: "piercing" },
+        { formula: "8d8", type: "radiant" }
+      ],
+      save: { failureByHitPoints: [{ atOrBelow: 100, dies: true }] }
+    });
+    expect(action("sea-hag", "death-glare")).toMatchObject({
+      damage: [{ formula: "3d8", type: "psychic" }],
+      save: { failureByHitPoints: [{ atOrBelow: 20, dropsToZero: true }] }
+    });
+    expect(action("sea-hag", "death-glare").reminder).toBeUndefined();
     // The first roar's save, and the third roar's thunder left to the GM.
     const roar = action("sphinx-of-valor", "roar");
     expect(roar.damage).toEqual([]);
@@ -143,7 +156,8 @@ describe("SRD monster save damage is what the failure deals at once", () => {
         .flatMap((action) => {
           const failure = /Failure:\s*(.+?)(?:\s*Success:|$)/s.exec(action.description)![1];
           const first = failure.split(/(?<=\.)\s/)[0] ?? "";
-          if (/^If the target has \d+ Hit Points/.test(first) || action.reminder?.startsWith("Roar runs")) return [];
+          if (/^If the (?:target|creature) has \d+ Hit Points/.test(first) || action.reminder?.startsWith("Roar runs"))
+            return [];
           // A type each use picks (a half-dragon's breath, of its Draconic Origin's type) is printed with no type.
           if (action.damageTypes !== undefined) return [];
           const want = [...first.matchAll(/\d+ \((\d+d\d+(?:\s*[+-]\s*\d+)?)\) ([A-Za-z]+) damage/g)].map(

@@ -6919,7 +6919,13 @@
     "count": 1
    },
    "healing": null,
-   "seenTargets": true
+   "seenTargets": true,
+   "drain": {
+    "killsAtZero": {
+     "cause": "Disintegrate",
+     "bodyGone": true
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -7489,7 +7495,52 @@
   "save": {
    "ability": "cha",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "failureByHitPoints": [
+    {
+     "atOrBelow": 20,
+     "dies": true
+    },
+    {
+     "atOrBelow": 30,
+     "conditions": [
+      "blinded",
+      "deafened",
+      "stunned"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 60
+     }
+    },
+    {
+     "atOrBelow": 40,
+     "conditions": [
+      "blinded",
+      "deafened"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 100
+     }
+    },
+    {
+     "atOrBelow": 50,
+     "conditions": [
+      "deafened"
+     ],
+     "duration": {
+      "type": "rounds",
+      "rounds": 10
+     }
+    }
+   ],
+   "failureBanishes": [
+    "celestial",
+    "elemental",
+    "fey",
+    "fiend"
+   ]
   },
   "target": {
    "type": "creature",
@@ -9628,7 +9679,15 @@
     "count": 1
    },
    "healing": null,
-   "seenTargets": true
+   "seenTargets": true,
+   "drain": {
+    "slainRise": {
+     "monsterId": "zombie",
+     "creatureTypes": [
+      "humanoid"
+     ]
+    }
+   }
   },
   "classes": [
    "sorcerer",
@@ -11409,7 +11468,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "reposes": true,
+   "targets": {
+    "count": 1
+   },
+   "grant": {
+    "name": "Gentle Repose",
+    "tags": [
+     "gentle-repose"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    },
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false
+   }
   },
   "classes": [
    "cleric",
@@ -18943,12 +19020,18 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
+   "damage": [
+    {
+     "formula": "12d12",
+     "type": "psychic"
+    }
+   ],
    "targets": {
     "count": 1
    },
    "healing": null,
-   "seenTargets": true
+   "seenTargets": true,
+   "killsAtHitPoints": 100
   },
   "classes": [
    "bard",
@@ -19936,7 +20019,14 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "revives": {
+    "hitPoints": "one",
+    "withinMinutes": 14400,
+    "notUndead": true,
+    "endsPoison": true,
+    "d20Penalty": -4
+   }
   },
   "classes": [
    "bard",
@@ -20400,7 +20490,12 @@
    "healing": null,
    "targetTypes": [
     "humanoid"
-   ]
+   ],
+   "revives": {
+    "hitPoints": "all",
+    "withinMinutes": 14400,
+    "rollsSpecies": true
+   }
   },
   "classes": [
    "druid"
@@ -20615,7 +20710,16 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "revives": {
+    "hitPoints": "all",
+    "withinMinutes": 52560000,
+    "notUndead": true,
+    "endsPoison": true,
+    "restoresParts": true,
+    "d20Penalty": -4,
+    "taxesCasterAfterMinutes": 525600
+   }
   },
   "classes": [
    "bard",
@@ -20731,7 +20835,11 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "revives": {
+    "hitPoints": "one",
+    "withinMinutes": 1
+   }
   },
   "classes": [
    "cleric",
@@ -24774,7 +24882,14 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "revives": {
+    "hitPoints": "all",
+    "withinMinutes": 105120000,
+    "newBody": true,
+    "endsPoison": true,
+    "endsCurses": true
+   }
   },
   "classes": [
    "cleric",

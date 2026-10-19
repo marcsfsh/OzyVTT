@@ -293,20 +293,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The beheading on a rolled 20 is the GM's, said with the hit. Not modeled: ignoring Resistance to Slashing damage.
+  // On a rolled 20 the sword cuts off a head (`kills.beheads`): 30 Slashing more where it can't, and a creature with
+  // Legendary Resistance left spends it. Not modeled: ignoring Resistance to Slashing damage.
   "vorpal-sword": {
     modifiers: [
       { type: "attack-bonus", amount: 3 },
       { type: "damage-bonus", amount: 3 }
     ],
-    onHit: [
-      {
-        conditions: [],
-        naturalTwenty: true,
-        reminder:
-          "On a rolled 20 the sword cuts off one of the creature's heads, and it dies if it can't survive without it. A creature with Immunity to Slashing damage, no head or one too big for the blade takes an extra 30 Slashing damage instead, and Legendary Resistance can trade the head for that damage."
-      }
-    ]
+    onHit: [{ conditions: [], naturalTwenty: true, kills: { beheads: true } }]
   },
 
   // Not modeled: the aura's Advantage on saves against spells for the wielder's allies.
@@ -326,11 +320,20 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Life Stealing (rolled charges, crit + HP threshold + save trigger) is not expressible.
+  // Life Stealing: a rolled 20 against a creature under 100 Hit Points asks a DC 15 Constitution save, a failure
+  // slaying it; Constructs and Undead succeed. Its 1d8 + 1 charges, one spent per slaying, are the GM's to count.
   "nine-lives-stealer": {
     modifiers: [
       { type: "attack-bonus", amount: 2 },
       { type: "damage-bonus", amount: 2 }
+    ],
+    onHit: [
+      {
+        conditions: [],
+        naturalTwenty: true,
+        save: { ability: "con", dc: 15 },
+        kills: { hitPointsUnder: 100, exceptCreatureTypes: ["construct", "undead"] }
+      }
     ]
   },
 
@@ -405,7 +408,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // +3 against a Construct, and 7 Bludgeoning more on a rolled 20 (14 against a Construct), never on a crit from a wider
-  // range; a mace's damage is Bludgeoning, so a flat bonus carries it. Destroying a Construct is the GM's, said then.
+  // range; a mace's damage is Bludgeoning, so a flat bonus carries it.
   "mace-of-smiting": {
     modifiers: [
       { type: "attack-bonus", amount: 1 },
@@ -427,21 +430,25 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         when: [{ type: "on-natural-20" }, { type: "versus-creature-type", creatureTypes: ["construct"] }]
       }
     ],
-    onHit: [
-      {
-        conditions: [],
-        naturalTwenty: true,
-        creatureTypes: ["construct"],
-        reminder: "A Construct with 25 Hit Points or fewer after this damage is destroyed."
-      }
-    ]
+    // "If a Construct has 25 Hit Points or fewer after taking this damage, it is destroyed."
+    onHit: [{ conditions: [], naturalTwenty: true, creatureTypes: ["construct"], kills: { afterHitAtOrBelow: 25 } }]
   },
 
-  // "When you hit a Fiend or an Undead with this magic weapon, that creature takes an extra 2d6 Radiant damage." The
-  // save against destruction at 25 Hit Points or fewer is not modeled. "While you hold this weapon, it sheds Bright
-  // Light in a 20-foot radius and Dim Light for an additional 20 feet."
+  // "When you hit a Fiend or an Undead with this magic weapon, that creature takes an extra 2d6 Radiant damage. If the
+  // target has 25 Hit Points or fewer after taking this damage, it must succeed on a DC 15 Wisdom saving throw or be
+  // destroyed. On a successful save, the creature has the Frightened condition until the end of your next turn."
+  // "While you hold this weapon, it sheds Bright Light in a 20-foot radius and Dim Light for an additional 20 feet."
   "mace-of-disruption": {
     modifiers: [versusTypes("2d6", ["fiend", "undead"], "radiant")],
+    onHit: [
+      {
+        conditions: [{ id: "frightened" }],
+        duration: { type: "until-source-turn-end" },
+        creatureTypes: ["fiend", "undead"],
+        save: { ability: "wis", dc: 15 },
+        kills: { afterHitAtOrBelow: 25 }
+      }
+    ],
     light: { brightFeet: 20, dimFeet: 20, always: true }
   },
 
@@ -1606,7 +1613,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     grants: { damageImmunities: ["poison"], conditionImmunities: ["poisoned"] }
   },
 
-  // `periapt-of-wound-closure` - death-save roll changes have no reader; doubling Hit Die healing is healing.
+  // Life Preservation: a death save's d20 of 9 or lower counts as 10 (death-saves.ts). Natural Healing Boost: each Hit
+  // Point Die rolled to regain Hit Points restores double (rests.ts, resolution/hit-point-die.ts).
+  "periapt-of-wound-closure": {
+    effects: [
+      {
+        name: "Wound Closure",
+        tags: ["death-save-floor", "hit-dice-doubled"],
+        duration: { type: "manual" },
+        modifiers: [],
+        onEnd: [],
+        voidWhileIncapacitated: false,
+        concentration: false
+      }
+    ]
+  },
 
   // AC only. Preservation (save outcome, crumbles when spent) and spell-save advantage are not expressible.
   "scarab-of-protection": { modifiers: [{ type: "armor-class", amount: 1 }] },

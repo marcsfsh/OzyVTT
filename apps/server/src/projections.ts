@@ -233,6 +233,9 @@ const PENDING_SAVE_FIELDS = {
   failureKills: "never",
   autoSucceeds: "never",
   disadvantageFrom: "never",
+  // What a failure does at each Hit Point band names the thresholds, the stat block's text; it is narrated as it lands.
+  failureByHitPoints: "never",
+  failureBanishes: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
   gmApplies: "player",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
@@ -624,6 +627,8 @@ const PLAYER_ACTOR_FIELDS = {
   tokenAssetId: "table",
   conditions: "table",
   deathSaves: "table",
+  // When it died and how, which the revival rules read: the GM's.
+  death: "never",
   armorClass: "party",
   // Only says the GM set the character's AC by hand; the number is `armorClass`, which the party already sees.
   armorClassOverride: "party",

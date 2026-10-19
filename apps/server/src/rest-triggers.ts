@@ -145,7 +145,17 @@ function loseMaximum(
       ...sourceOf(effect)
     }
   ];
-  if (maximum <= 0) events.push(...killOutright(state, actor.id, effect.name));
+  if (maximum <= 0)
+    events.push(
+      ...killOutright(state, actor.id, effect.name, {
+        withoutDamage: true,
+        deps: {
+          resolveDefinition: deps.resolveDefinition,
+          rollDie: deps.random,
+          ...(deps.catalog ? { catalog: deps.catalog } : {})
+        }
+      })
+    );
   return events;
 }
 
