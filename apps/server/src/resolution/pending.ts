@@ -14,6 +14,7 @@ import { recordRoll, tableLineOf, type ResolveContext } from "./context.js";
 import { coverBonusOf, coverFor } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf } from "./damage.js";
+import { effectNameOf } from "../effect-names.js";
 
 type HalfDamageReaction = Extract<ActionReaction, { response: "half-damage" }>;
 type AcBonusReaction = Extract<ActionReaction, { response: "ac-bonus" }>;
@@ -203,7 +204,9 @@ export function failureEffectFor(
   return {
     name: (
       declared?.name ??
-      (linked.length > 0 ? `${conditionLabel(linked[0]!)} by ${attacker.name} (${action.name})` : hazard!.name)
+      (linked.length > 0
+        ? `${conditionLabel(linked[0]!)} by ${attacker.name} (${effectNameOf(action.name)})`
+        : hazard!.name)
     ).slice(0, 120),
     tags: [
       ...(grapple ? ["grapple"] : []),
@@ -285,7 +288,7 @@ export function parkActionSave(ctx: ResolveContext): void {
             target.id,
             makeEffect({
               id: `${input.commandId}:${target.id}:speed`,
-              name: action.name,
+              name: effectNameOf(action.name),
               sourceActorId: attacker.id,
               sourceName: attacker.name,
               sourceActionId: action.id,

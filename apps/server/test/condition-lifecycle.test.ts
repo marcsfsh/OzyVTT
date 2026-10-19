@@ -703,9 +703,9 @@ describe("damage an effect deals at the start of a turn", () => {
     expect(hero.hp.current).toBe(30);
     const starting = advanceRolling(state, [7]); // the hero's turn starts
     expect(hero.hp.current).toBe(23);
-    expect(starting.map((event) => event.text)).toContain(
-      "Hero takes 7 Poison damage from Poisoned by Foe (Spores (Recharge 6))."
-    );
+    // The effect takes the action's name without its "(Recharge 6)".
+    expect(hero.effects.map((effect) => effect.name)).toEqual(["Poisoned by Foe (Spores)"]);
+    expect(starting.map((event) => event.text)).toContain("Hero takes 7 Poison damage from Poisoned by Foe (Spores).");
     advanceRolling(state, []); // the hero's turn ends: the repeated save opens
     answer(state, IDS.hero, 20);
     expect(hero.effects).toEqual([]);

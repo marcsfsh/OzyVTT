@@ -5,6 +5,7 @@ import { previewDamage } from "../hit-points.js";
 import { masteryHitEffects } from "../weapon-mastery.js";
 import { sizeAtMost, tableLineOf, type ResolveContext } from "./context.js";
 import { damagePartsOf } from "./damage.js";
+import { effectNameOf } from "../effect-names.js";
 
 /** Whether this hit deals its target any damage after the target's defences: what Slow and Vex need. */
 function dealsDamage(ctx: ResolveContext): boolean {
@@ -86,7 +87,7 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
       target.id,
       makeEffect({
         id: `${input.commandId}:hit:${target.id}:${index}`,
-        name: `${rider.name ?? conditionLabel(conditionIds[0]!)} by ${attacker.name} (${action.name})`,
+        name: `${rider.name ?? conditionLabel(conditionIds[0]!)} by ${attacker.name} (${effectNameOf(action.name)})`,
         tags: grapple ? ["grapple"] : [],
         sourceActorId: attacker.id,
         sourceName: attacker.name,

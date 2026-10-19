@@ -23,6 +23,7 @@ import { deriveEquipment } from "../equipment-derivation.js";
 import { currentSpeedFeet } from "../speed.js";
 import type { DefinitionAction, LiveActor, ResolveContext } from "./context.js";
 import { moveMark } from "./marks.js";
+import { effectNameOf } from "../effect-names.js";
 
 /** Reckless Attack's Advantage is on attack rolls using Strength. A sheet built before that gate was authored carries
  *  the roll mode ungated, so it is narrowed as it lands. */
@@ -178,10 +179,10 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       name:
         ctx.builtin?.grantName?.(ctx) ??
         ((hexAbility ?? enhancedAbility)
-          ? `${grant.name ?? action.name} (${ABILITY_NAMES[(hexAbility ?? enhancedAbility)!]})`
+          ? `${grant.name ?? effectNameOf(action.name)} (${ABILITY_NAMES[(hexAbility ?? enhancedAbility)!]})`
           : chosenType
-            ? `${grant.name ?? action.name} (${chosenType[0]!.toUpperCase()}${chosenType.slice(1)})`
-            : (grant.name ?? action.name)),
+            ? `${grant.name ?? effectNameOf(action.name)} (${chosenType[0]!.toUpperCase()}${chosenType.slice(1)})`
+            : (grant.name ?? effectNameOf(action.name))),
       tags: rage ? [...rage.tags] : grant.tags,
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -263,7 +264,7 @@ export function grantOutsideFight(
     actor.id,
     makeEffect({
       id: `${commandId}:grant`,
-      name: grant.name ?? action.name,
+      name: grant.name ?? effectNameOf(action.name),
       tags: grant.tags,
       sourceActorId: actor.id,
       sourceName: actor.name,
