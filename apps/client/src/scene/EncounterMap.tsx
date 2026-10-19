@@ -518,7 +518,9 @@ export function EncounterMap({
           extraPerStep: extraPerStepFor(draggedBudget, draggedMode),
           carried: grappledBy(actors, dragging.actorId, role),
           free: draggedMode === "teleport" || draggedMode === "forced",
-          walls: moveWalls
+          walls: moveWalls,
+          ...(draggedBudget?.passesCreatures ? { passesCreatures: true } : {}),
+          ...(draggedBudget?.swarmIds ? { swarmIds: draggedBudget.swarmIds } : {})
         })
       : null;
   // The drag's label says how the creature travels when it isn't walking: the way to move lives in the drag itself.

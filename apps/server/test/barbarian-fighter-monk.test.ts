@@ -186,6 +186,7 @@ const monkInput = (level: number): MutableInput => ({
     { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "monk", kind: "skill", id: "acrobatics" },
     { level: 1, classId: "monk", kind: "skill", id: "insight" },
+    { level: 1, classId: "monk", kind: "tool", id: "instrument-flute" },
     ...(level >= 3 ? ([{ level: 3, classId: "monk", kind: "subclass", id: "warrior-of-the-open-hand" }] as Row[]) : []),
     ...asisTo("monk", level, [
       [4, "dex", "dex"],

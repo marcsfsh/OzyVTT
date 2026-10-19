@@ -36,7 +36,7 @@
     "id": "remarkable-athlete",
     "name": "Remarkable Athlete",
     "level": 3,
-    "description": "You have Advantage on Initiative rolls and Strength (Athletics) checks. In addition, immediately after you score a Critical Hit, you can move up to half your Speed without provoking Opportunity Attacks.",
+    "description": "Thanks to your athleticism, you have Advantage on Initiative rolls and Strength (Athletics) checks. In addition, immediately after you score a Critical Hit, you can move up to half your Speed without provoking Opportunity Attacks.",
     "modifiers": [
      {
       "type": "roll-mode",
@@ -88,7 +88,7 @@
     "id": "superior-critical",
     "name": "Superior Critical",
     "level": 15,
-    "description": "Your attack rolls with weapons and Unarmed Strikes can now score a Critical Hit on a roll of 18-20 on the d20.",
+    "description": "Your attack rolls with weapons and Unarmed Strikes can now score a Critical Hit on a roll of 18–20 on the d20.",
     "replacesFeatureId": "improved-critical",
     "modifiers": [
      {
@@ -113,7 +113,7 @@
     "id": "survivor",
     "name": "Survivor",
     "level": 18,
-    "description": "You attain the pinnacle of resilience in battle. You have Advantage on Death Saving Throws, and at the start of each of your turns you regain Hit Points equal to 5 plus your Constitution modifier if you are Bloodied and have at least 1 Hit Point."
+    "description": "You attain the pinnacle of resilience in battle, giving you these benefits. Defy Death. You have Advantage on Death Saving Throws. Moreover, when you roll 18–20 on a Death Saving Throw, you gain the benefit of rolling a 20 on it. Heroic Rally. At the start of each of your turns, you regain Hit Points equal to 5 plus your Constitution modifier if you are Bloodied and have at least 1 Hit Point."
    }
   ]
  },
@@ -752,7 +752,14 @@
      "kind": "spell",
      "choose": 2,
      "fromCatalog": "cleric-spells-or-druid-spells-or-wizard-spells"
-    }
+    },
+    "replaces": [
+     {
+      "offer": "feature:magical-discoveries",
+      "when": "level-up",
+      "amount": 1
+     }
+    ]
    },
    {
     "id": "peerless-skill",
@@ -1157,7 +1164,7 @@
     "id": "evocation-savant",
     "name": "Evocation Savant",
     "level": 3,
-    "description": "Choose two Wizard spells from the Evocation school, each of which must be level 1 or 2, and add them to your spellbook for free.",
+    "description": "Choose two Wizard spells from the Evocation school, each of which must be no higher than level 2, and add them to your spellbook for free. In addition, whenever you gain access to a new level of spell slots in this class, you can add one Wizard spell from the Evocation school to your spellbook for free. The chosen spell must be of a level for which you have spell slots.",
     "tags": [
      "spellbook"
     ],
@@ -1173,25 +1180,25 @@
     "id": "potent-cantrip",
     "name": "Potent Cantrip",
     "level": 3,
-    "description": "Your damaging cantrips affect even creatures that avoid the brunt of the effect. When a creature succeeds on a saving throw against your cantrip, the creature takes half the damage (if any) but suffers no additional effect from the cantrip."
+    "description": "Your damaging cantrips affect even creatures that avoid the brunt of the effect. When you cast a cantrip at a creature and you miss with the attack roll or the target succeeds on a saving throw against the cantrip, the target takes half the cantrip's damage (if any) but suffers no additional effect from the cantrip."
    },
    {
     "id": "sculpt-spells",
     "name": "Sculpt Spells",
     "level": 6,
-    "description": "You can create pockets of relative safety within the effects of your evocations. When you cast an Evocation spell that affects other creatures you can see, you can choose a number of them equal to 1 plus the spell's level; the chosen creatures automatically succeed on their saving throws against the spell and take no damage if they would normally take half damage on a successful save."
+    "description": "You can create pockets of relative safety within the effects of your evocations. When you cast an Evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 plus the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save."
    },
    {
     "id": "empowered-evocation",
     "name": "Empowered Evocation",
     "level": 10,
-    "description": "You can add your Intelligence modifier to one damage roll of any Wizard Evocation spell you cast."
+    "description": "Whenever you cast a Wizard spell from the Evocation school, you can add your Intelligence modifier to one damage roll of that spell."
    },
    {
     "id": "overchannel",
     "name": "Overchannel",
     "level": 14,
-    "description": "You can increase the power of your spells. When you cast a Wizard spell of levels 1-5 that deals damage, you can deal maximum damage with it. The first time you do so, you suffer no adverse effect; using it again before you finish a Long Rest deals necrotic damage to you.",
+    "description": "You can increase the power of your spells. When you cast a Wizard spell with a spell slot of levels 1–5 that deals damage, you can deal maximum damage with that spell on the turn you cast it. The first time you do so, you suffer no adverse effect. If you use this feature again before you finish a Long Rest, you take 2d12 Necrotic damage for each level of the spell slot immediately after you cast it. This damage ignores Resistance and Immunity. Each time you use this feature again before finishing a Long Rest, the Necrotic damage per spell level increases by 1d12.",
     "uses": {
      "limit": 1,
      "per": "long-rest"
@@ -1687,7 +1694,7 @@
     "id": "life-domain-spells",
     "name": "Life Domain Spells",
     "level": 3,
-    "description": "Your connection to this divine domain ensures you always have certain spells ready. When you reach a Cleric level specified in the Life Domain Spells table, you thereafter always have the listed spells prepared. Cleric level 3: Aid, Bless, Cure Wounds, Lesser Restoration. Level 5: Mass Healing Word, Revivify. Level 7: Aura of Life, Death Ward. Level 9: Greater Restoration, Mass Cure Wounds.",
+    "description": "Your connection to this divine domain ensures you always have certain spells ready. When you reach a Cleric level specified in the Life Domain Spells table, you thereafter always have the listed spells prepared. Life Domain Spells Cleric Level 3: Aid, Bless, Cure Wounds, Lesser Restoration; Cleric Level 5: Mass Healing Word, Revivify; Cleric Level 7: Aura of Life, Death Ward; Cleric Level 9: Greater Restoration, Mass Cure Wounds.",
     "tags": [
      "spellcasting"
     ],

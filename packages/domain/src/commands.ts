@@ -547,6 +547,14 @@ export const ContentActionsSchema = z
       .max(200)
   })
   .strict();
+/** A stat block's actions to run, for one combatant built from it when `actorId` names one. */
+export const ContentMonsterActionsQuerySchema = z
+  .object({
+    /** A combatant built from the stat block: its actions as it has them now, with what its items give. */
+    actorId: z.uuid().optional()
+  })
+  .strict();
+export const ContentMonsterActionsSchema = ContentActionsSchema.extend(ContentMonsterActionsQuerySchema.shape);
 export const TurnReactionSchema = z
   .object({
     commandId: z.uuid(),
@@ -807,6 +815,29 @@ export const ActorSetHeroicInspirationSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     has: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
+/** A character's player (or the GM) gives its second Heroic Inspiration to a player character who lacks one, or lets
+ *  it go (`recipientId` null). */
+export const ActorGiveHeroicInspirationSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    recipientId: z.uuid().nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
+/** The GM awards XP: an amount to each recipient, and an even share of the defeated creatures' stat block XP. */
+export const ActorAwardExperienceSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorIds: z.array(z.uuid()).min(1).max(12),
+    amount: z.number().int().min(-1_000_000).max(1_000_000).default(0),
+    defeatedIds: z.array(z.uuid()).max(60).default([]),
+    inLairIds: z.array(z.uuid()).max(60).default([]),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1254,6 +1285,18 @@ export const CharacterGiveItemSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     toActorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM marks a carried manual or tome studied by the character carrying it. */
+export const CharacterStudyItemSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     itemId: z
       .string()
       .regex(/^[a-z0-9-]+$/)

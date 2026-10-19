@@ -251,6 +251,19 @@ export const ContentEquipmentSummarySchema = z.strictObject({
     .optional()
     .describe(
       "The spell levels one copy of a Spell Scroll can bear (0 is a cantrip), for the picker's spell step; absent on anything else"
+    ),
+  /** A manual or tome: its study raises a score for good (`character.study-item`). */
+  study: z
+    .strictObject({
+      ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]),
+      amount: z.number().int(),
+      maximum: z.number().int(),
+      hours: z.number().int(),
+      days: z.number().int()
+    })
+    .optional()
+    .describe(
+      "A manual or tome: `hours` of study within `days` raise the reader's `ability` by `amount`, never above `maximum`, as its text prints it; absent on anything else"
     )
 });
 export type ContentEquipmentSummary = Wire<z.infer<typeof ContentEquipmentSummarySchema>>;

@@ -17,6 +17,7 @@ import { damagePartsOf } from "./damage.js";
 import { spellOf, spellSaveDuration } from "./concentration.js";
 import { openDamageWindow, type DamageWindowDeps } from "../damage-window.js";
 import { answerKeyOf, answersFromOthers, askAnswer } from "../roll-answers.js";
+import { effectNameOf } from "../effect-names.js";
 
 type AcBonusReaction = Extract<ActionReaction, { response: "ac-bonus" }>;
 
@@ -314,7 +315,9 @@ export function failureEffectFor(
   return {
     name: (
       declared?.name ??
-      (linked.length > 0 ? `${conditionLabel(linked[0]!)} by ${attacker.name} (${action.name})` : hazard!.name)
+      (linked.length > 0
+        ? `${conditionLabel(linked[0]!)} by ${attacker.name} (${effectNameOf(action.name)})`
+        : hazard!.name)
     ).slice(0, 120),
     tags: [
       ...(grapple ? ["grapple"] : []),
@@ -405,7 +408,7 @@ export function parkActionSave(ctx: ResolveContext): void {
             target.id,
             makeEffect({
               id: `${input.commandId}:${target.id}:speed`,
-              name: action.name,
+              name: effectNameOf(action.name),
               sourceActorId: attacker.id,
               sourceName: attacker.name,
               sourceActionId: action.id,

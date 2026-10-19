@@ -289,6 +289,7 @@ export const GAME_PATHS = {
   characterAddToSpellbook: `${API_NAMESPACE}/game/actors/{actorId}/spellbook`,
   characterSetInventory: `${API_NAMESPACE}/game/actors/{actorId}/inventory`,
   characterGiveItem: `${API_NAMESPACE}/game/actors/{actorId}/inventory/give`,
+  characterStudyItem: `${API_NAMESPACE}/game/actors/{actorId}/inventory/study`,
   characterRecoverAmmunition: `${API_NAMESPACE}/game/actors/{actorId}/inventory/recover-ammunition`,
   characterSetCurrency: `${API_NAMESPACE}/game/actors/{actorId}/currency`,
   characterSetFavourites: `${API_NAMESPACE}/game/actors/{actorId}/favourites`,
@@ -311,6 +312,8 @@ export const GAME_PATHS = {
   checkReroll: `${API_NAMESPACE}/game/actors/{actorId}/check/reroll`,
   checkAnswer: `${API_NAMESPACE}/game/actors/{actorId}/check/answer`,
   actorHeroicInspiration: `${API_NAMESPACE}/game/actors/{actorId}/heroic-inspiration`,
+  actorGiveHeroicInspiration: `${API_NAMESPACE}/game/actors/{actorId}/heroic-inspiration/give`,
+  awardExperience: `${API_NAMESPACE}/game/experience/award`,
   rollCalls: `${API_NAMESPACE}/game/roll-calls`,
   rollCallAnswer: `${API_NAMESPACE}/game/roll-calls/{callId}/answer`,
   rollCallClose: `${API_NAMESPACE}/game/roll-calls/{callId}/close`,
@@ -673,6 +676,12 @@ export const GAME_COMMANDS = {
     method: "post",
     path: GAME_PATHS.actorHeroicInspiration
   },
+  "actor.give-heroic-inspiration": {
+    scope: "actor:write",
+    method: "post",
+    path: GAME_PATHS.actorGiveHeroicInspiration
+  },
+  "actor.award-experience": { scope: "actor:write", method: "post", path: GAME_PATHS.awardExperience },
   "rules.ask": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesAsk },
   "rules.answer": { scope: "combat:write", method: "post", path: GAME_PATHS.rulesAnswer },
   "table.set-staging-defaults": { scope: "combat:write", method: "post", path: GAME_PATHS.stagingDefaults },
@@ -708,6 +717,7 @@ export const GAME_COMMANDS = {
   "character.add-to-spellbook": { scope: "actor:write", method: "post", path: GAME_PATHS.characterAddToSpellbook },
   "character.set-inventory": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetInventory },
   "character.give-item": { scope: "actor:write", method: "post", path: GAME_PATHS.characterGiveItem },
+  "character.study-item": { scope: "actor:write", method: "post", path: GAME_PATHS.characterStudyItem },
   "character.recover-ammunition": {
     scope: "actor:write",
     method: "post",

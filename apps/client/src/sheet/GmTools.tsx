@@ -7,6 +7,7 @@ import { HpAdjust } from "../encounter/HpAdjust";
 import { isDeadOnSheet } from "../encounter/mortality";
 import { isKnockedOut, partyHelpers, StabilizeControl } from "../encounter/StabilizeControl";
 import { command } from "../lib/command";
+import { AwardExperience } from "./Experience";
 import { ArmorClassEditor } from "./HitPoints";
 import { GmLongRest } from "./PlayTab";
 import { heroicInspirationOf, type SheetActor, type SheetState } from "./sheet-model";
@@ -21,7 +22,7 @@ export function GmTools({
   state,
   onFeedback
 }: Readonly<{ actor: SheetActor; state: SheetState | undefined; onFeedback: (text: string) => void }>) {
-  const [open, setOpen] = useState<null | "hp" | "ac">(null);
+  const [open, setOpen] = useState<null | "hp" | "ac" | "xp">(null);
   const [busy, setBusy] = useState(false);
   const { rollInput } = useRollPreference();
   const inspired = heroicInspirationOf(actor) === true;
@@ -77,6 +78,16 @@ export function GmTools({
             {inspired ? "Take back Heroic Inspiration" : "Give Heroic Inspiration"}
           </Button>
         )}
+        {actor.kind === "player-character" && (
+          <Button
+            size="sm"
+            className="cs-gm-control"
+            aria-expanded={open === "xp"}
+            onClick={() => setOpen((current) => (current === "xp" ? null : "xp"))}
+          >
+            Award XP
+          </Button>
+        )}
         {state?.combat.active !== true && <GmLongRest actorId={actor.id} onFeedback={onFeedback} />}
       </div>
       {/* Only a revival brings the dead back, so it waits here without a tap to open it. */}
@@ -94,6 +105,7 @@ export function GmTools({
         )
       )}
       {open === "ac" && <ArmorClassEditor actor={actor} onFeedback={onFeedback} onDone={() => setOpen(null)} />}
+      {open === "xp" && <AwardExperience actorId={actor.id} name={actor.name} onFeedback={onFeedback} />}
       {actor.armorClassOverride !== undefined && <p className="cs-sub">The AC is set by hand.</p>}
       {(dying || isKnockedOut(actor)) && gmState && (
         <div className="cs-group" role="group" aria-label={`${actor.name} is ${dying ? "dying" : "knocked out"}`}>

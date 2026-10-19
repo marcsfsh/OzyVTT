@@ -33,6 +33,9 @@ export const warlock: ClassMechanicsModule = {
      * level-1 feature reads the column's growth, so no grant repeats.
      */
     "eldritch-invocations": {
+      // "Whenever you gain a Warlock level, you can replace one of your invocations with another one for which you
+      // qualify."
+      replaces: [{ offer: "feature:eldritch-invocations", when: "level-up", amount: 1 }],
       extraPicks: [
         {
           offer: "feature:eldritch-invocations",
@@ -157,8 +160,17 @@ export const warlock: ClassMechanicsModule = {
         // Investment of the Chain Master.
       }
     },
-    /** The sheet's spellcasting grouping slug, exactly as the hand-authored Wizard tags its own. */
-    "pact-magic": { tags: ["spellcasting"] },
+    /**
+     * The sheet's spellcasting grouping slug, exactly as the hand-authored Wizard tags its own. "Whenever you gain a
+     * Warlock level, you can replace one of your cantrips" and "one spell on your list".
+     */
+    "pact-magic": {
+      tags: ["spellcasting"],
+      replaces: [
+        { offer: "class-cantrips", when: "level-up", amount: 1 },
+        { offer: "class-spells", when: "level-up", amount: 1 }
+      ]
+    },
     // The once-per-Long-Rest permission only; no rider restores spell slots.
     "magical-cunning": { uses: { limit: 1, per: "long-rest" } },
     // Contact Other Plane always prepared, plus one free casting per Long Rest.
@@ -172,19 +184,31 @@ export const warlock: ClassMechanicsModule = {
      */
     "mystic-arcanum-level-6-spell": {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 6, maxSpellLevel: 6 },
-      uses: { limit: 1, per: "long-rest" }
+      uses: { limit: 1, per: "long-rest" },
+      // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
+      // same level."
+      replaces: [{ offer: "feature:mystic-arcanum-level-6-spell", when: "level-up", amount: 1 }]
     },
     "mystic-arcanum-level-7-spell": {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 7, maxSpellLevel: 7 },
-      uses: { limit: 1, per: "long-rest" }
+      uses: { limit: 1, per: "long-rest" },
+      // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
+      // same level."
+      replaces: [{ offer: "feature:mystic-arcanum-level-7-spell", when: "level-up", amount: 1 }]
     },
     "mystic-arcanum-level-8-spell": {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 8, maxSpellLevel: 8 },
-      uses: { limit: 1, per: "long-rest" }
+      uses: { limit: 1, per: "long-rest" },
+      // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
+      // same level."
+      replaces: [{ offer: "feature:mystic-arcanum-level-8-spell", when: "level-up", amount: 1 }]
     },
     "mystic-arcanum-level-9-spell": {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 9, maxSpellLevel: 9 },
-      uses: { limit: 1, per: "long-rest" }
+      uses: { limit: 1, per: "long-rest" },
+      // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
+      // same level."
+      replaces: [{ offer: "feature:mystic-arcanum-level-9-spell", when: "level-up", amount: 1 }]
     },
     "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "feats" } }
   },

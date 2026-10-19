@@ -67,6 +67,8 @@ import type {
   ActorSetSpeedSchema,
   ActorSetArmorClassSchema,
   ActorSetHeroicInspirationSchema,
+  ActorGiveHeroicInspirationSchema,
+  ActorAwardExperienceSchema,
   ActorStabilizeSchema,
   ActorSpendHitDiceSchema,
   ActorSpendUsesSchema,
@@ -95,6 +97,7 @@ import type {
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterGiveItemSchema,
+  CharacterStudyItemSchema,
   CharacterRecoverAmmunitionSchema,
   CharacterSetPreparedSchema,
   CharacterFinishPreparingSchema,
@@ -394,6 +397,22 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof ActorSetHeroicInspirationSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** A character's player or the GM: give its second Heroic Inspiration to a player character who lacks one, or let it go. */
+  "actor:give-heroic-inspiration": (
+    payload: CommandPayload<typeof ActorGiveHeroicInspirationSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM: award XP to player characters, each an amount and a share of the defeated creatures' XP. */
+  "actor:award-experience": (
+    payload: CommandPayload<typeof ActorAwardExperienceSchema>,
+    acknowledgement: (
+      result: MutationResult & {
+        each?: number;
+        creatures?: number;
+        ready?: Array<{ actorId: string; name: string; level: number }>;
+      }
+    ) => void
+  ) => void;
   /** The server first re-runs the command as the player; only a still-blocked one is parked for the GM (`askId`). */
   "rules:ask": (
     payload: CommandPayload<typeof RulesAskSchema>,
@@ -501,7 +520,7 @@ export interface ClientToServerEvents {
     acknowledgement: (result: ContentCompendiumResult) => void
   ) => void;
   "content:monster-actions": (
-    payload: { definitionId: string },
+    payload: { definitionId: string; actorId?: string },
     acknowledgement: (result: ContentActionsResult) => void
   ) => void;
   "content:monster-sheet": (
@@ -639,6 +658,11 @@ export interface ClientToServerEvents {
   "character:give-item": (
     payload: CommandPayload<typeof CharacterGiveItemSchema>,
     acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM: a carried manual or tome is studied; the score rises and the copy's magic is spent. */
+  "character:study-item": (
+    payload: CommandPayload<typeof CharacterStudyItemSchema>,
+    acknowledgement: (result: MutationResult & { ability?: string; before?: number; after?: number }) => void
   ) => void;
   "character:recover-ammunition": (
     payload: CommandPayload<typeof CharacterRecoverAmmunitionSchema>,

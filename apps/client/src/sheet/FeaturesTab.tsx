@@ -1,10 +1,12 @@
 import { useState, type ReactNode } from "react";
-import type { ActorDefinition, ActorDerivedSheet, ContentActionSummary } from "@vtt/domain";
-import { Button, IconLevelUp } from "@vtt/ui";
+import type { ActorDefinition, ActorDerivedSheet, ContentActionSummary, Rechoice } from "@vtt/domain";
+import { Button, IconLevelUp, Select } from "@vtt/ui";
 import { RichText } from "../encounter/RichText";
 import type { SrdExtension } from "../encounter/sheet-extension";
 import type { SheetActor } from "./sheet-model";
-import { UseList, type Pool } from "./Uses";
+import { plainActionName } from "../encounter/format";
+import { UseList, type Pool, type Spender } from "./Uses";
+import { ExperienceLine } from "./Experience";
 
 /** What a use costs on a turn, in the SRD's words. */
 const ACTIVATION_WORDS: Readonly<Record<string, string>> = {
@@ -61,6 +63,78 @@ function featureGroups(definition: ActorDefinition, extension: SrdExtension): Gr
   }));
   if (feats.length > 0) groups.set("feats", { title: "Feats", entries: feats });
   return [...groups.entries()].map(([key, group]) => ({ key, ...group }));
+}
+
+/** The class table's columns no use counts (the Bardic Die, Martial Arts, Sneak Attack), each class at its level. */
+function ClassColumns({ columns }: Readonly<{ columns: ActorDerivedSheet["classColumns"] }>) {
+  const classes = new Set(columns.map((column) => column.classId));
+  return (
+    <section className="cs-group" aria-label="Class table">
+      <span className="cs-eyebrow">Class table</span>
+      <dl className="cs-columns">
+        {columns.map((column) => (
+          <div key={`${column.classId}-${column.id}`} className="cs-column">
+            <dt>{classes.size > 1 ? `${column.className} · ${column.name}` : column.name}</dt>
+            <dd>{column.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+/** When a rest re-choice comes back, as the sheet says it. */
+const REST_WORDS: Readonly<Record<Rechoice["per"], string>> = {
+  "short-rest": "Chosen again after a Short or Long Rest",
+  "long-rest": "Chosen again after a Long Rest"
+};
+
+/**
+ * The picks a feature lets the character make again after a rest (Fiendish Resilience's damage type, a Circle of the
+ * Land's land), each with its answer in force. A Long Rest pick waits for the step that rest opens; the GM can make it
+ * any time. The server checks each one.
+ */
+function RestChoices({
+  rechoices,
+  afterLongRest,
+  busy,
+  onRechoose
+}: Readonly<{
+  rechoices: readonly Rechoice[];
+  afterLongRest: boolean;
+  busy: boolean;
+  onRechoose: (choice: Rechoice, option: Rechoice["options"][number]) => void;
+}>) {
+  return (
+    <section className="cs-group" aria-label="Rests">
+      <span className="cs-eyebrow">Rests</span>
+      {rechoices.map((choice) => {
+        const open = choice.per === "short-rest" || afterLongRest;
+        return (
+          <label key={choice.offer} className="cs-field">
+            <span className="cs-use-name">{choice.label}</span>
+            <span className="cs-sub">{REST_WORDS[choice.per]}</span>
+            <Select
+              aria-label={choice.label}
+              value={choice.chosen ?? ""}
+              disabled={busy || !open}
+              onChange={(event) => {
+                const picked = choice.options.find((option) => option.id === event.target.value);
+                if (picked) onRechoose(choice, picked);
+              }}
+            >
+              {choice.chosen === null && <option value="">None</option>}
+              {choice.options.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </Select>
+          </label>
+        );
+      })}
+    </section>
+  );
 }
 
 /** The Weapon Mastery picks as tiles, each weapon kind with its property; a tap shows what the property does. */
@@ -131,6 +205,8 @@ export function FeaturesTab({
   pools,
   serverActions,
   onUse,
+  rest,
+  experience,
   next
 }: Readonly<{
   actor: SheetActor;
@@ -142,27 +218,46 @@ export function FeaturesTab({
   serverActions: readonly ContentActionSummary[];
   /** Uses a pool's own action through the server, which applies what it does (Second Wind's healing). */
   onUse: (actionId: string) => void;
+  /** The picks a rest lets the character make again, out of a fight; absent or empty leaves the area out. */
+  rest?: Readonly<{
+    rechoices: readonly Rechoice[];
+    afterLongRest: boolean;
+    busy: boolean;
+    onRechoose: (choice: Rechoice, option: Rechoice["options"][number]) => void;
+  }>;
+  /** The character's XP and level once the GM has awarded XP, with the level up when the viewer may take it. */
+  experience?: Readonly<{ points: number; level: number; onLevelUp?: () => void }> | undefined;
   /** What the next level brings and the way to it, when the caller may level the character. */
   next?: ReactNode;
 }>) {
   const masteries = derived?.weaponMasteries ?? [];
   const groups = featureGroups(definition, extension);
-  const acting = new Map<string, string>();
+  // A pool whose actions do something on their own (a heal, an attack, a spell, an effect) is used through them, each
+  // by name where several spend it (Channel Divinity's Divine Spark and Turn Undead).
+  const acting = new Map<string, Spender[]>();
   for (const pool of pools) {
-    const own = definition.actions.find((action) => (action.uses?.pool ?? action.id) === pool.id);
-    const row = serverActions.find((action) => (action.usesPool ?? action.id) === pool.id);
-    // A pool whose action does something on its own (a heal, an attack, a spell, an effect) is used through it.
-    const does = own
-      ? own.healing !== undefined ||
-        own.attack !== undefined ||
-        own.save !== undefined ||
-        own.damage.length > 0 ||
-        own.grants !== undefined ||
-        own.spellId !== undefined
-      : row !== undefined &&
-        (row.healing != null || row.attackBonus !== null || row.saveAbility !== null || row.damage.length > 0);
-    const id = own?.id ?? row?.id;
-    if (does && id) acting.set(pool.id, id);
+    const own = definition.actions.filter((action) => (action.uses?.pool ?? action.id) === pool.id);
+    const spenders: Spender[] =
+      own.length > 0
+        ? own
+            .filter(
+              (action) =>
+                action.healing !== undefined ||
+                action.attack !== undefined ||
+                action.save !== undefined ||
+                action.damage.length > 0 ||
+                action.grants !== undefined ||
+                action.spellId !== undefined
+            )
+            .map((action) => ({ id: action.id, name: plainActionName(action.name) }))
+        : serverActions
+            .filter(
+              (row) =>
+                (row.usesPool ?? row.id) === pool.id &&
+                (row.healing != null || row.attackBonus !== null || row.saveAbility !== null || row.damage.length > 0)
+            )
+            .map((row) => ({ id: row.id, name: plainActionName(row.name) }));
+    if (spenders.length > 0) acting.set(pool.id, spenders);
   }
   // What each use costs on a turn, said beside its name.
   const costs = new Map<string, string>();
@@ -173,8 +268,11 @@ export function FeaturesTab({
   }
   // The monster's own actions, which have no uses to count but say what it can do.
   const monsterActions = actor.kind === "player-character" ? [] : definition.actions;
+  const columns = derived?.classColumns ?? [];
   return (
     <div className="cs-features">
+      {experience && <ExperienceLine {...experience} />}
+      {columns.length > 0 && <ClassColumns columns={columns} />}
       {pools.length > 0 && (
         <section className="cs-group" aria-label="Uses">
           <span className="cs-eyebrow">Uses</span>
@@ -188,6 +286,7 @@ export function FeaturesTab({
           />
         </section>
       )}
+      {rest && rest.rechoices.length > 0 && <RestChoices {...rest} />}
       {masteries.length > 0 && <MasteryBlock masteries={masteries} />}
       {groups.map((group) => (
         <section key={group.key} className="cs-group" aria-label={group.title}>

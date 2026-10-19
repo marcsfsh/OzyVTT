@@ -634,6 +634,20 @@ const ActorDerivedSheetSchema = z.strictObject({
     )
     .describe(
       "The weapon kinds the character chose under Weapon Mastery, in the order chosen, whether or not it carries one. Empty for a sheet that records no such choice (an import)."
+    ),
+  /** The class table's printed columns no use counts, each class at its own level. */
+  classColumns: z
+    .array(
+      z.strictObject({
+        classId: z.string(),
+        className: z.string().describe("The class as the sheet names it"),
+        id: z.string().describe("The column's id, e.g. bardic-inspiration"),
+        name: z.string().describe('The column as the class table prints it, e.g. "Bardic Die"'),
+        value: z.string().describe('Its value at the character\'s level in that class, e.g. "d8", "3d6", "+2"')
+      })
+    )
+    .describe(
+      "The columns a class table prints that no use counts (the Bardic Die, Martial Arts, Sneak Attack, Rage Damage, Eldritch Invocations, Weapon Mastery), each class at the character's level in it. A column wired to a pool (Rages, Focus Points, Sorcery Points) is a use instead. Empty for a sheet with no class the catalog knows."
     )
 });
 export type ActorDerivedSheet = Wire<z.infer<typeof ActorDerivedSheetSchema>>;
@@ -709,7 +723,12 @@ export const ActorMovementReplySchema = z.strictObject({
   /** Prone: it can only crawl, each foot costing an extra foot (two in Difficult Terrain). */
   crawling: z.boolean().optional(),
   /** It drags a creature it grapples that isn't Tiny or two sizes smaller, each foot costing an extra foot. */
-  dragging: z.boolean().optional()
+  dragging: z.boolean().optional(),
+  /** It may end a move in another creature's space (Air Form, a swarm), so no creature bars its way; a creature's
+   *  space still costs as Difficult Terrain. */
+  passesCreatures: z.boolean().optional(),
+  /** The swarms on the map the asker can see. Any creature may cross a swarm's space, as Difficult Terrain. */
+  swarmIds: z.array(z.uuid()).max(200).optional()
 });
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;

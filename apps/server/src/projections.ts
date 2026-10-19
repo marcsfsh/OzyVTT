@@ -72,6 +72,7 @@ function shownAttackRoll(
     .find(
       (candidate) =>
         candidate.purpose === "attack" &&
+        candidate.free !== true &&
         candidate.actorId === pending.sourceActorId &&
         (candidate.dice.length === 0 || candidate.dice.some((die) => die.sides === 20))
     );
@@ -575,6 +576,8 @@ const PLAYER_ACTOR_FIELDS = {
   replaySceneId: "derived",
   actionUses: "derived",
   heroicInspiration: "derived",
+  heroicInspirationToGive: "derived",
+  experiencePoints: "derived",
   choiceOverrides: "derived",
   hitDice: "derived",
   lastLongRestAt: "never",
@@ -641,6 +644,8 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * the claim picker, and nothing more of its sheet.
  * | definition (the imported sheet)         |  Y   |  -  |       -        |     Y      |          Y          |
  * | actionUses, hitDice, heroicInspiration  |  Y   |  -  |       -        |     -      |          Y          |
+ * | experiencePoints                        |  Y   |  -  |       -        |     -      |          Y          |
+ * | heroicInspirationToGive (a gift to make)|  Y   |  -  |       -        |     -      |          -          |
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
  * | spellbook (a Wizard's beyond the sheet) |  Y   |  -  |       -        |     -      |          Y          |
@@ -707,6 +712,8 @@ export function projectPlayerView(
           ownerSessionId,
           actionUses,
           heroicInspiration,
+          heroicInspirationToGive,
+          experiencePoints,
           choiceOverrides,
           hitDice,
           spellSlots,
@@ -756,6 +763,10 @@ export function projectPlayerView(
           ...(species !== null ? { species } : {}),
           ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
           ...(resourcesVisible ? { actionUses: { ...actionUses }, heroicInspiration } : {}),
+          // XP is a sheet resource, gated like the uses.
+          ...(resourcesVisible && experiencePoints !== undefined ? { experiencePoints } : {}),
+          // A gift to make is the owner's decision alone.
+          ...(mine && heroicInspirationToGive ? { heroicInspirationToGive } : {}),
           // Same gate as actionUses: a private sheet resource. Copied, never a live reference into GameState.
           ...(resourcesVisible
             ? {

@@ -264,7 +264,9 @@ of a hidden thing. When in doubt, leave it out.
   `@vtt/rules-5e`). How a token travels (walking, a special speed, teleporting, moved by force)
   rides on `token.move`, each speed with its own budget (`speed.ts`), and opportunity attacks are
   read along the whole path (`movement-rules.ts`). The map's drag preview runs the same function,
-  and a mirror test checks the two agree. Players and the table screen get only the terrain the
+  and a mirror test checks the two agree. The `actor:movement` reply tells the preview whether the
+  mover shares spaces (Air Form, a swarm) and which swarms its viewer can see (`space-sharing.ts`),
+  so it charges those spaces as the server does. Players and the table screen get only the terrain the
   fog reveals, and with vision on only what the party has seen.
 
 ## Rules engine

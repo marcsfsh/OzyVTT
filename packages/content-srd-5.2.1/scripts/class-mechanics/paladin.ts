@@ -11,10 +11,11 @@ const AURA_ACTIVE = {
 
 export const paladin: ClassMechanicsModule = {
   features: {
-    /**
-     * The Fighting Style feat catalog plus the inline Blessed Warrior option (consumers union the two).
-     * Its replace-a-cantrip-on-level-up clause stays prose.
-     */
+    // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": made in the Level flow until a
+    // rest offers it.
+    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "level-up", amount: 2 }] },
+
+    /** The Fighting Style feat catalog plus the inline Blessed Warrior option (consumers union the two). */
     "fighting-style": {
       choice: {
         kind: "fighting-style",
@@ -26,7 +27,8 @@ export const paladin: ClassMechanicsModule = {
             name: "Blessed Warrior",
             description:
               "You learn two Cleric cantrips of your choice. Charisma is your spellcasting ability for them. Whenever you gain a Paladin level, you can replace one of these cantrips with another Cleric cantrip.",
-            choice: { kind: "cantrip", choose: 2, fromCatalog: "cleric-spells", maxSpellLevel: 0 }
+            choice: { kind: "cantrip", choose: 2, fromCatalog: "cleric-spells", maxSpellLevel: 0 },
+            replaces: [{ offer: "feature:blessed-warrior", when: "level-up", amount: 1 }]
           }
         ]
       }

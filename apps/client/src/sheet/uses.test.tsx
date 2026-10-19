@@ -148,3 +148,31 @@ describe("a pool spent by any amount", () => {
     });
   });
 });
+
+// SRD Channel Divinity: one pool that Divine Spark and Turn Undead both spend, so the sheet offers each by name.
+describe("a pool several actions spend", () => {
+  it("offers each spender by name and uses the one tapped", async () => {
+    const used = vi.fn();
+    const pool = { id: "channel-divinity", name: "Channel Divinity", limit: 2, per: "short-rest" };
+    const spenders = [
+      { id: "divine-spark", name: "Divine Spark" },
+      { id: "turn-undead", name: "Turn Undead" }
+    ];
+    render(
+      <ToastProvider>
+        <UseList
+          actorId={PALADIN}
+          role="player"
+          pools={[pool]}
+          spent={{}}
+          acting={new Map([["channel-divinity", spenders]])}
+          onUse={used}
+        />
+      </ToastProvider>
+    );
+    expect(screen.getByRole("button", { name: "Use Channel Divinity: Divine Spark" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Use Channel Divinity: Turn Undead" }));
+    expect(used).toHaveBeenCalledWith("turn-undead");
+    expect(screen.queryByRole("button", { name: "Use Channel Divinity" })).toBeNull();
+  });
+});

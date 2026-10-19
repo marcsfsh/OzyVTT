@@ -80,7 +80,8 @@ export function FightMenu({
   run,
   onFeedback,
   onAddMonsters,
-  onEnd
+  onEnd,
+  onAwardExperience
 }: Readonly<{
   state: GmView;
   busy: boolean;
@@ -89,8 +90,12 @@ export function FightMenu({
   onFeedback: (text: string) => void;
   onAddMonsters: () => void;
   onEnd: () => void;
+  /** Shares the defeated monsters' XP among the characters in the fight, at the lair XP for a legendary creature
+   *  fought in its lair; absent until there is something to share. */
+  onAwardExperience?: ((inLair: boolean) => void) | undefined;
 }>) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [inLair, setInLair] = useState(false);
   // Close the ⋯ popover on Escape (outside clicks hit the backdrop). Rich content keeps it a bespoke
   // popover; a Menu can't hold it.
   useEffect(() => {
@@ -391,6 +396,29 @@ export function FightMenu({
                     + Add monsters
                   </button>
                 </div>
+                {onAwardExperience && (
+                  <div className="menu-section" role="group" aria-label="Experience Points">
+                    <p className="menu-section-title">Experience Points</p>
+                    <Switch
+                      className="environment-control"
+                      label="Fought in their lair"
+                      checked={inLair}
+                      disabled={busy}
+                      onChange={setInLair}
+                    />
+                    <button
+                      type="button"
+                      className="encounter-award-xp"
+                      disabled={busy}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onAwardExperience(inLair);
+                      }}
+                    >
+                      Award the fight's XP
+                    </button>
+                  </div>
+                )}
                 <button
                   type="button"
                   className="encounter-end"

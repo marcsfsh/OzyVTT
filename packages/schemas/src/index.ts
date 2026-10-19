@@ -1217,7 +1217,10 @@ export const InventoryItemSchema = z
      *  server keeps it. */
     ammunitionFired: z.number().int().min(0).max(10_000).optional(),
     /** Display-only marker so the sheet can offer Attune without the catalog; never the riders. */
-    magic: ItemMagicMarkerSchema.optional()
+    magic: ItemMagicMarkerSchema.optional(),
+    /** A copy whose magic is spent for now: a manual or tome after its study (`character.study-item`), until it
+     *  regains it in a century. The server keeps it. */
+    dormant: z.boolean().optional()
   })
   .strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
@@ -1392,6 +1395,12 @@ export const ActorSchema = z.object({
   /** SRD Heroic Inspiration: held or not (never more than one). Spent to reroll one die; the GM gives it, and a Human
    * gains it on finishing a Long Rest. */
   heroicInspiration: z.boolean().default(false),
+  /** A second Heroic Inspiration gained while holding one (SRD: "the excess is lost unless you give it to a player
+   *  character who lacks it"): its player gives it or lets it go. Player characters only. */
+  heroicInspirationToGive: z.boolean().optional(),
+  /** A player character's Experience Points, which the GM awards (`actor.award-experience`). Absent until the first
+   *  award, when it starts at the least XP the character's level needs. */
+  experiencePoints: z.number().int().min(0).max(10_000_000).optional(),
   /** Picks re-made on a rest, keyed by offer key; no rebuild needed. `per` is the rest that clears the override,
    * after which the build's recorded answer applies again. */
   choiceOverrides: z

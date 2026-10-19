@@ -67,7 +67,19 @@
       "uses": {
         "limit": 1,
         "per": "long-rest"
-      }
+      },
+      "replaces": [
+        {
+          "offer": "feature:magic-initiate-cleric",
+          "when": "level-up",
+          "amount": 1
+        },
+        {
+          "offer": "feature:magic-initiate-cleric/2",
+          "when": "level-up",
+          "amount": 1
+        }
+      ]
     }
   },
   {
@@ -116,7 +128,19 @@
       "uses": {
         "limit": 1,
         "per": "long-rest"
-      }
+      },
+      "replaces": [
+        {
+          "offer": "feature:magic-initiate-druid",
+          "when": "level-up",
+          "amount": 1
+        },
+        {
+          "offer": "feature:magic-initiate-druid/2",
+          "when": "level-up",
+          "amount": 1
+        }
+      ]
     }
   },
   {
@@ -165,7 +189,19 @@
       "uses": {
         "limit": 1,
         "per": "long-rest"
-      }
+      },
+      "replaces": [
+        {
+          "offer": "feature:magic-initiate-wizard",
+          "when": "level-up",
+          "amount": 1
+        },
+        {
+          "offer": "feature:magic-initiate-wizard/2",
+          "when": "level-up",
+          "amount": 1
+        }
+      ]
     }
   },
   {

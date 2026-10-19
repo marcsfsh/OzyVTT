@@ -209,8 +209,8 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "creature-sides.ts puts monsters and hostile creatures against the party, by token disposition. Opportunity Attacks, auras and Sneak Attack read it."
   ),
   exhaustion: condition("exhaustion"),
-  "experience-points": reference(
-    "The bestiary prints each monster's XP. Characters' XP isn't tracked, and the GM levels a character up in the builder."
+  "experience-points": enforced(
+    "experience.ts keeps each character's XP total, which the GM awards as an amount or as a share of the defeated creatures' stat block XP (the lair XP for one fought in its lair). The sheet shows the next level's threshold and offers the level up once the total reaches it. How much to award, or levelling by milestone, is the GM's."
   ),
   expertise: enforced(
     "ability-checks.ts doubles the Proficiency Bonus on a check with a skill the sheet has Expertise in."
@@ -235,7 +235,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/attack.ts gives the next attack roll by an ally against the distracted enemy Advantage. Helping with an ability check is the GM's to apply."
   ),
   "heroic-inspiration": guided(
-    "held-rolls.ts spends it to reroll the d20 of an attack, a check, a save or a death save while the roll is shown. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. Rerolling a damage die or Initiative, and giving a second one to another character, are the GM's."
+    "held-rolls.ts spends it to reroll the d20 of an attack, a check, a save or a death save while the roll is shown. Only the GM gives it by hand. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. A character who gains a second one passes it to a player character without it or lets it go (heroic-inspiration.ts). Rerolling a damage die or Initiative is the GM's."
   ),
   hide: enforced(
     "resolution/builtins.ts rolls a DC 15 Dexterity (Stealth) check and makes the creature Invisible on a success, until it attacks. Whether it can hide there is the GM's call."
@@ -406,7 +406,7 @@ const changesForm = reference("Changing form is the GM's to run; the token keeps
 /** A trait the server reads by name for movement (movement-rules.ts). */
 const sharesSpace = (who: string) =>
   enforced(
-    `movement-rules.ts lets ${who} end a move in another creature's space. Fitting through a narrow gap is the GM's to allow.`
+    `movement-rules.ts lets ${who} end a move in another creature's space, and the map's drag preview (movePreview.ts) charges the same path. Fitting through a narrow gap is the GM's to allow.`
   );
 /** A trait that regains Hit Points from damage of one type, which the creature is also immune to. */
 const absorbs = (type: string) =>
@@ -481,7 +481,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "trait-turns.ts deals the Fire damage at the end of the bearer's turns to each creature in the Emanation, or to an azer's enemies there. A fire elemental's aura also sets them burning."
   ),
   "Fire Form": guided(
-    "movement-rules.ts lets the elemental end a move in a creature's space. The 1d10 Fire damage when it first enters a space on a turn is the GM's to deal."
+    "movement-rules.ts lets the elemental end a move in a creature's space, and the map's drag preview (movePreview.ts) charges the same path. The 1d10 Fire damage when it first enters a space on a turn is the GM's to deal."
   ),
   Flyby: enforced("movement-rules.ts opens no Opportunity Attack when it flies out of an enemy's reach."),
   Freeze: reference("The slower Speed after Cold damage is the GM's to apply."),
@@ -551,7 +551,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Sunlight Sensitivity": light,
   "Sunlight Weakness": light,
   Swarm: guided(
-    "movement-rules.ts and terrain.ts let the swarm and other creatures share a space. Refusing it Hit Points and Temporary Hit Points is the GM's."
+    "movement-rules.ts and terrain.ts let the swarm and other creatures share a space, and the map's drag preview (movePreview.ts) charges the same path. Refusing it Hit Points and Temporary Hit Points is the GM's."
   ),
   "Telepathic Bond": senses,
   Training: reference("The GM picks the skill and applies its Advantage."),
@@ -574,6 +574,12 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Web Walker": reference("Webs aren't marked on the map; the GM waives what they would cost it."),
   Wishes: reference("The djinni's wishes are the GM's to run.")
 };
+
+/** A manual or tome, whose study the GM marks done. */
+const studied = (ability: string) =>
+  enforced(
+    `item-study.ts records the study in the reader's build, so ${ability} rises by 2 (to at most 30) and stays through every rebuild, and the copy's magic is spent. The 48 hours of study are downtime the GM gives, and the GM moves the clock.`
+  );
 
 /**
  * Records the data-driven pass gets wrong: those the engine handles in code by id or by name, the base rows of a choice
@@ -599,7 +605,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "stabilize.ts spends one use of the kit to make a creature at 0 Hit Points Stable with no check, and the last use takes the kit."
   ),
   "feature:spellcasting": enforced(
-    "character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest."
+    "character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows."
   ),
   "feature:pact-magic": enforced(
     "character-build.ts gives the Warlock its Pact Magic slots at the level its table prints, and resolution/economy.ts spends them. rests.ts restores them on a Short or Long Rest."
@@ -728,7 +734,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Protector's training and Thaumaturge's extra cantrip are applied. Thaumaturge's bonus to Arcana and Religion checks is the GM's."
   ),
   "feature:eldritch-invocations": guided(
-    "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied. Eldritch Smite's Pact Magic slot dice and Prone, and Lifedrinker's damage and Hit Point Die, ride a pact weapon's hit (resolution/hit-options.ts). The senses (Devil's Sight, Witch Sight), Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
+    "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied, and level-up-picks.ts lets a level up replace one invocation. Eldritch Smite's Pact Magic slot dice and Prone, and Lifedrinker's damage and Hit Point Die, ride a pact weapon's hit (resolution/hit-options.ts). The senses (Devil's Sight, Witch Sight), Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
   ),
   "feature:elemental-fury": enforced(
     "Primal Strike's extra damage, of the type the Druid picks, is applied once a turn. Potent Spellcasting adds the Druid's Wisdom modifier to the damage of Poison Spray, Produce Flame and Starry Wisp."
@@ -811,6 +817,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:boon-of-truesight": guided(
     "The ability score increase is applied. Truesight on a character sheet isn't read in play, so the GM applies it."
   ),
+
+  // Manuals and tomes: the GM marks the 48 hours of study done, and the score rises for good.
+  "item:manual-of-bodily-health": studied("Constitution"),
+  "item:manual-of-gainful-exercise": studied("Strength"),
+  "item:manual-of-quickness-of-action": studied("Dexterity"),
+  "item:tome-of-clear-thought": studied("Intelligence"),
+  "item:tome-of-leadership-and-influence": studied("Charisma"),
+  "item:tome-of-understanding": studied("Wisdom"),
 
   // Magic items whose riders apply part of what they do, and leave a property the table would expect applied.
   "item:armor-of-invulnerability": guided(

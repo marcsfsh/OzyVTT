@@ -1713,10 +1713,17 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // `lantern-of-revealing` - no rider suppresses Invisible within a light radius.
-  // `manual-of-bodily-health`, `manual-of-gainful-exercise`, `manual-of-quickness-of-action`,
-  //     `tome-of-clear-thought`, `tome-of-leadership-and-influence`, `tome-of-understanding`: a
-  //     permanent ability increase is a sheet edit, and an item rider is reversible (and `ability-score`
-  //     is refused on items).
+
+  // ---- Manuals and tomes: "If you spend 48 hours over a period of 6 days or fewer studying the book's contents and
+  // practicing its guidelines, your Constitution increases by 2, to a maximum of 30. The manual then loses its magic but
+  // regains it in a century." The increase is permanent, so it goes into the reader's build (the GM marks the study
+  // done); an item rider would end when the book is put down.
+  "manual-of-bodily-health": { study: { ability: "con", amount: 2, maximum: 30, hours: 48, days: 6 } },
+  "manual-of-gainful-exercise": { study: { ability: "str", amount: 2, maximum: 30, hours: 48, days: 6 } },
+  "manual-of-quickness-of-action": { study: { ability: "dex", amount: 2, maximum: 30, hours: 48, days: 6 } },
+  "tome-of-clear-thought": { study: { ability: "int", amount: 2, maximum: 30, hours: 48, days: 6 } },
+  "tome-of-leadership-and-influence": { study: { ability: "cha", amount: 2, maximum: 30, hours: 48, days: 6 } },
+  "tome-of-understanding": { study: { ability: "wis", amount: 2, maximum: 30, hours: 48, days: 6 } },
   // `manual-of-golems` - crafting.
   // `marvelous-pigments` - GM fiat, consumed.
   // `mirror-of-life-trapping` - a passive save on anyone who sees their reflection.

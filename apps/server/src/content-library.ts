@@ -680,7 +680,9 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     // The types the GM may pick for its resistance, as printed; the pick itself is the GM's, on the row.
     ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
     // The levels a Spell Scroll can bear, as its name says, for the picker's spell step.
-    ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {})
+    ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {}),
+    // A manual's or tome's study, as its text prints it, so the GM's sheet can offer it.
+    ...(item.study ? { study: { ...item.study } } : {})
   }));
 
   const monstersById = new Map<string, ActorDefinition>();
