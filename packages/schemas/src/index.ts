@@ -3016,7 +3016,12 @@ export const ActionAreaSchema = z
   .object({
     shape: z.enum(["cone", "line", "sphere", "cube", "emanation", "cylinder"]),
     sizeFeet: z.number().int().min(1).max(1000),
-    widthFeet: z.number().int().min(1).max(100).nullable()
+    widthFeet: z.number().int().min(1).max(100).nullable(),
+    /** How many of these areas one use places (Fire Storm's ten Cubes, Meteor Swarm's four Spheres); a creature under
+     *  more than one is caught once. */
+    count: z.number().int().min(2).max(10).optional(),
+    /** Each area must touch another ("Each Cube must be contiguous with at least one other Cube"). */
+    contiguous: z.literal(true).optional()
   })
   .strict();
 export type ActionArea = z.infer<typeof ActionAreaSchema>;

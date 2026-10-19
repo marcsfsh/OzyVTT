@@ -840,6 +840,10 @@ export type ContentActionArea = Readonly<{
   shape: "cone" | "line" | "sphere" | "cube" | "emanation" | "cylinder";
   sizeFeet: number;
   widthFeet: number | null;
+  /** How many of these areas one use places (Fire Storm's ten Cubes); `action.resolve`'s `templates`. */
+  count?: number;
+  /** Each area must touch another. */
+  contiguous?: true;
 }>;
 /** A cast whose granted effect carries this tag takes an ability its caster chooses (Hex: the target has Disadvantage on
  *  ability checks made with it). */

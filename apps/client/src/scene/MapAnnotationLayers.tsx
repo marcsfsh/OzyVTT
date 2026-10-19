@@ -91,6 +91,29 @@ export function ShapeLayer({
           <AnnotationGlyph data={preview.data} arrowSize={arrowSize} labelSize={labelSize} color={color} />
         </g>
       )}
+      {/* The areas already set down for a use that places several (Fire Storm's Cubes). */}
+      {activeTargeting?.mode === "template" &&
+        calibration &&
+        (activeTargeting.template?.others ?? []).map((placed, index) => {
+          const template = activeTargeting.template!;
+          const snap = sizedShapePreview(calibration, template.shape, placed.origin, placed.target, template.sizeFeet);
+          return (
+            <g key={index} className="annotation-shape live">
+              <AnnotationGlyph
+                data={{
+                  kind: "shape",
+                  shape: template.shape,
+                  origin: snap.origin,
+                  target: snap.target,
+                  sizeFeet: snap.feet
+                }}
+                arrowSize={arrowSize}
+                labelSize={labelSize}
+                color="#ff2e9a"
+              />
+            </g>
+          );
+        })}
       {activeTargeting?.mode === "template" &&
         activeTargeting.template?.placed &&
         calibration &&

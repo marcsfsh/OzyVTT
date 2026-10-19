@@ -448,6 +448,18 @@ export const ActionResolveSchema = z
       .object({ shape: AnnotationShapeKindSchema, origin: AnnotationPointSchema, target: AnnotationPointSchema })
       .strict()
       .optional(),
+    /** Several areas for an action that places more than one (Fire Storm's Cubes, Meteor Swarm's Spheres), each placed
+     *  as `template` is: up to the area's `count`, each within the spell's range, touching another where the area says
+     *  so. A creature under more than one is caught once. */
+    templates: z
+      .array(
+        z
+          .object({ shape: AnnotationShapeKindSchema, origin: AnnotationPointSchema, target: AnnotationPointSchema })
+          .strict()
+      )
+      .min(1)
+      .max(10)
+      .optional(),
     conditionId: z
       .string()
       .regex(/^[a-z0-9-]+$/)
@@ -590,6 +602,12 @@ export const ActionResolveSchema = z
   .refine((payload) => payload.targetIds === undefined || payload.template === undefined, {
     error: "Provide explicit targets or an area template, and only one of the two."
   })
+  .refine(
+    (payload) => payload.templates === undefined || (payload.template === undefined && payload.targetIds === undefined),
+    {
+      error: "Provide several area templates, or one template or explicit targets."
+    }
+  )
   .refine((payload) => payload.attackNatural === undefined || payload.attackTotal === undefined, {
     error: "Supply a natural d20 or a final total, and only one of the two."
   })

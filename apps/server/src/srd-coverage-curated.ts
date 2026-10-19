@@ -1634,6 +1634,12 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:entangle": enforced(
     "The cast's Strength save leaves a creature in the square Restrained, escaped with a Strength (Athletics) check against the spell save DC. zone-ground.ts makes the square Difficult Terrain for the duration. Leaving the caster out of its own square is the GM's."
   ),
+  "spell:fire-storm": enforced(
+    "The cast places up to ten 10-foot Cubes, each touching another and within 150 feet of the caster (multi-templates.ts), and each creature under any of them makes the Dexterity save once against 7d10 Fire damage, half on a success. Setting flammable objects alight is the GM's."
+  ),
+  "spell:meteor-swarm": enforced(
+    "The cast places up to four 40-foot-radius Spheres at different points within range (multi-templates.ts), and a creature in more than one makes the Dexterity save once, against 20d6 Fire and 20d6 Bludgeoning damage, half on a success. Setting objects alight is the GM's."
+  ),
   "spell:flaming-sphere": enforced(
     "spell-zones.ts asks for the Dexterity save against 2d6 Fire damage when a creature ends its turn within 5 feet of the sphere. The Bonus Action moves the sphere up to 30 feet (zone-moves.ts), and a creature it rams makes the save. It sheds its light for dynamic vision (vision/cast-sight.ts)."
   ),

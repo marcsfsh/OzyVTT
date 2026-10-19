@@ -14,6 +14,7 @@ import { revealInRegion } from "../lib/reveal";
 import { weaponChoicesOf, type CarriedRow } from "./weapon-choices";
 import {
   clearTargeting,
+  placeAnotherTemplate,
   setBoundItem,
   setChoiceOption,
   setCheckSkill,
@@ -128,6 +129,21 @@ export function ActionTargetPicker({
               ? "Drag again to move it. Everything inside is caught when you roll."
               : "Drag on the map to place it. Everything inside is caught when you roll."}
           </p>
+          {/* Several areas a use (Fire Storm's Cubes): each set down in turn, all caught once when you roll. */}
+          {picking.template?.count !== undefined && (
+            <p className="action-targeting-hint">
+              {(picking.template.others?.length ?? 0) + (picking.template.placed ? 1 : 0)} of up to{" "}
+              {picking.template.count} placed.
+              {picking.action.area?.contiguous ? " Each must touch another." : ""}
+            </p>
+          )}
+          {picking.template?.count !== undefined &&
+            picking.template.placed &&
+            (picking.template.others?.length ?? 0) + 1 < picking.template.count && (
+              <Button type="button" variant="secondary" disabled={busy} onClick={() => placeAnotherTemplate()}>
+                Place another
+              </Button>
+            )}
           {picking.template?.placed && insideNow && (
             <>
               <p className="action-targeting-inside">Inside now · {insideNow.length}</p>

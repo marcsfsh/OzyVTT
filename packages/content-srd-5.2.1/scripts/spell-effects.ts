@@ -2365,6 +2365,10 @@ const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   "conjure-elemental": { shape: "sphere", sizeFeet: 10, widthFeet: null },
   // "A 100-foot-radius circle centered on that point."
   earthquake: { shape: "cylinder", sizeFeet: 100, widthFeet: null },
+  // "Up to ten 10-foot Cubes, which you arrange as you like. Each Cube must be contiguous with at least one other Cube."
+  "fire-storm": { shape: "cube", sizeFeet: 10, widthFeet: null, count: 10, contiguous: true },
+  // "Four different points ... Each creature in a 40-foot-radius Sphere centered on each of those points."
+  "meteor-swarm": { shape: "sphere", sizeFeet: 40, widthFeet: null, count: 4 },
   // "Up to 40,000 square feet of floor space": a 200-foot square.
   forbiddance: { shape: "cube", sizeFeet: 200, widthFeet: null },
   // The hound and the 5 feet it bites in.

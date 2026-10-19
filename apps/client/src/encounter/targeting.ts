@@ -22,6 +22,9 @@ export type TargetingTemplate = Readonly<{
   sizeFeet: number;
   widthFeet: number | null;
   placed: Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }> | null;
+  /** How many areas one use places (Fire Storm's ten Cubes), and the ones already set down beside the one moving. */
+  count?: number;
+  others?: ReadonlyArray<Readonly<{ origin: AnnotationPoint; target: AnnotationPoint }>>;
 }>;
 export type TargetingSession = Readonly<
   {
@@ -161,7 +164,13 @@ export function beginTargeting(
       attackerId,
       mode: "template",
       selected: [],
-      template: { shape, sizeFeet: area.sizeFeet, widthFeet: area.widthFeet, placed: null },
+      template: {
+        shape,
+        sizeFeet: area.sizeFeet,
+        widthFeet: area.widthFeet,
+        placed: null,
+        ...(area.count !== undefined ? { count: area.count, others: [] } : {})
+      },
       ...slot
     };
   } else {
@@ -373,6 +382,15 @@ export function setTargetDarts(actorId: string, count: number) {
 /** The targets as the server reads darts: each named once per dart it takes. */
 const dartTargetIds = (selected: readonly string[], darts: TargetingSession["darts"]) =>
   darts ? selected.flatMap((id) => Array.from({ length: darts.counts[id] ?? 1 }, () => id)) : [...selected];
+/** Sets the placed area down beside the others, and starts another (Fire Storm's next Cube). */
+export function placeAnotherTemplate() {
+  const template = session?.template;
+  if (!session || !template?.placed) return;
+  const others = [...(template.others ?? []), template.placed];
+  if (others.length >= (template.count ?? 1)) return;
+  session = { ...session, template: { ...template, others, placed: null } };
+  emit();
+}
 export function setTemplatePlacement(origin: AnnotationPoint, target: AnnotationPoint) {
   if (session?.template) {
     session = { ...session, template: { ...session.template, placed: { origin, target } } };
@@ -525,12 +543,24 @@ export function resolveTargeting(
       ? { actorId: attackerId, actionId: action.id, ...extra }
       : mode === "template"
         ? template?.placed
-          ? {
-              actorId: attackerId,
-              actionId: action.id,
-              template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target },
-              ...extra
-            }
+          ? (template.others ?? []).length > 0
+            ? {
+                actorId: attackerId,
+                actionId: action.id,
+                // Every area set down, and the one moving now.
+                templates: [...template.others!, template.placed].map((placed) => ({
+                  shape: template.shape,
+                  origin: placed.origin,
+                  target: placed.target
+                })),
+                ...extra
+              }
+            : {
+                actorId: attackerId,
+                actionId: action.id,
+                template: { shape: template.shape, origin: template.placed.origin, target: template.placed.target },
+                ...extra
+              }
           : null
         : selected.length > 0
           ? { actorId: attackerId, actionId: action.id, targetIds: dartTargetIds(selected, darts), ...extra }

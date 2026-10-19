@@ -10,6 +10,8 @@ import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import { pushTokenAway } from "../forced-movement.js";
 import { pushThroughZones } from "../pushed-through.js";
+import { placeTemplates } from "../multi-templates.js";
+import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
 import { ActionResolveSchema, ActionUseSchema, DiceRollSchema } from "@vtt/domain/commands";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { heldRollFor, requireTypedDie } from "../held-rolls.js";
@@ -111,7 +113,8 @@ export const actionCommands = [
       // inside the synchronous mutation.
       const mapAssetId = kit.read().combat.mapAssetId;
       const geometry = mapAssetId ? await kit.context.tokenGeometryFor(mapAssetId) : null;
-      if (template && !geometry?.calibration)
+      const templates = request.templates;
+      if ((template || templates) && !geometry?.calibration)
         throw new CommandRejectedError("Calibrate this map before placing an area template.");
       const gmSessionId = sessionIdOf(principal);
       let resolution: ReturnType<typeof resolveDefinitionAction> | undefined;
@@ -166,7 +169,40 @@ export const actionCommands = [
         // The template as the action's area makes it, which the table's drawn shape records.
         let placed: Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }> | null =
           null;
-        if (template) {
+        // The other areas of a use that places several (Fire Storm's Cubes), drawn beside the first.
+        let morePlaced: ReadonlyArray<
+          Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }>
+        > = [];
+        if (templates) {
+          if (action.attack) throw new CommandRejectedError("Attacks target a single token. Pick the token itself.");
+          if (draft.combat.mapAssetId !== mapAssetId)
+            throw new CommandRejectedError("The active encounter changed. Try again.");
+          if (!action.area) throw new CommandRejectedError(`${action.name} has no area to place.`);
+          const casting = castSpellOf(action, kit.equipmentCatalog().spellRecord);
+          const area = casting ? areaAtLevel(action.area, casting, request.slotLevel) : action.area;
+          const range = casting ? kit.equipmentCatalog().spellRecord?.(casting.id)?.range : undefined;
+          const many = placeTemplates(draft, {
+            casterId: actorId,
+            actionName: action.name,
+            area,
+            templates,
+            rangeFeet: !range
+              ? null
+              : range.unit === "miles" && range.distance !== null
+                ? range.distance * 5280
+                : spellRangeFeet(range),
+            geometry: geometry!
+          });
+          placed = many.placed[0] ?? null;
+          morePlaced = many.placed.slice(1);
+          resolvedTargetIds = many.targetIds;
+          // Whether the areas hold anyone is judged on what the caster's player can see, as for one area.
+          const unseen = isPlayer ? hiddenFromPlayer(draft) : new Set<string>();
+          if (!resolvedTargetIds.some((id) => !unseen.has(id)))
+            throw new CommandRejectedError(
+              isPlayer ? "No creatures you can see are inside those areas." : "No combatants are inside those areas."
+            );
+        } else if (template) {
           if (action.attack) throw new CommandRejectedError("Attacks target a single token. Pick the token itself.");
           if (draft.combat.mapAssetId !== mapAssetId)
             throw new CommandRejectedError("The active encounter changed. Try again.");
@@ -280,7 +316,7 @@ export const actionCommands = [
         const untouchable = resolvedTargetIds.find(
           (id) => draft.actors.find((actor) => actor.id === id)?.summon?.intangible
         );
-        if (untouchable && template)
+        if (untouchable && (template || templates))
           resolvedTargetIds = resolvedTargetIds.filter(
             (id) => !draft.actors.find((actor) => actor.id === id)?.summon?.intangible
           );
@@ -393,7 +429,7 @@ export const actionCommands = [
             ...(request.targetForms ? { targetForms: request.targetForms } : {}),
             ...(request.gear !== undefined ? { gear: request.gear } : {}),
             ...(request.option !== undefined ? { option: request.option } : {}),
-            ...(template ? { areaPlaced: true } : {}),
+            ...(template || templates ? { areaPlaced: true } : {}),
             ...(request.ready === true ? { ready: true } : {}),
             ...(request.moveFirst === true ? { moveFirst: true } : {}),
             // The rest of an action whose move was taken first was paid for then.
@@ -497,21 +533,24 @@ export const actionCommands = [
             }
           );
         } else if (placed)
-          addAnnotation(
-            draft,
-            {
-              id: commandId,
-              kind: "shape",
-              shape: placed.shape,
-              origin: placed.origin,
-              target: placed.target,
-              visibility: fromHiddenCaster ? "gm-only" : unseenArea ? "gm-actor" : "public",
-              ...(unseenArea && !fromHiddenCaster ? { visibleToActorId: actorId } : {}),
-              reachesPastMap: action.area !== undefined,
-              actor: { sessionId: gmSessionId, role: "gm" },
-              now: Date.now()
-            },
-            geometry!
+          // The first area takes the command's id, which a lingering spell's zone reads; any others take their own.
+          [placed, ...morePlaced].forEach((shape, index) =>
+            addAnnotation(
+              draft,
+              {
+                id: index === 0 ? commandId : kit.context.newId(),
+                kind: "shape",
+                shape: shape.shape,
+                origin: shape.origin,
+                target: shape.target,
+                visibility: fromHiddenCaster ? "gm-only" : unseenArea ? "gm-actor" : "public",
+                ...(unseenArea && !fromHiddenCaster ? { visibleToActorId: actorId } : {}),
+                reachesPastMap: action.area !== undefined,
+                actor: { sessionId: gmSessionId, role: "gm" },
+                now: Date.now()
+              },
+              geometry!
+            )
           );
       });
       if (duplicate || !resolution) return;
