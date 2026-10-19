@@ -1202,8 +1202,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:halfling-luck": enforced(
     "roll-answers.ts offers a reroll when the d20 of the Halfling's attack roll, check, save or death save shows a 1, and the new roll stands."
   ),
-  "feature:deflect-attacks": guided(
-    "A hit whose damage includes Bludgeoning, Piercing or Slashing opens a reaction prompt (damage-window.ts), and using it takes 1d10 plus the Dexterity modifier and Monk level off the damage before it lands. Redirecting the attack's force for a Focus Point after reducing it to 0 is the GM's."
+  "feature:deflect-attacks": enforced(
+    "A hit whose damage includes Bludgeoning, Piercing or Slashing opens a reaction prompt (damage-window.ts), and using it takes 1d10 plus the Dexterity modifier and Monk level off the damage before it lands. The prompt lists the creatures the force may be redirected at (within 5 feet after a melee hit; seen within 60 feet and not behind Total Cover after a ranged one); one picked with the answer takes a Dexterity save against two Martial Arts dice plus the Dexterity modifier when the roll brings the damage to 0, for a Focus Point (deflect-redirect.ts)."
   ),
   "feature:deflect-energy": enforced(
     "character-build.ts lets Deflect Attacks meet a hit of any damage type from Monk level 13 (damage-window.ts)."

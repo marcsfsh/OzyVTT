@@ -80,8 +80,8 @@ export const monk: ClassMechanicsModule = {
     },
     /**
      * Offered when a hit's damage includes Bludgeoning, Piercing or Slashing (any type from Deflect Energy at 13); the
-     * builder adds the Dexterity modifier and Monk level to the 1d10. The Focus Point redirect after reducing the
-     * damage to 0 stays prose.
+     * builder adds the Dexterity modifier and Monk level to the 1d10. A reduction to 0 spends a Focus Point on the
+     * redirect picked with the answer (deflect-redirect.ts).
      */
     "deflect-attacks": {
       actions: [
@@ -96,10 +96,14 @@ export const monk: ClassMechanicsModule = {
             trigger: "hit-by-attack",
             response: "reduce-damage",
             formula: "1d10",
-            damageTypes: ["bludgeoning", "piercing", "slashing"]
+            damageTypes: ["bludgeoning", "piercing", "slashing"],
+            redirectsAtZero: true
           },
           reactionByLevel: [
-            { level: 13, reaction: { trigger: "hit-by-attack", response: "reduce-damage", formula: "1d10" } }
+            {
+              level: 13,
+              reaction: { trigger: "hit-by-attack", response: "reduce-damage", formula: "1d10", redirectsAtZero: true }
+            }
           ],
           adds: { classLevel: 1, abilityModifier: "dex" }
         }

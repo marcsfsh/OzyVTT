@@ -34,6 +34,7 @@ import { recordRoll, rolledTerms } from "./roll-history.js";
 import { answerAmount, type AnswerDeps } from "./roll-answers.js";
 import { answerSave, type SaveAnswerDependencies, type SaveOutcome } from "./saving-throws.js";
 import { swapPlaces } from "./resolution/redirect.js";
+import { redirectForce } from "./deflect-redirect.js";
 
 export type ReactionAnswerDependencies = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -98,7 +99,7 @@ export type OpportunityAttackOptions = Readonly<{
   slotLevel?: number;
   /** An answer to another creature's roll that may go either way (Improve Fate) takes its die off. */
   subtract?: boolean;
-  /** Redirect Attack: the ally the attack turns to. */
+  /** Redirect Attack: the ally the attack turns to. Deflect Attacks: the creature a reduction to 0 redirects at. */
   redirectTo?: string;
 }>;
 
@@ -189,7 +190,7 @@ export function answerReaction(
       return answerCounter(answer, attackOptions.slotLevel);
     case "hit-by-attack":
     case "takes-damage":
-      return answerParkedDamage(answer);
+      return answerParkedDamage(answer, attackOptions.redirectTo);
     case "falls":
       return answerFall(answer);
     case "roll-answer":
@@ -361,8 +362,9 @@ function owesDamage(resolution: ActionResolution): boolean {
 
 /** The damage a damage reaction holds, applied either way: halved (Uncanny Dodge), less a rolled amount (Deflect
  *  Attacks, Stone's Endurance) or met with Resistance to its type until the turn ends (Superior Hunter's Defense) when
- *  used. The reaction's own cost (a use, a recharge) is spent with its Reaction. */
-function answerParkedDamage(answer: Answer): ReactionOutcome {
+ *  used. The reaction's own cost (a use, a recharge) is spent with its Reaction. Deflect Attacks brought to 0 turns
+ *  the force on the creature picked (`deflect-redirect.ts`). */
+function answerParkedDamage(answer: Answer, redirectTo: string | undefined): ReactionOutcome {
   const { state, commandId, pending, reactor, use, deps, base, clearPrompt } = answer;
   let parts = [...pending.proposedDamageParts];
   const events: EffectNarration[] = [];
@@ -426,6 +428,19 @@ function answerParkedDamage(answer: Answer): ReactionOutcome {
         })
       );
     }
+    const redirected = redirectForce(
+      state,
+      {
+        reactor,
+        pending,
+        redirectTo,
+        remaining: parts.reduce((sum, part) => sum + part.amount, 0),
+        commandId,
+        role: answer.scope.role
+      },
+      deps
+    );
+    if (redirected) events.push(redirected);
   }
   clearPrompt(use);
   const total = parts.reduce((sum, part) => sum + part.amount, 0);

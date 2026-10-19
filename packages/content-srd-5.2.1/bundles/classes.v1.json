@@ -6010,7 +6010,8 @@
         "bludgeoning",
         "piercing",
         "slashing"
-       ]
+       ],
+       "redirectsAtZero": true
       },
       "reactionByLevel": [
        {
@@ -6018,7 +6019,8 @@
         "reaction": {
          "trigger": "hit-by-attack",
          "response": "reduce-damage",
-         "formula": "1d10"
+         "formula": "1d10",
+         "redirectsAtZero": true
         }
        }
       ],

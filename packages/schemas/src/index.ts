@@ -3321,7 +3321,10 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
       response: z.literal("reduce-damage"),
       formula: DamageFormulaSchema,
       damageTypes: z.array(DamageTypeSchema).min(1).max(13).optional(),
-      attackKinds: z.array(ReactionAttackKindSchema).min(1).max(6).optional()
+      attackKinds: z.array(ReactionAttackKindSchema).min(1).max(6).optional(),
+      /** Deflect Attacks: a reduction to 0 may spend 1 Focus Point to turn the attack's force on a creature nearby,
+       *  which makes a Dexterity save against two Martial Arts dice plus the Dexterity modifier. */
+      redirectsAtZero: z.literal(true).optional()
     })
     .strict(),
   z.object({ trigger: z.literal("takes-damage"), response: z.literal("resist-type") }).strict(),

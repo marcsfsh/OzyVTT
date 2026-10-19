@@ -857,7 +857,7 @@ export const PendingReactionSchema = z
     /** attack-targeted and a ward's attack-would-hit: the attack's target as it stands, by name. */
     targetName: z.string().min(1).max(120).optional(),
     /** attack-targeted (Redirect Attack): the allies the reactor may make the target instead, one picked with the
-     *  answer. */
+     *  answer. hit-by-attack (Deflect Attacks): the creatures a reduction to 0 may redirect the attack's force at. */
     redirectChoices: z
       .array(z.object({ actorId: z.uuid(), name: z.string().min(1).max(120) }).strict())
       .min(1)

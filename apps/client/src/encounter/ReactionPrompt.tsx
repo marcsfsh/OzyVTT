@@ -28,7 +28,7 @@ import "./prompts.css";
  * - Hellish Rebuke or Storm's Thunder: Use strikes the creature that dealt the damage.
  * - Counterspell: the spell another creature is casting waits; Use makes its caster save, and the spell may fail.
  * - Deflect Attacks, Stone's Endurance: Use rolls the reduction and takes it off the held damage; Superior Hunter's
- *   Defense resists the damage's type.
+ *   Defense resists the damage's type. Deflect Attacks names the creature a reduction to 0 redirects the force at.
  * - Cutting Words, Countercharm, Improve Fate: another creature's roll waits on the answer; Use applies it (a die that
  *   can be added or taken off gets a button for each), Decline lets the roll stand.
  * A reaction spell cast with a slot offers the slot levels the reactor has one of, so a higher one upcasts it.
@@ -89,6 +89,12 @@ export function ReactionPrompt({
   const slotLevels = reaction.slotLevels ?? [];
   const [slotPick, setSlotPick] = useState<number | null>(null);
   const slotLevel = slotPick !== null && slotLevels.includes(slotPick) ? slotPick : slotLevels[0];
+  // Deflect Attacks: the creature a reduction to 0 turns the force on, picked before the roll ("" keeps the Focus
+  // Point).
+  const forceChoices =
+    reaction.kind === "hit-by-attack" && reaction.damageResponse ? (reaction.redirectChoices ?? []) : [];
+  const [forcePick, setForcePick] = useState("");
+  const forceAt = forceChoices.some((choice) => choice.actorId === forcePick) ? forcePick : undefined;
   const weighed = reaction.weighed;
   const takeIfUsed =
     weighed?.use ?? reaction.proposedDamageParts.reduce((sum, part) => sum + Math.floor(part.amount / 2), 0);
@@ -288,6 +294,23 @@ export function ReactionPrompt({
             ariaLabel: `Cast with a level ${level} spell slot`
           }))}
         />
+      )}
+      {forceChoices.length > 0 && (
+        <div className="push-choice" role="group" aria-label="Redirect the force at 0 damage">
+          <span className="push-choice-label">At 0 damage, a Focus Point redirects the force at</span>
+          {[{ actorId: "", name: "No one" }, ...forceChoices].map((choice) => (
+            <button
+              key={choice.actorId || "none"}
+              type="button"
+              className={`save-die-mode${(forceAt ?? "") === choice.actorId ? " active" : ""}`}
+              aria-pressed={(forceAt ?? "") === choice.actorId}
+              disabled={busy}
+              onClick={() => setForcePick(choice.actorId)}
+            >
+              {choice.name}
+            </button>
+          ))}
+        </div>
       )}
       {push && pushFeet !== undefined && <PushChoice push={push} value={pushFeet} busy={busy} onPick={setPushPick} />}
       {rolled?.hitOffers && rolled.hitOffers.length > 0 && (
@@ -496,7 +519,7 @@ export function ReactionPrompt({
                     ? `Spend the reaction to take ${reaction.damageResponse.formula} off the damage.`
                     : "Spend the reaction for Resistance to the damage's type until the turn ends."
                 }
-                onClick={() => answer(true)}
+                onClick={() => answer(true, forceAt ? { redirectTo: forceAt } : {})}
               >
                 {useLabel} ·{" "}
                 {reaction.damageResponse.kind === "reduce"
