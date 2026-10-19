@@ -4,7 +4,7 @@ import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { footprintInTemplate } from "./area-targeting.js";
 import { areEnemies } from "./creature-sides.js";
-import { CONCENTRATING_TAG, type EffectNarration } from "./effects.js";
+import { CONCENTRATING_TAG, endEffectIfPresent, type EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { applyDamageDetailed, damageAdjustmentDetail } from "./hit-points.js";
 import { laterSpellAction, upcastAction } from "./item-actions.js";
@@ -53,25 +53,53 @@ export function zoneRowOf(spell: SpellReference) {
   return (spell.effect?.laterActions ?? []).find((row) => row.zone !== undefined);
 }
 
-/** Whether a zone still stands: its caster holds the Concentration it belongs to. */
-function holds(state: GameState, zone: SpellZone): boolean {
-  if (zone.castId === null) return state.actors.some((actor) => actor.id === zone.casterId);
-  return state.actors.some(
-    (actor) =>
-      actor.id === zone.casterId &&
-      actor.effects.some((effect) => effect.castId === zone.castId && effect.tags.includes(CONCENTRATING_TAG))
-  );
+/** Whether a zone still stands: its caster holds the Concentration it belongs to, or still carries the effect a spell
+ *  with no Concentration left on it (which lasts its duration in a fight and on the game clock outside one). */
+export function zoneHeld(state: GameState, zone: SpellZone): boolean {
+  const caster = state.actors.find((actor) => actor.id === zone.casterId);
+  if (!caster) return false;
+  if (zone.castId !== null)
+    return caster.effects.some((effect) => effect.castId === zone.castId && effect.tags.includes(CONCENTRATING_TAG));
+  if (zone.effectId !== undefined) return caster.effects.some((effect) => effect.id === zone.effectId);
+  return true;
+}
+
+/** Ends every zone whose Concentration or effect has gone, with its area; runs after every command, so an area leaves
+ *  the map as its spell ends however that happened (time passing, a fight's end, Dispel Magic). */
+export function pruneEndedZones(state: GameState): void {
+  for (const zone of [...state.combat.spellZones])
+    if (!zone.bursting && !zoneHeld(state, zone)) endZone(state, zone.id);
+}
+
+/** Ends a zone by a ruling (webs burned away, a glyph that went off), and with it a spell with no Concentration whose
+ *  effect on the caster only kept the area. A Concentration spell's caster keeps concentrating. */
+export function endZoneAndItsSpell(state: GameState, zoneId: string): EffectNarration[] {
+  const zone = state.combat.spellZones.find((candidate) => candidate.id === zoneId);
+  if (!zone) return [];
+  endZone(state, zone.id);
+  return zone.effectId !== undefined ? endEffectIfPresent(state, zone.casterId, zone.effectId) : [];
 }
 
 /** The zones still standing; one whose Concentration has gone is removed on the way, and one bursting as its spell
  *  ended acts only in `burstEndedZones`. */
 function liveZones(state: GameState): SpellZone[] {
-  for (const zone of [...state.combat.spellZones]) if (!zone.bursting && !holds(state, zone)) endZone(state, zone.id);
+  pruneEndedZones(state);
   return state.combat.spellZones.filter((zone) => !zone.bursting);
 }
 
 const tokenOf = (state: GameState, actorId: string) =>
   state.combat.tokens.find((token) => token.actorId === actorId && token.position !== null);
+
+/** The creatures an area can reach: the fight's, in turn order; outside a fight, everyone with a token on the map. */
+function creaturesOnMap(state: GameState): Actor[] {
+  const ids = state.combat.active
+    ? state.combat.initiative.map((entry) => entry.actorId)
+    : state.combat.tokens.filter((token) => token.position !== null).map((token) => token.actorId);
+  return ids.flatMap((id) => {
+    const creature = state.actors.find((actor) => actor.id === id);
+    return creature && tokenOf(state, id) ? [creature] : [];
+  });
+}
 
 /** "Is a creature of this size at this point inside the zone?", or null when the map can't say (no grid, the area
  *  not placed, its caster off the map). `casterAt` stands the caster of an Emanation somewhere else. */
@@ -114,8 +142,8 @@ function insideTest(
     footprintInTemplate(calibration, area.geometry, shape, spell.area?.widthFeet ?? null, position, sizeCells);
 }
 
-/** The creatures a zone can act on: those in the fight and on the map, except an Emanation's anchor, and only the
- *  caster's enemies where the spell spares the rest. */
+/** The creatures a zone can act on: those on the map (in the fight, during one), except an Emanation's anchor, and only
+ *  the caster's enemies where the spell spares the rest. */
 function exposed(
   state: GameState,
   zone: SpellZone,
@@ -123,9 +151,7 @@ function exposed(
   deps: Pick<ZoneDeps, "resolveDefinition">
 ): Actor[] {
   const caster = state.actors.find((actor) => actor.id === zone.casterId);
-  return state.combat.initiative.flatMap((entry) => {
-    const creature = state.actors.find((actor) => actor.id === entry.actorId);
-    if (!creature || !tokenOf(state, creature.id)) return [];
+  return creaturesOnMap(state).flatMap((creature) => {
     if (trigger.around === "caster" && creature.id === zone.casterId) return [];
     if (trigger.affects === "enemies" && (!caster || !areEnemies(caster, creature, deps.resolveDefinition))) return [];
     // A defeated creature takes no more; a dying character does (damage at 0 HP is a failed death save).
@@ -182,12 +208,16 @@ function act(
   // "If the spirit has no creature Restrained": while one is still held by the cast, the zone waits.
   if (trigger.holdsOne && zone.castId !== null && holdsACreature(state, zone.castId)) return;
   const travelling = meeting === "moves through";
-  if (!travelling) {
+  // Outside a fight there are no turns to count once in: each time a creature comes into the area counts.
+  const marks = state.combat.active;
+  if (!travelling && marks) {
     if ((meeting === "enters" || meeting === "is caught by") && zone.entered.includes(creature.id)) return;
     if (trigger.oncePerTurn && zone.affected.includes(creature.id)) return;
   }
-  zone.entered = meeting === "enters" || meeting === "is caught by" ? [...zone.entered, creature.id] : zone.entered;
-  zone.affected = zone.affected.includes(creature.id) ? zone.affected : [...zone.affected, creature.id];
+  if (marks) {
+    zone.entered = meeting === "enters" || meeting === "is caught by" ? [...zone.entered, creature.id] : zone.entered;
+    zone.affected = zone.affected.includes(creature.id) ? zone.affected : [...zone.affected, creature.id];
+  }
   const action = zoneAction(zone, spell, row);
   const parts = Array.from({ length: times }, () =>
     action.damage.map((part) => ({
@@ -312,7 +342,7 @@ export function zonesAfterMove(
   const events: EffectNarration[] = [];
   const mover = state.actors.find((actor) => actor.id === input.moverId);
   const moverToken = tokenOf(state, input.moverId);
-  if (!mover || !moverToken || input.path.length < 2 || !state.combat.active) return events;
+  if (!mover || !moverToken || input.path.length < 2) return events;
   const path = input.teleported ? [input.path[0]!, input.path[input.path.length - 1]!] : input.path;
   for (const zone of liveZones(state)) {
     const content = zoneContentOf(zone, deps.catalog);
@@ -355,7 +385,7 @@ export function zonesAfterAreaMove(
 ): EffectNarration[] {
   const events: EffectNarration[] = [];
   const area = state.combat.annotations.find((annotation) => annotation.id === annotationId);
-  if (!area || !state.combat.active) return events;
+  if (!area) return events;
   for (const zone of liveZones(state)) {
     if (zone.annotationId !== annotationId) continue;
     const content = zoneContentOf(zone, deps.catalog);
@@ -476,14 +506,13 @@ export function burstEndedZones(state: GameState, deps: ZoneDeps): EffectNarrati
   for (const zone of state.combat.spellZones.filter((candidate) => candidate.bursting)) {
     const content = zoneContentOf(zone, deps.catalog);
     const caster = state.actors.find((actor) => actor.id === zone.casterId);
-    if (content && caster && state.combat.active) {
+    if (content && caster) {
       const { spell, row, trigger } = content;
       const inside = insideTest(state, zone, trigger, spell, deps.geometry);
       const caught = inside
-        ? state.combat.initiative.flatMap((entry) => {
-            const creature = state.actors.find((actor) => actor.id === entry.actorId);
-            const token = creature ? tokenOf(state, creature.id) : undefined;
-            return creature && token && inside(token.position!, token.sizeCells) ? [creature] : [];
+        ? creaturesOnMap(state).filter((creature) => {
+            const token = tokenOf(state, creature.id)!;
+            return inside(token.position!, token.sizeCells);
           })
         : [];
       const action = zoneAction(zone, spell, row);

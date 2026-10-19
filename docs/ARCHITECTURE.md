@@ -305,7 +305,9 @@ Undead Fortitude, a Death Burst (`trait-turns.ts`, `statblock-traits.ts`). A sta
 wall of fire) opens a zone on the template the cast placed, or around its caster, which the server
 runs as tokens move, as the area moves and at each turn's end and start (`spell-zones.ts`); what
 such a spell lets its caster do on later turns is offered while it lasts, at the level it was cast
-(`lasting-spells.ts`).
+(`lasting-spells.ts`). A zone lasts while its caster's Concentration does, or the effect a spell with none
+leaves on its caster, so it opens outside a fight too (where it acts on the creatures the GM moves into
+it), counts down on the game clock, outlasts a fight and is carried into the next one on the same map.
 
 Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
 (`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long

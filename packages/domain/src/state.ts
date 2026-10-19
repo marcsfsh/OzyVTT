@@ -1031,6 +1031,9 @@ export const SpellZoneSchema = z
     casterId: z.uuid(),
     /** The Concentration cast it ends with; null for a spell that lasts `rounds` from `startedRound`, or until ended. */
     castId: z.string().min(1).max(120).nullable(),
+    /** The effect on its caster that keeps a spell with no Concentration (Glyph of Warding, Guardian of Faith): the
+     *  area lasts while that effect does, in a fight and on the game clock outside one. */
+    effectId: z.string().min(1).max(120).optional(),
     rounds: z.number().int().min(1).max(100).nullable().default(null),
     startedRound: z.number().int().positive(),
     /** The slot level it was cast at, which its damage rolls at. */

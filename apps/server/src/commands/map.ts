@@ -35,8 +35,7 @@ import {
   type MovementNarration
 } from "../movement-narration.js";
 import { releaseGrapplesOutOfRange, type EffectNarration } from "../effects.js";
-import { endZone } from "../spell-zone-state.js";
-import { placeZone, speedHalvingAt, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
+import { endZoneAndItsSpell, placeZone, speedHalvingAt, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
 import { movementCost } from "../terrain.js";
 import { moveEncounterToken, moveSceneToken } from "../token-placement.js";
 import { HIDDEN_SOURCE } from "../hidden-source.js";
@@ -290,7 +289,7 @@ export const mapCommands = [
     malformed: "The spell-area command is malformed.",
     gmOnly: "Only the GM places a spell's area.",
     async run({ principal, request, execute }, kit) {
-      const { mapAssetId, geometry } = await liveMap(kit, "Start an encounter before placing a spell's area.");
+      const { mapAssetId, geometry } = await liveMap(kit, "Make a scene live before placing a spell's area.");
       if (!geometry.calibration) throw new CommandRejectedError("Calibrate this map before placing a spell's area.");
       const { commandId, zoneId, template } = request;
       await execute((state) => {
@@ -323,20 +322,22 @@ export const mapCommands = [
     type: "spell-zone.end",
     operationId: "endSpellZone",
     description:
-      "Ends a spell's lingering area and removes it from the map (GM-grade only): webs burned away, a guardian dismissed, or a ruling. The caster's Concentration on the spell is untouched; ending that ends the area too.",
+      "Ends a spell's lingering area and removes it from the map (GM-grade only): webs burned away, a guardian dismissed, or a ruling. The caster's Concentration on the spell is untouched; ending that ends the area too. A spell with no Concentration that is only its area (Glyph of Warding, Guardian of Faith) ends with it.",
     summary: "End a spell's lingering area (GM).",
     schema: SpellZoneEndSchema,
     malformed: "The spell-area command is malformed.",
     gmOnly: "Only the GM ends a spell's area.",
     async run({ request, execute }, kit) {
       let name = "";
+      let ended: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {
         const zone = state.combat.spellZones.find((candidate) => candidate.id === request.zoneId);
         if (!zone) throw new CommandRejectedError("That spell's area has already ended.");
         name = zone.name;
-        endZone(state, zone.id);
+        ended = endZoneAndItsSpell(state, zone.id);
       });
       if (!duplicate && name) kit.context.appendLog({ kind: "encounter", text: `${name} ends.`, gmOnly: true });
+      if (!duplicate) kit.publishNarrations(ended);
     }
   }),
 

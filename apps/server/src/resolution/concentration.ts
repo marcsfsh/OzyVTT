@@ -159,18 +159,22 @@ function zoneDc(ctx: ResolveContext, spell: SpellReference, rowName: string): nu
 }
 
 /**
- * A cast that leaves an area acting on creatures later (Spirit Guardians, Moonbeam, Web): its zone, on the area the
- * GM placed with the cast, or around the caster for an Emanation. Cast without a template (a player's cast), the area
- * waits for the GM to place it. The creatures the cast itself caught have made this turn's save already.
+ * A cast that leaves an area acting on creatures later (Spirit Guardians, Moonbeam, Web, Glyph of Warding): its zone, on
+ * the area placed with the cast, or around the caster for an Emanation, in a fight or out of one. It lasts while the
+ * caster's Concentration does, or the effect a spell with none leaves on its caster (`markSpellUp`), so it runs on the
+ * game clock and across fights as that effect does. Cast without a template (a player's cast), the area waits for the
+ * GM to place it. The creatures the cast itself caught have made this turn's save already.
  */
 export function openSpellZone(ctx: ResolveContext): void {
   const spell = spellOf(ctx);
   const row = spell ? zoneRowOf(spell) : undefined;
-  if (!spell || !row?.zone || isLaterAction(ctx, spell) || !ctx.state.combat.active) return;
+  if (!spell || !row?.zone || isLaterAction(ctx, spell)) return;
   const { state, attacker, input, targets } = ctx;
   const aroundCaster = row.zone.around === "caster";
   const duration = spellEffectDuration(spell, castLevelOf(ctx, spell));
   const caught = ctx.action.save !== undefined || ctx.action.damage.length > 0;
+  const spellUp =
+    ctx.castId === null ? attacker.effects.find((effect) => effect.id === `${input.commandId}:spell`) : undefined;
   const zone: SpellZone = {
     id: input.commandId,
     spellId: spell.id,
@@ -178,7 +182,8 @@ export function openSpellZone(ctx: ResolveContext): void {
     laterActionId: laterSpellActionId(spell.id, row.name),
     casterId: attacker.id,
     castId: ctx.castId,
-    rounds: ctx.castId === null && duration.type === "rounds" ? Math.max(1, duration.remaining) : null,
+    ...(spellUp ? { effectId: spellUp.id } : {}),
+    rounds: ctx.castId === null && !spellUp && duration.type === "rounds" ? Math.max(1, duration.remaining) : null,
     startedRound: state.combat.round,
     level: castLevelOf(ctx, spell),
     dc: zoneDc(ctx, spell, row.name),
