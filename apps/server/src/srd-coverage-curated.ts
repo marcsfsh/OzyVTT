@@ -204,7 +204,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "survival.ts, while the GM tracks food and water: each character drinks from its Waterskins as the game day ends, as far as its need goes; less than half its water costs a level of Exhaustion that no rest removes until it drinks its fill. The GM gives a drink at a source."
   ),
   "difficult-terrain": enforced(
-    "The GM paints difficult terrain on the map (terrain.ts), and movement-rules.ts charges double through it, through an enemy's space and through an opening sized for a creature one size smaller (footprintStepPassage). Freedom of Movement ignores it."
+    "The GM paints difficult terrain on the map (terrain.ts), and movement-rules.ts charges double through it, through an enemy's space and, with dynamic vision on, through an opening sized for a creature one size smaller, which a narrower gap bars (footprintStepPassage in rules-5e): a Small or Medium creature squeezes through a gap half a square to three quarters of one wide. The map's drag preview charges the same path (movePreview.ts). Freedom of Movement ignores it."
   ),
   "difficulty-class": enforced(
     "The server works out spell save DCs and feature DCs from the sheet and compares every save and check with its DC."
@@ -422,7 +422,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "vision/senses.ts reads it, and with dynamic vision on vision/sight.ts lets the creature pinpoint creatures within range, walls or not, without seeing them. Whether a creature is touching the ground is the GM's."
   ),
   truesight: enforced(
-    "Within its range vision/sight.ts lets a creature see Invisible creatures and into normal and magical Darkness, and attack rolls read it, by the distance between the tokens with dynamic vision off. Illusions, true forms and the Ethereal Plane are the GM's."
+    "Within its range vision/sight.ts lets a creature see Invisible creatures and into normal and magical Darkness, and attack rolls read it, by the distance between the tokens with dynamic vision off. It succeeds with no roll on its saves against a visual illusion (Phantasmal Force, Phantasmal Killer, Hypnotic Pattern) cast within its range (resolution/pending.ts). True forms and the Ethereal Plane are the GM's."
   ),
   "unarmed-strike": enforced(
     "resolution/builtins.ts rolls the strike for 1 plus Strength Bludgeoning damage, or the grapple or shove save against 8 plus Strength plus the Proficiency Bonus."
@@ -817,7 +817,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Each target can leap up to 30 feet for 10 feet of movement once on each of its turns for 1 minute (jumping.ts)."
   ),
   "spell:levitate": guided(
-    "A failed save lifts the target 20 feet (falling.ts); while levitating it moves only as if climbing (altitude.ts), and it floats gently down when the spell ends. A willing target's save, and moving it up or down on the caster's turn, are the GM's, who sets its height."
+    "A creature on the caster's side rises 20 feet with no save, and any other creature only on a failed Constitution save (falling.ts); while levitating it moves only as if climbing (altitude.ts), and it floats gently down when the spell ends. Raising or lowering it on the caster's turn, and an object, are the GM's, who sets its height."
   ),
   "spell:banishment": guided(
     "A failed save Incapacitates the target and takes it off the map while the caster concentrates (off-plane.ts); it can't be targeted, and it returns to the space it left or the nearest unoccupied one. An extraplanar creature that stays gone after the full minute is the GM's."
@@ -940,7 +940,27 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "It works only in the tiger and hybrid forms (transform/rules.ts), and a move of its Speed that provokes no Opportunity Attacks is granted (granted-moves.ts). The Hide at the end of it is the GM's."
   ),
   // Cantrips with nothing to roll: the cast is the server's, what it does is the table's.
-  "spell:light": castOnly("The light and the object it shines from are the GM's."),
+  "spell:light": enforced(
+    "The object touched, held by the caster or a creature on its side, sheds Bright Light 20 feet and Dim Light 20 feet more for the hour, and moves with its holder; casting it again ends the earlier light (vision/cast-sight.ts). An enemy's object is refused (resolution/spell-targets.ts). An object no one holds, and covering the light, are the table's."
+  ),
+  "spell:continual-flame": enforced(
+    "The object touched, held by the caster or a creature on its side, sheds Bright Light 20 feet and Dim Light 20 feet more until dispelled, and moves with its holder (vision/cast-sight.ts); an enemy's object is refused (resolution/spell-targets.ts). It consumes 50 GP of ruby dust (resolution/components.ts). An object no one holds, and covering the flame, are the table's."
+  ),
+  "spell:animal-messenger": guided(
+    "Only a Tiny Beast the caster can see within 30 feet is affected: a larger creature is refused, and a creature of another type is unaffected though the slot is spent (resolution/spell-targets.ts, resolution/type-gates.ts). One whose Challenge Rating isn't 0 succeeds on the Charisma save with no roll (resolution/pending.ts). The message, the journey and its longer duration from a higher slot are the GM's."
+  ),
+  "spell:awaken": enforced(
+    "Only a Beast or a Plant with an Intelligence of 3 or less is affected, and any other creature isn't, though the cast is spent (resolution/type-gates.ts). The cast takes its 8 hours and consumes the agate (resolution/components.ts). The target's Intelligence becomes 10 for good, and it is Charmed by the caster for 30 days or until the caster or an ally damages it (resolution/inflicts.ts). Its language, a natural plant's statistics and its attitude after are the GM's."
+  ),
+  "spell:seeming": guided(
+    "Each creature the caster picks that it can see within 30 feet takes the disguise: one on the caster's side with no save, any other only on a failed Charisma save (resolution/pending.ts). The disguises and their 8 hours are the GM's."
+  ),
+  "spell:nondetection": enforced(
+    "The caster or a creature on its side that it touches can't be the target of a Divination spell for 8 hours, nor be caught in one's area or sensed by one (resolution/spell-wards.ts). It consumes 25 GP of diamond dust (resolution/components.ts). Hiding a place or an object, and scrying sensors, are the GM's."
+  ),
+  "spell:arcanists-magic-aura": enforced(
+    "Mask gives the caster or a creature on its side the creature type the caster picks for 24 hours, which spells and other magical effects read wherever they check a type (statblock-facts.ts creatureTypeOf); a skill check and a stat block's own traits read the true one. False Aura on an object, and making it last, are the GM's."
+  ),
   "spell:mage-hand": enforced(
     "The hand appears as a token at a point within 30 feet (summons.ts); a Magic action moves it up to 30 feet (summon-orders.ts), and it vanishes more than 30 feet from the caster or when the spell is cast again. Aimed at a door on the map within 30 feet, it opens or shuts an unlocked one (resolution/cast-walls.ts), and a door held shut stays shut. What else it handles is the GM's."
   ),
@@ -1152,8 +1172,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
 
   // Answers to a roll after it is seen (roll-answers.ts), and reactions to damage about to land (damage-window.ts).
-  "feature:bardic-inspiration": guided(
-    "The Bonus Action gives another creature the Bard's die, a d6 growing to a d12, one die at a time, and roll-answers.ts offers it when that creature fails an attack roll, a save, a check or a death save: the die is added and spent. A creature beyond 60 feet is refused, and an unused die ends after an hour. Whether the creature can see or hear the Bard is the GM's."
+  "feature:bardic-inspiration": enforced(
+    "The Bonus Action gives another creature within 60 feet that can see or hear the Bard (resolution/action-targets.ts) the Bard's die, a d6 growing to a d12, one die at a time, for an hour of game time; roll-answers.ts offers it when that creature fails an attack roll, a save, a check or a death save, and the die is added and spent."
+  ),
+  "feature:uncanny-dodge": enforced(
+    "When an attacker the Rogue can see hits it with an attack roll, damage-window.ts offers its Reaction to halve the attack's damage before it lands."
   ),
   "feature:cutting-words": enforced(
     "roll-answers.ts asks the Bard by a reaction prompt when a creature it can see within 60 feet hits with an attack roll, succeeds on a check or rolls damage. Using it spends a Bardic Inspiration use and the Reaction and takes the die off the roll, which can turn the hit into a miss or lower the damage before it lands (damage-window.ts)."
@@ -1298,6 +1321,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "feature:boon-of-truesight": enforced(
     "The ability score increase is applied, and Truesight 60 feet is a sense dynamic vision and attack rolls read (vision/senses.ts)."
+  ),
+  "feature:halfling-nimbleness": enforced(
+    "A Halfling moves through the space of a creature larger than it as Difficult Terrain, and can't end its move there (movement-rules.ts, spacePassage in rules-5e); the map's drag preview charges the same path."
   ),
   "feature:halfling-naturally-stealthy": enforced(
     "With dynamic vision on, resolution/validate.ts lets a Halfling Hide behind a creature at least one size larger than it (vision/rules.ts)."
@@ -1747,7 +1773,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The caster's nonmagical weapon picked gains +1 to its attack and damage rolls, +2 from a level 3 slot and +3 from level 6 (equipment-derivation.ts), for the hour; casting it again moves it. A weapon another creature carries is the GM's."
   ),
   "spell:mind-blank": enforced(
-    "The target is immune to Psychic damage (hit-points.ts) and the Charmed condition (effects.ts). What it hides from divination is the GM's."
+    "The target is immune to Psychic damage (hit-points.ts) and the Charmed condition (effects.ts), and a Divination spell can't target it, catch it in its area or sense it (resolution/spell-wards.ts). Other ways to read its emotions or thoughts, and scrying sensors, are the GM's."
   ),
   "spell:mind-spike": enforced(
     "The save and its Psychic damage are applied, and a failure outlines the target to the caster: Invisible gives it nothing against the caster's attacks or the caster's against it (resolution/attack.ts). Knowing where it is, and hiding, are the GM's."
@@ -2004,8 +2030,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:contact-patron": enforced(
     "Contact Other Plane is always prepared and cast once per Long Rest with no slot, and that cast succeeds on its own Intelligence save with no roll (resolution/pending.ts). What the patron answers is the GM's."
   ),
-  "feature:restoring-touch": guided(
-    "From Paladin 14, Lay on Hands spends 5 points to end one of Blinded, Charmed, Deafened, Frightened, Paralyzed or Stunned on a creature it touches (resolution/heal.ts). Ending several in one Bonus Action takes one use each here."
+  "feature:restoring-touch": enforced(
+    "From Paladin 14 a use of Lay on Hands on a creature it touches also ends any of Blinded, Charmed, Deafened, Frightened, Paralyzed and Stunned the Paladin picks in the target picker, 5 points of the pool each, beside the Hit Points it restores (resolution/heal.ts)."
+  ),
+  "feature:preserve-life": enforced(
+    "A use of Channel Divinity divides up to five times the Cleric level in Hit Points among Bloodied creatures within 30 feet, as the Cleric splits them in the target picker or else evenly, none above half its Hit Point maximum (resolution/heal.ts)."
+  ),
+  "feature:hunters-lore": enforced(
+    "While a Hunter's Mark of the Ranger's lasts on a creature, its player's target list shows that creature's damage Immunities, Resistances and Vulnerabilities and its condition Immunities, which no other player receives (hunters-lore.ts, projections.ts)."
   ),
   "feature:uncanny-metabolism": enforced(
     "When the Monk rolls Initiative, initiative-hooks.ts offers it: all Focus Points back and Hit Points equal to its Monk level plus a Martial Arts die, once per Long Rest (conversions.ts)."
@@ -2119,6 +2151,15 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "item:holy-water": enforced(
     "Thrown in place of an attack at a creature the thrower sees within 20 feet: on a failed Dexterity save a Fiend or an Undead takes 2d8 Radiant damage, and any other creature nothing, though the flask is used (resolution/type-gates.ts)."
+  ),
+  "item:amulet-of-proof-against-detection-and-location": enforced(
+    "While it is worn and attuned, a Divination spell can't target its wearer, catch it in its area or sense it (resolution/spell-wards.ts), unless the wearer allows it, which it does for a spell cast by its own side. Being seen through a scrying sensor is the GM's, as the sensor is."
+  ),
+  "item:ring-of-mind-shielding": enforced(
+    "While it is worn and attuned, Detect Thoughts can't target its wearer, Zone of Truth doesn't hold it and Detect Evil and Good doesn't sense it (resolution/spell-wards.ts). Telepathy, the imperceptible ring and the soul it can hold are the GM's."
+  ),
+  "item:trident-of-fish-command": guided(
+    "A charge casts Dominate Beast at DC 15 on a creature with a Swim Speed (resolution/action-targets.ts), which affects only a Beast (resolution/type-gates.ts); it has 3 charges and regains 1d3 at dawn, and the cast takes the spell's state. What the Beast does under it is the GM's."
   ),
   "item:net": enforced(
     "Thrown in place of an attack at a Large or smaller creature the thrower sees within 15 feet, a failed Dexterity save leaves it Restrained, escaped with a DC 10 Strength (Athletics) check. The Net is an object with AC 10 and 5 Hit Points, immune to Bludgeoning damage, and an attack that breaks it frees the creature (objects.ts)."
