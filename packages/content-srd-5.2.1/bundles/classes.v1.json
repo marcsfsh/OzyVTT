@@ -9730,7 +9730,26 @@
         },
         "per": "long-rest",
         "pool": "sorcery-points"
-       }
+       },
+       "actions": [
+        {
+         "id": "seeking-spell",
+         "name": "Seeking Spell",
+         "activation": "other",
+         "description": "When you miss with an attack roll for a spell, spend 1 Sorcery Point to reroll the d20. You must use the new roll.",
+         "damage": [],
+         "answer": {
+          "rolls": [
+           "attack"
+          ],
+          "when": "failure",
+          "spellAttacks": true,
+          "effect": {
+           "kind": "reroll"
+          }
+         }
+        }
+       ]
       },
       {
        "id": "subtle-spell",
