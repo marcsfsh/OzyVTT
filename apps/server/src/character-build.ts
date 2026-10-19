@@ -594,6 +594,8 @@ function linkSpellActions(
     const tier =
       record.level === 0 ? cantripTierAt(cantripScalingOf(record.castingOptions), numbers.characterLevel) : null;
     for (const later of record.effect?.laterActions ?? []) {
+      // An area that only changes the ground (Entangle's plants) is the server's alone, with nothing to take or roll.
+      if (later.activation === "other" && !later.save && later.damage.length === 0 && !later.attackRange) continue;
       const action = laterSpellAction(
         record,
         later,

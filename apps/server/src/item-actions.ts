@@ -154,6 +154,8 @@ export function itemAction(
     // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
     ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
     ...(declared.area ? { area: { ...declared.area } } : {}),
+    // The area it leaves to act later (spread Caltrops).
+    ...(declared.zone ? { zone: structuredClone(declared.zone) } : {}),
     // Who it may target (a flask's one creature within 20 feet) and the hit it rides (a staff's charge on a hit).
     ...(declared.targets ? { targets: structuredClone(declared.targets) } : {}),
     ...(declared.ridesHit ? { ridesHit: itemHitRider(declared.ridesHit, definition) } : {}),
@@ -239,7 +241,8 @@ export function castAction(
   );
   return {
     ...base,
-    ...castAreaOf(spell, mechanics),
+    // The item's own area, where it prints one (a wand's 60-foot Cone), else the spell's.
+    ...(cast.area ? { area: structuredClone(cast.area) } : castAreaOf(spell, mechanics)),
     ...mechanics,
     // A Reaction spell (Shield, Hellish Rebuke) is cast from the item as a Reaction, offered when its trigger happens.
     ...(spell.effect?.reaction

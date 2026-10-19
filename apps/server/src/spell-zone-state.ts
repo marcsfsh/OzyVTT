@@ -1,21 +1,52 @@
+import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState, SpellZone } from "@vtt/domain";
+import type { ActionArea, AreaTrigger } from "@vtt/schemas";
 import type { EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { laterRowOf } from "./item-actions.js";
 
-/** The spell and its zone row a live zone names; undefined when the catalog no longer has them. */
-export function zoneContentOf(zone: SpellZone, catalog: EquipmentCatalog | undefined) {
+/** A spell's area at the level it is cast: its size grows by the spell's `areaPerSlot` feet for each slot level above
+ *  its own (Fog Cloud's radius by 20, Confusion's by 5, Create or Destroy Water's Cube by 5). */
+export function areaAtLevel(
+  area: ActionArea,
+  spell: Pick<SpellReference, "level" | "effect">,
+  level: number | undefined
+): ActionArea {
+  const grows = spell.effect?.areaPerSlot;
+  const above = Math.max(0, (level ?? spell.level) - spell.level);
+  return grows && above > 0 ? { ...area, sizeFeet: Math.min(1000, area.sizeFeet + grows * above) } : area;
+}
+
+type LaterRow = NonNullable<NonNullable<SpellReference["effect"]>["laterActions"]>[number];
+
+/** What a live zone acts by: its trigger, its name in narration and the template it stands on, and for a spell's area
+ *  the spell and its zone row. */
+export type ZoneContent = Readonly<{
+  trigger: AreaTrigger;
+  name: string;
+  area: ActionArea | null;
+  spell?: SpellReference;
+  row?: LaterRow;
+}>;
+
+/** What a live zone acts by: an item's or a creature's area carries its rule, a spell's area names its spell and zone
+ *  row; undefined when the catalog no longer has them. */
+export function zoneContentOf(zone: SpellZone, catalog: EquipmentCatalog | undefined): ZoneContent | undefined {
+  if (zone.rule) return { trigger: zone.rule.trigger, name: zone.name, area: zone.area };
   const spell = catalog?.spellRecord?.(zone.spellId);
   const row = spell ? laterRowOf(spell, zone.laterActionId) : undefined;
-  return spell && row?.zone ? { spell, row, trigger: row.zone } : undefined;
+  return spell && row?.zone
+    ? { spell, row, trigger: row.zone, name: spell.name, area: zone.area ?? spell.area }
+    : undefined;
 }
 
 /** Removes a spell's zone (`combat.spellZones`) and the area it placed on the map. A zone that acts as its spell ends
- *  (Delayed Blast Fireball's bead) is left `bursting` instead, for `burstEndedZones` to raise its saves and remove. */
+ *  (Delayed Blast Fireball's bead) is left `bursting` instead, for `burstEndedZones` to raise its saves and remove, in a
+ *  fight or out of one. */
 export function endZone(state: GameState, zoneId: string): void {
   const zone = state.combat.spellZones.find((candidate) => candidate.id === zoneId);
   if (!zone) return;
-  if (zone.burstsOnEnd && !zone.bursting && state.combat.active) {
+  if (zone.burstsOnEnd && !zone.bursting) {
     zone.bursting = true;
     return;
   }

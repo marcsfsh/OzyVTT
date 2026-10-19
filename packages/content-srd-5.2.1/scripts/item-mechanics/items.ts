@@ -1459,8 +1459,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // falling only on an arrival in a filled space. The smoke cloud is the GM's.
   "cape-of-the-mountebank": { casts: [{ spellId: "dimension-door", uses: { limit: 1, per: "long-rest" } }] },
 
-  // Spider Climb, Spider Walk and the Web cast are not expressible.
-  "cloak-of-arachnida": { grants: { damageResistances: ["poison"] } },
+  // Spider Climb's Climb Speed; Spider Walk: "You can't be caught in webs of any sort" (the Web Walker tag a web's area
+  // reads); and Web at save DC 13 once a dawn, filling twice its normal area: a 40-foot Cube.
+  "cloak-of-arachnida": {
+    grants: { damageResistances: ["poison"] },
+    modifiers: [{ type: "special-speed", movement: "climb", equalToSpeed: true }],
+    tags: ["web-walker"],
+    casts: [
+      {
+        spellId: "web",
+        saveDc: 13,
+        uses: { limit: 1, per: "long-rest" },
+        area: { shape: "cube", sizeFeet: 40, widthFeet: null }
+      }
+    ]
+  },
 
   // `cloak-of-displacement` - attack disadvantage that switches off after damage or at Speed 0; no
   //     self-suppressing rider exists, so it would be permanent.
