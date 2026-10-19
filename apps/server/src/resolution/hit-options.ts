@@ -7,7 +7,7 @@ import { builtinBaseId } from "../builtin-actions.js";
 import { holdsFeature } from "../class-features.js";
 import { isIncapacitated } from "../condition-rules.js";
 import { areAllies } from "../creature-sides.js";
-import { addEffect, applyCondition, makeEffect, type EffectNarration } from "../effects.js";
+import { addEffect, applyCondition, hasEffectTag, makeEffect, type EffectNarration } from "../effects.js";
 import { sourceItemOf } from "../equipment-derivation.js";
 import { RulesBlockedError } from "../game-store.js";
 import { upcastAction, UNARMED_STRIKE_ACTION_ID } from "../item-actions.js";
@@ -23,6 +23,7 @@ import { applyHitOutcome, forceMove, grantHalfSpeedMove, openRiderSave, rollPlai
 import { hitRiderOf, type HitRider } from "./hit-riders.js";
 import { dealsDamage } from "./on-hit.js";
 import { spendHitPointDie } from "./hit-point-die.js";
+import { dealt } from "./dealings.js";
 import { OUTLINED_TAG } from "./attack.js";
 
 /**
@@ -129,6 +130,9 @@ function qualifies(ctx: ResolveContext, rider: HitRider, action: DefinitionActio
       break;
   }
   if (rider.ownTurn && ctx.state.combat.turnActorId !== ctx.attacker.id) return false;
+  // Frenzy: while both its Rage and its Reckless Attack hold, on the first Strength-based hit of the turn.
+  if (rider.whileEffectTags && !rider.whileEffectTags.every((tag) => hasEffectTag(ctx.attacker, tag))) return false;
+  if (rider.firstHitOnTurn && dealt(ctx.state, ctx.attacker.id, "strength-hit")) return false;
   if (rider.declaredBeforeRoll && ctx.forgoneAdvantageBy !== action.id) return false;
   if (rider.maxTargetSize && !sizeAtMost(ctx.targets[0].size, rider.maxTargetSize)) return false;
   if (rider.sneakAttack) {

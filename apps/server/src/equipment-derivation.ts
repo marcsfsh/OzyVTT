@@ -32,6 +32,7 @@ import {
   type ResolvedRider,
   type RollModeSource
 } from "@vtt/rules-5e";
+import { holdsFeature } from "./class-features.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { scrollCastAction } from "./scrolls.js";
 import { speedZeroed } from "./speed.js";
@@ -611,6 +612,7 @@ export function deriveEquipment(
     .filter((entry) => entry.item.weapon?.properties?.includes("light"))
     .reduce((count, entry) => count + Math.max(1, entry.item.quantity), 0);
   const twoWeaponFighting = (definition?.character?.feats ?? []).some((feat) => feat.id === "two-weapon-fighting");
+  const hordeBreaker = holdsFeature(definition, "horde-breaker", "Horde Breaker");
   // A Shield is strapped to one arm, so a Versatile weapon can't take its two-handed grip beside it, unless it hovers
   // beside its user (an animated Shield).
   const animated = animatedRowIds(actor);
@@ -671,6 +673,12 @@ export function deriveEquipment(
     }
     if (inForce?.id === "cleave" && weaponAttack.attack?.reachFeet !== undefined)
       actions.push(withItemHitRiders(extraAttackAction(entry.item, swing, "cleave"), entry));
+    // Hunter's Prey's Horde Breaker: one more attack with the same weapon, which carries its mastery.
+    if (hordeBreaker) {
+      const extra = withItemHitRiders(extraAttackAction(entry.item, swing, "horde-breaker"), entry);
+      actions.push(extra);
+      if (inForce) masteryByActionId[extra.id] = inForce;
+    }
     // "You can make one attack with it as a Bonus Action on each of your turns" (Scimitar of Speed).
     if (entry.record?.bonusActionAttack && itemIsActive(entry.item, entry.record)) {
       const bonus: ActorAction = {

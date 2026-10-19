@@ -630,6 +630,47 @@ describe("Barbarian: Rage Damage on attacks using Strength", () => {
   });
 });
 
+describe("Berserker: Frenzy rides the first Strength hit of a reckless, raging turn", () => {
+  const reckless = (built: Built) => use(built, "reckless-attack");
+
+  it("offers d6s of the weapon's type on the first Strength hit, and not on the second", () => {
+    const built = onTheTable(build(barbarianInput(3)));
+    use(built, "rage");
+    reckless(built);
+    const first = swing(built, "item-greataxe", [15, 15], { commit: false });
+    expect(first.hitOffers?.find((offer) => offer.id === "frenzy")).toMatchObject({ dice: "2d6 Slashing" });
+    const hit = swing(built, "item-greataxe", [15, 15, 6, 3, 3], { hitOptions: [{ id: "frenzy" }] });
+    expect(hit.damage.filter((part) => part.source === "Frenzy")).toEqual([
+      { formula: "2d6", type: "slashing", total: 6, source: "Frenzy" }
+    ]);
+    built.state.combat.turn = { ...built.state.combat.turn, actionUsed: false, actionInstance: null };
+    expect(offerIds(swing(built, "item-greataxe", [15, 15], { commit: false }))).not.toContain("frenzy");
+  });
+
+  it("isn't offered without Reckless Attack or without the Rage, and rolls 3d6 at Barbarian 9", () => {
+    const calm = onTheTable(build(barbarianInput(3)));
+    reckless(calm);
+    expect(offerIds(swing(calm, "item-greataxe", [15, 15], { commit: false }))).not.toContain("frenzy");
+    const careful = onTheTable(build(barbarianInput(3)));
+    use(careful, "rage");
+    expect(offerIds(swing(careful, "item-greataxe", [15, 15], { commit: false }))).not.toContain("frenzy");
+    const ninth = onTheTable(build(barbarianInput(9)));
+    use(ninth, "rage");
+    reckless(ninth);
+    expect(swing(ninth, "item-greataxe", [15, 15], { commit: false }).hitOffers).toContainEqual(
+      expect.objectContaining({ id: "frenzy", dice: "3d6 Slashing" })
+    );
+  });
+
+  it("isn't offered after a Strength hit that went without it", () => {
+    const built = onTheTable(build(barbarianInput(5)));
+    use(built, "rage");
+    reckless(built);
+    swing(built, "item-greataxe", [15, 15, 6]);
+    expect(offerIds(swing(built, "item-greataxe", [15, 15], { commit: false }))).not.toContain("frenzy");
+  });
+});
+
 describe("Barbarian: Persistent Rage is a counter the engine spends", () => {
   it("spends its one long-rest use and refuses the second attempt", () => {
     const built = onTheTable(build(barbarianInput()));

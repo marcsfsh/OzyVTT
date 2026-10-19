@@ -1444,6 +1444,14 @@ const sceneCombatShape = {
       /** The turn's actor has made an attack roll on its turn (SRD Reckless Attack is decided with the first). Engine
        *  bookkeeping, never projected. */
       attackRolled: z.boolean().optional(),
+      /** What creatures did to each other this turn: who attacked whom, who hit whom with a Strength-based attack, and
+       *  who damaged whom (Horde Breaker, Frenzy, Superior Hunter's Prey). Engine bookkeeping, never projected. */
+      dealings: z
+        .array(
+          z.object({ by: z.uuid(), target: z.uuid(), kind: z.enum(["attacked", "strength-hit", "damaged"]) }).strict()
+        )
+        .max(200)
+        .optional(),
       /** What this turn's attacks opened for an extra attack: the Light weapons its actor swung in the Attack action,
        *  and the creature a Cleave weapon hit; and the Loading weapons already fired in that action, which can't
        *  fire again in it. Engine bookkeeping, never projected. */
@@ -1463,7 +1471,13 @@ const sceneCombatShape = {
             .object({ actorId: z.uuid(), itemId: z.string().max(120), targetId: z.uuid() })
             .strict()
             .nullable()
-            .default(null)
+            .default(null),
+          /** Horde Breaker's opening: the weapon attack that opened it and its target. */
+          horde: z
+            .object({ actorId: z.uuid(), itemId: z.string().max(120), targetId: z.uuid() })
+            .strict()
+            .nullable()
+            .optional()
         })
         .strict()
         .optional(),

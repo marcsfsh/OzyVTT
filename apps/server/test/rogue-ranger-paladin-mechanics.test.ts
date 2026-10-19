@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyRest } from "../src/rests.js";
+import { applyDamageDetailed } from "../src/hit-points.js";
 import { BuilderPolicySchema, GameStateSchema, type Actor, type GameState } from "@vtt/domain";
 import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../src/character-build.js";
 import { ContentLibrary } from "../src/content-library.js";
@@ -761,19 +762,126 @@ describe("Ranger: Favored Enemy, audit row 32", () => {
   });
 });
 
-describe("Ranger: Superior Hunter's Prey", () => {
-  it("deals the mark's 1d6 Force to one other creature the Ranger can see, once per turn", () => {
-    const built = table(rangerInput(11));
-    expect(actionOf(built, "superior-hunters-prey")).toMatchObject({
-      damage: [{ formula: "1d6", type: "force" }],
-      uses: { limit: 1, per: "turn" },
-      targets: { count: 1, seen: true, who: "others" }
-    });
-    expect(() => resolve(built, "superior-hunters-prey", [4], [IDS.hero])).toThrowError(
-      /Superior Hunter's Prey can't target/
+describe("Hunter: Horde Breaker opens one more attack with the same weapon", () => {
+  const SECOND = "10000000-0000-4000-8000-000000000044";
+  const THIRD = "10000000-0000-4000-8000-000000000045";
+  /** A Hunter 3 with Horde Breaker beside a Foe, a second goblin 5 feet from the Foe and a third 10 feet from it. */
+  function horde() {
+    const input = rangerInput(3);
+    input.choices = input.choices.map((row) => (row.kind === "hunters-prey" ? { ...row, id: "horde-breaker" } : row));
+    const built = table(input);
+    for (const [id, name, score] of [
+      [SECOND, "Second Goblin", 5],
+      [THIRD, "Third Goblin", 4]
+    ] as const) {
+      built.state.actors.push({ ...built.foe, id, name, effects: [] });
+      built.state.combat.initiative.push({ actorId: id, score } as (typeof built.state.combat.initiative)[number]);
+    }
+    const distanceFeet = (a: string, b: string) => {
+      const pair = new Set([a, b]);
+      if (pair.has(IDS.foe) && pair.has(SECOND)) return 5;
+      if (pair.has(IDS.foe) && pair.has(THIRD)) return 10;
+      return 30;
+    };
+    const attack = (actionId: string, targetId: string, faces: number[]) =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, actionId)!,
+        { actorId: IDS.hero, targetIds: [targetId], commandId: nextCommandId() },
+        { ...deps(built, faces), distanceFeet }
+      );
+    return { built, attack };
+  }
+
+  it("follows a missed Longbow shot with a shot at a creature within 5 feet of the target, once a turn", () => {
+    const { attack } = horde();
+    const missed = attack("item-longbow", IDS.foe, [2]);
+    expect(missed.attack?.outcome).toBe("miss");
+    expect(missed.opens).toEqual({ actionId: "item-longbow-horde-breaker", actionName: "Longbow (Horde Breaker)" });
+    expect(attack("item-longbow-horde-breaker", SECOND, [17, 5]).attack?.outcome).toBe("hit");
+    expect(() => attack("item-longbow-horde-breaker", THIRD, [17, 5])).toThrowError(/no uses remaining/);
+  });
+
+  it("refuses a creature 10 feet from the first target, and one it already attacked this turn", () => {
+    const { attack } = horde();
+    attack("item-longbow", IDS.foe, [2]);
+    expect(() => attack("item-longbow-horde-breaker", THIRD, [17, 5])).toThrowError(
+      /Third Goblin is 10 ft from the target Horde Breaker follows/
     );
-    expect(resolve(built, "superior-hunters-prey", [4]).damageTargets).toMatchObject([{ total: 4 }]);
-    expect(() => resolve(built, "superior-hunters-prey", [4])).toThrowError(/no uses remaining/);
+    expect(() => attack("item-longbow-horde-breaker", IDS.foe, [17, 5])).toThrowError(
+      /took the attack that set off Horde Breaker/
+    );
+  });
+
+  it("refuses a creature the Ranger already attacked this turn", () => {
+    const { built, attack } = horde();
+    attack("item-longbow", SECOND, [2]);
+    // A second action this turn (the GM's say), aimed at the Foe beside the goblin already shot at.
+    built.state.combat.turn = { ...built.state.combat.turn, actionUsed: false, actionInstance: null };
+    attack("item-longbow", IDS.foe, [2]);
+    expect(() => attack("item-longbow-horde-breaker", SECOND, [17, 5])).toThrowError(
+      /has already attacked Second Goblin this turn/
+    );
+  });
+
+  it("is refused before any weapon attack this turn", () => {
+    const { attack } = horde();
+    expect(() => attack("item-longbow-horde-breaker", SECOND, [17, 5])).toThrowError(
+      /follows an attack with this weapon/
+    );
+  });
+});
+
+describe("Ranger: Superior Hunter's Prey", () => {
+  const OTHER = "10000000-0000-4000-8000-000000000033";
+  /** The Ranger 11 with its Hunter's Mark on the Foe and a Goblin `apart` feet from the Foe. */
+  function marked(apart: number) {
+    const built = table(rangerInput(11));
+    built.state.actors.push({ ...built.foe, id: OTHER, name: "Goblin", effects: [] });
+    built.state.combat.initiative.push({ actorId: OTHER, score: 5 } as (typeof built.state.combat.initiative)[number]);
+    addEffect(
+      built.state,
+      IDS.foe,
+      makeEffect({
+        id: "hunters-mark",
+        name: "Hunter's Mark",
+        tags: ["hunters-mark"],
+        sourceActorId: IDS.hero,
+        duration: { type: "rounds", remaining: 600 }
+      })
+    );
+    const distanceFeet = (a: string, b: string) =>
+      (a === IDS.foe && b === OTHER) || (a === OTHER && b === IDS.foe) ? apart : 30;
+    const prey = (faces: number[]) =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "superior-hunters-prey")!,
+        { actorId: IDS.hero, targetIds: [OTHER], commandId: nextCommandId() },
+        { ...deps(built, faces), distanceFeet }
+      );
+    /** A Longbow hit on the Foe, its damage applied as the table applies a hit's (`player-damage.ts`). */
+    const shoot = () => {
+      const hit = resolve(built, "item-longbow", [17, 5]);
+      applyDamageDetailed(built.state, IDS.foe, { amount: hit.damageTotal ?? 0, sourceActorId: IDS.hero }, GM_SCOPE);
+    };
+    return { built, prey, shoot };
+  }
+
+  it("deals the mark's 1d6 Force to a creature within 30 feet of the marked one once the Ranger has damaged it", () => {
+    const { prey, shoot } = marked(20);
+    expect(() => prey([4])).toThrowError(/hasn't dealt damage to a creature it marks this turn/);
+    shoot();
+    expect(prey([4]).damageTargets).toMatchObject([{ total: 4 }]);
+    expect(() => prey([4])).toThrowError(/no uses remaining/);
+  });
+
+  it("refuses a creature 40 feet from the marked one, and the marked one itself", () => {
+    const { built, prey, shoot } = marked(40);
+    shoot();
+    expect(() => prey([4])).toThrowError(/Goblin isn't within 30 feet of the marked creature/);
+    expect(() => resolve(built, "superior-hunters-prey", [4], [IDS.foe])).toThrowError(
+      /reaches a different creature than the marked one/
+    );
   });
 });
 
@@ -1185,9 +1293,7 @@ describe("Paladin: Sacred Weapon comes with the Attack action, and Divine Sense 
   it("is refused off the Paladin's turn and after an action that isn't the Attack action", () => {
     const offTurn = table(paladinInput(9));
     nextInitiativeTurn(offTurn.state);
-    expect(() => resolve(offTurn, "sacred-weapon", [], [])).toThrowError(
-      /Sacred Weapon is used on .*'s own turn\./
-    );
+    expect(() => resolve(offTurn, "sacred-weapon", [], [])).toThrowError(/Sacred Weapon is used on .*'s own turn\./);
     const built = table(paladinInput(9));
     resolve(built, "abjure-foes", [1], [IDS.foe]);
     expect(() => resolve(built, "sacred-weapon", [], [])).toThrowError(

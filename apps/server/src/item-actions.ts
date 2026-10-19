@@ -807,12 +807,24 @@ const withModifier = (dice: string, modifier: number) =>
 export function extraAttackAction(
   item: InventoryItem,
   swing: WeaponSwing,
-  kind: "light" | "cleave",
+  kind: "light" | "cleave" | "horde-breaker",
   options: Readonly<{ insideAttackAction?: boolean; keepModifier?: boolean }> = {}
 ): ActorAction {
   const { action, dice, modifier } = swing;
   const attack = action.attack!;
   const light = kind === "light";
+  // Horde Breaker: "another attack with the same weapon", melee or ranged, its ability modifier added as usual.
+  if (kind === "horde-breaker")
+    return {
+      id: itemActionId(item.id, kind),
+      name: `${item.name} (Horde Breaker)`,
+      activation: "other",
+      description: `Horde Breaker: after an attack with ${item.name} on your turn, attack a different creature within 5 feet of that one and within range that you haven't attacked this turn. Once on each of your turns.`,
+      attack: { ...attack, count: 1 },
+      damage: [{ formula: withModifier(dice, modifier), type: action.damage[0]!.type }],
+      uses: { limit: 1, per: "turn", pool: "horde-breaker" },
+      extraAttack: { kind, itemId: item.id }
+    };
   return {
     id: itemActionId(item.id, kind),
     name: light ? `${item.name} (Light extra attack)` : `${item.name} (Cleave)`,

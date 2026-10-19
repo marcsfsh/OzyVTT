@@ -8,7 +8,7 @@ import type { ResolveContext } from "./context.js";
 // are kept beside them (`checkLoading`).
 
 const opened = (ctx: ResolveContext) =>
-  ctx.state.combat.turn.extraAttacks ?? { light: null, loading: null, cleave: null };
+  ctx.state.combat.turn.extraAttacks ?? { light: null, loading: null, cleave: null, horde: null };
 
 /** An attack with a Light weapon in the Attack action, on the attacker's own turn, opens the Light extra attack
  *  with a different Light weapon. The extra attack itself opens nothing. */
@@ -66,6 +66,32 @@ export function recordAttackRoll(ctx: ResolveContext): void {
   if (attack === null || input.economyPaid === true || state.combat.turnActorId !== attacker.id) return;
   if (state.combat.turn.attackRolled) return;
   state.combat = { ...state.combat, turn: { ...state.combat.turn, attackRolled: true } };
+}
+
+/** SRD Horde Breaker: "Once on each of your turns when you make an attack with a weapon, you can make another attack
+ *  with the same weapon against a different creature". Any weapon attack on the Ranger's own turn opens it, hit or
+ *  miss, until it is used; the result card offers it. */
+export function recordHordeOpening(ctx: ResolveContext): void {
+  const { state, action, attacker, attack, riderItemId, input } = ctx;
+  if (
+    attack === null ||
+    riderItemId === null ||
+    input.commit === false ||
+    action.extraAttack?.kind === "horde-breaker" ||
+    state.combat.turnActorId !== attacker.id ||
+    (state.combat.turn.turnUses[`${attacker.id}:horde-breaker`] ?? 0) > 0
+  )
+    return;
+  const swing = ctx.siblings.find((candidate) => candidate.id === itemActionId(riderItemId, "horde-breaker"));
+  if (!swing) return;
+  state.combat = {
+    ...state.combat,
+    turn: {
+      ...state.combat.turn,
+      extraAttacks: { ...opened(ctx), horde: { actorId: attacker.id, itemId: riderItemId, targetId: attack.targetId } }
+    }
+  };
+  ctx.opens ??= { actionId: swing.id, actionName: swing.name };
 }
 
 /** A melee hit with a Cleave weapon opens its swing at a second creature, which the result card offers. */

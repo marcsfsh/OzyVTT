@@ -66,9 +66,11 @@ import { killOnCast } from "./resolution/kill.js";
 import {
   recordAttackRoll,
   recordCleaveOpening,
+  recordHordeOpening,
   recordLightAttack,
   recordLoadingShot
 } from "./resolution/extra-attacks.js";
+import { recordAttackDealings } from "./resolution/dealings.js";
 import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } from "./resolution/masteries.js";
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
@@ -293,6 +295,8 @@ export function resolveDefinitionAction(
     recordLightAttack(ctx);
     recordLoadingShot(ctx);
     recordAttackRoll(ctx);
+    recordAttackDealings(ctx);
+    recordHordeOpening(ctx);
     releaseHideAndReady(ctx);
     spendUntilItActs(ctx);
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
@@ -360,7 +364,9 @@ export function resolveDefinitionAction(
   recordLightAttack(ctx);
   recordLoadingShot(ctx);
   recordAttackRoll(ctx);
+  recordAttackDealings(ctx);
   recordCleaveOpening(ctx);
+  recordHordeOpening(ctx);
   releaseHideAndReady(ctx);
   spendUntilItActs(ctx);
   return resolutionOf(ctx);

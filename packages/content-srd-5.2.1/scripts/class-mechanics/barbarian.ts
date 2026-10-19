@@ -280,8 +280,34 @@ export const barbarian: ClassMechanicsModule = {
             reaction: { trigger: "damaged-by-creature", response: "melee-attack", rangeFeet: 5 }
           }
         ]
+      },
+      /** Rides the first Strength-based hit on the Berserker's turn while its Rage and Reckless Attack both hold: d6s
+       *  as many as the Rage Damage column (2 to 8, 3 to 15, then 4), of the weapon's or Unarmed Strike's type. */
+      frenzy: {
+        actions: [
+          {
+            id: "frenzy",
+            name: "Frenzy",
+            activation: "other",
+            description:
+              "If you use Reckless Attack while your Rage is active, you deal extra damage to the first target you hit on your turn with a Strength-based attack. To determine the extra damage, roll a number of d6s equal to your Rage Damage bonus and add them together. The damage has the same type as the weapon or Unarmed Strike used for the attack.",
+            damage: [{ formula: "2d6", type: "bludgeoning" }],
+            damageByLevel: [
+              { level: 3, formula: "2d6", type: "bludgeoning" },
+              { level: 9, formula: "3d6", type: "bludgeoning" },
+              { level: 16, formula: "4d6", type: "bludgeoning" }
+            ],
+            ridesHit: {
+              rides: "strength-attack",
+              ownTurn: true,
+              oncePerTurn: true,
+              firstHitOnTurn: true,
+              weaponType: true,
+              whileEffectTags: ["raging", "reckless-attack"]
+            }
+          }
+        ]
       }
-      // Not modeled: Frenzy (dice count read from the Rage Damage column).
     }
   },
   liveResources: ["rage"]

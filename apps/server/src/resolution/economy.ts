@@ -68,6 +68,7 @@ import {
   type ShapingPlan
 } from "./metamagic.js";
 import { legendaryActionsPerRound } from "../lair.js";
+import { dealt } from "./dealings.js";
 import { attackActionOpening, fleetStep, rageArmorViolation, timingViolations } from "./turn-windows.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
@@ -677,6 +678,21 @@ function checkExtraAttackOpened({ state, attacker, action, violations }: Evaluat
       violations.push({
         rule: "attack.light-needs-attack",
         message: `${action.name} follows an attack with a different Light weapon in the Attack action this turn.`
+      });
+    return;
+  }
+  if (extra.kind === "horde-breaker") {
+    const horde = opened?.horde;
+    // "Once on each of your turns when you make an attack with a weapon": the same weapon, on the Ranger's own turn.
+    if (
+      !horde ||
+      horde.actorId !== attacker.id ||
+      horde.itemId !== extra.itemId ||
+      state.combat.turnActorId !== attacker.id
+    )
+      violations.push({
+        rule: "attack.cleave-needs-hit",
+        message: `${action.name} follows an attack with this weapon on ${attacker.name}'s own turn.`
       });
     return;
   }
@@ -1525,22 +1541,35 @@ function checkTargeting(
 
   if (action.attack !== undefined && distanceFeet !== undefined) checkRange(evaluation, distanceFeet);
 
-  // Cleave (SRD): a second creature, within 5 feet of the first (when the map can tell).
-  const first = action.extraAttack?.kind === "cleave" ? state.combat.turn.extraAttacks?.cleave : null;
+  // Cleave (SRD): a second creature, within 5 feet of the first (when the map can tell). Horde Breaker: "a different
+  // creature that is within 5 feet of the original target ... and that you haven't attacked this turn".
+  const kind = action.extraAttack?.kind;
+  const first =
+    kind === "cleave"
+      ? state.combat.turn.extraAttacks?.cleave
+      : kind === "horde-breaker"
+        ? state.combat.turn.extraAttacks?.horde
+        : null;
+  const feature = kind === "horde-breaker" ? "Horde Breaker" : "Cleave";
   if (first && first.actorId === attacker.id) {
     for (const target of targets) {
       if (target.id === first.targetId) {
         violations.push({
           rule: "attack.cleave-same-target",
-          message: `${target.name} took the hit that set off Cleave. Choose a second creature for the extra attack.`
+          message: `${target.name} took the attack that set off ${feature}. Choose a second creature for the extra attack.`
         });
         continue;
       }
+      if (kind === "horde-breaker" && dealt(state, attacker.id, "attacked", target.id))
+        violations.push({
+          rule: "attack.cleave-same-target",
+          message: `${attacker.name} has already attacked ${target.name} this turn, and Horde Breaker needs a creature it hasn't.`
+        });
       const apart = distanceFeet?.(first.targetId, target.id) ?? null;
       if (apart !== null && apart > 5 + DISTANCE_TOLERANCE_FEET)
         violations.push({
           rule: "attack.cleave-too-far",
-          message: `${target.name} is ${Math.round(apart * 10) / 10} ft from the target Cleave follows; it must be within 5 feet of it.`
+          message: `${target.name} is ${Math.round(apart * 10) / 10} ft from the target ${feature} follows; it must be within 5 feet of it.`
         });
     }
   }

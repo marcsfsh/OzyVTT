@@ -3720,6 +3720,11 @@ export const HitRiderSchema = z
     dealsDamage: z.literal(true).optional(),
     /** Only against a target of at most this size (Hill's Tumble: Large or smaller). */
     maxTargetSize: SizeSchema.optional(),
+    /** Only while the bearer has an effect with each of these tags (Frenzy: its Rage and its Reckless Attack). */
+    whileEffectTags: z.array(EffectTagSchema).min(1).max(3).optional(),
+    /** Only on the first creature it hits on its turn with an attack this rider rides (Frenzy: "the first target you
+     *  hit on your turn with a Strength-based attack"). */
+    firstHitOnTurn: z.literal(true).optional(),
     /** Its damage takes the weapon's type (Sneak Attack, Brutal Strike). */
     weaponType: z.literal(true).optional(),
     /** The types its damage may take, picked when it is chosen (Divine Strike: Necrotic or Radiant). */
@@ -3801,6 +3806,12 @@ export const ActionTargetsSchema = z
     perceivesUser: z.literal(true).optional(),
     /** Only a Bloodied creature, at half its Hit Points or fewer (Preserve Life). */
     bloodied: z.literal(true).optional(),
+    /** Only a creature within `feet` of the one the user's own effect with this tag marks, other than that one, once
+     *  the user has damaged the marked creature this turn (Superior Hunter's Prey: 30 feet of Hunter's Mark's). */
+    nearMark: z
+      .object({ tag: EffectTagSchema, feet: z.number().int().min(5).max(120) })
+      .strict()
+      .optional(),
     /** Only a creature under this creature's effect from that action (one Restrained by an ettercap's Web Strand). */
     heldByAction: z
       .string()
@@ -4581,7 +4592,7 @@ export const ActionSchema = z
      *  Cleave's swing at a second creature (`cleave`), made with the inventory item `itemId`. */
     extraAttack: z
       .object({
-        kind: z.enum(["light", "cleave"]),
+        kind: z.enum(["light", "cleave", "horde-breaker"]),
         itemId: z
           .string()
           .regex(/^[a-z0-9-]+$/)
