@@ -271,18 +271,16 @@ export function GmEncounterPanel({
       }))
     )
       return;
-    setBusy(true);
-    const result = await command("actor:award-experience", {
-      actorIds: fightExperience.recipients.map((actor) => actor.id),
-      defeatedIds: fightExperience.defeated.map((actor) => actor.id),
-      // A creature with no lair XP gives its usual XP.
-      ...(inLair ? { inLairIds: fightExperience.defeated.map((actor) => actor.id) } : {})
-    });
-    setBusy(false);
-    setMessage(
-      result.ok
-        ? `${listOf(names)} gain ${(result.each ?? 0).toLocaleString("en")} XP each.`
-        : (result.message ?? "The XP was not awarded.")
+    // The log says how much each gained.
+    await run(
+      () =>
+        command("actor:award-experience", {
+          actorIds: fightExperience.recipients.map((actor) => actor.id),
+          defeatedIds: fightExperience.defeated.map((actor) => actor.id),
+          // A creature with no lair XP gives its usual XP.
+          ...(inLair ? { inLairIds: fightExperience.defeated.map((actor) => actor.id) } : {})
+        }),
+      `${listOf(names)} share the fight's XP.`
     );
   };
   // The quick-start door: everyone active is pre-listed in the staging tray, archived characters

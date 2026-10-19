@@ -15,7 +15,12 @@ function openingOf(className: string, featureName: string): string | null {
   const match = section ? new RegExp(`^#### (?:Level \\d+: )?${escaped}\\s*$`, "m").exec(section) : null;
   if (!section || !match) return null;
   const body = section.slice(match.index + match[0].length).split(/^#{3,4} /m)[0];
-  return body.replace(/[*_]/g, "").replace(/\s+/g, " ").replace(/[‘’]/g, "'").trim().slice(0, 60);
+  return body
+    .replace(/[*_]/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/[\u2018\u2019]/g, "'")
+    .trim()
+    .slice(0, 60);
 }
 
 const AUTHORED: ReadonlyArray<readonly [string, string, readonly FeatureRecord[]]> = [
@@ -44,7 +49,7 @@ describe("the hand-authored classes' text", () => {
         const opening = openingOf(className, feature.name);
         if (opening === null) continue;
         compared += 1;
-        expect(feature.description.replace(/[‘’]/g, "'"), `${id}.${feature.id}`).toContain(opening);
+        expect(feature.description.replace(/[\u2018\u2019]/g, "'"), `${id}.${feature.id}`).toContain(opening);
       }
     }
     expect(compared).toBeGreaterThan(30);
