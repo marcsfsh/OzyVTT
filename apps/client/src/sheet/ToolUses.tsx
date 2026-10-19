@@ -19,7 +19,7 @@ type UseRow = Readonly<{
 }>;
 
 /** Every Utilize use the character's tools and carried gear print, in one list. */
-function useRows(derived: Derived): UseRow[] {
+function rowsOf(derived: Derived): UseRow[] {
   const tools = derived.tools.flatMap((tool) =>
     tool.uses.map((use, index) => ({
       key: `${tool.id}-${index}`,
@@ -66,7 +66,7 @@ export function ToolUses({
 }>) {
   const [wearer, setWearer] = useState(actor.id);
   if (!derived) return null;
-  const rows = useRows(derived);
+  const rows = rowsOf(derived);
   const fastHands = derived.fastHands === true && inFight;
   if (rows.length === 0 && !fastHands) return null;
   const party = (state?.actors ?? []).filter(
