@@ -3194,6 +3194,9 @@ export const ActionAreaSchema = z
     /** How many of these areas one use places (Fire Storm's ten Cubes, Meteor Swarm's four Spheres); a creature under
      *  more than one is caught once. */
     count: z.number().int().min(2).max(10).optional(),
+    /** Each area one use places spends one of its uses ("For every charge you expend, you launch a glowing mote":
+     *  Ring of Shooting Stars). */
+    eachCostsAUse: z.literal(true).optional(),
     /** Each area must touch another ("Each Cube must be contiguous with at least one other Cube"). */
     contiguous: z.literal(true).optional(),
     /** How high a Cylinder rises from the ground it stands on ("5-foot-radius, 40-foot-high Cylinder"). */
@@ -3987,6 +3990,8 @@ export const AreaTriggerSchema = z
         modifiers: EffectModifiersSchema.optional(),
         conditions: z.array(ConditionSchema).min(1).max(2).optional(),
         keepsMaximum: z.literal(true).optional(),
+        /** A bonus to Armor Class while inside (a planted Rod of Alertness's +1). */
+        armorClassBonus: z.number().int().min(1).max(5).optional(),
         struck: StruckSchema.omit({ save: true })
           .extend({
             save: z
@@ -4073,6 +4078,11 @@ export const AreaTriggerSchema = z
     concentration: z.literal(true).optional(),
     /** Its user is unaffected by it ("the djinni is unaffected"). */
     sparesUser: z.literal(true).optional(),
+    /** A creature's action area that lasts this many rounds (a Rod of Alertness planted for 10 minutes). */
+    lastsRounds: z.number().int().min(1).max(100).optional(),
+    /** Its first damage part's dice by how many areas the use placed, the first for one (a Ring of Shooting Stars'
+     *  lightning spheres: 4d12 for one, down to 2d4 each for four). */
+    damageByCount: z.array(DiceFormulaSchema).min(2).max(10).optional(),
     /** A creature within 5 feet can touch it (Delayed Blast Fireball's bead): it makes the area's save, and a failure
      *  sets it off, while a success lets it throw it up to `throwFeet` at a creature, where it goes off. */
     touched: z

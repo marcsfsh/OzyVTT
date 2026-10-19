@@ -42,12 +42,13 @@ import { areaAtLevel } from "../spell-zone-state.js";
 import { pickedZoneRow, zoneRowOf } from "../spell-zones.js";
 import { ringTest } from "../zone-shapes.js";
 import { spellWardedTargets } from "../zone-barriers.js";
+import { zoneForEachArea } from "../spell-zone-state.js";
 import { zonePointFeet } from "../zone-touch.js";
 import { deflectingWall, zoneCover } from "../zone-walls.js";
 import { enclosedFrom } from "../enclosures.js";
 import { areaMoveOf, moveArea, planAreaMove, type AreaMove } from "../zone-moves.js";
 import { withChosenDamageType } from "../resolution/validate.js";
-import { useCostOf, withChosenCost } from "../use-cost.js";
+import { useCostOf, withAreaCost, withChosenCost } from "../use-cost.js";
 import { applyLooseHealing, looseHealTargets, partyMember } from "../loose-healing.js";
 import { countOptionUse } from "../option-uses.js";
 import { castLine, castSpellOf } from "../cast-narration.js";
@@ -158,8 +159,9 @@ export const actionCommands = [
         );
         const listed = statBlockAction ?? builtinActionFor(definition, actionId, attacker);
         if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
-        // An action whose user picks its cost (Lay on Hands) resolves at the amount picked.
-        const costed = withChosenCost(listed, request.spend);
+        // An action whose user picks its cost (Lay on Hands) resolves at the amount picked, and one whose every area
+        // spends a use (Ring of Shooting Stars) at the areas placed.
+        const costed = withChosenCost(withAreaCost(listed, templates?.length ?? 1), request.spend);
         // What the spell's area asks of it: a stage it waits for (Storm of Vengeance's bolts), and the dice a storm adds
         // (Call Lightning).
         const areaSpell = costed.spellId ? kit.equipmentCatalog().spellRecord?.(costed.spellId) : undefined;
@@ -215,10 +217,11 @@ export const actionCommands = [
           });
           placed = many.placed[0] ?? null;
           morePlaced = many.placed.slice(1);
-          resolvedTargetIds = many.targetIds;
+          // Areas left to act later (a ring's lightning spheres) catch no one as they appear.
+          resolvedTargetIds = leavesArea && !action.zone?.atCast ? [] : many.targetIds;
           // Whether the areas hold anyone is judged on what the caster's player can see, as for one area.
           const unseen = isPlayer ? hiddenFromPlayer(draft) : new Set<string>();
-          if (!resolvedTargetIds.some((id) => !unseen.has(id)))
+          if (!leavesArea && !resolvedTargetIds.some((id) => !unseen.has(id)))
             throw new CommandRejectedError(
               isPlayer ? "No creatures you can see are inside those areas." : "No combatants are inside those areas."
             );
@@ -624,13 +627,14 @@ export const actionCommands = [
             },
             areaMoveTerms
           );
-        } else if (placed)
+        } else if (placed) {
           // The first area takes the command's id, which a lingering spell's zone reads; any others take their own.
+          const areaIds = [placed, ...morePlaced].map((_, index) => (index === 0 ? commandId : kit.context.newId()));
           [placed, ...morePlaced].forEach((shape, index) =>
             addAnnotation(
               draft,
               {
-                id: index === 0 ? commandId : kit.context.newId(),
+                id: areaIds[index]!,
                 kind: "shape",
                 shape: shape.shape,
                 origin: shape.origin,
@@ -644,6 +648,9 @@ export const actionCommands = [
               geometry!
             )
           );
+          // Each area an item's use leaves acts on its own (a Ring of Shooting Stars' lightning spheres).
+          if (leavesArea && !resolution.preview) zoneForEachArea(draft, commandId, areaIds.slice(1));
+        }
         // A fire's area sets the webs it covers burning (Web).
         const fiery = action.damage.some((part) => part.type === "fire") || request.damageType === "fire";
         if (placed && !areaMove && !resolution.preview && fiery && geometry)

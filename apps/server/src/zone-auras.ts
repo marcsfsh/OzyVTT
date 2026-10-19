@@ -75,6 +75,7 @@ function wanted(
         startedRound: state.combat.round,
         duration: { type: "manual" },
         modifiers: structuredClone(holds.modifiers ?? []),
+        ...(holds.armorClassBonus !== undefined ? { armorClassBonus: holds.armorClassBonus } : {}),
         ...(holds.conditions ? { linkedConditionIds: [...holds.conditions] } : {}),
         ...(holds.struck ? { struck: struckAt(holds.struck, zone.dc) } : {}),
         ...(content.spell ? { spell: { id: content.spell.id, level: zone.level } } : {}),

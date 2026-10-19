@@ -333,6 +333,7 @@ export function openActionZone(ctx: ResolveContext): boolean {
   const trigger = action.zone;
   if (!trigger || action.spellId !== undefined) return false;
   const aroundCaster = trigger.around === "caster";
+  const casterAt = state.combat.tokens.find((token) => token.actorId === attacker.id)?.position ?? null;
   const row = itemRowOfAction(action.id, attacker.inventory);
   const record = row ? deps.catalog?.equipmentRecord(catalogIdOf(row)) : undefined;
   // "Caltrops (bag of 20)" lies on the map as Caltrops.
@@ -376,7 +377,8 @@ export function openActionZone(ctx: ResolveContext): boolean {
     laterActionId: action.id.slice(0, 120),
     casterId: attacker.id,
     castId: trigger.concentration ? input.commandId : null,
-    rounds: null,
+    // A planted Rod of Alertness glows for its 10 minutes.
+    rounds: trigger.lastsRounds ?? null,
     startedRound: state.combat.round,
     level: 0,
     dc: action.save?.dc ?? 10,
@@ -388,6 +390,8 @@ export function openActionZone(ctx: ResolveContext): boolean {
       damage: structuredClone(action.damage)
     },
     damageDealt: 0,
+    // It stays where its user stood (the rod planted in the ground).
+    ...(trigger.stays && casterAt ? { anchor: { x: casterAt.x, y: casterAt.y } } : {}),
     ...(state.combat.timeStop?.actorId === attacker.id ? { inTimeStop: true as const } : {}),
     entered: [],
     affected: []

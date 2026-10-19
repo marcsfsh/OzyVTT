@@ -21,6 +21,12 @@ export function withChosenCost<T extends Pick<ActorAction, "name" | "useCost">>(
   return { ...action, useCost: spend };
 }
 
+/** The action as a use that places `areas` areas spends it, where each area costs a use (Ring of Shooting Stars: a
+ *  charge for every mote). */
+export function withAreaCost<T extends Pick<ActorAction, "area" | "useCost">>(action: T, areas: number): T {
+  return action.area?.eachCostsAUse && areas >= 2 ? { ...action, useCost: areas } : action;
+}
+
 /** Why a pool can't pay for this activation when it still holds something. */
 export function notEnoughUses(name: string, left: number, cost: number): string {
   return `${name} has ${left} left, and this spends ${cost}.`;
