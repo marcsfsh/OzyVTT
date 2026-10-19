@@ -1,4 +1,4 @@
-import type { EffectInstance, PendingSave } from "@vtt/domain";
+import { ALIVE_AT_ZERO_TAG, type EffectInstance, type PendingSave } from "@vtt/domain";
 import type { ActorDefinition, Form } from "@vtt/schemas";
 import { holdsFeature } from "../class-features.js";
 import { CANT_SPEAK_TAG, makeEffect } from "../effects.js";
@@ -9,6 +9,7 @@ import { formEffectOf, trueDefinitionIdOf } from "../transform/forms.js";
 import { laterRowOf } from "../item-actions.js";
 import { classLevelOf, formChoice, formRecord } from "../transform/options.js";
 import { NO_SHAPE_SHIFT_TAG } from "../transform/rules.js";
+import { inSunlight } from "../transform/at-zero.js";
 import { spellEffectDuration, spellOf } from "./concentration.js";
 import { tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
 
@@ -60,6 +61,19 @@ export function checkShapeShift(ctx: ResolveContext): void {
   );
   if (held && !ctx.action.save)
     throw new CommandRejectedError(`${held.name} can't shape-shift while held in its true form.`);
+  // Misty Escape: "While it has 0 Hit Points in mist form, it can't return to its vampire form."
+  if (ctx.attacker.hp.current <= 0 && ctx.attacker.effects.some((effect) => effect.tags.includes(ALIVE_AT_ZERO_TAG)))
+    throw new CommandRejectedError(`${ctx.attacker.name} can't change form at 0 Hit Points.`);
+  if (
+    shift.notInSunlight &&
+    ctx.deps.resolveDefinition &&
+    inSunlight(ctx.state, ctx.attacker, {
+      resolveDefinition: ctx.deps.resolveDefinition,
+      ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {}),
+      ...(ctx.deps.distanceFeet ? { distanceFeet: ctx.deps.distanceFeet } : {})
+    })
+  )
+    throw new CommandRejectedError(`${ctx.attacker.name} can't shape-shift in sunlight.`);
   if (shift.from === "known" && (ctx.attacker.knownForms?.ids ?? []).length === 0)
     throw new CommandRejectedError(
       `${ctx.attacker.name} knows no forms yet. Choose the known forms on the sheet first.`
@@ -133,10 +147,13 @@ export function applyShapeShift(ctx: ResolveContext): void {
     // A new form while the spell lasts (Shapechange's Magic action) keeps the cast's lifetime and Concentration.
     const lasting = spell && laterRowOf(spell, action.id) ? formEffectOf(recipient) : undefined;
     const kept = lasting?.spell?.id === spell?.id ? lasting : undefined;
+    // What a printed form has while it lasts (a vampire's mist: Resistance to all damage).
+    const printed = shift.printed?.find((entry) => entry.id === form.printedId);
     const effect = makeEffect({
       id: `${input.commandId}:form:${recipient.id}`,
       name: formEffectName(ctx, form),
       tags: form.noSpeech ? [CANT_SPEAK_TAG] : [],
+      ...(printed && printed.modifiers.length > 0 ? { modifiers: structuredClone(printed.modifiers) } : {}),
       sourceActorId: attacker.id,
       sourceName: attacker.name,
       sourceActionId: kept?.sourceActionId ?? action.id,

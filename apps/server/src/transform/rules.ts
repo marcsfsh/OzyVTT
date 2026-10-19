@@ -54,7 +54,7 @@ export function formViolations(
     const names = action.formOnly.map((id) => formName(definition, id));
     violations.push({
       rule: "form.wrong-form",
-      message: `${action.name} works only in ${either(names)} form.`
+      message: `${action.name} works only in the ${either(names)} form.`
     });
   }
   return violations;

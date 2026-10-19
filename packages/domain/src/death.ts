@@ -4,7 +4,12 @@ export type MortalCreature = Readonly<{
   hp: Readonly<{ current: number }>;
   deathSaves: Readonly<{ failures: number }> | null;
   conditions: ReadonlyArray<Readonly<{ id: string; level?: number }>>;
+  effects?: ReadonlyArray<Readonly<{ tags: readonly string[] }>>;
 }>;
+
+/** An effect that keeps a monster alive at 0 Hit Points (a vampire's Misty Escape: "While it has 0 Hit Points in mist
+ *  form"). When it ends, the creature is dead. */
+export const ALIVE_AT_ZERO_TAG = "alive-at-zero";
 
 /**
  * SRD 5.2.1 "Dead": the one rule for who is dead, shared so healing, rests, Hit Dice and the sheets agree. A
@@ -16,5 +21,9 @@ export type MortalCreature = Readonly<{
 export function isDead(creature: MortalCreature): boolean {
   if ((creature.conditions.find((condition) => condition.id === "exhaustion")?.level ?? 0) >= 6) return true;
   if (creature.kind === "player-character") return (creature.deathSaves?.failures ?? 0) >= 3;
-  return creature.hp.current <= 0 && !creature.conditions.some((condition) => condition.id === "unconscious");
+  return (
+    creature.hp.current <= 0 &&
+    !creature.conditions.some((condition) => condition.id === "unconscious") &&
+    !(creature.effects ?? []).some((effect) => effect.tags.includes(ALIVE_AT_ZERO_TAG))
+  );
 }

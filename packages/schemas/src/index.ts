@@ -2605,7 +2605,15 @@ export const ShapeShiftSchema = z
     leaveAs: z.enum(["bonus-action", "action"]).optional(),
     /** It lasts hours equal to half the user's level in this class (Wild Shape). Absent: the spell's duration, or until
      *  ended. */
-    hoursPerTwoLevelsOf: RiderSlugSchema.optional()
+    hoursPerTwoLevelsOf: RiderSlugSchema.optional(),
+    /** It can't be used while its user stands in sunlight (a vampire's Shape-Shift). */
+    notInSunlight: z.literal(true).optional(),
+    /** Dropping to 0 Hit Points takes this printed form with no action, and the creature lives on in it at 0 Hit
+     *  Points for these hours or until the GM ends it (a vampire's Misty Escape). In sunlight it can't, and dies. */
+    escapesAtZero: z
+      .object({ form: RiderSlugSchema, hours: z.number().int().min(1).max(24) })
+      .strict()
+      .optional()
   })
   .strict()
   .describe(

@@ -53,7 +53,7 @@ describe("what one cast of an SRD spell does", () => {
     const waiting = loadSpells()
       .filter((spell) => spell.effect?.laterActions?.some((row) => row.laterTurnsOnly))
       .map((spell) => spell.id);
-    expect(waiting).toEqual(["arcane-sword", "conjure-fey", "heat-metal", "hex", "spiritual-weapon"]);
+    expect(waiting).toEqual(["animal-shapes", "arcane-sword", "conjure-fey", "heat-metal", "hex", "spiritual-weapon"]);
     // "Until the spell ends, you can take a Magic action": the turn of the cast too.
     expect(effectOf("produce-flame")!.laterActions?.[0]?.laterTurnsOnly).toBeUndefined();
   });

@@ -388,7 +388,6 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "new form",
       activation: "action",
       when: "Until the spell ends, a Magic action shape-shifts you into a different eligible form.",
-      laterTurnsOnly: true,
       damage: [],
       shapeShift: {
         from: "bestiary",

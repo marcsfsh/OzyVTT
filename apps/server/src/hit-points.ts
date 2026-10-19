@@ -1,4 +1,5 @@
 import { formsAfterDamage } from "./transform/rules.js";
+import { escapeAtZero, lycanthropyAtZero } from "./transform/at-zero.js";
 import {
   isDead,
   type Actor,
@@ -412,6 +413,8 @@ function fallToZero(
       text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
       actorId: actor.id
     });
+  } else if (deps && escapeAtZero(state, actor, definition, deps, events)) {
+    // A vampire's Misty Escape: it lives on at 0 in mist form.
   } else {
     defeated = true;
     // A swallower that dies lets out what it swallowed (SRD: "can escape from the corpse").
@@ -691,6 +694,14 @@ export function applyDamageDetailed(
     relentlessEndurance(actor, definition, damageToHp - hpBefore, events)
   ) {
     // Up at 1 Hit Point: nothing falls.
+  } else if (
+    !wasAtZero &&
+    actor.hp.current === 0 &&
+    damageToHp > 0 &&
+    deps &&
+    lycanthropyAtZero(state, actor, deps, events)
+  ) {
+    // A lycanthrope's curse: it becomes the lycanthrope instead of dropping.
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
     const fell = fallToZero(state, actor, definition, damageToHp - hpBefore, deps, events);
     instantDeath = fell.instantDeath;
