@@ -49,6 +49,7 @@ describe("rule families", () => {
       ["movement.no-speed", "movement"],
       ["movement.blocked-path", "movement"],
       ["movement.altitude", "movement"],
+      ["movement.jump", "movement"],
       ["economy.action-used", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
@@ -67,6 +68,7 @@ describe("rule families", () => {
       ["condition.no-reactions", "economy"],
       ["condition.no-spells", "economy"],
       ["legendary.own-turn", "economy"],
+      ["legendary.after-a-turn", "economy"],
       // An extra attack waits on the swing that opens it: a matter of what this turn has done.
       ["attack.light-needs-attack", "economy"],
       ["attack.cleave-needs-hit", "economy"],

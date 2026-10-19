@@ -649,7 +649,20 @@ export const ActorMovementReplySchema = z.strictObject({
   /** Prone: it can only crawl, each foot costing an extra foot (two in Difficult Terrain). */
   crawling: z.boolean().optional(),
   /** It drags a creature it grapples that isn't Tiny or two sizes smaller, each foot costing an extra foot. */
-  dragging: z.boolean().optional()
+  dragging: z.boolean().optional(),
+  /** A move an action or feature granted it for this turn, beside its own (Pounce, Tactical Shift): the feet left,
+   *  the way it travels when only one, whether it provokes Opportunity Attacks, and whether it is a jump. */
+  granted: z
+    .strictObject({
+      name: z.string(),
+      feet: z.number().min(0),
+      mode: z.enum(["walk", "fly", "swim", "climb", "burrow"]).optional(),
+      provokes: z.boolean(),
+      jump: z.boolean().optional()
+    })
+    .optional(),
+  /** A teleport granted it for this turn (Misty Step): up to `feet` to an unoccupied space it can see. */
+  teleport: z.strictObject({ name: z.string(), feet: z.number().min(0) }).optional()
 });
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;

@@ -51,6 +51,8 @@ export function heightRefusal(
   if (mode === "fly" || mode === "teleport" || mode === "forced") return null;
   if (mode === "climb") return null;
   if (airborne === "fly" && fromFeet > 0) return `${name} is in the air. Fly to move it, or climb onto a surface.`;
+  // A jump lands where it lands: up on a ledge, or down off one.
+  if (mode === "jump") return null;
   if (fromFeet !== toFeet)
     return `${name} can't rise or descend by ${mode === "walk" ? "walking" : mode === "swim" ? "swimming" : "burrowing"}. Fly, climb or jump to change height.`;
   return null;
@@ -63,7 +65,7 @@ export function airborneAfter(mode: MoveMode, toFeet: number, before: Token["air
   if (toFeet <= 0) return undefined;
   if (before === "levitate") return "levitate";
   if (mode === "fly") return "fly";
-  if (mode === "climb") return undefined;
+  if (mode === "climb" || mode === "jump") return undefined;
   if (mode === "teleport" || mode === "forced") return before ?? "fly";
   return before;
 }

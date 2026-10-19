@@ -3,7 +3,7 @@ import { Stepper, Switch } from "@vtt/ui";
 import type { MoveMode } from "./movePreview";
 
 /** The ways of moving that change a creature's height on the map, and the verb each button uses. */
-const RISES: Partial<Record<MoveMode, string>> = { fly: "Fly", climb: "Climb", teleport: "Teleport" };
+const RISES: Partial<Record<MoveMode, string>> = { fly: "Fly", climb: "Climb", jump: "Jump", teleport: "Teleport" };
 
 /**
  * How high a creature is, and how to change it. The creature whose move counts now rises or descends in place by the

@@ -494,6 +494,27 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].move.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the move an action makes its creature take (a dragon's Pounce, a troll's Charge) - read from the action's description as it is saved; the editor writes the description",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].teleport.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the teleport an action makes its creature take (a blink dog's 40 feet) - read from the action's description as it is saved; the editor writes the description",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].leap.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the jump an action allows (a bulette's Leap) - read from the action's description as it is saved; the editor writes the description",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].drain.**",
     types: ACTION_CARRIERS,
     reason:

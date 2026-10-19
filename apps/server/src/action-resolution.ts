@@ -35,6 +35,7 @@ import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
+import { applyMovementGrants } from "./resolution/movement-grants.js";
 import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
@@ -85,6 +86,12 @@ export function resolveDefinitionAction(
   if (input.ready === true) {
     holdReadiedSpell(ctx);
     commitEconomy(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // The action's move taken before the rest of it: its cost is spent and the move granted, and the rest waits.
+  if (input.moveFirst === true) {
+    commitEconomy(ctx);
+    applyMovementGrants(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
   // A failed check to read a scroll spends the cast and the scroll, and nothing else happens.
@@ -144,6 +151,7 @@ export function resolveDefinitionAction(
   markSpellUp(ctx);
   markCastTurn(ctx);
   openSpellZone(ctx);
+  applyMovementGrants(ctx);
   applyGrant(ctx);
   applyHealing(ctx);
   applyConditionCures(ctx);
@@ -374,6 +382,9 @@ function tapTargeting(action: DefinitionAction, usesUpItem: boolean): "none" | "
   if (action.healing) return action.healing.self ? "none" : action.healing.divided ? "multi" : "single";
   const structured =
     action.grants !== undefined ||
+    action.move !== undefined ||
+    action.teleport !== undefined ||
+    action.leap !== undefined ||
     action.multiattack !== undefined ||
     action.uses !== undefined ||
     action.spellSlot !== undefined ||

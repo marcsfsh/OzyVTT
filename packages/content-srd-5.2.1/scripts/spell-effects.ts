@@ -567,6 +567,16 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   ]
 };
 
+/** Spells whose cast teleports the caster on the map, taken at once with no GM ask (`granted-moves.ts`). Teleport,
+ *  Plane Shift and Word of Recall go somewhere off the map, which stays with the GM. */
+const CAST_TELEPORTS: Readonly<Record<string, NonNullable<SpellEffect["teleport"]>>> = {
+  // "You teleport up to 30 feet to an unoccupied space you can see."
+  "misty-step": { feet: 30 },
+  // "You teleport to a location within range": seen or not. "If you ... would arrive in a space occupied by a
+  // creature ... you ... each take 4d6 Force damage, and the teleportation fails."
+  "dimension-door": { feet: 500, unseen: true, failDamage: "4d6" }
+};
+
 /** Reaction spells the table offers as prompts: what triggers each and what casting it does. Counterspell answers a
  *  trigger the engine doesn't see (a spell being cast), so it stays with the GM. */
 const CAST_REACTIONS: Readonly<Record<string, NonNullable<SpellEffect["reaction"]>>> = {
@@ -884,6 +894,15 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "targets",
     duration: rounds(10)
   }),
+  // "Once on each of its turns until the spell ends, that creature can jump up to 30 feet by spending 10 feet of
+  // movement": a jump the movement rules take once a turn (`jumping.ts`).
+  jump: spellGrant({
+    name: "Jump",
+    tags: ["jump"],
+    target: "targets",
+    duration: rounds(10),
+    modifiers: [{ type: "movement", rule: "leap", feet: 30, costFeet: 10 }]
+  }),
   // "Gains a Fly Speed of 60 feet and can hover."
   fly: spellGrant({
     name: "Fly",
@@ -1005,6 +1024,7 @@ export function spellEffectFor(
   const drain = CAST_DRAINS[id];
   const cures = CAST_CURES[id];
   const burst = CAST_BURSTS[id];
+  const teleport = CAST_TELEPORTS[id];
   return {
     attacks,
     ...(attackRange ? { attackRange } : {}),
@@ -1024,7 +1044,8 @@ export function spellEffectFor(
       : {}),
     ...(grant ? { grant: structuredClone(grant) } : {}),
     ...(failureEffect ? { failureEffect: structuredClone(failureEffect) } : {}),
-    ...(reaction ? { reaction } : {})
+    ...(reaction ? { reaction } : {}),
+    ...(teleport ? { teleport: { ...teleport } } : {})
   };
 }
 
@@ -1094,6 +1115,7 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_TARGETS),
   ...Object.keys(UPCAST_CORRECTIONS),
   ...Object.keys(CAST_REACTIONS),
+  ...Object.keys(CAST_TELEPORTS),
   ...Object.keys(CAST_GRANTS),
   ...Object.keys(CAST_ON_HIT),
   ...Object.keys(CAST_MISS_DAMAGE),

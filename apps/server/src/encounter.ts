@@ -6,6 +6,7 @@ import type {
   RuleExceptions,
   RuleMode
 } from "@vtt/domain";
+import { dropStaleGrants } from "./granted-moves.js";
 import { abilityCheckClaims } from "./ability-checks.js";
 import { wardedConditions } from "./paladin-auras.js";
 import { assertNotArchived } from "./actor-roster.js";
@@ -681,11 +682,14 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     initiative: order,
     round: wraps ? state.combat.round + 1 : state.combat.round,
     turnActorId: nextActorId,
-    // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD).
-    turn: { ...EMPTY_TURN },
+    // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD). The turn
+    // that just ended opens the window for legendary actions, until the incoming creature does something.
+    turn: { ...EMPTY_TURN, ...(outgoingId ? { afterActorId: outgoingId } : {}) },
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, nextActorId)
   };
+  // A move or teleport granted for the turn that ended lapses with it.
+  dropStaleGrants(state);
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
   events?.push(...expiry);
@@ -719,4 +723,5 @@ export function previousInitiativeTurn(state: GameState) {
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== previousActorId),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, previousActorId)
   };
+  dropStaleGrants(state);
 }

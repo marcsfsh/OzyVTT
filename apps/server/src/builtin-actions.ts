@@ -281,7 +281,13 @@ export function withTakenActions(action: BuiltinAction): BuiltinAction {
       name: action.name,
       tags: [...new Set(grants.flatMap((grant) => grant.tags))],
       duration: { type: "until-source-next-turn" },
-      modifiers: grants.flatMap((grant) => grant.modifiers),
+      // Step of the Wind: "and your jump distance is doubled for the turn" (`jumping.ts`).
+      modifiers: [
+        ...grants.flatMap((grant) => grant.modifiers),
+        ...(action.id === "step-of-the-wind"
+          ? [{ type: "movement" as const, rule: "jump-multiplier" as const, times: 2 }]
+          : [])
+      ],
       onEnd: [],
       target: "self",
       // Dodge's half lapses while Incapacitated or at Speed 0; the tags still answer for Dash and Disengage.

@@ -26,6 +26,7 @@ const MODE_VERBS: Readonly<Record<MoveMode, string>> = {
   swim: "swam",
   climb: "climbed",
   burrow: "burrowed",
+  jump: "jumped",
   teleport: "teleported",
   forced: "was moved"
 };
@@ -165,6 +166,8 @@ export function narrateTokenMove(
     fromHiding?: boolean;
     /** Its height before the move; on the ground when absent. */
     fromAltitudeFeet?: number;
+    /** The action or feature that granted the move (Pounce, Misty Step), named after it. */
+    granted?: string;
   }>
 ): MovementNarration | null {
   const { state, actorId, from, geometry } = input;
@@ -216,7 +219,11 @@ export function narrateTokenMove(
   const how = input.crawled ? "crawled" : MODE_VERBS[input.mode ?? "walk"];
   // A change of height says where it ended up: so many feet up, or down on the ground.
   const height =
-    from !== null && toAltitude !== fromAltitude ? (toAltitude > 0 ? `, ${toAltitude} ft up` : " to the ground") : "";
+    (from !== null && toAltitude !== fromAltitude
+      ? toAltitude > 0
+        ? `, ${toAltitude} ft up`
+        : " to the ground"
+      : "") + (input.granted ? ` with ${input.granted}` : "");
   const verb =
     from === null
       ? `${mover.name} entered the map${toAltitude > 0 ? `, ${toAltitude} ft up` : ""}`

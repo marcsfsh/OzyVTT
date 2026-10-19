@@ -97,6 +97,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "movement.no-speed": () => "You don't have that speed.",
   "movement.blocked-path": () => "Enemies block the way.",
   "movement.altitude": () => "Fly, climb or jump to change height.",
+  "movement.jump": () => "A jump goes as far as the creature's Strength allows.",
   "economy.action-used": actionSpentReason,
   "economy.bonus-action-used": ({ state, attacker }) =>
     hasEffectTag(attacker, SLOWED_TAG) && state.combat.turn.actionUsed && !state.combat.turn.bonusActionUsed
@@ -118,7 +119,8 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "condition.raging": () => "You can't cast spells while raging.",
   "condition.no-reactions": () => "You can't take Reactions now.",
   "condition.no-spells": () => "You can't cast spells now.",
-  "legendary.own-turn": () => "Take it at the end of another creature's turn.",
+  "legendary.own-turn": () => "Take it right after another creature's turn.",
+  "legendary.after-a-turn": () => "Take it right after another creature's turn, before the next one acts.",
   "attack.light-needs-attack": () => "Attack with another Light weapon first.",
   "attack.cleave-needs-hit": () => "Hit with this weapon in melee first.",
   "attack.after-first-roll": () => "Decide it before your first attack roll.",

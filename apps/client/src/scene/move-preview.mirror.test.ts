@@ -242,3 +242,42 @@ describe("the drag preview counts height as the server does", () => {
     expect(aloft(state, cell(0, 0), cell(8, 0), 20, 20)?.feet).toBe(charged?.feet);
   });
 });
+
+describe("the drag preview takes jumps and granted moves as the server does", () => {
+  const base = (state: GameState) => ({
+    calibration: CALIBRATION,
+    size: { width: GRID.width, height: GRID.height },
+    terrain: state.combat.terrain.difficult,
+    tokens: state.combat.tokens,
+    actorsById: new Map(state.actors.map((actor) => [actor.id, actor as GmActor])),
+    moverId: HERO
+  });
+
+  it("measures a jump straight over rubble and creatures, a foot of movement for each foot", () => {
+    const state = table([cells(2, 0, 3, 0)], { [FRIEND]: cell(4, 0) });
+    const leap = previewMove({ ...base(state), from: cell(0, 0), to: cell(6, 0), straight: true })!;
+    expect(leap.feet).toBe(30);
+    expect(leap.free).toBeUndefined();
+    const budget = { counted: true, speedFeet: 30, usedFeet: 0, enforcement: "strict" as const };
+    expect(moveLabel(leap, budget, "jump")).toEqual({ text: "30 ft · 0 ft left", over: false });
+  });
+
+  it("names the granted move or teleport a drag is taken with, and a teleport past its range", () => {
+    const state = table([], {});
+    const walk = preview(state, cell(0, 0), cell(4, 0))!;
+    const granted = {
+      counted: false,
+      speedFeet: 40,
+      usedFeet: 0,
+      enforcement: "strict" as const,
+      granted: { name: "Pounce", feet: 20, provokes: true }
+    };
+    expect(moveLabel(walk, granted)).toEqual({ text: "20 ft · Pounce", over: false });
+    const blink = previewMove({ ...base(state), from: cell(0, 0), to: cell(8, 0), free: true })!;
+    const misty = { counted: true, speedFeet: 30, usedFeet: 0, enforcement: "strict" as const };
+    expect(moveLabel(blink, { ...misty, teleport: { name: "Misty Step", feet: 30 } }, "teleport")).toEqual({
+      text: "Misty Step 40 ft · 10 ft too far",
+      over: true
+    });
+  });
+});

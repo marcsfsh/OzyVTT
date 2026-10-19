@@ -639,6 +639,12 @@
   min-width: 0;
   max-width: 100%;
 }
+/* A move or teleport an action granted this turn, on its own line under the modes. */
+.encounter-move-modes-grant {
+  flex-basis: 100%;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
 .encounter-move-modes .nh-segmented-option {
   flex: none;
   min-height: var(--tap-min);

@@ -370,6 +370,10 @@ export const ActionResolveSchema = z
     /** Ready this spell for later (SRD Ready): its slot is spent and it is held with Concentration until
      *  the start of the caster's next turn; casting it off-turn then releases it with the Reaction. */
     ready: z.boolean().optional(),
+    /** Take the action's own move before the rest of it ("The dragon moves up to half its Speed, and it makes one
+     *  Rend attack"): the action's cost is spent and the move granted now, with no target; the action taken again
+     *  afterwards makes the rest at no further cost. */
+    moveFirst: z.boolean().optional(),
     /** false previews the attack roll only (no damage/riders/economy). The server holds the previewed d20, so a second
      *  preview of the same attack shows the same die, and the confirm (`commit: true`) uses it. Non-attack actions
      *  ignore it. */
@@ -1465,7 +1469,7 @@ export const DiceRollSchema = z
   .strict();
 /** How a token move travels (SRD Movement): on foot or by one of the special speeds, which spend movement; by
  *  teleportation, which spends none and provokes no Opportunity Attack; or moved by force (the GM's), neither. */
-export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "teleport", "forced"]);
+export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "jump", "teleport", "forced"]);
 export type MoveMode = z.infer<typeof MoveModeSchema>;
 
 export const TokenMoveSchema = z

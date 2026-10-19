@@ -261,7 +261,7 @@ of a hidden thing. When in doubt, leave it out.
   A move is charged along the cheapest grid path, where terrain costs double, other creatures'
   spaces cost double or bar the way, and crawling, climbing or swimming without the speed, or
   dragging a grappled creature, add a foot per foot (`movementPath` and `spacePassage` in
-  `@vtt/rules-5e`). How a token travels (walking, a special speed, teleporting, moved by force)
+  `@vtt/rules-5e`). How a token travels (walking, a special speed, jumping, teleporting, moved by force)
   rides on `token.move`, each speed with its own budget (`speed.ts`), and opportunity attacks are
   read along the whole path (`movement-rules.ts`). The map's drag preview runs the same function,
   and a mirror test checks the two agree. Players and the table screen get only the terrain the
@@ -286,6 +286,25 @@ of a hidden thing. When in doubt, leave it out.
   creature that sees the faller in range, the faller's own Slow Fall) and waits on them in
   `combat.pendingFalls`; then the server rolls 1d6 per 10 feet to 20d6 through the damage rules and
   leaves the creature Prone unless it took no damage.
+- Granted moves (`granted-moves.ts`, `resolution/movement-grants.ts`): a move or teleport an action
+  or feature gives beside the turn's own ("moves up to half its Speed", Tactical Shift, Misty Step)
+  is an effect on the creature that belongs to the turn it was granted in and lapses with it. The
+  movement rules charge a move to its grant when it fits, on the creature's turn or off it, and it
+  provokes unless the grant says otherwise; a granted teleport is checked for range, an unoccupied
+  space and sight, and needs no GM go-ahead. An action whose move comes first (Pounce) can be taken
+  `moveFirst`: its cost is spent and the move granted, and the action picked again pays nothing more.
+  Monster moves, teleports and leaps are read from the action's prose where it enters the system
+  (`action-prose.ts`). Other moves off the creature's turn are the GM's repositioning and spend
+  nothing.
+- Jumping (`jumping.ts`): the `jump` way of moving goes straight over what lies between, up to the
+  Strength score across and 3 + the Strength modifier up, half from a standing start (no 10 feet
+  moved this turn), a foot of movement for each foot. Riders change the numbers (`movement`
+  modifiers: Dexterity for Second-Story Work, Step of the Wind's doubling, the once-a-turn leap of
+  the Jump spell and Boots of Striding and Springing); a landing in Difficult Terrain rolls a DC 10
+  Dexterity (Acrobatics) check or leaves the jumper Prone.
+- Legendary actions are taken right after another creature's turn (`legendary.after-a-turn`): a turn
+  change records the creature whose turn ended (`turn.afterActorId`), and the window stays open, one
+  action a legendary creature, until the creature whose turn it is does something.
 
 ## Rules engine
 

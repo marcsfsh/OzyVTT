@@ -498,7 +498,8 @@ describe("generated OpenAPI components", () => {
       "damage-resistance": { damageTypes: ["fire"], when: [{ type: "while-effect-tag", tags: ["raging"] }] },
       "damage-vulnerability": { damageTypes: ["cold"] },
       sense: { sense: "tremorsense", feet: 30 },
-      "special-speed": { movement: "fly", feet: 60, hover: true }
+      "special-speed": { movement: "fly", feet: 60, hover: true },
+      movement: { rule: "leap", feet: 30, costFeet: 10 }
     };
 
     it("validates every trigger against the branch its discriminator routes it to", () => {

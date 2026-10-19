@@ -61,14 +61,17 @@ describe("turn economy", () => {
       turnUses: {},
       movementUsedFeet: 0
     });
+    const outgoing = game.combat.turnActorId;
     nextInitiativeTurn(game);
+    // The turn that ended opens the window for legendary actions.
     expect(game.combat.turn).toEqual({
       actionUsed: false,
       bonusActionUsed: false,
       actionInstance: null,
       bonusActionInstance: null,
       turnUses: {},
-      movementUsedFeet: 0
+      movementUsedFeet: 0,
+      afterActorId: outgoing
     });
     setTurnSlot(game, "action", true, GM);
     previousInitiativeTurn(game);

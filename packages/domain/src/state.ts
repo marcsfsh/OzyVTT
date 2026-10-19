@@ -839,6 +839,11 @@ const sceneCombatShape = {
       spellSlotCasters: z.array(z.uuid()).max(200).optional(),
       /** The turn's actor has made its one death save (SRD: at the start of its turn). Never projected. */
       deathSaveRolled: z.boolean().optional(),
+      /** The creature whose turn ended just before this one, which opened the window for legendary actions
+       *  (SRD 5.2.1: "Immediately after another creature's turn"); absent on a fight's first turn. `legendaryTakenBy`:
+       *  the creatures that took their one legendary action in that window. Engine bookkeeping, never projected. */
+      afterActorId: z.uuid().optional(),
+      legendaryTakenBy: z.array(z.uuid()).max(50).optional(),
       /** The turn's actor has made an attack roll on its turn (SRD Reckless Attack is decided with the first). Engine
        *  bookkeeping, never projected. */
       attackRolled: z.boolean().optional(),

@@ -10,6 +10,7 @@ import {
   templateOfArea,
   type AnnotationActor
 } from "../annotations.js";
+import { pointInRects } from "@vtt/rules-5e";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import {
   AnnotationAddSchema,
@@ -29,6 +30,8 @@ import {
 import { CommandRejectedError } from "../game-store.js";
 import { airborneAfter, altitudeOf, setAltitude } from "../altitude.js";
 import { startFall } from "../falling.js";
+import { failedTeleport } from "../granted-moves.js";
+import { landJump } from "../jumping.js";
 import { applyMovementRules, dragAlong, dragCostsExtra, grappledBy } from "../movement-rules.js";
 import {
   creatureDistance,
@@ -45,6 +48,7 @@ import { placeZone, speedHalvingAt, zonesAfterAreaMove, zonesAfterMove } from ".
 import { movementCost } from "../terrain.js";
 import { moveEncounterToken, moveSceneToken } from "../token-placement.js";
 import { HIDDEN_SOURCE } from "../hidden-source.js";
+import { insidePolygon } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -72,7 +76,7 @@ export const mapCommands = [
     type: "token.move",
     operationId: "moveToken",
     description:
-      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. `mode` says how it travels: walking (default) or a special speed (`fly`, `swim`, `climb`, `burrow`) spends movement, `teleport` spends none and provokes no Opportunity Attack, and `forced` (GM only) is a creature moved against its will. A grappler drags the creatures it grapples along. Player sessions may move only their claimed character, and only once a fight is running; in a fight, moving it off its turn or teleporting is the GM's to allow, and only the GM takes a placed token back to the tray. Before a fight the GM places tokens on the live scene without narration. `sceneId` targets a prepared (GM-private) scene; without it the token moves on the live table.",
+      "Moves a combatant's token; the server snaps to the calibrated grid. `position: null` returns the token to the tray. `mode` says how it travels: walking (default) or a special speed (`fly`, `swim`, `climb`, `burrow`) spends movement, `jump` leaps straight over what lies between up to the jump distance (a foot of movement for each foot), `teleport` spends none and provokes no Opportunity Attack, and `forced` (GM only) is a creature moved against its will. A grappler drags the creatures it grapples along. Player sessions may move only their claimed character, and only once a fight is running; in a fight, moving it off its turn or teleporting is the GM's to allow unless an action or feature granted that move or teleport this turn (Tactical Shift, Misty Step), which the move is charged to, and only the GM takes a placed token back to the tray. Before a fight the GM places tokens on the live scene without narration. `sceneId` targets a prepared (GM-private) scene; without it the token moves on the live table.",
     summary:
       "Move a combatant's token (server-snapped) walking, by a special speed, teleporting or by force; position null returns it to the tray.",
     schema: TokenMoveSchema,
@@ -105,8 +109,10 @@ export const mapCommands = [
       let released: EffectNarration[] = [];
       const zoneEvents: EffectNarration[] = [];
       const draggedNames: string[] = [];
+      const landing: EffectNarration[] = [];
+      let granted: string | undefined;
       let moverHiddenAtStart = false;
-      const { duplicate } = await execute((state) => {
+      const { state: moved, duplicate } = await execute((state) => {
         if (state.combat.mapAssetId !== mapAssetId)
           throw new CommandRejectedError("The active encounter changed. Try moving the token again.");
         requireActorAccess(
@@ -193,11 +199,52 @@ export const mapCommands = [
           catalog: kit.equipmentCatalog(),
           ...(perceives ? { perceives } : {}),
           ...(seenAtStart ? { seenBy: (id: string) => seenAtStart.has(id) } : {}),
+          ...(sight.enabled
+            ? {
+                seesPoint: (point: { x: number; y: number }) =>
+                  sight.areaOf([actorId]).some((area) => insidePolygon(point, area))
+              }
+            : {}),
+          difficultAt: (point) => pointInRects(point, state.combat.terrain.difficult),
           moverHiddenFromPlayers: moverHiddenAtStart,
           newPromptId: kit.context.newId,
           now: Date.now,
           commandId
         });
+        // A jump that lands in Difficult Terrain: the server rolls the DC 10 Dexterity (Acrobatics) check.
+        if (outcome.landsOnDifficult) {
+          const jumper = state.actors.find((actor) => actor.id === actorId);
+          if (jumper)
+            landJump(
+              state,
+              jumper,
+              kit.fallDeps(
+                state,
+                (current, a, b) => tokenCreatureDistance(current, geometry, a, b)?.value ?? null,
+                commandId
+              ),
+              landing
+            );
+        }
+        granted = outcome.granted;
+        // A teleport into a filled space fails: back where it was, hurt (Dimension Door).
+        if (outcome.teleportFails && from !== null) {
+          moveEncounterToken(state, actorId, from, geometry);
+          setAltitude(state, actorId, fromAltitude, wasAirborne);
+          const caster = state.actors.find((actor) => actor.id === actorId);
+          if (caster)
+            failedTeleport(
+              state,
+              caster,
+              outcome.teleportFails,
+              kit.fallDeps(
+                state,
+                (current, a, b) => tokenCreatureDistance(current, geometry, a, b)?.value ?? null,
+                commandId
+              ),
+              landing
+            );
+        }
         movementWarning = outcome.warning;
         movementOverridden = outcome.overridden;
         opportunityPrompts.push(...outcome.prompts);
@@ -230,7 +277,8 @@ export const mapCommands = [
               crawled: outcome.crawled,
               hiddenFromTable: hiddenAfter,
               fromHiding: moverHiddenAtStart,
-              fromAltitudeFeet: fromAltitude
+              fromAltitudeFeet: fromAltitude,
+              ...(granted ? { granted } : {})
             })
           : null;
         const to = moverToken?.position ?? null;
@@ -257,6 +305,7 @@ export const mapCommands = [
         );
       });
       if (duplicate) return;
+      if (landing.length > 0) kit.publishRolls(moved, commandId);
       kit.publishNarrations(released);
       if (movement?.publicText)
         kit.context.appendLog({ kind: "movement", text: movement.publicText, actorIds: [actorId] });
@@ -268,8 +317,9 @@ export const mapCommands = [
           gmOnly: kit.actorHidden(actorId)
         });
       if (movement?.gmText) kit.context.appendLog({ kind: "movement", text: movement.gmText, gmOnly: true });
-      // What the spell areas did to the mover follows the move itself.
+      // What the spell areas did to the mover follows the move itself, as does a jump's landing.
       kit.publishNarrations(zoneEvents);
+      kit.publishNarrations(landing);
       if (movementWarning)
         kit.context.appendLog({
           kind: "movement",

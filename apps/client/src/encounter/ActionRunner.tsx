@@ -14,6 +14,7 @@ import {
   resolveActionDirect,
   resolveTargeting,
   setTargetingResult,
+  takeMoveFirst,
   useTargeting,
   useTargetingBlocked,
   useTargetingBusy,
@@ -278,6 +279,7 @@ export function ActionRunner({
           onRoll={(face) =>
             resolveTargeting(state.revision, onOutcome, face !== undefined ? { attackNatural: face } : {})
           }
+          onMoveFirst={() => takeMoveFirst(onOutcome)}
         />
       )}
       {result && (

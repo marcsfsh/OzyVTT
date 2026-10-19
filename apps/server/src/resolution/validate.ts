@@ -52,8 +52,13 @@ function combatantsOf(
     if (!target || !inFight(targetId)) throw new CommandRejectedError("Every target must be in this encounter.");
     return target;
   });
-  // A readied spell is cast now and aimed when its trigger comes (SRD Ready), so it names no target yet.
+  // A readied spell is cast now and aimed when its trigger comes (SRD Ready), so it names no target yet; nor does an
+  // action whose move is taken before the rest of it.
   if (input.ready === true) return { attacker, targets };
+  if (input.moveFirst === true) {
+    if (!action.move) throw new CommandRejectedError(`${action.name} makes no move of its own to take first.`);
+    return { attacker, targets };
+  }
   if (action.attack && targets.length !== 1)
     throw new CommandRejectedError("An attack roll resolves against exactly one target.");
   // A grant aimed at the action's target (Help) needs exactly one recipient; one for each target (Bless), at least one.
@@ -79,6 +84,10 @@ function combatantsOf(
     action.multiattack !== undefined ||
     spendsALimitedUse ||
     startsALastingSpell ||
+    // A move, jump or teleport of its own (a troll's Charge, a bulette's Leap) is something done.
+    action.move !== undefined ||
+    action.leap !== undefined ||
+    action.teleport !== undefined ||
     input.builtin === true;
   // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
   const touchesSomeone = action.endsConditions !== undefined || action.healing?.perUse === true;
@@ -93,6 +102,9 @@ function combatantsOf(
     action.multiattack === undefined &&
     !spendsALimitedUse &&
     !startsALastingSpell &&
+    action.move === undefined &&
+    action.leap === undefined &&
+    action.teleport === undefined &&
     input.builtin !== true
   )
     throw new CommandRejectedError("That action has no structured effect to resolve. Run it from its description.");
@@ -153,22 +165,23 @@ export function openResolve(
     throw new CommandRejectedError(
       `${action.name} makes ${action.darts} darts; ${input.targetIds.length} were assigned.`
     );
-  const economy = input.economyPaid
-    ? { plan: paidPlan(state), overridden: null }
-    : planEconomy(
-        state,
-        attacker,
-        action,
-        input,
-        deps.definition,
-        warnings,
-        deps.distanceFeet,
-        siblings,
-        false,
-        deps.catalog,
-        spell,
-        deps.resolveDefinition
-      );
+  const economy =
+    input.economyPaid || input.owedPaid
+      ? { plan: paidPlan(state), overridden: null }
+      : planEconomy(
+          state,
+          attacker,
+          action,
+          input,
+          deps.definition,
+          warnings,
+          deps.distanceFeet,
+          siblings,
+          false,
+          deps.catalog,
+          spell,
+          deps.resolveDefinition
+        );
   let overridden = economy.overridden;
 
   // GM-adjudicated cover (SRD Cover, no line-of-sight engine): the GM's choice for this resolve, else the cover the

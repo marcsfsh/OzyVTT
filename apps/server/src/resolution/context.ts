@@ -89,6 +89,10 @@ export type ResolveInput = Readonly<{
   areaPlaced?: boolean;
   /** Ready the spell for later: its slot is spent and it is held with Concentration (SRD Ready). */
   ready?: boolean;
+  /** Take the action's own move now and the rest of it later (`movement-grants.ts`): the cost is spent, no target. */
+  moveFirst?: boolean;
+  /** The rest of an action whose move was taken first: its cost was spent then, so it is neither checked nor spent. */
+  owedPaid?: boolean;
 }>;
 
 export type ResolveDependencies = Readonly<{

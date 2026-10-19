@@ -24,6 +24,7 @@ const RULE_FAMILIES = {
   "movement.blocked-path": "movement",
   // Height changes by flying, climbing, jumping or teleporting, and a creature in the air moves by flying.
   "movement.altitude": "movement",
+  "movement.jump": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",
@@ -42,8 +43,9 @@ const RULE_FAMILIES = {
   // An effect that takes away Reactions (Slow).
   "condition.no-reactions": "economy",
   "condition.no-spells": "economy",
-  // "Legendary actions are taken on other creatures' turns" is a timing/economy rule...
+  // "Legendary actions are taken right after other creatures' turns" is a timing/economy rule...
   "legendary.own-turn": "economy",
+  "legendary.after-a-turn": "economy",
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.
   "attack.light-needs-attack": "economy",
   "attack.cleave-needs-hit": "economy",

@@ -1668,6 +1668,11 @@ describe("Incapacitated: feature activations are refused too", () => {
       legendary: { cost: 1 }
     };
     const check = () => evaluateActionEconomy(built.state, foe, tail, [IDS.hero], undefined).violations;
+    // Right after a turn ends, before the next creature acts (SRD 5.2.1 Legendary Actions).
+    built.state.combat = {
+      ...built.state.combat,
+      turn: { ...built.state.combat.turn, afterActorId: built.state.combat.turnActorId! }
+    };
     expect(check()).toEqual([]);
     setCondition(built.state, IDS.foe, "stunned", true, undefined, { role: "gm" });
     expect(check().map((violation) => violation.rule)).toEqual(["condition.incapacitated"]);

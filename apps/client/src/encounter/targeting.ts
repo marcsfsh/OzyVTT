@@ -415,6 +415,41 @@ export function resolveActionDirect(
   });
 }
 
+/** Take the targeted action's own move before the rest of it (Pounce): the server spends the action and grants the
+ *  move now; the action picked again after the move makes the rest at no further cost. */
+export function takeMoveFirst(onResult: (ok: boolean, message?: string) => void) {
+  if (!session || busy) return;
+  const { attackerId, action } = session;
+  busy = true;
+  emit();
+  void command("action:resolve", { actorId: attackerId, actionId: action.id, moveFirst: true }).then((response) => {
+    busy = false;
+    if (response.ok) session = null;
+    else if (response.blocked?.overridable)
+      blockedPrompt = {
+        blocked: response.blocked,
+        retry: (confirmed) =>
+          void command("action:resolve", {
+            actorId: attackerId,
+            actionId: action.id,
+            moveFirst: true,
+            override: confirmed
+          }).then((retried) => {
+            if (retried.ok) session = null;
+            blockedPrompt = null;
+            emit();
+            onResult(retried.ok, retried.message);
+          }),
+        asked: {
+          type: "action.resolve",
+          payload: { commandId: newId(), actorId: attackerId, actionId: action.id, moveFirst: true }
+        }
+      };
+    emit();
+    onResult(response.ok, response.blocked ? undefined : response.message);
+  });
+}
+
 export function useTargeting() {
   return useSyncExternalStore(
     subscribe,

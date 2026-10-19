@@ -13,6 +13,7 @@ import { ActionResolveSchema, ActionUseSchema, DiceRollSchema } from "@vtt/domai
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { heldRollFor, requireTypedDie } from "../held-rolls.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
+import { activeMoveGrant } from "../granted-moves.js";
 import { mapDistance, tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
@@ -237,7 +238,12 @@ export const actionCommands = [
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),
             ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),
             ...(template ? { areaPlaced: true } : {}),
-            ...(request.ready === true ? { ready: true } : {})
+            ...(request.ready === true ? { ready: true } : {}),
+            ...(request.moveFirst === true ? { moveFirst: true } : {}),
+            // The rest of an action whose move was taken first was paid for then.
+            ...(request.moveFirst !== true && activeMoveGrant(draft, attacker)?.owedActionId === action.id
+              ? { owedPaid: true }
+              : {})
           },
           {
             random: (sides) => kit.context.random(sides),

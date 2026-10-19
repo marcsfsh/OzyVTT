@@ -30,7 +30,7 @@ export function movementWallsOf(
 }
 
 /** How a drag travels, as `token.move` takes it. */
-export type MoveMode = "walk" | "fly" | "swim" | "climb" | "burrow" | "teleport" | "forced";
+export type MoveMode = "walk" | "fly" | "swim" | "climb" | "burrow" | "jump" | "teleport" | "forced";
 
 export type MovePreview = Readonly<{
   /** Footprint centres from start to end, in image pixels. */
@@ -82,6 +82,8 @@ export function previewMove(
     carried?: readonly string[];
     /** Teleporting or moved by force: a straight line that spends nothing. */
     free?: boolean;
+    /** A jump: a straight line over what lies between, a foot of movement for each foot. */
+    straight?: boolean;
     /** Walls that bar the way while the scene's dynamic vision is on (`movementWallsOf`). */
     walls?: readonly MoveWall[];
     /** The mover's height as it sets off and where the move ends, in feet; on the ground when absent. */
@@ -103,13 +105,13 @@ export function previewMove(
   const climb = climbCells(fromFeet, toFeet, feetPerCell);
   const lowFeet = Math.min(fromFeet, toFeet);
   const highFeet = Math.max(fromFeet, toFeet) + spaceHeightCells(sizeCells) * feetPerCell;
-  if (input.free) {
+  if (input.free || input.straight) {
     const cells = Math.max(Math.abs(to.column - from.column), Math.abs(to.row - from.row), climb);
     return {
       path: [centerOf(from), centerOf(to)],
       feet: cells * feetPerCell,
       difficultFeet: 0,
-      free: true
+      ...(input.free ? { free: true as const } : {})
     };
   }
   const isAlly = input.isAlly ?? alliesByKind;
@@ -179,9 +181,22 @@ export function moveLabel(
   mode: MoveMode = "walk"
 ): { text: string; over: boolean } {
   if (preview.blocked) return { text: "No way through", over: true };
+  // A teleport an action granted this turn (Misty Step) goes as far as it says.
+  const teleport = mode === "teleport" ? budget?.teleport : undefined;
+  if (preview.free && teleport)
+    return preview.feet <= teleport.feet
+      ? { text: `${teleport.name} ${preview.feet} ft`, over: false }
+      : { text: `${teleport.name} ${preview.feet} ft · ${preview.feet - teleport.feet} ft too far`, over: true };
   if (preview.free) return { text: `${mode === "teleport" ? "Teleport" : "Moved"} ${preview.feet} ft`, over: false };
   const cost =
     preview.difficultFeet > 0 ? `${preview.feet} ft (${preview.difficultFeet} ft difficult)` : `${preview.feet} ft`;
+  // A move an action granted this turn (Pounce) is taken with that grant when it fits, as the server takes it.
+  const grant = budget?.granted;
+  const grantFits =
+    grant !== undefined &&
+    (grant.jump === true ? mode === "jump" : mode !== "jump" && (grant.mode === undefined || grant.mode === mode)) &&
+    preview.feet <= grant.feet;
+  if (grantFits) return { text: `${cost} · ${grant.name}`, over: false };
   const total = budgetFor(budget, mode);
   if (!budget?.counted || total === null) return { text: cost, over: false };
   const left = total - budget.usedFeet - preview.feet;
@@ -193,7 +208,7 @@ export function moveLabel(
 /** Feet added to every foot of a counted move: crawling while Prone, climbing or swimming without the speed, and
  *  dragging a grappled creature (the server says which apply). */
 export function extraPerStepFor(budget: ActorMovementReply | null, mode: MoveMode): number {
-  if (!budget || mode === "teleport" || mode === "forced") return 0;
+  if (!budget || mode === "teleport" || mode === "forced" || mode === "jump") return 0;
   const slowed = budget.crawling === true || budget.modes?.find((entry) => entry.mode === mode)?.extraCost === true;
   return (slowed ? 1 : 0) + (budget.dragging ? 1 : 0);
 }
