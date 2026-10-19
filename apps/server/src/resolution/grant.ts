@@ -1,3 +1,4 @@
+import { endCrossedBonds, WARDING_BOND_TAG } from "../warding-bond.js";
 import { openStoreWindow } from "../stored-casts.js";
 import { CHOSEN_ABILITY_TAG, ENHANCED_ABILITY_TAG, type GameState } from "@vtt/domain";
 import { abilityModifier, rollDice } from "@vtt/rules-5e";
@@ -330,6 +331,8 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   if (effect.sizeChange) refreshSize(state, recipient);
   // Contingency, a spell glyph or a Ring of Spell Storing held out waits for the spell it will hold.
   if (grant.storeAwaits) openStoreWindow(ctx, recipient, effect, grant.storeAwaits, castLevel);
+  if (effect.tags.includes(WARDING_BOND_TAG))
+    warnings.push(...endCrossedBonds(state, recipient.id, effect.id).map((event) => event.text));
   warnings.push(...replaced.map((event) => event.text));
   // A new way to work out AC counts at once.
   if (baseArmorClass !== undefined && recipientDefinition)

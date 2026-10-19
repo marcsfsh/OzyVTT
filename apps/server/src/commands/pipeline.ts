@@ -15,6 +15,7 @@ import { releaseGlyphSpells } from "../stored-cast-release.js";
 import { planNextTurn } from "../combat-history.js";
 import { nextInitiativeTurn } from "../encounter.js";
 import { holdsSummons, needsSummonSettling, settleSummons, summonHoldingTurnLeaves } from "../summons.js";
+import { holdsBonds, needsBondSettling, settleBonds } from "../warding-bond.js";
 import { holdsAuras, settleZoneAuras, zoneAuraChanges } from "../zone-auras.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
@@ -266,6 +267,24 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     kit.publishNarrations(events);
   }
 
+  /** A Warding Bond whose caster dropped to 0 or ended more than 60 feet from its ward ends, as its own write. */
+  async function settleWardingBonds() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null || !holdsBonds(before)) return;
+    const distance = await kit.creatureDistance();
+    if (!needsBondSettling(before, (a, b) => distance(before, a, b))) return;
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute(
+      { id: context.newId(), type: "bonds.settle", principal: "table" },
+      (draft) => {
+        events = settleBonds(draft, (a, b) => distance(draft, a, b));
+      }
+    );
+    if (result.duplicate) return;
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
   /**
    * A spell area that acts as its spell ends (Delayed Blast Fireball's bead) is left bursting by whatever ended the
    * spell; the table then raises its saves with the server's dice and the live map, as its own write.
@@ -355,6 +374,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
       await settleZoneAurasAfter();
       await settleDownedReactions();
       await settleSummoned();
+      await settleWardingBonds();
       await settleFalls();
     }
     return reply;

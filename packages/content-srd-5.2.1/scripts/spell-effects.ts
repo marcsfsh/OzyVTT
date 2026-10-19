@@ -834,7 +834,12 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
         successDamage: "none",
         failureConditions: [],
         successEndsSpell: true,
-        endedBy: { name: "Push the probe out", by: "bearer", check: { ability: "int", skill: "arcana" }, endsSpell: true }
+        endedBy: {
+          name: "Push the probe out",
+          by: "bearer",
+          check: { ability: "int", skill: "arcana" },
+          endsSpell: true
+        }
       },
       failureEffect: { name: "Detect Thoughts", tags: [], modifiers: [] },
       damage: []
@@ -2127,8 +2132,8 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
       naturalWeapon("hooves", "Hooves", "bludgeoning")
     ]
   }),
-  // "Until the spell ends, the target has a +1 bonus to AC and saving throws, and it has Resistance to all damage."
-  // The caster's share of its damage is the GM's.
+  // "Until the spell ends, the target has a +1 bonus to AC and saving throws, and it has Resistance to all damage." The
+  // tag shares its damage with the caster and ends the bond at 60 feet apart (warding-bond.ts).
   "warding-bond": spellGrant({
     name: "Warding Bond",
     tags: ["warding-bond"],

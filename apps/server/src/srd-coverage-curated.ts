@@ -1813,8 +1813,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:sequester": enforced(
     "The target is Invisible and Unconscious until the spell ends, which taking damage does (effects.ts). The end condition the caster sets, and hiding from divination, are the GM's."
   ),
-  "spell:warding-bond": guided(
-    "The target has +1 to AC and saving throws and Resistance to all damage for the hour. The caster's share of its damage, and the spell ending at 60 feet apart, are the GM's."
+  "spell:warding-bond": enforced(
+    "The target has +1 to AC and saving throws and Resistance to all damage for the hour, and each time it takes damage the caster takes the same amount (hit-points.ts). The bond ends when the caster drops to 0 Hit Points or the two are more than 60 feet apart on the map, and a new Warding Bond cast on either creature ends the old one (warding-bond.ts)."
   ),
   "feature:dark-ones-blessing": enforced(
     "When the Warlock drops an enemy to 0 Hit Points, or anyone does within 10 feet of it on the map, it gains Temporary Hit Points equal to its Charisma modifier plus its Warlock level, at least 1, keeping the higher (dark-ones-blessing.ts)."
