@@ -225,8 +225,9 @@ const PENDING_SAVE_FIELDS = {
   // The save's own roll mode is read when it is answered.
   advantageAtSize: "never",
   advantageFrom: "never",
-  // What a failure does beyond conditions is narrated when it lands.
+  // What a failure does beyond conditions is narrated when it lands, and an automatic success when it is answered.
   failureKills: "never",
+  autoSucceeds: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
   gmApplies: "player",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
@@ -251,6 +252,7 @@ const ON_FAIL_EFFECT_FIELDS = {
   endsWhenSourceDefeated: "player",
   rangeFeet: "player",
   endsOnSpellHealing: "player",
+  endsOutOfSight: "player",
   armorClassBonus: "player",
   name: "derived",
   sourceName: "derived",

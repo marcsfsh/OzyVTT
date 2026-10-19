@@ -229,6 +229,8 @@ const PendingSaveEffectSchema = z
     magical: EffectInstanceSchema.shape.magical,
     /** It ends when a spell restores the bearer's hit points (an infernal wound). */
     endsOnSpellHealing: EffectInstanceSchema.shape.endsOnSpellHealing,
+    /** It ends when the bearer ends its turn where it can't see its source (Horror Nimbus). */
+    endsOutOfSight: EffectInstanceSchema.shape.endsOutOfSight,
     /** What the effect does while it lasts (Bane's -1d4 on attack rolls and saves). */
     modifiers: EffectModifiersSchema.default([]),
     /** What it adds to AC while it lasts (Slow's -2). */
@@ -313,6 +315,9 @@ export const PendingSaveSchema = z
     /** What gives the save Advantage beyond the target's own riders, as the roll card names it: the damage that opened
      *  it (Hideous Laughter), or a fight with its source's side (Charm Person). */
     advantageFrom: z.string().min(1).max(120).optional(),
+    /** Why the target succeeds without rolling (a Construct against Flesh to Stone, an elf against Sleep). GM
+     *  bookkeeping, never projected: the result says it when the save is answered. */
+    autoSucceeds: z.string().min(1).max(120).optional(),
     /** A failure kills the target outright, and the source regains these hit points (Consume Life). GM bookkeeping,
      *  never projected. */
     failureKills: z

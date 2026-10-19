@@ -462,7 +462,11 @@ const SAVE_LIFETIME_KEYS = [
   "endsWhenSourceDies",
   "onlyCreatureTypes",
   "sparesAffected",
-  "failureKills.**"
+  "failureKills.**",
+  "repeatDamageAgain",
+  "repeatUnseenSource",
+  "endsOutOfSight",
+  "autoSuccess.**"
 ] as const;
 
 /** The exemption table. First match wins, so specific rows sit above general ones. */

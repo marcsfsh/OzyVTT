@@ -959,6 +959,7 @@ export type EffectStage = z.infer<typeof EffectStageSchema>;
  * - `onDamage`: each time the bearer takes damage too, with Advantage (`advantage`, Hideous Laughter), or only damage
  *   from another source than the effect's (`notFromSource`, a harpy's Luring Song).
  * - `byAction`: the bearer may take an action to repeat it (Irresistible Dance).
+ * - `unseenSource`: at its turn's end only when it can't see the effect's source (Fear).
  * - `failureDamage`: what a failure deals (Weird's 5d10 Psychic).
  * - `tally`: successes and failures counted apart until one reaches `needed` (Flesh to Stone's three).
  * - `next`: what a failure (the last counted one, with a tally) turns the effect into.
@@ -975,6 +976,8 @@ export const RepeatSaveSchema = z
       .strict()
       .optional(),
     byAction: z.literal(true).optional(),
+    /** Only when the bearer ends its turn where it can't see the effect's source (Fear). */
+    unseenSource: z.literal(true).optional(),
     failureDamage: RepeatFailureDamageSchema.optional(),
     tally: z
       .object({
@@ -1110,6 +1113,8 @@ export const EffectInstanceSchema = z
     magical: z.literal(true).optional(),
     /** It ends when a spell restores the bearer's hit points (an infernal wound). */
     endsOnSpellHealing: z.literal(true).optional(),
+    /** It ends when the bearer ends its turn where it can't see the effect's source (Horror Nimbus). */
+    endsOutOfSight: z.literal(true).optional(),
     /** On a caster's Concentration: the spell is nothing but what it leaves on creatures (Hold Person's paralysis,
      *  Bless's d4), so it ends once no living creature keeps any of it. */
     endsWhenUnaffected: z.literal(true).optional(),
@@ -1898,6 +1903,31 @@ export const SaveOutcomeFields = {
     .describe(
       "What a failed repeat save leaves in place of the first failure: its conditions, how long they last, whether damage ends them and whether the save repeats each turn"
     ),
+  /** A failed repeat deals the cast's damage again (Phantasmal Killer: "it takes the Psychic damage again"). */
+  repeatDamageAgain: z
+    .literal(true)
+    .optional()
+    .describe("Each failed repeat save deals the first failure's damage again"),
+  /** The target repeats the save only when it ends its turn out of the source's line of sight (Fear). */
+  repeatUnseenSource: z
+    .literal(true)
+    .optional()
+    .describe("The target repeats the save only when it ends its turn where it can't see the source"),
+  /** The failure ends when the target ends its turn out of the source's line of sight (Horror Nimbus). */
+  endsOutOfSight: z
+    .literal(true)
+    .optional()
+    .describe("The failure ends when the target ends its turn where it can't see the source"),
+  /** Creatures that succeed without rolling: of these types (Flesh to Stone's Constructs), or that don't sleep (Sleep:
+   *  "Creatures that don't sleep, such as elves, or that have Immunity to the Exhaustion condition"). */
+  autoSuccess: z
+    .object({
+      creatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
+      sleepless: z.literal(true).optional()
+    })
+    .strict()
+    .optional()
+    .describe("Creatures that succeed without rolling: of these creature types, or that don't sleep"),
   /** Exhaustion levels a failure adds (Weight of Years: "The target gains 1 Exhaustion level"). */
   failureExhaustion: z.number().int().min(1).max(6).optional().describe("Exhaustion levels a failed save adds"),
   /** In a fight, the target has Advantage when the source or its allies are fighting it (Charm Person). */
@@ -2032,7 +2062,10 @@ export const SaveFailureEffectSchema = z
     /** What it adds to AC while it lasts; Slow's -2 is a penalty. Kept apart from `modifiers`, as on an effect. */
     armorClassBonus: z.number().int().min(-10).max(10).optional(),
     /** It ends when a spell restores the bearer's hit points ("The wound closes after ... a spell restores Hit Points"). */
-    endsOnSpellHealing: z.literal(true).optional()
+    endsOnSpellHealing: z.literal(true).optional(),
+    /** The bearer's Speed is 0 while it lasts (Flesh to Stone's success: "its Speed is 0 until the start of your next
+     *  turn"). */
+    speedZero: z.literal(true).optional()
   })
   .strict();
 

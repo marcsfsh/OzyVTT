@@ -6,7 +6,8 @@ import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
 import { applyDamageDetailed, damageAdjustmentDetail, loseHitPoints, UNTYPED_DAMAGE } from "./hit-points.js";
 import { holyNimbusBurns } from "./paladin-auras.js";
-import { openEndingSave, openRepeatSaves } from "./save-stages.js";
+import { endEffectsOutOfSight, openEndingSave, openRepeatSaves } from "./save-stages.js";
+import { sceneSight, type SceneSight } from "./vision/sight.js";
 import { traitsAtTurnEnd, traitsAtTurnStart } from "./trait-turns.js";
 
 type Actor = GameState["actors"][number];
@@ -44,12 +45,29 @@ export type TurnStartDeps = Readonly<{
  */
 export function endOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps?: TurnEndDeps): void {
   events.push(...expireEffectsAtTurnEnd(state, actorId));
-  if (deps) events.push(...openRepeatSaves(state, actorId, "turn-end", deps));
+  if (deps) {
+    const sees = sightOf(state, deps);
+    events.push(...endEffectsOutOfSight(state, actorId, { ...deps, sees }));
+    events.push(...openRepeatSaves(state, actorId, "turn-end", { ...deps, sees }));
+  }
   if (!deps?.rollDie || !deps.resolveDefinition) return;
   const dice = { ...deps, rollDie: deps.rollDie, resolveDefinition: deps.resolveDefinition };
   events.push(...traitsAtTurnEnd(state, actorId, dice));
   // "Takes 10 (3d6) Acid damage at the end of each of the toad's turns."
   dealOngoingAt(state, actorId, "end", events, dice);
+}
+
+/** Whether one creature sees another on the live map, worked out only when a rule asks; true when vision is off, so a
+ *  rule that needs a creature out of sight leaves it to the GM. */
+function sightOf(state: GameState, deps: TurnEndDeps): (viewerId: string, targetId: string) => boolean {
+  let sight: SceneSight | null = null;
+  return (viewerId, targetId) => {
+    sight ??= sceneSight(state, {
+      ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+      ...(deps.catalog ? { catalog: deps.catalog } : {})
+    });
+    return !sight.enabled || sight.sees(viewerId, targetId);
+  };
 }
 
 /**

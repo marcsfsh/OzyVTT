@@ -331,7 +331,8 @@ export function spellCastMechanics(
               ...(effect.selfSave
                 ? { dc: effect.selfSave.dc, bySelf: true as const }
                 : { dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) }),
-              ...(effect.failureEffect ? { failureEffect: structuredClone(effect.failureEffect) } : {})
+              ...(effect.failureEffect ? { failureEffect: structuredClone(effect.failureEffect) } : {}),
+              ...(effect.successEffect ? { successEffect: structuredClone(effect.successEffect) } : {})
             }
           }
         : {}),
@@ -493,12 +494,25 @@ export function withSpellEffects(action: ActorAction, spell: SpellReference | un
     action.save && !action.save.failureEffect && effect.failureEffect
       ? structuredClone(effect.failureEffect)
       : undefined;
+  const successEffect =
+    action.save && !action.save.successEffect && effect.successEffect
+      ? structuredClone(effect.successEffect)
+      : undefined;
   const saveFields = action.save ? newerSaveFields(action.save, spell.save) : {};
-  if (!grants && !failureEffect && Object.keys(saveFields).length === 0) return action;
+  if (!grants && !failureEffect && !successEffect && Object.keys(saveFields).length === 0) return action;
   return {
     ...action,
     ...(grants ? { grants } : {}),
-    ...(action.save ? { save: { ...action.save, ...saveFields, ...(failureEffect ? { failureEffect } : {}) } } : {})
+    ...(action.save
+      ? {
+          save: {
+            ...action.save,
+            ...saveFields,
+            ...(failureEffect ? { failureEffect } : {}),
+            ...(successEffect ? { successEffect } : {})
+          }
+        }
+      : {})
   };
 }
 
@@ -517,7 +531,21 @@ export function conditionChoicesOf(
 
 /** Save outcome fields the build has added since a sheet was made, which its cast copied without: the conditions a
  *  caster picks from (Blindness/Deafness). */
-const NEWER_SAVE_FIELDS = ["conditionChoices"] as const;
+const NEWER_SAVE_FIELDS = [
+  "conditionChoices",
+  "repeatSave",
+  "repeatOnce",
+  "repeatOnDamage",
+  "repeatByAction",
+  "repeatUnseenSource",
+  "repeatFailureDamage",
+  "repeatDamageAgain",
+  "repeatTally",
+  "secondFailure",
+  "speedZero",
+  "advantageIfFighting",
+  "autoSuccess"
+] as const;
 
 function newerSaveFields(
   save: NonNullable<ActorAction["save"]>,

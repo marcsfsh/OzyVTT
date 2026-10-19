@@ -212,6 +212,12 @@ const LABELS: Readonly<Record<string, string>> = {
   sparesAffected: "creatures already affected left out",
   failureKills: "a failure that kills",
   sourceRegains: "hit points the source regains",
+  repeatDamageAgain: "damage again on a failed repeat",
+  repeatUnseenSource: "save repeated out of the source's sight",
+  endsOutOfSight: "end out of the source's sight",
+  autoSuccess: "creatures that succeed without rolling",
+  sleepless: "creatures that don't sleep",
+  successEffect: "what a success leaves",
   chainFeet: "distance between targets"
 };
 /** A key whose words depend on what holds it: a weapon's category is its weapon kind, as the editor labels it. */

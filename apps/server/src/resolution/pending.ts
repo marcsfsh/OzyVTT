@@ -1,6 +1,6 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { PendingReaction, PendingSave } from "@vtt/domain";
-import { catalogIdOf, type ActionReaction } from "@vtt/schemas";
+import { catalogIdOf, DamageTypeSchema, type ActionReaction } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
 import { addEffect, ESCAPE_ATHLETICS_TAG, makeEffect, NO_ACTIONS_TAG } from "../effects.js";
@@ -19,6 +19,7 @@ import { repeatSaveOf } from "../save-stages.js";
 import { areEnemies } from "../creature-sides.js";
 import { AURA_IMMUNE_TAG, traitActionId } from "../statblock-traits.js";
 import { creatureTypeOf } from "../statblock-facts.js";
+import { holdsFeature } from "../class-features.js";
 import { openDamageWindow, type DamageWindowDeps } from "../damage-window.js";
 import { answerKeyOf, answersFromOthers, askAnswer } from "../roll-answers.js";
 
@@ -316,9 +317,18 @@ export function failureEffectFor(
     (cast ? spellSaveDuration(cast.spell, cast.level) : undefined);
   const ongoingDamage = save.ongoingDamage ?? hazard?.ongoingDamage;
   // When the target repeats the save, and what a failed repeat does (a basilisk's second failure Petrifies).
+  // "On a failed save, it takes the Psychic damage again" (Phantasmal Killer): the cast's own damage, at its level.
+  const again = save.repeatDamageAgain
+    ? action.damage.flatMap((part) =>
+        /d/.test(part.formula) && DamageTypeSchema.safeParse(part.type).success
+          ? [{ formula: part.formula, type: DamageTypeSchema.parse(part.type) }]
+          : []
+      )
+    : undefined;
   const repeat = repeatSaveOf(
     save,
-    (conditionId) => `${conditionLabel(conditionId)} by ${attacker.name} (${action.name})`
+    (conditionId) => `${conditionLabel(conditionId)} by ${attacker.name} (${action.name})`,
+    again
   );
   return {
     name: (
@@ -346,7 +356,8 @@ export function failureEffectFor(
     ...(save.endsOnDamage ? { endsOnDamage: true } : {}),
     ...(save.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
     ...(declared?.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
-    ...(save.speedZero ? { speedZero: true } : {}),
+    ...(save.speedZero || declared?.speedZero ? { speedZero: true } : {}),
+    ...(save.endsOutOfSight ? { endsOutOfSight: true as const } : {}),
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
     // "Until the aboleth dies".
     ...(save.endsWhenSourceDies && !grapple ? { endsWhenSourceDefeated: true } : {}),
@@ -372,6 +383,7 @@ export function successEffectFor(
     tags: [...declared.tags],
     modifiers: [...declared.modifiers],
     ...(declared.armorClassBonus !== undefined ? { armorClassBonus: declared.armorClassBonus } : {}),
+    ...(declared.speedZero ? { speedZero: true } : {}),
     linkedConditionIds: [],
     escapeDc: null,
     sourceActorId: attacker.id,
@@ -498,12 +510,16 @@ export function parkActionSave(ctx: ResolveContext): void {
   // side from the source.
   const fightingOf = (target: (typeof targets)[number]) =>
     action.save!.advantageIfFighting === true && fightingSides(ctx, target) ? FIGHTING_ADVANTAGE : "";
-  const groups = new Map<string, { saveBonus: number; advantageFrom: string; targetIds: string[] }>();
+  const groups = new Map<
+    string,
+    { saveBonus: number; advantageFrom: string; autoSucceeds: string; targetIds: string[] }
+  >();
   for (const target of saving) {
     const saveBonus = saveBonusOf(target);
     const advantageFrom = fightingOf(target);
-    const key = `${saveBonus}:${advantageFrom}`;
-    const group = groups.get(key) ?? { saveBonus, advantageFrom, targetIds: [] };
+    const autoSucceeds = autoSuccessOf(ctx, target);
+    const key = `${saveBonus}:${advantageFrom}:${autoSucceeds}`;
+    const group = groups.get(key) ?? { saveBonus, advantageFrom, autoSucceeds, targetIds: [] };
     groups.set(key, { ...group, targetIds: [...group.targetIds, target.id] });
   }
   // The spell the save is against, and whether it aimed at one creature alone (Staff of Charming's Resist Enchantment).
@@ -516,7 +532,7 @@ export function parkActionSave(ctx: ResolveContext): void {
         singleTarget: targets.length === 1 && action.area === undefined && spell.area === null
       }
     : undefined;
-  for (const { saveBonus, advantageFrom, targetIds } of groups.values())
+  for (const { saveBonus, advantageFrom, autoSucceeds, targetIds } of groups.values())
     createPendingSaves(state, {
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -536,12 +552,32 @@ export function parkActionSave(ctx: ResolveContext): void {
       ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),
       ...(against ? { spell: against } : {}),
       ...(advantageFrom !== "" ? { advantageFrom } : {}),
+      ...(autoSucceeds !== "" ? { autoSucceeds } : {}),
       ...(action.save.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
       ...(action.save.failureKills ? { failureKills: { ...action.save.failureKills } } : {}),
       magical: isMagicalAction(ctx),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
+}
+
+/** Why a target succeeds on this save without rolling, or "" when it rolls: its creature type (Flesh to Stone's
+ *  Constructs), or that it doesn't sleep (Sleep: an elf's Trance, an Immunity to Exhaustion). */
+function autoSuccessOf(ctx: ResolveContext, target: ResolveContext["targets"][number]): string {
+  const rule = ctx.action.save?.autoSuccess;
+  if (!rule) return "";
+  const definition = target.definitionId ? ctx.deps.resolveDefinition?.(target.definitionId) : undefined;
+  const type = creatureTypeOf(target, definition);
+  if (rule.creatureTypes && type !== null && rule.creatureTypes.includes(type))
+    return `${type[0]!.toUpperCase()}${type.slice(1)}`;
+  if (
+    rule.sleepless &&
+    (holdsFeature(definition, "elf-trance", "Trance") ||
+      definition?.character?.race?.id === "elf" ||
+      target.conditionImmunities.includes("exhaustion"))
+  )
+    return "doesn't sleep";
+  return "";
 }
 
 /** How a save's roll card names the Advantage a fight with its source's side gives it. */

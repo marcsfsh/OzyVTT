@@ -34,6 +34,8 @@ export const NO_ACTIONS_TAG = "no-actions";
 export const NO_REACTIONS_TAG = "no-reactions";
 /** The bearer can't take a Bonus Action while this lasts (an ice devil's Ice Spear). */
 export const NO_BONUS_ACTIONS_TAG = "no-bonus-actions";
+/** The bearer can't end the Prone condition on itself while this lasts (Hideous Laughter). */
+export const CANT_STAND_TAG = "cant-stand";
 /** On its turn the bearer can take an action or a Bonus Action, not both (a copper dragon's Slowing Breath). */
 export const ACTION_OR_BONUS_TAG = "action-or-bonus";
 /** The bearer can't make Opportunity Attacks while this lasts (Shocking Grasp). */

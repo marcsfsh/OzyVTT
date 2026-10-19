@@ -2,7 +2,13 @@ import type { Actor, GameState } from "@vtt/domain";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
 import type { Initiator } from "./authorization.js";
 import { adjustableActor } from "./hit-points.js";
-import { applyCondition, conditionGained, type ConditionImmunitySource, type EffectNarration } from "./effects.js";
+import {
+  applyCondition,
+  CANT_STAND_TAG,
+  conditionGained,
+  type ConditionImmunitySource,
+  type EffectNarration
+} from "./effects.js";
 import { conditionLabel, exhaustionLevel } from "./condition-rules.js";
 import { deriveEquipment } from "./equipment-derivation.js";
 import { currentSpeedFeet, effectiveSpeedFeet } from "./speed.js";
@@ -78,6 +84,17 @@ function checkPlayerRemoval(
 /** SRD Prone: standing up costs half your Speed, so it happens on your own turn, with movement you have. */
 function standUp(state: GameState, actor: Actor, scope: Initiator, options: SetConditionOptions | undefined) {
   const events: EffectNarration[] = [];
+  // SRD Hideous Laughter: "it can't end the Prone condition on itself" while the spell lasts.
+  const pinned = actor.effects.find((effect) => effect.tags.includes(CANT_STAND_TAG));
+  if (pinned && scope.role === "player")
+    policeConditionRule(
+      state,
+      actor,
+      "condition.imposed",
+      `${actor.name} can't end the Prone condition while ${pinned.name} lasts.`,
+      options,
+      events
+    );
   // Off your turn there is no movement to spend; the GM's own housekeeping stays free.
   if (scope.role === "player" && state.combat.active && state.combat.turnActorId !== actor.id) {
     policeConditionRule(

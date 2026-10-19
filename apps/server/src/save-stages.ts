@@ -32,6 +32,7 @@ export type RepeatFields = Readonly<{
   repeatAtTurnStart?: true;
   repeatOnDamage?: Readonly<{ advantage?: true; notFromSource?: true }>;
   repeatByAction?: true;
+  repeatUnseenSource?: true;
   repeatFailureDamage?: RepeatSave["failureDamage"];
   repeatTally?: number;
   secondFailure?: Readonly<{
@@ -44,9 +45,18 @@ export type RepeatFields = Readonly<{
 }>;
 
 /** The repeat save a failure's effect carries, read from its save block; undefined when the failure isn't repeated.
- *  `stageName` names the next stage for its first condition ("Petrified by Basilisk (Petrifying Gaze)"). */
-export function repeatSaveOf(save: RepeatFields, stageName: (conditionId: string) => string): RepeatSave | undefined {
-  const atTurns = save.repeatSave === true || save.repeatOnce === true || save.repeatTally !== undefined;
+ *  `stageName` names the next stage for its first condition ("Petrified by Basilisk (Petrifying Gaze)"); `again` is
+ *  the damage a failed repeat deals when the text says it deals the first failure's damage again. */
+export function repeatSaveOf(
+  save: RepeatFields,
+  stageName: (conditionId: string) => string,
+  again?: RepeatSave["failureDamage"]
+): RepeatSave | undefined {
+  const atTurns =
+    save.repeatSave === true ||
+    save.repeatOnce === true ||
+    save.repeatTally !== undefined ||
+    save.repeatUnseenSource === true;
   if (!atTurns && !save.repeatOnDamage && !save.repeatByAction && !save.repeatAtTurnStart) return undefined;
   const second = save.secondFailure;
   return {
@@ -56,7 +66,12 @@ export function repeatSaveOf(save: RepeatFields, stageName: (conditionId: string
     ...(save.repeatOnce ? { once: true as const } : {}),
     ...(save.repeatOnDamage ? { onDamage: { ...save.repeatOnDamage } } : {}),
     ...(save.repeatByAction ? { byAction: true as const } : {}),
-    ...(save.repeatFailureDamage ? { failureDamage: save.repeatFailureDamage.map((part) => ({ ...part })) } : {}),
+    ...(save.repeatUnseenSource ? { unseenSource: true as const } : {}),
+    ...(save.repeatFailureDamage
+      ? { failureDamage: save.repeatFailureDamage.map((part) => ({ ...part })) }
+      : again && again.length > 0
+        ? { failureDamage: again.map((part) => ({ ...part })) }
+        : {}),
     ...(save.repeatTally !== undefined ? { tally: { needed: save.repeatTally, successes: 0, failures: 0 } } : {}),
     ...(second
       ? {
@@ -88,11 +103,13 @@ export function durationUntilRepeat(
   return repeat?.once && duration?.type === "until-bearer-turn-end" ? undefined : duration;
 }
 
-/** What opening an ending save needs: ids, the clock, and dice for a failure's damage. */
+/** What opening an ending save needs: ids, the clock, dice for a failure's damage, and whether a creature sees another
+ *  (true when the map can't tell). */
 export type EndingSaveDeps = Readonly<{
   newId: () => string;
   now: () => string;
   rollDie?: (sides: number) => number;
+  sees?: (viewerId: string, targetId: string) => boolean;
 }>;
 
 /** The repeat saves `actorId` owes as its turn starts or ends: one per effect that repeats then. A once-only repeat
@@ -113,9 +130,31 @@ export function openRepeatSaves(
       writeRepeat(actor, effect.id, { ...repeat, skipsCurrentTurn: undefined });
       continue;
     }
+    // "If the creature ends its turn in a space where it doesn't have line of sight to you" (Fear).
+    if (repeat.unseenSource && (effect.sourceActorId === null || seesSource(deps, actor.id, effect.sourceActorId)))
+      continue;
     events.push(openEndingSave(state, actor, effect, repeat, "repeats", deps));
   }
   return events;
+}
+
+/** Whether the bearer sees its effect's source; true when the map can't tell. */
+const seesSource = (deps: EndingSaveDeps, bearerId: string, sourceId: string) =>
+  deps.sees === undefined || deps.sees(bearerId, sourceId);
+
+/** "Until it ends its turn with the nalfeshnee out of line of sight": what ends as `actorId`'s turn ends where it can't
+ *  see the effect's source. Nothing ends where the map can't tell. */
+export function endEffectsOutOfSight(state: GameState, actorId: string, deps: EndingSaveDeps): EffectNarration[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return [];
+  return actor.effects
+    .filter(
+      (effect) =>
+        effect.endsOutOfSight === true &&
+        effect.sourceActorId !== null &&
+        !seesSource(deps, actor.id, effect.sourceActorId)
+    )
+    .flatMap((effect) => endEffectIfPresent(state, actor.id, effect.id));
 }
 
 /** "Whenever the target takes damage, it repeats the save": one save per effect that repeats on damage, with

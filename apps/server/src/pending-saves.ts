@@ -44,6 +44,8 @@ export function createPendingSaves(
     advantageFrom?: string;
     /** A failure kills the target outright (Consume Life). */
     failureKills?: PendingSave["failureKills"];
+    /** Why the target succeeds without rolling (a Construct against Flesh to Stone). */
+    autoSucceeds?: string;
     newSaveId: () => string;
     createdAt: number;
   }>
@@ -81,6 +83,7 @@ export function createPendingSaves(
     ...(input.spell ? { spell: { ...input.spell } } : {}),
     ...(input.advantageFrom ? { advantageFrom: input.advantageFrom.slice(0, 120) } : {}),
     ...(input.failureKills ? { failureKills: { ...input.failureKills } } : {}),
+    ...(input.autoSucceeds ? { autoSucceeds: input.autoSucceeds.slice(0, 120) } : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt.

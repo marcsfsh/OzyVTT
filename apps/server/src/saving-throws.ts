@@ -636,6 +636,10 @@ export function answerSave(
   } else if (magicResistance === "succeeds") {
     autoSucceeded = "Greater Magic Resistance";
     total = 0;
+  } else if (pending.autoSucceeds) {
+    // "Constructs automatically succeed on the save" (Flesh to Stone); no die is rolled.
+    autoSucceeded = pending.autoSucceeds;
+    total = 0;
   } else {
     const definition = targetDefinition;
     const derivation = deriveEquipment(target, definition, deps.catalog);

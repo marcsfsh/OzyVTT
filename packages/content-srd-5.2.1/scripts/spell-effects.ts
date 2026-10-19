@@ -1153,12 +1153,80 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   "bestow-curse": { name: "Bestow Curse", tags: ["curse"], modifiers: [] },
   // "A Remove Curse, Greater Restoration, or Wish spell ends this spell."
   geas: { name: "Geas", tags: ["curse"], modifiers: [] },
+  // "It can't end the Prone condition on itself" while it laughs.
+  "hideous-laughter": { name: "Hideous Laughter", tags: ["cant-stand"], modifiers: [] },
+  // "Has Disadvantage on Dexterity saving throws and attack rolls, and other creatures have Advantage on attack rolls
+  // against it" while it dances (the save's Speed 0 keeps it dancing in place).
+  "irresistible-dance": {
+    name: "Irresistible Dance",
+    tags: [],
+    modifiers: [
+      { type: "roll-mode", roll: "attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] },
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "disadvantage",
+        when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["dex"] }]
+      },
+      attackedWithAdvantage
+    ]
+  },
+  // "Disadvantage on Strength-based D20 Tests for the duration". Its 1d8 off each damage roll is the GM's.
+  "ray-of-enfeeblement": {
+    name: "Ray of Enfeeblement",
+    tags: [],
+    modifiers: (["attack", "save", "check"] as const).map((roll) => ({
+      type: "roll-mode" as const,
+      roll,
+      mode: "disadvantage" as const,
+      when: [
+        {
+          type:
+            roll === "attack"
+              ? ("on-attack-roll" as const)
+              : roll === "save"
+                ? ("on-saving-throw" as const)
+                : ("on-ability-check" as const)
+        },
+        { type: "ability-is" as const, abilities: ["str" as const] }
+      ]
+    }))
+  },
   // "Disadvantage on the next attack roll it makes before the end of its next turn": its own roll spends it.
   "vicious-mockery": {
     name: "Vicious Mockery",
     tags: ["until-own-attack"],
     duration: { type: "until-bearer-turn-end" },
     modifiers: [{ type: "roll-mode", roll: "attack", mode: "disadvantage" }]
+  }
+};
+
+/** What a successful save against the cast leaves on the creature instead (SRD 5.2.1 text). */
+const SAVE_SUCCESS_EFFECTS: Readonly<Record<string, FailureEffect>> = {
+  // "On a successful save, its Speed is 0 until the start of your next turn."
+  "flesh-to-stone": {
+    name: "Flesh to Stone",
+    tags: [],
+    speedZero: true,
+    duration: { type: "until-source-next-turn" },
+    modifiers: []
+  },
+  // "On a successful save, the target dances comically until the end of its next turn, during which it must spend all
+  // its movement to dance in place."
+  "irresistible-dance": {
+    name: "Dancing",
+    tags: [],
+    speedZero: true,
+    duration: { type: "until-bearer-turn-end" },
+    modifiers: []
+  },
+  // "On a successful save, the target has Disadvantage on the next attack roll it makes until the start of your next
+  // turn": its own roll spends it.
+  "ray-of-enfeeblement": {
+    name: "Ray of Enfeeblement",
+    tags: ["until-own-attack"],
+    duration: { type: "until-source-next-turn" },
+    modifiers: [{ type: "roll-mode", roll: "attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }]
   }
 };
 
@@ -1227,6 +1295,7 @@ export function spellEffectFor(
   const targets = CAST_TARGETS[id];
   const grant = CAST_GRANTS[id];
   const failureEffect = SAVE_FAILURE_EFFECTS[id];
+  const successEffect = SAVE_SUCCESS_EFFECTS[id];
   const onHit = CAST_ON_HIT[id];
   const missDamage = CAST_MISS_DAMAGE[id];
   const drain = CAST_DRAINS[id];
@@ -1253,6 +1322,7 @@ export function spellEffectFor(
       : {}),
     ...(grant ? { grant: structuredClone(grant) } : {}),
     ...(failureEffect ? { failureEffect: structuredClone(failureEffect) } : {}),
+    ...(successEffect ? { successEffect: structuredClone(successEffect) } : {}),
     ...(reaction ? { reaction } : {}),
     ...(selfSave ? { selfSave: { ...selfSave } } : {}),
     ...(dispel ? { dispel: { ...dispel } } : {}),
@@ -1344,6 +1414,7 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_CURES),
   ...Object.keys(CAST_HEALING),
   ...Object.keys(SAVE_FAILURE_EFFECTS),
+  ...Object.keys(SAVE_SUCCESS_EFFECTS),
   ...Object.keys(SPELL_AREAS),
   ...Object.keys(CAST_DISPELS),
   ...Object.keys(CAST_SELF_SAVES),

@@ -44,6 +44,10 @@ export type SaveOutcome = {
   onlyCreatureTypes?: string[];
   sparesAffected?: true;
   failureKills?: { sourceRegains?: string };
+  repeatDamageAgain?: true;
+  repeatUnseenSource?: true;
+  endsOutOfSight?: true;
+  autoSuccess?: { creatureTypes?: string[]; sleepless?: true };
 };
 
 /** What a failed repeat leaves in place of the first failure ("Second Failure"). */
@@ -307,6 +311,10 @@ export function statBlockSaveOutcome(description: string): SaveOutcome {
     ...(only && only[1] !== "Creature" ? { onlyCreatureTypes: [only[1]!.toLowerCase()] } : {}),
     // "Each creature that isn't currently affected by this breath".
     ...(/\bthat isn[\u2019']t currently affected by this\b/.test(description) ? { sparesAffected: true as const } : {}),
+    // "Or until it ends its turn with the nalfeshnee out of line of sight".
+    ...(/\buntil it ends its turn with the [a-z' -]+ out of line of sight\b/.test(failure)
+      ? { endsOutOfSight: true as const }
+      : {}),
     // "Until the aboleth dies".
     ...(/\buntil the [a-z' -]+? dies\b/.test(failure) && lifetime.failureConditions.length > 0
       ? { endsWhenSourceDies: true as const }
@@ -445,10 +453,27 @@ function spellSaveOutcome(description: string): SaveOutcome {
   const duration = failureDurationOf(failureSentences);
   const lifetime = failureLifetime(after, named);
   const { failureDuration: _later, ...rest } = lifetime;
+  // "Whenever the target takes damage, it repeats the save"; "each time it takes damage ... Advantage on the save if the
+  // save is triggered by damage" (Hideous Laughter).
+  const onDamage =
+    /\bWhenever the target takes damage, it repeats the save\b|\beach time it takes damage, it makes another [A-Z][a-z]+ saving throw\b/.test(
+      description
+    );
   return {
     successDamage: half ? "half" : "none",
     ...rest,
-    ...(duration && named.conditions.length > 0 ? { failureDuration: duration } : {})
+    ...(duration && named.conditions.length > 0 ? { failureDuration: duration } : {}),
+    ...(onDamage
+      ? {
+          repeatOnDamage: /\bAdvantage on the save if the save is triggered by damage\b/.test(description)
+            ? { advantage: true as const }
+            : {}
+        }
+      : {}),
+    // "It does so with Advantage if you or your allies are fighting it."
+    ...(/\bAdvantage(?: on the save)? if you or your allies are fighting it\b/.test(description)
+      ? { advantageIfFighting: true as const }
+      : {})
   };
 }
 
@@ -463,9 +488,38 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   // No save at the cast: 150 HP or fewer is Stunned outright, then a Constitution save at the end of each of its
   // turns ends it. (A tougher target's Speed 0 until your next turn is left to the GM.)
   "power-word-stun": { failureConditions: ["stunned"], repeatSave: true, failsAtHitPoints: 150 },
-  // Three successes or three failures: the GM keeps count.
-  "flesh-to-stone": { repeatSave: undefined },
-  contagion: { repeatSave: undefined },
+  // "If it successfully saves against this spell three times, the spell ends. If it fails its saves three times, it is
+  // turned to stone and has the Petrified condition for the duration." Constructs automatically succeed.
+  "flesh-to-stone": {
+    repeatSave: undefined,
+    repeatTally: 3,
+    secondFailure: { conditions: ["petrified"] },
+    autoSuccess: { creatureTypes: ["construct"] }
+  },
+  // "Until it gets three successes or failures": three successes end it, three failures keep it Poisoned for 7 days.
+  contagion: {
+    repeatSave: undefined,
+    repeatTally: 3,
+    secondFailure: { conditions: ["poisoned"], duration: { type: "minutes", minutes: 10080 } }
+  },
+  // "At which point it must repeat the save. If the target fails the second save, the target has the Unconscious
+  // condition for the duration"; elves and creatures immune to Exhaustion succeed outright.
+  sleep: {
+    repeatOnce: true,
+    secondFailure: { conditions: ["unconscious"], endsOnDamage: true },
+    autoSuccess: { sleepless: true }
+  },
+  // "A Frightened target makes a Wisdom saving throw at the end of each of its turns. On a failed save, it takes 5d10
+  // Psychic damage."
+  weird: { repeatFailureDamage: [{ formula: "5d10", type: "psychic" }] },
+  // "Must use all its movement to dance in place", and "can take an action to collect itself and repeat the save".
+  "irresistible-dance": { speedZero: true, repeatByAction: true },
+  // "The target repeats the save at the end of each of its turns, ending the spell on a success." The text names no
+  // condition for the reader to hang it on.
+  "ray-of-enfeeblement": { repeatSave: true },
+  // "If the creature ends its turn in a space where it doesn't have line of sight to you, the creature makes a Wisdom
+  // saving throw. On a successful save, the spell ends on that creature."
+  fear: { repeatUnseenSource: true },
   // "The target gains no benefit from Half Cover or Three-Quarters Cover for this save."
   "sacred-flame": { ignoresCover: true },
   // "An affected target repeats the save at the end of each of its turns, ending the spell on itself on a success."
@@ -478,9 +532,10 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   // "Make a DC 15 Intelligence saving throw" yourself: "you take 6d6 Psychic damage and have the Incapacitated condition
   // until you finish a Long Rest" (`spell-effects.ts` makes it the caster's own save).
   "contact-other-plane": { failureDuration: { type: "until-rest", rest: "long" } },
-  // "For the duration, the target makes a Wisdom saving throw at the end of each of its turns ... On a successful save,
-  // the spell ends." The failure leaves no condition for the reader to hang it on.
-  "phantasmal-killer": { repeatSave: true },
+  // "For the duration, the target makes a Wisdom saving throw at the end of each of its turns. On a failed save, it takes
+  // the Psychic damage again. On a successful save, the spell ends." The failure leaves no condition for the reader to
+  // hang it on.
+  "phantasmal-killer": { repeatSave: true, repeatDamageAgain: true },
   // "While Restrained, the target takes 1d6 Piercing damage at the start of each of its turns", and "A Large or larger
   // creature has Advantage on this save".
   "ensnaring-strike": {
