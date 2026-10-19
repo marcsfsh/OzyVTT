@@ -1739,6 +1739,8 @@ describe("Rogue: Cunning Strike forgoes Sneak Attack dice for an effect", () => 
     });
     expect(built.hero.effects.some((effect) => effect.id === "hiding")).toBe(true);
     expect(hit.warnings?.join(" ")).toMatch(/stays hidden only if it ends this turn behind Three-Quarters Cover/);
+    // The turn's end reads the cover (supreme-sneak.test.ts).
+    expect(built.state.combat.turn.turnUses[`${IDS.hero}:stealth-attack`]).toBe(1);
   });
 });
 

@@ -32,6 +32,7 @@ import {
 } from "./simultaneous-effects.js";
 import { disgorge, regurgitationSaves } from "./swallow.js";
 import { selfRestorationAtTurnEnd } from "./self-restoration.js";
+import { stealthAttackAtTurnEnd } from "./supreme-sneak.js";
 
 type Actor = GameState["actors"][number];
 type Effect = Actor["effects"][number];
@@ -65,7 +66,8 @@ export type TurnStartDeps = Readonly<{
  * 1. "until the end of its/your next turn" durations it owns end (`expireEffectsAtTurnEnd`);
  * 2. each effect it bears that "repeats the save at the end of each of its turns" opens that save (`openRepeatSaves`:
  *    a success ends the effect, unless the text counts them or makes the failure worse);
- * 3. a Monk's Self-Restoration ends one of its Charmed, Frightened or Poisoned conditions;
+ * 3. a Monk's Self-Restoration ends one of its Charmed, Frightened or Poisoned conditions, and a Thief's Stealth
+ *    Attack reveals it unless it has Three-Quarters or Total Cover;
  * 4. its stat block's traits that act as its turn ends (Fire Aura, a hydra's heads) do, and the ongoing damage printed
  *    for the end of a turn lands, in the order its controller gave (`endSteps`), then a troll's limbs come off.
  */
@@ -79,7 +81,10 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
     events.push(...endEffectsOutOfSight(state, actorId, { ...deps, sees }));
     events.push(...openRepeatSaves(state, actorId, "turn-end", { ...deps, sees }));
   }
-  if (deps?.resolveDefinition) events.push(...selfRestorationAtTurnEnd(state, actorId, deps.resolveDefinition));
+  if (deps?.resolveDefinition) {
+    events.push(...selfRestorationAtTurnEnd(state, actorId, deps.resolveDefinition));
+    events.push(...stealthAttackAtTurnEnd(state, actorId, deps.resolveDefinition));
+  }
   if (!deps?.rollDie || !deps.resolveDefinition) {
     clearTurnSteps(state);
     return;

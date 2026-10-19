@@ -1277,8 +1277,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:devious-strikes": enforced(
     "Daze (one of moving, an action or a Bonus Action, resolution/economy.ts), Knock Out (Unconscious that ends on damage, with repeat saves) and Obscure (Blinded) join Cunning Strike's effects. A Dazed creature's move after acting is the GM's."
   ),
-  "feature:supreme-sneak": guided(
-    "Stealth Attack joins Cunning Strike's effects, and the attack leaves the Rogue's Invisible from the Hide action on (resolution/release.ts). Whether it ends the turn behind Three-Quarters or Total Cover is the GM's, said with the hit."
+  "feature:supreme-sneak": enforced(
+    "Stealth Attack joins Cunning Strike's effects for 1d6: the attack keeps the Hide action's Invisible (resolution/release.ts), which ends at the end of the Rogue's turn unless it has Three-Quarters or Total Cover from every enemy on the map, measured from the walls and creatures or marked by the GM (supreme-sneak.ts, cover.ts). With dynamic vision off the cover is the GM's, said with the hit."
   ),
   "feature:hurl-through-hell": guided(
     "It rides an attack roll's hit once a Long Rest: the Charisma save, 8d10 Psychic unless the target is a Fiend, and Incapacitated off the map with nothing able to target it until the end of the Warlock's next turn, when it returns to the space it left or the nearest unoccupied one (off-plane.ts). conversions.ts restores the use with a Pact Magic slot."
