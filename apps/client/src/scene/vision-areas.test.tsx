@@ -104,6 +104,9 @@ describe("the GM's areas of light and obscurement", () => {
     const light = await openLight(user);
     await user.selectOptions(light.getByLabelText("Area to paint"), "magical-darkness");
     await user.click(light.getByRole("button", { name: "Paint area" }));
+    // The rail marks Light as the group in use while its area tool is on.
+    const rail = screen.getByRole("toolbar", { name: "Map tools" });
+    expect(within(rail).getByRole("button", { name: "Light" }).classList.contains("in-use")).toBe(true);
     fireEvent.pointerDown(svgPoint(), { button: 0, clientX: 100, clientY: 100, pointerId: 1, pointerType: "mouse" });
     fireEvent.pointerMove(svgPoint(), { clientX: 220, clientY: 180, pointerId: 1, pointerType: "mouse" });
     fireEvent.pointerUp(svgPoint(), { clientX: 220, clientY: 180, pointerId: 1, pointerType: "mouse" });

@@ -41,7 +41,12 @@ async function makeLiveFromSteps(gm: Page, steps: readonly string[]) {
   await expect(gm.getByRole("heading", { name: "Review and make live" })).toBeVisible();
   await expectPageFits(gm);
   await press(gm.getByRole("button", { name: "Make live" }));
-  await press(gm.getByRole("button", { name: "Go to the table" }));
+  // With a fight running, making another scene live parks it, which the GM confirms.
+  const confirm = gm.getByRole("dialog", { name: "Make scene live?" });
+  const table = gm.getByRole("button", { name: "Go to the table" });
+  await expect(confirm.or(table)).toBeVisible();
+  if (await confirm.isVisible()) await press(confirm.getByRole("button", { name: "Make live" }));
+  await press(table);
 }
 
 /** A new scene on a freshly uploaded map, made from the Scenes tab's steps and made live; the GM ends at the table. */
@@ -494,6 +499,34 @@ test("a player answers the GM's call with a physical die, then rerolls it with H
   await expectPageFits(player);
   await press(card.getByRole("button", { name: "Done" }));
   await expect(card).toBeHidden();
+});
+
+test("the GM paints darkness over part of the live map, and bright light that is sunlight", async ({
+  open,
+  request
+}) => {
+  await ensureGmPassword(request);
+  const gm = await open("/");
+  await signInAsGm(gm);
+  await liveSceneOnNewMap(gm, "Smoke cellar.png", battleMap(700, 518));
+
+  const rail = gm.getByRole("toolbar", { name: "Map tools" });
+  await press(rail.getByRole("button", { name: "Light" }));
+  const light = gm.getByRole("group", { name: "Light" });
+  await expect(light.getByRole("switch", { name: "Sunlight" })).toBeVisible();
+  await expectPageFits(gm);
+  await press(light.getByRole("switch", { name: "Sunlight" }));
+  await expect(light.getByRole("switch", { name: "Sunlight" })).toBeChecked();
+  await light.getByLabel("Area to paint").selectOption("dark");
+  await press(light.getByRole("button", { name: "Paint area" }));
+  await expect(light.getByRole("button", { name: "Paint area" })).toHaveAttribute("aria-pressed", "true");
+  await gm.keyboard.press("Escape");
+
+  // A drag over the map paints it, drawn for the GM in violet.
+  const map = gm.getByRole("group", { name: /Interactive tokens are layered above this map/ });
+  await drag(gm, map, { x: 90, y: 60 });
+  await expect(gm.locator("[data-area-id] .vision-area-dark")).toHaveCount(1);
+  await expectPageFits(gm);
 });
 
 test("the GM presents a map on a paired table screen", async ({ open, request }) => {
