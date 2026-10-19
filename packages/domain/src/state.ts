@@ -1385,6 +1385,31 @@ export const SpellZoneSchema = z
     glowing: z.literal(true).optional(),
     /** It was made while its caster's Time Stop ran, so it ends the Time Stop when it affects another creature. */
     inTimeStop: z.literal(true).optional(),
+    /** The grid cells (`column,row`) left out of it: what its caster spared (Plant Growth) or fire burned away (Web). */
+    cut: z.array(z.string().max(24)).max(4000).optional(),
+    /** The cells burning now (Web), until the turn of `actorId` in `untilRound` begins. */
+    burning: z
+      .array(
+        z
+          .object({
+            cells: z.array(z.string().max(24)).max(400),
+            untilRound: z.number().int().positive(),
+            actorId: z.uuid().nullable()
+          })
+          .strict()
+      )
+      .max(50)
+      .optional(),
+    /** Where Fire damage landed on a creature standing in it since the last settle (Web), for the cells it sets
+     *  burning. */
+    fireAt: z
+      .array(z.object({ x: z.number(), y: z.number(), sizeCells: z.number().int().min(1).max(20) }).strict())
+      .max(50)
+      .optional(),
+    /** It burns away when fire reaches it (Web). */
+    flammable: z.literal(true).optional(),
+    /** Its heal, rolled with its caster's numbers (Conjure Celestial's "4d12 + 4"). */
+    healing: z.string().min(1).max(60).optional(),
     /** It acts when its spell ends (Delayed Blast Fireball's bead), so ending it leaves it `bursting` until the server
      *  has raised the saves. */
     burstsOnEnd: z.literal(true).optional(),

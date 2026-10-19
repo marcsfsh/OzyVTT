@@ -6,6 +6,7 @@ import { endSpellZone } from "./spell-endings.js";
 import { zoneContentOf } from "./spell-zone-state.js";
 import { endZoneAndItsSpell, insideTest, liveZones, type ZoneDeps } from "./spell-zones.js";
 import { dispelFogUnder } from "./vision/cast-sight.js";
+import { settleFire } from "./zone-fire.js";
 
 /**
  * What a standing spell area does to fire, fog and clouds (SRD 5.2.1): Sleet Storm's "exposed flames in the area are
@@ -17,14 +18,18 @@ import { dispelFogUnder } from "./vision/cast-sight.js";
  * then ends.
  */
 
-type Deps = Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog" | "rollDie">;
+type Deps = Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog" | "rollDie" | "newId" | "now">;
 
-/** Whether any standing area acts on fire, fog or clouds, so settling is worth a look. */
+/** Whether any standing area acts on fire, fog or clouds, or burns (Web), so settling is worth a look. */
 export function holdsZoneOutcomes(state: GameState, catalog: Deps["catalog"]): boolean {
   return state.combat.spellZones.some((zone) => {
     const trigger = zoneContentOf(zone, catalog)?.trigger;
     return (
-      trigger?.douses === true || trigger?.wind === true || trigger?.destroysFog === true || trigger?.instant === true
+      zone.flammable === true ||
+      trigger?.douses === true ||
+      trigger?.wind === true ||
+      trigger?.destroysFog === true ||
+      trigger?.instant === true
     );
   });
 }
@@ -136,6 +141,8 @@ export function settleZoneOutcomes(state: GameState, deps: Deps): EffectNarratio
   for (const zone of liveZones(state))
     if (zone.annotationId !== null && zoneContentOf(zone, deps.catalog)?.trigger.instant)
       events.push(...endZoneAndItsSpell(state, zone.id));
+  // Fire that reached the webs sets them burning (Web).
+  events.push(...settleFire(state, deps));
   return events;
 }
 

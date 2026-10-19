@@ -405,6 +405,30 @@ function wallOfFireForms(): Later[] {
   ];
 }
 
+/** One of Conjure Celestial's ways to shine: Healing Light on the caster and its allies with Searing Light on the rest,
+ *  or one light on every creature; on the cast and whenever the Cylinder or a creature meets it, once a turn. */
+function celestialLight(
+  name: string,
+  option: Readonly<{ id: string; name: string }>,
+  heals: "allies" | "all" | null
+): Later {
+  return {
+    name,
+    activation: "other",
+    when: `${option.name}: Healing Light restores 4d12 plus your spellcasting ability modifier, and Searing Light asks for the save. Each creature in the Cylinder, entering it or ending its turn there is bathed once a turn.`,
+    save: save("dex"),
+    damage: [{ formula: "6d12", type: "radiant" }],
+    zone: {
+      on: ["enter", "end-turn"],
+      oncePerTurn: true,
+      atCast: true,
+      dicePerSlot: 1,
+      ...(heals ? { heals: { formula: "4d12", addsModifier: true, who: heals } } : {})
+    },
+    option
+  };
+}
+
 /** Symbol's six glyphs, each a hidden glyph that glows when a creature comes onto it (SRD 5.2.1 text): Death,
  *  Discord, Fear, Pain, Sleep and Stunning. Fear's "must move at least 30 feet away from the glyph" is the
  *  Frightened creature's to obey. */
@@ -784,6 +808,25 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       option: { id: "destroy", name: "Destroy Water: fog" }
     }
   ],
+  // "For each creature you can see in the Cylinder, choose which of these lights shines on it": Healing Light (4d12 plus
+  // your spellcasting ability modifier) or Searing Light (a Dexterity save against 6d12 Radiant damage); "when you move
+  // on your turn, you can also move the Cylinder up to 30 feet", and "whenever the Cylinder moves into the space of a
+  // creature you can see and whenever a creature you can see enters the Cylinder or ends its turn there, you can bathe
+  // it in one of the lights. A creature can be affected by this spell only once per turn." The caster picks as it
+  // casts which light each creature gets: by side, or one light for all.
+  "conjure-celestial": [
+    celestialLight("light", { id: "by-side", name: "Heal you and your allies, sear the rest" }, "allies"),
+    celestialLight("healing light", { id: "heal-all", name: "Healing Light on everyone" }, "all"),
+    celestialLight("searing light", { id: "sear-all", name: "Searing Light on everyone" }, null),
+    {
+      name: "move",
+      activation: "other",
+      when: "When you move on your turn, you can also move the Cylinder up to 30 feet.",
+      damage: [],
+      area: { shape: "cylinder", sizeFeet: 10, widthFeet: null, heightFeet: 40 },
+      movesArea: { feet: 30, withCasterMove: true }
+    }
+  ],
   "conjure-woodland-beings": [
     {
       name: "save",
@@ -1147,11 +1190,55 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   ],
   // Overgrowth: "A creature moving through that area must spend 4 feet of movement for every 1 foot it moves." The
   // plants stay overgrown, so the area stays until the GM ends it.
+  // "You can exclude one or more areas of any size within the spell's area from being affected": each 10-foot square
+  // the caster leaves out as it casts.
   "plant-growth": [
     lasting("ground", "A creature moving through the overgrown area spends 4 feet of movement for every foot.", {
       on: [],
       terrain: { cost: 4, kind: "plants" }
-    })
+    }),
+    {
+      name: "leave out",
+      activation: "other",
+      when: "As you cast it, leave a 10-foot square of the Sphere out of the overgrowth, as many times as you like.",
+      damage: [],
+      area: { shape: "cube", sizeFeet: 10, widthFeet: null },
+      cutsArea: true
+    }
+  ],
+  // "You can also turn Difficult Terrain caused by plant growth (such as thickets and undergrowth) into ordinary terrain
+  // that lasts for the duration. Or you can turn ordinary terrain where plants are present into Difficult Terrain that
+  // lasts for the duration." The immobile Emanation stays where it was cast; the plants' answers are the GM's.
+  "speak-with-plants": [
+    {
+      ...lasting("plants", "The plants in the Emanation speak with you; the ground is as it was.", {
+        on: [],
+        around: "caster",
+        feet: 30,
+        stays: true
+      }),
+      option: { id: "talk", name: "Leave the ground as it is" }
+    },
+    {
+      ...lasting("thicket", "The plants in the Emanation make its ground Difficult Terrain.", {
+        on: [],
+        around: "caster",
+        feet: 30,
+        stays: true,
+        terrain: { cost: 2, kind: "plants" }
+      }),
+      option: { id: "thicket", name: "Make the ground Difficult Terrain" }
+    },
+    {
+      ...lasting("clearing", "The plants in the Emanation clear their Difficult Terrain into ordinary ground.", {
+        on: [],
+        around: "caster",
+        feet: 30,
+        stays: true,
+        clearsTerrain: true
+      }),
+      option: { id: "clearing", name: "Clear the plants' Difficult Terrain" }
+    }
   ],
   "produce-flame": [
     {
@@ -1383,7 +1470,9 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: "The first time a creature enters the webs on a turn or starts its turn there, it makes the save; Restrained, it can try a Strength (Athletics) check against your spell save DC as an action. The webs are Difficult Terrain.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["restrained"] },
       damage: [],
-      zone: { on: ["enter", "start-turn"], terrain: { cost: 2, kind: "webs" } }
+      // "The webs are flammable. Any 5-foot Cube of webs exposed to fire burns away in 1 round, dealing 2d4 Fire damage
+      // to any creature that starts its turn in the fire."
+      zone: { on: ["enter", "start-turn"], terrain: { cost: 2, kind: "webs" }, burns: { formula: "2d4" } }
     }
   ],
   "zone-of-truth": [
@@ -1470,6 +1559,10 @@ const CAST_CURES: Readonly<Record<string, Readonly<{ conditions: readonly string
   "lesser-restoration": { conditions: ["blinded", "deafened", "paralyzed", "poisoned"], one: true },
   "protection-from-poison": { conditions: ["poisoned"] }
 };
+
+/** Spells whose healing is their area's, on each creature it bathes, not the cast's on picked targets (Conjure
+ *  Celestial's Healing Light, `LATER_ACTIONS`). */
+const NO_CAST_HEALING: ReadonlySet<string> = new Set(["conjure-celestial"]);
 
 /** Healing the text gives as no single roll: Mass Heal's 700 divided among its targets, Power Word Heal's "regains all
  *  its Hit Points", and False Life's Temporary Hit Points. */
@@ -2804,7 +2897,7 @@ export function spellEffectFor(
   types: readonly string[],
   range: SpellRange
 ): SpellEffect {
-  const healing = CAST_HEALING[id] ?? healingOfText(description);
+  const healing = NO_CAST_HEALING.has(id) ? null : (CAST_HEALING[id] ?? healingOfText(description));
   const attacks = CAST_ATTACKS[id] ?? (/\bmakes? an? (?:ranged|melee) spell attack\b/i.test(description) ? 1 : 0);
   const attackRange = attacks > 0 ? spellAttackRangeOf(description, range) : null;
   const reaction = CAST_REACTIONS[id];

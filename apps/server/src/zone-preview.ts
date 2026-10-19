@@ -29,12 +29,17 @@ export function areaGroundFor(
   const ground = zoneGround(state, actorId, deps, zones);
   if (
     !ground ||
-    (ground.difficult.length === 0 && ground.doubled.length === 0 && ground.toward.length === 0 && !ground.halving)
+    (ground.difficult.length === 0 &&
+      ground.cleared.length === 0 &&
+      ground.doubled.length === 0 &&
+      ground.toward.length === 0 &&
+      !ground.halving)
   )
     return undefined;
   const sizeCells = token.sizeCells;
   const at = footprintOrigin(imageToGrid(calibration, token.position), sizeCells);
   const difficult: Cell[] = [];
+  const cleared: Cell[] = [];
   const halved: Cell[] = [];
   const costlyGround: Cell[] = [];
   const toward = ground.toward.map((entry) => ({ caster: entry.caster, inside: entry.inside, cells: [] as Cell[] }));
@@ -43,6 +48,7 @@ export function areaGroundFor(
       const cell = { column, row };
       const center = gridToImage(calibration, { column: column + 0.5, row: row + 0.5 });
       if (ground.difficult.some((inside) => inside(center, 1))) difficult.push(cell);
+      if (ground.cleared.some((inside) => inside(center, 1))) cleared.push(cell);
       // A footprint's own tests, read at its centre with its size, as the server reads them.
       const footprint = gridToImage(calibration, footprintCenter(cell, sizeCells));
       if (ground.halving?.(footprint, sizeCells) === true) halved.push(cell);
@@ -51,6 +57,7 @@ export function areaGroundFor(
     }
   return {
     difficult,
+    ...(cleared.length > 0 ? { cleared } : {}),
     halved,
     costlyGround,
     toward: toward.filter((entry) => entry.cells.length > 0).map(({ caster, cells }) => ({ caster, cells }))

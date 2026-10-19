@@ -1,7 +1,10 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
-import type { AnnotationPoint, GameState, SpellZone } from "@vtt/domain";
+import type { AnnotationPoint, AnnotationShapeKind, GameState, SpellZone } from "@vtt/domain";
 import type { ActorAction } from "@vtt/schemas";
+import { shapeGeometry } from "./annotations.js";
+import type { EffectNarration } from "./effects.js";
 import { CommandRejectedError } from "./game-store.js";
+import { gridToImage, imageToGrid } from "./grid-calibration.js";
 import { laterRowOf, laterSpellActionId } from "./item-actions.js";
 import { DISTANCE_TOLERANCE_FEET, mapDistance } from "./movement-narration.js";
 import type { RulesOverride } from "./rules-families.js";
@@ -105,6 +108,53 @@ export function checkAimInArea(
   if (apart > (leaves.zone.feet ?? 5) + DISTANCE_TOLERANCE_FEET)
     refuse(`${spell.name} strikes under its area, within ${leaves.zone.feet ?? 5} feet of its middle.`);
   return notes.find((note) => note !== null) ?? null;
+}
+
+/**
+ * SRD Plant Growth: "You can exclude one or more areas of any size within the spell's area from being affected." A
+ * square the caster places as it casts leaves the cells it covers out of the area. In a fight it is done on the turn of
+ * the cast; outside one the caster leaves out what it likes before going on.
+ */
+export function leaveOut(
+  state: GameState,
+  input: Readonly<{
+    casterId: string;
+    spell: SpellReference;
+    placed: Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }>;
+  }>,
+  deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">
+): EffectNarration[] {
+  const calibration = deps.geometry?.calibration;
+  const zone = areaOfSpell(state, input.casterId, input.spell);
+  const content = zone ? zoneContentOf(zone, deps.catalog) : undefined;
+  const inside = zone && content ? insideTest(state, zone, content.trigger, content, deps.geometry) : null;
+  if (!calibration || !zone || !inside)
+    throw new CommandRejectedError(`${input.spell.name}'s area isn't on the map. Place it first.`);
+  const combat = state.combat;
+  if (combat.active && (zone.startedRound !== combat.round || combat.turnActorId !== input.casterId))
+    throw new CommandRejectedError(`${input.spell.name}'s areas are left out as it is cast.`);
+  const snapped = shapeGeometry(calibration, input.placed.shape, input.placed.origin, input.placed.target);
+  const from = imageToGrid(calibration, snapped.origin);
+  const to = imageToGrid(calibration, snapped.target);
+  const cut = new Set(zone.cut ?? []);
+  let left = 0;
+  for (let column = Math.floor(Math.min(from.column, to.column)); column < Math.max(from.column, to.column); column++)
+    for (let row = Math.floor(Math.min(from.row, to.row)); row < Math.max(from.row, to.row); row++) {
+      const key = `${column},${row}`;
+      const center = gridToImage(calibration, { column: column + 0.5, row: row + 0.5 });
+      if (cut.has(key) || !inside(center, 1)) continue;
+      cut.add(key);
+      left += 1;
+    }
+  zone.cut = [...cut].slice(-4000);
+  const casterName = state.actors.find((actor) => actor.id === input.casterId)?.name ?? "Its caster";
+  return [
+    {
+      kind: "effect",
+      text: `${casterName} leaves ${left * calibration.distancePerCell * calibration.distancePerCell} square feet out of ${input.spell.name}.`,
+      actorId: input.casterId
+    }
+  ];
 }
 
 /** "12d6" with `extra` more dice of its size. */

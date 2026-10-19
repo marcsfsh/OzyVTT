@@ -619,7 +619,8 @@ function linkSpellActions(
         !later.save &&
         later.damage.length === 0 &&
         !later.attackRange &&
-        !later.movesArea
+        !later.movesArea &&
+        !later.cutsArea
       )
         continue;
       const action = laterSpellAction(

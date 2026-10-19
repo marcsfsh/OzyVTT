@@ -185,6 +185,9 @@ export const SpellLaterActionSchema = z
       })
       .strict()
       .optional(),
+    /** Its template leaves the ground it covers out of the spell's area (Plant Growth: "You can exclude one or more areas
+     *  of any size within the spell's area from being affected"), taken by the caster as the spell is cast. */
+    cutsArea: z.literal(true).optional(),
     /** Its template's point, or each creature it targets, must be inside the area the spell left (Call Lightning's
      *  bolt "under the cloud", Storm of Vengeance's bolts "beneath it"). */
     inArea: z.literal(true).optional(),

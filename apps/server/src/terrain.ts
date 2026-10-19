@@ -111,6 +111,8 @@ export type MovementCostOptions = Readonly<{
   halvedAt?: (position: Point, sizeCells: number) => boolean;
   /** Whether a spell's area makes the cell with this centre Difficult Terrain for the mover (Web, Entangle). */
   difficultAt?: (position: Point) => boolean;
+  /** Whether a spell's area lifts the painted Difficult Terrain of the cell with this centre (Speak with Plants). */
+  clearedAt?: (position: Point) => boolean;
   /** Whether a spell's ground costs double again on top of its Difficult Terrain with the mover's centre at this point
    *  (Plant Growth's 4 feet for every foot). A mover off the ground passes over it. */
   costlyGroundAt?: (position: Point, sizeCells: number) => boolean;
@@ -241,7 +243,8 @@ export function movementCost(
       (difficultCells.has(`${column},${row}`) ||
         // The ground a spell's area makes difficult lies on the ground, as painted terrain does.
         (!aloft &&
-          (pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), terrain) ||
+          ((pointInRects(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 }), terrain) &&
+            options.clearedAt?.(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 })) !== true) ||
             options.difficultAt?.(gridToImage(calibration, { column: column + 0.5, row: row + 0.5 })) === true))),
     // A path can't leave the map to walk round something, nor pass a creature that bars the way.
     isOpen: (column, row) => {

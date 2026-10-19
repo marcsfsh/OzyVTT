@@ -24,7 +24,8 @@ import { recordRoll, rolledTerms } from "../roll-history.js";
 import { effectiveModeFor, overrideWaives, rulesInForce } from "../rules-families.js";
 import { looseRollPlan, routeForTap, slotsModeFor, spendLooseUses } from "../tap-routing.js";
 import { conditionChoicesOf, isItemActionId, laterRowOf, upcastAction } from "../item-actions.js";
-import { checkAimInArea, markStageUse, stageRefusal, withAreaDice } from "../zone-later.js";
+import { checkAimInArea, leaveOut, markStageUse, stageRefusal, withAreaDice } from "../zone-later.js";
+import { igniteUnder } from "../zone-fire.js";
 import { BURNING_TAG, PUT_OUT_FIRE_ACTION_ID, putOutFire } from "../hazards.js";
 import type { EffectNarration } from "../effects.js";
 import { grantOutsideFight } from "../resolution/grant.js";
@@ -299,8 +300,9 @@ export const actionCommands = [
             throw new CommandRejectedError(
               isPlayer ? "No creatures you can see are inside that area." : "No combatants are inside that area."
             );
-          // Caltrops spread under a creature catch it only as it moves in.
-          if (leavesArea) resolvedTargetIds = [];
+          // Caltrops spread under a creature catch it only as it moves in; ground left out of a spell's area (Plant
+          // Growth) catches no one.
+          if (leavesArea || areaRow?.cutsArea) resolvedTargetIds = [];
           // What moves the spell's area (Moonbeam's move, Flaming Sphere's ram) places that area there instead, and
           // its save falls on the creatures the area moves onto.
           const moving = areaMoveOf(action, kit.equipmentCatalog());
@@ -604,7 +606,10 @@ export const actionCommands = [
         const unseenArea = spell
           ? (pickedZoneRow(spell, request.option) ?? zoneRowOf(spell))?.zone?.hidden === true
           : action.zone?.hidden === true;
-        if (placed && areaMove) {
+        // The ground a caster leaves out of its spell's area (Plant Growth) is cut from the area, with nothing drawn.
+        if (placed && areaRow?.cutsArea && areaSpell && geometry && !resolution.preview)
+          areaEvents = leaveOut(draft, { casterId: actorId, spell: areaSpell, placed }, kit.zoneDeps(draft, geometry));
+        else if (placed && areaMove) {
           areaMoveNote = areaMove.note;
           areaEvents = moveArea(
             draft,
@@ -637,6 +642,18 @@ export const actionCommands = [
               geometry!
             )
           );
+        // A fire's area sets the webs it covers burning (Web).
+        const fiery = action.damage.some((part) => part.type === "fire") || request.damageType === "fire";
+        if (placed && !areaMove && !resolution.preview && fiery && geometry)
+          for (const shape of [placed, ...morePlaced])
+            areaEvents = [
+              ...areaEvents,
+              ...igniteUnder(
+                draft,
+                { ...shape, widthFeet: action.area?.widthFeet ?? null },
+                kit.zoneDeps(draft, geometry)
+              )
+            ];
       });
       if (duplicate || !resolution) return;
       // A player's reply names only the creatures they may see; the rest of an area's catch stays with the GM.

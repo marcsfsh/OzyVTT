@@ -67,6 +67,7 @@ import { leaveShortRest } from "./short-rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { oilIgnition, OILED_TAG } from "./hazards.js";
+import { noteFire } from "./zone-fire-note.js";
 import { sightRules } from "./vision/rules.js";
 import {
   deathBurst,
@@ -800,6 +801,8 @@ export function applyDamageDetailed(
   if (totalAdjusted > 0) events.push(...stopRegeneration(state, actor, definition, parts));
   // What a damage type does to the stat block it lands on (Acid Absorption, Aversion to Fire, Freeze).
   events.push(...damageTypeTraits(state, actor, definition, parts));
+  // Fire on a creature standing in webs sets them burning (Web), settled with the map after the command.
+  noteFire(state, actor.id, input.parts ?? parts);
   if (!isPlayerCharacter && !knockedOut && !wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deps)
     undeadFortitude(
       state,

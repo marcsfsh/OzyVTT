@@ -3,7 +3,8 @@ import type { GameState, SpellZone } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import { catalogIdOf, type ActorAction, type ActorDefinition } from "@vtt/schemas";
 import { shapeGeometry } from "./annotations.js";
-import { footprintInTemplate } from "./area-targeting.js";
+import { footprintCellCenters, footprintInTemplate } from "./area-targeting.js";
+import { gridToImage } from "./grid-calibration.js";
 import { holdsFeature } from "./class-features.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import { areAllies, areEnemies } from "./creature-sides.js";
@@ -55,7 +56,25 @@ type Meeting =
   | "is set upon by"
   | "is caught in the blast of"
   | "is caught in"
-  | "is swept up by";
+  | "is swept up by"
+  | "is bathed in";
+
+/** An area that acts as it is cast acts on each creature the cast caught (SRD Conjure Celestial: "For each creature
+ *  you can see in the Cylinder, choose which of these lights shines on it"), marked so it isn't affected again this
+ *  turn. */
+export function actOnCast(
+  state: GameState,
+  zone: SpellZone,
+  creatureIds: readonly string[],
+  deps: ZoneDeps
+): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  const content = zoneContentOf(zone, deps.catalog);
+  if (!content) return events;
+  for (const creature of exposed(state, zone, content.trigger, deps))
+    if (creatureIds.includes(creature.id)) act(state, zone, creature, "is bathed in", deps, events);
+  return events;
+}
 
 /** The later action whose zone this spell leaves, if any: the one its cast picked among the spell's options (Wall of
  *  Fire's ring), else the first. */
@@ -153,6 +172,28 @@ function creaturesOnMap(state: GameState): Actor[] {
  *  the area not placed, its caster off the map). `casterAt` stands the caster of an Emanation somewhere else. A
  *  creature's height is 0 when the caller doesn't give it: on the ground. */
 export function insideTest(
+  state: GameState,
+  zone: SpellZone,
+  trigger: ZoneTrigger,
+  source: Pick<ZoneContent, "area">,
+  geometry: TokenMapGeometry | null,
+  casterAt?: Point
+): ((position: Point, sizeCells: number, altitudeFeet?: number) => boolean) | null {
+  const whole = wholeAreaTest(state, zone, trigger, source, geometry, casterAt);
+  const calibration = geometry?.calibration;
+  if (!whole || !calibration || !zone.cut?.length) return whole;
+  // The ground left out of it (Plant Growth's spared squares) or burned away (Web's) is no longer in it.
+  const cut = new Set(zone.cut);
+  return (position, sizeCells, altitudeFeet = 0) =>
+    footprintCellCenters(calibration, position, sizeCells).some(
+      (center) =>
+        !cut.has(`${Math.floor(center.column)},${Math.floor(center.row)}`) &&
+        whole(gridToImage(calibration, center), 1, altitudeFeet)
+    );
+}
+
+/** The test for the whole of a zone's area, before any of it is left out. */
+function wholeAreaTest(
   state: GameState,
   zone: SpellZone,
   trigger: ZoneTrigger,
@@ -392,6 +433,26 @@ function act(
     events.push(...endZoneAndItsSpell(state, zone.id));
     return;
   }
+  // Conjure Celestial's Healing Light on the caster and its allies, or on everyone, as the cast picked.
+  const heals = trigger.heals;
+  if (
+    heals &&
+    (heals.who === "all" || creature.id === caster.id || areAllies(caster, creature, deps.resolveDefinition))
+  ) {
+    const extra = (trigger.dicePerSlot ?? 0) * Math.max(0, zone.level - (content.spell?.level ?? zone.level));
+    const formula = withMoreDice(zone.healing ?? heals.formula, extra);
+    const amount = Math.max(0, resolveDice(parseDiceFormula(formula), deps.rollDie).total);
+    events.push(
+      {
+        kind: "effect",
+        text: `${creature.name} ${meeting} ${content.name} and regains ${amount} Hit Points.`,
+        actorId: creature.id,
+        source: { actorId: caster.id, name: caster.name }
+      },
+      ...healActor(state, creature.id, amount, { role: "gm" })
+    );
+    return;
+  }
   const action = zoneAction(zone, content);
   if (!action) return;
   if (trigger.once) events.push(...endZoneAndItsSpell(state, zone.id));
@@ -504,8 +565,12 @@ export function zoneAction(zone: SpellZone, content: ZoneContent): ActorAction |
     };
   } else return undefined;
   const chosen = zone.damageType;
-  // Dice it has gained (Delayed Blast Fireball) less those it has lost (Tsunami's 1d10 a round).
-  const extra = (zone.grown ?? 0) - (zone.faded ?? 0);
+  // Dice it has gained (Delayed Blast Fireball) less those it has lost (Tsunami's 1d10 a round), and those a higher
+  // slot gives where the area says so (Conjure Celestial's 1d12).
+  const slotDice = content.spell
+    ? (content.trigger.dicePerSlot ?? 0) * Math.max(0, zone.level - content.spell.level)
+    : 0;
+  const extra = (zone.grown ?? 0) - (zone.faded ?? 0) + slotDice;
   return {
     ...action,
     damage: action.damage.map((part, index) => ({

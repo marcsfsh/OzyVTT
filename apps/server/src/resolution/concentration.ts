@@ -9,8 +9,8 @@ import { itemRowOfAction } from "../item-charges.js";
 import { castThisTurnKey } from "../lasting-spells.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { areaAtLevel, endZone } from "../spell-zone-state.js";
-import { pickedZoneRow, zoneRowOf } from "../spell-zones.js";
-import { tableLineOf, type ResolveContext } from "./context.js";
+import { actOnCast, pickedZoneRow, zoneRowOf } from "../spell-zones.js";
+import { abilityModifier, tableLineOf, type ResolveContext } from "./context.js";
 import { shapedZone, shapingOf } from "./metamagic.js";
 import { castWithoutConcentration } from "./summon.js";
 
@@ -262,6 +262,16 @@ export function openSpellZone(ctx: ResolveContext): void {
     ...(state.combat.timeStop?.actorId === attacker.id ? { inTimeStop: true as const } : {}),
     // Storm of Vengeance counts its turns from the cast's.
     ...(row.zone.schedule ? { stage: 1 } : {}),
+    // Fire burns it away (Web).
+    ...(row.zone.burns ? { flammable: true as const } : {}),
+    // Its Healing Light with the caster's spellcasting modifier (Conjure Celestial).
+    ...(row.zone.heals
+      ? {
+          healing: row.zone.heals.addsModifier
+            ? formulaWith(row.zone.heals.formula, spellcastingModifier(ctx))
+            : row.zone.heals.formula
+        }
+      : {}),
     entered: [],
     affected: caught ? targets.map((target) => target.id) : []
   };
@@ -272,6 +282,33 @@ export function openSpellZone(ctx: ResolveContext): void {
   state.combat = { ...state.combat, spellZones: [...state.combat.spellZones, zone].slice(-20) };
   if (!aroundCaster && zone.annotationId === null)
     ctx.warnings.push(`Place ${spell.name}'s area on the map (Spell areas), and the server will run it.`);
+  // An area that acts as it is cast acts on the creatures the cast caught (Conjure Celestial's lights).
+  if (row.zone.atCast && targets.length > 0) {
+    const events = actOnCast(
+      state,
+      zone,
+      targets.map((target) => target.id),
+      {
+        geometry: null,
+        resolveDefinition: ctx.deps.resolveDefinition ?? (() => undefined),
+        ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {}),
+        rollDie: ctx.deps.random,
+        newId: ctx.deps.newRollId,
+        now: ctx.deps.now
+      }
+    );
+    for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
+  }
+}
+
+/** "4d12" with a modifier added: "4d12 + 4", "4d12 - 1". */
+const formulaWith = (formula: string, modifier: number) =>
+  modifier === 0 ? formula : `${formula} ${modifier > 0 ? "+" : "-"} ${Math.abs(modifier)}`;
+
+/** The caster's spellcasting ability modifier, from its sheet's or stat block's spellcasting. */
+function spellcastingModifier(ctx: ResolveContext): number {
+  const ability = ctx.deps.definition?.spellcasting?.ability;
+  return ability ? abilityModifier(ctx.deps.definition, ability) : 0;
 }
 
 /**

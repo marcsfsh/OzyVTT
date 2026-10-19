@@ -4073,7 +4073,34 @@ export const AreaTriggerSchema = z
       .optional(),
     /** The spell's damage has this many more dice while it stands, on the cast and every later action (Call
      *  Lightning cast in a storm: "the spell's damage increases by 1d10"). */
-    extraDice: z.number().int().min(1).max(10).optional()
+    extraDice: z.number().int().min(1).max(10).optional(),
+    /** It heals instead of asking its save: its caster and the caster's allies (`allies`), the others making the save,
+     *  or every creature (`all`). `formula` is rolled with the caster's spellcasting modifier where `addsModifier`
+     *  says so (Conjure Celestial's Healing Light: "4d12 plus your spellcasting ability modifier"). */
+    heals: z
+      .object({
+        formula: z.string().min(1).max(40),
+        addsModifier: z.boolean(),
+        who: z.enum(["allies", "all"])
+      })
+      .strict()
+      .optional(),
+    /** Its damage and healing gain this many dice for each slot level it was cast above the spell's own (Conjure
+     *  Celestial's 1d12). */
+    dicePerSlot: z.number().int().min(1).max(4).optional(),
+    /** It acts on each creature its cast catches, as the cast (Conjure Celestial's lights on the creatures in the
+     *  Cylinder). */
+    atCast: z.literal(true).optional(),
+    /** Fire burns it away (Web: "Any 5-foot Cube of webs exposed to fire burns away in 1 round, dealing 2d4 Fire damage
+     *  to any creature that starts its turn in the fire"): the cells fire reaches burn until the same point of the next
+     *  round, dealing this to a creature that starts its turn there, and are then gone. */
+    burns: z
+      .object({ formula: z.string().min(1).max(40) })
+      .strict()
+      .optional(),
+    /** It lifts the Difficult Terrain painted in it while it stands (Speak with Plants: "turn Difficult Terrain caused
+     *  by plant growth ... into ordinary terrain"). */
+    clearsTerrain: z.literal(true).optional()
   })
   .strict();
 export type AreaTrigger = z.infer<typeof AreaTriggerSchema>;

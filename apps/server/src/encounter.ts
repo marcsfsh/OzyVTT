@@ -42,6 +42,7 @@ import { releaseSwallowedBy } from "./swallow.js";
 import { endOfTurn, playStartSteps, startOfTurn } from "./turn-boundaries.js";
 import { zoneHeld, zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
 import { wavesAtTurnEnd, wavesAtTurnStart } from "./zone-waves.js";
+import { fireAtTurnStart } from "./zone-fire.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
 import { lapseLongCasts } from "./resolution/long-casting.js";
@@ -918,6 +919,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   if (zones) starting.push(...zonesAtTurnStart(state, nextActorId, zones));
   // A creature in a wave fights it before it can move (Tsunami).
   if (zones) starting.push(...wavesAtTurnStart(state, nextActorId, zones));
+  // Burning webs burn out, and burn a creature starting its turn in them (Web).
+  if (zones) starting.push(...fireAtTurnStart(state, nextActorId, zones));
   events?.push(...starting);
   rollRecharges(state, nextActorId, deps, events);
   refreshOwnTurnUses(state, nextActorId, deps);

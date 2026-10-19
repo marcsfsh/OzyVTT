@@ -20,10 +20,13 @@ export function zoneMovementOptions(
   state: GameState,
   actorId: string,
   deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">
-): Pick<MovementCostOptions, "difficultAt" | "halvedAt" | "costlyGroundAt" | "barredStep" | "costlyStep"> {
+): Pick<
+  MovementCostOptions,
+  "difficultAt" | "clearedAt" | "halvedAt" | "costlyGroundAt" | "barredStep" | "costlyStep"
+> {
   const ground = zoneGround(state, actorId, deps);
   if (!ground) return {};
-  const { difficult, doubled, toward, halving } = ground;
+  const { difficult, cleared, doubled, toward, halving } = ground;
   const barredStep = barredStepFor(state, actorId, deps);
   const closer = (from: Point, to: Point, caster: Point) =>
     Math.hypot(to.x - caster.x, to.y - caster.y) < Math.hypot(from.x - caster.x, from.y - caster.y) - 0.5;
@@ -38,6 +41,7 @@ export function zoneMovementOptions(
       : {}),
     ...(barredStep ? { barredStep } : {}),
     ...(difficult.length > 0 ? { difficultAt: (point: Point) => difficult.some((inside) => inside(point, 1)) } : {}),
+    ...(cleared.length > 0 ? { clearedAt: (point: Point) => cleared.some((inside) => inside(point, 1)) } : {}),
     ...(halving ? { halvedAt: halving } : {}),
     ...(doubled.length > 0
       ? { costlyGroundAt: (point: Point, sizeCells: number) => doubled.some((inside) => inside(point, sizeCells)) }
@@ -54,6 +58,7 @@ export function zoneGround(
   zones: readonly SpellZone[] = liveZones(state)
 ): Readonly<{
   difficult: Inside[];
+  cleared: Inside[];
   doubled: Inside[];
   toward: Array<Readonly<{ inside: Inside; caster: Point }>>;
   halving: ((position: Point, sizeCells: number) => boolean) | null;
@@ -61,6 +66,8 @@ export function zoneGround(
   const mover = state.actors.find((actor) => actor.id === actorId);
   if (!mover) return null;
   const difficult: Inside[] = [];
+  // Where an area lifts the painted Difficult Terrain (Speak with Plants' clearing).
+  const cleared: Inside[] = [];
   const doubled: Inside[] = [];
   // Steps that cost double in an area for going toward its caster (Gust of Wind).
   const toward: Array<Readonly<{ inside: Inside; caster: Point }>> = [];
@@ -71,6 +78,10 @@ export function zoneGround(
       const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
       const caster = state.combat.tokens.find((token) => token.actorId === zone.casterId)?.position;
       if (inside && caster) toward.push({ inside, caster });
+    }
+    if (content?.trigger.clearsTerrain) {
+      const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
+      if (inside) cleared.push(inside);
     }
     const terrain = content?.trigger.terrain;
     if (!content || !terrain) continue;
@@ -83,5 +94,5 @@ export function zoneGround(
     // 4 feet for every foot: Difficult Terrain's 2, doubled.
     if (terrain.cost === 4) doubled.push(inside);
   }
-  return { difficult, doubled, toward, halving };
+  return { difficult, cleared, doubled, toward, halving };
 }

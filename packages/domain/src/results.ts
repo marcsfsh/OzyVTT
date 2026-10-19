@@ -947,10 +947,15 @@ export const ActorMovementReplySchema = z.strictObject({
   /** The ground the spell areas the asker can see change for this mover, in grid cells near it, as the server charges
    *  it: Difficult Terrain (each cell), and where its footprint (named by its top-left cell) has its Speed halved,
    *  costs double again on the ground (Plant Growth), or pays double for a step toward an area's caster (Gust of
-   *  Wind's Line, the caster's position in image pixels). */
+   *  Wind's Line, the caster's position in image pixels). `cleared`: cells whose painted Difficult Terrain an area lifts
+   *  (Speak with Plants). */
   areaGround: z
     .strictObject({
       difficult: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
+      cleared: z
+        .array(z.strictObject({ column: z.number().int(), row: z.number().int() }))
+        .max(4000)
+        .optional(),
       halved: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
       costlyGround: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
       toward: z
