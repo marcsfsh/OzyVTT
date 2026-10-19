@@ -53,7 +53,7 @@ describe("what one cast of an SRD spell does", () => {
     const waiting = loadSpells()
       .filter((spell) => spell.effect?.laterActions?.some((row) => row.laterTurnsOnly))
       .map((spell) => spell.id);
-    expect(waiting).toEqual(["arcane-sword", "conjure-fey", "heat-metal", "hex", "spiritual-weapon"]);
+    expect(waiting).toEqual(["arcane-sword", "conjure-fey", "heat-metal", "hex", "moonbeam", "spiritual-weapon"]);
     // "Until the spell ends, you can take a Magic action": the turn of the cast too.
     expect(effectOf("produce-flame")!.laterActions?.[0]?.laterTurnsOnly).toBeUndefined();
   });
@@ -176,6 +176,18 @@ describe("what one cast of an SRD spell does", () => {
       way: "in",
       types: ["celestial", "elemental", "fey", "fiend", "undead"]
     });
+  });
+
+  it("marks the areas that move: by a later action, up to how far, and drifting from their caster", () => {
+    const rowOf = (id: string, name: string) => effectOf(id)!.laterActions?.find((row) => row.name === name);
+    expect(rowOf("moonbeam", "move")).toMatchObject({
+      activation: "action",
+      laterTurnsOnly: true,
+      movesArea: { feet: 60 }
+    });
+    expect(rowOf("flaming-sphere", "ram")?.movesArea).toEqual({ feet: 30 });
+    expect(rowOf("cloudkill", "save")?.zone?.drifts).toBe(10);
+    expect(rowOf("incendiary-cloud", "save")?.zone?.drifts).toBe(10);
   });
 
   it("marks what an aura gives the creatures in it, and to whom", () => {

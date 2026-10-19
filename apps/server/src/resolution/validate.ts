@@ -97,6 +97,8 @@ function combatantsOf(
     consumableRowFor(action, attacker.inventory, catalog) !== null;
   // A spell that lasts and acts again later (Produce Flame, a lingering area) starts with no creature under it yet.
   const startsALastingSpell = castsASpell && (spell?.effect?.laterActions ?? []).length > 0;
+  // Moving a spell's area (Moonbeam, Flaming Sphere's ram) is something done, whoever it moves onto.
+  const movesAnArea = spell !== undefined && laterRowOf(spell, action.id)?.movesArea !== undefined;
   const rollsOnTargets =
     action.attack !== undefined ||
     action.save !== undefined ||
@@ -109,6 +111,7 @@ function combatantsOf(
     action.multiattack !== undefined ||
     spendsALimitedUse ||
     startsALastingSpell ||
+    movesAnArea ||
     (castsASpell && !rollsOnTargets) ||
     input.builtin === true ||
     // A light or a cloud is something done, with no creature under it (a magmin's flames, a darkmantle's aura).
@@ -128,6 +131,7 @@ function combatantsOf(
     action.endsCurses === undefined &&
     !spendsALimitedUse &&
     !castsASpell &&
+    !movesAnArea &&
     action.sight === undefined &&
     input.builtin !== true
   )

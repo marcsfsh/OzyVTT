@@ -319,7 +319,11 @@ for the creatures it holds back (Antilife Shell, Magic Circle), a melee attack w
 can't reach through Antilife Shell, and no creature teleports into Forbiddance. What an area gives the
 creatures in it (Holy Aura's Advantage on saves, Pass without Trace's +10 to Stealth, Silence's Deafened)
 is an effect each one holds while it stands inside (`zone-auras.ts`): the pipeline settles who holds it
-after every command, as its own write when anything changed.
+after every command, as its own write when anything changed. A later action that moves a spell's area
+(Moonbeam's Magic action, Flaming Sphere's ram) takes a template like a cast: the area moves there if that
+is within the spell's reach of where it stood, its save falls on the creatures the area moves onto, and no
+new shape is drawn (`zone-moves.ts`). A cloud that drifts (Cloudkill) moves straight away from its caster as
+the caster's turn starts.
 
 Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
 (`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long

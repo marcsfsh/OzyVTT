@@ -461,7 +461,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The Sphere moves 10 feet away from you at the start of each of your turns.`,
       save: save("con"),
       damage: [{ formula: "5d8", type: "poison" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, drifts: 10 }
     }
   ],
   "conjure-animals": [
@@ -606,7 +606,9 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "bonus-action",
       when: "As a Bonus Action, you can roll the sphere up to 30 feet; a creature whose space you move it into makes the save, and the sphere stops for the turn.",
       save: save("dex"),
-      damage: [{ formula: "2d6", type: "fire" }]
+      damage: [{ formula: "2d6", type: "fire" }],
+      area: { shape: "sphere", sizeFeet: 5, widthFeet: null },
+      movesArea: { feet: 30 }
     }
   ],
   grease: [
@@ -715,7 +717,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: `A creature the Sphere moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} The cloud moves 10 feet away from you at the start of each of your turns.`,
       save: save("dex"),
       damage: [{ formula: "10d8", type: "fire" }],
-      zone: ENTER_OR_END_ONCE
+      zone: { ...ENTER_OR_END_ONCE, drifts: 10 }
     }
   ],
   "insect-plague": [
@@ -736,6 +738,16 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       save: save("con"),
       damage: [{ formula: "2d10", type: "radiant" }],
       zone: ENTER_OR_END_ONCE
+    },
+    // "On each of your later turns, you can take a Magic action to move the Cylinder up to 60 feet."
+    {
+      name: "move",
+      activation: "action",
+      when: "On your later turns, a Magic action moves the Cylinder up to 60 feet; a creature it moves onto makes the save.",
+      laterTurnsOnly: true,
+      damage: [],
+      area: { shape: "cylinder", sizeFeet: 5, widthFeet: null },
+      movesArea: { feet: 60 }
     }
   ],
   // A creature of a chosen type "can't willingly enter the Cylinder by nonmagical means". Every type the spell names is

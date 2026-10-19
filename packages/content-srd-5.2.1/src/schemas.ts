@@ -173,7 +173,10 @@ export const SpellZoneSchema = z
       .strict()
       .optional(),
     /** A creature it affects that starts its turn there at 0 Hit Points regains this many (Aura of Life's 1). */
-    revives: z.number().int().min(1).max(10).optional()
+    revives: z.number().int().min(1).max(10).optional(),
+    /** Its area moves this many feet straight away from its caster at the start of each of the caster's turns
+     *  (Cloudkill, Incendiary Cloud), acting on the creatures it moves onto. */
+    drifts: z.number().int().min(5).max(60).optional()
   })
   .strict();
 export type SpellZone = z.infer<typeof SpellZoneSchema>;
@@ -206,7 +209,13 @@ export const SpellLaterActionSchema = z
     /** What its damage drains as it lands (Vampiric Touch's later touches). */
     drain: DamageDrainSchema.optional(),
     /** The area the spell leaves, whose trigger the server watches (an "other" action only). */
-    zone: SpellZoneSchema.optional()
+    zone: SpellZoneSchema.optional(),
+    /** It moves the area the spell left up to this many feet, to where its template is placed (Moonbeam's Magic
+     *  action: 60 feet; Flaming Sphere's ram: 30). Its save, if any, falls on the creatures the area moves onto. */
+    movesArea: z
+      .object({ feet: z.number().int().min(5).max(300) })
+      .strict()
+      .optional()
   })
   .strict();
 export type SpellLaterAction = z.infer<typeof SpellLaterActionSchema>;

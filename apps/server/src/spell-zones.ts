@@ -2,6 +2,7 @@ import type { SpellReference, SpellZone as ZoneTrigger } from "@vtt/content-srd-
 import type { GameState, SpellZone } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
+import { shapeGeometry } from "./annotations.js";
 import { footprintInTemplate } from "./area-targeting.js";
 import { holdsFeature } from "./class-features.js";
 import { creatureTypeOf } from "./statblock-facts.js";
@@ -503,9 +504,9 @@ function zonesAtCasterTurnEnd(state: GameState, casterId: string, deps: ZoneDeps
 }
 
 /**
- * A turn's start: a spell that lasts its duration ends once its caster's turn comes round after it (`rounds`), the
- * GM is reminded to move a cloud its caster's turn moves, and the zones the incoming creature starts its turn inside
- * act on it. Each zone's marks are cleared first: "once per turn" counts afresh.
+ * A turn's start: a spell that lasts its duration ends once its caster's turn comes round after it (`rounds`), a cloud
+ * its caster's turn moves drifts away from it, and the zones the incoming creature starts its turn inside act on it.
+ * Each zone's marks are cleared first: "once per turn" counts afresh.
  */
 export function zonesAtTurnStart(state: GameState, actorId: string, deps: ZoneDeps): EffectNarration[] {
   const events: EffectNarration[] = [];
@@ -518,17 +519,56 @@ export function zonesAtTurnStart(state: GameState, actorId: string, deps: ZoneDe
       events.push({ kind: "effect", text: `${zone.name} ends.`, actorId: zone.casterId });
       continue;
     }
-    if (MOVES_AT_CASTER_TURN.has(zone.spellId))
-      events.push({
-        kind: "effect",
-        text: `${zone.name} moves 10 feet away from its caster: drag its area on the map.`,
-        actorId: zone.casterId,
-        gmOnly: true
-      });
+    const drifts = zoneContentOf(zone, deps.catalog)?.trigger.drifts;
+    if (drifts !== undefined && zoneHeld(state, zone)) events.push(...drift(state, zone, drifts, deps));
   }
   events.push(...zonesWhereItStands(state, actorId, "start-turn", deps));
   events.push(...zonesAtCasterTurnStart(state, actorId, deps));
   return events;
+}
+
+/**
+ * SRD Cloudkill: "The Sphere moves 10 feet away from you at the start of each of your turns" (Incendiary Cloud's too):
+ * the area moves `feet` straight away from its caster, snapped as a placed area is, and acts on the creatures it moves
+ * onto. When the map can't say which way that is (no grid, the area unplaced, the caster at its centre or off the
+ * map), the GM is told to move it.
+ */
+function drift(state: GameState, zone: SpellZone, feet: number, deps: ZoneDeps): EffectNarration[] {
+  const calibration = deps.geometry?.calibration ?? null;
+  const area = zone.annotationId
+    ? state.combat.annotations.find((annotation) => annotation.id === zone.annotationId)
+    : undefined;
+  const caster = tokenOf(state, zone.casterId)?.position;
+  const away = area && caster ? { x: area.geometry.origin.x - caster.x, y: area.geometry.origin.y - caster.y } : null;
+  const length = away ? Math.hypot(away.x, away.y) : 0;
+  if (!calibration || !area || area.shape === null || !away || length < 1)
+    return [
+      {
+        kind: "effect",
+        text: `${zone.name} moves ${feet} feet away from its caster: drag its area on the map.`,
+        actorId: zone.casterId,
+        gmOnly: true
+      }
+    ];
+  const pixels = (feet / calibration.distancePerCell) * calibration.cellSizePx;
+  const shift = { x: (away.x / length) * pixels, y: (away.y / length) * pixels };
+  const before = { origin: area.geometry.origin, target: area.geometry.target };
+  const moved = shapeGeometry(
+    calibration,
+    area.shape,
+    { x: before.origin.x + shift.x, y: before.origin.y + shift.y },
+    { x: before.target.x + shift.x, y: before.target.y + shift.y }
+  );
+  area.geometry = moved;
+  const casterName = state.actors.find((actor) => actor.id === zone.casterId)?.name ?? "its caster";
+  return [
+    {
+      kind: "effect",
+      text: `${zone.name} drifts ${feet} feet away from ${casterName}.`,
+      actorId: zone.casterId
+    },
+    ...zonesAfterAreaMove(state, area.id, before, deps)
+  ];
 }
 
 /** SRD Faithful Hound: "At the start of each of your turns, the hound attempts to bite one enemy within 5 feet of it."
@@ -630,9 +670,6 @@ export function burstEndedZones(state: GameState, deps: ZoneDeps): EffectNarrati
   }
   return events;
 }
-
-/** SRD Cloudkill and Incendiary Cloud: the Sphere "moves 10 feet away from you at the start of each of your turns". */
-const MOVES_AT_CASTER_TURN: ReadonlySet<string> = new Set(["cloudkill", "incendiary-cloud"]);
 
 function zonesWhereItStands(
   state: GameState,

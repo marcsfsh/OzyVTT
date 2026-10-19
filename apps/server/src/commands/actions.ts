@@ -31,6 +31,7 @@ import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { SCROLL_UNREADABLE, scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "../scrolls.js";
 import { castSlotLevel, untrainedArmorCast } from "../resolution/economy.js";
 import { zoneRowOf } from "../spell-zones.js";
+import { areaMoveOf, moveArea, planAreaMove, type AreaMove } from "../zone-moves.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
 import { applyLooseHealing, looseHealTargets, partyMember } from "../loose-healing.js";
@@ -115,6 +116,9 @@ export const actionCommands = [
       let restBroken: EffectNarration[] = [];
       let castingOnward = false;
       let clock = { fromHours: 0, toHours: 0 };
+      // A spell's area this action moved, what it did as it came to rest, and a rules note its move let through.
+      let areaEvents: EffectNarration[] = [];
+      let areaMoveNote: string | null = null;
       const { state, duplicate } = await execute((draft) => {
         // Access first (the action kind is for the per-table policy hook, ADR-0021): a missing creature and someone
         // else's get one answer, so a player can't probe which ids exist.
@@ -145,6 +149,7 @@ export const actionCommands = [
               : null;
         let resolvedTargetIds: readonly string[];
         let originAtCaster = false;
+        let areaMove: AreaMove | null = null;
         // The template as the action's area makes it, which the table's drawn shape records.
         let placed: Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }> | null =
           null;
@@ -186,6 +191,24 @@ export const actionCommands = [
             throw new CommandRejectedError(
               isPlayer ? "No creatures you can see are inside that area." : "No combatants are inside that area."
             );
+          // What moves the spell's area (Moonbeam's move, Flaming Sphere's ram) places that area there instead, and
+          // its save falls on the creatures the area moves onto.
+          const moving = areaMoveOf(action, kit.equipmentCatalog());
+          if (moving) {
+            areaMove = planAreaMove(
+              draft,
+              {
+                casterId: actorId,
+                spell: moving.spell,
+                feet: moving.feet,
+                placed,
+                override: isPlayer ? null : (override ?? null),
+                widthFeet: action.area?.widthFeet ?? null
+              },
+              geometry!
+            );
+            resolvedTargetIds = action.save ? areaMove.movedOnto : [];
+          }
         } else {
           resolvedTargetIds = targetIds ?? [];
           // A player may target only public combatants they can see: resolving against a hidden actor would leak
@@ -320,7 +343,19 @@ export const actionCommands = [
         const fromHiddenCaster = originAtCaster && kit.hiddenFromTable(draft)(actorId);
         // A nearly imperceptible glyph is drawn for the GM and its caster's player alone.
         const unseenArea = spell ? zoneRowOf(spell)?.zone?.hidden === true : false;
-        if (placed)
+        if (placed && areaMove) {
+          areaMoveNote = areaMove.note;
+          areaEvents = moveArea(
+            draft,
+            areaMove,
+            placed,
+            { sessionId: gmSessionId, role: "gm" },
+            {
+              ...kit.zoneDeps(draft, geometry),
+              geometry: geometry!
+            }
+          );
+        } else if (placed)
           addAnnotation(
             draft,
             {
@@ -385,6 +420,14 @@ export const actionCommands = [
         }
         kit.narrateResolution(resolution, actorId);
         kit.publishNarrations(restBroken);
+        kit.publishNarrations(areaEvents);
+        if (areaMoveNote)
+          kit.context.appendLog({
+            kind: "action",
+            text: `Rules note: ${areaMoveNote}`,
+            actorIds: [actorId],
+            gmOnly: true
+          });
         for (const { outcome, targetId, sourceActorId, label } of playerDamageApplied) {
           // Narrated like actor:apply-damage. Both actors ride actorIds so the line is gm-only if either is hidden.
           const detail = damageAdjustmentDetail(outcome.application);
