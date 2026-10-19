@@ -727,7 +727,7 @@ describe("the absences that were measured and must stay absent", () => {
     expect(carries(horn)).toBe(false);
   });
 
-  it("the seven ability-score refusals stay prose, and so do the reserved and multi-cost rows", () => {
+  it("the seven ability-score refusals stay prose, and so do the reserved rows", () => {
     // `ability-score` is refused on an item carrier: one potion, three manuals, three tomes.
     for (const id of [
       "potion-of-giant-strength",
@@ -741,7 +741,7 @@ describe("the absences that were measured and must stay absent", () => {
       expect({ id, carries: carries(view.equipmentRecord(id)!) }).toEqual({ id, carries: false });
     }
     // Rows needing mechanics not modeled yet: a Pearl of Power is a slot recovery (conversions.ts), not an item row.
-    for (const id of ["mysterious-deck", "dragon-orb", "gem-of-brightness", "pearl-of-power"]) {
+    for (const id of ["mysterious-deck", "dragon-orb", "pearl-of-power"]) {
       expect({ id, carries: carries(view.equipmentRecord(id)!) }).toEqual({ id, carries: false });
     }
   });

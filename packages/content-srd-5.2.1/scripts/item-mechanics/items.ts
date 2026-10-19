@@ -210,9 +210,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Bearer only: the 30-foot ally aura and the surprise/sleep clause are not expressible.
   "weapon-of-warning": { modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }] },
 
-  // "On your person" is read as equipped. Luck rerolls a failed D20 Test once per dawn (`answer`). Not modeled: Wish
-  // (a rolled charge count that never comes back).
+  // "On your person" is read as equipped. Luck rerolls a failed D20 Test once per dawn (`answer`). Wish casts on 1d3
+  // charges rolled when the blade is added, which never come back; its once-a-dawn limit is the GM's.
   "luck-blade": {
+    charges: { starting: "1d3" },
+    casts: [{ spellId: "wish", uses: { limit: 3, per: "never", pool: "luck-blade-wish" } }],
     modifiers: [
       { type: "save-bonus", amount: 1 },
       { type: "attack-bonus", amount: 1 },
@@ -1962,8 +1964,48 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `figurine-of-wondrous-power` - ten figurines, summons, multi-day cooldowns.
   // `folding-boat` - a vehicle.
   // Its first command's light ("Bright Light in a 30-foot radius and Dim Light for an additional 30 feet"), lit and put
-  // out on the row. Not modeled: the 50 charges that never return, and the beam and flare that Blind.
-  "gem-of-brightness": { light: { brightFeet: 30, dimFeet: 30 } },
+  // out on the row, and its beam (1 charge) and flare (5) on 50 charges that never return. The gem turning
+  // nonmagical when they are gone is the GM's.
+  "gem-of-brightness": {
+    light: { brightFeet: 30, dimFeet: 30 },
+    actions: [
+      {
+        id: "beam",
+        name: "Beam of Light",
+        activation: "action",
+        description:
+          "Expend 1 charge to fire a beam of light at one creature you can see within 60 feet. It must succeed on a DC 15 Constitution saving throw or have the Blinded condition for 1 minute, repeating the save at the end of each of its turns.",
+        save: {
+          ability: "con",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["blinded"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          repeatSave: true
+        },
+        uses: { limit: 50, per: "never", pool: "gem-of-brightness-charges" },
+        targets: { count: 1, rangeFeet: 60, seen: true }
+      },
+      {
+        id: "flare",
+        name: "Flare",
+        activation: "action",
+        description:
+          "Expend 5 charges to flare with intense light in a 30-foot Cone. Each creature in it must succeed on a DC 15 Constitution saving throw or have the Blinded condition for 1 minute, repeating the save at the end of each of its turns.",
+        area: { shape: "cone", sizeFeet: 30, widthFeet: null },
+        save: {
+          ability: "con",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["blinded"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          repeatSave: true
+        },
+        useCost: 5,
+        uses: { limit: 50, per: "never", pool: "gem-of-brightness-charges" }
+      }
+    ]
+  },
 
   // Not cast as True Seeing (that spell targets someone you touch): the charge gives its user Truesight 120 feet for
   // 10 minutes, which dynamic vision reads.

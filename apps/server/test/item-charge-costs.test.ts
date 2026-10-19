@@ -137,3 +137,28 @@ describe("a flat regain", () => {
     expect(spent(table, "rod-of-resurrection-charges")).toBe(4);
   });
 });
+
+describe("more charges that never come back", () => {
+  it("spends five of a Gem of Brightness's 50 charges on its flare, and a Long Rest gives none back", () => {
+    const table = tableOf({ [IDS.wizard]: wizardInput() });
+    write(table, IDS.wizard, catalogRow("gem-of-brightness"));
+    expect(actionOf(table, IDS.wizard, "item-gem-of-brightness-flare")).toMatchObject({
+      useCost: 5,
+      uses: { limit: 50, per: "never", pool: "gem-of-brightness-charges" }
+    });
+    table.actor(IDS.wizard).actionUses = { "gem-of-brightness-charges": 5 };
+    table.state.combat.active = false;
+    applyRest(table.state, IDS.wizard, "long", table.resolve, catalog, { random: () => 6, lines: [] });
+    expect(spent(table, "gem-of-brightness-charges")).toBe(5);
+  });
+
+  it("rolls a Luck Blade's 1d3 Wish charges when it is added", () => {
+    const table = tableOf({ [IDS.wizard]: wizardInput() }, false);
+    setInventoryItem(table.state, IDS.wizard, catalogRow("luck-blade"), table.resolve, {
+      catalog,
+      role: "gm",
+      random: () => 2
+    });
+    expect(spent(table, "luck-blade-wish")).toBe(1);
+  });
+});
