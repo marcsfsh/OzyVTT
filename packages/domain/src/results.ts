@@ -818,6 +818,12 @@ export const ActorMovementReplySchema = z.strictObject({
     .optional(),
   /** It passes through walls and creatures as through Difficult Terrain (a ghost's Incorporeal Movement). */
   throughWalls: z.boolean().optional(),
+  /** How narrow an opening it passes with no extra movement: any gap (`point`: Amorphous, "as narrow as 1 inch"), or
+   *  one a Tiny creature fits (`tiny`: a swarm). */
+  opening: z.enum(["point", "tiny"]).optional(),
+  /** Burrowing, it goes through walls: freely through earth and stone (`free`: Earth Glide), or at half its Burrow
+   *  Speed (`half`: Tunneler). */
+  burrowsThroughWalls: z.enum(["free", "half"]).optional(),
   /** Difficult Terrain costs it nothing extra (Freedom of Movement). */
   ignoresDifficultTerrain: z.boolean().optional(),
   /** A teleport granted it for this turn (Misty Step): up to `feet` to an unoccupied space it can see. */

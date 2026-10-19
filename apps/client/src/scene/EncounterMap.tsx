@@ -534,7 +534,11 @@ export function EncounterMap({
           carried: grappledBy(actors, dragging.actorId, role),
           free: draggedMode === "teleport" || draggedMode === "forced",
           straight: draggedMode === "jump",
-          throughWalls: draggedBudget?.throughWalls === true,
+          throughWalls:
+            draggedBudget?.throughWalls === true ||
+            (draggedMode === "burrow" && draggedBudget?.burrowsThroughWalls === "half"),
+          throughWallsFree: draggedMode === "burrow" && draggedBudget?.burrowsThroughWalls === "free",
+          ...(draggedBudget?.opening ? { opening: draggedBudget.opening } : {}),
           ignoresDifficult: draggedBudget?.ignoresDifficultTerrain === true,
           walls: moveWalls,
           ...(draggedBudget?.passesCreatures ? { passesCreatures: true } : {}),

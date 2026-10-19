@@ -377,6 +377,41 @@ export function footprintStepPassage(
   return opening ? "squeeze" : "blocked";
 }
 
+/**
+ * Whether a creature that slips through narrow gaps may take a step past walls, its body flowing through one gap: one
+ * that "can move through a space as narrow as 1 inch" (`point`: Amorphous, Compression) needs one clear lane through its
+ * footprint along the step, and one that moves "through any opening large enough for a Tiny" creature (`tiny`: a swarm)
+ * a lane clear for a quarter of a square either side. A closed door or a wall with no gap stops both.
+ */
+export function slipsThroughStep(
+  from: GridCell,
+  to: GridCell,
+  sizeCells: number,
+  crosses: (a: GridPoint, b: GridPoint) => boolean,
+  gap: "point" | "tiny"
+): boolean {
+  const size = Math.max(1, Math.round(sizeCells));
+  const dc = Math.sign(to.column - from.column);
+  const dr = Math.sign(to.row - from.row);
+  const widths = gap === "point" ? [0] : [-0.25, 0, 0.25];
+  const cells = Array.from({ length: size }, (_, index) => index);
+  /** Whether the line its body's centres sweep along one row (or column) is clear, as wide as the gap needs: from its
+   *  first cell's centre to its last one's after the step. Cell centres never lie on a grid line. */
+  const across = (row: number) =>
+    widths.every((offset) => {
+      const y = from.row + row + 0.5 + offset;
+      const near = from.column + (dc >= 0 ? 0.5 : size - 0.5);
+      return !crosses({ column: near, row: y }, { column: near + dc * size, row: y });
+    });
+  const down = (column: number) =>
+    widths.every((offset) => {
+      const x = from.column + column + 0.5 + offset;
+      const near = from.row + (dr >= 0 ? 0.5 : size - 0.5);
+      return !crosses({ column: x, row: near }, { column: x, row: near + dr * size });
+    });
+  return (dc === 0 || cells.some(across)) && (dr === 0 || cells.some(down));
+}
+
 /** Whether a point lies in any of the rects, edges included. */
 export function pointInRects(
   point: Readonly<{ x: number; y: number }>,
