@@ -139,6 +139,39 @@ export const DamageTypeSchema = z.enum([
 ]);
 export type DamageType = z.infer<typeof DamageTypeSchema>;
 
+/**
+ * An object's statistics as the SRD prints them (Rules Glossary: Breaking Objects, Damage Threshold): its Armor Class,
+ * its Hit Points, a damage threshold if it has one, and the damage types it resists, ignores or takes double from.
+ * Every object also has Immunity to Poison and Psychic damage and fails every saving throw, so those aren't listed. A
+ * Net is `{ name: "Net", armorClass: 10, hitPoints: 5, immunities: ["bludgeoning"] }`.
+ */
+export const ObjectPrintSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    armorClass: z.number().int().min(1).max(40),
+    hitPoints: z.number().int().min(1).max(100000),
+    /** Damage from one attack or effect below this deals none; at or above it the whole of it lands. */
+    damageThreshold: z.number().int().min(1).max(1000).optional(),
+    immunities: z.array(DamageTypeSchema).max(13).optional(),
+    resistances: z.array(DamageTypeSchema).max(13).optional(),
+    vulnerabilities: z.array(DamageTypeSchema).max(13).optional(),
+    /** Immune to all damage (Wall of Force): only a rule that names it ends it (Disintegrate). */
+    immuneToAll: z.literal(true).optional()
+  })
+  .strict();
+export type ObjectPrint = z.infer<typeof ObjectPrintSchema>;
+
+/** An object in play (a door, a wall's panel, the Net holding a creature) and the Hit Points it has left. */
+export const ObjectStatsSchema = ObjectPrintSchema.extend({
+  hitPoints: z
+    .object({
+      current: z.number().int().min(0).max(100000),
+      maximum: z.number().int().min(1).max(100000)
+    })
+    .strict()
+}).strict();
+export type ObjectStats = z.infer<typeof ObjectStatsSchema>;
+
 /** The ways a caster shapes one casting as it casts: the Sorcerer's Metamagic options chosen with the cast (SRD 5.2.1
  *  Metamagic Options; Seeking Spell answers a missed roll instead) and the Evoker's Sculpt Spells. */
 export const CastShapingIdSchema = z.enum([
@@ -1239,7 +1272,10 @@ export const EffectInstanceSchema = z
     /** A Hide's Dexterity (Stealth) total: "the DC for a creature to find you with a Wisdom (Perception) check". */
     findDc: z.number().int().min(1).max(60).optional(),
     /** The creatures it lets its bearer sense (Divine Sense), shown to the bearer's player alone. */
-    detects: DetectsSchema.optional()
+    detects: DetectsSchema.optional(),
+    /** What holds the bearer (a Net, a giant spider's web): an object any creature can attack, whose destruction ends
+     *  this effect. */
+    heldBy: ObjectStatsSchema.optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -2011,7 +2047,12 @@ export const SaveOutcomeFields = {
   breaksConcentration: z
     .literal(true)
     .optional()
-    .describe("A failure also ends the Concentration the creature holds (Earthquake, Sleet Storm)")
+    .describe("A failure also ends the Concentration the creature holds (Earthquake, Sleet Storm)"),
+  /** What holds the creature a failure restrains (a Net: AC 10, 5 Hit Points), which can be attacked; destroying it
+   *  ends the failure's conditions. */
+  heldBy: ObjectPrintSchema.optional().describe(
+    "What holds the creature a failure restrains (a Net: AC 10, 5 Hit Points, Immunity to Bludgeoning damage), which can be attacked and damaged; destroying it ends the failure's conditions"
+  )
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */

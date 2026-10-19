@@ -35,6 +35,29 @@ export const blocksMovement = (wall: VisionWall) => wall.kind !== "door" || wall
 
 export const segmentOf = (wall: VisionWall): Segment => ({ ax: wall.a.x, ay: wall.a.y, bx: wall.b.x, by: wall.b.y });
 
+type WallEnds = Readonly<{ a: Point; b: Point }>;
+
+/** The parts of a wall that stand: the whole of it, less the gaps cut in it (Passwall's passage, a tunnel). */
+export function wallPieces(wall: VisionWall): WallEnds[] {
+  const gaps = [...(wall.openings ?? [])]
+    .map((gap) => ({ from: Math.min(gap.from, gap.to), to: Math.max(gap.from, gap.to) }))
+    .sort((left, right) => left.from - right.from);
+  if (gaps.length === 0) return [{ a: wall.a, b: wall.b }];
+  const at = (t: number): Point => ({ x: wall.a.x + (wall.b.x - wall.a.x) * t, y: wall.a.y + (wall.b.y - wall.a.y) * t });
+  const pieces: WallEnds[] = [];
+  let start = 0;
+  for (const gap of gaps) {
+    if (gap.from > start + 1e-6) pieces.push({ a: at(start), b: at(gap.from) });
+    start = Math.max(start, gap.to);
+  }
+  if (start < 1 - 1e-6) pieces.push({ a: at(start), b: wall.b });
+  return pieces;
+}
+
+/** A wall's standing parts as segments. */
+export const segmentsOf = (wall: VisionWall): Segment[] =>
+  wallPieces(wall).map((piece) => ({ ax: piece.a.x, ay: piece.a.y, bx: piece.b.x, by: piece.b.y }));
+
 /** Feet of slack on a sense's range: a creature at the edge of a 60-foot Darkvision is in it. */
 const RANGE_SLACK_FEET = 0.5;
 /** A 5e Cone is as wide as it is long: half its angle is atan(1/2). */
@@ -131,7 +154,8 @@ function wallsKey(walls: readonly VisionWall[]): string {
   const key = fingerprint(
     walls
       .filter(blocksSight)
-      .map((wall) => `${wall.a.x},${wall.a.y},${wall.b.x},${wall.b.y}`)
+      .flatMap(segmentsOf)
+      .map((piece) => `${piece.ax},${piece.ay},${piece.bx},${piece.by}`)
       .join(";")
   );
   segmentKeys.set(walls, key);
@@ -259,7 +283,7 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
   if (!vision?.enabled || !measure) return OFF;
   const pixelsPerFoot = measure.pixelsPerFoot;
   const bounds: Bounds = { width: measure.width, height: measure.height };
-  const walls = vision.walls.filter(blocksSight).map(segmentOf);
+  const walls = vision.walls.filter(blocksSight).flatMap(segmentsOf);
   const wallKey = wallsKey(vision.walls);
   const tokens = new Map(
     state.combat.tokens.flatMap((token) => (token.position ? [[token.actorId, token] as const] : []))

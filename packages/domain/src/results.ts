@@ -879,6 +879,16 @@ export type ScenePreviewReply = Omit<Wire<z.infer<typeof ScenePreviewReplySchema
 export type ScenePreviewResult = { ok: boolean; message?: string } & Partial<ScenePreviewReply>;
 export type WallAddResult = MutationResult & { wallIds?: readonly string[] };
 export type LightAddResult = MutationResult & { lightId?: string };
+/** What working on a door came to: the line the table reads, and whether the door came open. */
+export type DoorUseResult = MutationResult & { text?: string; opened?: boolean };
+/** An attack on an object: hit or miss, and whether it broke. A player is told neither the object's Armor Class nor
+ *  the Hit Points it has left. */
+export type ObjectAttackResult = MutationResult & {
+  outcome?: "hit" | "crit" | "miss";
+  total?: number;
+  damage?: number;
+  destroyed?: boolean;
+};
 
 /** What `character:draft` answers: the caller's parked build and when it was last saved, or null for none. */
 export const CharacterDraftReplySchema = z.strictObject({

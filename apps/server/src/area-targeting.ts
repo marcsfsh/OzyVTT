@@ -1,6 +1,6 @@
 import type { AnnotationPoint, AnnotationShapeKind, GameState } from "@vtt/domain";
 import { clearLine } from "./vision/geometry.js";
-import { segmentOf } from "./vision/sight.js";
+import { segmentsOf } from "./vision/sight.js";
 import { gridToImage, imageToGrid, type GridPoint, type SquareGridCalibration } from "./grid-calibration.js";
 
 const EPSILON = 1e-6;
@@ -106,7 +106,7 @@ function blockedFromOrigin(
 ): (cell: GridPoint) => boolean {
   const vision = state.combat.vision;
   if (!vision?.enabled || vision.walls.length === 0) return () => true;
-  const obstacles = vision.walls.filter((wall) => wall.kind !== "door" || wall.open !== true).map(segmentOf);
+  const obstacles = vision.walls.filter((wall) => wall.kind !== "door" || wall.open !== true).flatMap(segmentsOf);
   const origin =
     shape === "square"
       ? { x: (geometry.origin.x + geometry.target.x) / 2, y: (geometry.origin.y + geometry.target.y) / 2 }

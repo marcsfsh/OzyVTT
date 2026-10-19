@@ -1,6 +1,6 @@
 import type { Actor, GameState } from "@vtt/domain";
 import { clearLine } from "./vision/geometry.js";
-import { segmentOf } from "./vision/sight.js";
+import { segmentsOf } from "./vision/sight.js";
 
 /** SRD Cover: half and three-quarters raise AC and Dexterity saves; total can't be targeted directly. */
 export type CoverDegree = "half" | "three-quarters" | "total";
@@ -95,7 +95,7 @@ export function mapCover(state: GameState, fromActorId: string, targetId: string
   const target = tokens.find((token) => token.actorId === targetId && token.position !== null);
   const source = tokens.find((token) => token.actorId === fromActorId && token.position !== null);
   if (!target || (!source && !origin)) return null;
-  const obstacles = vision.walls.filter((wall) => wall.kind !== "door" || wall.open !== true).map(segmentOf);
+  const obstacles = vision.walls.filter((wall) => wall.kind !== "door" || wall.open !== true).flatMap(segmentsOf);
   const space = spaceOf(target);
   const targetCorners = cornersOf(space.at, space.half);
   const from = origin ? [origin] : cornersOf(spaceOf(source!).at, spaceOf(source!).half);

@@ -20,6 +20,7 @@ import { saveCommands } from "./saves.js";
 import { sceneCommands } from "./scenes.js";
 import { soundCommands } from "./sound.js";
 import { tableSettingCommands } from "./table-settings.js";
+import { objectCommands } from "./objects.js";
 import { visionCommands } from "./vision.js";
 
 export { describeFailure, failureReply, NOT_JOINED_REPLY, SESSION_ENDED_REPLY } from "./failures.js";
@@ -46,7 +47,8 @@ export const gameCommands: readonly AnyCommand[] = [
   ...sceneCommands,
   ...mapCommands,
   ...soundCommands,
-  ...visionCommands
+  ...visionCommands,
+  ...objectCommands
 ];
 export { gameReads };
 

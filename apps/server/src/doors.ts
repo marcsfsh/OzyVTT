@@ -1,0 +1,390 @@
+import type { DoorFastening, DoorState, GameState, RollVisibility, VisionWall } from "@vtt/domain";
+import type { RandomSource } from "@vtt/rules-5e";
+import { catalogIdOf, type ActorDefinition, type InventoryItem } from "@vtt/schemas";
+import { checkPlan, type CheckNames, type CheckPlan } from "./ability-checks.js";
+import { GameAccessDeniedError, requireActorAccess, type Initiator } from "./authorization.js";
+import { rollSettledCheck } from "./check-rolls.js";
+import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
+import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
+import { clockMinutesOf } from "./game-time.js";
+import { effectiveModeFor, overrideCovers } from "./rules-families.js";
+import { doorWithinReach } from "./vision/edit.js";
+
+/**
+ * Doors that stay shut (SRD 5.2.1 Lock, Thieves' Tools, Ram Portable, Spikes Iron, Knock, Arcane Lock): a closed door
+ * may be locked, stuck, barred, jammed with a spike or sealed by Stone Shape, and may hold an Arcane Lock. A creature
+ * opens it only when nothing holds it shut against that creature: a lock's key holder, and the creatures an Arcane Lock
+ * names, pass. Thieves' Tools pick a lock, a Strength (Athletics) check forces the rest, and an Iron Spike jams a door.
+ * The server keeps every fastening; a player learns of one by trying the door.
+ */
+
+type Actor = GameState["actors"][number];
+
+/** SRD Lock: "pick this Lock with a successful DC 15 Dexterity (Sleight of Hand) check". */
+export const LOCK_DC = 15;
+/** A stuck, barred or jammed door is forced at this DC unless the GM sets another. */
+export const FORCE_DC = 15;
+/** SRD Ram, Portable: "you gain a +4 bonus to the Strength check". */
+const RAM_BONUS = 4;
+/** SRD Knock: an Arcane Lock "is suppressed for 10 minutes". */
+const KNOCK_MINUTES = 10;
+
+const THIEVES_TOOLS = "thieves-tools";
+const PORTABLE_RAM = "portable-ram";
+const IRON_SPIKES = "iron-spikes";
+/** Spikes come in bundles of ten. */
+const SPIKES_PER_BUNDLE = 10;
+
+const SHUT: Readonly<Record<DoorFastening["kind"], string>> = {
+  lock: "The door is locked.",
+  stuck: "The door is stuck.",
+  barred: "The door is barred.",
+  jammed: "The door is jammed shut.",
+  sealed: "The door is sealed shut."
+};
+
+/** Whether Knock still holds an Arcane Lock off: through its round in this fight, or its minute on the game clock. */
+export function arcaneLockSuppressed(state: GameState, lock: NonNullable<DoorState["arcaneLock"]>): boolean {
+  const suppressed = lock.suppressed;
+  if (!suppressed) return false;
+  if (suppressed.untilRound !== undefined && state.combat.active && state.combat.round <= suppressed.untilRound)
+    return true;
+  return suppressed.untilMinute !== undefined && clockMinutesOf(state) < suppressed.untilMinute;
+}
+
+/** Whether an Arcane Lock keeps the door shut against this creature: it holds, and the creature isn't its caster or
+ *  one it names. */
+function arcaneLockBars(state: GameState, door: DoorState, openerId: string | null): boolean {
+  const lock = door.arcaneLock;
+  if (!lock || arcaneLockSuppressed(state, lock)) return false;
+  return openerId === null || (openerId !== lock.casterId && !lock.allowedIds.includes(openerId));
+}
+
+/** The fastenings that keep the door shut against this creature: all but a lock whose key it holds. */
+function fasteningsAgainst(door: DoorState, openerId: string | null): DoorFastening[] {
+  return door.fastenings.filter(
+    (fastening) => !(fastening.kind === "lock" && openerId !== null && fastening.keyHolderIds?.includes(openerId))
+  );
+}
+
+/** Why the door won't open for this creature (null: it opens). With no creature, why it won't open for anyone without
+ *  a key. */
+export function heldShutAgainst(state: GameState, wall: VisionWall, openerId: string | null): string | null {
+  const door = wall.door;
+  if (!door) return null;
+  if (arcaneLockBars(state, door, openerId)) return SHUT.lock;
+  const first = fasteningsAgainst(door, openerId)[0];
+  return first ? SHUT[first.kind] : null;
+}
+
+/** A secret door: players see it as wall until the GM reveals it. */
+export const isHiddenDoor = (wall: VisionWall) => wall.kind === "door" && wall.door?.hidden === true;
+
+function requireDoor(state: GameState, wallId: string): VisionWall {
+  const wall = state.combat.vision.walls.find((candidate) => candidate.id === wallId);
+  if (!wall || wall.kind !== "door") throw new CommandRejectedError("That door is no longer there.");
+  return wall;
+}
+
+function writeDoor(state: GameState, wallId: string, change: (wall: VisionWall) => VisionWall): void {
+  state.combat = {
+    ...state.combat,
+    vision: {
+      ...state.combat.vision,
+      walls: state.combat.vision.walls.map((wall) => (wall.id === wallId ? change(wall) : wall))
+    }
+  };
+}
+
+/** A door's state as the GM sets it: what holds it shut, an Arcane Lock, and whether it is a secret door. */
+export function setDoorState(state: GameState, wallId: string, door: DoorState | null): void {
+  requireDoor(state, wallId);
+  writeDoor(state, wallId, (wall) => {
+    const next: VisionWall = { ...wall };
+    if (door === null || (door.fastenings.length === 0 && !door.arcaneLock && !door.hidden)) delete next.door;
+    else next.door = door;
+    return next;
+  });
+}
+
+/** Spends the creature's Action when it is its turn in a fight (the Utilize action); a player may not do this off its
+ *  turn, and strict rules refuse a second Action. */
+function spendAction(state: GameState, actor: Actor, initiator: Initiator, what: string): void {
+  const combat = state.combat;
+  if (!combat.active || !combat.initiative.some((entry) => entry.actorId === actor.id)) return;
+  if (combat.turnActorId !== actor.id) {
+    if (initiator.role === "player") throw new GameAccessDeniedError(`${what} on ${actor.name}'s turn.`);
+    return;
+  }
+  if (combat.turn.actionUsed) {
+    const rule = "economy.action-used" as const;
+    if (
+      initiator.role === "player" &&
+      effectiveModeFor(combat, rule) === "strict" &&
+      !overrideCovers(combat.turn, rule)
+    )
+      throw new RulesBlockedError(rule, `${actor.name} has already used an Action this turn.`);
+    return;
+  }
+  state.combat = { ...combat, turn: { ...combat.turn, actionUsed: true } };
+}
+
+const carried = (actor: Actor, id: string) =>
+  actor.inventory.find((row) => row.quantity > 0 && catalogIdOf(row) === id);
+
+export type DoorUse = "pick" | "force" | "jam";
+
+export type DoorUseDeps = Readonly<{
+  random: RandomSource;
+  newId: () => string;
+  commandId: string;
+  sessionId: string;
+  now: () => string;
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+  catalog?: EquipmentCatalog;
+  names?: CheckNames;
+}>;
+
+export type DoorUseResult = Readonly<{
+  /** The line the table reads. */
+  text: string;
+  /** The door came open. */
+  opened: boolean;
+  /** The check's total, when one was rolled. */
+  total?: number;
+}>;
+
+/**
+ * A creature next to a door works on it: picks its lock with Thieves' Tools (a Dexterity (Sleight of Hand) check), forces
+ * it (a Strength (Athletics) check, +4 with a Portable Ram and Advantage with a helper on the ram), or jams it shut with
+ * an Iron Spike. Each takes the Utilize action in a fight. A pick or a force that succeeds opens the way: the lock is
+ * unlocked, or every fastening it beat is broken and the door swings open.
+ */
+export function useDoor(
+  state: GameState,
+  input: Readonly<{ wallId: string; actorId: string; how: DoorUse; helperId?: string; visibility: RollVisibility }>,
+  initiator: Initiator,
+  deps: DoorUseDeps
+): DoorUseResult {
+  const actor = state.actors.find((candidate) => candidate.id === input.actorId);
+  if (!actor) throw new CommandRejectedError("That character no longer exists.");
+  requireActorAccess(initiator, state, actor.id, "move", "You can only work on a door with your own character.");
+  const wall = state.combat.vision.walls.find((candidate) => candidate.id === input.wallId);
+  // A secret door and one out of reach answer as a door that isn't there, so trying one gives nothing away.
+  if (!wall || wall.kind !== "door" || (isHiddenDoor(wall) && initiator.role === "player"))
+    throw new GameAccessDeniedError("Move your character next to the door to work on it.");
+  if (!doorWithinReach(state, wall.id, [actor.id]))
+    throw new GameAccessDeniedError("Move your character next to the door to work on it.");
+  if (input.how === "jam") return jamDoor(state, wall, actor, initiator);
+  if (wall.open === true) throw new CommandRejectedError("The door is already open.");
+  const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
+  return input.how === "pick"
+    ? pickLock(state, wall, actor, definition, input.visibility, initiator, deps)
+    : forceDoor(state, wall, actor, definition, input, initiator, deps);
+}
+
+function rollFor(
+  state: GameState,
+  actor: Actor,
+  plan: CheckPlan,
+  label: string,
+  visibility: RollVisibility,
+  initiator: Initiator,
+  deps: DoorUseDeps
+) {
+  return rollSettledCheck(
+    state,
+    actor,
+    plan,
+    {
+      id: deps.newId(),
+      commandId: deps.commandId,
+      sessionId: deps.sessionId,
+      role: initiator.role,
+      label,
+      visibility: actor.visibility === "public" ? visibility : "gm-only",
+      createdAt: deps.now()
+    },
+    deps.random
+  );
+}
+
+function pickLock(
+  state: GameState,
+  wall: VisionWall,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  visibility: RollVisibility,
+  initiator: Initiator,
+  deps: DoorUseDeps
+): DoorUseResult {
+  const tools = carried(actor, THIEVES_TOOLS);
+  if (!tools) throw new CommandRejectedError(`${actor.name} needs Thieves' Tools to pick a lock.`);
+  const door = wall.door;
+  const lock = door ? fasteningsAgainst(door, actor.id).find((fastening) => fastening.kind === "lock") : undefined;
+  // SRD Arcane Lock: "This lock can't be unlocked by any nonmagical means."
+  if (!lock && door && arcaneLockBars(state, door, actor.id))
+    throw new CommandRejectedError("The lock doesn't yield to Thieves' Tools.");
+  if (!lock) throw new CommandRejectedError("There is no lock to pick on this door.");
+  spendAction(state, actor, initiator, "Pick the lock");
+  const plan = checkPlan(
+    actor,
+    definition,
+    deriveEquipment(actor, definition, deps.catalog),
+    { ability: "dex", skill: "sleight-of-hand", tool: THIEVES_TOOLS },
+    deps.names ? { names: deps.names } : {}
+  );
+  const dc = lock.dc ?? LOCK_DC;
+  const roll = rollFor(state, actor, plan, "Pick a lock", visibility, initiator, deps);
+  if (roll.total < dc) return { text: `${actor.name} fails to pick the lock.`, opened: false, total: roll.total };
+  writeDoor(state, wall.id, (current) => withoutFastenings(current, [lock]));
+  return { text: `${actor.name} picks the lock.`, opened: false, total: roll.total };
+}
+
+function forceDoor(
+  state: GameState,
+  wall: VisionWall,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  input: Readonly<{ helperId?: string; visibility: RollVisibility }>,
+  initiator: Initiator,
+  deps: DoorUseDeps
+): DoorUseResult {
+  const door = wall.door;
+  if (door?.fastenings.some((fastening) => fastening.kind === "sealed"))
+    throw new CommandRejectedError("The door is sealed shut. Break it down or shape the stone again.");
+  if (door && arcaneLockBars(state, door, actor.id))
+    throw new CommandRejectedError("The door won't move: magic holds it shut. Break it down or dispel the magic.");
+  const holding = door ? fasteningsAgainst(door, actor.id) : [];
+  // A lock with no force DC is picked or broken, never forced with a check.
+  const unforceable = holding.find((fastening) => fastening.kind === "lock" && fastening.forceDc === undefined);
+  if (unforceable) throw new CommandRejectedError("The door is locked. Pick the lock or break the door down.");
+  const ram = carried(actor, PORTABLE_RAM);
+  const helper =
+    ram && input.helperId !== undefined && input.helperId !== actor.id
+      ? state.actors.find((candidate) => candidate.id === input.helperId)
+      : undefined;
+  if (input.helperId !== undefined && !helper)
+    throw new CommandRejectedError("Only another character can help, and only with a Portable Ram.");
+  if (helper && !doorWithinReach(state, wall.id, [helper.id]))
+    throw new CommandRejectedError(`${helper.name} must be next to the door to help with the ram.`);
+  spendAction(state, actor, initiator, "Force the door");
+  const base = checkPlan(
+    actor,
+    definition,
+    deriveEquipment(actor, definition, deps.catalog),
+    { ability: "str", skill: "athletics" },
+    deps.names ? { names: deps.names } : {}
+  );
+  const plan: CheckPlan = {
+    ...base,
+    modifier: base.modifier + (ram ? RAM_BONUS : 0),
+    rollMode: helper
+      ? {
+          mode: base.rollMode.disadvantage.length > 0 ? "normal" : "advantage",
+          advantage: [...base.rollMode.advantage, `${helper.name} helps with the ram`],
+          disadvantage: base.rollMode.disadvantage
+        }
+      : base.rollMode
+  };
+  const label = ram ? "Break down a door with a ram" : "Force a door";
+  const roll = rollFor(state, actor, plan, label, input.visibility, initiator, deps);
+  const dc = Math.max(0, ...holding.map(forceDcOf));
+  if (holding.length > 0 && roll.total < dc)
+    return { text: `${actor.name} fails to force the door.`, opened: false, total: roll.total };
+  writeDoor(state, wall.id, (current) => ({ ...withoutFastenings(current, holding), open: true }));
+  return { text: `${actor.name} forces the door open.`, opened: true, total: roll.total };
+}
+
+/** SRD Spikes, Iron: "As a Utilize action, you can use a blunt object ... to hammer a spike into wood ... to jam a door
+ *  shut." The door must be closed; one spike of the bundle is used. */
+function jamDoor(state: GameState, wall: VisionWall, actor: Actor, initiator: Initiator): DoorUseResult {
+  if (wall.open === true) throw new CommandRejectedError("Close the door before jamming it.");
+  const spikes = carried(actor, IRON_SPIKES);
+  if (!spikes) throw new CommandRejectedError(`${actor.name} needs Iron Spikes to jam a door.`);
+  spendAction(state, actor, initiator, "Jam the door");
+  useOneSpike(actor, spikes);
+  writeDoor(state, wall.id, (current) => ({
+    ...current,
+    door: {
+      ...(current.door ?? { fastenings: [] }),
+      fastenings: [...(current.door?.fastenings ?? []), { kind: "jammed" as const, dc: FORCE_DC }].slice(-6)
+    }
+  }));
+  return { text: `${actor.name} jams the door shut with an iron spike.`, opened: false };
+}
+
+/** Takes one spike from a bundle row, counting what is left as a bundle of ammunition counts its pieces. */
+function useOneSpike(actor: Actor, row: InventoryItem): void {
+  const left = (row.ammunitionLeft ?? row.quantity * SPIKES_PER_BUNDLE) - 1;
+  const quantity = Math.ceil(Math.max(0, left) / SPIKES_PER_BUNDLE);
+  actor.inventory = actor.inventory.flatMap((candidate) => {
+    if (candidate !== row) return [candidate];
+    if (left <= 0) return [];
+    const next: InventoryItem = { ...candidate, quantity };
+    if (left === quantity * SPIKES_PER_BUNDLE) delete next.ammunitionLeft;
+    else next.ammunitionLeft = left;
+    return [next];
+  });
+}
+
+/** The Strength (Athletics) check that forces a fastening: a lock's `forceDc`, the others' own DC. */
+const forceDcOf = (fastening: DoorFastening) =>
+  fastening.kind === "lock" ? (fastening.forceDc ?? 0) : (fastening.dc ?? FORCE_DC);
+
+function withoutFastenings(wall: VisionWall, gone: readonly DoorFastening[]): VisionWall {
+  const door = wall.door;
+  if (!door) return wall;
+  return { ...wall, door: { ...door, fastenings: door.fastenings.filter((fastening) => !gone.includes(fastening)) } };
+}
+
+/**
+ * SRD Knock: "A target that is held shut by a mundane lock or that is stuck or barred becomes unlocked, unstuck, or
+ * unbarred. If the object has multiple locks, only one of them is unlocked. If the target is held shut by Arcane Lock,
+ * that spell is suppressed for 10 minutes." A sealed door isn't held by any of these, so it stays shut. Returns the line
+ * the table reads.
+ */
+export function knockOn(state: GameState, wallId: string): string {
+  const wall = requireDoor(state, wallId);
+  const door = wall.door;
+  const opened = door?.fastenings.find((fastening) => fastening.kind !== "sealed");
+  const lock = door?.arcaneLock;
+  const minute = clockMinutesOf(state) + KNOCK_MINUTES;
+  writeDoor(state, wallId, (current) => {
+    const now = current.door;
+    if (!now) return current;
+    return {
+      ...current,
+      door: {
+        ...now,
+        fastenings: now.fastenings.filter((fastening) => fastening !== opened),
+        ...(lock
+          ? {
+              arcaneLock: {
+                ...lock,
+                suppressed: {
+                  ...(state.combat.active ? { untilRound: state.combat.round + KNOCK_MINUTES * 10 - 1 } : {}),
+                  untilMinute: minute
+                }
+              }
+            }
+          : {})
+      }
+    };
+  });
+  return "A loud knock sounds from the door.";
+}
+
+/** SRD Arcane Lock: the touched closed door "is locked for the duration", and only the caster and the creatures it
+ *  designates open it. */
+export function arcaneLock(state: GameState, wallId: string, casterId: string, allowedIds: readonly string[]): void {
+  const wall = requireDoor(state, wallId);
+  if (wall.open === true) throw new CommandRejectedError("Arcane Lock takes a closed door. Close it first.");
+  writeDoor(state, wallId, (current) => ({
+    ...current,
+    door: {
+      ...(current.door ?? { fastenings: [] }),
+      arcaneLock: { casterId, allowedIds: [...new Set(allowedIds)].slice(0, 20) }
+    }
+  }));
+}

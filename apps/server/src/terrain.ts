@@ -24,7 +24,7 @@ import { mapDistance } from "./movement-narration.js";
 import { revealedRegion } from "./fog.js";
 import { intersectRegions, subtractRect, unionRect, type Rect } from "./rect-region.js";
 import type { TokenMapGeometry } from "./token-placement.js";
-import { blocksMovement } from "./vision/sight.js";
+import { blocksMovement, wallPieces } from "./vision/sight.js";
 
 /** Difficult terrain (SRD 5.2.1): the GM paints it per scene; entering a cell whose centre lies in it costs
  *  double. Stored as disjoint rects, so marking an area twice costs nothing and clearing can cut any shape. */
@@ -115,7 +115,8 @@ export function movementWalls(state: GameState, calibration: NonNullable<TokenMa
   if (!vision.enabled) return [];
   return vision.walls
     .filter(blocksMovement)
-    .map((wall) => ({ a: imageToGrid(calibration, wall.a), b: imageToGrid(calibration, wall.b) }));
+    .flatMap(wallPieces)
+    .map((piece) => ({ a: imageToGrid(calibration, piece.a), b: imageToGrid(calibration, piece.b) }));
 }
 
 /**
@@ -262,7 +263,8 @@ function straightThroughWall(state: GameState, from: Point, to: Point): boolean 
   const grid = (point: Point) => ({ column: point.x, row: point.y });
   return vision.walls
     .filter(blocksMovement)
-    .some((wall) => segmentsMeet(grid(from), grid(to), grid(wall.a), grid(wall.b)));
+    .flatMap(wallPieces)
+    .some((piece) => segmentsMeet(grid(from), grid(to), grid(piece.a), grid(piece.b)));
 }
 
 /** Points along a straight move, every 2.5 feet or so, start and end included. */
