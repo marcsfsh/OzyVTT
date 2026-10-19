@@ -39,12 +39,12 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | Backgrounds (4) | 4 | 0 | 0 |
 | Feats (19) | 15 | 4 | 0 |
 | Magic items (270) | 71 | 132 | 67 |
-| Gear and tools (141) | 22 | 37 | 82 |
+| Gear and tools (141) | 28 | 37 | 76 |
 | Weapons (38) | 38 | 0 | 0 |
 | Armor (13) | 13 | 0 | 0 |
 | Conditions (15) | 13 | 2 | 0 |
 | Rules glossary (155) | 109 | 13 | 33 |
-| All records (2423) | 1645 | 453 | 325 |
+| All records (2423) | 1651 | 453 | 319 |
 
 ## How records are classified
 
@@ -644,17 +644,23 @@ Notes on the curated rows:
 
 ## Gear and tools
 
-**Enforced (22):** Acid (vial) · Alchemist's Fire (flask) · Antitoxin (vial) · Arrows (20) · Blowgun Needles (50) · Candle · Crossbow Bolts (20) · Firearm Bullets (10) · Healer's Kit · Holy Water (flask) · Lamp · Lantern, Bullseye · Lantern, Hooded · Net · Oil (flask) · Poison, Basic (vial) · Potion of Healing · Sling Bullets (20) · Spell Scroll (Cantrip) · Spell Scroll (Level 1) · Tinderbox · Torch
+**Enforced (28):** Acid (vial) · Alchemist's Fire (flask) · Antitoxin (vial) · Arrows (20) · Blowgun Needles (50) · Book · Candle · Costume · Crossbow Bolts (20) · Crowbar · Firearm Bullets (10) · Healer's Kit · Holy Water (flask) · Lamp · Lantern, Bullseye · Lantern, Hooded · Magnifying Glass · Map · Net · Oil (flask) · Poison, Basic (vial) · Pole (10-foot) · Potion of Healing · Sling Bullets (20) · Spell Scroll (Cantrip) · Spell Scroll (Level 1) · Tinderbox · Torch
 
 **Guided (37):** Alchemist's Supplies · Brewer's Supplies · Calligrapher's Supplies · Carpenter's Tools · Cartographer's Tools · Cobbler's Tools · Cook's Utensils · Disguise Kit · Forgery Kit · Gaming Set (Dice) · Gaming Set (Dragonchess) · Gaming Set (Playing Cards) · Gaming Set (Three-Dragon Ante) · Glassblower's Tools · Herbalism Kit · Jeweler's Tools · Leatherworker's Tools · Mason's Tools · Musical Instrument (Bagpipes) · Musical Instrument (Drum) · Musical Instrument (Dulcimer) · Musical Instrument (Flute) · Musical Instrument (Horn) · Musical Instrument (Lute) · Musical Instrument (Lyre) · Musical Instrument (Pan Flute) · Musical Instrument (Shawm) · Musical Instrument (Viol) · Navigator's Tools · Painter's Supplies · Poisoner's Kit · Potter's Tools · Smith's Tools · Thieves' Tools · Tinker's Tools · Weaver's Tools · Woodcarver's Tools
 
-**Reference (82):** Arcane Focus (Crystal) · Arcane Focus (Orb) · Arcane Focus (Rod) · Arcane Focus (Staff) · Arcane Focus (Wand) · Backpack · Ball Bearings (bag of 1,000) · Barrel · Basket · Bedroll · Bell · Blanket · Block and Tackle · Book · Bottle, Glass · Bucket · Burglar's Pack · Caltrops (bag of 20) · Case, Crossbow Bolt · Case, Map or Scroll · Chain (10 feet) · Chalk (1 piece) · Chest · Climber's Kit · Clothes, Fine · Clothes, Traveler's · Component Pouch · Costume · Crowbar · Diplomat's Pack · Druidic Focus (Sprig of Mistletoe) · Druidic Focus (Totem) · Druidic Focus (Wooden Staff) · Druidic Focus (Yew Wand) · Dungeoneer's Pack · Entertainer's Pack · Explorer's Pack · Flask or Tankard · Grappling Hook · Hammer · Holy Symbol (Amulet) · Holy Symbol (Emblem) · Holy Symbol (Reliquary) · Hunting Trap · Ink (1-ounce bottle) · Ink Pen · Jug or Pitcher · Ladder (10-foot) · Lock · Magnifying Glass · Manacles · Map · Mess Kit · Mirror, Steel · Paper (one sheet) · Parchment (one sheet) · Perfume (vial) · Pole (10-foot) · Pot, Iron · Pouch · Priest's Pack · Quiver · Ram, Portable · Rations (1 day) · Robe · Rope (50 feet) · Sack · Scale, Merchant's · Scholar's Pack · Sealing Wax · Shovel · Signal Whistle · Signet Ring · Soap · Spellbook · Spikes, Iron (10) · Spyglass · String (10 feet) · Tent, Two-Person · Vial · Waterskin · Whetstone
+**Reference (76):** Arcane Focus (Crystal) · Arcane Focus (Orb) · Arcane Focus (Rod) · Arcane Focus (Staff) · Arcane Focus (Wand) · Backpack · Ball Bearings (bag of 1,000) · Barrel · Basket · Bedroll · Bell · Blanket · Block and Tackle · Bottle, Glass · Bucket · Burglar's Pack · Caltrops (bag of 20) · Case, Crossbow Bolt · Case, Map or Scroll · Chain (10 feet) · Chalk (1 piece) · Chest · Climber's Kit · Clothes, Fine · Clothes, Traveler's · Component Pouch · Diplomat's Pack · Druidic Focus (Sprig of Mistletoe) · Druidic Focus (Totem) · Druidic Focus (Wooden Staff) · Druidic Focus (Yew Wand) · Dungeoneer's Pack · Entertainer's Pack · Explorer's Pack · Flask or Tankard · Grappling Hook · Hammer · Holy Symbol (Amulet) · Holy Symbol (Emblem) · Holy Symbol (Reliquary) · Hunting Trap · Ink (1-ounce bottle) · Ink Pen · Jug or Pitcher · Ladder (10-foot) · Lock · Manacles · Mess Kit · Mirror, Steel · Paper (one sheet) · Parchment (one sheet) · Perfume (vial) · Pot, Iron · Pouch · Priest's Pack · Quiver · Ram, Portable · Rations (1 day) · Robe · Rope (50 feet) · Sack · Scale, Merchant's · Scholar's Pack · Sealing Wax · Shovel · Signal Whistle · Signet Ring · Soap · Spellbook · Spikes, Iron (10) · Spyglass · String (10 feet) · Tent, Two-Person · Vial · Waterskin · Whetstone
 
 Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
+| Book | enforced | While it is equipped, the sheet offers "consulting an accurate Book about its topic" beside the checks (check-situations.ts), and an Intelligence (Arcana, History, Nature or Religion) check that names it gains +5 (ability-checks.ts). Whether the Book is accurate and on topic is the GM's. |
+| Costume | enforced | While it is worn (equipped), the sheet offers "impersonating whom the Costume represents" beside the checks (check-situations.ts), and a check that names it has Advantage (ability-checks.ts). |
+| Crowbar | enforced | While it is equipped, the sheet offers "where the Crowbar's leverage applies" beside the checks (check-situations.ts), and a Strength check that names it has Advantage (ability-checks.ts). Whether its leverage applies is the GM's. |
 | Healer's Kit | enforced | stabilize.ts spends one use of the kit to make a creature at 0 Hit Points Stable with no check, and the last use takes the kit. |
+| Magnifying Glass | enforced | While it is equipped, the sheet offers "appraising or inspecting a highly detailed item" beside the checks (check-situations.ts), and a check that names it has Advantage (ability-checks.ts). Lighting a fire with it is the GM's. |
+| Map | enforced | While it is equipped, the sheet offers "finding the way in the place an accurate Map shows" beside the checks (check-situations.ts), and a Wisdom (Survival) check that names it gains +5 (ability-checks.ts). |
+| Pole (10-foot) | enforced | While it is equipped, the sheet offers "vaulting with the Pole on a High or Long Jump" beside the checks (check-situations.ts), and a Strength (Athletics) check that names it has Advantage (ability-checks.ts). Touching something 10 feet away is the GM's. |
 | Tinderbox | enforced | item-light.ts lights a Candle, Lamp, Lantern or Torch in hand only when its bearer holds a Tinderbox or another flame, spending its Bonus Action in a fight. Lighting any other fire is the GM's. |
 
 ## Weapons
