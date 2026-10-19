@@ -210,6 +210,7 @@ import type {
   VisionSetAmbientSchema,
   VisionAreaAddSchema,
   VisionAreaRemoveSchema,
+  ItemSetFormSchema,
   ItemSetLightSchema,
   VisionSetEnabledSchema,
   WallAddSchema,
@@ -1009,6 +1010,10 @@ export interface ClientToServerEvents {
   ) => void;
   "item:set-light": (
     payload: CommandPayload<typeof ItemSetLightSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "item:set-form": (
+    payload: CommandPayload<typeof ItemSetFormSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "annotation:add": (

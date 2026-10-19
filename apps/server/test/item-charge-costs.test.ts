@@ -105,7 +105,8 @@ describe("the last charge's d20", () => {
 
   it("turns a Staff of the Woodlands into a Quarterstaff on a 1", () => {
     const table = tableOf({ [IDS.wizard]: wizardInput() });
-    write(table, IDS.wizard, catalogRow("staff-of-the-woodlands", { attuned: true }));
+    // A Druid's staff: the GM hands it to the wizard attuned.
+    write(table, IDS.wizard, catalogRow("staff-of-the-woodlands", { attuned: true }), "gm");
     table.actor(IDS.wizard).actionUses = { "staff-of-the-woodlands-charges": 5 };
     fight(table, IDS.wizard);
     resolveAt(table, IDS.wizard, "item-staff-of-the-woodlands-tree-form", [1], { targetIds: [] });

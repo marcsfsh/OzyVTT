@@ -135,7 +135,7 @@ export function initiativeRollFor(
   if (incapacitated) claims.disadvantage.push({ source: "incapacitated", label: conditionLabel(incapacitated) });
   const penalty = exhaustionPenalty(actor);
   // A bonus to ability checks reaches a Dexterity check (a Stone of Good Luck's +1), which Initiative is.
-  const checkBonus = checkRiderBonus(derivation, { ability: "dex" });
+  const checkBonus = checkRiderBonus(derivation, { ability: "dex" }, definition?.abilityScores);
   const reasons = [...claims.advantage, ...claims.disadvantage].map((claim) => claim.label);
   if (penalty !== 0) reasons.push(`Exhaustion ${penalty}`);
   return { mode: aggregateRollMode(claims.advantage, claims.disadvantage).mode, penalty, checkBonus, reasons };

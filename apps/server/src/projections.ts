@@ -750,10 +750,16 @@ const PARTY_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filte
 
 /** Copies the listed fields. Optional ones that are unset are left out. */
 /** A carried row for a player. The GM's pick of a resistance type stays the GM's until the bearer attunes, when
- *  the item's properties are learned (and the resistance starts to apply). */
+ *  the item's properties are learned (and the resistance starts to apply); so does which kind an item that needs
+ *  attunement is (an Ioun Stone's). */
 function playerInventoryRow(item: Actor["inventory"][number]): Actor["inventory"][number] {
-  const { chosenDamageType, ...row } = item;
-  return chosenDamageType !== undefined && item.attuned ? { ...row, chosenDamageType } : row;
+  const { chosenDamageType, variantId, ...row } = item;
+  const learned = item.attuned || item.magic?.attunementRequired !== true;
+  return {
+    ...row,
+    ...(chosenDamageType !== undefined && item.attuned ? { chosenDamageType } : {}),
+    ...(variantId !== undefined && learned ? { variantId } : {})
+  };
 }
 
 function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): Pick<Actor, K> {

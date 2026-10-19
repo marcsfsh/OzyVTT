@@ -440,11 +440,11 @@ function armorBaseIds(entry: Entry, qualifier: string): readonly string[] {
 }
 
 /**
- * Rows not bound even though they name a base: the SRD prints them as more than their base (Sun
- * Blade's radiant blade, Energy Bow's force damage), and a bare-base bind would derive a wrong attack.
- * The Sun Blade carries its own block instead (`WIELDED_AS`); the Energy Bow stays unbound.
+ * Rows not bound even though they name a base: the SRD prints the Sun Blade as more than its base (a radiant blade
+ * with Finesse), so it carries its own block instead (`WIELDED_AS`). The Energy Bow binds to its bow, and its
+ * `weaponChanges` make the arrows Force with no ammunition.
  */
-const RESERVED_UNBINDABLE = new Set(["sun-blade", "energy-bow"]);
+const RESERVED_UNBINDABLE = new Set(["sun-blade"]);
 
 /**
  * Weapon, body-armor and ammunition rows get the column; everything else gets null. A magic shield

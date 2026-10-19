@@ -126,7 +126,7 @@ const CARRIED_ROWS = loadMagicItems().filter(
     ((row.category === "wondrous-item" && row.slot === "wondrous") || row.category === "consumable") &&
     row.id !== "spell-scroll"
 );
-/** "Carries a rider" over all nine keys `overlay.ts`'s `ITEM_RIDER_KEYS` admits, `tags` included. */
+/** "Carries a rider" over the keys `overlay.ts`'s `ITEM_RIDER_KEYS` admits that act, `tags` and kinds included. */
 const carries = (row: {
   tags?: unknown[];
   modifiers: unknown[];
@@ -137,6 +137,7 @@ const carries = (row: {
   grantsFeatIds: unknown[];
   uses?: unknown;
   cursed: boolean;
+  variants?: unknown[];
 }) =>
   (row.tags ?? []).length > 0 ||
   row.modifiers.length > 0 ||
@@ -146,7 +147,8 @@ const carries = (row: {
   row.grants !== undefined ||
   row.grantsFeatIds.length > 0 ||
   row.uses !== undefined ||
-  row.cursed;
+  row.cursed ||
+  (row.variants ?? []).length > 0;
 
 describe("the Pipes of Haunting spend a charge, refuse the fourth press, and force a real save", () => {
   it("carries the authored action out of the COMMITTED bundle, through the real content library", () => {
@@ -410,34 +412,54 @@ describe("the Stone of Good Luck: both halves reach the roll", () => {
 });
 
 describe("what the carried items' buttons do outside an encounter", () => {
-  it("leaves them to the loose route, which uses each and spends its charges", () => {
-    // Their printed uses (scrying, messaging, Truesight) are not combat activities: the structured resolver
-    // refuses them, and the loose `action.use` route uses them with nothing to roll, charge by charge.
+  it("casts an item's spell or puts its effect on its user, and leaves a save with no fight to the loose route", () => {
     const definition = definitionOf();
+    // A cast resolves outside a fight as a creature's own does, and spends its charge.
     for (const [id, name, actionId] of [
-      ["crystal-ball", "Crystal Ball", "item-crystal-ball-cast-scrying"],
       ["sending-stones", "Sending Stones", "item-sending-stones-cast-sending"],
-      ["gem-of-seeing", "Gem of Seeing", "item-gem-of-seeing-peer"],
-      ["pipes-of-haunting", "Pipes of Haunting", "item-pipes-of-haunting-play"]
+      ["gem-of-seeing", "Gem of Seeing", "item-gem-of-seeing-peer"]
     ] as const) {
       const state = stateWith([carried(id, name)]); // no `fight()`
       const action = effectiveActions(definition, state.actors[0], catalog).find((entry) => entry.id === actionId)!;
       expect(action, `${id} - the button is on the sheet`).toBeDefined();
-      expect(() =>
-        resolveDefinitionAction(
-          state,
-          action,
-          { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(17) },
-          deps([], definition)
-        )
-      ).toThrow("Start an encounter before resolving actions.");
-      expect({ id, plan: looseRollPlan(action, { includeDamage: true }) }).toEqual({ id, plan: [] });
-      if (!action.uses) continue;
-      // Every printed charge, then a refusal.
-      const available = effectiveActions(definition, state.actors[0], catalog);
-      for (let charge = 0; charge < action.uses.limit; charge++) spendLooseUses(state.actors[0], action, available);
-      expect(() => spendLooseUses(state.actors[0], action, available), id).toThrow("no uses remaining");
+      resolveDefinitionAction(
+        state,
+        action,
+        { actorId: IDS.hero, targetIds: [], commandId: cmd(17) },
+        deps([], definition)
+      );
+      expect(state.actors[0].actionUses[action.uses!.pool ?? action.id], `${id} - its charge is spent`).toBe(1);
     }
+    // The Gem of Seeing's Truesight lands on its user.
+    const peered = stateWith([carried("gem-of-seeing", "Gem of Seeing")]);
+    const peer = effectiveActions(definition, peered.actors[0], catalog).find(
+      (entry) => entry.id === "item-gem-of-seeing-peer"
+    )!;
+    resolveDefinitionAction(
+      peered,
+      peer,
+      { actorId: IDS.hero, targetIds: [], commandId: cmd(18) },
+      deps([], definition)
+    );
+    expect(peered.actors[0].effects.map((effect) => effect.name)).toContain("Peering Through the Gem of Seeing");
+
+    // A save its user forces on others has no one to resolve against outside a fight: the loose route spends it.
+    const state = stateWith([carried("pipes-of-haunting", "Pipes of Haunting")]);
+    const action = effectiveActions(definition, state.actors[0], catalog).find(
+      (entry) => entry.id === "item-pipes-of-haunting-play"
+    )!;
+    expect(() =>
+      resolveDefinitionAction(
+        state,
+        action,
+        { actorId: IDS.hero, targetIds: [IDS.foe], commandId: cmd(19) },
+        deps([], definition)
+      )
+    ).toThrow("Start an encounter before resolving actions.");
+    expect(looseRollPlan(action, { includeDamage: true })).toEqual([]);
+    const available = effectiveActions(definition, state.actors[0], catalog);
+    for (let charge = 0; charge < action.uses!.limit; charge++) spendLooseUses(state.actors[0], action, available);
+    expect(() => spendLooseUses(state.actors[0], action, available)).toThrow("no uses remaining");
   });
 
   it("rolls the Iron Bands' attack loose, and spends their one charge a dawn", () => {
@@ -524,7 +546,8 @@ describe("the charged items with no roll of their own, whose counter they enforc
       ["gem-of-seeing", "Gem of Seeing", "item-gem-of-seeing-peer", 3, "Peer Through the Gem"],
       ["pipes-of-the-sewers", "Pipes of the Sewers", "item-pipes-of-the-sewers-call", 3, "Call a Swarm of Rats"]
     ] as const) {
-      const state = fight(stateWith([carried(id, name)]));
+      // A Bag of Tricks is one of three bags: this one the gray.
+      const state = fight(stateWith([carried(id, name, id === "bag-of-tricks" ? { variantId: "gray" } : {})]));
       const actor = state.actors[0];
       const action = effectiveActions(definition, actor, catalog).find((entry) => entry.id === actionId)!;
       expect(action.uses).toEqual({ limit, per: "long-rest", pool: `${id}-charges` });
@@ -703,18 +726,29 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
 // The absences, pinned so none is authored by accident.
 
 describe("what no carried item can carry", () => {
-  it("of the potions and oils, the Potions of Healing, Flying, Gaseous Form, Growth and Diminution act", () => {
-    // A consumed item is sayable (`consumedOnUse`); the rest of the potions and the oils stay prose.
+  it("names the potions and oils that act, and leaves the rest prose", () => {
+    // A consumed item is sayable (`consumedOnUse`), and an hour is game time an effect counts.
     const consumables = CARRIED_ROWS.filter((row) => row.category === "consumable");
     expect(consumables.length).toBeGreaterThan(0);
     expect(consumables.filter(carries).map((row) => row.id)).toEqual([
+      "elixir-of-health",
+      "potion-of-animal-friendship",
+      "potion-of-climbing",
       "potion-of-diminution",
       "potion-of-flying",
       "potion-of-gaseous-form",
+      "potion-of-giant-strength",
       "potion-of-growth",
       "potion-of-healing-greater",
       "potion-of-healing-superior",
-      "potion-of-healing-supreme"
+      "potion-of-healing-supreme",
+      "potion-of-heroism",
+      "potion-of-invisibility",
+      "potion-of-invulnerability",
+      "potion-of-poison",
+      "potion-of-resistance",
+      "potion-of-speed",
+      "potion-of-vitality"
     ]);
   });
 
@@ -729,27 +763,31 @@ describe("what no carried item can carry", () => {
 });
 
 describe("the absences that were measured and must stay absent", () => {
-  it("the briefed far end, Potion of Resistance, carries no rider, because 'for 1 hour' cannot be said", () => {
+  it("gives a Potion of Resistance's hour to its drinker, by the kind the GM says it is, never to its carrier", () => {
     const potion = view.equipmentRecord("potion-of-resistance")!;
     expect(potion.description).toContain("Resistance to one type of damage for 1 hour");
     // An item's `effects` rider would stand while the bottle is merely carried.
     expect(potion.effects).toEqual([]);
-    // ...and nothing else was reached for either.
     expect(potion.grants).toBeUndefined();
-    expect(potion.actions).toEqual([]);
-    expect(potion.casts).toEqual([]);
-    expect(potion.modifiers).toEqual([]);
-    // Its expensive sibling fails the same way and must not be authored either.
+    expect(potion.variants!.map((kind) => kind.id)).toHaveLength(10);
+    const fire = potion.variants!.find((kind) => kind.id === "fire")!;
+    expect(fire.actions[0]!.grants).toMatchObject({
+      duration: { type: "minutes", minutes: 60 },
+      modifiers: [{ type: "damage-resistance", damageTypes: ["fire"] }]
+    });
     const invulnerability = view.equipmentRecord("potion-of-invulnerability")!;
     expect(invulnerability.effects).toEqual([]);
-    expect(invulnerability.grants).toBeUndefined();
+    expect(invulnerability.actions[0]!.grants?.duration).toEqual({ type: "rounds", rounds: 10 });
   });
 
-  it("every row whose printed effect restores or grants hit points is prose, but the Potions of Healing", () => {
-    for (const id of ["potion-of-vitality", "ioun-stone", "dragon-orb", "potion-of-heroism", "bag-of-beans"]) {
+  it("leaves the rows whose hit points come back on the clock or a table prose", () => {
+    // Dragon Orb's healing cast and a Bag of Beans' rolled table; an Ioun Stone of Regeneration's hourly 15 is the GM's.
+    for (const id of ["dragon-orb", "bag-of-beans"]) {
       const row = view.equipmentRecord(id)!;
       expect({ id, carries: carries(row) }).toEqual({ id, carries: false });
     }
+    const regeneration = view.equipmentRecord("ioun-stone")!.variants!.find((kind) => kind.id === "regeneration")!;
+    expect(regeneration.modifiers).toEqual([]);
   });
 
   it("the Bead of Force is used up as it is thrown, and the Horn of Blasting carries no action", () => {
@@ -763,10 +801,9 @@ describe("the absences that were measured and must stay absent", () => {
     expect(carries(horn)).toBe(false);
   });
 
-  it("the seven ability-score refusals stay prose, and so do the reserved rows", () => {
-    // `ability-score` is refused on an item carrier: one potion, three manuals, three tomes.
+  it("the six study books stay prose, and so do the reserved rows", () => {
+    // A manual or tome changes the sheet for good through its study, not a rider.
     for (const id of [
-      "potion-of-giant-strength",
       "manual-of-bodily-health",
       "manual-of-gainful-exercise",
       "manual-of-quickness-of-action",

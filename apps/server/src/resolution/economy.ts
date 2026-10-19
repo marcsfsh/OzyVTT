@@ -4,6 +4,7 @@ import type { GameState } from "@vtt/domain";
 import type { ActorDefinition, CastShaping } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
 import { RIDING_TAG } from "../mounts.js";
+import { animatedRowIds } from "../animated-items.js";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { wardingAura } from "../paladin-auras.js";
 import { areAllies } from "../creature-sides.js";
@@ -697,11 +698,14 @@ function checkHands({ attacker, action, violations }: Evaluation): void {
     item.weapon?.properties?.includes("two-handed") === true ||
     itemActionRest(action.id) === `${item.id}-${TWO_HANDED_SUFFIX}`;
   if (!twoHands) return;
+  // An animated Shield hovers beside its user and fills no hand.
+  const animated = animatedRowIds(attacker);
   const shield = attacker.inventory.find(
     (entry) =>
       entry.equipped &&
       entry.quantity > 0 &&
       entry.armor !== undefined &&
+      !animated.has(entry.id) &&
       effectiveSlot({ slot: entry.magic?.slot, category: entry.category }) === "shield"
   );
   if (shield)

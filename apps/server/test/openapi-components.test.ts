@@ -468,7 +468,10 @@ describe("generated OpenAPI components", () => {
       "sees-other": {},
       "seen-by-other": {},
       "other-lacks-sense": { senses: ["blindsight", "truesight"] },
-      "situation-is": { situation: "consulting an accurate Book about its topic" }
+      "situation-is": { situation: "consulting an accurate Book about its topic" },
+      "weapon-is": { ids: ["longbow", "shortbow"] },
+      "versus-magic": {},
+      "versus-spell": {}
     };
 
     /** One payload per modifier. */
@@ -520,7 +523,16 @@ describe("generated OpenAPI components", () => {
       "healing-received-maximized": {},
       "healing-dice-maximized": {},
       "healing-bonus": { amount: 2, perSlotLevel: true },
-      movement: { rule: "leap", feet: 30, costFeet: 10 }
+      movement: { rule: "leap", feet: 30, costFeet: 10 },
+      "ability-score-minimum": { ability: "str", score: 19 },
+      "speed-minimum": { feet: 30, ignoresArmor: true },
+      "carrying-capacity-larger": {},
+      "ignores-cover": {
+        degree: "half",
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["spell"] }]
+      },
+      "no-critical-hits": {},
+      "base-armor-class": { base: 15 }
     };
 
     it("validates every trigger against the branch its discriminator routes it to", () => {
@@ -610,7 +622,7 @@ describe("generated OpenAPI components", () => {
       expect(() =>
         bundle.EquipmentReferenceSchema.parse({
           ...authored,
-          modifiers: [{ type: "ability-score", ability: "str", amount: 2 }]
+          modifiers: [{ type: "hit-points-per-level", amount: 1 }]
         })
       ).toThrow();
     });

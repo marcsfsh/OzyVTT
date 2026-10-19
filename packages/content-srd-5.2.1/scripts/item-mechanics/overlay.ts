@@ -53,9 +53,14 @@ export type ItemRiderKey =
   | "spellScroll"
   | "onHit"
   | "study"
-  | "light";
+  | "light"
+  | "variants"
+  | "variantChoice"
+  | "weaponChanges"
+  | "bonusActionAttack"
+  | "magicSaveAura";
 
-/** The same eighteen, as a value, so the empty-rider check below iterates the list it is typed against. */
+/** The same twenty-three, as a value, so the empty-rider check below iterates the list it is typed against. */
 const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "tags",
   "actions",
@@ -74,7 +79,12 @@ const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "spellScroll",
   "onHit",
   "study",
-  "light"
+  "light",
+  "variants",
+  "variantChoice",
+  "weaponChanges",
+  "bonusActionAttack",
+  "magicSaveAura"
 ] as const);
 
 /** The riders one magic item may carry. Every key optional: an entry authors only what it names. */
@@ -124,6 +134,12 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
   "healing-received-maximized": "at-its-moment",
   "healing-dice-maximized": "at-its-moment",
   "healing-bonus": "at-its-moment",
+  "ability-score-minimum": "standing",
+  "speed-minimum": "standing",
+  "carrying-capacity-larger": "standing",
+  "ignores-cover": "at-its-moment",
+  "base-armor-class": "standing",
+  "no-critical-hits": "at-its-moment",
   sense: "vision"
 });
 
@@ -387,7 +403,7 @@ export function applyItemMechanics(
     const unknown = Object.keys(entry).filter((key) => !(ITEM_RIDER_KEYS as readonly string[]).includes(key));
     if (unknown.length > 0) {
       refused.push(
-        `${itemId} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The eighteen are: ${ITEM_RIDER_KEYS.join(", ")}`
+        `${itemId} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The twenty-three are: ${ITEM_RIDER_KEYS.join(", ")}`
       );
       continue;
     }
@@ -419,13 +435,17 @@ export function applyItemMechanics(
       continue;
     }
 
-    // The item's own `modifiers`; its `effects[].modifiers` are refused per type by `EffectModifiersSchema`.
-    const unread = parsed.data.modifiers
-      .map((modifier, index) => ({ index, type: modifier.type }))
-      .filter((modifier) => UNREAD_RIDER_TYPES.has(modifier.type));
+    // The item's own `modifiers` and each kind's; `effects[].modifiers` are refused per type by
+    // `EffectModifiersSchema`.
+    const unread = [
+      ...parsed.data.modifiers.map((modifier, index) => ({ path: `modifiers.${index}`, type: modifier.type })),
+      ...(parsed.data.variants ?? []).flatMap((variant, at) =>
+        variant.modifiers.map((modifier, index) => ({ path: `variants.${at}.modifiers.${index}`, type: modifier.type }))
+      )
+    ].filter((modifier) => UNREAD_RIDER_TYPES.has(modifier.type));
     if (unread.length > 0) {
       refused.push(
-        `${itemId} - ${unread.map((modifier) => `modifiers.${modifier.index} is "${modifier.type}"`).join(" and ")}, which CARRIER_RIDER_DISPOSITION (apps/server/src/character-build.ts) marks "unread": the rider reaches derivation and no consumer applies it yet, so it would change nothing at the table. Leave the item prose until a consumer reads it`
+        `${itemId} - ${unread.map((modifier) => `${modifier.path} is "${modifier.type}"`).join(" and ")}, which CARRIER_RIDER_DISPOSITION (apps/server/src/character-build.ts) marks "unread": the rider reaches derivation and no consumer applies it yet, so it would change nothing at the table. Leave the item prose until a consumer reads it`
       );
       continue;
     }

@@ -71,8 +71,11 @@ import {
   type ConditionImmunitySource,
   type EffectNarration
 } from "./effects.js";
+import { areAllies } from "./creature-sides.js";
+import { rowRecord } from "./item-records.js";
 import {
   deriveEquipment,
+  itemIsActive,
   rollModeClaims,
   type EquipmentCatalog,
   type EquipmentDerivation,
@@ -138,7 +141,8 @@ export function saveRollSources(
   derivation: EquipmentDerivation,
   concentration = false,
   stakes: readonly string[] = [],
-  sourceCreatureType: string | null = null
+  sourceCreatureType: string | null = null,
+  against: SaveSource = {}
 ): RollModeClaims {
   const claims: RollModeClaims = { advantage: [], disadvantage: [] };
   if (ability === "dex" && target.conditions.some((condition) => condition.id === "restrained")) {
@@ -152,11 +156,34 @@ export function saveRollSources(
       ability,
       ...(stakes.length > 0 ? { targetConditionIds: stakes } : {}),
       // The creature whose effect forces the save, for a rider against its kind (Protection from Evil and Good).
-      ...(sourceCreatureType !== null ? { sourceCreatureType } : {})
+      ...(sourceCreatureType !== null ? { sourceCreatureType } : {}),
+      // A save against a spell or another magical effect (Spellguard Shield), and against a spell, with its school and
+      // level (Mantle of Spell Resistance).
+      ...(against.magical ? { magicalSource: true } : {}),
+      ...(against.spell
+        ? {
+            spellSource: true,
+            spellId: against.spell.id,
+            spellSchool: against.spell.school,
+            spellLevel: against.spell.level
+          }
+        : {})
     },
     claims
   );
 }
+
+/** What a save is against, for a rider that reads it: magic, and the spell. */
+export type SaveSource = Readonly<{
+  magical?: boolean;
+  spell?: Readonly<{ id: string; school: string; level: number }>;
+}>;
+
+/** What a pending save is against: a spell is magic too. */
+export const saveSourceOf = (pending: Pick<PendingSave, "magical" | "spell">): SaveSource => ({
+  ...(pending.magical === true || pending.spell !== undefined ? { magical: true } : {}),
+  ...(pending.spell ? { spell: pending.spell } : {})
+});
 
 /**
  * A save's total once its riders' floors apply: a d20 under a `d20-minimum` counts as it, and a total under a
@@ -320,6 +347,48 @@ function traitSaveClaims(
   ];
 }
 
+/**
+ * An item's aura of Advantage on saves against magic (SRD Holy Avenger: "You and all creatures Friendly to you in the
+ * Emanation have Advantage on saving throws against spells and other magical effects"), for a save against magic: the
+ * bearer's own, or an ally's within its reach on the map. A bearer hidden from the table gives a visible creature
+ * nothing, which would reveal it.
+ */
+export function magicSaveAuraClaims(
+  state: GameState,
+  target: Actor,
+  against: SaveSource,
+  context: AuraContext
+): Array<{ source: string; label: string }> {
+  if (!against.magical || !context.catalog) return [];
+  const claims: Array<{ source: string; label: string }> = [];
+  let hidden: ((actorId: string) => boolean) | null = null;
+  for (const bearer of state.actors) {
+    if (bearer.archived || bearer.hp.current <= 0) continue;
+    for (const row of bearer.inventory) {
+      const record = rowRecord(context.catalog, row);
+      const aura = record?.magicSaveAura;
+      if (!aura || !itemIsActive(row, record)) continue;
+      if (bearer.id !== target.id) {
+        if (!areAllies(bearer, target, context.resolveDefinition)) continue;
+        hidden ??= tableHiddenCheck(state, context);
+        if (hidden(bearer.id) && !hidden(target.id)) continue;
+        const definition = bearer.definitionId ? context.resolveDefinition(bearer.definitionId) : undefined;
+        const level = aura.widerAt
+          ? (definition?.character?.classes.find((entry) => entry.id === aura.widerAt!.classId)?.level ?? 0)
+          : 0;
+        const feet = aura.widerAt && level >= aura.widerAt.level ? aura.widerAt.feet : aura.feet;
+        const distance = context.distanceFeet?.(bearer.id, target.id) ?? null;
+        if (distance === null || distance > feet + 1e-6) continue;
+      }
+      claims.push({
+        source: "item-aura",
+        label: bearer.id === target.id ? record!.name : `${bearer.name}'s ${record!.name}`
+      });
+    }
+  }
+  return claims;
+}
+
 /** SRD Magic Resistance: "Advantage on saving throws against spells and other magical effects"; Greater Magic
  *  Resistance (the rakshasa's) "automatically succeeds" on them. Read from the stat block's trait by its name. */
 export function magicResistanceOf(definition: ActorDefinition | undefined): "advantage" | "succeeds" | null {
@@ -376,7 +445,9 @@ export function rollSaveAtOnce(
   const derivation = deriveEquipment(actor, definition, deps.catalog);
   const modifier =
     saveTotalFor(definition, actor, ability, derivation) + (auraOfProtection(state, actor, deps)?.amount ?? 0);
-  const sources = saveRollSources(actor, ability, derivation);
+  const sources = saveRollSources(actor, ability, derivation, false, [], null, {
+    ...(deps.magical === true ? { magical: true } : {})
+  });
   if (deps.magical === true && magicResistanceOf(definition) !== null)
     sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
   const rollMode = aggregateRollMode(sources.advantage, sources.disadvantage);
@@ -494,7 +565,7 @@ export function applyFailureEffect(
   const applied = addEffect(state, target.id, failed, events, immunities);
   if (applied.sizeChange) refreshSize(state, target);
   // "It drops whatever it is holding" (Fear), once, as the failure lands.
-  if (onFail.tags.includes(DROPS_HELD_TAG)) events.push(...dropHeldItems(target));
+  if (onFail.tags.includes(DROPS_HELD_TAG)) events.push(...dropHeldItems(target, immunities));
   // "Is suffocating" while engulfed or whelmed: it holds its breath until what smothers it ends.
   if (onFail.tags.includes(SMOTHERING_TAG)) {
     const definition = target.definitionId ? immunities?.resolveDefinition?.(target.definitionId) : undefined;
@@ -773,7 +844,8 @@ export function answerSave(
       derivation,
       pending.endsEffects !== undefined,
       conditionsAtStake(state, pending),
-      sourceCreatureTypeOf(state, pending.sourceActorId, deps.resolveDefinition)
+      sourceCreatureTypeOf(state, pending.sourceActorId, deps.resolveDefinition),
+      saveSourceOf(pending)
     );
     if (magicResistance === "advantage")
       sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
@@ -786,6 +858,7 @@ export function answerSave(
     if (pending.disadvantageFrom)
       sources.disadvantage.push({ source: "disadvantage-from", label: pending.disadvantageFrom });
     sources.advantage.push(...traitSaveClaims(state, target, definition, deps));
+    sources.advantage.push(...magicSaveAuraClaims(state, target, saveSourceOf(pending), deps));
     // Sunlight Weakness: Disadvantage on D20 Tests while it stands in sunlight.
     const sightContent = { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
     for (const name of lightSensitivities(state, target, "save", sightRules(state, sightContent), sightContent))

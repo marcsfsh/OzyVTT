@@ -411,6 +411,30 @@ export const RiderTriggerSchema = z
       .object({ type: z.literal("weapon-property-is"), properties: z.array(RiderSlugSchema).min(1).max(12) })
       .strict()
       .describe("Filter. Narrows to weapons carrying any of these property slugs (finesse, heavy, two-handed)."),
+    /** The attack is made with one of these weapons, by its catalog id or the base a magic weapon is bound to (Bracers
+     *  of Archery: a Longbow or Shortbow). */
+    z
+      .object({ type: z.literal("weapon-is"), ids: z.array(RiderSlugSchema).min(1).max(12) })
+      .strict()
+      .describe(
+        "Filter. Narrows to attacks made with one of these weapons, by the weapon's id or the base a magic weapon is bound to (Bracers of Archery: longbow, shortbow)."
+      ),
+    /** The save is against a spell or another magical effect: a spell, a magic item's property, or what either left
+     *  (Spellguard Shield, Magic Resistance's wording). */
+    z
+      .object({ type: z.literal("versus-magic") })
+      .strict()
+      .describe(
+        "Filter. Narrows a saving throw to one against a spell or another magical effect: a spell, a magic item's property, or what either leaves behind (Spellguard Shield)."
+      ),
+    /** The save is against a spell (Mantle of Spell Resistance); `spell-school-is` and `spell-level-is` then read
+     *  that spell. */
+    z
+      .object({ type: z.literal("versus-spell") })
+      .strict()
+      .describe(
+        "Filter. Narrows a saving throw to one against a spell (Mantle of Spell Resistance). Beside it, `spell-school-is` and `spell-level-is` read that spell's school and level."
+      ),
     z
       .object({ type: z.literal("damage-type-is"), damageTypes: z.array(DamageTypeSchema).min(1).max(12) })
       .strict()
@@ -544,7 +568,7 @@ export const RiderTriggerSchema = z
       )
   ])
   .describe(
-    "When a rider applies. Forty-one named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
+    "When a rider applies. Forty-four named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
   );
 export type RiderTrigger = z.infer<typeof RiderTriggerSchema>;
 export type RiderTriggerKind = "static-gate" | "dynamic-gate" | "moment" | "filter";
@@ -572,6 +596,9 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "on-healing": "moment",
   "attack-kind-is": "filter",
   "weapon-property-is": "filter",
+  "weapon-is": "filter",
+  "versus-magic": "filter",
+  "versus-spell": "filter",
   "damage-type-is": "filter",
   "ability-is": "filter",
   "skill-is": "filter",
@@ -720,7 +747,19 @@ export const ModifierSchema = z
       })
       .strict()
       .describe(
-        "Raise (or lower) one ability score, optionally past the usual cap. Refused on an item: an ability score cascades into AC, saves, skills, spell DC, hit points and initiative, and every one of those reads the baked `abilityScores`, so layering one score means layering the whole sheet."
+        'Raise (or lower) one ability score, optionally past the usual cap. On a feature the builder bakes it into the sheet. On a magic item it is read live while the item is worn, to `maximum` (20 when absent) and never below the score as it was ("Your Dexterity increases by 2, to a maximum of 20"): every rule that reads the score reads the raised one, the Hit Point maximum follows Constitution, and taking the item off gives it back. Refused on an effect.'
+      ),
+    /** "Your Strength is 19 while you wear these gauntlets": the score is at least `score` while its carrier lasts. */
+    z
+      .object({
+        type: z.literal("ability-score-minimum"),
+        ability: AbilitySchema,
+        score: z.number().int().min(1).max(30),
+        ...riderGate
+      })
+      .strict()
+      .describe(
+        'An ability score is at least `score` while it lasts ("Your Strength is 19 while you wear these gauntlets. They have no effect on you if your Strength is already 19 or higher"). Read live from items and effects (a Potion of Giant Strength), after any increase, so every rule that reads the score reads the higher one and it comes back when its carrier ends.'
       ),
     z
       .object({ type: z.literal("hit-points-per-level"), amount: z.number().int().min(-5).max(5), ...riderGate })
@@ -735,6 +774,27 @@ export const ModifierSchema = z
       .strict()
       .describe(
         "Change walking speed in feet, signed (Longstrider +10, the `slow` mastery -10). On a feature it is baked into the sheet's speed when the character is built, unless gated (Unarmored Movement's `while-unarmored`), when it is read with the live loadout; on an item or an effect it is summed live into the movement budget, so the feet come back when the item comes off or the effect ends."
+      ),
+    /** "Your Speed becomes 30 feet unless your Speed is higher": a floor under the bearer's Speed; with `ignoresArmor`,
+     *  Heavy Armor's Strength requirement and a load beyond carrying capacity take nothing from it either (Boots of
+     *  Striding and Springing). */
+    z
+      .object({
+        type: z.literal("speed-minimum"),
+        feet: z.number().int().min(5).max(120),
+        ignoresArmor: z.literal(true).optional(),
+        ...riderGate
+      })
+      .strict()
+      .describe(
+        "The bearer's Speed is at least `feet` while it holds (\"Your Speed becomes 30 feet unless your Speed is higher\"), read live with the movement budget. With `ignoresArmor`, neither armor whose Strength requirement the bearer doesn't meet nor a load beyond its carrying capacity takes Speed from it."
+      ),
+    /** "You count as one size larger when determining your carrying capacity" (Powerful Build). */
+    z
+      .object({ type: z.literal("carrying-capacity-larger"), ...riderGate })
+      .strict()
+      .describe(
+        "The bearer counts as one size larger when its carrying capacity is worked out (Powerful Build: a Medium creature carries Strength x 30 pounds). Read live with what it carries."
       ),
     /** A Fly, Swim, Climb or Burrow Speed: `feet` (Fly's 60, a Ring of Swimming's 40), or with `equalToSpeed` the
      *  creature's Speed as it stands (Spider Climb); `hover` lets a flier hover. Read live by the movement rules from
@@ -780,6 +840,14 @@ export const ModifierSchema = z
       .strict()
       .describe(
         'A flat AC rider, read live from every carrier (a feature or feat as much as an item), so it follows the armor worn now. `whileArmored` is the one bounded condition the SRD\'s printed bonuses need (the Defense fighting style reads "While you\'re wearing Light, Medium, or Heavy armor"); it is a plain boolean with no condition language, and defaults to the unconditional bonus every earlier record meant. `when: [{"type": "while-armored"}]` now says the same thing in the general vocabulary; the boolean stays because shipped bundles author it, and a collector normalises it into that trigger.'
+      ),
+    /** "If you aren't wearing armor, your base Armor Class is 15 plus your Dexterity modifier" (Robe of the Archmagi): a
+     *  way to work out AC while no body armor is worn, a Shield adding, chosen like Unarmored Defense. */
+    z
+      .object({ type: z.literal("base-armor-class"), base: z.number().int().min(11).max(20), ...riderGate })
+      .strict()
+      .describe(
+        "A way to work out the bearer's AC while it wears no body armor: `base` plus its Dexterity modifier, a Shield adding (Robe of the Archmagi: 15). It is chosen like Unarmored Defense, so the best way counts, and other AC bonuses add to it. Read live from items; refused on an effect, whose grant says `baseArmorClass` instead."
       ),
     /** `proficiencyBonus` adds the creature's Proficiency Bonus on top of `amount` (Alert's Initiative Proficiency). */
     z
@@ -1036,6 +1104,25 @@ export const ModifierSchema = z
       .describe(
         "The bearer's damage of these types ignores the target's Resistance (\"The Bludgeoning, Piercing, and Slashing damage you deal always ignores Resistance\"). Read standing on the creature dealing the damage."
       ),
+    /** The bearer's attack rolls ignore the target's cover of this degree or less (Wand of the War Mage: Half Cover on
+     *  a spell attack). Gate it on the attack roll. */
+    z
+      .object({
+        type: z.literal("ignores-cover"),
+        degree: z.enum(["half", "three-quarters"]),
+        ...riderGate
+      })
+      .strict()
+      .describe(
+        'The bearer\'s attack rolls ignore the target\'s cover up to this degree: "half" sets Half Cover aside, "three-quarters" Three-Quarters Cover as well (Total Cover still blocks). Gate it on `on-attack-roll`, narrowed by `attack-kind-is` ("when making a spell attack roll").'
+      ),
+    /** "Any Critical Hit against you becomes a normal hit" (Adamantine Armor): read on the target as an attack lands. */
+    z
+      .object({ type: z.literal("no-critical-hits"), ...riderGate })
+      .strict()
+      .describe(
+        "Any Critical Hit against the bearer becomes a normal hit while it holds (Adamantine Armor), so the hit's damage dice are rolled once. Read on the target as the attack lands."
+      ),
     /** No attack roll against the bearer has Advantage (Elusive), while its gates hold. */
     z
       .object({ type: z.literal("advantage-denied"), roll: z.enum(["incoming-attack"]), ...riderGate })
@@ -1130,7 +1217,7 @@ export const ModifierSchema = z
       )
   ])
   .describe(
-    "The rider vocabulary: what a feature, a feat, a chosen option, a magic item and a live effect contribute to the rules engine, one union for every carrier and read by one evaluator against one context, so a bonus means the same thing wherever it is authored. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a signed integer, so a curse is this same vocabulary with a negative number, and every branch carries the `when`/`scope` gate. Carriers refuse what they cannot honour: an item refuses `hit-points-per-level`, `ability-score` (both bake into the sheet and cannot be un-granted when the item comes off) and `attunement-slots` (it would decide its own attunement), and an effect refuses every number stored on the sheet or the actor (`attunement-slots`, `ability-score`, `hit-points-per-level`, `armor-class`, `initiative`, `unarmored-defense`, `spell-slot`), which an effect that ends could never give back. Senses are read live, so an effect may carry them (True Seeing, the Darkvision spell)."
+    "The rider vocabulary: what a feature, a feat, a chosen option, a magic item and a live effect contribute to the rules engine, one union for every carrier and read by one evaluator against one context, so a bonus means the same thing wherever it is authored. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a signed integer, so a curse is this same vocabulary with a negative number, and every branch carries the `when`/`scope` gate. Carriers refuse what they cannot honour: an item refuses `hit-points-per-level` (it bakes into the sheet and cannot be un-granted when the item comes off) and `attunement-slots` (it would decide its own attunement), and reads `ability-score` live while it is worn, and an effect refuses every number stored on the sheet or the actor (`attunement-slots`, `ability-score`, `hit-points-per-level`, `armor-class`, `initiative`, `unarmored-defense`, `spell-slot`), which an effect that ends could never give back. Senses are read live, so an effect may carry them (True Seeing, the Darkvision spell)."
   );
 export type Modifier = z.infer<typeof ModifierSchema>;
 
@@ -1141,6 +1228,7 @@ export type Modifier = z.infer<typeof ModifierSchema>;
  */
 export const EFFECT_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze([
   "attunement-slots",
+  "base-armor-class",
   "ability-score",
   "hit-points-per-level",
   "armor-class",
@@ -1974,6 +2062,14 @@ export const InventoryItemSchema = z
     /** The type the GM picked for an item whose record lets the GM choose its resistance (Ring of Resistance). Only
      *  the GM sets it; the server checks it against the record's `damageTypeChoice`. */
     chosenDamageType: DamageTypeSchema.optional(),
+    /** Which of its record's kinds this copy is (an Ioun Stone of Protection, a Belt of Fire Giant Strength), or the
+     *  form its holder put it in (a Rod of Lordly Might's flaming blade). The server checks it against the record's
+     *  `variants`, and keeps it on writes that don't say. */
+    variantId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
     /** The spell a Spell Scroll bears, picked when it is added. The server checks it against the scroll's levels;
      *  every copy in the row bears it. */
     spellId: z
@@ -2014,6 +2110,9 @@ export type InventoryItem = z.infer<typeof InventoryItemSchema>;
 export function catalogIdOf(item: Readonly<{ id: string; recordId?: string | undefined }>): string {
   return item.recordId ?? item.id;
 }
+
+/** The `actionUses` key counting a carried row's own uses (a Healer's Kit's ten), which belong to that copy. */
+export const rowUsesKey = (item: Readonly<{ id: string }>): string => `${item.id}-uses`;
 export const CurrencySchema = z
   .object({
     cp: z.number().int().min(0).max(1_000_000).default(0),
@@ -3356,6 +3455,8 @@ export const OnHitRiderSchema = z
           .array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict())
           .max(2)
           .optional(),
+        /** A success takes half the failure's damage (Ammunition of Slaying's 6d10 Force). */
+        halfOnSuccess: z.literal(true).optional(),
         repeatSave: z.literal(true).optional(),
         endsOnDamage: z.literal(true).optional()
       })
@@ -3555,14 +3656,15 @@ export const ActionTargetsSchema = z
     conditions: z.array(ConditionSchema).min(1).max(4).optional(),
     /** Only a creature whose space this creature shares or is in (a Vortex, a Whelm). */
     inSpace: z.literal(true).optional(),
-    /** "Each enemy", "an ally", or "another creature" (not the user itself). */
-    who: z.enum(["enemies", "allies", "others"]).optional(),
+    /** "Each enemy", "an ally", "another creature" (not the user itself), or only the user ("can target only
+     *  yourself", a Ring of Jumping's Jump). */
+    who: z.enum(["enemies", "allies", "others", "self"]).optional(),
     /** Only a creature this creature's own effect with this tag marks (Quivering Palm's vibrations). */
     markedBy: EffectTagSchema.optional()
   })
   .strict()
   .describe(
-    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions, in the user's space, enemies, allies or others, or a creature the user marked."
+    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions, in the user's space, enemies, allies, others or only the user itself, or a creature the user marked."
   );
 export type ActionTargets = z.infer<typeof ActionTargetsSchema>;
 

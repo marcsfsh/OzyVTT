@@ -480,8 +480,13 @@ read by one evaluator (`collectRiders` in `packages/rules-5e`). `deriveEquipment
 they grant, its own feats and features, its live effects) with one context of bearer facts, and
 each roll collects the standing modifiers plus those gated on its moment (`on-attack-roll`,
 `on-saving-throw`, ...), so a modifier's `when` gate means the same thing on every carrier. A
-carrier refuses what it cannot give back: an item refuses hit points and ability scores, an effect
-everything the sheet stores (AC, initiative, slots). Senses on any carrier are read live by dynamic
+carrier refuses what it cannot give back: an item refuses hit points per level, an effect everything the sheet
+stores (AC, initiative, slots, ability scores). An item's ability score riders are read live instead
+(`live-abilities.ts`): a worn item raises a score to its maximum or sets it to a floor (`ability-score-minimum`,
+Gauntlets of Ogre Power), a live effect sets a floor too (a Potion of Giant Strength), and the play-time
+definition (`resolveDefinitionIn` in `commands/kit.ts`) carries the raised scores, with the attack, DC and
+Initiative numbers built from them; a change to Constitution moves the Hit Point maximum as the item goes on or
+comes off. Senses on any carrier are read live by dynamic
 vision. Riders name damage types and
 conditions from the SRD's closed sets, and the homebrew publish gate (`homebrew-validate.ts`)
 refuses a rider gated on a moment its reader never collects.
@@ -507,7 +512,17 @@ checked as a spell's targets are, in `resolution/action-targets.ts`.
 
 A magic item's charges are an `actionUses` pool keyed by the carried row (`itemPool` in
 `item-actions.ts`), so two copies count separately and the count moves with the row when the GM hands
-it over (`character.give-item`). A cast spends its printed cost (`useCost`), and one whose extra charges raise its
+it over (`character.give-item`). One record can cover several kinds of an item (an Ioun Stone's stones, a Bag
+of Tricks' bags) or the forms its holder puts it in (a Rod of Lordly Might's buttons): a carried copy is one of
+them (`variantId`), read through `rowRecord` (`item-records.ts`) so its kind's riders, actions, casts, light and
+weapon join the record's or stand in for them. The GM says what a found copy is with `character.set-inventory`,
+and the player learns it on attuning (`projections.ts`); its holder changes a form with `item.set-form`
+(`setItemForm` in `inventory.ts`), paying the Bonus Action the item names. A creature attunes to one copy of an
+item, two kinds of one record being two items, and a player attunes or ends attunement only during a Short Rest or
+the step a finished rest opens, to an item whose printed prerequisites (`attunement.restrictedTo`: a class, a
+species, a spellcaster or another item attuned) the character meets (`attunement.ts`); the GM may attune anyone.
+What a worn item's own action gave its user (a Ring of Invisibility's Invisible) ends when it is taken off,
+unattuned or put away. A cast spends its printed cost (`useCost`), and one whose extra charges raise its
 level (`chargesRaiseLevel`, a Wand of Fireballs) is one action for each cost. A pool that never comes back
 (`per: "never"`, a Necklace of Fireballs' beads) starts at a count rolled when the row is added (`charges.starting`).
 A Long Rest gives back the item's printed dice (`charges.regain`), not every charge; when the GM keeps a dawn hour
@@ -532,6 +547,18 @@ it Prone, and Fire damage on an oiled creature within the minute deals 5 more. A
 Poison are effects the item grants its user; a coat's damage lasts a set number of hits (`damageUses`), in a fight
 or out of one.
 
+Adventuring gear follows the same rows. An equipment pack is the things it holds (`contents`): the build and a
+write to the sheet unpack it into its stacks (`character-build.ts`, `setInventoryItem`). A record's own `uses`
+with `per: "never"` (a Healer's Kit's ten) are counted per carried row under `rowUsesKey`, and spending the last
+takes one copy from the stack (`stabilize.ts`). Bindings (Chain, Rope, Manacles) are actions that grant their
+target an effect with an `endAction` check, the escape at its printed DC. In a fight a player can't don or doff
+body armor, which takes minutes, and a Shield takes the Utilize action on their turn (`held-items.ts`). An
+Unconscious creature, or one a failed Fear save makes drop them, keeps its held rows carried but out of its hands
+(`dropHeldItems` in `effects.ts`), and what one gave its Armor Class (a Staff of Power's +2) goes with it. `carrying.ts`
+weighs what a character carries, coins included, against its Strength times its size's figure (a
+`carrying-capacity-larger` rider counts it one size up), and `speed.ts` holds its Speed to 5 feet beyond that. The
+sheet offers each tool's Utilize uses as checks at the DCs its record prints (`toolUses` in `ability-checks.ts`).
+
 Every spell a sheet or stat block knows is a cast action (`character-build.ts`, `monster-spells.ts`), so even
 one with nothing to roll (Light) spends its casting time and slot, holds its Concentration, places its area and is
 told to the table as cast (`cast-narration.ts`). Before anything is spent the economy checks the cast's components
@@ -541,8 +568,10 @@ names, its creature type, sight with dynamic vision on, range, and for creatures
 the area). A cast with components waits while a creature that sees it may answer with Counterspell
 (`resolution/counter.ts`, `counter-answers.ts`), and a reaction spell's prompt lets its caster pick the slot. A
 creature's own spell of a minute or more takes the action on each of its turns in a fight and resolves on the last
-(`resolution/long-casting.ts`). Outside a fight a creature's own cast resolves through the same path with no turn to
-spend, and a long one moves the game clock by its whole hours; an item's cast there stays on the loose route.
+(`resolution/long-casting.ts`). Outside a fight a creature's own cast, an item's included, resolves through the same
+path with no turn to spend, and a long one moves the game clock by its whole hours. An item's cast takes the spell's
+own casting time (a Ring of Jumping's Jump is a Bonus Action, a reaction spell answers its trigger) unless the item
+prints another, and a printed bonus to hit stays the item's (Circlet of Blasting's +5).
 
 A player only spends spell slots (`character.set-slot` refuses a raise from a player); everything that gives a
 resource back is its own checked command. `conversions.ts` is one table of the features that turn one resource

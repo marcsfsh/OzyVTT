@@ -276,5 +276,5 @@ export function setCondition(
   if (written === "full") throw new CommandRejectedError("That combatant already has too many conditions.");
   // A re-set that changes nothing (Paralyzed again) has nothing new to break; Exhaustion always moved a level.
   if (present && conditionId !== "exhaustion") return events;
-  return [...events, ...conditionGained(state, actor, conditionId, previousExhaustion)];
+  return [...events, ...conditionGained(state, actor, conditionId, previousExhaustion, options)];
 }

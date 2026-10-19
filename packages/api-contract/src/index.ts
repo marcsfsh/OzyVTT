@@ -397,7 +397,8 @@ export const GAME_PATHS = {
   lightMove: `${API_NAMESPACE}/game/lights/{lightId}/move`,
   visionAreas: `${API_NAMESPACE}/game/vision/areas`,
   visionAreaById: `${API_NAMESPACE}/game/vision/areas/{areaId}`,
-  itemLight: `${API_NAMESPACE}/game/actors/{actorId}/items/{itemId}/light`
+  itemLight: `${API_NAMESPACE}/game/actors/{actorId}/items/{itemId}/light`,
+  itemForm: `${API_NAMESPACE}/game/actors/{actorId}/items/{itemId}/form`
 } as const;
 
 /** Session issuance for headless/alternate player clients: the HTTP mirror of the socket's open join. */
@@ -833,7 +834,8 @@ export const GAME_COMMANDS = {
   "vision.add-area": { scope: "scene:write", method: "post", path: GAME_PATHS.visionAreas },
   "vision.remove-area": { scope: "scene:write", method: "delete", path: GAME_PATHS.visionAreaById },
   // A player lights a Torch in their own character's hand, so it is a combat command.
-  "item.set-light": { scope: "combat:write", method: "post", path: GAME_PATHS.itemLight }
+  "item.set-light": { scope: "combat:write", method: "post", path: GAME_PATHS.itemLight },
+  "item.set-form": { scope: "combat:write", method: "post", path: GAME_PATHS.itemForm }
 } as const satisfies Record<
   string,
   Readonly<{ scope: z.infer<typeof IntegrationScopeSchema>; method: "post" | "delete"; path: string }>

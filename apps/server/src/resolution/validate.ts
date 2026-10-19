@@ -17,7 +17,6 @@ import {
 } from "../rules-families.js";
 import {
   isItemActionId,
-  isLongCastingTime,
   laterRowOf,
   laterSpellActionId,
   upcastAction,
@@ -32,7 +31,6 @@ import { areEnemies } from "../creature-sides.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
 import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
-import { scrollOfAction } from "../scrolls.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { reachBarredBy } from "../zone-barriers.js";
 import { enclosureBlocks } from "../enclosures.js";
@@ -59,12 +57,14 @@ function combatantsOf(
   // Casting a spell is something done even when it rolls nothing (Light, Guidance): it spends its casting time and is
   // told to the table. What a spell lets its caster do later is no new cast.
   const castsASpell = action.spellId !== undefined && !(spell !== undefined && laterRowOf(spell, action.id));
-  // Outside a fight a creature's own cast still starts what it starts (a grant, Concentration, a save, an area), with
-  // no turn to spend; an item's use stays on the loose route, which spends its charges.
+  // Outside a fight a cast still starts what it starts (a grant, Concentration, a save, an area), with no turn to
+  // spend, whether the creature or its item casts it, and so does an item's use that leaves an effect on its user
+  // (Winged Boots' flight, a Ring of Invisibility).
   const outsideFight = !state.combat.active;
   // A shape-shift is something a creature does outside a fight too (Wild Shape to scout, a werewolf's change).
   const shapeShifts = action.shapeShift !== undefined || action.endsForm === true;
-  if (outsideFight && !(castsASpell && !isItemActionId(action.id)) && !shapeShifts)
+  const itemGrant = isItemActionId(action.id) && action.grants !== undefined;
+  if (outsideFight && !castsASpell && !shapeShifts && !itemGrant)
     throw new CommandRejectedError("Start an encounter before resolving actions.");
   const inFight = (actorId: string) =>
     outsideFight
@@ -404,15 +404,7 @@ export function openResolve(
     keepsHidden: false
   };
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
-  if (!input.economyPaid)
-    warnings.push(
-      ...laterActionReminders(
-        spell,
-        action,
-        scrollOfAction(action, attacker.inventory, deps.catalog) !== null,
-        state.combat.active
-      )
-    );
+  if (!input.economyPaid) warnings.push(...laterActionReminders(spell, action));
   return ctx;
 }
 
@@ -446,27 +438,14 @@ export function withChosenDamageType(action: DefinitionAction, chosen: string | 
 }
 
 /** The GM's reminder on casting a spell that does more later (SRD text): what the caster may do on later turns, and
- *  what the GM spots for an area the server doesn't watch (an area with a zone it does). A creature's own long cast
- *  runs over its turns (`long-casting.ts`); an item's in a fight is the GM's to time, and a scroll read for a long
- *  casting time "isn't lost" if the casting is interrupted. */
-function laterActionReminders(
-  spell: SpellReference | undefined,
-  action: DefinitionAction,
-  fromScroll: boolean,
-  inFight: boolean
-): string[] {
+ *  what the GM spots for an area the server doesn't watch (an area with a zone it does). A long cast runs over its
+ *  caster's turns (`long-casting.ts`), an item's or a scroll's as much as a creature's own. */
+function laterActionReminders(spell: SpellReference | undefined, action: DefinitionAction): string[] {
   const later = spell?.effect?.laterActions ?? [];
   if (!spell || later.some((row) => laterSpellActionId(spell.id, row.name) === action.id)) return [];
-  return [
-    ...(inFight && isItemActionId(action.id) && isLongCastingTime(spell.castingTime)
-      ? [
-          `${spell.name} takes ${spell.castingTime} to cast. Until then, the caster takes the Magic action on each turn and keeps Concentration. If that breaks, the spell fails and ${fromScroll ? "the scroll isn't lost, so give it back on the sheet" : "its charges aren't spent, so restore them on the sheet"}.`
-        ]
-      : []),
-    ...later
-      .filter((row) => row.zone === undefined)
-      .map((row) => `${spell.name}: ${row.when} Use "${spell.name}: ${row.name}" for it.`)
-  ];
+  return later
+    .filter((row) => row.zone === undefined)
+    .map((row) => `${spell.name}: ${row.when} Use "${spell.name}: ${row.name}" for it.`);
 }
 
 /** The plan of a resolve whose economy was already spent: it changes nothing, and casts at the slot it was made with. */

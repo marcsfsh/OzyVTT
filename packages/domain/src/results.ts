@@ -639,7 +639,12 @@ const DerivedToolRowSchema = z.strictObject({
   ability: AbilityIdSchema,
   bonus: z.number().int(),
   mode: RollModeSummarySchema,
-  reliableTalent: z.boolean()
+  reliableTalent: z.boolean(),
+  uses: z
+    .array(z.strictObject({ label: z.string(), dc: z.number().int().min(1).max(40) }))
+    .describe(
+      "What the tool's Utilize line lets it do, each with its printed DC (Thieves' Tools: Pick a lock, DC 15), rolled as a check with `tool` and `dc`. In a fight it takes the Utilize action. Empty when the tool prints none"
+    )
 });
 export type DerivedToolRow = Wire<z.infer<typeof DerivedToolRowSchema>>;
 /** A situation the character's riders name for its checks (a Book's topic, prying with a Crowbar), offered as a toggle
@@ -708,6 +713,19 @@ const ActorDerivedSheetSchema = z.strictObject({
     .min(1)
     .max(10)
     .describe("How many items the character can attune to at once: 3, or 4 with Use Magic Device"),
+  /** What the character carries against what it can; over capacity its Speed is at most 5 feet. */
+  carrying: z
+    .strictObject({
+      pounds: z.number().min(0).describe("What its rows and coins weigh, in pounds (fifty coins to the pound)"),
+      capacity: z
+        .number()
+        .min(0)
+        .describe("The most it can carry: Strength times 15 pounds for a Small or Medium creature, by size")
+    })
+    .nullable()
+    .describe(
+      "What the character carries against its carrying capacity. Beyond it, its Speed is no more than 5 feet. Null for a stat block, which says nothing of what it carries"
+    ),
   /** The weapon kinds chosen under Weapon Mastery, in the order chosen, each with the property it grants and the SRD
    *  text of what that property does. Empty for a sheet that records no such choice. */
   weaponMasteries: z

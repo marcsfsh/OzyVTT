@@ -70,6 +70,8 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
     const self = target.id === attacker.id;
     if (rules.who === "others" && self)
       violations.push({ rule: "target.not-allowed", message: `${action.name} can't target ${attacker.name}.` });
+    if (rules.who === "self" && !self)
+      violations.push({ rule: "target.not-allowed", message: `${action.name} can target only ${attacker.name}.` });
     if (rules.who === "enemies" && (self || !areEnemies(attacker, target, resolveDefinition)))
       violations.push({
         rule: "target.not-an-enemy",

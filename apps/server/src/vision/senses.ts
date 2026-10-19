@@ -1,7 +1,8 @@
 import { gearMerged } from "../transform/forms.js";
 import type { GameState } from "@vtt/domain";
-import { catalogIdOf, type ActorDefinition, type Modifier } from "@vtt/schemas";
+import type { ActorDefinition, Modifier } from "@vtt/schemas";
 import { itemIsActive, type EquipmentCatalog } from "../equipment-derivation.js";
+import { rowRecord } from "../item-records.js";
 
 /**
  * What a creature perceives with, in feet (SRD 5.2.1 Rules Glossary: Darkvision, Blindsight, Tremorsense, Truesight;
@@ -115,7 +116,7 @@ export function sensesOf(state: GameState, actor: Actor, content: SightContent):
     // Gear melded into a form gives nothing while the form lasts.
     for (const item of gearMerged(actor) ? [] : actor.inventory) {
       if (item.quantity <= 0) continue;
-      const record = catalog.equipmentRecord(catalogIdOf(item));
+      const record = rowRecord(catalog, item);
       if (record && itemIsActive(item, record)) riderSenses(record.modifiers, senses, extensions);
     }
   }
@@ -146,7 +147,7 @@ export function carriedLightsOf(state: GameState, actor: Actor, content: SightCo
   if (catalog)
     for (const item of actor.inventory) {
       if (!item.equipped || item.quantity <= 0) continue;
-      const record = catalog.equipmentRecord(catalogIdOf(item));
+      const record = rowRecord(catalog, item);
       const light = record?.light;
       if (!light || (item.lit !== true && light.always !== true) || !itemIsActive(item, record)) continue;
       const shed = item.hoodLowered === true && light.hooded ? light.hooded : light;

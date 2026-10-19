@@ -484,7 +484,7 @@ function fallToZero(
         text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
         actorId: actor.id
       });
-    events.push(...dropHeldItems(actor));
+    events.push(...dropHeldItems(actor, deps));
   } else {
     defeated = true;
     // A swallower that dies lets out what it swallowed (SRD: "can escape from the corpse").

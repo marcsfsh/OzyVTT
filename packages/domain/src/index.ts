@@ -47,6 +47,7 @@ export {
 /** Re-exported because the client cannot import `@vtt/schemas`; a hand-copied list would drift. */
 export {
   catalogIdOf,
+  rowUsesKey,
   ItemMagicMarkerSchema,
   ItemSlotSchema,
   RIDER_TRIGGER_KINDS,

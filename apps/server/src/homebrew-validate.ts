@@ -593,6 +593,19 @@ function riderBlockIssues(
   block.actions.forEach((action, index) =>
     riderIssues(action.grants?.modifiers, [...path, "actions", index, "grants", "modifiers"], label, checks)
   );
+  // An item's kinds carry riders of their own (an Ioun Stone's stones).
+  if ("variants" in block)
+    (block.variants ?? []).forEach((variant, index) => {
+      const at: Path = [...path, "variants", index];
+      const named = `${variant.name} (${label})`;
+      riderIssues(variant.modifiers, [...at, "modifiers"], named, checks);
+      variant.effects.forEach((effect, effectIndex) =>
+        riderIssues(effect.modifiers, [...at, "effects", effectIndex, "modifiers"], named, checks)
+      );
+      variant.actions.forEach((action, actionIndex) =>
+        riderIssues(action.grants?.modifiers, [...at, "actions", actionIndex, "grants", "modifiers"], named, checks)
+      );
+    });
 }
 
 /** The moments each reader collects, for the modifiers whose reader is narrower than the vocabulary: a damage
@@ -607,6 +620,12 @@ const MOMENTS_READ: Partial<Record<Modifier["type"], readonly string[]>> = {
   "damage-immunity": [],
   "ignores-resistance": [],
   "advantage-denied": [],
+  "ability-score-minimum": [],
+  "base-armor-class": [],
+  "speed-minimum": [],
+  "carrying-capacity-larger": [],
+  "ignores-cover": ["on-attack-roll"],
+  "no-critical-hits": ["on-attack-roll"],
   "healing-received-maximized": [],
   "healing-dice-maximized": HEALING_MOMENTS,
   "healing-bonus": HEALING_MOMENTS,

@@ -10,7 +10,7 @@ import {
 } from "@vtt/schemas";
 import type { CheckSubject } from "./ability-checks.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
-import { castAreaOf, itemActionId, spellCastMechanics } from "./item-actions.js";
+import { castAreaOf, itemActionId, spellActivationOf, spellCastMechanics } from "./item-actions.js";
 import { itemRowOfAction } from "./item-charges.js";
 
 /**
@@ -70,14 +70,6 @@ export function scrollSpellProblem(record: EquipmentReference, spell: SpellRefer
   return spell.level < range.minLevel || spell.level > range.maxLevel
     ? `${itemName} holds ${levelsWord(range)}, and ${spell.name} is ${spell.level === 0 ? "a cantrip" : `level ${spell.level}`}.`
     : null;
-}
-
-/** "Action", "Bonus Action", "Reaction"; anything longer is outside the turn's
- *  economy, as the builder reads a spell's casting time. */
-function activationOf(castingTime: string): ActorAction["activation"] {
-  if (/bonus/i.test(castingTime)) return "bonus-action";
-  if (/reaction/i.test(castingTime)) return "reaction";
-  return /^(?:1 )?action$/i.test(castingTime.trim()) ? "action" : "other";
 }
 
 export type ScrollCheck = Readonly<{ ability: RiderAbility; dc: number; skill: "arcana" | null }>;
@@ -162,19 +154,11 @@ export function scrollOfAction(
   return record?.spellScroll && spell ? { row, record, spell } : null;
 }
 
-/** The reader's character level, which a cantrip's damage grows with; a stat block counts as level 1. */
-function characterLevel(definition: ActorDefinition | undefined): number {
-  return Math.max(
-    1,
-    (definition?.character?.classes ?? []).reduce((sum, entry) => sum + entry.level, 0)
-  );
-}
-
 /**
  * Reading the scroll as an action: the spell at its own level (no upcast) with the scroll's DC and attack bonus, no
- * slot, at the spell's casting time. The reader casts it, so a cantrip grows with the reader's level ("when you reach
- * levels 5 ..."), and its healing adds the reader's spellcasting modifier. Null when the row bears no spell the
- * catalog knows.
+ * slot, at the spell's casting time. SRD "Spells Cast from Items": it is cast at the lowest possible spell and caster
+ * level, so a cantrip deals its level 1 damage whoever reads it. Its healing adds the reader's spellcasting modifier.
+ * Null when the row bears no spell the catalog knows.
  */
 export function scrollCastAction(
   item: InventoryItem,
@@ -187,21 +171,20 @@ export function scrollCastAction(
   const reading = scrollReading(definition, spell, catalog);
   const ability = reading.readable ? reading.ability : null;
   const modifier = definition && ability ? abilityModifier(definition.abilityScores[ability]) : 0;
-  const tier =
-    spell.level === 0 ? cantripTierAt(cantripScalingOf(spell.castingOptions), characterLevel(definition)) : null;
+  const tier = spell.level === 0 ? cantripTierAt(cantripScalingOf(spell.castingOptions), 1) : null;
   const mechanics = spellCastMechanics(
     spell,
     { ...numbers, bearersDc: false, modifier },
     {
       roll: tier?.damageRoll ?? null,
-      // Eldritch Blast's extra beams, as its caster's level gives them.
+      // Eldritch Blast's one beam at the lowest caster level.
       ...(tier?.targetCount && spell.effect?.attacks ? { attacks: tier.targetCount } : {})
     }
   );
   return {
     id: itemActionId(item.id, READ_SUFFIX),
     name: `Cast ${spell.name} (${item.name})`,
-    activation: activationOf(spell.castingTime),
+    activation: spellActivationOf(spell.castingTime),
     description:
       `Read the scroll to cast ${spell.name} with no spell slot and no Material components (save DC ${numbers.saveDc}, attack +${numbers.attackBonus}). It crumbles once the spell is cast. ${spell.description}`.slice(
         0,
