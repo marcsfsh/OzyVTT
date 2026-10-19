@@ -1,3 +1,4 @@
+import { verticalEdgeCells } from "@vtt/rules-5e";
 import type { AnnotationShapeKind, EncounterToken } from "@vtt/domain";
 import { imageToGridPreview, sizedShapePreview, snapShapePreview, type GridCalibration } from "../scene/gridPreview";
 
@@ -7,9 +8,14 @@ import { imageToGridPreview, sizedShapePreview, snapShapePreview, type GridCalib
  * choice, and they mirror the server's maths (`creatureDistance`, `tokensInTemplate`) so they agree with it.
  */
 
-type Placed = Readonly<{ position: Readonly<{ x: number; y: number }> | null; sizeCells?: number }>;
+type Placed = Readonly<{
+  position: Readonly<{ x: number; y: number }> | null;
+  sizeCells?: number;
+  altitudeFeet?: number;
+}>;
 
-/** Edge-to-edge distance in feet between two placed creatures on a calibrated grid, as the server measures it. */
+/** Edge-to-edge distance in feet between two placed creatures on a calibrated grid, as the server measures it: height
+ *  counts by the same diagonal rule as the floor. */
 export function creatureDistanceFeet(calibration: GridCalibration | null, a: Placed, b: Placed): number | null {
   if (!calibration || !a.position || !b.position) return null;
   const gridA = imageToGridPreview(calibration, a.position);
@@ -19,7 +25,12 @@ export function creatureDistanceFeet(calibration: GridCalibration | null, a: Pla
     0,
     centerCells - (Math.max(1, a.sizeCells ?? 1) - 1) / 2 - (Math.max(1, b.sizeCells ?? 1) - 1) / 2
   );
-  return Math.round(edgeCells * calibration.distancePerCell * 100) / 100;
+  const upCells = verticalEdgeCells(
+    { altitudeFeet: a.altitudeFeet, sizeCells: a.sizeCells ?? 1 },
+    { altitudeFeet: b.altitudeFeet, sizeCells: b.sizeCells ?? 1 },
+    calibration.distancePerCell
+  );
+  return Math.round(Math.max(edgeCells, upCells) * calibration.distancePerCell * 100) / 100;
 }
 
 const EPSILON = 1e-6;

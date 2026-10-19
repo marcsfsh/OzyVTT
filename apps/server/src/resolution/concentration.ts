@@ -8,6 +8,7 @@ import { castThisTurnKey } from "../lasting-spells.js";
 import { endZone } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
 import { tableLineOf, type ResolveContext } from "./context.js";
+import { shapedZone, shapingOf } from "./metamagic.js";
 
 type SpellLifetime = Pick<SpellReference, "duration" | "concentration" | "upcastDurations">;
 
@@ -83,12 +84,18 @@ export function startConcentration(ctx: ResolveContext): void {
 export function beginConcentration(ctx: ResolveContext, spell: SpellReference, castId: string, level: number): void {
   const { state, attacker, deps } = ctx;
   const ended: EffectNarration[] = [];
+  // SRD Extended Spell: "If the affected spell requires Concentration, you have Advantage on any saving throw you make
+  // to maintain that Concentration."
+  const extended = spell.id === ctx.action.spellId && shapingOf(ctx.input.shaping, "extended-spell") !== undefined;
   addEffect(
     state,
     attacker.id,
     makeEffect({
       id: `${castId}:concentration`,
-      name: `Concentrating on ${spell.name}`,
+      name: `Concentrating on ${spell.name}${extended ? " (Extended Spell)" : ""}`,
+      ...(extended
+        ? { modifiers: [{ type: "roll-mode" as const, roll: "concentration" as const, mode: "advantage" as const }] }
+        : {}),
       tags: [CONCENTRATING_TAG],
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -106,7 +113,7 @@ export function beginConcentration(ctx: ResolveContext, spell: SpellReference, c
   ctx.effectsApplied.push({
     targetId: attacker.id,
     targetName: attacker.name,
-    name: `Concentrating on ${spell.name}`,
+    name: `Concentrating on ${spell.name}${extended ? " (Extended Spell)" : ""}`,
     conditionIds: []
   });
   // The previous Concentration ending is the table's news.
@@ -185,10 +192,11 @@ export function openSpellZone(ctx: ResolveContext): void {
     annotationId: !aroundCaster && input.areaPlaced === true ? input.commandId : null,
     area: aroundCaster ? null : (spell.area ?? null),
     damageDealt: 0,
-    // The damage type the caster chose for it (Conjure Elemental's element).
+    // The damage type the caster chose for it (Conjure Elemental's element), or Transmuted Spell's.
     ...(input.damageType && (spell.effect?.damageTypes ?? []).includes(input.damageType as never)
       ? { damageType: input.damageType }
       : {}),
+    ...shapedZone(ctx, row.damage),
     ...(row.zone.on.includes("spell-end") ? { burstsOnEnd: true as const } : {}),
     entered: [],
     affected: caught ? targets.map((target) => target.id) : []

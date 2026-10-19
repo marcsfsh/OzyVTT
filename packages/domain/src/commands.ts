@@ -16,6 +16,7 @@ import {
 } from "./state.js";
 import {
   AbilitySchema,
+  CastShapingSchema,
   CharacterChoiceSchema,
   CharacterIdentitySchema,
   CurrencySchema,
@@ -358,6 +359,15 @@ export const RollAnswerChoiceSchema = z
     face: z.number().int().min(1).max(20).optional()
   })
   .strict();
+/** How a spell's caster shapes this casting: Metamagic options paid in Sorcery Points (Careful Spell's and Heightened
+ *  Spell's creatures, Transmuted Spell's new damage type) and Sculpt Spells' protected creatures. The server checks each
+ *  against the caster's picks, the spell and the points left, and spends them. Each option at most once. */
+const CastShapingListSchema = z
+  .array(CastShapingSchema)
+  .max(4)
+  .refine((list) => new Set(list.map((entry) => entry.id)).size === list.length, {
+    error: "Choose each way to shape the spell at most once."
+  });
 export const ActionResolveSchema = z
   .object({
     commandId: z.uuid(),
@@ -390,6 +400,10 @@ export const ActionResolveSchema = z
     /** Ready this spell for later (SRD Ready): its slot is spent and it is held with Concentration until
      *  the start of the caster's next turn; casting it off-turn then releases it with the Reaction. */
     ready: z.boolean().optional(),
+    /** Take the action's own move before the rest of it ("The dragon moves up to half its Speed, and it makes one
+     *  Rend attack"): the action's cost is spent and the move granted now, with no target; the action taken again
+     *  afterwards makes the rest at no further cost. */
+    moveFirst: z.boolean().optional(),
     /** GM only: the spell area a cast that ends spells is aimed at (Dispel Magic on a Moonbeam), from
      *  `combat.spellZones`. */
     zoneId: z.string().min(1).max(120).optional(),
@@ -441,6 +455,7 @@ export const ActionResolveSchema = z
     /** An Evoker's Overchannel (Wizard 14): a Wizard spell cast with a level 1 to 5 slot deals its maximum damage, the
      *  caster taking Necrotic damage for each use after the first before a Long Rest. Refused for anything else. */
     overchannel: z.boolean().optional(),
+    shaping: CastShapingListSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -684,6 +699,8 @@ export const ActionUseSchema = z
     spend: z.number().int().min(1).max(100).optional(),
     /** The damage type picked; see `action.resolve`. */
     damageType: DamageTypeSchema.optional(),
+    /** How the spell's caster shapes the cast (Metamagic); see `action.resolve`. Refused on the loose route. */
+    shaping: CastShapingListSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1295,6 +1312,8 @@ export const TimePassSchema = z
     hours: z.number().int().min(0).max(720).default(0),
     /** Minutes on top of the hours, so a group can skip the minute or the 10 minutes a spell lasts. */
     minutes: z.number().int().min(0).max(59).default(0),
+    /** The party travels for that time at this pace (SRD 5.2.1 Travel Pace): the log says how far it went. */
+    pace: z.enum(["fast", "normal", "slow"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -1659,7 +1678,7 @@ export const DiceRollSchema = z
   .strict();
 /** How a token move travels (SRD Movement): on foot or by one of the special speeds, which spend movement; by
  *  teleportation, which spends none and provokes no Opportunity Attack; or moved by force (the GM's), neither. */
-export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "teleport", "forced"]);
+export const MoveModeSchema = z.enum(["walk", "fly", "swim", "climb", "burrow", "jump", "teleport", "forced"]);
 export type MoveMode = z.infer<typeof MoveModeSchema>;
 
 export const TokenMoveSchema = z
@@ -1669,8 +1688,48 @@ export const TokenMoveSchema = z
     position: EncounterTokenPositionSchema.nullable(),
     /** Absent: walking. A player may teleport only with the GM's go-ahead, and only the GM moves a creature by force. */
     mode: MoveModeSchema.optional(),
+    /** Feet above the ground the move ends at; absent keeps the height it has. Rising or descending costs movement as
+     *  distance does, and only flying, climbing, jumping, teleporting or a forced move changes it. */
+    altitudeFeet: z.number().int().min(0).max(10000).optional(),
     sceneId: z.uuid().optional(),
     /** GM-grade bypass of a movement-rule rejection (speed budget); audited like every override. */
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** GM-set height of a token, free of movement: on a surface (a ledge, a balcony, a wall), or in the air flying or
+ *  levitating. 0 puts it on the ground. */
+export const TokenSetAltitudeSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    altitudeFeet: z.number().int().min(0).max(10000),
+    /** What holds it up in the air; null or absent: it stands or clings on a surface. */
+    airborne: z.enum(["fly", "levitate"]).nullable().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM makes a creature fall (SRD Falling): from its height, or `feet` given, onto the ground or a lower ledge. */
+export const ActorFallSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    /** How far it falls; absent, from the height it is at. */
+    feet: z.number().int().min(1).max(10000).optional(),
+    /** It falls into water or another liquid, which can halve the damage. */
+    intoWater: z.boolean().optional(),
+    /** The height it lands at; the ground when absent. */
+    landingAltitudeFeet: z.number().int().min(0).max(10000).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A creature climbs onto a mount (`mountId`) or off the one it rides (`mountId: null`), SRD 5.2.1 Mounted Combat. */
+export const ActorMountSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    mountId: z.uuid().nullable(),
+    /** GM-grade bypass of a movement-rule rejection (the half Speed it costs, a mount too small or too far). */
     override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })

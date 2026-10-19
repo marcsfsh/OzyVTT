@@ -6,6 +6,7 @@ import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.j
 import { areAllies } from "./creature-sides.js";
 import { wardingAura } from "./paladin-auras.js";
 import { endZonesOfCast } from "./spell-zone-state.js";
+import { DESCENDS_SAFELY_TAG, descendSafely } from "./altitude.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
  *  end, which clears linked conditions and fires onEnd grants. Returns narration events and writes nothing to
@@ -456,6 +457,8 @@ function endEffectInternal(
       events.push(...applyExhaustionDeath(state, actor));
   }
   if (effect.tags.includes(HASTED_TAG) && !sweeping) addLethargy(state, actor, effect, events);
+  // A flight that lowers its creature when it ends (Winged Boots: "you descend ... until you land") drifts it down.
+  if (effect.tags.includes(DESCENDS_SAFELY_TAG)) descendSafely(state, actor.id);
   // The caster's "Concentrating on X" ending ends everything that cast made, on every creature, and the area it left.
   if (effect.tags.includes(CONCENTRATING_TAG) && effect.castId !== undefined) {
     for (const bearer of state.actors) {

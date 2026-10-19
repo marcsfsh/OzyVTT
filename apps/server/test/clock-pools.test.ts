@@ -31,7 +31,7 @@ describe("a pool that comes back after a time", () => {
     fight(table, IDS.wizard);
     // 1d12 + 1 with a 5: six hours from the use.
     const result = resolveAt(table, IDS.wizard, "item-wings-of-flying-wings", [5], { targetIds: [] });
-    expect(result.warnings?.join(" ")).toMatch(/Spread the Wings can be used again in 6 hours/);
+    expect(result.warnings?.join(" ")).toMatch(/Wings of Flying can be used again in 6 hours/);
     expect(spent(table, "item-wings-of-flying-wings")).toBe(1);
     table.state.combat.active = false;
 
@@ -43,7 +43,7 @@ describe("a pool that comes back after a time", () => {
     const back = passTime(table.state, 0, 1, depsOf(table, 1));
     expect(spent(table, "item-wings-of-flying-wings")).toBe(0);
     expect(table.actor(IDS.wizard).readyAt).toEqual({});
-    expect(back.map((event) => event.text).join(" ")).toMatch(/'s Spread the Wings can be used again\./);
+    expect(back.map((event) => event.text).join(" ")).toMatch(/'s Wings of Flying can be used again\./);
   });
 
   it("starts a Horn of Valhalla's 7 days when it is spent from the sheet", () => {

@@ -2238,7 +2238,7 @@ describe("a settled pick the character may re-make (`replaces`): through both pa
     expect(field.validate?.("f1", { id: "f2" }, EMPTY_CONTEXT)).toBeNull();
   });
 
-  it("2. SRD content authors the same shape: 2 picks re-made on a rest and 7 superseding features", () => {
+  it("2. SRD content authors the same shape: 10 picks re-made on a rest and 7 superseding features", () => {
     const library = new ContentLibrary().forAudience("gm");
     const clauses: Array<{ id: string; clause: Record<string, unknown> }> = [];
     const supersedes: Array<{ id: string; replaced: string }> = [];
@@ -2261,10 +2261,18 @@ describe("a settled pick the character may re-make (`replaces`): through both pa
     for (const summary of library.subclassSummaries()) walk(library.subclassRecord(summary.id));
     for (const summary of library.featSummaries()) walk(library.featRecord(summary.id));
 
-    // Two rest clauses at the time of writing, both on subclass features, each naming its own feature's pick. The
-    // level-up clauses are the replacements a player may make when levelling (`level-up-picks.ts`).
+    // The rest clauses at the time of writing: Circle of the Land, Fiendish Resilience, the Hunter's two options, the
+    // Wizard's cantrips and Weapon Mastery in its five classes. The level-up clauses are the replacements a player
+    // may make when levelling (`level-up-picks.ts`).
     const onRests = clauses.filter((entry) => entry.clause.when !== "level-up");
-    expect(onRests.map((entry) => entry.id).sort()).toEqual(["circle-of-the-land-spells", "fiendish-resilience"]);
+    expect(onRests.map((entry) => entry.id).sort()).toEqual([
+      "circle-of-the-land-spells",
+      "defensive-tactics",
+      "fiendish-resilience",
+      "hunters-prey",
+      "spellcasting",
+      ...Array<string>(5).fill("weapon-mastery")
+    ]);
     expect(clauses.filter((entry) => entry.clause.when === "level-up").map((entry) => entry.id)).toEqual(
       expect.arrayContaining(["eldritch-invocations", "metamagic", "magic-initiate-cleric", "spellcasting"])
     );
@@ -2337,7 +2345,10 @@ describe("a settled pick the character may re-make (`replaces`): through both pa
     const bareView = emberkinView(bare);
     const bareSheet = buildCharacterDefinition(emberkinInput(), bareView, BuilderPolicySchema.parse({}));
     expect(bareSheet.damageResistances).toContain(REOPENED.built);
-    expect(replaceableOffers(bareSheet, bareView)).toEqual([]);
+    // Its class's own rest picks (a Fighter's Weapon Mastery) aren't the species'.
+    expect(replaceableOffers(bareSheet, bareView).filter((candidate) => candidate.offer === REOPENED.offer)).toEqual(
+      []
+    );
   });
 
   it("4. `replacesFeatureId`: the class stops granting what its successor replaces, from both paths", () => {

@@ -132,6 +132,11 @@ export type RiderModifier = Readonly<{
   movement?: "fly" | "swim" | "climb" | "burrow";
   equalToSpeed?: boolean;
   hover?: boolean;
+  /** `movement`: how the bearer falls and jumps ("safe-fall", "leap"), with a leap's `costFeet` and a multiplier's
+   *  `times`. */
+  rule?: string;
+  costFeet?: number;
+  times?: number;
   /** `attack-bonus` / `save-bonus`: dice rolled on top of `amount` ("1d4"), or taken off ("-1d4"). */
   dice?: string;
   when?: readonly RiderTrigger[];

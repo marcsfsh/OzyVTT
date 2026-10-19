@@ -57,6 +57,8 @@ export type AvailabilityRow = Readonly<{
   passive?: "rider" | "rest" | "automatic";
   /** The Weapon Mastery property this character applies with the swing. */
   mastery?: Readonly<{ id: string; name: string }>;
+  /** The ways the caster may shape this spell's cast (Metamagic, Sculpt Spells). */
+  shaping?: ContentActionSummary["shaping"];
 }>;
 
 /** What the server says of one row now: whether it can be used, why not, and what a weapon's swing masters. */
@@ -115,7 +117,9 @@ export function summaryOfAvailability(row: AvailabilityRow): ContentActionSummar
     ...(row.darts ? { darts: row.darts } : {}),
     ...(row.damageTypes ? { damageTypes: row.damageTypes } : {}),
     // Search, Study and the like pick the skill they are made with.
-    ...(row.checkSkills ? { checkSkills: row.checkSkills } : {})
+    ...(row.checkSkills ? { checkSkills: row.checkSkills } : {}),
+    // A spell's cast offers the Metamagic its caster knows.
+    ...(row.shaping ? { shaping: row.shaping } : {})
   };
 }
 

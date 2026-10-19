@@ -171,6 +171,9 @@ import type {
   TimePassSchema,
   TimeSetDawnSchema,
   TokenMoveSchema,
+  TokenSetAltitudeSchema,
+  ActorFallSchema,
+  ActorMountSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
   TurnUseSchema,
@@ -797,6 +800,21 @@ export interface ClientToServerEvents {
   "token:move": (
     payload: CommandPayload<typeof TokenMoveSchema>,
     acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** GM makes a creature fall: the server rolls the damage once any reaction to it is answered. */
+  "actor:fall": (
+    payload: CommandPayload<typeof ActorFallSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A creature climbs onto a mount or off the one it rides. */
+  "actor:mount": (
+    payload: CommandPayload<typeof ActorMountSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** GM sets how high a creature is, free of movement. */
+  "token:set-altitude": (
+    payload: CommandPayload<typeof TokenSetAltitudeSchema>,
+    acknowledgement: (result: MutationResult) => void
   ) => void;
   "scene:create": (
     payload: CommandPayload<typeof SceneCreateSchema>,

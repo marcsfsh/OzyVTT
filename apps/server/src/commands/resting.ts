@@ -217,13 +217,14 @@ export const restingCommands = [
     type: "time.pass",
     operationId: "passTime",
     description:
-      "GM-only: moves the game clock forward by hours and minutes. The clock is what the 16-hour rule between Long Rests reads; a party rest moves it too (8 hours for a Long Rest, 1 for a Short Rest). A round is 6 seconds, so 10 rounds make a minute: the time counts down every creature's effects (an effect measured in rounds loses 10 a minute, one measured in minutes or hours loses them, and one that lasts until a turn ends is over), and what runs out ends with its on-end grants, as at a turn boundary. A fight doesn't move the clock; a parked fight's combatants wait outside it. Each midnight it crosses moves the Codex calendar's date a day, and the players' date with it when the two were the same day.",
+      "GM-only: moves the game clock forward by hours and minutes. The clock is what the 16-hour rule between Long Rests reads; a party rest moves it too (8 hours for a Long Rest, 1 for a Short Rest). A round is 6 seconds, so 10 rounds make a minute: the time counts down every creature's effects (an effect measured in rounds loses 10 a minute, one measured in minutes or hours loses them, and one that lasts until a turn ends is over), and what runs out ends with its on-end grants, as at a turn boundary. A fight doesn't move the clock; a parked fight's combatants wait outside it. Each midnight it crosses moves the Codex calendar's date a day, and the players' date with it when the two were the same day. With `pace` the party travels for that time (SRD Travel Pace: 4, 3 or 2 miles an hour), and the log says how far it went and what the pace does to its checks.",
     summary: "Move game time forward by some hours and minutes.",
     schema: TimePassSchema,
     malformed: "Choose between 1 minute and 720 hours.",
     gmOnly: "Only the GM moves game time.",
     async run({ request, execute }, kit) {
       const minutes = (request.hours ?? 0) * 60 + (request.minutes ?? 0);
+      const { pace } = request;
       let events: EffectNarration[] = [];
       const span: ClockSpan = { fromHours: 0, toHours: 0 };
       const { duplicate } = await execute((state) =>
@@ -246,6 +247,7 @@ export const restingCommands = [
         text: passedLine(minutes),
         gmOnly: false
       });
+      if (pace) kit.context.appendLog({ kind: "encounter", text: travelLine(minutes / 60, pace), gmOnly: false });
       kit.publishNarrations(events);
     }
   }),
@@ -275,3 +277,17 @@ export const restingCommands = [
     }
   })
 ];
+
+/** SRD 5.2.1 Travel Pace: how far the party goes in those hours, and what the pace does to its checks. */
+const TRAVEL_PACES = {
+  fast: { milesPerHour: 4, effect: "Disadvantage on Wisdom (Perception or Survival) and Dexterity (Stealth) checks" },
+  normal: { milesPerHour: 3, effect: "Disadvantage on Dexterity (Stealth) checks" },
+  slow: { milesPerHour: 2, effect: "Advantage on Wisdom (Perception or Survival) checks" }
+} as const;
+
+export function travelLine(hours: number, pace: keyof typeof TRAVEL_PACES): string {
+  const { milesPerHour, effect } = TRAVEL_PACES[pace];
+  const miles = Math.round(hours * milesPerHour * 10) / 10;
+  const name = pace[0]!.toUpperCase() + pace.slice(1);
+  return `The party travels ${miles} ${miles === 1 ? "mile" : "miles"} at a ${name} pace, with ${effect} on the way.`;
+}

@@ -584,7 +584,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `ring-of-feather-falling` - no falling model.
+  /** "When you fall while wearing this ring, you descend 60 feet per round and take no damage from falling." */
+  "ring-of-feather-falling": { modifiers: [{ type: "movement", rule: "safe-fall" }] },
 
   // `ring-of-free-action` - a condition immunity cannot be limited to magical sources, and an absolute
   // one would refuse ordinary Restrained/Paralyzed effects. Ignoring difficult terrain is not modeled.
@@ -1418,10 +1419,32 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `boots-of-levitation` - the Levitate cast would prompt the wearer to save against their own boots.
+  // "You can cast Levitate on yourself at will": the levitation lands on the wearer with no save to make against its
+  // own boots, and the movement rules raise it 20 feet and let it move only as if climbing (`falling.ts`). It lasts
+  // the spell's 10 minutes; ending it sooner (the spell's Concentration) is the wearer's, on the sheet.
+  "boots-of-levitation": {
+    actions: [
+      {
+        id: "levitate",
+        name: "Levitate (Self)",
+        activation: "action",
+        description:
+          "Cast Levitate on yourself: you rise up to 20 feet and stay suspended, moving only by pushing or pulling along a surface as if climbing. You can move up or down as part of your move. When it ends, you float gently to the ground. End it on your sheet.",
+        damage: [],
+        grants: {
+          name: "Levitate",
+          tags: ["levitating"],
+          duration: { type: "minutes", minutes: 10 },
+          modifiers: []
+        }
+      }
+    ]
+  },
   // `boots-of-speed` - doubled speed, a 10-minute budget, and opportunity-attack disadvantage (the
   //     defender's incoming-attack riders get no attack-kind filters).
-  // `boots-of-striding-and-springing` - a speed floor, encumbrance and jumping are not modeled.
+  // `boots-of-striding-and-springing` - the speed floor and encumbrance are not modeled. "Once on each of your turns,
+  // you can jump up to 30 feet by spending only 10 feet of movement": a leap the jump rules read.
+  "boots-of-striding-and-springing": { modifiers: [{ type: "movement", rule: "leap", feet: 30, costFeet: 10 }] },
   /** "You have a Climb Speed equal to your Speed." Walls, ceilings and slippery surfaces are the GM's. */
   "slippers-of-spider-climbing": { modifiers: [{ type: "special-speed", movement: "climb", equalToSpeed: true }] },
 
@@ -1441,7 +1464,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         uses: { limit: 4, per: "long-rest", pool: "winged-boots-charges" },
         grants: {
           name: "Winged Flight",
-          tags: ["winged-flight"],
+          // "You descend at a rate of 30 feet per round until you land": the engine lowers a flier gently.
+          tags: ["winged-flight", "descends-safely"],
           duration: { type: "minutes", minutes: 60 },
           modifiers: [{ type: "special-speed", movement: "fly", feet: 30 }]
         }
@@ -1594,7 +1618,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ---- Shoulders -------------------------------------------------------------------------------
 
-  // `cape-of-the-mountebank` - the Dimension Door cast would deal its 4d6 to the target; the smoke cloud is not modeled.
+  // "You can use it to cast Dimension Door", once a dawn: the cast teleports its wearer (`granted-moves.ts`), the 4d6
+  // falling only on an arrival in a filled space. The smoke cloud is the GM's.
+  "cape-of-the-mountebank": { casts: [{ spellId: "dimension-door", uses: { limit: 1, per: "long-rest" } }] },
 
   // Spider Climb, Spider Walk and the Web cast are not expressible.
   "cloak-of-arachnida": { grants: { damageResistances: ["poison"] } },
@@ -1730,10 +1756,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     actions: [
       {
         id: "wings",
-        name: "Spread the Wings",
+        name: "Wings of Flying",
         activation: "action",
         description:
-          "Magic action: the cloak turns into a pair of wings on your back for 1 hour, giving you a Fly Speed of 60 feet. When the wings disappear, you can't use them again for 1d12 hours.",
+          "Turn the cloak into wings on your back: a Fly Speed of 60 feet for 1 hour or until you end it with a Magic action. If you are in the air when they vanish, you fall. Once they vanish, you can't use them again for 1d12 hours.",
+        damage: [],
         uses: { limit: 1, per: "time", afterHours: "1d12+1" },
         grants: {
           name: "Wings of Flying",
@@ -1823,7 +1850,27 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `broom-of-flying` - Fly Speed is not modeled (also `carpet-of-flying`, `horseshoes-of-a-zephyr`).
+  // "It hovers beneath you and can be ridden in the air. It has a Fly Speed of 50 feet"; 30 feet carrying over 200
+  // pounds, which carried weight doesn't track. The carpet's speed depends on its size, so it stays the GM's, and so do
+  // the horseshoes.
+  "broom-of-flying": {
+    actions: [
+      {
+        id: "ride",
+        name: "Ride the Broom",
+        activation: "action",
+        description:
+          "Stand astride the broom and speak its command word: it hovers beneath you with a Fly Speed of 50 feet (30 feet while carrying over 200 pounds). It stops hovering when you land; end it on your sheet.",
+        damage: [],
+        grants: {
+          name: "Broom of Flying",
+          tags: ["broom-of-flying"],
+          duration: { type: "manual" },
+          modifiers: [{ type: "special-speed", movement: "fly", feet: 50, hover: true }]
+        }
+      }
+    ]
+  },
 
   // Its light: "the candle sheds Dim Light in a 30-foot radius" for its 4 hours of burning. Not modeled: Advantage on
   // D20 Tests and slot-free level 1 spells within that light, and the Gate it can open.

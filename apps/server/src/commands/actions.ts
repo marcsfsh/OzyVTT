@@ -3,6 +3,7 @@ import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry, templateOfArea } from "../annotations.js";
 import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
+import { areaOriginHeight, creatureAtPoint, withinAreaHeight } from "../altitude.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { withSeenTargets } from "../resolution/seen-targets.js";
 import { builtinActionFor } from "../builtin-actions.js";
@@ -12,7 +13,8 @@ import { ActionResolveSchema, ActionUseSchema, DiceRollSchema } from "@vtt/domai
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { heldRollFor, requireTypedDie } from "../held-rolls.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
-import { tokenCreatureDistance } from "../movement-narration.js";
+import { activeMoveGrant } from "../granted-moves.js";
+import { mapDistance, tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { effectiveModeFor, overrideWaives, rulesInForce } from "../rules-families.js";
@@ -56,7 +58,7 @@ export const actionCommands = [
     type: "action.resolve",
     operationId: "resolveAction",
     description:
-      "Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. GM-grade for any combatant; a player session only for their own claimed character (cover and rules overrides stay GM-only). A player's hit is handed to the GM as a damage proposal, or applied directly when the table's player-damage-mode is `direct`. Targets are explicit ids or an area template (never both). An area catches every combatant under it; for a player it is refused when none they can see is inside, and their reply names only the creatures they can see. Rolls are recorded in the shared history and the response carries the `resolution`. An action or Bonus Action off the creature's own turn meets the `economy.not-your-turn` block, except a Readied creature's response, which spends its Reaction.",
+      "Runs a stat-block action: attack vs target AC with 2024 crit doubling, or save-DC surfacing with proposed damage. GM-grade for any combatant; a player session only for their own claimed character (cover and rules overrides stay GM-only). A player's hit is handed to the GM as a damage proposal, or applied directly when the table's player-damage-mode is `direct`. Targets are explicit ids or an area template (never both). An area catches every combatant under it; for a player it is refused when none they can see is inside, and their reply names only the creatures they can see. Rolls are recorded in the shared history and the response carries the `resolution`. An action or Bonus Action off the creature's own turn meets the `economy.not-your-turn` block, except a Readied creature's response, which spends its Reaction. A spell's cast may carry `shaping`: Metamagic options its caster knows, paid in Sorcery Points, and Sculpt Spells' protected creatures. The server checks each against the spell (`metamagic.*` blocks) and applies it.",
     summary:
       "Run a stat-block action: attack vs AC or save-DC with typed damage (GM anyone; a player their own claimed character).",
     schema: ActionResolveSchema,
@@ -171,6 +173,24 @@ export const actionCommands = [
               (id !== actorId || !casterOutside) &&
               (!draft.combat.active || draft.combat.initiative.some((entry) => entry.actorId === id))
           );
+          // Height: an area reaches up and down only as far as its shape does (a flier above a Fireball is spared).
+          resolvedTargetIds = withinAreaHeight(
+            draft,
+            resolvedTargetIds,
+            action.area ?? { shape: placed.shape, sizeFeet: snapped.sizeFeet, widthFeet: null },
+            areaOriginHeight(
+              draft,
+              actorId,
+              casterOutside,
+              creatureAtPoint(draft, calibration, snapped.origin),
+              calibration.distancePerCell
+            ),
+            (id) => {
+              const at = draft.combat.tokens.find((token) => token.actorId === id)?.position;
+              return at ? (mapDistance(geometry!, snapped.origin, at)?.value ?? null) : null;
+            },
+            calibration.distancePerCell
+          );
           // An area catches everyone under it, seen or not. Whether it holds anyone is judged on what the caster's
           // player can see, so an empty refusal never tells them a hidden creature is there. A spell that leaves its
           // area behind (Moonbeam, Web, a wall), or does nothing to whoever is in it (Minor Illusion's image), may be
@@ -257,8 +277,14 @@ export const actionCommands = [
             ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),
             ...(request.knockOut === true ? { knockOut: true } : {}),
             ...(request.overchannel === true ? { overchannel: true } : {}),
+            ...(request.shaping && request.shaping.length > 0 ? { shaping: request.shaping } : {}),
             ...(template ? { areaPlaced: true } : {}),
             ...(request.ready === true ? { ready: true } : {}),
+            ...(request.moveFirst === true ? { moveFirst: true } : {}),
+            // The rest of an action whose move was taken first was paid for then.
+            ...(request.moveFirst !== true && activeMoveGrant(draft, attacker)?.owedActionId === action.id
+              ? { owedPaid: true }
+              : {}),
             // Spell areas are the GM's to see, so only the GM aims a cast at one.
             ...(request.zoneId !== undefined && !isPlayer ? { zoneId: request.zoneId } : {}),
             ...(action.spellId !== undefined && standsInSilence(draft, actorId, geometry, kit.equipmentCatalog())
@@ -425,6 +451,7 @@ export const actionCommands = [
         slotLevel,
         spend: chosenSpend,
         damageType,
+        shaping,
         expectedRevision
       } = request;
       if (override && !isGmGrade(principal)) throw new GameAccessDeniedError("Your GM adjudicates rules overrides.");
@@ -444,6 +471,7 @@ export const actionCommands = [
           ...(slotLevel === undefined ? {} : { slotLevel }),
           ...(chosenSpend === undefined ? {} : { spend: chosenSpend }),
           ...(damageType === undefined ? {} : { damageType }),
+          ...(shaping === undefined ? {} : { shaping }),
           ...(expectedRevision === undefined ? {} : { expectedRevision })
         });
 
@@ -487,11 +515,15 @@ export const actionCommands = [
           ...(slotLevel === undefined ? {} : { slotLevel }),
           ...(chosenSpend === undefined ? {} : { spend: chosenSpend }),
           ...(damageType === undefined ? {} : { damageType }),
+          ...(shaping === undefined ? {} : { shaping }),
           ...(expectedRevision === undefined ? {} : { expectedRevision })
         });
         const healing = (result.resolution as ActionResolution | undefined)?.healing;
         return { ...result, route: "resolved", ...(healing ? { healing } : {}) };
       }
+      // Metamagic shapes a cast the server resolves; loose dice have nothing for it to change.
+      if (shaping && shaping.length > 0)
+        throw new CommandRejectedError("Metamagic shapes a spell cast at its targets. Choose who the spell targets.");
       // A spell cast with a higher slot rolls that slot's dice, on the loose route as in the fight.
       const castLevel = listed.spellSlot ? castSlotLevel(actor, listed.spellSlot.level, slotLevel) : undefined;
       const spell = listed.spellId ? kit.equipmentCatalog().spellRecord?.(listed.spellId) : undefined;

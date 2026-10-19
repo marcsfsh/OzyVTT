@@ -153,3 +153,20 @@ export function travelBudgetFeet(
   const speed = multipliedSpeed(actor, Math.max(0, special - 5 * exhaustionLevel(actor) + riderSpeed(derivation)));
   return speed * (1 + dashesOf(actor).count);
 }
+
+/** One way of moving's Speed as it stands now, before Dash: what "half its Fly Speed" measures. Climbing or swimming
+ *  without the speed is walking Speed; null when the creature has no such speed or no known Speed. */
+export function currentTravelSpeedFeet(
+  actor: Actor,
+  derivation: EquipmentDerivation,
+  definition: ActorDefinition | undefined,
+  mode: TravelMode
+): number | null {
+  const walking = currentSpeedFeet(actor, derivation);
+  if (mode === "walk") return walking;
+  const special = specialSpeedsOf(actor, definition, derivation)[mode];
+  if (special === undefined) return mode === "climb" || mode === "swim" ? walking : null;
+  if (walking === null) return null;
+  if (speedZeroed(actor)) return 0;
+  return multipliedSpeed(actor, Math.max(0, special - 5 * exhaustionLevel(actor) + riderSpeed(derivation)));
+}

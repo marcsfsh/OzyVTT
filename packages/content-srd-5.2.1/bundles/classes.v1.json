@@ -5918,7 +5918,22 @@
     "id": "slow-fall",
     "name": "Slow Fall",
     "level": 4,
-    "description": "You can take a Reaction when you fall to reduce any damage you take from the fall by an amount equal to five times your Monk level."
+    "description": "You can take a Reaction when you fall to reduce any damage you take from the fall by an amount equal to five times your Monk level.",
+    "actions": [
+     {
+      "id": "slow-fall",
+      "name": "Slow Fall",
+      "activation": "reaction",
+      "description": "When you fall, take a Reaction to reduce any damage you take from the fall by an amount equal to five times your Monk level.",
+      "damage": [],
+      "reaction": {
+       "trigger": "falls",
+       "response": "reduce-fall-damage",
+       "perLevel": 5,
+       "classId": "monk"
+      }
+     }
+    ]
    },
    {
     "id": "extra-attack",
@@ -7290,115 +7305,7 @@
     "id": "restoring-touch",
     "name": "Restoring Touch",
     "level": 14,
-    "description": "When you use Lay On Hands on a creature, you can also remove one or more of the following conditions from the creature: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. You must expend 5 Hit Points from the healing pool of Lay On Hands for each of these conditions you remove; those points don't also restore Hit Points to the creature.",
-    "uses": {
-     "scaling": {
-      "type": "by-level",
-      "table": [
-       {
-        "level": 1,
-        "limit": 5
-       },
-       {
-        "level": 2,
-        "limit": 10
-       },
-       {
-        "level": 3,
-        "limit": 15
-       },
-       {
-        "level": 4,
-        "limit": 20
-       },
-       {
-        "level": 5,
-        "limit": 25
-       },
-       {
-        "level": 6,
-        "limit": 30
-       },
-       {
-        "level": 7,
-        "limit": 35
-       },
-       {
-        "level": 8,
-        "limit": 40
-       },
-       {
-        "level": 9,
-        "limit": 45
-       },
-       {
-        "level": 10,
-        "limit": 50
-       },
-       {
-        "level": 11,
-        "limit": 55
-       },
-       {
-        "level": 12,
-        "limit": 60
-       },
-       {
-        "level": 13,
-        "limit": 65
-       },
-       {
-        "level": 14,
-        "limit": 70
-       },
-       {
-        "level": 15,
-        "limit": 75
-       },
-       {
-        "level": 16,
-        "limit": 80
-       },
-       {
-        "level": 17,
-        "limit": 85
-       },
-       {
-        "level": 18,
-        "limit": 90
-       },
-       {
-        "level": 19,
-        "limit": 95
-       },
-       {
-        "level": 20,
-        "limit": 100
-       }
-      ]
-     },
-     "per": "long-rest",
-     "pool": "lay-on-hands"
-    },
-    "actions": [
-     {
-      "id": "lay-on-hands-restoring-touch",
-      "name": "Lay on Hands: Restoring Touch",
-      "activation": "bonus-action",
-      "description": "As a Bonus Action, touch a creature and expend 5 Hit Points from the pool of healing to remove one of these conditions from it: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. Those points don't also restore Hit Points to the creature.",
-      "damage": [],
-      "useCost": 5,
-      "endsConditions": [
-       "blinded",
-       "charmed",
-       "deafened",
-       "frightened",
-       "paralyzed",
-       "stunned"
-      ],
-      "endsOneCondition": true
-     }
-    ]
+    "description": "When you use Lay On Hands on a creature, you can also remove one or more of the following conditions from the creature: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. You must expend 5 Hit Points from the healing pool of Lay On Hands for each of these conditions you remove; those points don't also restore Hit Points to the creature."
    },
    {
     "id": "aura-expansion",
@@ -10002,7 +9909,26 @@
         },
         "per": "long-rest",
         "pool": "sorcery-points"
-       }
+       },
+       "actions": [
+        {
+         "id": "seeking-spell",
+         "name": "Seeking Spell",
+         "activation": "other",
+         "description": "When you miss with an attack roll for a spell, spend 1 Sorcery Point to reroll the d20. You must use the new roll.",
+         "damage": [],
+         "answer": {
+          "rolls": [
+           "attack"
+          ],
+          "when": "failure",
+          "spellAttacks": true,
+          "effect": {
+           "kind": "reroll"
+          }
+         }
+        }
+       ]
       },
       {
        "id": "subtle-spell",
