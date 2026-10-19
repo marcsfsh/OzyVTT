@@ -70,7 +70,9 @@ describe("what one cast of an SRD spell does", () => {
       response: "strike-back",
       rangeFeet: 60
     });
-    for (const id of ["counterspell", "feather-fall"]) expect(effectOf(id)!.reaction, id).toBeUndefined();
+    // Feather Fall answers a fall, which the server sees (`falling.ts`).
+    expect(effectOf("feather-fall")!.reaction).toEqual({ trigger: "falls", response: "cast-on-faller", rangeFeet: 60 });
+    expect(effectOf("counterspell")!.reaction).toBeUndefined();
   });
 
   it("deals the damage of a spell that harms as it appears (2024 wording)", () => {
