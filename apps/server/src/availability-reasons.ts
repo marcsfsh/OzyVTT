@@ -133,6 +133,13 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "condition.dash-only": () => "You can take only the Dash action now.",
   "condition.one-thing-a-turn": () => "This turn you can only move, take an action or take a Bonus Action.",
   "movement.cant-stand": () => "You can't stand up now.",
+  "form.no-spells": ({ spell }) =>
+    spell && (spell.components.materialConsumed || (spell.components.costly ?? []).length > 0)
+      ? "Beast Spells leaves out a spell with a costly or consumed Material component."
+      : "You can't cast spells in this form.",
+  "form.no-actions": () => "You can't take actions in this form.",
+  "form.no-attacks": () => "You can't attack in this form.",
+  "form.wrong-form": ({ action }) => `Only in ${action.formOnly?.length === 1 ? "one" : "some"} of your forms.`,
   "legendary.own-turn": () => "Take it right after another creature's turn.",
   "legendary.after-a-turn": () => "Take it right after another creature's turn, before the next one acts.",
   "attack.light-needs-attack": () => "Attack with another Light weapon first.",

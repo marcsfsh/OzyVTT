@@ -100,6 +100,11 @@ describe("rule families", () => {
       ["roll.answers-a-roll", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
+      // A form keeps its creature from casting, acting or attacking, or from an action printed for another form.
+      ["form.no-spells", "economy"],
+      ["form.no-actions", "economy"],
+      ["form.no-attacks", "economy"],
+      ["form.wrong-form", "economy"],
       // Action Surge with two uses, Stunning Strike: once on a turn, a spent per-turn limit.
       ["feature.once-per-turn", "resources"],
       ["legendary.no-actions-remaining", "resources"],

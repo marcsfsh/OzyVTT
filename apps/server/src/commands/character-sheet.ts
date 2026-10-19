@@ -1,3 +1,4 @@
+import { setKnownForms } from "../transform/known-forms.js";
 import { randomUUID } from "node:crypto";
 import type { GameState } from "@vtt/domain";
 import { catalogIdOf, type InventoryItem } from "@vtt/schemas";
@@ -11,6 +12,7 @@ import {
   CharacterRecoverAmmunitionSchema,
   CharacterSetCurrencySchema,
   CharacterSetFavouritesSchema,
+  CharacterSetKnownFormsSchema,
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterFinishPreparingSchema,
@@ -398,6 +400,32 @@ export const characterSheetCommands = [
         const actor = state.actors.find((candidate) => candidate.id === request.actorId);
         const definition = actor?.definitionId ? kit.resolveDefinitionIn(state, actor.definitionId) : undefined;
         setFavourites(state, request.actorId, request.optionIds, { definition, catalog: kit.equipmentCatalog() });
+      });
+    }
+  }),
+
+  defineCommand({
+    type: "character.set-known-forms",
+    operationId: "setKnownForms",
+    description:
+      "Sets the Beast forms a Druid knows for Wild Shape, as bestiary ids: at most the Beast Shapes table's count for its Druid level, each a Beast of that level's Challenge Rating or lower, with a Fly Speed only from Druid level 8. A player fills an empty place at any time and replaces one known form after each Long Rest; the GM may set any. The GM for any character; a player session only for their claimed character.",
+    summary: "Set a Druid's known Wild Shape forms (the GM for anyone; a player for their own claimed character).",
+    schema: CharacterSetKnownFormsSchema,
+    malformed: "The known forms command is malformed.",
+    issueMessage: true,
+    async run({ principal, request, execute }, kit) {
+      await execute((state) => {
+        requireActorAccess(initiatorOf(principal), state, request.actorId, "edit");
+        setKnownForms(
+          state,
+          request.actorId,
+          request.formIds,
+          {
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+            catalog: kit.equipmentCatalog()
+          },
+          isGmGrade(principal)
+        );
       });
     }
   }),

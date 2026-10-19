@@ -53,6 +53,11 @@ const RULE_FAMILIES = {
   "condition.one-thing-a-turn": "economy",
   // A creature that can't end the Prone condition on itself (Hideous Laughter).
   "movement.cant-stand": "movement",
+  // A form forbids it: spells (Wild Shape, Polymorph), actions (a vampire's mist), or another form's attack.
+  "form.no-spells": "economy",
+  "form.no-actions": "economy",
+  "form.no-attacks": "economy",
+  "form.wrong-form": "economy",
   // "Legendary actions are taken right after other creatures' turns" is a timing/economy rule...
   "legendary.own-turn": "economy",
   "legendary.after-a-turn": "economy",

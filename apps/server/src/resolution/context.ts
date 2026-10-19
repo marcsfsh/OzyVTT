@@ -119,6 +119,14 @@ export type ResolveInput = Readonly<{
   knockOut?: boolean;
   /** How the caster shapes this spell's cast (Metamagic, Sculpt Spells), checked and applied by `metamagic.ts`. */
   shaping?: readonly CastShaping[];
+  /** The form a shape-shift takes (a known form, a Beast, a printed form's id, or `true`), and one per target where
+   *  each takes its own (`shape-shift.ts`). */
+  form?: string;
+  targetForms?: ReadonlyArray<Readonly<{ targetId: string; form: string }>>;
+  /** Whether the user's gear melds into its form or is worn by it, where the action lets it choose. */
+  gear?: "merged" | "worn";
+  /** The effect a use picks among its action's options (Enlarge or Reduce). */
+  option?: string;
 }>;
 
 export type ResolveDependencies = Readonly<{

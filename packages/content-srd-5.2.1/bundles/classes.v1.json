@@ -3972,6 +3972,23 @@
       },
       "adds": {
        "classLevel": 1
+      },
+      "shapeShift": {
+       "from": "known",
+       "creatureTypes": [
+        "beast"
+       ],
+       "keeps": [
+        "mental",
+        "features",
+        "proficiencies",
+        "type"
+       ],
+       "noSpells": true,
+       "gear": "choice",
+       "endsOnIncapacitated": true,
+       "leaveAs": "bonus-action",
+       "hoursPerTwoLevelsOf": "druid"
       }
      }
     ]

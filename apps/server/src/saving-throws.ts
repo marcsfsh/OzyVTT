@@ -1,3 +1,6 @@
+import { ownSizeOf, takeForm } from "./transform/assume.js";
+import { revertOnFailure } from "./transform/rules.js";
+import { refreshSize } from "./transform/forms.js";
 import type {
   AbilityId,
   Actor,
@@ -423,6 +426,7 @@ export function createPendingSaves(
       | "gmApplies"
       | "failureByHitPoints"
       | "failureBanishes"
+      | "endsForm"
     >;
     /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
     magical?: boolean;
@@ -481,6 +485,7 @@ export function createPendingSaves(
     ...(input.extra?.breaksConcentration ? { breaksConcentration: true as const } : {}),
     ...(input.extra?.zoneId !== undefined ? { zoneId: input.extra.zoneId } : {}),
     ...(input.extra?.gmApplies ? { gmApplies: true as const } : {}),
+    ...(input.extra?.endsForm ? { endsForm: true as const } : {}),
     ...(input.extra?.failureByHitPoints ? { failureByHitPoints: structuredClone(input.extra.failureByHitPoints) } : {}),
     ...(input.extra?.failureBanishes ? { failureBanishes: [...input.extra.failureBanishes] } : {}),
     ...(input.magical ? { magical: true as const } : {}),
@@ -539,49 +544,61 @@ export function applyFailureEffect(
   }
   const events: EffectNarration[] = [];
   withoutSameHazard(target, onFail);
-  const applied = addEffect(
-    state,
-    target.id,
-    makeEffect({
-      id,
-      name: onFail.name,
-      tags: [...onFail.tags],
-      sourceActorId: onFail.sourceActorId,
-      sourceName: onFail.sourceName,
-      sourceActionId: onFail.sourceActionId ?? null,
-      startedRound: state.combat.round,
-      // "Until the end of the current turn": the end of this turn.
-      duration:
-        onFail.currentTurn && onFail.duration?.type === "until-bearer-turn-end"
-          ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
-          : effectDurationOf(state, onFail.duration, target.id, onFail.sourceActorId),
-      // Saves parked before failures carried their own lifetime were all grapples.
-      endsWhenSourceDefeated: onFail.endsWhenSourceDefeated ?? onFail.tags.includes("grapple"),
-      concentration: onFail.castId !== undefined,
-      linkedConditionIds: [...onFail.linkedConditionIds],
-      escapeDc: onFail.escapeDc,
-      ...(onFail.repeatSave ? { repeatSave: { ...onFail.repeatSave } } : {}),
-      ...(onFail.endsOnDamage ? { endsOnDamage: true } : {}),
-      ...(onFail.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
-      ...(onFail.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
-      ...(onFail.speedZero ? { speedZero: true } : {}),
-      ...(onFail.castId !== undefined ? { castId: onFail.castId } : {}),
-      ...(onFail.spell ? { spell: { ...onFail.spell } } : {}),
-      ...(onFail.rangeFeet !== undefined ? { rangeFeet: onFail.rangeFeet } : {}),
-      ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {}),
-      ...(onFail.magical ? { magical: true as const } : {}),
-      ...(onFail.armorClassBonus !== undefined ? { armorClassBonus: onFail.armorClassBonus } : {}),
-      ...(onFail.endAction ? { endAction: { ...onFail.endAction } } : {}),
-      ...(onFail.optionId !== undefined ? { optionId: onFail.optionId } : {}),
-      ...(onFail.conditionImmunities ? { conditionImmunities: [...onFail.conditionImmunities] } : {}),
-      // The light it sheds while it lasts (Faerie Fire's Dim Light).
-      ...(onFail.light ? { light: { ...onFail.light } } : {}),
-      // What it does while it lasts (Bane's -1d4).
-      modifiers: [...onFail.modifiers]
-    }),
-    events,
-    immunities
-  );
+  const failed = makeEffect({
+    id,
+    name: onFail.name,
+    tags: [...onFail.tags],
+    sourceActorId: onFail.sourceActorId,
+    sourceName: onFail.sourceName,
+    sourceActionId: onFail.sourceActionId ?? null,
+    startedRound: state.combat.round,
+    // "Until the end of the current turn": the end of this turn.
+    duration:
+      onFail.currentTurn && onFail.duration?.type === "until-bearer-turn-end"
+        ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
+        : effectDurationOf(state, onFail.duration, target.id, onFail.sourceActorId),
+    // Saves parked before failures carried their own lifetime were all grapples.
+    endsWhenSourceDefeated: onFail.endsWhenSourceDefeated ?? onFail.tags.includes("grapple"),
+    concentration: onFail.castId !== undefined,
+    linkedConditionIds: [...onFail.linkedConditionIds],
+    escapeDc: onFail.escapeDc,
+    ...(onFail.repeatSave ? { repeatSave: { ...onFail.repeatSave } } : {}),
+    ...(onFail.endsOnDamage ? { endsOnDamage: true } : {}),
+    ...(onFail.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
+    ...(onFail.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
+    ...(onFail.speedZero ? { speedZero: true } : {}),
+    ...(onFail.castId !== undefined ? { castId: onFail.castId } : {}),
+    ...(onFail.spell ? { spell: { ...onFail.spell } } : {}),
+    ...(onFail.rangeFeet !== undefined ? { rangeFeet: onFail.rangeFeet } : {}),
+    ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {}),
+    ...(onFail.magical ? { magical: true as const } : {}),
+    ...(onFail.armorClassBonus !== undefined ? { armorClassBonus: onFail.armorClassBonus } : {}),
+    ...(onFail.endAction ? { endAction: { ...onFail.endAction } } : {}),
+    ...(onFail.optionId !== undefined ? { optionId: onFail.optionId } : {}),
+    ...(onFail.conditionImmunities ? { conditionImmunities: [...onFail.conditionImmunities] } : {}),
+    // The light it sheds while it lasts (Faerie Fire's Dim Light).
+    ...(onFail.light ? { light: { ...onFail.light } } : {}),
+    // What it does while it lasts (Bane's -1d4).
+    modifiers: [...onFail.modifiers],
+    // A size it changes (Enlarge/Reduce), from the size the creature had before.
+    ...(onFail.sizeChange ? { sizeChange: { ...onFail.sizeChange }, ownSize: ownSizeOf(target) } : {})
+  });
+  // A failure that shape-shifts the creature (Polymorph) takes the form, which needs the stat blocks.
+  if (onFail.form && immunities?.resolveDefinition) {
+    const shifted = takeForm(
+      state,
+      target.id,
+      { ...failed, form: structuredClone(onFail.form) },
+      {
+        resolveDefinition: immunities.resolveDefinition,
+        ...(immunities.catalog ? { catalog: immunities.catalog } : {})
+      },
+      immunities
+    );
+    return shifted;
+  }
+  const applied = addEffect(state, target.id, failed, events, immunities);
+  if (applied.sizeChange) refreshSize(state, target);
   // Calm Emotions: a Charmed or Frightened it holds off is kept on the effect for later; one it makes the creature
   // immune to and doesn't hold off ends.
   const held = suppressConditions(target, onFail.suppressesConditions ?? []);
@@ -1216,6 +1233,23 @@ export function answerSave(
   if (!success && pending.failurePush) events.push(...pushOnFailure(target, pending, deps));
   // SRD Sleet Storm: a failure "and lose Concentration".
   if (!success && pending.breaksConcentration) events.push(...endConcentrationSustainedBy(state, target.id));
+  // SRD Moonbeam: a shape-shifted creature that fails "reverts to its true form and can't shape-shift until it leaves".
+  if (!success && pending.endsForm) {
+    const zone = state.combat.spellZones.find((entry) => entry.id === pending.zoneId);
+    const caster = state.actors.find((actor) => actor.id === pending.sourceActorId);
+    const castId =
+      zone?.castId ??
+      caster?.effects.find((effect) => effect.castId !== undefined && effect.spell?.id === pending.spell?.id)?.castId;
+    events.push(
+      ...revertOnFailure(state, target, {
+        sourceActorId: pending.sourceActorId,
+        sourceName: pending.sourceName,
+        spellName: pending.actionName,
+        ...(castId ? { castId } : {}),
+        id: `${commandId}:${saveId}:revert`
+      })
+    );
+  }
   if (outcomeCondition)
     conditionApplied = target.conditions.some(
       (condition) =>

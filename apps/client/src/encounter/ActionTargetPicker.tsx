@@ -9,6 +9,7 @@ import { FaceEntry } from "./RollControls";
 import { plainActionName } from "./format";
 import type { TargetRow } from "../table/targetRows";
 import { InFooter } from "../table/footerSlot";
+import { ShapeChoices } from "./ShapeChoices";
 import { revealInRegion } from "../lib/reveal";
 import { weaponChoicesOf, type CarriedRow } from "./weapon-choices";
 import {
@@ -19,6 +20,9 @@ import {
   setChosenAbility,
   setConditionChoice,
   setDamageType,
+  setEffectOption,
+  setShapeForm,
+  setShapeGear,
   setShapingCreatures,
   setTargetDarts,
   setTargetingSpend,
@@ -227,6 +231,14 @@ export function ActionTargetPicker({
         </label>
       )}
       <ChoicePicks picking={picking} targets={targets} carried={carried} />
+      <ShapeChoices
+        action={picking.action}
+        choice={picking}
+        targets={targets.filter((target) => picking.selected.includes(target.id))}
+        onForm={setShapeForm}
+        onGear={setShapeGear}
+        onOption={setEffectOption}
+      />
       <ShapingPicks
         picking={picking}
         group={group}

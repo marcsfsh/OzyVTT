@@ -24,6 +24,9 @@ import { effectNameOf } from "../effect-names.js";
 import { fatalFailureOf } from "../fatal-saves.js";
 import { sightRules } from "../vision/rules.js";
 import { sceneSight } from "../vision/sight.js";
+import { areAllies } from "../creature-sides.js";
+import { chosenEffectOption } from "./effect-options.js";
+import { failureFormOf } from "./shape-shift.js";
 
 type AcBonusReaction = Extract<ActionReaction, { response: "ac-bonus" }>;
 
@@ -300,7 +303,15 @@ export function failureEffectFor(
   ctx: MagicalSource & Pick<ResolveContext, "castId">,
   conditionIds: readonly string[],
   cast?: SpellCast,
-  option: GrantOption | null = null
+  option: GrantOption | null = null,
+  /** What this use adds: the form a failure takes (Polymorph's Beast), and the effect it picked among the action's
+   *  options (Enlarge or Reduce) in place of its declared one. */
+  shaped: Readonly<{
+    form?: NonNullable<PendingSave["onFailEffect"]>["form"];
+    tags?: readonly string[];
+    name?: string;
+    declared?: NonNullable<NonNullable<ResolveContext["action"]["save"]>["failureEffect"]>;
+  }> = {}
 ): PendingSave["onFailEffect"] {
   const { action, attacker, castId } = ctx;
   const save = action.save;
@@ -311,11 +322,11 @@ export function failureEffectFor(
     .filter((id) => !BARE_FAILURE_CONDITIONS.has(id))
     .slice(0, 4);
   // What the failure leaves besides conditions (Bane's -1d4, Faerie Fire's outline), declared by the action.
-  const declared = save.failureEffect;
+  const declared = shaped.declared ?? save.failureEffect;
   const endAction = declared?.endAction;
   // Alchemist's Fire sets its target burning, Oil covers it: an effect of its own, or riding the conditions.
   const hazard = save.failureHazard ? HAZARDS[save.failureHazard] : undefined;
-  if (linked.length === 0 && !declared && !hazard) return undefined;
+  if (linked.length === 0 && !declared && !hazard && !shaped.form) return undefined;
   const grapple = linked.includes("grappled");
   const athletics =
     (action.spellId !== undefined && ATHLETICS_ESCAPES.has(action.spellId) && linked.includes("restrained")) ||
@@ -328,7 +339,8 @@ export function failureEffectFor(
   const ongoingDamage = save.ongoingDamage ?? hazard?.ongoingDamage;
   return {
     name: withOptionName(
-      declared?.name ??
+      shaped.name ??
+        declared?.name ??
         (linked.length > 0
           ? `${conditionLabel(linked[0]!)} by ${attacker.name} (${effectNameOf(action.name)})`
           : hazard!.name),
@@ -340,10 +352,13 @@ export function failureEffectFor(
         ...(athletics ? [ESCAPE_ATHLETICS_TAG] : []),
         ...(action.spellId !== undefined && NO_ACTIONS_FAILURES.has(action.spellId) ? [NO_ACTIONS_TAG] : []),
         ...(declared?.tags ?? []),
+        ...(shaped.tags ?? []),
         ...parts.tags,
         ...(hazard ? [hazard.tag] : [])
       ])
     ].slice(0, 8),
+    ...(shaped.form ? { form: structuredClone(shaped.form) } : {}),
+    ...(declared?.sizeChange ? { sizeChange: { ...declared.sizeChange } } : {}),
     modifiers: [...(declared?.modifiers ?? []), ...parts.modifiers],
     ...(option ? { optionId: option.id } : {}),
     ...(parts.conditionImmunities.length > 0 ? { conditionImmunities: [...parts.conditionImmunities] } : {}),
@@ -470,13 +485,42 @@ export function parkActionSave(ctx: ResolveContext): void {
     if (!picked.has(target.id)) picked.set(target.id, offered ? optionFor(ctx, offered, target, action.name) : null);
     return picked.get(target.id)!;
   };
-  const onFailEffect = failureEffectFor(ctx, conditionIds, cast);
+  // The effect picked among the action's options (Enlarge or Reduce), and the form a failure takes (Polymorph).
+  const effectOption = chosenEffectOption(ctx);
+  const shaped = { ...failureFormOf(ctx), ...(effectOption ? { declared: effectOption.effect } : {}) };
+  const onFailEffect = failureEffectFor(ctx, conditionIds, cast, null, shaped);
   const onFailFor = (option: GrantOption | null) =>
-    option ? failureEffectFor(ctx, conditionIds, cast, option) : onFailEffect;
+    option ? failureEffectFor(ctx, conditionIds, cast, option, shaped) : onFailEffect;
   // Careful Spell's and Sculpt Spells' creatures succeed with no roll and take no damage (`metamagic.ts`).
   const targets = shieldFromSave(ctx, cast);
   // A save its user makes (Contact Other Plane) is the user's alone, whatever was aimed at.
   let saving = action.save.bySelf ? [attacker] : seeingTargets(ctx, targets);
+  // "If the target is an unwilling creature, it can make a saving throw": a creature on the user's side is willing and
+  // takes the effect with no save.
+  if (action.save.unwillingOnly) {
+    const willing = saving.filter(
+      (target) => target.id === attacker.id || areAllies(target, attacker, deps.resolveDefinition)
+    );
+    saving = saving.filter((target) => !willing.includes(target));
+    for (const target of willing) {
+      const events = [
+        ...conditionIds
+          .filter((id) => !onFailEffect?.linkedConditionIds.includes(id))
+          .flatMap((id) => setCondition(state, target.id, id, true, undefined, { role: "gm" }, conditionDeps(deps))),
+        ...(onFailEffect
+          ? applyFailureEffect(
+              state,
+              target.id,
+              onFailEffect,
+              `${input.commandId}:${target.id}:fail`,
+              conditionDeps(deps)
+            )
+          : [])
+      ];
+      ctx.warnings.push(`${target.name} is willing, so it makes no save against ${action.name}.`);
+      for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
+    }
+  }
   const threshold = action.save.failsAtHitPoints;
   if (threshold !== undefined) {
     saving = [];
@@ -589,6 +633,8 @@ export function parkActionSave(ctx: ResolveContext): void {
   const extra = {
     ...(onSuccessEffect ? { onSuccessEffect } : gmApplies ? { gmApplies: true as const } : {}),
     ...(action.save.breaksConcentration ? { breaksConcentration: true as const } : {}),
+    // Moonbeam: a shape-shifted creature that fails reverts to its true form.
+    ...(action.save.failureEndsForm ? { endsForm: true as const } : {}),
     ...fatal
   };
   for (const { saveBonus, option, targetIds } of groups.values()) {

@@ -801,8 +801,50 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "transform again",
+     "activation": "action",
+     "when": "On your later turns, a Magic action transforms the targets again, each into a Large or smaller Beast of Challenge Rating 4 or lower.",
+     "laterTurnsOnly": true,
+     "damage": [],
+     "shapeShift": {
+      "from": "bestiary",
+      "onTargets": true,
+      "creatureTypes": [
+       "beast"
+      ],
+      "maxChallenge": 4,
+      "maxSize": "large",
+      "keeps": [
+       "mental",
+       "type"
+      ],
+      "noSpells": true,
+      "gear": "merged",
+      "leaveAs": "bonus-action"
+     }
+    }
+   ],
    "healing": null,
-   "seenTargets": true
+   "seenTargets": true,
+   "shapeShift": {
+    "from": "bestiary",
+    "onTargets": true,
+    "creatureTypes": [
+     "beast"
+    ],
+    "maxChallenge": 4,
+    "maxSize": "large",
+    "keeps": [
+     "mental",
+     "type"
+    ],
+    "noSpells": true,
+    "gear": "merged",
+    "temporaryHitPoints": "first-form",
+    "leaveAs": "bonus-action"
+   }
   },
   "classes": [
    "druid"
@@ -9361,30 +9403,23 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "noCastSave": true,
    "targets": {
     "count": 1
    },
    "healing": null,
-   "grant": {
-    "modifiers": [],
-    "onEnd": [],
-    "voidWhileIncapacitated": false,
-    "concentration": false,
-    "name": "Enlarge/Reduce",
-    "tags": [
-     "enlarge-reduce"
-    ],
-    "target": "target",
-    "duration": {
-     "type": "rounds",
-     "rounds": 10
-    },
-    "options": [
-     {
-      "id": "enlarge",
-      "name": "Enlarge",
-      "tags": [],
+   "seenTargets": true,
+   "effectOptions": [
+    {
+     "id": "enlarge",
+     "name": "Enlarge",
+     "effect": {
+      "name": "Enlarged",
+      "tags": [
+       "enlarged"
+      ],
+      "sizeChange": {
+       "step": 1
+      },
       "modifiers": [
        {
         "type": "roll-mode",
@@ -9419,12 +9454,12 @@
         ]
        },
        {
-        "type": "damage-bonus",
-        "amount": 0,
-        "dice": "1d4",
+        "type": "extra-damage",
+        "formula": "1d4",
+        "doubleOnCritical": true,
         "when": [
          {
-          "type": "on-damage-roll"
+          "type": "on-hit"
          },
          {
           "type": "attack-kind-is",
@@ -9436,11 +9471,19 @@
         ]
        }
       ]
-     },
-     {
-      "id": "reduce",
-      "name": "Reduce",
-      "tags": [],
+     }
+    },
+    {
+     "id": "reduce",
+     "name": "Reduce",
+     "effect": {
+      "name": "Reduced",
+      "tags": [
+       "reduced"
+      ],
+      "sizeChange": {
+       "step": -1
+      },
       "modifiers": [
        {
         "type": "roll-mode",
@@ -9494,9 +9537,9 @@
        }
       ]
      }
-    ]
-   },
-   "seenTargets": true
+    }
+   ],
+   "unwillingOnly": true
   },
   "classes": [
    "bard",
@@ -12357,83 +12400,89 @@
     "perSlot": 1
    },
    "healing": null,
-   "grant": {
-    "modifiers": [
+   "shapeShift": {
+    "from": "printed",
+    "onTargets": true,
+    "printed": [
      {
-      "type": "damage-resistance",
-      "damageTypes": [
-       "bludgeoning",
-       "piercing",
-       "slashing"
-      ]
-     },
-     {
-      "type": "roll-mode",
-      "roll": "save",
-      "mode": "advantage",
-      "when": [
+      "id": "misty-cloud",
+      "name": "Misty cloud",
+      "speeds": {
+       "walk": 0,
+       "fly": 10,
+       "hover": true
+      },
+      "noSpeech": true,
+      "noAttacks": true,
+      "sharesSpaces": true,
+      "conditionImmunities": [
+       "prone"
+      ],
+      "modifiers": [
        {
-        "type": "on-saving-throw"
+        "type": "damage-resistance",
+        "damageTypes": [
+         "bludgeoning",
+         "piercing",
+         "slashing"
+        ]
        },
        {
-        "type": "ability-is",
-        "abilities": [
-         "str"
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "advantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "str"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "advantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "dex"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "roll-mode",
+        "roll": "save",
+        "mode": "advantage",
+        "when": [
+         {
+          "type": "on-saving-throw"
+         },
+         {
+          "type": "ability-is",
+          "abilities": [
+           "con"
+          ]
+         }
         ]
        }
       ]
-     },
-     {
-      "type": "roll-mode",
-      "roll": "save",
-      "mode": "advantage",
-      "when": [
-       {
-        "type": "on-saving-throw"
-       },
-       {
-        "type": "ability-is",
-        "abilities": [
-         "dex"
-        ]
-       }
-      ]
-     },
-     {
-      "type": "roll-mode",
-      "roll": "save",
-      "mode": "advantage",
-      "when": [
-       {
-        "type": "on-saving-throw"
-       },
-       {
-        "type": "ability-is",
-        "abilities": [
-         "con"
-        ]
-       }
-      ]
-     },
-     {
-      "type": "special-speed",
-      "movement": "fly",
-      "feet": 10,
-      "hover": true
      }
     ],
-    "onEnd": [],
-    "voidWhileIncapacitated": false,
-    "concentration": false,
-    "name": "Gaseous Form",
-    "tags": [
-     "gaseous-form",
-     "dash-only"
-    ],
-    "target": "target",
-    "duration": {
-     "type": "manual"
-    }
+    "keeps": [],
+    "noSpells": true,
+    "gear": "worn",
+    "endsAtZeroHitPoints": true,
+    "leaveAs": "action"
    }
   },
   "classes": [
@@ -19696,7 +19745,8 @@
   "save": {
    "ability": "con",
    "successDamage": "half",
-   "failureConditions": []
+   "failureConditions": [],
+   "failureEndsForm": true
   },
   "target": {
    "type": "creature",
@@ -19724,7 +19774,8 @@
      "save": {
       "ability": "con",
       "successDamage": "half",
-      "failureConditions": []
+      "failureConditions": [],
+      "failureEndsForm": true
      },
      "damage": [
       {
@@ -20695,7 +20746,22 @@
     "count": 1
    },
    "healing": null,
-   "seenTargets": true
+   "seenTargets": true,
+   "shapeShift": {
+    "from": "bestiary",
+    "creatureTypes": [
+     "beast"
+    ],
+    "challengeOf": "target",
+    "keeps": [
+     "type"
+    ],
+    "noSpells": true,
+    "noSpeech": true,
+    "gear": "merged",
+    "temporaryHitPoints": "each-form",
+    "endsWithoutTemporaryHitPoints": true
+   }
   },
   "classes": [
    "bard",
@@ -23812,7 +23878,46 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "laterActions": [
+    {
+     "name": "new form",
+     "activation": "action",
+     "when": "Until the spell ends, a Magic action shape-shifts you into a different eligible form.",
+     "damage": [],
+     "shapeShift": {
+      "from": "bestiary",
+      "notCreatureTypes": [
+       "construct",
+       "undead"
+      ],
+      "challengeOf": "user",
+      "keeps": [
+       "mental",
+       "proficiencies",
+       "spellcasting",
+       "type"
+      ],
+      "gear": "choice"
+     }
+    }
+   ],
+   "healing": null,
+   "shapeShift": {
+    "from": "bestiary",
+    "notCreatureTypes": [
+     "construct",
+     "undead"
+    ],
+    "challengeOf": "user",
+    "keeps": [
+     "mental",
+     "proficiencies",
+     "spellcasting",
+     "type"
+    ],
+    "gear": "choice",
+    "temporaryHitPoints": "first-form"
+   }
   },
   "classes": [
    "druid",
@@ -27065,7 +27170,17 @@
     "count": 1
    },
    "healing": null,
-   "seenTargets": true
+   "seenTargets": true,
+   "shapeShift": {
+    "from": "bestiary",
+    "challengeOf": "target",
+    "keeps": [],
+    "noSpells": true,
+    "noSpeech": true,
+    "gear": "merged",
+    "temporaryHitPoints": "each-form"
+   },
+   "unwillingOnly": true
   },
   "classes": [
    "bard",
@@ -28558,38 +28673,41 @@
     "count": 11
    },
    "healing": null,
-   "grant": {
-    "modifiers": [
+   "shapeShift": {
+    "from": "printed",
+    "onTargets": true,
+    "printed": [
      {
-      "type": "damage-resistance",
-      "damageTypes": [
-       "bludgeoning",
-       "piercing",
-       "slashing"
+      "id": "cloud",
+      "name": "Cloud",
+      "speeds": {
+       "walk": 0,
+       "fly": 300,
+       "hover": true
+      },
+      "noActions": true,
+      "allowsActions": [
+       "dash"
+      ],
+      "conditionImmunities": [
+       "prone"
+      ],
+      "modifiers": [
+       {
+        "type": "damage-resistance",
+        "damageTypes": [
+         "bludgeoning",
+         "piercing",
+         "slashing"
+        ]
+       }
       ]
-     },
-     {
-      "type": "special-speed",
-      "movement": "fly",
-      "feet": 300,
-      "hover": true
      }
     ],
-    "onEnd": [],
-    "voidWhileIncapacitated": false,
-    "concentration": false,
-    "name": "Wind Walk",
-    "tags": [
-     "wind-walk",
-     "dash-only"
-    ],
-    "target": "targets",
-    "duration": {
-     "type": "manual"
-    },
-    "conditionImmunities": [
-     "prone"
-    ]
+    "keeps": [],
+    "gear": "worn",
+    "leaveAs": "action",
+    "revertRounds": 10
    }
   },
   "classes": [

@@ -47,7 +47,7 @@ import { VEXED_TAG } from "../weapon-mastery.js";
 import { areAllies, areEnemies } from "../creature-sides.js";
 import { holdsFeature, spellClassOf } from "../class-features.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
-import { creatureTypeOf, statblockFacts, swimSpeedFeet } from "../statblock-facts.js";
+import { creatureTypeOf, swimSpeedFeet } from "../statblock-facts.js";
 import { auraOfAuthority } from "../statblock-traits.js";
 import { hitRiderOf } from "./hit-riders.js";
 import { wardedConditions } from "../paladin-auras.js";
@@ -641,7 +641,8 @@ export function rollAttack(ctx: ResolveContext): void {
   const distance = deps.distanceFeet?.(attacker.id, target.id) ?? null;
   const targetDefinition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
   const targetDerivation = deriveEquipment(target, targetDefinition, deps.catalog);
-  const creatureType = targetDefinition ? statblockFacts(targetDefinition).creatureType : null;
+  // A character with no printed type is a Humanoid (a lycanthrope's Bite curses one).
+  const creatureType = creatureTypeOf(target, targetDefinition);
   const ability = attackAbilityOf(ctx);
   ctx.riderFilters = {
     attackKinds: attackKindsOf(ctx, distance),

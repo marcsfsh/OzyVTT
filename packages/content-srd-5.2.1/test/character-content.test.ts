@@ -707,6 +707,23 @@ describe("character-builder content records", () => {
       }
       if (slug === "skills") return skillCount > 0;
       if (slug === "weapons") return weaponCount > 0;
+      // A narrower kind of weapon, each word a filter ("melee-weapons", "martial-finesse-weapons").
+      if (/^((?:simple|martial|melee|ranged|light|finesse)-)+weapons$/.test(slug)) {
+        const words = slug.split("-").slice(0, -1);
+        return loadEquipment().some((item) => {
+          const weapon = item.category === "weapon" ? item.weapon : null;
+          if (!weapon) return false;
+          return words.every((word) =>
+            word === "simple" || word === "martial"
+              ? weapon.category === word
+              : word === "melee"
+                ? weapon.melee === true
+                : word === "ranged"
+                  ? weapon.melee === false
+                  : (weapon.properties ?? []).includes(word)
+          );
+        });
+      }
       if (slug === "tools") return toolCount > 0;
       if (slug === "languages") return languages.length > 0;
       if (slug === "feats") return feats.length > 0;

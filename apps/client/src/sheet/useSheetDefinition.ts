@@ -61,6 +61,10 @@ export type AvailabilityRow = Readonly<{
   mastery?: Readonly<{ id: string; name: string }>;
   /** The ways the caster may shape this spell's cast (Metamagic, Sculpt Spells). */
   shaping?: ContentActionSummary["shaping"];
+  /** The forms a shape-shift may take now, and for Wild Shape the Beasts its user may learn. */
+  forms?: ContentActionSummary["forms"];
+  /** The effects a use picks one of (Enlarge or Reduce). */
+  options?: ContentActionSummary["options"];
 }>;
 
 /** What the server says of one row now: whether it can be used, why not, and what a weapon's swing masters. */
@@ -123,7 +127,10 @@ export function summaryOfAvailability(row: AvailabilityRow): ContentActionSummar
     // Fire Shield's warm or chill, Bestow Curse's curse, the weapon Magic Weapon is cast on.
     ...(row.choices ? { choices: row.choices } : {}),
     // A spell's cast offers the Metamagic its caster knows.
-    ...(row.shaping ? { shaping: row.shaping } : {})
+    ...(row.shaping ? { shaping: row.shaping } : {}),
+    // A shape-shift picks its form (Wild Shape), and Enlarge/Reduce which of its effects.
+    ...(row.forms ? { forms: row.forms } : {}),
+    ...(row.options ? { options: row.options } : {})
   };
 }
 

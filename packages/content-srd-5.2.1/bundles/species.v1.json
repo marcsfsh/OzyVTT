@@ -2055,11 +2055,12 @@
             "id": "large-form",
             "name": "Large Form",
             "activation": "bonus-action",
-            "description": "Become Large for 10 minutes: Advantage on Strength checks and +10 feet Speed.",
+            "description": "Become Large for 10 minutes, where there is room: Advantage on Strength checks and +10 feet Speed.",
             "damage": [],
             "grants": {
               "name": "Large Form",
               "tags": ["large-form"],
+              "sizeChange": { "to": "large" },
               "duration": {
                 "type": "rounds",
                 "rounds": 100

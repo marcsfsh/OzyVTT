@@ -1,4 +1,5 @@
-import type { Actor } from "@vtt/domain";
+import { gearMerged } from "./transform/forms.js";
+import type { Actor, ContentMonsterSummary } from "@vtt/domain";
 import type {
   ClassReference,
   EquipmentReference,
@@ -86,6 +87,9 @@ export type EquipmentCatalog = Readonly<{
   /** A class or subclass record, for the spell list a Spell Scroll's reader draws from. */
   classRecord?: (id: string) => ClassReference | undefined;
   subclassRecord?: (id: string) => SubclassReference | undefined;
+  /** The bestiary's rows and stat blocks, for the forms a shape-shift may take (Wild Shape, Polymorph). */
+  monsterSummaries?: () => readonly ContentMonsterSummary[];
+  monster?: (id: string) => ActorDefinition | undefined;
 }>;
 
 /** Narrows a content view to the hooks the derivation reads. */
@@ -96,7 +100,9 @@ export function equipmentCatalogOf(view: EquipmentCatalog): EquipmentCatalog {
     ...(view.featureRecord ? { featureRecord: view.featureRecord } : {}),
     ...(view.spellRecord ? { spellRecord: view.spellRecord } : {}),
     ...(view.classRecord ? { classRecord: view.classRecord } : {}),
-    ...(view.subclassRecord ? { subclassRecord: view.subclassRecord } : {})
+    ...(view.subclassRecord ? { subclassRecord: view.subclassRecord } : {}),
+    ...(view.monsterSummaries ? { monsterSummaries: view.monsterSummaries } : {}),
+    ...(view.monster ? { monster: view.monster } : {})
   };
 }
 
@@ -400,9 +406,11 @@ export function deriveEquipment(
   /** A curse's vulnerabilities, which hold while attuned whether or not the item is worn. */
   const cursedVulnerabilities: Defence[] = [];
   // Every row read with the catalog's armor and weapon blocks, so what they do holds for a row that names the item only.
-  const inventory = catalog
-    ? actor.inventory.map((item) => withCatalogWeapon(withCatalogArmor(item, catalog), catalog))
-    : [];
+  // Gear melded into a form gives nothing while the form lasts (Polymorph, Wild Shape's merged equipment).
+  const inventory =
+    catalog && !gearMerged(actor)
+      ? actor.inventory.map((item) => withCatalogWeapon(withCatalogArmor(item, catalog), catalog))
+      : [];
   for (const item of inventory) {
     if (item.quantity <= 0) continue;
     const record = catalog!.equipmentRecord(catalogIdOf(item));

@@ -1,3 +1,4 @@
+import { formEffectOf } from "./transform/forms.js";
 import type { ActorMovementReply, EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { MoveMode } from "@vtt/domain/commands";
 import type { ActorDefinition } from "@vtt/schemas";
@@ -347,6 +348,8 @@ const SHARES_SPACE = ["Air Form", "Fire Form", "Water Form", "Swarm"] as const;
 const sharesSpace = (state: GameState, actorId: string, input: MovementRulesInput, swarmOnly = false): boolean => {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   const definition = actor?.definitionId ? input.resolveDefinition(actor.definitionId) : undefined;
+  // A form that can enter a creature's space and stop there (a vampire's mist, Gaseous Form's cloud).
+  if (!swarmOnly && actor && formEffectOf(actor)?.form?.sharesSpaces) return true;
   return (swarmOnly ? ["Swarm"] : SHARES_SPACE).some((name) => holdsFeature(definition, name, name));
 };
 

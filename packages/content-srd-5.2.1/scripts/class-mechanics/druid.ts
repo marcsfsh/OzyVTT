@@ -121,9 +121,11 @@ export const druid: ClassMechanicsModule = {
     },
 
     /**
-     * The use pool, read off the printed column (2 -> 3 -> 4), one use of which comes back on a Short Rest, and the
-     * Temporary Hit Points equal to the Druid level. Known Beast forms (needs a creature catalog with CR and Fly Speed
-     * filters) and the form replacement stay prose.
+     * The use pool, read off the printed column (2 -> 3 -> 4), one use of which comes back on a Short Rest, the
+     * Temporary Hit Points equal to the Druid level, and the form: one of the Druid's known Beast forms (the sheet keeps
+     * them, within the Beast Shapes table), which keeps its Hit Points, mental scores, class features, feats and
+     * proficiencies, can't cast spells, lasts half the Druid level in hours and ends on Incapacitated, death or a
+     * Bonus Action. The equipment's fate is the Druid's pick: merged (the default) or worn.
      */
     "wild-shape": {
       uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest" },
@@ -137,7 +139,17 @@ export const druid: ClassMechanicsModule = {
             "Shape-shift into a Beast form you have learned for this feature. You stay in that form for a number of hours equal to half your Druid level or until you use Wild Shape again, have the Incapacitated condition, or die. You can leave the form early as a Bonus Action, and you gain Temporary Hit Points equal to your Druid level when you assume a form.",
           damage: [],
           healing: { formula: "0", self: true, temporary: true },
-          adds: { classLevel: 1 }
+          adds: { classLevel: 1 },
+          shapeShift: {
+            from: "known",
+            creatureTypes: ["beast"],
+            keeps: ["mental", "features", "proficiencies", "type"],
+            noSpells: true,
+            gear: "choice",
+            endsOnIncapacitated: true,
+            leaveAs: "bonus-action",
+            hoursPerTwoLevelsOf: "druid"
+          }
         }
       ]
     },

@@ -15,6 +15,7 @@ import {
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { raiseCreature } from "./risen.js";
 import { traitMechanicsOf, traitOf } from "./statblock-traits.js";
+import { escapeIntoForm } from "./transform/at-zero.js";
 import { sightRules } from "./vision/rules.js";
 
 /**
@@ -54,7 +55,8 @@ const definitionOf = (actor: Actor, deps: Pick<TraitDeps, "resolveDefinition"> |
  * SRD Misty Escape (the vampire): "If the vampire drops to 0 Hit Points outside its resting place, the vampire uses
  * Shape-Shift to become mist (no action required). If it can't use Shape-Shift, it is destroyed." It lives on at 0 Hit
  * Points as mist, which can't take actions or speak; in sunlight, read with dynamic vision on, it can't shape-shift and
- * is destroyed. Running water and the 2 hours to reach its resting place are the GM's. True when it escaped.
+ * is destroyed. Where its Shape-Shift prints the mist, it takes that form (its size, speeds and Resistance) for the 2
+ * hours it has to reach its resting place (`escapeIntoForm`); running water is the GM's. True when it escaped.
  */
 export function mistyEscape(
   state: GameState,
@@ -79,20 +81,24 @@ export function mistyEscape(
     });
     return false;
   }
-  addEffect(
-    state,
-    actor.id,
-    makeEffect({
-      id: `${actor.id}:misty-escape:${state.combat.round}`,
-      name: `Mist at 0 HP (${trait.name})`,
-      tags: [ALIVE_AT_ZERO_TAG, NO_ACTIONS_TAG, CANT_SPEAK_TAG],
-      sourceActorId: actor.id,
-      sourceName: actor.name,
-      startedRound: state.combat.round,
-      duration: { type: "manual" }
-    }),
-    events
-  );
+  const mist = {
+    id: `${actor.id}:misty-escape:${state.combat.round}`,
+    name: `Mist at 0 HP (${trait.name})`,
+    tags: [ALIVE_AT_ZERO_TAG, NO_ACTIONS_TAG, CANT_SPEAK_TAG]
+  };
+  if (!deps || !escapeIntoForm(state, actor, definition, deps, mist, events))
+    addEffect(
+      state,
+      actor.id,
+      makeEffect({
+        ...mist,
+        sourceActorId: actor.id,
+        sourceName: actor.name,
+        startedRound: state.combat.round,
+        duration: { type: "manual" }
+      }),
+      events
+    );
   events.push({
     kind: "condition",
     text: `${actor.name} drops to 0 HP and escapes as mist (${trait.name}). It must reach its resting place within 2 hours or be destroyed.`,

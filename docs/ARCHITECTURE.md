@@ -521,6 +521,21 @@ answer on a missed spell attack. The shaping stays on the cast's open action ins
 readied spell for its release and on a spell area for the saves it calls for later. `actor:available-actions` offers
 each known option with its cost and why it can't be used now, and the sheet's cast detail sends the picks.
 
+A creature that shape-shifts takes a form as an effect (`EffectInstance.form`, `apps/server/src/transform/`). The
+action's `shapeShift` says where forms come from (its user's known forms for Wild Shape, the bestiary under limits for
+Polymorph and Shapechange, or the stat block's printed forms for a werewolf), what the creature keeps of its own
+statistics and how the form ends. Taking one stores a composed definition as `form-<actorId>`
+(`transform/compose.ts`): a stat block's statistics with what is kept of the creature's own, or the creature's own with
+a printed form's size and speeds. The actor's `definitionId` points at it while the form lasts, so every rule that reads
+a definition reads the form, and the true one, Speed and Armor Class wait on the effect for its end
+(`transform/assume.ts`). Ending the effect, by its duration, Concentration, the leave action the form adds, death,
+running out of Temporary Hit Points or the Incapacitated condition (`transform/rules.ts`), gives them back. A form can
+forbid spells, actions or attacks, and an action printed for some forms only is refused in the others; those are
+economy rules (`form.*`). A sheet in a form can't be rebuilt or edited until it ends. A creature's size changes the same
+way: a form's size, or an effect's `sizeChange` (Enlarge/Reduce, Large Form, the size potions), over the size it had
+before (`ownSize`), and its token takes the new footprint from its top-left cell (`transform/forms.ts`). A player sees
+only a form's name on an effect, never its stat block or terms (`projections.ts`).
+
 What a save does is data on the action's save block: `successDamage` (half or none) and the
 `failureCondition` a failed save imposes. Nothing parses the description for it. They are written where the content
 is made (the SRD build, the builder, homebrew) and copied onto the pending save prompt.

@@ -112,6 +112,8 @@ export const SpellLaterActionSchema = z
     drain: DamageDrainSchema.optional(),
     /** The area the spell leaves, whose trigger the server watches (an "other" action only). */
     zone: SpellZoneSchema.optional(),
+    /** It shape-shifts a creature again while the spell lasts (Shapechange's new form, Animal Shapes' transforming). */
+    shapeShift: ActionSchema.shape.shapeShift,
     /** It moves the area the spell left up to this many feet, to where its template is placed (Moonbeam's Magic
      *  action: 60 feet; Flaming Sphere's ram: 30). Its save, if any, falls on the creatures the area moves onto. */
     movesArea: z
@@ -266,6 +268,12 @@ export const SpellEffectSchema = z
     /** No sound can be made in the area its cast places (Silence), so a creature standing there can't cast a spell
      *  with a Verbal component while the spell lasts. */
     silencesArea: z.literal(true).optional(),
+    /** The cast shape-shifts a creature (Polymorph's Beast, Shapechange's form), as `ActionSchema.shapeShift`. */
+    shapeShift: ActionSchema.shape.shapeShift,
+    /** Effects the cast picks one of (Enlarge/Reduce), as `ActionSchema.effectOptions`. */
+    effectOptions: ActionSchema.shape.effectOptions,
+    /** Only an unwilling creature makes the cast's save; one on the caster's side takes its effect with no save. */
+    unwillingOnly: z.literal(true).optional(),
     /** Feet its area's size grows for each slot level above the spell's (Fog Cloud's radius: 20; Confusion's: 5). */
     areaPerSlot: z.number().int().min(5).max(100).optional()
   })

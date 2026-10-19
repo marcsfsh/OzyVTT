@@ -383,6 +383,14 @@ const CastShapingOffersSchema = z
     "The ways the caster may shape this spell's cast (Metamagic options it knows, Sculpt Spells), each with its Sorcery Point cost and whether this spell can take it now. Send the picks as `action.resolve`'s `shaping`; the server checks them again."
   );
 export type CastShapingOffers = Wire<z.infer<typeof CastShapingOffersSchema>>;
+/** One form a shape-shift may take, as the sheet lists it. */
+const FormOptionSchema = z.strictObject({
+  id: z.string(),
+  name: z.string(),
+  challengeRating: z.number().nullable(),
+  size: z.string(),
+  fly: z.boolean()
+});
 export const ActionAvailabilitySchema = z.strictObject({
   id: z.string(),
   name: z.string(),
@@ -529,6 +537,24 @@ export const ActionAvailabilitySchema = z.strictObject({
     ),
   /** The ways its caster may shape this spell's cast (Metamagic, Sculpt Spells), for the cast to offer. */
   shaping: CastShapingOffersSchema.optional(),
+  /** The forms a shape-shift may take now, for the user to pick (`action.resolve`'s `form`): Wild Shape's known forms,
+   *  the bestiary's Beasts for Polymorph, a werewolf's printed forms with its true form. Wild Shape also lists the
+   *  forms its user may learn, how many it knows and whether a Long Rest opened one to replace. */
+  forms: z
+    .strictObject({
+      options: z.array(FormOptionSchema),
+      perTarget: z.literal(true).optional(),
+      gearChoice: z.literal(true).optional(),
+      learnable: z.array(FormOptionSchema).optional(),
+      knownLimit: z.number().int().optional(),
+      swapOpen: z.boolean().optional()
+    })
+    .optional()
+    .describe(
+      "The forms a shape-shift may take now, sent back as the resolve's `form` (or `targetForms`, one per target, when `perTarget`); `gearChoice` lets the user say whether its gear melds or is worn. For Wild Shape, the Beasts its user may learn (`learnable`), how many it knows (`knownLimit`) and whether one may be replaced now (`swapOpen`)"
+    ),
+  /** The effects a use picks one of (Enlarge or Reduce), sent back as the resolve's `option`. */
+  options: z.array(z.strictObject({ id: z.string(), name: z.string() })).optional(),
   /** Present when the option belongs off the turn list: `rider` changes a roll, a hit or a cast and is chosen with it
    *  (Savage Attacker, Sneak Attack), `rest` is used when a rest ends (Arcane Recovery), `automatic` the server runs
    *  (a spell area's later save). */
