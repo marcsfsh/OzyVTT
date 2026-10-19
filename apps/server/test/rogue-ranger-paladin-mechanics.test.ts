@@ -735,6 +735,22 @@ describe("Ranger: Favored Enemy, audit row 32", () => {
   });
 });
 
+describe("Ranger: Superior Hunter's Prey", () => {
+  it("deals the mark's 1d6 Force to one other creature the Ranger can see, once per turn", () => {
+    const built = table(rangerInput(11));
+    expect(actionOf(built, "superior-hunters-prey")).toMatchObject({
+      damage: [{ formula: "1d6", type: "force" }],
+      uses: { limit: 1, per: "turn" },
+      targets: { count: 1, seen: true, who: "others" }
+    });
+    expect(() => resolve(built, "superior-hunters-prey", [4], [IDS.hero])).toThrowError(
+      /Superior Hunter's Prey can't target/
+    );
+    expect(resolve(built, "superior-hunters-prey", [4]).damageTargets).toMatchObject([{ total: 4 }]);
+    expect(() => resolve(built, "superior-hunters-prey", [4])).toThrowError(/no uses remaining/);
+  });
+});
+
 describe("Ranger: the rest of the kit", () => {
   it("REFUSES a level-2 Ranger with no Deft Explorer Expertise, and grants it when chosen", () => {
     const missing = rangerInput(2);

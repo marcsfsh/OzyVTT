@@ -498,7 +498,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /**
    * Three casts on one shared 3-charge pool at the printed DC. Speak with Animals forces no save, so it
-   * carries no `saveDc`. "Fear (affects Beasts only)" stays prose.
+   * carries no `saveDc`. "Fear (affects Beasts only)" refuses any other creature as a target.
    */
   "ring-of-animal-influence": {
     charges: { regain: "1d3" },
@@ -508,7 +508,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         saveDc: 13,
         uses: { limit: 3, per: "long-rest", pool: "ring-of-animal-influence-charges" }
       },
-      { spellId: "fear", saveDc: 13, uses: { limit: 3, per: "long-rest", pool: "ring-of-animal-influence-charges" } },
+      {
+        spellId: "fear",
+        saveDc: 13,
+        uses: { limit: 3, per: "long-rest", pool: "ring-of-animal-influence-charges" },
+        targets: { creatureTypes: ["beast"] }
+      },
       { spellId: "speak-with-animals", uses: { limit: 3, per: "long-rest", pool: "ring-of-animal-influence-charges" } }
     ]
   },

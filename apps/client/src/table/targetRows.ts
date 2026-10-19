@@ -15,6 +15,8 @@ export type TargetRow = Readonly<{
   number?: number;
   /** "50 ft · AC 15": the distance from the attacker, and the AC when this viewer knows it. */
   detail?: string;
+  /** The distance from the attacker in feet, where the map measures it. */
+  feet?: number;
 }>;
 
 type Candidate = Readonly<{ id: string; name: string; kind: string; armorClass?: number }>;
@@ -44,9 +46,42 @@ export function targetRows(
       initials: initialsOf(candidate.name),
       kind: candidate.kind,
       ...(number !== undefined ? { number } : {}),
-      ...(parts.length > 0 ? { detail: parts.join(" · ") } : {})
+      ...(parts.length > 0 ? { detail: parts.join(" · ") } : {}),
+      ...(feet !== null ? { feet } : {})
     };
   });
+}
+
+/** How far an action's targets may be, when it says: an attack's reach or longest range, or its own target range
+ *  (Lay on Hands' touch). Null when nothing here limits it. */
+export function targetReachFeet(
+  action: Readonly<{ reachFeet: number | null; rangeFeet: number | null; targetRangeFeet?: number }>
+): number | null {
+  const limits = [action.reachFeet, action.rangeFeet, action.targetRangeFeet ?? null].filter(
+    (feet): feet is number => feet !== null
+  );
+  return limits.length > 0 ? Math.max(...limits) : null;
+}
+
+/** Slack for the map's measure against the server's, so a creature at the edge of reach is still offered. */
+const REACH_SLACK_FEET = 2.5;
+
+/**
+ * The creatures a picker offers (#152): none beyond the action's reach or range where the map measures it, and, for
+ * an action that harms, none that is dead. The server decides either way; this keeps the list to what it allows.
+ */
+export function offeredTargets<Row extends Readonly<{ id: string; feet?: number }>>(
+  rows: readonly Row[],
+  action: Parameters<typeof targetReachFeet>[0] &
+    Readonly<{ attackBonus: number | null; saveAbility: string | null; damage: readonly unknown[] }>,
+  dead: (id: string) => boolean
+): Row[] {
+  const reach = targetReachFeet(action);
+  const harms = action.attackBonus !== null || action.saveAbility !== null || action.damage.length > 0;
+  return rows.filter(
+    (row) =>
+      !(harms && dead(row.id)) && (reach === null || row.feet === undefined || row.feet <= reach + REACH_SLACK_FEET)
+  );
 }
 
 /** A player's target rows for their own character's action, and who a placed area of theirs covers now. */

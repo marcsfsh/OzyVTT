@@ -835,6 +835,7 @@ export type ContentActionSummary = Readonly<{
   rangeFeet: number | null;
   /** Normal range band for two-range weapons; shots beyond it (up to rangeFeet) roll at disadvantage. */ rangeNormalFeet:
     number | null;
+  /** How far its targets may be when it says so without an attack (Lay on Hands' touch is 5). */ targetRangeFeet?: number;
   saveAbility: string | null;
   saveDc: number | null;
   damage: ReadonlyArray<{ formula: string; type: string }>;

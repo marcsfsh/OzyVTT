@@ -35,8 +35,8 @@ export const bard: ClassMechanicsModule = {
     },
 
     /**
-     * Both spells always prepared and not counted against the prepared total. Targeting a second
-     * creature is a spell change and stays prose.
+     * Both spells always prepared and not counted against the prepared total. The second creature either can target,
+     * within 10 feet of the first, is checked by the server by this feature's id (`resolution/action-targets.ts`).
      */
     "words-of-creation": {
       grants: {

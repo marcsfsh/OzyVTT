@@ -38,7 +38,7 @@ import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.j
 import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { castMarks, markMoveOf } from "./marks.js";
-import { actionTargetViolations } from "./action-targets.js";
+import { actionTargetViolations, wordsOfCreation } from "./action-targets.js";
 import { hitRiderOf } from "./hit-riders.js";
 import { hiddenFrom } from "../vision/audience.js";
 import { withoutSourceName } from "../hidden-source.js";
@@ -1308,7 +1308,7 @@ function checkTargeting(
  * creature is.
  */
 function checkSpellTargets(
-  { state, attacker, action, targetIds, violations }: Evaluation,
+  { state, attacker, action, targetIds, resolveDefinition, violations }: Evaluation,
   spell: SpellReference,
   castLevel: number,
   distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined
@@ -1320,8 +1320,11 @@ function checkSpellTargets(
     return;
   const targets = spell.effect?.targets;
   const unique = [...new Set(targetIds)];
+  const nameOf = (actorId: string) => state.actors.find((candidate) => candidate.id === actorId)?.name ?? "The target";
+  const words = wordsOfCreation(attacker, spell.id, unique, resolveDefinition, distanceFeet, nameOf);
+  if (words.violation) violations.push(words.violation);
   if (targets && action.darts === undefined) {
-    const limit = targets.count + (targets.perSlot ?? 0) * Math.max(0, castLevel - spell.level);
+    const limit = targets.count + (targets.perSlot ?? 0) * Math.max(0, castLevel - spell.level) + words.extra;
     if (unique.length > limit)
       violations.push({
         rule: "target.too-many",

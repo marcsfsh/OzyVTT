@@ -28,7 +28,7 @@ import {
   useTargetingBusy,
   useTargetingResult
 } from "./targeting";
-import { foesFirst, type TargetRow } from "../table/targetRows";
+import { foesFirst, offeredTargets, type TargetRow } from "../table/targetRows";
 import { revealInRegion } from "../lib/reveal";
 import "./action-runner.css";
 
@@ -128,6 +128,7 @@ export function PlayerActionRunner({
   effectTags = [],
   unavailable,
   targetRows,
+  deadIds,
   insideNow,
   actor = null,
   myTurn = true,
@@ -148,6 +149,8 @@ export function PlayerActionRunner({
   targets: readonly { actorId: string; name: string }[];
   /** Each target as its token shows it, with its distance and the AC the player knows. */
   targetRows?: ReadonlyMap<string, TargetRow>;
+  /** The creatures the player's view shows as dead, which an action that harms doesn't offer. */
+  deadIds?: ReadonlySet<string>;
   /** For an area: who it covers where it is placed now, of the creatures the player can see. */
   insideNow?: readonly TargetRow[];
   /** The tags of the character's effects, which bring forward a generic action that needs one (Put Out the Fire). */
@@ -431,23 +434,27 @@ export function PlayerActionRunner({
         <ActionTargetPicker
           picking={picking}
           targets={foesFirst(
-            targets
-              // A heal may be for the healer too (a potion the healer drinks), and so may a touch that cures or
-              // protects with no attack, save or damage (Lesser Restoration, Enhance Ability on the caster).
-              .filter(
-                (target) =>
-                  target.actorId !== actorId ||
-                  picking.action.healing != null ||
-                  healingOf(picking.action) !== undefined ||
-                  (picking.action.builtin !== true &&
-                    picking.action.attackBonus === null &&
-                    picking.action.saveAbility === null &&
-                    picking.action.damage.length === 0)
-              )
-              .map(
-                (target): Pick<TargetRow, "id" | "label"> & Partial<TargetRow> =>
-                  targetRows?.get(target.actorId) ?? { id: target.actorId, label: target.name }
-              ),
+            offeredTargets(
+              targets
+                // A heal may be for the healer too (a potion the healer drinks), and so may a touch that cures or
+                // protects with no attack, save or damage (Lesser Restoration, Enhance Ability on the caster).
+                .filter(
+                  (target) =>
+                    target.actorId !== actorId ||
+                    picking.action.healing != null ||
+                    healingOf(picking.action) !== undefined ||
+                    (picking.action.builtin !== true &&
+                      picking.action.attackBonus === null &&
+                      picking.action.saveAbility === null &&
+                      picking.action.damage.length === 0)
+                )
+                .map(
+                  (target): Pick<TargetRow, "id" | "label"> & Partial<TargetRow> =>
+                    targetRows?.get(target.actorId) ?? { id: target.actorId, label: target.name }
+                ),
+              picking.action,
+              (id) => deadIds?.has(id) === true
+            ),
             "player-character",
             picking.action.healing != null || healingOf(picking.action) !== undefined
           )}

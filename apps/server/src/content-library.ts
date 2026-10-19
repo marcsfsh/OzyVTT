@@ -257,6 +257,7 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     reachFeet: action.attack?.reachFeet ?? null,
     rangeFeet: action.attack?.rangeFeet ?? null,
     rangeNormalFeet: action.attack?.rangeNormalFeet ?? null,
+    ...(action.targets?.rangeFeet !== undefined ? { targetRangeFeet: action.targets.rangeFeet } : {}),
     saveAbility: action.save?.ability ?? null,
     saveDc: action.save?.dc ?? null,
     damage: action.damage.map((part) => ({ formula: part.formula, type: part.type })),

@@ -1,6 +1,7 @@
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { abilityModifier as scoreModifier } from "@vtt/rules-5e";
+import { holdsFeature } from "../class-features.js";
 import { conditionLabel } from "../condition-rules.js";
 import { areAllies, areEnemies } from "../creature-sides.js";
 import { endEffect } from "../effects.js";
@@ -156,4 +157,34 @@ export function endTargetMarks(ctx: ResolveContext): void {
       endEffect(ctx.state, target.id, mark.id);
       ctx.effectsEnded.push(endedEffect(target, mark));
     }
+}
+
+const WORDS_OF_CREATION_SPELLS: ReadonlySet<string> = new Set(["power-word-heal", "power-word-kill"]);
+
+/**
+ * SRD Words of Creation (Bard 20): "When you cast either spell [Power Word Heal or Power Word Kill], you can target a
+ * second creature with it if that creature is within 10 feet of the first target." The extra target it allows the
+ * cast, and the refusal of a second one farther from the first.
+ */
+export function wordsOfCreation(
+  attacker: LiveActor,
+  spellId: string,
+  targetIds: readonly string[],
+  resolveDefinition: ((definitionId: string) => ActorDefinition | undefined) | undefined,
+  distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined,
+  names: (actorId: string) => string
+): Readonly<{ extra: number; violation?: Violation }> {
+  if (!WORDS_OF_CREATION_SPELLS.has(spellId)) return { extra: 0 };
+  const definition = attacker.definitionId ? resolveDefinition?.(attacker.definitionId) : undefined;
+  if (!holdsFeature(definition, "words-of-creation", "Words of Creation")) return { extra: 0 };
+  const [first, second] = [...new Set(targetIds)];
+  const apart = first && second ? (distanceFeet?.(first, second) ?? null) : null;
+  if (apart === null || apart <= 10 + DISTANCE_TOLERANCE_FEET) return { extra: 1 };
+  return {
+    extra: 1,
+    violation: {
+      rule: "range.out-of-range",
+      message: `${names(second!)} is ${Math.round(apart * 10) / 10} ft from ${names(first!)}, and Words of Creation's second target must be within 10 feet of the first.`
+    }
+  };
 }

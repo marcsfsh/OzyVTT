@@ -513,6 +513,40 @@ function effectRiders(desc: string, maxTargetSize: OnHitRider["maxTargetSize"], 
   return found;
 }
 
+const SAVE_TARGET_CONDITIONS = ["Frightened", "Charmed", "Prone", "Grappled", "Restrained", "Incapacitated"];
+const SAVE_TARGET_TYPES = ["Humanoid", "Beast", "Undead", "Fiend", "Giant", "Dragon", "Construct", "Elemental"];
+
+/**
+ * Who a save action may target, from the stock clause after its DC ("Strength Saving Throw: DC 15, one Large or smaller
+ * creature Grappled by the behir"): one creature or each, its size, a condition it must have, its creature type, a
+ * range, "the X can see", "Grappled by the X" and "in the X's space". An area's creatures come from its template, and a
+ * clause the reader doesn't know whole (willing, "Charmed or Grappled", 0 Hit Points) stays the GM's.
+ */
+function withSaveTargets(desc: string): Pick<ActorAction, "targets"> {
+  const clause = /Saving Throw: DC \d+, ((?:one|each) [^.(]*)/.exec(desc)?.[1]?.trim();
+  if (!clause) return {};
+  if (/\bin an? \d+-foot\b|\bdestination\b|\bwhose space\b|\bwilling\b| or Grappled\b|\bHit Points\b/.test(clause))
+    return {};
+  const targets: NonNullable<ActorAction["targets"]> = {};
+  if (/^one\b/.test(clause)) targets.count = 1;
+  const size = /\b(Tiny|Small|Medium|Large|Huge) or smaller\b/.exec(clause);
+  if (size) targets.maxSize = size[1]!.toLowerCase() as NonNullable<typeof targets.maxSize>;
+  const lead = new RegExp(
+    `^one (?:(?:Tiny|Small|Medium|Large|Huge) or smaller )?(${SAVE_TARGET_CONDITIONS.join("|")}) creature\\b`
+  ).exec(clause);
+  const has = new RegExp(`\\bthat has the (${SAVE_TARGET_CONDITIONS.join("|")}) condition\\b`).exec(clause);
+  const condition = (lead ?? has)?.[1];
+  if (condition) targets.conditions = [condition.toLowerCase() as NonNullable<typeof targets.conditions>[number]];
+  const type = new RegExp(`^one (${SAVE_TARGET_TYPES.join("|")})\\b`).exec(clause);
+  if (type) targets.creatureTypes = [type[1]!.toLowerCase()];
+  const range = /\bwithin (\d+) feet\b/.exec(clause);
+  if (range) targets.rangeFeet = Number(range[1]);
+  if (/\b(?:the [a-z' -]+|it) can see\b/.test(clause)) targets.seen = true;
+  if (/\bGrappled by the\b/.test(clause)) targets.grappledBySource = true;
+  if (/\bin the [a-z' -]+?'s space\b/.test(clause)) targets.inSpace = true;
+  return Object.keys(targets).length > 0 ? { targets } : {};
+}
+
 /** Typed defense lists from the display strings: exact damage-type/condition-id tokens only; qualified phrases ("…from nonmagical attacks") stay display-only. */
 const splitTypedList = (display: string, known: ReadonlySet<string>): string[] =>
   display
@@ -567,7 +601,7 @@ function linkedActions(actions: ActorAction[], idOf: (name: string) => string | 
         new RegExp(`\\buses (${PRINTED_NAME})(?=[.,]| and\\b)`).exec(body);
       const source = named ? byId.get(idOf(named[1]) ?? "") : undefined;
       if (source && (source.attack || source.save || source.damage.length > 0)) {
-        const { attack, save, damage, onHit, conditionalDamage, reminder, area, targetRules } = source;
+        const { attack, save, damage, onHit, conditionalDamage, reminder, area, targetRules, targets } = source;
         next = {
           ...next,
           ...(attack ? { attack } : {}),
@@ -577,7 +611,8 @@ function linkedActions(actions: ActorAction[], idOf: (name: string) => string | 
           ...(conditionalDamage ? { conditionalDamage } : {}),
           ...(reminder ? { reminder } : {}),
           ...(area && !next.area ? { area } : {}),
-          ...(targetRules ? { targetRules } : {})
+          ...(targetRules ? { targetRules } : {}),
+          ...(targets && !next.targets ? { targets } : {})
         };
       }
     }
@@ -1060,6 +1095,7 @@ const monsters: ActorDefinition[] = creatures
           ? { multiattackReplacements: multiattack.replacements }
           : {}),
         ...(onHit ? { onHit } : {}),
+        ...(save && !attack ? withSaveTargets(action.fields.desc) : {}),
         ...(uses ? { uses } : {}),
         ...(legendary
           ? {

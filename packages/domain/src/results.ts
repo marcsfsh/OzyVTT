@@ -369,6 +369,11 @@ export const ActionAvailabilitySchema = z.strictObject({
     .int()
     .nullable()
     .describe("Normal range band; shots beyond it up to rangeFeet roll at disadvantage"),
+  targetRangeFeet: z
+    .number()
+    .int()
+    .optional()
+    .describe("How far its targets may be when it says so without an attack (Lay on Hands' touch is 5)"),
   attackCount: z.number().int().nullable(),
   saveAbility: z.string().nullable(),
   saveDc: z.number().int().nullable().describe("Save DC including item riders"),

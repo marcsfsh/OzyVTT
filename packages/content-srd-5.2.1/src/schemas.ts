@@ -15,6 +15,7 @@ import {
   BurstSchema,
   ActionReactionSchema,
   ActionSchema,
+  ActionTargetsSchema,
   ActorDefinitionSchema,
   DamageDrainSchema,
   DamageFormulaSchema,
@@ -409,7 +410,11 @@ export const ItemSpellCastSchema = z
     consumesSpellSlot: z
       .boolean()
       .default(false)
-      .describe("Whether casting it also spends one of the bearer's own spell slots")
+      .describe("Whether casting it also spends one of the bearer's own spell slots"),
+    /** Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear: Beasts only). */
+    targets: ActionTargetsSchema.optional().describe(
+      "Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear affects Beasts only), checked on the server"
+    )
   })
   .strict()
   .describe(

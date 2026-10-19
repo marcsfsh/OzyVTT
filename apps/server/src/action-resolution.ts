@@ -337,6 +337,7 @@ export function actionAvailability(
       reachFeet: action.attack?.reachFeet ?? null,
       rangeFeet: action.attack?.rangeFeet ?? null,
       rangeNormalFeet: action.attack?.rangeNormalFeet ?? null,
+      ...(action.targets?.rangeFeet !== undefined ? { targetRangeFeet: action.targets.rangeFeet } : {}),
       attackCount: action.attack?.count ?? null,
       saveAbility: action.save?.ability ?? null,
       saveDc: action.save?.dc ?? null,
