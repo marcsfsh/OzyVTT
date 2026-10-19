@@ -31,6 +31,7 @@ const MODIFIER_LABELS: Readonly<
   "advantage-denied": ["Damage and defence", "No Advantage on attacks against it"],
   "ignores-cover": ["Damage and defence", "Attacks that ignore cover"],
   "no-critical-hits": ["Damage and defence", "Critical hits against it become normal hits"],
+  "spell-ward": ["Damage and defence", "Spells that can't reach it"],
   "healing-received-maximized": ["Healing", "Healing received at its most"],
   "healing-dice-maximized": ["Healing", "Healing dice at their most"],
   "healing-bonus": ["Healing", "More healing"],
@@ -139,6 +140,8 @@ function blankModifier(type: string): Draft {
       return { type, damageTypes: [] };
     case "advantage-denied":
       return { type, roll: "incoming-attack" };
+    case "spell-ward":
+      return { type, schools: ["divination"] };
     case "healing-bonus":
       return { type, amount: 2 };
     default:
@@ -170,6 +173,16 @@ const trueOnly = (key: string): Pick<FieldDef, "read" | "write"> => ({
     const rest = { ...row };
     delete rest[key];
     return next === true ? { ...rest, [key]: true } : rest;
+  }
+});
+/** A list the schema takes as absent when empty, never as an empty list. */
+const listOrAbsent = (key: string): Pick<FieldDef, "read" | "write"> => ({
+  read: (row) => (Array.isArray(row[key]) ? row[key] : []),
+  write: (next, row) => {
+    const rest = { ...row };
+    delete rest[key];
+    const list = Array.isArray(next) ? (next as string[]) : [];
+    return list.length > 0 ? { ...rest, [key]: list } : rest;
   }
 });
 
@@ -735,6 +748,40 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       note: "Display only."
     },
     { key: "feet", label: "Distance", kind: "number", min: 0, max: 240, unit: "ft", visibleWhen: hasType("sense") },
+    {
+      key: "schools",
+      label: "Schools",
+      kind: "tags",
+      visibleWhen: hasType("spell-ward"),
+      suggestions: (ctx) => ctx.schools,
+      ...listOrAbsent("schools"),
+      help: "A spell of these schools can't target the bearer, and its area leaves the bearer out."
+    },
+    {
+      key: "spellIds",
+      label: "Spells",
+      kind: "tags",
+      visibleWhen: hasType("spell-ward"),
+      suggestions: (ctx) => ctx.spells.map((entry) => entry.id),
+      ...listOrAbsent("spellIds"),
+      help: "These spells can't reach the bearer either, whatever their school, as Zone of Truth can't a Ring of Mind Shielding's."
+    },
+    {
+      key: "typeSenses",
+      label: "Hidden from senses that tell its type",
+      kind: "switch",
+      visibleWhen: hasType("spell-ward"),
+      ...trueOnly("typeSenses"),
+      help: "On when no magic may learn the bearer's type, so Divine Sense doesn't find it either."
+    },
+    {
+      key: "alliesAllowed",
+      label: "Lets its own side's spells through",
+      kind: "switch",
+      visibleWhen: hasType("spell-ward"),
+      ...trueOnly("alliesAllowed"),
+      help: "On when the bearer may allow a spell, as an Amulet of Proof against Detection and Location's wearer does."
+    },
     whenField(),
     {
       key: "scope",

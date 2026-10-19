@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import { GameStateSchema, type GameState, type GmActor } from "@vtt/domain";
+import type { ActorDefinition } from "@vtt/schemas";
 import { movementCost } from "../../../server/src/terrain";
 import type { TokenMapGeometry } from "../../../server/src/token-placement";
 import { spaceSharingFor } from "../../../server/src/space-sharing";
@@ -280,6 +281,25 @@ describe("the drag preview squeezes and passes walls as the server does", () => 
     expect(previewed?.difficultFeet).toBe(charged?.difficultFeet);
   });
 
+  // SRD 5.2.1 Difficult Terrain: "A narrow opening sized for a creature one size smaller than you".
+  it("squeezes a Medium creature through a 3-foot gap, and stops it at a 1-foot one", () => {
+    // A wall along x = 150 with a gap centred on y = 275, 30 or 10 pixels wide.
+    const gapped = (pixels: number) =>
+      table([], {}, [
+        wall({ x: 150, y: 0 }, { x: 150, y: 275 - pixels / 2 }),
+        wall({ x: 150, y: 275 + pixels / 2 }, { x: 150, y: 1000 })
+      ]);
+    const three = gapped(30);
+    const charged = movementCost(three, GRID, HERO, cell(0, 5), cell(6, 5));
+    expect(charged).toMatchObject({ feet: 35, difficultFeet: 5 });
+    const previewed = preview(three, cell(0, 5), cell(6, 5));
+    expect(previewed?.feet).toBe(charged?.feet);
+    expect(previewed?.difficultFeet).toBe(charged?.difficultFeet);
+    const one = gapped(10);
+    expect(movementCost(one, GRID, HERO, cell(0, 5), cell(6, 5))?.blocked).toBe(true);
+    expect(preview(one, cell(0, 5), cell(6, 5))?.blocked).toBe(true);
+  });
+
   it("passes an incorporeal mover through a wall as through Difficult Terrain", () => {
     const state = table([], { [OGRE]: { x: 50, y: 300 } }, [wall({ x: 150, y: 0 }, { x: 150, y: 1000 })]);
     expect(movementCost(state, GRID, OGRE, { x: 50, y: 300 }, { x: 300, y: 300 })?.blocked).toBe(true);
@@ -353,7 +373,12 @@ describe("the drag preview follows the server through creatures that share space
   const ELEMENTAL = "10000000-0000-4000-8000-000000000004";
   const RATS = "10000000-0000-4000-8000-000000000005";
   const monsters = new Map(loadMonsterDefinitions().map((definition) => [definition.source.externalId, definition]));
-  const resolve = (definitionId: string) => monsters.get(definitionId);
+  const halfling = {
+    actions: [],
+    extensions: {},
+    character: { features: [{ id: "halfling-nimbleness", kind: "species", sourceId: "halfling" }] }
+  } as unknown as ActorDefinition;
+  const resolve = (definitionId: string) => (definitionId === "halfling" ? halfling : monsters.get(definitionId));
   // One row of cells, so a creature that bars the way leaves no way round it.
   const corridor = { ...GRID, height: 50 };
 
@@ -385,7 +410,8 @@ describe("the drag preview follows the server through creatures that share space
     const sharing = spaceSharingFor(state, moverId, resolve, () => false);
     const charged = movementCost(state, corridor, moverId, from, to, {
       resolveDefinition: resolve,
-      ...(sharing.passesCreatures ? { passesCreatures: true } : {})
+      ...(sharing.passesCreatures ? { passesCreatures: true } : {}),
+      ...(sharing.nimble ? { nimble: true } : {})
     });
     const previewed = previewMove({
       calibration: CALIBRATION,
@@ -397,6 +423,7 @@ describe("the drag preview follows the server through creatures that share space
       from,
       to,
       ...(sharing.passesCreatures ? { passesCreatures: true } : {}),
+      ...(sharing.nimble ? { nimble: true } : {}),
       ...(sharing.swarmIds ? { swarmIds: sharing.swarmIds } : {})
     });
     return { charged, previewed };
@@ -409,6 +436,24 @@ describe("the drag preview follows the server through creatures that share space
     expect(previewed?.blocked).toBeUndefined();
     expect(previewed?.feet).toBe(charged?.feet);
     expect(previewed?.difficultFeet).toBe(charged?.difficultFeet);
+  });
+
+  it("takes a Halfling through a hostile orc's space at double cost, and a gnome nowhere", () => {
+    const state = hall({ [HERO]: cell(0, 0), [ELEMENTAL]: cell(2, 0) });
+    const hero = state.actors.find((actor) => actor.id === HERO)!;
+    hero.size = "small";
+    hero.definitionId = "halfling";
+    const orc = state.actors.find((actor) => actor.id === ELEMENTAL)!;
+    orc.definitionId = "no-such-orc";
+    orc.size = "medium";
+    const { charged, previewed } = both(state, HERO, cell(0, 0), cell(4, 0));
+    expect(charged).toMatchObject({ feet: 25, difficultFeet: 5 });
+    expect(previewed?.feet).toBe(charged?.feet);
+    expect(previewed?.difficultFeet).toBe(charged?.difficultFeet);
+    hero.definitionId = "gnome";
+    const gnome = both(state, HERO, cell(0, 0), cell(4, 0));
+    expect(gnome.charged?.blocked).toBe(true);
+    expect(gnome.previewed?.blocked).toBe(true);
   });
 
   it("takes a fighter through a swarm of rats at double cost", () => {

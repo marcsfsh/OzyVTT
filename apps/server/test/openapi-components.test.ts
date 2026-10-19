@@ -532,6 +532,7 @@ describe("generated OpenAPI components", () => {
         when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["spell"] }]
       },
       "no-critical-hits": {},
+      "spell-ward": { schools: ["divination"], spellIds: ["zone-of-truth"], alliesAllowed: true, typeSenses: true },
       "base-armor-class": { base: 15 }
     };
 

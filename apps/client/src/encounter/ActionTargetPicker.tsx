@@ -22,6 +22,7 @@ import {
   setConditionChoice,
   setDamageType,
   setEffectOption,
+  setHealingShare,
   setShapeForm,
   setShapeGear,
   setShapingCreatures,
@@ -30,7 +31,9 @@ import {
   setTargetDarts,
   setTargetingSpend,
   SHAPING_CREATURE_PICKS,
+  sharedOut,
   targetingReady,
+  toggleConditionPick,
   toggleTarget,
   type TargetingSession
 } from "./targeting";
@@ -97,6 +100,10 @@ export function ActionTargetPicker({
   const skillName = (id: string) => skillCatalog.items.find((skill) => skill.id === id)?.name ?? id;
   const darts = picking.darts;
   const assigned = darts ? Object.values(darts.counts).reduce((sum, count) => sum + count, 0) : 0;
+  // A pool its user divides among the creatures picked (Preserve Life).
+  const pool = picking.action.dividesHealing;
+  const given = sharedOut(picking);
+  const picks = picking.action.conditionPicks;
   // The level or "Cantrip" the list shows in brackets is noise once the action is chosen.
   const name = plainActionName(picking.action.name);
   // A summon that rolls nothing (Find Familiar) asks for its creature and is used, not rolled.
@@ -167,6 +174,9 @@ export function ActionTargetPicker({
             {darts
               ? `. ${darts.total} darts: ${assigned >= darts.total ? "all assigned" : `${darts.total - Math.min(assigned, darts.total)} left, which go round the chosen targets in order`}.`
               : ""}
+            {pool !== undefined
+              ? `. ${pool} Hit Points to divide: ${given > pool ? `${given - pool} too many given` : `${pool - given} left`}. With none given, they are split evenly.`
+              : ""}
           </p>
           <ul className="action-target-list scroll-y">
             {targets.map((target) => (
@@ -193,6 +203,15 @@ export function ActionTargetPicker({
                     max={darts.total}
                     aria-label={`Darts at ${target.label}`}
                     onChange={(count) => setTargetDarts(target.id, count)}
+                  />
+                )}
+                {pool !== undefined && picking.selected.includes(target.id) && (
+                  <Stepper
+                    value={picking.healingShares?.[target.id] ?? 0}
+                    min={0}
+                    max={pool}
+                    aria-label={`Hit Points for ${target.label}`}
+                    onChange={(points) => setHealingShare(target.id, points)}
                   />
                 )}
               </li>
@@ -234,10 +253,10 @@ export function ActionTargetPicker({
           more than is left. */}
       {picking.action.useCost === "chosen" && (
         <Stepper
-          label="Points to spend"
+          label={picks ? "Hit Points to restore" : "Points to spend"}
           value={picking.spend ?? 1}
           onChange={setTargetingSpend}
-          min={1}
+          min={picks ? 0 : 1}
           max={picking.action.usesLimit ?? 100}
           disabled={busy}
           aria-label={`How much of ${picking.action.name} to spend`}
@@ -328,6 +347,26 @@ export function ActionTargetPicker({
             ))}
           </Select>
         </label>
+      )}
+      {/* Conditions the touch also ends, each for points of the pool (Restoring Touch). */}
+      {picks && (
+        <fieldset className="action-condition-picks">
+          <legend>Also end · {picks.pointsEach} points each</legend>
+          <ul className="action-target-list">
+            {picks.conditions.map((id) => (
+              <li key={id}>
+                <label className={`action-target${picking.conditionIds?.includes(id) ? " is-picked" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={picking.conditionIds?.includes(id) ?? false}
+                    onChange={() => toggleConditionPick(id)}
+                  />
+                  <span className="action-target-name">{id.charAt(0).toUpperCase() + id.slice(1)}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </fieldset>
       )}
       {/* On a phone Cancel and Roll go to the bar under the thumb. */}
       <InFooter>

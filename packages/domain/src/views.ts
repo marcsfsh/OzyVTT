@@ -151,7 +151,16 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     /** The resolved token health indicator, present only when the table shows a bar/ring/aura to everyone (audience "all"); the client derives the fill from `hp` (exact for the owner, coarse band otherwise). */ healthDisplay?: Readonly<{
       style: "bar" | "ring" | "aura";
     }>;
+    /** What this player's Hunter knows of the creature its Hunter's Mark marks (Hunter's Lore), while the mark lasts.
+     *  Only in that player's own projection. */ knownDefences?: KnownDefences;
   };
+/** A creature's damage Immunities, Resistances and Vulnerabilities and its condition Immunities, by id. */
+export type KnownDefences = Readonly<{
+  damageImmunities: readonly string[];
+  damageResistances: readonly string[];
+  damageVulnerabilities: readonly string[];
+  conditionImmunities: readonly string[];
+}>;
 export type PlayerInitiativeEntry = Readonly<{
   actorId: string;
   name: string;

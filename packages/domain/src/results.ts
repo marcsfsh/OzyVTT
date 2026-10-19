@@ -992,6 +992,9 @@ export const ActorMovementReplySchema = z.strictObject({
   /** It may end a move in another creature's space (Air Form, a swarm), so no creature bars its way; a creature's
    *  space still costs as Difficult Terrain. */
   passesCreatures: z.boolean().optional(),
+  /** It may pass through the space of any creature larger than itself, as Difficult Terrain, and not stop there
+   *  (Halfling Nimbleness). */
+  nimble: z.boolean().optional(),
   /** The swarms on the map the asker can see. Any creature may cross a swarm's space, as Difficult Terrain. */
   swarmIds: z.array(z.uuid()).max(200).optional(),
   /** The ground the spell areas the asker can see change for this mover, in grid cells near it, as the server charges

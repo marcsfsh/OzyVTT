@@ -74,6 +74,21 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     ...(action.save?.conditionChoices ? { conditionChoices: [...action.save.conditionChoices] } : {}),
     // A cure that ends one condition of several asks which (Lesser Restoration).
     ...(action.endsOneCondition && action.endsConditions ? { conditionChoices: [...action.endsConditions] } : {}),
+    // Conditions a touch may also end, each for points of its pool (Restoring Touch).
+    ...(action.conditionPicks
+      ? {
+          conditionPicks: {
+            conditions: [...action.conditionPicks.conditions],
+            pointsEach: action.conditionPicks.pointsEach
+          }
+        }
+      : {}),
+    // A pool its user divides among the targets (Preserve Life): the flat number the sheet resolved it to.
+    ...(action.healing?.divided && /^\d+(\s*\+\s*\d+)*$/.test(action.healing.formula.trim())
+      ? {
+          dividesHealing: action.healing.formula.split("+").reduce((sum, term) => sum + Number(term.trim()), 0)
+        }
+      : {}),
     ...(choosesAbility(action) ? { choosesAbility: true } : {}),
     // A summon whose user picks the creature or its type (Find Familiar) asks before it resolves.
     ...(summonChoicesOf(action.summons) ? { summonChoices: summonChoicesOf(action.summons)! } : {}),
