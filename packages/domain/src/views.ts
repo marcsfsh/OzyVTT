@@ -44,6 +44,7 @@ export type PlayerEffect = Omit<
   | "hitPointMaximumGain"
   | "temporaryHitPointsEachTurn"
   | "conditionImmunities"
+  | "light"
 > & {
   yours?: true;
 };
@@ -153,12 +154,14 @@ export type PlayerVisionWall = Readonly<{
   open?: boolean;
 }>;
 /** Dynamic vision as one player gets it (ADR-0023): where their own characters see now, what the party has seen in
- *  this scene, and the walls in it. Everything else on the map is dark. */
+ *  this scene, and the walls in it. Everything else on the map is dark. `bright`, when present, is the part of what
+ *  they see that lies in Bright Light; the rest of it is dim, or dark seen by Darkvision. Absent, all of it is bright. */
 export type PlayerVision =
   | Readonly<{ enabled: false }>
   | Readonly<{
       enabled: true;
       visible: readonly VisionPolygon[];
+      bright?: readonly VisionPolygon[];
       explored: readonly VisionRect[];
       walls: readonly PlayerVisionWall[];
     }>;

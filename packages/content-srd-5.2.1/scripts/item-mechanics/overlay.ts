@@ -50,9 +50,10 @@ export type ItemRiderKey =
   | "vulnerableToOtherChoices"
   | "removesArmorDrawbacks"
   | "consumedOnUse"
-  | "spellScroll";
+  | "spellScroll"
+  | "light";
 
-/** The same fifteen, as a value, so the empty-rider check below iterates the list it is typed against. */
+/** The same sixteen, as a value, so the empty-rider check below iterates the list it is typed against. */
 const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "tags",
   "actions",
@@ -68,7 +69,8 @@ const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "vulnerableToOtherChoices",
   "removesArmorDrawbacks",
   "consumedOnUse",
-  "spellScroll"
+  "spellScroll",
+  "light"
 ] as const);
 
 /** The riders one magic item may carry. Every key optional: an entry authors only what it names. */
@@ -86,7 +88,7 @@ export type ItemMechanicsModule = Readonly<Record<string, ItemMechanics>>;
  * rider yet.
  */
 export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
-  Record<string, "standing" | "at-its-moment" | "unread" | "display-only">
+  Record<string, "standing" | "at-its-moment" | "unread" | "display-only" | "vision">
 > = Object.freeze({
   "attack-bonus": "standing",
   "save-bonus": "standing",
@@ -108,25 +110,15 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
   "damage-reduction": "at-its-moment",
   "damage-resistance": "standing",
   "damage-vulnerability": "standing",
-  sense: "display-only"
+  sense: "vision"
 });
 
-/**
- * Derived from the mirror. `display-only` is not refused here because the set must match the server
- * table, but `sense` riders on items do reach nothing; see `MEASURED_INERT_RIDER_TYPES`.
- */
+/** Derived from the mirror. A `vision` rider (a sense, Darkvision) is read live by dynamic vision. */
 const UNREAD_RIDER_TYPES: ReadonlySet<string> = new Set(
   Object.entries(CARRIER_RIDER_DISPOSITION_MIRROR)
     .filter(([, disposition]) => disposition === "unread")
     .map(([type]) => type)
 );
-
-/**
- * Rider types measured inert on an item carrier, kept apart from the mirror so it stays derivable
- * from the server's table: `darkvision` and `sense` have no field in `EquipmentDerivation` (the
- * sheet's Senses line comes from the species).
- */
-const MEASURED_INERT_RIDER_TYPES: ReadonlySet<string> = new Set(["darkvision", "sense"]);
 
 // ---- Cross-bundle vocabularies (check 3) --------------------------------------------------------
 
@@ -222,7 +214,7 @@ const ELEMENT_REFERENCES: Readonly<Record<string, Readonly<Record<string, RefKin
  *   `uses.pool`, `resource-bonus.poolId`: the live `actionUses` key.
  *   `grants.tools` / `grants.armor` - proficiency groups; no bundle has those ids.
  *   `while-proficient-with.ids` for weapon/armor/tool: groups (the `"skill"` kind is checked).
- *   `sense` - no senses model to check against.
+ *   `sense` - an open name: dynamic vision reads the ones it knows (`vision/senses.ts`), the rest are shown.
  *   `actions[].id`, `multiattack[].actionId` - local to the item's own action list.
  *   `grants.saves` - already a closed zod enum.
  */
@@ -381,7 +373,7 @@ export function applyItemMechanics(
     const unknown = Object.keys(entry).filter((key) => !(ITEM_RIDER_KEYS as readonly string[]).includes(key));
     if (unknown.length > 0) {
       refused.push(
-        `${itemId} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The fifteen are: ${ITEM_RIDER_KEYS.join(", ")}`
+        `${itemId} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The sixteen are: ${ITEM_RIDER_KEYS.join(", ")}`
       );
       continue;
     }
@@ -420,16 +412,6 @@ export function applyItemMechanics(
     if (unread.length > 0) {
       refused.push(
         `${itemId} - ${unread.map((modifier) => `modifiers.${modifier.index} is "${modifier.type}"`).join(" and ")}, which CARRIER_RIDER_DISPOSITION (apps/server/src/character-build.ts) marks "unread": the rider reaches derivation and no consumer applies it yet, so it would change nothing at the table. Leave the item prose until a consumer reads it`
-      );
-      continue;
-    }
-
-    const inert = parsed.data.modifiers
-      .map((modifier, index) => ({ index, type: modifier.type }))
-      .filter((modifier) => MEASURED_INERT_RIDER_TYPES.has(modifier.type));
-    if (inert.length > 0) {
-      refused.push(
-        `${itemId} - ${inert.map((modifier) => `modifiers.${modifier.index} is "${modifier.type}"`).join(" and ")}, which reaches NOTHING from an item: EquipmentDerivation carries no darkvision or senses field at all, so the sheet's Senses line comes from the definition's species extension and never from an item. The rider would parse, ship, and change nothing at the table. Leave the item prose until a consumer reads it`
       );
       continue;
     }

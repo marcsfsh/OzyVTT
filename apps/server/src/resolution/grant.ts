@@ -210,6 +210,8 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       // A Concentration spell's effects end with the caster's Concentration on that cast.
       ...(ctx.castId !== null ? { castId: ctx.castId } : {}),
       ...(armorClassBonus !== undefined ? { armorClassBonus } : {}),
+      // The light its bearer sheds while it lasts (Shining Smite's 5 feet of Bright Light).
+      ...(grant.light ? { light: { ...grant.light } } : {}),
       ...(steadyAim ? { speedZero: true } : {}),
       ...grantedMovement,
       // Heroism: immune to Frightened, and Temporary Hit Points at the start of each of the bearer's turns.

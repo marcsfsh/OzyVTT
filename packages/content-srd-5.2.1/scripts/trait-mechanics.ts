@@ -230,6 +230,44 @@ function berserk(trait: Trait): TraitMechanic | null {
   return match ? { kind: "berserk", name: trait.name, on: Number(match[1]) } : null;
 }
 
+/** "The elemental sheds Bright Light in a 30-foot radius and Dim Light for an additional 30 feet." */
+function illumination(trait: Trait): TraitMechanic | null {
+  const match =
+    /^The [\w' -]+? sheds Bright Light in a (\d+)-foot radius and Dim Light for an additional (\d+) feet\.$/.exec(
+      trait.description
+    );
+  return match ? { kind: "light", name: trait.name, brightFeet: Number(match[1]), dimFeet: Number(match[2]) } : null;
+}
+
+const ROLLS_BY_WORD: Readonly<Record<string, ReadonlyArray<"attack" | "check" | "save">>> = {
+  "ability checks and attack rolls": ["check", "attack"],
+  "attack rolls and ability checks": ["attack", "check"],
+  "attack rolls": ["attack"],
+  // A D20 Test is an attack roll, an ability check or a saving throw.
+  "D20 Test": ["attack", "check", "save"],
+  "D20 Tests": ["attack", "check", "save"]
+};
+
+/** "While in sunlight, the drider has Disadvantage on ability checks and attack rolls." / "While in Bright Light, the
+ *  cloaker has Disadvantage on attack rolls." / a vampire's "**Sunlight:** The vampire takes 20 Radiant damage if it
+ *  starts its turn in sunlight. While in sunlight, it has Disadvantage on attack rolls and ability checks." */
+function lightSensitivity(trait: Trait): TraitMechanic | null {
+  const match = /While in (sunlight|Bright Light), (?:the [\w' -]+?|it) has Disadvantage on ([A-Za-z0-9 ]+?)\./.exec(
+    trait.description
+  );
+  const rolls = match ? ROLLS_BY_WORD[match[2]!] : undefined;
+  if (!match || !rolls) return null;
+  const burns = /takes (\d+) ([A-Z][a-z]+) damage if it starts its turn in sunlight/.exec(trait.description);
+  const type = burns ? damageTypeOf(burns[2]!) : null;
+  return {
+    kind: "light-sensitivity",
+    name: trait.name,
+    light: match[1] === "sunlight" ? "sunlight" : "bright",
+    rolls: [...rolls],
+    ...(burns && type ? { damageAtTurnStart: { amount: Number(burns[1]), type } } : {})
+  };
+}
+
 const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
   regeneration,
   undeadFortitude,
@@ -238,7 +276,9 @@ const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
   grappleTurnStart,
   deathBurst,
   meleeHitDamage,
-  berserk
+  berserk,
+  illumination,
+  lightSensitivity
 ];
 
 /** Every trait the engine can run, in the stat block's order; the rest stay prose. */

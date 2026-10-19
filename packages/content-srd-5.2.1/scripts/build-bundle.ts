@@ -42,6 +42,7 @@ import {
 } from "./save-outcomes.js";
 import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
 import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } from "./spell-effects.js";
+import { spellSightFor } from "./spell-sight.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
 import { traitMechanicsOf } from "./trait-mechanics.js";
@@ -423,10 +424,50 @@ const PROTECTIVE_MAGIC: Pick<ActorAction, "reaction"> = {
  * - giant-crocodile tail: "…can't be targeted by the crocodile's Tail" (stated on Bite).
  * - protective-magic: its Shield, offered when an attack would hit.
  */
-const ACTION_ENRICHMENTS: Record<string, Pick<ActorAction, "targetRules" | "reaction">> = {
+const ACTION_ENRICHMENTS: Record<
+  string,
+  Partial<Pick<ActorAction, "targetRules" | "reaction" | "sight" | "grants">>
+> = {
   "archmage/protective-magic": PROTECTIVE_MAGIC,
   "lich/protective-magic": PROTECTIVE_MAGIC,
-  "mage/protective-magic": PROTECTIVE_MAGIC
+  "mage/protective-magic": PROTECTIVE_MAGIC,
+  // "Magical darkness fills a 15-foot Emanation originating from the darkmantle. This effect lasts while the darkmantle
+  // maintains Concentration on it, up to 10 minutes. Darkvision can't penetrate this area, and no light can
+  // illuminate it."
+  "darkmantle/darkness-aura": {
+    grants: {
+      name: "Darkness Aura",
+      tags: ["darkness-aura"],
+      target: "self",
+      duration: { type: "rounds", rounds: 100 },
+      modifiers: [],
+      onEnd: [],
+      voidWhileIncapacitated: false,
+      concentration: true
+    },
+    sight: { area: { kind: "magical-darkness", aroundSelfFeet: 15 } }
+  },
+  // "The magmin sets itself ablaze or extinguishes its flames. While ablaze, the magmin sheds Bright Light in a 10-foot
+  // radius and Dim Light for an additional 10 feet."
+  "magmin/ignited-illumination": { sight: { light: { on: "caster", brightFeet: 10, dimFeet: 10 }, toggles: true } },
+  // "The Cube is Heavily Obscured for 1 minute": the Cube the reaction places.
+  "octopus/ink-cloud": { sight: { area: { kind: "heavily-obscured" }, rounds: 10 } },
+  "giant-octopus/ink-cloud": { sight: { area: { kind: "heavily-obscured" }, rounds: 10 } },
+  // "The wisp and its light have the Invisible condition until the wisp's Concentration ends on this effect, which ends
+  // early immediately after the wisp makes an attack roll": Invisible, its Illumination out, until it attacks.
+  "will-o-wisp/vanish": {
+    grants: {
+      name: "Vanish",
+      tags: ["light-out", "until-it-acts"],
+      target: "self",
+      duration: { type: "manual" },
+      conditions: ["invisible"],
+      modifiers: [],
+      onEnd: [],
+      voidWhileIncapacitated: false,
+      concentration: true
+    }
+  }
 };
 
 const PRINTED_NAME = "[A-Z][A-Za-z'\u2019-]*(?: [A-Z][A-Za-z'\u2019-]*)*";
@@ -1194,6 +1235,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
       : null,
     area: spellAreaFor(slugOf(spell.pk), fields.desc),
     effect,
+    ...(spellSightFor(slugOf(spell.pk)) ? { sight: spellSightFor(slugOf(spell.pk)) } : {}),
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
     higherLevel: fields.higher_level || null,

@@ -23,7 +23,8 @@ import {
   ItemSlotSchema,
   OnHitRiderSchema,
   SaveFailureEffectSchema,
-  SaveOutcomeFields
+  SaveOutcomeFields,
+  SightEffectSchema
 } from "@vtt/schemas";
 import {
   BackgroundReferenceSchema,
@@ -264,6 +265,9 @@ export const SpellReferenceSchema = z
      *  describe the prose (Hex's later 1d6, Faerie Fire's "attack rolls against") and no single cast. A zone, a summons or a
      *  rider on later hits casts with none of these, and stays for the GM. Actions built from a spell read this. */
     effect: SpellEffectSchema.nullable().default(null),
+    /** What the spell does to light and sight while it lasts (Light, Darkness, Fog Cloud, Daylight), which dynamic
+     *  vision reads. */
+    sight: SightEffectSchema.optional(),
     classes: z
       .array(z.string())
       .describe(
@@ -506,13 +510,40 @@ const EquipmentWeaponStatsSchema = z.object({
 });
 
 /** The light a lit item sheds, as its description prints it: Bright Light out to `brightFeet` and Dim Light for
- *  `dimFeet` more (Torch: 20 and 20). Dynamic vision lights a carried one while it is equipped (ADR-0023). */
+ *  `dimFeet` more (Torch: 20 and 20). Dynamic vision lights its bearer while it is lit and equipped (ADR-0023). */
 const ItemLightSchema = z
   .object({
     brightFeet: z.number().int().min(0).max(240),
-    dimFeet: z.number().int().min(0).max(240)
+    dimFeet: z.number().int().min(0).max(240),
+    /** The light is a Cone the bearer aims (a Bullseye Lantern). */
+    cone: z.literal(true).optional(),
+    /** With its hood lowered (a Hooded Lantern): "reducing the light to Dim Light in a 5-foot radius". */
+    hooded: z
+      .object({ brightFeet: z.number().int().min(0).max(240), dimFeet: z.number().int().min(0).max(240) })
+      .strict()
+      .optional(),
+    /** Its Bright Light is sunlight (a Sun Blade). */
+    sunlight: z.literal(true).optional(),
+    /** Invisible creatures in its Bright Light are seen (a Lantern of Revealing). */
+    revealsInvisible: z.literal(true).optional(),
+    /** It sheds its light whenever it is held, with nothing to light (a Mace of Disruption). */
+    always: z.literal(true).optional(),
+    /** Its other riders apply only while it is lit (a Flame Tongue's 2d6 Fire while ablaze). */
+    ridersWhileLit: z.literal(true).optional(),
+    /** How long it burns once lit, in hours: a Torch or Candle is used up, and a Lamp or Lantern spends a flask of
+     *  `fuel` (Oil). */
+    burnHours: z.number().int().min(1).max(24).optional(),
+    fuel: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional()
   })
-  .strict();
+  .strict()
+  .describe(
+    "The light the item sheds while it is lit and equipped: Bright Light out to `brightFeet` and Dim Light for `dimFeet` more, a Cone with `cone`, less with its hood down (`hooded`), sunlight with `sunlight`, and revealing Invisible creatures in its Bright Light with `revealsInvisible`. `burnHours` is how long it burns once lit, spending a `fuel` item when it names one. With `always` it shines whenever it is held, and with `ridersWhileLit` its other riders apply only while it is lit."
+  );
+export type ItemLight = z.infer<typeof ItemLightSchema>;
 
 /**
  * The base weapons or armors a template item may bind to: the SRD's printed qualifier (`label`) and

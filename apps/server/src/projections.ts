@@ -240,6 +240,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   rangeFeet: "player",
   endsOnSpellHealing: "player",
   armorClassBonus: "player",
+  // The light a failure sheds is the spell's own text (Faerie Fire's Dim Light).
+  light: "player",
   name: "derived",
   sourceName: "derived",
   sourceActorId: "derived",
@@ -452,6 +454,8 @@ function playerEffect(
     hitPointMaximumGain: _hitPointMaximumGain,
     temporaryHitPointsEachTurn: _temporaryHitPointsEachTurn,
     conditionImmunities: _conditionImmunities,
+    // The light it sheds reaches players only as the lit ground in their own sight, which the server draws.
+    light: _light,
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);

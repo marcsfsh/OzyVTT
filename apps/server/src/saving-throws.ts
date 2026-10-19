@@ -458,6 +458,8 @@ export function applyFailureEffect(
       ...(onFail.ongoingDamage ? { ongoingDamage: onFail.ongoingDamage } : {}),
       ...(onFail.magical ? { magical: true as const } : {}),
       ...(onFail.armorClassBonus !== undefined ? { armorClassBonus: onFail.armorClassBonus } : {}),
+      // The light it sheds while it lasts (Faerie Fire's Dim Light).
+      ...(onFail.light ? { light: { ...onFail.light } } : {}),
       // What it does while it lasts (Bane's -1d4).
       modifiers: [...onFail.modifiers]
     }),

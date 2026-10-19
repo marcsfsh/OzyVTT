@@ -694,13 +694,39 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     onHit: true,
     duration: { type: "until-source-turn-end" }
   }),
-  // "Until the end of your next turn, it ... can't benefit from the Invisible condition"; its Dim Light is the GM's.
+  // "Until the end of your next turn, it emits Dim Light in a 10-foot radius and can't benefit from the Invisible
+  // condition."
   "starry-wisp": spellGrant({
     name: "Starry Wisp",
     tags: ["outlined"],
     target: "target",
     onHit: true,
-    duration: { type: "until-source-turn-end" }
+    duration: { type: "until-source-turn-end" },
+    light: { brightFeet: 0, dimFeet: 10 }
+  }),
+  // "For the duration, you see creatures and objects that have the Invisible condition as if they were visible."
+  "see-invisibility": spellGrant({
+    name: "See Invisibility",
+    tags: ["see-invisibility"],
+    target: "self",
+    duration: { type: "manual" },
+    modifiers: [{ type: "sense", sense: "see-invisibility", feet: 0 }]
+  }),
+  // "This spell gives the willing creature you touch Truesight with a range of 120 feet."
+  "true-seeing": spellGrant({
+    name: "True Seeing",
+    tags: ["true-seeing"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [{ type: "sense", sense: "truesight", feet: 120 }]
+  }),
+  // "For the duration, a willing creature you touch has Darkvision with a range of 150 feet."
+  darkvision: spellGrant({
+    name: "Darkvision",
+    tags: ["darkvision-spell"],
+    target: "target",
+    duration: { type: "manual" },
+    modifiers: [{ type: "darkvision", feet: 150 }]
   }),
   bless: spellGrant({
     name: "Bless",
@@ -924,8 +950,15 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
 /** What a failed save against the cast leaves on the creature while the spell lasts (SRD 5.2.1 text). */
 const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   bane: { name: "Bane", tags: ["baned"], duration: rounds(10), modifiers: d20Dice("-1d4") },
-  // Outlined in light: attack rolls against it have Advantage, and it can't benefit from the Invisible condition.
-  "faerie-fire": { name: "Faerie Fire", tags: ["outlined"], duration: rounds(10), modifiers: [attackedWithAdvantage] },
+  // Outlined in light: it sheds Dim Light in a 10-foot radius, attack rolls against it have Advantage, and it can't
+  // benefit from the Invisible condition.
+  "faerie-fire": {
+    name: "Faerie Fire",
+    tags: ["outlined"],
+    duration: rounds(10),
+    modifiers: [attackedWithAdvantage],
+    light: { brightFeet: 0, dimFeet: 10 }
+  },
   // "Speed is halved, it takes a -2 penalty to AC and Dexterity saving throws, and it can't take Reactions", with
   // one action or Bonus Action a turn, one attack with the Attack action and a chance a somatic spell fails.
   slow: {

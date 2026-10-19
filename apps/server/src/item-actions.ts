@@ -427,6 +427,8 @@ export function withSpellEffects(action: ActorAction, spell: SpellReference | un
   action = {
     ...action,
     ...hitRiders,
+    // The light it sheds and the fog or Darkness it fills (`vision/cast-sight.ts`).
+    ...(action.sight === undefined && spell.sight ? { sight: structuredClone(spell.sight) } : {}),
     ...(action.drain === undefined && effect.drain ? { drain: { ...effect.drain } } : {}),
     ...(action.endsConditions === undefined && effect.endsConditions
       ? {

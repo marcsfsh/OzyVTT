@@ -920,10 +920,71 @@ export const VisionSetAmbientSchema = z
   .object({
     commandId: z.uuid(),
     ambient: z.enum(["bright", "dim", "dark"]),
+    /** The bright ambient light is sunlight (daylight outdoors). Left as it was when absent. */
+    sunlight: z.boolean().optional(),
     sceneId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** An area of light or obscurement painted over the ambient light: a rect (snapped to whole cells), or a circle for
+ *  fog or magical Darkness. */
+export const VisionAreaAddSchema = z
+  .object({
+    commandId: z.uuid(),
+    kind: z.enum(["bright", "dim", "dark", "lightly-obscured", "heavily-obscured", "magical-darkness"]),
+    sunlight: z.boolean().optional(),
+    rect: z
+      .object({
+        x: z.number().min(-100000).max(1_000_000),
+        y: z.number().min(-100000).max(1_000_000),
+        width: z.number().min(-1_000_000).max(1_000_000),
+        height: z.number().min(-1_000_000).max(1_000_000)
+      })
+      .strict()
+      .optional(),
+    circle: z
+      .object({
+        x: z.number().min(-100000).max(1_000_000),
+        y: z.number().min(-100000).max(1_000_000),
+        radiusFeet: z.number().positive().max(1000)
+      })
+      .strict()
+      .optional(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((area) => (area.rect === undefined) !== (area.circle === undefined), {
+    message: "Give the area a rectangle or a circle, not both."
+  });
+export const VisionAreaRemoveSchema = z
+  .object({
+    commandId: z.uuid(),
+    areaId: z.uuid(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Light or put out a light source a creature carries, lower or raise a Hooded Lantern's hood, or aim a Bullseye
+ *  Lantern. */
+export const ItemSetLightSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    lit: z.boolean().optional(),
+    hoodLowered: z.boolean().optional(),
+    facingDegrees: z.number().min(-360).max(720).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine(
+    (change) => change.lit !== undefined || change.hoodLowered !== undefined || change.facingDegrees !== undefined,
+    { message: "Say whether to light it, hood it or aim it." }
+  );
 export const VisionResetExploredSchema = z
   .object({
     commandId: z.uuid(),

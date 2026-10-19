@@ -524,11 +524,20 @@ export const ModifierSchema = z
       .describe(
         "AC = 10 + DEX + this ability while wearing no armor (Barbarian, Monk, and any homebrew that wants it)."
       ),
+    /** Read live by dynamic vision (`vision/senses.ts`): the best range wins, and `extends` adds its feet to the
+     *  bearer's other Darkvision (Goggles of Night: "increases its range by 60 feet"). */
     z
-      .object({ type: z.literal("darkvision"), feet: z.number().int().min(0).max(240), ...riderGate })
+      .object({
+        type: z.literal("darkvision"),
+        feet: z.number().int().min(0).max(240),
+        extends: z.literal(true).optional(),
+        ...riderGate
+      })
       .strict()
-      .describe("Grant or extend darkvision."),
-    /** Display-level, like `darkvision`, until a senses model exists. */
+      .describe(
+        "Grant or extend Darkvision, read live by dynamic vision. The best range wins; with `extends`, the feet are added to the bearer's other Darkvision, or are its range when it has none (Goggles of Night)."
+      ),
+    /** A special sense in feet, read live by dynamic vision (`vision/senses.ts`). */
     z
       .object({
         type: z.literal("sense"),
@@ -538,7 +547,7 @@ export const ModifierSchema = z
       })
       .strict()
       .describe(
-        "The missing sibling of `darkvision`: any named sense in feet. Display-level, like `darkvision`, until a senses model exists."
+        "A special sense in feet, read live by dynamic vision: `blindsight`, `tremorsense` and `truesight` as the Rules Glossary defines them, `see-invisibility` (sees Invisible creatures as if they were visible), `devils-sight` (sees normally in Dim Light and Darkness, magical or not) and `x-ray` (sees through walls). Any other name is shown on the sheet and read by nothing."
       ),
     /** More magic items attuned at once than the SRD's three (Use Magic Device: four). Read when an item is attuned. */
     z
@@ -719,14 +728,14 @@ export const ModifierSchema = z
       )
   ])
   .describe(
-    "The rider vocabulary: what a feature, a feat, a chosen option, a magic item and a live effect contribute to the rules engine, one union for every carrier and read by one evaluator against one context, so a bonus means the same thing wherever it is authored. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a signed integer, so a curse is this same vocabulary with a negative number, and every branch carries the `when`/`scope` gate. Carriers refuse what they cannot honour: an item refuses `hit-points-per-level`, `ability-score` (both bake into the sheet and cannot be un-granted when the item comes off) and `attunement-slots` (it would decide its own attunement), and an effect refuses every number stored on the sheet or the actor (`attunement-slots`, `ability-score`, `hit-points-per-level`, `armor-class`, `initiative`, `unarmored-defense`, `darkvision`, `sense`, `spell-slot`), which an effect that ends could never give back."
+    "The rider vocabulary: what a feature, a feat, a chosen option, a magic item and a live effect contribute to the rules engine, one union for every carrier and read by one evaluator against one context, so a bonus means the same thing wherever it is authored. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a signed integer, so a curse is this same vocabulary with a negative number, and every branch carries the `when`/`scope` gate. Carriers refuse what they cannot honour: an item refuses `hit-points-per-level`, `ability-score` (both bake into the sheet and cannot be un-granted when the item comes off) and `attunement-slots` (it would decide its own attunement), and an effect refuses every number stored on the sheet or the actor (`attunement-slots`, `ability-score`, `hit-points-per-level`, `armor-class`, `initiative`, `unarmored-defense`, `spell-slot`), which an effect that ends could never give back. Senses are read live, so an effect may carry them (True Seeing, the Darkvision spell)."
   );
 export type Modifier = z.infer<typeof ModifierSchema>;
 
 /**
  * Modifiers an effect may not carry: each is a number stored on the sheet or the actor (hit points, AC, initiative,
- * slot maxima, senses), written when the character is built or its inventory changes, so an effect that ends could
- * never give it back.
+ * slot maxima), written when the character is built or its inventory changes, so an effect that ends could never give
+ * it back. Senses aren't among them: dynamic vision reads them live from every carrier.
  */
 export const EFFECT_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze([
   "attunement-slots",
@@ -735,10 +744,23 @@ export const EFFECT_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object
   "armor-class",
   "initiative",
   "unarmored-defense",
-  "darkvision",
-  "sense",
   "spell-slot"
 ]);
+
+/** The light its bearer sheds while an effect lasts (Produce Flame's flame, Faerie Fire's outline, Holy Nimbus's
+ *  sunlight): Bright Light out to `brightFeet` and Dim Light for `dimFeet` more. With `sunlight`, the Bright Light is
+ *  sunlight, which Sunlight Sensitivity reads. */
+export const CarriedLightSchema = z
+  .object({
+    brightFeet: z.number().int().min(0).max(240),
+    dimFeet: z.number().int().min(0).max(240),
+    sunlight: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "The light its bearer sheds while the effect lasts: Bright Light out to `brightFeet` and Dim Light for `dimFeet` more. With `sunlight`, the Bright Light is sunlight."
+  );
+export type CarriedLight = z.infer<typeof CarriedLightSchema>;
 
 /** An effect's modifiers: the shared vocabulary, minus what an effect cannot give back when it ends. */
 export const EffectModifiersSchema = z
@@ -915,7 +937,10 @@ export const EffectInstanceSchema = z
     /** It comes from a spell or a magic item, so a save repeated against it is one Magic Resistance helps with. */
     magical: z.literal(true).optional(),
     /** It ends when a spell restores the bearer's hit points (an infernal wound). */
-    endsOnSpellHealing: z.literal(true).optional()
+    endsOnSpellHealing: z.literal(true).optional(),
+    /** The light its bearer sheds while it lasts (Produce Flame's flame, Faerie Fire's outline), read by dynamic
+     *  vision as a light the bearer's token carries. */
+    light: CarriedLightSchema.optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -1051,6 +1076,17 @@ export const InventoryItemSchema = z
     /** Pieces fired from this row in the running fight that can be picked up after it (half come back). The
      *  server keeps it. */
     ammunitionFired: z.number().int().min(0).max(10_000).optional(),
+    /** A light source in hand is burning (a Torch, a Lamp, a Flame Tongue's flames). Dynamic vision lights its bearer
+     *  while it is lit and equipped. The server keeps it. */
+    lit: z.boolean().optional(),
+    /** A Hooded Lantern's hood is down: Dim Light in 5 feet only. */
+    hoodLowered: z.literal(true).optional(),
+    /** Where a Bullseye Lantern's Cone points, in degrees from the right of the map, clockwise. */
+    facingDegrees: z.number().min(0).max(360).optional(),
+    /** The game hour (`rest.clockHours`) a lit Torch, Candle or flask of Oil burns out at. */
+    burnsOutAtHour: z.number().int().min(0).max(10_000_000).optional(),
+    /** Hours of burning left in a light that was put out before it burned down. */
+    burnHoursLeft: z.number().int().min(0).max(24).optional(),
     /** Display-only marker so the sheet can offer Attune without the catalog; never the riders. */
     magic: ItemMagicMarkerSchema.optional()
   })
@@ -1373,7 +1409,11 @@ export const EffectGrantSchema = z
       ])
       .describe("How long the effect lasts."),
     modifiers: EffectModifiersSchema.default([]).describe(
-      "What the effect does while it lasts, gates included, in the shared rider vocabulary. Refused here: every modifier the sheet or the actor stores (ability-score, hit-points-per-level, armor-class, initiative, unarmored-defense, darkvision, sense, spell-slot), which an effect that ends could not give back."
+      "What the effect does while it lasts, gates included, in the shared rider vocabulary. Refused here: every modifier the sheet or the actor stores (ability-score, hit-points-per-level, armor-class, initiative, unarmored-defense, spell-slot), which an effect that ends could not give back."
+    ),
+    /** The light its bearer sheds while it lasts (Produce Flame, Fire Shield, Sacred Weapon). */
+    light: CarriedLightSchema.optional().describe(
+      "The light its bearer sheds while it lasts, carried with its token (Produce Flame's flame, Holy Nimbus's sunlight)"
     ),
     onEnd: z.array(EffectOnEndSchema).max(2).default([]),
     /** The granted effect ends when the actor loses every other effect with this tag (Frenzy's marker ends with the Rage). */
@@ -1603,6 +1643,59 @@ export const ActionAreaSchema = z
   .strict();
 export type ActionArea = z.infer<typeof ActionAreaSchema>;
 
+/**
+ * What a spell or an action does to light and sight while it lasts (SRD Rules Glossary: Bright Light, Dim Light,
+ * Heavily Obscured; the Darkness and Daylight spells). It lasts as long as what keeps it: the caster's Concentration,
+ * the lasting effect its cast leaves, or `rounds`, else until it is cast again or the GM removes it.
+ */
+export const SightEffectSchema = z
+  .object({
+    /** A light it makes: carried by its user (`caster`: Produce Flame), by each creature it targets (`targets`, its user
+     *  when it names none: Light), filling the area it places (`area`: Moonbeam's Cylinder, Daylight's Sphere), or
+     *  `count` lights set at its user's feet to be moved (`point`: Dancing Lights). */
+    light: z
+      .object({
+        on: z.enum(["caster", "targets", "area", "point"]),
+        brightFeet: z.number().int().min(0).max(240),
+        dimFeet: z.number().int().min(0).max(240),
+        sunlight: z.literal(true).optional(),
+        count: z.number().int().min(1).max(4).optional()
+      })
+      .strict()
+      .optional(),
+    /** An area of obscurement or magical Darkness: the area it places on the map, or with `aroundSelfFeet` an
+     *  Emanation round its user that moves with it (a darkmantle's Darkness Aura). */
+    area: z
+      .object({
+        kind: z.enum(["lightly-obscured", "heavily-obscured", "magical-darkness"]),
+        aroundSelfFeet: z.number().int().min(5).max(120).optional(),
+        /** Its user sees through it ("Heavily Obscured for creatures other than you": Insect Cloud). */
+        sparesUser: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    /** Spell-made light (`light`), magical Darkness (`darkness`) or fog and clouds (`fog`: Gust of Wind) of a spell of
+     *  `upToLevel` or lower that its area overlaps is dispelled (Darkness: light of level 2 or lower; Daylight: Darkness
+     *  of level 3 or lower). With no level, any (Sunburst). */
+    dispels: z
+      .object({
+        kind: z.enum(["light", "darkness", "fog"]),
+        upToLevel: z.number().int().min(0).max(9).optional()
+      })
+      .strict()
+      .optional(),
+    /** How many rounds it lasts when nothing else keeps it (an octopus's ink: 1 minute). */
+    rounds: z.number().int().min(1).max(100).optional(),
+    /** Using it again puts out what the last use made instead of making more (a magmin "sets itself ablaze or
+     *  extinguishes its flames"). */
+    toggles: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "What it does to light and sight while it lasts: a light it makes (on its user, its targets, its area or set down), an area of obscurement or magical Darkness, and the spell light or Darkness it dispels."
+  );
+export type SightEffect = z.infer<typeof SightEffectSchema>;
+
 const ReactionRangeFeet = z.number().int().min(5).max(1000).optional();
 
 /**
@@ -1655,7 +1748,9 @@ export const SaveFailureEffectSchema = z
     /** What it adds to AC while it lasts; Slow's -2 is a penalty. Kept apart from `modifiers`, as on an effect. */
     armorClassBonus: z.number().int().min(-10).max(10).optional(),
     /** It ends when a spell restores the bearer's hit points ("The wound closes after ... a spell restores Hit Points"). */
-    endsOnSpellHealing: z.literal(true).optional()
+    endsOnSpellHealing: z.literal(true).optional(),
+    /** The light the creature sheds while it lasts (Faerie Fire: "Each creature ... sheds Dim Light"). */
+    light: CarriedLightSchema.optional()
   })
   .strict();
 
@@ -1987,6 +2082,8 @@ export const ActionSchema = z
     /** The area it covers, for the map template. Filled from the description where the action enters the system
      *  (the content build, a homebrew save, an import), so play never reads the prose. */
     area: ActionAreaSchema.optional(),
+    /** What it does to light and sight while it lasts (a darkmantle's Darkness Aura, an octopus's ink). */
+    sight: SightEffectSchema.optional(),
     /** The spells it casts, each its own cast action in play (a Spellcasting list, a Misty Step); see `CastsSpellsSchema`. */
     castsSpells: CastsSpellsSchema.optional(),
     /** Damage a hit adds or swaps in under a printed condition ("plus 2 (1d4) Slashing damage if the attack roll had
@@ -2396,6 +2493,34 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
     })
     .strict(),
   z.object({ kind: z.literal("melee-hit-damage"), name: TraitNameSchema, damage: TraitDamageSchema }).strict(),
+  /** "The [creature] sheds Bright Light in a 10-foot radius and Dim Light for an additional 10 feet" (Illumination):
+   *  a light its token carries. */
+  z
+    .object({
+      kind: z.literal("light"),
+      name: TraitNameSchema,
+      brightFeet: z.number().int().min(0).max(240),
+      dimFeet: z.number().int().min(0).max(240)
+    })
+    .strict(),
+  /** Sunlight Sensitivity, Sunlight Weakness, a vampire's sunlight, Light Sensitivity: while it stands in `light`
+   *  (sunlight, or any Bright Light), its `rolls` have Disadvantage, and a vampire takes `damageAtTurnStart` as its
+   *  turn starts there. */
+  z
+    .object({
+      kind: z.literal("light-sensitivity"),
+      name: TraitNameSchema,
+      light: z.enum(["sunlight", "bright"]),
+      rolls: z
+        .array(z.enum(["attack", "check", "save"]))
+        .min(1)
+        .max(3),
+      damageAtTurnStart: z
+        .object({ amount: z.number().int().min(1).max(100), type: DamageTypeSchema })
+        .strict()
+        .optional()
+    })
+    .strict(),
   z
     .object({
       kind: z.literal("berserk"),

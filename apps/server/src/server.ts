@@ -73,6 +73,8 @@ import { SoundStore } from "./sound-store.js";
 import { CharacterDraftStore } from "./character-drafts.js";
 import { turnReminder } from "./turn-reminder.js";
 import { hiddenFrom, hideRollsOfHidden, rememberExplored } from "./vision/audience.js";
+import { pruneEndedSight } from "./vision/cast-sight.js";
+import { burnOutLights } from "./item-light.js";
 import { stampSceneChanges } from "./scenes.js";
 import type { SightContent } from "./vision/senses.js";
 
@@ -120,6 +122,13 @@ export function createServer(options: CreateServerOptions) {
     // What the party sees joins what it has seen, in the same transaction as the move or door that showed it. A
     // failure here must not undo the command; the next one catches up.
     afterMutate: (state, before) => {
+      try {
+        // A spell's light or fog goes with the cast that kept it, and a Torch burns down on the game clock.
+        pruneEndedSight(state);
+        burnOutLights(state, sightContent().catalog);
+      } catch (error) {
+        console.error("ending lights failed:", error instanceof Error ? error.message : error);
+      }
       try {
         rememberExplored(state, sightContent());
       } catch (error) {

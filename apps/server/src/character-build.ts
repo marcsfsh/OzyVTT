@@ -176,7 +176,7 @@ type CarrierRiderType = Exclude<Modifier["type"], (typeof BUILDER_BAKED_MODIFIER
  *  fails. These reach the table as rider carriers via `deriveEquipment`. Values record where each is
  *  consumed ("unread": no consumer yet). */
 const CARRIER_RIDER_DISPOSITION: Readonly<
-  Record<CarrierRiderType, "standing" | "at-its-moment" | "unread" | "display-only">
+  Record<CarrierRiderType, "standing" | "at-its-moment" | "unread" | "display-only" | "vision">
 > = {
   "attack-bonus": "standing", // effective-actions folds it into attack.bonus; action-resolution adds the on-attack-roll half
   "save-bonus": "standing", // saving-throws.ts saveRiderBonus (standing + on-saving-throw)
@@ -198,15 +198,15 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "damage-reduction": "at-its-moment", // hit-points.ts damageReductionsFor, taken off the hit before resistances
   "damage-resistance": "standing", // derivation.damageResistances, beside the definition's own
   "damage-vulnerability": "standing", // derivation.damageVulnerabilities, beside the definition's own
-  sense: "display-only" // like `darkvision`: the trait prose carries it; no definition field models senses
+  sense: "vision" // vision/senses.ts reads it live for dynamic vision, from every carrier
 };
 
 /** Where a modifier type is consumed, for the coverage manifest (`srd-coverage.ts`): baked by the builder, read at a
- *  roll, or read by nothing yet. `darkvision` is baked, but only to be displayed, like `sense`. */
+ *  roll, read live by dynamic vision (`darkvision` and `sense`, `vision/senses.ts`), or read by nothing yet. */
 export function modifierDisposition(
   type: Modifier["type"]
-): "baked" | "standing" | "at-its-moment" | "unread" | "display-only" {
-  if (type === "darkvision") return "display-only";
+): "baked" | "standing" | "at-its-moment" | "unread" | "display-only" | "vision" {
+  if (type === "darkvision") return "vision";
   return (BUILDER_BAKED_MODIFIER_TYPES as readonly string[]).includes(type)
     ? "baked"
     : CARRIER_RIDER_DISPOSITION[type as CarrierRiderType];
@@ -665,7 +665,7 @@ function interpretFeature(
           into.unarmoredDefenses.push({ ability: modifier.ability, allowShield: modifier.allowShield });
         break;
       case "darkvision":
-        break; // display-only: the trait prose carries the senses; no definition field models them
+        break; // nothing to bake: dynamic vision reads it live (vision/senses.ts)
       // The roll-time variants; see `CARRIER_RIDER_DISPOSITION`.
       default:
         ownedByTheRollTimeCollector(modifier);

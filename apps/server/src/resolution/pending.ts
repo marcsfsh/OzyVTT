@@ -214,6 +214,7 @@ export function failureEffectFor(
     ].slice(0, 8),
     modifiers: [...(declared?.modifiers ?? [])],
     ...(declared?.armorClassBonus !== undefined ? { armorClassBonus: declared.armorClassBonus } : {}),
+    ...(declared?.light ? { light: { ...declared.light } } : {}),
     linkedConditionIds: linked,
     // An escape DC the text doesn't print is the grapple's own DC, as the 2024 rules set it; a spell's restraint is
     // escaped against the spell save DC.

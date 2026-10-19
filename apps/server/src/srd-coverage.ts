@@ -82,7 +82,8 @@ export function spellState(spell: SpellReference): CoverageState {
       (effect?.damage.length ?? 0) > 0 ||
       spell.save.speedZero === true ||
       spell.save.failurePush !== undefined);
-  if (applies || saveApplies) return "enforced";
+  // The light it sheds or the fog or Darkness it fills, which dynamic vision reads.
+  if (applies || saveApplies || spell.sight !== undefined) return "enforced";
   if (spell.level > 0 || spell.concentration || spell.area !== null || spell.save !== null) return "guided";
   return "reference";
 }
@@ -145,9 +146,9 @@ const modifierApplies = (riders: Riders) => (modifier: Modifier) => {
   return modifier.type !== "short-rest-regain" || riders.actions.length === 0;
 };
 
-/** A modifier nothing reads yet (a spell attack bonus, a sense): its record applies in part at most. */
+/** A modifier nothing reads yet: its record applies in part at most. Senses are read by dynamic vision. */
 const unreadModifier = (riders: Riders) =>
-  riders.modifiers.some((modifier) => modifierDisposition(modifier.type) === "unread" || modifier.type === "sense");
+  riders.modifiers.some((modifier) => modifierDisposition(modifier.type) === "unread");
 
 const ridersApply = (riders: Riders) =>
   riders.actions.some(actionResolves) ||
@@ -191,6 +192,8 @@ export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<str
     (item.ammunition ?? null) !== null ||
     item.spellScroll !== undefined ||
     item.removesArmorDrawbacks === true ||
+    // Its light, which dynamic vision reads while it is lit.
+    item.light !== undefined ||
     ridersApply(item);
   if (applies) return unreadModifier(item) ? "guided" : "enforced";
   const casts = item.casts.map((cast) => spellStates.get(cast.spellId) ?? "reference");

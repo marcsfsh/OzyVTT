@@ -79,7 +79,9 @@ function combatantsOf(
     action.multiattack !== undefined ||
     spendsALimitedUse ||
     startsALastingSpell ||
-    input.builtin === true;
+    input.builtin === true ||
+    // A light or a cloud is something done, with no creature under it (a magmin's flames, a darkmantle's aura).
+    action.sight !== undefined;
   // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
   const touchesSomeone = action.endsConditions !== undefined || action.healing?.perUse === true;
   if (targets.length === 0 && (touchesSomeone || (!structuredWithoutTargets && action.grants?.target !== "target")))
@@ -93,6 +95,7 @@ function combatantsOf(
     action.multiattack === undefined &&
     !spendsALimitedUse &&
     !startsALastingSpell &&
+    action.sight === undefined &&
     input.builtin !== true
   )
     throw new CommandRejectedError("That action has no structured effect to resolve. Run it from its description.");
