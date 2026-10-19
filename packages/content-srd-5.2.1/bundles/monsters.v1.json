@@ -8135,6 +8135,12 @@
       "type": "fire"
      }
     ]
+   },
+   {
+    "kind": "light",
+    "name": "Illumination",
+    "brightFeet": 10,
+    "dimFeet": 10
    }
   ],
   "extensions": {
@@ -12841,6 +12847,16 @@
     "height": 2
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Light Sensitivity",
+    "light": "bright",
+    "rolls": [
+     "attack"
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -14329,6 +14345,27 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "grants": {
+     "name": "Darkness Aura",
+     "tags": [
+      "darkness-aura"
+     ],
+     "target": "self",
+     "duration": {
+      "type": "rounds",
+      "rounds": 100
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "voidWhileIncapacitated": false,
+     "concentration": true
+    },
+    "sight": {
+     "area": {
+      "kind": "magical-darkness",
+      "aroundSelfFeet": 15
+     }
     },
     "area": {
      "shape": "emanation",
@@ -15846,6 +15883,17 @@
     "height": 2
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Sunlight Sensitivity",
+    "light": "sunlight",
+    "rolls": [
+     "check",
+     "attack"
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
@@ -17753,6 +17801,12 @@
      }
     ],
     "hazard": "burning"
+   },
+   {
+    "kind": "light",
+    "name": "Illumination",
+    "brightFeet": 30,
+    "dimFeet": 30
    }
   ],
   "extensions": {
@@ -18982,6 +19036,9 @@
       "type": "psychic"
      }
     ],
+    "sight": {
+     "seenBy": "user"
+    },
     "area": {
      "shape": "cone",
      "sizeFeet": 60,
@@ -20494,6 +20551,14 @@
   "damageResistances": [
    "fire"
   ],
+  "traitMechanics": [
+   {
+    "kind": "light",
+    "name": "Illumination",
+    "brightFeet": 10,
+    "dimFeet": 10
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
@@ -21006,6 +21071,12 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "sight": {
+     "area": {
+      "kind": "heavily-obscured"
+     },
+     "rounds": 10
     },
     "area": {
      "shape": "cube",
@@ -27883,6 +27954,12 @@
    "restrained",
    "unconscious"
   ],
+  "traitMechanics": [
+   {
+    "kind": "invisible",
+    "name": "Invisibility"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 6,
@@ -28505,6 +28582,17 @@
     "height": 1
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Sunlight Sensitivity",
+    "light": "sunlight",
+    "rolls": [
+     "check",
+     "attack"
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0.125,
@@ -30176,7 +30264,15 @@
     "name": "Ignited Illumination",
     "activation": "bonus-action",
     "description": "The magmin sets itself ablaze or extinguishes its flames. While ablaze, the magmin sheds Bright Light in a 10-foot radius and Dim Light for an additional 10 feet.",
-    "damage": []
+    "damage": [],
+    "sight": {
+     "light": {
+      "on": "caster",
+      "brightFeet": 10,
+      "dimFeet": 10
+     },
+     "toggles": true
+    }
    },
    {
     "id": "touch",
@@ -32727,6 +32823,14 @@
   "damageImmunities": [
    "fire"
   ],
+  "traitMechanics": [
+   {
+    "kind": "light",
+    "name": "Illumination",
+    "brightFeet": 10,
+    "dimFeet": 10
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
@@ -33038,6 +33142,12 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "sight": {
+     "area": {
+      "kind": "heavily-obscured"
+     },
+     "rounds": 10
     },
     "area": {
      "shape": "cube",
@@ -38805,6 +38915,7 @@
      "beast",
      "humanoid"
     ],
+    "seenOnly": true,
     "save": {
      "ability": "wis",
      "dc": 11,
@@ -39041,6 +39152,18 @@
    "prone",
    "restrained",
    "unconscious"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Sunlight Weakness",
+    "light": "sunlight",
+    "rolls": [
+     "attack",
+     "check",
+     "save"
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -40159,6 +40282,17 @@
    "prone",
    "restrained",
    "unconscious"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Sunlight Sensitivity",
+    "light": "sunlight",
+    "rolls": [
+     "check",
+     "attack"
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -45101,6 +45235,21 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 3
   },
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Vampire Weakness",
+    "light": "sunlight",
+    "rolls": [
+     "attack",
+     "check"
+    ],
+    "damageAtTurnStart": {
+     "amount": 20,
+     "type": "radiant"
+    }
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
@@ -45405,6 +45554,21 @@
   },
   "damageResistances": [
    "necrotic"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Vampire Weakness",
+    "light": "sunlight",
+    "rolls": [
+     "attack",
+     "check"
+    ],
+    "damageAtTurnStart": {
+     "amount": 20,
+     "type": "radiant"
+    }
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -47791,6 +47955,17 @@
    "exhaustion",
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Sunlight Sensitivity",
+    "light": "sunlight",
+    "rolls": [
+     "check",
+     "attack"
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 3,
@@ -47900,7 +48075,25 @@
     "name": "Vanish",
     "activation": "bonus-action",
     "description": "The wisp and its light have the Invisible condition until the wisp's Concentration ends on this effect, which ends early immediately after the wisp makes an attack roll or uses Consume Life.",
-    "damage": []
+    "damage": [],
+    "grants": {
+     "name": "Vanish",
+     "tags": [
+      "light-out",
+      "until-it-acts"
+     ],
+     "target": "self",
+     "duration": {
+      "type": "manual"
+     },
+     "conditions": [
+      "invisible"
+     ],
+     "modifiers": [],
+     "onEnd": [],
+     "voidWhileIncapacitated": false,
+     "concentration": true
+    }
    }
   ],
   "token": {
@@ -47929,6 +48122,14 @@
    "prone",
    "restrained",
    "unconscious"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "light",
+    "name": "Illumination",
+    "brightFeet": 20,
+    "dimFeet": 20
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -48422,6 +48623,17 @@
    "prone",
    "restrained",
    "unconscious"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "light-sensitivity",
+    "name": "Sunlight Sensitivity",
+    "light": "sunlight",
+    "rolls": [
+     "check",
+     "attack"
+    ]
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {

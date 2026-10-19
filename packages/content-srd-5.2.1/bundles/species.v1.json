@@ -1372,7 +1372,25 @@
             "name": "Stonecunning",
             "activation": "bonus-action",
             "description": "Gain Tremorsense with a range of 60 feet for 10 minutes while on or touching a stone surface.",
-            "damage": []
+            "damage": [],
+            "grants": {
+              "name": "Stonecunning",
+              "tags": [
+                "stonecunning"
+              ],
+              "target": "self",
+              "duration": {
+                "type": "rounds",
+                "rounds": 100
+              },
+              "modifiers": [
+                {
+                  "type": "sense",
+                  "sense": "tremorsense",
+                  "feet": 60
+                }
+              ]
+            }
           }
         ],
         "uses": {

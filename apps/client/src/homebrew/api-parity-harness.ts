@@ -790,6 +790,20 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "sight.**",
+    types: ["spell"],
+    reason:
+      "the light, darkness or fog the spell places on the map (Daylight, Fog Cloud), authored per spell as the catalog is built",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].sight.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the light, darkness or fog an action places (a darkmantle's Darkness Aura) - copied from the spell by the character build or authored in the catalog; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].spellSlot.level",
     types: ACTION_CARRIERS,
     reason: "synthesised from an item's consumesSpellSlot during equipment derivation, zero hand authors",
@@ -866,6 +880,20 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "effects[].voidWhileIncapacitated",
     types: FEATURE_CARRIERS,
     reason: "effect linkage vocabulary with no control: no program unit authors it",
+    status: "gap"
+  },
+  {
+    at: "effects[].light.**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "the light an effect sheds around its bearer (Faerie Fire's outline); authored in the spell overlay, no control yet",
+    status: "gap"
+  },
+  {
+    at: "effects[].detects.**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "the creatures an effect lets its bearer sense (Divine Sense); authored in the class and spell overlays, no control yet",
     status: "gap"
   },
   {
@@ -1061,6 +1089,12 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ["equipment"],
     reason:
       "the light an item sheds (a Torch's 20 feet bright, 20 dim), which dynamic vision reads; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^study.**",
+    types: ["equipment"],
+    reason: "a manual's or tome's study, the score it raises for good once the GM marks it done; no editor control yet",
     status: "gap"
   },
   {

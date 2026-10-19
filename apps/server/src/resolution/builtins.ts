@@ -2,6 +2,7 @@ import { d20FacesFor } from "@vtt/rules-5e";
 import { wardedConditions } from "../paladin-auras.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import { checkPlan, totalCheck, type CheckSubject } from "../ability-checks.js";
+import { checkSightFor, couldSpot } from "../vision/rules.js";
 import { builtinBaseId } from "../builtin-actions.js";
 import { addEffect, endEffect, ESCAPE_ATHLETICS_TAG, makeEffect } from "../effects.js";
 import { putOutFire } from "../hazards.js";
@@ -66,14 +67,26 @@ export function rollCheck(
     : [];
   const plan = checkPlan(ctx.attacker, ctx.deps.definition, ctx.derivation, subject, {
     ...(warded.length > 0 ? { warded } : {}),
-    ...(stakes.length > 0 ? { stakes } : {})
+    ...(stakes.length > 0 ? { stakes } : {}),
+    // Frightened's line of sight and the light the roller stands in (Sunlight Sensitivity).
+    sight: checkSightFor(
+      ctx.state,
+      ctx.attacker,
+      {
+        ...(ctx.deps.resolveDefinition ? { definition: ctx.deps.resolveDefinition } : {}),
+        ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {})
+      },
+      undefined,
+      ctx.deps.distanceFeet
+    )
   });
   const forced = label === undefined ? (ctx.input.rollMode ?? undefined) : undefined;
   const mode = forced ?? plan.rollMode.mode;
   ctx.rollMode = shownRollMode(plan.rollMode, forced);
   const roll = totalCheck(plan, d20FacesFor(mode, [], ctx.deps.random), mode, ctx.deps.random);
   recordRoll(ctx, roll.resolution, "check", undefined, { total: roll.total });
-  const success = dc === null ? null : roll.total >= dc;
+  const success = plan.autoFails !== undefined ? false : dc === null ? null : roll.total >= dc;
+  if (plan.autoFails !== undefined) ctx.warnings.push(plan.autoFails);
   ctx.check = { skill: label ?? plan.label, total: roll.total, naturalRoll: roll.natural, dc, success };
   return success;
 }
@@ -113,10 +126,37 @@ function chosenSubject(ctx: ResolveContext, ability: CheckSubject["ability"]): C
   return { ability: skillAbility, skill };
 }
 
-/** SRD Search and Study: the GM sets the DC and adjudicates. */
+/** SRD Search and Study: the GM sets the DC and adjudicates. A Search with Perception also finds the hidden enemies
+ *  whose Hide total it meets ("an enemy finds you"), with dynamic vision on, among those it could see but for hiding. */
 const searchOrStudy = (ability: CheckSubject["ability"]) => (ctx: ResolveContext) => {
-  rollCheck(ctx, chosenSubject(ctx, ability), null);
+  const subject = chosenSubject(ctx, ability);
+  rollCheck(ctx, subject, null);
+  if (ctx.action.id === "search" && subject.skill === "perception") findHidden(ctx);
 };
+
+/** Ends the Hide of each enemy the searcher's Perception total finds. */
+function findHidden(ctx: ResolveContext): void {
+  const total = ctx.check?.total;
+  if (total === undefined) return;
+  const { state, attacker, deps } = ctx;
+  const content = {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  };
+  for (const other of state.actors) {
+    if (other.id === attacker.id) continue;
+    const hiding = other.effects.find((effect) => effect.tags.includes("hidden") && effect.findDc !== undefined);
+    if (!hiding || total < hiding.findDc!) continue;
+    if (!couldSpot(state, content, attacker.id, other.id, deps.distanceFeet)) continue;
+    const events = endEffect(state, other.id, hiding.id);
+    for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
+    ctx.tableNarration.push({
+      kind: "effect",
+      text: `${attacker.name} finds ${other.name}.`,
+      actorIds: [attacker.id, other.id]
+    });
+  }
+}
 
 /** SRD Influence: "a default DC equal to 15 or the monster's Intelligence score, whichever is higher", so a monster
  *  picked as the target sets it; with none, the GM does. Attitude (Friendly, Hostile) stays the GM's call. */
@@ -144,7 +184,8 @@ function hide(ctx: ResolveContext): void {
       sourceActionId: "hide",
       startedRound: state.combat.round,
       duration: { type: "manual" },
-      linkedConditionIds: ["invisible"]
+      linkedConditionIds: ["invisible"],
+      findDc: ctx.check!.total
     }),
     undefined,
     deps

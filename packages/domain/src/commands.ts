@@ -547,6 +547,14 @@ export const ContentActionsSchema = z
       .max(200)
   })
   .strict();
+/** A stat block's actions to run, for one combatant built from it when `actorId` names one. */
+export const ContentMonsterActionsQuerySchema = z
+  .object({
+    /** A combatant built from the stat block: its actions as it has them now, with what its items give. */
+    actorId: z.uuid().optional()
+  })
+  .strict();
+export const ContentMonsterActionsSchema = ContentActionsSchema.extend(ContentMonsterActionsQuerySchema.shape);
 export const TurnReactionSchema = z
   .object({
     commandId: z.uuid(),
@@ -811,6 +819,29 @@ export const ActorSetHeroicInspirationSchema = z
   })
   .strict();
 
+/** A character's player (or the GM) gives its second Heroic Inspiration to a player character who lacks one, or lets
+ *  it go (`recipientId` null). */
+export const ActorGiveHeroicInspirationSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    recipientId: z.uuid().nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
+/** The GM awards XP: an amount to each recipient, and an even share of the defeated creatures' stat block XP. */
+export const ActorAwardExperienceSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorIds: z.array(z.uuid()).min(1).max(12),
+    amount: z.number().int().min(-1_000_000).max(1_000_000).default(0),
+    defeatedIds: z.array(z.uuid()).max(60).default([]),
+    inLairIds: z.array(z.uuid()).max(60).default([]),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
 /** Ask the GM. `payload` is the original command, revalidated with its own schema before use. */
 export const RulesAskSchema = z
   .object({
@@ -970,10 +1001,71 @@ export const VisionSetAmbientSchema = z
   .object({
     commandId: z.uuid(),
     ambient: z.enum(["bright", "dim", "dark"]),
+    /** The bright ambient light is sunlight (daylight outdoors). Left as it was when absent. */
+    sunlight: z.boolean().optional(),
     sceneId: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** An area of light or obscurement painted over the ambient light: a rect (snapped to whole cells), or a circle for
+ *  fog or magical Darkness. */
+export const VisionAreaAddSchema = z
+  .object({
+    commandId: z.uuid(),
+    kind: z.enum(["bright", "dim", "dark", "lightly-obscured", "heavily-obscured", "magical-darkness"]),
+    sunlight: z.boolean().optional(),
+    rect: z
+      .object({
+        x: z.number().min(-100000).max(1_000_000),
+        y: z.number().min(-100000).max(1_000_000),
+        width: z.number().min(-1_000_000).max(1_000_000),
+        height: z.number().min(-1_000_000).max(1_000_000)
+      })
+      .strict()
+      .optional(),
+    circle: z
+      .object({
+        x: z.number().min(-100000).max(1_000_000),
+        y: z.number().min(-100000).max(1_000_000),
+        radiusFeet: z.number().positive().max(1000)
+      })
+      .strict()
+      .optional(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((area) => (area.rect === undefined) !== (area.circle === undefined), {
+    message: "Give the area a rectangle or a circle, not both."
+  });
+export const VisionAreaRemoveSchema = z
+  .object({
+    commandId: z.uuid(),
+    areaId: z.uuid(),
+    sceneId: z.uuid().optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** Light or put out a light source a creature carries, lower or raise a Hooded Lantern's hood, or aim a Bullseye
+ *  Lantern. */
+export const ItemSetLightSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    lit: z.boolean().optional(),
+    hoodLowered: z.boolean().optional(),
+    facingDegrees: z.number().min(-360).max(720).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine(
+    (change) => change.lit !== undefined || change.hoodLowered !== undefined || change.facingDegrees !== undefined,
+    { message: "Say whether to light it, hood it or aim it." }
+  );
 export const VisionResetExploredSchema = z
   .object({
     commandId: z.uuid(),
@@ -1254,6 +1346,18 @@ export const CharacterGiveItemSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     toActorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM marks a carried manual or tome studied by the character carrying it. */
+export const CharacterStudyItemSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     itemId: z
       .string()
       .regex(/^[a-z0-9-]+$/)

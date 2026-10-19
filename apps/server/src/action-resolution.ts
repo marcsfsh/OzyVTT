@@ -64,6 +64,7 @@ import {
 } from "./resolution/pending.js";
 import { markCastTurn, markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
 import { parkForCounterspell } from "./resolution/counter.js";
+import { placeCastSight } from "./resolution/cast-sight.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
@@ -183,6 +184,7 @@ export function resolveDefinitionAction(
   markCastTurn(ctx);
   openSpellZone(ctx);
   applyGrant(ctx);
+  placeCastSight(ctx);
   applyHealing(ctx);
   applyConditionCures(ctx);
   applySpellEndings(ctx);

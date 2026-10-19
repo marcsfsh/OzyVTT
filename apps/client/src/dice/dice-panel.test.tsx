@@ -67,3 +67,45 @@ describe("an armed Advantage in a custom formula", () => {
     expect(screen.getByText("Disadvantage is armed for the next d20 roll.")).toBeTruthy();
   });
 });
+
+describe("a free roll in the history", () => {
+  const roll = (id: string, free: boolean) => ({
+    id,
+    commandId: id,
+    initiatorRole: free ? "player" : "gm",
+    initiatorLabel: free ? "Hero" : "GM",
+    label: "Stealth",
+    actorId: null,
+    purpose: "check",
+    visibility: "public",
+    formula: "1d20 + 30",
+    normalizedFormula: "1d20+30",
+    dice: [{ group: 0, sides: 20, face: 4, kept: true, sign: 1 }],
+    modifiers: [{ value: 30, sign: 1 }],
+    total: 34,
+    ...(free ? { free: true } : {}),
+    createdAt: "2026-10-18T00:00:00.000Z"
+  });
+
+  it("says a player's roll is a free roll", () => {
+    render(
+      <DicePanel
+        role="player"
+        state={{ rolls: [roll("10000000-0000-4000-8000-000000000001", true)] } as unknown as PlayerView}
+      />,
+      { wrapper: ToastProvider }
+    );
+    expect(screen.getByText(/Hero · .* · Free roll/)).toBeTruthy();
+  });
+
+  it("leaves a GM's roll unmarked", () => {
+    render(
+      <DicePanel
+        role="player"
+        state={{ rolls: [roll("10000000-0000-4000-8000-000000000002", false)] } as unknown as PlayerView}
+      />,
+      { wrapper: ToastProvider }
+    );
+    expect(screen.queryByText(/Free roll/)).toBeNull();
+  });
+});

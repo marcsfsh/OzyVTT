@@ -7,6 +7,7 @@ import { endedEffect, sizeAtMost, tableLineOf, type DefinitionAction, type Resol
 import { damagePartsOf } from "./damage.js";
 import { spellCastOf } from "./pending.js";
 import { forceMove, openRiderSave, rollPlain } from "./hit-rider-outcomes.js";
+import { effectNameOf } from "../effect-names.js";
 
 /** Whether this hit deals its target any damage after the target's defences: what Slow and Vex need. */
 export function dealsDamage(ctx: ResolveContext): boolean {
@@ -111,7 +112,9 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
       bearer.id,
       makeEffect({
         id: `${input.commandId}:hit:${bearer.id}:${index}`,
-        name: rider.self ? `${label} (${action.name})` : `${label} by ${attacker.name} (${action.name})`,
+        name: rider.self
+          ? `${label} (${effectNameOf(action.name)})`
+          : `${label} by ${attacker.name} (${effectNameOf(action.name)})`,
         tags: [...(grapple ? ["grapple"] : []), ...tags],
         sourceActorId: attacker.id,
         sourceName: attacker.name,

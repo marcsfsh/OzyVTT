@@ -28,7 +28,7 @@ import {
   useTargetingBusy,
   useTargetingResult
 } from "./targeting";
-import { foesFirst, offeredTargets, type TargetRow } from "../table/targetRows";
+import { foesFirst, pickableTargets, type TargetRow } from "../table/targetRows";
 import { revealInRegion } from "../lib/reveal";
 import "./action-runner.css";
 
@@ -128,10 +128,10 @@ export function PlayerActionRunner({
   effectTags = [],
   unavailable,
   targetRows,
-  deadIds,
   insideNow,
   actor = null,
   myTurn = true,
+  offTurn = false,
   header,
   pickOnly,
   castPlace = { kind: "inline" },
@@ -149,8 +149,6 @@ export function PlayerActionRunner({
   targets: readonly { actorId: string; name: string }[];
   /** Each target as its token shows it, with its distance and the AC the player knows. */
   targetRows?: ReadonlyMap<string, TargetRow>;
-  /** The creatures the player's view shows as dead, which an action that harms doesn't offer. */
-  deadIds?: ReadonlySet<string>;
   /** For an area: who it covers where it is placed now, of the creatures the player can see. */
   insideNow?: readonly TargetRow[];
   /** The tags of the character's effects, which bring forward a generic action that needs one (Put Out the Fire). */
@@ -161,6 +159,8 @@ export function PlayerActionRunner({
   actor?: SheetActor | null;
   /** The character acts now; off its turn the list stays in view and only reactions are live. */
   myTurn?: boolean;
+  /** It acts off its own turn (a readied spell or action), so a result it gets stays until its player closes it. */
+  offTurn?: boolean;
   /** What sits above the list (the economy on the sheet's own Play tab). */
   header?: ReactNode;
   /** Only the aim and its result, for a use started from another tab of the sheet; Done closes it. */
@@ -246,12 +246,20 @@ export function PlayerActionRunner({
     },
     []
   );
-  // The turn moved on: what was being aimed on it goes, as when the runner was mounted only for the turn.
+  // The turn moved on: what was being aimed on it goes, as when the runner was mounted only for the turn. A result got
+  // off the turn (a readied spell released, which ends the Ready) stays until its player closes it.
   const wasMyTurn = useRef(myTurn);
+  const resultOffTurn = useRef(false);
+  const offTurnNow = useRef(offTurn);
+  offTurnNow.current = offTurn;
+  // Whether the result in view arrived off the turn, read when it arrives.
+  useEffect(() => {
+    resultOffTurn.current = result !== null && offTurnNow.current;
+  }, [result]);
   useEffect(() => {
     if (wasMyTurn.current && !myTurn) {
       clearTargeting();
-      setTargetingResult(null);
+      if (!resultOffTurn.current) setTargetingResult(null);
     }
     wasMyTurn.current = myTurn;
   }, [myTurn]);
@@ -433,8 +441,8 @@ export function PlayerActionRunner({
       {picking && !result?.preview && (
         <ActionTargetPicker
           picking={picking}
-          targets={foesFirst(
-            offeredTargets(
+          targets={pickableTargets(
+            foesFirst(
               targets
                 // A heal may be for the healer too (a potion the healer drinks), and so may a touch that cures or
                 // protects with no attack, save or damage (Lesser Restoration, Enhance Ability on the caster).
@@ -452,11 +460,11 @@ export function PlayerActionRunner({
                   (target): Pick<TargetRow, "id" | "label"> & Partial<TargetRow> =>
                     targetRows?.get(target.actorId) ?? { id: target.actorId, label: target.name }
                 ),
-              picking.action,
-              (id) => deadIds?.has(id) === true
+              "player-character",
+              picking.action.healing != null || healingOf(picking.action) !== undefined
             ),
-            "player-character",
-            picking.action.healing != null || healingOf(picking.action) !== undefined
+            picking.action,
+            picking.action.spellId !== undefined ? spellIndex.get(picking.action.spellId) : undefined
           )}
           onMap
           {...(insideNow ? { insideNow } : {})}

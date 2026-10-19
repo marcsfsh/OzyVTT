@@ -14,6 +14,7 @@ import { travelBudgetFeet, travelCostsExtra, type TravelMode } from "./speed.js"
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import type { MovementCost, MovementCostOptions } from "./terrain.js";
 import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
+import { frightenedApproach } from "./vision/rules.js";
 import {
   effectiveModeFor,
   familyModeFor,
@@ -344,6 +345,16 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     police(state, input, "movement.teleport", `${mover.name} can teleport only with the GM's go-ahead.`, outcome);
   if ((counted || input.byPlayer) && endsInOccupiedSpace(state, input, to))
     police(state, input, "movement.occupied", `${mover.name} can't end its move in another creature's space.`, outcome);
+  // SRD Frightened: "You can't willingly move closer to the source of fear."
+  const feared = counted || input.byPlayer ? frightenedApproach(state, actorId, from, to) : null;
+  if (feared !== null)
+    police(
+      state,
+      input,
+      "movement.toward-fear",
+      `${mover.name} is Frightened and can't willingly move closer to ${feared}.`,
+      outcome
+    );
   if (mode === "teleport" || !counted) return done();
 
   // The budget for this way of moving; Prone, the only way is to crawl (SRD Prone: "Your only movement options are

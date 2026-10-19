@@ -98,6 +98,8 @@ function offered(action: ActorDefinition["actions"][number], facts: TurnFacts): 
     action.damage.length > 0 ||
     action.uses !== undefined ||
     (action.healing !== undefined && action.spellId === undefined) ||
+    // A feature that grants its user an effect (Reckless Attack, Steady Aim), taken with a tap.
+    (action.grants !== undefined && action.spellId === undefined) ||
     // A spell the server can resolve (Misty Step, Fly), though it rolls nothing.
     ((action.spellId !== undefined || action.spellSlot !== undefined) && row?.targeting)
   );
@@ -219,7 +221,12 @@ export function turnOptions({
     if (!own) continue;
     const row = facts.rows.get(action.id);
     // The damage the server rolls, where it differs (a lasting spell's later row at its cast level).
-    const summary = row && row.damage.length === own.damage.length ? { ...own, damage: row.damage } : own;
+    const rolled = row && row.damage.length === own.damage.length ? { ...own, damage: row.damage } : own;
+    // Who a feature's grant reaches, as the server takes it: a self grant is a tap with no target.
+    const summary =
+      action.grants !== undefined && action.spellId === undefined && row?.targeting
+        ? { ...rolled, targeting: row.targeting }
+        : rolled;
     const option = build(summary, action);
     const later = action.id.match(LATER);
     const parent = later ? `spell-${later[1]}` : null;

@@ -718,7 +718,7 @@ export const actionCommands = [
     type: "dice.roll",
     operationId: "rollDice",
     description:
-      "Rolls dice into the shared, auditable roll history; the response carries `rollId`. Player sessions cannot roll gm-only, and rolling for an actor requires owning it. A formula with no dice is a number typed from physical dice: a player may send one only while the table's `typedRolls` is open, and its record is marked `typed`.",
+      "Rolls dice into the shared, auditable roll history; the response carries `rollId`. Player sessions cannot roll gm-only, and rolling for an actor requires owning it. A formula with no dice is a number typed from physical dice: a player may send one only while the table's `typedRolls` is open, and its record is marked `typed`. A player's roll is marked `free` and shown as a free roll: its formula and label are the player's, and the rules' checks, saves and attacks come from the commands that work out their bonuses.",
     summary: "Roll dice into the shared, auditable roll history.",
     schema: DiceRollSchema,
     malformed: "The roll request is malformed.",
@@ -779,6 +779,8 @@ export const actionCommands = [
           ...rolledTerms(resolution),
           total: resolution.total,
           ...(typed ? { typed: true as const } : {}),
+          // A player's own formula and label: shown as a free roll, so it never reads as a rule's.
+          ...(gmGrade ? {} : { free: true as const }),
           createdAt: new Date().toISOString()
         };
         recordRoll(draft, record);

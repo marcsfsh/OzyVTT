@@ -47,12 +47,15 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
   "versus-size": "A target's size",
   "versus-condition": "A target's condition",
   "versus-creature-type": "A target's kind",
-  "by-effect-source": "The creature that put this effect on"
+  "by-effect-source": "The creature that put this effect on",
+  "sees-other": "You can see the other creature",
+  "seen-by-other": "The other creature can see you",
+  "other-lacks-sense": "The other creature lacks a sense"
 };
 
-/** Read only on an effect the engine puts on another creature (Hunter's Mark), never on an item or a feature, so the
- *  editor doesn't offer it. */
-const ENGINE_ONLY_TRIGGERS: ReadonlySet<string> = new Set(["by-effect-source"]);
+/** Read only on an effect the engine puts on another creature (Hunter's Mark), or authored only by the content
+ *  (Blur's senses), so the editor doesn't offer them. */
+const ENGINE_ONLY_TRIGGERS: ReadonlySet<string> = new Set(["by-effect-source", "other-lacks-sense"]);
 
 const TRIGGER_TYPES: readonly SelectOption[] = (Object.keys(TRIGGER_LABELS) as RiderTrigger["type"][])
   .filter((type) => !ENGINE_ONLY_TRIGGERS.has(type))

@@ -170,7 +170,8 @@
 .encounter-menu .encounter-end {
   margin-top: 0;
 }
-.encounter-add-monsters {
+.encounter-add-monsters,
+.encounter-award-xp {
   width: 100%;
   min-height: var(--tap-min);
   margin: 0.9rem 0 0.6rem;
@@ -184,7 +185,11 @@
   text-align: center;
   cursor: pointer;
 }
-.encounter-add-monsters:hover:not(:disabled) {
+.encounter-menu .encounter-award-xp {
+  margin: 0;
+}
+.encounter-add-monsters:hover:not(:disabled),
+.encounter-award-xp:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
   background: var(--surface-2);
   color: var(--text);

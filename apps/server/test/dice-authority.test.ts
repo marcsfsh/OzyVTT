@@ -499,3 +499,31 @@ describe("players type faces, never totals or modes", () => {
     ).toBe(200);
   });
 });
+
+describe("the free dice roller", () => {
+  it("marks a player's roll for their character as a free roll, on the record and in the feed", async () => {
+    const { base, server, gmToken, player } = await boot(fight());
+    const roll = (token: string, label: string) =>
+      post(base, GAME_PATHS.rolls, token, {
+        commandId: randomUUID(),
+        formula: "1d20 + 30",
+        purpose: "check",
+        visibility: "public",
+        label,
+        actorId: HERO
+      });
+    expect((await roll(player, "Stealth")).status).toBe(200);
+    expect((await roll(gmToken, "Stealth for Hero")).status).toBe(200);
+    const [mine, gms] = server.store.snapshot.rolls.slice(-2);
+    expect(mine).toMatchObject({ actorId: HERO, purpose: "check", label: "Stealth", free: true });
+    expect(gms?.free).toBeUndefined();
+    const feed = (
+      (await (await fetch(base + GAME_PATHS.log, { headers: bearer(gmToken) })).json()).data.entries as ReadonlyArray<{
+        text: string;
+      }>
+    ).map((entry) => entry.text);
+    expect(feed).toContainEqual(
+      expect.stringMatching(/^Hero rolled \d+ on Stealth \(1d20\+30\) with the free dice roller\.$/)
+    );
+  });
+});

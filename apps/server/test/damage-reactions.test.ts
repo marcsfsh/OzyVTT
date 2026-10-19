@@ -200,6 +200,7 @@ function monk(level: number): ActorDefinition {
         { level: 1, kind: "language", id: "giant" },
         { level: 1, classId: "monk", kind: "skill", id: "acrobatics" },
         { level: 1, classId: "monk", kind: "skill", id: "insight" },
+        { level: 1, classId: "monk", kind: "tool", id: "instrument-flute" },
         { level: 3, classId: "monk", kind: "subclass", id: "warrior-of-the-open-hand" },
         ...asi(4, "dex", "dex"),
         ...asi(8, "wis", "wis"),

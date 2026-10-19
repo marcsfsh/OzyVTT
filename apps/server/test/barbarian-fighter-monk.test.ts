@@ -186,6 +186,7 @@ const monkInput = (level: number): MutableInput => ({
     { level: 1, kind: "language", id: "giant" },
     { level: 1, classId: "monk", kind: "skill", id: "acrobatics" },
     { level: 1, classId: "monk", kind: "skill", id: "insight" },
+    { level: 1, classId: "monk", kind: "tool", id: "instrument-flute" },
     ...(level >= 3 ? ([{ level: 3, classId: "monk", kind: "subclass", id: "warrior-of-the-open-hand" }] as Row[]) : []),
     ...asisTo("monk", level, [
       [4, "dex", "dex"],
@@ -1389,7 +1390,12 @@ describe("Monk: the Bonus Action forms Martial Arts and Monk's Focus give", () =
     use(built, "patient-defense");
     const effect = built.hero.effects.find((entry) => entry.tags.includes("dodging"))!;
     expect(effect.tags).toEqual(["disengaged", "dodging"]);
-    expect(effect.modifiers).toContainEqual({ type: "roll-mode", roll: "incoming-attack", mode: "disadvantage" });
+    expect(effect.modifiers).toContainEqual({
+      type: "roll-mode",
+      roll: "incoming-attack",
+      mode: "disadvantage",
+      when: [{ type: "on-attack-roll" }, { type: "sees-other" }]
+    });
     // Dodge's half lapses at Speed 0 or while Incapacitated, as the Dodge action does.
     expect(effect.voidWhileIncapacitated).toBe(true);
     expect(built.hero.actionUses["focus-points"]).toBe(1);

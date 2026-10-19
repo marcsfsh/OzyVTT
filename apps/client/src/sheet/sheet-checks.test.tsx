@@ -73,6 +73,7 @@ function derivedSheet(over: Partial<ActorDerivedSheet> = {}): ActorDerivedSheet 
     spellSaveDcBonus: 0,
     attunementSlots: 3,
     weaponMasteries: [],
+    classColumns: [],
     ...over
   };
 }

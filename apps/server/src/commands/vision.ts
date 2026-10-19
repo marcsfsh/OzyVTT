@@ -1,5 +1,8 @@
 import {
   DoorSetOpenSchema,
+  ItemSetLightSchema,
+  VisionAreaAddSchema,
+  VisionAreaRemoveSchema,
   LightAddSchema,
   LightMoveSchema,
   LightRemoveSchema,
@@ -13,8 +16,11 @@ import {
 } from "@vtt/domain/commands";
 import { GameAccessDeniedError } from "../authorization.js";
 import { CommandRejectedError } from "../game-store.js";
+import { setItemLight } from "../item-light.js";
 import {
   addLight,
+  addVisionArea,
+  removeVisionArea,
   addWalls,
   clearWalls,
   doorWithinReach,
@@ -28,7 +34,7 @@ import {
   setVisionEnabled
 } from "../vision/edit.js";
 import { playerViewerIds } from "../vision/audience.js";
-import { isGmGrade, type Kit } from "./kit.js";
+import { initiatorOf, isGmGrade, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
 // Dynamic vision (ADR-0023): the GM's walls, doors, windows and lights, the scene's ambient light and its switch, and
@@ -82,9 +88,79 @@ export const visionCommands = [
     malformed: "The ambient light is malformed.",
     gmOnly: GM_ONLY,
     async run({ request, execute }, kit) {
-      const { ambient, sceneId } = request;
+      const { ambient, sunlight, sceneId } = request;
       const geometry = await sceneGeometry(kit, sceneId);
-      await execute((state) => setVisionAmbient(state, sceneId, geometry, ambient));
+      await execute((state) => setVisionAmbient(state, sceneId, geometry, ambient, sunlight));
+    }
+  }),
+
+  defineCommand({
+    type: "vision.add-area",
+    operationId: "addVisionArea",
+    description:
+      "Paints an area of light or obscurement over the scene's ambient light (GM-grade only): `bright`, `dim` or `dark` set its light level (a lit room in a dark dungeon, a shadowed cellar in daylight; `sunlight` makes a bright one sunlit), `lightly-obscured` (patchy fog, moderate foliage) gives Disadvantage on Wisdom (Perception) checks that rely on sight, `heavily-obscured` (dense fog or foliage) blocks sight into and through it, and `magical-darkness` stays dark whatever light reaches it, seen into only by Blindsight, Truesight and Devil's Sight. A `rect` snaps to whole cells; fog and magical Darkness may be a `circle` of `radiusFeet` instead. `sceneId` targets a prepared scene. The area's id is the commandId.",
+    summary: "Paint an area of light, darkness or fog over the scene (GM).",
+    schema: VisionAreaAddSchema,
+    malformed: "The area is malformed.",
+    issueMessage: true,
+    gmOnly: GM_ONLY,
+    async run({ request, execute }, kit) {
+      const { commandId, kind, sunlight, rect, circle, sceneId } = request;
+      const geometry = await sceneGeometry(kit, sceneId);
+      await execute((state) =>
+        addVisionArea(state, sceneId, geometry, {
+          id: commandId,
+          kind,
+          ...(sunlight !== undefined ? { sunlight } : {}),
+          ...(rect ? { rect } : {}),
+          ...(circle ? { circle } : {})
+        })
+      );
+    }
+  }),
+
+  defineCommand({
+    type: "vision.remove-area",
+    operationId: "removeVisionArea",
+    description:
+      "Removes an area of light, darkness or fog (GM-grade only), whether the GM painted it or a spell made it. `sceneId` targets a prepared scene.",
+    summary: "Remove an area of light, darkness or fog (GM).",
+    schema: VisionAreaRemoveSchema,
+    malformed: "The area command is malformed.",
+    gmOnly: GM_ONLY,
+    async run({ request, execute }) {
+      await execute((state) => removeVisionArea(state, request.sceneId, request.areaId));
+    }
+  }),
+
+  defineCommand({
+    type: "item.set-light",
+    operationId: "setItemLight",
+    description:
+      "Lights or puts out a light source a creature carries (a Torch, a Lamp, a Lantern, a Candle, a magic item that glows), lowers or raises a Hooded Lantern's hood, or aims a Bullseye Lantern's Cone (`facingDegrees`, from the right of the map, clockwise). Lighting a Candle, Lamp, Lantern or Torch needs a Tinderbox or another flame in hand, and a Lamp or Lantern burns a flask of Oil for 6 hours; a Torch or Candle burns for an hour, then is used up. Lighting one and moving a hood take the creature's Bonus Action on its turn in a fight. A lit light is held (equipped), and stowing it puts it out. GM-grade for any creature; a player session for their own claimed character.",
+    summary: "Light, put out, hood or aim a carried light source.",
+    schema: ItemSetLightSchema,
+    malformed: "The light command is malformed.",
+    issueMessage: true,
+    async run({ principal, request, execute }, kit) {
+      const { actorId, itemId, lit, hoodLowered, facingDegrees } = request;
+      let said: string | null = null;
+      const { duplicate } = await execute((state) => {
+        said = setItemLight(
+          state,
+          {
+            actorId,
+            itemId,
+            ...(lit !== undefined ? { lit } : {}),
+            ...(hoodLowered !== undefined ? { hoodLowered } : {}),
+            ...(facingDegrees !== undefined ? { facingDegrees } : {})
+          },
+          initiatorOf(principal),
+          kit.equipmentCatalog()
+        );
+      });
+      if (!duplicate && said !== null)
+        kit.context.appendLog({ kind: "action", text: said, actorIds: [actorId], gmOnly: kit.actorHidden(actorId) });
     }
   }),
 

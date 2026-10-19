@@ -55,6 +55,9 @@ import {
 } from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
 import { BUILDER_SOURCE_NAME } from "./actor-roster.js";
+import { CONTENT_STAMP } from "./content-stamp.js";
+import { withProficiencyEdit } from "./sheet-proficiency-edits.js";
+import { studyIncreasesOf } from "./study-ledger.js";
 import { featHoldings, featPrerequisiteFailure } from "./feat-prerequisites.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -178,7 +181,7 @@ type CarrierRiderType = Exclude<Modifier["type"], (typeof BUILDER_BAKED_MODIFIER
  *  fails. These reach the table as rider carriers via `deriveEquipment`. Values record where each is
  *  consumed ("unread": no consumer yet). */
 const CARRIER_RIDER_DISPOSITION: Readonly<
-  Record<CarrierRiderType, "standing" | "at-its-moment" | "unread" | "display-only">
+  Record<CarrierRiderType, "standing" | "at-its-moment" | "unread" | "display-only" | "vision">
 > = {
   "attack-bonus": "standing", // effective-actions folds it into attack.bonus; action-resolution adds the on-attack-roll half
   "save-bonus": "standing", // saving-throws.ts saveRiderBonus (standing + on-saving-throw)
@@ -200,15 +203,15 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "damage-reduction": "at-its-moment", // hit-points.ts damageReductionsFor, taken off the hit before resistances
   "damage-resistance": "standing", // derivation.damageResistances, beside the definition's own
   "damage-vulnerability": "standing", // derivation.damageVulnerabilities, beside the definition's own
-  sense: "display-only" // like `darkvision`: the trait prose carries it; no definition field models senses
+  sense: "vision" // vision/senses.ts reads it live for dynamic vision, from every carrier
 };
 
 /** Where a modifier type is consumed, for the coverage manifest (`srd-coverage.ts`): baked by the builder, read at a
- *  roll, or read by nothing yet. `darkvision` is baked, but only to be displayed, like `sense`. */
+ *  roll, read live by dynamic vision (`darkvision` and `sense`, `vision/senses.ts`), or read by nothing yet. */
 export function modifierDisposition(
   type: Modifier["type"]
-): "baked" | "standing" | "at-its-moment" | "unread" | "display-only" {
-  if (type === "darkvision") return "display-only";
+): "baked" | "standing" | "at-its-moment" | "unread" | "display-only" | "vision" {
+  if (type === "darkvision") return "vision";
   return (BUILDER_BAKED_MODIFIER_TYPES as readonly string[]).includes(type)
     ? "baked"
     : CARRIER_RIDER_DISPOSITION[type as CarrierRiderType];
@@ -714,7 +717,7 @@ function interpretFeature(
           into.unarmoredDefenses.push({ ability: modifier.ability, allowShield: modifier.allowShield });
         break;
       case "darkvision":
-        break; // display-only: the trait prose carries the senses; no definition field models them
+        break; // nothing to bake: dynamic vision reads it live (vision/senses.ts)
       // The roll-time variants; see `CARRIER_RIDER_DISPOSITION`.
       default:
         ownedByTheRollTimeCollector(modifier);
@@ -896,6 +899,9 @@ export function buildCharacterDefinition(
       });
     });
   }
+  // A studied manual or tome lands after its level's own increases, so an Ability Score Improvement taken later still
+  // stops at 20.
+  const studies = studyIncreasesOf(input.choices, input.level);
   const holdings = featHoldings({ classes, granted });
   const featChecks = [
     ...(originFeat ? [{ feat: originFeat, level: 1 }] : []),
@@ -923,6 +929,11 @@ export function buildCharacterDefinition(
           `${increase.ability.toUpperCase()} would be ${finalScores[increase.ability]}; ${increase.source} cannot raise a score above ${increase.maximum}. Choose another ability.`
         );
     }
+    for (const study of studies.filter((candidate) => candidate.level === level))
+      finalScores[study.ability] = Math.max(
+        finalScores[study.ability],
+        Math.min(study.maximum, finalScores[study.ability] + study.amount)
+      );
   }
 
   // ---- 5c. Feature `ability-score` riders, before any feature is interpreted: `interpretAction`
@@ -1098,33 +1109,37 @@ export function buildCharacterDefinition(
   for (const skill of expertiseTaken) {
     if (!skillTaken.includes(skill)) reject(`Expertise in "${skill}" requires proficiency in it first.`);
   }
-  const proficiencies = {
-    saves: dedupe([...classRecord.savingThrows, ...interpreted.grantedSaves]),
-    skills: dedupe(skillTaken).map((id) => ({
-      id,
-      proficiency: expertiseTaken.includes(id) ? "expertise" : "proficient"
-    })),
-    armor: dedupe([...classRecord.armorProficiencies, ...multiclassTraining("armor"), ...interpreted.grantedArmor]),
-    weapons: dedupe([
-      ...classRecord.weaponProficiencies,
-      ...multiclassTraining("weapons"),
-      ...interpreted.grantedWeapons
-    ]),
-    tools: dedupe([
-      ...classRecord.toolProficiencies,
-      ...multiclassTraining("tools"),
-      ...takenOf("tool"),
-      ...skillOrTool.filter((id) => !skillIds.has(id)),
-      ...background.toolProficiencies,
-      ...interpreted.grantedTools
-    ]),
-    languages: dedupe([
-      ...species.languages,
-      ...takenOf("language"),
-      ...background.languages,
-      ...interpreted.grantedLanguages
-    ])
-  };
+  // A hand edit made on the sheet comes last, so it outlasts the rebuild (`sheet-proficiency-edits.ts`).
+  const proficiencies = withProficiencyEdit(
+    {
+      saves: dedupe([...classRecord.savingThrows, ...interpreted.grantedSaves]),
+      skills: dedupe(skillTaken).map((id) => ({
+        id,
+        proficiency: expertiseTaken.includes(id) ? "expertise" : "proficient"
+      })),
+      armor: dedupe([...classRecord.armorProficiencies, ...multiclassTraining("armor"), ...interpreted.grantedArmor]),
+      weapons: dedupe([
+        ...classRecord.weaponProficiencies,
+        ...multiclassTraining("weapons"),
+        ...interpreted.grantedWeapons
+      ]),
+      tools: dedupe([
+        ...classRecord.toolProficiencies,
+        ...multiclassTraining("tools"),
+        ...takenOf("tool"),
+        ...skillOrTool.filter((id) => !skillIds.has(id)),
+        ...background.toolProficiencies,
+        ...interpreted.grantedTools
+      ]),
+      languages: dedupe([
+        ...species.languages,
+        ...takenOf("language"),
+        ...background.languages,
+        ...interpreted.grantedLanguages
+      ])
+    },
+    input.choices
+  );
 
   // ---- 9. Spellcasting: each casting class's own row (cantrips, prepared cap, the highest level it prepares, its
   // list and ability) over one shared slot pool, plus chosen and granted spells. ----
@@ -1493,7 +1508,7 @@ export function buildCharacterDefinition(
   return ActorDefinitionSchema.parse({
     schemaId: "vtt.actor-character",
     schemaVersion: 1,
-    source: { name: BUILDER_SOURCE_NAME, version: "1" },
+    source: { name: BUILDER_SOURCE_NAME, version: CONTENT_STAMP },
     name: input.name,
     summary,
     size,

@@ -886,7 +886,10 @@ describe("the worn items left as prose, by name", () => {
       ["robe-of-eyes", "Perception 'that rely on sight', on a robe whose own Drawbacks Blind you"],
       ["talisman-of-the-sphere", "Arcana to control a Sphere of Annihilation, which the engine does not hold"]
     ] as const) {
-      const advantage = view.equipmentRecord(id)!.modifiers.filter((modifier) => modifier.type === "roll-mode");
+      // A check's Advantage only: the belt's Advantage on saves against Poisoned is authored.
+      const advantage = view
+        .equipmentRecord(id)!
+        .modifiers.filter((modifier) => modifier.type === "roll-mode" && modifier.roll === "check");
       expect(advantage, `${id} must stay prose: ${why}`).toEqual([]);
     }
   });
