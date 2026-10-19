@@ -1569,7 +1569,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A failed save imposes Charmed. The move it forces each turn, and the save after it, are the GM's."
   ),
   "spell:conjure-celestial": enforced(
-    "The cast picks the lights: Healing Light on the caster's side and Searing Light on the rest, or one of them for all. spell-zones.ts shines it on each creature in the Cylinder on the cast and as a creature enters it or ends its turn there, once a turn: 4d12 plus the spellcasting modifier healed, or the Dexterity save against 6d12 Radiant damage, each 1d12 more a slot level above 7. The later Magic action moves it (zone-moves.ts), and Bright Light fills it for dynamic vision (vision/cast-sight.ts)."
+    "The cast picks the lights: Healing Light on the caster's side and Searing Light on the rest, or one of them for all. spell-zones.ts shines it on each creature in the Cylinder on the cast and as a creature enters it or ends its turn there, once a turn: 4d12 plus the spellcasting modifier healed, or the Dexterity save against 6d12 Radiant damage, each 1d12 more a slot level above 7. When the caster moves on its turn the Cylinder can move 30 feet too, bathing the creatures it moves onto (zone-moves.ts), and Bright Light fills it for dynamic vision (vision/cast-sight.ts)."
   ),
   "spell:conjure-elemental": enforced(
     "spell-zones.ts asks for the spirit's Dexterity save when an enemy enters its space or starts its turn within 5 feet of it, while it has no creature Restrained: 8d8 damage of its element and Restrained until the spell ends on a failure. The Restrained creature repeats the save at the start of each of its turns, taking 4d8 of the element on a failure and going free on a success (save-stages.ts)."
