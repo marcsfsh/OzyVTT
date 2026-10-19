@@ -300,10 +300,12 @@ of a hidden thing. When in doubt, leave it out.
   lasts (`zone-ground.ts`): Web, Entangle or Ice Storm's hail make its cells Difficult Terrain, Plant Growth
   and Wall of Thorns cost 4 feet for every foot, Conjure Minor Elementals' only for the caster's enemies,
   Gust of Wind's Line 2 feet for every foot a creature moves closer to its caster (`costlyStep`), and
-  a creature whose trait frees it from that kind of ground (Web Walker, Ice Walk) pays nothing extra. The
+  a creature whose trait frees it from that kind of ground (Web Walker, Ice Walk) pays nothing extra. Speak with
+  Plants clears the painted Difficult Terrain in its Emanation (`clearedAt`), and a gibbering mouther's ground is
+  Difficult round it wherever it goes. The
   server charges it on the ground (a mover off the ground passes over it as over painted terrain), and the
-  `actor:movement` reply gives the preview the cells it changes for the mover, of the areas the asker can see
-  (`areaGround`, `zone-preview.ts`); the area itself is on the map. A cast's template grows with a higher slot as
+  `actor:movement` reply gives the preview the cells it changes for the mover, of the areas and the creatures the
+  asker can see (`areaGround`, `zone-preview.ts`); the area itself is on the map. A cast's template grows with a higher slot as
   the availability row says (`areaPerSlot`), so the drawn template is the size the server places.
 - Height (`altitude.ts`, `@vtt/rules-5e` `altitude.ts`): a token's `altitudeFeet` is how far its lowest
   point is above the ground, and `airborne` says what holds it up in the air (flying, or a
@@ -445,7 +447,26 @@ under more than one is caught once (`multi-templates.ts`).
 A creature pushed or pulled by force meets the areas on its straight way as any mover does (`pushed-through.ts`).
 An item's action with a `zone` (spread Caltrops, a set Hunting Trap) rolls nothing as it is used: it opens
 a zone that carries the action's own save and damage (`SpellZone.rule`), which stays until the GM ends it
-or it goes off once.
+or it goes off once. Such an area may hold its user's Concentration (a djinni's whirlwind), last a set number of
+rounds (a planted Rod of Alertness), catch the creatures it appears on, spare its user, carry the creatures it
+Restrained when it is dragged, or open one zone per area placed with damage by their number (a Ring of Shooting
+Stars' lightning spheres, `zoneForEachArea`). A Sphere of Annihilation is such an area that a creature controls with
+an Arcana check and moves toward a creature (`zone-sphere.ts`); a Delayed Blast Fireball's bead is touched, and
+thrown on a success, with a generic action (`zone-touch.ts`).
+
+A cast picks its area among the spell's options (`option` on a later row): a wall's form, a ring that acts only on its
+edge and a burning side within 10 feet of it (`zone-shapes.ts`), a Symbol's glyph, Antipathy/Sympathy's creature type
+(one option per type), Conjure Celestial's lights, Create or Destroy Water's rain or fog, and the client swaps the
+template to the picked form's area. An area can be round the creature the cast targets and move with it
+(Antipathy/Sympathy), wait hidden until a creature comes onto it and then grow (Symbol), run a schedule of later rows
+at its caster's turn starts (Storm of Vengeance), be steered or drift and carry what is in it (Incendiary Cloud,
+Tsunami: `zone-waves.ts`), or be moved by a later row's terms (anywhere in range, with its caster's move, to an
+unoccupied space: `zone-moves.ts`). Later rows can aim inside the area (Call Lightning's bolts), cut squares out of it
+as it is cast (Plant Growth: `zone-later.ts`), and pull creatures toward its middle as their turns start. What an
+area does to the world settles after every command (`zone-outcomes.ts`): wind and water put out fires, carried
+flames and lanterns, and disperse the fog they reach, and fire burns flammable areas cell by cell (Web:
+`zone-fire.ts`). A stat block's ground trait (a gibbering mouther's Aberrant Ground) makes the ground round it
+Difficult Terrain as it moves (`zone-ground.ts`).
 
 Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
 (`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long
