@@ -1262,8 +1262,10 @@ function placeChoices(
   /** Inline options answered to a feat-kinded pick (Blessed Warrior, Druidic Warrior), with the class they scale with. */
   const chosenInlineStyles: Array<{ record: FeatureRecord; classId: string | null }> = [];
   const asiLevels: number[] = [];
-  for (const row of choices) {
-    if (!FEAT_KINDS.has(row.kind)) continue;
+  /** A feat row answering a pick only a chosen option makes (Lessons of the First Ones' Origin feat), placed once pass
+   *  A2 has made that option's offers. */
+  const deferredFeatRows: CharacterChoice[] = [];
+  const placeFeatRow = (row: CharacterChoice): void =>
     place(() => {
       if (row.kind === "asi-or-feat" && row.id === "asi") {
         const offer =
@@ -1314,13 +1316,24 @@ function placeChoices(
       chosenFeats.push(feat);
       chosenFeatSites.push(siteOfPick(matched, row));
     });
+  for (const row of choices) {
+    if (!FEAT_KINDS.has(row.kind)) continue;
+    const tag = featureTagOf(row);
+    const offered = (offer: ChoiceOffer) =>
+      offer.kind === row.kind && (offer.featureId === tag || offer.featureAliases.includes(tag ?? ""));
+    if (tag !== null && !offers.some(offered)) deferredFeatRows.push(row);
+    else placeFeatRow(row);
   }
-  // Chosen feats' features join the granted set: their choices become offers for pass B.
-  for (const [index, feat] of chosenFeats.entries()) {
-    granted.push({ record: feat.feature, count: 1, origin: null, classId: null }); // recorded on `character.feats`
-    featureOffer(feat.feature, 1, [], chosenFeatSites[index]);
-  }
-  for (const feat of chosenFeats) grantExtraPicks(feat.feature, 1, null);
+  /** Chosen feats' features join the granted set from `from` on: their choices become offers for pass B. */
+  const joinChosenFeats = (from: number) => {
+    for (const [index, feat] of chosenFeats.entries()) {
+      if (index < from) continue;
+      granted.push({ record: feat.feature, count: 1, origin: null, classId: null }); // recorded on `character.feats`
+      featureOffer(feat.feature, 1, [], chosenFeatSites[index]);
+    }
+    for (const feat of chosenFeats.slice(from)) grantExtraPicks(feat.feature, 1, null);
+  };
+  joinChosenFeats(0);
   for (const { record, classId } of chosenInlineStyles) grantExtraPicks(record, 1, classId);
 
   // Pass A2: picks whose options carry their own mechanics (Divine Order, Giant Ancestry, Blessed
@@ -1356,6 +1369,10 @@ function placeChoices(
   }
   // Folded after the loop so the result does not depend on ledger order.
   for (const { record, classId } of chosenOptionFeatures) grantExtraPicks(record, 1, classId);
+  // Pass A3: the feats chosen options ask for, now that their offers exist.
+  const featsBefore = chosenFeats.length;
+  for (const row of deferredFeatRows) placeFeatRow(row);
+  joinChosenFeats(featsBefore);
 
   // A budget key that names nothing is an authoring error and fails loudly; checked against this
   // build's real offers plus each casting class's two printed columns. A draft still missing part of its

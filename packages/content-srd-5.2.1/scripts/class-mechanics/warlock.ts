@@ -81,10 +81,12 @@ export const warlock: ClassMechanicsModule = {
         // "You don't roll the die for the Temporary Hit Points; you automatically get the highest number on the die."
         "fiendish-vigor": { grants: { spells: [{ ...onYourself("false-life", 1), maximized: true }] } },
         /**
-         * The only one limited to once per Long Rest, so it also takes a counter. The Swim Speed stays
-         * prose (no per-movement-mode speed).
+         * "You can breathe underwater, and you gain a Swim Speed equal to your Speed": the Swim Speed is read live by
+         * speed.ts and the breathing by breath.ts (the invocation's name). The free Water Breathing is the only casting
+         * limited to once per Long Rest, so it also takes a counter.
          */
         "gift-of-the-depths": {
+          modifiers: [{ type: "special-speed", movement: "swim", equalToSpeed: true }],
           grants: { spells: [{ id: "water-breathing", level: 3, withoutSlot: "free", withSlot: false }] },
           uses: { limit: 1, per: "long-rest" }
         },
@@ -207,14 +209,18 @@ export const warlock: ClassMechanicsModule = {
             ]
           }
         },
+        // "You have received knowledge from an elder entity of the multiverse, allowing you to gain one Origin feat of
+        // your choice", a different one each time it is taken.
+        "lessons-of-the-first-ones": {
+          repeatable: true,
+          choice: { kind: "feat", choose: 1, fromCatalog: "origin-feats" }
+        },
         /**
          * The three cantrips only. The two level-1 Ritual spells from any class list are not expressible
          * (no all-classes list, no Ritual filter).
          */
         "pact-of-the-tome": { choice: { kind: "cantrip", choose: 3, fromCatalog: "warlock-spells", maxSpellLevel: 0 } }
-        // Not modeled: Lessons of the First Ones (a feat pick on an option's nested choice cannot be
-        // settled by the build's pass ordering), the pact weapon itself with Thirsting Blade and Devouring Blade, and
-        // Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master.
+        // Thirsting Blade and Devouring Blade are read off the bonded pact weapon (pact-weapon.ts).
       }
     },
     /**

@@ -880,26 +880,28 @@ describe("Warlock invocations: Agonizing Blast adds the caster's Charisma to the
 });
 
 describe("Warlock invocations: the ones that ask a question of their own (audit rows 24, 25, 50)", () => {
-  // Lessons of the First Ones is not authored. Its nested `{kind: "feat"}` pick cannot be answered:
-  // feat rows are settled before chosen options create their offers, so the row finds no offer, and
-  // omitting it fails the completeness check. If that ordering changes, this fails and the row should be authored.
-  it("still takes Lessons of the First Ones as a bare option, because a nested FEAT pick cannot be answered yet", () => {
-    // Takeable, and it grants only its prose.
-    expect(() => withInvocation("lessons-of-the-first-ones")).not.toThrow();
-    // ...and a feat row aimed at it finds no offer.
-    expect(
-      thrown(() =>
-        withInvocation("lessons-of-the-first-ones", [
-          {
-            level: 5,
-            classId: "warlock",
-            kind: "feat",
-            id: "tough",
-            payload: { featureId: "lessons-of-the-first-ones" }
-          } as Row
-        ])
-      )
-    ).toMatch(/No feature "lessons-of-the-first-ones" offers a "feat" choice/);
+  // Lessons of the First Ones: "allowing you to gain one Origin feat of your choice". The feat row answers a pick
+  // only the chosen invocation makes, so the build places it once the invocation's own offers exist.
+  it("takes Lessons of the First Ones with the Origin feat picked for it", () => {
+    const lessons = (feat: string) =>
+      withInvocation("lessons-of-the-first-ones", [
+        {
+          level: 5,
+          classId: "warlock",
+          kind: "feat",
+          id: feat,
+          payload: { featureId: "lessons-of-the-first-ones" }
+        } as Row
+      ]);
+    const built = lessons("savage-attacker");
+    expect((built.character?.feats ?? []).map((feat) => feat.id)).toContain("savage-attacker");
+    expect(built.actions.some((action) => action.id === "savage-attacker")).toBe(true);
+    // An Origin feat only, and not one already held (the Human's Alert).
+    expect(thrown(() => lessons("grappler"))).toMatch(/grappler/);
+    expect(thrown(() => lessons("alert"))).toMatch(/already on this character/);
+    expect(thrown(() => withInvocation("lessons-of-the-first-ones"))).toMatch(
+      /"Lessons of the First Ones" needs 1 pick\(s\) of kind "feat"/
+    );
   });
 
   it("Pact of the Blade asks which weapon, and records the answer", () => {
