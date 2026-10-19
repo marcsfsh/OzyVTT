@@ -509,7 +509,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   "Incubus Form": changesForm,
   Inscrutable: reference("The Disadvantage on Insight checks about it is the GM's to apply."),
-  Invisibility: reference("The GM sets the Invisible condition on the token; the stat block doesn't add it."),
+  Invisibility: enforced("actor-roster.ts gives the stalker the Invisible condition when it joins the roster."),
   "Iron Scent": senses,
   Jumper: jumps,
   "Legendary Resistance": enforced(
@@ -596,6 +596,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:spare-the-dying": enforced(
     "stabilize.ts makes a creature at 0 Hit Points within 15 feet Stable with no check, once the caster knows the cantrip."
   ),
+  "item:tinderbox": enforced(
+    "item-light.ts lights a Candle, Lamp, Lantern or Torch in hand only when its bearer holds a Tinderbox or another flame, spending its Bonus Action in a fight. Lighting any other fire is the GM's."
+  ),
   "item:healers-kit": enforced(
     "stabilize.ts spends one use of the kit to make a creature at 0 Hit Points Stable with no check, and the last use takes the kit."
   ),
@@ -658,7 +661,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Charmed while it isn't Incapacitated, and an ally already Charmed may target its charmer while there (resolution/economy.ts)."
   ),
   "feature:holy-nimbus": enforced(
-    "The Bonus Action puts Holy Nimbus on the Paladin for 10 minutes. turn-boundaries.ts deals its Radiant damage to an enemy that starts its turn in the aura, and saving-throws.ts gives the Paladin Advantage on saves a Fiend or an Undead forces. The sunlight is the GM's, since the map has no light."
+    "The Bonus Action puts Holy Nimbus on the Paladin for 10 minutes. turn-boundaries.ts deals its Radiant damage to an enemy that starts its turn in the aura, and saving-throws.ts gives the Paladin Advantage on saves a Fiend or an Undead forces. Its 30 feet of sunlight is carried with the Paladin's token (vision/senses.ts), which Sunlight Sensitivity reads. Restoring it with a level 5 slot is the GM's."
   ),
   "feature:smite-of-protection": enforced(
     "resolution/hit-options.ts marks the Paladin when Divine Smite rides a hit, and until its next turn the creatures in its aura have Half Cover against attacks and on Dexterity saves (resolution/validate.ts, resolution/pending.ts)."
@@ -679,7 +682,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Protector's training and Thaumaturge's extra cantrip are applied. Thaumaturge's bonus to Arcana and Religion checks is the GM's."
   ),
   "feature:eldritch-invocations": guided(
-    "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied. The senses (Devil's Sight, Witch Sight), the pact-weapon invocations, Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
+    "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied. Devil's Sight and Witch Sight are senses dynamic vision reads (vision/senses.ts), and One with Shadows' Invisibility is refused in Bright Light (resolution/validate.ts). The pact-weapon invocations, Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
   ),
   "feature:elemental-fury": enforced(
     "Primal Strike's extra damage, of the type the Druid picks, is applied once a turn. Potent Spellcasting adds the Druid's Wisdom modifier to the damage of Poison Spray, Produce Flame and Starry Wisp."
@@ -720,11 +723,17 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:boon-of-spell-recall": guided(
     "The ability score increase is applied. Casting a spell without spending its slot is the GM's."
   ),
-  "feature:boon-of-the-night-spirit": guided(
-    "The ability score increase is applied. Merging with shadows, and Resistance in Dim Light or Darkness, are the GM's."
+  "feature:boon-of-the-night-spirit": enforced(
+    "The ability score increase is applied. With dynamic vision on, Merge with Shadows makes the creature Invisible as a Bonus Action only in Dim Light or Darkness (resolution/validate.ts), until it next takes an action, a Bonus Action or a Reaction (resolution/release.ts), and hit-points.ts gives it Resistance to all damage but Psychic and Radiant there."
   ),
-  "feature:boon-of-truesight": guided(
-    "The ability score increase is applied. Truesight on a character sheet isn't read in play, so the GM applies it."
+  "feature:boon-of-truesight": enforced(
+    "The ability score increase is applied, and Truesight 60 feet is a sense dynamic vision and attack rolls read (vision/senses.ts)."
+  ),
+  "feature:halfling-naturally-stealthy": enforced(
+    "With dynamic vision on, resolution/validate.ts lets a Halfling Hide behind a creature at least one size larger than it (vision/rules.ts)."
+  ),
+  "feature:sacred-weapon": guided(
+    "A use of Channel Divinity puts Sacred Weapon on the Paladin for 10 minutes, and its 20 feet of Bright Light and 20 of Dim are carried with the Paladin's token (vision/senses.ts). The Charisma bonus to attack rolls with the weapon and its Radiant damage are the GM's."
   ),
 
   // Magic items whose riders apply part of what they do, and leave a property the table would expect applied.
@@ -873,7 +882,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A failed save deals the Psychic damage and bars the target from casting spells and the Magic action (resolution/economy.ts). The save every 30 days, and Greater Restoration, Heal or Wish ending it, are the GM's."
   ),
   "spell:blur": enforced(
-    "Attack rolls against the caster have Disadvantage while it lasts. An attacker that perceives the caster with Blindsight or Truesight is the GM's to spare."
+    "Attack rolls against the caster have Disadvantage while it lasts, except from an attacker whose Blindsight or Truesight reaches it (resolution/attack.ts)."
   ),
   "spell:chromatic-orb": guided(
     "The attack and the chosen damage type are applied. The leap to another target on matching dice is the GM's."
@@ -882,7 +891,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A failed save imposes Charmed. The move it forces each turn, and the save after it, are the GM's."
   ),
   "spell:conjure-celestial": guided(
-    "The Healing Light on the cast is applied. Searing Light, and moving the Cylinder, are the GM's."
+    "The Healing Light on the cast is applied, and Bright Light fills the Cylinder for dynamic vision (vision/cast-sight.ts). Searing Light, and moving the Cylinder, are the GM's."
   ),
   "spell:conjure-elemental": guided(
     "The spirit's save, its 8d8 damage and Restrained are a later action the GM calls. The repeat save with 4d8 damage at the start of each of the target's turns is the GM's."
@@ -924,7 +933,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "speed.ts gives the target a Swim Speed equal to its Speed. Ignoring Difficult Terrain, the immunity to magical Paralyzed and Restrained, and slipping free of restraints are the GM's."
   ),
   "spell:gust-of-wind": guided(
-    "The cast's save pushes a creature that fails 15 feet away from the caster. The save at the end of a creature's turn in the Line, the doubled cost of moving toward the caster and turning the Line are the GM's."
+    "The cast's save pushes a creature that fails 15 feet away from the caster, and the Line disperses the fog and clouds it overlaps (vision/cast-sight.ts). The save at the end of a creature's turn in the Line, the doubled cost of moving toward the caster and turning the Line are the GM's."
   ),
   "spell:hideous-laughter": guided(
     "A failed save imposes Prone and Incapacitated, repeated at the end of each of the target's turns. The save with Advantage each time it takes damage is the GM's."
@@ -960,7 +969,13 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A failed save imposes Incapacitated until the end of the target's next turn, and damage ends it. The second save, and Unconscious on its failure, are the GM's."
   ),
   "spell:sleet-storm": guided(
-    "spell-zones.ts asks for the save against Prone when a creature enters the area or starts its turn there. The broken Concentration on a failure is the GM's."
+    "spell-zones.ts asks for the save against Prone when a creature enters the area or starts its turn there, and the Cylinder is Heavily Obscured for dynamic vision (vision/cast-sight.ts). The broken Concentration on a failure is the GM's."
+  ),
+  "action:Octopus/ink-cloud": guided(
+    "The Reaction fills its 5-foot Cube with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts). Offering it when a creature ends its turn beside the octopus underwater, and its swim away, are the GM's."
+  ),
+  "action:Giant Octopus/ink-cloud": guided(
+    "The Reaction fills its 10-foot Cube with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts). Offering it when the octopus takes damage underwater, and its swim away, are the GM's."
   ),
   "spell:sorcerous-burst": guided(
     "The attack and the chosen damage type are applied. Rolling another d8 on each 8 is the GM's."

@@ -19,6 +19,9 @@ function readiedRay(ctx: ResolveContext): "held" | "last" | null {
   return "held";
 }
 
+/** An effect that ends once its bearer takes an action, a Bonus Action or a Reaction (Merge with Shadows). */
+export const UNTIL_NEXT_ACTION_TAG = "until-next-action";
+
 /** Rule consequences of having acted: attacking reveals a hidden creature, and a Reaction taken off-turn uses up
  *  the ready. The economy already spent that Reaction on the readied response (`isReadiedResponse`); any other
  *  Reaction leaves none to take the readied action with. */
@@ -34,6 +37,20 @@ export function releaseHideAndReady(ctx: ResolveContext): void {
   // Verbal component ("you cast a spell with a Verbal component").
   const spell = action.spellId ? ctx.deps.catalog?.spellRecord?.(action.spellId) : undefined;
   if (action.attack !== undefined || action.save !== undefined || spell?.components.verbal === true) end("hidden");
+  // "The condition ends on you immediately after you take an action, a Bonus Action, or a Reaction": any of them but
+  // the one that gave it.
+  const tookTurnAction =
+    action.activation === "action" ||
+    action.activation === "bonus-action" ||
+    action.activation === "reaction" ||
+    plan.markReaction;
+  if (tookTurnAction)
+    for (const effect of attacker.effects.filter(
+      (candidate) => candidate.tags.includes(UNTIL_NEXT_ACTION_TAG) && !candidate.id.startsWith(ctx.input.commandId)
+    )) {
+      endEffect(state, attacker.id, effect.id);
+      effectsEnded.push(endedEffect(attacker, effect));
+    }
   // A released spell of several rays (Scorching Ray) keeps its ready until its last ray, all on the one Reaction.
   const ray = readiedRay(ctx);
   if (ray === "held") return;

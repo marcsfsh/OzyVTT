@@ -1353,7 +1353,12 @@ describe("Monk: the Bonus Action forms Martial Arts and Monk's Focus give", () =
     use(built, "patient-defense");
     const effect = built.hero.effects.find((entry) => entry.tags.includes("dodging"))!;
     expect(effect.tags).toEqual(["disengaged", "dodging"]);
-    expect(effect.modifiers).toContainEqual({ type: "roll-mode", roll: "incoming-attack", mode: "disadvantage" });
+    expect(effect.modifiers).toContainEqual({
+      type: "roll-mode",
+      roll: "incoming-attack",
+      mode: "disadvantage",
+      when: [{ type: "on-attack-roll" }, { type: "sees-other" }]
+    });
     // Dodge's half lapses at Speed 0 or while Incapacitated, as the Dodge action does.
     expect(effect.voidWhileIncapacitated).toBe(true);
     expect(built.hero.actionUses["focus-points"]).toBe(1);

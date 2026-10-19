@@ -679,7 +679,17 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     // The types the GM may pick for its resistance, as printed; the pick itself is the GM's, on the row.
     ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
     // The levels a Spell Scroll can bear, as its name says, for the picker's spell step.
-    ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {})
+    ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {}),
+    // How it sheds light, as its own text says: whether it is lit on the row, has a hood to lower or a Cone to aim.
+    ...(item.light
+      ? {
+          light: {
+            ...(item.light.always ? { always: true as const } : {}),
+            ...(item.light.hooded ? { hooded: true as const } : {}),
+            ...(item.light.cone ? { cone: true as const } : {})
+          }
+        }
+      : {})
   }));
 
   const monstersById = new Map<string, ActorDefinition>();

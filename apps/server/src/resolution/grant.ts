@@ -212,6 +212,8 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       ...(armorClassBonus !== undefined ? { armorClassBonus } : {}),
       // The light its bearer sheds while it lasts (Shining Smite's 5 feet of Bright Light).
       ...(grant.light ? { light: { ...grant.light } } : {}),
+      // The creatures it lets its bearer sense (Divine Sense), drawn for its player alone (`vision/detect.ts`).
+      ...(grant.detects ? { detects: { ...grant.detects, creatureTypes: [...grant.detects.creatureTypes] } } : {}),
       ...(steadyAim ? { speedZero: true } : {}),
       ...grantedMovement,
       // Heroism: immune to Frightened, and Temporary Hit Points at the start of each of the bearer's turns.

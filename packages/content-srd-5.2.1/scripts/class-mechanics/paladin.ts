@@ -90,7 +90,14 @@ export const paladin: ClassMechanicsModule = {
           activation: "bonus-action",
           description:
             "You open your awareness to detect Celestials, Fiends, and Undead. For the next 10 minutes or until you have the Incapacitated condition, you know the location of any creature of those types within 60 feet of yourself, and you know its creature type. Within the same radius, you also detect any place or object that has been consecrated or desecrated, as with the Hallow spell.",
-          damage: []
+          damage: [],
+          // Where each one stands and its type reach the Paladin's player alone, walls or not.
+          grants: {
+            name: "Divine Sense",
+            tags: ["divine-sense"],
+            duration: { type: "rounds", rounds: 100 },
+            detects: { creatureTypes: ["celestial", "fiend", "undead"], feet: 60 }
+          }
         }
       ]
     },
@@ -199,7 +206,8 @@ export const paladin: ClassMechanicsModule = {
       },
 
       // A subclass spender of the class's Channel Divinity pool. The Charisma-modifier attack bonus is
-      // not expressible (`attack-bonus` is a flat integer).
+      // not expressible (`attack-bonus` is a flat integer); the weapon's light rides an effect on the Paladin, who
+      // holds it.
       "sacred-weapon": {
         uses: {
           scaling: { type: "class-resource", id: "channel-divinity" },
@@ -213,7 +221,13 @@ export const paladin: ClassMechanicsModule = {
             activation: "other",
             description:
               "When you take the Attack action, you can expend one use of your Channel Divinity to imbue one Melee weapon you are holding with positive energy. For 10 minutes or until you use this feature again, you add your Charisma modifier to attack rolls with that weapon (minimum bonus of +1), and each time you hit with it you can make it deal Radiant damage instead of its normal type. The weapon emits Bright Light in a 20-foot radius and Dim Light 20 feet beyond that.",
-            damage: []
+            damage: [],
+            grants: {
+              name: "Sacred Weapon",
+              tags: ["sacred-weapon"],
+              duration: { type: "rounds", rounds: 100 },
+              light: { brightFeet: 20, dimFeet: 20 }
+            }
           }
         ]
       },
@@ -224,8 +238,8 @@ export const paladin: ClassMechanicsModule = {
       },
 
       // The nimbus is an effect on the Paladin for 10 minutes; the server reads it for the Radiant damage an enemy
-      // starting its turn in the aura takes and the Advantage on saves a Fiend or an Undead forces. The sunlight
-      // stays prose.
+      // starting its turn in the aura takes and the Advantage on saves a Fiend or an Undead forces. Its sunlight
+      // fills the aura's 30 feet (Aura Expansion comes at level 18, before Holy Nimbus at 20).
       "holy-nimbus": {
         uses: { limit: 1, per: "long-rest" },
         actions: [
@@ -236,7 +250,12 @@ export const paladin: ClassMechanicsModule = {
             description:
               "You imbue your Aura of Protection with holy power for 10 minutes or until you end it (no action required). You have Advantage on saving throws forced by Fiends and Undead; an enemy that starts its turn in the aura takes Radiant damage equal to your Charisma modifier plus your Proficiency Bonus; and the aura is filled with Bright Light that is sunlight. You can restore your use of this feature by expending a level 5 spell slot.",
             damage: [],
-            grants: { name: "Holy Nimbus", tags: ["holy-nimbus"], duration: { type: "rounds", rounds: 100 } }
+            grants: {
+              name: "Holy Nimbus",
+              tags: ["holy-nimbus"],
+              duration: { type: "rounds", rounds: 100 },
+              light: { brightFeet: 30, dimFeet: 0, sunlight: true }
+            }
           }
         ]
       }

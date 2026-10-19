@@ -788,6 +788,21 @@ export const CarriedLightSchema = z
   );
 export type CarriedLight = z.infer<typeof CarriedLightSchema>;
 
+/** A sense an effect gives its bearer for creatures of some types (Divine Sense, Detect Evil and Good): it knows where
+ *  each one within `feet` is and its creature type, unseen or not. With `blockedByWalls`, a wall between them hides
+ *  one ("blocked by 1 foot of stone"). */
+export const DetectsSchema = z
+  .object({
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(14),
+    feet: z.number().int().min(5).max(240),
+    blockedByWalls: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "Creatures of these types within `feet` of the bearer whose place and type it knows, seen or not (Divine Sense); with `blockedByWalls`, not through a wall. Shown only to the bearer's player, on a scene with dynamic vision."
+  );
+export type Detects = z.infer<typeof DetectsSchema>;
+
 /** An effect's modifiers: the shared vocabulary, minus what an effect cannot give back when it ends. */
 export const EffectModifiersSchema = z
   .array(ModifierSchema)
@@ -968,7 +983,9 @@ export const EffectInstanceSchema = z
      *  vision as a light the bearer's token carries. */
     light: CarriedLightSchema.optional(),
     /** A Hide's Dexterity (Stealth) total: "the DC for a creature to find you with a Wisdom (Perception) check". */
-    findDc: z.number().int().min(1).max(60).optional()
+    findDc: z.number().int().min(1).max(60).optional(),
+    /** The creatures it lets its bearer sense (Divine Sense), shown to the bearer's player alone. */
+    detects: DetectsSchema.optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -1443,6 +1460,8 @@ export const EffectGrantSchema = z
     light: CarriedLightSchema.optional().describe(
       "The light its bearer sheds while it lasts, carried with its token (Produce Flame's flame, Holy Nimbus's sunlight)"
     ),
+    /** The creatures it lets its bearer sense while it lasts (Divine Sense). */
+    detects: DetectsSchema.optional(),
     onEnd: z.array(EffectOnEndSchema).max(2).default([]),
     /** The granted effect ends when the actor loses every other effect with this tag (Frenzy's marker ends with the Rage). */
     endsWithTag: EffectTagSchema.optional().describe(
@@ -1716,11 +1735,16 @@ export const SightEffectSchema = z
     rounds: z.number().int().min(1).max(100).optional(),
     /** Using it again puts out what the last use made instead of making more (a magmin "sets itself ablaze or
      *  extinguishes its flames"). */
-    toggles: z.literal(true).optional()
+    toggles: z.literal(true).optional(),
+    /** Usable only while its user stands in Dim Light or Darkness (Merge with Shadows), read with dynamic vision on. */
+    inDimLightOrDarkness: z.literal(true).optional(),
+    /** Its save reaches only a creature that can see its user (a ghost's Horrific Visage: "each creature ... that can
+     *  see the ghost") or its area (Hypnotic Pattern: "who can see the pattern"); the server's sight decides. */
+    seenBy: z.enum(["user", "area"]).optional()
   })
   .strict()
   .describe(
-    "What it does to light and sight while it lasts: a light it makes (on its user, its targets, its area or set down), an area of obscurement or magical Darkness, and the spell light or Darkness it dispels."
+    "What it does to light and sight while it lasts: a light it makes (on its user, its targets, its area or set down), an area of obscurement or magical Darkness, the spell light or Darkness it dispels, and whether it works only in Dim Light or Darkness."
   );
 export type SightEffect = z.infer<typeof SightEffectSchema>;
 
@@ -2557,6 +2581,13 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       name: TraitNameSchema,
       /** The d6 face, or higher, that sends it berserk. */
       on: z.number().int().min(1).max(6)
+    })
+    .strict(),
+  /** "The stalker has the Invisible condition": the creature joins the roster with it. */
+  z
+    .object({
+      kind: z.literal("invisible"),
+      name: TraitNameSchema
     })
     .strict()
 ]);

@@ -46,6 +46,7 @@ export type PlayerEffect = Omit<
   | "conditionImmunities"
   | "light"
   | "findDc"
+  | "detects"
 > & {
   yours?: true;
 };
@@ -157,6 +158,9 @@ export type PlayerVisionWall = Readonly<{
 /** Dynamic vision as one player gets it (ADR-0023): where their own characters see now, what the party has seen in
  *  this scene, and the walls in it. Everything else on the map is dark. `bright`, when present, is the part of what
  *  they see that lies in Bright Light; the rest of it is dim, or dark seen by Darkvision. Absent, all of it is bright. */
+/** A creature one of the player's characters senses without seeing it (Divine Sense): where it stands and its
+ *  creature type, nothing else. */
+export type PlayerSensedCreature = Readonly<{ x: number; y: number; creatureType: string }>;
 export type PlayerVision =
   | Readonly<{ enabled: false }>
   | Readonly<{
@@ -165,6 +169,8 @@ export type PlayerVision =
       bright?: readonly VisionPolygon[];
       explored: readonly VisionRect[];
       walls: readonly PlayerVisionWall[];
+      /** Only in a player's own projection, never the table's. */
+      sensed?: readonly PlayerSensedCreature[];
     }>;
 export type PlayerCombatView = Readonly<{
   active: boolean;

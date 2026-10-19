@@ -785,6 +785,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "effects[].detects.**",
+    types: FEATURE_CARRIERS,
+    reason:
+      "the creatures an effect lets its bearer sense (Divine Sense); authored in the class and spell overlays, no control yet",
+    status: "gap"
+  },
+  {
     at: "effects[].damageUses",
     types: FEATURE_CARRIERS,
     reason:

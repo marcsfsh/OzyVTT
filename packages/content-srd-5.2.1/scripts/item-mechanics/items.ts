@@ -405,10 +405,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "necrotic", doubleOnCritical: true }]
   },
 
+  /** "While the blade exists, it sheds Bright Light in a 15-foot radius and Dim Light for an additional 15 feet. The
+   *  light is sunlight": the blade is made and put away on the row, lit or not. Not modeled: swinging it (Radiant
+   *  where the Longsword's type would go needs weapon-swing overrides), and the radius its Magic action adjusts. */
+  "sun-blade": { light: { brightFeet: 15, dimFeet: 15, sunlight: true } },
+
   // Prose-only items:
   //   `javelin-of-lightning`: Lightning where the javelin deals Piercing, and a Line area.
-  //   `sun-blade`, `energy-bow`: deal Radiant/Force where the weapon's own type would go; unbound until
-  //       weapon-swing overrides exist. Energy Bow's arrow options are not expressible either.
+  //   `energy-bow`: deals Force where the bow's own type would go; unbound until weapon-swing overrides exist. Its
+  //       arrow options are not expressible either.
   //   `thunderous-greatclub` - "your Strength is 20" is `ability-score`, refused on items; areas.
   //   `adamantine-armor` - no rider suppresses an incoming critical hit.
   //   `mithral-armor` - no rider removes a base armor's stealth disadvantage or Strength requirement.
@@ -910,9 +915,22 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ---- Belt ------------------------------------------------------------------------------------
 
-  // `belt-of-dwarvenkind` - Constitution +2 (`ability-score`, refused), Dwarvish (item languages have
-  //     no reader), Persuasion advantage limited to dwarves (no target creature type), and Darkvision
-  //     and Poison resistance under a negated species gate ("if you aren't a dwarf").
+  /** "If you aren't a dwarf or duergar, you have Darkvision 60 feet, Resistance to Poison damage, and Advantage on
+   *  saving throws to avoid or end the Poisoned condition": authored for every wearer, since a dwarf's own Darkvision
+   *  (120 feet) and Dwarven Resilience already give it as much. Not modeled: Constitution +2 (`ability-score`,
+   *  refused), Dwarvish (item languages have no reader), and the Persuasion Advantage with dwarves. */
+  "belt-of-dwarvenkind": {
+    grants: { damageResistances: ["poison"] },
+    modifiers: [
+      { type: "darkvision", feet: 60 },
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "advantage",
+        when: [{ type: "on-saving-throw" }, { type: "versus-condition", conditionIds: ["poisoned"] }]
+      }
+    ]
+  },
   // `belt-of-giant-strength` - sets Strength (`ability-score`, refused).
 
   // ---- Feet ------------------------------------------------------------------------------------

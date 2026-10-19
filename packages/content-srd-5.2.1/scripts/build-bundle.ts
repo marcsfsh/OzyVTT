@@ -452,6 +452,8 @@ const ACTION_ENRICHMENTS: Record<
   "magmin/ignited-illumination": { sight: { light: { on: "caster", brightFeet: 10, dimFeet: 10 }, toggles: true } },
   // "The Cube is Heavily Obscured for 1 minute": the Cube the reaction places.
   "octopus/ink-cloud": { sight: { area: { kind: "heavily-obscured" }, rounds: 10 } },
+  // "Wisdom Saving Throw: DC 13, each creature in a 60-foot Cone that can see the ghost and isn't an Undead."
+  "ghost/horrific-visage": { sight: { seenBy: "user" } },
   "giant-octopus/ink-cloud": { sight: { area: { kind: "heavily-obscured" }, rounds: 10 } },
   // "The wisp and its light have the Invisible condition until the wisp's Concentration ends on this effect, which ends
   // early immediately after the wisp makes an attack roll": Invisible, its Illumination out, until it attacks.

@@ -720,6 +720,20 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     modifiers: [{ type: "sense", sense: "truesight", feet: 120 }]
   }),
+  // "For the duration, you sense the location of any Aberration, Celestial, Elemental, Fey, Fiend, or Undead within 30
+  // feet of yourself. You also sense whether the Hallow spell is active there and, if so, where. The spell is blocked
+  // by 1 foot of stone, dirt, or wood; 1 inch of metal; or a thin sheet of lead."
+  "detect-evil-and-good": spellGrant({
+    name: "Detect Evil and Good",
+    tags: ["detect-evil-and-good"],
+    target: "self",
+    duration: { type: "manual" },
+    detects: {
+      creatureTypes: ["aberration", "celestial", "elemental", "fey", "fiend", "undead"],
+      feet: 30,
+      blockedByWalls: true
+    }
+  }),
   // "For the duration, a willing creature you touch has Darkvision with a range of 150 feet."
   darkvision: spellGrant({
     name: "Darkvision",

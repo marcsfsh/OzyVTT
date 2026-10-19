@@ -1230,6 +1230,9 @@ describe("Paladin: smites that outlast the hit", () => {
     );
     const mark = built.foe.effects.find((effect) => effect.name === "Shining Smite")!;
     expect(mark.castId).toBe(built.hero.effects[0].castId);
+    // "The target sheds Bright Light in a 5-foot radius ... and it can't benefit from the Invisible condition."
+    expect(mark.light).toEqual({ brightFeet: 5, dimFeet: 0 });
+    expect(mark.tags).toContain("outlined");
     // Dropping the Concentration ends the mark.
     endEffect(built.state, IDS.hero, built.hero.effects[0].id);
     expect(built.foe.effects.map((effect) => effect.name)).toEqual(["Sapped by Bree"]);

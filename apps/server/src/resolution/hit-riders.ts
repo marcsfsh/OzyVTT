@@ -21,8 +21,15 @@ export type HitRider = Readonly<{
   versus?: Readonly<{ creatureTypes: readonly string[]; formula: string }>;
   /** "Once on each of your turns", or a Bonus Action: never on someone else's turn. */
   ownTurn?: true;
-  /** A lasting effect on the target (Shining Smite), held by the attacker's concentration. */
-  marks?: Readonly<{ name: string; tag: string; rounds: number }>;
+  /** A lasting effect on the target (Shining Smite), held by the attacker's concentration: the light it sheds, and
+   *  `outlined` when it can't benefit from the Invisible condition. */
+  marks?: Readonly<{
+    name: string;
+    tag: string;
+    rounds: number;
+    light?: Readonly<{ brightFeet: number; dimFeet: number }>;
+    outlined?: true;
+  }>;
   /** A lasting effect on the target that deals the rider's dice again at the start of each of its turns and then
    *  asks for the spell's save, a success ending it (Searing Smite). */
   lingers?: Readonly<{ name: string; rounds: number }>;
@@ -51,9 +58,15 @@ const BY_SPELL_ID: Readonly<Record<string, HitRider>> = {
   "shining-smite": {
     rides: "melee-weapon-or-unarmed",
     ownTurn: true,
-    marks: { name: "Shining Smite", tag: "shining-smite", rounds: 10 },
-    reminder:
-      "Shining Smite: until the spell ends the target sheds Bright Light in a 5-foot radius and can't benefit from the Invisible condition."
+    // "Until the spell ends, the target sheds Bright Light in a 5-foot radius, attack rolls against it have Advantage,
+    // and it can't benefit from the Invisible condition."
+    marks: {
+      name: "Shining Smite",
+      tag: "shining-smite",
+      rounds: 10,
+      light: { brightFeet: 5, dimFeet: 0 },
+      outlined: true
+    }
   }
 };
 

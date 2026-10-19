@@ -209,6 +209,11 @@ export function openResolve(
     else warnings.push("The target has Total Cover. The rules mode allows it.");
   }
 
+  const sightContent = {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  };
+  const sightBlocks: Array<readonly [RuleId, string]> = [];
   // SRD Hide: "you must be out of any enemy's line of sight". With dynamic vision on the engine knows who sees whom;
   // only an enemy the hider sees counts ("if you can see a creature, you can discern whether it can see you"), so
   // the refusal never gives away one the player doesn't know of.
@@ -223,12 +228,8 @@ export function openResolve(
       if (waived && overridden === null) overridden = { rule: "hide.seen", reason: overrideReason(input.override) };
       else warnings.push(message);
     }
-    // "While you're Heavily Obscured or behind Three-Quarters Cover or Total Cover", and a shadow's Shadow Stealth only
-    // in Dim Light or darkness; with dynamic vision on the map answers both (`vision/rules.ts`).
-    const content = {
-      ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
-      ...(deps.catalog ? { catalog: deps.catalog } : {})
-    };
+    // "While you're Heavily Obscured or behind Three-Quarters Cover or Total Cover"; with dynamic vision on the map
+    // answers it (`vision/rules.ts`).
     const enemies = state.combat.initiative.flatMap((entry) => {
       const enemy = state.actors.find((actor) => actor.id === entry.actorId);
       if (!enemy || enemy.id === attacker.id || isIncapacitated(enemy)) return [];
@@ -236,26 +237,27 @@ export function openResolve(
       return areEnemies(attacker, enemy, deps.resolveDefinition) ? [enemy.id] : [];
     });
     const stealthy = holdsFeature(deps.definition, "halfling-naturally-stealthy", "Naturally Stealthy");
-    const blocks: Array<readonly [RuleId, string]> = [];
-    if (!hidingPlace(state, content, attacker.id, enemies, stealthy))
-      blocks.push([
+    if (!hidingPlace(state, sightContent, attacker.id, enemies, stealthy))
+      sightBlocks.push([
         "hide.exposed",
         `${attacker.name} isn't Heavily Obscured or behind Three-Quarters Cover. Hide in darkness, fog or behind a wall.`
       ]);
-    if (bonusNeedsDarkness(deps.definition, action.id) && !inDimLightOrDarkness(state, attacker.id, content))
-      blocks.push([
-        "light.too-bright",
-        `${attacker.name} stands in Bright Light. ${action.name} needs Dim Light or darkness.`
-      ]);
-    for (const [rule, message] of blocks) {
-      const mode = effectiveModeFor(state.combat, rule);
-      if (mode === "freeform") continue;
-      const waived = overrideWaives(input.override, rule);
-      if (mode === "strict" && !waived && !overrideCovers(state.combat.turn, rule))
-        throw new RulesBlockedError(rule, message);
-      if (waived && overridden === null) overridden = { rule, reason: overrideReason(input.override) };
-      else warnings.push(message);
-    }
+  }
+  // What works only in Dim Light or Darkness (a shadow's Shadow Stealth, Merge with Shadows, One with Shadows), where
+  // dynamic vision knows the light.
+  if (needsDimLightOrDarkness(deps.definition, action) && !inDimLightOrDarkness(state, attacker.id, sightContent))
+    sightBlocks.push([
+      "light.too-bright",
+      `${attacker.name} stands in Bright Light. ${action.name} needs Dim Light or darkness.`
+    ]);
+  for (const [rule, message] of sightBlocks) {
+    const mode = effectiveModeFor(state.combat, rule);
+    if (mode === "freeform") continue;
+    const waived = overrideWaives(input.override, rule);
+    if (mode === "strict" && !waived && !overrideCovers(state.combat.turn, rule))
+      throw new RulesBlockedError(rule, message);
+    if (waived && overridden === null) overridden = { rule, reason: overrideReason(input.override) };
+    else warnings.push(message);
   }
 
   const builtin = input.builtin ? builtinHandlerFor(action.id) : undefined;
@@ -367,4 +369,13 @@ function paidPlan(state: GameState): EconomyPlan {
     magicAction: false,
     surge: false
   };
+}
+
+/** Whether an action works only in Dim Light or Darkness: one whose sight data says so (Merge with Shadows), a Bonus
+ *  Action form a stat block offers "While in Dim Light or darkness" (Shadow Stealth), and One with Shadows' Invisibility
+ *  without a slot ("while you're in an area of Dim Light or Darkness"). */
+function needsDimLightOrDarkness(definition: ResolveDependencies["definition"], action: DefinitionAction): boolean {
+  if ("sight" in action && action.sight?.inDimLightOrDarkness === true) return true;
+  if (bonusNeedsDarkness(definition, action.id)) return true;
+  return action.id === "spell-invisibility-free" && holdsFeature(definition, "one-with-shadows", "One with Shadows");
 }

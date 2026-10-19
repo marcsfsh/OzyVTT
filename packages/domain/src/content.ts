@@ -251,6 +251,17 @@ export const ContentEquipmentSummarySchema = z.strictObject({
     .optional()
     .describe(
       "The spell levels one copy of a Spell Scroll can bear (0 is a cantrip), for the picker's spell step; absent on anything else"
+    ),
+  /** A light source: lit and put out on the row unless it always glows, with a hood to lower or a Cone to aim. */
+  light: z
+    .strictObject({
+      always: z.literal(true).optional(),
+      hooded: z.literal(true).optional(),
+      cone: z.literal(true).optional()
+    })
+    .optional()
+    .describe(
+      "How the item sheds light, as its own text says: lit and put out on its row (item.set-light) unless `always` (it glows while held), with a hood to lower (`hooded`) or a Cone to aim (`cone`). Absent on anything that sheds none"
     )
 });
 export type ContentEquipmentSummary = Wire<z.infer<typeof ContentEquipmentSummarySchema>>;

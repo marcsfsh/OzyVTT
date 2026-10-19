@@ -270,6 +270,13 @@ function lightSensitivity(trait: Trait): TraitMechanic | null {
   };
 }
 
+/** "The stalker has the Invisible condition." */
+function alwaysInvisible(trait: Trait): TraitMechanic | null {
+  return /^The [\w' -]+? has the Invisible condition\.$/.test(trait.description)
+    ? { kind: "invisible", name: trait.name }
+    : null;
+}
+
 const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
   regeneration,
   undeadFortitude,
@@ -280,7 +287,8 @@ const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
   meleeHitDamage,
   berserk,
   illumination,
-  lightSensitivity
+  lightSensitivity,
+  alwaysInvisible
 ];
 
 /** Every trait the engine can run, in the stat block's order; the rest stay prose. */

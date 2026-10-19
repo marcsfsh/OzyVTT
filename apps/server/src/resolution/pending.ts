@@ -14,6 +14,9 @@ import { recordRoll, tableLineOf, type ResolveContext } from "./context.js";
 import { bestCover, coverBonusOf, coverFor, mapCover } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf } from "./damage.js";
+import { spellOf } from "./concentration.js";
+import { sightRules } from "../vision/rules.js";
+import { sceneSight } from "../vision/sight.js";
 
 type HalfDamageReaction = Extract<ActionReaction, { response: "half-damage" }>;
 type AcBonusReaction = Extract<ActionReaction, { response: "ac-bonus" }>;
@@ -266,6 +269,33 @@ const SPEED_ZERO_OVER_THE_GATE: ReadonlySet<string> = new Set(["power-word-stun"
  * the damage already rode the hit, so the save proposes none of its own. A save that a low enough target fails
  * outright (Power Word Stun) lands at once, and only its repeated save can end it.
  */
+/** The targets a save reaches: all of them, or with `sight.seenBy` only those that can see the user (a gaze) or a
+ *  point of its area where they stand (Hypnotic Pattern). With dynamic vision off, a Blinded creature sees neither. */
+function seeingTargets(ctx: ResolveContext): ResolveContext["targets"] {
+  const { state, action, attacker, targets, deps } = ctx;
+  const seenBy = (action.sight ?? spellOf(ctx)?.sight)?.seenBy;
+  if (!seenBy) return targets;
+  const content = {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  };
+  const rules = sightRules(state, content, deps.distanceFeet);
+  const sight = sceneSight(state, content);
+  return targets.filter((target) => {
+    const sees =
+      seenBy === "user"
+        ? rules.canSee(target.id, attacker.id)
+        : rules.visionOn && sight.positionOf(target.id) !== null
+          ? sight.seesPoint(target.id, sight.positionOf(target.id)!)
+          : !target.conditions.some((condition) => condition.id === "blinded");
+    if (!sees)
+      ctx.warnings.push(
+        `${target.name} can't see ${seenBy === "user" ? attacker.name : "it"}, so ${action.name} doesn't affect it.`
+      );
+    return sees;
+  });
+}
+
 export function parkActionSave(ctx: ResolveContext): void {
   const { state, action, attacker, targets, input, deps, attack } = ctx;
   if (!action.save) return;
@@ -274,7 +304,7 @@ export function parkActionSave(ctx: ResolveContext): void {
   // The GM's explicit choice wins over the condition the action declares.
   const conditionIds = input.conditionId ? [input.conditionId] : action.save.failureConditions;
   const onFailEffect = failureEffectFor(ctx, conditionIds);
-  let saving = targets;
+  let saving = seeingTargets(ctx);
   const threshold = action.save.failsAtHitPoints;
   if (threshold !== undefined) {
     saving = [];

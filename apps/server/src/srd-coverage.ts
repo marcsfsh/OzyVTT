@@ -83,21 +83,26 @@ export function spellState(spell: SpellReference): CoverageState {
       spell.save.speedZero === true ||
       spell.save.failurePush !== undefined);
   // The light it sheds or the fog or Darkness it fills, which dynamic vision reads.
-  if (applies || saveApplies || spell.sight !== undefined) return "enforced";
+  const sight = spell.sight;
+  if (applies || saveApplies || sight?.light !== undefined || sight?.area !== undefined || sight?.dispels !== undefined)
+    return "enforced";
   if (spell.level > 0 || spell.concentration || spell.area !== null || spell.save !== null) return "guided";
   return "reference";
 }
 
 type ResolvingFields = Pick<
   ActorAction,
-  "damage" | "healing" | "multiattack" | "onHit" | "darts" | "reaction" | "grants" | "endsConditions"
+  "damage" | "healing" | "multiattack" | "onHit" | "darts" | "reaction" | "grants" | "endsConditions" | "sight"
 > &
   Readonly<{ attack?: unknown; save?: unknown; damageByLevel?: unknown }>;
 
 /** An action resolves when it rolls an attack or a save, deals damage, heals, grants an effect, ends conditions,
- *  runs a structured Multiattack or is offered as a reaction prompt. One with none of these only spends its use and
- *  its place in the turn. */
+ *  runs a structured Multiattack, places light or an area of obscurement on the map, or is offered as a reaction
+ *  prompt. One with none of these only spends its use and its place in the turn. */
 const actionResolves = (action: ResolvingFields) =>
+  action.sight?.light !== undefined ||
+  action.sight?.area !== undefined ||
+  action.sight?.dispels !== undefined ||
   action.attack !== undefined ||
   action.save !== undefined ||
   action.damage.length > 0 ||

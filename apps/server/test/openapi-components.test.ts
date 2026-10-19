@@ -456,7 +456,10 @@ describe("generated OpenAPI components", () => {
       "versus-creature-type": { creatureTypes: ["undead"] },
       "versus-size": { sizes: ["large", "huge"] },
       "versus-condition": { conditionIds: ["prone"] },
-      "by-effect-source": {}
+      "by-effect-source": {},
+      "sees-other": {},
+      "seen-by-other": {},
+      "other-lacks-sense": { senses: ["blindsight", "truesight"] }
     };
 
     /** One payload per modifier. */

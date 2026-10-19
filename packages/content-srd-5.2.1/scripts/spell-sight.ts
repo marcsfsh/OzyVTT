@@ -45,7 +45,11 @@ const SPELL_SIGHT: Readonly<Record<string, SightEffect>> = {
   "fire-shield": { light: { on: "caster", brightFeet: 10, dimFeet: 10 } },
   // "A mote of brilliant radiance shines above you ... It sheds Bright Light in a 30-foot radius and Dim Light for an
   // additional 30 feet. This light is sunlight."
-  sunbeam: { light: { on: "caster", brightFeet: 30, dimFeet: 30, sunlight: true } }
+  sunbeam: { light: { on: "caster", brightFeet: 30, dimFeet: 30, sunlight: true } },
+  // "The wall sheds Bright Light within 100 feet and Dim Light for an additional 100 feet."
+  "prismatic-wall": { light: { on: "area", brightFeet: 100, dimFeet: 100 } },
+  // "Each creature in the area who can see the pattern makes a Wisdom saving throw."
+  "hypnotic-pattern": { seenBy: "area" }
 };
 
 /** The spell's sight, when it has one. */

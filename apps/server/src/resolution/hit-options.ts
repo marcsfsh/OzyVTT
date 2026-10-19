@@ -15,6 +15,7 @@ import { beginConcentration } from "./concentration.js";
 import { criticalExpression } from "./damage.js";
 import { commitEconomy, evaluateActionEconomy, planEconomy } from "./economy.js";
 import { hitRiderOf, type HitRider } from "./hit-riders.js";
+import { OUTLINED_TAG } from "./attack.js";
 
 /**
  * Extras a hit can carry, which the attacker chooses on the attack's preview and spends with the hit (SRD Sneak
@@ -240,7 +241,7 @@ export function rollHitOptions(ctx: ResolveContext): void {
         makeEffect({
           id: `${ctx.input.commandId}:${action.id}:${target.id}`,
           name: rider.marks.name,
-          tags: [rider.marks.tag],
+          tags: [rider.marks.tag, ...(rider.marks.outlined ? [OUTLINED_TAG] : [])],
           sourceActorId: ctx.attacker.id,
           sourceName: ctx.attacker.name,
           sourceActionId: action.id,
@@ -248,6 +249,7 @@ export function rollHitOptions(ctx: ResolveContext): void {
           duration: { type: "rounds", remaining: rider.marks.rounds },
           concentration: true,
           ...(castId !== undefined ? { castId } : {}),
+          ...(rider.marks.light ? { light: { ...rider.marks.light } } : {}),
           modifiers: [{ type: "roll-mode", roll: "incoming-attack", mode: "advantage" }]
         }),
         ended,
