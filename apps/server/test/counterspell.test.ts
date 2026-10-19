@@ -21,10 +21,11 @@ const wizard = build(wizardInput(["counterspell", "shield", "magic-missile", "fi
 const GM = { role: "gm" } as const;
 
 /** The wizard (whose turn comes first unless `mageFirst`) against a Mage stat block. Dice come from `faces`. */
-function duel(faces: number[], options: Readonly<{ mageFirst?: boolean }> = {}) {
+function duel(faces: number[], options: Readonly<{ mageFirst?: boolean; monster?: string }> = {}) {
+  const monster = options.monster ?? "mage";
   const state = GameStateSchema.parse({
     schemaVersion: 1,
-    actors: [{ id: MAGE, name: "Mage", kind: "monster", hp: { current: 81, maximum: 81 }, definitionId: "mage" }]
+    actors: [{ id: MAGE, name: "Mage", kind: "monster", hp: { current: 81, maximum: 81 }, definitionId: monster }]
   });
   importActorDefinition(state, wizard, HERO, "public", catalog);
   startEncounter(
@@ -150,6 +151,17 @@ describe("a cast a Counterspell may stop", () => {
     expect(slotsOf(hero, 3)).toBe(1);
     // The Fireball dissipated: nobody owes its save.
     expect(state.combat.pendingSaves).toEqual([]);
+  });
+
+  it("meets Magic Resistance with Advantage on the caster's save", () => {
+    // The archmage rolls 1 and 20 and keeps the 20, so its Lightning Bolt goes ahead.
+    const { state, cast, answer } = duel([1, 20], { mageFirst: true, monster: "archmage" });
+    cast(MAGE, "spellcasting-lightning-bolt");
+    const outcome = answer(true, 3);
+    expect(outcome).toMatchObject({ used: true, countered: false });
+    expect(state.rolls.find((roll) => roll.label === "Constitution save against Counterspell")).toMatchObject({
+      dice: [expect.objectContaining({ face: 20 })]
+    });
   });
 
   it("isn't offered once the reactor's Reaction is spent", () => {

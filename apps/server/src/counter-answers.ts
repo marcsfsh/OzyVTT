@@ -10,7 +10,7 @@ import { spendComponents } from "./resolution/components.js";
 import type { LiveActor } from "./resolution/context.js";
 import { commitEconomy, commitUse, planEconomy, spendSlot } from "./resolution/economy.js";
 import { recordRoll } from "./roll-history.js";
-import { rollSaveAtOnce } from "./saving-throws.js";
+import { magicResistanceOf, rollSaveAtOnce } from "./saving-throws.js";
 
 /** What answering one Counterspell prompt needs from the answer it belongs to. */
 export type CounterAnswer = Readonly<{
@@ -104,34 +104,44 @@ export function answerCounter(answer: CounterAnswer, slotLevel: number | undefin
 
   const ability = declared.reaction.ability;
   const dc = declared.save?.dc ?? definition?.spellcasting?.saveDc ?? 10;
-  const save = rollSaveAtOnce(state, caster, ability, {
-    resolveDefinition: deps.resolveDefinition,
-    ...(deps.catalog ? { catalog: deps.catalog } : {}),
-    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
-    rollDie: deps.random
-  });
-  recordRoll(state, {
-    id: deps.newRollId(),
-    commandId,
-    initiatorSessionId: deps.gmSessionId,
-    initiatorRole: "gm",
-    initiatorLabel: caster.name,
-    label: `${ABILITY_WORDS[ability]} save against ${declared.name}`,
-    actorId: caster.id,
-    purpose: "save",
-    visibility: caster.visibility === "gm-only" ? "gm-only" : "public",
-    formula: "1d20",
-    normalizedFormula: "1d20",
-    dice: [{ group: 0, sides: 20, face: save.natural, kept: true, sign: 1 as const }],
-    modifiers:
-      save.total === save.natural
-        ? []
-        : [{ value: Math.abs(save.total - save.natural), sign: save.total > save.natural ? 1 : -1 }],
-    total: save.total,
-    createdAt: deps.now()
-  });
-  const readout = `${ABILITY_WORDS[ability]} save ${save.total} against DC ${dc}`;
-  if (save.total < dc) {
+  // Counterspell is a spell, so the caster's Magic Resistance meets its save with Advantage, and Greater Magic
+  // Resistance succeeds without a roll.
+  const casterDefinition = caster.definitionId ? deps.resolveDefinition(caster.definitionId) : undefined;
+  const greater = magicResistanceOf(casterDefinition) === "succeeds";
+  const save = greater
+    ? null
+    : rollSaveAtOnce(state, caster, ability, {
+        resolveDefinition: deps.resolveDefinition,
+        ...(deps.catalog ? { catalog: deps.catalog } : {}),
+        ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
+        rollDie: deps.random,
+        magical: true
+      });
+  if (save)
+    recordRoll(state, {
+      id: deps.newRollId(),
+      commandId,
+      initiatorSessionId: deps.gmSessionId,
+      initiatorRole: "gm",
+      initiatorLabel: caster.name,
+      label: `${ABILITY_WORDS[ability]} save against ${declared.name}`,
+      actorId: caster.id,
+      purpose: "save",
+      visibility: caster.visibility === "gm-only" ? "gm-only" : "public",
+      formula: "1d20",
+      normalizedFormula: "1d20",
+      dice: [{ group: 0, sides: 20, face: save.natural, kept: true, sign: 1 as const }],
+      modifiers:
+        save.total === save.natural
+          ? []
+          : [{ value: Math.abs(save.total - save.natural), sign: save.total > save.natural ? 1 : -1 }],
+      total: save.total,
+      createdAt: deps.now()
+    });
+  const readout = save
+    ? `${ABILITY_WORDS[ability]} save ${save.total} against DC ${dc}`
+    : `Greater Magic Resistance against DC ${dc}`;
+  if (save !== null && save.total < dc) {
     // The cast is over: no other prompt waits on it.
     state.combat = {
       ...state.combat,

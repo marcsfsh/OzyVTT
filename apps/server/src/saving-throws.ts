@@ -284,6 +284,8 @@ export function rollSaveAtOnce(
     catalog?: EquipmentCatalog;
     distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
     rollDie: RandomSource;
+    /** Against a spell, which Magic Resistance meets with Advantage. */
+    magical?: boolean;
   }>
 ): Readonly<{ natural: number; total: number; rollMode: AggregatedRollMode }> {
   const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
@@ -291,6 +293,8 @@ export function rollSaveAtOnce(
   const modifier =
     saveTotalFor(definition, actor, ability, derivation) + (auraOfProtection(state, actor, deps)?.amount ?? 0);
   const sources = saveRollSources(actor, ability, derivation);
+  if (deps.magical === true && magicResistanceOf(definition) !== null)
+    sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });
   const rollMode = aggregateRollMode(sources.advantage, sources.disadvantage);
   const resolution = resolveDice(
     parseDiceFormula(d20TestFormula(rollMode.mode, modifier) + saveRiderDiceTerms(derivation, ability)),
