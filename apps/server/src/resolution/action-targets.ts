@@ -114,6 +114,11 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
         rule: "target.not-allowed",
         message: `${action.name} targets a creature ${attacker.name} holds with ${heldName(rules.heldByAction)}, and ${name} isn't held.`
       });
+    if (rules.typeTag && !typeTagsOf(targetDefinition).includes(rules.typeTag.toLowerCase()))
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} targets a ${rules.typeTag}, and ${name} isn't one.`
+      });
     if (rules.atZeroHitPoints && target.hp.current > 0)
       violations.push({
         rule: "target.not-allowed",
@@ -142,6 +147,14 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
       });
   }
   return violations;
+}
+
+/** The type tags a stat block prints ("Fiend (Demon)": demon), lower case. */
+function typeTagsOf(definition: ActorDefinition | undefined): string[] {
+  const tags = (definition?.extensions["open5e.srd-2024"] as { typeTags?: unknown } | undefined)?.typeTags;
+  return Array.isArray(tags)
+    ? tags.filter((tag): tag is string => typeof tag === "string").map((tag) => tag.toLowerCase())
+    : [];
 }
 
 /** An action's printed name from its id ("web-strand": "Web Strand"). */

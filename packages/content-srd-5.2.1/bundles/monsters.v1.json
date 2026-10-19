@@ -8926,7 +8926,13 @@
     "description": "The balor teleports itself or a willing demon within 10 feet of itself up to 60 feet to an unoccupied space the balor can see.",
     "damage": [],
     "teleport": {
-     "feet": 60
+     "feet": 60,
+     "orAnother": true
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 10,
+     "typeTag": "demon"
     }
    },
    {
@@ -34423,7 +34429,26 @@
     "name": "Ethereal Stride",
     "activation": "action",
     "description": "The nightmare and up to three willing creatures within 5 feet of it teleport to the Ethereal Plane from the Material Plane or vice versa.",
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 4,
+     "rangeFeet": 5
+    },
+    "grants": {
+     "name": "Ethereal",
+     "tags": [
+      "off-plane"
+     ],
+     "target": "targets",
+     "toggles": true,
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
    }
   ],
   "token": {
@@ -35959,7 +35984,22 @@
     "name": "Ethereal Jaunt",
     "activation": "bonus-action",
     "description": "The spider teleports from the Material Plane to the Ethereal Plane or vice versa.",
-    "damage": []
+    "damage": [],
+    "grants": {
+     "name": "Ethereal",
+     "tags": [
+      "off-plane"
+     ],
+     "target": "self",
+     "toggles": true,
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
    },
    {
     "id": "multiattack",

@@ -554,3 +554,42 @@ describe("a water elemental's Whelm", () => {
     );
   });
 });
+
+describe("leaving the plane and coming back", () => {
+  const fresh = (built: Table) => {
+    built.state.combat = {
+      ...built.state.combat,
+      turnActorId: IDS.monster,
+      turn: { ...built.state.combat.turn, actionUsed: false, bonusActionUsed: false, actionInstance: null }
+    };
+  };
+
+  it("sends a phase spider to the Ethereal Plane, and back with the next Ethereal Jaunt", () => {
+    const built = table("phase-spider");
+    use(built, "ethereal-jaunt", IDS.monster);
+    expect(actor(built, IDS.monster).effects).toMatchObject([{ name: "Ethereal", tags: ["off-plane"] }]);
+    fresh(built);
+    use(built, "ethereal-jaunt", IDS.monster);
+    expect(actor(built, IDS.monster).effects).toEqual([]);
+  });
+
+  it("takes a nightmare and the creatures beside it to the Ethereal Plane together", () => {
+    const built = table("nightmare");
+    use(built, "ethereal-stride", IDS.monster, [], { targetIds: [IDS.monster, IDS.hero] });
+    for (const id of [IDS.monster, IDS.hero])
+      expect(actor(built, id).effects.map((effect) => effect.tags)).toEqual([["off-plane"]]);
+  });
+});
+
+describe("a balor's Teleport", () => {
+  it("teleports the balor, or a demon within 10 feet of it instead", () => {
+    const built = table("balor");
+    expect(() => use(built, "teleport", IDS.ally)).toThrow(/targets a demon, and Ally isn't one/);
+    const vrock = MONSTERS.find((monster) => monster.source.externalId === "vrock")!;
+    built.state.definitions.push({ id: "vrock-def", definition: vrock });
+    actor(built, IDS.ally).definitionId = "vrock-def";
+    use(built, "teleport", IDS.ally);
+    expect(activeTeleportGrant(built.state, actor(built, IDS.ally))).toMatchObject({ feet: 60 });
+    expect(activeTeleportGrant(built.state, actor(built, IDS.monster))).toBeNull();
+  });
+});

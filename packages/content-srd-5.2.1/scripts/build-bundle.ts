@@ -642,6 +642,7 @@ const ACTION_ENRICHMENTS: Record<
       | "inflicts"
       | "afterHurtingBloodied"
       | "largeFillsHold"
+      | "teleport"
     >
   >
 > = {
@@ -672,6 +673,39 @@ const ACTION_ENRICHMENTS: Record<
       target: "target",
       duration: { type: "until-source-turn-end" },
       armorClassBonus: 2,
+      modifiers: [],
+      onEnd: [],
+      voidWhileIncapacitated: false,
+      concentration: false
+    }
+  },
+  // "The balor teleports itself or a willing demon within 10 feet of itself up to 60 feet to an unoccupied space the
+  // balor can see."
+  "balor/teleport": { teleport: { feet: 60, orAnother: true }, targets: { count: 1, rangeFeet: 10, typeTag: "demon" } },
+  // "The spider teleports from the Material Plane to the Ethereal Plane or vice versa."
+  "phase-spider/ethereal-jaunt": {
+    grants: {
+      name: "Ethereal",
+      tags: ["off-plane"],
+      target: "self",
+      toggles: true,
+      duration: { type: "manual" },
+      modifiers: [],
+      onEnd: [],
+      voidWhileIncapacitated: false,
+      concentration: false
+    }
+  },
+  // "The nightmare and up to three willing creatures within 5 feet of it teleport to the Ethereal Plane from the
+  // Material Plane or vice versa."
+  "nightmare/ethereal-stride": {
+    targets: { count: 4, rangeFeet: 5 },
+    grants: {
+      name: "Ethereal",
+      tags: ["off-plane"],
+      target: "targets",
+      toggles: true,
+      duration: { type: "manual" },
       modifiers: [],
       onEnd: [],
       voidWhileIncapacitated: false,

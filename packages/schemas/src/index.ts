@@ -2534,6 +2534,9 @@ export type GrantOption = z.infer<typeof GrantOptionSchema>;
  *  when its attack hits (Guiding Bolt's light), and add to AC while it lasts (Shield of Faith). */
 export const ActionGrantSchema = EffectGrantSchema.extend({
   target: z.enum(["self", "target", "targets"]).default("self"),
+  /** Taken again while what it gave lasts, it ends that instead (a phase spider's Ethereal Jaunt: "from the Material
+   *  Plane to the Ethereal Plane or vice versa"). */
+  toggles: z.literal(true).optional(),
   onHit: z.boolean().optional(),
   /** Kept apart from `modifiers`, whose `armor-class` is written onto the sheet, like a reaction's lasting bonus. */
   armorClassBonus: z.number().int().min(1).max(10).optional(),
@@ -3543,6 +3546,8 @@ export const ActionTargetsSchema = z
     markedBy: EffectTagSchema.optional(),
     /** Only a creature at 0 Hit Points (a will-o'-wisp's Consume Life). */
     atZeroHitPoints: z.literal(true).optional(),
+    /** Only a creature whose stat block prints this type tag ("a willing demon": a Fiend (Demon)). */
+    typeTag: z.string().min(1).max(40).optional(),
     /** Only a creature under this creature's effect from that action (one Restrained by an ettercap's Web Strand). */
     heldByAction: z
       .string()
@@ -3793,7 +3798,10 @@ export const ActionTeleportSchema = z
   .object({
     feet: z.number().int().min(5).max(10000),
     unseen: z.literal(true).optional(),
-    failDamage: DiceFormulaSchema.optional()
+    failDamage: DiceFormulaSchema.optional(),
+    /** It may teleport the one willing creature its targets name instead of its user (a balor's "itself or a willing
+     *  demon within 10 feet of itself"). */
+    orAnother: z.literal(true).optional()
   })
   .strict();
 export type ActionTeleport = z.infer<typeof ActionTeleportSchema>;

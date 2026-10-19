@@ -897,8 +897,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Mummy Lord/whirlwind-of-sand": guided(
     "The Reaction gives a 60-foot teleport (granted-moves.ts). The +2 AC against the triggering attack and the creatures it blinds are the GM's."
   ),
-  "action:Balor/teleport": guided(
-    "A 60-foot teleport is granted (granted-moves.ts). Teleporting a willing demon within 10 feet instead is the GM's."
+  "action:Balor/teleport": enforced(
+    "A 60-foot teleport is granted to the balor, or to the one demon within 10 feet it names instead (resolution/movement-grants.ts, resolution/action-targets.ts). Whether that demon is willing is its player's or the GM's."
+  ),
+  "action:Phase Spider/ethereal-jaunt": guided(
+    "The spider leaves the map for the Ethereal Plane, out of reach of the creatures on the plane, and the next Ethereal Jaunt brings it back to the space it left or the nearest unoccupied one (off-plane.ts). Moving while ethereal, to come back elsewhere, is the GM's."
+  ),
+  "action:Nightmare/ethereal-stride": guided(
+    "The nightmare and up to three creatures within 5 feet leave the map for the Ethereal Plane, and the next Ethereal Stride brings them back to the spaces they left (off-plane.ts). Moving while ethereal, and whether a creature taken along is willing, are the GM's."
   ),
   "action:Dryad/tree-stride": guided(
     "A teleport of up to 65 feet is granted (granted-moves.ts). Whether a Large tree stands at each end is the GM's, since trees aren't on the map."
