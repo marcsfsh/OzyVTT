@@ -72,6 +72,7 @@ function shownAttackRoll(
     .find(
       (candidate) =>
         candidate.purpose === "attack" &&
+        candidate.free !== true &&
         candidate.actorId === pending.sourceActorId &&
         (candidate.dice.length === 0 || candidate.dice.some((die) => die.sides === 20))
     );

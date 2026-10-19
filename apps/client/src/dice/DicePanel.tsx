@@ -306,6 +306,7 @@ export function DicePanel({
                       </span>
                       <span className="roll-meta">
                         {roll.initiatorLabel ?? "Unknown roller"} · {visibilityLabel(roll.visibility)}
+                        {roll.free ? " · Free roll" : ""}
                       </span>
                     </div>
                     <div className="roll-readout">

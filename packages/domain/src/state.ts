@@ -66,6 +66,9 @@ export const RollRecordSchema = z.object({
   total: z.number().int(),
   /** The d20 was typed from a physical die; the server threw nothing. */
   typed: z.literal(true).optional(),
+  /** A player's roll from the free dice roller: its formula and label are the player's own, where a rule's roll
+   *  (a check, a save, an attack) works out its bonuses on the server. */
+  free: z.literal(true).optional(),
   createdAt: z.iso.datetime()
 });
 export type RollVisibility = z.infer<typeof RollVisibilitySchema>;
