@@ -1,5 +1,6 @@
 import { abilityModifier } from "@vtt/rules-5e";
 import { resolveSpellcasting, type Summon } from "@vtt/schemas";
+import { addEffect, CONCENTRATING_TAG, makeEffect, type EffectNarration } from "../effects.js";
 import { laterRowOf } from "../item-actions.js";
 import type { SummonerNumbers } from "../summon-stat-blocks.js";
 import { spellEffectDuration, spellOf } from "./concentration.js";
@@ -44,6 +45,34 @@ function summonerNumbers(ctx: ResolveContext, summon: Summon): SummonerNumbers {
   };
 }
 
+/** An item's creature that stays while its user concentrates (a Ring of Djinni Summoning: "as long as you maintain
+ *  Concentration, to a maximum of 1 hour"): the user's Concentration on the item, which keeps what it brought. */
+function beginItemConcentration(ctx: ResolveContext, minutes: number): void {
+  const { state, attacker, action, input } = ctx;
+  ctx.castId = input.commandId;
+  const name = `Concentrating on ${action.name}`;
+  const ended: EffectNarration[] = [];
+  addEffect(
+    state,
+    attacker.id,
+    makeEffect({
+      id: `${input.commandId}:concentration`,
+      name,
+      tags: [CONCENTRATING_TAG],
+      sourceActorId: attacker.id,
+      sourceName: attacker.name,
+      startedRound: state.combat.round,
+      duration: minutes <= 10 ? { type: "rounds", remaining: minutes * 10 } : { type: "minutes", remaining: minutes },
+      endsWhenSourceDefeated: true,
+      concentration: true,
+      castId: input.commandId
+    }),
+    ended
+  );
+  ctx.effectsApplied.push({ targetId: attacker.id, targetName: attacker.name, name, conditionIds: [] });
+  for (const event of ended) ctx.tableNarration.push(tableLineOf(ctx, event));
+}
+
 export function applySummons(ctx: ResolveContext): void {
   const summon = summonOf(ctx);
   if (!summon) return;
@@ -55,6 +84,8 @@ export function applySummons(ctx: ResolveContext): void {
     );
     return;
   }
+  if (!spell && summon.lasts?.type === "minutes" && summon.lasts.concentration)
+    beginItemConcentration(ctx, summon.lasts.minutes);
   const level = spell ? (ctx.plan.castLevel ?? spell.level) : null;
   const outcome = deps.summon({
     userId: attacker.id,

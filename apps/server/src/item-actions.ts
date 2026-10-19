@@ -162,7 +162,9 @@ export function itemAction(
     ...(declared.onHit ? { onHit: structuredClone(declared.onHit) } : {}),
     // A roll it answers (a Ring of Evasion's Evade) and the trigger it is offered on (a Reaction's).
     ...(declared.answer ? { answer: structuredClone(declared.answer) } : {}),
-    ...(reaction ? { reaction: { ...reaction } } : {})
+    ...(reaction ? { reaction: { ...reaction } } : {}),
+    // The creatures it brings (a Horn of Valhalla's Berserkers).
+    ...(declared.summons ? { summons: structuredClone(declared.summons) } : {})
   };
 }
 

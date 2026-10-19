@@ -2745,6 +2745,11 @@ export const SummonCreatureSchema = z
     form: RiderSlugSchema.optional(),
     /** How much of an `upToModifier` budget one counts for (Animate Objects: a Large object counts as two). */
     share: z.number().int().min(1).max(4).optional(),
+    /** Who commands it when the summon's die brings this row, in place of the summon's own (an Efreeti Bottle's 1:
+     *  "The efreeti attacks you"), and how many rounds it stays then ("After fighting for 5 rounds, the efreeti
+     *  disappears"). */
+    allegiance: z.enum(["user", "none", "hostile"]).optional(),
+    rounds: z.number().int().min(1).max(100).optional(),
     /** How it differs from its stat block ("uses the Riding Horse stat block, except it has a Speed of 100 feet"; a
      *  treant's trees have Intelligence and Charisma scores of 1 and lack Animate Trees). */
     except: z
@@ -2857,6 +2862,12 @@ export const SummonSchema = z
     /** Who commands it: its user, no one (a Wand of Wonder's Rhinoceros), or no one and it turns on its user (a Horn of
      *  Valhalla blown without the training it asks). */
     allegiance: z.enum(["user", "none", "hostile"]).default("user"),
+    /** It obeys its user only when its user has this training, and attacks its user otherwise (a Horn of Valhalla's
+     *  Berserkers: "Proficiency with all Martial weapons", "Training with all Medium armor"). */
+    obeysWith: z
+      .object({ weapons: ProficiencyIdSchema.optional(), armor: ProficiencyIdSchema.optional() })
+      .strict()
+      .optional(),
     /** It can't attack, but takes other actions as normal (a familiar). */
     noAttacks: z.literal(true).optional(),
     /** Its user can have only one from this source; a new one replaces the old (Find Steed, Find Familiar). */

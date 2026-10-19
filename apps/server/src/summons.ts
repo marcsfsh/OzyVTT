@@ -94,15 +94,38 @@ export function summonCountAt(row: SummonCreature, level: number | null, printed
 const sameRow = (row: SummonCreature, pick: Readonly<{ monsterId: string; form?: string }>) =>
   row.monsterId === pick.monsterId && (pick.form === undefined || row.form === undefined || row.form === pick.form);
 
-/** One kind of creature a summon makes, and how many. */
-type Planned = Readonly<{ monsterId: string; form?: string; count: number; except?: SummonCreature["except"] }>;
+/** One kind of creature a summon makes, and how many; who commands it and how long it stays when its row says. */
+type Planned = Readonly<{
+  monsterId: string;
+  form?: string;
+  count: number;
+  except?: SummonCreature["except"];
+  allegiance?: SummonCreature["allegiance"];
+  rounds?: number;
+}>;
 
 const plannedOf = (row: SummonCreature, count: number, form = row.form): Planned => ({
   monsterId: row.monsterId,
   ...(form ? { form } : {}),
   count,
-  ...(row.except ? { except: row.except } : {})
+  ...(row.except ? { except: row.except } : {}),
+  ...(row.allegiance ? { allegiance: row.allegiance } : {}),
+  ...(row.rounds !== undefined ? { rounds: row.rounds } : {})
 });
+
+/** Whether the user has the training a summon asks before it obeys (a Horn of Valhalla's). Training a sheet never
+ *  recorded counts as had: the GM settles it. */
+function hasTraining(
+  user: Actor,
+  wants: Summon["obeysWith"],
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): boolean {
+  if (!wants) return true;
+  const proficiencies = user.definitionId ? resolveDefinition(user.definitionId)?.proficiencies : undefined;
+  const has = (recorded: readonly string[] | undefined, id: string | undefined) =>
+    id === undefined || recorded === undefined || recorded.includes(id);
+  return has(proficiencies?.weapons, wants.weapons) && has(proficiencies?.armor, wants.armor);
+}
 
 /** The stat blocks and counts this summon makes: rolled on its die, picked by its user, or its first row. */
 function plannedCreatures(request: SummonRequest, deps: SummonDeps, events: EffectNarration[], user: Actor): Planned[] {
@@ -297,10 +320,14 @@ function keepingEffect(
   request: SummonRequest,
   user: Actor,
   creature: Actor,
-  index: number
+  index: number,
+  rounds?: number
 ): { bearerId: string; effect: EffectInstance } | null {
   const { summon, spell } = request;
-  const lasts = summon.lasts ?? (spell ? { type: "spell" as const } : { type: "untimed" as const });
+  const lasts =
+    rounds !== undefined
+      ? { type: "rounds" as const, rounds }
+      : (summon.lasts ?? (spell ? { type: "spell" as const } : { type: "untimed" as const }));
   const name = spell ? spell.name : request.action.name;
   const base = {
     name,
@@ -318,13 +345,15 @@ function keepingEffect(
     };
   if (lasts.type === "untimed" && !summon.endsOnDamage) return null;
   const duration: EffectInstance["duration"] =
-    lasts.type === "minutes"
-      ? lasts.minutes <= 10
-        ? { type: "rounds", remaining: lasts.minutes * 10 }
-        : { type: "minutes", remaining: lasts.minutes }
-      : lasts.type === "spell"
-        ? (request.spellDuration ?? { type: "manual" })
-        : { type: "manual" };
+    lasts.type === "rounds"
+      ? { type: "rounds", remaining: lasts.rounds }
+      : lasts.type === "minutes"
+        ? lasts.minutes <= 10
+          ? { type: "rounds", remaining: lasts.minutes * 10 }
+          : { type: "minutes", remaining: lasts.minutes }
+        : lasts.type === "spell"
+          ? (request.spellDuration ?? { type: "manual" })
+          : { type: "manual" };
   return {
     bearerId: creature.id,
     effect: makeEffect({
@@ -378,6 +407,7 @@ export function bringSummons(state: GameState, request: SummonRequest, deps: Sum
   const total = corpses.length > 0 ? corpses.length : planned.reduce((sum, entry) => sum + entry.count, 0);
   if (state.actors.length + total > 200)
     throw new CommandRejectedError("The roster is full. Remove unused combatants first.");
+  const trained = hasTraining(user, summon.obeysWith, deps.resolveDefinition);
   let index = 0;
   const queue =
     corpses.length > 0
@@ -406,7 +436,7 @@ export function bringSummons(state: GameState, request: SummonRequest, deps: Sum
     addSummonedActor(state, made, id, user.visibility, definitionId, deps.catalog);
     const actor = state.actors.find((candidate) => candidate.id === id)!;
     const corpse = corpses[index];
-    const kept = keepingEffect(state, request, user, actor, index);
+    const kept = keepingEffect(state, request, user, actor, index, entry.rounds);
     if (kept) addEffect(state, kept.bearerId, kept.effect);
     actor.summon = {
       by: user.id,
@@ -426,7 +456,14 @@ export function bringSummons(state: GameState, request: SummonRequest, deps: Sum
       ...(summon.strikesFrom ? { strikesFrom: summon.strikesFrom } : {}),
       ...(summon.endsSpell && request.castId !== null ? { endsSpell: request.castId } : {})
     };
-    if (summon.allegiance === "user")
+    const allegiance = entry.allegiance ?? summon.allegiance;
+    if (allegiance === "user" && !trained)
+      events.push({
+        kind: "effect",
+        text: `${actor.name} turns on ${user.name}, who lacks the training ${request.action.name} asks.`,
+        actorId: actor.id
+      });
+    if (allegiance === "user" && trained)
       actor.control = {
         by: user.id,
         side,
