@@ -1,3 +1,4 @@
+import { formEffectOf, gearMerged, isFormDefinitionId } from "./transform/forms.js";
 import { makeHitDicePool, type Actor, type ActorDefinition, type GameState, type HitDiceEntry } from "@vtt/domain";
 import type { ActorAction } from "@vtt/schemas";
 import {
@@ -17,7 +18,7 @@ import {
 } from "@vtt/rules-5e";
 import { withProseFacts } from "@vtt/content-srd-5.2.1/action-prose";
 import { storedClassSequence } from "./character-offers.js";
-import { endEffectsSustainedBy } from "./effects.js";
+import { endEffect, endEffectsSustainedBy } from "./effects.js";
 import { actionPools, effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, withResolvedSlots, type EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
@@ -232,7 +233,8 @@ function armorClassWith(
   if (actor.armorClassOverride !== undefined) return actor.armorClassOverride;
   const derivation = deriveEquipment(actor, definition, catalog);
   const dex = abilityModifier(definition.abilityScores.dex);
-  const items = withResolvedSlots(actor.inventory, catalog);
+  // Gear melded into a form is worn by nothing.
+  const items = gearMerged(actor) ? [] : withResolvedSlots(actor.inventory, catalog);
   const unarmored = [...unarmoredDefensesOf(definition, catalog), ...extra];
   const training = { shield: derivation.untrainedShield === null };
   const worn = [null, ...unarmored]
@@ -418,7 +420,7 @@ export function importActorDefinition(
   visibility: "public" | "gm-only",
   catalog?: EquipmentCatalog
 ) {
-  if (state.definitions.length >= MAX_IMPORTED_DEFINITIONS)
+  if (state.definitions.filter((entry) => !isFormDefinitionId(entry.id)).length >= MAX_IMPORTED_DEFINITIONS)
     throw new CommandRejectedError("The imported-sheet library is full. Remove unused combatants first.");
   const definitionId = `import-${actorId}`;
   const kind = definition.schemaId === "vtt.actor-character" ? ("player-character" as const) : ("monster" as const);
@@ -508,6 +510,9 @@ export function rebuildActorDefinition(
   if (!actor) throw new CommandRejectedError("That character no longer exists.");
   if (actor.kind !== "player-character") throw new CommandRejectedError("Only characters can be rebuilt.");
   const definitionId = `import-${actorId}`;
+  // The sheet a form replaced comes back when the form ends; rebuilding it under the form would be lost then.
+  const form = formEffectOf(actor);
+  if (form) throw new CommandRejectedError(`${actor.name} is in ${form.name}. End it before changing the sheet.`);
   // A bundled/example definition is not ours to rewrite.
   if (actor.definitionId !== definitionId)
     throw new CommandRejectedError("That character was not built here, so it can't be rebuilt.");
@@ -664,6 +669,9 @@ export function removeActor(state: GameState, actorId: string) {
     if (!actor.archived) throw new CommandRejectedError("Release that character's claim before removing it.");
     actor.ownerSessionId = null;
   }
+  // A creature leaves the roster in its true form, so its own sheet goes with it and no form is left stored.
+  const form = formEffectOf(actor);
+  if (form) endEffect(state, actorId, form.id);
   if (actor.kind === "player-character" && !actor.definitionId?.startsWith("import-"))
     throw new CommandRejectedError("Player characters can't be removed from the roster.");
   // A recorded snapshot may reference this actor; make the GM leave history review first.

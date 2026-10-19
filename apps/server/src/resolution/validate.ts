@@ -60,7 +60,9 @@ function combatantsOf(
   // Outside a fight a creature's own cast still starts what it starts (a grant, Concentration, a save, an area), with
   // no turn to spend; an item's use stays on the loose route, which spends its charges.
   const outsideFight = !state.combat.active;
-  if (outsideFight && !(castsASpell && !isItemActionId(action.id)))
+  // A shape-shift is something a creature does outside a fight too (Wild Shape to scout, a werewolf's change).
+  const shapeShifts = action.shapeShift !== undefined || action.endsForm === true;
+  if (outsideFight && !(castsASpell && !isItemActionId(action.id)) && !shapeShifts)
     throw new CommandRejectedError("Start an encounter before resolving actions.");
   const inFight = (actorId: string) =>
     outsideFight
@@ -139,7 +141,9 @@ function combatantsOf(
     (castsASpell && !rollsOnTargets) ||
     input.builtin === true ||
     // A light or a cloud is something done, with no creature under it (a magmin's flames, a darkmantle's aura).
-    action.sight !== undefined;
+    action.sight !== undefined ||
+    // Taking a form, or leaving it, is the user's own (Wild Shape, a werewolf's Shape-Shift).
+    (shapeShifts && action.shapeShift?.onTargets !== true && action.save === undefined);
   // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
   const touchesSomeone = action.endsConditions !== undefined || action.healing?.perUse === true;
   if (targets.length === 0 && (touchesSomeone || (!structuredWithoutTargets && action.grants?.target !== "target")))
@@ -157,6 +161,7 @@ function combatantsOf(
     !castsASpell &&
     !movesAnArea &&
     action.sight === undefined &&
+    !shapeShifts &&
     action.move === undefined &&
     action.leap === undefined &&
     action.teleport === undefined &&

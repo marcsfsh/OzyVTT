@@ -250,7 +250,11 @@ const PendingSaveEffectSchema = z
     light: EffectInstanceSchema.shape.light,
     /** "Until the end of the current turn" for a save made at the start of the bearer's own turn (Stinking Cloud),
      *  where "until the end of its next turn" would run a turn longer. */
-    currentTurn: z.literal(true).optional()
+    currentTurn: z.literal(true).optional(),
+    /** The form a failure shape-shifts the creature into (Polymorph's Beast), taken as the effect lands. */
+    form: EffectInstanceSchema.shape.form,
+    /** The creature's size while it lasts (Enlarge/Reduce). */
+    sizeChange: EffectInstanceSchema.shape.sizeChange
   })
   .strict();
 
@@ -336,6 +340,8 @@ export const PendingSaveSchema = z
       .optional(),
     /** What gives the save Disadvantage, as the roll names it (Heightened Spell). GM bookkeeping, never projected. */
     disadvantageFrom: z.string().min(1).max(60).optional(),
+    /** A failure returns a shape-shifted creature to its true form (Moonbeam). Narrated when it lands. */
+    endsForm: z.literal(true).optional(),
     /** Nothing the server applies rides the save's outcome (Levitate, Polymorph): the GM applies what it does. The save
      *  card says so, so it never reads as if the engine did. */
     gmApplies: z.literal(true).optional(),
@@ -1571,8 +1577,9 @@ export const GameStateSchema = z.object({
     tokens: [],
     annotations: []
   }),
-  /** Imported stat blocks (canonical ActorDefinition JSON) that live with the campaign (ADR-0007). */
-  definitions: z.array(StoredDefinitionSchema).max(100).default([]),
+  /** Imported stat blocks (canonical ActorDefinition JSON) that live with the campaign (ADR-0007), and the definition
+   *  of each form a creature has taken (`form-<actorId>`), which it reads in place of its own until it reverts. */
+  definitions: z.array(StoredDefinitionSchema).max(200).default([]),
   /** Player-submitted PDF imports awaiting GM approval. GM-only: excluded from PlayerView and the viewer (ADR-0018). */
   pendingImports: z.array(PendingImportSchema).max(20).default([]),
   /** Character-builder table policy. GM-set, player-read. */

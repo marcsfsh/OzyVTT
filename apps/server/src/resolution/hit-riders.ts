@@ -29,7 +29,12 @@ export type HitRider = HitRiderData &
 const BY_ACTION_ID: Readonly<Record<string, HitRider>> = {
   "sneak-attack": { rides: "finesse-or-ranged-weapon", sneakAttack: true, weaponType: true },
   "divine-strike": { rides: "weapon", damageTypes: ["radiant", "necrotic"], ownTurn: true },
-  "primal-strike": { rides: "weapon", damageTypes: ["lightning", "cold", "fire", "thunder"], ownTurn: true },
+  // "An attack roll using a weapon or a Beast form's attack in Wild Shape."
+  "primal-strike": {
+    rides: "weapon-or-beast-form",
+    damageTypes: ["lightning", "cold", "fire", "thunder"],
+    ownTurn: true
+  },
   "stunning-strike": { rides: "monk-weapon-or-unarmed", oncePerTurn: true },
   "hurl-through-hell": { rides: "attack-roll", oncePerTurn: true, sparesCreatureTypes: ["fiend"] },
   "fires-burn": { rides: "attack-roll", dealsDamage: true },
