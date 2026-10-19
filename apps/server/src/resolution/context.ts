@@ -110,6 +110,9 @@ export type ResolveInput = Readonly<{
   /** The cast's area was placed on the map as a template, whose annotation takes this command's id; a spell that
    *  leaves its area behind (Moonbeam) keeps acting there. */
   areaPlaced?: boolean;
+  /** The placed area's point of origin on the map, from which its Dexterity saves read cover (SRD Cover: "an attack
+   *  or other effect originates on the opposite side of the cover"). A replay reads it from the template's drawing. */
+  areaOrigin?: Readonly<{ x: number; y: number }>;
   /** Ready the spell for later: its slot is spent and it is held with Concentration (SRD Ready). */
   ready?: boolean;
   /** A long casting's first turn going ahead after no Counterspell stopped it: it begins as that turn's cast would. */

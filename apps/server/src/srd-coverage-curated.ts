@@ -160,7 +160,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   ),
   cone: areaShape("its width at any point equals that point's distance from the origin."),
   cover: enforced(
-    "With dynamic vision on, cover.ts works out Half, Three-Quarters and Total Cover from the walls between the attacker or the effect's origin and the target, and Half Cover from a creature in the way; a spell's wall gives the cover its text names (Blade Barrier's Three-Quarters, zone-walls.ts), and the GM can mark more. The server adds 2 or 5 to AC and Dexterity saves, and resolution/validate.ts refuses an attack against Total Cover, or across a sphere of force (enclosures.ts)."
+    "With dynamic vision on, cover.ts works out Half, Three-Quarters and Total Cover from the walls between the attacker, or a placed area's point of origin (resolution/pending.ts), and each target, and Half Cover from a creature in the way; a spell's wall gives the cover its text names against an attack or a picked target (Blade Barrier's Three-Quarters, zone-walls.ts), and the GM can mark more. The server adds 2 or 5 to AC and Dexterity saves, and resolution/validate.ts refuses any picked target behind Total Cover, each of a spell's several targets included, or across a sphere of force (enclosures.ts). Cover from what the map doesn't hold (furniture, a low wall drawn as a full one) is the GM's mark."
   ),
   crawling: enforced("movement-rules.ts charges an extra foot per foot while a creature is Prone."),
   creature: reference("A definition; there is nothing to apply."),

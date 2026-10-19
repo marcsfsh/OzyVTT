@@ -319,16 +319,31 @@ export function openResolve(
         ))
       : (input.cover ?? null);
   // An area's other targets still take it, so a marked creature among several is the GM's to remove.
-  if (targets.length > 1)
+  if (targets.length > 1 && input.areaPlaced === true)
     for (const target of targets)
       if ((input.cover ?? null) === null && coverFor(null, target) === "total")
         warnings.push(`${target.name} has Total Cover. Leave it out if the effect can't reach it.`);
-  if (attackCover === "total" && coverMode !== "freeform") {
+  // "A Clear Path to the Target": each creature picked for a spell of several targets (Magic Missile, Bless) needs one,
+  // so the GM's mark or the walls on the map leaving it Total Cover bar it as they bar a single target.
+  const covered =
+    targets.length > 1 && input.areaPlaced !== true && (input.cover ?? null) === null
+      ? targets.filter(
+          (target) =>
+            target.id !== attacker.id &&
+            bestCover(coverFor(null, target), fromMap(target), swallowCover(state, attacker.id, target.id)) === "total"
+        )
+      : [];
+  if ((attackCover === "total" || covered.length > 0) && coverMode !== "freeform") {
+    const named = covered.map((target) => (hiddenFromInitiator(target.id) ? "A target" : target.name));
+    const message =
+      covered.length > 0
+        ? `${named.join(" and ")} ${covered.length === 1 ? "has" : "have"} Total Cover and can't be targeted directly.`
+        : "The target has Total Cover and can't be targeted directly.";
     const waived = overrideWaives(input.override, "cover.total");
     if (coverMode === "strict" && !waived && !overrideCovers(state.combat.turn, "cover.total"))
-      throw new RulesBlockedError("cover.total", "The target has Total Cover and can't be targeted directly.");
+      throw new RulesBlockedError("cover.total", message);
     if (waived && overridden === null) overridden = { rule: "cover.total", reason: overrideReason(input.override) };
-    else warnings.push("The target has Total Cover. The rules mode allows it.");
+    else warnings.push(`${message.replace(" and can't be targeted directly.", ".")} The rules mode allows it.`);
   }
 
   const sightContent = {
