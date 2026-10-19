@@ -353,8 +353,8 @@ export type ReactionAnswerResult = MutationResult & {
  *  explainability), plus the action's display values. */
 /** One way a spell's cast can be shaped, as the cast offers it: its cost in Sorcery Points, whether this spell can take
  *  it now and why not, whether it counts toward the options one spell may carry, the creatures it names (Careful
- *  Spell's up to the Charisma modifier, Sculpt Spells' 1 plus the spell's level, Heightened Spell's one), and the types
- *  Transmuted Spell can change to. */
+ *  Spell's up to the Charisma modifier, Heightened Spell's one, Sculpt Spells' 1 plus the spell's level, with
+ *  `plusLevel` when that is 1 plus the slot's level), and the types Transmuted Spell can change to. */
 const CastShapingOfferSchema = z.strictObject({
   id: CastShapingIdSchema,
   name: z.string(),

@@ -9,6 +9,7 @@ import type {
   HitOptionChoice,
   RulesBlocked
 } from "@vtt/domain";
+import type { CastShaping } from "@vtt/schemas";
 import { command } from "../lib/command";
 import { newId } from "../lib/ids";
 
@@ -45,6 +46,8 @@ export type TargetingSession = Readonly<{
   conditionId?: string;
   /** The GM places a spell's lingering area and resolves no action: the zone it is for. */
   placeZoneId?: string;
+  /** How the caster shapes the cast (Metamagic, Sculpt Spells), with the creatures each pick names once chosen. */
+  shaping?: readonly CastShaping[];
 }>;
 
 let session: TargetingSession | null = null;
@@ -77,7 +80,8 @@ export function beginTargeting(
   action: ContentActionSummary,
   attackerId: string,
   slotLevel?: number,
-  dartsAtSlot?: number
+  dartsAtSlot?: number,
+  shaping?: readonly CastShaping[]
 ) {
   const area = action.area;
   const dartTotal = dartsAtSlot ?? action.darts;
@@ -85,6 +89,7 @@ export function beginTargeting(
   const usualSkill = action.id === "escape-grapple" ? undefined : action.checkSkills?.[0]?.id;
   const slot = {
     ...(slotLevel !== undefined ? { slotLevel } : {}),
+    ...(shaping && shaping.length > 0 ? { shaping } : {}),
     ...(dartTotal !== undefined ? { darts: { total: dartTotal, counts: {} } } : {}),
     ...(usualSkill !== undefined ? { skill: usualSkill } : {}),
     // A picked cost starts at one; the picker raises it.
@@ -175,6 +180,16 @@ export function toggleTarget(actorId: string) {
     const { [actorId]: _dropped, ...counts } = session.darts.counts;
     session = { ...session, darts: { ...session.darts, counts: dropping ? counts : { ...counts, [actorId]: 1 } } };
   }
+  // A creature no longer targeted is no longer one the cast's shaping names.
+  if (session.shaping && (dropping || session.mode === "single")) {
+    const kept = session.selected;
+    session = {
+      ...session,
+      shaping: session.shaping.map((entry) =>
+        entry.creatureIds ? { ...entry, creatureIds: entry.creatureIds.filter((id) => kept.includes(id)) } : entry
+      )
+    };
+  }
   emit();
 }
 /** Picks the damage type an action deals, for one whose caster chooses (Chromatic Orb). */
@@ -204,10 +219,39 @@ export function setChosenAbility(ability: AbilityId) {
   session = { ...session, ability };
   emit();
 }
-/** Whether the session has what its Roll needs: its targets or placed area, and a chosen ability for a cast that takes
- *  one. */
+/** The picks of a cast's shaping that name creatures among its targets: Careful Spell's and Sculpt Spells' protected
+ *  creatures, and Heightened Spell's one target when the spell has several. */
+export const SHAPING_CREATURE_PICKS: ReadonlySet<string> = new Set([
+  "careful-spell",
+  "sculpt-spells",
+  "heightened-spell"
+]);
+
+/** Chooses the creatures one of the cast's shaping picks names; the server checks how many and whom. */
+export function setShapingCreatures(id: CastShaping["id"], creatureIds: readonly string[]) {
+  if (!session?.shaping?.some((entry) => entry.id === id)) return;
+  session = {
+    ...session,
+    shaping: session.shaping.map((entry) => (entry.id === id ? { ...entry, creatureIds: [...creatureIds] } : entry))
+  };
+  emit();
+}
+
+/** Whether a shaping pick still has creatures to choose: protected creatures, or Heightened Spell's target among
+ *  several. */
+const shapingUnchosen = (picking: TargetingSession) =>
+  (picking.shaping ?? []).some(
+    (entry) =>
+      SHAPING_CREATURE_PICKS.has(entry.id) &&
+      (entry.creatureIds ?? []).length === 0 &&
+      !(entry.id === "heightened-spell" && picking.mode === "single")
+  );
+
+/** Whether the session has what its Roll needs: its targets or placed area, a chosen ability for a cast that takes
+ *  one, and the creatures its shaping names. */
 export function targetingReady(picking: TargetingSession): boolean {
   if (picking.action.choosesAbility && picking.ability === undefined) return false;
+  if (shapingUnchosen(picking)) return false;
   if (picking.mode === "template") return Boolean(picking.template?.placed);
   if (picking.mode === "none") return true;
   return picking.selected.length > 0;
@@ -298,7 +342,8 @@ export function resolveTargeting(
     damageType,
     skill,
     ability,
-    conditionId
+    conditionId,
+    shaping
   } = session;
   if (session.placeZoneId !== undefined) {
     if (!template?.placed) return;
@@ -337,6 +382,7 @@ export function resolveTargeting(
     ...(skill !== undefined ? { skill } : {}),
     ...(ability !== undefined ? { ability } : {}),
     ...(conditionId !== undefined ? { conditionId } : {}),
+    ...(shaping && shaping.length > 0 ? { shaping: shaping.map((entry) => ({ ...entry })) } : {}),
     commit,
     ...(revision !== undefined ? { expectedRevision: revision } : {})
   };
@@ -392,14 +438,15 @@ export function resolveActionDirect(
   override?: { reason: string },
   /** A spell readied to cast later, at a chosen slot level. */
   readied?: Readonly<{ slotLevel?: number }>,
-  /** A spell with nothing to aim, cast now at a chosen slot level. */
-  cast?: Readonly<{ slotLevel?: number }>
+  /** A spell with nothing to aim, cast now at a chosen slot level and shaped as its caster chose. */
+  cast?: Readonly<{ slotLevel?: number; shaping?: readonly CastShaping[] }>
 ) {
   const extra = readied
     ? { ready: true, ...(readied.slotLevel !== undefined ? { slotLevel: readied.slotLevel } : {}) }
-    : cast?.slotLevel !== undefined
-      ? { slotLevel: cast.slotLevel }
-      : {};
+    : {
+        ...(cast?.slotLevel !== undefined ? { slotLevel: cast.slotLevel } : {}),
+        ...(cast?.shaping && cast.shaping.length > 0 ? { shaping: cast.shaping.map((entry) => ({ ...entry })) } : {})
+      };
   void command("action:resolve", {
     actorId: attackerId,
     actionId,

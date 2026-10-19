@@ -442,7 +442,7 @@ export function shapingOffers(
         ...(reason !== undefined ? { reason } : {}),
         counted: rule.counted,
         ...(id === "careful-spell" ? { creatures: { count: carefulCount(definition) } } : {}),
-        ...(id === "sculpt-spells" ? { creatures: { count: 1, plusLevel: true as const } } : {}),
+        ...(id === "sculpt-spells" ? { creatures: { count: 1 + facts.castLevel, plusLevel: true as const } } : {}),
         ...(id === "heightened-spell" ? { creatures: { count: 1 } } : {}),
         ...(id === "transmuted-spell" && unfit === null ? { damageTypes: transmutedTypes(action) } : {})
       };

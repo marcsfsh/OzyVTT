@@ -218,8 +218,13 @@ export function turnOptions({
     const own = ownSummaries.get(action.id);
     if (!own) continue;
     const row = facts.rows.get(action.id);
-    // The damage the server rolls, where it differs (a lasting spell's later row at its cast level).
-    const summary = row && row.damage.length === own.damage.length ? { ...own, damage: row.damage } : own;
+    // The damage the server rolls, where it differs (a lasting spell's later row at its cast level), and the ways the
+    // caster may shape a spell's cast.
+    const summary = {
+      ...own,
+      ...(row && row.damage.length === own.damage.length ? { damage: row.damage } : {}),
+      ...(row?.shaping ? { shaping: row.shaping } : {})
+    };
     const option = build(summary, action);
     const later = action.id.match(LATER);
     const parent = later ? `spell-${later[1]}` : null;
