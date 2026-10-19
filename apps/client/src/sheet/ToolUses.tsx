@@ -18,6 +18,12 @@ type UseRow = Readonly<{
   bonus?: number;
 }>;
 
+/** The roll's name as the server writes it: the use and its item, or the use alone past 80 characters. */
+const rollName = (row: UseRow) => {
+  const both = `${row.label} (${row.itemName})`;
+  return (both.length <= 80 ? both : row.label).slice(0, 80);
+};
+
 /** Every Utilize use the character's tools and carried gear print, in one list. */
 function rowsOf(derived: Derived): UseRow[] {
   const tools = derived.tools.flatMap((tool) =>
@@ -75,7 +81,7 @@ export function ToolUses({
   const roll = (row: UseRow, bonusAction: boolean) =>
     void rolls.rollUse({
       ...row.target,
-      label: `${row.label} (${row.itemName})`,
+      label: rollName(row),
       ...(bonusAction ? { bonusAction: true } : {}),
       ...(row.forAnother && wearer !== actor.id ? { forActorId: wearer } : {})
     });

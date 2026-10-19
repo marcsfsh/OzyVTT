@@ -96,6 +96,12 @@ export function itemUseOf(
   return { use, itemName: record.name };
 }
 
+/** A roll's name holds 80 characters: the use and its item when both fit, else the use alone, cut whole. */
+export function useRollName(label: string, itemName: string): string {
+  const both = `${label} (${itemName})`;
+  return (both.length <= 80 ? both : label).slice(0, 80);
+}
+
 /** A tool's or gear's printed Utilize use, from the sheet: the record's DC and ability, never the caller's. */
 export function rollItemUse(
   state: GameState,
@@ -118,7 +124,7 @@ export function rollItemUse(
         ...(use.tool !== undefined ? { tool: use.tool } : {})
       },
       dc: use.dc,
-      label: `${use.label} (${itemName})`.slice(0, 80),
+      label: useRollName(use.label, itemName),
       visibility: input.visibility,
       ...(input.face !== undefined ? { face: input.face } : {}),
       ...(input.forcedMode !== undefined ? { forcedMode: input.forcedMode } : {}),

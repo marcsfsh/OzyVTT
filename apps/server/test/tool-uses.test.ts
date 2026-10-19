@@ -139,6 +139,12 @@ describe("a tool's printed Utilize uses", () => {
     });
   });
 
+  it("names a long use's roll by the use alone, so the name stays whole", () => {
+    const { state, deps } = table({ inventory: [catalogRow("calligraphers-supplies")] });
+    const result = rollItemUse(state, PLAYER, toolUse("calligraphers-supplies", 0), deps);
+    expect(result.outcome?.label).toBe("Write text with impressive flourishes that guard against forgery");
+  });
+
   it("refuses a use of a tool that isn't in the pack", () => {
     const { state, deps } = table();
     expect(() => rollItemUse(state, PLAYER, toolUse("thieves-tools", 0), deps)).toThrowError(
