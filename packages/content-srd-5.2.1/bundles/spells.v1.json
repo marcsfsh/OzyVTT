@@ -8993,7 +8993,8 @@
    "failureEffect": {
     "name": "Dominate Beast",
     "tags": [
-     "commanded"
+     "commanded",
+     "commander-reaction"
     ],
     "modifiers": []
    }
@@ -9098,7 +9099,8 @@
    "failureEffect": {
     "name": "Dominate Monster",
     "tags": [
-     "commanded"
+     "commanded",
+     "commander-reaction"
     ],
     "modifiers": []
    }
@@ -9193,7 +9195,8 @@
    "failureEffect": {
     "name": "Dominate Person",
     "tags": [
-     "commanded"
+     "commanded",
+     "commander-reaction"
     ],
     "modifiers": []
    }

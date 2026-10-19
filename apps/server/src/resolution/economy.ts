@@ -1,3 +1,4 @@
+import { reactionSpent, spendReaction } from "../commanded-reactions.js";
 import { formViolations } from "../transform/rules.js";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
@@ -1147,6 +1148,12 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
           ? `${attacker.name} has no reaction left to take the readied action with.`
           : `${attacker.name} has already used a reaction this round.`
       });
+    // Dominate Person: "You can command the target to take a Reaction but must take your own Reaction to do so."
+    else if (reactionSpent(state, attacker.id))
+      violations.push({
+        rule: "economy.reaction-used",
+        message: `${attacker.name}'s Reaction takes its commander's, which is spent this round.`
+      });
     return { ...unchanged, markReaction: true };
   }
   return unchanged;
@@ -1768,12 +1775,8 @@ export function commitEconomy({
       : null;
     state.combat = { ...state.combat, turn: { ...state.combat.turn, bonusActionInstance: bonusInstance } };
   }
-  if (plan.markReaction) {
-    state.combat = {
-      ...state.combat,
-      reactionsUsed: [...state.combat.reactionsUsed.filter((id) => id !== attacker.id), attacker.id]
-    };
-  }
+  // A dominated creature's Reaction takes its commander's too.
+  if (plan.markReaction) spendReaction(state, attacker.id);
   // Actions beyond the one (Action Surge, Haste) and the Magic actions taken, for the turn's own creature.
   if ((plan.extraAction !== null || plan.magicAction || plan.surge) && state.combat.turnActorId === attacker.id) {
     const before = state.combat.turn.extraActions;

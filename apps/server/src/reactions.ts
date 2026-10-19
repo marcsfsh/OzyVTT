@@ -1,3 +1,4 @@
+import { reactionSpenders, reactionSpent } from "./commanded-reactions.js";
 import type { ActionResolution, DamageApplication, GameState, PendingReaction } from "@vtt/domain";
 import type { RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition, DamageType } from "@vtt/schemas";
@@ -144,9 +145,11 @@ export function answerReaction(
   if (!pending) throw new CommandRejectedError("That reaction prompt was already answered or dismissed.");
   const reactor = adjustableActor(state, pending.actorId, scope);
   // An answer to a roll checks its own cost (an Improve Fate takes no Reaction); every other prompt is a Reaction.
-  if (use && pending.kind !== "roll-answer" && state.combat.reactionsUsed.includes(reactor.id)) {
+  if (use && pending.kind !== "roll-answer" && reactionSpent(state, reactor.id)) {
     throw new CommandRejectedError(
-      `${reactor.name} has already used a reaction this round. Decline instead, or free the reaction first.`
+      state.combat.reactionsUsed.includes(reactor.id)
+        ? `${reactor.name} has already used a reaction this round. Decline instead, or free the reaction first.`
+        : `${reactor.name}'s Reaction takes its commander's, which is spent this round. Decline instead.`
     );
   }
   // A creature at 0 HP can't take reactions (SRD Incapacitated / Unconscious).
@@ -173,8 +176,14 @@ export function answerReaction(
       state.combat = {
         ...state.combat,
         pendingReactions: state.combat.pendingReactions.filter((entry) => entry.id !== reactionId),
+        // A dominated creature's Reaction takes its commander's too.
         ...(markUsed
-          ? { reactionsUsed: [...state.combat.reactionsUsed.filter((id) => id !== reactor.id), reactor.id] }
+          ? {
+              reactionsUsed: [
+                ...state.combat.reactionsUsed.filter((id) => !reactionSpenders(state, reactor.id).includes(id)),
+                ...reactionSpenders(state, reactor.id)
+              ]
+            }
           : {})
       };
     }

@@ -219,9 +219,10 @@ const ROWS: Readonly<Record<string, SummonInput>> = {
  *  the caster's command while its condition lasts (the `commanded` tag, read by `summons.ts`). Planar Binding's bound
  *  creature serves the caster for the duration. */
 const COMMANDING_FAILURES: Readonly<Record<string, NonNullable<SpellEffect["failureEffect"]>>> = {
-  "dominate-beast": { name: "Dominate Beast", tags: ["commanded"], modifiers: [] },
-  "dominate-person": { name: "Dominate Person", tags: ["commanded"], modifiers: [] },
-  "dominate-monster": { name: "Dominate Monster", tags: ["commanded"], modifiers: [] },
+  // "You can command the target to take a Reaction but must take your own Reaction to do so."
+  "dominate-beast": { name: "Dominate Beast", tags: ["commanded", "commander-reaction"], modifiers: [] },
+  "dominate-person": { name: "Dominate Person", tags: ["commanded", "commander-reaction"], modifiers: [] },
+  "dominate-monster": { name: "Dominate Monster", tags: ["commanded", "commander-reaction"], modifiers: [] },
   "planar-binding": { name: "Bound by Planar Binding", tags: ["commanded"], modifiers: [] }
 };
 
