@@ -394,7 +394,7 @@ const changesForm = reference("Changing form is the GM's to run; the token keeps
 /** A trait the server reads by name for movement (movement-rules.ts). */
 const sharesSpace = (who: string) =>
   enforced(
-    `movement-rules.ts lets ${who} end a move in another creature's space. Fitting through a narrow gap is the GM's to allow.`
+    `movement-rules.ts lets ${who} end a move in another creature's space, and the map's drag preview (movePreview.ts) charges the same path. Fitting through a narrow gap is the GM's to allow.`
   );
 /** A trait that regains Hit Points from damage of one type, which the creature is also immune to. */
 const absorbs = (type: string) =>
@@ -469,7 +469,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "trait-turns.ts deals the Fire damage at the end of the bearer's turns to each creature in the Emanation, or to an azer's enemies there. A fire elemental's aura also sets them burning."
   ),
   "Fire Form": guided(
-    "movement-rules.ts lets the elemental end a move in a creature's space. The 1d10 Fire damage when it first enters a space on a turn is the GM's to deal."
+    "movement-rules.ts lets the elemental end a move in a creature's space, and the map's drag preview (movePreview.ts) charges the same path. The 1d10 Fire damage when it first enters a space on a turn is the GM's to deal."
   ),
   Flyby: enforced("movement-rules.ts opens no Opportunity Attack when it flies out of an enemy's reach."),
   Freeze: reference("The slower Speed after Cold damage is the GM's to apply."),
@@ -539,7 +539,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Sunlight Sensitivity": light,
   "Sunlight Weakness": light,
   Swarm: guided(
-    "movement-rules.ts and terrain.ts let the swarm and other creatures share a space. Refusing it Hit Points and Temporary Hit Points is the GM's."
+    "movement-rules.ts and terrain.ts let the swarm and other creatures share a space, and the map's drag preview (movePreview.ts) charges the same path. Refusing it Hit Points and Temporary Hit Points is the GM's."
   ),
   "Telepathic Bond": senses,
   Training: reference("The GM picks the skill and applies its Advantage."),

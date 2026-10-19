@@ -663,7 +663,12 @@ export const ActorMovementReplySchema = z.strictObject({
   /** Prone: it can only crawl, each foot costing an extra foot (two in Difficult Terrain). */
   crawling: z.boolean().optional(),
   /** It drags a creature it grapples that isn't Tiny or two sizes smaller, each foot costing an extra foot. */
-  dragging: z.boolean().optional()
+  dragging: z.boolean().optional(),
+  /** It may end a move in another creature's space (Air Form, a swarm), so no creature bars its way; a creature's
+   *  space still costs as Difficult Terrain. */
+  passesCreatures: z.boolean().optional(),
+  /** The swarms on the map the asker can see. Any creature may cross a swarm's space, as Difficult Terrain. */
+  swarmIds: z.array(z.uuid()).max(200).optional()
 });
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;

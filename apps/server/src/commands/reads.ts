@@ -31,6 +31,7 @@ import { partyViewerIds } from "../vision/audience.js";
 import { flatPolygon } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
 import { movementStatus } from "../movement-rules.js";
+import { spaceSharingFor } from "../space-sharing.js";
 import { previewScene } from "../scene-preview.js";
 import { nextLevelOf } from "../next-level.js";
 import { GameNotFoundError } from "./failures.js";
@@ -258,10 +259,17 @@ export const gameReads = [
       );
       if (!state.actors.some((candidate) => candidate.id === actorId))
         throw new GameNotFoundError("That combatant no longer exists.");
-      return movementStatus(state, actorId, {
-        resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
-        catalog: kit.equipmentCatalog()
-      });
+      const initiator = initiatorOf(principal);
+      // The preview charges what the server will: a creature that shares spaces passes others, and anyone may cross a
+      // swarm. A player hears only of swarms their characters can see.
+      const hidden = initiator.role === "gm" ? () => false : kit.hiddenFor(initiator, state);
+      return {
+        ...movementStatus(state, actorId, {
+          resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
+          catalog: kit.equipmentCatalog()
+        }),
+        ...spaceSharingFor(state, actorId, (definitionId) => kit.resolveDefinition(definitionId), hidden)
+      };
     }
   },
 
