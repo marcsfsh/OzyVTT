@@ -79,7 +79,7 @@ export function HeightControl({
             type="button"
             className="token-context-item"
             disabled={busy}
-            title="Puts the creature at this height without spending movement"
+            title={`Puts ${name} at this height without spending movement`}
             onClick={() => onSet(target, inTheAir && target > 0 ? (airborne ?? "fly") : null)}
           >
             Set height
@@ -91,7 +91,7 @@ export function HeightControl({
                 type="button"
                 className="token-context-item"
                 disabled={busy}
-                title="Rolls 1d6 Bludgeoning for every 10 feet, and the creature lands Prone if it takes any"
+                title={`Rolls 1d6 Bludgeoning for every 10 feet, and ${name} lands Prone if it takes any`}
                 onClick={() => onFall(intoWater)}
               >
                 Fall {altitudeFeet} ft
