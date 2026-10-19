@@ -301,7 +301,7 @@ export const RiderTriggerSchema = z
     z.object({ type: z.literal("by-effect-source") }).strict()
   ])
   .describe(
-    "When a rider applies. Twenty-nine named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
+    "When a rider applies. Thirty named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
   );
 export type RiderTrigger = z.infer<typeof RiderTriggerSchema>;
 export type RiderTriggerKind = "static-gate" | "dynamic-gate" | "moment" | "filter";
@@ -645,7 +645,7 @@ export const ModifierSchema = z
       })
       .strict()
       .describe(
-        'Extra typed damage, in one of the 13 SRD damage types. An attack\'s `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry a type. Two independent ways to say how much, and a rider may use either or both: `formula` is dice ("an extra 1d6 fire"), and `abilityModifier` adds the bearer\'s modifier in that ability as a flat number resolved at the roll ("add your Charisma modifier to the damage"): a printed wording that no authored constant can express, because the amount depends on the character. Agonizing Blast is `abilityModifier: "cha"` plus a `spell-id-is` gate. A rider with neither is refused at publish, so none is stored to silently add nothing, and so is one gated on a moment the damage roll never collects (only `on-hit`, `on-critical-hit` and `on-damage-roll` are). `doubleOnCritical` defaults true because a Critical Hit rolls the attack\'s other damage dice twice too (SRD 5.2.1 "Critical Hits": "If the attack involves other damage dice, such as from the Rogue\'s Sneak Attack feature, you also roll those dice twice"); set it false only where a rule says otherwise. An ability modifier is never doubled at all.'
+        'Extra typed damage, in one of the 13 SRD damage types. An attack\'s `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry a type. Two independent ways to say how much, and a rider may use either or both: `formula` is dice ("an extra 1d6 fire"), and `abilityModifier` adds the bearer\'s modifier in that ability as a flat number resolved at the roll ("add your Charisma modifier to the damage"): a printed wording that no authored constant can express, because the amount depends on the character. Agonizing Blast is `abilityModifier: "cha"` plus a `spell-id-is` gate. A rider with neither is refused at publish, so none is stored to silently add nothing, and so is one gated on a moment the damage roll never collects (only `on-hit`, `on-critical-hit`, `on-natural-20` and `on-damage-roll` are). `doubleOnCritical` defaults true because a Critical Hit rolls the attack\'s other damage dice twice too (SRD 5.2.1 "Critical Hits": "If the attack involves other damage dice, such as from the Rogue\'s Sneak Attack feature, you also roll those dice twice"); set it false only where a rule says otherwise. An ability modifier is never doubled at all.'
       ),
     /** Score a critical hit on this natural roll or higher (19-20 keen weapons). */
     z
@@ -1737,8 +1737,11 @@ export const OnHitRiderSchema = z
       .max(6)
       .optional()
       .describe(
-        "Effect tags the hit leaves, which the engine reads: no-healing, no-reactions, no-opportunity-attacks, speed-halved, until-own-attack (spent by the target's next attack roll), until-attacked (spent by the next attack roll against it)"
+        "Effect tags the hit leaves, which the engine reads: no-healing, no-reactions, no-bonus-actions, dazed (one of moving, an action or a Bonus Action on its turn), no-opportunity-attacks, speed-halved, until-own-attack (spent by the bearer's next attack roll), until-attacked (spent by the next attack roll against it)"
       ),
+    /** The effect lands on the attacker instead of the target (a pirate captain's Advantage on its next attack). Its
+     *  `until-source-turn-end` duration then means the end of this turn. */
+    self: z.literal(true).optional(),
     /** Modifiers the effect carries while it lasts: a Speed cut (a frost giant's Great Bow), Disadvantage on the
      *  target's next attack roll (an ettin's Morningstar, with the `until-own-attack` tag). */
     modifiers: EffectModifiersSchema.optional(),

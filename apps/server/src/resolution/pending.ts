@@ -147,7 +147,8 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
             ...(effects ? { effects: [...effects] } : {})
           })),
           // A roll that forwent its Advantage for Brutal Strike still offers its hit when it lands.
-          ...(ctx.forgoneAdvantageBy !== null ? { forgoneAdvantageBy: ctx.forgoneAdvantageBy } : {})
+          ...(ctx.forgoneAdvantageBy !== null ? { forgoneAdvantageBy: ctx.forgoneAdvantageBy } : {}),
+          ...(input.knockOut === true ? { knockOut: true as const } : {})
         },
         createdAt: Date.parse(deps.now())
       }

@@ -223,8 +223,8 @@ export function HitOfferChoices({
  * An attack previewed but not yet applied: Confirm resolves the hit for real (damage, riders, economy) with the die
  * shown, which the server holds (ADR-0012). The GM may force Advantage or Disadvantage and reroll freely; a player
  * rerolls only by spending Heroic Inspiration, and types the reroll's face when the shown die was typed. A hit that offers
- * a Push asks how far first, and a hit that can carry extras (Sneak Attack, a smite) offers them; Confirm sends those
- * choices.
+ * a Push asks how far first, and a hit that can carry extras (Sneak Attack, a smite) offers them, as a melee hit offers
+ * to knock its target out; Confirm sends those choices.
  */
 export function AttackPreview({
   attack,
@@ -234,6 +234,7 @@ export function AttackPreview({
   onFeedback,
   push,
   hitOffers = [],
+  knockOutOffered = false,
   resolve: resolveWith
 }: Readonly<{
   attack: Attack;
@@ -247,6 +248,8 @@ export function AttackPreview({
   push?: ActionResolution["push"];
   /** The extras this hit can carry; chosen ones ride the Confirm. */
   hitOffers?: readonly HitOffer[];
+  /** A melee hit may knock its target out instead of dropping it (SRD); the attacker chooses it before Confirm. */
+  knockOutOffered?: boolean;
   resolve: (options: ResolveOptions) => void;
 }>) {
   // The shown die was typed from a physical die, so a player's reroll is typed too.
@@ -255,6 +258,7 @@ export function AttackPreview({
   const [pushPick, setPushPick] = useState<number | null>(null);
   const pushFeet = push ? Math.min(pushPick ?? push.maxFeet, push.maxFeet) : undefined;
   const [extras, setExtras] = useState<HitOptionChoice[]>([]);
+  const [knockOut, setKnockOut] = useState(false);
   // The GM's forced mode, sent with every later look at the held die so Confirm reads it the same way.
   const [forced, setForced] = useState<DieMode | undefined>(undefined);
   // A reroll can change what is offered (a miss offers nothing), so only choices still offered are sent.
@@ -265,13 +269,30 @@ export function AttackPreview({
       ...(forced ? { rollMode: forced } : {}),
       // Only a confirming call carries the push and extras; previews ignore them.
       ...(options.commit && pushFeet !== undefined ? { pushFeet } : {}),
-      ...(options.commit && hitOptions.length > 0 ? { hitOptions } : {})
+      ...(options.commit && hitOptions.length > 0 ? { hitOptions } : {}),
+      ...(options.commit && knockOutOffered && knockOut ? { knockOut: true } : {})
     });
   return (
     <div className="action-preview">
       {push && pushFeet !== undefined && <PushChoice push={push} value={pushFeet} busy={busy} onPick={setPushPick} />}
       {hitOffers.length > 0 && (
         <HitOfferChoices offers={hitOffers} chosen={hitOptions} busy={busy} onChange={setExtras} />
+      )}
+      {knockOutOffered && (
+        <div className="hit-offers" role="group" aria-label="If the hit drops the target to 0">
+          <div className="hit-offer">
+            <button
+              type="button"
+              className={`save-die-mode${knockOut ? " active" : ""}`}
+              aria-pressed={knockOut}
+              disabled={busy}
+              onClick={() => setKnockOut(!knockOut)}
+            >
+              Knock out
+            </button>
+            <small className="hit-offer-note">At 0 Hit Points it is left at 1 Hit Point and Unconscious instead.</small>
+          </div>
+        </div>
       )}
       <span className="save-prompt-confirm">
         {viewer === "gm" && (

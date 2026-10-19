@@ -138,6 +138,8 @@ export function itemAction(
     // A Potion of Healing's 2d4 + 2.
     ...(declared.healing ? { healing: { ...declared.healing } } : {}),
     ...(uses ? { uses } : {}),
+    // Charges one use spends (a Staff of Striking's 2 or 3).
+    ...(declared.useCost !== undefined ? { useCost: declared.useCost } : {}),
     // A thrown flask uses one attack of the Attack action; the action's other attacks stay open.
     ...(declared.replacesAttack ? { replacesAttack: true } : {}),
     // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).

@@ -148,3 +148,17 @@ describe("the extras a previewed hit offers", () => {
     });
   });
 });
+
+describe("knocking a creature out with a melee hit", () => {
+  it("sends the knock-out with Confirm once the attacker turns it on", () => {
+    const resolve = vi.fn<(options: ResolveOptions) => void>();
+    render(
+      <AttackPreview attack={HIT} busy={false} viewer="gm" onFeedback={() => {}} knockOutOffered resolve={resolve} />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Confirm hit" }));
+    expect(resolve).toHaveBeenLastCalledWith({ commit: true });
+    fireEvent.click(screen.getByRole("button", { name: "Knock out" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm hit" }));
+    expect(resolve).toHaveBeenLastCalledWith({ commit: true, knockOut: true });
+  });
+});

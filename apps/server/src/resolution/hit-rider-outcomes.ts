@@ -1,4 +1,5 @@
 import type { PendingSave } from "@vtt/domain";
+import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ForcedPush, HitOutcome } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
@@ -6,7 +7,7 @@ import { addEffect, effectDurationOf, endEffect, makeEffect, type EffectNarratio
 import { deriveEquipment } from "../equipment-derivation.js";
 import { createPendingSaves } from "../saving-throws.js";
 import { currentSpeedFeet } from "../speed.js";
-import { tableLineOf, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
+import { recordRoll, tableLineOf, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 import { failureEffectFor, isMagicalAction, successEffectFor } from "./pending.js";
 
 /**
@@ -78,6 +79,13 @@ export function applyHitOutcome(
   );
   for (const event of gained) ctx.tableNarration.push(tableLineOf(ctx, event));
   ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds: linked });
+}
+
+/** Rolls a rider's save dice as they stand: a save's damage is no hit's, so a Critical Hit doesn't double it. */
+export function rollPlain(ctx: ResolveContext, formula: string, type: string, source: string) {
+  const rolled = resolveDice(parseDiceFormula(formula), ctx.deps.random);
+  recordRoll(ctx, rolled, "damage", source);
+  return { amount: Math.max(0, rolled.total), type };
 }
 
 /** A save a rider opens on its target. */

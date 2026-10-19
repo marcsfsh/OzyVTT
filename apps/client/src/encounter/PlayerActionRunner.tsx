@@ -482,6 +482,7 @@ export function PlayerActionRunner({
               onFeedback={onFeedback}
               push={result.push}
               {...(result.hitOffers ? { hitOffers: result.hitOffers } : {})}
+              knockOutOffered={result.knockOut === "offered"}
               resolve={(options) => resolveTargeting(revision, onOutcome, options)}
             />
           )}

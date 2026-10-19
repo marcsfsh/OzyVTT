@@ -18,7 +18,7 @@ import { recordRoll, sizeAtMost, tableLineOf, type DefinitionAction, type Resolv
 import { beginConcentration } from "./concentration.js";
 import { criticalExpression } from "./damage.js";
 import { commitEconomy, evaluateActionEconomy, planEconomy, spendSlot } from "./economy.js";
-import { applyHitOutcome, forceMove, grantHalfSpeedMove, openRiderSave } from "./hit-rider-outcomes.js";
+import { applyHitOutcome, forceMove, grantHalfSpeedMove, openRiderSave, rollPlain } from "./hit-rider-outcomes.js";
 import { hitRiderOf, type HitRider } from "./hit-riders.js";
 import { dealsDamage } from "./on-hit.js";
 import { spendHitPointDie } from "./hit-point-die.js";
@@ -384,6 +384,17 @@ export function rollHitOptions(ctx: ResolveContext): void {
   };
   // "And deal damage to it" is judged on the hit as it stands, before any extra joins it.
   const hitDealsDamage = dealsDamage(ctx);
+  // Riders on one pool are alternatives (a Staff of Striking's 1, 2 or 3 charges), so one hit takes one of them.
+  const byPool = new Map<string, string>();
+  for (const choice of chosen) {
+    const action = ctx.siblings.find((candidate) => candidate.id === choice.id);
+    const pool = action?.uses?.pool;
+    if (!action || !pool) continue;
+    const other = byPool.get(pool);
+    if (other !== undefined)
+      refuse(ctx, `${other} and ${action.name} spend the same uses, so a hit takes one of them.`);
+    byPool.set(pool, action.name);
+  }
   for (const choice of chosen) {
     if (choice.id === "charge") {
       rollCharge(ctx, roll);
@@ -490,13 +501,6 @@ function riderEconomy(
     ctx.siblings,
     true
   );
-}
-
-/** Rolls a rider's save dice as they stand: a save's damage is no hit's, so a Critical Hit doesn't double it. */
-function rollPlain(ctx: ResolveContext, formula: string, type: string, source: string) {
-  const rolled = resolveDice(parseDiceFormula(formula), ctx.deps.random);
-  recordRoll(ctx, rolled, "damage", source);
-  return { amount: Math.max(0, rolled.total), type };
 }
 
 /** A monster's charge: its dice join the hit's, and what it imposes lands. */

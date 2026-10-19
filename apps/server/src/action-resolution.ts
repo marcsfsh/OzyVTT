@@ -63,6 +63,7 @@ import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
 import { holdReadiedSpell } from "./resolution/ready.js";
+import { checkKnockOut, knockOutOffered, knocksOut } from "./resolution/knock-out.js";
 import { healLimit } from "./loose-healing.js";
 import { passiveOf, unavailableReason } from "./availability-reasons.js";
 
@@ -102,6 +103,7 @@ export function resolveDefinitionAction(
     return { ...resolutionOf(ctx), save: null };
   }
   rollAttack(ctx);
+  checkKnockOut(ctx);
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
   if (ctx.attack !== null && input.commit === false) return previewOf(ctx);
@@ -196,7 +198,8 @@ function previewOf(ctx: ResolveContext): ActionResolution {
     overridden: ctx.overridden,
     push: offeredPush(ctx),
     preview: true,
-    ...withOffers(hitOffersOf(ctx))
+    ...withOffers(hitOffersOf(ctx)),
+    ...(knockOutOffered(ctx) ? { knockOut: "offered" as const } : {})
   };
 }
 
@@ -258,7 +261,8 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
     ...(ctx.effectsEnded.length > 0 ? { effectsEnded: ctx.effectsEnded.map((ended) => toldEnded(ctx, ended)) } : {}),
     ...(ctx.healing ? { healing: ctx.healing } : {}),
     ...(ctx.opens ? { opens: ctx.opens } : {}),
-    ...(damageTargets ? { damageTargets } : {})
+    ...(damageTargets ? { damageTargets } : {}),
+    ...(knocksOut(ctx) ? { knockOut: "chosen" as const } : {})
   };
 }
 

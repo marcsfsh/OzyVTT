@@ -273,11 +273,19 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Not modeled: ignoring Slashing resistance and the natural-20 decapitation (30 damage exceeds the range).
+  // The beheading on a rolled 20 is the GM's, said with the hit. Not modeled: ignoring Resistance to Slashing damage.
   "vorpal-sword": {
     modifiers: [
       { type: "attack-bonus", amount: 3 },
       { type: "damage-bonus", amount: 3 }
+    ],
+    onHit: [
+      {
+        conditions: [],
+        naturalTwenty: true,
+        reminder:
+          "On a rolled 20 the sword cuts off one of the creature's heads, and it dies if it can't survive without it. A creature with Immunity to Slashing damage, no head or one too big for the blade takes an extra 30 Slashing damage instead, and Legendary Resistance can trade the head for that damage."
+      }
     ]
   },
 
@@ -314,17 +322,42 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The armed-then-discharged poison coating needs item state and is not modeled.
+  // The coat is a Bonus Action once per dawn, an effect on the bearer that the dagger's next hit spends on its save.
   "dagger-of-venom": {
     modifiers: [
       { type: "attack-bonus", amount: 1 },
       { type: "damage-bonus", amount: 1 }
+    ],
+    actions: [
+      {
+        id: "coat-blade",
+        name: "Coat the Blade",
+        activation: "bonus-action",
+        description:
+          "Coat the blade with poison. It remains for 1 minute or until an attack using this weapon hits a creature, which must succeed on a DC 15 Constitution saving throw or take 2d10 Poison damage and have the Poisoned condition for 1 minute.",
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        grants: { name: "Dagger of Venom: coated", tags: ["venom-coat"], duration: { type: "rounds", rounds: 10 } }
+      }
+    ],
+    onHit: [
+      {
+        conditions: [{ id: "poisoned" }],
+        duration: { type: "rounds", rounds: 10 },
+        spendsEffectTag: "venom-coat",
+        save: { ability: "con", dc: 15, failureDamage: [{ formula: "2d10", type: "poison" }] }
+      }
     ]
   },
 
-  // The extra 2d6 of the weapon's type against a Giant; the Giant's save against Prone is not modeled.
+  // The extra 2d6 of the weapon's type against a Giant, and the Giant's DC 15 Strength save against Prone.
   "giant-slayer": {
-    modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }, versusTypes("2d6", ["giant"])]
+    modifiers: [
+      { type: "attack-bonus", amount: 1 },
+      { type: "damage-bonus", amount: 1 },
+      versusTypes("2d6", ["giant"])
+    ],
+    onHit: [{ conditions: [{ id: "prone" }], creatureTypes: ["giant"], save: { ability: "str", dc: 15 } }]
   },
 
   // "The weapon deals an extra 3d6 damage of the weapon's type if the target is a Dragon."
@@ -336,8 +369,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // +3 against a Construct, and 7 Bludgeoning more on a Critical Hit (14 against a Construct); a mace's damage is
-  // Bludgeoning, so a flat bonus carries it. Destroying a Construct at 25 Hit Points or fewer is not modeled.
+  // +3 against a Construct, and 7 Bludgeoning more on a rolled 20 (14 against a Construct), never on a crit from a wider
+  // range; a mace's damage is Bludgeoning, so a flat bonus carries it. Destroying a Construct is the GM's, said then.
   "mace-of-smiting": {
     modifiers: [
       { type: "attack-bonus", amount: 1 },
@@ -352,11 +385,19 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         amount: 2,
         when: [{ type: "on-hit" }, { type: "versus-creature-type", creatureTypes: ["construct"] }]
       },
-      { type: "damage-bonus", amount: 7, when: [{ type: "on-critical-hit" }] },
+      { type: "damage-bonus", amount: 7, when: [{ type: "on-natural-20" }] },
       {
         type: "damage-bonus",
         amount: 7,
-        when: [{ type: "on-critical-hit" }, { type: "versus-creature-type", creatureTypes: ["construct"] }]
+        when: [{ type: "on-natural-20" }, { type: "versus-creature-type", creatureTypes: ["construct"] }]
+      }
+    ],
+    onHit: [
+      {
+        conditions: [],
+        naturalTwenty: true,
+        creatureTypes: ["construct"],
+        reminder: "A Construct with 25 Hit Points or fewer after this damage is destroyed."
       }
     ]
   },
@@ -391,15 +432,39 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Authored always on: the command-word lit state is not modeled, and a drawn Flame Tongue in combat is lit.
   "flame-tongue": { modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "fire", doubleOnCritical: true }] },
 
-  // The "can't regain Hit Points" save is not expressible.
+  // The DC 15 Constitution save against healing, repeated at the end of each of the target's turns. Its hour outlasts
+  // any fight, so the effect lasts until the save ends it.
   "sword-of-wounding": {
-    modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "necrotic", doubleOnCritical: true }]
+    modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "necrotic", doubleOnCritical: true }],
+    onHit: [
+      { conditions: [], name: "Wounded", tags: ["no-healing"], save: { ability: "con", dc: 15, repeatSave: true } }
+    ]
+  },
+
+  // An extra 14 Slashing damage (two 7s: one flat bonus stops at 10) and a level of Exhaustion on a rolled 20. Not
+  // modeled: maximized damage against an object.
+  "sword-of-sharpness": {
+    modifiers: [
+      { type: "damage-bonus", amount: 7, when: [{ type: "on-natural-20" }] },
+      { type: "damage-bonus", amount: 7, when: [{ type: "on-natural-20" }] }
+    ],
+    onHit: [{ conditions: [{ id: "exhaustion", level: 1 }], naturalTwenty: true }]
+  },
+
+  // A Longsword with Finesse that deals Radiant damage (its weapon block), +2, and 1d8 Radiant more against an Undead.
+  // Not modeled: the Bonus Action that makes the blade appear, and its sunlight.
+  "sun-blade": {
+    modifiers: [
+      { type: "attack-bonus", amount: 2 },
+      { type: "damage-bonus", amount: 2 },
+      versusTypes("1d8", ["undead"], "radiant")
+    ]
   },
 
   // Prose-only items:
   //   `javelin-of-lightning`: Lightning where the javelin deals Piercing, and a Line area.
-  //   `sun-blade`, `energy-bow`: deal Radiant/Force where the weapon's own type would go; unbound until
-  //       weapon-swing overrides exist. Energy Bow's arrow options are not expressible either.
+  //   `energy-bow`: deals Force where the weapon's own type would go; unbound until weapon-swing overrides exist.
+  //       Its arrow options are not expressible either.
   //   `thunderous-greatclub` - "your Strength is 20" is `ability-score`, refused on items; areas.
   //   `adamantine-armor` - no rider suppresses an incoming critical hit.
   //   `mithral-armor` - no rider removes a base armor's stealth disadvantage or Strength requirement.
@@ -409,7 +474,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //   `mace-of-terror` - an area Frightened effect; item actions have no radius.
   //   `ammunition-of-slaying` - entirely gated on creature type.
   //   `oathbow` - everything is gated on a player-declared sworn enemy.
-  //   `sword-of-life-stealing`, `sword-of-sharpness` - crit damage of 15 and 14 exceeds the range.
+  //   `sword-of-life-stealing` - its 15 Necrotic on a rolled 20 also heals, and Constructs and Undead are spared.
 
   // ==== Wands, staffs, rods, rings and the spell scroll ===========================================
   //
@@ -418,8 +483,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //   - "Regains 1d6 + 1 expended charges daily at dawn" is `charges.regain`, rolled on a Long Rest, and "if you
   //     expend the last charge, roll 1d20" is `charges.lastChargeRoll`. Charges count per carried copy.
   //   - Use pools are capped at 20.
-  //   - Staffs and rods have no weapon block, so "+N to attack and damage rolls made with it" would be
-  //     bearer-scoped (every weapon) or inert; it is not authored.
+  //   - A staff wielded as a Quarterstaff and the Rod of Lordly Might carry their base's weapon block
+  //     (`build-magic-items.ts`), so "+N to attack and damage rolls made with it" is scoped to them, and a hit property
+  //     is an action that rides the item's own melee hits (`ridesHit: melee-this-weapon`).
   //   - An item action's to-hit is ability-derived; a printed flat attack bonus cannot be said.
   //   - `castAction` takes a cast's damage and attack from the spell record's `damage`/`attackRoll`
   //     columns, which describe the spell's text as a whole: healing spells become Force
@@ -569,7 +635,66 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `rod-of-lordly-might` - no weapon block, and its buttons turn one record into several weapons.
+  // A +3 Mace, Drain Life and Paralyze on its melee hits, and Terrify. Not modeled: the buttons that turn it into
+  // other weapons and tools (one record, one weapon block), and Drain Life's healing, said with the hit.
+  "rod-of-lordly-might": {
+    modifiers: [
+      { type: "attack-bonus", amount: 3 },
+      { type: "damage-bonus", amount: 3 }
+    ],
+    actions: [
+      {
+        id: "drain-life",
+        name: "Drain Life",
+        activation: "other",
+        description:
+          "When you hit a creature with a melee attack using the rod, force it to make a DC 17 Constitution saving throw. On a failed save, it takes an extra 4d6 Necrotic damage, and you regain Hit Points equal to half that damage.",
+        save: { ability: "con", dc: 17, successDamage: "none", failureConditions: [] },
+        damage: [{ formula: "4d6", type: "necrotic" }],
+        uses: { limit: 1, per: "long-rest" },
+        ridesHit: {
+          rides: "melee-this-weapon",
+          reminder: "On a failed save you regain Hit Points equal to half the Necrotic damage it takes."
+        }
+      },
+      {
+        id: "paralyze",
+        name: "Paralyze",
+        activation: "other",
+        description:
+          "When you hit a creature with a melee attack using the rod, force it to make a DC 17 Constitution saving throw. On a failed save, it has the Paralyzed condition for 1 minute, repeating the save at the end of each of its turns.",
+        save: {
+          ability: "con",
+          dc: 17,
+          successDamage: "none",
+          failureConditions: ["paralyzed"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          repeatSave: true
+        },
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        ridesHit: { rides: "melee-this-weapon" }
+      },
+      {
+        id: "terrify",
+        name: "Terrify",
+        activation: "action",
+        description:
+          "Each creature you can see within 30 feet makes a DC 17 Wisdom saving throw. On a failed save, it has the Frightened condition for 1 minute, repeating the save at the end of each of its turns.",
+        save: {
+          ability: "wis",
+          dc: 17,
+          successDamage: "none",
+          failureConditions: ["frightened"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          repeatSave: true
+        },
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        targets: { rangeFeet: 30, seen: true, who: "others" }
+      }
+    ]
+  },
 
   // `rod-of-resurrection` - `heal` has no healing in the spell model; Resurrection costs 5 charges.
 
@@ -627,19 +752,38 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // is multi-charge.
 
   /**
-   * The AC, save and spell attack bonuses. Not authored: Magic Missile and Ray of Enfeeblement (wrong cast
-   * effects), the +2 Quarterstaff (no weapon block), the multi-charge spells, and Retributive Strike (damage from
-   * live charge count).
+   * The +2 Quarterstaff and the AC, save and spell attack bonuses. Not authored: Magic Missile and Ray of
+   * Enfeeblement (wrong cast effects), the multi-charge spells, and Retributive Strike (damage from live charge count).
    */
   "staff-of-power": {
     modifiers: [
+      { type: "attack-bonus", amount: 2 },
+      { type: "damage-bonus", amount: 2 },
       { type: "armor-class", amount: 2 },
       { type: "save-bonus", amount: 2 },
       { type: "spell-attack-bonus", amount: 2 }
     ]
   },
 
-  // `staff-of-striking` - the +3 and the per-charge 1d6 both need a weapon block (and multi-charge).
+  // A +3 Quarterstaff whose melee hit can spend 1, 2 or 3 charges for 1d6 Force each: one rider per count on the one
+  // pool, of which a hit takes one.
+  "staff-of-striking": {
+    charges: { regain: "1d6 + 4", lastChargeRoll: true },
+    modifiers: [
+      { type: "attack-bonus", amount: 3 },
+      { type: "damage-bonus", amount: 3 }
+    ],
+    actions: [1, 2, 3].map((count) => ({
+      id: `striking-${count}`,
+      name: `Striking (${count} charge${count === 1 ? "" : "s"})`,
+      activation: "other" as const,
+      description: `When you hit with a melee attack using the staff, expend ${count} charge${count === 1 ? "" : "s"}: the target takes an extra ${count}d6 Force damage.`,
+      damage: [{ formula: `${count}d6`, type: "force" }],
+      uses: { limit: 10, per: "long-rest" as const, pool: "staff-of-striking-charges" },
+      ...(count > 1 ? { useCost: count } : {}),
+      ridesHit: { rides: "melee-this-weapon" as const }
+    }))
+  },
 
   // Insect Cloud's counter; the Heavily Obscured area is a GM ruling. Giant Insect and Insect Plague are multi-charge.
   "staff-of-swarming-insects": {
@@ -658,21 +802,29 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   /**
-   * The four zero-charge casts and the +2 to spell attack rolls; 50 charges exceed the pool cap. Not authored:
-   * Protection from Evil and Good (bogus attack roll), the +2 Quarterstaff, advantage on saves against spells, the
+   * The +2 Quarterstaff, the four zero-charge casts and the +2 to spell attack rolls; 50 charges exceed the pool cap.
+   * Not authored: Protection from Evil and Good (bogus attack roll), advantage on saves against spells, the
    * multi-charge rows, Spell Absorption and Retributive Strike.
    */
   "staff-of-the-magi": {
-    modifiers: [{ type: "spell-attack-bonus", amount: 2 }],
+    modifiers: [
+      { type: "attack-bonus", amount: 2 },
+      { type: "damage-bonus", amount: 2 },
+      { type: "spell-attack-bonus", amount: 2 }
+    ],
     casts: [{ spellId: "arcane-lock" }, { spellId: "detect-magic" }, { spellId: "enlargereduce" }, { spellId: "light" }]
   },
 
   // `staff-of-the-python` - summoning a controlled creature is not expressible.
 
-  // The three one-charge properties on the 6-charge pool and the +2 to spell attack rolls. Not authored: the
-  // +2 Quarterstaff, the multi-charge spells.
+  // The +2 Quarterstaff, the three one-charge properties on the 6-charge pool and the +2 to spell attack rolls. Not
+  // authored: the multi-charge spells.
   "staff-of-the-woodlands": {
-    modifiers: [{ type: "spell-attack-bonus", amount: 2 }],
+    modifiers: [
+      { type: "attack-bonus", amount: 2 },
+      { type: "damage-bonus", amount: 2 },
+      { type: "spell-attack-bonus", amount: 2 }
+    ],
     charges: { regain: "1d6", lastChargeRoll: true },
     casts: [
       { spellId: "animal-friendship", uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" } },
@@ -691,11 +843,67 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   /**
-   * The two standalone properties, each with its own once-per-dawn counter. The on-hit properties and the
-   * +2 Quarterstaff need a weapon block.
+   * The +2 Quarterstaff and its five properties, each with its own once-per-dawn counter: Lightning and Thunder ride a
+   * melee hit, Thunder and Lightning does both as a Bonus Action after one, and the other two are actions.
    */
   "staff-of-thunder-and-lightning": {
+    modifiers: [
+      { type: "attack-bonus", amount: 2 },
+      { type: "damage-bonus", amount: 2 }
+    ],
     actions: [
+      {
+        id: "lightning",
+        name: "Lightning",
+        activation: "other",
+        description:
+          "When you hit with a melee attack using the staff, the target takes an extra 2d6 Lightning damage.",
+        damage: [{ formula: "2d6", type: "lightning" }],
+        uses: { limit: 1, per: "long-rest" },
+        ridesHit: { rides: "melee-this-weapon" }
+      },
+      {
+        id: "thunder",
+        name: "Thunder",
+        activation: "other",
+        description:
+          "When you hit with a melee attack using the staff, it emits a crack of thunder audible out to 300 feet. The target must succeed on a DC 17 Constitution saving throw or have the Stunned condition until the end of your next turn.",
+        save: {
+          ability: "con",
+          dc: 17,
+          successDamage: "none",
+          failureConditions: ["stunned"],
+          failureDuration: { type: "until-source-turn-end" }
+        },
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        ridesHit: { rides: "melee-this-weapon" }
+      },
+      {
+        id: "thunder-and-lightning",
+        name: "Thunder and Lightning",
+        activation: "bonus-action",
+        description:
+          "Immediately after you hit with a melee attack using the staff, take a Bonus Action to use Lightning and Thunder at once, which spends neither of their daily uses.",
+        damage: [{ formula: "2d6", type: "lightning" }],
+        uses: { limit: 1, per: "long-rest" },
+        ridesHit: {
+          rides: "melee-this-weapon",
+          saveDc: 17,
+          effectRequired: true,
+          effects: [
+            {
+              id: "thunder",
+              name: "Thunder",
+              save: {
+                ability: "con",
+                failureConditions: ["stunned"],
+                failureDuration: { type: "until-source-turn-end" }
+              }
+            }
+          ]
+        }
+      },
       {
         id: "lightning-strike",
         name: "Lightning Strike",
@@ -726,7 +934,53 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `staff-of-withering` - the on-hit 2d10 needs a weapon block (bearer-scoped it would hit every weapon).
+  // A Quarterstaff whose hit can spend a charge for 2d10 Necrotic and a DC 15 Constitution save. The failure's hour of
+  // Disadvantage on Strength and Constitution checks and saves outlasts a fight, so it lasts until the GM ends it.
+  "staff-of-withering": {
+    charges: { regain: "1d3" },
+    actions: [
+      {
+        id: "withering",
+        name: "Withering",
+        activation: "other",
+        description:
+          "On a hit with the staff, expend 1 charge to deal an extra 2d10 Necrotic damage to the target and force it to make a DC 15 Constitution saving throw. On a failed save, the target has Disadvantage for 1 hour on any ability check or saving throw that uses Strength or Constitution.",
+        damage: [{ formula: "2d10", type: "necrotic" }],
+        uses: { limit: 3, per: "long-rest", pool: "staff-of-withering-charges" },
+        ridesHit: {
+          rides: "this-weapon",
+          saveDc: 15,
+          effectRequired: true,
+          effects: [
+            {
+              id: "withering",
+              name: "Withering",
+              save: {
+                ability: "con",
+                failureEffect: {
+                  name: "Withered",
+                  modifiers: [
+                    {
+                      type: "roll-mode",
+                      roll: "check",
+                      mode: "disadvantage",
+                      when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["str", "con"] }]
+                    },
+                    {
+                      type: "roll-mode",
+                      roll: "save",
+                      mode: "disadvantage",
+                      when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["str", "con"] }]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
 
   // ---- Wands -----------------------------------------------------------------------------------
 

@@ -1,10 +1,11 @@
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
-import { addEffect, effectDurationOf, makeEffect, type EffectNarration } from "../effects.js";
+import { addEffect, effectDurationOf, endEffect, makeEffect, type EffectNarration } from "../effects.js";
 import { previewDamage } from "../hit-points.js";
 import { masteryHitEffects } from "../weapon-mastery.js";
-import { sizeAtMost, tableLineOf, type ResolveContext } from "./context.js";
+import { endedEffect, sizeAtMost, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
 import { damagePartsOf } from "./damage.js";
+import { forceMove, openRiderSave, rollPlain } from "./hit-rider-outcomes.js";
 
 /** Whether this hit deals its target any damage after the target's defences: what Slow and Vex need. */
 export function dealsDamage(ctx: ResolveContext): boolean {
@@ -38,7 +39,9 @@ export function applyOnHitEffects(ctx: ResolveContext): void {
 /** Declared on-hit riders apply as one source-linked effect each (ADR-0020 condition carve-out); a rider
  *  with a size limit skips a target that is too large. A grapple's effect carries its escape DC and range and ends
  *  with its grappler; a timed rider its printed duration. Prone and Exhaustion stand alone: Prone ends by standing
- *  up, and Exhaustion adds a level each time it lands. */
+ *  up, and Exhaustion adds a level each time it lands. A rider can also pull the target, open a save whose failure
+ *  leaves the effect (Giant Slayer, a Sword of Wounding), fire only on a rolled 20 or against some creature types, and
+ *  spend a coat the bearer put on the weapon (a Dagger of Venom). */
 function applyDeclaredRiders(ctx: ResolveContext): void {
   const { state, action, attacker, attack, targets, input, deps, warnings } = ctx;
   if (!action.onHit || attack === null || (attack.outcome !== "crit" && attack.outcome !== "hit")) return;
@@ -48,10 +51,21 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
     ...(deps.catalog ? { catalog: deps.catalog } : {})
   };
   action.onHit.forEach((rider, index) => {
+    // "When you roll a 20": the die itself, so a wider crit range doesn't fire it.
+    if (rider.naturalTwenty && attack.naturalRoll !== 20) return;
+    const creatureType = ctx.riderFilters.targetCreatureType;
+    if (rider.creatureTypes && (creatureType === undefined || !rider.creatureTypes.includes(creatureType))) return;
     if (rider.maxTargetSize && !sizeAtMost(target.size, rider.maxTargetSize)) {
       warnings.push(
         `${target.name} is too large for ${action.name}'s ${rider.name ?? rider.conditions.map((condition) => conditionLabel(condition.id)).join("/")} rider.`
       );
+      return;
+    }
+    if (rider.spendsEffectTag && !spendCoat(ctx, rider.spendsEffectTag)) return;
+    if (rider.reminder) warnings.push(`${action.name}: ${rider.reminder}`);
+    if (rider.pull) forceMove(ctx, target, action.name, rider.pull, true);
+    if (rider.save) {
+      openOnHitSave(ctx, rider, index);
       return;
     }
     const bare = rider.conditions.filter((condition) => condition.id === "prone" || condition.id === "exhaustion");
@@ -72,7 +86,9 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
     const conditionIds = rider.conditions
       .map((condition) => condition.id)
       .filter((id) => id !== "prone" && id !== "exhaustion");
-    if (conditionIds.length === 0 && !rider.ongoingDamage) return;
+    const tags = rider.tags ?? [];
+    const modifiers = rider.modifiers ?? [];
+    if (conditionIds.length === 0 && !rider.ongoingDamage && tags.length === 0 && modifiers.length === 0) return;
     // "The rug can give it the Grappled condition ... instead of dealing damage": the hit's damage goes.
     if (rider.insteadOfDamage) {
       ctx.damage.splice(0);
@@ -81,20 +97,28 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
     }
     const grapple = conditionIds.includes("grappled");
     const gained: EffectNarration[] = [];
+    const label = rider.name ?? (conditionIds[0] ? conditionLabel(conditionIds[0]) : action.name);
+    // A rider on the attacker itself lasts to the end of this turn when it says the source's turn end.
+    const bearer = rider.self ? attacker : target;
+    const duration =
+      rider.self && rider.duration?.type === "until-source-turn-end"
+        ? { type: "until-source-turn-end" as const, skipsCurrentTurn: false }
+        : effectDurationOf(state, rider.duration, bearer.id, attacker.id);
     const effect = addEffect(
       state,
-      target.id,
+      bearer.id,
       makeEffect({
-        id: `${input.commandId}:hit:${target.id}:${index}`,
-        name: `${rider.name ?? conditionLabel(conditionIds[0]!)} by ${attacker.name} (${action.name})`,
-        tags: grapple ? ["grapple"] : [],
+        id: `${input.commandId}:hit:${bearer.id}:${index}`,
+        name: rider.self ? `${label} (${action.name})` : `${label} by ${attacker.name} (${action.name})`,
+        tags: [...(grapple ? ["grapple"] : []), ...tags],
         sourceActorId: attacker.id,
         sourceName: attacker.name,
         sourceActionId: `${action.id}:${index}`,
         startedRound: state.combat.round,
-        duration: effectDurationOf(state, rider.duration, target.id, attacker.id),
+        duration,
         endsWhenSourceDefeated: grapple,
         linkedConditionIds: conditionIds,
+        modifiers: [...modifiers],
         escapeDc: rider.escapeDc ?? null,
         ...(grapple ? { rangeFeet: action.attack?.reachFeet ?? 5 } : {}),
         // A stirge attached, a rug smothering: what it deals each turn while it holds on, and it lets go as it dies.
@@ -104,6 +128,47 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
       deps
     );
     for (const event of gained) ctx.tableNarration.push(tableLineOf(ctx, event));
-    ctx.effectsApplied.push({ targetId: target.id, targetName: target.name, name: effect.name, conditionIds });
+    ctx.effectsApplied.push({ targetId: bearer.id, targetName: bearer.name, name: effect.name, conditionIds });
   });
+}
+
+/** Ends the coat on the attacker that this hit spends (a Dagger of Venom's poison). False when none is on. */
+function spendCoat(ctx: ResolveContext, tag: string): boolean {
+  const coat = ctx.attacker.effects.find((effect) => effect.tags.includes(tag));
+  if (!coat) return false;
+  for (const event of endEffect(ctx.state, ctx.attacker.id, coat.id)) ctx.tableNarration.push(tableLineOf(ctx, event));
+  ctx.effectsEnded.push(endedEffect(ctx.attacker, coat));
+  return true;
+}
+
+/** The save an on-hit rider opens on the target at its printed DC: a failure takes the rider's damage, rolled now,
+ *  and its conditions, tags and modifiers as one effect. */
+function openOnHitSave(
+  ctx: ResolveContext,
+  rider: NonNullable<DefinitionAction["onHit"]>[number],
+  index: number
+): void {
+  const { action, targets } = ctx;
+  const save = rider.save!;
+  const failureDamage = (save.failureDamage ?? []).map((part) => rollPlain(ctx, part.formula, part.type, action.name));
+  const tags = rider.tags ?? [];
+  const modifiers = rider.modifiers ?? [];
+  openRiderSave(
+    ctx,
+    targets[0],
+    { ...action, id: `${action.id}:${index}` },
+    {
+      name: rider.name ? `${action.name}: ${rider.name}` : action.name,
+      ability: save.ability,
+      dc: save.dc,
+      failureConditions: rider.conditions.map((condition) => condition.id),
+      ...(rider.duration ? { failureDuration: rider.duration } : {}),
+      ...(save.repeatSave ? { repeatSave: true as const } : {}),
+      ...(save.endsOnDamage ? { endsOnDamage: true as const } : {}),
+      ...(tags.length > 0 || modifiers.length > 0
+        ? { failureEffect: { name: rider.name ?? action.name, tags: [...tags], modifiers: [...modifiers] } }
+        : {}),
+      ...(failureDamage.length > 0 ? { failureDamage } : {})
+    }
+  );
 }

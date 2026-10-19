@@ -114,6 +114,7 @@ export function ActionResultCard({
           onFeedback={onFeedback}
           push={result.push}
           {...(result.hitOffers ? { hitOffers: result.hitOffers } : {})}
+          knockOutOffered={result.knockOut === "offered"}
           resolve={resolve}
         />
       )}

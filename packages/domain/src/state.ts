@@ -479,7 +479,9 @@ export const ParkedAttackSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(120)
-      .optional()
+      .optional(),
+    /** The attacker chose to knock the target out (SRD Knocking Out a Creature), so the replay's damage does. */
+    knockOut: z.literal(true).optional()
   })
   .strict();
 export type ParkedAttack = z.infer<typeof ParkedAttackSchema>;
@@ -554,6 +556,8 @@ export const PendingDamageSchema = z
     critical: z.boolean().default(false),
     /** What the damage drains as it lands (Vampiric Touch's healing). */
     drain: DamageDrainSchema.optional(),
+    /** The attacker knocks the target out: a drop to 0 leaves it at 1 Hit Point and Unconscious (SRD). */
+    nonlethal: z.literal(true).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();

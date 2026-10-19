@@ -151,6 +151,9 @@ export type ActionResolution = Readonly<{
   rollMode?: ActionRollMode;
   /** Flat typed damage added by active effects (Rage +2 melee), included in damageTotal. */
   bonusDamage?: ReadonlyArray<{ amount: number; type: string; source: string }>;
+  /** A melee hit can knock its target out (SRD Knocking Out a Creature): on a preview, offered; on a confirm, chosen,
+   *  so the damage it owes leaves the target at 1 Hit Point and Unconscious if it would drop it to 0. */
+  knockOut?: "offered" | "chosen";
   /** Source-linked effects the hit applied to targets (Bite: Grappled + Restrained). */
   effectsApplied?: ReadonlyArray<{
     targetId: string;

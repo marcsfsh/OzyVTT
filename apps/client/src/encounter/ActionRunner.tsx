@@ -172,7 +172,9 @@ export function ActionRunner({
       // Names the action, so the server lands what its damage drains (a Life Drain's lower Hit Point maximum).
       ...(result.actionId !== undefined && result.actionId.length <= 120 ? { sourceActionId: result.actionId } : {}),
       sourceName: `${actor.name}'s ${result.actionName}`,
-      critical: result.crit
+      critical: result.crit,
+      // The attacker chose to knock the target out with this melee hit.
+      ...(result.knockOut === "chosen" ? { nonlethal: true } : {})
     }).then((response) => {
       setBusy(false);
       if (!response.ok) {

@@ -420,6 +420,9 @@ export const ActionResolveSchema = z
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
     /** How much of its pool an action that lets its user choose spends (Lay on Hands' points); refused otherwise. */
     spend: z.number().int().min(1).max(100).optional(),
+    /** Knocking out a creature (SRD): a melee hit that drops the target to 0 leaves it at 1 Hit Point and Unconscious
+     *  instead. Refused on any other attack. */
+    knockOut: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()

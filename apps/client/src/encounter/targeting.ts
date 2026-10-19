@@ -274,6 +274,8 @@ export type ResolveOptions = Readonly<{
   pushFeet?: number;
   /** Extras the confirmed hit carries (Sneak Attack, a smite), from the preview's offers. */
   hitOptions?: readonly HitOptionChoice[];
+  /** The confirmed melee hit knocks its target out if it drops it to 0 (SRD Knocking Out a Creature). */
+  knockOut?: boolean;
 }>;
 
 export function resolveTargeting(
@@ -325,6 +327,7 @@ export function resolveTargeting(
     ...(opts.reroll ? { reroll: true } : {}),
     ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
     ...(opts.hitOptions && opts.hitOptions.length > 0 ? { hitOptions: [...opts.hitOptions] } : {}),
+    ...(opts.knockOut ? { knockOut: true } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
     ...(spend !== undefined ? { spend } : {}),
     ...(damageType !== undefined ? { damageType } : {}),

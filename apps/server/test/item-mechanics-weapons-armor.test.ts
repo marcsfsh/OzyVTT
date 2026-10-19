@@ -454,13 +454,13 @@ describe("the authored riders are present in the shipped bundle", () => {
 
   it("pins the re-authored weapon rows BY NAME AND VALUE, and every other weapon row to none", () => {
     // Exactly these weapon rows carry exactly these weapon-scoped riders (by name and value), and any
-    // other weapon row carries none. Magic weapon rows still carry no `weapon` block of their own;
-    // the swing comes from the base weapon at bind time.
+    // other weapon row carries none. Magic weapon rows carry no `weapon` block of their own, the swing coming from
+    // the base weapon at bind time, except the Sun Blade, whose radiant blade is its own Longsword.
     const weapons = MAGIC_ITEMS.filter((row) => row.category === "weapon");
     expect(
-      weapons.filter((row) => row.weapon != null),
+      weapons.filter((row) => row.weapon != null).map((row) => row.id),
       "the premise moved: a weapon row now carries a weapon block"
-    ).toHaveLength(0);
+    ).toEqual(["sun-blade"]);
 
     const AUTHORED: Readonly<Record<string, readonly string[]>> = {
       "weapon-1": ["attack-bonus +1", "damage-bonus +1"],
@@ -481,8 +481,8 @@ describe("the authored riders are present in the shipped bundle", () => {
         "damage-bonus +1",
         "attack-bonus +2 vs construct",
         "damage-bonus +2 vs construct",
-        "damage-bonus +7 on a critical hit",
-        "damage-bonus +7 on a critical hit vs construct"
+        "damage-bonus +7 on a rolled 20",
+        "damage-bonus +7 on a rolled 20 vs construct"
       ],
       "mace-of-disruption": ["extra-damage 2d6 radiant vs fiend, undead"],
       "vicious-weapon": ["extra-damage 2d6 of the weapon's type"],
@@ -491,7 +491,9 @@ describe("the authored riders are present in the shipped bundle", () => {
       "luck-blade": ["attack-bonus +1", "damage-bonus +1"],
       "flame-tongue": ["extra-damage 2d6 fire"],
       "frost-brand": ["extra-damage 1d6 cold"],
-      "sword-of-wounding": ["extra-damage 2d6 necrotic"]
+      "sword-of-wounding": ["extra-damage 2d6 necrotic"],
+      "sword-of-sharpness": ["damage-bonus +7 on a rolled 20", "damage-bonus +7 on a rolled 20"],
+      "sun-blade": ["attack-bonus +2", "damage-bonus +2", "extra-damage 1d8 radiant vs undead"]
     };
     const WEAPON_SCOPED = ["attack-bonus", "extra-damage", "critical-range", "critical-bonus-dice", "damage-bonus"];
     type Named = {
@@ -503,7 +505,11 @@ describe("the authored riders are present in the shipped bundle", () => {
     };
     // A gate names when the rider fires: on a critical hit, or against the creature types it names.
     const gateOf = (modifier: Named): string => {
-      const crit = modifier.when?.some((trigger) => trigger.type === "on-critical-hit") ? " on a critical hit" : "";
+      const crit = modifier.when?.some((trigger) => trigger.type === "on-critical-hit")
+        ? " on a critical hit"
+        : modifier.when?.some((trigger) => trigger.type === "on-natural-20")
+          ? " on a rolled 20"
+          : "";
       const versus = modifier.when?.find((trigger) => trigger.type === "versus-creature-type")?.creatureTypes;
       return `${crit}${versus ? ` vs ${versus.join(", ")}` : ""}`;
     };
@@ -533,7 +539,7 @@ describe("the authored riders are present in the shipped bundle", () => {
     // weapon", and `scope: "bearer"` would let two magic weapons in a pack stack. A rider gated on the hit, a
     // critical hit or the target's creature type is the item's own printed condition.
     const printedGate = (trigger: { type: string }) =>
-      ["on-hit", "on-attack-roll", "on-critical-hit", "versus-creature-type"].includes(trigger.type);
+      ["on-hit", "on-attack-roll", "on-critical-hit", "on-natural-20", "versus-creature-type"].includes(trigger.type);
     for (const row of weapons) {
       for (const modifier of row.modifiers ?? []) {
         if (!WEAPON_SCOPED.includes(modifier.type)) continue;
@@ -549,7 +555,7 @@ describe("the authored riders are present in the shipped bundle", () => {
 
   it("leaves every RESERVED item bare, so a later unit finds an unauthored carrier", () => {
     // Rows whose printed effects need mechanics the engine does not model yet.
-    for (const id of ["sun-blade", "energy-bow", "thunderous-greatclub"]) {
+    for (const id of ["energy-bow", "thunderous-greatclub"]) {
       const row = shipped(id) as unknown as { modifiers: unknown[]; casts: unknown[]; cursed: boolean };
       expect(row.modifiers, `${id} is reserved and must carry no modifiers`).toEqual([]);
       expect(row.casts, `${id} is reserved and must carry no casts`).toEqual([]);
