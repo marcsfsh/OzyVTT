@@ -27,6 +27,7 @@ import {
   spendUntilOwnAttack
 } from "./resolution/attack.js";
 import { rollLastCharge } from "./resolution/charges.js";
+import { recallSpellSlot } from "./resolution/spell-recall.js";
 import type {
   DefinitionAction,
   EndedEffect,
@@ -152,6 +153,7 @@ export function resolveDefinitionAction(
   // a miss: the attack is spent, and the answer finishes it.
   if (parkForRollAnswer(ctx) || parkForAcReaction(ctx)) {
     commitEconomy(ctx);
+    recallSpellSlot(ctx);
     rollLastCharge(ctx);
     spendAmmunition(ctx);
     useUpConsumable(ctx);
@@ -199,6 +201,7 @@ export function resolveDefinitionAction(
   applyRageRules(ctx);
 
   commitEconomy(ctx);
+  recallSpellSlot(ctx);
   spendHitOptions(ctx);
   spendDamageUses(ctx);
   rollLastCharge(ctx);

@@ -468,6 +468,9 @@ function relentlessEndurance(
   return true;
 }
 
+/** The tag on a Hunter's Mark effect. */
+const HUNTERS_MARK_TAG = "hunters-mark";
+
 /** Counts the uses of Relentless Rage since the last rest; each one raises its DC by 5. */
 export const RELENTLESS_RAGE_KEY = "relentless-rage";
 
@@ -743,13 +746,17 @@ export function applyDamageDetailed(
   // ends. Skipped without an id-minter.
   if (totalAdjusted > 0 && actor.hp.current > 0 && deps?.newId) {
     const sustained: Array<{ actorId: string; effectId: string }> = [];
+    let markOnly = true;
     for (const bearer of state.actors) {
       for (const effect of bearer.effects) {
-        if (effect.concentration && effect.sourceActorId === actor.id)
-          sustained.push({ actorId: bearer.id, effectId: effect.id });
+        if (!effect.concentration || effect.sourceActorId !== actor.id) continue;
+        sustained.push({ actorId: bearer.id, effectId: effect.id });
+        markOnly &&= effect.tags.includes(HUNTERS_MARK_TAG);
       }
     }
-    if (sustained.length > 0 && state.combat.pendingSaves.length < 100) {
+    // SRD Relentless Hunter (Ranger 13): "Taking damage can't break your Concentration on Hunter's Mark."
+    const unbroken = markOnly && holdsFeature(definition, "relentless-hunter", "Relentless Hunter");
+    if (sustained.length > 0 && !unbroken && state.combat.pendingSaves.length < 100) {
       const dc = Math.min(30, Math.max(10, Math.floor(totalAdjusted / 2)));
       state.combat = {
         ...state.combat,

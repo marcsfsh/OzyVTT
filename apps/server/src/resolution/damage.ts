@@ -87,7 +87,7 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
   // A strike declared before its roll (Brutal Strike) rolls its dice with the hit it rides, never with its tap.
   if (declaredBeforeRoll(action)) return;
   const parts = damageInForce(ctx);
-  if (parts.length > 0 && action.missDamage === "half" && missed(ctx.attack)) {
+  if (parts.length > 0 && (action.missDamage === "half" || potentCantrip(ctx)) && missed(ctx.attack)) {
     halfOnAMiss(ctx, parts);
     return;
   }
@@ -162,6 +162,18 @@ const missed = (attack: ActionResolutionAttack | null) =>
 
 /** SRD Acid Arrow: "On a miss, the arrow splashes the target with acid for half as much of the initial damage only." The
  *  dice roll as for a hit, and half of each part (rounded down) is owed like Graze's damage. */
+/** SRD Potent Cantrip (Evoker 3): "When you cast a cantrip at a creature and you miss with the attack roll or the target
+ *  succeeds on a saving throw against the cantrip, the target takes half the cantrip's damage (if any) but suffers no
+ *  additional effect from the cantrip." */
+export function potentCantrip(ctx: Pick<ResolveContext, "action" | "deps">): boolean {
+  const { action, deps } = ctx;
+  if (action.spellId === undefined) return false;
+  return (
+    deps.catalog?.spellRecord?.(action.spellId)?.level === 0 &&
+    holdsFeature(deps.definition, "potent-cantrip", "Potent Cantrip")
+  );
+}
+
 function halfOnAMiss(ctx: ResolveContext, parts: ResolveContext["action"]["damage"]): void {
   for (const part of parts) {
     const rolled = resolveDice(parseDiceFormula(part.formula), ctx.deps.random);

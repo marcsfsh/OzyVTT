@@ -1650,3 +1650,45 @@ describe("Spell picks keep to the level and school the SRD prints", () => {
     expect(spellOf(built, "burning-hands")).toMatchObject({ prepared: false, alwaysPrepared: false });
   });
 });
+
+// SRD 5.2.1 Boon of Spell Recall, Free Casting: "Whenever you cast a spell with a level 1-4 spell slot, roll 1d4. If the
+// number you roll is the same as the slot's level, the slot isn't expended."
+describe("Boon of Spell Recall", () => {
+  const recaller = () =>
+    table(
+      buildCharacterDefinition(
+        {
+          ...wizardInput(),
+          choices: wizardInput().choices.map((row) =>
+            row.id === "boon-of-dimensional-travel"
+              ? { ...row, id: "boon-of-spell-recall" }
+              : row.payload?.featureId === "boon-of-dimensional-travel"
+                ? { ...row, payload: { featureId: "boon-of-spell-recall" } }
+                : row
+          ) as CharacterCreateRequestInput["choices"]
+        },
+        library,
+        POLICY
+      )
+    );
+  const thirdLeft = (built: Built) => built.hero.spellSlots?.find((slot) => slot.level === 3)?.remaining;
+
+  it("keeps a level 3 slot when the d4 shows 3, and spends it on a 2", () => {
+    for (const [d4, kept] of [
+      [3, true],
+      [2, false]
+    ] as const) {
+      const built = recaller();
+      const before = thirdLeft(built)!;
+      const result = resolveDefinitionAction(
+        built.state,
+        actionOf(built, "spell-fireball"),
+        { actorId: IDS.hero, targetIds: [], commandId: `50000000-0000-4000-8000-00000000015${d4}` },
+        // Fireball's 8d6, then the boon's d4.
+        deps(built, [...Array<number>(8).fill(3), d4])
+      );
+      expect(thirdLeft(built)).toBe(kept ? before : before - 1);
+      if (kept) expect(result.warnings?.join(" ")).toMatch(/Boon of Spell Recall: the d4 shows 3/);
+    }
+  });
+});

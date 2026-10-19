@@ -196,7 +196,12 @@ function proseByPrefix(prose: Map<string, string>, featureId: string): string | 
     if (!featureId.startsWith(`${key}-`)) continue;
     if (best === undefined || key.length > best.length) best = key;
   }
-  return best === undefined ? undefined : prose.get(best);
+  const text = best === undefined ? undefined : prose.get(best);
+  // Each later arcanum row names its own spell level, not the first one's.
+  const arcanum = /^mystic-arcanum-level-(\d)-spell$/.exec(featureId);
+  return text && arcanum
+    ? text.replace("Choose one level 6 Warlock spell", `Choose one level ${arcanum[1]} Warlock spell`)
+    : text;
 }
 
 // ---- Per-class configuration the printed text cannot supply deterministically -------------------

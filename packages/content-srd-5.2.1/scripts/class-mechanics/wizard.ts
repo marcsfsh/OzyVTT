@@ -27,9 +27,21 @@ export const wizard: ClassMechanicsModule = {
     // step after a Short Rest (`rests.ts`). Scholar, subclass, ASI and Epic Boon choices are already on the record.
   },
   subclasses: {
-    evoker: {}
-    // Not modeled: Evocation Savant's school filter, Potent Cantrip (no half-on-save field), Sculpt
-    // Spells, Empowered Evocation (no "same type as the spell" damage, and `spellSchool` has no
-    // producer), and Overchannel's max-damage and backlash (its counter is on the record).
+    evoker: {
+      // "Whenever you cast a Wizard spell from the Evocation school, you can add your Intelligence modifier to one
+      // damage roll of that spell": the modifier in the spell's own damage type, on each resolve of an Evocation
+      // spell. That it is a Wizard spell, and once for a spell of several rolls, aren't checked.
+      "empowered-evocation": {
+        modifiers: [
+          {
+            type: "extra-damage",
+            abilityModifier: "int",
+            when: [{ type: "on-damage-roll" }, { type: "spell-school-is", schools: ["evocation"] }]
+          }
+        ]
+      }
+    }
+    // Potent Cantrip is the server's (`resolution/damage.ts`). Not modeled: Evocation Savant's later free spells,
+    // Sculpt Spells, and Overchannel's max-damage and backlash (its counter is on the record).
   }
 };
