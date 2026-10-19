@@ -303,6 +303,13 @@ export type PlayerRollCall = Readonly<{
 export type PlayerRestView = Readonly<{
   requests: readonly string[];
   shortRest: Readonly<{ actorIds: readonly string[]; done: readonly string[] }> | null;
+  /** The party's Long Rest when one of their characters is in it, cut down to them: who was interrupted and waits to
+   *  resume, and who of those has a Short Rest's benefits to spend Hit Point Dice in. */
+  longRest: Readonly<{
+    actorIds: readonly string[];
+    interrupted: readonly string[];
+    shortRestEarned: readonly string[];
+  }> | null;
 }>;
 export type PlayerView = Pick<GameState, "revision"> & {
   combat: PlayerCombatView;

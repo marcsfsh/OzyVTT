@@ -53,6 +53,8 @@ export const DAY_MINUTES = 24 * 60;
 /** The inventory rows survival reads, by catalog id. */
 export const RATIONS_ID = "rations";
 export const WATERSKIN_ID = "waterskin";
+/** SRD Bead of Nourishment: it "provides as much nourishment as 1 day of Rations". */
+export const BEAD_OF_NOURISHMENT_ID = "bead-of-nourishment";
 
 /** What one day of eating and drinking starts from. */
 export const freshNourishment = (): Nourishment => ({
@@ -126,7 +128,7 @@ function fillSkins(actor: Actor): void {
  *  nourishment to sustain a creature for one day") meets the day's food; a ration is a day's for a Small or Medium
  *  creature; drinking one's fill at a source meets the day's water and fills the Waterskins carried. */
 export type Nourish = Readonly<{
-  food?: "meal" | "ration" | "goodberry";
+  food?: "meal" | "ration" | "goodberry" | "bead";
   water?: "fill" | "waterskin";
 }>;
 
@@ -161,6 +163,11 @@ export function nourish(state: GameState, actorId: string, choice: Nourish, scop
     if (useUp(actor, RATIONS_ID, 1) === 0) throw new CommandRejectedError(`${actor.name} carries no Rations.`);
     today.foodPounds += RATION_POUNDS;
     said.push("eats a day's Rations");
+  } else if (choice.food === "bead") {
+    if (useUp(actor, BEAD_OF_NOURISHMENT_ID, 1) === 0)
+      throw new CommandRejectedError(`${actor.name} carries no Bead of Nourishment.`);
+    today.foodPounds += RATION_POUNDS;
+    said.push("eats a Bead of Nourishment");
   } else if (choice.food === "goodberry") {
     if (useUp(actor, GOODBERRY_ID, 1) === 0) throw new CommandRejectedError(`${actor.name} carries no Goodberry.`);
     today.foodPounds = Math.max(today.foodPounds, need.food);
@@ -217,6 +224,14 @@ function endDayFor(state: GameState, actor: Actor, deps: DayEndDeps): EffectNarr
     if (eaten > 0) {
       today.foodPounds += eaten * RATION_POUNDS;
       meals.push(`eats ${eaten === 1 ? "a day's Rations" : `${eaten} days' Rations`}`);
+    }
+  }
+  // A Bead of Nourishment is as much as a day of Rations, eaten once the Rations run out.
+  if (today.foodPounds < need.food) {
+    const beads = useUp(actor, BEAD_OF_NOURISHMENT_ID, Math.ceil((need.food - today.foodPounds) / RATION_POUNDS));
+    if (beads > 0) {
+      today.foodPounds += beads * RATION_POUNDS;
+      meals.push(`eats ${beads === 1 ? "a Bead of Nourishment" : `${beads} Beads of Nourishment`}`);
     }
   }
   if (today.waterPints < need.water) {

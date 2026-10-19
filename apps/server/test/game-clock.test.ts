@@ -81,6 +81,12 @@ describe("one game clock", () => {
       actorIds: [LYRA, BORIN]
     });
     expect(rest.status).toBe(200);
+    const finished = await booted.post(GAME_PATHS.restFinish, booted.gmToken, {
+      commandId: randomUUID(),
+      apply: true,
+      kind: "long"
+    });
+    expect(finished.status).toBe(200);
     expect(booted.server.store.snapshot.rest.clockHours).toBe(33);
     expect((await calendar(booted)).currentDate).toEqual({ year: 1491, month: 0, day: 10 });
 

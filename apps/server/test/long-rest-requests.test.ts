@@ -7,13 +7,17 @@ import { loadActorFixture } from "@vtt/test-fixtures";
 import { GameAccessDeniedError } from "../src/authorization.js";
 import { startEncounter } from "../src/encounter.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
+import { interruptByGm, resumeLongRest } from "../src/long-rest.js";
+import { restApplier } from "../src/rest-interruptions.js";
 import {
   answerLongRest,
   applyRest,
   askForLongRest,
+  finishPartyLongRest,
   finishPartyShortRest,
   markShortRestDone,
   passTime,
+  spendHitDice,
   startPartyRest
 } from "../src/rests.js";
 import { bootServer } from "./boot-server.js";
@@ -129,34 +133,39 @@ describe("a player asks for a Long Rest and the GM answers", () => {
 });
 
 describe("the GM rests the party", () => {
-  it("a Long Rest rests everyone now and moves the clock 8 hours", () => {
+  it("a Long Rest stays under way until the GM finishes it, which rests everyone and moves the clock 8 hours", () => {
     const state = game();
     passTime(state, 20);
-    startPartyRest(state, [TORVA, BRYN], "long", resolve(state));
-    expect(state.rest.clockHours).toBe(28);
+    startPartyRest(state, [TORVA, BRYN], "long");
+    expect(state.rest).toMatchObject({ clockHours: 20, longRest: { startedAt: 1200 } });
+    expect(actor(state, TORVA).hp.current).toBe(30);
+    expect(() => startPartyRest(state, [TORVA], "long")).toThrow("A Long Rest is already under way. Finish it first.");
+    const { rested, hours } = finishPartyLongRest(state, true, resolve(state));
+    expect({ rested, hours }).toEqual({ rested: ["Torva", "Bryn"], hours: 8 });
+    expect(state.rest).toMatchObject({ clockHours: 28, longRest: null });
     for (const id of [TORVA, BRYN]) expect(actor(state, id)).toMatchObject({ hp: { current: 75 }, lastLongRestAt: 28 });
   });
 
   it("rests nobody when someone can't, and says who and why", () => {
     const state = game({}, { hp: { current: 0, maximum: 75 } });
-    expect(() => startPartyRest(state, [TORVA, BRYN], "long", resolve(state))).toThrow(
+    expect(() => startPartyRest(state, [TORVA, BRYN], "long")).toThrow(
       "Bryn has 0 Hit Points. A Long Rest needs at least 1. Heal Bryn first."
     );
     expect(actor(state, TORVA).hp.current).toBe(30);
     expect(state.rest.clockHours).toBe(0);
     const early = game({ lastLongRestAt: 0 });
     passTime(early, 9);
-    expect(() => startPartyRest(early, [TORVA, BRYN], "long", resolve(early))).toThrow(
+    expect(() => startPartyRest(early, [TORVA, BRYN], "long")).toThrow(
       "Torva finished a Long Rest 9 hours ago. Another can start in 7 hours."
     );
   });
 
   it("a Short Rest stays open while players spend Hit Dice, then gives its benefits and an hour", () => {
     const state = game();
-    startPartyRest(state, [TORVA, BRYN], "short", resolve(state));
+    startPartyRest(state, [TORVA, BRYN], "short");
     expect(state.rest.shortRest).toEqual({ actorIds: [TORVA, BRYN], done: [] });
     expect(actor(state, TORVA).actionUses).toEqual({ rage: 2, "action-surge": 1 });
-    expect(() => startPartyRest(state, [TORVA], "short", resolve(state))).toThrow(/already under way/);
+    expect(() => startPartyRest(state, [TORVA], "short")).toThrow(/already under way/);
     markShortRestDone(state, TORVA, true, PLAYER);
     expect(() => markShortRestDone(state, BRYN, true, PLAYER)).toThrow(GameAccessDeniedError);
     expect(state.rest.shortRest?.done).toEqual([TORVA]);
@@ -172,7 +181,7 @@ describe("the GM rests the party", () => {
 
   it("rolling Initiative takes a combatant out of the Short Rest, and closes it when nobody is left", () => {
     const state = game();
-    startPartyRest(state, [TORVA, BRYN], "short", resolve(state));
+    startPartyRest(state, [TORVA, BRYN], "short");
     markShortRestDone(state, BRYN, true, GM);
     const geometry = { width: 900, height: 600, calibration: null } as const;
     startEncounter(state, { mapAssetId: randomUUID(), entries: [{ actorId: BRYN, score: 12 }] }, () => 10, geometry);
@@ -185,7 +194,7 @@ describe("the GM rests the party", () => {
   it("taking damage ends a member's Short Rest, which then gives them nothing", () => {
     // SRD Short Rest: "A Short Rest is stopped by ... Taking any damage. An interrupted Short Rest confers no benefits."
     const state = game();
-    startPartyRest(state, [TORVA, BRYN], "short", resolve(state));
+    startPartyRest(state, [TORVA, BRYN], "short");
     const shrugged = applyDamageDetailed(state, BRYN, { amount: 0 }, GM);
     expect(shrugged.events).toEqual([]);
     const { events } = applyDamageDetailed(state, BRYN, { amount: 4 }, GM);
@@ -198,9 +207,92 @@ describe("the GM rests the party", () => {
     expect(actor(state, BRYN).actionUses).toEqual({ rage: 2, "action-surge": 1 });
   });
 
+  it("gives a member who takes damage two hours in a Short Rest's benefits only, and the rest of the party finishes", () => {
+    // SRD Long Rest: "A Long Rest is stopped by ... Taking any damage ... If you rested at least 1 hour before the
+    // interruption, you gain the benefits of a Short Rest."
+    const state = game();
+    startPartyRest(state, [TORVA, BRYN], "long");
+    passTime(state, 2);
+    const { events } = applyDamageDetailed(state, BRYN, { amount: 4 }, GM);
+    expect(events.map((event) => event.text)).toContain(
+      "Bryn took damage, which interrupts Bryn's Long Rest. After an hour of rest, Bryn gets a Short Rest's benefits."
+    );
+    expect(actor(state, BRYN).actionUses).toEqual({ rage: 2 });
+    expect(state.rest.longRest?.members[1]).toMatchObject({ interrupted: true, shortRestEarned: true });
+    const { rested } = finishPartyLongRest(state, true, resolve(state));
+    expect(rested).toEqual(["Torva"]);
+    expect(state.rest.clockHours).toBe(8);
+    expect(actor(state, TORVA)).toMatchObject({ hp: { current: 75 }, actionUses: {}, lastLongRestAt: 8 });
+    expect(actor(state, BRYN)).toMatchObject({ hp: { current: 26 }, actionUses: { rage: 2 }, lastLongRestAt: null });
+  });
+
+  it("gives a member interrupted within the first hour nothing", () => {
+    const state = game();
+    startPartyRest(state, [TORVA, BRYN], "long");
+    passTime(state, 0, 30);
+    const { events } = applyDamageDetailed(state, BRYN, { amount: 4 }, GM);
+    expect(events.map((event) => event.text)).toContain("Bryn took damage, which interrupts Bryn's Long Rest.");
+    expect(actor(state, BRYN).actionUses).toEqual({ rage: 2, "action-surge": 1 });
+    expect(state.rest.longRest?.members[1]).toMatchObject({ interrupted: true, shortRestEarned: false });
+  });
+
+  it("is interrupted by rolling Initiative, and resumed takes an hour more", () => {
+    // "You can resume a Long Rest immediately after an interruption. If you do so, the rest requires 1 additional hour
+    // per interruption to finish."
+    const state = game();
+    startPartyRest(state, [TORVA, BRYN], "long");
+    passTime(state, 3);
+    const geometry = { width: 900, height: 600, calibration: null } as const;
+    const started = startEncounter(
+      state,
+      { mapAssetId: randomUUID(), entries: [{ actorId: BRYN, score: 12 }] },
+      () => 10,
+      geometry,
+      resolve(state)
+    );
+    expect(started.map((event) => event.text)).toContain(
+      "Bryn rolled Initiative, which interrupts Bryn's Long Rest. After an hour of rest, Bryn gets a Short Rest's benefits."
+    );
+    expect(actor(state, BRYN).actionUses).toEqual({ rage: 2 });
+    expect(() => resumeLongRest(state, BRYN, GM)).toThrow("End the fight before Bryn rests again.");
+    state.combat = { ...state.combat, active: false, initiative: [], turnActorId: null };
+    expect(() => resumeLongRest(state, BRYN, PLAYER)).toThrow(GameAccessDeniedError);
+    expect(resumeLongRest(state, BRYN, { role: "player", sessionId: OTHER })).toBe(
+      "Bryn goes back to resting. The Long Rest now takes 9 hours."
+    );
+    const { rested } = finishPartyLongRest(state, true, resolve(state));
+    expect(rested).toEqual(["Torva", "Bryn"]);
+    expect(state.rest.clockHours).toBe(9);
+    expect(actor(state, BRYN)).toMatchObject({ hp: { current: 75 }, actionUses: {}, lastLongRestAt: 9 });
+  });
+
+  it("lets a member with a Short Rest's benefits spend Hit Point Dice until it resumes", () => {
+    const state = game();
+    startPartyRest(state, [TORVA, BRYN], "long");
+    passTime(state, 2);
+    interruptByGm(state, BRYN, GM, restApplier({ resolveDefinition: resolve(state) }));
+    const other = { role: "player", sessionId: OTHER } as const;
+    spendHitDice(state, BRYN, [6], other, resolve(state));
+    expect(actor(state, BRYN).hitDice?.remaining).toBe(2);
+    resumeLongRest(state, BRYN, other);
+    expect(() => spendHitDice(state, BRYN, [6], other, resolve(state))).toThrow(/spent during a Short Rest/);
+    expect(() => interruptByGm(state, BRYN, PLAYER, restApplier())).toThrow(GameAccessDeniedError);
+  });
+
+  it("calling the Long Rest off passes no time and gives a Short Rest's benefits after an hour", () => {
+    const state = game();
+    startPartyRest(state, [TORVA], "long");
+    passTime(state, 1);
+    const { rested } = finishPartyLongRest(state, false, resolve(state));
+    expect(rested).toEqual([]);
+    expect(state.rest).toMatchObject({ clockHours: 1, longRest: null });
+    expect(actor(state, TORVA)).toMatchObject({ hp: { current: 30 }, actionUses: { rage: 2 } });
+    expect(() => finishPartyLongRest(state, true, resolve(state))).toThrow("No Long Rest is under way.");
+  });
+
   it("calling the Short Rest off gives nothing and passes no time", () => {
     const state = game();
-    startPartyRest(state, [TORVA], "short", resolve(state));
+    startPartyRest(state, [TORVA], "short");
     finishPartyShortRest(state, false, resolve(state));
     expect(actor(state, TORVA).actionUses).toEqual({ rage: 2, "action-surge": 1 });
     expect(state.rest).toMatchObject({ clockHours: 0, shortRest: null });
@@ -247,7 +339,7 @@ describe("over the API", () => {
 
     const snapshot = await fetch(base + GAME_PATHS.snapshot, { headers: { authorization: `Bearer ${player}` } });
     const view = (await snapshot.json()).data.game as PlayerView;
-    expect(view.rest).toEqual({ requests: [TORVA], shortRest: { actorIds: [TORVA], done: [] } });
+    expect(view.rest).toEqual({ requests: [TORVA], shortRest: { actorIds: [TORVA], done: [] }, longRest: null });
     expect(JSON.stringify(view)).not.toContain("clockHours");
     expect(view.actors.every((entry) => !("lastLongRestAt" in entry))).toBe(true);
 

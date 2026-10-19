@@ -143,7 +143,9 @@ import type {
   RestAnswerSchema,
   RestAskSchema,
   RestFinishSchema,
+  RestInterruptSchema,
   RestMarkDoneSchema,
+  RestResumeSchema,
   RestPartySchema,
   RulesAnswerSchema,
   RulesAskSchema,
@@ -663,9 +665,19 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof RestMarkDoneSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
-  /** GM-only: end the party's Short Rest, with its benefits or without. */
+  /** GM-only: end the party's Short or Long Rest, with its benefits or without. */
   "rest:finish": (
     payload: CommandPayload<typeof RestFinishSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** A member of the party's Long Rest that was interrupted rests again. */
+  "rest:resume": (
+    payload: CommandPayload<typeof RestResumeSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: interrupt one member's Long Rest. */
+  "rest:interrupt": (
+    payload: CommandPayload<typeof RestInterruptSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM-only: move game time forward. */

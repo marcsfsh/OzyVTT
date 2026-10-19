@@ -1574,8 +1574,8 @@ export const RestAnswerSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** The GM rests several characters at once. Long: the rest happens now and 8 hours pass. Short: it opens, each
- *  player spends Hit Dice on their own device, and it ends when the GM finishes it. */
+/** The GM rests several characters at once. Long: it opens, and it ends when the GM finishes it, which passes its
+ *  8 hours. Short: it opens, each player spends Hit Dice on their own device, and it ends when the GM finishes it. */
 export const RestPartySchema = z
   .object({
     commandId: z.uuid(),
@@ -1597,11 +1597,29 @@ export const RestMarkDoneSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** The GM ends the party's Short Rest: `apply` gives its benefits and an hour passes; otherwise it is called off. */
+/** The GM ends the party's rest: `apply` gives its benefits and its time passes; otherwise it is called off. */
 export const RestFinishSchema = z
   .object({
     commandId: z.uuid(),
     apply: z.boolean(),
+    /** Which rest: absent, the Short Rest when one is under way, else the Long Rest. */
+    kind: z.enum(["short", "long"]).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A member of the party's Long Rest that an interruption stopped takes it up again. */
+export const RestResumeSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The GM interrupts one member's Long Rest (an hour of walking or other physical exertion). */
+export const RestInterruptSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1619,7 +1637,7 @@ export const ActorNourishSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
-    food: z.enum(["meal", "ration", "goodberry"]).optional(),
+    food: z.enum(["meal", "ration", "goodberry", "bead"]).optional(),
     water: z.enum(["fill", "waterskin"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })

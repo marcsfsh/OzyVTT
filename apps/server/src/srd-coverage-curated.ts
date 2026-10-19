@@ -368,7 +368,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "transform/assume.ts takes a form as an effect on the creature: a stat block's statistics replace its own, with what the effect says it keeps (transform/compose.ts), or one of its printed forms changes its size and speeds. Its Hit Points stay its own, conditions and effects carry over, and the token takes the form's size (transform/forms.ts). It reverts when the effect ends or it dies (transform/rules.ts)."
   ),
   "short-rest": enforced(
-    "rests.ts needs 1 Hit Point, lets Hit Point Dice be spent, gives back what a Short Rest restores and ends what lasts until one. The party's Short Rest moves the game clock an hour when the GM finishes it. short-rest-interruptions.ts ends it for anyone who rolls Initiative, takes damage or casts a spell above a cantrip."
+    "rests.ts needs 1 Hit Point, lets Hit Point Dice be spent, gives back what a Short Rest restores and ends what lasts until one. The party's Short Rest moves the game clock an hour when the GM finishes it. rest-interruptions.ts ends it for anyone who rolls Initiative, takes damage or casts a spell above a cantrip."
   ),
   "simultaneous-effects": guided(
     "simultaneous-effects.ts: two or more things that change Hit Points as a turn starts or ends (ongoing damage, Hit Points or Temporary Hit Points regained, a trait that burns or regenerates) wait for the creature's controller, its player or the GM, to put them in order, and turn-boundaries.ts plays them out that way. The saves a turn opens are prompts answered in any order. Other things that happen at once (effects set off by the same hit) run in the server's order, which the GM may correct."

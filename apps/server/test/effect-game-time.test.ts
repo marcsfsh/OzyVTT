@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyRest, passTime, startPartyRest } from "../src/rests.js";
+import { applyRest, finishPartyLongRest, passTime, startPartyRest } from "../src/rests.js";
 import { startStableRecovery } from "../src/effects.js";
 import { ALLY, FOE, HERO, heroTurnAgain } from "./spell-casters.js";
 import { actorOf, answer, cast, caster, effectNames, endFight, wizard } from "./spell-lifetimes-kit.js";
@@ -80,7 +80,8 @@ describe("what lasts in game time", () => {
     expect(table.state.rest.clockHours).toBe(7);
     // The Wizard's party rest moves the clock past the ally's hour too.
     actorOf(table.state, HERO).lastLongRestAt = null;
-    startPartyRest(table.state, [HERO], "long", resolveDefinition);
+    startPartyRest(table.state, [HERO], "long");
+    finishPartyLongRest(table.state, true, resolveDefinition);
     expect(table.state.rest.clockHours).toBe(15);
     expect(effectNames(table.state, ALLY)).toEqual([]);
   });

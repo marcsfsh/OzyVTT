@@ -689,16 +689,26 @@ export function projectPlayerRollCalls(state: GameState, playerSessionId: string
   });
 }
 
-/** Resting as one player sees it: their own characters' requests, and the party's Short Rest only when one of their
- *  characters is in it, cut down to those characters. Who else rests, and the game clock, stay with the GM. */
+/** Resting as one player sees it: their own characters' requests, and the party's Short and Long Rests only when one of
+ *  their characters is in them, cut down to those characters. Who else rests, and the game clock, stay with the GM. */
 function playerRest(state: GameState, yourActorIds: ReadonlySet<string>): PlayerView["rest"] {
   const shortRest = state.rest.shortRest;
   const members = shortRest?.actorIds.filter((id) => yourActorIds.has(id)) ?? [];
+  // The Long Rest's own members only: neither when it started nor who else rests reaches a player.
+  const yours = (state.rest.longRest?.members ?? []).filter((member) => yourActorIds.has(member.actorId));
   return {
     requests: state.rest.requests.filter((id) => yourActorIds.has(id)),
     shortRest:
       shortRest && members.length > 0
         ? { actorIds: members, done: shortRest.done.filter((id) => yourActorIds.has(id)) }
+        : null,
+    longRest:
+      yours.length > 0
+        ? {
+            actorIds: yours.map((member) => member.actorId),
+            interrupted: yours.filter((member) => member.interrupted).map((member) => member.actorId),
+            shortRestEarned: yours.filter((member) => member.shortRestEarned).map((member) => member.actorId)
+          }
         : null
   };
 }

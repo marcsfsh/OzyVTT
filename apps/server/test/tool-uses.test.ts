@@ -312,7 +312,7 @@ describe("Fast Hands", () => {
   it("picks a door's lock as a Bonus Action", () => {
     const entrance = {
       ...wall({ x: 250, y: 250 }, { x: 250, y: 300 }, "door", false),
-      door: { fastenings: [{ kind: "lock" }] }
+      door: { fastenings: [{ kind: "lock" as const }] }
     };
     const state = visionGame({
       walls: [entrance],
@@ -324,8 +324,8 @@ describe("Fast Hands", () => {
       active: true,
       turnActorId: HERO,
       initiative: [
-        { actorId: HERO, score: 20 },
-        { actorId: FRIEND, score: 10 }
+        { actorId: HERO, score: 20, tieBreaker: 0 },
+        { actorId: FRIEND, score: 10, tieBreaker: 0 }
       ]
     };
     const sheet = pipSheet(["fast-hands"]);

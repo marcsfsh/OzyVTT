@@ -29,7 +29,7 @@ import type { EffectNarration } from "../effects.js";
 import { grantOutsideFight } from "../resolution/grant.js";
 import { lastChargeLine, lastChargeRollFor } from "../item-charges.js";
 import { consumableRowFor, withOneUsedUp } from "../consumables.js";
-import { leaveShortRest } from "../short-rest-interruptions.js";
+import { interruptRests } from "../rest-interruptions.js";
 import { ammunitionLabel, shotFrom, spendPiece } from "../ammunition.js";
 import { checkPlan } from "../ability-checks.js";
 import { rollSettledCheck } from "../check-rolls.js";
@@ -536,7 +536,10 @@ export const actionCommands = [
         restBroken = [
           ...clockEvents,
           ...(spell && spell.level > 0 && !draft.combat.active
-            ? leaveShortRest(draft, new Set([actorId]), `cast ${spell.name}`)
+            ? interruptRests(draft, new Set([actorId]), `cast ${spell.name}`, {
+                resolveDefinition: kit.resolveDefinition,
+                catalog: kit.equipmentCatalog()
+              })
             : [])
         ];
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
@@ -896,7 +899,13 @@ export const actionCommands = [
         spend = spendLooseUses(live, action, available, castLevel, slotsModeFor(draft), definition);
         // Casting a spell other than a cantrip stops a Short Rest.
         if (spell && spell.level > 0)
-          narrations = [...narrations, ...leaveShortRest(draft, new Set([actorId]), `cast ${spell.name}`)];
+          narrations = [
+            ...narrations,
+            ...interruptRests(draft, new Set([actorId]), `cast ${spell.name}`, {
+              resolveDefinition: kit.resolveDefinition,
+              catalog: kit.equipmentCatalog()
+            })
+          ];
         // A potion drunk or a flask thrown outside a fight is used up all the same.
         const consumable = consumableRowFor(action, live.inventory, kit.equipmentCatalog());
         if (consumable) live.inventory = withOneUsedUp(live.inventory, consumable.id);

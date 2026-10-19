@@ -63,7 +63,7 @@ import { markBloodiedHit } from "./bloodied-hits.js";
 import { damageTypeTraits } from "./damage-traits.js";
 import { openRepeatSavesOnDamage } from "./save-stages.js";
 import { berserkerCurse } from "./berserker-axe.js";
-import { leaveShortRest } from "./short-rest-interruptions.js";
+import { interruptRests } from "./rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { oilIgnition, OILED_TAG } from "./hazards.js";
@@ -819,7 +819,7 @@ export function applyDamageDetailed(
           ? { actorId: input.sourceActorId, ...(deps ? { resolveDefinition: deps.resolveDefinition } : {}) }
           : undefined
       ),
-      ...leaveShortRest(state, new Set([actor.id]), "took damage")
+      ...interruptRests(state, new Set([actor.id]), "took damage", deps ?? {})
     );
 
   // "Whenever the target takes damage, it repeats the save" (Dominate Person, Hideous Laughter).

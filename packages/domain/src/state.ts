@@ -1798,6 +1798,33 @@ export const PartyShortRestSchema = z
   .strict();
 export type PartyShortRest = z.infer<typeof PartyShortRestSchema>;
 
+/** A Long Rest the GM runs for several characters, under way from `startedAt` until the GM finishes it, so rolling
+ *  Initiative, damage and a spell above a cantrip can interrupt it (SRD Long Rest, Interrupting the Rest). */
+export const PartyLongRestSchema = z
+  .object({
+    /** When it began, in minutes of game time. */
+    startedAt: z.number().int().min(0),
+    members: z
+      .array(
+        z
+          .object({
+            actorId: z.uuid(),
+            /** Interruptions it resumed after; each adds an hour to its rest. */
+            interruptions: z.number().int().min(0).max(24).default(0),
+            /** It was interrupted and hasn't resumed. */
+            interrupted: z.boolean().default(false),
+            /** It rested an hour before the interruption, so it has a Short Rest's benefits and may spend Hit Point Dice
+             *  while it stands interrupted. */
+            shortRestEarned: z.boolean().default(false)
+          })
+          .strict()
+      )
+      .min(1)
+      .max(12)
+  })
+  .strict();
+export type PartyLongRest = z.infer<typeof PartyLongRestSchema>;
+
 /** Game time and the rests waiting on the GM. The clock is what the 16-hour rule between Long Rests reads and what
  *  effects measured in game time count down on; the GM moves it, and a party rest moves it by the rest's length. */
 export const RestStateSchema = z
@@ -1812,6 +1839,7 @@ export const RestStateSchema = z
      *  back as the clock passes it. Null: at each Long Rest. GM-set. */
     dawnHour: z.number().int().min(0).max(23).nullable().default(null),
     shortRest: PartyShortRestSchema.nullable().default(null),
+    longRest: PartyLongRestSchema.nullable().default(null),
     /** The table tracks food and water: as each game day ends, every character eats and drinks what it carries and
      *  what it lacks costs it (SRD Malnutrition, Dehydration). Off by default. */
     survival: z.boolean().default(false)
