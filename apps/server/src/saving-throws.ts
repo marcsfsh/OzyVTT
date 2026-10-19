@@ -48,6 +48,7 @@ import {
 } from "./equipment-derivation.js";
 import { countZoneDamage } from "./spell-zone-state.js";
 import { sizeAtMost, sizeRank } from "./resolution/context.js";
+import { lightSensitivities, sightRules } from "./vision/rules.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -635,6 +636,10 @@ export function answerSave(
     if (pending.advantageAtSize && sizeRank(target.size) >= sizeRank(pending.advantageAtSize))
       sources.advantage.push({ source: "size", label: `${pending.actionName}: its size` });
     sources.advantage.push(...traitSaveClaims(state, target, definition, deps));
+    // Sunlight Weakness: Disadvantage on D20 Tests while it stands in sunlight.
+    const sightContent = { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
+    for (const name of lightSensitivities(state, target, "save", sightRules(state, sightContent), sightContent))
+      sources.disadvantage.push({ source: "light-sensitivity", label: `${name} (in the light)` });
     const ward = holyWardClaim(state, target, pending.sourceActorId, {
       resolveDefinition: deps.resolveDefinition,
       ...(deps.catalog ? { catalog: deps.catalog } : {})

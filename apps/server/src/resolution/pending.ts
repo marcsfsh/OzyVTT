@@ -11,7 +11,7 @@ import { HIDDEN_SOURCE } from "../hidden-source.js";
 import { rollDice } from "@vtt/rules-5e";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { recordRoll, tableLineOf, type ResolveContext } from "./context.js";
-import { coverBonusOf, coverFor } from "../cover.js";
+import { bestCover, coverBonusOf, coverFor, mapCover } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf } from "./damage.js";
 
@@ -330,17 +330,22 @@ export function parkActionSave(ctx: ResolveContext): void {
   const onSuccessEffect = successEffectFor(ctx);
   // Cover adds to Dexterity saving throws (SRD Cover), each target's own: the GM's choice for this resolve, else the
   // cover the GM marked it with, unless the save ignores it (Sacred Flame). Carried on the prompt.
+  // With dynamic vision on, the walls and creatures between the caster and a single target cover it too (`mapCover`).
   const saveBonusOf = (target: (typeof targets)[number]) =>
     action.save!.ability === "dex" && !action.save!.ignoresCover
       ? coverBonusOf(
-          coverFor(input.cover, target) ??
-            (deps.resolveDefinition
-              ? smiteOfProtectionCover(state, target, {
-                  resolveDefinition: deps.resolveDefinition,
-                  ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
-                  ...(deps.catalog ? { catalog: deps.catalog } : {})
-                })
-              : null)
+          input.cover ??
+            bestCover(
+              coverFor(null, target),
+              input.areaPlaced === true ? null : mapCover(state, attacker.id, target.id),
+              deps.resolveDefinition
+                ? smiteOfProtectionCover(state, target, {
+                    resolveDefinition: deps.resolveDefinition,
+                    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
+                    ...(deps.catalog ? { catalog: deps.catalog } : {})
+                  })
+                : null
+            )
         )
       : 0;
   const groups = new Map<number, string[]>();

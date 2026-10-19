@@ -322,7 +322,8 @@ describe("the shipped on-hit dice on a bound melee block", () => {
   it("(c) flame-tongue on a longsword: the resolution carries TWO typed entries, slashing + 2d6 fire", () => {
     const definition = definitionOf();
     const catalog = catalogOf([shipped("flame-tongue")]);
-    const state = fight(stateWith([boundTo("flame-tongue", "longsword")]));
+    // Ablaze: its flames are lit on the row (a Bonus Action), which its 2d6 Fire needs.
+    const state = fight(stateWith([boundTo("flame-tongue", "longsword", { lit: true })]));
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-flame-tongue"
     )!;

@@ -5,7 +5,7 @@ import { withShotAmmunitionOnly } from "../ammunition.js";
 import { consumableRowFor } from "../consumables.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
-import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
+import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives, type RuleId } from "../rules-families.js";
 import {
   isLongCastingTime,
   laterRowOf,
@@ -15,12 +15,14 @@ import {
   withSpellAttackReach,
   withSpellEffects
 } from "../item-actions.js";
-import { coverBonusOf, coverFor } from "../cover.js";
-import { builtinBaseId } from "../builtin-actions.js";
+import { bestCover, coverBonusOf, coverFor, mapCover } from "../cover.js";
+import { bonusNeedsDarkness, builtinBaseId } from "../builtin-actions.js";
+import { holdsFeature } from "../class-features.js";
 import { isIncapacitated } from "../condition-rules.js";
 import { areEnemies } from "../creature-sides.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
+import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
 import { scrollOfAction } from "../scrolls.js";
 import { builtinHandlerFor } from "./builtins.js";
 import {
@@ -174,8 +176,8 @@ export function openResolve(
       );
   let overridden = economy.overridden;
 
-  // GM-adjudicated cover (SRD Cover, no line-of-sight engine): the GM's choice for this resolve, else the cover the
-  // GM marked the target with, whoever attacks. Total cover can't be targeted; half/three-quarters add to AC and
+  // SRD Cover: the GM's choice for this resolve, else the best of the cover the GM marked the target with and what the
+  // map gives it from the walls and creatures between. Total cover can't be targeted; half/three-quarters add to AC and
   // Dexterity saves.
   const coverMode = effectiveModeFor(state.combat, "cover.total");
   // A Paladin's Smite of Protection gives Half Cover to the creatures in its aura.
@@ -187,8 +189,13 @@ export function openResolve(
           ...(deps.catalog ? { catalog: deps.catalog } : {})
         })
       : null;
+  // With dynamic vision on, the walls and creatures between them cover the target too (`mapCover`); an area's
+  // creatures were caught by what its point of origin reaches, so a placed area reads no cover from the caster.
+  const fromMap = (target: LiveActor) => (input.areaPlaced === true ? null : mapCover(state, attacker.id, target.id));
   const attackCover =
-    targets.length === 1 ? (coverFor(input.cover, targets[0]) ?? auraCover(targets[0])) : (input.cover ?? null);
+    targets.length === 1
+      ? (input.cover ?? bestCover(coverFor(null, targets[0]), fromMap(targets[0]), auraCover(targets[0])))
+      : (input.cover ?? null);
   // An area's other targets still take it, so a marked creature among several is the GM's to remove.
   if (targets.length > 1)
     for (const target of targets)
@@ -214,6 +221,39 @@ export function openResolve(
       if (mode === "strict" && !waived && !overrideCovers(state.combat.turn, "hide.seen"))
         throw new RulesBlockedError("hide.seen", message);
       if (waived && overridden === null) overridden = { rule: "hide.seen", reason: overrideReason(input.override) };
+      else warnings.push(message);
+    }
+    // "While you're Heavily Obscured or behind Three-Quarters Cover or Total Cover", and a shadow's Shadow Stealth only
+    // in Dim Light or darkness; with dynamic vision on the map answers both (`vision/rules.ts`).
+    const content = {
+      ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+      ...(deps.catalog ? { catalog: deps.catalog } : {})
+    };
+    const enemies = state.combat.initiative.flatMap((entry) => {
+      const enemy = state.actors.find((actor) => actor.id === entry.actorId);
+      if (!enemy || enemy.id === attacker.id || isIncapacitated(enemy)) return [];
+      if (hiddenFromInitiator(enemy.id) && !hiddenFromInitiator(attacker.id)) return [];
+      return areEnemies(attacker, enemy, deps.resolveDefinition) ? [enemy.id] : [];
+    });
+    const stealthy = holdsFeature(deps.definition, "halfling-naturally-stealthy", "Naturally Stealthy");
+    const blocks: Array<readonly [RuleId, string]> = [];
+    if (!hidingPlace(state, content, attacker.id, enemies, stealthy))
+      blocks.push([
+        "hide.exposed",
+        `${attacker.name} isn't Heavily Obscured or behind Three-Quarters Cover. Hide in darkness, fog or behind a wall.`
+      ]);
+    if (bonusNeedsDarkness(deps.definition, action.id) && !inDimLightOrDarkness(state, attacker.id, content))
+      blocks.push([
+        "light.too-bright",
+        `${attacker.name} stands in Bright Light. ${action.name} needs Dim Light or darkness.`
+      ]);
+    for (const [rule, message] of blocks) {
+      const mode = effectiveModeFor(state.combat, rule);
+      if (mode === "freeform") continue;
+      const waived = overrideWaives(input.override, rule);
+      if (mode === "strict" && !waived && !overrideCovers(state.combat.turn, rule))
+        throw new RulesBlockedError(rule, message);
+      if (waived && overridden === null) overridden = { rule, reason: overrideReason(input.override) };
       else warnings.push(message);
     }
   }

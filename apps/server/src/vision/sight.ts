@@ -75,6 +75,8 @@ export type SceneSight = Readonly<{
   lightAt: (point: Point) => LightAt;
   /** How obscured a point is, for anyone looking at it. */
   obscurementAt: (point: Point) => Obscurement;
+  /** How obscured a point is by fog, smoke or foliage alone, whatever the light. */
+  fogAt: (point: Point) => Obscurement;
   /** Where a creature on the map stands; null when it has no token there. */
   positionOf: (actorId: string) => Point | null;
   /** Where the viewers see together, as polygons whose union is the area. With `showsLight`, a light carried by a
@@ -96,6 +98,7 @@ const OFF: SceneSight = {
   lineOfSight: () => true,
   lightAt: () => ({ level: "bright", sunlight: false, magical: false }),
   obscurementAt: () => "none",
+  fogAt: () => "none",
   positionOf: () => null,
   areaOf: () => [],
   brightOf: () => null,
@@ -349,12 +352,19 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
     return result;
   };
 
+  const fogAt = (point: Point): Obscurement =>
+    heavy.some((area) => area.contains(point))
+      ? "heavy"
+      : lightFog.some((area) => area.contains(point))
+        ? "light"
+        : "none";
+
   const obscurementAt = (point: Point): Obscurement => {
-    if (heavy.some((area) => area.contains(point))) return "heavy";
+    const fog = fogAt(point);
+    if (fog === "heavy") return "heavy";
     const light = lightAt(point);
     if (light.level === "dark") return "heavy";
-    if (light.level === "dim" || lightFog.some((area) => area.contains(point))) return "light";
-    return "none";
+    return light.level === "dim" || fog === "light" ? "light" : "none";
   };
 
   /** An Invisible creature at this point is seen anyway: it stands in a revealing light's Bright Light. */
@@ -565,6 +575,7 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
     lineOfSight,
     lightAt,
     obscurementAt,
+    fogAt,
     positionOf: (actorId) => tokens.get(actorId)?.position ?? null,
     areaOf,
     brightOf,

@@ -1145,24 +1145,20 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `cloak-of-the-manta-ray` - underwater breathing and Swim Speed are not modeled.
   // `mantle-of-spell-resistance` - spell-save advantage would apply to every save.
-  /** Darkvision and Truesight out to 120 feet, and Advantage on Wisdom (Perception) checks (sight's are the usual
-   *  ones). Not modeled: the Light or Daylight drawback that Blinds the wearer. */
+  /** Darkvision and Truesight out to 120 feet, which dynamic vision reads. Not modeled: Advantage on Wisdom
+   *  (Perception) checks "that rely on sight" (a check doesn't say what it relies on), and the Light or Daylight
+   *  drawback that Blinds the wearer. */
   "robe-of-eyes": {
     modifiers: [
       { type: "darkvision", feet: 120 },
-      { type: "sense", sense: "truesight", feet: 120 },
-      {
-        type: "roll-mode",
-        roll: "check",
-        mode: "advantage",
-        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
-      }
+      { type: "sense", sense: "truesight", feet: 120 }
     ]
   },
 
   /**
-   * A real DC 15 Wisdom save that Stuns on a failure, and the robe's light until the end of the wearer's next turn.
-   * Not modeled: the attack disadvantage for the duration, and the stun ending with the effect (the GM clears it).
+   * A real DC 15 Wisdom save that Stuns on a failure, and the robe's light and the Disadvantage of attackers that can
+   * see the wearer until the end of its next turn. Not modeled: the save only for those in the Bright Light that see
+   * it, and the stun ending with the effect (the GM clears it).
    */
   "robe-of-scintillating-colors": {
     charges: { regain: "1d3" },
@@ -1179,7 +1175,16 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           name: "Scintillating Colors",
           tags: ["scintillating-colors"],
           duration: { type: "until-source-turn-end" },
-          light: { brightFeet: 30, dimFeet: 30 }
+          light: { brightFeet: 30, dimFeet: 30 },
+          // "Creatures that can see you have Disadvantage on attack rolls against you."
+          modifiers: [
+            {
+              type: "roll-mode",
+              roll: "incoming-attack",
+              mode: "disadvantage",
+              when: [{ type: "on-attack-roll" }, { type: "seen-by-other" }]
+            }
+          ]
         }
       }
     ]

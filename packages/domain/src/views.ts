@@ -45,6 +45,7 @@ export type PlayerEffect = Omit<
   | "temporaryHitPointsEachTurn"
   | "conditionImmunities"
   | "light"
+  | "findDc"
 > & {
   yours?: true;
 };

@@ -1,3 +1,4 @@
+import { checkSightFor } from "./vision/rules.js";
 import type { Actor, CheckRollOutcome, GameState, RollCall, RollRecord, RollVisibility } from "@vtt/domain";
 import { d20FacesFor, otherDiceOf, rerollLowestD20, type RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
@@ -85,7 +86,15 @@ function planFor(state: GameState, scope: Initiator, input: CheckRollInput, deps
   const plan = checkPlan(actor, definition, derivation, input.subject, {
     ...(deps.names ? { names: deps.names } : {}),
     ...(finding ? { finding } : {}),
-    ...(warded.length > 0 ? { warded } : {})
+    ...(warded.length > 0 ? { warded } : {}),
+    // Frightened's line of sight, the light the roller stands in, and how obscured the creature it seeks is.
+    sight: checkSightFor(
+      state,
+      actor,
+      { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) },
+      finding,
+      deps.distanceFeet
+    )
   });
   return { actor, plan };
 }
@@ -125,7 +134,8 @@ function recordCheck(
     createdAt: deps.now()
   };
   recordRoll(state, record);
-  const success = input.dc === null ? null : roll.total >= input.dc;
+  // A check that needs sight the roller hasn't fails whatever it rolls.
+  const success = plan.autoFails !== undefined ? false : input.dc === null ? null : roll.total >= input.dc;
   holdRoll(state, {
     key: checkKey(actor.id),
     actorId: actor.id,

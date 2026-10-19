@@ -456,6 +456,7 @@ function playerEffect(
     conditionImmunities: _conditionImmunities,
     // The light it sheds reaches players only as the lit ground in their own sight, which the server draws.
     light: _light,
+    findDc: _findDc,
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);

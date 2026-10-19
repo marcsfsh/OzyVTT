@@ -155,6 +155,8 @@ function turnStartAura(trait: Trait): TraitMechanic | null {
     affects: match[3] === "enemy" ? "enemies" : "all",
     ...(creatureTypes.length > 0 ? { creatureTypes } : {}),
     ...(NOT_WHILE_INCAPACITATED.test(text) ? { notWhileIncapacitated: true as const } : {}),
+    // "... and can see the hag's true form": only a creature that sees the bearer makes the save.
+    ...(/\bthat starts its turn [^.]*\band can see the\b/.test(text) ? { seenOnly: true as const } : {}),
     save: {
       ability,
       dc: Number(match[2]),

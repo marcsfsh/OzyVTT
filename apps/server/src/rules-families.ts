@@ -22,6 +22,8 @@ const RULE_FAMILIES = {
   // Flying or burrowing without the speed, and a path that hostile creatures shut.
   "movement.no-speed": "movement",
   "movement.blocked-path": "movement",
+  // Frightened: "You can't willingly move closer to the source of fear."
+  "movement.toward-fear": "movement",
   "economy.action-used": "economy",
   "economy.bonus-action-used": "economy",
   "economy.reaction-used": "economy",
@@ -81,6 +83,10 @@ const RULE_FAMILIES = {
   "cover.total": "targeting",
   // SRD Hide: out of any enemy's line of sight, which dynamic vision can tell.
   "hide.seen": "targeting",
+  // SRD Hide: "while you're Heavily Obscured or behind Three-Quarters Cover or Total Cover".
+  "hide.exposed": "targeting",
+  // What works only in Dim Light or Darkness (a shadow's Shadow Stealth, One with Shadows) in Bright Light.
+  "light.too-bright": "targeting",
   // Cleave's second creature: another one, within 5 feet of the first.
   "attack.cleave-same-target": "targeting",
   "attack.cleave-too-far": "targeting",

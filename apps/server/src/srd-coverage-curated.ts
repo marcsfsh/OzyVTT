@@ -17,7 +17,7 @@ const reference = (note: string): CuratedCoverage => ({ state: "reference", note
 
 export const CONDITION_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   blinded: enforced(
-    "resolution/attack.ts: its attack rolls have Disadvantage and attack rolls against it have Advantage. movement-rules.ts: it makes an Opportunity Attack only against a mover in its Blindsight. The GM rules on checks that need sight."
+    "resolution/attack.ts: its attack rolls have Disadvantage and attack rolls against it have Advantage. ability-checks.ts fails its Perception check to find a creature unless its Blindsight reaches it. movement-rules.ts: it makes an Opportunity Attack only against a mover in its Blindsight, and with dynamic vision on vision/sight.ts lets it see only within Blindsight. The GM rules on other checks that need sight."
   ),
   charmed: guided(
     "resolution/economy.ts: a creature Charmed by a spell or an action can't attack its charmer or target it with a save or damage. A Charmed chip the GM sets names no charmer, so nothing is refused. The charmer's Advantage on social checks is the GM's."
@@ -28,8 +28,8 @@ export const CONDITION_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   exhaustion: enforced(
     "condition-rules.ts takes 2 per level from every D20 Test, and speed.ts takes 5 feet per level from Speed. effects.ts kills the creature at level 6, and rests.ts removes a level on each Long Rest."
   ),
-  frightened: guided(
-    "resolution/attack.ts and ability-checks.ts: Disadvantage on its attack rolls and ability checks while the condition lasts, since the map has no line of sight. Moving closer to the source of its fear isn't refused; the GM rules on it."
+  frightened: enforced(
+    "resolution/attack.ts, ability-checks.ts and encounter.ts give it Disadvantage on attack rolls, ability checks and Initiative while the source of its fear is within line of sight (vision/rules.ts; always with dynamic vision off, or when the GM set the condition by hand). movement-rules.ts refuses a willing move that takes it closer to the source."
   ),
   grappled: enforced(
     "speed.ts: Speed 0. resolution/attack.ts: Disadvantage on attack rolls against anyone but the grappler. movement-rules.ts lets the grappler drag it, and resolution/builtins.ts rolls Escape a Grapple against the escape DC."
@@ -38,7 +38,7 @@ export const CONDITION_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/economy.ts refuses its actions, Bonus Actions and Reactions. effects.ts ends its Concentration and its grapples, and encounter.ts gives it Disadvantage on Initiative."
   ),
   invisible: enforced(
-    "resolution/attack.ts: Advantage on its attack rolls and Disadvantage on attack rolls against it, unless Faerie Fire outlines it. encounter.ts: Advantage on Initiative. movement-rules.ts: it provokes an Opportunity Attack only from a creature whose Blindsight or Truesight reaches it. Effects that need sight of it are the GM's."
+    "resolution/attack.ts: Advantage on its attack rolls and Disadvantage on attack rolls against it, unless the other creature sees it (Blindsight, Truesight or See Invisibility within range, or the map with dynamic vision on) or Faerie Fire outlines it. encounter.ts: Advantage on Initiative. movement-rules.ts: it provokes an Opportunity Attack only from a creature whose Blindsight or Truesight reaches it."
   ),
   paralyzed: enforced(
     "It counts as Incapacitated, and speed.ts sets its Speed to 0. saving-throws.ts fails its Strength and Dexterity saves. resolution/attack.ts gives attack rolls against it Advantage and makes a hit from within 5 feet a Critical Hit."
@@ -88,7 +88,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "creature-sides.ts puts player characters and friendly creatures on one side, by token disposition. Auras, Pack Tactics and Help read it."
   ),
   "area-of-effect": enforced(
-    "commands/actions.ts places the template and area-targeting.ts finds who is inside. The creature a Cone, a Line or an Emanation comes from is left out of it."
+    "commands/actions.ts places the template and area-targeting.ts finds who is inside. The creature a Cone, a Line or an Emanation comes from is left out of it, and with dynamic vision on a creature every straight line to which a wall or closed door blocks from the point of origin is left out too."
   ),
   "armor-class": enforced(
     "armor-class.ts in the domain package works out AC from armor, Shield, Dexterity and riders, and every attack roll is compared with it."
@@ -105,8 +105,8 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "inventory.ts holds a creature to three attuned items, and an item that needs Attunement gives nothing until it has it."
   ),
   blinded: condition("blinded"),
-  blindsight: guided(
-    "movement-rules.ts reads the stat block's range to let it spot a mover for an Opportunity Attack while Blinded or against an Invisible creature. Attack rolls against a creature it perceives this way are the GM's to adjust."
+  blindsight: enforced(
+    "vision/senses.ts reads it from stat blocks, features, items and effects. Within its range a creature perceives what no wall hides, Blinded, in darkness or fog, or against the Invisible condition (vision/sight.ts). Attack rolls, Hide, Search and Opportunity Attacks read it, by the distance between the tokens with dynamic vision off."
   ),
   bloodied: enforced(
     "The server counts half Hit Points or fewer as Bloodied (healthBandOf in hit-points.ts) for the rules that name it, such as monster traits and damage that changes when Bloodied."
@@ -115,7 +115,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/economy.ts allows one Bonus Action on a turn, and only from a feature, spell or item that offers one."
   ),
   "breaking-objects": reference("Objects have no AC or Hit Points in the app."),
-  "bright-light": reference("The map has no light levels."),
+  "bright-light": enforced(
+    "With dynamic vision on, vision/sight.ts gives Bright Light under the scene's bright ambient light, in a painted bright area and within a light's bright radius, and a creature sees normally there."
+  ),
   burning: enforced(
     "hazards.ts deals 1d4 Fire damage at the start of each of the creature's turns. Put Out the Fire (resolution/builtins.ts) ends it and leaves the creature Prone."
   ),
@@ -146,7 +148,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   ),
   cone: areaShape("its width at any point equals that point's distance from the origin."),
   cover: enforced(
-    "The GM marks the degree of cover (cover.ts). The server adds 2 or 5 to AC and Dexterity saves, and resolution/validate.ts refuses an attack against Total Cover."
+    "With dynamic vision on, cover.ts works out Half, Three-Quarters and Total Cover from the walls between the attacker or the effect's origin and the target, and Half Cover from a creature in the way; the GM can mark more. The server adds 2 or 5 to AC and Dexterity saves, and resolution/validate.ts refuses an attack against Total Cover."
   ),
   crawling: enforced("movement-rules.ts charges an extra foot per foot while a creature is Prone."),
   creature: reference("A definition; there is nothing to apply."),
@@ -170,9 +172,11 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   "damage-types": enforced(
     "Damage carries one of the 13 types, and hit-points.ts applies Immunity, Resistance and Vulnerability by type."
   ),
-  darkness: reference("The map has no light levels; the GM rules on what a creature can see."),
-  darkvision: reference(
-    "The builder shows a species' range, and the trait's text is on the sheet. The map has no light levels, so the GM decides what a creature sees."
+  darkness: enforced(
+    "With dynamic vision on, vision/sight.ts treats an unlit point in a dark scene or a painted dark area as Heavily Obscured: only Darkvision, Blindsight, Truesight or Devil's Sight see there, and only Blindsight, Truesight or Devil's Sight into magical Darkness. Attack rolls, Hide, Search and what each player sees read it."
+  ),
+  darkvision: enforced(
+    "vision/senses.ts reads it from species, stat blocks, items and effects, and with dynamic vision on vision/sight.ts lets the creature see Dim Light within its range as Bright Light and Darkness as Dim Light, so a creature in darkness there is Lightly Obscured to it."
   ),
   dash: enforced("resolution/grant.ts and speed.ts add the creature's Speed to its movement for the turn."),
   dead: enforced(
@@ -189,13 +193,15 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   "difficulty-class": enforced(
     "The server works out spell save DCs and feature DCs from the sheet and compares every save and check with its DC."
   ),
-  "dim-light": reference("The map has no light levels."),
+  "dim-light": enforced(
+    "With dynamic vision on, vision/sight.ts knows Dim Light (dim ambient light, a painted dim area, a light's outer radius) and treats it as Lightly Obscured."
+  ),
   disadvantage: enforced(
     "rules-5e rolls two d20s and keeps the lower. Any Advantage and any Disadvantage on the same roll cancel."
   ),
   disengage: enforced("movement-rules.ts opens no Opportunity Attacks against the creature for the rest of its turn."),
   dodge: enforced(
-    "builtin-actions.ts gives attack rolls against it Disadvantage and its Dexterity saves Advantage until its next turn. Both lapse while it is Incapacitated."
+    "builtin-actions.ts gives attack rolls against it Disadvantage from an attacker it can see (vision/rules.ts) and its Dexterity saves Advantage until its next turn. Both lapse while it is Incapacitated."
   ),
   emanation: areaShape("an Emanation is a circle around its creature, which isn't in the area."),
   encounter: reference("A definition. Fights run in the encounter tracker, which the other rows describe."),
@@ -224,7 +230,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   healing: enforced(
     "resolution/heal.ts restores Hit Points up to the maximum, and healing a dying character brings it back to consciousness."
   ),
-  "heavily-obscured": reference("The map has no obscurement; the GM rules on what a creature can see."),
+  "heavily-obscured": enforced(
+    "With dynamic vision on, no one sees into a Heavily Obscured space (darkness beyond a creature's senses, a painted fog or foliage area, a spell's cloud) in vision/sight.ts, so an attack there is against an unseen target, a creature there may Hide, and a Perception check to find a creature there fails (ability-checks.ts)."
+  ),
   help: guided(
     "resolution/attack.ts gives the next attack roll by an ally against the distracted enemy Advantage. Helping with an ability check is the GM's to apply."
   ),
@@ -232,7 +240,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "held-rolls.ts spends it to reroll the d20 of an attack, a check or a save. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn."
   ),
   hide: enforced(
-    "resolution/builtins.ts rolls a DC 15 Dexterity (Stealth) check and makes the creature Invisible on a success, until it attacks. Whether it can hide there is the GM's call."
+    "resolution/builtins.ts rolls a DC 15 Dexterity (Stealth) check and makes the creature Invisible on a success, until it attacks, casts a spell with a Verbal component or an enemy's Search meets its total. With dynamic vision on, resolution/validate.ts asks that it be Heavily Obscured or behind Three-Quarters or Total Cover and out of every enemy's sight (vision/rules.ts). A sound louder than a whisper is the GM's call."
   ),
   "high-jump": reference("Jumps aren't measured."),
   "hit-point-dice": enforced(
@@ -261,7 +269,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   "knocking-out-a-creature": enforced(
     "hit-points.ts leaves a creature dropped by a melee attack chosen to knock out at 1 Hit Point and Unconscious, until it regains Hit Points or stabilize.ts gives it first aid."
   ),
-  "lightly-obscured": reference("The map has no obscurement."),
+  "lightly-obscured": enforced(
+    "With dynamic vision on, vision/sight.ts knows Lightly Obscured points (Dim Light, a painted light fog or foliage area), and ability-checks.ts gives a Perception check to find a creature there Disadvantage. Passive Perception against it is the GM's."
+  ),
   line: areaShape("a Line has a fixed width, and the point it starts from isn't in it."),
   "long-jump": reference("Jumps aren't measured."),
   "long-rest": enforced(
@@ -316,7 +326,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "saving-throws.ts opens a save prompt for each target and rolls it on the server, with the proficiency, riders, Advantage and Disadvantage that apply."
   ),
   search: guided(
-    "resolution/builtins.ts rolls the chosen Wisdom check. The GM sets the DC and says what the creature finds."
+    "resolution/builtins.ts rolls the chosen Wisdom check. With dynamic vision on, a Perception search finds each hidden creature in its line of sight whose Hide total it meets and ends its hiding. The GM sets any other DC and says what else the creature finds."
   ),
   "shape-shifting": reference("Changing form is the GM's to run; the sheet keeps the creature's own statistics."),
   "short-rest": enforced(
@@ -360,9 +370,11 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   "temporary-hit-points": enforced(
     "hit-points.ts takes damage from Temporary Hit Points first, and a Long Rest clears them. A new grant replaces the old one; choosing to keep the higher is the GM's."
   ),
-  tremorsense: reference("Senses other than Blindsight and Truesight aren't read in play."),
-  truesight: guided(
-    "movement-rules.ts lets it spot an Invisible mover for an Opportunity Attack. Attack rolls, illusions and shape-shifters are the GM's to adjust."
+  tremorsense: guided(
+    "vision/senses.ts reads it, and with dynamic vision on vision/sight.ts lets the creature pinpoint creatures within range, walls or not, without seeing them. Whether a creature is touching the ground is the GM's."
+  ),
+  truesight: enforced(
+    "Within its range vision/sight.ts lets a creature see Invisible creatures and into normal and magical Darkness, and attack rolls read it, by the distance between the tokens with dynamic vision off. Illusions, true forms and the Ethereal Plane are the GM's."
   ),
   "unarmed-strike": enforced(
     "resolution/builtins.ts rolls the strike for 1 plus Strength Bludgeoning damage, or the grapple or shove save against 8 plus Strength plus the Proficiency Bonus."
@@ -381,8 +393,13 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
 const revives = reference("Its return after death happens off the table; the GM runs it.");
 /** A trait about breathing, which the app doesn't track. */
 const breath = reference("Breathing isn't tracked.");
-/** A trait about light, which the map doesn't model. */
-const light = reference("The map has no light levels, so the GM applies it.");
+/** A trait that lights the map around its creature. */
+const sheds = enforced("vision/senses.ts gives the creature its printed Bright and Dim Light, carried with its token.");
+/** A trait that hinders a creature standing in sunlight, read from the light where its token stands. */
+const sunlightHinders = (rolls: string, files: string) =>
+  enforced(
+    `${files} give it Disadvantage on ${rolls} while it stands in sunlight (vision/rules.ts). With dynamic vision off, the light is the GM's.`
+  );
 /** A trait about communicating or sensing, which play doesn't read. */
 const senses = reference("Communication and senses like this are the GM's to run.");
 /** A trait about squeezing through narrow gaps, which the map doesn't model. */
@@ -485,7 +502,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Hellish Restoration": revives,
   "Hold Breath": breath,
   "Ice Walk": reference("Ice and snow aren't marked on the map, so the GM waives the cost."),
-  Illumination: light,
+  Illumination: sheds,
   "Immutable Form": reference("Shape-changing isn't modeled, so there is nothing to refuse."),
   "Incorporeal Movement": reference(
     "Passing through creatures and objects, and the Force damage for ending a turn inside one, are the GM's."
@@ -498,7 +515,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Legendary Resistance": enforced(
     "saving-throws.ts lets the GM turn a failed save into a success, as many times a day as the stat block prints. A Long Rest restores them; the extra use in the lair is the GM's."
   ),
-  "Light Sensitivity": light,
+  "Light Sensitivity": enforced(
+    "resolution/attack.ts gives the cloaker Disadvantage on attack rolls while it stands in Bright Light (vision/rules.ts). With dynamic vision off, the light is the GM's."
+  ),
   "Lightning Absorption": absorbs("Lightning"),
   "Limited Amphibiousness": breath,
   "Loathsome Limbs": reference("Severed limbs are the GM's to place as Troll Limb stat blocks."),
@@ -536,8 +555,11 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "trait-turns.ts opens the Constitution save for each creature that starts its turn within 5 feet. A failure is Poisoned until the start of its next turn, and a success makes it immune for the fight."
   ),
   "Succubus Form": changesForm,
-  "Sunlight Sensitivity": light,
-  "Sunlight Weakness": light,
+  "Sunlight Sensitivity": sunlightHinders(
+    "attack rolls and ability checks",
+    "resolution/attack.ts and ability-checks.ts"
+  ),
+  "Sunlight Weakness": sunlightHinders("D20 Tests", "resolution/attack.ts, ability-checks.ts and saving-throws.ts"),
   Swarm: guided(
     "movement-rules.ts and terrain.ts let the swarm and other creatures share a space. Refusing it Hit Points and Temporary Hit Points is the GM's."
   ),
@@ -551,10 +573,12 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "statblock-traits.ts rolls the Constitution save of DC 5 plus the damage when damage drops it to 0, and leaves it at 1 Hit Point on a success. Radiant damage and Critical Hits get no save."
   ),
   "Undead Restoration": revives,
-  "Vampire Weakness": reference("Running water, invitations and the stake are the GM's to apply."),
+  "Vampire Weakness": guided(
+    "trait-turns.ts deals the vampire 20 Radiant damage when it starts its turn in sunlight, where resolution/attack.ts and ability-checks.ts give it Disadvantage on attack rolls and ability checks (vision/rules.ts). Running water, invitations and the stake are the GM's."
+  ),
   "Vampiric Connection": senses,
   "Vile Appearance": enforced(
-    "trait-turns.ts opens the Wisdom save for each Beast or Humanoid that starts its turn within 30 feet of the hag. A failure is Frightened until the start of its next turn, and a success makes it immune for the fight. Whether the creature can see the hag's true form is the GM's, who dismisses the save when it can't."
+    "trait-turns.ts opens the Wisdom save for each Beast or Humanoid that starts its turn within 30 feet of the hag. A failure is Frightened until the start of its next turn, and a success makes it immune for the fight. With dynamic vision on, only a creature that sees the hag (vision/sight.ts) makes the save; whether the hag is disguised is the GM's."
   ),
   "Water Breathing": breath,
   "Water Form": sharesSpace("the elemental"),

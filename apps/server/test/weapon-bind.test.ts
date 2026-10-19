@@ -6,6 +6,7 @@ import { resolveDefinitionAction, type ResolveDependencies } from "../src/action
 import { effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "../src/equipment-derivation.js";
 import { setInventoryItem } from "../src/inventory.js";
+import { setItemLight } from "../src/item-light.js";
 import { startEncounter } from "../src/encounter.js";
 import { CommandRejectedError } from "../src/game-store.js";
 
@@ -580,6 +581,8 @@ describe("the bind: the four write-path rules", () => {
       resolve,
       { catalog: CATALOG }
     );
+    // Ablaze: its 2d6 Fire is there while its flames are lit.
+    setItemLight(state, { actorId: IDS.hero, itemId: "flame-tongue", lit: true }, { role: "gm" }, CATALOG);
     const action = effectiveActions(DEFINITION, state.actors[0], CATALOG).find(
       (entry) => entry.id === "item-flame-tongue"
     )!;

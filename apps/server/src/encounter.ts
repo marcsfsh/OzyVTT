@@ -26,6 +26,7 @@ import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
 import { zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
+import { checkSightFor } from "./vision/rules.js";
 
 type StartEncounterInput = Readonly<{
   mapAssetId: string;
@@ -108,7 +109,12 @@ export function initiativeRollFor(
   const warded = deps.resolveDefinition
     ? wardedConditions(state, actor, { resolveDefinition: deps.resolveDefinition })
     : [];
-  const asCheck = abilityCheckClaims(actor, derivation, { ability: "dex" }, warded);
+  // Frightened only while its source is within line of sight, and the light it stands in (Sunlight Sensitivity).
+  const sight = checkSightFor(state, actor, {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
+  const asCheck = abilityCheckClaims(actor, derivation, { ability: "dex" }, warded, [], sight);
   for (const side of ["advantage", "disadvantage"] as const)
     for (const claim of asCheck[side])
       if (!claims[side].some((held) => held.label === claim.label)) claims[side].push(claim);

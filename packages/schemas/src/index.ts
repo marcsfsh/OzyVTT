@@ -295,10 +295,33 @@ export const RiderTriggerSchema = z
       .describe("Filter. Narrows to targets currently under any of these conditions."),
     /** On an effect, its riders fire only for the creature that put the effect on its bearer, never for the bearer:
      * Hunter's Mark's extra damage when its caster hits the marked creature. */
-    z.object({ type: z.literal("by-effect-source") }).strict()
+    z.object({ type: z.literal("by-effect-source") }).strict(),
+    /** The bearer can see the other creature in the roll (Dodge: "if you can see the attacker"), as the server's sight
+     *  answers it. */
+    z
+      .object({ type: z.literal("sees-other") })
+      .strict()
+      .describe(
+        'Filter. On an attack roll, the bearer can see the other creature in it, as the server\'s sight answers it (Dodge: "attack rolls against you have Disadvantage if you can see the attacker").'
+      ),
+    /** The other creature in the roll can see the bearer (Faerie Fire: "if the attacker can see it"). */
+    z
+      .object({ type: z.literal("seen-by-other") })
+      .strict()
+      .describe(
+        'Filter. On an attack roll, the other creature in it can see the bearer (Faerie Fire: "Attack rolls against an affected creature have Advantage if the attacker can see it").'
+      ),
+    /** The other creature in the roll perceives the bearer with none of these senses (Blur: an attacker that perceives
+     *  you with Blindsight or Truesight is immune). */
+    z
+      .object({ type: z.literal("other-lacks-sense"), senses: z.array(RiderSlugSchema).min(1).max(4) })
+      .strict()
+      .describe(
+        "Filter. On an attack roll, the other creature in it perceives the bearer with none of these senses within their range (Blur: an attacker that perceives you with Blindsight or Truesight is immune)."
+      )
   ])
   .describe(
-    "When a rider applies. Twenty-eight named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
+    "When a rider applies. Thirty-two named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
   );
 export type RiderTrigger = z.infer<typeof RiderTriggerSchema>;
 export type RiderTriggerKind = "static-gate" | "dynamic-gate" | "moment" | "filter";
@@ -333,7 +356,10 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "versus-creature-type": "filter",
   "versus-size": "filter",
   "versus-condition": "filter",
-  "by-effect-source": "filter"
+  "by-effect-source": "filter",
+  "sees-other": "filter",
+  "seen-by-other": "filter",
+  "other-lacks-sense": "filter"
 });
 
 /** The moments the damage roll collects (`rollRiderDamage`). A damage rider gated on any other moment would never
@@ -940,7 +966,9 @@ export const EffectInstanceSchema = z
     endsOnSpellHealing: z.literal(true).optional(),
     /** The light its bearer sheds while it lasts (Produce Flame's flame, Faerie Fire's outline), read by dynamic
      *  vision as a light the bearer's token carries. */
-    light: CarriedLightSchema.optional()
+    light: CarriedLightSchema.optional(),
+    /** A Hide's Dexterity (Stealth) total: "the DC for a creature to find you with a Wisdom (Perception) check". */
+    findDc: z.number().int().min(1).max(60).optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -2475,6 +2503,8 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       /** Only creatures of these types ("any Beast or Humanoid", a sea hag's Vile Appearance). */
       creatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
       notWhileIncapacitated: z.literal(true).optional(),
+      /** Only a creature that can see the bearer is affected ("and can see the hag's true form"). */
+      seenOnly: z.literal(true).optional(),
       damage: TraitDamageSchema.optional(),
       save: TraitSaveSchema.optional(),
       /** The fire it sets (a fire elemental's Emanation): "start burning" (SRD Burning). */

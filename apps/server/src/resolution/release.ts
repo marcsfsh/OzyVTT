@@ -30,8 +30,10 @@ export function releaseHideAndReady(ctx: ResolveContext): void {
     endEffect(state, attacker.id, effect.id);
     effectsEnded.push(endedEffect(attacker, effect));
   };
-  // SRD Hide: the attack still had Invisible's advantage, then the hidden effect ends.
-  if (action.attack !== undefined || action.save !== undefined) end("hidden");
+  // SRD Hide: the attack still had Invisible's advantage, then the hidden effect ends. So does casting a spell with a
+  // Verbal component ("you cast a spell with a Verbal component").
+  const spell = action.spellId ? ctx.deps.catalog?.spellRecord?.(action.spellId) : undefined;
+  if (action.attack !== undefined || action.save !== undefined || spell?.components.verbal === true) end("hidden");
   // A released spell of several rays (Scorching Ray) keeps its ready until its last ray, all on the one Reaction.
   const ray = readiedRay(ctx);
   if (ray === "held") return;
