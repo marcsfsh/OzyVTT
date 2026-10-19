@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { experienceForChallenge } from "@vtt/rules-5e";
+import { experienceForChallenge, experienceInLair } from "@vtt/rules-5e";
 import { RichText } from "./RichText";
 import { formatChallenge } from "./format";
 import {
@@ -91,7 +91,20 @@ export function StatBlock({ monster, className }: Readonly<{ monster: StatBlockR
     typeof bag.type === "string" ? title(bag.type) : "Being"
   }${typeof bag.alignment === "string" && bag.alignment ? `, ${title(bag.alignment)}` : ""}`;
   const immunities = [defences(monster, "damageImmunities"), defences(monster, "conditionImmunities")].filter(Boolean);
-  const experience = rating === null ? null : experienceForChallenge(rating);
+  // The XP the stat block prints, else its rating's; a legendary creature with a lair prints a second for it.
+  const experience =
+    typeof bag.experiencePoints === "number"
+      ? bag.experiencePoints
+      : rating === null
+        ? null
+        : experienceForChallenge(rating);
+  const inLair =
+    rating === null
+      ? null
+      : experienceInLair(
+          rating,
+          traits.map((trait) => trait.name)
+        );
 
   return (
     <article className={className ? `sb ${className}` : "sb"} aria-label={`${name} stat block`}>
@@ -146,7 +159,7 @@ export function StatBlock({ monster, className }: Readonly<{ monster: StatBlockR
         <Line label="CR">
           {rating === null
             ? "None"
-            : `${formatChallenge(rating)} (XP ${experience?.toLocaleString("en") ?? "None"}; PB ${signed(proficiency)})`}
+            : `${formatChallenge(rating)} (XP ${experience?.toLocaleString("en") ?? "None"}${inLair !== null ? `, or ${inLair.toLocaleString("en")} in lair` : ""}; PB ${signed(proficiency)})`}
         </Line>
       </div>
       {traits.length > 0 && (
