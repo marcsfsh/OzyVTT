@@ -36,6 +36,8 @@ import {
 } from "../movement-narration.js";
 import { releaseGrapplesOutOfRange, type EffectNarration } from "../effects.js";
 import { endZoneAndItsSpell, placeZone, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
+import { zoneContentOf } from "../spell-zone-state.js";
+import { policeBarrier, shellsForcedBy, teleportBarredAt } from "../zone-barriers.js";
 import { zoneMovementOptions } from "../zone-ground.js";
 import { movementCost } from "../terrain.js";
 import { moveEncounterToken, moveSceneToken } from "../token-placement.js";
@@ -192,16 +194,26 @@ export const mapCommands = [
         // A spell area the move enters (or that its mover carries over others) acts on whoever it meets.
         const arrived = moverToken?.position ?? null;
         if (from !== null && arrived !== null) {
+          const zoneDeps = kit.zoneDeps(state, geometry);
+          // SRD Forbiddance: "creatures can't teleport into the area".
+          const ward =
+            mode === "teleport" ? teleportBarredAt(state, arrived, moverToken?.sizeCells ?? 1, zoneDeps) : null;
+          if (ward) {
+            const note = policeBarrier(
+              state,
+              request.override ?? null,
+              "movement.teleport",
+              `${kit.actorName(actorId)} can't teleport into ${ward}.`
+            );
+            if (note) movementWarning = movementWarning ? `${movementWarning} ${note}` : note;
+          }
           const path =
             mode === "teleport"
               ? [from, arrived]
               : (movementCost(state, geometry, actorId, from, arrived)?.path ?? [from, arrived]);
           zoneEvents.push(
-            ...zonesAfterMove(
-              state,
-              { moverId: actorId, path, teleported: mode === "teleport" },
-              kit.zoneDeps(state, geometry)
-            )
+            ...zonesAfterMove(state, { moverId: actorId, path, teleported: mode === "teleport" }, zoneDeps),
+            ...(mode === "teleport" ? [] : shellsForcedBy(state, actorId, path, zoneDeps))
           );
         }
         // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.
@@ -301,6 +313,8 @@ export const mapCommands = [
         if (!zone) throw new CommandRejectedError("That spell's area has already ended.");
         // The spell's own area decides the shape and the size; the drag only places and points it.
         const placed = zone.area ? templateOfArea(geometry.calibration!, template, zone.area) : template;
+        // A nearly imperceptible glyph is drawn for the GM and its caster's player alone.
+        const unseen = zoneContentOf(zone, kit.equipmentCatalog())?.trigger.hidden === true;
         addAnnotation(
           state,
           {
@@ -309,7 +323,8 @@ export const mapCommands = [
             shape: placed.shape,
             origin: placed.origin,
             target: placed.target,
-            visibility: "public",
+            visibility: unseen ? "gm-actor" : "public",
+            ...(unseen ? { visibleToActorId: zone.casterId } : {}),
             reachesPastMap: zone.area !== null,
             actor: annotationActorOf(principal),
             now: Date.now()

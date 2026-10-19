@@ -89,6 +89,10 @@ const DAMAGE_CHOICES: Readonly<Record<string, readonly DamageType[]>> = {
   "conjure-elemental": ["lightning", "thunder", "fire", "cold"],
   // Radiant for a good or neutral caster, Necrotic for an evil one.
   "spirit-guardians": ["radiant", "necrotic"],
+  // "Radiant or Necrotic damage (your choice when you cast this spell)".
+  forbiddance: ["radiant", "necrotic"],
+  // The explosive rune's "Acid, Cold, Fire, Lightning, or Thunder damage (your choice when you create the glyph)".
+  "glyph-of-warding": ["thunder", "acid", "cold", "fire", "lightning"],
   // The Resistance the touched creature gains: "one damage type of your choice".
   "protection-from-energy": ["acid", "cold", "fire", "lightning", "thunder"]
 };
@@ -357,8 +361,14 @@ const ONCE_PER_TURN = "A creature makes this save only once per turn.";
 const ENTER_OR_END_ONCE: Zone = { on: ["enter", "end-turn"], oncePerTurn: true };
 /** "The area is Difficult Terrain" for every creature. */
 const DIFFICULT: NonNullable<Zone["terrain"]> = { cost: 2 };
-/** A row for an area that only changes the ground while it lasts, with nothing to roll. */
-const ground = (when: string, zone: Zone): Later => ({ name: "ground", activation: "other", when, damage: [], zone });
+/** A row for an area that only lasts on the map (its ground, its barrier), with nothing to roll. */
+const lasting = (name: string, when: string, zone: Zone): Later => ({
+  name,
+  activation: "other",
+  when,
+  damage: [],
+  zone
+});
 
 /**
  * What a spell lets its caster do after the cast (SRD 5.2.1 text): the attacks a summoned thing or a held flame
@@ -367,6 +377,26 @@ const ground = (when: string, zone: Zone): Later => ({ name: "ground", activatio
  * that moment; the rest stay with the GM, whom the cast reminds.
  */
 const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
+  // "An alarm alerts you whenever a creature touches or enters the warded area", sparing the creatures you designate:
+  // your allies.
+  alarm: [
+    {
+      name: "alarm",
+      activation: "other",
+      when: "Whenever a creature other than your allies enters the warded area, the alarm alerts you.",
+      damage: [],
+      zone: { on: ["enter"], alerts: true, affects: "enemies" }
+    }
+  ],
+  // "The aura prevents creatures other than Constructs and Undead from passing or reaching through it."
+  "antilife-shell": [
+    lasting("barrier", "Creatures other than Constructs and Undead can't pass or reach through the Emanation.", {
+      on: [],
+      around: "caster",
+      feet: 10,
+      bars: { way: "both", except: ["construct", "undead"], reach: true }
+    })
+  ],
   "arcane-sword": [
     {
       name: "attack",
@@ -453,7 +483,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   ],
   // "The ground in the Emanation is Difficult Terrain for your enemies."
   "conjure-minor-elementals": [
-    ground("The ground in the Emanation is Difficult Terrain for your enemies.", {
+    lasting("ground", "The ground in the Emanation is Difficult Terrain for your enemies.", {
       on: [],
       around: "caster",
       feet: 15,
@@ -506,7 +536,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   ],
   // "For the duration, these plants turn the ground in the area into Difficult Terrain."
   entangle: [
-    ground("The plants turn the ground in the area into Difficult Terrain.", {
+    lasting("ground", "The plants turn the ground in the area into Difficult Terrain.", {
       on: [],
       terrain: { cost: 2, kind: "plants" }
     })
@@ -519,6 +549,22 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       save: { ability: "dex", successDamage: "none", failureConditions: [] },
       damage: [{ formula: "4d8", type: "force" }],
       zone: { on: ["caster-turn-start"], around: "point", feet: 5, affects: "enemies" }
+    }
+  ],
+  // "When a creature of a chosen type enters the spell's area for the first time on a turn or ends its turn there, the
+  // creature takes 5d10 Radiant or Necrotic damage", and "creatures can't teleport into the area". Every type the
+  // spell names is chosen.
+  forbiddance: [
+    {
+      name: "ward",
+      activation: "other",
+      when: "An Aberration, Celestial, Elemental, Fey, Fiend or Undead that enters the area for the first time on a turn or ends its turn there takes the damage. No creature can teleport into the area.",
+      damage: [{ formula: "5d10", type: "radiant" }],
+      zone: {
+        ...ENTER_OR_END_ONCE,
+        types: ["aberration", "celestial", "elemental", "fey", "fiend", "undead"],
+        noTeleport: true
+      }
     }
   ],
   "flame-blade": [
@@ -555,6 +601,18 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       save: { ability: "dex", successDamage: "none", failureConditions: ["prone"] },
       damage: [],
       zone: { on: ["enter", "end-turn"], terrain: DIFFICULT }
+    }
+  ],
+  // Explosive Rune: a creature that sets the glyph off (stepping on it) makes it erupt in a "20-foot-radius Sphere
+  // centered on the glyph", and "once a glyph is triggered, this spell ends". The glyph is nearly imperceptible.
+  "glyph-of-warding": [
+    {
+      name: "explosive rune",
+      activation: "other",
+      when: "A creature that steps onto the glyph sets it off: each creature in the 20-foot-radius Sphere makes the save, and the spell ends.",
+      save: save("dex"),
+      damage: [{ formula: "5d8", type: "thunder" }],
+      zone: { on: ["enter", "spell-end"], around: "point", feet: 5, once: true, hidden: true }
     }
   ],
   "guardian-of-faith": [
@@ -601,11 +659,15 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   ],
   // "Hailstones turn ground in the Cylinder into Difficult Terrain until the end of your next turn."
   "ice-storm": [
-    ground("Hailstones turn the ground in the Cylinder into Difficult Terrain until the end of your next turn.", {
-      on: [],
-      terrain: { cost: 2, kind: "ice" },
-      untilCasterNextTurnEnd: true
-    })
+    lasting(
+      "ground",
+      "Hailstones turn the ground in the Cylinder into Difficult Terrain until the end of your next turn.",
+      {
+        on: [],
+        terrain: { cost: 2, kind: "ice" },
+        untilCasterNextTurnEnd: true
+      }
+    )
   ],
   "incendiary-cloud": [
     {
@@ -637,10 +699,18 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       zone: ENTER_OR_END_ONCE
     }
   ],
+  // A creature of a chosen type "can't willingly enter the Cylinder by nonmagical means". Every type the spell names is
+  // chosen, and the circle faces outward.
+  "magic-circle": [
+    lasting("barrier", "Celestials, Elementals, Fey, Fiends and Undead can't willingly enter the Cylinder.", {
+      on: [],
+      bars: { way: "in", types: ["celestial", "elemental", "fey", "fiend", "undead"] }
+    })
+  ],
   // Overgrowth: "A creature moving through that area must spend 4 feet of movement for every 1 foot it moves." The
   // plants stay overgrown, so the area stays until the GM ends it.
   "plant-growth": [
-    ground("A creature moving through the overgrown area spends 4 feet of movement for every foot.", {
+    lasting("ground", "A creature moving through the overgrown area spends 4 feet of movement for every foot.", {
       on: [],
       terrain: { cost: 4, kind: "plants" }
     })
@@ -1291,6 +1361,8 @@ const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   "conjure-elemental": { shape: "sphere", sizeFeet: 10, widthFeet: null },
   // "A 100-foot-radius circle centered on that point."
   earthquake: { shape: "cylinder", sizeFeet: 100, widthFeet: null },
+  // "Up to 40,000 square feet of floor space": a 200-foot square.
+  forbiddance: { shape: "cube", sizeFeet: 200, widthFeet: null },
   // The hound and the 5 feet it bites in.
   "faithful-hound": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "flaming-sphere": { shape: "sphere", sizeFeet: 5, widthFeet: null },

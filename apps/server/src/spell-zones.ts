@@ -4,6 +4,7 @@ import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { footprintInTemplate } from "./area-targeting.js";
 import { holdsFeature } from "./class-features.js";
+import { creatureTypeOf } from "./statblock-facts.js";
 import { areEnemies } from "./creature-sides.js";
 import { CONCENTRATING_TAG, endEffectIfPresent, type EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
@@ -165,8 +166,13 @@ export function movesFreelyOn(
   return holdsFeature(deps.resolveDefinition(creature.definitionId), trait.id, trait.name);
 }
 
+/** A creature's type, as its stat block prints it ("humanoid" for a character). */
+export const typeOf = (creature: Actor, deps: Pick<ZoneDeps, "resolveDefinition">): string | null =>
+  creatureTypeOf(creature, creature.definitionId ? deps.resolveDefinition(creature.definitionId) : undefined);
+
 /** The creatures a zone can act on: those on the map (in the fight, during one), except an Emanation's anchor, only
- *  the caster's enemies where the spell spares the rest, and none that its ground can't hold (a spider in the webs). */
+ *  the caster's enemies where the spell spares the rest, only the creature types it names, and none that its ground
+ *  can't hold (a spider in the webs). */
 export function exposed(
   state: GameState,
   zone: SpellZone,
@@ -179,6 +185,7 @@ export function exposed(
     if (trigger.around === "caster" && creature.id === zone.casterId) return [];
     if (trigger.affects === "enemies" && (!caster || !areEnemies(caster, creature, deps.resolveDefinition))) return [];
     if (kind && movesFreelyOn(creature, kind, deps, true)) return [];
+    if (trigger.types && !trigger.types.includes(typeOf(creature, deps) ?? "")) return [];
     // A defeated creature takes no more; a dying character does (damage at 0 HP is a failed death save).
     if (creature.hp.current <= 0 && (creature.kind !== "player-character" || (creature.deathSaves?.failures ?? 0) >= 3))
       return [];
@@ -240,6 +247,30 @@ function act(
     zone.entered = meeting === "enters" || meeting === "is caught by" ? [...zone.entered, creature.id] : zone.entered;
     zone.affected = zone.affected.includes(creature.id) ? zone.affected : [...zone.affected, creature.id];
   }
+  // SRD Alarm: "an alarm alerts you whenever a creature touches or enters the warded area". The GM is told who, and
+  // passes on the bell or the ping.
+  if (trigger.alerts) {
+    events.push({
+      kind: "effect",
+      text: `${spell.name}: ${creature.name} ${meeting} ${caster.name}'s warded area.`,
+      actorId: creature.id,
+      gmOnly: true
+    });
+    return;
+  }
+  // A glyph that bursts over its whole area once set off (Glyph of Warding's explosive rune): its spell ends, and the
+  // burst follows (`burstEndedZones`).
+  if (trigger.once && trigger.on.includes("spell-end")) {
+    events.push({
+      kind: "effect",
+      text: `${creature.name} sets off ${spell.name}.`,
+      actorId: creature.id,
+      source: { actorId: caster.id, name: caster.name }
+    });
+    events.push(...endZoneAndItsSpell(state, zone.id));
+    return;
+  }
+  if (trigger.once) events.push(...endZoneAndItsSpell(state, zone.id));
   const action = zoneAction(zone, spell, row);
   const parts = Array.from({ length: times }, () =>
     action.damage.map((part) => ({
@@ -549,7 +580,9 @@ export function burstEndedZones(state: GameState, deps: ZoneDeps): EffectNarrati
     const caster = state.actors.find((actor) => actor.id === zone.casterId);
     if (content && caster) {
       const { spell, row, trigger } = content;
-      const inside = insideTest(state, zone, trigger, spell, deps.geometry);
+      // The burst fills the whole area the cast placed, whatever set it off (a glyph stepped on).
+      const { around: _around, ...whole } = trigger;
+      const inside = insideTest(state, zone, whole, spell, deps.geometry);
       const caught = inside
         ? creaturesOnMap(state).filter((creature) => {
             const token = tokenOf(state, creature.id)!;

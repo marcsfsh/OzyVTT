@@ -151,3 +151,12 @@ export const answer = (state: GameState, actorId: string, total: number) =>
 
 export const hpOf = (state: GameState, actorId: string) =>
   state.actors.find((actor) => actor.id === actorId)!.hp.current;
+
+/** Puts a priced material a spell needs in the creature's pack ("Diamond dust", "Ruby dust"). */
+export function carry(state: GameState, actorId: string, name: string, quantity = 1): void {
+  const actor = state.actors.find((candidate) => candidate.id === actorId)!;
+  actor.inventory = [
+    ...actor.inventory,
+    { id: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), name, quantity, equipped: false, attuned: false }
+  ];
+}

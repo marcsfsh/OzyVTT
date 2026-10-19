@@ -318,6 +318,8 @@ export const actionCommands = [
         // Record the blast as a shape; id=commandId keeps re-delivery idempotent. A cone or line starts at its caster,
         // so one from a caster hidden from the table is drawn for the GM alone: it would point at where it hides.
         const fromHiddenCaster = originAtCaster && kit.hiddenFromTable(draft)(actorId);
+        // A nearly imperceptible glyph is drawn for the GM and its caster's player alone.
+        const unseenArea = spell ? zoneRowOf(spell)?.zone?.hidden === true : false;
         if (placed)
           addAnnotation(
             draft,
@@ -327,7 +329,8 @@ export const actionCommands = [
               shape: placed.shape,
               origin: placed.origin,
               target: placed.target,
-              visibility: fromHiddenCaster ? "gm-only" : "public",
+              visibility: fromHiddenCaster ? "gm-only" : unseenArea ? "gm-actor" : "public",
+              ...(unseenArea && !fromHiddenCaster ? { visibleToActorId: actorId } : {}),
               reachesPastMap: action.area !== undefined,
               actor: { sessionId: gmSessionId, role: "gm" },
               now: Date.now()

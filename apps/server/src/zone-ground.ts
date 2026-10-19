@@ -3,6 +3,7 @@ import { areEnemies } from "./creature-sides.js";
 import { zoneContentOf } from "./spell-zone-state.js";
 import { insideTest, liveZones, movesFreelyOn, speedHalvingAt, type ZoneDeps } from "./spell-zones.js";
 import type { MovementCostOptions } from "./terrain.js";
+import { barredStepFor } from "./zone-barriers.js";
 
 type Point = Readonly<{ x: number; y: number }>;
 type Inside = (position: Point, sizeCells: number) => boolean;
@@ -12,13 +13,14 @@ type Inside = (position: Point, sizeCells: number) => boolean;
  * Storm's hailstones are Difficult Terrain; Plant Growth's overgrowth and Wall of Thorns cost 4 feet of movement for
  * every foot), with Spirit Guardians' halved Speed, as the tests the movement cost reads: where a cell is Difficult
  * Terrain for it, and where a step costs double again. A creature that crosses the ground's kind freely (Web Walker in
- * webs, Ice Walk on ice) and one the area spares (an ally on Conjure Minor Elementals' ground) pays nothing extra.
+ * webs, Ice Walk on ice) and one the area spares (an ally on Conjure Minor Elementals' ground) pays nothing extra. The
+ * barriers that bar it a step come too (`zone-barriers.ts`).
  */
 export function zoneMovementOptions(
   state: GameState,
   actorId: string,
   deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">
-): Pick<MovementCostOptions, "difficultAt" | "halvedAt"> {
+): Pick<MovementCostOptions, "difficultAt" | "halvedAt" | "barredStep"> {
   const mover = state.actors.find((actor) => actor.id === actorId);
   if (!mover) return {};
   const difficult: Inside[] = [];
@@ -38,7 +40,9 @@ export function zoneMovementOptions(
     // 4 feet for every foot: Difficult Terrain's 2, doubled.
     if (terrain.cost === 4) doubled.push(inside);
   }
+  const barredStep = barredStepFor(state, actorId, deps);
   return {
+    ...(barredStep ? { barredStep } : {}),
     ...(difficult.length > 0 ? { difficultAt: (point: Point) => difficult.some((inside) => inside(point, 1)) } : {}),
     ...(doubled.length > 0
       ? { halvedAt: (point: Point, sizeCells: number) => doubled.some((inside) => inside(point, sizeCells)) }

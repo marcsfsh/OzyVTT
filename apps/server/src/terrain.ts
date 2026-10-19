@@ -91,6 +91,8 @@ export type MovementCostOptions = Readonly<{
   halvedAt?: (position: Point, sizeCells: number) => boolean;
   /** Whether a spell's area makes the cell with this centre Difficult Terrain for the mover (Web, Entangle). */
   difficultAt?: (position: Point) => boolean;
+  /** Whether a spell's barrier bars the mover's step between these two centres (Antilife Shell, Magic Circle). */
+  barredStep?: (from: Point, to: Point, sizeCells: number) => boolean;
 }>;
 
 /** The movement-blocking walls of the live scene (walls, closed doors, windows) in grid units, while its dynamic
@@ -173,7 +175,13 @@ export function movementCost(
       const center = gridToImage(calibration, { column: column + 0.5, row: row + 0.5 });
       return center.x >= 0 && center.y >= 0 && center.x <= geometry.width && center.y <= geometry.height;
     },
-    isStepOpen: (stepFrom, stepTo) => !footprintStepBlocked(stepFrom, stepTo, sizeCells, crosses),
+    isStepOpen: (stepFrom, stepTo) =>
+      !footprintStepBlocked(stepFrom, stepTo, sizeCells, crosses) &&
+      options.barredStep?.(
+        gridToImage(calibration, footprintCenter(stepFrom, sizeCells)),
+        gridToImage(calibration, footprintCenter(stepTo, sizeCells)),
+        sizeCells
+      ) !== true,
     extraPerStep: extra,
     ...(halvedAt
       ? {

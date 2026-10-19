@@ -155,6 +155,29 @@ describe("what one cast of an SRD spell does", () => {
     ]);
   });
 
+  it("marks the wards: an alarm, a glyph that bursts once, a ward by creature type, and barriers", () => {
+    const zoneOf = (id: string) => effectOf(id)!.laterActions?.find((row) => row.zone)?.zone;
+    expect(zoneOf("alarm")).toEqual({ on: ["enter"], alerts: true, affects: "enemies" });
+    expect(zoneOf("glyph-of-warding")).toEqual({
+      on: ["enter", "spell-end"],
+      around: "point",
+      feet: 5,
+      once: true,
+      hidden: true
+    });
+    expect(effectOf("glyph-of-warding")!.damageTypes).toEqual(["thunder", "acid", "cold", "fire", "lightning"]);
+    expect(zoneOf("forbiddance")).toMatchObject({
+      types: ["aberration", "celestial", "elemental", "fey", "fiend", "undead"],
+      noTeleport: true
+    });
+    expect(effectOf("forbiddance")!.laterActions?.[0]!.save).toBeUndefined();
+    expect(zoneOf("antilife-shell")?.bars).toEqual({ way: "both", except: ["construct", "undead"], reach: true });
+    expect(zoneOf("magic-circle")?.bars).toEqual({
+      way: "in",
+      types: ["celestial", "elemental", "fey", "fiend", "undead"]
+    });
+  });
+
   it("marks the ground an area makes difficult, and how long the ground stays", () => {
     const zoneOf = (id: string) => effectOf(id)!.laterActions?.find((row) => row.zone)?.zone;
     expect(zoneOf("entangle")).toEqual({ on: [], terrain: { cost: 2, kind: "plants" } });

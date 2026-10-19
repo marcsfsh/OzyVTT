@@ -87,6 +87,12 @@ const SpellDamageSchema = z
  * (entering counts once a turn anyway); `affects` "enemies" spares the caster's allies (Guardian of Faith; spirits that
  * harm the creatures the caster chooses); `damageCap` ends it once it has dealt that much (Guardian of Faith's 60).
  */
+/** A creature type as the stat blocks name it ("undead", "fey"). */
+const CreatureTypeIdSchema = z
+  .string()
+  .regex(/^[a-z][a-z-]*$/)
+  .max(40);
+
 export const SpellZoneSchema = z
   .object({
     /** When it acts; none for an area that only changes the ground (Entangle's plants, Ice Storm's hail). */
@@ -118,7 +124,31 @@ export const SpellZoneSchema = z
       .strict()
       .optional(),
     /** It lasts until the end of its caster's next turn, whatever the spell's own duration (Ice Storm's hailstones). */
-    untilCasterNextTurnEnd: z.literal(true).optional()
+    untilCasterNextTurnEnd: z.literal(true).optional(),
+    /** It acts only on creatures of these types (Forbiddance: Aberrations, Celestials, Elementals, Fey, Fiends and
+     *  Undead). */
+    types: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
+    /** It alerts its caster, with no save or damage (Alarm): the GM is told who set it off. */
+    alerts: z.literal(true).optional(),
+    /** The spell ends the first time it acts (Glyph of Warding: "Once a glyph is triggered, this spell ends"); with
+     *  `spell-end` it then bursts over its area. */
+    once: z.literal(true).optional(),
+    /** It is nearly imperceptible: its area is drawn for the GM and its caster alone (Glyph of Warding, Symbol). */
+    hidden: z.literal(true).optional(),
+    /** A barrier at its edge: the creatures it holds back can't move across it, into it (`way` "in": Magic Circle) or
+     *  either way ("both": Antilife Shell), and with `reach` can't reach through it with a melee attack that isn't
+     *  made with a Reach weapon. `types` it holds back, or every type `except` these; every creature when neither. */
+    bars: z
+      .object({
+        way: z.enum(["in", "both"]),
+        types: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
+        except: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
+        reach: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    /** No creature can teleport into it (Forbiddance). */
+    noTeleport: z.literal(true).optional()
   })
   .strict();
 export type SpellZone = z.infer<typeof SpellZoneSchema>;

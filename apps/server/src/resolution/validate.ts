@@ -32,6 +32,7 @@ import { sceneSight } from "../vision/sight.js";
 import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
 import { scrollOfAction } from "../scrolls.js";
 import { creatureTypeOf } from "../statblock-facts.js";
+import { reachBarredBy } from "../zone-barriers.js";
 import { builtinHandlerFor } from "./builtins.js";
 import {
   resolveHiddenCheck,
@@ -282,6 +283,9 @@ export function openResolve(
       "light.too-bright",
       `${attacker.name} stands in Bright Light. ${action.name} needs Dim Light or darkness.`
     ]);
+  // A melee attack can't reach through a barrier that holds its attacker back (Antilife Shell).
+  const shell = reachBarredBy(state, attacker, action, targets, deps);
+  if (shell) sightBlocks.push(["range.out-of-reach", shell]);
   for (const [rule, message] of sightBlocks) {
     const mode = effectiveModeFor(state.combat, rule);
     if (mode === "freeform") continue;

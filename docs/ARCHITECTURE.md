@@ -312,6 +312,11 @@ such a spell lets its caster do on later turns is offered while it lasts, at the
 (`lasting-spells.ts`). A zone lasts while its caster's Concentration does, or the effect a spell with none
 leaves on its caster, so it opens outside a fight too (where it acts on the creatures the GM moves into
 it), counts down on the game clock, outlasts a fight and is carried into the next one on the same map.
+A zone may act only on the creature types it names (Forbiddance), tell the GM who came in (Alarm), end
+its spell the first time it acts and burst over its area (Glyph of Warding, drawn for the GM and its
+caster alone), or raise a barrier at its edge (`zone-barriers.ts`): a step across it closes the path
+for the creatures it holds back (Antilife Shell, Magic Circle), a melee attack without a Reach weapon
+can't reach through Antilife Shell, and no creature teleports into Forbiddance.
 
 Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
 (`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long
