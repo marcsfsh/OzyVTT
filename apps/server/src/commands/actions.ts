@@ -45,6 +45,7 @@ import { castingMinutesOf } from "../resolution/long-casting.js";
 import { passTime } from "../rests.js";
 import { standsInSilence } from "../silence.js";
 import { bringSummons, familiarDelivery } from "../summons.js";
+import { distanceFromForce, settleForce, strikeOriginFor, struckFrom } from "../summon-strikes.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -271,6 +272,17 @@ export const actionCommands = [
               throw new CommandRejectedError(OUTSIDE_FIGHT_TARGETS);
           }
         }
+        // A spell's force (Spiritual Weapon's, an Arcane Eye) can't be harmed: an area passes over it, and nothing
+        // harmful targets it.
+        const untouchable = resolvedTargetIds.find(
+          (id) => draft.actors.find((actor) => actor.id === id)?.summon?.intangible
+        );
+        if (untouchable && template)
+          resolvedTargetIds = resolvedTargetIds.filter(
+            (id) => !draft.actors.find((actor) => actor.id === id)?.summon?.intangible
+          );
+        else if (untouchable && (action.attack || action.save || action.damage.length > 0))
+          throw new CommandRejectedError(`${kit.actorName(untouchable)} can't be harmed.`);
         // A barrier against spells (Globe of Invulnerability) leaves the creatures in it out of a lower spell cast from
         // outside it: the spell can target them and has no effect on them.
         const spellCast = castSpellOf(action, kit.equipmentCatalog().spellRecord);
@@ -298,8 +310,23 @@ export const actionCommands = [
                 distanceFeet: measured
               })
             : null;
-        const distanceFeet = (actorIdA: string, actorIdB: string): number | null =>
+        // A spell's force that strikes for its caster (Spiritual Weapon): the attack reaches from the force.
+        const force = strikeOriginFor(
+          draft,
+          {
+            userId: actorId,
+            action,
+            spell: action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined,
+            at: request.summon?.at,
+            targetId: resolvedTargetIds[0],
+            override: isPlayer ? null : (override ?? null)
+          },
+          geometry?.calibration || geometry?.scale ? geometry : null
+        );
+        const fromCaster = (actorIdA: string, actorIdB: string): number | null =>
           courier && actorIdA === actorId ? measured(courier, actorIdB) : measured(actorIdA, actorIdB);
+        const distanceFeet =
+          force && geometry ? distanceFromForce(draft, actorId, force, geometry, fromCaster) : fromCaster;
         // The attack's d20 is held between a preview and its confirm, one per creature and turn (ADR-0012), so a
         // second look at the attack shows the same die. A typed die must be one the table takes.
         const holdKey = `attack:${actorId}`;
@@ -312,7 +339,7 @@ export const actionCommands = [
           draft.combat.mapAssetId === mapAssetId ? pushTokenAway(draft, input, geometry) : null;
         resolution = resolveDefinitionAction(
           draft,
-          action,
+          force ? struckFrom(action, force) : action,
           {
             actorId,
             targetIds: resolvedTargetIds,
@@ -342,7 +369,12 @@ export const actionCommands = [
             ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),
             ...(request.knockOut === true ? { knockOut: true } : {}),
             ...(request.shaping && request.shaping.length > 0 ? { shaping: request.shaping } : {}),
-            ...(request.summon ? { summon: request.summon } : {}),
+            // The force appears where its cast strikes from.
+            ...(force && force.markerId === null
+              ? { summon: { ...(request.summon ?? {}), at: force.at } }
+              : request.summon
+                ? { summon: request.summon }
+                : {}),
             ...(template ? { areaPlaced: true } : {}),
             ...(request.ready === true ? { ready: true } : {}),
             ...(request.moveFirst === true ? { moveFirst: true } : {}),
@@ -378,6 +410,9 @@ export const actionCommands = [
         );
         // A committed use counts toward the sheet's most-used options; a preview counts with its confirm.
         if (!resolution.preview) countOptionUse(draft, actorId, actionId);
+        // The force moved before it struck again.
+        if (force && geometry && !resolution.preview) settleForce(draft, force, geometry);
+        if (force?.note) resolution = { ...resolution, warnings: [...(resolution.warnings ?? []), force.note] };
         // The familiar's Reaction delivered the touch.
         if (courier && !resolution.preview && draft.combat.active && !draft.combat.reactionsUsed.includes(courier))
           draft.combat = { ...draft.combat, reactionsUsed: [...draft.combat.reactionsUsed, courier] };

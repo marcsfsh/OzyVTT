@@ -118,6 +118,90 @@ const ROWS: Readonly<Record<string, SummonInput>> = {
     dodgesUncommanded: true,
     sharedResistance: true
   },
+  // A spectral force in a space within 60 feet: the cast's attack and each later one reach a creature within 5 feet
+  // of it, and each later Bonus Action moves it up to 20 feet first.
+  "spiritual-weapon": {
+    creatures: [{ monsterId: "spiritual-weapon" }],
+    rangeFeet: 60,
+    turn: "none",
+    intangible: true,
+    strikesFrom: { reachFeet: 5, moveFeet: 20 }
+  },
+  // A spectral sword within 90 feet; each later Bonus Action moves it up to 30 feet before it strikes again.
+  "arcane-sword": {
+    creatures: [{ monsterId: "arcane-sword" }],
+    rangeFeet: 90,
+    turn: "none",
+    intangible: true,
+    strikesFrom: { reachFeet: 5, moveFeet: 30 }
+  },
+  // A Fey spirit in a space within 60 feet; each later Bonus Action teleports it up to 30 feet before it attacks.
+  "conjure-fey": {
+    creatures: [{ monsterId: "fey-spirit" }],
+    rangeFeet: 60,
+    turn: "none",
+    intangible: true,
+    strikesFrom: { reachFeet: 5, moveFeet: 30, teleports: true }
+  },
+  // An Invisible, invulnerable eye within 30 feet whose sight its caster shares, with Darkvision 30 feet; a Bonus
+  // Action moves it up to 30 feet.
+  "arcane-eye": {
+    creatures: [{ monsterId: "arcane-eye" }],
+    rangeFeet: 30,
+    turn: "none",
+    intangible: true,
+    sight: "always",
+    commandedWith: "bonus-action",
+    commandMove: 30,
+    noAttacks: true
+  },
+  // A Large hand within 120 feet, AC 20 with its caster's Hit Point maximum: each of its effects reaches a creature
+  // within 5 feet of it after it moves up to 60 feet, and the spell ends if it drops to 0 Hit Points.
+  "arcane-hand": {
+    creatures: [{ monsterId: "arcane-hand" }],
+    rangeFeet: 120,
+    turn: "none",
+    strikesFrom: { reachFeet: 5, moveFeet: 60 },
+    endsSpell: true,
+    noAttacks: true
+  },
+  // A spectral hand within 30 feet; a Magic action moves it up to 30 feet, and it vanishes more than 30 feet from its
+  // caster or when the spell is cast again.
+  "mage-hand": {
+    creatures: [{ monsterId: "mage-hand" }],
+    rangeFeet: 30,
+    turn: "none",
+    intangible: true,
+    commandedWith: "action",
+    commandMove: 30,
+    leashFeet: 30,
+    onlyOne: true,
+    noAttacks: true
+  },
+  // An intangible, invulnerable double where its caster stands, whose eyes and ears its caster shares; a Magic action
+  // moves it up to twice its caster's Speed.
+  mislead: {
+    creatures: [{ monsterId: "illusory-double" }],
+    turn: "none",
+    intangible: true,
+    sight: "always",
+    commandedWith: "action",
+    commandMove: "twice-user-speed",
+    noAttacks: true
+  },
+  // A copy of its caster anywhere within range its caster has seen, whose eyes and ears its caster shares; a Magic
+  // action moves it up to 60 feet, and any damage ends it and the spell.
+  "project-image": {
+    creatures: [{ monsterId: "illusory-copy" }],
+    rangeFeet: 1000,
+    turn: "none",
+    sight: "always",
+    commandedWith: "action",
+    commandMove: 60,
+    endsOnDamage: true,
+    endsSpell: true,
+    noAttacks: true
+  },
   // An Invisible force within 60 feet (AC 10, 1 Hit Point, Strength 2) that can't attack: once on each of the caster's
   // turns a Bonus Action moves it 15 feet, and the spell ends if it is more than 60 feet away.
   "unseen-servant": {

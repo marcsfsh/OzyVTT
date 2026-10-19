@@ -349,10 +349,14 @@ const sharesSpace = (state: GameState, actorId: string, input: MovementRulesInpu
   return (swarmOnly ? ["Swarm"] : SHARES_SPACE).some((name) => holdsFeature(definition, name, name));
 };
 
+/** A spell's force that neither blocks a space nor is blocked (Spiritual Weapon's force, an Arcane Eye). */
+const intangible = (state: GameState, actorId: string): boolean =>
+  state.actors.find((actor) => actor.id === actorId)?.summon?.intangible === true;
+
 /** SRD: "You can't willingly end a move in a space occupied by another creature." Hidden creatures don't count, so
  *  the refusal can't give one away; neither do the creatures the mover drags. */
 function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Point, everyone = false): boolean {
-  if (!input.calibration || sharesSpace(state, input.actorId, input)) return false;
+  if (!input.calibration || sharesSpace(state, input.actorId, input) || intangible(state, input.actorId)) return false;
   const moverToken = state.combat.tokens.find((token) => token.actorId === input.actorId);
   const mine = cellsAt(input.calibration, to, moverToken?.sizeCells ?? 1);
   const feetPerCell = input.calibration.distancePerCell;
@@ -363,7 +367,7 @@ function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Po
     if (ridesWith(state, input.actorId, token.actorId)) return false;
     // A creature above or below the mover's space at the end isn't in it (a flier over a goblin).
     if (moverToken && !sharesHeight(moverToken, token, feetPerCell, input.toAltitudeFeet ?? 0)) return false;
-    if (sharesSpace(state, token.actorId, input, true)) return false;
+    if (sharesSpace(state, token.actorId, input, true) || intangible(state, token.actorId)) return false;
     if (!everyone && state.actors.find((actor) => actor.id === token.actorId)?.visibility === "gm-only") return false;
     if (!everyone && input.perceives && !input.perceives(token.actorId)) return false;
     for (const cell of cellsAt(input.calibration!, token.position, token.sizeCells ?? 1))

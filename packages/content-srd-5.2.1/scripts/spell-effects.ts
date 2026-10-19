@@ -415,6 +415,31 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       }
     )
   ],
+  // "When you cast the spell and as a Bonus Action on your later turns, you can move the hand up to 60 feet and then
+  // cause one of the following effects": each reaches from the hand (`spell-summons.ts`). Forceful Hand's push and
+  // Interposing Hand's cover are the table's.
+  "arcane-hand": [
+    {
+      name: "clenched fist",
+      activation: "bonus-action",
+      when: "The hand moves up to 60 feet and strikes a target within 5 feet of it with a melee spell attack.",
+      attackRange: melee(125),
+      damage: [{ formula: "5d8", type: "force" }]
+    },
+    {
+      name: "grasping hand",
+      activation: "bonus-action",
+      when: "The hand moves up to 60 feet and grapples a Huge or smaller creature within 5 feet of it that fails a Dexterity save.",
+      save: { ability: "dex", successDamage: "none", failureConditions: ["grappled"] },
+      damage: []
+    },
+    {
+      name: "crush",
+      activation: "bonus-action",
+      when: "While the hand grapples a creature, a Bonus Action crushes it.",
+      damage: [{ formula: "4d6", type: "bludgeoning", addsModifier: true }]
+    }
+  ],
   "arcane-sword": [
     {
       name: "attack",
@@ -1333,6 +1358,15 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "target",
     duration: { type: "manual" },
     baseArmorClass: 13
+  }),
+  // "You gain the Invisible condition ... the invisibility ends immediately after you make an attack roll, deal damage,
+  // or cast a spell"; the double it leaves keeps the spell going (`spell-summons.ts`).
+  mislead: spellGrant({
+    name: "Mislead",
+    tags: ["mislead", "until-it-acts"],
+    target: "self",
+    duration: { type: "manual" },
+    conditions: ["invisible"]
   }),
   // "If a creature lands before the spell ends, the creature takes no damage from the fall, and the spell ends for
   // that creature." The engine lands a creature that carries it without damage (`falling.ts`).

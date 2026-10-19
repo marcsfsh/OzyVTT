@@ -90,9 +90,13 @@ export function nearestOpenSpace(state: GameState, actorId: string, at: Point, g
       for (let row = 0; row < size; row++) cells.push(`${origin.column + column},${origin.row + row}`);
     return cells;
   };
+  // A spell's force (Spiritual Weapon's) fills no space.
+  const intangible = new Set(state.actors.filter((actor) => actor.summon?.intangible).map((actor) => actor.id));
   const filled = new Set(
     state.combat.tokens.flatMap((token) =>
-      token.actorId === actorId || !token.position ? [] : cellsAt(token.position, token.sizeCells ?? 1)
+      token.actorId === actorId || !token.position || intangible.has(token.actorId)
+        ? []
+        : cellsAt(token.position, token.sizeCells ?? 1)
     )
   );
   const open = (point: Point) =>

@@ -2,7 +2,7 @@ import { GAME_PATHS } from "@vtt/api-contract";
 import { GameStateSchema, type GameState } from "@vtt/domain";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { addActorFromDefinition, importActorDefinition } from "../src/actor-roster.js";
-import { spellCastMechanics } from "../src/item-actions.js";
+import { laterSpellAction, spellCastMechanics } from "../src/item-actions.js";
 import { bootMovementServer, cell } from "./movement-fixtures.js";
 import { build, catalog, view, wizardInput } from "./spell-casters.js";
 
@@ -43,13 +43,30 @@ export const SUMMON_SPELLS = [
   "phantom-steed",
   "unseen-servant",
   "dominate-person",
-  "dominate-beast"
+  "dominate-beast",
+  "spiritual-weapon",
+  "arcane-sword",
+  "conjure-fey",
+  "arcane-eye",
+  "arcane-hand",
+  "mage-hand",
+  "mislead",
+  "project-image"
 ] as const;
 
-/** The Wizard's sheet with a cast action for every summoning spell. */
+/** What a spell lets its caster do once it is up (Spiritual Weapon's later attack), at the test Wizard's numbers. */
+const laterActionsOf = (spellId: string): ActorAction[] => {
+  const spell = view.spellRecord(spellId)!;
+  return (spell.effect?.laterActions ?? []).map((later) => laterSpellAction(spell, later, NUMBERS));
+};
+
+/** The Wizard's sheet with a cast action for every summoning spell, and what each lets it do later. */
 export const summoner: ActorDefinition = (() => {
   const built = build(wizardInput(["magic-missile", "shield"]));
-  return { ...built, actions: [...built.actions, ...SUMMON_SPELLS.map(castActionOf)] };
+  return {
+    ...built,
+    actions: [...built.actions, ...SUMMON_SPELLS.map(castActionOf), ...SUMMON_SPELLS.flatMap(laterActionsOf)]
+  };
 })();
 
 const monsterActor = (state: GameState, monsterId: string, id: string, hp?: number) => {

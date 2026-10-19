@@ -7,12 +7,13 @@ import type { ActorAction, ActorDefinition, SummonCreature, SummonForm } from "@
  */
 
 /** What a scaled stat block reads from its summoner: its spell attack bonus, spell save DC, spellcasting ability
- *  modifier and Proficiency Bonus. */
+ *  modifier, Proficiency Bonus and Hit Point maximum. */
 export type SummonerNumbers = Readonly<{
   attackBonus: number;
   saveDc: number;
   modifier: number;
   proficiencyBonus: number;
+  hitPointMaximum?: number;
 }>;
 
 export type StatBlockPicks = Readonly<{
@@ -196,7 +197,10 @@ function scaledStatBlock(
   const speeds: Partial<Record<"fly" | "climb" | "swim", number>> = { ...(form?.speeds ?? {}) };
   for (const row of scaling.speedsFrom ?? []) if (level >= row.level) speeds[row.mode] = row.feet;
   const size = form?.size ?? definition.size;
-  const hitPoints = form?.hitPoints ?? definition.hitPoints.maximum + above * (scaling.hitPointsPerLevel ?? 0);
+  const hitPoints =
+    scaling.hitPointsOfSummoner && numbers.hitPointMaximum !== undefined
+      ? numbers.hitPointMaximum
+      : (form?.hitPoints ?? definition.hitPoints.maximum + above * (scaling.hitPointsPerLevel ?? 0));
   return {
     ...rest,
     name: form && (scaling.forms?.length ?? 0) > 1 ? `${definition.name} (${form.name})` : definition.name,

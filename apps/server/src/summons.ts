@@ -6,6 +6,7 @@ import { sideOf } from "./creature-sides.js";
 import {
   addEffect,
   endConcentrationSustainedBy,
+  endEffectIfPresent,
   endEffectsSustainedBy,
   makeEffect,
   type EffectNarration
@@ -279,8 +280,14 @@ function joinMap(
       ...createEncounterTokens([{ actorId: actor.id, sizeCells: actor.sizeCells ?? 1, size: actor.size }], geometry)
     ]
   };
+  // A force that can't be harmed or blocked stands where it was put, whoever is there.
   if (at && state.combat.mapAssetId)
-    moveEncounterToken(state, actor.id, nearestOpenSpace(state, actor.id, at, geometry), geometry);
+    moveEncounterToken(
+      state,
+      actor.id,
+      actor.summon?.intangible ? at : nearestOpenSpace(state, actor.id, at, geometry),
+      geometry
+    );
 }
 
 /** The effect that keeps a summoned creature: on the creature, ending with the cast's Concentration or after the
@@ -415,7 +422,9 @@ export function bringSummons(state: GameState, request: SummonRequest, deps: Sum
       ...(summon.commandMove !== undefined ? { commandMove: summon.commandMove } : {}),
       ...(summon.sight ? { sight: summon.sight } : {}),
       ...(summon.dismiss ? { dismiss: summon.dismiss } : {}),
-      ...(summon.deliversTouch !== undefined ? { deliversTouch: summon.deliversTouch } : {})
+      ...(summon.deliversTouch !== undefined ? { deliversTouch: summon.deliversTouch } : {}),
+      ...(summon.strikesFrom ? { strikesFrom: summon.strikesFrom } : {}),
+      ...(summon.endsSpell && request.castId !== null ? { endsSpell: request.castId } : {})
     };
     if (summon.allegiance === "user")
       actor.control = {
@@ -555,6 +564,7 @@ export function retireSummoned(
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const events: EffectNarration[] = [];
+  const endsCast = actor.summon?.endsSpell ?? null;
   if (state.combat.active && state.combat.turnActorId === actorId && state.combat.initiative.length > 1) {
     if (options.advance) options.advance(state);
     if (state.combat.turnActorId === actorId) {
@@ -606,6 +616,14 @@ export function retireSummoned(
   state.actors = state.actors.filter((candidate) => candidate.id !== actorId);
   pruneSummonDefinitions(state);
   if (!options.silent) events.push({ kind: "effect", text: `${actor.name} ${why}.`, actorId });
+  // Its spell ends with it (Arcane Hand at 0 Hit Points): its caster's Concentration on that cast.
+  if (endsCast) {
+    const holder = state.actors.find((candidate) =>
+      candidate.effects.some((effect) => effect.castId === endsCast && effect.concentration)
+    );
+    const holding = holder?.effects.find((effect) => effect.castId === endsCast && effect.concentration);
+    if (holder && holding) events.push(...endEffectIfPresent(state, holder.id, holding.id));
+  }
   return events;
 }
 

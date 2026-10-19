@@ -1,6 +1,8 @@
 /**
  * The stat blocks SRD 5.2.1 prints inside its summoning spells (Animate Objects, Find Steed, Giant Insect, Summon
- * Dragon), which the open5e source leaves out. Each is printed at the spell's own level with its summoner's numbers as
+ * Dragon) and items (a Figurine of Wondrous Power's Giant Fly), which the open5e source leaves out, and the tokens of
+ * the spells that put a force or an illusion on the map (Spiritual Weapon, Arcane Eye, Arcane Hand, Mislead). A
+ * spell's stat block is printed at the spell's own level with its summoner's numbers as
  * placeholders; `summonScaling` says how the engine scales it to the level it is cast at and fills in the summoner's
  * spell attack modifier, spell save DC and Proficiency Bonus (`apps/server/src/summon-stat-blocks.ts`). They carry no
  * Challenge Rating ("CR None"), so the encounter budget and the CR benchmarks leave them out.
@@ -437,11 +439,217 @@ const UNSEEN_SERVANT = statBlock({
   actions: []
 });
 
+/** Every damage type and condition: what a spell's invulnerable force is immune to. */
+const EVERY_DAMAGE = [
+  "acid",
+  "bludgeoning",
+  "cold",
+  "fire",
+  "force",
+  "lightning",
+  "necrotic",
+  "piercing",
+  "poison",
+  "psychic",
+  "radiant",
+  "slashing",
+  "thunder"
+] as const;
+const EVERY_CONDITION = [
+  "blinded",
+  "charmed",
+  "deafened",
+  "exhaustion",
+  "frightened",
+  "grappled",
+  "incapacitated",
+  "paralyzed",
+  "petrified",
+  "poisoned",
+  "prone",
+  "restrained",
+  "stunned",
+  "unconscious"
+] as const;
+
+/** A spell's token that is no creature and can't be harmed (Spiritual Weapon's force, an Arcane Eye, Mislead's double):
+ *  it marks where the spell acts from or sees from. Its user moves it; it never acts. */
+function force(
+  printed: Readonly<{
+    id: string;
+    name: string;
+    size?: ActorDefinition["size"];
+    description: string;
+    senses?: readonly string[];
+    invisible?: true;
+    fly?: number;
+  }>
+): ActorDefinition {
+  return statBlock({
+    id: printed.id,
+    name: printed.name,
+    summary: `${printed.size === "tiny" ? "Tiny" : "Medium"} force - CR none`,
+    size: printed.size ?? "medium",
+    type: "",
+    alignment: "unaligned",
+    abilityScores: { str: 1, dex: 10, con: 10, int: 1, wis: 10, cha: 1 },
+    armorClass: 10,
+    hitPoints: 1,
+    speeds: { walk: 0, ...(printed.fly ? { fly: printed.fly } : {}) },
+    senses: [...(printed.senses ?? [])],
+    passivePerception: 10,
+    languages: "None",
+    damageImmunities: EVERY_DAMAGE,
+    conditionImmunities: EVERY_CONDITION,
+    traits: [{ name: printed.invisible ? "Invisible" : "Spell Force", description: printed.description }],
+    ...(printed.invisible ? { traitMechanics: [{ kind: "invisible" as const, name: "Invisible" }] } : {}),
+    actions: []
+  });
+}
+
+/** Spiritual Weapon: "a floating, spectral force that resembles a weapon", whose attacks reach 5 feet from it. */
+const SPIRITUAL_WEAPON = force({
+  id: "spiritual-weapon",
+  name: "Spiritual Weapon",
+  description:
+    "A floating, spectral force that resembles a weapon. Its caster's attacks with the spell reach a creature within 5 feet of it, and a Bonus Action moves it up to 20 feet before each later attack."
+});
+
+/** Arcane Sword: "a spectral sword that hovers within range". */
+const ARCANE_SWORD = force({
+  id: "arcane-sword",
+  name: "Arcane Sword",
+  description:
+    "A spectral sword that hovers in the air. Its caster's attacks with the spell reach a creature within 5 feet of it, and a Bonus Action moves it up to 30 feet before each later attack."
+});
+
+/** Conjure Fey: "a Medium spirit from the Feywild ... it looks like a Fey creature of your choice". */
+const FEY_SPIRIT = force({
+  id: "fey-spirit",
+  name: "Fey Spirit",
+  description:
+    "A spirit from the Feywild that looks like a Fey creature. Its caster's attacks with the spell reach a creature within 5 feet of it, and a Bonus Action teleports it up to 30 feet before each later attack."
+});
+
+/** Arcane Eye: "an Invisible, invulnerable eye ... It also has Darkvision with a range of 30 feet." */
+const ARCANE_EYE = force({
+  id: "arcane-eye",
+  name: "Arcane Eye",
+  size: "tiny",
+  invisible: true,
+  fly: 30,
+  senses: ["darkvision 30 ft."],
+  description:
+    "An Invisible, invulnerable eye that hovers and sees in every direction, with Darkvision 30 ft. Its caster sees what it sees, and a Bonus Action moves it up to 30 feet."
+});
+
+/** Mage Hand: "a spectral, floating hand". */
+const MAGE_HAND = force({
+  id: "mage-hand",
+  name: "Mage Hand",
+  size: "tiny",
+  fly: 30,
+  description:
+    "A spectral, floating hand that can't attack, activate magic items or carry more than 10 pounds. A Magic action moves it up to 30 feet; it vanishes more than 30 feet from its caster."
+});
+
+/** Mislead: "an illusory double of you ... It is intangible and invulnerable." */
+const ILLUSORY_DOUBLE = force({
+  id: "illusory-double",
+  name: "Illusory Double",
+  description:
+    "An intangible, invulnerable illusion of its caster, who sees and hears through it. A Magic action moves it up to twice its caster's Speed."
+});
+
+/** Project Image: "an illusory copy of yourself ... If the illusion takes any damage, it disappears, and the spell
+ *  ends." It can be harmed, so it is no `force`. */
+const ILLUSORY_COPY = statBlock({
+  id: "illusory-copy",
+  name: "Illusory Copy",
+  summary: "Medium illusion - CR none",
+  size: "medium",
+  type: "",
+  alignment: "unaligned",
+  abilityScores: { str: 1, dex: 10, con: 10, int: 1, wis: 10, cha: 1 },
+  armorClass: 10,
+  hitPoints: 1,
+  speeds: { walk: 0 },
+  senses: [],
+  passivePerception: 10,
+  languages: "None",
+  conditionImmunities: EVERY_CONDITION,
+  traits: [
+    {
+      name: "Illusion",
+      description:
+        "An intangible copy of its caster, who sees and hears through it. A Magic action moves it up to 60 feet. Any damage makes it disappear, and the spell ends."
+    }
+  ],
+  actions: []
+});
+
+/** Arcane Hand: "a Large hand of shimmering magical energy ... an object that has AC 20 and Hit Points equal to your Hit
+ *  Point maximum. If it drops to 0 Hit Points, the spell ends." */
+const ARCANE_HAND = statBlock({
+  id: "arcane-hand",
+  name: "Arcane Hand",
+  summary: "Large object - CR none",
+  size: "large",
+  type: "",
+  alignment: "unaligned",
+  abilityScores: { str: 26, dex: 10, con: 10, int: 1, wis: 10, cha: 1 },
+  armorClass: 20,
+  hitPoints: 1,
+  speeds: { walk: 0, fly: 60 },
+  senses: [],
+  passivePerception: 10,
+  languages: "None",
+  damageImmunities: ["poison", "psychic"],
+  conditionImmunities: EVERY_CONDITION,
+  traits: [
+    {
+      name: "Hand of Force",
+      description:
+        "An object of shimmering magical energy that moves at its caster's command and doesn't occupy its space. Its caster's effects with the spell reach a creature within 5 feet of it, and each moves it up to 60 feet first. If it drops to 0 Hit Points, the spell ends."
+    }
+  ],
+  actions: [],
+  summonScaling: { baseLevel: 5, hitPointsOfSummoner: true }
+});
+
+/** A Figurine of Wondrous Power's Ebony Fly, whose Giant Fly the item prints. */
+const GIANT_FLY = statBlock({
+  id: "giant-fly",
+  name: "Giant Fly",
+  summary: "Large beast, unaligned - CR 0",
+  size: "large",
+  type: "beast",
+  alignment: "unaligned",
+  abilityScores: { str: 14, dex: 13, con: 13, int: 2, wis: 10, cha: 3 },
+  armorClass: 11,
+  hitPoints: 19,
+  speeds: { walk: 30, fly: 60 },
+  senses: ["darkvision 60 ft."],
+  passivePerception: 10,
+  languages: "None",
+  traits: [],
+  actions: []
+});
+
 /** The spell-printed stat blocks, beside the bestiary's own. */
 export const SUMMON_STAT_BLOCKS: readonly ActorDefinition[] = [
   ANIMATED_OBJECT,
+  ARCANE_EYE,
+  ARCANE_HAND,
+  ARCANE_SWORD,
   DRACONIC_SPIRIT,
+  FEY_SPIRIT,
+  GIANT_FLY,
   GIANT_INSECT,
+  ILLUSORY_COPY,
+  ILLUSORY_DOUBLE,
+  MAGE_HAND,
   OTHERWORLDLY_STEED,
+  SPIRITUAL_WEAPON,
   UNSEEN_SERVANT
 ];

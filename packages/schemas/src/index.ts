@@ -1511,6 +1511,18 @@ export const MAX_OPTION_USE_COUNT = 100_000;
  * A creature something brought onto the map (SRD 5.2.1 summoned creatures), and what keeps it there. The engine takes
  * it off the map and the roster when that ends (`summons.ts`). GM knowledge: a player is told only that it commands it.
  */
+/** Where a spell's attacks reach from when it brings a force to the map that strikes for it (Spiritual Weapon): a
+ *  creature within `reachFeet` of the force, which each later attack first moves up to `moveFeet`, or teleports that
+ *  far (Conjure Fey's spirit). */
+export const StrikesFromSchema = z
+  .object({
+    reachFeet: z.number().int().min(5).max(30),
+    moveFeet: z.number().int().min(5).max(120),
+    teleports: z.literal(true).optional()
+  })
+  .strict();
+export type StrikesFrom = z.infer<typeof StrikesFromSchema>;
+
 export const SummonedSchema = z
   .object({
     /** The creature that brought it. */
@@ -1547,7 +1559,12 @@ export const SummonedSchema = z
     /** How its user dismisses it (a Bonus Action for an elemental from a bowl, a Magic action for a familiar). */
     dismiss: z.enum(["bonus-action", "action"]).optional(),
     /** Its user's touch spells can be delivered through it within this many feet (a familiar: 100). */
-    deliversTouch: z.number().int().min(5).max(1000).optional()
+    deliversTouch: z.number().int().min(5).max(1000).optional(),
+    /** Its spell's attacks reach from it (Spiritual Weapon's force); see `StrikesFromSchema`. */
+    strikesFrom: StrikesFromSchema.optional(),
+    /** The cast whose Concentration ends when it is gone (Arcane Hand at 0 Hit Points, Project Image's copy when it
+     *  takes damage). */
+    endsSpell: z.string().min(1).max(120).optional()
   })
   .strict();
 export type Summoned = z.infer<typeof SummonedSchema>;
@@ -2863,6 +2880,11 @@ export const SummonSchema = z
     /** Its user's spells with a range of touch can be delivered through it, with its Reaction, while it is within this
      *  many feet of its user (a familiar: 100). */
     deliversTouch: z.number().int().min(5).max(1000).optional(),
+    /** The spell's attacks reach from it, not from its user (Spiritual Weapon's force, Arcane Sword, Conjure Fey's
+     *  spirit); see `StrikesFromSchema`. */
+    strikesFrom: StrikesFromSchema.optional(),
+    /** When it is gone before its time (0 Hit Points, damage), its spell ends too (Arcane Hand, Project Image). */
+    endsSpell: z.literal(true).optional(),
     /** Its user's spell attack bonus, spell save DC and spellcasting ability modifier, which a scaled stat block reads
      *  (`summonScaling`). The engine fills them when it makes a cast action. */
     numbers: z
@@ -3678,7 +3700,9 @@ export const SummonScalingSchema = z
     forms: z.array(SummonFormSchema).min(2).max(6).optional(),
     /** Actions whose damage type its summoner picks at the summon among the types the stat block resists (a Draconic
      *  Spirit's Breath Weapon). */
-    chosenDamageType: z.array(ActionIdSchema).max(3).optional()
+    chosenDamageType: z.array(ActionIdSchema).max(3).optional(),
+    /** Its Hit Points equal its summoner's Hit Point maximum (Arcane Hand). */
+    hitPointsOfSummoner: z.literal(true).optional()
   })
   .strict()
   .describe(

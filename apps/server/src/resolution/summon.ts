@@ -26,19 +26,21 @@ export function castWithoutConcentration(ctx: Pick<ResolveContext, "action" | "d
   return ctx.input.summon?.withoutConcentration === true && summonOf(ctx)?.concentrationOptional === true;
 }
 
-/** The user's spell attack bonus, spell save DC, spellcasting ability modifier and Proficiency Bonus: the cast's own
- *  numbers when the action carries them, else its sheet's. */
+/** The user's spell attack bonus, spell save DC, spellcasting ability modifier, Proficiency Bonus and Hit Point
+ *  maximum: the cast's own numbers when the action carries them, else its sheet's. */
 function summonerNumbers(ctx: ResolveContext, summon: Summon): SummonerNumbers {
   const definition = ctx.deps.definition;
   const proficiencyBonus = definition?.proficiencyBonus ?? 2;
-  if (summon.numbers) return { ...summon.numbers, proficiencyBonus };
+  const hitPointMaximum = ctx.attacker.hp.maximum;
+  if (summon.numbers) return { ...summon.numbers, proficiencyBonus, hitPointMaximum };
   const casting = resolveSpellcasting(definition?.spellcasting);
   const modifier = casting && definition ? abilityModifier(definition.abilityScores[casting.ability]) : 0;
   return {
     attackBonus: casting?.attackBonus ?? proficiencyBonus + modifier,
     saveDc: casting?.saveDc ?? 8 + proficiencyBonus + modifier,
     modifier,
-    proficiencyBonus
+    proficiencyBonus,
+    hitPointMaximum
   };
 }
 
