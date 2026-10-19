@@ -2,8 +2,10 @@ import { useState } from "react";
 import type {
   AnnotationShapeKind,
   AnnotationVisibility,
+  DoorState,
   EncounterTokenPosition,
   MutationResult,
+  ObjectStats,
   RulesBlocked
 } from "@vtt/domain";
 import { command } from "../lib/command";
@@ -28,6 +30,9 @@ export type BlockedMove = Readonly<{
 }>;
 
 const ASKED = "Asked the GM. Waiting for their call.";
+
+/** How a creature works on a door (`door:use`). */
+export type DoorWork = "pick" | "force" | "jam" | "pry" | "seal";
 
 export function useMapCommands({
   revision,
@@ -395,6 +400,28 @@ export function useMapCommands({
       open ? "The door could not be opened." : "The door could not be closed.",
       open ? "Door opened." : "Door closed."
     );
+  /** A creature beside a door picks, forces, pries, jams or seals it; the server rolls the check and says how it went. */
+  const workDoor = (wallId: string, actorId: string, how: DoorWork) => {
+    setVisionBusy(true);
+    void command("door:use", { wallId, actorId, how, expectedRevision: revision }).then((result) => {
+      setVisionBusy(false);
+      setMessage(result.ok ? (result.text ?? "") : (result.message ?? "That could not be done to the door."));
+    });
+  };
+  /** The GM sets what keeps a door shut, or clears it (null). */
+  const setDoorState = (wallId: string, door: DoorState | null) =>
+    runVision(
+      () => command("door:set-state", { wallId, door, ...scene, expectedRevision: revision }),
+      "The door could not be changed.",
+      "Door saved."
+    );
+  /** The GM gives a door or a wall its statistics as an object, or clears them (null). */
+  const setWallObject = (wallId: string, object: ObjectStats | null) =>
+    runVision(
+      () => command("object:set", { wallId, object, ...scene, expectedRevision: revision }),
+      "The statistics could not be saved.",
+      "Statistics saved."
+    );
   const addLight = (position: Point, light: Readonly<{ brightFeet: number; dimFeet: number }>) =>
     runVision(
       () =>
@@ -457,6 +484,9 @@ export function useMapCommands({
     removeWall,
     clearWalls,
     setDoorOpen,
+    workDoor,
+    setDoorState,
+    setWallObject,
     addLight,
     removeLight,
     forgetExplored

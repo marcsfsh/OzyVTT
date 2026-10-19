@@ -16,7 +16,7 @@ import type {
 import { Button, useDragSurface, useToastMute } from "@vtt/ui";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import { read } from "../lib/command";
-import { useTargeting } from "../encounter/targeting";
+import { resolveAtWall, useTargeting } from "../encounter/targeting";
 import { FogOverlay } from "./FogOverlay";
 import { gesturePreview } from "./gesturePreview";
 import { snapCellCenterPreview, useMapCalibration } from "./gridPreview";
@@ -38,7 +38,8 @@ import { useMapCommands } from "./useMapCommands";
 import { useMapGestures } from "./useMapGestures";
 import { useMapView } from "./useMapView";
 import { cameraFocus, useCameraFollow } from "./cameraFollow";
-import { VisionLayer } from "./VisionLayer";
+import { VisionLayer, type MapWall } from "./VisionLayer";
+import { DoorMenu } from "./DoorMenu";
 import { publishTableGeometry, usePlacementRequests, useTokenFocusRequests } from "./tableGeometry";
 import { MapSpotMenu, type SpotChoice } from "./MapSpotMenu";
 import { GridLines } from "./GridLines";
@@ -168,6 +169,8 @@ export function EncounterMap({
   const [contextMenu, setContextMenu] = useState<{ actorId: string; x: number; y: number } | null>(null);
   /** What a right-click or long press on an empty spot offers to put there. */
   const [spotMenu, setSpotMenu] = useState<{ point: { x: number; y: number }; x: number; y: number } | null>(null);
+  /** The door whose handle was tapped, and where its menu opens. */
+  const [doorMenu, setDoorMenu] = useState<{ wallId: string; x: number; y: number } | null>(null);
   /** A creature armed from outside the map (a scene's list): the next press on the map places it. */
   const [armedActorId, setArmedActorId] = useState<string | null>(null);
   usePlacementRequests((actorId) => {
@@ -414,7 +417,18 @@ export function EncounterMap({
     // A player's spot menu only places their own waiting token, so it opens only while one waits.
     ...(readOnly || (role === "player" && !tokens.some((placed) => placed.position === null && canMove(placed.actorId)))
       ? {}
-      : { onMapMenu: setSpotMenu })
+      : { onMapMenu: setSpotMenu }),
+    ...(readOnly ? {} : { onDoorMenu: setDoorMenu }),
+    // An attack or a spell aimed at a door or a wall of the live table.
+    ...(readOnly || moveSceneId
+      ? {}
+      : {
+          onWallAim: (wallId: string) =>
+            resolveAtWall(wallId, revision, (ok, text) => {
+              if (text) commands.setMessage(text);
+              else if (!ok) commands.setMessage("That could not be aimed at the wall.");
+            })
+        })
   });
 
   useEffect(() => {
@@ -783,7 +797,8 @@ export function EncounterMap({
                       cellSizePx={calibration?.cellSizePx ?? 50}
                       showWalls={role === "gm" && (gmVision?.enabled === true || isVisionTool(tool))}
                       erasing={role === "gm" && tool === "vision-erase"}
-                      onToggleDoor={(wallId, open) => void commands.setDoorOpen(wallId, open)}
+                      aiming={activeTargeting !== null && activeTargeting.mode !== "template" && !moveSceneId}
+                      onDoorMenu={(wallId, x, y) => setDoorMenu({ wallId, x, y })}
                     />
                   )}
                   <MarkLayer annotations={annotations} preview={preview} sizes={sizes} color={sessionColor} />
@@ -896,6 +911,31 @@ export function EncounterMap({
               onClose={() => setSpotMenu(null)}
             />
           )}
+          {doorMenu &&
+            (() => {
+              const walls: readonly MapWall[] = gmVision ? gmVision.walls : (playerVision?.walls ?? []);
+              const wall = walls.find((candidate) => candidate.id === doorMenu.wallId);
+              // Who works on the door: a player's own character, the GM's acting creature, on the live table.
+              const workerId = moveSceneId ? null : role === "gm" ? activeActorId : ownActorId;
+              const worker = workerId && tokensById.get(workerId)?.position ? actorsById.get(workerId) : undefined;
+              return wall ? (
+                <DoorMenu
+                  role={role}
+                  wall={wall}
+                  x={doorMenu.x}
+                  y={doorMenu.y}
+                  actorName={worker?.name ?? null}
+                  busy={commands.visionBusy}
+                  onOpen={(open) => commands.setDoorOpen(wall.id, open)}
+                  onWork={(how) => {
+                    if (worker) commands.workDoor(wall.id, worker.id, how);
+                  }}
+                  onSaveDoor={(door) => commands.setDoorState(wall.id, door)}
+                  onSaveObject={(object) => commands.setWallObject(wall.id, object)}
+                  onClose={() => setDoorMenu(null)}
+                />
+              ) : null;
+            })()}
           {contextMenu &&
             (() => {
               const actor = actorsById.get(contextMenu.actorId);

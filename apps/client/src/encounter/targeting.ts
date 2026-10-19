@@ -468,6 +468,57 @@ export function resolveActionDirect(
   });
 }
 
+/** What an attack on a door or a wall came to, as the map's status line says it. */
+export function objectAttackLine(
+  reply: Readonly<{ outcome?: "hit" | "crit" | "miss"; damage?: number; destroyed?: boolean }>
+): string {
+  if (reply.outcome === "miss") return "Miss.";
+  const hit = reply.outcome === "crit" ? "Critical hit" : "Hit";
+  const damage = reply.damage !== undefined ? ` · ${reply.damage} damage` : "";
+  return `${hit}${damage}.${reply.destroyed ? " It breaks." : ""}`;
+}
+
+/**
+ * Aims the live session at a door or a wall of the map. An attack strikes it as an object (`object:attack`); a spell
+ * acts on it (`action:resolve` with `wallId`: Knock, Arcane Lock, Passwall, Disintegrate). The server checks reach,
+ * range and sight, and whether the spell acts on walls at all.
+ */
+export function resolveAtWall(
+  wallId: string,
+  revision: number | undefined,
+  onResult: (ok: boolean, message?: string) => void
+) {
+  if (!session || busy) return;
+  const { attackerId, action, slotLevel } = session;
+  busy = true;
+  blockedPrompt = null;
+  emit();
+  const done = (ok: boolean, message?: string) => {
+    busy = false;
+    if (ok) session = null;
+    emit();
+    onResult(ok, message);
+  };
+  const expected = revision !== undefined ? { expectedRevision: revision } : {};
+  if (action.attackBonus !== null) {
+    void command("object:attack", { actorId: attackerId, actionId: action.id, target: { wallId }, ...expected }).then(
+      (reply) => done(reply.ok, reply.ok ? objectAttackLine(reply) : reply.message)
+    );
+    return;
+  }
+  void command("action:resolve", {
+    actorId: attackerId,
+    actionId: action.id,
+    wallId,
+    commit: true,
+    ...(slotLevel !== undefined ? { slotLevel } : {}),
+    ...expected
+  }).then((response) => {
+    if (response.ok && response.resolution) result = response.resolution;
+    done(response.ok, response.message);
+  });
+}
+
 /** Take the targeted action's own move before the rest of it (Pounce): the server spends the action and grants the
  *  move now; the action picked again after the move makes the rest at no further cost. */
 export function takeMoveFirst(onResult: (ok: boolean, message?: string) => void) {
