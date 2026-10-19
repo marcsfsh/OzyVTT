@@ -118,7 +118,11 @@ export const SpellLaterActionSchema = z
     /** It moves the area the spell left up to this many feet, to where its template is placed (Moonbeam's Magic
      *  action: 60 feet; Flaming Sphere's ram: 30). Its save, if any, falls on the creatures the area moves onto. */
     movesArea: z
-      .object({ feet: z.number().int().min(5).max(300) })
+      .object({
+        feet: z.number().int().min(5).max(300),
+        /** The area is placed again from its caster, pointing a new way (Gust of Wind's Line, turned). */
+        fromCaster: z.literal(true).optional()
+      })
       .strict()
       .optional()
   })

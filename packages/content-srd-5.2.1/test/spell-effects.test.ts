@@ -57,11 +57,17 @@ describe("what one cast of an SRD spell does", () => {
       "animal-shapes",
       "arcane-sword",
       "conjure-fey",
+      "gust-of-wind",
       "heat-metal",
       "hex",
       "moonbeam",
       "spiritual-weapon"
     ]);
+    // "As a Bonus Action on your later turns, you can change the direction in which the Line blasts from you."
+    expect(effectOf("gust-of-wind")!.laterActions?.[1]).toMatchObject({
+      activation: "bonus-action",
+      movesArea: { feet: 60, fromCaster: true }
+    });
     // "Until the spell ends, you can take a Magic action": the turn of the cast too.
     expect(effectOf("produce-flame")!.laterActions?.[0]?.laterTurnsOnly).toBeUndefined();
   });

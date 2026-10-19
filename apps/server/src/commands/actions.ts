@@ -282,6 +282,7 @@ export const actionCommands = [
                 casterId: actorId,
                 spell: moving.spell,
                 feet: moving.feet,
+                fromCaster: moving.fromCaster,
                 placed,
                 override: isPlayer ? null : (override ?? null),
                 widthFeet: action.area?.widthFeet ?? null

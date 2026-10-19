@@ -682,6 +682,28 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       movesArea: { feet: 30 }
     }
   ],
+  // "A creature that ends its turn in the Line must make the same save. Any creature in the Line must spend 2 feet of
+  // movement for every 1 foot it moves when moving closer to you", and "As a Bonus Action on your later turns, you can
+  // change the direction in which the Line blasts from you."
+  "gust-of-wind": [
+    {
+      name: "gust",
+      activation: "other",
+      when: "A creature that ends its turn in the Line makes the save, and a failure pushes it 15 feet away from you. Moving closer to you in the Line costs 2 feet for every foot.",
+      save: { ability: "str", successDamage: "none", failureConditions: [], failurePush: { feet: 15 } },
+      damage: [],
+      zone: { on: ["end-turn"], towardCaster: true }
+    },
+    {
+      name: "turn",
+      activation: "bonus-action",
+      when: "As a Bonus Action on your later turns, you point the Line another way from you.",
+      laterTurnsOnly: true,
+      damage: [],
+      area: { shape: "line", sizeFeet: 60, widthFeet: 10 },
+      movesArea: { feet: 60, fromCaster: true }
+    }
+  ],
   grease: [
     {
       name: "save",

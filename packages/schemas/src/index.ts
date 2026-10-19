@@ -3752,6 +3752,8 @@ export const AreaTriggerSchema = z
     stays: z.literal(true).optional(),
     /** It acts only on the creatures on the ground in it (Earthquake's "each creature on the ground in the area"). */
     grounded: z.literal(true).optional(),
+    /** A creature in it spends 2 feet of movement for every foot it moves closer to its caster (Gust of Wind). */
+    towardCaster: z.literal(true).optional(),
     /** A spell of this level or lower cast from outside it can't affect anything within, one level higher for each slot
      *  level the spell is cast above its own (Globe of Invulnerability's 5). */
     wardsSpells: z.number().int().min(0).max(9).optional()

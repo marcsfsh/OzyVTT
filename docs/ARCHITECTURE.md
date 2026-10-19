@@ -294,7 +294,8 @@ of a hidden thing. When in doubt, leave it out.
   so it charges those spaces as the server does. Players and the table screen get only the terrain the
   fog reveals, and with vision on only what the party has seen. A spell's area changes the ground while it
   lasts (`zone-ground.ts`): Web, Entangle or Ice Storm's hail make its cells Difficult Terrain, Plant Growth
-  and Wall of Thorns cost 4 feet for every foot, Conjure Minor Elementals' only for the caster's enemies, and
+  and Wall of Thorns cost 4 feet for every foot, Conjure Minor Elementals' only for the caster's enemies,
+  Gust of Wind's Line 2 feet for every foot a creature moves closer to its caster (`costlyStep`), and
   a creature whose trait frees it from that kind of ground (Web Walker, Ice Walk) pays nothing extra. The
   server alone charges it, on the ground (a mover off the ground passes over it as over painted terrain); the
   area itself is on the map.
@@ -396,8 +397,9 @@ is an effect each one holds while it stands inside (`zone-auras.ts`): the pipeli
 after every command, as its own write when anything changed. A later action that moves a spell's area
 (Moonbeam's Magic action, Flaming Sphere's ram) takes a template like a cast: the area moves there if that
 is within the spell's reach of where it stood, its save falls on the creatures the area moves onto, and no
-new shape is drawn (`zone-moves.ts`). A cloud that drifts (Cloudkill) moves straight away from its caster as
-the caster's turn starts. A cast's template grows with its slot where the spell says so (Fog Cloud), an
+new shape is drawn (`zone-moves.ts`). An area that blasts from its caster (Gust of Wind's Line) is turned
+instead: its new template must start at the caster. A cloud that drifts (Cloudkill) moves straight away from its
+caster as the caster's turn starts. A cast's template grows with its slot where the spell says so (Fog Cloud), an
 item's cast may place its own area (Cloak of Arachnida's doubled Web), and an Emanation that stays where
 its caster stood (Globe of Invulnerability) keeps lower spells cast from outside off the creatures in it.
 A use that places several areas (Fire Storm's ten Cubes, Meteor Swarm's four Spheres: `ActionArea.count`) takes them as

@@ -222,6 +222,8 @@ export function exposed(
     // "You and your allies": an aura its caster carries reaches the caster too.
     const own = creature.id === zone.casterId;
     if (trigger.around === "caster" && own && trigger.affects !== "allies") return [];
+    // A Line that blasts from its caster (Gust of Wind) starts beside it, not on it.
+    if (own && trigger.towardCaster) return [];
     if (trigger.affects === "enemies" && (!caster || !areEnemies(caster, creature, deps.resolveDefinition))) return [];
     if (trigger.affects === "allies" && !own && (!caster || !areAllies(caster, creature, deps.resolveDefinition)))
       return [];
@@ -389,6 +391,8 @@ function act(
     },
     // A creature can owe this zone a second save before answering the first (entering, then ending its turn there).
     replaceExisting: false,
+    // Gust of Wind's push away from its caster.
+    ...(save.failurePush ? { failurePush: save.failurePush } : {}),
     // Heightened Spell's target has Disadvantage on every save against the spell.
     ...(zone.heightened === creature.id ? { disadvantage: { targetId: creature.id, from: "Heightened Spell" } } : {}),
     newSaveId: deps.newId,

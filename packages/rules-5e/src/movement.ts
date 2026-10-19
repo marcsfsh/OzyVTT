@@ -132,6 +132,8 @@ export function movementPath(
     extraPerStep?: number;
     /** Whether the mover's Speed is halved at this position, its top-left cell given (Spirit Guardians' Emanation). */
     isHalved?: (column: number, row: number) => boolean;
+    /** Whether this step costs double for the way it goes (Gust of Wind: moving closer to its caster in the Line). */
+    isStepCostly?: (from: GridCell, to: GridCell) => boolean;
     maxNodes?: number;
   }>
 ): MovementPath | null {
@@ -212,7 +214,8 @@ export function movementPath(
         enteringIsDifficult(column, row) ||
         input.isStepSqueezed?.({ column: node.column, row: node.row }, { column, row }) === true;
       const halved = input.isHalved?.(column, row) === true;
-      const cost = node.cost + ((difficult ? 2 : 1) + extraPerStep) * (halved ? 2 : 1);
+      const costly = input.isStepCostly?.({ column: node.column, row: node.row }, { column, row }) === true;
+      const cost = node.cost + ((difficult ? 2 : 1) + extraPerStep) * (halved ? 2 : 1) * (costly ? 2 : 1);
       const key = keyOf(column, row);
       const known = best.get(key);
       if (known !== undefined && known <= cost) continue;

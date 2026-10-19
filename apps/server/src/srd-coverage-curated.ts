@@ -1468,8 +1468,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:freedom-of-movement": guided(
     "speed.ts gives the target a Swim Speed equal to its Speed, terrain.ts charges it nothing extra for Difficult Terrain, and the target can't have the Paralyzed or Restrained condition (effects.ts), whatever its source. Keeping its Speed from being reduced and slipping free of restraints are the GM's."
   ),
-  "spell:gust-of-wind": guided(
-    "The cast's save pushes a creature that fails 15 feet away from the caster, and the Line disperses the fog and clouds it overlaps (vision/cast-sight.ts). The save at the end of a creature's turn in the Line, the doubled cost of moving toward the caster and turning the Line are the GM's."
+  "spell:gust-of-wind": enforced(
+    "The cast's save pushes a creature that fails 15 feet away from the caster, and the Line disperses the fog and clouds it overlaps (vision/cast-sight.ts). spell-zones.ts repeats the save for a creature ending its turn in the Line, zone-ground.ts charges 2 feet for every foot a creature in it moves closer to the caster, and the Bonus Action points the Line another way from the caster (zone-moves.ts). Putting out flames is the table's."
   ),
   "spell:hideous-laughter": enforced(
     "A failed save imposes Prone and Incapacitated, repeated at the end of each of the target's turns and each time it takes damage, with Advantage then (save-stages.ts). It can't stand up while it laughs (actor-conditions.ts)."
