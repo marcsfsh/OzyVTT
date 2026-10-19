@@ -501,7 +501,24 @@ export function laterSpellAction(
           ...(later.onHit ? { onHit: structuredClone(later.onHit) } : {})
         }
       : later.save
-        ? { save: { ...later.save, dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) } }
+        ? {
+            save: {
+              ...later.save,
+              ...(later.save.failurePush && later.pushPerModifier
+                ? {
+                    failurePush: {
+                      ...later.save.failurePush,
+                      feet: Math.min(
+                        120,
+                        later.save.failurePush.feet + later.pushPerModifier * Math.max(0, numbers.modifier)
+                      )
+                    }
+                  }
+                : {}),
+              dc: numbers.saveDc,
+              ...(numbers.bearersDc ? { spellcasting: true } : {})
+            }
+          }
         : {}),
     ...(spell.effect?.damageTypes && damage.length > 0 ? { damageTypes: [...spell.effect.damageTypes] } : {}),
     ...(later.area ? { area: later.area } : {}),

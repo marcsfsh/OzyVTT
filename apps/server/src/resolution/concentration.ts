@@ -6,7 +6,7 @@ import { addEffect, CONCENTRATING_TAG, makeEffect, turnEndDuration, type EffectN
 import { isItemActionId, itemActionRest, laterRowOf, laterSpellActionId } from "../item-actions.js";
 import { CommandRejectedError } from "../game-store.js";
 import { itemRowOfAction } from "../item-charges.js";
-import { castThisTurnKey } from "../lasting-spells.js";
+import { castThisTurnKey, withCastKey } from "../lasting-spells.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { areaAtLevel, endZone } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
@@ -132,8 +132,18 @@ export function beginConcentration(ctx: ResolveContext, spell: SpellReference, c
 export function markCastTurn(ctx: ResolveContext): void {
   const spell = spellOf(ctx);
   const { state, attacker } = ctx;
-  if (!spell || isLaterAction(ctx, spell) || state.combat.turnActorId !== attacker.id) return;
-  if (!(spell.effect?.laterActions ?? []).some((row) => row.laterTurnsOnly)) return;
+  if (!spell || state.combat.turnActorId !== attacker.id) return;
+  if (isLaterAction(ctx, spell)) {
+    // The cast's own free use of a later action is spent (Arcane Hand's first effect).
+    if (!ctx.withCast) return;
+    const key = withCastKey(attacker.id, spell.id);
+    state.combat = {
+      ...state.combat,
+      turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
+    };
+    return;
+  }
+  if (!(spell.effect?.laterActions ?? []).some((row) => row.laterTurnsOnly || row.withCast)) return;
   const key = castThisTurnKey(attacker.id, spell.id);
   state.combat = {
     ...state.combat,

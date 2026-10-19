@@ -1,4 +1,5 @@
 import type { GameState, SpellZone } from "@vtt/domain";
+import { INTERPOSING_TAG } from "./cover.js";
 import { areEnemies } from "./creature-sides.js";
 import { zoneContentOf } from "./spell-zone-state.js";
 import { insideTest, liveZones, movesFreelyOn, speedHalvingAt, type ZoneDeps } from "./spell-zones.js";
@@ -82,6 +83,16 @@ export function zoneGround(
     difficult.push(inside);
     // 4 feet for every foot: Difficult Terrain's 2, doubled.
     if (terrain.cost === 4) doubled.push(inside);
+  }
+  // SRD 5.2.1 Arcane Hand's Interposing Hand: "its space counts as Difficult Terrain for your enemies".
+  for (const hand of state.actors) {
+    if (!hand.effects.some((effect) => effect.tags.includes(INTERPOSING_TAG))) continue;
+    const caster = state.actors.find((actor) => actor.id === hand.summon?.by);
+    const token = state.combat.tokens.find((candidate) => candidate.actorId === hand.id)?.position;
+    const size = state.combat.tokens.find((candidate) => candidate.actorId === hand.id);
+    if (!caster || !token || !size || !areEnemies(caster, mover, deps.resolveDefinition)) continue;
+    const half = Math.max(size.sizePx, (size.gridSizePx ?? 0) * size.sizeCells) / 2;
+    difficult.push((point) => Math.abs(point.x - token.x) < half && Math.abs(point.y - token.y) < half);
   }
   return { difficult, doubled, toward, halving };
 }

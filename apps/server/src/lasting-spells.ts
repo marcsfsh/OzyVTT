@@ -53,3 +53,26 @@ export function atSpellUpLevel(
   const level = spellUpLevel(actor, spell);
   return level !== null && level > spell.level ? upcastAction(action, spell, level) : action;
 }
+
+/** The `turnUses` key the cast's own free use of a later action spends (Arcane Hand: "When you cast the spell ... you
+ *  can move the hand up to 60 feet and then cause one of the following effects"). */
+export const withCastKey = (actorId: string, spellId: string) => `${actorId}:with-cast:${spellId}`;
+
+/** Whether this later action comes with the cast at no further cost: a `withCast` row, on its caster's turn, the turn it
+ *  cast the spell, before the cast's free use is spent. */
+export function takenWithCast(
+  state: Pick<GameState, "combat">,
+  actorId: string,
+  spell: SpellReference,
+  actionId: string
+): boolean {
+  if (!laterRowOf(spell, actionId)?.withCast || state.combat.turnActorId !== actorId) return false;
+  const uses = state.combat.turn.turnUses;
+  return (uses[castThisTurnKey(actorId, spell.id)] ?? 0) > 0 && (uses[withCastKey(actorId, spell.id)] ?? 0) === 0;
+}
+
+/** Whether a creature bears an effect of this caster's spell, for a later action that takes only such a creature
+ *  (`bearerOnly`: Arcane Hand's crush, Phantasmal Force's harm). */
+export function bearsCastOf(target: Pick<Actor, "effects">, casterId: string, spellId: string): boolean {
+  return target.effects.some((effect) => effect.spell?.id === spellId && effect.sourceActorId === casterId);
+}

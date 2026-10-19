@@ -1363,6 +1363,7 @@
     {
      "name": "clenched fist",
      "activation": "bonus-action",
+     "withCast": true,
      "when": "The hand moves up to 60 feet and strikes a target within 5 feet of it with a melee spell attack.",
      "attackRange": {
       "kind": "melee",
@@ -1377,21 +1378,42 @@
      ]
     },
     {
+     "name": "forceful hand",
+     "activation": "bonus-action",
+     "withCast": true,
+     "when": "The hand moves up to 60 feet and pushes a Huge or smaller creature within 5 feet of it that fails a Strength save up to 5 feet plus five times your spellcasting ability modifier, following it.",
+     "save": {
+      "ability": "str",
+      "successDamage": "none",
+      "failureConditions": [],
+      "failurePush": {
+       "feet": 5,
+       "upTo": true,
+       "maxTargetSize": "huge"
+      }
+     },
+     "pushPerModifier": 5,
+     "damage": []
+    },
+    {
      "name": "grasping hand",
      "activation": "bonus-action",
+     "withCast": true,
      "when": "The hand moves up to 60 feet and grapples a Huge or smaller creature within 5 feet of it that fails a Dexterity save.",
      "save": {
       "ability": "dex",
       "successDamage": "none",
       "failureConditions": [
        "grappled"
-      ]
+      ],
+      "failureMaxSize": "huge"
      },
      "damage": []
     },
     {
      "name": "crush",
      "activation": "bonus-action",
+     "bearerOnly": true,
      "when": "While the hand grapples a creature, a Bonus Action crushes it.",
      "damage": [
       {
@@ -1401,6 +1423,14 @@
        "perSlot": "2d6"
       }
      ]
+    },
+    {
+     "name": "interposing hand",
+     "activation": "bonus-action",
+     "withCast": true,
+     "interposes": true,
+     "when": "The hand moves up to 60 feet and grants you Half Cover against attacks and other effects from or through its space, which is Difficult Terrain for your enemies.",
+     "damage": []
     }
    ],
    "healing": null,

@@ -465,30 +465,54 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     )
   ],
   // "When you cast the spell and as a Bonus Action on your later turns, you can move the hand up to 60 feet and then
-  // cause one of the following effects": each reaches from the hand (`spell-summons.ts`). Forceful Hand's push and
-  // Interposing Hand's cover are the table's.
+  // cause one of the following effects": each reaches from the hand (`spell-summons.ts`), and the cast takes one free.
   "arcane-hand": [
     {
       name: "clenched fist",
       activation: "bonus-action",
+      withCast: true,
       when: "The hand moves up to 60 feet and strikes a target within 5 feet of it with a melee spell attack.",
       attackRange: melee(125),
       // "The damage of the Clenched Fist increases by 2d8 ... for each spell slot level above 5."
       damage: [{ formula: "5d8", type: "force", perSlot: "2d8" }]
     },
     {
+      name: "forceful hand",
+      activation: "bonus-action",
+      withCast: true,
+      when: "The hand moves up to 60 feet and pushes a Huge or smaller creature within 5 feet of it that fails a Strength save up to 5 feet plus five times your spellcasting ability modifier, following it.",
+      save: {
+        ability: "str",
+        successDamage: "none",
+        failureConditions: [],
+        failurePush: { feet: 5, upTo: true, maxTargetSize: "huge" }
+      },
+      pushPerModifier: 5,
+      damage: []
+    },
+    {
       name: "grasping hand",
       activation: "bonus-action",
+      withCast: true,
       when: "The hand moves up to 60 feet and grapples a Huge or smaller creature within 5 feet of it that fails a Dexterity save.",
-      save: { ability: "dex", successDamage: "none", failureConditions: ["grappled"] },
+      save: { ability: "dex", successDamage: "none", failureConditions: ["grappled"], failureMaxSize: "huge" },
       damage: []
     },
     {
       name: "crush",
       activation: "bonus-action",
+      bearerOnly: true,
       when: "While the hand grapples a creature, a Bonus Action crushes it.",
       // "... and the damage of the Grasping Hand increases by 2d6 for each spell slot level above 5."
       damage: [{ formula: "4d6", type: "bludgeoning", addsModifier: true, perSlot: "2d6" }]
+    },
+    {
+      name: "interposing hand",
+      activation: "bonus-action",
+      withCast: true,
+      interposes: true,
+      when: "The hand moves up to 60 feet and grants you Half Cover against attacks and other effects from or through its space, which is Difficult Terrain for your enemies.",
+      damage: []
     }
   ],
   "arcane-sword": [

@@ -32,6 +32,7 @@ import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
 import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
 import { reachBarredBy } from "../zone-barriers.js";
+import { bearsCastOf, takenWithCast } from "../lasting-spells.js";
 import { swallowCover } from "../swallow.js";
 import { enclosureBlocks } from "../enclosures.js";
 import { builtinHandlerFor } from "./builtins.js";
@@ -123,7 +124,10 @@ function combatantsOf(
   // A spell that lasts and acts again later (Produce Flame, a lingering area) starts with no creature under it yet.
   const startsALastingSpell = castsASpell && (spell?.effect?.laterActions ?? []).length > 0;
   // Moving a spell's area (Moonbeam, Flaming Sphere's ram) is something done, whoever it moves onto.
-  const movesAnArea = spell !== undefined && laterRowOf(spell, action.id)?.movesArea !== undefined;
+  // So is moving a spell's force between its caster and harm (Arcane Hand's Interposing Hand).
+  const movesAnArea =
+    spell !== undefined &&
+    (laterRowOf(spell, action.id)?.movesArea !== undefined || laterRowOf(spell, action.id)?.interposes === true);
   // Spreading Caltrops leaves an area that acts on whoever meets it later.
   const leavesAnArea = action.zone !== undefined && !castsASpell;
   const rollsOnTargets =
@@ -259,7 +263,18 @@ export function openResolve(
     castLevel !== null && castLevel !== undefined && spell && reaching.spellSlot && castLevel > reaching.spellSlot.level
       ? upcastAction(reaching, spell, castLevel)
       : reaching;
-  const action = withChosenDamageType(upcast, input.damageType ?? null);
+  const chosen = withChosenDamageType(upcast, input.damageType ?? null);
+  // The cast's own free use of a later action costs nothing more (Arcane Hand's first effect).
+  const withCast = spell !== undefined && takenWithCast(state, attacker.id, spell, chosen.id);
+  const action = withCast ? { ...chosen, activation: "other" as const } : chosen;
+  // A later action that takes only a creature bearing the caster's spell (Arcane Hand's crush) refuses any other.
+  const laterRow = spell ? laterRowOf(spell, action.id) : undefined;
+  if (spell && laterRow?.bearerOnly)
+    for (const target of targets)
+      if (!bearsCastOf(target, attacker.id, spell.id))
+        throw new CommandRejectedError(
+          `${hiddenFromInitiator(target.id) ? "That creature" : target.name} isn't under ${attacker.name}'s ${spell.name}, so ${action.name} can't take it.`
+        );
   // An option or a weapon the action doesn't offer is refused before anything rolls.
   checkChoices(action, input, attacker, deps.catalog);
   const derived = deriveEquipment(attacker, deps.definition, deps.catalog);
@@ -471,7 +486,8 @@ export function openResolve(
     hitRiders: [],
     damageEffectIds: [],
     forgoneAdvantageBy: input.forgoneAdvantageBy ?? null,
-    keepsHidden: false
+    keepsHidden: false,
+    ...(withCast ? { withCast: true } : {})
   };
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
   if (!input.economyPaid) warnings.push(...laterActionReminders(spell, action));

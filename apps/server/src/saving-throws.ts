@@ -83,6 +83,7 @@ import {
   type RollModeClaims
 } from "./equipment-derivation.js";
 import { countZoneDamage } from "./spell-zone-state.js";
+import { followPushed, forceOf } from "./summon-strikes.js";
 import { armedRepeat, durationUntilRepeat, settleEndingSave } from "./save-stages.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import { suppressConditions } from "./suppressed-conditions.js";
@@ -606,6 +607,7 @@ export const DROPS_HELD_TAG = "drops-held";
  * the token.
  */
 function pushOnFailure(
+  state: GameState,
   target: GameState["actors"][number],
   pending: PendingSave,
   deps: SaveAnswerDependencies
@@ -614,7 +616,16 @@ function pushOnFailure(
   const sourceId = pending.sourceActorId;
   if (sourceId === null || sourceId === target.id) return [];
   if (push.maxTargetSize && !sizeAtMost(target.size, push.maxTargetSize)) return [];
-  const moved = deps.pushToken?.({ actorId: target.id, awayFromActorId: sourceId, distanceFeet: push.feet }) ?? null;
+  // A spell's force pushes from where it stands and goes along (Arcane Hand's Forceful Hand).
+  const before = state.combat.tokens.find((token) => token.actorId === target.id)?.position ?? null;
+  const standing = pending.spell ? forceOf(state, sourceId, pending.spell.id) : undefined;
+  const forceAt = standing && state.combat.tokens.find((token) => token.actorId === standing.id)?.position;
+  // A force that moved into the creature's own space pushes it straight away from the caster.
+  const force = forceAt && before && (forceAt.x !== before.x || forceAt.y !== before.y) ? standing : undefined;
+  const moved =
+    deps.pushToken?.({ actorId: target.id, awayFromActorId: force?.id ?? sourceId, distanceFeet: push.feet }) ?? null;
+  const after = state.combat.tokens.find((token) => token.actorId === target.id)?.position ?? null;
+  if (standing && before && after && moved !== null) followPushed(state, standing.id, before, after);
   if (moved === null)
     return [
       {
@@ -1269,7 +1280,7 @@ export function answerSave(
       actorId: target.id,
       ...(pending.sourceActorId ? { source: { actorId: pending.sourceActorId, name: pending.sourceName } } : {})
     });
-  if (!success && pending.failurePush) events.push(...pushOnFailure(target, pending, deps));
+  if (!success && pending.failurePush) events.push(...pushOnFailure(state, target, pending, deps));
   // "The target dies, and the wisp regains 10 (3d6) Hit Points."
   if (!success && pending.failureKills) events.push(...killOnFailure(state, target, pending, deps));
   // A swallower that fails to hold on lets out what it swallowed.

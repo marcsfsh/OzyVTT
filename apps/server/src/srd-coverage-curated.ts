@@ -713,8 +713,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:arcane-eye": enforced(
     "An Invisible, invulnerable eye appears within 30 feet (summons.ts) with Darkvision 30 feet, and the caster's player sees what it sees (vision/audience.ts). A Bonus Action moves it up to 30 feet (summon-orders.ts). Gaps an inch wide are the GM's."
   ),
-  "spell:arcane-hand": guided(
-    "The hand appears within 120 feet with AC 20 and the caster's Hit Point maximum, and the spell ends when it drops to 0 (summons.ts). Clenched Fist's attack and Grasping Hand's Dexterity save reach a creature within 5 feet of the hand, which moves up to 60 feet first (summon-strikes.ts), and the crush deals its damage. Forceful Hand's push, Interposing Hand's cover, the grapple's escape DC and the size limits are the GM's."
+  "spell:arcane-hand": enforced(
+    "The hand appears within 120 feet with AC 20 and the caster's Hit Point maximum, and the spell ends when it drops to 0 (summons.ts). The cast and each later Bonus Action move it up to 60 feet and cause one effect, the cast's at no further cost (lasting-spells.ts): Clenched Fist's attack (5d8 Force, 2d8 more a slot level above 5) and the saves reach from the hand (summon-strikes.ts); Forceful Hand pushes a Huge or smaller creature that fails its Strength save 5 feet plus five times the spellcasting modifier, the hand following (saving-throws.ts); Grasping Hand grapples a Huge or smaller creature that fails its Dexterity save, escaped against the spell save DC, and only that creature can be crushed (4d6 plus the modifier, 2d6 more a slot level above 5); Interposing Hand gives the caster Half Cover from or through its space, which is Difficult Terrain for the caster's enemies (cover.ts, zone-ground.ts)."
   ),
   "spell:arcane-sword": enforced(
     "The sword appears within 90 feet (summons.ts) and the cast's attack reaches a creature within 5 feet of it; each later Bonus Action moves it up to 30 feet first and strikes from there (summon-strikes.ts)."

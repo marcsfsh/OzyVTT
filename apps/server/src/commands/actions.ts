@@ -23,7 +23,7 @@ import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { effectiveModeFor, overrideWaives, rulesInForce } from "../rules-families.js";
 import { looseRollPlan, routeForTap, slotsModeFor, spendLooseUses } from "../tap-routing.js";
-import { conditionChoicesOf, isItemActionId, upcastAction } from "../item-actions.js";
+import { conditionChoicesOf, isItemActionId, laterRowOf, upcastAction } from "../item-actions.js";
 import { BURNING_TAG, PUT_OUT_FIRE_ACTION_ID, putOutFire } from "../hazards.js";
 import type { EffectNarration } from "../effects.js";
 import { grantOutsideFight } from "../resolution/grant.js";
@@ -51,7 +51,13 @@ import { castingMinutesOf } from "../resolution/long-casting.js";
 import { passTime } from "../rests.js";
 import { standsInSilence } from "../silence.js";
 import { bringSummons, familiarDelivery } from "../summons.js";
-import { distanceFromForce, settleForce, strikeOriginFor, struckFrom } from "../summon-strikes.js";
+import {
+  distanceFromForce,
+  settleForce,
+  settleInterposing,
+  strikeOriginFor,
+  struckFrom
+} from "../summon-strikes.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -511,7 +517,13 @@ export const actionCommands = [
         // A committed use counts toward the sheet's most-used options; a preview counts with its confirm.
         if (!resolution.preview) countOptionUse(draft, actorId, actionId);
         // The force moved before it struck again.
-        if (force && geometry && !resolution.preview) settleForce(draft, force, geometry);
+        if (force && geometry && !resolution.preview) {
+          settleForce(draft, force, geometry);
+          // Interposing Hand leaves the hand between its caster and harm until it causes another effect.
+          const forceSpell = action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined;
+          const forceRow = forceSpell ? laterRowOf(forceSpell, action.id) : undefined;
+          if (forceRow) settleInterposing(draft, force, forceRow.interposes === true);
+        }
         if (force?.note) resolution = { ...resolution, warnings: [...(resolution.warnings ?? []), force.note] };
         // The familiar's Reaction delivered the touch.
         if (courier && !resolution.preview && draft.combat.active && !draft.combat.reactionsUsed.includes(courier))

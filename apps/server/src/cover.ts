@@ -14,6 +14,9 @@ export const COVER_TAGS: Readonly<Record<CoverDegree, string>> = {
 
 const ORDER: readonly CoverDegree[] = ["total", "three-quarters", "half"];
 
+/** The tag on a spell's force that stands between its caster and harm (Arcane Hand's Interposing Hand). */
+export const INTERPOSING_TAG = "interposing";
+
 /**
  * The cover the GM has marked a creature with ("The GM determines whether the target has Cover"): an effect tagged
  * for it, which every attack and Dexterity save against the creature reads, a player's included. The best degree
@@ -90,7 +93,7 @@ export function crossesSpace(from: Point, to: Point, at: Point, half: number): b
  */
 export function mapCover(state: GameState, fromActorId: string, targetId: string, origin?: Point): CoverDegree | null {
   const vision = state.combat.vision;
-  if (!vision?.enabled) return null;
+  if (!vision?.enabled) return interposedCover(state, fromActorId, targetId, origin);
   const tokens = state.combat.tokens;
   const target = tokens.find((token) => token.actorId === targetId && token.position !== null);
   const source = tokens.find((token) => token.actorId === fromActorId && token.position !== null);
@@ -115,8 +118,34 @@ export function mapCover(state: GameState, fromActorId: string, targetId: string
     if (token.position === null || token.actorId === targetId || token.actorId === fromActorId) return false;
     const actor = state.actors.find((candidate) => candidate.id === token.actorId);
     if (!actor || actor.size === "tiny") return false;
+    // A spell's force doesn't occupy its space (Arcane Hand), so it covers only the caster it interposes for.
+    if (
+      actor.summon?.strikesFrom !== undefined &&
+      !(actor.summon.by === targetId && actor.effects.some((effect) => effect.tags.includes(INTERPOSING_TAG)))
+    )
+      return false;
     const other = spaceOf(token);
     return crossesSpace(centre, space.at, other.at, other.half * 0.8);
   });
   return bestCover(walls, between ? "half" : null);
+}
+
+/** SRD 5.2.1 Arcane Hand's Interposing Hand, with or without dynamic vision: "The hand grants you Half Cover against
+ *  attacks and other effects that originate from its space or that pass through it." */
+function interposedCover(state: GameState, fromActorId: string, targetId: string, origin?: Point): CoverDegree | null {
+  const tokens = state.combat.tokens;
+  const target = tokens.find((token) => token.actorId === targetId && token.position !== null);
+  const source = tokens.find((token) => token.actorId === fromActorId && token.position !== null);
+  if (!target || (!source && !origin)) return null;
+  const centre = origin ?? spaceOf(source!).at;
+  const space = spaceOf(target);
+  const interposed = state.actors.some((actor) => {
+    if (actor.summon?.by !== targetId || !actor.effects.some((effect) => effect.tags.includes(INTERPOSING_TAG)))
+      return false;
+    const token = tokens.find((candidate) => candidate.actorId === actor.id && candidate.position !== null);
+    if (!token) return false;
+    const hand = spaceOf(token);
+    return crossesSpace(centre, space.at, hand.at, hand.half * 0.8);
+  });
+  return interposed ? "half" : null;
 }

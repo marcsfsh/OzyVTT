@@ -164,6 +164,18 @@ export const SpellLaterActionSchema = z
     /** It is taken only on the caster's turns after the one it cast the spell on ("As a Bonus Action on your later
      *  turns": Spiritual Weapon, Heat Metal). */
     laterTurnsOnly: z.literal(true).optional(),
+    /** The cast itself takes one of the rows that say this, at no further cost, on the turn it is cast ("When you cast
+     *  the spell and as a Bonus Action on your later turns": Arcane Hand). */
+    withCast: z.literal(true).optional(),
+    /** It takes only a creature that bears an effect of this caster's spell (Arcane Hand's crush: the creature the
+     *  hand grapples; Phantasmal Force's harm: the creature that perceives the phantasm). */
+    bearerOnly: z.literal(true).optional(),
+    /** Its failure's push goes this many feet farther for each point of the caster's spellcasting ability modifier
+     *  (Arcane Hand's Forceful Hand: 5 feet plus five times the modifier). */
+    pushPerModifier: z.number().int().min(5).max(10).optional(),
+    /** The hand stands between the caster and harm: Half Cover from its space, which is Difficult Terrain for the
+     *  caster's enemies, until another of its effects (Arcane Hand's Interposing Hand). */
+    interposes: z.literal(true).optional(),
     /** What its damage drains as it lands (Vampiric Touch's later touches). */
     drain: DamageDrainSchema.optional(),
     /** The area the spell leaves, whose trigger the server watches (an "other" action only). */
@@ -239,7 +251,7 @@ export const SpellEffectSchema = z
     /** The spell's save is not made when it is cast but later (Spirit Guardians, Web) or never by its target
      *  (Haste, Sanctuary): the cast prompts none. `laterActions` carries one the engine can roll. */
     noCastSave: z.literal(true).optional(),
-    laterActions: z.array(SpellLaterActionSchema).min(1).max(3).optional(),
+    laterActions: z.array(SpellLaterActionSchema).min(1).max(6).optional(),
     /** Missiles one cast makes, each at a creature of the caster's choice (Magic Missile's three darts). */
     darts: z.number().int().min(2).max(20).optional(),
     /** How many creatures one cast targets (Bless: up to three), plus `perSlot` more for each slot level above the
