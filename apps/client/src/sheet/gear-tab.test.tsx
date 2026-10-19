@@ -492,3 +492,59 @@ describe("the hand-set Armor Class", () => {
     expect(sent("actor:set-armor-class").at(-1)).toMatchObject({ actorId: HERO, armorClass: null });
   });
 });
+
+describe("an item's charge pools", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  /** A server row spending one pool of the staff. */
+  const staffRow = (id: string, name: string, usesLimit: number, usesPool: string | null) => ({
+    id,
+    name,
+    activation: "other",
+    available: true,
+    violations: [],
+    usesRemaining: null,
+    description: name,
+    attackBonus: null,
+    reachFeet: null,
+    rangeFeet: null,
+    rangeNormalFeet: null,
+    attackCount: null,
+    saveAbility: null,
+    saveDc: null,
+    damage: [],
+    usesLimit,
+    usesPer: "long-rest",
+    usesPool,
+    requiresEffectTag: null,
+    multiattack: null,
+    reaction: null
+  });
+
+  it("lists every pool of an item in its detail, each with what is left", async () => {
+    serve(3, [
+      staffRow("item-staff-of-thunder-and-lightning-lightning", "Lightning", 1, null),
+      staffRow("item-staff-of-thunder-and-lightning-thunder", "Thunder", 1, null)
+    ]);
+    const bearer = hero({
+      actionUses: { "item-staff-of-thunder-and-lightning-thunder": 1 },
+      inventory: [
+        {
+          id: "staff-of-thunder-and-lightning",
+          name: "Staff of Thunder and Lightning",
+          quantity: 1,
+          equipped: true,
+          attuned: true
+        }
+      ]
+    });
+    render(<CharacterSheet actor={bearer} role="gm" state={stateWith(bearer)} onClose={() => {}} />, {
+      wrapper: ToastProvider
+    });
+    const user = userEvent.setup();
+    await openGear(user);
+    await user.click(await screen.findByText("Staff of Thunder and Lightning"));
+    expect(await screen.findByText(/Lightning · 1 of 1 left/)).toBeTruthy();
+    expect(screen.getByText(/Thunder · 0 of 1 left/)).toBeTruthy();
+  });
+});

@@ -451,6 +451,9 @@ const SAVE_LIFETIME_KEYS = [
   "escapeAthletics"
 ] as const;
 
+/** The save-block keys that make a failure act by the target's Hit Points or send it home (`SaveOutcomeFields`). */
+const DEATH_SAVE_KEYS = ["failureByHitPoints[].**", "failureBanishes"] as const;
+
 /** The exemption table. First match wins, so specific rows sit above general ones. */
 export const EXEMPTIONS: readonly ExemptionRow[] = [
   // ---- action rider surface (every carrier that mounts actions) ----
@@ -619,6 +622,27 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
       "how a failed save's conditions end, where it pushes and who has Advantage on it, read from the spell's description as the catalog is built",
     status: "gap"
   })),
+  ...DEATH_SAVE_KEYS.map((key): ExemptionRow => ({
+    at: `actions[].save.${key}`,
+    types: ACTION_CARRIERS,
+    reason:
+      "what a failed save does by the target's Hit Points (a Slaying Bow's death, a Death Glare's drop to 0) and the creature types it sends home - authored in the content scripts; no editor control yet",
+    status: "gap"
+  })),
+  ...DEATH_SAVE_KEYS.map((key): ExemptionRow => ({
+    at: `save.${key}`,
+    types: ["spell"],
+    reason:
+      "what a failed save does by the target's Hit Points and the creature types it sends home (Divine Word) - authored in the content scripts",
+    status: "gap"
+  })),
+  {
+    at: "actions[].raisesCorpse.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a corpse an action raises as a new creature (a wraith's Create Specter): the stat block, how long dead and how many at once - authored in the content scripts; no editor control yet",
+    status: "gap"
+  },
   {
     at: "actions[].save.breaksConcentration",
     types: ACTION_CARRIERS,
@@ -1028,6 +1052,48 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "casts[].uses.scaling.**",
     types: ["equipment"],
     reason: "an item cast's scaling: zero SRD authors until the magic-item bundle lands",
+    status: "gap"
+  },
+  {
+    at: "casts[].useCost",
+    types: ["equipment"],
+    reason:
+      "an item cast's charge cost above one (Staff of Fire's Fireball: 3) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].chargesRaiseLevel",
+    types: ["equipment"],
+    reason:
+      "the most charges a cast may spend, each a level higher (Wand of Fireballs) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "charges.lastCharge.**",
+    types: ["equipment"],
+    reason:
+      "what the last charge does to the item (destroyed, or a plain item it becomes) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "charges.lastChargeTwenty",
+    types: ["equipment"],
+    reason:
+      "the charges a 20 on the last charge's d20 gives back (Staff of Power) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "charges.starting",
+    types: ["equipment"],
+    reason:
+      "the charges a copy holds when it is added (Necklace of Fireballs' beads) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "uses.afterHours",
+    types: "*",
+    reason:
+      "the hours of game time before uses spent for a time come back (Wings of Flying's 1d12) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {

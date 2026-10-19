@@ -130,6 +130,17 @@ describe("Efreeti Bottle, Figurines and the Staff of the Python", () => {
     });
   });
 
+  it("a Staff of Swarming Insects' Giant Insect costs 4 charges and brings the insect", async () => {
+    const table = await carrying("staff-of-swarming-insects");
+    const used = await table.resolve({
+      actionId: "item-staff-of-swarming-insects-cast-giant-insect",
+      summon: { picks: [{ monsterId: "giant-insect", form: "spider" }] }
+    });
+    expect(used.status, await used.clone().text()).toBe(200);
+    expect(table.named("Giant Insect (Spider)")).toHaveLength(1);
+    expect(table.actor(CASTER)!.actionUses["staff-of-swarming-insects-charges"]).toBe(4);
+  });
+
   it("the staff becomes a Giant Constrictor Snake within 10 feet that a Bonus Action turns back", async () => {
     const table = await carrying("staff-of-the-python");
     const used = await table.resolve({ actionId: "item-staff-of-the-python-snake" });

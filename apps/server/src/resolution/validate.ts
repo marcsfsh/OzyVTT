@@ -163,6 +163,7 @@ function combatantsOf(
     action.leap === undefined &&
     action.teleport === undefined &&
     action.summons === undefined &&
+    action.raisesCorpse === undefined &&
     input.builtin !== true
   )
     throw new CommandRejectedError("That action has no structured effect to resolve. Run it from its description.");

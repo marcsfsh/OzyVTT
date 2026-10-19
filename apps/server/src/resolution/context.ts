@@ -74,6 +74,8 @@ export type ResolveInput = Readonly<{
   attackKinds?: readonly AttackKind[];
   /** Push mastery's chosen distance (0 declines); absent pushes the most the mastery allows. */
   pushFeet?: number;
+  /** An Evoker's Overchannel: the spell's damage dice deal their maximum (`resolution/overchannel.ts`). */
+  overchannel?: boolean;
   /** The slot a spell is cast with; absent, its own level, else the lowest above it with a slot left. */
   slotLevel?: number;
   /** The damage type picked for an action whose caster chooses one (`ActorAction.damageTypes`); absent, its first. */
@@ -220,6 +222,9 @@ export type ResolveContext = {
   readonly hiddenFromInitiator: (actorId: string) => boolean;
   readonly attacker: LiveActor;
   readonly targets: readonly LiveActor[];
+  /** Targets the cast's damage passes over: killed outright by it, or saved from that by Death Ward (Power Word
+   *  Kill). */
+  spared?: Set<string>;
   /** The builtin's special cases; only for an action taken from the builtin catalog. */
   readonly builtin: BuiltinHandler | undefined;
   /** The attacker's equipment contribution. */

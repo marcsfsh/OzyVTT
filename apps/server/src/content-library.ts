@@ -268,6 +268,7 @@ export function actionSummaryOf(action: ActorDefinition["actions"][number]): Con
     usesPer: action.uses?.per ?? null,
     usesRecharge: action.uses?.recharge ?? null,
     usesPool: action.uses?.pool ?? null,
+    ...(action.uses?.afterHours !== undefined ? { usesAfterHours: action.uses.afterHours } : {}),
     ...(action.useCost !== undefined ? { useCost: action.useCost } : {}),
     requiresEffectTag: action.requiresEffectTag ?? null,
     multiattack: action.multiattack ?? null,

@@ -46,6 +46,7 @@ function restorableSlice(state: GameState): string {
       conditions: actor.conditions,
       effects: actor.effects,
       deathSaves: actor.deathSaves,
+      death: actor.death,
       actionUses: actor.actionUses,
       // A rewound Fireball gives its slot back; a rewound Short Rest its Hit Dice.
       spellSlots: actor.spellSlots,
@@ -79,19 +80,21 @@ export function applyTimelineRestore(state: GameState, snapshot: GameState, curs
       : initiative[0].actorId;
   state.actors = state.actors.map((actor) => {
     const past = snapshotActors.get(actor.id);
-    return past
-      ? {
-          ...actor,
-          hp: structuredClone(past.hp),
-          conditions: structuredClone(past.conditions),
-          effects: structuredClone(past.effects),
-          deathSaves: structuredClone(past.deathSaves),
-          actionUses: structuredClone(past.actionUses),
-          spellSlots: structuredClone(past.spellSlots),
-          pactSlots: structuredClone(past.pactSlots),
-          hitDice: structuredClone(past.hitDice)
-        }
-      : actor;
+    if (!past) return actor;
+    const { death: _death, ...living } = actor;
+    return {
+      ...living,
+      hp: structuredClone(past.hp),
+      conditions: structuredClone(past.conditions),
+      effects: structuredClone(past.effects),
+      deathSaves: structuredClone(past.deathSaves),
+      // A rewound death takes its time of death with it.
+      ...(past.death ? { death: structuredClone(past.death) } : {}),
+      actionUses: structuredClone(past.actionUses),
+      spellSlots: structuredClone(past.spellSlots),
+      pactSlots: structuredClone(past.pactSlots),
+      hitDice: structuredClone(past.hitDice)
+    };
   });
   state.combat = {
     ...structuredClone(snapshot.combat),

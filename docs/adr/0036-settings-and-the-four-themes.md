@@ -40,8 +40,8 @@ For the sign-in's dark words:
 **Sections.** Settings is six sections: Players (join address, what players see of each other, the claimed
 characters), Fights (the rules assistant and what it checks, players' hits, initiative and dice, health display, new
 tokens), Characters (who builds, max level, ability scores, hit point rolls, random characters), Device (theme, how
-you roll, arranging new scenes), Access (GM password, sign out, every GM browser, integration credentials) and API
-(the reference). They sit in the Codex shell's section bar on a laptop and its tab bar on a phone, at
+you roll, pinch zoom, arranging new scenes), Access (GM password, sign out, every GM browser, integration credentials)
+and API (the reference). They sit in the Codex shell's section bar on a laptop and its tab bar on a phone, at
 `/settings/<section>`; Players opens first because the join address is used every session. `settings/sections.ts`
 declares the sections, their audience and every setting's label and one-sentence hint, so the page, the search and
 the tests read one list. A player's page is the Device section alone, with no bar and no search.

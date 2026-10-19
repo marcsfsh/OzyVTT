@@ -123,6 +123,39 @@ export const SpellLaterActionSchema = z
   .strict();
 export type SpellLaterAction = z.infer<typeof SpellLaterActionSchema>;
 
+/** The most game time a revival reaches back, in minutes: True Resurrection's 200 years. */
+export const MAX_REVIVAL_MINUTES = 200 * 365 * 24 * 60;
+
+/** What a cast that brings the dead back does: which dead creature it can take, and how that creature returns. */
+export const SpellRevivalSchema = z
+  .object({
+    /** It returns with 1 Hit Point (`one`) or all of them (`all`). */
+    hitPoints: z.enum(["one", "all"]),
+    /** The longest the creature may have been dead, in minutes of game time (Revivify's 1, Raise Dead's 10 days). */
+    withinMinutes: z.number().int().min(1).max(MAX_REVIVAL_MINUTES),
+    /** It can't take a creature that was Undead when it died (Raise Dead, Resurrection). */
+    notUndead: z.literal(true).optional(),
+    /** It makes a new body, so a creature whose body is gone comes back (True Resurrection). */
+    newBody: z.literal(true).optional(),
+    /** It restores missing body parts, so a creature that lost its head comes back (Resurrection). Without this or
+     *  `newBody`, such a creature can't be revived (Raise Dead: "the spell automatically fails"). */
+    restoresParts: z.literal(true).optional(),
+    /** "Coming back from the dead is an ordeal": the creature takes this penalty to D20 Tests, reduced by 1 each time
+     *  it finishes a Long Rest (Raise Dead's and Resurrection's -4). */
+    d20Penalty: z.number().int().min(-10).max(-1).optional(),
+    /** It neutralizes the poison that affected the creature: its Poisoned condition ends (Raise Dead). */
+    endsPoison: z.literal(true).optional(),
+    /** It lifts the curses on the creature and cures its magical contagions (True Resurrection). */
+    endsCurses: z.literal(true).optional(),
+    /** Bringing back a creature dead at least this many minutes taxes the caster until it finishes a Long Rest: it
+     *  can't cast spells and has Disadvantage on D20 Tests (Resurrection's 365 days). */
+    taxesCasterAfterMinutes: z.number().int().min(1).max(MAX_REVIVAL_MINUTES).optional(),
+    /** The new body's species is rolled on the spell's d10 table (Reincarnate). */
+    rollsSpecies: z.literal(true).optional()
+  })
+  .strict();
+export type SpellRevival = z.infer<typeof SpellRevivalSchema>;
+
 /** One cast's mechanical effect; see `SpellReference.effect`. */
 export const SpellEffectSchema = z
   .object({
@@ -221,6 +254,14 @@ export const SpellEffectSchema = z
     chainFeet: z.number().int().min(5).max(300).optional(),
     /** The cast makes a creature at 0 Hit Points that isn't dead Stable (Spare the Dying). */
     stabilizes: z.literal(true).optional(),
+    /** The cast brings a dead creature back to life (Revivify, Raise Dead, Resurrection, True Resurrection, Reincarnate). */
+    revives: SpellRevivalSchema.optional(),
+    /** The cast touches a corpse and keeps it from decay, so the days it lasts don't count against a revival's time
+     *  limit (Gentle Repose). */
+    reposes: z.literal(true).optional(),
+    /** A target with this many Hit Points or fewer dies, with no damage and no save; one with more takes the cast's
+     *  damage (Power Word Kill's 100). */
+    killsAtHitPoints: z.number().int().min(1).max(1000).optional(),
     /** A cantrip whose range doubles at character levels 5, 11 and 17 (Spare the Dying's 15 feet). */
     rangeDoubles: z.literal(true).optional(),
     /** No sound can be made in the area its cast places (Silence), so a creature standing there can't cast a spell
@@ -504,6 +545,25 @@ export const ItemSpellCastSchema = z
       .describe('A flat printed DC ("save DC 15"). It overrides any derivation'),
     /** Charges. Share one pool across several casts with `uses.pool`. */
     uses: FeatureUsesSchema.optional().describe("Charges. Share one pool across several casts with `uses.pool`"),
+    /** Charges one cast spends, when more than one (Staff of Fire's Fireball: 3). */
+    useCost: z
+      .number()
+      .int()
+      .min(2)
+      .max(50)
+      .optional()
+      .describe("Charges one cast spends, when more than one (Staff of Fire's Fireball: 3)"),
+    /** The most charges one cast may spend, each charge after the first casting it one level higher (Wand of
+     *  Fireballs: 3, for levels 3 to 5). The sheet offers each as its own cast. */
+    chargesRaiseLevel: z
+      .number()
+      .int()
+      .min(2)
+      .max(9)
+      .optional()
+      .describe(
+        "The most charges one cast may spend, each charge after the first casting it one level higher (Wand of Fireballs: 3, for levels 3 to 5). Each becomes its own cast on the sheet"
+      ),
     /** Whether casting it also spends one of the bearer's own spell slots. */
     consumesSpellSlot: z
       .boolean()
@@ -530,14 +590,37 @@ export type ItemSpellCast = z.infer<typeof ItemSpellCastSchema>;
  * Long Rest ("regains 1d6 + 1 expended charges daily at dawn"; absent = all come back), and `lastChargeRoll` rolls a
  * d20 when the last charge is spent, whose 1 does what the item's text says (most crumble).
  */
+/** A charge count as the SRD prints one: dice ("1d6 + 1"; a d3 is a die of its own here) or a flat number ("1"). */
+const ChargeCountSchema = z
+  .string()
+  .regex(
+    /^(?:\d+d(?:3|4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?|\d{1,2})$/i,
+    "Use a dice formula such as 1d6 + 1, or a number."
+  );
+
 export const ItemChargesSchema = z
   .object({
     // The SRD's own grammar here includes a d3 ("regains 1d3 expended charges"), which the dice roller lacks.
-    regain: z
-      .string()
-      .regex(/^\d+d(?:3|4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?$/i, "Use a dice formula such as 1d6 + 1.")
-      .optional(),
-    lastChargeRoll: z.boolean().default(false)
+    regain: ChargeCountSchema.optional(),
+    lastChargeRoll: z.boolean().default(false),
+    /** What spending the last charge does to the item: with `lastChargeRoll`, on a d20 of 1, and otherwise always (a
+     *  Chime of Opening cracks). `destroyed` takes the row away; `becomes` turns it into that plain item (a Staff of
+     *  Striking becomes a Quarterstaff). Absent: the GM is told, and decides. */
+    lastCharge: z
+      .union([z.literal("destroyed"), z.object({ becomes: ContentIdSchema }).strict()])
+      .optional()
+      .describe(
+        "What spending the last charge does to the item: with lastChargeRoll on a d20 of 1, otherwise always. destroyed takes the row away; becomes turns it into that plain item. Absent: the GM is told"
+      ),
+    /** With `lastChargeRoll`, the charges a d20 of 20 gives back (Staff of Power: 1d8 + 2). */
+    lastChargeTwenty: ChargeCountSchema.optional().describe(
+      "With lastChargeRoll, the charges a d20 of 20 gives back (Staff of Power: 1d8 + 2)"
+    ),
+    /** The charges a copy holds when it is added, rolled then (a Necklace of Fireballs' 1d6 + 3 beads). Its pools
+     *  count from there. */
+    starting: ChargeCountSchema.optional().describe(
+      "The charges a copy holds when it is added, rolled then (a Necklace of Fireballs' 1d6 + 3 beads); its pools count from there"
+    )
   })
   .strict();
 export type ItemCharges = z.infer<typeof ItemChargesSchema>;
@@ -753,7 +836,8 @@ export const EquipmentReferenceSchema = z
       ),
     casts: z
       .array(ItemSpellCastSchema)
-      .max(8)
+      // A Staff of the Magi casts 18 spells.
+      .max(24)
       .default([])
       .describe("Spells the item can cast (Amulet of Message, Wand of Fireballs)"),
     charges: ItemChargesSchema.optional().describe(

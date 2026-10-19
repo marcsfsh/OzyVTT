@@ -6,9 +6,13 @@ import { CommandRejectedError } from "./game-store.js";
 
 type ResolveDefinition = (definitionId: string) => ActorDefinition | undefined;
 
-/** Sets the remaining slots for one level, clamped to 0..max. Covers spending and restoring (Arcane
- *  Recovery); the caller computes the target. Rejects if the actor has no pool at that level. `pact` names the
- *  Pact Magic pool; without it, the spell slots. */
+/** Why a player can't raise their own slots: every recovery is its own checked command. */
+export const SLOT_RECOVERY_REFUSAL =
+  "A player only spends spell slots here. A rest or a feature that recovers slots gives them back.";
+
+/** Sets the remaining slots for one level, clamped to 0..max. The GM sets them freely; a player only spends (lowers),
+ *  since a slot comes back only by a rest or a feature whose own command checks its rule. Rejects if the actor has no
+ *  pool at that level. `pact` names the Pact Magic pool; without it, the spell slots. */
 export function setSpellSlotRemaining(
   state: GameState,
   actorId: string,
@@ -16,13 +20,16 @@ export function setSpellSlotRemaining(
   remaining: number,
   resolveDefinition: ResolveDefinition,
   catalog?: EquipmentCatalog,
-  pact = false
+  pact = false,
+  role: "gm" | "player" = "gm"
 ): void {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (pact) {
     if (actor.pactSlots?.level !== level)
       throw new CommandRejectedError(`${actor.name} has no level ${level} Pact Magic slots.`);
+    if (role === "player" && remaining > actor.pactSlots.remaining)
+      throw new CommandRejectedError(SLOT_RECOVERY_REFUSAL);
     const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
     const max = pactSlotMaximum(definition)?.max ?? actor.pactSlots.remaining;
     actor.pactSlots = { ...actor.pactSlots, remaining: Math.max(0, Math.min(max, remaining)) };
@@ -30,13 +37,16 @@ export function setSpellSlotRemaining(
   }
   const slot = actor.spellSlots?.find((entry) => entry.level === level);
   if (!slot) throw new CommandRejectedError(`${actor.name} has no level ${level} spell slots.`);
+  if (role === "player" && remaining > slot.remaining) throw new CommandRejectedError(SLOT_RECOVERY_REFUSAL);
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   // The same maxima seeding and the Long Rest use, so derived multiclass tables aren't clamped down.
   const max =
     spellSlotMaxima(definition, deriveEquipment(actor, definition, catalog).spellSlots).find(
       (entry) => entry.level === level
     )?.max ?? slot.remaining;
-  const clamped = Math.max(0, Math.min(max, remaining));
+  // A slot made above the maximum (Font of Magic) stays while a player spends the level down to it.
+  const ceiling = role === "player" ? Math.max(max, slot.remaining) : max;
+  const clamped = Math.max(0, Math.min(ceiling, remaining));
   actor.spellSlots = actor.spellSlots!.map((entry) =>
     entry.level === level ? { ...entry, remaining: clamped } : entry
   );
@@ -108,7 +118,7 @@ export function setPreparedSpell(
     if (actor.preparation === null)
       throw new CommandRejectedError("You change your prepared spells when you finish a Long Rest.");
     if (prepared && actor.preparation.changesLeft === 0)
-      throw new CommandRejectedError("You've changed as many prepared spells as this Long Rest allows.");
+      throw new CommandRejectedError("You've changed as many prepared spells as this rest allows.");
   }
   if (prepared) {
     const cap = preparedCap(definition, spell.classId);
@@ -123,9 +133,11 @@ export function setPreparedSpell(
   } else actor.preparedSpellIds = actor.preparedSpellIds.filter((id) => id !== spellId);
 }
 
-/** Closes the prepare step: the prepared list stands until the next Long Rest. */
-export function finishPreparing(state: GameState, actorId: string): void {
+/** Closes the prepare step, whose prepared list stands until the next Long Rest; with `rest`, the step a finished rest
+ *  opened, whose recoveries and re-choices wait for the next rest. */
+export function finishPreparing(state: GameState, actorId: string, rest = false): void {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
-  actor.preparation = null;
+  if (rest) actor.restStep = null;
+  else actor.preparation = null;
 }

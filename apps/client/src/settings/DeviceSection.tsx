@@ -1,6 +1,6 @@
 import { Button, SegmentedControl, Switch, ThemeToggle } from "@vtt/ui";
 import { useRollPreference } from "../dice/roll-preference";
-import { setAutoArrange, useAutoArrange } from "./preferences";
+import { setAutoArrange, setPinchZoom, useAutoArrange, usePinchZoom } from "./preferences";
 import { SETTING } from "./sections";
 import { SettingRow, SettingsSection } from "./SettingRow";
 
@@ -18,6 +18,7 @@ export function DeviceSection({
 }>) {
   const { rollInput, mayType, setRollInput } = useRollPreference();
   const autoArrange = useAutoArrange();
+  const pinchZoom = usePinchZoom();
   return (
     <SettingsSection id="device" gmOnly={false}>
       <SettingRow setting={SETTING.theme} stacked>
@@ -42,6 +43,9 @@ export function DeviceSection({
           hint="At this table the server rolls players' dice, and only the GM can change that."
         />
       )}
+      <SettingRow setting={SETTING.pinchZoom}>
+        <Switch checked={pinchZoom} onChange={setPinchZoom} label="Let pinch zoom the page" />
+      </SettingRow>
       {role === "gm" && (
         <SettingRow setting={SETTING.arrangeScenes} gmOnly>
           <Switch checked={autoArrange} onChange={setAutoArrange} label="Open new scenes for arranging" />

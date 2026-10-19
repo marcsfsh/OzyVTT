@@ -231,7 +231,10 @@ describe("healing outside a fight", () => {
     ];
     const { base, server, heroSession } = await boot(state);
     expect((await use(base, heroSession, "spell-prayer-of-healing", { targetIds: [FRIEND] })).status).toBe(200);
-    expect(server.store.snapshot.actors.find((candidate) => candidate.id === FRIEND)!.effects).toEqual([]);
+    // The wound is closed; what is left marks the creature Prayer of Healing can't reach again before a Long Rest.
+    expect(
+      server.store.snapshot.actors.find((candidate) => candidate.id === FRIEND)!.effects.map((effect) => effect.name)
+    ).toEqual(["Prayer of Healing"]);
   });
 
   it("heals each creature a healing spell reaches, and tells the sheet how many that is", async () => {

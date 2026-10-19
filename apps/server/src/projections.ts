@@ -231,6 +231,9 @@ const PENDING_SAVE_FIELDS = {
   // The save's own roll mode is read when it is answered.
   advantageAtSize: "never",
   disadvantageFrom: "never",
+  // What a failure does at each Hit Point band names the thresholds, the stat block's text; it is narrated as it lands.
+  failureByHitPoints: "never",
+  failureBanishes: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
   gmApplies: "player",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
@@ -621,6 +624,8 @@ const PLAYER_ACTOR_FIELDS = {
   tokenAssetId: "table",
   conditions: "table",
   deathSaves: "table",
+  // When it died and how, which the revival rules read: the GM's.
+  death: "never",
   armorClass: "party",
   // Only says the GM set the character's AC by hand; the number is `armorClass`, which the party already sees.
   armorClassOverride: "party",
@@ -633,6 +638,7 @@ const PLAYER_ACTOR_FIELDS = {
   healthDisplay: "derived",
   replaySceneId: "derived",
   actionUses: "derived",
+  readyAt: "derived",
   heroicInspiration: "derived",
   heroicInspirationToGive: "derived",
   experiencePoints: "derived",
@@ -644,6 +650,7 @@ const PLAYER_ACTOR_FIELDS = {
   preparedSpellIds: "derived",
   spellbook: "derived",
   preparation: "derived",
+  restStep: "derived",
   inventory: "derived",
   currency: "derived",
   notes: "never",
@@ -705,10 +712,12 @@ function pickFields<K extends keyof Actor>(source: Actor, keys: readonly K[]): P
  * the claim picker, and nothing more of its sheet.
  * | definition (the imported sheet)         |  Y   |  -  |       -        |     Y      |          Y          |
  * | actionUses, hitDice, heroicInspiration  |  Y   |  -  |       -        |     -      |          Y          |
+ * | readyAt (a timed pool's return)         |  Y   |  -  |       -        |     -      |          Y          |
  * | experiencePoints                        |  Y   |  -  |       -        |     -      |          Y          |
  * | heroicInspirationToGive (a gift to make)|  Y   |  -  |       -        |     -      |          -          |
  * | spellSlots, pactSlots, preparedSpellIds |  Y   |  -  |       -        |     -      |          Y          |
  * | preparation (Long Rest prepare step)    |  Y   |  -  |       -        |     -      |          Y          |
+ * | restStep (what a finished rest opened)  |  Y   |  -  |       -        |     -      |          Y          |
  * | spellbook (a Wizard's beyond the sheet) |  Y   |  -  |       -        |     -      |          Y          |
  * | inventory, currency                     |  Y   |  -  |       -        |     -      |          Y          |
  * | favouriteOptionIds, optionUseCounts     |  Y   |  -  |       -        |     -      |          -          |
@@ -778,6 +787,7 @@ export function projectPlayerView(
         const {
           ownerSessionId,
           actionUses,
+          readyAt,
           heroicInspiration,
           heroicInspirationToGive,
           experiencePoints,
@@ -788,6 +798,7 @@ export function projectPlayerView(
           preparedSpellIds,
           spellbook,
           preparation,
+          restStep,
           inventory,
           currency,
           replaySceneId,
@@ -856,6 +867,10 @@ export function projectPlayerView(
           ...(species !== null ? { species } : {}),
           ...(sheetVisible && storedSheet ? { definition: storedSheet } : {}),
           ...(resourcesVisible ? { actionUses: { ...actionUses }, heroicInspiration } : {}),
+          // When a pool spent for a time comes back: the owner's own sheet resource, as its spent count is.
+          ...(resourcesVisible
+            ? { readyAt: Object.fromEntries(Object.entries(readyAt).map(([key, value]) => [key, { ...value }])) }
+            : {}),
           // XP is a sheet resource, gated like the uses.
           ...(resourcesVisible && experiencePoints !== undefined ? { experiencePoints } : {}),
           // A gift to make is the owner's decision alone.
@@ -883,6 +898,10 @@ export function projectPlayerView(
                 preparedSpellIds: [...preparedSpellIds],
                 spellbook: spellbook.map((entry) => ({ ...entry })),
                 preparation: preparation === null ? null : { ...preparation },
+                restStep:
+                  restStep === null
+                    ? null
+                    : { after: restStep.after, ...(restStep.swaps ? { swaps: { ...restStep.swaps } } : {}) },
                 inventory: inventory.map(playerInventoryRow),
                 currency: { ...currency }
               }

@@ -37,6 +37,7 @@ import type {
   LooseSaveOutcome,
   MutationResult,
   SpellbookResult,
+  ConversionResult,
   ReactionAnswerResult,
   RulesBlocked,
   SaveAnswerResult,
@@ -73,6 +74,7 @@ import type {
   ActorSpendHitDiceSchema,
   ActorSpendUsesSchema,
   ActorRestoreUsesSchema,
+  ActorConvertSchema,
   AddCombatantSchema,
   RemoveCombatantSchema,
   SpellZoneEndSchema,
@@ -167,6 +169,7 @@ import type {
   TableSetStagingDefaultsSchema,
   TempHpSchema,
   TimePassSchema,
+  TimeSetDawnSchema,
   TokenMoveSchema,
   TokenSetAltitudeSchema,
   ActorFallSchema,
@@ -610,6 +613,11 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof ActorRestoreUsesSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  /** Turn one resource into another, or recover one, by a feature's rule (the character's player or the GM). */
+  "actor:convert": (
+    payload: CommandPayload<typeof ActorConvertSchema>,
+    acknowledgement: (result: ConversionResult) => void
+  ) => void;
   /** A player asks the GM for a Long Rest for their character, or takes the ask back. */
   "rest:ask": (
     payload: CommandPayload<typeof RestAskSchema>,
@@ -638,6 +646,11 @@ export interface ClientToServerEvents {
   /** GM-only: move game time forward. */
   "time:pass": (
     payload: CommandPayload<typeof TimePassSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM-only: set the hour dawn comes, or let a Long Rest stand in for it. */
+  "time:set-dawn": (
+    payload: CommandPayload<typeof TimeSetDawnSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "character:set-slot": (

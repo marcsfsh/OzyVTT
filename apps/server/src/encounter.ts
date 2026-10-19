@@ -26,6 +26,7 @@ import {
   expireEffectsAtTurnStart,
   type EffectNarration
 } from "./effects.js";
+import { closeInitiativeWindow, rolledInitiative } from "./initiative-hooks.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
 import { releaseSwallowedBy } from "./swallow.js";
 import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
@@ -278,7 +279,7 @@ export function startEncounter(
   now: number = Date.now(),
   catalog?: EquipmentCatalog,
   onRoll?: InitiativeRollSink
-) {
+): EffectNarration[] {
   if (state.combat.active) throw new CommandRejectedError("End the active encounter before starting another one.");
   if (input.entries.length === 0 || input.entries.length > 200)
     throw new CommandRejectedError("Choose 1 to 200 combatants before starting the encounter.");
@@ -359,6 +360,7 @@ export function startEncounter(
     // Asks parked in the last fight concern a situation that no longer exists.
     pendingRuleAsks: [],
     pendingInitiative,
+    initiativeWindow: [],
     // A fresh fight starts live; the handler captures this start state as the rewind baseline.
     historyCursor: null,
     historyDirty: false
@@ -366,6 +368,8 @@ export function startEncounter(
   if (resolveDefinition) clearPerEncounterUses(state, actorIds, resolveDefinition, catalog);
   // Rolling Initiative stops a Short Rest; the GM's rest panel shows who left it.
   leaveShortRest(state, actorIds, "rolled Initiative");
+  // What happens "when you roll Initiative": Superior Inspiration's regain, Persistent Rage's window.
+  return rolledInitiative(state, actorIds, { resolveDefinition, catalog });
 }
 
 /**
@@ -432,7 +436,7 @@ export function addCombatant(
   now: number = Date.now(),
   onRoll?: InitiativeRollSink,
   deps: InitiativeRollDeps = {}
-) {
+): EffectNarration[] {
   if (!state.combat.active) throw new CommandRejectedError("Start the encounter before adding a combatant to it.");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -464,6 +468,7 @@ export function addCombatant(
   };
   if (deps.resolveDefinition) clearPerEncounterUses(state, new Set([actorId]), deps.resolveDefinition, deps.catalog);
   leaveShortRest(state, new Set([actorId]), "rolled Initiative");
+  return rolledInitiative(state, [actorId], deps);
 }
 
 /**
@@ -515,6 +520,7 @@ export function endEncounter(state: GameState) {
     pendingDamage: [],
     pendingRuleAsks: [],
     pendingInitiative: [],
+    initiativeWindow: [],
     historyCursor: null,
     historyDirty: false
   };
@@ -760,6 +766,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
   const ending: EffectNarration[] = [];
   const outgoingId = state.combat.turnActorId;
+  // Its first turn over, a creature has done what it does when it rolled Initiative.
+  closeInitiativeWindow(state, outgoingId);
   // "If you somehow end a turn in a space with another creature, you have the Prone condition" (SRD 5.2.1).
   const calibration = deps?.geometry?.calibration;
   if (outgoingId && calibration && deps && familyModeFor(state.combat, "movement") !== "freeform")

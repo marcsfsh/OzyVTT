@@ -673,7 +673,8 @@ function leavesBecause(
   const summon = actor.summon;
   if (!summon) return null;
   if (summon.keptBy && !effectHeld(state, summon.keptBy)) return "disappears as its magic ends";
-  if (actor.hp.current <= 0) return "drops to 0 Hit Points and disappears";
+  // A creature a rule raised is a creature like any other at 0 Hit Points: it dies by the rules, or regenerates.
+  if (actor.hp.current <= 0 && summon.actionId !== RAISED_ACTION_ID) return "drops to 0 Hit Points and disappears";
   const user = state.actors.find((candidate) => candidate.id === summon.by);
   if (!user) return "disappears with the creature that summoned it";
   if (summon.endsOnUserDeath && isDead(user)) return `disappears as ${user.name} dies`;
@@ -704,6 +705,84 @@ function commandStarting(actor: Actor): EffectInstance | undefined {
       candidate.tags.includes(COMMANDED_TAG) && candidate.sourceActorId !== null && candidate.sourceActorId !== actor.id
   );
   return effect && actor.control?.keptBy !== effect.id ? effect : undefined;
+}
+
+export type RaiseDeps = Readonly<{
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+  catalog?: EquipmentCatalog;
+  newId: () => string;
+}>;
+
+/**
+ * A creature a rule raises from a stat block on its maker's side (SRD Finger of Death's Zombie, a wraith's Specter, a
+ * troll's severed limb): the same summoned, commanded creature an action's `summons` brings, standing in `at`'s space
+ * and taking its turn right after its maker's. It follows its maker's orders, so a player whose character raised it
+ * runs it, and it leaves as a summoned creature does. Null when the stat block isn't a monster's.
+ */
+export function raiseCreature(
+  state: GameState,
+  input: Readonly<{
+    monsterId: string;
+    /** The creature that raised it, whose side it fights on and whose orders it follows. */
+    maker: Actor;
+    /** Where it appears: this creature's token's space. */
+    at: Actor;
+    /** What raised it ("Create Specter", "Loathsome Limbs"). */
+    source: string;
+    visibility?: "public" | "gm-only";
+  }>,
+  deps: RaiseDeps
+): Readonly<{ actorId: string; name: string }> | null {
+  const printed = deps.resolveDefinition(input.monsterId);
+  if (!printed || printed.schemaId !== "vtt.actor-monster") return null;
+  if (state.actors.length >= 200) throw new CommandRejectedError("The roster is full. Remove unused combatants first.");
+  const { maker } = input;
+  const id = deps.newId();
+  addSummonedActor(state, printed, id, input.visibility ?? maker.visibility, input.monsterId, deps.catalog);
+  const actor = state.actors.find((candidate) => candidate.id === id)!;
+  actor.summon = { by: maker.id, actionId: RAISED_ACTION_ID, name: input.source.slice(0, 120) };
+  actor.control = { by: maker.id, side: sideOf(maker, deps.resolveDefinition) ?? "foes" };
+  if (state.combat.active) {
+    const makerEntry = state.combat.initiative.find((entry) => entry.actorId === maker.id);
+    joinInitiative(state, {
+      actorId: id,
+      score: makerEntry?.score ?? 0,
+      tieBreaker: makerEntry?.tieBreaker ?? 0,
+      ...(makerEntry ? { follows: maker.id } : {})
+    });
+    // It stands in its maker's or its corpse's space, as the text says, whoever is there.
+    const reference = state.combat.tokens.find((token) => token.actorId === input.at.id);
+    state.combat = {
+      ...state.combat,
+      tokens: [
+        ...state.combat.tokens,
+        {
+          actorId: id,
+          position: reference?.position ? { ...reference.position } : null,
+          sizePx: reference ? (reference.sizePx / (reference.sizeCells ?? 1)) * (actor.sizeCells ?? 1) : 48,
+          gridSizePx: reference?.gridSizePx ?? null,
+          gridRotationRadians: reference?.gridRotationRadians ?? null,
+          sizeCells: actor.sizeCells ?? 1
+        }
+      ]
+    };
+  }
+  return { actorId: id, name: actor.name };
+}
+
+/** The summon record's action id on a creature a rule raised (`raiseCreature`). */
+const RAISED_ACTION_ID = "raised";
+
+/** How many living creatures raised as `monsterId` follow `makerId`'s orders (a wraith's seven specters). */
+export function raisedBy(state: GameState, makerId: string, monsterId: string): number {
+  return state.actors.filter(
+    (actor) =>
+      !isDead(actor) &&
+      actor.summon?.by === makerId &&
+      actor.summon.actionId === RAISED_ACTION_ID &&
+      (actor.definitionId === monsterId ||
+        state.definitions.find((entry) => entry.id === actor.definitionId)?.definition.source.externalId === monsterId)
+  ).length;
 }
 
 /** Whether any creature is summoned or under command, so the settle step has anything to look at. */

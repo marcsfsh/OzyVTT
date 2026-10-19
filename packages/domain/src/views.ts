@@ -95,6 +95,7 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
       number
     >;
     /** Whether the character holds Heroic Inspiration. Same gate as `actionUses`. */ heroicInspiration?: boolean;
+    /** When each pool spent for a time comes back (game-clock minute). Same gate as `actionUses`. */ readyAt?: Actor["readyAt"];
     /** A second Heroic Inspiration your own character gained, to give to a player character who lacks one or let go.
      *  Your own claimed character only. */ heroicInspirationToGive?: boolean;
     /** The character's Experience Points, once the GM has awarded any. Same gate as `actionUses`. */ experiencePoints?: number;
@@ -116,6 +117,7 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     preparedSpellIds?: Actor["preparedSpellIds"];
     /** A Wizard's spellbook beyond its sheet. Same gate as `preparedSpellIds`. */ spellbook?: Actor["spellbook"];
     preparation?: Actor["preparation"];
+    /** The step a finished rest opened (recoveries and re-choices). Same gate as `preparation`. */ restStep?: Actor["restStep"];
     inventory?: Actor["inventory"];
     currency?: Actor["currency"];
     /** The options pinned to the sheet's turn card and how often each option resolved. Your own claimed character

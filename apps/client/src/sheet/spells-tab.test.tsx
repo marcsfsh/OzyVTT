@@ -223,6 +223,25 @@ describe("a Warlock's Pact Magic on the sheet", () => {
     });
   });
 
+  it("gives a player no pip that restores a slot, and gives the GM one", () => {
+    mountWarlock();
+    expect(screen.queryByRole("button", { name: "Restore a Pact Magic slot" })).toBeNull();
+    render(
+      <SpellsTab
+        actor={vex}
+        definition={warlock}
+        role="gm"
+        busy={false}
+        edit={vi.fn() as unknown as SheetEdit}
+        rolls={{ rollFlat: vi.fn() } as unknown as SheetRolls}
+        onFeedback={() => {}}
+        routeSpell={() => false}
+        castSpellAction={vi.fn()}
+      />
+    );
+    expect(screen.getByRole("button", { name: "Restore a Pact Magic slot" })).toBeTruthy();
+  });
+
   it("casts a spell with a pact slot at the pact level, through its action or from the pool", () => {
     const { castSpellAction, edit } = mountWarlock();
     fireEvent.click(screen.getByRole("button", { name: "Cast Hex" }));

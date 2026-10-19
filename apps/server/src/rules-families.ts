@@ -111,6 +111,9 @@ const RULE_FAMILIES = {
   // A creature the action can't affect: the wrong creature type or size, unseen, not grappled or marked by the user,
   // an ally where it names an enemy, or a creature gone from the plane.
   "target.not-allowed": "targeting",
+  // A revival spell, Gentle Repose or an action that raises a corpse, aimed at a creature it can't take: one alive, dead
+  // longer than its limit, Undead when it died, or whose body or head is gone.
+  "target.revival": "targeting",
   // The hit an extra is added to can't carry it (no Advantage or ally for Sneak Attack, a ranged smite).
   "attack.hit-option-unqualified": "targeting",
   // Being Charmed by your target is a targeting restriction.

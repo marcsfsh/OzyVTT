@@ -482,6 +482,9 @@ export const ActionResolveSchema = z
     /** Knocking out a creature (SRD): a melee hit that drops the target to 0 leaves it at 1 Hit Point and Unconscious
      *  instead. Refused on any other attack. */
     knockOut: z.boolean().optional(),
+    /** An Evoker's Overchannel (Wizard 14): a Wizard spell cast with a level 1 to 5 slot deals its maximum damage, the
+     *  caster taking Necrotic damage for each use after the first before a Long Rest. Refused for anything else. */
+    overchannel: z.boolean().optional(),
     shaping: CastShapingListSchema.optional(),
     /** What the user picks for an action that brings creatures onto the map (Find Familiar's form, Giant Insect's
      *  spider, Summon Dragon's breath and the Resistance it shares), and the point they appear at, within the action's
@@ -1239,6 +1242,12 @@ export const ActorRechooseSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(80),
+    /** For a pick of several (Weapon Mastery), the answer `id` takes the place of. */
+    replacing: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1266,6 +1275,24 @@ const PoolAmountFields = {
 export const ActorSpendUsesSchema = z.object(PoolAmountFields).strict();
 /** Give back spent uses of a pool (GM). */
 export const ActorRestoreUsesSchema = z.object(PoolAmountFields).strict();
+/** Turns one resource into another, or recovers one, by a feature's rule (Font of Magic, Arcane Recovery): the slot it
+ *  spends or makes (`level`, `pact` for a Pact Magic slot), the slots it recovers (`levels`), or how many uses or points
+ *  (`count`). The server checks each against the feature. */
+export const ActorConvertSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    conversionId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(60),
+    level: z.number().int().min(1).max(9).optional(),
+    pact: z.boolean().optional(),
+    levels: z.array(z.number().int().min(1).max(9)).min(1).max(9).optional(),
+    count: z.number().int().min(1).max(20).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** A player asks the GM for a Long Rest for their character, or takes the ask back (`withdraw`). */
 export const RestAskSchema = z
   .object({
@@ -1328,6 +1355,14 @@ export const TimePassSchema = z
   })
   .strict()
   .refine((request) => request.hours > 0 || request.minutes > 0, "Choose at least 1 minute.");
+/** The hour of the day dawn comes on the game clock, or null for a Long Rest to stand in for the day. */
+export const TimeSetDawnSchema = z
+  .object({
+    commandId: z.uuid(),
+    hour: z.number().int().min(0).max(23).nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const CharacterSetSlotSchema = z
   .object({
     commandId: z.uuid(),
@@ -1353,6 +1388,8 @@ export const CharacterFinishPreparingSchema = z
   .object({
     commandId: z.uuid(),
     actorId: z.uuid(),
+    /** Closes the step a finished rest opened (recoveries and re-choices); without it, the Long Rest's prepare step. */
+    rest: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

@@ -46,6 +46,7 @@ import {
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
 import { openDamageWindow } from "./damage-window.js";
+import { applyHitPointBand, banishOnFailure, hitPointBandOf } from "./fatal-saves.js";
 import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacitated } from "./condition-rules.js";
@@ -368,7 +369,16 @@ export function createPendingSaves(
     /** The GM's call for a roll these saves answer. */
     callId?: string;
     /** What else each save carries: what a success leaves, a line for a failure, the spell area that raised it. */
-    extra?: Pick<PendingSave, "onSuccessEffect" | "failureNote" | "breaksConcentration" | "zoneId" | "gmApplies">;
+    extra?: Pick<
+      PendingSave,
+      | "onSuccessEffect"
+      | "failureNote"
+      | "breaksConcentration"
+      | "zoneId"
+      | "gmApplies"
+      | "failureByHitPoints"
+      | "failureBanishes"
+    >;
     /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
     magical?: boolean;
     /** A success makes the target immune to this trait of its source for the fight (a ghast's Stench). */
@@ -426,6 +436,8 @@ export function createPendingSaves(
     ...(input.extra?.breaksConcentration ? { breaksConcentration: true as const } : {}),
     ...(input.extra?.zoneId !== undefined ? { zoneId: input.extra.zoneId } : {}),
     ...(input.extra?.gmApplies ? { gmApplies: true as const } : {}),
+    ...(input.extra?.failureByHitPoints ? { failureByHitPoints: structuredClone(input.extra.failureByHitPoints) } : {}),
+    ...(input.extra?.failureBanishes ? { failureBanishes: [...input.extra.failureBanishes] } : {}),
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
     ...(input.drain ? { drain: { ...input.drain } } : {}),
@@ -921,8 +933,11 @@ export function answerSave(
     !isIncapacitated(target) &&
     hasEvasion(target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined);
   const halved = success !== evasion;
-  const outcomeParts =
-    parts && parts.length > 0
+  // A failure that acts by the target's Hit Points (Divine Word, Slaying Bow) does its band's outcome instead.
+  const band = success ? null : hitPointBandOf(pending, target);
+  const outcomeParts = band
+    ? []
+    : parts && parts.length > 0
       ? success && (!pending.halfOnSuccess || evasion)
         ? []
         : halved
@@ -938,7 +953,9 @@ export function answerSave(
           ? Math.floor(proposedTotal / 2)
           : proposedTotal;
   const outcomeCondition =
-    !success && (pending.conditionIds.length > 0 || (pending.onFailEffect?.linkedConditionIds.length ?? 0) > 0);
+    !success &&
+    band === null &&
+    (pending.conditionIds.length > 0 || (pending.onFailEffect?.linkedConditionIds.length ?? 0) > 0);
 
   // Preview (commit=false): the roll is recorded so everyone sees it, but nothing is applied and the
   // save stays open until the answerer confirms. The damage is weighed through the target's defences, so the
@@ -1075,7 +1092,34 @@ export function answerSave(
       events.push(...endEffectIfPresent(state, reference.actorId, reference.effectId));
   }
   // A committed failure applies the declared source-linked effect (a grapple, a timed or Concentration condition).
-  if (!success && pending.onFailEffect)
+  if (band)
+    events.push(
+      ...applyHitPointBand(
+        state,
+        target,
+        band,
+        pending,
+        {
+          resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
+          ...(deps.catalog ? { catalog: deps.catalog } : {}),
+          newId: deps.newRollId,
+          now: deps.now,
+          rollDie: deps.random
+        },
+        `${commandId}:${saveId}:band`
+      )
+    );
+  if (!success && pending.failureBanishes)
+    events.push(
+      ...banishOnFailure(
+        state,
+        target,
+        pending,
+        target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined,
+        `${commandId}:${saveId}:banished`
+      )
+    );
+  if (!success && band === null && pending.onFailEffect)
     events.push(
       ...applyFailureEffect(state, target.id, pending.onFailEffect, `${commandId}:${saveId}:fail`, immunities)
     );

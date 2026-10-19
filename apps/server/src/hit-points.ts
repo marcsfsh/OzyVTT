@@ -39,12 +39,16 @@ import {
   makeEffect,
   STABLE_RECOVERY_TAG,
   NO_HEALING_TAG,
-  reduceExhaustion,
+  RAGING_TAG,
   removeConditionDirect,
   sourceOf,
   type EffectNarration
 } from "./effects.js";
-import { reconcileEquipment } from "./inventory.js";
+import { returnToLife, stampDeath } from "./death.js";
+import { markRising } from "./risen.js";
+import { mistyEscape, regainedHitPoints, restorationAtDeath, tallyTurnDamage } from "./death-traits.js";
+import { holdsFeature } from "./class-features.js";
+import { rollSaveAtOnce } from "./saving-throws.js";
 import { offerDamageReaction } from "./damage-reactions.js";
 import { releaseSwallowedBy } from "./swallow.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
@@ -388,7 +392,8 @@ export function previewDamage(
 /**
  * What dropping to 0 Hit Points does, by damage or by hit points lost: a character falls Unconscious and is dying (or
  * dies outright when the overflow reaches its maximum), any other creature is defeated (a troll lies down until its
- * turn, a Death Burst goes off), and nobody at 0 sustains effects or Concentration.
+ * turn, a vampire turns to mist, a Death Burst goes off), and nobody at 0 sustains effects or Concentration. `outright`:
+ * it dies whatever it would otherwise do (a kill-outright rule).
  */
 function fallToZero(
   state: GameState,
@@ -396,28 +401,36 @@ function fallToZero(
   definition: ActorDefinition | undefined,
   overflow: number,
   deps: DamageDeps | undefined,
-  events: EffectNarration[]
+  events: EffectNarration[],
+  outright = false
 ): Readonly<{ instantDeath: boolean; defeated: boolean }> {
   let instantDeath = false;
   let defeated = false;
   if (actor.kind === "player-character") {
-    const outcome = droppedToZero(overflow, actor.hp.maximum);
+    const outcome = droppedToZero(outright ? actor.hp.maximum : overflow, actor.hp.maximum);
     actor.deathSaves = outcome.state;
     instantDeath = outcome.instantDeath;
     applyCondition(actor, "unconscious", { immunities: deps });
     applyCondition(actor, "prone", { immunities: deps });
-    events.push({
-      kind: "condition",
-      text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
-      actorId: actor.id
-    });
+    // A rule that kills outright says what killed it.
+    if (!outright)
+      events.push({
+        kind: "condition",
+        text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
+        actorId: actor.id
+      });
   } else {
     defeated = true;
     // A swallower that dies lets out what it swallowed (SRD: "can escape from the corpse").
     events.push(...releaseSwallowedBy(state, actor.id, definition));
-    // A troll lies down until its next turn says whether it regenerates; anything else dies, and a Death Burst goes
-    // off as it does.
-    if (!holdOnAtZero(state, actor, definition, events) && deps) deathBurst(state, actor, definition, deps, events);
+    // A troll lies down until its next turn says whether it regenerates and a vampire escapes as mist; anything else
+    // dies, and a Death Burst goes off as it does. Killed outright, it lies dead whatever its traits.
+    if (outright) removeConditionDirect(actor, "unconscious");
+    const holds =
+      !outright &&
+      (holdOnAtZero(state, actor, definition, events) || mistyEscape(state, actor, definition, deps, events));
+    if (!holds && deps) deathBurst(state, actor, definition, deps, events);
+    if (!holds) restorationAtDeath(state, actor, definition, events);
   }
   // At 0 HP a combatant can't sustain effects (grapples, rage); incapacitation also breaks
   // concentration (SRD Concentration).
@@ -426,6 +439,43 @@ function fallToZero(
   // A spell whose last creature just died has nothing left.
   events.push(...endConcentrationOnTheDead(state, actor));
   return { instantDeath, defeated };
+}
+
+/**
+ * A creature killed outright, whatever its Hit Points (Power Word Kill, a solar's Slaying Bow): it drops to 0 and dies
+ * there, a character with three failed death saves and anything else with no trait to hold it up, and what it sustained
+ * ends as any death ends it. `withoutDamage` is an effect that kills with no damage, which Death Ward negates instead
+ * ("If the spell is still in effect when the target is subjected to an effect that would kill it instantly without
+ * dealing damage, that effect is negated against the target, and the spell ends").
+ */
+export function killOutright(
+  state: GameState,
+  actorId: string,
+  cause: string,
+  options: Readonly<{ withoutDamage?: boolean; bodyGone?: boolean; headLost?: boolean; deps?: DamageDeps }> = {}
+): EffectNarration[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || isDead(actor)) return [];
+  const events: EffectNarration[] = [];
+  const ward = options.withoutDamage ? actor.effects.find((effect) => effect.tags.includes(DEATH_WARD_TAG)) : undefined;
+  if (ward) {
+    events.push(
+      { kind: "condition", text: `${ward.name} turns ${cause} aside from ${actor.name}.`, actorId },
+      ...endEffect(state, actor.id, ward.id)
+    );
+    return events;
+  }
+  const deps = options.deps;
+  const definition = actor.definitionId && deps ? deps.resolveDefinition(actor.definitionId) : undefined;
+  actor.hp = { ...actor.hp, current: 0, temporary: 0 };
+  events.push({ kind: "condition", text: `${actor.name} dies (${cause}).`, actorId });
+  fallToZero(state, actor, definition, actor.hp.maximum, deps, events, true);
+  stampDeath(state, actor, {
+    cause,
+    ...(options.bodyGone ? { bodyGone: true } : {}),
+    ...(options.headLost ? { headLost: true } : {})
+  });
+  return events;
 }
 
 /** SRD Death Ward: "The first time the target would drop to 0 Hit Points before the spell ends, the target instead
@@ -463,6 +513,42 @@ function relentlessEndurance(
     actorId: actor.id
   });
   return true;
+}
+
+/** The tag on a Hunter's Mark effect. */
+const HUNTERS_MARK_TAG = "hunters-mark";
+
+/** Counts the uses of Relentless Rage since the last rest; each one raises its DC by 5. */
+export const RELENTLESS_RAGE_KEY = "relentless-rage";
+
+/** SRD Relentless Rage (Barbarian 11): "If you drop to 0 Hit Points while your Rage is active and don't die outright,
+ *  you can make a DC 10 Constitution saving throw. If you succeed, your Hit Points instead change to a number equal to
+ *  twice your Barbarian level. Each time you use this feature after the first, the DC increases by 5." The server
+ *  rolls the save. True when it held the creature up. */
+function relentlessRage(
+  state: GameState,
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  overflow: number,
+  deps: DamageDeps | undefined,
+  events: EffectNarration[]
+): boolean {
+  if (overflow >= actor.hp.maximum || !deps?.rollDie) return false;
+  if (!actor.effects.some((effect) => effect.tags.includes(RAGING_TAG))) return false;
+  if (!holdsFeature(definition, "relentless-rage", "Relentless Rage")) return false;
+  const used = actor.actionUses[RELENTLESS_RAGE_KEY] ?? 0;
+  const dc = 10 + 5 * used;
+  const save = rollSaveAtOnce(state, actor, "con", { ...deps, rollDie: deps.rollDie });
+  actor.actionUses = { ...actor.actionUses, [RELENTLESS_RAGE_KEY]: used + 1 };
+  const held = save.total >= dc;
+  const level = definition?.character?.classes.find((entry) => entry.id === "barbarian")?.level ?? 0;
+  if (held) actor.hp = { ...actor.hp, current: Math.min(actor.hp.maximum, Math.max(1, level * 2)) };
+  events.push({
+    kind: "condition",
+    text: `${actor.name}'s Relentless Rage: CON save ${save.total} (d20 ${save.natural}) vs DC ${dc}: ${held ? `up at ${actor.hp.current} HP` : "it falls"}.`,
+    actorId: actor.id
+  });
+  return held;
 }
 
 /** Marks the effect that holds what drained damage took off a creature's Hit Point maximum. */
@@ -607,6 +693,7 @@ export function applyDamageDetailed(
 
   const hpBefore = actor.hp.current;
   const wasAtZero = hpBefore <= 0;
+  const deadBefore = isDead(actor);
   const absorbed = Math.min(actor.hp.temporary, totalAdjusted);
   actor.hp.temporary -= absorbed;
   const damageToHp = totalAdjusted - absorbed;
@@ -682,12 +769,22 @@ export function applyDamageDetailed(
     });
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deathWard(state, actor, events)) {
     // Death Ward held the creature at 1 Hit Point: nothing falls.
+  } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && input.drain?.killsAtZero) {
+    // "The target dies if it is reduced to 0 Hit Points by this attack": no death saves, no trait to hold it up.
+    const kill = input.drain.killsAtZero;
+    const cause = kill.cause ?? input.sourceName ?? "the blow";
+    events.push({ kind: "condition", text: `${actor.name} dies (${cause}).`, actorId });
+    const fell = fallToZero(state, actor, definition, damageToHp - hpBefore, deps, events, true);
+    stampDeath(state, actor, { cause, ...(kill.bodyGone ? { bodyGone: true } : {}) });
+    instantDeath = fell.instantDeath;
+    defeated = fell.defeated;
   } else if (
     isPlayerCharacter &&
     !wasAtZero &&
     actor.hp.current === 0 &&
     damageToHp > 0 &&
-    relentlessEndurance(actor, definition, damageToHp - hpBefore, events)
+    (relentlessRage(state, actor, definition, damageToHp - hpBefore, deps, events) ||
+      relentlessEndurance(actor, definition, damageToHp - hpBefore, events))
   ) {
     // Up at 1 Hit Point: nothing falls.
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
@@ -695,24 +792,39 @@ export function applyDamageDetailed(
     instantDeath = fell.instantDeath;
     defeated = fell.defeated;
   }
+  // A hydra's heads and a troll's limbs count the damage of each turn.
+  events.push(
+    ...tallyTurnDamage(state, actor, definition, parts, totalAdjusted, (cause) => {
+      const killed = killOutright(state, actor.id, cause, deps ? { deps } : {});
+      defeated ||= killed.length > 0 && !isPlayerCharacter;
+      return killed;
+    })
+  );
   if (input.drain && totalAdjusted > 0) {
     const drained = drainDamage(state, actor, input, { parts, totalAdjusted }, definition, deps, events);
     instantDeath ||= drained.died && isPlayerCharacter;
     defeated ||= drained.died && !isPlayerCharacter;
   }
+  // Finger of Death: a Humanoid it kills rises as a Zombie at the start of its caster's next turn.
+  if (input.drain?.slainRise && totalAdjusted > 0 && !deadBefore && isDead(actor))
+    events.push(...markRising(state, actor, definition, input.drain.slainRise, input.sourceActorId));
 
   // SRD Concentration: damage while concentrating prompts a CON save, DC max(10, half the damage) capped
   // at 30, in a fight or out of one (a trap between fights). The prompt carries the effects a committed failure
   // ends. Skipped without an id-minter.
   if (totalAdjusted > 0 && actor.hp.current > 0 && deps?.newId) {
     const sustained: Array<{ actorId: string; effectId: string }> = [];
+    let markOnly = true;
     for (const bearer of state.actors) {
       for (const effect of bearer.effects) {
-        if (effect.concentration && effect.sourceActorId === actor.id)
-          sustained.push({ actorId: bearer.id, effectId: effect.id });
+        if (!effect.concentration || effect.sourceActorId !== actor.id) continue;
+        sustained.push({ actorId: bearer.id, effectId: effect.id });
+        markOnly &&= effect.tags.includes(HUNTERS_MARK_TAG);
       }
     }
-    if (sustained.length > 0 && state.combat.pendingSaves.length < 100) {
+    // SRD Relentless Hunter (Ranger 13): "Taking damage can't break your Concentration on Hunter's Mark."
+    const unbroken = markOnly && holdsFeature(definition, "relentless-hunter", "Relentless Hunter");
+    if (sustained.length > 0 && !unbroken && state.combat.pendingSaves.length < 100) {
       const dc = Math.min(30, Math.max(10, Math.floor(totalAdjusted / 2)));
       state.combat = {
         ...state.combat,
@@ -807,7 +919,7 @@ export function healActor(state: GameState, actorId: string, amount: number, sco
 /** SRD: an Unconscious creature at 0 HP, or one knocked out at 1, stays so "until it regains any Hit Points". */
 function wakeOnHealing(state: GameState, actor: Actor, before: number): EffectNarration[] {
   if (actor.hp.current <= before) return [];
-  const events = endKnockOut(state, actor);
+  const events = [...endKnockOut(state, actor), ...regainedHitPoints(state, actor)];
   // A Stable creature healed has no more need of its hours to recover.
   for (const effect of actor.effects.filter((candidate) => candidate.tags.includes(STABLE_RECOVERY_TAG)))
     events.push(...endEffect(state, actor.id, effect.id));
@@ -864,9 +976,8 @@ export function setCurrentHp(state: GameState, actorId: string, current: number,
 }
 
 /**
- * SRD "Dead": the one way back. The GM applies the revival (Revivify, Raise Dead, a story) and names the hit points it
- * gives. The dying state and the Unconscious it brought end, a creature that died with Exhaustion comes back one
- * level lower, and it is no longer attuned to any magic item. Other conditions stay.
+ * SRD "Dead": the GM's way back, for a revival the server doesn't cast (a story, a wish). The GM names the hit points
+ * it gives, and the creature returns as a revival spell returns it (`returnToLife`).
  */
 export function reviveActor(
   state: GameState,
@@ -881,25 +992,8 @@ export function reviveActor(
   requireGm(scope, "Only the GM can revive a creature.");
   const actor = adjustableActor(state, actorId, scope);
   if (!isDead(actor)) throw new CommandRejectedError(`${actor.name} isn't dead.`);
-  actor.hp.current = Math.max(1, Math.min(actor.hp.maximum, hitPoints));
-  actor.deathSaves = null;
-  if (!actor.effects.some((effect) => effect.linkedConditionIds.includes("unconscious")))
-    removeConditionDirect(actor, "unconscious");
-  reduceExhaustion(actor);
-  if (actor.inventory.some((item) => item.attuned)) {
-    actor.inventory = actor.inventory.map((item) => (item.attuned ? { ...item, attuned: false } : item));
-    // Attunement feeds stored AC and slot maxima, so the loadout is reconciled as an inventory write would be.
-    const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
-    reconcileEquipment(actor, definition, { catalog: deps.catalog, role: "gm" });
-  }
-  const regained = actor.hp.current;
-  return [
-    {
-      kind: "condition",
-      text: `${actor.name} returns to life with ${regained} ${regained === 1 ? "hit point" : "hit points"}.`,
-      actorId
-    }
-  ];
+  const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
+  return returnToLife(actor, hitPoints, { definition, ...(deps.catalog ? { catalog: deps.catalog } : {}) });
 }
 
 /** The GM sets a creature's hit point maximum. Current HP never exceeds it. A character's sheet sets the

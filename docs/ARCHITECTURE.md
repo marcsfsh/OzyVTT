@@ -408,6 +408,19 @@ dispelled with no Concentration. An effect can also last until its bearer's next
 would run out in its 8 hours and leaves longer effects for the GM to pass those hours, so they count
 once. The clock also runs a Stable creature's 1d4 hours to 1 Hit Point and a knocked-out creature's hour.
 
+Death is a record on the creature (`Actor.death`, `death.ts`). After every command the server stamps when a
+creature died: the fight's round while its fight runs, then the game clock. A rule that kills also says what killed
+it and what is left of the body (Disintegrate's dust, a Vorpal Sword's lost head). A revival spell's conditions are
+data on the spell (`effect.revives`: its time limit, no Undead, a new body, the Hit Points it gives back). They are
+checked before anything is spent and applied as the cast resolves (`resolution/revival.ts`). Time under Gentle
+Repose doesn't count against the limit, and Raise Dead's ordeal is a penalty to D20 Tests that eases with each Long
+Rest. What kills outright is data too: damage that kills at 0 (`drain.killsAtZero`), a corpse that rises
+(`drain.slainRise`, `risen.ts`), a hit that kills (`onHit.kills`, `resolution/kill.ts`), a cast that kills by Hit
+Points (`killsAtHitPoints`) and a save whose failure acts by the target's Hit Points (`failureByHitPoints`,
+`fatal-saves.ts`). All of them die through `killOutright` in `hit-points.ts`: a character makes no death saves, and
+Death Ward turns aside a death that deals no damage. Stat block traits that cheat death (Misty Escape, the
+Restoration traits, Multiple Heads, Loathsome Limbs) run from `death-traits.ts` as damage lands and as turns end.
+
 Each effect a spell leaves records the spell and the level it was cast at (`spell`), so a spell can be
 ended as a whole: Dispel Magic and Remove Curse resolve in `resolution/dispel.ts`, which ends the
 spell's effects, its area or its caster's Concentration (`spell-endings.ts`). A Concentration spell that
@@ -441,8 +454,15 @@ checked as a spell's targets are, in `resolution/action-targets.ts`.
 
 A magic item's charges are an `actionUses` pool keyed by the carried row (`itemPool` in
 `item-actions.ts`), so two copies count separately and the count moves with the row when the GM hands
-it over (`character.give-item`). A Long Rest gives back the item's printed dice (`charges.regain`), not
-every charge, and spending the last one rolls the SRD's d20 for the GM (`item-charges.ts`). Ammunition is
+it over (`character.give-item`). A cast spends its printed cost (`useCost`), and one whose extra charges raise its
+level (`chargesRaiseLevel`, a Wand of Fireballs) is one action for each cost. A pool that never comes back
+(`per: "never"`, a Necklace of Fireballs' beads) starts at a count rolled when the row is added (`charges.starting`).
+A Long Rest gives back the item's printed dice (`charges.regain`), not every charge; when the GM keeps a dawn hour
+(`time.set-dawn`) the clock's dawn gives them back instead (`clock-pools.ts`). Spending the last charge rolls the
+SRD's d20, and the record says what a 1 does (destroyed, or a plain item it becomes) and what a 20 gives back
+(`resolution/charges.ts`, which also rolls a Thief's Use Magic Device d6). A pool spent for a time (`per: "time"`,
+Wings of Flying) waits `afterHours` of game time from its first use (`readyAt` on the actor) and comes back as
+`passGameTime` passes it. Ammunition is
 counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs a piece of the kind it fires
 and spends one, and half of the pieces fired come back when the encounter ends. Magic ammunition is bound to a
 kind when it is added, like a magic weapon to its base, so +1 bolts fit only a crossbow, and its bonus rides only
@@ -470,6 +490,18 @@ the area). A cast with components waits while a creature that sees it may answer
 creature's own spell of a minute or more takes the action on each of its turns in a fight and resolves on the last
 (`resolution/long-casting.ts`). Outside a fight a creature's own cast resolves through the same path with no turn to
 spend, and a long one moves the game clock by its whole hours; an item's cast there stays on the loose route.
+
+A player only spends spell slots (`character.set-slot` refuses a raise from a player); everything that gives a
+resource back is its own checked command. `conversions.ts` is one table of the features that turn one resource
+into another or recover one (Font of Magic both ways, Arcane and Natural Recovery, Magical Cunning, restoring a
+use with a slot or points, Pearl of Power), each with its timing, its check and its pick, offered by
+`actor:available-actions` and taken with `actor.convert`. Hit Point Dice are spent only during a Short Rest, a
+player's own or the party's (`rests.ts`). A finished rest opens a step on the actor (`restStep`) where its
+recoveries and re-choices are made until its player taps Done; a re-choice the build reads (a Weapon Mastery pick,
+a Wizard's cantrip, a Hunter's option) is written to the ledger and the sheet rebuilt (`ledger-rechoice.ts`), a
+pick of several one held answer at a time. When Initiative is rolled, `initiative-hooks.ts` opens a window for the
+features that act then (Persistent Rage, Uncanny Metabolism) and gives back what others restore (Perfect Focus,
+Superior Inspiration, Archdruid).
 
 A cast can carry Metamagic options and Sculpt Spells' picks (`ResolveInput.shaping`, `resolution/metamagic.ts`).
 The economy checks each pick against the options the caster knows, the spell and the Sorcery Points left, and spends
@@ -671,8 +703,9 @@ change as a new numbered migration in the owning store.
 
 ## Client
 
-A routed single-page app (`apps/client/src/router.ts`); every surface has an address. `main.tsx` only
-mounts `shell/App.tsx`, where `useSession` holds the sign-in, the socket and the projected state, and
+A routed single-page app (`apps/client/src/router.ts`); every surface has an address. `main.tsx` installs
+the zoom guard (`lib/zoom-guard.ts`, which holds a phone's page at its own size, as the other two entries do)
+and mounts `shell/App.tsx`, where `useSession` holds the sign-in, the socket and the projected state, and
 the GM and player shells render the surface the address names. The game arrives over the socket; the
 Codex and homebrew are fetched over HTTP. Socket request/replies go through `lib/command.ts`
 (`command` adds the `commandId`, `read` does not, and a lost reply becomes a refusal) and `/api/v1`

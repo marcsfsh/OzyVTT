@@ -868,10 +868,12 @@ export type ContentActionSummary = Readonly<{
   area: ContentActionArea | null;
   attackCount: number | null;
   usesLimit: number | null;
-  usesPer: "turn" | "own-turn" | "encounter" | "long-rest" | "short-rest" | "recharge" | null;
+  usesPer: "turn" | "own-turn" | "encounter" | "long-rest" | "short-rest" | "recharge" | "never" | "time" | null;
   /** d6 threshold for usesPer "recharge" ("Recharge 5-6" → 5); rolled automatically at the start of the owner's turn. */ usesRecharge:
     number | null;
   usesPool: string | null;
+  /** For usesPer "time": the hours of game time after the first use before the pool comes back ("1d12", "168"). */
+  usesAfterHours?: string;
   /** Uses one activation spends when it is more than one, or `chosen` when the user picks it (Lay on Hands). */ useCost?:
     number | "chosen";
   requiresEffectTag: string | null;

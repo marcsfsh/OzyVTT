@@ -69,7 +69,8 @@ export const fighter: ClassMechanicsModule = {
       extraPicks: [
         { offer: "feature:weapon-mastery", scaling: { type: "class-resource-growth", id: "weapon-mastery" } }
       ],
-      replaces: [{ offer: "feature:weapon-mastery", when: "level-up", amount: 1 }]
+      // "Whenever you finish a Long Rest, you can practice weapon drills and change one of those weapon choices."
+      replaces: [{ offer: "feature:weapon-mastery", when: "long-rest", amount: 1 }]
     }
     // Not modeled: Tactical Mind (retroactive check bonus with a refund), Tactical Shift and Tactical
     // Master (movement, mastery swap) and Studied Attacks (needs memory of the missed target).

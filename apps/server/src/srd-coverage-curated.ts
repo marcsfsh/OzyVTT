@@ -254,7 +254,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "jumping.ts lets a jump rise up to 3 plus the Strength modifier with 10 feet moved this turn before it, half from a standing start, a foot of movement for each foot. Reaching up half its height more is the GM's."
   ),
   "hit-point-dice": enforced(
-    "rests.ts spends them on a Short Rest, each healing its roll plus the Constitution modifier, and restores them all on a Long Rest."
+    "rests.ts lets a creature spend them only during a Short Rest (its own or the party's), each healing its roll plus the Constitution modifier, and restores them all on a Long Rest. The GM may spend them any time."
   ),
   "hit-points": enforced(
     "hit-points.ts keeps Hit Points between 0 and the maximum, and a creature at 0 falls Unconscious or dies."
@@ -412,7 +412,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
 };
 
 /** A trait that brings a creature back to life somewhere else, which happens off the table. */
-const revives = reference("Its return after death happens off the table; the GM runs it.");
+const revives = guided(
+  "death-traits.ts tells the GM as the creature dies that it may come back, and marks a body that disappears as gone (death.ts). When and where it returns are the GM's."
+);
 /** A trait about breathing, which the app doesn't track. */
 const breath = reference("Breathing isn't tracked.");
 /** A trait that lights the map around its creature. */
@@ -545,15 +547,21 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   "Lightning Absorption": absorbs("Lightning"),
   "Limited Amphibiousness": breath,
-  "Loathsome Limbs": reference("Severed limbs are the GM's to place as Troll Limb stat blocks."),
+  "Loathsome Limbs": enforced(
+    "death-traits.ts severs a limb when the troll ends any turn Bloodied after taking 15 Slashing damage or more in it, four times a day. The limb joins the fight as a Troll Limb on the troll's side in its space and acts right after the troll (risen.ts). The troll has 1 Exhaustion level for each missing limb until it next regains Hit Points, when they grow back."
+  ),
   "Magic Resistance": enforced(
     "saving-throws.ts gives it Advantage on saves against spells and magic items, saves a spell asks it to repeat included."
   ),
   "Magic Rope": reference("The rope and its statistics are the GM's to run."),
   Mimicry: senses,
-  "Misty Escape": reference("Turning to mist at 0 Hit Points is the GM's to run."),
+  "Misty Escape": guided(
+    "death-traits.ts keeps the vampire alive at 0 Hit Points as mist that can't take actions or speak until it regains Hit Points; in sunlight, read with dynamic vision on, it is destroyed instead. The mist form's statistics, running water and the 2 hours to reach its resting place are the GM's."
+  ),
   "Mucus Cloud": reference("The save at the end of the aboleth's turn and its curse are the GM's to run."),
-  "Multiple Heads": reference("Heads lost and regrown, and the Hit Points that come with them, are the GM's to track."),
+  "Multiple Heads": enforced(
+    "death-traits.ts kills one head on each turn the hydra takes 25 damage or more, and the hydra with its last. At the end of its turn it grows two heads for each one lost since its last turn and regains 20 Hit Points, unless it took Fire damage since then. Its Multiattack makes one Bite per living head (effective-actions.ts)."
+  ),
   "Ooze Cube": reference("Entering the cube, and pulling a creature out, are the GM's to run with its Engulf."),
   "Pack Tactics": enforced(
     "resolution/attack.ts gives Advantage when an ally of the attacker that isn't Incapacitated is within 5 feet of the target."
@@ -669,8 +677,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:boots-of-levitation": guided(
     "The action levitates the wearer with no save for the spell's 10 minutes: it rises 20 feet, moves only as if climbing, and floats down when the levitation ends (falling.ts). Concentration on it is the wearer's to end sooner on the sheet."
   ),
-  "item:wings-of-flying": guided(
-    "The action gives a Fly Speed of 60 feet for an hour, or until the wearer ends it on the sheet; a creature in the air when it ends falls (falling.ts). The 1d12 hours before the wings work again are the GM's."
+  "item:wings-of-flying": enforced(
+    "The action gives a Fly Speed of 60 feet for an hour, or until the wearer ends it on the sheet; a creature in the air when it ends falls (falling.ts). clock-pools.ts keeps the wings from being used again until 1d12 + 1 hours of game time have passed from their use (the hour they last, then the wait)."
   ),
   "item:broom-of-flying": guided(
     "The action gives the rider a Fly Speed of 50 feet with hover until it ends it on the sheet. The 30 feet while carrying over 200 pounds is the GM's, since weight isn't tracked."
@@ -695,6 +703,21 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "action:Lich/deathly-teleport": guided(
     "The legendary use is spent and a 60-foot teleport granted (granted-moves.ts). Who stood within 10 feet of the space it left, for the Necrotic damage, is the GM's to pick."
+  ),
+  "action:Hydra/multiattack": enforced(
+    "effective-actions.ts makes the Multiattack one Bite per living head, which death-traits.ts counts as heads die and grow back (Multiple Heads)."
+  ),
+  "action:Sea Hag/death-glare": enforced(
+    "Only a Frightened creature the hag can see within 30 feet can be targeted (resolution/action-targets.ts). On a failed save one with 20 Hit Points or fewer drops to 0, and any other takes 3d8 Psychic damage (fatal-saves.ts)."
+  ),
+  "action:Solar/slaying-bow": enforced(
+    "On a failed DC 21 Dexterity save a creature with 100 Hit Points or fewer dies outright, a character with no death saves, and Death Ward turns it aside; any other takes the Piercing and Radiant damage (fatal-saves.ts)."
+  ),
+  "action:Wraith/create-specter": enforced(
+    "resolution/revival.ts takes a Humanoid corpse within 10 feet dead no longer than 1 minute, and refuses an eighth specter. Its spirit rises as a Specter on the wraith's side in the corpse's space, acting right after the wraith (risen.ts), and the corpse leaves the fight."
+  ),
+  "action:Gibbering Mouther/bite": enforced(
+    "The hit's damage, and Prone on a Medium or smaller target, are applied. A creature it drops to 0 Hit Points dies outright with nothing left of its body (hit-points.ts)."
   ),
   "action:Mummy Lord/whirlwind-of-sand": guided(
     "The Reaction gives a 60-foot teleport (granted-moves.ts). The +2 AC against the triggering attack and the creatures it blinds are the GM's."
@@ -761,7 +784,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "feature:human-resourceful": enforced("rests.ts gives a Human Heroic Inspiration when it finishes a Long Rest."),
   "feature:persistent-rage": enforced(
-    "Taking the Persistent Rage action restores every expended use of Rage, once per Long Rest (resolution/rage.ts). A Rage under it lasts 10 minutes, and only Unconscious ends it early (effects.ts)."
+    "When the Barbarian rolls Initiative, initiative-hooks.ts opens its window and the Persistent Rage action restores every expended use of Rage, once per Long Rest (resolution/rage.ts). A Rage under it lasts 10 minutes, and only Unconscious ends it early (effects.ts)."
   ),
   "feature:action-surge": enforced(
     "resolution/economy.ts gives one more action on the Fighter's own turn, once a turn, and refuses it for the Magic action."
@@ -790,7 +813,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Charmed while it isn't Incapacitated, and an ally already Charmed may target its charmer while there (resolution/economy.ts)."
   ),
   "feature:holy-nimbus": enforced(
-    "The Bonus Action puts Holy Nimbus on the Paladin for 10 minutes. turn-boundaries.ts deals its Radiant damage to an enemy that starts its turn in the aura, and saving-throws.ts gives the Paladin Advantage on saves a Fiend or an Undead forces. Its 30 feet of sunlight is carried with the Paladin's token (vision/senses.ts), which Sunlight Sensitivity reads. Restoring it with a level 5 slot is the GM's."
+    "The Bonus Action puts Holy Nimbus on the Paladin for 10 minutes. turn-boundaries.ts deals its Radiant damage to an enemy that starts its turn in the aura, and saving-throws.ts gives the Paladin Advantage on saves a Fiend or an Undead forces. Its 30 feet of sunlight is carried with the Paladin's token (vision/senses.ts), which Sunlight Sensitivity reads. conversions.ts restores the use with a level 5 slot."
   ),
   "feature:smite-of-protection": enforced(
     "resolution/hit-options.ts marks the Paladin when Divine Smite rides a hit, and until its next turn the creatures in its aura have Half Cover against attacks and on Dexterity saves (resolution/validate.ts, resolution/pending.ts)."
@@ -906,7 +929,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Stealth Attack joins Cunning Strike's effects, and the attack leaves the Rogue's Invisible from the Hide action on (resolution/release.ts). Whether it ends the turn behind Three-Quarters or Total Cover is the GM's, said with the hit."
   ),
   "feature:hurl-through-hell": guided(
-    "It rides an attack roll's hit once a Long Rest: the Charisma save, 8d10 Psychic unless the target is a Fiend, and Incapacitated off the map with nothing able to target it until the end of the Warlock's next turn, when it returns to the space it left or the nearest unoccupied one (off-plane.ts). Restoring the use with a Pact Magic spell slot is the GM's."
+    "It rides an attack roll's hit once a Long Rest: the Charisma save, 8d10 Psychic unless the target is a Fiend, and Incapacitated off the map with nothing able to target it until the end of the Warlock's next turn, when it returns to the space it left or the nearest unoccupied one (off-plane.ts). conversions.ts restores the use with a Pact Magic slot."
   ),
   "feature:lay-on-hands": enforced(
     "The Bonus Action spends the points the Paladin picks to heal one creature it touches, within 5 feet (resolution/action-targets.ts), or 5 points to end Poisoned."
@@ -917,8 +940,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:words-of-creation": enforced(
     "Power Word Heal and Power Word Kill are always prepared, and either may take a second creature within 10 feet of the first (resolution/action-targets.ts)."
   ),
-  "feature:use-magic-device": guided(
-    "The fourth attuned item is applied (inventory.ts). The roll to save a charge, and reading any Spell Scroll, are the GM's."
+  "feature:use-magic-device": enforced(
+    "The fourth attuned item is applied (inventory.ts), and resolution/charges.ts rolls the d6 when an item's charges are spent, giving them back on a 6. Reading any Spell Scroll is the GM's."
   ),
   "feature:grappler": guided(
     "The ability score increase is applied. Punch and Grab, Attack Advantage and Fast Wrestler are the GM's."
@@ -941,8 +964,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:boon-of-irresistible-offense": guided(
     "The ability score increase is applied. Overcoming Resistance, and the extra damage on a 20, are the GM's."
   ),
-  "feature:boon-of-spell-recall": guided(
-    "The ability score increase is applied. Casting a spell without spending its slot is the GM's."
+  "feature:boon-of-spell-recall": enforced(
+    "The ability score increase is applied, and resolution/spell-recall.ts rolls a d4 for a spell cast with a level 1 to 4 slot, keeping the slot when it matches the level."
   ),
   "feature:boon-of-the-night-spirit": enforced(
     "The ability score increase is applied. With dynamic vision on, Merge with Shadows makes the creature Invisible as a Bonus Action only in Dim Light or Darkness (resolution/validate.ts), until it next takes an action, a Bonus Action or a Reaction (resolution/release.ts), and hit-points.ts gives it Resistance to all damage but Psychic and Radiant there."
@@ -972,8 +995,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:sculpt-spells": enforced(
     "An Evoker's Evocation spell protects up to 1 plus the spell's level creatures the Wizard can see: they succeed on its save with no roll and take no damage (resolution/pending.ts). Saves its area calls for later are rolled as usual."
   ),
-  "feature:sorcery-incarnate": guided(
-    "While Innate Sorcery is active, a cast may carry two Metamagic options (resolution/metamagic.ts). Activating Innate Sorcery for 2 Sorcery Points once its uses are spent is the GM's."
+  "feature:sorcery-incarnate": enforced(
+    "While Innate Sorcery is active, a cast may carry two Metamagic options (resolution/metamagic.ts), and with no use of Innate Sorcery left conversions.ts spends 2 Sorcery Points for one."
   ),
   "feature:arcane-apotheosis": enforced(
     "While Innate Sorcery is active, the first Metamagic option on each of the Sorcerer's turns in a fight costs no Sorcery Points (resolution/metamagic.ts)."
@@ -1036,19 +1059,19 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "item:iron-flask": guided("The command's save is applied. Trapping the creature in the flask is the GM's."),
   "item:luck-blade": guided(
-    "The +1 to attack and damage rolls and saving throws is applied, and roll-answers.ts offers its Luck reroll on a failed D20 Test once a day while the wielder isn't Incapacitated. Its Wish is the GM's."
+    "The +1 to attack and damage rolls and saving throws is applied, and roll-answers.ts offers its Luck reroll on a failed D20 Test once a day while the wielder isn't Incapacitated. Its Wish casts on 1d3 charges rolled when it is added, which never come back; its once a day limit, and what a Wish does, are the GM's."
   ),
   "item:gloves-of-missile-snaring": enforced(
     "A hit by a weapon from range opens a reaction prompt (damage-window.ts), and using it takes 1d10 plus the wearer's Dexterity modifier off the damage. Whether a hand is free, and catching the missile, are the GM's."
   ),
-  "item:mace-of-disruption": guided(
-    "The extra 2d6 Radiant against Fiends and Undead is applied. The save against destruction at 25 Hit Points or fewer, and the Frightened condition a success leaves, are the GM's."
+  "item:mace-of-disruption": enforced(
+    "The extra 2d6 Radiant against Fiends and Undead and the weapon's light are applied. A Fiend or an Undead the hit leaves at 25 Hit Points or fewer makes the DC 15 Wisdom save (resolution/kill.ts): a failure destroys it, and a success leaves it Frightened until the end of the wielder's next turn."
   ),
-  "item:mace-of-smiting": guided(
-    "The +1 to attack and damage rolls, +3 against Constructs, and the 7 Bludgeoning on a rolled 20 (14 against a Construct) are applied. Destroying a Construct left at 25 Hit Points or fewer is the GM's, said with the hit."
+  "item:mace-of-smiting": enforced(
+    "The +1 to attack and damage rolls, +3 against Constructs, and the 7 Bludgeoning on a rolled 20 (14 against a Construct) are applied. A Construct that rolled 20 leaves at 25 Hit Points or fewer is destroyed (resolution/kill.ts)."
   ),
   "item:nine-lives-stealer": guided(
-    "The +2 to attack and damage rolls is applied. Life Stealing on a Critical Hit is the GM's."
+    "The +2 to attack and damage rolls is applied. On a rolled 20 against a creature with fewer than 100 Hit Points, other than a Construct or an Undead, the target makes the DC 15 Constitution save, and a failure slays it (resolution/kill.ts). The 1d8 + 1 charges, one spent per slaying, are the GM's to count."
   ),
   "item:pipes-of-haunting": guided(
     "The save against Frightened, with its repeat at the end of each turn, is applied. The immunity after a success is the GM's."
@@ -1063,7 +1086,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The save against Stunned is applied. The light, the Disadvantage on attacks against the wearer and ending the stun are the GM's."
   ),
   "item:robe-of-stars": guided(
-    "The +1 to saving throws is applied. The Magic Missile stars and the trip to the Astral Plane are the GM's."
+    "The +1 to saving throws is applied, and its six stars each cast a level 5 Magic Missile, 1d6 coming back at dusk or a Long Rest. The trip to the Astral Plane is the GM's."
   ),
   "item:rod-of-alertness": guided(
     "Advantage on Initiative and Wisdom (Perception) checks, and its detection casts, are applied. The Protective Aura's benefit to allies is the GM's."
@@ -1083,20 +1106,20 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:staff-of-charming": guided(
     "Its one-charge casts are cast actions, and roll-answers.ts offers to turn a failed save against an Enchantment spell aimed only at the holder into a success once a day. Turning the spell back on its caster is the GM's."
   ),
-  "item:staff-of-fire": guided(
-    "Resistance to Fire damage and its one-charge Burning Hands are applied. Fireball and Wall of Fire, which cost more charges, are the GM's."
+  "item:staff-of-fire": enforced(
+    "Resistance to Fire damage is applied, and Burning Hands, Fireball and Wall of Fire spend their printed charges (item-actions.ts); a 1 on the last charge's d20 destroys it (resolution/charges.ts)."
   ),
-  "item:staff-of-frost": guided(
-    "Resistance to Cold damage and its one-charge Fog Cloud are applied. The spells that cost more charges are the GM's."
+  "item:staff-of-frost": enforced(
+    "Resistance to Cold damage is applied, and Fog Cloud, Cone of Cold, Ice Storm and Wall of Ice spend their printed charges (item-actions.ts); a 1 on the last charge's d20 destroys it (resolution/charges.ts)."
   ),
   "item:staff-of-power": guided(
-    "It swings as a +2 Quarterstaff, and the +2 to AC, saving throws and spell attack rolls is applied. Its spells and its Retributive Strike are the GM's."
+    "It swings as a +2 Quarterstaff, the +2 to AC, saving throws and spell attack rolls is applied, and its spells spend their printed charges; a 20 on the last charge's d20 gives 1d8 + 2 back (resolution/charges.ts). Retributive Strike, and a 1 on that d20, are the GM's."
   ),
   "item:staff-of-the-magi": guided(
-    "It swings as a +2 Quarterstaff, and its four casts that cost no charge and the +2 to spell attack rolls are applied. The spells that cost charges, Spell Absorption and Retributive Strike are the GM's."
+    "It swings as a +2 Quarterstaff, the +2 to spell attack rolls is applied, and its spells spend their printed charges from 50; a 20 on the last charge's d20 gives 1d12 + 1 back (resolution/charges.ts). Advantage on saves against spells, Spell Absorption and Retributive Strike are the GM's."
   ),
-  "item:staff-of-the-woodlands": guided(
-    "It swings as a +2 Quarterstaff, its one-charge casts are cast actions, Tree Form's use is counted, and the +2 to spell attack rolls is applied. The spells that cost more charges are the GM's."
+  "item:staff-of-the-woodlands": enforced(
+    "It swings as a +2 Quarterstaff, the +2 to spell attack rolls is applied, its spells spend their printed charges and Tree Form's use is counted. A 1 on the last charge's d20 leaves a plain Quarterstaff (resolution/charges.ts)."
   ),
   "item:staff-of-thunder-and-lightning": enforced(
     "It swings as a +2 Quarterstaff. Lightning and Thunder ride a melee hit, Thunder and Lightning does both as a Bonus Action (resolution/hit-options.ts), and Lightning Strike and Thunderclap are actions, each once a day."
@@ -1126,13 +1149,16 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The extra Necrotic damage is applied, and a hit opens a DC 15 Constitution save whose failure stops the target regaining Hit Points until it succeeds on the save it repeats at the end of each of its turns (resolution/on-hit.ts)."
   ),
   "item:vorpal-sword": guided(
-    "The +3 to attack and damage rolls is applied. Ignoring Resistance to Slashing damage, and the head it takes on a rolled 20, are the GM's, said with the hit."
+    "The +3 to attack and damage rolls is applied. On a rolled 20 it cuts off the target's head (resolution/kill.ts): the creature dies, and only a revival that restores lost parts brings it back. A creature with no head, Immunity to Slashing damage, a neck too big (larger than Large) or Legendary Resistance to spend takes 30 Slashing damage more instead, and a hydra loses one head. Ignoring Resistance to Slashing damage, and a creature that lives without its head, are the GM's."
   ),
-  "item:wand-of-fireballs": guided(
-    "Fireball at DC 15 on its charges is applied. Spending more charges for a higher-level Fireball is the GM's."
+  "item:periapt-of-wound-closure": enforced(
+    "death-saves.ts counts an attuned wearer's death save of 9 or lower as a 10, and rests.ts and resolution/hit-point-die.ts double what each Hit Point Die it rolls to heal restores."
   ),
-  "item:wand-of-lightning-bolts": guided(
-    "Lightning Bolt at DC 15 on its charges is applied. Spending more charges for a higher-level Lightning Bolt is the GM's."
+  "item:wand-of-fireballs": enforced(
+    "Fireball at DC 15 on its charges, each charge past the first raising its level by 1 up to 3 (item-actions.ts); a 1 on the last charge's d20 destroys it (resolution/charges.ts)."
+  ),
+  "item:wand-of-lightning-bolts": enforced(
+    "Lightning Bolt at DC 15 on its charges, each charge past the first raising its level by 1 up to 3 (item-actions.ts); a 1 on the last charge's d20 destroys it (resolution/charges.ts)."
   ),
   "item:wand-of-the-war-mage-1": guided(
     "The +1 to spell attack rolls is applied. Ignoring Half Cover on a spell attack is the GM's, who sets the cover."
@@ -1182,7 +1208,38 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/dispel.ts ends each spell on the target creature of the slot's level or lower, and for each higher one rolls the caster's spellcasting ability check against DC 10 plus its level. The GM can aim it at a spell's area on the map instead. A spell on an object the app doesn't track is the GM's."
   ),
   "spell:death-ward": enforced(
-    "hit-points.ts leaves the target at 1 Hit Point the first time it would drop to 0, and ends the spell. Negating an effect that would kill it without damage is the GM's."
+    "hit-points.ts leaves the target at 1 Hit Point the first time it would drop to 0, and ends the spell. An effect that would kill it outright without dealing damage (Power Word Kill, Divine Word, a Slaying Bow) ends the spell instead (hit-points.ts, fatal-saves.ts)."
+  ),
+  // Death and coming back (death.ts, resolution/revival.ts, resolution/kill.ts, fatal-saves.ts, risen.ts).
+  "spell:revivify": enforced(
+    "resolution/revival.ts refuses a target that isn't dead, died more than a minute of game time ago (death.ts keeps the time of death: a fight's rounds, then the game clock), or lost its body or its head. The cast returns it with 1 Hit Point and spends the diamond (resolution/components.ts). Death by old age is the GM's to rule."
+  ),
+  "spell:raise-dead": enforced(
+    "resolution/revival.ts refuses a target dead more than 10 days of game time, less any time under Gentle Repose, one Undead when it died, and one whose body or head is gone. It returns with 1 Hit Point and no longer Poisoned, and takes a -4 penalty to D20 Tests that eases by 1 with each Long Rest (death.ts)."
+  ),
+  "spell:resurrection": enforced(
+    "resolution/revival.ts refuses a target dead more than a century, one Undead when it died, and one whose body is gone; a lost head is restored. It returns with all its Hit Points, no longer Poisoned, with a -4 penalty to D20 Tests that eases by 1 with each Long Rest (death.ts). For a creature dead 365 days or longer the caster can't cast spells and has Disadvantage on D20 Tests until a Long Rest. Death by old age is the GM's to rule."
+  ),
+  "spell:true-resurrection": enforced(
+    "resolution/revival.ts refuses a target dead more than 200 years, and brings back one whose body is gone (Disintegrate) in a new body. It returns with all its Hit Points, its poison, curses and Contagion ended. Where a new body appears, and the stat block of an Undead returned to life, are the GM's."
+  ),
+  "spell:reincarnate": guided(
+    "resolution/revival.ts refuses a target dead more than 10 days and returns it with all its Hit Points in a new body, rolling the d10 for its species (a 1 rolls again) and noting it on the creature. Rebuilding the sheet with the new species, and the soul's consent, are the GM's."
+  ),
+  "spell:gentle-repose": enforced(
+    "resolution/revival.ts takes only a corpse, and the game time it spends under the spell's 10 days doesn't count against a revival's limit (death.ts). Keeping it from becoming Undead is the GM's."
+  ),
+  "spell:disintegrate": enforced(
+    "The save and its Force damage are applied, and a target it drops to 0 Hit Points dies with nothing left of its body (hit-points.ts): only True Resurrection or Wish brings it back (resolution/revival.ts). The gear it leaves is the GM's."
+  ),
+  "spell:power-word-kill": enforced(
+    "resolution/kill.ts kills a target with 100 Hit Points or fewer outright, a character with no death saves, and deals 12d12 Psychic damage to any other. Death Ward turns the death aside."
+  ),
+  "spell:finger-of-death": enforced(
+    "The save and its Necrotic damage are applied. A Humanoid it kills rises as a Zombie on the caster's side at the start of the caster's next turn, in the corpse's space and acting after the caster (risen.ts). Its orders are the GM's to give."
+  ),
+  "spell:divine-word": enforced(
+    "A failed Charisma save acts by the target's Hit Points (fatal-saves.ts): 20 or fewer dies, 30 or fewer is Blinded, Deafened and Stunned for 1 hour, 40 or fewer Blinded and Deafened for 10 minutes, and 50 or fewer Deafened for 1 minute. A Celestial, an Elemental, a Fey or a Fiend that fails leaves the map for 24 hours (off-plane.ts)."
   ),
   "spell:dissonant-whispers": enforced(
     "The save and its Psychic damage are applied. On a failure the target spends its Reaction, when it can take one, on a move of its Speed that must end farther from the caster (granted-moves.ts), provoking as any move does; the route is the mover's."
@@ -1250,8 +1307,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:power-word-stun": enforced(
     "A target with 150 Hit Points or fewer is Stunned and repeats the save at the end of each of its turns; a tougher one's Speed is 0 until the start of the caster's next turn (resolution/pending.ts)."
   ),
-  "spell:prayer-of-healing": guided(
-    "The 2d8 Hit Points are applied. The Short Rest's benefits, and the limit of once per Long Rest, are the GM's."
+  "spell:prayer-of-healing": enforced(
+    "The 2d8 Hit Points are applied, each target gains a Short Rest's benefits, and a creature it healed is refused until it finishes a Long Rest (resolution/prayer-of-healing.ts)."
   ),
   "spell:prismatic-wall": guided(
     "The save against Blinded for a creature near the wall is applied. Each layer's save and effect are the GM's."
@@ -1378,5 +1435,125 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "spell:wind-wall": guided(
     "The save and its Bludgeoning damage are applied. The projectiles the wall turns aside are the GM's."
+  ),
+
+  // Resources, rests, conversions and charges.
+  "feature:relentless-rage": enforced(
+    "hit-points.ts rolls the Constitution save when a raging Barbarian drops to 0 Hit Points and isn't killed outright: DC 10, 5 more for each use since its last rest (rests.ts clears the count). A success leaves it at twice its Barbarian level."
+  ),
+  "feature:intimidating-presence": enforced(
+    "The Bonus Action's Wisdom save against Frightened is applied, and conversions.ts restores its use for one use of Rage (actor.convert)."
+  ),
+  "feature:font-of-magic": enforced(
+    "conversions.ts turns a spell slot into Sorcery Points equal to its level, and Sorcery Points into a slot at the SRD costs (2, 3, 5, 6 or 7 for levels 1 to 5, each at its Sorcerer level) as a Bonus Action. A created slot is gone after a Long Rest, which sets the slots to their maximum."
+  ),
+  "feature:sorcerous-restoration": enforced(
+    "In the step a Short Rest opens, conversions.ts restores Sorcery Points up to half the Sorcerer level, once per Long Rest."
+  ),
+  "feature:dragon-wings": enforced(
+    "The Bonus Action gives a Fly Speed of 60 feet, once per Long Rest, and conversions.ts restores the use for 3 Sorcery Points."
+  ),
+  "feature:font-of-inspiration": enforced(
+    "Bardic Inspiration comes back on a Short Rest, and conversions.ts spends a spell slot for one use of it."
+  ),
+  "feature:superior-inspiration": enforced(
+    "When the Bard rolls Initiative with fewer than two uses of Bardic Inspiration left, initiative-hooks.ts brings it up to two."
+  ),
+  "feature:wild-resurgence": enforced(
+    "conversions.ts spends a spell slot for a use of Wild Shape once a turn, and a use of Wild Shape for a level 1 slot once per Long Rest."
+  ),
+  "feature:archdruid": enforced(
+    "When the Druid rolls Initiative with no use of Wild Shape left, initiative-hooks.ts restores one. conversions.ts turns uses of Wild Shape into one spell slot, two levels a use, once per Long Rest (Nature Magician). Its slow aging is narrative."
+  ),
+  "feature:natural-recovery": enforced(
+    "In the step a Short Rest opens, conversions.ts recovers slots of combined level up to half the Druid level, none of level 6 or higher, once per Long Rest."
+  ),
+  "feature:arcane-recovery": enforced(
+    "In the step a Short Rest opens, conversions.ts recovers slots of combined level up to half the Wizard level, none of level 6 or higher, once per Long Rest."
+  ),
+  "feature:memorize-spell": enforced(
+    "Finishing a Short Rest opens a prepare step with one change (rests.ts): one prepared spell swapped for another from the spellbook."
+  ),
+  "feature:magical-cunning": enforced(
+    "Outside a fight, conversions.ts restores expended Pact Magic slots up to half the maximum, once per Long Rest."
+  ),
+  "feature:eldritch-master": enforced("Magical Cunning restores every expended Pact Magic slot (conversions.ts)."),
+  "feature:contact-patron": enforced(
+    "Contact Other Plane is always prepared and cast once per Long Rest with no slot, and that cast succeeds on its own Intelligence save with no roll (resolution/pending.ts). What the patron answers is the GM's."
+  ),
+  "feature:restoring-touch": guided(
+    "From Paladin 14, Lay on Hands spends 5 points to end one of Blinded, Charmed, Deafened, Frightened, Paralyzed or Stunned on a creature it touches (resolution/heal.ts). Ending several in one Bonus Action takes one use each here."
+  ),
+  "feature:uncanny-metabolism": enforced(
+    "When the Monk rolls Initiative, initiative-hooks.ts offers it: all Focus Points back and Hit Points equal to its Monk level plus a Martial Arts die, once per Long Rest (conversions.ts)."
+  ),
+  "feature:perfect-focus": enforced(
+    "When the Monk rolls Initiative with 3 Focus Points or fewer, initiative-hooks.ts brings them up to 4."
+  ),
+  "feature:weapon-mastery": enforced(
+    "equipment-derivation.ts applies the mastery property of each picked weapon kind. A Barbarian picks melee weapons and a Rogue the weapons it is proficient with. In the step a Long Rest opens, actor.rechoose swaps picks and rebuilds the sheet (ledger-rechoice.ts): one for a Barbarian or Fighter, any for a Paladin, Ranger or Rogue."
+  ),
+  "feature:hunters-prey": guided(
+    "The option is picked at build and swapped after a Short or Long Rest (ledger-rechoice.ts). Colossus Slayer's extra die and Horde Breaker's attack are the GM's."
+  ),
+  "feature:defensive-tactics": enforced(
+    "Escape the Horde gives Opportunity Attacks against the Ranger Disadvantage, and Multiattack Defense marks a creature that hit it (resolution/struck.ts). The option is swapped after a Short or Long Rest (ledger-rechoice.ts)."
+  ),
+  "feature:relentless-hunter": enforced(
+    "hit-points.ts opens no Concentration save from damage when the only spell the Ranger concentrates on is Hunter's Mark."
+  ),
+  "feature:improved-elemental-fury": enforced(
+    "Primal Strike deals 2d8. Improved Potent Spellcasting adds 300 feet to a Druid cantrip of 10 feet or more (effective-actions.ts, resolution/spell-targets.ts)."
+  ),
+  "feature:potent-cantrip": enforced(
+    "resolution/damage.ts deals half an Evoker's cantrip damage on a missed attack roll, and resolution/pending.ts halves it on a successful save, with no other effect."
+  ),
+  "feature:empowered-evocation": guided(
+    "The Intelligence modifier is added to an Evocation spell's damage (resolution/damage.ts). A spell of several rolls (Scorching Ray's rays) gets it on each, which the GM trims to one."
+  ),
+  "feature:elemental-affinity": guided(
+    "Resistance to the chosen type is applied, and the Charisma modifier is added to a spell's damage of that type, never a weapon's (resolution/damage.ts). A spell of several rolls gets it on each, which the GM trims to one."
+  ),
+  "feature:overchannel": guided(
+    "A cast sent with overchannel (action.resolve) deals a Wizard spell's maximum damage with a level 1 to 5 slot, and from the second use before a Long Rest the Evoker takes 2d12 Necrotic a slot level, 1d12 more each time, past its defences (resolution/overchannel.ts). The sheet has no control for it yet, so the table asks for it through the API."
+  ),
+  "feature:signature-spells": guided(
+    "Both spells are always prepared, and each is cast once at level 3 with no slot, back on a Short or Long Rest, on its own counter (character-build.ts). That they come from the spellbook is the player's to keep."
+  ),
+  "feature:spell-mastery": guided(
+    "The level 1 and level 2 picks are always prepared and cast at will at their own level with no slot (character-build.ts). That they come from the spellbook with a casting time of an action, and swapping one after a Long Rest, are the GM's."
+  ),
+  "spell:mirror-image": enforced(
+    "The caster has three duplicates for a minute. Each hit on it rolls a d6 a duplicate, and on a 3 or higher the hit lands on a duplicate, which is destroyed, ending the spell with the last; an attacker Blinded or with Blindsight or Truesight is unaffected (resolution/mirror-image.ts)."
+  ),
+  "spell:augury": guided(
+    "Each cast after the first before a Long Rest rolls the d100 against a 25 percent chance of no answer for each earlier cast (resolution/divinations.ts). The omen is the GM's."
+  ),
+  "spell:commune": guided(
+    "Each cast after the first before a Long Rest rolls the d100 against a 25 percent chance of no answer for each earlier cast (resolution/divinations.ts). The deity's answers are the GM's."
+  ),
+  "spell:divination": guided(
+    "Each cast after the first before a Long Rest rolls the d100 against a 25 percent chance of no answer for each earlier cast (resolution/divinations.ts). The truthful reply is the GM's."
+  ),
+  "item:pearl-of-power": enforced(
+    "Its Magic action restores one expended slot of level 3 or lower, once per Long Rest (conversions.ts)."
+  ),
+  "item:horn-of-valhalla": guided(
+    "Blowing it is counted, and clock-pools.ts keeps it from being blown again until 7 days have passed on the game clock. The Berserkers it calls, and the requirement of its metal, are the GM's."
+  ),
+  "item:necklace-of-fireballs": enforced(
+    "inventory.ts rolls its 1d6 + 3 beads when it is added, and each bead casts a level 3 Fireball at DC 15 and never comes back. Hurling several beads at once is the GM's."
+  ),
+  "item:chime-of-opening": enforced(
+    "Each strike casts Knock on its 10 charges, which never come back, and the last one cracks it (resolution/charges.ts)."
+  ),
+  "item:ring-of-three-wishes": guided(
+    "Its three Wish casts are counted and never come back (resolution/charges.ts). What a Wish does is the GM's."
+  ),
+  "item:gem-of-brightness": enforced(
+    "Its light is lit and put out on the row, and its beam (1 charge) and flare (5 charges) open the DC 15 Constitution save against Blinded on its 50 charges, which never come back."
+  ),
+  "item:rod-of-resurrection": enforced(
+    "Its casts spend their printed charges, and it regains 1 charge at dawn or at a Long Rest (item-charges.ts)."
   )
 };

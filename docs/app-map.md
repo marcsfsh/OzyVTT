@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 147 commands · 323 HTTP paths
+- 14 GameState fields · 149 commands · 325 HTTP paths
 
 ## GameState shape
 
@@ -44,6 +44,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `actor.add-from-definition` | `actor:write` |
 | `actor.apply-damage` | `actor:write` |
 | `actor.award-experience` | `actor:write` |
+| `actor.convert` | `actor:write` |
 | `actor.fall` | `combat:write` |
 | `actor.give-heroic-inspiration` | `actor:write` |
 | `actor.heal` | `actor:write` |
@@ -171,6 +172,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `terrain.paint` | `scene:write` |
 | `terrain.reset` | `scene:write` |
 | `time.pass` | `combat:write` |
+| `time.set-dawn` | `combat:write` |
 | `token.move` | `combat:write` |
 | `token.set-altitude` | `combat:write` |
 | `turn.end` | `combat:write` |
@@ -301,6 +303,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/check/answer`
 - `POST /api/v1/game/actors/{actorId}/check/reroll`
 - `POST /api/v1/game/actors/{actorId}/conditions`
+- `POST /api/v1/game/actors/{actorId}/convert`
 - `POST /api/v1/game/actors/{actorId}/currency`
 - `POST /api/v1/game/actors/{actorId}/damage`
 - `POST /api/v1/game/actors/{actorId}/death-save`
@@ -429,6 +432,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/table/staging-defaults`
 - `POST /api/v1/game/terrain/paint`
 - `POST /api/v1/game/terrain/reset`
+- `POST /api/v1/game/time/dawn`
 - `POST /api/v1/game/time/pass`
 - `POST /api/v1/game/tokens/{actorId}/altitude`
 - `POST /api/v1/game/tokens/{actorId}/move`
