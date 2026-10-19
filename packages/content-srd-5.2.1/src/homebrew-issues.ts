@@ -157,7 +157,15 @@ const LABELS: Readonly<Record<string, string>> = {
   speeds: "speeds",
   senses: "senses",
   alignment: "alignment",
-  experiencePoints: "XP"
+  experiencePoints: "XP",
+  costly: "priced or consumed materials",
+  itemIds: "items",
+  matches: "names it matches",
+  perTarget: "one for each target",
+  coins: "coins",
+  waives: "components it goes without",
+  targetTypes: "creature types it affects",
+  chainFeet: "distance between targets"
 };
 /** A key whose words depend on what holds it: a weapon's category is its weapon kind, as the editor labels it. */
 const NESTED_LABELS: Readonly<Record<string, string>> = { "weapon.category": "weapon kind" };

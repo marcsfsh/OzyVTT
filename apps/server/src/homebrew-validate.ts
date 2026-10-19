@@ -19,6 +19,7 @@ import {
   type FeatureRecord,
   type SpeciesReference,
   type SpellListReference,
+  type SpellReference,
   type SubclassReference
 } from "@vtt/content-srd-5.2.1";
 import type { ContentLibrary, ContentView } from "./content-library.js";
@@ -135,8 +136,9 @@ export function validateForPublish(
     case "spell-list":
       spellListIssues(record as SpellListReference, checks);
       break;
-    // A spell names no other record: `SpellReference.classes` entries are open membership tags.
+    // `SpellReference.classes` entries are open membership tags; a priced material may name gear.
     case "spell":
+      spellIssues(record as SpellReference, checks);
       break;
     case "equipment":
       equipmentIssues(record as EquipmentReference, checks);
@@ -414,6 +416,20 @@ function monsterIssues(definition: ActorDefinition, id: string, checks: Checks) 
 
 /** A template's `appliesTo.baseIds` must resolve to items with the stats the bind copies (weapon or armor), or to
  *  the kinds of ammunition a piece of magic ammunition can be. */
+/** A priced or consumed material that names gear must name gear the catalog holds, or no carried item would be it
+ *  (a name it matches still could). */
+function spellIssues(spell: SpellReference, checks: Checks) {
+  (spell.components.costly ?? []).forEach((material, row) =>
+    (material.itemIds ?? []).forEach((itemId, index) => {
+      if (checks.catalog.equipmentRecord(itemId) === undefined)
+        checks.add(
+          ["components", "costly", row, "itemIds", index],
+          `${spell.name}'s material ${material.name} names an item this table doesn't have. Pick one from the equipment list, or leave the items out and let its name match what a character carries.`
+        );
+    })
+  );
+}
+
 function equipmentIssues(item: EquipmentReference, checks: Checks) {
   riderBlockIssues(item, [], item.name, checks);
   // An item's riders reach the sheet through equipment derivation, which has no arm for granted spells.
