@@ -26,15 +26,33 @@ import "./prompts.css";
  *   its hit can carry (Sneak Attack) to add; the server holds the die, so only Heroic Inspiration or the GM throws it
  *   again. Let them go clears.
  * - Hellish Rebuke or Storm's Thunder: Use strikes the creature that dealt the damage.
+ * - A stat block's reaction to a hit, a creature's turn or move nearby, or damage it takes (Reflexive Antennae,
+ *   Unnerving Gaze, Ink Cloud, Pursuit, Split): Use does what the stat block says.
  * - Counterspell: the spell another creature is casting waits; Use makes its caster save, and the spell may fail.
  * - Deflect Attacks, Stone's Endurance: Use rolls the reduction and takes it off the held damage; Superior Hunter's
- *   Defense resists the damage's type.
+ *   Defense resists the damage's type. Deflect Missile names the creature its force turns on if nothing gets through.
  * - Cutting Words, Countercharm, Improve Fate: another creature's roll waits on the answer; Use applies it (a die that
  *   can be added or taken off gets a button for each), Decline lets the roll stand.
  * A reaction spell cast with a slot offers the slot levels the reactor has one of, so a higher one upcasts it.
  * The GM's dismiss clears the prompt without applying anything it holds, for a moment settled by hand; a roll waiting
  * on an answer is declined instead.
  */
+
+/** What set off a stat block's reaction, as its label says it. */
+export function triggerWords(reaction: PendingReaction | PlayerPendingReaction, actorName: string): string {
+  switch (reaction.cause) {
+    case "hit":
+      return `${reaction.sourceName} hit ${actorName}`;
+    case "turn-start":
+      return `${reaction.sourceName} starts its turn nearby`;
+    case "turn-end":
+      return `${reaction.sourceName} ends its turn nearby`;
+    case "move-end":
+      return `${reaction.sourceName} ends its move nearby`;
+    default:
+      return `${actorName} took damage`;
+  }
+}
 
 /** The roll an answer prompt meets, as its label says it. */
 const ROLL_WORDS = {
@@ -66,7 +84,8 @@ export function ReactionPrompt({
   const [busy, setBusy] = useState(false);
   // Answering rolls a melee swing first: an opportunity attack, or Retaliation.
   const opportunity =
-    reaction.kind === "leaves-reach" || (reaction.kind === "damaged-by-creature" && reaction.rollsAttack);
+    reaction.kind === "leaves-reach" ||
+    ((reaction.kind === "damaged-by-creature" || reaction.kind === "triggered") && reaction.rollsAttack);
   // An opportunity attack previewed but not applied: confirm it, as with a saving throw.
   const [rolled, setRolled] = useState<{
     attack: NonNullable<ActionResolution["attack"]>;
@@ -89,6 +108,10 @@ export function ReactionPrompt({
   const slotLevels = reaction.slotLevels ?? [];
   const [slotPick, setSlotPick] = useState<number | null>(null);
   const slotLevel = slotPick !== null && slotLevels.includes(slotPick) ? slotPick : slotLevels[0];
+  // Deflect Missile's force, if the damage is taken to 0: the attacker unless another is picked.
+  const redirectChoices = reaction.kind === "hit-by-attack" ? (reaction.redirectChoices ?? []) : [];
+  const [redirectPick, setRedirectPick] = useState<string | null>(null);
+  const redirectTo = redirectChoices.some((choice) => choice.actorId === redirectPick) ? redirectPick : null;
   const weighed = reaction.weighed;
   const takeIfUsed =
     weighed?.use ?? reaction.proposedDamageParts.reduce((sum, part) => sum + Math.floor(part.amount / 2), 0);
@@ -183,11 +206,13 @@ export function ReactionPrompt({
             attack ? `. The attack ${attack.outcome === "hit" || attack.outcome === "crit" ? "hits" : "misses"}` : ""
           }.`
         );
-      } else if (reaction.kind === "damaged-by-creature") {
+      } else if (reaction.kind === "damaged-by-creature" || reaction.kind === "triggered") {
         const save = outcome.resolution?.save;
+        const against =
+          reaction.cause === "hit" || reaction.cause === "turn-start" ? ` against ${reaction.sourceName}` : "";
         onFeedback(
           use
-            ? `${actorName} used ${reaction.actionName} against ${reaction.sourceName}${
+            ? `${actorName} used ${reaction.actionName}${reaction.kind === "triggered" ? against : ` against ${reaction.sourceName}`}${
                 save
                   ? `: DC ${save.dc} ${save.ability.toUpperCase()} save`
                   : outcome.appliedDamage > 0
@@ -243,6 +268,10 @@ export function ReactionPrompt({
           <>
             <strong>{name}</strong> · {reaction.sourceName} damaged {actorName}
           </>
+        ) : reaction.kind === "triggered" ? (
+          <>
+            <strong>{name}</strong> · {triggerWords(reaction, actorName)}
+          </>
         ) : reaction.kind === "falls" ? (
           <>
             <strong>{name}</strong> · {reaction.sourceName} is falling
@@ -255,7 +284,7 @@ export function ReactionPrompt({
         ) : reaction.kind === "attack-would-hit" ? (
           <>
             <strong>{name}</strong> · {reaction.sourceName}'s attack would hit {reaction.targetName ?? actorName}. +
-            {reaction.acBonus} AC turns it into a miss.
+            {reaction.acBonus} AC may turn it into a miss.
           </>
         ) : reaction.kind === "attack-targeted" ? (
           <>
@@ -487,6 +516,25 @@ export function ReactionPrompt({
             </>
           ) : reaction.damageResponse ? (
             <>
+              {redirectChoices.length > 1 && (
+                <label className="reaction-redirect">
+                  <span>If it takes the damage to 0, turn the force on</span>
+                  <select
+                    value={redirectTo ?? ""}
+                    disabled={busy}
+                    onChange={(event) => setRedirectPick(event.target.value || null)}
+                  >
+                    <option value="">{reaction.sourceName}</option>
+                    {redirectChoices
+                      .filter((choice) => choice.name !== reaction.sourceName)
+                      .map((choice) => (
+                        <option key={choice.actorId} value={choice.actorId}>
+                          {choice.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              )}
               <button
                 type="button"
                 className="save-prompt-roll"
@@ -496,7 +544,7 @@ export function ReactionPrompt({
                     ? `Spend the reaction to take ${reaction.damageResponse.formula} off the damage.`
                     : "Spend the reaction for Resistance to the damage's type until the turn ends."
                 }
-                onClick={() => answer(true)}
+                onClick={() => answer(true, redirectTo ? { redirectTo } : {})}
               >
                 {useLabel} ·{" "}
                 {reaction.damageResponse.kind === "reduce"
@@ -514,6 +562,7 @@ export function ReactionPrompt({
             </>
           ) : reaction.kind === "attack-would-hit" ||
             reaction.kind === "damaged-by-creature" ||
+            reaction.kind === "triggered" ||
             reaction.kind === "casts-spell" ? (
             <>
               {/* Taking the hit comes first; using the reaction is the prompt's one primary. */}
@@ -545,7 +594,9 @@ export function ReactionPrompt({
                     ? `Spend the reaction for +${reaction.acBonus} AC against the attack.`
                     : reaction.kind === "casts-spell"
                       ? `Spend the reaction to try to stop ${reaction.sourceName}'s spell.`
-                      : `Spend the reaction against ${reaction.sourceName}.`
+                      : reaction.kind === "triggered" && reaction.targetActorId === null
+                        ? "Spend the reaction."
+                        : `Spend the reaction against ${reaction.sourceName}.`
                 }
                 onClick={() => answer(true)}
               >

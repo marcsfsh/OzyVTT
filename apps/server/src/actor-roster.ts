@@ -234,8 +234,14 @@ function armorClassWith(
   if (actor.armorClassOverride !== undefined) return actor.armorClassOverride;
   const derivation = deriveEquipment(actor, definition, catalog);
   const dex = abilityModifier(definition.abilityScores.dex);
-  // Gear melded into a form is worn by nothing.
-  const items = gearMerged(actor) ? [] : withResolvedSlots(actor.inventory, catalog);
+  // Gear melded into a form is worn by nothing. Armor acid or rust marked offers that much less AC (`row-penalties.ts`).
+  const items = gearMerged(actor)
+    ? []
+    : withResolvedSlots(actor.inventory, catalog).map((item) =>
+        item.penalty !== undefined && item.armor
+          ? { ...item, armor: { ...item.armor, acBase: item.armor.acBase - item.penalty } }
+          : item
+      );
   // An item's base AC while no armor is worn (Robe of the Archmagi) is one more way, chosen as Unarmored Defense is.
   const fromItems = derivation.baseArmorClasses.map((base) => ({ bonus: base - 10, allowShield: true }));
   const unarmored = [...unarmoredDefensesOf(definition, catalog), ...extra, ...fromItems];

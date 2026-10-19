@@ -1662,6 +1662,17 @@ export const FormSchema = z
   .strict();
 export type Form = z.infer<typeof FormSchema>;
 
+/** What a teleport's arrival does to the creatures near its destination: `conditions` on each enemy its traveler can
+ *  see within `withinFeet` of the space it lands in, until the end of the traveler's next turn (a mummy lord's
+ *  Whirlwind of Sand: "Each creature of its choice that it can see within 5 feet of its destination space has the
+ *  Blinded condition until the end of the mummy's next turn"). */
+export const TeleportLandingSchema = z
+  .object({
+    conditions: z.array(ConditionIdSchema).min(1).max(2),
+    withinFeet: z.number().int().min(5).max(60)
+  })
+  .strict();
+export type TeleportLanding = z.infer<typeof TeleportLandingSchema>;
 /** A live rules-engine effect on an actor (Rage, a grapple), with source links, duration and typed modifiers.
  * Ids derive from the commandId so retries mint the same effect. */
 export const EffectInstanceSchema = z
@@ -1745,7 +1756,14 @@ export const EffectInstanceSchema = z
         round: z.number().int().positive(),
         turnActorId: z.uuid().nullable(),
         unseen: z.literal(true).optional(),
-        failDamage: DiceFormulaSchema.optional()
+        failDamage: DiceFormulaSchema.optional(),
+        /** Its destination must be within `feet` of this creature (a nalfeshnee's Pursuit). */
+        near: z
+          .object({ actorId: z.uuid(), feet: z.number().int().min(5).max(120) })
+          .strict()
+          .optional(),
+        /** What its arrival does near the destination (a mummy lord's Whirlwind of Sand). */
+        landing: TeleportLandingSchema.optional()
       })
       .strict()
       .optional(),
@@ -1753,6 +1771,13 @@ export const EffectInstanceSchema = z
      * effect lasts; a penalty is negative (Slow's -2). Kept apart from `modifiers`, whose `armor-class` is written onto
      * the sheet and would outlast it. */
     armorClassBonus: z.number().int().min(-10).max(10).optional(),
+    /** What it takes off one of the bearer's ability scores while it lasts (a shadow's Draining Swipe), read live with
+     *  the scores every rule uses and given back when it ends. Kept apart from `modifiers`, whose `ability-score` is
+     *  written onto the sheet. */
+    abilityReduction: z
+      .object({ ability: AbilitySchema, amount: z.number().int().min(1).max(30) })
+      .strict()
+      .optional(),
     /** Hit points this effect took off the bearer's Hit Point maximum (a Life Drain), given back when it ends. */
     hitPointMaximumLoss: z.number().int().min(1).max(10000).optional(),
     /** What this effect adds to the bearer's Hit Point maximum (Aid), taken back when it ends. */
@@ -2135,7 +2160,11 @@ export const InventoryItemSchema = z
     magic: ItemMagicMarkerSchema.optional(),
     /** A copy whose magic is spent for now: a manual or tome after its study (`character.study-item`), until it
      *  regains it in a century. The server keeps it. */
-    dormant: z.boolean().optional()
+    dormant: z.boolean().optional(),
+    /** The cumulative penalty acid or rust left on this armor or weapon (a black pudding's Pseudopod, a rust monster's
+     *  Antennae): armor offers that much less AC and a weapon that much less to its attack rolls, until Mending removes
+     *  it. Armor whose AC it takes to 10, or a weapon it takes to -5, is destroyed. The server keeps it. */
+    penalty: z.number().int().min(1).max(10).optional()
   })
   .strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
@@ -2440,6 +2469,9 @@ export const ActorSchema = z.object({
   /** SRD Influence: a monster's or NPC's attitude toward the party, Indifferent when absent. The GM sets it; an
    *  Influence check against it has Advantage when Friendly and Disadvantage when Hostile. GM-only in projections. */
   attitude: z.enum(["friendly", "indifferent", "hostile"]).optional(),
+  /** What the GM chose for this creature where its stat block leaves a choice (a half-dragon's Draconic Origin: a
+   *  damage type; a commoner's Training: a skill), keyed by the pick its trait names. GM-only in projections. */
+  statBlockPicks: z.record(RiderSlugSchema, RiderSlugSchema).optional(),
   /** SRD Malnutrition and Dehydration, while the table tracks food and water (`rest.survival`): what the creature ate
    *  and drank this game day, the days in a row it ate nothing, and the Exhaustion levels hunger and thirst gave it,
    *  which no rest removes until it eats or drinks its full need for a day. The server keeps it. Owner and GM only. */
@@ -2926,6 +2958,33 @@ export const HitPointBandSchema = z
 export type HitPointBand = z.infer<typeof HitPointBandSchema>;
 
 /**
+ * What a save failed by `by` or more does ("Failure by 5 or More"). Its `conditions` and `duration` stand in for the
+ * failure's (a homunculus's Bite: Poisoned for 1 minute in place of until its next turn); without them the failure stands
+ * as printed. `whileFailed` adds conditions that last while the failure's own do and may end sooner: on damage, or by
+ * another creature's action ("While Poisoned, the target also has the Unconscious condition, which ends early if the
+ * target takes damage or a creature within 5 feet of it takes an action to wake it").
+ */
+export const FailureMarginSchema = z
+  .object({
+    by: z.number().int().min(2).max(20),
+    conditions: z.array(SaveConditionSchema).min(1).max(4).optional(),
+    duration: SaveFailureDurationSchema.optional(),
+    whileFailed: z
+      .object({
+        conditions: z.array(SaveConditionSchema).min(1).max(3),
+        endsOnDamage: z.literal(true).optional(),
+        endedBy: EndedBySchema.optional()
+      })
+      .strict()
+      .optional()
+  })
+  .strict()
+  .describe(
+    "What a save failed by `by` or more does: its conditions and duration in place of the failure's, and conditions that last while the failure's do and may end sooner (on damage, or by another creature's action)"
+  );
+export type FailureMargin = z.infer<typeof FailureMarginSchema>;
+
+/**
  * What a saving throw does, as data: the damage a success takes ("half" for Fireball, "none" for Sacred
  * Flame) and the condition a failure imposes. Every save block (stat-block action, feature action, spell)
  * spreads these fields. Unset, they take the common printing: half damage on a success, no condition.
@@ -3143,6 +3202,24 @@ export const SaveOutcomeFields = {
     .max(6)
     .optional()
     .describe("Only creatures of these types make the save; any other is spared it"),
+  /** Creatures of these types are spared the save and all it does ("If the target is a creature that isn't an Undead or
+   *  elf, it is subjected to the following effect": a ghoul's Claw). */
+  sparesCreatureTypes: z
+    .array(RiderSlugSchema)
+    .min(1)
+    .max(6)
+    .optional()
+    .describe("Creatures of these types make no save and take nothing a failure does"),
+  /** Characters of these species are spared it too (a ghoul's Claw spares an elf). */
+  sparesSpecies: z
+    .array(RiderSlugSchema)
+    .min(1)
+    .max(4)
+    .optional()
+    .describe("Characters of these species make no save and take nothing a failure does"),
+  /** What a failure by `by` or more does ("Failure by 5 or More"): its conditions and duration replace the failure's,
+   *  and `whileFailed` adds conditions that last while the failure's do and may end sooner. */
+  failureByMargin: FailureMarginSchema.optional(),
   /** A creature that still bears this action's failure is left out ("each creature that isn't currently affected by
    *  this breath"). */
   sparesAffected: z.literal(true).optional().describe("A creature still under this action's failure makes no new save"),
@@ -3288,8 +3365,13 @@ const ReactionAttackKindSchema = z.enum(["melee", "ranged", "melee-weapon", "ran
  *   triggering damage included.
  * - ac-bonus (Parry, Shield): add `amount` to AC against the attack before it lands, possibly turning the hit into a
  *   miss. `melee` limits it to melee attacks; `untilNextTurn` keeps the bonus until the reactor's next turn starts.
- * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action against the creature that dealt the damage, or
- *   the sibling action `usesAction` names (a rust monster's Antennae).
+ * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action, or the sibling action `usesAction` names (a rust
+ *   monster's Reflexive Antennae uses Antennae), against the creature that dealt the damage, that hit the reactor with
+ *   an attack roll (`hit-by-attack`), or that started its turn within `rangeFeet` (`starts-turn-near`: a chain devil's
+ *   Unnerving Gaze).
+ * - use-on-self (an octopus's Ink Cloud): resolve this action by the reactor on itself, its area centred on the reactor.
+ * - teleport-near (a nalfeshnee's Pursuit): the sibling Teleport `usesAction` names, its destination near the creature.
+ * - split (a black pudding's Split): the reactor becomes two smaller creatures of its stat block.
  * - melee-attack (Retaliation): make one melee attack against that creature instead.
  * - counter (Counterspell): a creature the reactor can see casts a spell with components; the cast waits, and "use"
  *   makes the caster roll an `ability` saving throw against the reactor's spell save DC, its spell lost on a failure.
@@ -3309,7 +3391,11 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
       response: z.literal("reduce-damage"),
       formula: DamageFormulaSchema,
       damageTypes: z.array(DamageTypeSchema).min(1).max(13).optional(),
-      attackKinds: z.array(ReactionAttackKindSchema).min(1).max(6).optional()
+      attackKinds: z.array(ReactionAttackKindSchema).min(1).max(6).optional(),
+      /** When the reduction takes the damage to 0, the reactor turns this action's own save on one creature it picks
+       *  within the action's range (a stone giant's Deflect Missile: "the giant can redirect some of the attack's
+       *  force"). */
+      redirect: z.literal(true).optional()
     })
     .strict(),
   z.object({ trigger: z.literal("takes-damage"), response: z.literal("resist-type") }).strict(),
@@ -3319,12 +3405,17 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
       response: z.literal("ac-bonus"),
       amount: z.number().int().min(1).max(10),
       melee: z.boolean().optional(),
-      untilNextTurn: z.boolean().optional()
+      untilNextTurn: z.boolean().optional(),
+      /** Offered on every hit, even one the bonus can't turn into a miss, for what else the action does (a mummy
+       *  lord's Whirlwind of Sand teleports it). */
+      anyHit: z.literal(true).optional()
     })
     .strict(),
   z
     .object({
-      trigger: z.literal("damaged-by-creature"),
+      /** Damage from a creature (Hellish Rebuke), an attack roll that hits (a rust monster's Reflexive Antennae), or a
+       *  creature starting its turn within `rangeFeet` (a chain devil's Unnerving Gaze). */
+      trigger: z.enum(["damaged-by-creature", "hit-by-attack", "starts-turn-near"]),
       response: z.literal("strike-back"),
       rangeFeet: ReactionRangeFeet,
       /** The sibling action it uses instead of itself ("The rust monster uses Antennae"). */
@@ -3332,7 +3423,48 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
         .string()
         .regex(/^[a-z0-9-]+$/)
         .max(120)
-        .optional()
+        .optional(),
+      /** The reactor must see the creature, and with `mutual` the creature must see it too ("A creature the devil can
+       *  see starts its turn within 30 feet of the devil and can see the devil"). */
+      sight: z.enum(["reactor", "mutual"]).optional()
+    })
+    .strict(),
+  /** Ink Cloud: when a creature ends its turn within `rangeFeet` of the reactor (`ends-turn-near`), or the reactor takes
+   *  damage (`damaged`), the reactor uses this action on itself, its area centred on it and its move granted.
+   *  `underwater` offers it only in a fight the GM marked as underwater. */
+  z
+    .object({
+      trigger: z.enum(["ends-turn-near", "damaged"]),
+      response: z.literal("use-on-self"),
+      rangeFeet: ReactionRangeFeet,
+      underwater: z.literal(true).optional()
+    })
+    .strict(),
+  /** Pursuit: when another creature the reactor can see ends a move within `rangeFeet` of it, the reactor uses the
+   *  sibling action `usesAction` names (its Teleport), its destination within `nearFeet` of that creature. */
+  z
+    .object({
+      trigger: z.literal("ends-move-near"),
+      response: z.literal("teleport-near"),
+      rangeFeet: ReactionRangeFeet,
+      usesAction: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(120),
+      nearFeet: z.number().int().min(5).max(120)
+    })
+    .strict(),
+  /** Split: while the reactor is one of `sizes` and has `minHitPoints` or more, it becomes Bloodied (`bloodied`) or
+   *  takes damage of one of `damageTypes`; it splits into two creatures of its own stat block, each one size smaller
+   *  with half its Hit Points (round down), and leaves the fight. */
+  z
+    .object({
+      trigger: z.literal("damaged"),
+      response: z.literal("split"),
+      damageTypes: z.array(DamageTypeSchema).min(1).max(13).optional(),
+      bloodied: z.literal(true).optional(),
+      sizes: z.array(SizeSchema).min(1).max(6),
+      minHitPoints: z.number().int().min(1).max(1000)
     })
     .strict(),
   z
@@ -3486,6 +3618,16 @@ export const DamageDrainSchema = z
       })
       .strict()
       .optional(),
+    /** A creature the damage reduces to 0 Hit Points becomes Stable instead of dying, and has these conditions for
+     *  `minutes` (a phase spider's Bite: "the target becomes Stable, and it has the Poisoned condition for 1 hour. While
+     *  Poisoned, the target also has the Paralyzed condition"). */
+    stableAtZero: z
+      .object({
+        conditions: z.array(SaveConditionSchema).min(1).max(3),
+        minutes: z.number().int().min(1).max(1440)
+      })
+      .strict()
+      .optional(),
     /** A creature of `creatureTypes` the damage kills rises as `monsterId` on the dealer's side at the start of the
      *  dealer's next turn (Finger of Death: "A Humanoid killed by this spell rises at the start of your next turn as a
      *  Zombie"). */
@@ -3582,6 +3724,15 @@ export const OnHitRiderSchema = z
       ),
     /** What the engine leaves to the GM, said with the hit: a curse that acts at rests, a creature killed outright. */
     reminder: z.string().min(1).max(400).optional(),
+    /** The hit gives the nonmagical body armor its target wears a cumulative -1 to the AC it offers, destroyed when that
+     *  reaches 10 (a black pudding's Dissolving Pseudopod); Mending removes it. */
+    armorPenalty: z.literal(true).optional(),
+    /** The hit lowers one of the target's ability scores by `dice`, cumulatively and until ended (a shadow's Draining
+     *  Swipe: "the target's Strength score decreases by 1d4"); with `killsAtZero` the target dies if it reaches 0. */
+    lowersScore: z
+      .object({ ability: AbilitySchema, dice: DiceFormulaSchema, killsAtZero: z.literal(true).optional() })
+      .strict()
+      .optional(),
     /** An action that ends the effect ("The target or a creature within 5 feet of it can detach the stirge as an
      *  action"). */
     endedBy: EndedBySchema.optional(),
@@ -3764,6 +3915,9 @@ export const ActionTargetsSchema = z
     grappledBySource: z.literal(true).optional(),
     /** Only a creature with one of these conditions (a Trample's Prone, Death Glare's Frightened). */
     conditions: z.array(ConditionSchema).min(1).max(4).optional(),
+    /** Only a creature with one of these conditions from this creature's own effect ("one creature within 30 feet
+     *  that is Charmed or Grappled by the aboleth"). */
+    conditionsFromSource: z.array(ConditionSchema).min(1).max(4).optional(),
     /** Only a creature whose space this creature shares or is in (a Vortex, a Whelm). */
     inSpace: z.literal(true).optional(),
     /** "Each enemy", "an ally", "another creature" (not the user itself), or only the user ("can target only
@@ -3798,7 +3952,7 @@ export const ActionTargetsSchema = z
   })
   .strict()
   .describe(
-    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions, in the user's space, enemies, allies, others or only the user itself, a creature the user marked, one at 0 Hit Points, a Bloodied one, one with a special speed, or one that can see or hear the user."
+    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions (or conditions from the user's own effect), in the user's space, enemies, allies, others or only the user itself, a creature the user marked, one at 0 Hit Points, a Bloodied one, one with a special speed, or one that can see or hear the user."
   );
 export type ActionTargets = z.infer<typeof ActionTargetsSchema>;
 
@@ -4062,7 +4216,9 @@ export const ActionTeleportSchema = z
     failDamage: DiceFormulaSchema.optional(),
     /** It may teleport the one willing creature its targets name instead of its user (a balor's "itself or a willing
      *  demon within 10 feet of itself"). */
-    orAnother: z.literal(true).optional()
+    orAnother: z.literal(true).optional(),
+    /** What its arrival does to the enemies near its destination (a mummy lord's Whirlwind of Sand). */
+    landing: TeleportLandingSchema.optional()
   })
   .strict();
 export type ActionTeleport = z.infer<typeof ActionTeleportSchema>;
@@ -4382,7 +4538,12 @@ export const ActionSchema = z
           formula: DamageFormulaSchema.describe(
             'One die term plus at most one flat modifier ("1d8 + 3"), or a fixed amount that uses no roll ("1", a Blowgun), which a crit leaves as it is. Anything richer stays prose (ADR-0008)'
           ),
-          type: z.string().min(1).max(40)
+          type: z.string().min(1).max(40),
+          /** The part's type is the one this creature's stat-block pick chose ("damage of the type chosen for the
+           *  Draconic Origin trait"); `type` is the first it may be. */
+          pick: RiderSlugSchema.optional().describe(
+            "The key of the stat-block pick whose damage type this part takes (a half-dragon's Draconic Origin); the action is refused until the creature has one"
+          )
         })
       )
       .max(8)
@@ -4613,6 +4774,25 @@ export const ActionSchema = z
     useNumber: z.number().int().min(1).max(10).optional(),
     /** Its saves are against magic (a sphinx's "magical roar"), which Magic Resistance meets with Advantage. */
     magical: z.literal(true).optional(),
+    /** It can be used only in a fight underwater ("While underwater, the seahorse moves", a kraken's Toxic Ink). */
+    underwaterOnly: z.literal(true).optional().describe("It can be used only in a fight the GM marked as underwater"),
+    /** The object it acts on, worn or carried by its target: a nonmagical armor or weapon (`metal`: of metal) a failed
+     *  save gives a cumulative -1 (a rust monster's Antennae). The resolve names the row (`objectItemId`); absent, the
+     *  target's worn armor, else its weapon in hand. */
+    object: z
+      .object({
+        kinds: z
+          .array(z.enum(["armor", "weapon"]))
+          .min(1)
+          .max(2),
+        metal: z.literal(true).optional(),
+        does: z.enum(["penalty-on-failure"])
+      })
+      .strict()
+      .optional()
+      .describe(
+        "The object it acts on, worn or carried by its target: a nonmagical armor or weapon (of metal with `metal`) that a failed save gives a cumulative -1 (a rust monster's Antennae), named by the resolve's `objectItemId`, else the target's worn armor or its weapon in hand"
+      ),
     /** What it does to each target with no roll: conditions, on creatures of `maxTargetSize` or smaller, standing
      *  until ended or for `duration`; and a lost Concentration (a tarrasque's shock wave: "Creatures in that area lose
      *  Concentration and, if Medium or smaller, have the Prone condition"). */
@@ -5166,6 +5346,31 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
   /** "Attack rolls against the mephit are made with Disadvantage unless the mephit has the Incapacitated condition"
    *  (Blurred Form). */
   z.object({ kind: z.literal("blurred"), name: TraitNameSchema }).strict(),
+  /** What touching the creature does to gear (a black pudding's and a gray ooze's Corrosive Form): a nonmagical weapon
+   *  that hits and damages it takes a cumulative -1 to attack rolls, destroyed at -5 (`weapons`), and nonmagical
+   *  ammunition that hits it is destroyed (`ammunition`). */
+  z
+    .object({
+      kind: z.literal("corrodes-gear"),
+      name: TraitNameSchema,
+      weapons: z.literal(true).optional(),
+      ammunition: z.literal(true).optional()
+    })
+    .strict(),
+  /** A choice the stat block leaves to the GM for each creature (a half-dragon's Draconic Origin: "one of the following
+   *  damage types (DM's choice)"; a commoner's Training: "proficiency in one skill of the DM's choice"), stored on the
+   *  creature under `key`. A damage-type pick is what the actions' parts with this `pick` deal; a skill pick with
+   *  `skillAdvantage` gives proficiency in the skill and Advantage on ability checks with it. */
+  z
+    .object({
+      kind: z.literal("pick"),
+      name: TraitNameSchema,
+      key: RiderSlugSchema,
+      of: z.enum(["damage-type", "skill"]),
+      options: z.array(RiderSlugSchema).min(2).max(18).optional(),
+      skillAdvantage: z.literal(true).optional()
+    })
+    .strict(),
   /** "Other creatures can enter that space, but a creature that does so is subjected to the cube's Engulf and has
    *  Disadvantage on the saving throw" (Ooze Cube): the action whose save a creature entering its space makes. */
   z

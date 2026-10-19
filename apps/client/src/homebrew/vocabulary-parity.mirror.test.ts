@@ -152,7 +152,18 @@ function resolveTheFixture(definition: ActorDefinition) {
         kind: "monster",
         visibility: "public",
         hp: { current: 40, maximum: 40 },
-        armorClass: 12
+        armorClass: 12,
+        // The SRD's printing reaches only a creature the aboleth Charms or Grapples.
+        conditions: [{ id: "charmed" }],
+        effects: [
+          {
+            id: "charmed-by-the-caster",
+            name: "Charmed",
+            sourceActorId: IDS.caster,
+            linkedConditionIds: ["charmed"],
+            duration: { type: "manual" }
+          }
+        ]
       }
     ]
   });

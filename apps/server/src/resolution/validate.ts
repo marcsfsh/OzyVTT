@@ -45,6 +45,7 @@ import {
 } from "./context.js";
 import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
 import { actionTargetViolations } from "./action-targets.js";
+import { withPickedDamageTypes } from "../statblock-picks.js";
 import { typeGated } from "./type-gates.js";
 
 /** The attacker and targets, refused unless the action has something structured to resolve against them. */
@@ -259,7 +260,12 @@ export function openResolve(
     castLevel !== null && castLevel !== undefined && spell && reaching.spellSlot && castLevel > reaching.spellSlot.level
       ? upcastAction(reaching, spell, castLevel)
       : reaching;
-  const action = withChosenDamageType(upcast, input.damageType ?? null);
+  // A part of the creature's picked type (a half-dragon's Draconic Origin) deals that type.
+  const action = withPickedDamageTypes(
+    withChosenDamageType(upcast, input.damageType ?? null),
+    attacker,
+    deps.definition
+  );
   // An option or a weapon the action doesn't offer is refused before anything rolls.
   checkChoices(action, input, attacker, deps.catalog);
   const derived = deriveEquipment(attacker, deps.definition, deps.catalog);

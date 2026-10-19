@@ -65,7 +65,10 @@ describe("SRD monster attack damage matches the stat block", () => {
   it("rolls exactly the printed unconditional damage of every attack, fixed amounts included", () => {
     const wrong = attacks.flatMap(({ key, action }) => {
       const printed = printedHit(action.description);
-      const got = action.damage.map((part) => `${normal(part.formula)} ${part.type}`);
+      // A part of the creature's picked type (a half-dragon's Draconic Origin) is printed with no type.
+      const got = action.damage
+        .filter((part) => part.pick === undefined)
+        .map((part) => `${normal(part.formula)} ${part.type}`);
       const want = printed.map((part) => `${normal(part.formula)} ${part.type}`);
       return JSON.stringify(got) === JSON.stringify(want) ? [] : [`${key}: ${got.join(", ")} vs ${want.join(", ")}`];
     });
@@ -164,12 +167,22 @@ describe("SRD monster save damage is what the failure deals at once", () => {
           const first = failure.split(/(?<=\.)\s/)[0] ?? "";
           // A step of a printed sequence (a sphinx's roars) carries its own failure, printed further on.
           if (/^If the (?:target|creature) has \d+ Hit Points/.test(first) || action.useNumber !== undefined) return [];
-          // A type each use picks (a half-dragon's breath, of its Draconic Origin's type) is printed with no type.
+          // A type each use picks is printed with no type.
           if (action.damageTypes !== undefined) return [];
-          const want = [...first.matchAll(/\d+ \((\d+d\d+(?:\s*[+-]\s*\d+)?)\) ([A-Za-z]+) damage/g)].map(
-            ([, dice, type]) => `${normal(dice)} ${type.toLowerCase()}`
+          const want = [
+            ...[...first.matchAll(/\d+ \((\d+d\d+(?:\s*[+-]\s*\d+)?)\) ([A-Za-z]+) damage/g)].map(
+              ([, dice, type]) => `${normal(dice)} ${type.toLowerCase()}`
+            ),
+            // "Damage of the type chosen for the Draconic Origin trait": the creature's pick.
+            ...[
+              ...first.matchAll(
+                /\d+ \((\d+d\d+(?:\s*[+-]\s*\d+)?)\) damage of the type chosen for the ([A-Za-z ]+) trait/g
+              )
+            ].map(([, dice, trait]) => `${normal(dice)} pick:${trait!.toLowerCase().replace(/ /g, "-")}`)
+          ];
+          const got = action.damage.map(
+            (part) => `${normal(part.formula)} ${part.pick ? `pick:${part.pick}` : part.type}`
           );
-          const got = action.damage.map((part) => `${normal(part.formula)} ${part.type}`);
           return JSON.stringify(got) === JSON.stringify(want)
             ? []
             : [`${monster.source.externalId}/${action.id}: ${got.join(", ")} vs ${want.join(", ")}`];

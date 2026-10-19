@@ -218,6 +218,12 @@ export function evaluateActionEconomy(
   );
   checkTurnsBegun(evaluation);
   checkOwnTurn(evaluation);
+  // "While underwater, the seahorse moves": only in a fight the GM marked as underwater.
+  if (action.underwaterOnly && !(state.combat.active && state.combat.underwater))
+    evaluation.violations.push({
+      rule: "action.underwater-only",
+      message: `${action.name} can be used only underwater, and this fight isn't.`
+    });
   checkExtraAttackOpened(evaluation);
   checkHands(evaluation);
   checkArmorTraining(evaluation, definition, catalog);

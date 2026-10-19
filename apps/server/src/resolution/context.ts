@@ -85,6 +85,12 @@ export type ResolveInput = Readonly<{
   targetOptions?: Readonly<Record<string, string>>;
   /** The carried weapon a grant binds to (`grants.bindsWeapon`). */
   itemId?: string | null;
+  /** The armor or weapon of the target the action acts on (`action.object`, Mending). */
+  objectItemId?: string | null;
+  /** A reaction to this creature's turn starting: a failure "until the end of its turn" ends with that turn. */
+  currentTurnOf?: string;
+  /** The action's area is centred on its user where it stands (an octopus's ink), with no template placed. */
+  areaAt?: Readonly<{ x: number; y: number }>;
   /** How this attack is made, for `attack-kind-is` riders. Melee/ranged/thrown are derived; opportunity and
    *  reaction can't be, so `reactions.ts` announces them here. */
   attackKinds?: readonly AttackKind[];

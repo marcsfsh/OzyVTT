@@ -717,6 +717,11 @@ An attack can wait before its roll too, while a creature that may change its tar
 `resolution/redirect.ts`): Redirect Attack hands it to an ally, the two swapping places, and an Arrow-Catching Shield's
 wielder takes it on itself. A guardian's ward (Shield Guardian's Protection) is an `attack-would-hit` prompt to the
 guardian for the creature that commands it, whose AC it raises.
+A stat block's reaction to something else is a `triggered` prompt naming its `cause` (`triggered-reactions.ts`): an
+attack roll that hits it (Reflexive Antennae), a creature starting or ending its turn, or ending a move, nearby
+(Unnerving Gaze, Ink Cloud, Pursuit), or damage it takes (Split). Its answer does what the declared response says
+(`reactions.ts`): it resolves the action against that creature, on the reactor itself, as a teleport near that
+creature, or splits the reactor in two (`split.ts`).
 Players type die faces, never totals, and only while the table allows typed dice. On the client every roll prompt
 shares one set of controls (`RollControls.tsx`, with its answer buttons), and the GM's calls for a roll
 (`GameState.rollCalls`) reach each player as a card that follows them across the app (`RollCallPrompt.tsx`).
