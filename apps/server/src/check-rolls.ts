@@ -2,7 +2,16 @@ import { checkSightFor } from "./vision/rules.js";
 import type { Actor, CheckRollOutcome, GameState, HeldRoll, RollCall, RollRecord, RollVisibility } from "@vtt/domain";
 import { d20FacesFor, otherDiceOf, rerollLowestD20, type RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
-import { checkPlan, type CheckNames, type CheckPlan, type CheckSubject, totalCheck } from "./ability-checks.js";
+import {
+  checkPlan,
+  type CheckNames,
+  type CheckPlan,
+  type CheckSubject,
+  type CheckVersus,
+  totalCheck
+} from "./ability-checks.js";
+import { creatureTypeOf } from "./statblock-facts.js";
+import { endUsedHelp, useHelp } from "./help-assist.js";
 import {
   canPlayerTarget,
   GameAccessDeniedError,
@@ -86,6 +95,16 @@ function checkVisibility(state: GameState, scope: Initiator, actorId: string, as
   return hidden ? "gm-only" : asked;
 }
 
+/** The other party of a check about a creature, as a social check reads it (its type for Perfume, how far away). */
+function versusOf(actor: Actor, other: Actor, deps: CheckRollDependencies): CheckVersus {
+  const definition = other.definitionId ? deps.resolveDefinition(other.definitionId) : undefined;
+  return {
+    actor: other,
+    humanoid: creatureTypeOf(other, definition) === "humanoid",
+    feet: deps.distanceFeet?.(actor.id, other.id) ?? null
+  };
+}
+
 function planFor(state: GameState, scope: Initiator, input: CheckRollInput, deps: CheckRollDependencies) {
   const actor = state.actors.find((candidate) => candidate.id === input.actorId);
   if (!actor) throw new CommandRejectedError("That character no longer exists.");
@@ -104,7 +123,7 @@ function planFor(state: GameState, scope: Initiator, input: CheckRollInput, deps
   });
   const plan = checkPlan(actor, definition, derivation, input.subject, {
     ...(deps.names ? { names: deps.names } : {}),
-    ...(finding ? { finding } : {}),
+    ...(finding ? { finding, versus: versusOf(actor, finding, deps) } : {}),
     ...(warded.length > 0 ? { warded } : {}),
     // Frightened's line of sight, the light the roller stands in, and how obscured the creature it seeks is.
     sight: checkSightFor(
@@ -217,6 +236,7 @@ function heldCheckResult(
       success,
       ...(rollMode ? { rollMode } : {}),
       ...(roll.reliableTalent ? { reliableTalent: true as const } : {}),
+      ...(plan.autoFails !== undefined ? { autoFailed: plan.autoFails } : {}),
       ...(held.typed ? { typed: true as const } : {}),
       ...(answered.length > 0 ? { answered } : {}),
       ...(offered.length > 0 ? { answers: offered } : {}),
@@ -408,17 +428,27 @@ export function rollAbilityCheck(
   input: CheckRollInput,
   deps: CheckRollDependencies
 ): CheckResult {
-  const { plan } = planFor(state, scope, input, deps);
+  // A Help an earlier check used ends before this one is planned; a refused roll writes nothing.
+  const roller = state.actors.find((candidate) => candidate.id === input.actorId);
+  const ended = roller ? endUsedHelp(state, roller) : [];
+  const { actor, plan } = planFor(state, scope, input, deps);
   const forced = scope.role === "gm" ? input.forcedMode : undefined;
+  let result: CheckResult;
   if (input.face !== undefined) {
     requireTypedDie(state, scope, undefined, input.face);
-    return recordCheck(state, scope, { ...input, forcedMode: forced }, deps, plan, [input.face], "normal", true, {
+    result = recordCheck(state, scope, { ...input, forcedMode: forced }, deps, plan, [input.face], "normal", true, {
+      fresh: true
+    });
+  } else {
+    const mode = forced ?? plan.rollMode.mode;
+    const faces = d20FacesFor(mode, [], deps.random);
+    result = recordCheck(state, scope, { ...input, forcedMode: forced }, deps, plan, faces, mode, false, {
       fresh: true
     });
   }
-  const mode = forced ?? plan.rollMode.mode;
-  const faces = d20FacesFor(mode, [], deps.random);
-  return recordCheck(state, scope, { ...input, forcedMode: forced }, deps, plan, faces, mode, false, { fresh: true });
+  // An ally's Help with this skill is used by this check; a reroll of it still has the Advantage.
+  useHelp(state, actor, input.subject);
+  return ended.length > 0 ? { ...result, events: [...ended, ...(result.events ?? [])] } : result;
 }
 
 /**

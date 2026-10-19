@@ -388,7 +388,10 @@ export const CheckSubjectSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/)
       .max(80)
-      .optional()
+      .optional(),
+    /** What the check relies on, when the GM says: SRD Blinded and Deafened fail a check "that requires sight" or
+     *  "hearing". */
+    sense: z.enum(["sight", "hearing"]).optional()
   })
   .strict();
 export type CheckSubject = z.infer<typeof CheckSubjectSchema>;

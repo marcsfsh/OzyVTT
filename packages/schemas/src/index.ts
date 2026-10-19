@@ -1624,6 +1624,9 @@ export const ActorSchema = z.object({
     .default({}),
   /** Conditions this actor is immune to (seeded from its definition). GM knowledge, stripped from player projections. */
   conditionImmunities: z.array(ConditionIdSchema).max(20).default([]),
+  /** SRD Influence: a monster's or NPC's attitude toward the party, Indifferent when absent. The GM sets it; an
+   *  Influence check against it has Advantage when Friendly and Disadvantage when Hostile. GM-only in projections. */
+  attitude: z.enum(["friendly", "indifferent", "hostile"]).optional(),
   /** Walking speed in feet (seeded from the definition, GM-editable). Absent = unknown, so movement rules skip. */
   speedFeet: z.number().int().min(0).max(500).optional(),
   /** Legendary actions per round and Legendary Resistance per day (SRD 2024). GM knowledge, stripped from player projections. */

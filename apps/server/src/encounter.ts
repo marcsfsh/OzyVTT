@@ -12,7 +12,7 @@ import { wardedConditions } from "./paladin-auras.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 import { aggregateRollMode } from "@vtt/rules-5e";
-import { deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
+import { checkRiderBonus, deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
 import { effectiveActions } from "./effective-actions.js";
 import {
   endConcentrationSustainedBy,
@@ -98,9 +98,9 @@ export function initiativeRollFor(
   actorId: string,
   surprised: boolean,
   deps: InitiativeRollDeps = {}
-): { mode: RollMode; penalty: number; reasons: string[] } {
+): { mode: RollMode; penalty: number; checkBonus: number; reasons: string[] } {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor) return { mode: "normal", penalty: 0, reasons: [] };
+  if (!actor) return { mode: "normal", penalty: 0, checkBonus: 0, reasons: [] };
   const definition = actor.definitionId ? deps.resolveDefinition?.(actor.definitionId) : undefined;
   const derivation = deriveEquipment(actor, definition, deps.catalog);
   const claims = rollModeClaims(derivation, ["initiative"], "on-initiative-roll");
@@ -126,9 +126,11 @@ export function initiativeRollFor(
   const incapacitated = incapacitatingCondition(actor);
   if (incapacitated) claims.disadvantage.push({ source: "incapacitated", label: conditionLabel(incapacitated) });
   const penalty = exhaustionPenalty(actor);
+  // A bonus to ability checks reaches a Dexterity check (a Stone of Good Luck's +1), which Initiative is.
+  const checkBonus = checkRiderBonus(derivation, { ability: "dex" });
   const reasons = [...claims.advantage, ...claims.disadvantage].map((claim) => claim.label);
   if (penalty !== 0) reasons.push(`Exhaustion ${penalty}`);
-  return { mode: aggregateRollMode(claims.advantage, claims.disadvantage).mode, penalty, reasons };
+  return { mode: aggregateRollMode(claims.advantage, claims.disadvantage).mode, penalty, checkBonus, reasons };
 }
 
 /** The roll mode alone, from riders and conditions, for a combatant who isn't surprised. */
@@ -171,9 +173,9 @@ function rollInitiative(
   natural?: number
 ): { natural: number; modifier: number; total: number; mode: RollMode } {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  const { mode, penalty } = initiativeRollFor(state, actorId, surprised, deps);
+  const { mode, penalty, checkBonus } = initiativeRollFor(state, actorId, surprised, deps);
   const die = natural ?? rollUnderMode(rollD20, mode);
-  const modifier = (actor?.initiative ?? 0) + penalty;
+  const modifier = (actor?.initiative ?? 0) + checkBonus + penalty;
   const total = die + modifier;
   if (!validScore(total)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
   return { natural: die, modifier, total, mode };

@@ -102,8 +102,54 @@ export const ABILITY_NAMES: Readonly<Record<AbilityId, string>> = {
   cha: "Charisma"
 };
 
-/** What a check is made with: the ability, and a skill or a tool (or a tool with the skill it uses) when one applies. */
-export type CheckSubject = Readonly<{ ability: AbilityId; skill?: string; tool?: string }>;
+/** What a check is made with: the ability, and a skill or a tool (or a tool with the skill it uses) when one applies.
+ *  `sense` is what the check relies on, when the GM says: a Blinded roller fails one that needs sight, a Deafened one
+ *  one that needs hearing. */
+export type CheckSubject = Readonly<{ ability: AbilityId; skill?: string; tool?: string; sense?: "sight" | "hearing" }>;
+
+/** The creature a social check interacts with (Influence, or a Charisma check the GM calls naming it). */
+export type CheckVersus = Readonly<{
+  actor: Actor;
+  /** Its creature type is Humanoid (Perfume's "an Indifferent Humanoid"). */
+  humanoid: boolean;
+  /** Feet between the two tokens; null when the map can't tell. */
+  feet: number | null;
+}>;
+
+/** The tag on Perfume's hour, which gives Advantage on Persuasion to influence an Indifferent Humanoid within 5 feet. */
+export const PERFUME_TAG = "perfume";
+
+/** The slack on Perfume's 5 feet, as for reach. */
+const PERFUME_SLACK_FEET = 0.1;
+
+/** A check "to interact with [a creature] socially" (SRD Charmed) or to influence it (Influence): a Charisma check, or
+ *  Wisdom (Animal Handling), which the Influence table lists. */
+const isSocial = (subject: CheckSubject) => subject.ability === "cha" || subject.skill === "animal-handling";
+
+/** What the other party of a social check gives it: its charmer has Advantage (SRD Charmed), its attitude gives
+ *  Advantage when Friendly and Disadvantage when Hostile (SRD Influence), and Perfume gives Advantage on Persuasion
+ *  against an Indifferent Humanoid within 5 feet. */
+function socialClaims(actor: Actor, subject: CheckSubject, versus: CheckVersus, claims: RollModeClaims): void {
+  if (!isSocial(subject)) return;
+  const other = versus.actor;
+  const charmedByRoller =
+    other.conditions.some((held) => held.id === "charmed") &&
+    other.effects.some((effect) => effect.linkedConditionIds.includes("charmed") && effect.sourceActorId === actor.id);
+  if (charmedByRoller)
+    claims.advantage.push({ source: "charmed-by-roller", label: `${other.name} is Charmed by ${actor.name}` });
+  const attitude = other.attitude ?? "indifferent";
+  if (attitude === "friendly") claims.advantage.push({ source: "attitude", label: `${other.name} is Friendly` });
+  if (attitude === "hostile") claims.disadvantage.push({ source: "attitude", label: `${other.name} is Hostile` });
+  if (
+    subject.skill === "persuasion" &&
+    attitude === "indifferent" &&
+    versus.humanoid &&
+    versus.feet !== null &&
+    versus.feet <= 5 + PERFUME_SLACK_FEET &&
+    actor.effects.some((effect) => effect.tags.includes(PERFUME_TAG))
+  )
+    claims.advantage.push({ source: "perfume", label: "Perfume" });
+}
 
 /** The tag on a Hunter's Mark effect, which gives its caster Advantage on checks to find the marked creature. */
 const HUNTERS_MARK_TAG = "hunters-mark";
@@ -190,6 +236,8 @@ export type CheckContext = Readonly<{
   stakes?: readonly string[];
   /** What sight decides about it (Frightened's line of sight, the light, how obscured `finding` is). */
   sight?: CheckSight;
+  /** The creature a social check interacts with: its charmer, its attitude and Perfume read it. */
+  versus?: CheckVersus;
 }>;
 
 /** The flat part of a skill check (SRD Skills, Expertise, Jack of All Trades): a GM-typed total, else the stat block's
@@ -274,14 +322,21 @@ function plainCheckPlan(
           proficient: toolProficient
         };
   const claims = abilityCheckClaims(actor, derivation, narrow, context.warded, context.stakes, context.sight);
-  // A Wisdom (Perception) check to find a creature relies on sight: Disadvantage when it is Lightly Obscured to the
-  // roller, and a failure whatever the roll when the roller is Blinded or it is Heavily Obscured.
-  const lookingFor = context.finding !== undefined && subject.ability === "wis" && subject.skill === "perception";
+  if (context.versus) socialClaims(actor, subject, context.versus, claims);
+  // A Wisdom (Perception) check to find a creature relies on sight unless the GM says it listens: Disadvantage when
+  // it is Lightly Obscured to the roller, and a failure whatever the roll when the roller is Blinded or it is Heavily
+  // Obscured.
+  const lookingFor =
+    context.finding !== undefined &&
+    subject.ability === "wis" &&
+    subject.skill === "perception" &&
+    subject.sense !== "hearing";
   const sight = context.sight ?? {};
   if (lookingFor && sight.findingObscured === "light" && !sight.findingByBlindsight)
     claims.disadvantage.push({ source: "lightly-obscured", label: `${context.finding!.name} is Lightly Obscured` });
   const blinded = actor.conditions.some((held) => held.id === "blinded");
-  const autoFails =
+  const deafened = actor.conditions.some((held) => held.id === "deafened");
+  const findingFails =
     !lookingFor || sight.findingByBlindsight
       ? undefined
       : blinded
@@ -289,6 +344,15 @@ function plainCheckPlan(
         : sight.findingObscured === "heavy"
           ? `${context.finding!.name} is Heavily Obscured to ${actor.name}.`
           : undefined;
+  // SRD Blinded: "You automatically fail any ability check that requires sight"; Deafened: "... that requires
+  // hearing". What the check perceives within the roller's Blindsight needs no sight.
+  const autoFails =
+    findingFails ??
+    (subject.sense === "sight" && blinded && !sight.findingByBlindsight
+      ? `${actor.name} is Blinded, and this check needs sight.`
+      : subject.sense === "hearing" && deafened
+        ? `${actor.name} is Deafened, and this check needs hearing.`
+        : undefined);
   // SRD Tools: "If you have proficiency in the skill that's also used with that check, you have Advantage".
   if (
     subject.tool !== undefined &&

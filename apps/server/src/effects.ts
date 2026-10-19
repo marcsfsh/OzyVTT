@@ -160,7 +160,7 @@ export type ConditionImmunitySource = Readonly<{
 
 /** SRD condition immunity: innate, granted by what the actor carries when a catalog is supplied, Petrified's own
  *  immunity to the Poisoned condition, or a Paladin's aura it stands in. */
-function immuneToCondition(actor: Actor, conditionId: string, source?: ConditionImmunitySource): boolean {
+export function immuneToCondition(actor: Actor, conditionId: string, source?: ConditionImmunitySource): boolean {
   if (actor.conditionImmunities.includes(conditionId)) return true;
   // An effect's own immunity while it lasts (Heroism: Frightened).
   if (actor.effects.some((effect) => effect.conditionImmunities?.includes(conditionId))) return true;
@@ -250,6 +250,25 @@ export function hasEffectTag(actor: Actor, tag: string): boolean {
  * Concentration breaks (SRD Incapacitated, Grappling), and its Rage ends; Exhaustion 6 is death. 0 HP is handled
  * by the damage path, which ends everything the creature sustains.
  */
+/** What is carried in a hand rather than worn: a row with weapon stats, a wand, a staff or a rod. */
+const HELD_CATEGORIES: ReadonlySet<string> = new Set(["weapon", "wand", "staff", "rod"]);
+
+/**
+ * SRD Unconscious ("you drop whatever you're holding") and Fear ("drops whatever it is holding"): the creature's held
+ * rows stay carried but are no longer in hand, so taking one up again is an object interaction (equipping it). Worn
+ * armor and a strapped Shield stay on.
+ */
+export function dropHeldItems(actor: Actor): EffectNarration[] {
+  const held = actor.inventory.filter(
+    (row) => row.equipped && (row.weapon !== undefined || HELD_CATEGORIES.has(row.category ?? ""))
+  );
+  if (held.length === 0) return [];
+  actor.inventory = actor.inventory.map((row) => (held.includes(row) ? { ...row, equipped: false } : row));
+  const names = held.map((row) => row.name);
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  return [{ kind: "condition", text: `${actor.name} drops ${list}.`, actorId: actor.id }];
+}
+
 export function conditionGained(
   state: GameState,
   actor: Actor,
@@ -257,6 +276,7 @@ export function conditionGained(
   previousExhaustion = 0
 ): EffectNarration[] {
   const events: EffectNarration[] = [];
+  if (conditionId === "unconscious") events.push(...dropHeldItems(actor));
   if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
     events.push(...releaseGrapplesHeldBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));

@@ -1209,6 +1209,8 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   "phantasmal-force": { name: "Phantasmal Force", tags: [], modifiers: [] },
   // "It can't end the Prone condition on itself" while it laughs.
   "hideous-laughter": { name: "Hideous Laughter", tags: ["cant-stand"], modifiers: [] },
+  // "Each target ... drops whatever it is holding and has the Frightened condition for the duration."
+  fear: { name: "Fear", tags: ["drops-held"], modifiers: [] },
   // "Has Disadvantage on Dexterity saving throws and attack rolls, and other creatures have Advantage on attack rolls
   // against it" while it dances (the save's Speed 0 keeps it dancing in place).
   "irresistible-dance": {

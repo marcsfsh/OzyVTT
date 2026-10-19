@@ -1356,17 +1356,26 @@ function checkTargeting(
       resolveDefinition: evaluation.resolveDefinition,
       ...(distanceFeet ? { distanceFeet } : {})
     }) !== null;
-  if (!charmWarded && (action.attack !== undefined || action.save !== undefined || action.damage.length > 0)) {
-    const charmers = attacker.effects.filter(
-      (effect) => effect.linkedConditionIds.includes("charmed") && effect.sourceActorId !== null
-    );
+  // "You can't attack the charmer or target the charmer with damaging abilities or magical effects": a spell, from a
+  // sheet or an item, is magical whether it harms or helps.
+  const magical = action.spellId !== undefined;
+  if (
+    !charmWarded &&
+    (action.attack !== undefined || action.save !== undefined || action.damage.length > 0 || magical)
+  ) {
+    // The condition itself must be on: a hand cleared it while its effect lingers.
+    const charmers = attacker.conditions.some((condition) => condition.id === "charmed")
+      ? attacker.effects.filter(
+          (effect) => effect.linkedConditionIds.includes("charmed") && effect.sourceActorId !== null
+        )
+      : [];
     for (const targetId of targetIds) {
       const charmer = charmers.find((effect) => effect.sourceActorId === targetId);
       if (charmer) {
         const target = state.actors.find((candidate) => candidate.id === targetId);
         violations.push({
           rule: "condition.charmed-charmer",
-          message: `${attacker.name} is Charmed by ${target?.name ?? charmer.sourceName ?? "its charmer"} and can't target them with harmful effects.`
+          message: `${attacker.name} is Charmed by ${target?.name ?? charmer.sourceName ?? "its charmer"} and can't target them with harmful or magical effects.`
         });
       }
     }

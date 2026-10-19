@@ -1,11 +1,14 @@
 import type { Actor, GameState } from "@vtt/domain";
 import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
-import type { Initiator } from "./authorization.js";
+import { requireGm, type Initiator } from "./authorization.js";
 import { adjustableActor } from "./hit-points.js";
 import {
+  addEffect,
   applyCondition,
   CANT_STAND_TAG,
   conditionGained,
+  immuneToCondition,
+  makeEffect,
   type ConditionImmunitySource,
   type EffectNarration
 } from "./effects.js";
@@ -22,7 +25,64 @@ import {
   type RulesOverride
 } from "./rules-families.js";
 
-type SetConditionOptions = ConditionImmunitySource & Readonly<{ override?: RulesOverride | null }>;
+type SetConditionOptions = ConditionImmunitySource &
+  Readonly<{
+    override?: RulesOverride | null;
+    /** The charmer or the source of fear the GM names for Charmed or Frightened. */
+    sourceActorId?: string;
+  }>;
+
+/** The tag on the effect that carries a Charmed or Frightened set by hand with its source named. */
+export const HAND_SET_TAG = "hand-set";
+
+/** The conditions whose source the rules read (SRD Charmed, Frightened). */
+const SOURCED_CONDITIONS: ReadonlySet<string> = new Set(["charmed", "frightened"]);
+
+/** Charmed or Frightened set by hand with its source named: it rides an effect from that creature, so the charmer
+ *  check (`resolution/economy.ts`) and Frightened's line of sight and approach read it. */
+function setSourcedCondition(
+  state: GameState,
+  actor: Actor,
+  conditionId: string,
+  sourceActorId: string,
+  scope: Initiator,
+  options: SetConditionOptions
+): EffectNarration[] {
+  requireGm(scope, "Only the GM names who imposed a condition.");
+  if (!SOURCED_CONDITIONS.has(conditionId))
+    throw new CommandRejectedError("Only Charmed and Frightened name the creature that imposed them.");
+  const source = state.actors.find((candidate) => candidate.id === sourceActorId);
+  if (!source) throw new CommandRejectedError("The creature named as its source isn't here.");
+  if (source.id === actor.id) throw new CommandRejectedError(`${actor.name} can't be its own source.`);
+  if (immuneToCondition(actor, conditionId, { ...options, state }))
+    return [
+      {
+        kind: "condition",
+        text: `${actor.name} is immune to ${conditionLabel(conditionId)}, so it isn't applied.`,
+        actorId: actor.id,
+        immune: true
+      }
+    ];
+  const events: EffectNarration[] = [];
+  addEffect(
+    state,
+    actor.id,
+    makeEffect({
+      id: `${HAND_SET_TAG}:${conditionId}:${source.id}`,
+      name: `${conditionLabel(conditionId)} by ${source.name}`,
+      tags: [HAND_SET_TAG],
+      sourceActorId: source.id,
+      sourceName: source.name,
+      sourceActionId: `${HAND_SET_TAG}-${conditionId}`,
+      startedRound: state.combat.round,
+      duration: { type: "manual" },
+      linkedConditionIds: [conditionId]
+    }),
+    events,
+    options
+  );
+  return events;
+}
 
 /**
  * Runs one rule through the ladder for a condition change: strict throws (a player may then ask the GM), assisted lets
@@ -170,6 +230,8 @@ export function setCondition(
   if (level !== undefined && conditionId !== "exhaustion")
     throw new CommandRejectedError("Only exhaustion has levels.");
   const present = actor.conditions.some((condition) => condition.id === conditionId);
+  if (active && options?.sourceActorId !== undefined)
+    return setSourcedCondition(state, actor, conditionId, options.sourceActorId, scope, options);
   if (!active) {
     if (!present) return [];
     const events =
@@ -183,6 +245,10 @@ export function setCondition(
             })()
           : [];
     actor.conditions = actor.conditions.filter((condition) => condition.id !== conditionId);
+    // A hand-set source goes with the condition it carried.
+    actor.effects = actor.effects.filter(
+      (effect) => !(effect.tags.includes(HAND_SET_TAG) && effect.linkedConditionIds.includes(conditionId))
+    );
     return events;
   }
   const previousExhaustion = exhaustionLevel(actor);

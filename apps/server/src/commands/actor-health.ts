@@ -258,7 +258,7 @@ export const actorHealthCommands = [
     type: "actor.set-condition",
     operationId: "setCondition",
     description:
-      "Applies or clears a bundled SRD condition. Exhaustion is cumulative: without `level` it gains one level, with one it is set to that level. Player sessions may target only their claimed character: they may add any condition and clear one they added, while clearing one imposed by a save, an effect or the GM is a rules block (`condition.imposed`) they can ask the GM about; standing from Prone is allowed only on their own turn in a fight (`movement.stand-up-off-turn`) and costs half their Speed.",
+      "Applies or clears a bundled SRD condition. Exhaustion is cumulative: without `level` it gains one level, with one it is set to that level. The GM may name the charmer or the source of fear (`sourceActorId`) for Charmed or Frightened: the condition then rides an effect from that creature, so it can't be harmed by its charmed bearer or approached by its frightened one, and clearing the condition ends it. Player sessions may target only their claimed character: they may add any condition and clear one they added, while clearing one imposed by a save, an effect or the GM is a rules block (`condition.imposed`) they can ask the GM about; standing from Prone is allowed only on their own turn in a fight (`movement.stand-up-off-turn`) and costs half their Speed.",
     summary: "Apply or clear an SRD condition, with exhaustion levels.",
     schema: SetConditionSchema,
     malformed: "The condition command is malformed.",
@@ -267,11 +267,12 @@ export const actorHealthCommands = [
         throw new CommandRejectedError("That condition is not in the bundled rules.");
       if (request.override && !isGmGrade(principal))
         throw new GameAccessDeniedError("Only the GM can override movement rules.");
-      const { actorId, conditionId, active, level } = request;
+      const { actorId, conditionId, active, level, sourceActorId } = request;
       let events: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {
         events = setCondition(state, actorId, conditionId, active, level, initiatorOf(principal), {
           override: request.override ?? null,
+          ...(sourceActorId !== undefined ? { sourceActorId } : {}),
           resolveDefinition: kit.resolveDefinition,
           catalog: kit.equipmentCatalog()
         });

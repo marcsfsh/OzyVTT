@@ -151,6 +151,7 @@ import type {
   SceneReorderSchema,
   SceneSetCombatantsSchema,
   SetActorArchivedSchema,
+  SetActorAttitudeSchema,
   SetActorHealthDisplaySchema,
   SetActorSheetPreviewSchema,
   SetActorSizeSchema,
@@ -569,6 +570,10 @@ export interface ClientToServerEvents {
   ) => void;
   "actor:set-health-display": (
     payload: CommandPayload<typeof SetActorHealthDisplaySchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "actor:set-attitude": (
+    payload: CommandPayload<typeof SetActorAttitudeSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "encounter:set-environment": (

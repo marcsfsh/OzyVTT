@@ -22,6 +22,8 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
   const [skill, setSkill] = useState("perception");
   const [dc, setDc] = useState("");
   const [blind, setBlind] = useState(false);
+  // What the check relies on: a Blinded character fails one that needs sight, a Deafened one one that needs hearing.
+  const [sense, setSense] = useState<"" | "sight" | "hearing">("");
   // Characters left out of the next call; everyone is in until the GM taps them out.
   const [left, setLeft] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -64,6 +66,7 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
       kind,
       ability,
       ...(kind === "check" && skill ? { skill } : {}),
+      ...(kind === "check" && sense ? { sense } : {}),
       ...(dcValue !== undefined ? { dc: dcValue } : {}),
       actorIds: chosen.map((actor) => actor.id),
       ...(kind === "check" && blind ? { blind: true } : {})
@@ -130,6 +133,16 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
                       {entry.name}
                     </option>
                   ))}
+                </Select>
+              </label>
+            )}
+            {kind === "check" && (
+              <label>
+                Needs
+                <Select value={sense} onChange={(event) => setSense(event.target.value as "" | "sight" | "hearing")}>
+                  <option value="">Nothing more</option>
+                  <option value="sight">Sight</option>
+                  <option value="hearing">Hearing</option>
                 </Select>
               </label>
             )}

@@ -28,6 +28,7 @@ import { CommandRejectedError } from "./game-store.js";
 import {
   addEffect,
   applyCondition,
+  dropHeldItems,
   DEATH_WARD_TAG,
   endConcentrationOnTheDead,
   endConcentrationSustainedBy,
@@ -413,6 +414,7 @@ function fallToZero(
       text: instantDeath ? `${actor.name} was killed outright.` : `${actor.name} fell Unconscious and is dying.`,
       actorId: actor.id
     });
+    events.push(...dropHeldItems(actor));
   } else {
     defeated = true;
     // A swallower that dies lets out what it swallowed (SRD: "can escape from the corpse").

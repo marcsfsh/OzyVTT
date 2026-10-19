@@ -52,6 +52,7 @@ import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty, isIncapacita
 import {
   addEffect,
   CONCENTRATING_TAG,
+  dropHeldItems,
   effectDurationOf,
   endConcentrationSustainedBy,
   endEffectIfPresent,
@@ -423,11 +424,16 @@ export function applyFailureEffect(
     events,
     immunities
   );
+  // "It drops whatever it is holding" (Fear), once, as the failure lands.
+  if (onFail.tags.includes(DROPS_HELD_TAG)) events.push(...dropHeldItems(target));
   return [
     { kind: "effect", text: `${target.name} is ${applied.name}.`, actorId: target.id, ...sourceOf(applied) },
     ...events
   ];
 }
+
+/** The tag on a failure that makes its target drop what it holds (Fear). */
+export const DROPS_HELD_TAG = "drops-held";
 
 /**
  * A failure's push (Thunderwave's 10 feet, a dragon's Repulsion Breath "up to 60 feet"), the whole way, straight away
@@ -590,7 +596,7 @@ export function answerSave(
   state: GameState,
   commandId: string,
   saveId: string,
-  method: "roll" | "manual",
+  method: "roll" | "manual" | "fail",
   manualTotal: number | undefined,
   commit: boolean,
   scope: Initiator,
@@ -628,7 +634,16 @@ export function answerSave(
   if (options.answer && method !== "roll") throw new CommandRejectedError("Answer a save the dice decide.");
   const targetDefinition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
   const magicResistance = pending.magical ? magicResistanceOf(targetDefinition) : null;
-  if (method === "manual") {
+  // SRD Saving Throw: "you can decide to fail the save without rolling" (a willing target). Its controller decides,
+  // which `adjustableActor` checked above.
+  const chosenFailure = method === "fail";
+  if (chosenFailure && legendaryResistance)
+    throw new CommandRejectedError("A creature that chooses to fail a save doesn't spend Legendary Resistance on it.");
+  if (chosenFailure) {
+    total = 0;
+    // A die shown on an earlier look (an auto-roll) goes unused.
+    if (commit) releaseHeldRoll(state, heldKey);
+  } else if (method === "manual") {
     // The GM's typed total is a ruling, so it stands as given (a table may rule an exception to an auto-fail). A
     // player types the face their die shows instead, and the server adds the bonus.
     requireGm(scope, "Type the d20 your die shows; the server adds your bonus.");
@@ -811,7 +826,8 @@ export function answerSave(
   // Waiting on an answer, the confirm reads as a look: nothing lands until the answer finishes it.
   const applying = commit && !awaitingAnswer;
 
-  let success = autoSucceeded !== null || (autoFailed === null && total >= pending.dc) || answerSucceeds;
+  let success =
+    !chosenFailure && (autoSucceeded !== null || (autoFailed === null && total >= pending.dc) || answerSucceeds);
   // SRD Legendary Resistance: on a failed save the creature can choose to succeed. The GM commits with
   // the flag; the pool rides actionUses["legendary-resistance"] and a Long Rest re-arms it.
   let legendaryNote: string | null = null;
@@ -909,6 +925,12 @@ export function answerSave(
 
   const events: EffectNarration[] = [...answerEvents, ...spendUntilOwnSave(state, target)];
   if (legendaryNote !== null) events.push({ kind: "effect", text: legendaryNote, actorId: target.id });
+  if (chosenFailure)
+    events.push({
+      kind: "condition",
+      text: `${target.name} chooses to fail the ${pending.ability.toUpperCase()} save.`,
+      actorId: target.id
+    });
   if (autoFailed !== null)
     events.push({
       kind: "condition",

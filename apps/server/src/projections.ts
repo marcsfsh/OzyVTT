@@ -641,6 +641,8 @@ const PLAYER_ACTOR_FIELDS = {
   currency: "derived",
   notes: "never",
   conditionImmunities: "never",
+  // A creature's attitude is the GM's: players learn it from how the GM has them roll.
+  attitude: "never",
   legendary: "never",
   lastUsedAt: "never",
   firstClaimedAt: "never",

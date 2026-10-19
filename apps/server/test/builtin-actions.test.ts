@@ -34,6 +34,7 @@ describe("builtin action catalog", () => {
       "escape-grapple",
       "extinguish-fire",
       "help",
+      "help-check",
       "hide",
       "influence",
       "magic",

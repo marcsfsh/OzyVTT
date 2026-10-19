@@ -310,6 +310,9 @@ export const SetConditionSchema = z
       .max(60),
     active: z.boolean(),
     level: z.number().int().min(1).max(6).optional(),
+    /** GM only, for Charmed or Frightened: the charmer or the source of fear, which the rules then read (a charmed
+     *  creature can't harm its charmer; a frightened one can't move closer to its source). */
+    sourceActorId: z.uuid().optional(),
     /** Bypass a rules rejection (standing from Prone costs half Speed, on your own turn; a condition someone else
      *  imposed is theirs to end); audited. */ override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -457,8 +460,8 @@ export const SaveAnswerSchema = z
     commandId: z.uuid(),
     saveId: z.uuid(),
     /** "roll": the server throws the d20 (or takes `face`) and adds the save's modifier. "manual": GM only, `total` is
-     *  the final total as the GM rules it. */
-    method: z.enum(["roll", "manual"]),
+     *  the final total as the GM rules it. "fail": the creature chooses to fail without rolling (SRD Saving Throw). */
+    method: z.enum(["roll", "manual", "fail"]),
     /** GM only, with `method: "manual"`: the final total, used as given. */
     total: z.number().int().min(-20).max(60).optional(),
     /** A typed d20 for `method: "roll"`: the face a physical die shows (the one that counts). A player may type one only
@@ -728,9 +731,13 @@ export const CheckRollSchema = z
     face: z.number().int().min(1).max(20).optional(),
     /** The GM's choice of roll mode. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
-    /** The creature a Wisdom (Perception or Survival) check is made to find: the roller's Hunter's Mark on it gives
-     *  Advantage. */
+    /** The creature the check is about: one a Wisdom (Perception or Survival) check is made to find (the roller's
+     *  Hunter's Mark on it gives Advantage), or one a Charisma check interacts with (its charmer, its attitude and
+     *  Perfume give Advantage or Disadvantage). */
     findActorId: z.uuid().optional(),
+    /** What the check relies on, when the GM says: a Blinded roller fails one that needs sight, a Deafened one one
+     *  that needs hearing. */
+    sense: z.enum(["sight", "hearing"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -773,6 +780,9 @@ export const RollCallStartSchema = z
     /** A check the players roll blind: they see neither its result nor its DC. A save is never blind: its outcome
      *  lands on the character. */
     blind: z.boolean().optional(),
+    /** What a check relies on: a Blinded character fails one that needs sight, a Deafened one one that needs
+     *  hearing. */
+    sense: z.enum(["sight", "hearing"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -782,9 +792,12 @@ export const RollCallStartSchema = z
   .refine((payload) => payload.kind === "check" || payload.blind !== true, {
     error: "A saving throw can't be rolled blind: its outcome lands on the character."
   })
-  .refine((payload) => payload.kind === "check" || (payload.skill === undefined && payload.tool === undefined), {
-    error: "A saving throw takes no skill or tool."
-  })
+  .refine(
+    (payload) =>
+      payload.kind === "check" ||
+      (payload.skill === undefined && payload.tool === undefined && payload.sense === undefined),
+    { error: "A saving throw takes no skill, tool or sense." }
+  )
   .refine((payload) => new Set(payload.actorIds).size === payload.actorIds.length, {
     error: "Name each character once."
   });
@@ -910,6 +923,15 @@ export const SetHealthDisplaySchema = z
     commandId: z.uuid(),
     style: z.enum(["band", "bar", "ring", "aura"]),
     audience: z.enum(["gm", "all"]),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** SRD Influence: a monster's or NPC's attitude toward the party (GM). Indifferent is the default. */
+export const SetActorAttitudeSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    attitude: z.enum(["friendly", "indifferent", "hostile"]),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

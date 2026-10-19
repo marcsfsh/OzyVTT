@@ -11,6 +11,7 @@ import { aggregateRollMode, collectRiders, sumRiders } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import { checkPlan, passivePerception, toolAbility, toolProficiencies, type CheckNames } from "./ability-checks.js";
 import {
+  checkRiderBonus,
   EMPTY_DERIVATION,
   skillTierSources,
   type EquipmentCatalog,
@@ -112,7 +113,9 @@ export function deriveActorSheet(
     // Initiative is not reconciled onto the actor, so the live value is computed here; `actor.initiative`
     // still holds the instantiation-time number. `initiativeBonus` already includes Dexterity (a built
     // character's Dex modifier plus feats, a stat block's printed bonus).
-    initiative: (definition?.initiativeBonus ?? 0) + derivation.initiative,
+    // Initiative is a Dexterity check, so a bonus to ability checks reaches it too (a Stone of Good Luck).
+    initiative:
+      (definition?.initiativeBonus ?? 0) + derivation.initiative + checkRiderBonus(derivation, { ability: "dex" }),
     abilities,
     skills: derivedSkills,
     tools,
