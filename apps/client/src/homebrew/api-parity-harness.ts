@@ -466,6 +466,7 @@ const SAVE_LIFETIME_KEYS = [
   "failureMaxSize",
   "repeatDamageAgain",
   "repeatUnseenSource",
+  "repeatBeyondFeet",
   "endsOutOfSight",
   "autoSuccess.**",
   "endedBy.**",
