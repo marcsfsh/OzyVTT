@@ -571,7 +571,27 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `ring-of-djinni-summoning` - summoning a creature is not expressible.
+  // The djinni within 120 feet, Friendly and obeying the wearer while the wearer keeps Concentration, up to 1 hour; then
+  // 24 hours before it can be summoned again. "If you fail to command it, the djinni defends itself against attackers but takes no other actions." The ring
+  // becoming nonmagical when the djinni dies is the table's.
+  "ring-of-djinni-summoning": {
+    actions: [
+      {
+        id: "summon-djinni",
+        name: "Summon the Djinni",
+        activation: "action",
+        description:
+          "Summon the ring's Djinni in an unoccupied space you choose within 120 feet. It remains as long as you maintain Concentration, to a maximum of 1 hour, or until it drops to 0 Hit Points. It is Friendly to you and your allies and obeys your commands; uncommanded, it defends itself and takes no other actions. It can't be summoned again for 24 hours.",
+        uses: { limit: 1, per: "time", afterHours: "24" },
+        summons: {
+          creatures: [{ monsterId: "djinni" }],
+          rangeFeet: 120,
+          lasts: { type: "minutes", minutes: 60, concentration: true },
+          dodgesUncommanded: true
+        }
+      }
+    ]
+  },
   // `ring-of-elemental-command` - `versus-creature-type` is inert; the plane is a per-copy GM choice;
   // multi-charge spells.
 
@@ -1026,7 +1046,27 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `staff-of-the-python` - summoning a controlled creature is not expressible.
+  // Thrown within 10 feet, it becomes a Giant Constrictor Snake that shares its user's Initiative and acts right after,
+  // commanded within 60 feet, defending itself otherwise; a Bonus Action turns it back into the staff. The hour before
+  // it can be used again, and the staff shattering when the snake dies, are the table's.
+  "staff-of-the-python": {
+    actions: [
+      {
+        id: "snake",
+        name: "Throw the Staff",
+        activation: "action",
+        description:
+          "Throw the staff so that it lands in an unoccupied space within 10 feet, where it becomes a Giant Constrictor Snake under your control. It shares your Initiative count and takes its turn immediately after yours. You command it while it is within 60 feet of you; absent commands, it defends itself. A Bonus Action turns it back into the staff.",
+        summons: {
+          creatures: [{ monsterId: "giant-constrictor-snake" }],
+          rangeFeet: 10,
+          commandFeet: 60,
+          dodgesUncommanded: true,
+          dismiss: "bonus-action"
+        }
+      }
+    ]
+  },
 
   // The +2 Quarterstaff, the spells at their printed charge costs on the 6-charge pool, Tree Form and the +2 to spell
   // attack rolls; a 1 on the last charge's d20 leaves a nonmagical Quarterstaff.
@@ -1837,16 +1877,81 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `bag-of-devouring` - a trap with a percentage pull and instant death.
   // `bag-of-holding` - no capacity/container model (also `handy-haversack`, `efficient-quiver`, `portable-hole`).
 
-  // Charge-alone: three pulls a day. Which beast (a 1d8 table per bag color) is the GM's.
+  // Three pulls a day, one action per bag colour: the server rolls the d8 on that colour's table and the creature joins
+  // the map within 20 feet, acting right after its user, until the next dawn (a Long Rest) or 0 Hit Points.
   "bag-of-tricks": {
     actions: [
       {
-        id: "pull",
-        name: "Pull a Fuzzy Object",
+        id: "pull-gray",
+        name: "Pull a Fuzzy Object (Gray bag)",
         activation: "action",
         description:
-          "Pull the fuzzy object from the bag and throw it up to 20 feet. When the object lands, it transforms into a creature determined by rolling on the table for the bag's color. The creature vanishes at the next dawn or when it is reduced to 0 Hit Points. It is Friendly to you and your allies and acts immediately after you on your Initiative count.",
-        uses: { limit: 3, per: "long-rest", pool: "bag-of-tricks-charges" }
+          "Pull the fuzzy object from the gray bag and throw it up to 20 feet. When it lands, it becomes the creature a d8 picks on the gray bag's table. The creature vanishes at the next dawn or at 0 Hit Points. It is Friendly to you and your allies and acts immediately after you on your Initiative count; a Bonus Action commands how it moves and what it does on its next turn.",
+        uses: { limit: 3, per: "long-rest", pool: "bag-of-tricks-charges" },
+        summons: {
+          creatures: [
+            { monsterId: "weasel", faces: { from: 1, to: 1 } },
+            { monsterId: "giant-rat", faces: { from: 2, to: 2 } },
+            { monsterId: "badger", faces: { from: 3, to: 3 } },
+            { monsterId: "boar", faces: { from: 4, to: 4 } },
+            { monsterId: "panther", faces: { from: 5, to: 5 } },
+            { monsterId: "giant-badger", faces: { from: 6, to: 6 } },
+            { monsterId: "dire-wolf", faces: { from: 7, to: 7 } },
+            { monsterId: "giant-elk", faces: { from: 8, to: 8 } }
+          ],
+          die: 8,
+          rangeFeet: 20,
+          lasts: { type: "until-long-rest" },
+          commandedWith: "bonus-action"
+        }
+      },
+      {
+        id: "pull-rust",
+        name: "Pull a Fuzzy Object (Rust bag)",
+        activation: "action",
+        description:
+          "Pull the fuzzy object from the rust bag and throw it up to 20 feet. When it lands, it becomes the creature a d8 picks on the rust bag's table. The creature vanishes at the next dawn or at 0 Hit Points. It is Friendly to you and your allies and acts immediately after you on your Initiative count; a Bonus Action commands how it moves and what it does on its next turn.",
+        uses: { limit: 3, per: "long-rest", pool: "bag-of-tricks-charges" },
+        summons: {
+          creatures: [
+            { monsterId: "rat", faces: { from: 1, to: 1 } },
+            { monsterId: "owl", faces: { from: 2, to: 2 } },
+            { monsterId: "mastiff", faces: { from: 3, to: 3 } },
+            { monsterId: "goat", faces: { from: 4, to: 4 } },
+            { monsterId: "giant-goat", faces: { from: 5, to: 5 } },
+            { monsterId: "giant-boar", faces: { from: 6, to: 6 } },
+            { monsterId: "lion", faces: { from: 7, to: 7 } },
+            { monsterId: "brown-bear", faces: { from: 8, to: 8 } }
+          ],
+          die: 8,
+          rangeFeet: 20,
+          lasts: { type: "until-long-rest" },
+          commandedWith: "bonus-action"
+        }
+      },
+      {
+        id: "pull-tan",
+        name: "Pull a Fuzzy Object (Tan bag)",
+        activation: "action",
+        description:
+          "Pull the fuzzy object from the tan bag and throw it up to 20 feet. When it lands, it becomes the creature a d8 picks on the tan bag's table. The creature vanishes at the next dawn or at 0 Hit Points. It is Friendly to you and your allies and acts immediately after you on your Initiative count; a Bonus Action commands how it moves and what it does on its next turn.",
+        uses: { limit: 3, per: "long-rest", pool: "bag-of-tricks-charges" },
+        summons: {
+          creatures: [
+            { monsterId: "jackal", faces: { from: 1, to: 1 } },
+            { monsterId: "ape", faces: { from: 2, to: 2 } },
+            { monsterId: "baboon", faces: { from: 3, to: 3 } },
+            { monsterId: "axe-beak", faces: { from: 4, to: 4 } },
+            { monsterId: "black-bear", faces: { from: 5, to: 5 } },
+            { monsterId: "giant-weasel", faces: { from: 6, to: 6 } },
+            { monsterId: "giant-hyena", faces: { from: 7, to: 7 } },
+            { monsterId: "tiger", faces: { from: 8, to: 8 } }
+          ],
+          die: 8,
+          rangeFeet: 20,
+          lasts: { type: "until-long-rest" },
+          commandedWith: "bonus-action"
+        }
       }
     ]
   },
@@ -1857,8 +1962,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   /**
    * The four elemental-commanding items (`bowl-of-commanding-water-elementals`,
    * `brazier-of-commanding-fire-elementals`, `censer-of-controlling-air-elementals`,
-   * `stone-of-controlling-earth-elementals`): charge-alone at one use per dawn. The elemental itself
-   * is added by the GM; nothing mints an actor. Each description follows its own row's wording.
+   * `stone-of-controlling-earth-elementals`): once per dawn, the elemental joins the map on its user's side, acts right
+   * after its user, and leaves after 1 hour, at 0 Hit Points or when its user dismisses it as a Bonus Action. Being near
+   * the bowl or the brazier is the table's. Each description follows its own row's wording.
    */
   "bowl-of-commanding-water-elementals": {
     actions: [
@@ -1868,6 +1974,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "While this bowl is filled with water and you are within 5 feet of it, summon a Water Elemental. It appears in an unoccupied space as close to the bowl as possible, understands your languages, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action. The bowl can't be used this way again until the next dawn.",
+        summons: {
+          creatures: [{ monsterId: "water-elemental" }],
+          rangeFeet: 10,
+          lasts: { type: "minutes", minutes: 60 },
+          dismiss: "bonus-action"
+        },
         uses: { limit: 1, per: "long-rest", pool: "bowl-of-commanding-water-elementals-charges" }
       }
     ]
@@ -1880,6 +1992,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "While you are within 5 feet of this brazier, summon a Fire Elemental. It appears in an unoccupied space as close to the brazier as possible, understands your languages, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action. The brazier can't be used this way again until the next dawn.",
+        summons: {
+          creatures: [{ monsterId: "fire-elemental" }],
+          rangeFeet: 10,
+          lasts: { type: "minutes", minutes: 60 },
+          dismiss: "bonus-action"
+        },
         uses: { limit: 1, per: "long-rest", pool: "brazier-of-commanding-fire-elementals-charges" }
       }
     ]
@@ -1920,6 +2038,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "While gently swinging this censer, summon an Air Elemental. It appears in an unoccupied space as close to the censer as possible, understands your languages, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action. The censer can't be used this way again until the next dawn.",
+        summons: {
+          creatures: [{ monsterId: "air-elemental" }],
+          rangeFeet: 10,
+          lasts: { type: "minutes", minutes: 60 },
+          dismiss: "bonus-action"
+        },
         uses: { limit: 1, per: "long-rest", pool: "censer-of-controlling-air-elementals-charges" }
       }
     ]
@@ -2024,8 +2148,90 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `dust-of-dryness` - consumed pinches; its damage is gated on creature type.
   // `dust-of-sneezing-and-choking` - single use, and a trap.
   // `efficient-quiver` - a container.
-  // `efreeti-bottle` - a first-opening table governing later uses.
-  // `elemental-gem` - single use.
+  // Opened, an Efreeti appears within 30 feet and the server rolls the d10: on a 1 it attacks its user and leaves after 5
+  // rounds; on 2 to 9 it obeys for 1 hour; on a 10 it grants a Wish (the GM's) and leaves within the hour. That the
+  // first roll sets every later opening, the 24 hours between openings and the bottle losing its magic are the
+  // table's.
+  "efreeti-bottle": {
+    actions: [
+      {
+        id: "open",
+        name: "Open the Bottle",
+        activation: "action",
+        description:
+          "Remove the stopper: an Efreeti appears in an unoccupied space within 30 feet, and the d10 says what it does. 1: it attacks you, and disappears after fighting for 5 rounds. 2-9: it understands your languages and obeys your commands for 1 hour. 10: it can cast Wish once for you, and disappears when it grants the wish or after 1 hour.",
+        summons: {
+          creatures: [
+            { monsterId: "efreeti", faces: { from: 1, to: 1 }, allegiance: "hostile", rounds: 5 },
+            { monsterId: "efreeti", faces: { from: 2, to: 9 } },
+            { monsterId: "efreeti", faces: { from: 10, to: 10 } }
+          ],
+          die: 10,
+          rangeFeet: 30,
+          lasts: { type: "minutes", minutes: 60 }
+        }
+      }
+    ]
+  },
+  // Broken (a Utilize action), the gem summons the elemental its stone names, which obeys its user and acts right after
+  // it, for 1 hour, until it dies, or until a Bonus Action dismisses it. The gem is used up.
+  "elemental-gem": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "break-blue-sapphire",
+        name: "Break the Gem (Blue sapphire)",
+        activation: "action",
+        description:
+          "Break the blue sapphire: an Air Elemental appears in an unoccupied space as close to the gem as possible, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
+        summons: {
+          creatures: [{ monsterId: "air-elemental" }],
+          rangeFeet: 5,
+          lasts: { type: "minutes", minutes: 60 },
+          dismiss: "bonus-action"
+        }
+      },
+      {
+        id: "break-emerald",
+        name: "Break the Gem (Emerald)",
+        activation: "action",
+        description:
+          "Break the emerald: a Water Elemental appears in an unoccupied space as close to the gem as possible, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
+        summons: {
+          creatures: [{ monsterId: "water-elemental" }],
+          rangeFeet: 5,
+          lasts: { type: "minutes", minutes: 60 },
+          dismiss: "bonus-action"
+        }
+      },
+      {
+        id: "break-red-corundum",
+        name: "Break the Gem (Red corundum)",
+        activation: "action",
+        description:
+          "Break the red corundum: a Fire Elemental appears in an unoccupied space as close to the gem as possible, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
+        summons: {
+          creatures: [{ monsterId: "fire-elemental" }],
+          rangeFeet: 5,
+          lasts: { type: "minutes", minutes: 60 },
+          dismiss: "bonus-action"
+        }
+      },
+      {
+        id: "break-yellow-diamond",
+        name: "Break the Gem (Yellow diamond)",
+        activation: "action",
+        description:
+          "Break the yellow diamond: an Earth Elemental appears in an unoccupied space as close to the gem as possible, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action.",
+        summons: {
+          creatures: [{ monsterId: "earth-elemental" }],
+          rangeFeet: 5,
+          lasts: { type: "minutes", minutes: 60 },
+          dismiss: "bonus-action"
+        }
+      }
+    ]
+  },
   /** Opened, "smoke billows out of the bottle and fills a 60-foot Emanation originating from the bottle", Heavily
    *  Obscured, for 10 minutes. Not modeled: the cloud growing 10 feet a minute while it stays open, and a strong wind
    *  dispersing it. */
@@ -2042,8 +2248,160 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       }
     ]
   },
-  // `feather-token` - six single-use tokens in one row.
-  // `figurine-of-wondrous-power` - ten figurines, summons, multi-day cooldowns.
+  // The Bird token: "an enormous, multicolored bird ... has the statistics of a Roc, but it can't attack. It obeys your
+  // simple commands", until a Magic action dismisses it or it drops to 0 Hit Points. The token is used up. The Anchor,
+  // Fan and Swan Boat act on ships and water travel, and the Tree and the Whip are the table's.
+  "feather-token": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "bird",
+        name: "Toss the Bird Token",
+        activation: "action",
+        description:
+          "Toss the token 5 feet into the air: it disappears and an enormous, multicolored bird takes its place, with the statistics of a Roc, but it can't attack. It obeys your simple commands and carries up to 500 pounds at its full speed. It disappears after flying its maximum distance for a day or at 0 Hit Points; a Magic action dismisses it.",
+        summons: {
+          creatures: [{ monsterId: "roc" }],
+          rangeFeet: 5,
+          noAttacks: true,
+          dismiss: "action"
+        }
+      }
+    ]
+  },
+  // One action for each figurine (the Ivory Goats' three in one, picked by goat): thrown within 60 feet, it becomes its
+  // creature for its time, on its user's side and acting right after its user, defending itself when uncommanded; a
+  // Magic action turns it back, and then the figurine waits its days. The Ivory Goats' waits (one action for three
+  // goats with three waits), the Goat of Traveling's hourly charges, the Goat of Terror's fear and horns, the Onyx Dog's
+  // Blindsight and speech, the Obsidian Steed ignoring orders, and the Silver Raven (an item holds eight actions) are
+  // the table's.
+  "figurine-of-wondrous-power": {
+    actions: [
+      {
+        id: "bronze-griffon",
+        name: "Throw the Bronze Griffon",
+        activation: "action",
+        description:
+          "Throw the figurine to a point on the ground within 60 feet: it becomes a Griffon for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+        uses: { limit: 1, per: "time", afterHours: "120" },
+        summons: {
+          creatures: [{ monsterId: "griffon" }],
+          rangeFeet: 60,
+          lasts: { type: "minutes", minutes: 360 },
+          dodgesUncommanded: true,
+          dismiss: "action"
+        }
+      },
+      {
+        id: "ebony-fly",
+        name: "Throw the Ebony Fly",
+        activation: "action",
+        description:
+          "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Fly for up to 12 hours, which can be ridden as a mount. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+        uses: { limit: 1, per: "time", afterHours: "48" },
+        summons: {
+          creatures: [{ monsterId: "giant-fly" }],
+          rangeFeet: 60,
+          lasts: { type: "minutes", minutes: 720 },
+          dodgesUncommanded: true,
+          dismiss: "action"
+        }
+      },
+      {
+        id: "golden-lions",
+        name: "Throw the Golden Lions",
+        activation: "action",
+        description:
+          "Throw the figurine to a point on the ground within 60 feet: it becomes a Lion for up to 1 hour, one for each figurine of the pair thrown. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+        uses: { limit: 1, per: "time", afterHours: "168" },
+        summons: {
+          creatures: [{ monsterId: "lion", count: 2 }],
+          rangeFeet: 60,
+          lasts: { type: "minutes", minutes: 60 },
+          dodgesUncommanded: true,
+          dismiss: "action"
+        }
+      },
+      {
+        id: "ivory-goats",
+        name: "Throw the Ivory Goats",
+        activation: "action",
+        description:
+          "Throw the figurine to a point on the ground within 60 feet: it becomes the goat it is: the Goat of Terror a Giant Goat that can't attack, the Goat of Travail a Giant Goat, the Goat of Traveling a Large goat with the statistics of a Riding Horse; each for up to 3 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+        summons: {
+          creatures: [
+            { monsterId: "giant-goat", form: "terror", except: { name: "Goat of Terror" } },
+            { monsterId: "giant-goat", form: "travail", except: { name: "Goat of Travail" } },
+            { monsterId: "riding-horse", form: "traveling", except: { name: "Goat of Traveling" } }
+          ],
+          rangeFeet: 60,
+          lasts: { type: "minutes", minutes: 180 },
+          dodgesUncommanded: true,
+          dismiss: "action"
+        }
+      },
+      {
+        id: "marble-elephant",
+        name: "Throw the Marble Elephant",
+        activation: "action",
+        description:
+          "Throw the figurine to a point on the ground within 60 feet: it becomes an Elephant for up to 24 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+        uses: { limit: 1, per: "time", afterHours: "168" },
+        summons: {
+          creatures: [{ monsterId: "elephant" }],
+          rangeFeet: 60,
+          lasts: { type: "minutes", minutes: 1440 },
+          dodgesUncommanded: true,
+          dismiss: "action"
+        }
+      },
+      {
+        id: "obsidian-steed",
+        name: "Throw the Obsidian Steed",
+        activation: "action",
+        description:
+          "Throw the figurine to a point on the ground within 60 feet: it becomes a Nightmare for up to 24 hours, which fights only to defend itself. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+        uses: { limit: 1, per: "time", afterHours: "120" },
+        summons: {
+          creatures: [{ monsterId: "nightmare" }],
+          rangeFeet: 60,
+          lasts: { type: "minutes", minutes: 1440 },
+          dodgesUncommanded: true,
+          dismiss: "action"
+        }
+      },
+      {
+        id: "onyx-dog",
+        name: "Throw the Onyx Dog",
+        activation: "action",
+        description:
+          "Throw the figurine to a point on the ground within 60 feet: it becomes a Mastiff with an Intelligence of 8 for up to 6 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+        uses: { limit: 1, per: "time", afterHours: "168" },
+        summons: {
+          creatures: [{ monsterId: "mastiff", except: { abilityScores: { int: 8 } } }],
+          rangeFeet: 60,
+          lasts: { type: "minutes", minutes: 360 },
+          dodgesUncommanded: true,
+          dismiss: "action"
+        }
+      },
+      {
+        id: "serpentine-owl",
+        name: "Throw the Serpentine Owl",
+        activation: "action",
+        description:
+          "Throw the figurine to a point on the ground within 60 feet: it becomes a Giant Owl for up to 8 hours. The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.",
+        uses: { limit: 1, per: "time", afterHours: "48" },
+        summons: {
+          creatures: [{ monsterId: "giant-owl" }],
+          rangeFeet: 60,
+          lasts: { type: "minutes", minutes: 480 },
+          dodgesUncommanded: true,
+          dismiss: "action"
+        }
+      }
+    ]
+  },
   // `folding-boat` - a vehicle.
   // Its first command's light ("Bright Light in a 30-foot radius and Dim Light for an additional 30 feet"), lit and put
   // out on the row, and its beam (1 charge) and flare (5) on 50 charges that never return. The gem turning
@@ -2115,18 +2473,65 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `hat-of-many-spells` - a cast gated on an Arcana check outcome with a wild-magic table.
   // `horn-of-blasting` - authorable except its 20% chance to explode and damage the user; authoring
   //     only the blast would make it strictly better than printed.
-
-  // The 7-day wait only. The spirits (2 to 5 Berserkers by the horn's metal) are placed by the GM, and the four
-  // metals share one row, so the requirement isn't checked.
+  // One action for each metal: its number of Berserkers within 60 feet for 1 hour, obeying the user who meets the
+  // horn's requirement (checked on the sheet) and attacking one who doesn't, immune to Charmed and Frightened; then 7
+  // days before it sounds again.
   "horn-of-valhalla": {
     actions: [
       {
-        id: "blow",
-        name: "Blow the Horn",
+        id: "blow-silver",
+        name: "Blow the Horn (Silver)",
         activation: "action",
         description:
-          "Magic action: warrior spirits (Berserkers) appear within 60 feet of you for 1 hour: 2 from a silver horn, 3 from brass, 4 from bronze, 5 from iron. If you don't meet the horn's requirement, they attack you. The horn can't be used again until 7 days have passed.",
-        uses: { limit: 1, per: "time", afterHours: "168" }
+          "Blow the silver horn: 2 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: none. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
+        uses: { limit: 1, per: "time", afterHours: "168" },
+        summons: {
+          creatures: [{ monsterId: "berserker", count: 2, except: { conditionImmunities: ["charmed", "frightened"] } }],
+          rangeFeet: 60,
+          lasts: { type: "minutes", minutes: 60 }
+        }
+      },
+      {
+        id: "blow-brass",
+        name: "Blow the Horn (Brass)",
+        activation: "action",
+        description:
+          "Blow the brass horn: 3 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: Proficiency with all Simple weapons. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
+        uses: { limit: 1, per: "time", afterHours: "168" },
+        summons: {
+          creatures: [{ monsterId: "berserker", count: 3, except: { conditionImmunities: ["charmed", "frightened"] } }],
+          rangeFeet: 60,
+          lasts: { type: "minutes", minutes: 60 },
+          obeysWith: { weapons: "simple" }
+        }
+      },
+      {
+        id: "blow-bronze",
+        name: "Blow the Horn (Bronze)",
+        activation: "action",
+        description:
+          "Blow the bronze horn: 4 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: Training with all Medium armor. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
+        uses: { limit: 1, per: "time", afterHours: "168" },
+        summons: {
+          creatures: [{ monsterId: "berserker", count: 4, except: { conditionImmunities: ["charmed", "frightened"] } }],
+          rangeFeet: 60,
+          lasts: { type: "minutes", minutes: 60 },
+          obeysWith: { armor: "medium" }
+        }
+      },
+      {
+        id: "blow-iron",
+        name: "Blow the Horn (Iron)",
+        activation: "action",
+        description:
+          "Blow the iron horn: 5 warrior spirits from Ysgard appear in unoccupied spaces within 60 feet, each using the Berserker stat block, with Immunity to the Charmed and Frightened conditions. They return to Ysgard after 1 hour or at 0 Hit Points. Requirement: Proficiency with all Martial weapons. If you meet it, they are Friendly to you and your allies and follow your commands; if not, they attack you.",
+        uses: { limit: 1, per: "time", afterHours: "168" },
+        summons: {
+          creatures: [{ monsterId: "berserker", count: 5, except: { conditionImmunities: ["charmed", "frightened"] } }],
+          rangeFeet: 60,
+          lasts: { type: "minutes", minutes: 60 },
+          obeysWith: { weapons: "martial" }
+        }
       }
     ]
   },
@@ -2284,6 +2689,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "While touching this stone to the ground, summon an Earth Elemental. It appears in an unoccupied space you choose within 30 feet of yourself, obeys your commands, and takes its turn immediately after you on your Initiative count. It disappears after 1 hour, when it dies, or when you dismiss it as a Bonus Action. The stone can't be used this way again until the next dawn.",
+        summons: {
+          creatures: [{ monsterId: "earth-elemental" }],
+          rangeFeet: 30,
+          lasts: { type: "minutes", minutes: 60 },
+          dismiss: "bonus-action"
+        },
         uses: { limit: 1, per: "long-rest", pool: "stone-of-controlling-earth-elementals-charges" }
       }
     ]

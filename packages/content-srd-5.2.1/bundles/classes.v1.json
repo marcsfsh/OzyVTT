@@ -4012,7 +4012,14 @@
        "id": "find-familiar",
        "level": 1,
        "alwaysPrepared": true,
-       "withoutSlot": "free"
+       "withoutSlot": "free",
+       "asMagicAction": "every-casting",
+       "summon": {
+        "creatureTypes": [
+         "fey"
+        ],
+        "untilLongRest": true
+       }
       }
      ]
     }
@@ -11228,7 +11235,33 @@
          {
           "id": "find-familiar",
           "level": 1,
-          "withoutSlot": "at-will"
+          "withoutSlot": "at-will",
+          "asMagicAction": "without-slot",
+          "summon": {
+           "moreCreatures": [
+            {
+             "monsterId": "imp"
+            },
+            {
+             "monsterId": "pseudodragon"
+            },
+            {
+             "monsterId": "quasit"
+            },
+            {
+             "monsterId": "skeleton"
+            },
+            {
+             "monsterId": "sphinx-of-wonder"
+            },
+            {
+             "monsterId": "sprite"
+            },
+            {
+             "monsterId": "venomous-snake"
+            }
+           ]
+          }
          }
         ]
        }

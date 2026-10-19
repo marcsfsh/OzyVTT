@@ -52,16 +52,16 @@ describe("a pool that comes back after a time", () => {
     const { line } = spendUses(
       table.state,
       IDS.wizard,
-      "item-horn-of-valhalla-blow",
+      "item-horn-of-valhalla-blow-silver",
       1,
       { role: "gm" },
       { resolveDefinition: table.resolve, catalog, random: () => 1 }
     );
-    expect(line).toBe("Blow the Horn can be used again in 7 days.");
+    expect(line).toBe("Blow the Horn (Silver) can be used again in 7 days.");
     passTime(table.state, 167, 0, depsOf(table, 1));
-    expect(spent(table, "item-horn-of-valhalla-blow")).toBe(1);
+    expect(spent(table, "item-horn-of-valhalla-blow-silver")).toBe(1);
     passTime(table.state, 1, 0, depsOf(table, 1));
-    expect(spent(table, "item-horn-of-valhalla-blow")).toBe(0);
+    expect(spent(table, "item-horn-of-valhalla-blow-silver")).toBe(0);
   });
 });
 

@@ -127,6 +127,8 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "condition.down": () => "You can't act at 0 Hit Points.",
   "condition.imposed": () => "It ends by its own rules or the GM's say.",
   "condition.raging": () => "You can't cast spells while raging.",
+  "summon.cant-attack": () => "This creature can't attack.",
+  "summon.command": () => "Your command doesn't reach that far.",
   "condition.no-reactions": () => "You can't take Reactions now.",
   "condition.no-spells": () => "You can't cast spells now.",
   "condition.cant-attack": () => "You can't attack now.",

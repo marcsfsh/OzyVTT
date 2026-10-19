@@ -2,6 +2,7 @@ import {
   actionChoicesOf,
   owedDamageParts,
   owedDamageTotal,
+  summonChoicesOf,
   type ActionAvailability,
   type ActionResolution,
   type GameState
@@ -50,6 +51,7 @@ import { formsOffer } from "./transform/offer.js";
 import { applyMovementGrants } from "./resolution/movement-grants.js";
 import { applyTimeStop } from "./time-stop.js";
 import { applySpellEndings } from "./resolution/dispel.js";
+import { applySummons } from "./resolution/summon.js";
 import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
@@ -233,6 +235,7 @@ export function resolveDefinitionAction(
   applyMovementGrants(ctx);
   applyTimeStop(ctx);
   applyGrant(ctx);
+  applySummons(ctx);
   applyShapeShift(ctx);
   placeCastSight(ctx);
   refuseThePrayedFor(ctx);
@@ -356,6 +359,7 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
     ...(ctx.healing ? { healing: ctx.healing } : {}),
     ...(ctx.opens ? { opens: ctx.opens } : {}),
     ...(damageTargets ? { damageTargets } : {}),
+    ...(ctx.summoned && ctx.summoned.length > 0 ? { summoned: ctx.summoned } : {}),
     ...(knocksOut(ctx) ? { knockOut: "chosen" as const } : {})
   };
 }
@@ -471,6 +475,8 @@ export function actionAvailability(
       ...(conditionChoicesOf(action, spell).length > 0
         ? { conditionChoices: [...conditionChoicesOf(action, spell)] as SaveCondition[] }
         : {}),
+      // The creature a summon brings and its creature type, picked as it is used (Find Familiar's forms).
+      ...(summonChoicesOf(action.summons) ? { summonChoices: summonChoicesOf(action.summons)! } : {}),
       // An option, one for each target, or the weapon a grant binds to (Fire Shield, Bestow Curse, Magic Weapon).
       ...(actionChoicesOf(action) ? { choices: structuredClone(actionChoicesOf(action)!) } : {}),
       // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.

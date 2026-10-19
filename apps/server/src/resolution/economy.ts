@@ -193,6 +193,7 @@ export function evaluateActionEconomy(
     notes: []
   };
   checkAbleToAct(evaluation);
+  checkCommandedLimits(evaluation);
   // What the creature's form keeps it from doing (no spells in Wild Shape, a werewolf's Bite only in wolf form).
   evaluation.violations.push(
     ...formViolations(
@@ -606,6 +607,13 @@ function checkAbleToAct({ state, attacker, action, resolveDefinition, violations
       message: `${action.name} requires an active ${conditionLabel(action.requiresEffectTag)} effect.`
     });
   }
+}
+
+/** What a commanded creature can't do (SRD 5.2.1 Find Familiar: "A familiar can't attack, but it can take other
+ *  actions as normal"). */
+function checkCommandedLimits({ attacker, action, violations }: Evaluation): void {
+  if (attacker.control?.noAttacks && (action.attack !== undefined || action.multiattack !== undefined))
+    violations.push({ rule: "summon.cant-attack", message: `${attacker.name} can't attack.` });
 }
 
 /** An extra attack (SRD Light, Cleave) is owed only once the swing that opens it has happened this turn: an attack

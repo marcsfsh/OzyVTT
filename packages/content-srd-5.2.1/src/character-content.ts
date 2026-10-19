@@ -22,6 +22,7 @@ import {
   PickBudgetScalingSchema,
   SaveFailureEffectSchema,
   SaveOutcomeFields,
+  SummonCreatureSchema,
   type Modifier
 } from "@vtt/schemas";
 
@@ -356,7 +357,22 @@ export const FeatureGrantsFieldsSchema = z
              *  per Long Rest), "at-will" costs nothing (Armor of Shadows). Absent: only with a slot. */
             withoutSlot: z.enum(["free", "at-will"]).optional(),
             /** False when it can be cast only without a slot (an invocation's spell the Warlock does not know). */
-            withSlot: z.boolean().default(true)
+            withSlot: z.boolean().default(true),
+            /** Which of its castings are a Magic action, whatever the spell's casting time: the one without a slot
+             *  (Pact of the Chain's Find Familiar) or every one the feature gives (Wild Companion's). */
+            asMagicAction: z.enum(["without-slot", "every-casting"]).optional(),
+            /** How the feature changes the creatures the spell brings when cast this way: the creature type it takes
+             *  (Wild Companion's Fey familiar), that it leaves when its caster finishes a Long Rest, more forms to pick
+             *  (Pact of the Chain), and casting it without Concentration for a minute (Dragon Companion). */
+            summon: z
+              .object({
+                creatureTypes: z.array(ContentIdSchema).min(1).max(6).optional(),
+                untilLongRest: z.literal(true).optional(),
+                moreCreatures: z.array(SummonCreatureSchema).min(1).max(12).optional(),
+                concentrationOptional: z.literal(true).optional()
+              })
+              .strict()
+              .optional()
           })
           .strict()
       )

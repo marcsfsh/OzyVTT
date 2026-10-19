@@ -30,7 +30,7 @@ describe("the coverage of a monster's action", () => {
     expect(row("Adult Red Dragon: Spellcasting").state).toBe("enforced");
     const lich = row("Lich: Spellcasting");
     expect(lich.state).toBe("guided");
-    expect(lich.note).toMatch(/Animate Dead, Dimension Door, Plane Shift apply only as their own rows say\.$/);
+    expect(lich.note).toMatch(/Dimension Door, Plane Shift apply only as their own rows say\.$/);
     expect(lich.note).not.toMatch(/Detect Magic|Scrying/);
   });
 

@@ -39,13 +39,13 @@ describe("the census: every API-authorable key the editor cannot reach, held to 
   it("pins the walk: the plan's two schema-intrinsic counts, and this file's own expansion", () => {
     // `objectSchemas`/`declaredKeys` are properties of the schemas; the counts below are properties
     // of the canonicaliser. When a schema or control change moves them, re-pin in the same change.
-    expect(stats).toEqual({ objectSchemas: 317, declaredKeys: 1723 });
+    expect(stats).toEqual({ objectSchemas: 339, declaredKeys: 1841 });
     expect({
       asked: results.length,
       covered: results.filter((result) => result.covered).length,
       forced: results.filter((result) => !result.covered && isSystemForced(result.address)).length,
       open: open.length
-    }).toEqual({ asked: 37642, covered: 20749, forced: 296, open: 16597 });
+    }).toEqual({ asked: 39425, covered: 20749, forced: 297, open: 18379 });
   });
 
   it("holds the open set to the exemption table exactly, in both directions", () => {
