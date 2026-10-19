@@ -48,7 +48,10 @@ const modeOf = (state: GameState, ability: "wis" | "dex", skill: string) =>
   checkPlan(lyra(state), sheet, deriveEquipment(lyra(state), sheet, undefined), { ability, skill }).rollMode.mode;
 const passive = (state: GameState) =>
   passivePerception(
-    checkPlan(lyra(state), sheet, deriveEquipment(lyra(state), sheet, undefined), { ability: "wis", skill: "perception" })
+    checkPlan(lyra(state), sheet, deriveEquipment(lyra(state), sheet, undefined), {
+      ability: "wis",
+      skill: "perception"
+    })
   );
 
 describe("travel pace on the party's checks", () => {
