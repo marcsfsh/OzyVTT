@@ -2181,7 +2181,10 @@ export const InventoryItemSchema = z
     magic: ItemMagicMarkerSchema.optional(),
     /** A copy whose magic is spent for now: a manual or tome after its study (`character.study-item`), until it
      *  regains it in a century. The server keeps it. */
-    dormant: z.boolean().optional()
+    dormant: z.boolean().optional(),
+    /** Identify was cast on this copy: its carrier's player learns its kind and the type the GM picked without
+     *  attuning to it. Only the cast sets it; the server keeps it. */
+    identified: z.literal(true).optional()
   })
   .strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
@@ -4493,6 +4496,11 @@ export const ActionSchema = z
       .literal(true)
       .optional()
       .describe("The cast picks a destination's familiarity and rolls on the Teleportation Outcome table"),
+    /** Identify: the cast names one item its caster carries (`itemId`), whose kind its player then learns. */
+    identifiesItem: z
+      .literal(true)
+      .optional()
+      .describe("The cast names a carried item (itemId) whose properties its caster learns"),
     /** Hit points each target regains, rolled once and applied when the action resolves (Cure Wounds). */
     healing: z
       .object({

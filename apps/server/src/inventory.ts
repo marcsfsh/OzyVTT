@@ -384,6 +384,17 @@ function keepDormant(stored: InventoryItem | undefined, item: InventoryItem): In
   return stored?.dormant ? { ...rest, dormant: true } : rest;
 }
 
+/** What only a cast writes on a row: Identify's mark and the spells a Ring of Spell Storing holds. A sheet write keeps
+ *  the stored ones and can't add any. */
+function keepCastMarks(stored: InventoryItem | undefined, item: InventoryItem): InventoryItem {
+  const { identified: _identified, storedCasts: _casts, ...rest } = item;
+  return {
+    ...rest,
+    ...(stored?.identified ? { identified: true as const } : {}),
+    ...(stored?.storedCasts ? { storedCasts: structuredClone(stored.storedCasts) } : {})
+  };
+}
+
 /** SRD Ephemeral (a will-o'-wisp): "The wisp can't wear or carry anything." */
 function refuseToCarry(actor: Actor, definition: ActorDefinition | undefined): void {
   if (holdsFeature(definition, "ephemeral", "Ephemeral"))
@@ -449,6 +460,10 @@ export function setInventoryItem(
     deps.catalog
   );
   item = keepDormant(
+    actor.inventory.find((entry) => entry.id === item.id),
+    item
+  );
+  item = keepCastMarks(
     actor.inventory.find((entry) => entry.id === item.id),
     item
   );

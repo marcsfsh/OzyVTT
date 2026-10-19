@@ -57,6 +57,11 @@ export function checkChoices(
   if (Object.keys(input.targetOptions ?? {}).some((id) => !input.targetIds.includes(id)))
     throw new CommandRejectedError("Each choice must be for one of the action's targets.");
   const binds = action.grants?.bindsWeapon;
+  if (action.identifiesItem) {
+    if (input.itemId != null && !attacker.inventory.some((row) => row.id === input.itemId && row.quantity > 0))
+      throw new CommandRejectedError(`${attacker.name} isn't carrying that item.`);
+    return;
+  }
   if (input.itemId != null && !binds) throw new CommandRejectedError(`${action.name} isn't cast on a weapon.`);
   if (binds && input.itemId != null && action.grants!.target === "self")
     fittingRow(attacker, binds, input.itemId, catalog, action.name, definition);

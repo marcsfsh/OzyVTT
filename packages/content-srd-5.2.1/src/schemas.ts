@@ -268,6 +268,8 @@ export const SpellEffectSchema = z
     /** The caster picks how familiar the destination is and the d100 is rolled on the Teleportation Outcome table
      *  (Teleport). */
     teleportOutcome: z.literal(true).optional(),
+    /** The cast names an item its caster carries and learns its properties (Identify). */
+    identifiesItem: z.literal(true).optional(),
     /** The spell's save is not made when it is cast but later (Spirit Guardians, Web) or never by its target
      *  (Haste, Sanctuary): the cast prompts none. `laterActions` carries one the engine can roll. */
     noCastSave: z.literal(true).optional(),

@@ -802,10 +802,11 @@ const PARTY_FIELDS = (Object.keys(PLAYER_ACTOR_FIELDS) as (keyof Actor)[]).filte
  *  attunement is (an Ioun Stone's). */
 function playerInventoryRow(item: Actor["inventory"][number]): Actor["inventory"][number] {
   const { chosenDamageType, variantId, storedCasts, ...row } = item;
-  const learned = item.attuned || item.magic?.attunementRequired !== true;
+  // Identify tells its caster what attuning would: the copy's kind and the type the GM picked.
+  const learned = item.attuned || item.identified === true || item.magic?.attunementRequired !== true;
   return {
     ...row,
-    ...(chosenDamageType !== undefined && item.attuned ? { chosenDamageType } : {}),
+    ...(chosenDamageType !== undefined && (item.attuned || item.identified === true) ? { chosenDamageType } : {}),
     ...(variantId !== undefined && learned ? { variantId } : {}),
     // The spells a Ring of Spell Storing holds are known to the creature attuned to it, which casts them.
     ...(storedCasts !== undefined && item.attuned ? { storedCasts } : {})

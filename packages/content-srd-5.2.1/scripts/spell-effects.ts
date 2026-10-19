@@ -2793,6 +2793,7 @@ export function spellEffectFor(
     // "If you roll an 8 on a d8 for this spell, you can roll another d8, and add it to the damage."
     ...(id === "sorcerous-burst" ? { explodingDice: true as const } : {}),
     ...(id === "teleport" ? { teleportOutcome: true as const } : {}),
+    ...(id === "identify" ? { identifiesItem: true as const } : {}),
     ...(NO_CAST_SAVE.has(id) ? { noCastSave: true as const } : {}),
     ...(later ? { laterActions: later.map((row) => ({ ...row, damage: [...row.damage] })) } : {}),
     ...(darts ? { darts } : {}),

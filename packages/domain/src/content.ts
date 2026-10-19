@@ -891,6 +891,8 @@ export type ActionChoices = Readonly<{
   options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
   optionsPerTarget?: true;
   bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true }>;
+  /** Any item the user carries may be named (Identify). */
+  pickItem?: true;
 }>;
 /** Teleport's familiarity picks, the rows of its Teleportation Outcome table. */
 export const TELEPORT_FAMILIARITY: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
@@ -903,6 +905,7 @@ export const TELEPORT_FAMILIARITY: ReadonlyArray<Readonly<{ id: string; name: st
 ];
 type ChoosingAction = Readonly<{
   teleportOutcome?: true;
+  identifiesItem?: true;
   grants?: Readonly<{
     options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
     optionsPerTarget?: true;
@@ -923,7 +926,7 @@ export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
       ? { options: TELEPORT_FAMILIARITY }
       : action.save?.failureEffect;
   const binds = action.grants?.bindsWeapon;
-  if (!chooser?.options && !binds) return null;
+  if (!chooser?.options && !binds && !action.identifiesItem) return null;
   return {
     ...(chooser?.options ? { options: chooser.options.map((option) => ({ id: option.id, name: option.name })) } : {}),
     ...(chooser && "optionsPerTarget" in chooser && chooser.optionsPerTarget
@@ -936,7 +939,8 @@ export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
             ...(binds.melee ? { melee: true as const } : {})
           }
         }
-      : {})
+      : {}),
+    ...(action.identifiesItem ? { pickItem: true as const } : {})
   };
 }
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */
