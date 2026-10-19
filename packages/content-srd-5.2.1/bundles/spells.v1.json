@@ -452,7 +452,8 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "endsOnSourceSideDamage": true
   },
   "target": {
    "type": "creature",
@@ -548,6 +549,43 @@
   },
   "duration": "24 hours",
   "concentration": false,
+  "upcastDurations": [
+   {
+    "level": 3,
+    "duration": "72 hours",
+    "concentration": false
+   },
+   {
+    "level": 4,
+    "duration": "120 hours",
+    "concentration": false
+   },
+   {
+    "level": 5,
+    "duration": "168 hours",
+    "concentration": false
+   },
+   {
+    "level": 6,
+    "duration": "216 hours",
+    "concentration": false
+   },
+   {
+    "level": 7,
+    "duration": "264 hours",
+    "concentration": false
+   },
+   {
+    "level": 8,
+    "duration": "312 hours",
+    "concentration": false
+   },
+   {
+    "level": 9,
+    "duration": "360 hours",
+    "concentration": false
+   }
+  ],
   "ritual": true,
   "attackRoll": false,
   "damage": {
@@ -1741,7 +1779,8 @@
     "target": "target",
     "duration": {
      "type": "manual"
-    }
+    },
+    "armorClassFloor": 17
    }
   },
   "classes": [
@@ -1891,6 +1930,28 @@
   },
   "duration": "1 minute",
   "concentration": true,
+  "upcastDurations": [
+   {
+    "level": 4,
+    "duration": "10 minutes",
+    "concentration": true
+   },
+   {
+    "level": 5,
+    "duration": "8 hours",
+    "concentration": false
+   },
+   {
+    "level": 7,
+    "duration": "24 hours",
+    "concentration": false
+   },
+   {
+    "level": 9,
+    "duration": "until dispelled",
+    "concentration": false
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -1913,7 +1974,14 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Bestow Curse",
+    "tags": [
+     "curse"
+    ],
+    "modifiers": []
+   }
   },
   "classes": [
    "bard",
@@ -2972,7 +3040,8 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "endsOnSourceSideDamage": true
   },
   "target": {
    "type": "creature",
@@ -3063,7 +3132,8 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "endsOnSourceSideDamage": true
   },
   "target": {
    "type": "creature",
@@ -4419,7 +4489,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 10,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -4447,7 +4521,17 @@
        "formula": "8d8",
        "type": "lightning"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "enter",
+       "start-turn"
+      ],
+      "around": "point",
+      "feet": 10,
+      "affects": "enemies",
+      "holdsOne": true
+     }
     }
    ],
    "healing": null
@@ -4838,7 +4922,11 @@
    "successDamage": "none",
    "failureConditions": [
     "incapacitated"
-   ]
+   ],
+   "failureDuration": {
+    "type": "until-rest",
+    "rest": "long"
+   }
   },
   "target": {
    "type": "creature",
@@ -4848,8 +4936,16 @@
   "area": null,
   "effect": {
    "attacks": 0,
-   "damage": [],
-   "healing": null
+   "damage": [
+    {
+     "formula": "6d6",
+     "type": "psychic"
+    }
+   ],
+   "healing": null,
+   "selfSave": {
+    "dc": 15
+   }
   },
   "classes": [
    "warlock",
@@ -5904,6 +6000,12 @@
       "shape": "sphere",
       "sizeFeet": 20,
       "widthFeet": null
+     },
+     "zone": {
+      "on": [
+       "spell-end"
+      ],
+      "grows": true
      }
     }
    ],
@@ -6439,7 +6541,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "dispel": {
+    "automaticLevel": 3
+   }
   },
   "classes": [
    "bard",
@@ -6909,6 +7014,23 @@
   },
   "duration": "1 minute",
   "concentration": true,
+  "upcastDurations": [
+   {
+    "level": 5,
+    "duration": "10 minutes",
+    "concentration": true
+   },
+   {
+    "level": 6,
+    "duration": "1 hour",
+    "concentration": true
+   },
+   {
+    "level": 7,
+    "duration": "8 hours",
+    "concentration": true
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -6997,6 +7119,13 @@
   },
   "duration": "1 hour",
   "concentration": true,
+  "upcastDurations": [
+   {
+    "level": 9,
+    "duration": "8 hours",
+    "concentration": true
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -7062,6 +7191,23 @@
   },
   "duration": "1 minute",
   "concentration": true,
+  "upcastDurations": [
+   {
+    "level": 6,
+    "duration": "10 minutes",
+    "concentration": true
+   },
+   {
+    "level": 7,
+    "duration": "1 hour",
+    "concentration": true
+   },
+   {
+    "level": 8,
+    "duration": "8 hours",
+    "concentration": true
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -7410,7 +7556,8 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "persistsWithoutTargets": true
   },
   "classes": [
    "cleric",
@@ -7875,7 +8022,8 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "persistsWithoutTargets": true
   },
   "classes": [
    "druid",
@@ -8276,7 +8424,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "sphere",
+   "sizeFeet": 5,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -8296,7 +8448,15 @@
        "formula": "4d8",
        "type": "force"
       }
-     ]
+     ],
+     "zone": {
+      "on": [
+       "caster-turn-start"
+      ],
+      "around": "point",
+      "feet": 5,
+      "affects": "enemies"
+     }
     }
    ],
    "healing": null
@@ -10331,6 +10491,18 @@
   },
   "duration": "30 days",
   "concentration": false,
+  "upcastDurations": [
+   {
+    "level": 7,
+    "duration": "365 days",
+    "concentration": false
+   },
+   {
+    "level": 9,
+    "duration": "until dispelled",
+    "concentration": false
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -10355,7 +10527,14 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Geas",
+    "tags": [
+     "curse"
+    ],
+    "modifiers": []
+   }
   },
   "classes": [
    "bard",
@@ -11204,8 +11383,7 @@
     "target": "target",
     "onHit": true,
     "duration": {
-     "type": "rounds",
-     "rounds": 2
+     "type": "until-source-turn-end"
     }
    }
   },
@@ -11568,6 +11746,7 @@
      "type": "rounds",
      "rounds": 10
     },
+    "speedMultiplier": 2,
     "armorClassBonus": 2
    }
   },
@@ -12181,6 +12360,23 @@
   },
   "duration": "1 hour",
   "concentration": true,
+  "upcastDurations": [
+   {
+    "level": 2,
+    "duration": "4 hours",
+    "concentration": true
+   },
+   {
+    "level": 3,
+    "duration": "8 hours",
+    "concentration": true
+   },
+   {
+    "level": 5,
+    "duration": "24 hours",
+    "concentration": true
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -12232,7 +12428,8 @@
     "concentration": false,
     "name": "Hex",
     "tags": [
-     "hexed"
+     "hexed",
+     "curse"
     ],
     "target": "target",
     "duration": {
@@ -12666,6 +12863,18 @@
   },
   "duration": "1 hour",
   "concentration": true,
+  "upcastDurations": [
+   {
+    "level": 3,
+    "duration": "8 hours",
+    "concentration": true
+   },
+   {
+    "level": 5,
+    "duration": "24 hours",
+    "concentration": true
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -14522,7 +14731,8 @@
     "target": "target",
     "duration": {
      "type": "manual"
-    }
+    },
+    "baseArmorClass": 13
    }
   },
   "classes": [
@@ -14603,6 +14813,38 @@
   },
   "duration": "1 hour",
   "concentration": false,
+  "upcastDurations": [
+   {
+    "level": 4,
+    "duration": "2 hours",
+    "concentration": false
+   },
+   {
+    "level": 5,
+    "duration": "3 hours",
+    "concentration": false
+   },
+   {
+    "level": 6,
+    "duration": "4 hours",
+    "concentration": false
+   },
+   {
+    "level": 7,
+    "duration": "5 hours",
+    "concentration": false
+   },
+   {
+    "level": 8,
+    "duration": "6 hours",
+    "concentration": false
+   },
+   {
+    "level": 9,
+    "duration": "7 hours",
+    "concentration": false
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -15046,6 +15288,13 @@
   },
   "duration": "10 minutes",
   "concentration": true,
+  "upcastDurations": [
+   {
+    "level": 4,
+    "duration": "until dispelled",
+    "concentration": false
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -15372,6 +15621,23 @@
   },
   "duration": "24 hours",
   "concentration": false,
+  "upcastDurations": [
+   {
+    "level": 7,
+    "duration": "10 days",
+    "concentration": false
+   },
+   {
+    "level": 8,
+    "duration": "30 days",
+    "concentration": false
+   },
+   {
+    "level": 9,
+    "duration": "366 days",
+    "concentration": false
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -15383,7 +15649,8 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "endsOnSourceSideDamage": true
   },
   "target": {
    "type": "creature",
@@ -16587,7 +16854,8 @@
   "save": {
    "ability": "wis",
    "successDamage": "half",
-   "failureConditions": []
+   "failureConditions": [],
+   "repeatSave": true
   },
   "target": {
    "type": "creature",
@@ -16606,7 +16874,25 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Phantasmal Killer",
+    "tags": [
+     "phantasmal-killer"
+    ],
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "attack",
+      "mode": "disadvantage"
+     },
+     {
+      "type": "roll-mode",
+      "roll": "check",
+      "mode": "disadvantage"
+     }
+    ]
+   }
   },
   "classes": [
    "bard",
@@ -16760,6 +17046,28 @@
   },
   "duration": "24 hours",
   "concentration": false,
+  "upcastDurations": [
+   {
+    "level": 6,
+    "duration": "10 days",
+    "concentration": false
+   },
+   {
+    "level": 7,
+    "duration": "30 days",
+    "concentration": false
+   },
+   {
+    "level": 8,
+    "duration": "180 days",
+    "concentration": false
+   },
+   {
+    "level": 9,
+    "duration": "366 days",
+    "concentration": false
+   }
+  ],
   "ritual": false,
   "attackRoll": false,
   "damage": {
@@ -18482,7 +18790,8 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "endsCurses": true
   },
   "classes": [
    "cleric",
@@ -21432,7 +21741,8 @@
      "type": "thunder"
     }
    ],
-   "healing": null
+   "healing": null,
+   "persistsWithoutTargets": true
   },
   "classes": [
    "druid"
@@ -21473,7 +21783,8 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "endsOnSourceSideDamage": true
   },
   "target": {
    "type": "creature",
