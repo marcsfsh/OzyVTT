@@ -12,7 +12,9 @@ import { pruneEndedSight } from "../src/vision/cast-sight.js";
 import { mapCover } from "../src/cover.js";
 import { sceneSight } from "../src/vision/sight.js";
 import { movementCost } from "../src/terrain.js";
-import { fight, FOE, HERO } from "./spell-casters.js";
+import { actionAvailability } from "../src/action-resolution.js";
+import { effectiveActions } from "../src/effective-actions.js";
+import { catalog, fight, FOE, HERO } from "./spell-casters.js";
 import { carry, cell, GRID, place, wizardAt } from "./zone-fixtures.js";
 
 // SRD 5.2.1 spells that change the map's walls and doors: Wall of Force, Wall of Stone, Wall of Ice, Forcecage and the
@@ -249,6 +251,22 @@ describe("spells aimed at a door", () => {
     const doorOf = () => caster.state.combat.vision.walls.find((wall) => wall.id === DOOR)!;
     return { ...caster, doorOf };
   }
+
+  it("is aimed at one thing on the map, so the turn list starts aiming it", () => {
+    const definition = wizardAt(9, ["knock", "arcane-lock", "passwall"]);
+    const { state, hero } = fight(definition);
+    const rows = actionAvailability(
+      state,
+      hero,
+      effectiveActions(definition, hero, catalog),
+      definition,
+      false,
+      undefined,
+      catalog
+    );
+    for (const id of ["spell-knock", "spell-arcane-lock", "spell-passwall"])
+      expect(rows.find((row) => row.id === id)?.targeting).toBe("single");
+  });
 
   it("Knock unlocks a locked door it can see within 60 feet", () => {
     const caster = doorway(["knock"]);

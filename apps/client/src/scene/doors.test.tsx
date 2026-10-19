@@ -29,6 +29,7 @@ vi.mock("./gridPreview", async (original) => ({
 
 import { beginTargeting, clearTargeting } from "../encounter/targeting";
 import { EncounterMap } from "./EncounterMap";
+import { TokenContextMenu } from "./TokenContextMenu";
 
 // Doors and objects on the map: the GM sees which doors are held shut and the hit points of a wall or door that is an
 // object, and sets them from a door's menu; a player opens a door or works on it with their character from the same
@@ -83,6 +84,31 @@ const playerVision: PlayerVision = {
     { id: DOOR, kind: "door", a: lockedDoor.a, b: lockedDoor.b, open: false }
   ]
 };
+
+const DAGGER = {
+  id: "dagger",
+  name: "Dagger",
+  activation: "action",
+  description: "A dagger.",
+  attackBonus: 5,
+  reachFeet: 5,
+  rangeFeet: null,
+  rangeNormalFeet: null,
+  saveAbility: null,
+  saveDc: null,
+  damage: [{ formula: "1d4+2", type: "piercing" }],
+  area: null,
+  attackCount: null,
+  usesLimit: null,
+  usesPer: null,
+  usesRecharge: null,
+  usesPool: null,
+  requiresEffectTag: null,
+  multiattack: null,
+  grants: false,
+  reaction: null,
+  targeting: "single"
+} as ContentActionSummary;
 
 function map(role: "gm" | "player") {
   return render(
@@ -178,36 +204,53 @@ describe("a door on a player's map", () => {
   });
 
   it("aims an attack at a wall or a door tapped while it is being aimed", () => {
-    const dagger = {
-      id: "dagger",
-      name: "Dagger",
-      activation: "action",
-      description: "A dagger.",
-      attackBonus: 5,
-      reachFeet: 5,
-      rangeFeet: null,
-      rangeNormalFeet: null,
-      saveAbility: null,
-      saveDc: null,
-      damage: [{ formula: "1d4+2", type: "piercing" }],
-      area: null,
-      attackCount: null,
-      usesLimit: null,
-      usesPer: null,
-      usesRecharge: null,
-      usesPool: null,
-      requiresEffectTag: null,
-      multiattack: null,
-      grants: false,
-      reaction: null,
-      targeting: "single"
-    } as ContentActionSummary;
     map("player");
-    act(() => beginTargeting(dagger, LYRA));
+    act(() => beginTargeting(DAGGER, LYRA));
     tap(handle());
     expect(sent("object:attack")).toEqual([
       expect.objectContaining({ actorId: LYRA, actionId: "dagger", target: { wallId: DOOR } })
     ]);
     expect(screen.queryByRole("menu", { name: "Door" })).toBeNull();
+  });
+});
+
+describe("what holds a creature", () => {
+  const netted = {
+    ...actors[0],
+    effects: [
+      {
+        id: "net-1",
+        name: "Net",
+        tags: [],
+        heldBy: { name: "Net", armorClass: 10, hitPoints: { current: 5, maximum: 5 }, immunities: [] }
+      }
+    ]
+  } as unknown as GmView["actors"][number];
+
+  it("tells the GM the Net's Armor Class and hit points, and aims a live attack at it", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <TokenContextMenu
+          actor={netted}
+          role="gm"
+          gmToken="gm"
+          x={10}
+          y={10}
+          reactionUsed={false}
+          placed
+          onOpenSheet={() => {}}
+          onReturnToTray={() => {}}
+          onClose={() => {}}
+        />
+      </ToastProvider>
+    );
+    expect(screen.getByText("Held by Net · AC 10 · 5/5 HP")).toBeTruthy();
+    expect(screen.getByText(/^Breaking the Net frees Lyra\./)).toBeTruthy();
+    act(() => beginTargeting(DAGGER, LYRA));
+    await user.click(screen.getByRole("menuitem", { name: "Attack the Net with Dagger" }));
+    expect(sent("object:attack")).toEqual([
+      expect.objectContaining({ actorId: LYRA, actionId: "dagger", target: { actorId: LYRA, effectId: "net-1" } })
+    ]);
   });
 });

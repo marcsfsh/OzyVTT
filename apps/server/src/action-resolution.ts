@@ -486,6 +486,10 @@ function tapTargeting(
   // A touch that ends a condition picks who it touches (Lesser Restoration).
   if (action.endsConditions) return "single";
   if (action.spellId !== undefined) {
+    // A cast that acts only on a door or a wall (Knock, Arcane Lock, Stone Shape, Passwall) is aimed at one on the map.
+    const walls = spell?.walls;
+    if (walls && (walls.cuts || (walls.door && walls.door !== "open-or-close" && walls.door !== "close")))
+      return "single";
     const named = spell?.effect?.targets;
     return named === undefined ? "none" : named.count > 1 || named.perSlot !== undefined ? "multi" : "single";
   }

@@ -519,6 +519,31 @@ export function resolveAtWall(
   });
 }
 
+/** Aims the live attack at what holds a creature (a Net, a web, a rope): `object:attack` on the effect that holds it.
+ *  Breaking it frees the creature. */
+export function resolveAtHeld(
+  actorId: string,
+  effectId: string,
+  revision: number | undefined,
+  onResult: (ok: boolean, message?: string) => void
+) {
+  if (!session || busy || session.action.attackBonus === null) return;
+  const { attackerId, action } = session;
+  busy = true;
+  emit();
+  void command("object:attack", {
+    actorId: attackerId,
+    actionId: action.id,
+    target: { actorId, effectId },
+    ...(revision !== undefined ? { expectedRevision: revision } : {})
+  }).then((reply) => {
+    busy = false;
+    if (reply.ok) session = null;
+    emit();
+    onResult(reply.ok, reply.ok ? objectAttackLine(reply) : reply.message);
+  });
+}
+
 /** Take the targeted action's own move before the rest of it (Pounce): the server spends the action and grants the
  *  move now; the action picked again after the move makes the rest at no further cost. */
 export function takeMoveFirst(onResult: (ok: boolean, message?: string) => void) {

@@ -8,6 +8,7 @@ import { HealthAudienceOptions, HealthStyleOptions, type HealthStyle } from "../
 import { command } from "../lib/command";
 import { TokenLibrary } from "../tokens/TokenLibrary";
 import { titleCase } from "../encounter/format";
+import { resolveAtHeld, useTargeting } from "../encounter/targeting";
 import { useMenuDismiss, useMenuPlacement } from "./menuPlacement";
 import "./token-menu.css";
 
@@ -81,6 +82,7 @@ export function TokenContextMenu({
           <IconX />
         </IconButton>
       </div>
+      <HeldBy actor={actor} role={role} />
       <TokenControls
         actor={actor}
         role={role}
@@ -101,6 +103,50 @@ export function TokenContextMenu({
       />
     </div>,
     document.fullscreenElement ?? document.body
+  );
+}
+
+/**
+ * What holds the creature (a Net, a web, a rope), each an object that frees it when broken: for the GM with its Armor
+ * Class and hit points. While an attack is being aimed, the attack can be aimed at it here.
+ */
+function HeldBy({ actor, role }: Readonly<{ actor: Actor; role: "gm" | "player" }>) {
+  const session = useTargeting();
+  const [note, setNote] = useState("");
+  const held = actor.effects.flatMap((effect) =>
+    "heldBy" in effect && effect.heldBy ? [{ effectId: effect.id, holder: effect.heldBy }] : []
+  );
+  if (held.length === 0) return null;
+  const attack = session && session.action.attackBonus !== null ? session.action : null;
+  return (
+    <>
+      {held.map(({ effectId, holder }) => (
+        <div key={effectId} className="token-context-held">
+          <p className="token-context-feedback">
+            {role === "gm" && "armorClass" in holder
+              ? `Held by ${holder.name} · AC ${holder.armorClass} · ${holder.hitPoints.current}/${holder.hitPoints.maximum} HP`
+              : `Held by ${holder.name}`}
+          </p>
+          {attack ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="token-context-item"
+              onClick={() => resolveAtHeld(actor.id, effectId, undefined, (_ok, text) => setNote(text ?? ""))}
+            >
+              {`Attack the ${holder.name} with ${attack.name}`}
+            </button>
+          ) : (
+            <p className="token-context-feedback">{`Breaking the ${holder.name} frees ${actor.name}. Choose an attack, then open this menu to aim it at the ${holder.name}.`}</p>
+          )}
+        </div>
+      ))}
+      {note && (
+        <p className="token-context-feedback" role="status">
+          {note}
+        </p>
+      )}
+    </>
   );
 }
 
