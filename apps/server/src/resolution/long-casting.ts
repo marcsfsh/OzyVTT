@@ -58,6 +58,11 @@ export function longCastStepOf(
   if (!state.combat.active || !spell || action.spellId === undefined || isItemActionId(action.id)) return null;
   // A feature that casts it as a Magic action (Pact of the Chain's Find Familiar) takes that action alone.
   if (action.castsAtOnce) return null;
+  // The first turn going ahead once no Counterspell stopped it: its action was spent when it was cast.
+  if (input.longCastBegins === true && laterRowOf(spell, action.id) === undefined) {
+    const minutes = castingMinutesOf(spell, action.id);
+    if (minutes > 0) return { phase: "start", input, spell, rounds: minutes * ROUNDS_PER_MINUTE };
+  }
   if (input.economyPaid === true || input.ready === true || input.commit === false) return null;
   if (laterRowOf(spell, action.id) !== undefined) return null;
   const minutes = castingMinutesOf(spell, action.id);
@@ -95,7 +100,8 @@ export function stepLongCast(ctx: ResolveContext, step: LongCastStep): void {
     const casting: Casting = {
       actionId: ctx.action.id,
       targetIds: ctx.targets.map((target) => target.id),
-      slotLevel: ctx.plan.spendSpellSlot?.level ?? null,
+      // A first turn going ahead after Counterspell's prompts carries the level it was cast with.
+      slotLevel: ctx.plan.spendSpellSlot?.level ?? (input.longCastBegins === true ? (input.slotLevel ?? null) : null),
       areaPlaced: input.areaPlaced === true,
       ...(input.optionId != null ? { optionId: input.optionId } : {}),
       ...(input.shaping && input.shaping.length > 0 ? { shaping: input.shaping.map((entry) => ({ ...entry })) } : {}),

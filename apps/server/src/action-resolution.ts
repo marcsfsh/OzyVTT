@@ -160,6 +160,13 @@ export function resolveDefinitionAction(
   // A warded target (Sanctuary) asks its save as the attack or spell is made; a failure spends nothing and stops here.
   if (input.commit !== false && input.economyPaid !== true && turnedAwayByWard(ctx))
     return { ...resolutionOf(ctx), save: null };
+  // A casting is seen as it begins: Counterspell may stop it on its first turn, its action spent and nothing else.
+  if (longCast?.phase === "start" && input.longCastBegins !== true && parkForCounterspell(ctx, true)) {
+    commitEconomy({ ...ctx, plan: { ...ctx.plan, spendSpellSlot: null, spendUse: null, componentSpends: [] } });
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
+  }
   if (longCast && longCast.phase !== "finish") {
     stepLongCast(ctx, longCast);
     releaseHideAndReady(ctx);
@@ -167,8 +174,14 @@ export function resolveDefinitionAction(
     return { ...resolutionOf(ctx), save: null };
   }
   if (longCast) finishLongCast(ctx);
-  // A readied spell is cast now and held: its slot and the action are spent, and nothing else happens yet.
+  // A readied spell is cast now and held: its slot and the action are spent, and nothing else happens yet. It is seen
+  // as it is cast, so a Counterspell may stop it now.
   if (input.ready === true) {
+    if (parkForCounterspell(ctx)) {
+      commitEconomy({ ...ctx, plan: { ...ctx.plan, spendSpellSlot: null, spendUse: null, componentSpends: [] } });
+      useUpConsumable(ctx);
+      return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
+    }
     holdReadiedSpell(ctx);
     commitEconomy(ctx);
     return { ...resolutionOf(ctx), save: null };
@@ -200,9 +213,11 @@ export function resolveDefinitionAction(
     return { ...resolutionOf(ctx), save: null };
   }
   // A cast a Counterspell may stop waits before anything of it happens: its action is spent and it was seen cast, but
-  // its slot, its limited use and the materials it consumes wait to see whether it goes ahead.
-  if (parkForCounterspell(ctx)) {
+  // its slot, its limited use and the materials it consumes wait to see whether it goes ahead. A scroll read is used
+  // up either way. A long casting was offered as it began.
+  if (longCast?.phase !== "finish" && parkForCounterspell(ctx)) {
     commitEconomy({ ...ctx, plan: { ...ctx.plan, spendSpellSlot: null, spendUse: null, componentSpends: [] } });
+    useUpConsumable(ctx);
     releaseHideAndReady(ctx);
     spendUntilItActs(ctx);
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };

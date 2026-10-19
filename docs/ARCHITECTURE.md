@@ -535,7 +535,9 @@ told to the table as cast (`cast-narration.ts`). Before anything is spent the ec
 material the content build lists on the spell) and its targets (`resolution/spell-targets.ts`: the count the spell
 names, its creature type, sight with dynamic vision on, range, and for creatures of the caster's choice in an area,
 the area). A cast with components waits while a creature that sees it may answer with Counterspell
-(`resolution/counter.ts`, `counter-answers.ts`), and a reaction spell's prompt lets its caster pick the slot. A
+(`resolution/counter.ts`, `counter-answers.ts`), and a reaction spell's prompt lets its caster pick the slot. A Spell
+Scroll's cast is seen (a wand's needs no components and isn't), a spell readied with the Ready action is seen as it is
+cast and not when it is let go, and a long casting as it begins. A
 creature's own spell of a minute or more takes the action on each of its turns in a fight and resolves on the last
 (`resolution/long-casting.ts`). Outside a fight a creature's own cast resolves through the same path with no turn to
 spend, and a long one moves the game clock by its whole hours; an item's cast there stays on the loose route.

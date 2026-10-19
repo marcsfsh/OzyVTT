@@ -764,7 +764,12 @@ export const ParkedCastSchema = z
     initiatorRole: z.enum(["gm", "player"]),
     initiatorSessionId: z.string().min(1).max(200),
     /** How the caster shaped the spell (Metamagic, Sculpt Spells); its Sorcery Points were spent with the cast. */
-    shaping: z.array(CastShapingSchema).max(4).optional()
+    shaping: z.array(CastShapingSchema).max(4).optional(),
+    /** It was cast to be held with the Ready action: going ahead holds it until its trigger. */
+    ready: z.literal(true).optional(),
+    /** The first turn of a spell cast over several turns: going ahead begins the casting, and its slot, use and
+     *  materials wait for its last turn as any long casting's do. */
+    beginsLongCast: z.literal(true).optional()
   })
   .strict();
 export type ParkedCast = z.infer<typeof ParkedCastSchema>;
