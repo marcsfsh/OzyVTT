@@ -555,7 +555,8 @@ type there is `creatureTypeOf` (`statblock-facts.ts`), which reads an Arcanist's
 tag) for spells and other magic, and the true type for skills and a stat block's own traits. A ward its target bears
 (`spell-ward` modifier: Nondetection, Mind Blank, an Amulet of Proof against Detection and Location, a Ring of Mind
 Shielding) refuses a spell of its schools or ids aimed at it, leaves it out of such a spell's area and zone, and hides
-it from such a spell's sense (`resolution/spell-wards.ts`). A picked target is also held to the spell's size limit,
+it from such a spell's sense (`resolution/spell-wards.ts`); one with `typeSenses` also hides it from every magical sense
+that tells a creature's type, Divine Sense included (`vision/detect.ts`). A picked target is also held to the spell's size limit,
 and to the caster or its own side for a spell on a willing creature (Light, Nondetection). Several picked targets are
 each checked for Total Cover. A heal that divides a pool (Preserve Life) takes the shares the user sets
 (`healingShares`), and one that also ends conditions for points of its pool (Restoring Touch, `conditionPicks`) takes

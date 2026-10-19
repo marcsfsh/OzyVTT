@@ -1102,7 +1102,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // your alignment, or know your creature type": Detect Thoughts, Zone of Truth and Detect Evil and Good don't reach the
   // wearer. Telepathy by consent and the soul the ring keeps are the GM's.
   "ring-of-mind-shielding": {
-    modifiers: [{ type: "spell-ward", spellIds: ["detect-thoughts", "zone-of-truth", "detect-evil-and-good"] }]
+    modifiers: [
+      {
+        type: "spell-ward",
+        spellIds: ["detect-thoughts", "zone-of-truth", "detect-evil-and-good"],
+        typeSenses: true
+      }
+    ]
   },
 
   "ring-of-protection": {

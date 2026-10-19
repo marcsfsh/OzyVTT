@@ -295,6 +295,7 @@ const LABELS: Readonly<Record<string, string>> = {
   schools: "schools of magic",
   spellIds: "spells",
   alliesAllowed: "its own side's spells let through",
+  typeSenses: "hidden from senses that tell a creature's type",
   conditionPicks: "conditions its user may also end",
   pointsEach: "points each costs",
   failureEndsForm: "a failure ends a shape-shift",

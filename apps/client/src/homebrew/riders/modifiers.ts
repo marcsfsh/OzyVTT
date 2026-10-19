@@ -175,6 +175,16 @@ const trueOnly = (key: string): Pick<FieldDef, "read" | "write"> => ({
     return next === true ? { ...rest, [key]: true } : rest;
   }
 });
+/** A list the schema takes as absent when empty, never as an empty list. */
+const listOrAbsent = (key: string): Pick<FieldDef, "read" | "write"> => ({
+  read: (row) => (Array.isArray(row[key]) ? row[key] : []),
+  write: (next, row) => {
+    const rest = { ...row };
+    delete rest[key];
+    const list = Array.isArray(next) ? (next as string[]) : [];
+    return list.length > 0 ? { ...rest, [key]: list } : rest;
+  }
+});
 
 /** Signed dice ("1d4", or "-1d4" to take them off), as `SignedDiceSchema` takes them. */
 const signedDiceValidate = (value: unknown): string | null => {
@@ -744,7 +754,25 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       kind: "tags",
       visibleWhen: hasType("spell-ward"),
       suggestions: (ctx) => ctx.schools,
+      ...listOrAbsent("schools"),
       help: "A spell of these schools can't target the bearer, and its area leaves the bearer out."
+    },
+    {
+      key: "spellIds",
+      label: "Spells",
+      kind: "tags",
+      visibleWhen: hasType("spell-ward"),
+      suggestions: (ctx) => ctx.spells.map((entry) => entry.id),
+      ...listOrAbsent("spellIds"),
+      help: "These spells can't reach the bearer either, whatever their school, as Zone of Truth can't a Ring of Mind Shielding's."
+    },
+    {
+      key: "typeSenses",
+      label: "Hidden from senses that tell a creature's type",
+      kind: "switch",
+      visibleWhen: hasType("spell-ward"),
+      ...trueOnly("typeSenses"),
+      help: "On when no magic may learn the bearer's creature type, so Divine Sense doesn't find it either."
     },
     {
       key: "alliesAllowed",

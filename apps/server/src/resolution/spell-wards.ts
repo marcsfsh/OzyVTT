@@ -21,6 +21,21 @@ export type WardContent = Readonly<{
   catalog?: EquipmentCatalog | undefined;
 }>;
 
+/** The `spell-ward` riders `target` bears, with their labels. */
+function wardsOf(target: Actor, content: WardContent) {
+  const definition = target.definitionId ? content.resolveDefinition?.(target.definitionId) : undefined;
+  const derivation = deriveEquipment(target, definition, content.catalog);
+  return collectRiders(derivation.carriers, { ...derivation.context, moment: null }).filter(
+    (rider) => rider.modifier.type === "spell-ward"
+  );
+}
+
+/** The name of what hides `target` from a magical sense that tells a creature's type (Divine Sense, Detect Evil and
+ *  Good), or null: a Ring of Mind Shielding's "know your creature type". */
+export function typeSenseWardOf(target: Actor, content: WardContent): string | null {
+  return wardsOf(target, content).find((rider) => rider.modifier.typeSenses === true)?.label ?? null;
+}
+
 /** The name of what wards `target` against `spell` cast by `casterId` (null for a spell no one cast), or null. */
 export function spellWardOf(
   state: GameState,
@@ -29,12 +44,9 @@ export function spellWardOf(
   casterId: string | null,
   content: WardContent
 ): string | null {
-  const definition = target.definitionId ? content.resolveDefinition?.(target.definitionId) : undefined;
-  const derivation = deriveEquipment(target, definition, content.catalog);
   const caster = casterId === null ? undefined : state.actors.find((actor) => actor.id === casterId);
-  for (const rider of collectRiders(derivation.carriers, { ...derivation.context, moment: null })) {
+  for (const rider of wardsOf(target, content)) {
     const ward = rider.modifier;
-    if (ward.type !== "spell-ward") continue;
     const meets = (ward.schools ?? []).includes(spell.school) || (ward.spellIds ?? []).includes(spell.id);
     if (!meets) continue;
     if (

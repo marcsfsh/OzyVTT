@@ -2156,7 +2156,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "While it is worn and attuned, a Divination spell can't target its wearer, catch it in its area or sense it (resolution/spell-wards.ts), unless the wearer allows it, which it does for a spell cast by its own side. Being seen through a scrying sensor is the GM's, as the sensor is."
   ),
   "item:ring-of-mind-shielding": enforced(
-    "While it is worn and attuned, Detect Thoughts can't target its wearer, Zone of Truth doesn't hold it and Detect Evil and Good doesn't sense it (resolution/spell-wards.ts). Telepathy, the imperceptible ring and the soul it can hold are the GM's."
+    "While it is worn and attuned, Detect Thoughts can't target its wearer, Zone of Truth doesn't hold it, and no magical sense that tells a creature's type finds it, Detect Evil and Good and Divine Sense included (resolution/spell-wards.ts, vision/detect.ts). Telepathy, the imperceptible ring and the soul it can hold are the GM's."
   ),
   "item:trident-of-fish-command": guided(
     "A charge casts Dominate Beast at DC 15 on a creature with a Swim Speed (resolution/action-targets.ts), which affects only a Beast (resolution/type-gates.ts); it has 3 charges and regains 1d3 at dawn, and the cast takes the spell's state. What the Beast does under it is the GM's."

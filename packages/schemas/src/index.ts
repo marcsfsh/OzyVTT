@@ -1135,11 +1135,12 @@ export const ModifierSchema = z
         schools: z.array(RiderSlugSchema).min(1).max(8).optional(),
         spellIds: z.array(RiderSlugSchema).min(1).max(12).optional(),
         alliesAllowed: z.literal(true).optional(),
+        typeSenses: z.literal(true).optional(),
         ...riderGate
       })
       .strict()
       .describe(
-        "A spell of these schools (`divination`) or ids can't reach the bearer while it holds: it can't pick the bearer as a target (\"can't be targeted by any Divination spell\", Nondetection), its area and its lasting area leave the bearer out, and its detection doesn't sense it (a Ring of Mind Shielding against Zone of Truth and Detect Evil and Good). `alliesAllowed`: a spell from the bearer's own side reaches it (\"unless the wearer allows it\"). Read on the bearer as a spell is aimed."
+        "A spell of these schools (`divination`) or ids can't reach the bearer while it holds: it can't pick the bearer as a target (\"can't be targeted by any Divination spell\", Nondetection), its area and its lasting area leave the bearer out, and its detection doesn't sense it (a Ring of Mind Shielding against Zone of Truth and Detect Evil and Good). `alliesAllowed`: a spell from the bearer's own side reaches it (\"unless the wearer allows it\"). `typeSenses`: no magical sense that tells a creature's type finds the bearer, a feature's included (Divine Sense against a Ring of Mind Shielding's \"know your creature type\"). Read on the bearer as a spell is aimed or a sense reaches out."
       ),
     /** No attack roll against the bearer has Advantage (Elusive), while its gates hold. */
     z

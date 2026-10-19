@@ -1,6 +1,6 @@
 import type { GameState, PlayerSensedCreature } from "@vtt/domain";
 import { isIncapacitated } from "../condition-rules.js";
-import { spellWardOf } from "../resolution/spell-wards.js";
+import { spellWardOf, typeSenseWardOf } from "../resolution/spell-wards.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { clearLine, distance } from "./geometry.js";
 import { definitionOf, type SightContent } from "./senses.js";
@@ -40,7 +40,7 @@ export function sensedBy(
     if (!viewer || !token || isIncapacitated(viewer)) return [];
     return viewer.effects.flatMap((effect) => {
       if (!effect.detects) return [];
-      // A spell's detection (Detect Evil and Good) passes over a creature warded against it (a Ring of Mind Shielding).
+      // A spell's detection (Detect Evil and Good) passes over a creature warded against it (Nondetection).
       const spell = effect.spell ? content.catalog?.spellRecord?.(effect.spell.id) : undefined;
       return [{ token, detects: effect.detects, spell, viewerId }];
     });
@@ -57,9 +57,11 @@ export function sensedBy(
     if (type === null) continue;
     const reached = senses.some(({ token: from, detects, spell, viewerId }) => {
       if (!detects.creatureTypes.includes(type)) return false;
+      const wardContent = { resolveDefinition: content.definition, catalog: content.catalog };
+      // Every such sense tells the creature's type, which a Ring of Mind Shielding keeps from any magic.
       const warded =
-        spell !== undefined &&
-        spellWardOf(state, actor, spell, viewerId, { resolveDefinition: content.definition, catalog: content.catalog });
+        (spell !== undefined && spellWardOf(state, actor, spell, viewerId, wardContent)) ||
+        typeSenseWardOf(actor, wardContent);
       if (warded) return false;
       const feet = (distance(from.position!, token.position!) - reachOf(from) - reachOf(token)) / pixelsPerFoot;
       if (feet > detects.feet + 0.5) return false;
