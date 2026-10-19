@@ -39,7 +39,7 @@ export function playerHitOwesDamage(resolution: ActionResolution): boolean {
     attack !== null &&
     !resolution.preview &&
     resolution.damageTotal > 0 &&
-    !(resolution.reactionPrompts ?? []).some((prompt) => prompt.actorId === attack.targetId)
+    !(resolution.reactionPrompts ?? []).some((prompt) => prompt.actorId === attack.targetId || prompt.holdsDamage)
   );
 }
 

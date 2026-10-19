@@ -1,11 +1,10 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
-import type { PendingSave } from "@vtt/domain";
+import type { PendingReaction, PendingSave } from "@vtt/domain";
 import { catalogIdOf, type ActionReaction } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
 import { addEffect, ESCAPE_ATHLETICS_TAG, makeEffect, NO_ACTIONS_TAG } from "../effects.js";
 import { HAZARDS } from "../hazards.js";
-import { halvedDamageParts, previewDamage } from "../hit-points.js";
 import { offerableReaction, slotChoiceOf } from "../reaction-offers.js";
 import { applyFailureEffect, createPendingSaves } from "../saving-throws.js";
 import { HIDDEN_SOURCE } from "../hidden-source.js";
@@ -16,59 +15,170 @@ import { coverBonusOf, coverFor } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf } from "./damage.js";
 import { spellOf, spellSaveDuration } from "./concentration.js";
+import { openDamageWindow, type DamageWindowDeps } from "../damage-window.js";
+import { answerKeyOf, answersFromOthers, askAnswer } from "../roll-answers.js";
 
-type HalfDamageReaction = Extract<ActionReaction, { response: "half-damage" }>;
 type AcBonusReaction = Extract<ActionReaction, { response: "ac-bonus" }>;
 
-/** A hit on a combatant with a matching declared reaction (Uncanny Dodge) parks the damage in a prompt:
- *  "use" spends the reaction and applies half, "decline" applies it in full (see reactions.ts). The
- *  reaction window follows the economy family, so freeform movement does not silence it. */
+/** What the damage window needs from a resolve. */
+function windowDeps(ctx: ResolveContext): DamageWindowDeps {
+  const { deps } = ctx;
+  return {
+    resolveDefinition: deps.resolveDefinition ?? (() => undefined),
+    ...(deps.catalog ? { catalog: deps.catalog } : {}),
+    random: deps.random,
+    newId: deps.newRollId,
+    now: deps.now,
+    sessionId: ctx.rollBase.initiatorSessionId,
+    role: ctx.rollBase.initiatorRole,
+    commandId: ctx.input.commandId,
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+  };
+}
+
+/**
+ * A hit's damage waits while the creatures who may act on it answer (`damage-window.ts`): another creature's answer
+ * to the damage roll (Cutting Words), then the target's own reaction (Uncanny Dodge halves it, Deflect Attacks takes a
+ * rolled amount off, Superior Hunter's Defense resists its type). The first prompt holds the damage, and each answer
+ * passes it on until it lands (see reactions.ts). The reaction window follows the economy family, so freeform
+ * movement does not silence it.
+ */
 export function parkReaction(ctx: ResolveContext): void {
-  const { state, attack, attacker, targets, input, deps } = ctx;
+  const { state, attack, attacker, targets, deps } = ctx;
   if (attack === null || (attack.outcome !== "crit" && attack.outcome !== "hit") || !deps.resolveDefinition) return;
   const target = targets[0];
-  const proposedParts = damagePartsOf(ctx);
-  const proposedTotal = proposedParts.reduce((sum, part) => sum + part.amount, 0);
-  if (proposedTotal <= 0 || target.id === attacker.id) return;
-  const offer = offerableReaction(
+  if (target.id === attacker.id) return;
+  const parts = damagePartsOf(ctx);
+  const opened = openDamageWindow(
     state,
-    target,
-    (reaction): reaction is HalfDamageReaction => reaction.response === "half-damage",
-    { resolveDefinition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) }
+    {
+      source: attacker,
+      sourceName: attacker.name,
+      target,
+      parts,
+      critical: ctx.crit,
+      hit: true,
+      hitKinds: ctx.riderFilters.attackKinds ?? [],
+      ...(ctx.action.drain ? { drain: ctx.action.drain } : {}),
+      asked: []
+    },
+    windowDeps(ctx)
   );
-  if (!offer) return;
-  // Both answers weighed through the reactor's defences now, so its buttons name what each would take off.
-  const damageDeps = { resolveDefinition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
-  const weigh = (parts: typeof proposedParts) =>
-    previewDamage(state, target.id, { amount: 0, parts }, damageDeps).totalApplied;
-  const halved = halvedDamageParts(proposedParts);
-  const weighed = { use: halved.length > 0 ? weigh(halved) : 0, decline: weigh(proposedParts) };
-  state.combat = {
-    ...state.combat,
-    pendingReactions: [
-      ...state.combat.pendingReactions,
-      {
-        id: deps.newRollId(),
-        kind: "hit-by-attack" as const,
-        actorId: target.id,
-        actionId: offer.action.id,
-        actionName: offer.action.name,
-        sourceActorId: attacker.id,
-        sourceName: attacker.name,
-        targetActorId: null,
-        triggerCommandId: input.commandId,
-        proposedDamage: proposedTotal,
-        proposedDamageParts: proposedParts,
-        critical: ctx.crit,
-        weighed,
-        acBonus: null,
-        rollsAttack: false,
-        parkedAttack: null,
-        createdAt: Date.parse(deps.now())
-      }
-    ]
+  if (!opened) return;
+  if (opened.line) ctx.tableNarration.push(tableLineOf(ctx, opened.line));
+  const reactor = state.actors.find((actor) => actor.id === opened.prompt.actorId)!;
+  ctx.reactionPrompts.push({
+    actorId: reactor.id,
+    actorName: reactor.name,
+    actionName: opened.prompt.actionName,
+    holdsDamage: true
+  });
+}
+
+/** The attack a prompt holds at its roll, to be finished by its answer with the same die and dice. What answers
+ *  added to the roll (a Bardic Inspiration die) rides as one of its dice, since the replay holds no die to read. */
+function parkedAttackOf(ctx: ResolveContext, untilNextTurn: boolean): NonNullable<PendingReaction["parkedAttack"]> {
+  const { attack, attacker, input, deps } = ctx;
+  const target = ctx.targets[0];
+  const cover = input.cover === "half" || input.cover === "three-quarters" ? input.cover : null;
+  return {
+    actionId: ctx.action.id,
+    builtin: input.builtin === true,
+    attackNatural: input.attackTotal === undefined ? attack!.naturalRoll : null,
+    attackTotal: input.attackTotal ?? null,
+    cover,
+    conditionId: input.conditionId ?? null,
+    attackKinds: (input.attackKinds ?? []).filter(
+      (kind): kind is "reaction" | "opportunity" => kind === "reaction" || kind === "opportunity"
+    ),
+    pushFeet: input.pushFeet ?? null,
+    slotLevel: ctx.plan.castLevel,
+    damageType: input.damageType ?? null,
+    bonusDice: [
+      ...(attack!.bonusDice ?? []).flatMap((entry) =>
+        entry.total === null ? [] : [{ label: entry.label, dice: entry.dice, total: entry.total }]
+      ),
+      ...(ctx.attackAnswerBonus
+        ? [
+            {
+              label: ((attack!.answered ?? []).map((line) => line.name).join(", ") || "Answers").slice(0, 120),
+              dice: "",
+              total: Math.max(-48, Math.min(48, ctx.attackAnswerBonus))
+            }
+          ]
+        : [])
+    ],
+    distanceFeet: deps.distanceFeet?.(attacker.id, target.id) ?? null,
+    initiatorRole: deps.initiatorRole ?? "gm",
+    initiatorSessionId: deps.initiatorSessionId ?? deps.gmSessionId,
+    untilNextTurn,
+    // The extras chosen for the hit ride the replay, spent only if it still hits.
+    hitOptions: (input.hitOptions ?? []).map(({ effects, ...choice }) => ({
+      ...choice,
+      ...(effects ? { effects: [...effects] } : {})
+    })),
+    // A roll that forwent its Advantage for Brutal Strike still offers its hit when it lands.
+    ...(ctx.forgoneAdvantageBy !== null ? { forgoneAdvantageBy: ctx.forgoneAdvantageBy } : {}),
+    ...(input.knockOut === true ? { knockOut: true as const } : {})
   };
-  ctx.reactionPrompts.push({ actorId: target.id, actorName: target.name, actionName: offer.action.name });
+}
+
+/**
+ * An attack roll another creature may answer stops at its roll (Cutting Words on a hit, Improve Fate): that creature
+ * is prompted, one at a time in turn order, and the answer finishes the attack with the same die and the answer's die
+ * added (see reactions.ts). An attack an answer made hit (Boon of Combat Prowess) is past answering. True when the
+ * attack was parked: the caller spends its economy and stops there.
+ */
+export function parkForRollAnswer(ctx: ResolveContext): boolean {
+  const { state, attack, attacker, targets, input, deps } = ctx;
+  if (attack === null || input.commit === false || !state.combat.active || ctx.answeredHit === true) return false;
+  const target = targets[0];
+  const asked = input.answersAsked ?? [];
+  const next = answersFromOthers(
+    state,
+    {
+      kind: "attack",
+      roller: attacker,
+      key: input.holdKey ?? `attack:${attacker.id}`,
+      natural: attack.naturalRoll,
+      total: attack.total,
+      threshold: attack.outcome === "unknown" ? null : attack.targetAc,
+      ...(attack.outcome === "fumble" ? { automatic: "fail" as const } : {}),
+      ...(attack.outcome === "crit" ? { automatic: "succeed" as const } : {}),
+      mode: ctx.rollMode?.mode ?? "normal",
+      purpose: "attack",
+      label: `${ctx.action.name} attack roll`,
+      visibility: ctx.rollBase.visibility
+    },
+    {
+      resolveDefinition: deps.resolveDefinition ?? (() => undefined),
+      ...(deps.catalog ? { catalog: deps.catalog } : {}),
+      random: deps.random,
+      newRollId: deps.newRollId,
+      sessionId: ctx.rollBase.initiatorSessionId,
+      role: ctx.rollBase.initiatorRole,
+      now: deps.now,
+      commandId: input.commandId,
+      ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+    },
+    new Set(asked)
+  )[0];
+  if (!next) return false;
+  const line = askAnswer(
+    state,
+    next,
+    {
+      rollKind: "attack",
+      roller: attacker,
+      targetActorId: target.id,
+      parkedAttack: parkedAttackOf(ctx, false),
+      asked: [...asked, answerKeyOf(next)]
+    },
+    { newId: deps.newRollId, now: deps.now, commandId: input.commandId }
+  );
+  ctx.tableNarration.push(tableLineOf(ctx, line));
+  ctx.reactionPrompts.push({ actorId: next.bearer.id, actorName: next.bearer.name, actionName: next.offer.name });
+  return true;
 }
 
 /**
@@ -83,8 +193,10 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
     attack === null ||
     attack.outcome !== "hit" ||
     attack.targetAc === null ||
-    input.economyPaid === true ||
-    !deps.resolveDefinition
+    input.acSettled === true ||
+    !deps.resolveDefinition ||
+    // An attack an answer made hit hits whatever the AC (Boon of Combat Prowess).
+    ctx.answeredHit === true
   )
     return false;
   const target = targets[0];
@@ -101,7 +213,6 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
     { resolveDefinition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) }
   );
   if (!offer) return false;
-  const cover = input.cover === "half" || input.cover === "three-quarters" ? input.cover : null;
   state.combat = {
     ...state.combat,
     pendingReactions: [
@@ -123,36 +234,10 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
         acBonus: offer.reaction.amount,
         rollsAttack: false,
         attackTotal: attack.total,
-        parkedAttack: {
-          actionId: ctx.action.id,
-          builtin: input.builtin === true,
-          attackNatural: input.attackTotal === undefined ? attack.naturalRoll : null,
-          attackTotal: input.attackTotal ?? null,
-          cover,
-          conditionId: input.conditionId ?? null,
-          attackKinds: (input.attackKinds ?? []).filter(
-            (kind): kind is "reaction" | "opportunity" => kind === "reaction" || kind === "opportunity"
-          ),
-          pushFeet: input.pushFeet ?? null,
-          slotLevel: ctx.plan.castLevel,
-          damageType: input.damageType ?? null,
-          bonusDice: (attack.bonusDice ?? []).flatMap((entry) =>
-            entry.total === null ? [] : [{ label: entry.label, dice: entry.dice, total: entry.total }]
-          ),
-          distanceFeet: deps.distanceFeet?.(attacker.id, target.id) ?? null,
-          initiatorRole: deps.initiatorRole ?? "gm",
-          initiatorSessionId: deps.initiatorSessionId ?? deps.gmSessionId,
-          untilNextTurn: offer.reaction.untilNextTurn === true,
-          // The extras chosen for the hit ride the replay, spent only if it still hits.
-          hitOptions: (input.hitOptions ?? []).map(({ effects, ...choice }) => ({
-            ...choice,
-            ...(effects ? { effects: [...effects] } : {})
-          })),
-          // A roll that forwent its Advantage for Brutal Strike still offers its hit when it lands.
-          ...(ctx.forgoneAdvantageBy !== null ? { forgoneAdvantageBy: ctx.forgoneAdvantageBy } : {}),
-          ...(input.knockOut === true ? { knockOut: true as const } : {})
-        },
+        parkedAttack: parkedAttackOf(ctx, offer.reaction.untilNextTurn === true),
         ...slotChoiceOf(target, offer.action),
+        // The roll's answers were asked before this; the finish doesn't ask them again.
+        ...(input.answersAsked ? { asked: [...input.answersAsked] } : {}),
         createdAt: Date.parse(deps.now())
       }
     ]
@@ -393,6 +478,16 @@ export function parkActionSave(ctx: ResolveContext): void {
       : 0;
   const groups = new Map<number, string[]>();
   for (const target of saving) groups.set(saveBonusOf(target), [...(groups.get(saveBonusOf(target)) ?? []), target.id]);
+  // The spell the save is against, and whether it aimed at one creature alone (Staff of Charming's Resist Enchantment).
+  const spell = action.spellId !== undefined ? deps.catalog?.spellRecord?.(action.spellId) : undefined;
+  const against = spell
+    ? {
+        id: spell.id,
+        school: spell.school,
+        level: ctx.plan.castLevel ?? spell.level,
+        singleTarget: targets.length === 1 && action.area === undefined && spell.area === null
+      }
+    : undefined;
   for (const [saveBonus, targetIds] of groups)
     createPendingSaves(state, {
       sourceActorId: attacker.id,
@@ -411,6 +506,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       ...(action.drain ? { drain: action.drain } : {}),
       ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
       ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),
+      ...(against ? { spell: against } : {}),
       magical: isMagicalAction(ctx),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())

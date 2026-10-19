@@ -37828,7 +37828,13 @@
     "name": "Reflexive Antennae",
     "activation": "reaction",
     "description": "_Trigger:_ An attack roll hits the rust monster. _Response:_ The rust monster uses **Antennae**.",
-    "damage": []
+    "damage": [],
+    "reaction": {
+     "trigger": "damaged-by-creature",
+     "response": "strike-back",
+     "rangeFeet": 5,
+     "usesAction": "antennae"
+    }
    },
    {
     "id": "bite",
@@ -40787,6 +40793,20 @@
     "uses": {
      "limit": 2,
      "per": "long-rest"
+    },
+    "answer": {
+     "rolls": [
+      "check",
+      "save",
+      "death-save"
+     ],
+     "whose": "any",
+     "rangeFeet": 30,
+     "when": "any",
+     "effect": {
+      "kind": "add",
+      "amount": "2"
+     }
     }
    },
    {
@@ -41774,6 +41794,19 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 5
+    },
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "reduce-damage",
+     "formula": "1d10 + 6",
+     "damageTypes": [
+      "bludgeoning",
+      "piercing",
+      "slashing"
+     ],
+     "attackKinds": [
+      "ranged"
+     ]
     }
    },
    {

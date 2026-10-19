@@ -85,6 +85,7 @@ describe("rule families", () => {
       ["spell.later-turn", "economy"],
       // Sneak Attack or a smite taken alone, with no hit to add to.
       ["attack.rides-a-hit", "economy"],
+      ["roll.answers-a-roll", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
       // Action Surge with two uses, Stunning Strike: once on a turn, a spent per-turn limit.

@@ -16,7 +16,7 @@ import { effectiveModeFor, overrideCovers, overrideWaives } from "../rules-famil
 import { useCostOf } from "../use-cost.js";
 import { recordRoll, sizeAtMost, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
 import { beginConcentration } from "./concentration.js";
-import { criticalExpression } from "./damage.js";
+import { criticalExpression, SAVAGE_ATTACKER, savageAttackerReady } from "./damage.js";
 import { commitEconomy, evaluateActionEconomy, planEconomy, spendSlot } from "./economy.js";
 import { applyHitOutcome, forceMove, grantHalfSpeedMove, openRiderSave, rollPlain } from "./hit-rider-outcomes.js";
 import { hitRiderOf, type HitRider } from "./hit-riders.js";
@@ -270,6 +270,15 @@ export function hitOffersOf(ctx: ResolveContext): HitOffer[] {
       cost: null,
       unverified: `Only if ${ctx.attacker.name} moved ${charge.feet ?? 20}+ feet straight toward the target immediately before the hit.`
     });
+  // Savage Attacker rolls the weapon's own dice twice rather than adding any.
+  if (savageAttackerReady(ctx))
+    offers.push({
+      id: SAVAGE_ATTACKER,
+      name: "Savage Attacker",
+      dice: ctx.action.damage[0]!.formula.replace(/\s*[+-]\s*\d+$/, ""),
+      cost: "once per turn",
+      rerolls: true
+    });
   for (const action of ctx.siblings) {
     const rider = hitRiderOf(action);
     if (!rider || action.id === ctx.action.id) continue;
@@ -396,6 +405,8 @@ export function rollHitOptions(ctx: ResolveContext): void {
     byPool.set(pool, action.name);
   }
   for (const choice of chosen) {
+    // Rolled with the weapon's own dice (`rollWeaponDamage`).
+    if (choice.id === SAVAGE_ATTACKER) continue;
     if (choice.id === "charge") {
       rollCharge(ctx, roll);
       continue;

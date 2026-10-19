@@ -5,16 +5,12 @@
     "source": "srd",
     "summary": "Dragon-blooded folk with a breath weapon and an elemental birthright.",
     "description": "Dragonborn trace their lineage to a dragon progenitor. The kind of dragon sets the damage type of their Breath Weapon and their Damage Resistance, and from level 5 they can sprout spectral wings and fly for a time.",
-    "sizes": [
-      "medium"
-    ],
+    "sizes": ["medium"],
     "speedFeet": 30,
     "darkvisionFeet": 60,
     "creatureType": "humanoid",
     "abilityBonuses": [],
-    "languages": [
-      "common"
-    ],
+    "languages": ["common"],
     "languageChoices": {
       "choose": 2,
       "fromCatalog": "standard-languages"
@@ -65,9 +61,7 @@
             "damage": [],
             "grants": {
               "name": "Draconic Flight",
-              "tags": [
-                "draconic-flight"
-              ],
+              "tags": ["draconic-flight"],
               "duration": {
                 "type": "rounds",
                 "rounds": 100
@@ -103,9 +97,7 @@
             "name": "Damage Resistance (Acid)",
             "description": "You have Resistance to Acid damage, and your Breath Weapon deals Acid damage.",
             "grants": {
-              "damageResistances": [
-                "acid"
-              ]
+              "damageResistances": ["acid"]
             }
           },
           {
@@ -226,9 +218,7 @@
             "name": "Damage Resistance (Lightning)",
             "description": "You have Resistance to Lightning damage, and your Breath Weapon deals Lightning damage.",
             "grants": {
-              "damageResistances": [
-                "lightning"
-              ]
+              "damageResistances": ["lightning"]
             }
           },
           {
@@ -349,9 +339,7 @@
             "name": "Damage Resistance (Fire)",
             "description": "You have Resistance to Fire damage, and your Breath Weapon deals Fire damage.",
             "grants": {
-              "damageResistances": [
-                "fire"
-              ]
+              "damageResistances": ["fire"]
             }
           },
           {
@@ -472,9 +460,7 @@
             "name": "Damage Resistance (Lightning)",
             "description": "You have Resistance to Lightning damage, and your Breath Weapon deals Lightning damage.",
             "grants": {
-              "damageResistances": [
-                "lightning"
-              ]
+              "damageResistances": ["lightning"]
             }
           },
           {
@@ -595,9 +581,7 @@
             "name": "Damage Resistance (Acid)",
             "description": "You have Resistance to Acid damage, and your Breath Weapon deals Acid damage.",
             "grants": {
-              "damageResistances": [
-                "acid"
-              ]
+              "damageResistances": ["acid"]
             }
           },
           {
@@ -718,9 +702,7 @@
             "name": "Damage Resistance (Fire)",
             "description": "You have Resistance to Fire damage, and your Breath Weapon deals Fire damage.",
             "grants": {
-              "damageResistances": [
-                "fire"
-              ]
+              "damageResistances": ["fire"]
             }
           },
           {
@@ -841,9 +823,7 @@
             "name": "Damage Resistance (Poison)",
             "description": "You have Resistance to Poison damage, and your Breath Weapon deals Poison damage.",
             "grants": {
-              "damageResistances": [
-                "poison"
-              ]
+              "damageResistances": ["poison"]
             }
           },
           {
@@ -964,9 +944,7 @@
             "name": "Damage Resistance (Fire)",
             "description": "You have Resistance to Fire damage, and your Breath Weapon deals Fire damage.",
             "grants": {
-              "damageResistances": [
-                "fire"
-              ]
+              "damageResistances": ["fire"]
             }
           },
           {
@@ -1087,9 +1065,7 @@
             "name": "Damage Resistance (Cold)",
             "description": "You have Resistance to Cold damage, and your Breath Weapon deals Cold damage.",
             "grants": {
-              "damageResistances": [
-                "cold"
-              ]
+              "damageResistances": ["cold"]
             }
           },
           {
@@ -1210,9 +1186,7 @@
             "name": "Damage Resistance (Cold)",
             "description": "You have Resistance to Cold damage, and your Breath Weapon deals Cold damage.",
             "grants": {
-              "damageResistances": [
-                "cold"
-              ]
+              "damageResistances": ["cold"]
             }
           },
           {
@@ -1331,16 +1305,12 @@
     "source": "srd",
     "summary": "Hardy folk of mountain and stone with a resistance to poison.",
     "description": "Dwarves are hardy folk shaped by mountain and stone. They have Darkvision out to 120 feet and Resistance to Poison damage. Dwarven Toughness raises their Hit Point maximum at every level.",
-    "sizes": [
-      "medium"
-    ],
+    "sizes": ["medium"],
     "speedFeet": 30,
     "darkvisionFeet": 120,
     "creatureType": "humanoid",
     "abilityBonuses": [],
-    "languages": [
-      "common"
-    ],
+    "languages": ["common"],
     "languageChoices": {
       "choose": 2,
       "fromCatalog": "standard-languages"
@@ -1372,17 +1342,13 @@
               },
               {
                 "type": "versus-condition",
-                "conditionIds": [
-                  "poisoned"
-                ]
+                "conditionIds": ["poisoned"]
               }
             ]
           }
         ],
         "grants": {
-          "damageResistances": [
-            "poison"
-          ]
+          "damageResistances": ["poison"]
         }
       },
       {
@@ -1425,16 +1391,12 @@
     "source": "srd",
     "summary": "Long-lived folk with keen senses and ties to the Feywild.",
     "description": "Elves are magical people whose ancestors lived in the Feywild. They have keen senses and resist being Charmed. An elf needs no sleep and rests in a four-hour trance.",
-    "sizes": [
-      "medium"
-    ],
+    "sizes": ["medium"],
     "speedFeet": 30,
     "darkvisionFeet": 60,
     "creatureType": "humanoid",
     "abilityBonuses": [],
-    "languages": [
-      "common"
-    ],
+    "languages": ["common"],
     "languageChoices": {
       "choose": 2,
       "fromCatalog": "standard-languages"
@@ -1466,9 +1428,7 @@
               },
               {
                 "type": "versus-condition",
-                "conditionIds": [
-                  "charmed"
-                ]
+                "conditionIds": ["charmed"]
               }
             ]
           }
@@ -1481,11 +1441,7 @@
         "choice": {
           "kind": "skill",
           "choose": 1,
-          "from": [
-            "insight",
-            "perception",
-            "survival"
-          ]
+          "from": ["insight", "perception", "survival"]
         }
       },
       {
@@ -1506,11 +1462,7 @@
           {
             "kind": "spellcasting-ability",
             "choose": 1,
-            "from": [
-              "int",
-              "wis",
-              "cha"
-            ]
+            "from": ["int", "wis", "cha"]
           }
         ]
       }
@@ -1729,16 +1681,12 @@
     "source": "srd",
     "summary": "Small, quick-witted folk with a spark of innate magic.",
     "description": "Gnomes are small, inventive folk with Advantage on Intelligence, Wisdom and Charisma saving throws. Each has a little innate magic from a lineage: forest gnomes speak with animals, and rock gnomes build tiny clockwork devices.",
-    "sizes": [
-      "small"
-    ],
+    "sizes": ["small"],
     "speedFeet": 30,
     "darkvisionFeet": 60,
     "creatureType": "humanoid",
     "abilityBonuses": [],
-    "languages": [
-      "common"
-    ],
+    "languages": ["common"],
     "languageChoices": {
       "choose": 2,
       "fromCatalog": "standard-languages"
@@ -1770,11 +1718,7 @@
               },
               {
                 "type": "ability-is",
-                "abilities": [
-                  "int",
-                  "wis",
-                  "cha"
-                ]
+                "abilities": ["int", "wis", "cha"]
               }
             ]
           }
@@ -1793,11 +1737,7 @@
           {
             "kind": "spellcasting-ability",
             "choose": 1,
-            "from": [
-              "int",
-              "wis",
-              "cha"
-            ]
+            "from": ["int", "wis", "cha"]
           }
         ]
       }
@@ -1884,16 +1824,12 @@
     "source": "srd",
     "summary": "Towering descendants of Giants who carry an ancestral boon.",
     "description": "Goliaths are descended from Giants, and each carries a supernatural boon from one kind of giant: cloud, fire, frost, hill, stone or storm. From level 5 they can grow to Large size for a time.",
-    "sizes": [
-      "medium"
-    ],
+    "sizes": ["medium"],
     "speedFeet": 35,
     "darkvisionFeet": null,
     "creatureType": "humanoid",
     "abilityBonuses": [],
-    "languages": [
-      "common"
-    ],
+    "languages": ["common"],
     "languageChoices": {
       "choose": 2,
       "fromCatalog": "standard-languages"
@@ -2030,7 +1966,15 @@
                   "name": "Stone's Endurance",
                   "activation": "reaction",
                   "description": "When you take damage, roll 1d12 and add your Constitution modifier; reduce the damage you take by that total.",
-                  "damage": []
+                  "damage": [],
+                  "reaction": {
+                    "trigger": "takes-damage",
+                    "response": "reduce-damage",
+                    "formula": "1d12"
+                  },
+                  "adds": {
+                    "abilityModifier": "con"
+                  }
                 }
               ],
               "uses": {
@@ -2096,9 +2040,7 @@
             "damage": [],
             "grants": {
               "name": "Large Form",
-              "tags": [
-                "large-form"
-              ],
+              "tags": ["large-form"],
               "duration": {
                 "type": "rounds",
                 "rounds": 100
@@ -2114,9 +2056,7 @@
                     },
                     {
                       "type": "ability-is",
-                      "abilities": [
-                        "str"
-                      ]
+                      "abilities": ["str"]
                     }
                   ]
                 },
@@ -2152,9 +2092,7 @@
               },
               {
                 "type": "versus-condition",
-                "conditionIds": [
-                  "grappled"
-                ]
+                "conditionIds": ["grappled"]
               }
             ]
           }
@@ -2169,16 +2107,12 @@
     "source": "srd",
     "summary": "Small, brave folk with uncanny luck.",
     "description": "Halflings are small, cheerful folk. They can reroll a 1 on a d20 Test and have Advantage on saving throws against being Frightened. A larger creature is cover enough for them to hide behind.",
-    "sizes": [
-      "small"
-    ],
+    "sizes": ["small"],
     "speedFeet": 30,
     "darkvisionFeet": null,
     "creatureType": "humanoid",
     "abilityBonuses": [],
-    "languages": [
-      "common"
-    ],
+    "languages": ["common"],
     "languageChoices": {
       "choose": 2,
       "fromCatalog": "standard-languages"
@@ -2199,9 +2133,7 @@
               },
               {
                 "type": "versus-condition",
-                "conditionIds": [
-                  "frightened"
-                ]
+                "conditionIds": ["frightened"]
               }
             ]
           }
@@ -2215,7 +2147,21 @@
       {
         "id": "halfling-luck",
         "name": "Luck",
-        "description": "When you roll a 1 on the d20 of a D20 Test, you can reroll the die, and you must use the new roll."
+        "description": "When you roll a 1 on the d20 of a D20 Test, you can reroll the die, and you must use the new roll.",
+        "actions": [
+          {
+            "id": "halfling-luck",
+            "name": "Luck",
+            "activation": "other",
+            "description": "When you roll a 1 on the d20 of a D20 Test, reroll the die. You must use the new roll.",
+            "damage": [],
+            "answer": {
+              "rolls": ["attack", "save", "check", "death-save"],
+              "when": "natural-one",
+              "effect": { "kind": "reroll", "one": true }
+            }
+          }
+        ]
       },
       {
         "id": "halfling-naturally-stealthy",
@@ -2231,17 +2177,12 @@
     "source": "srd",
     "summary": "Adaptable folk with an extra skill and an Origin feat.",
     "description": "Humans are the most widespread of the common species. They gain an extra skill proficiency and an Origin feat, and finishing a Long Rest gives them Heroic Inspiration.",
-    "sizes": [
-      "small",
-      "medium"
-    ],
+    "sizes": ["small", "medium"],
     "speedFeet": 30,
     "darkvisionFeet": null,
     "creatureType": "humanoid",
     "abilityBonuses": [],
-    "languages": [
-      "common"
-    ],
+    "languages": ["common"],
     "languageChoices": {
       "choose": 2,
       "fromCatalog": "standard-languages"
@@ -2281,16 +2222,12 @@
     "source": "srd",
     "summary": "Tireless folk with Darkvision and bursts of adrenaline.",
     "description": "Orcs are broad, tireless people built for the charge. They have Darkvision out to 120 feet, and Adrenaline Rush makes a Dash a Bonus Action that also grants Temporary Hit Points. Once per Long Rest, Relentless Endurance keeps an Orc at 1 Hit Point when damage would drop it to 0.",
-    "sizes": [
-      "medium"
-    ],
+    "sizes": ["medium"],
     "speedFeet": 30,
     "darkvisionFeet": 120,
     "creatureType": "humanoid",
     "abilityBonuses": [],
-    "languages": [
-      "common"
-    ],
+    "languages": ["common"],
     "languageChoices": {
       "choose": 2,
       "fromCatalog": "standard-languages"
@@ -2309,9 +2246,7 @@
             "damage": [],
             "grants": {
               "name": "Dashing",
-              "tags": [
-                "dashing"
-              ],
+              "tags": ["dashing"],
               "duration": {
                 "type": "until-source-next-turn"
               },
@@ -2367,17 +2302,12 @@
     "source": "srd",
     "summary": "Bearers of a fiendish legacy from the Lower Planes.",
     "description": "Tieflings carry an abyssal, chthonic or infernal legacy, and it shows in their appearance. The legacy gives them a damage Resistance and a cantrip, and it grants more spells at levels 3 and 5.",
-    "sizes": [
-      "small",
-      "medium"
-    ],
+    "sizes": ["small", "medium"],
     "speedFeet": 30,
     "darkvisionFeet": 60,
     "creatureType": "humanoid",
     "abilityBonuses": [],
-    "languages": [
-      "common"
-    ],
+    "languages": ["common"],
     "languageChoices": {
       "choose": 2,
       "fromCatalog": "standard-languages"
@@ -2407,11 +2337,7 @@
           {
             "kind": "spellcasting-ability",
             "choose": 1,
-            "from": [
-              "int",
-              "wis",
-              "cha"
-            ]
+            "from": ["int", "wis", "cha"]
           }
         ]
       },
@@ -2441,9 +2367,7 @@
             "name": "Abyssal Legacy",
             "description": "You have Resistance to Poison damage. You also know the Poison Spray cantrip.",
             "grants": {
-              "damageResistances": [
-                "poison"
-              ],
+              "damageResistances": ["poison"],
               "spells": [
                 {
                   "id": "poison-spray",
@@ -2505,9 +2429,7 @@
             "name": "Chthonic Legacy",
             "description": "You have Resistance to Necrotic damage. You also know the Chill Touch cantrip.",
             "grants": {
-              "damageResistances": [
-                "necrotic"
-              ],
+              "damageResistances": ["necrotic"],
               "spells": [
                 {
                   "id": "chill-touch",
@@ -2569,9 +2491,7 @@
             "name": "Infernal Legacy",
             "description": "You have Resistance to Fire damage. You also know the Fire Bolt cantrip.",
             "grants": {
-              "damageResistances": [
-                "fire"
-              ],
+              "damageResistances": ["fire"],
               "spells": [
                 {
                   "id": "fire-bolt",

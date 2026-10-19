@@ -567,11 +567,38 @@ const PROTECTIVE_MAGIC: Pick<ActorAction, "reaction"> = {
  * "<creature slug>/<action id>"; values merge into the adapted action.
  * - giant-crocodile tail: "…can't be targeted by the crocodile's Tail" (stated on Bite).
  * - protective-magic: its Shield, offered when an attack would hit.
+ * - burst-of-ingenuity: "The sphinx or another creature within 30 feet makes an ability check or a saving throw ...
+ *   The sphinx adds 2 to the roll", an answer to the roll.
+ * - reflexive-antennae: "An attack roll hits the rust monster ... The rust monster uses Antennae", offered when a
+ *   creature within 5 feet damages it.
+ * - deflect-missile: "hit by a ranged attack roll and takes Bludgeoning, Piercing, or Slashing damage from it ...
+ *   reduces the damage it takes from the attack by 11 (1d10 + 6)"; the redirect after reducing it to 0 stays prose.
  */
-const ACTION_ENRICHMENTS: Record<string, Pick<ActorAction, "targetRules" | "reaction">> = {
+const ACTION_ENRICHMENTS: Record<string, Pick<ActorAction, "targetRules" | "reaction" | "answer">> = {
   "archmage/protective-magic": PROTECTIVE_MAGIC,
   "lich/protective-magic": PROTECTIVE_MAGIC,
-  "mage/protective-magic": PROTECTIVE_MAGIC
+  "mage/protective-magic": PROTECTIVE_MAGIC,
+  "sphinx-of-wonder/burst-of-ingenuity": {
+    answer: {
+      rolls: ["check", "save", "death-save"],
+      whose: "any",
+      rangeFeet: 30,
+      when: "any",
+      effect: { kind: "add", amount: "2" }
+    }
+  },
+  "rust-monster/reflexive-antennae": {
+    reaction: { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 5, usesAction: "antennae" }
+  },
+  "stone-giant/deflect-missile": {
+    reaction: {
+      trigger: "hit-by-attack",
+      response: "reduce-damage",
+      formula: "1d10 + 6",
+      damageTypes: ["bludgeoning", "piercing", "slashing"],
+      attackKinds: ["ranged"]
+    }
+  }
 };
 
 const PRINTED_NAME = "[A-Z][A-Za-z'\u2019-]*(?: [A-Z][A-Za-z'\u2019-]*)*";

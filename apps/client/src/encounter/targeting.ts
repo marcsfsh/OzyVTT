@@ -276,6 +276,8 @@ export type ResolveOptions = Readonly<{
   hitOptions?: readonly HitOptionChoice[];
   /** The confirmed melee hit knocks its target out if it drops it to 0 (SRD Knocking Out a Creature). */
   knockOut?: boolean;
+  /** An answer to the previewed attack roll (Bardic Inspiration, Peerless Aim), applied to the held die. */
+  answer?: Readonly<{ id: string; subtract?: boolean; face?: number }>;
 }>;
 
 export function resolveTargeting(
@@ -328,6 +330,7 @@ export function resolveTargeting(
     ...(opts.pushFeet !== undefined ? { pushFeet: opts.pushFeet } : {}),
     ...(opts.hitOptions && opts.hitOptions.length > 0 ? { hitOptions: [...opts.hitOptions] } : {}),
     ...(opts.knockOut ? { knockOut: true } : {}),
+    ...(opts.answer ? { answer: { ...opts.answer } } : {}),
     ...(slotLevel !== undefined ? { slotLevel } : {}),
     ...(spend !== undefined ? { spend } : {}),
     ...(damageType !== undefined ? { damageType } : {}),

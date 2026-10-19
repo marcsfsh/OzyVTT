@@ -47,6 +47,7 @@ export type PlayerEffect = Omit<
   | "conditionImmunities"
   | "endsWhenUnaffected"
   | "longCast"
+  | "struck"
 > & {
   yours?: true;
 };
@@ -128,16 +129,23 @@ export type PlayerPendingSave = Omit<
   | "drain"
   | "failurePush"
   | "advantageAtSize"
+  | "spell"
+  | "confirmed"
 > & {
   onFailEffect?: Omit<
     NonNullable<PendingSave["onFailEffect"]>,
     "castId" | "sourceActionId" | "ongoingDamage" | "magical"
   >;
+  /** Confirmed, and waiting on another creature's answer to the roll; who may answer stays unnamed. */
+  awaitingAnswer?: true;
 };
 /** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names
  *  the attacker's action and how it was rolled. `attackRoll` is the held attack's total, present only when that roll
  *  is in the player's own dice log; `lastsUntilNextTurn` says the reactor's reaction lasts (Shield). */
-export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId" | "parkedAttack" | "parkedCast"> & {
+export type PlayerPendingReaction = Omit<
+  PendingReaction,
+  "sourceActorId" | "parkedAttack" | "parkedCast" | "saveId" | "asked" | "drain" | "hitKinds"
+> & {
   attackRoll?: number;
   lastsUntilNextTurn?: true;
 };

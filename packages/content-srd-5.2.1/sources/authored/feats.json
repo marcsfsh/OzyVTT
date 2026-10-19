@@ -424,7 +424,25 @@
       "uses": {
         "limit": 1,
         "per": "own-turn"
-      }
+      },
+      "actions": [
+        {
+          "id": "boon-of-combat-prowess",
+          "name": "Peerless Aim",
+          "activation": "other",
+          "description": "When you miss with an attack roll, you can hit instead. Once you use this benefit, you can't use it again until the start of your next turn.",
+          "damage": [],
+          "answer": {
+            "rolls": [
+              "attack"
+            ],
+            "when": "failure",
+            "effect": {
+              "kind": "hit"
+            }
+          }
+        }
+      ]
     }
   },
   {
@@ -494,7 +512,31 @@
       "uses": {
         "limit": 1,
         "per": "encounter"
-      }
+      },
+      "actions": [
+        {
+          "id": "boon-of-fate",
+          "name": "Improve Fate",
+          "activation": "other",
+          "description": "When you or another creature within 60 feet of you succeeds on or fails a D20 Test, roll 2d4 and apply the total as a bonus or penalty to the d20 roll. Once you use it, you can't use it again until you roll Initiative or finish a Short or Long Rest.",
+          "damage": [],
+          "answer": {
+            "rolls": [
+              "attack",
+              "save",
+              "check",
+              "death-save"
+            ],
+            "whose": "any",
+            "rangeFeet": 60,
+            "when": "any",
+            "effect": {
+              "kind": "add-or-subtract",
+              "amount": "2d4"
+            }
+          }
+        }
+      ]
     }
   },
   {

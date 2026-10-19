@@ -1836,7 +1836,51 @@
        "count": 1,
        "rangeFeet": 60,
        "who": "others"
-      }
+      },
+      "grants": {
+       "name": "Bardic Inspiration",
+       "tags": [
+        "bardic-inspiration"
+       ],
+       "target": "target",
+       "duration": {
+        "type": "minutes",
+        "minutes": 60
+       },
+       "notSelf": true,
+       "onlyOne": true,
+       "answer": {
+        "rolls": [
+         "attack",
+         "save",
+         "check",
+         "death-save"
+        ],
+        "when": "failure",
+        "effect": {
+         "kind": "add",
+         "amount": "1d6"
+        }
+       }
+      },
+      "answerAmountByLevel": [
+       {
+        "level": 1,
+        "amount": "1d6"
+       },
+       {
+        "level": 5,
+        "amount": "1d8"
+       },
+       {
+        "level": 10,
+        "amount": "1d10"
+       },
+       {
+        "level": 15,
+        "amount": "1d12"
+       }
+      ]
      }
     ]
    },
@@ -1902,7 +1946,34 @@
     "id": "countercharm",
     "name": "Countercharm",
     "level": 7,
-    "description": "You can use musical notes or words of power to disrupt mind-influencing effects. If you or a creature within 30 feet of you fails a saving throw against an effect that applies the Charmed or Frightened condition, you can take a Reaction to cause the save to be rerolled, and the new roll has Advantage."
+    "description": "You can use musical notes or words of power to disrupt mind-influencing effects. If you or a creature within 30 feet of you fails a saving throw against an effect that applies the Charmed or Frightened condition, you can take a Reaction to cause the save to be rerolled, and the new roll has Advantage.",
+    "actions": [
+     {
+      "id": "countercharm",
+      "name": "Countercharm",
+      "activation": "reaction",
+      "description": "When you or a creature within 30 feet of you fails a saving throw against an effect that applies the Charmed or Frightened condition, take a Reaction to have the save rerolled with Advantage.",
+      "damage": [],
+      "answer": {
+       "rolls": [
+        "save"
+       ],
+       "whose": "any",
+       "rangeFeet": 30,
+       "when": "failure",
+       "versus": {
+        "conditions": [
+         "charmed",
+         "frightened"
+        ]
+       },
+       "effect": {
+        "kind": "reroll",
+        "advantage": true
+       }
+      }
+     }
+    ]
    },
    {
     "id": "magical-secrets",
@@ -4776,7 +4847,48 @@
     "id": "tactical-mind",
     "name": "Tactical Mind",
     "level": 2,
-    "description": "You have a mind for tactics on and off the battlefield. When you fail an ability check, you can expend a use of Second Wind to push yourself toward success. Roll 1d10 and add it to the check, potentially turning it into a success. If the check still fails, this use of Second Wind isn't expended."
+    "description": "You have a mind for tactics on and off the battlefield. When you fail an ability check, you can expend a use of Second Wind to push yourself toward success. Roll 1d10 and add it to the check, potentially turning it into a success. If the check still fails, this use of Second Wind isn't expended.",
+    "uses": {
+     "per": "long-rest",
+     "pool": "second-wind",
+     "scaling": {
+      "type": "by-level",
+      "table": [
+       {
+        "level": 1,
+        "limit": 2
+       },
+       {
+        "level": 4,
+        "limit": 3
+       },
+       {
+        "level": 10,
+        "limit": 4
+       }
+      ]
+     }
+    },
+    "actions": [
+     {
+      "id": "tactical-mind",
+      "name": "Tactical Mind",
+      "activation": "other",
+      "description": "When you fail an ability check, expend a use of Second Wind to roll 1d10 and add it to the check. If the check still fails, the use isn't expended.",
+      "damage": [],
+      "answer": {
+       "rolls": [
+        "check"
+       ],
+       "when": "failure",
+       "effect": {
+        "kind": "add",
+        "amount": "1d10",
+        "keepUseOnFailure": true
+       }
+      }
+     }
+    ]
    },
    {
     "id": "fighter-subclass",
@@ -4848,7 +4960,29 @@
        }
       ]
      }
-    }
+    },
+    "actions": [
+     {
+      "id": "indomitable",
+      "name": "Indomitable",
+      "activation": "other",
+      "description": "When you fail a saving throw, reroll it with a bonus equal to your Fighter level. You must use the new roll.",
+      "damage": [],
+      "adds": {
+       "classLevel": 1
+      },
+      "answer": {
+       "rolls": [
+        "save",
+        "death-save"
+       ],
+       "when": "failure",
+       "effect": {
+        "kind": "reroll"
+       }
+      }
+     }
+    ]
    },
    {
     "id": "tactical-master",
@@ -5623,7 +5757,40 @@
     "id": "deflect-attacks",
     "name": "Deflect Attacks",
     "level": 3,
-    "description": "When an attack roll hits you and its damage includes Bludgeoning, Piercing, or Slashing damage, you can take a Reaction to reduce the attack's total damage against you. The reduction equals 1d10 plus your Dexterity modifier and Monk level. If you reduce the damage to 0, you can expend 1 Focus Point to redirect some of the attack's force. If you do so, choose a creature you can see within 5 feet of yourself if the attack was a melee attack or a creature you can see within 60 feet of yourself that isn't behind Total Cover if the attack was a ranged attack. That creature must succeed on a Dexterity saving throw or take damage equal to two rolls of your Martial Arts die plus your Dexterity modifier. The damage is the same type dealt by the attack."
+    "description": "When an attack roll hits you and its damage includes Bludgeoning, Piercing, or Slashing damage, you can take a Reaction to reduce the attack's total damage against you. The reduction equals 1d10 plus your Dexterity modifier and Monk level. If you reduce the damage to 0, you can expend 1 Focus Point to redirect some of the attack's force. If you do so, choose a creature you can see within 5 feet of yourself if the attack was a melee attack or a creature you can see within 60 feet of yourself that isn't behind Total Cover if the attack was a ranged attack. That creature must succeed on a Dexterity saving throw or take damage equal to two rolls of your Martial Arts die plus your Dexterity modifier. The damage is the same type dealt by the attack.",
+    "actions": [
+     {
+      "id": "deflect-attacks",
+      "name": "Deflect Attacks",
+      "activation": "reaction",
+      "description": "When an attack roll hits you and its damage includes Bludgeoning, Piercing, or Slashing damage, take a Reaction to reduce the attack's total damage against you by 1d10 plus your Dexterity modifier and Monk level.",
+      "damage": [],
+      "reaction": {
+       "trigger": "hit-by-attack",
+       "response": "reduce-damage",
+       "formula": "1d10",
+       "damageTypes": [
+        "bludgeoning",
+        "piercing",
+        "slashing"
+       ]
+      },
+      "reactionByLevel": [
+       {
+        "level": 13,
+        "reaction": {
+         "trigger": "hit-by-attack",
+         "response": "reduce-damage",
+         "formula": "1d10"
+        }
+       }
+      ],
+      "adds": {
+       "classLevel": 1,
+       "abilityModifier": "dex"
+      }
+     }
+    ]
    },
    {
     "id": "monk-subclass",
@@ -5780,7 +5947,34 @@
       "wis",
       "cha"
      ]
-    }
+    },
+    "uses": {
+     "scaling": {
+      "type": "class-resource",
+      "id": "focus-points"
+     },
+     "per": "short-rest",
+     "pool": "focus-points"
+    },
+    "actions": [
+     {
+      "id": "disciplined-survivor",
+      "name": "Disciplined Survivor",
+      "activation": "other",
+      "description": "When you fail a saving throw, expend 1 Focus Point to reroll it. You must use the new roll.",
+      "damage": [],
+      "answer": {
+       "rolls": [
+        "save",
+        "death-save"
+       ],
+       "when": "failure",
+       "effect": {
+        "kind": "reroll"
+       }
+      }
+     }
+    ]
    },
    {
     "id": "perfect-focus",
@@ -8748,7 +8942,29 @@
     "uses": {
      "limit": 1,
      "per": "short-rest"
-    }
+    },
+    "actions": [
+     {
+      "id": "stroke-of-luck",
+      "name": "Stroke of Luck",
+      "activation": "other",
+      "description": "When you fail a D20 Test, turn the d20 roll into a 20.",
+      "damage": [],
+      "answer": {
+       "rolls": [
+        "attack",
+        "save",
+        "check",
+        "death-save"
+       ],
+       "when": "failure",
+       "effect": {
+        "kind": "set-d20",
+        "face": 20
+       }
+      }
+     }
+    ]
    }
   ]
  },

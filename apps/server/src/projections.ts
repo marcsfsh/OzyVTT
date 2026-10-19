@@ -224,7 +224,11 @@ const PENDING_SAVE_FIELDS = {
   // The save's own roll mode is read when it is answered.
   advantageAtSize: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
-  gmApplies: "player"
+  gmApplies: "player",
+  // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
+  spell: "never",
+  // Who was asked to answer it would name them; the player is told only that it waits (`awaitingAnswer`).
+  confirmed: "derived"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
@@ -280,7 +284,17 @@ const PENDING_REACTION_FIELDS = {
   // The cast a Counterspell decides: its action, targets and slot are the caster's, not the reactor's.
   parkedCast: "never",
   // Sent as `attackRoll`, and only when the roll it came from is in the player's dice log.
-  attackTotal: "derived"
+  attackTotal: "derived",
+  // What kind of roll the reactor is asked to answer, and what its own answer does.
+  rollKind: "player",
+  answerDoes: "player",
+  answerEither: "player",
+  damageResponse: "player",
+  // The save it waits on and who else was asked are the GM's bookkeeping.
+  saveId: "never",
+  asked: "never",
+  drain: "never",
+  hitKinds: "never"
 } as const satisfies Record<keyof PendingReaction, FieldAudience>;
 
 const PENDING_RULE_ASK_FIELDS = {
@@ -405,6 +419,7 @@ export function projectPlayerCombat(
           ...copyPlayerFields(entry, PENDING_SAVE_FIELDS),
           actionName: hiddenSource ? withoutSourceName(entry.actionName, entry.sourceName) : entry.actionName,
           sourceName: hiddenSource ? HIDDEN_SOURCE : entry.sourceName,
+          ...(entry.confirmed ? { awaitingAnswer: true as const } : {}),
           ...(onFail
             ? {
                 onFailEffect: {
@@ -465,6 +480,8 @@ function playerEffect(
     endsWhenUnaffected: _endsWhenUnaffected,
     // A long casting's targets and slot are the caster's plan; its name says what is being cast.
     longCast: _longCast,
+    // What a hit on the bearer costs its attacker names a save's DC; the server applies it.
+    struck: _struck,
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);

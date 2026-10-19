@@ -86,19 +86,19 @@ export function ActionResultCard({
       {result.waitingOnReaction &&
         result.attack &&
         (() => {
-          // The target's Parry or Shield may turn this hit into a miss; its answer finishes the attack, damage and all.
-          const targetId = result.attack.targetId;
-          const prompt = result.reactionPrompts?.find((candidate) => candidate.actorId === targetId);
+          // The target's Parry or Shield, or another creature's answer to the roll (Cutting Words), may turn this hit
+          // into a miss; its answer finishes the attack, damage and all.
+          const prompt = result.reactionPrompts?.[0];
           const waiting = state.combat.pendingReactions.some(
             (reaction) =>
-              reaction.kind === "attack-would-hit" &&
-              reaction.actorId === targetId &&
+              (reaction.kind === "attack-would-hit" || reaction.kind === "roll-answer") &&
               reaction.sourceActorId === actor.id
           );
           return waiting ? (
             <p className="action-save-note">
-              Waiting on {result.attack.targetName}'s <strong>{prompt?.actionName ?? "reaction"}</strong>. Answer it in
-              Needs you, and the attack finishes there.
+              Waiting on {prompt?.actorName ?? result.attack.targetName}'s{" "}
+              <strong>{prompt?.actionName ?? "reaction"}</strong>. Answer it in Needs you, and the attack finishes
+              there.
             </p>
           ) : (
             <p className="action-applied">
@@ -153,17 +153,21 @@ export function ActionResultCard({
       {result.attack &&
         result.damageTotal > 0 &&
         (() => {
-          // A reaction window (Uncanny Dodge) parked this damage on a prompt whose answer applies it
-          // server-side, so no apply button here (it would double-apply).
-          const prompt = result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId);
+          // A reaction window (Uncanny Dodge, Cutting Words on the damage roll) parked this damage on a prompt whose
+          // answer applies it server-side, so no apply button here (it would double-apply). Each answer may hand it
+          // on to the next prompt, so the one still holding it is named.
+          const prompt =
+            result.reactionPrompts?.find((candidate) => candidate.holdsDamage) ??
+            result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId);
           if (prompt) {
-            const waiting = state.combat.pendingReactions.some(
-              (reaction) => reaction.actorId === result.attack!.targetId && reaction.sourceActorId === actor.id
+            const holding = state.combat.pendingReactions.find(
+              (reaction) => reaction.sourceActorId === actor.id && reaction.proposedDamageParts.length > 0
             );
-            return waiting ? (
+            const holder = state.actors.find((candidate) => candidate.id === holding?.actorId)?.name;
+            return holding ? (
               <p className="action-save-note">
-                Waiting on {result.attack.targetName}'s <strong>{prompt.actionName}</strong>. Answer it in Needs you,
-                and the damage applies there.
+                Waiting on {holder ? `${holder}'s ` : ""}
+                <strong>{holding.actionName}</strong>. Answer it in Needs you, and the damage applies there.
               </p>
             ) : (
               <p className="action-applied">{prompt.actionName} answered. The damage was handled in Needs you.</p>

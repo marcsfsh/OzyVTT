@@ -58,6 +58,24 @@ export type SampleRemovalResult = MutationResult & {
 };
 export type SceneCreateResult = MutationResult & { sceneId?: string };
 
+/** A way the roller may still change a roll it sees, sent back as `answer` with its next look: a Bardic Inspiration
+ *  die, Indomitable's reroll, Stroke of Luck. */
+export type RollAnswerOffer = Readonly<{
+  /** What the answer names: the action's id, or `effect:<id>` for an effect that carries one. */
+  id: string;
+  name: string;
+  /** What it does, for its button: "+1d8", "Reroll +9", "Reroll with Advantage", "The d20 becomes 20". */
+  does: string;
+  /** What using it spends ("a use", "the Reaction and a use"), or null. */
+  cost: string | null;
+  /** The die may be added or taken off (Boon of Fate); `subtract` on the answer takes it off. */
+  either?: true;
+  /** It rerolls the d20, so a typed roll's answer carries the face the physical reroll shows. */
+  rerolls?: true;
+}>;
+/** An answer a roll took, as its result says it: "Bardic Inspiration +5", "Indomitable: rerolled". */
+export type RollAnswered = Readonly<{ name: string; change: string }>;
+
 /** Server-computed outcome of resolving a definition action (rolls already recorded in the roll history). */
 export type ActionResolutionAttack = Readonly<{
   targetId: string;
@@ -74,6 +92,10 @@ export type ActionResolutionAttack = Readonly<{
   /** Dice an effect adds to the roll, in `total` (Bless +1d4, Bane -1d4). A preview leaves `total` null: they roll
    *  when the attack is confirmed. */
   bonusDice?: ReadonlyArray<Readonly<{ label: string; dice: string; total: number | null }>>;
+  /** What answered the roll after it was seen, already in `total` and `outcome`. */
+  answered?: readonly RollAnswered[];
+  /** On a preview, the answers the attacker may still give it. */
+  answers?: readonly RollAnswerOffer[];
 }>;
 /** Every source behind an attack's advantage/disadvantage, so the table can see the math (ADR-0020). */
 export type ActionRollMode = Readonly<{
@@ -119,6 +141,8 @@ export type HitOffer = Readonly<{
   effectsChoose?: number;
   /** It is chosen with one effect or not at all (Open Hand Technique). */
   effectRequired?: true;
+  /** It rolls the weapon's own dice again rather than adding any (Savage Attacker); `dice` names them. */
+  rerolls?: true;
 }>;
 /** One effect a hit offer carries: its id, its name and what it costs ("-1d6"). */
 export type HitOfferEffect = Readonly<{ id: string; name: string; cost?: string }>;
@@ -179,7 +203,9 @@ export type ActionResolution = Readonly<{
   /** On a previewed hit, the push its weapon mastery offers (SRD "up to 10 feet"); the confirm says how far with `pushFeet`. */
   push?: Readonly<{ targetName: string; maxFeet: number }> | null;
   /** Reaction prompts this hit opened (Uncanny Dodge): the triggering damage waits on the answer. */
-  reactionPrompts?: ReadonlyArray<Readonly<{ actorId: string; actorName: string; actionName: string }>>;
+  reactionPrompts?: ReadonlyArray<
+    Readonly<{ actorId: string; actorName: string; actionName: string; holdsDamage?: true }>
+  >;
   /** An extra attack this swing opened (Cleave's swing at a second creature), for the result card to offer. */
   opens?: Readonly<{ actionId: string; actionName: string }>;
   /** The attack would hit, and the target's reaction (Parry, Shield) may still turn it into a miss. Nothing past the
@@ -247,6 +273,8 @@ export type DeathSaveResult = MutationResult & {
     /** The d20 mode when it had Advantage or Disadvantage; absent for a plain roll. */ rollMode?:
       "advantage" | "disadvantage" | "normal";
     /** What gave the death save Advantage or Disadvantage. */ rollModeSources?: ActionRollMode;
+    /** What answered the roll, already in its numbers. */ answered?: readonly RollAnswered[];
+    /** On a preview, the answers the dying character may still give it. */ answers?: readonly RollAnswerOffer[];
   }>;
 };
 /** A check the server rolled. A blind roll's numbers stay with the GM: the roller gets `hiddenFromRoller` alone. */
@@ -264,6 +292,10 @@ export type CheckRollOutcome = Readonly<{
   reliableTalent?: true;
   /** The d20 was typed from a physical die. */
   typed?: true;
+  /** What answered the check, already in its numbers. */
+  answered?: readonly RollAnswered[];
+  /** The answers the roller may still give it (`check.answer`). */
+  answers?: readonly RollAnswerOffer[];
   rollId: string;
 }>;
 export type CheckRollResult = MutationResult & { check?: CheckRollOutcome; hiddenFromRoller?: boolean };
@@ -292,6 +324,10 @@ export type SaveAnswerResult = MutationResult & {
     /** Advantage/disadvantage sources that shaped the save roll (Restrained, Dodge). */ rollMode?: ActionRollMode;
     /** The typed breakdown behind `appliedDamage`; absent when the save applied no damage. */ parts?: DamageApplication["parts"];
     /** Flat reduction taken off before Resistance. */ flatReduction?: number;
+    /** What answered the save, already in its numbers. */ answered?: readonly RollAnswered[];
+    /** On a preview, the answers the saving creature may still give it. */ answers?: readonly RollAnswerOffer[];
+    /** The confirm waits on another creature's answer to the roll (Countercharm). */ awaitingAnswer?: true;
+    /** The damage waits on the target's own reaction to taking it (Stone's Endurance). */ damageHeld?: true;
   };
 };
 /** A loose saving throw (none was owed): its total and d20, or the condition that failed it without a roll. */

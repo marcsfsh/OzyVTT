@@ -540,17 +540,35 @@ describe("Bardic Inspiration: the counter the class is built around", () => {
     expect(actionOf(build(bard(1, 15)), "bardic-inspiration")?.activation).toBe("bonus-action");
   });
 
-  it("spends the die three times and then refuses the fourth", () => {
+  it("gives the die three times and then refuses the fourth", () => {
     const definition = build(bard(1, 15));
     const state = encounterWith(definition);
     const inspire = actionOf(definition, "bardic-inspiration")!;
+    const give = () =>
+      resolveDefinitionAction(
+        state,
+        inspire,
+        { actorId: HERO, targetIds: [FOE], commandId: command() },
+        deps(definition)
+      );
     for (let spent = 1; spent <= 3; spent += 1) {
-      resolveDefinitionAction(state, inspire, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition));
+      give();
       expect(state.actors[0].actionUses["bardic-inspiration"]).toBe(spent);
+      // The die the creature holds is the Bardic Die column's at this level.
+      expect(state.actors[1].effects[0]?.answer?.effect).toEqual({ kind: "add", amount: "1d6" });
+      state.actors[1].effects = [];
     }
-    expect(() =>
-      resolveDefinitionAction(state, inspire, { actorId: HERO, targetIds: [], commandId: command() }, deps(definition))
-    ).toThrowError(/no uses remaining \(3\/Long Rest\)/);
+    expect(give).toThrowError(/no uses remaining \(3\/Long Rest\)/);
+  });
+
+  it("gives a d8 from level 5, and a d12 from level 15", () => {
+    const dieAt = (level: number) =>
+      actionOf(
+        build(bard(level, 15, level >= 3 ? loreSkills("history", "arcana", "nature") : [])),
+        "bardic-inspiration"
+      )?.grants?.answer?.effect;
+    expect(dieAt(5)).toEqual({ kind: "add", amount: "1d8" });
+    expect(dieAt(15)).toEqual({ kind: "add", amount: "1d12" });
   });
 
   it("lets Cutting Words and Peerless Skill spend that SAME counter", () => {
@@ -577,7 +595,7 @@ describe("Bardic Inspiration: the counter the class is built around", () => {
     resolveDefinitionAction(
       state,
       actionOf(definition, "bardic-inspiration")!,
-      { actorId: HERO, targetIds: [], commandId: command() },
+      { actorId: HERO, targetIds: [FOE], commandId: command() },
       deps(definition)
     );
     expect(state.actors[0].actionUses["bardic-inspiration"]).toBe(3);

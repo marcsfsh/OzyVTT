@@ -45,9 +45,18 @@ import { hitRiderOf } from "./hit-riders.js";
 import { wardedConditions } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
 import {
+  answeredLines,
+  answersOffered,
+  applyRollAnswer,
+  withAnswers,
+  type AnswerDeps,
+  type AnswerTarget
+} from "../roll-answers.js";
+import {
   endedEffect,
   naturalFace,
   recordRoll,
+  tableLineOf,
   type DefinitionAction,
   type LiveActor,
   type ResolveContext
@@ -493,7 +502,7 @@ function rollBonusDice(
 /** The attack roll against the one target: rider filters, roll mode, bonus, the d20 and the outcome
  *  (2024: a hit on an Unconscious or Paralyzed creature from within 5 feet is a critical hit). */
 export function rollAttack(ctx: ResolveContext): void {
-  const { attacker, targets, input, deps, derivation, warnings } = ctx;
+  const { state, attacker, targets, input, deps, derivation, warnings } = ctx;
   const action: DefinitionAction = ctx.action;
   // The spell this action is, on both branches: the spell filters must gate a save spell's riders too.
   const spell = action.spellId === undefined ? undefined : deps.catalog?.spellRecord?.(action.spellId);
@@ -559,11 +568,18 @@ export function rollAttack(ctx: ResolveContext): void {
   const bonus = action.attack.bonus + exhaustionPenalty(attacker) + momentaryAttackBonus + (sundering ? 5 : 0);
   if (exhaustionLevel(attacker) > 0)
     warnings.push(`Exhaustion ${exhaustionLevel(attacker)}: −${2 * exhaustionLevel(attacker)} to the attack roll.`);
-  const { naturalRoll, total: rolled, declaredCrit } = rollD20(ctx, mode, bonus);
+  // What answered this roll on an earlier look (`roll-answers.ts`) counts in this one; a confirm releases the die, so
+  // the answers are read first.
+  const answeredBefore = input.holdKey ? heldRollFor(state, input.holdKey) : undefined;
+  if (input.answer && (input.commit !== false || input.holdKey === undefined || input.reroll === true))
+    throw new CommandRejectedError("Answer the attack roll on a look of its own, before you confirm it.");
+  if (input.answer && !answeredBefore)
+    throw new CommandRejectedError("Roll first: an answer meets a roll that was made.");
+  let thrown = rollD20(ctx, mode, bonus);
   // Dice riders are never folded into the bonus, standing or not.
   const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
   const bonusDice = rollBonusDice(ctx, diceRiders([...standing, ...atRoll], "attack-bonus"));
-  const total = rolled + bonusDice.reduce((sum, entry) => sum + (entry.total ?? 0), 0);
+  const diceTotal = bonusDice.reduce((sum, entry) => sum + (entry.total ?? 0), 0);
   const manualTotal = input.attackTotal !== undefined;
 
   // Cover raises the effective AC (SRD Cover: +2 half, +5 three-quarters), and so does a reaction against this
@@ -571,43 +587,110 @@ export function rollAttack(ctx: ResolveContext): void {
   const reactionBonus = input.reactionAcBonus?.amount ?? 0;
   const inPlay = armorClassInPlay(target);
   const targetAc = inPlay !== undefined ? inPlay + ctx.coverBonus + reactionBonus : null;
-  // A declared crit (total mode) or a natural roll at or above the threshold crits (a `critical-range`
-  // rider can widen it); a nat 1 fumbles when the die is known or, with a typed total, declared.
-  ctx.crit =
-    declaredCrit || (!manualTotal && naturalRoll >= criticalThreshold(derivation, attacker, action, ctx.riderFilters));
-  let outcome = ctx.crit
-    ? ("crit" as const)
-    : naturalRoll === 1
-      ? ("fumble" as const)
-      : targetAc === null
-        ? ("unknown" as const)
-        : total >= targetAc
-          ? ("hit" as const)
-          : ("miss" as const);
-  // SRD Greater Magic Resistance: "the attack rolls of spells automatically miss it". Said to the GM only, since the
-  // reason names a trait of the stat block.
-  if (action.spellId !== undefined && magicResistanceOf(targetDefinition) === "succeeds") {
-    outcome = "miss";
-    ctx.crit = false;
-    if (deps.initiatorRole !== "player")
-      warnings.push(`${target.name}'s Greater Magic Resistance: spell attack rolls automatically miss it.`);
-  }
-  if (outcome === "hit" && (has(target, "unconscious") || has(target, "paralyzed"))) {
-    if ((distance !== null && distance <= 5) || (distance === null && action.attack.reachFeet !== undefined)) {
-      outcome = "crit";
-      ctx.crit = true;
+  const answersHeld = () =>
+    input.commit === false && input.holdKey !== undefined ? heldRollFor(state, input.holdKey) : answeredBefore;
+  /** The roll as its die, its bonus and its answers make it, against the target's AC. */
+  const judge = () => {
+    const read = withAnswers(answersHeld(), thrown.naturalRoll, thrown.total + diceTotal);
+    const naturalRoll = read.natural;
+    // A declared crit (total mode) or a natural roll at or above the threshold crits (a `critical-range`
+    // rider can widen it); a nat 1 fumbles when the die is known or, with a typed total, declared.
+    let crit =
+      thrown.declaredCrit ||
+      (!manualTotal && naturalRoll >= criticalThreshold(derivation, attacker, action, ctx.riderFilters));
+    let outcome: "crit" | "fumble" | "unknown" | "hit" | "miss" = crit
+      ? "crit"
+      : naturalRoll === 1
+        ? "fumble"
+        : targetAc === null
+          ? "unknown"
+          : read.total >= targetAc
+            ? "hit"
+            : "miss";
+    // SRD Greater Magic Resistance: "the attack rolls of spells automatically miss it".
+    const resisted = action.spellId !== undefined && magicResistanceOf(targetDefinition) === "succeeds";
+    if (resisted) {
+      outcome = "miss";
+      crit = false;
     }
+    // Boon of Combat Prowess: "When you miss with an attack roll, you can hit instead."
+    if (read.hit && !resisted && (outcome === "miss" || outcome === "fumble")) outcome = "hit";
+    if (outcome === "hit" && (has(target, "unconscious") || has(target, "paralyzed"))) {
+      if ((distance !== null && distance <= 5) || (distance === null && reachFeet !== undefined)) {
+        outcome = "crit";
+        crit = true;
+      }
+    }
+    return { naturalRoll, total: read.total, outcome, crit, resisted, read };
+  };
+  const reachFeet = action.attack.reachFeet;
+  let judged = judge();
+  const answerTarget = (): AnswerTarget => ({
+    kind: "attack",
+    roller: attacker,
+    key: input.holdKey ?? "",
+    natural: judged.naturalRoll,
+    total: judged.total,
+    // A miss fails and a hit succeeds; an attack with no AC on record is the GM's to judge.
+    threshold: judged.outcome === "unknown" ? null : targetAc,
+    ...(judged.outcome === "fumble" || judged.resisted
+      ? { automatic: "fail" as const }
+      : judged.outcome === "crit" || judged.read.hit
+        ? { automatic: "succeed" as const }
+        : {}),
+    mode: ctx.rollMode?.mode ?? mode,
+    purpose: "attack",
+    label: `${action.name} attack roll`,
+    visibility: ctx.rollBase.visibility
+  });
+  if (input.answer) {
+    const events = applyRollAnswer(state, answerTarget(), attacker, input.answer, attackAnswerDeps(ctx));
+    for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
+    // A reroll answer changed the held die; this look reads it.
+    thrown = rollD20(ctx, mode, bonus);
+    judged = judge();
   }
+  ctx.crit = judged.crit;
+  if (judged.resisted && deps.initiatorRole !== "player")
+    warnings.push(`${target.name}'s Greater Magic Resistance: spell attack rolls automatically miss it.`);
+  const held = answersHeld();
+  ctx.attackAnswerBonus = judged.read.bonus;
+  ctx.answeredHit = judged.read.hit;
+  const answered = answeredLines(held);
+  const offered =
+    input.commit === false && input.holdKey !== undefined && held !== undefined
+      ? answersOffered(state, answerTarget(), attackAnswerDeps(ctx))
+      : [];
   ctx.attack = {
     targetId: target.id,
     targetName: target.name,
-    total,
-    naturalRoll,
+    total: judged.total,
+    naturalRoll: judged.naturalRoll,
     targetAc,
-    outcome,
+    outcome: judged.outcome,
     ...(ctx.coverBonus > 0 ? { coverBonus: ctx.coverBonus } : {}),
     ...(input.reactionAcBonus ? { reactionAcBonus: { ...input.reactionAcBonus } } : {}),
-    ...(bonusDice.length > 0 ? { bonusDice } : {})
+    ...(bonusDice.length > 0 ? { bonusDice } : {}),
+    ...(answered.length > 0 ? { answered } : {}),
+    ...(offered.length > 0 ? { answers: offered } : {})
+  };
+}
+
+/** What an answer to an attack roll needs from the resolve. */
+function attackAnswerDeps(ctx: ResolveContext): AnswerDeps {
+  const { deps } = ctx;
+  return {
+    // The attacker's own sheet is the one the resolve holds, read when no other lookup is given.
+    resolveDefinition: (id) =>
+      deps.resolveDefinition?.(id) ?? (id === ctx.attacker.definitionId ? deps.definition : undefined),
+    ...(deps.catalog ? { catalog: deps.catalog } : {}),
+    random: deps.random,
+    newRollId: deps.newRollId,
+    sessionId: ctx.rollBase.initiatorSessionId,
+    role: ctx.rollBase.initiatorRole,
+    now: deps.now,
+    commandId: ctx.input.commandId,
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
   };
 }
 

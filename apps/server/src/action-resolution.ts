@@ -53,11 +53,12 @@ import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } f
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { endTargetMarks } from "./resolution/action-targets.js";
-import { markMultiattackDefense, strikeBackOnHit } from "./resolution/struck.js";
+import { markMultiattackDefense, strikeBackFromEffects, strikeBackOnHit } from "./resolution/struck.js";
 import {
   parkActionSave,
   parkBurstSave,
   parkForAcReaction,
+  parkForRollAnswer,
   parkHeldObjectSave,
   parkReaction
 } from "./resolution/pending.js";
@@ -146,8 +147,9 @@ export function resolveDefinitionAction(
     spendSteadyAim(ctx);
     spendForgoneDeclaration(ctx);
   }
-  // A hit the target's Parry or Shield may still turn into a miss: the attack is spent, and the answer finishes it.
-  if (parkForAcReaction(ctx)) {
+  // A roll another creature may still answer (Cutting Words), or a hit the target's Parry or Shield may still turn into
+  // a miss: the attack is spent, and the answer finishes it.
+  if (parkForRollAnswer(ctx) || parkForAcReaction(ctx)) {
     commitEconomy(ctx);
     rollLastCharge(ctx);
     spendAmmunition(ctx);
@@ -173,6 +175,7 @@ export function resolveDefinitionAction(
 
   applyOnHitEffects(ctx);
   strikeBackOnHit(ctx);
+  strikeBackFromEffects(ctx);
   markMultiattackDefense(ctx);
   applyMasteryForces(ctx);
   startConcentration(ctx);

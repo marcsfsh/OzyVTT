@@ -127,6 +127,15 @@ export function itemAction(
       }
     : undefined;
   const uses = usesOf(declared.uses, definition, item);
+  // "1d10 + your Dexterity modifier" taken off the damage (Gloves of Missile Snaring), read off the bearer.
+  const added = declared.adds
+    ? (declared.adds.abilityModifier ? scoreModifierOf(definition, declared.adds.abilityModifier) : 0) +
+      (declared.adds.proficiencyBonus ? caster.proficiencyBonus : 0)
+    : 0;
+  const reaction =
+    declared.reaction?.response === "reduce-damage" && added !== 0
+      ? { ...declared.reaction, formula: formulaPlus(declared.reaction.formula, added) }
+      : declared.reaction;
   return {
     id: itemActionId(itemId, declared.id),
     name: declared.name,
@@ -148,7 +157,10 @@ export function itemAction(
     // Who it may target (a flask's one creature within 20 feet) and the hit it rides (a staff's charge on a hit).
     ...(declared.targets ? { targets: structuredClone(declared.targets) } : {}),
     ...(declared.ridesHit ? { ridesHit: itemHitRider(declared.ridesHit, definition) } : {}),
-    ...(declared.onHit ? { onHit: structuredClone(declared.onHit) } : {})
+    ...(declared.onHit ? { onHit: structuredClone(declared.onHit) } : {}),
+    // A roll it answers (a Ring of Evasion's Evade) and the trigger it is offered on (a Reaction's).
+    ...(declared.answer ? { answer: structuredClone(declared.answer) } : {}),
+    ...(reaction ? { reaction: { ...reaction } } : {})
   };
 }
 
@@ -225,7 +237,15 @@ export function castAction(
     { attackBonus, saveDc: clampDc(saveDc), bearersDc, modifier: scoreModifierOf(definition, ability) },
     { roll: upcast }
   );
-  return { ...base, ...castAreaOf(spell, mechanics), ...mechanics };
+  return {
+    ...base,
+    ...castAreaOf(spell, mechanics),
+    ...mechanics,
+    // A Reaction spell (Shield, Hellish Rebuke) is cast from the item as a Reaction, offered when its trigger happens.
+    ...(spell.effect?.reaction
+      ? { activation: "reaction" as const, reaction: structuredClone(spell.effect.reaction) }
+      : {})
+  };
 }
 
 /** The template a cast places: the spell's area, unless the caster picks its targets in that area (Mass Cure Wounds'

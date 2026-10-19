@@ -1,6 +1,7 @@
 import type { GameState } from "@vtt/domain";
 import {
   ActorSetHeroicInspirationSchema,
+  CheckAnswerSchema,
   CheckRerollSchema,
   CheckRollSchema,
   RollCallAnswerSchema,
@@ -9,6 +10,7 @@ import {
 } from "@vtt/domain/commands";
 import { ABILITY_NAMES, checkLabel } from "../ability-checks.js";
 import {
+  answerAbilityCheck,
   answerRollCall,
   closeRollCall,
   rerollAbilityCheck,
@@ -109,6 +111,7 @@ export const rollCommands = [
       if (duplicate || !result) return;
       kit.publishRolls(state, commandId);
       narrateVerdict(kit, actorId, result, visibility);
+      kit.publishNarrations(result.events ?? []);
       return checkReply(result);
     }
   }),
@@ -143,6 +146,38 @@ export const rollCommands = [
       if (duplicate || !result) return;
       kit.publishRolls(state, request.commandId);
       narrateVerdict(kit, request.actorId, result, visibility);
+      kit.publishNarrations(result.events ?? []);
+      return checkReply(result);
+    }
+  }),
+
+  defineCommand({
+    type: "check.answer",
+    operationId: "answerCheck",
+    description:
+      "Answers a character's latest check with one of the `answers` its result offered, while it is still that character's latest roll (SRD: a roll changed after it is seen, such as a Bardic Inspiration die added to a failed check, Tactical Mind's 1d10, Peerless Skill, Stroke of Luck or the halfling's Luck). The server checks the answer may meet this roll (whose roll, a failure or a success, uses and Reaction left), rolls its die or rerolls the d20 (`answer.face` is the face a physical reroll shows, for a typed check), spends what it costs, and updates the GM's call the check answers. The response carries `check`.",
+    summary: "Answer a character's latest check with a feature that changes a roll after it is seen.",
+    schema: CheckAnswerSchema,
+    malformed: "The answer is malformed.",
+    async run({ principal, request, execute }, kit) {
+      const initiator = initiatorOf(principal);
+      let result: ReturnType<typeof answerAbilityCheck> | undefined;
+      let visibility = "public";
+      const geometry = await kit.liveGeometry();
+      const { state, duplicate } = await execute((draft) => {
+        visibility =
+          draft.heldRolls.find((held) => held.key === `check:${request.actorId}`)?.check?.visibility ?? "public";
+        result = answerAbilityCheck(
+          draft,
+          initiator,
+          { commandId: request.commandId, actorId: request.actorId, answer: request.answer },
+          { ...checkDeps(kit, principal, draft, geometry), commandId: request.commandId }
+        );
+      });
+      if (duplicate || !result) return;
+      kit.publishRolls(state, request.commandId);
+      narrateVerdict(kit, request.actorId, result, visibility);
+      kit.publishNarrations(result.events);
       return checkReply(result);
     }
   }),
@@ -219,6 +254,7 @@ export const rollCommands = [
       if (duplicate || !result) return;
       kit.publishRolls(state, request.commandId);
       narrateVerdict(kit, request.actorId, result, blind ? "gm-only" : "public");
+      kit.publishNarrations(result.events ?? []);
       return checkReply(result);
     }
   }),

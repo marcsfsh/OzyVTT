@@ -3504,7 +3504,26 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "snare-missile",
+    "name": "Snare Missile",
+    "activation": "reaction",
+    "description": "If you're hit by an attack roll made with a Ranged or Thrown weapon while wearing these gloves, you can take a Reaction to reduce the damage by 1d10 plus your Dexterity modifier if you have a free hand. If you reduce the damage to 0, you can catch the ammunition or weapon if it is small enough for you to hold in that hand.",
+    "damage": [],
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "reduce-damage",
+     "formula": "1d10",
+     "attackKinds": [
+      "ranged-weapon"
+     ]
+    },
+    "adds": {
+     "abilityModifier": "dex"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -4367,7 +4386,33 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "luck",
+    "name": "Luck",
+    "activation": "other",
+    "description": "Reroll one failed D20 Test if you don't have the Incapacitated condition. You must use the second roll. Once used, this property can't be used again until the next dawn.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "answer": {
+     "rolls": [
+      "attack",
+      "save",
+      "check",
+      "death-save"
+     ],
+     "whose": "own",
+     "when": "failure",
+     "notWhileIncapacitated": true,
+     "effect": {
+      "kind": "reroll"
+     }
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {
@@ -6084,7 +6129,24 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "attack-deflection",
+    "name": "Attack Deflection",
+    "activation": "reaction",
+    "description": "When you are hit by an attack while holding the weapon, take a Reaction to twirl it around you and gain a +5 bonus to your Armor Class against the triggering attack, potentially causing it to miss. You can't use this property again until you finish a Short or Long Rest.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "short-rest"
+    },
+    "reaction": {
+     "trigger": "hit-by-attack",
+     "response": "ac-bonus",
+     "amount": 5
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {
@@ -6251,6 +6313,19 @@
      "limit": 3,
      "per": "long-rest",
      "pool": "ring-of-evasion-charges"
+    },
+    "answer": {
+     "rolls": [
+      "save"
+     ],
+     "whose": "own",
+     "when": "failure",
+     "abilities": [
+      "dex"
+     ],
+     "effect": {
+      "kind": "succeed"
+     }
     }
    }
   ],
@@ -7972,7 +8047,35 @@
   },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "resist-enchantment",
+    "name": "Resist Enchantment",
+    "activation": "other",
+    "description": "If you fail a saving throw against an Enchantment spell that targets only you, you can turn your failed save into a successful one. You can't use this property of the staff again until the next dawn.",
+    "damage": [],
+    "uses": {
+     "limit": 1,
+     "per": "long-rest"
+    },
+    "answer": {
+     "rolls": [
+      "save"
+     ],
+     "whose": "own",
+     "when": "failure",
+     "versus": {
+      "spellSchools": [
+       "enchantment"
+      ],
+      "singleTarget": true
+     },
+     "effect": {
+      "kind": "succeed"
+     }
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },

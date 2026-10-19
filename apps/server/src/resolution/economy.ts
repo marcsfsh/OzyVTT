@@ -440,7 +440,7 @@ function shownEffectName(
  *  actions and feature activations included; a required effect (Frenzy needs Rage) must be active, and a raging
  *  Barbarian can't cast spells. */
 function checkAbleToAct({ state, attacker, action, resolveDefinition, violations }: Evaluation): void {
-  if (action.activation !== "other" || !ANSWERS_A_ROLL.has(action.id)) {
+  if (action.activation !== "other" || !(ANSWERS_A_ROLL.has(action.id) || action.answer !== undefined)) {
     const incapacitating = incapacitatingCondition(attacker);
     if (incapacitating !== null)
       violations.push({
@@ -627,6 +627,12 @@ function checkLoading({ state, attacker, action, onOwnTurn, violations }: Evalua
 /** Sneak Attack, a smite and the like add their dice to a hit, so they're chosen on the attack's result before it
  *  is confirmed; taken alone they would deal damage with no hit to ride. */
 function checkTakenAlone({ state, attacker, action, onOwnTurn, violations }: Evaluation): void {
+  // Its cost is spent by the answer itself (`roll-answers.ts`), offered on the roll's own result.
+  if (action.answer)
+    violations.push({
+      rule: "roll.answers-a-roll",
+      message: `${action.name} answers a roll: use it on the roll's result, once the roll is shown.`
+    });
   const rider = hitRiderOf(action);
   if (!rider) return;
   // Brutal Strike is decided before the roll, so its tap stands alone, on the Barbarian's own turn.

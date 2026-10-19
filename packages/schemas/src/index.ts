@@ -45,6 +45,79 @@ export const HealingFormulaSchema = z
   .regex(/^(?:\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?|\d+)$/i, "Use dice such as 2d8 + 3, or a number.");
 export const AbilitySchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 export type AbilityId = z.infer<typeof AbilitySchema>;
+
+/** The rolls an answer can change: the three D20 Tests (a check includes Initiative), a death save, and a damage
+ *  roll. */
+export const RollAnswerRollSchema = z.enum(["attack", "save", "check", "death-save", "damage"]);
+export type RollAnswerRoll = z.infer<typeof RollAnswerRollSchema>;
+
+/**
+ * What an answer does to the roll it answers:
+ * - add / subtract: roll `amount` and add it to the total, or take it off (Bardic Inspiration, Cutting Words).
+ *   `keepUseOnFailure`: the use comes back when the roll still fails (Peerless Skill, Tactical Mind).
+ * - add-or-subtract: the answerer picks the sign when it answers (Boon of Fate).
+ * - reroll: throw the d20s again and use the new roll (Indomitable). `one` rerolls only the die that counts (the
+ *   halfling's Luck), `bonus` adds to the new roll, `advantage` rerolls it with Advantage (Countercharm).
+ * - set-d20: the d20 that counts becomes `face` (Stroke of Luck).
+ * - succeed: a failed save succeeds (Ring of Evasion). hit: a missed attack hits (Boon of Combat Prowess).
+ */
+export const RollAnswerEffectSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("add"),
+      amount: DamageFormulaSchema,
+      keepUseOnFailure: z.literal(true).optional()
+    })
+    .strict(),
+  z.object({ kind: z.literal("subtract"), amount: DamageFormulaSchema }).strict(),
+  z.object({ kind: z.literal("add-or-subtract"), amount: DamageFormulaSchema }).strict(),
+  z
+    .object({
+      kind: z.literal("reroll"),
+      one: z.literal(true).optional(),
+      bonus: z.number().int().min(1).max(30).optional(),
+      advantage: z.literal(true).optional()
+    })
+    .strict(),
+  z.object({ kind: z.literal("set-d20"), face: z.number().int().min(1).max(20) }).strict(),
+  z.object({ kind: z.literal("succeed") }).strict(),
+  z.object({ kind: z.literal("hit") }).strict()
+]);
+export type RollAnswerEffect = z.infer<typeof RollAnswerEffectSchema>;
+
+/**
+ * A way to change a roll after it is seen and before its outcome lands (SRD "after seeing the roll"): what rolls it
+ * answers, whose (the bearer's own, another creature's within `rangeFeet`, or either), when (after a failure, a success,
+ * either, or a d20 showing 1), what it does, and for a save what the save must be against. Its cost is the action's own:
+ * its uses and, on a Reaction, the Reaction. An effect that carries one (a Bardic Inspiration die) ends when it is used.
+ * `versus` passes when any of its lists matches: a save against an effect that imposes one of `conditions`, a spell of
+ * one of `spellSchools` (`singleTarget`: aimed at the bearer alone), or a source of one of `creatureTypes`.
+ */
+export const RollAnswerSchema = z
+  .object({
+    rolls: z.array(RollAnswerRollSchema).min(1).max(5),
+    whose: z.enum(["own", "other", "any"]).default("own"),
+    rangeFeet: z.number().int().min(5).max(1000).optional(),
+    when: z.enum(["failure", "success", "any", "natural-one"]).default("failure"),
+    /** Not while the bearer is Incapacitated (a Luck Blade's luck). */
+    notWhileIncapacitated: z.literal(true).optional(),
+    abilities: z.array(AbilitySchema).min(1).max(6).optional(),
+    versus: z
+      .object({
+        conditions: z.array(ConditionIdSchema).min(1).max(4).optional(),
+        spellSchools: z.array(RiderSlugSchema).min(1).max(8).optional(),
+        creatureTypes: z.array(RiderSlugSchema).min(1).max(8).optional(),
+        singleTarget: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    effect: RollAnswerEffectSchema
+  })
+  .strict()
+  .describe(
+    "A way to change a roll after it is seen and before it counts: the rolls it answers, whose roll (own, other or any, within rangeFeet), when (failure, success, any or natural-one), what it does (add, subtract, add-or-subtract, reroll, set-d20, succeed, hit), and what a save must be against. It costs the action's own uses, and its Reaction when the action is one."
+  );
+export type RollAnswer = z.infer<typeof RollAnswerSchema>;
 /** The SRD's 13 damage types. Riders name one of these, so a misspelled type is refused, and no
  * gate or defence that matches nothing is published. */
 export const DamageTypeSchema = z.enum([
@@ -63,6 +136,36 @@ export const DamageTypeSchema = z.enum([
   "thunder"
 ]);
 export type DamageType = z.infer<typeof DamageTypeSchema>;
+
+/**
+ * What a melee hit on an effect's bearer costs the attacker (SRD Fire Shield: "Whenever a creature within 5 feet of
+ * you hits you with a melee attack roll, the shield erupts"; Holy Aura's light blinding a Fiend or an Undead): damage it
+ * takes, and a save it makes or has the conditions until the end of its next turn. Only an attacker within
+ * `withinFeet`, and of `creatureTypes` when set, is answered.
+ */
+export const StruckSchema = z
+  .object({
+    withinFeet: z.number().int().min(5).max(120).optional(),
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(8).optional(),
+    damage: z
+      .array(z.object({ formula: DamageFormulaSchema, type: DamageTypeSchema }).strict())
+      .min(1)
+      .max(3)
+      .optional(),
+    save: z
+      .object({
+        ability: AbilitySchema,
+        dc: z.number().int().min(1).max(40),
+        conditions: z.array(ConditionIdSchema).min(1).max(3)
+      })
+      .strict()
+      .optional()
+  })
+  .strict()
+  .describe(
+    "What a melee hit on the bearer costs the attacker: damage, and a save against conditions that last until the end of the attacker's next turn, for an attacker within withinFeet and of creatureTypes"
+  );
+export type Struck = z.infer<typeof StruckSchema>;
 /** The SRD's 15 conditions, closed in riders for the same reason. Exhaustion is a condition, levels and all. */
 export const ConditionSchema = z.enum([
   "blinded",
@@ -973,7 +1076,11 @@ export const EffectInstanceSchema = z
         lastRound: z.number().int().positive()
       })
       .strict()
-      .optional()
+      .optional(),
+    /** A roll its bearer may answer with it, which ends it (a Bardic Inspiration die). */
+    answer: RollAnswerSchema.optional(),
+    /** What a melee hit on its bearer costs the attacker (Fire Shield's 2d8). */
+    struck: StruckSchema.optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -1497,7 +1604,16 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
    *  (Mage Armor: 13). */
   baseArmorClass: z.number().int().min(11).max(20).optional(),
   /** The recipient's AC is at least this while it lasts (Barkskin: 17). */
-  armorClassFloor: z.number().int().min(10).max(25).optional()
+  armorClassFloor: z.number().int().min(10).max(25).optional(),
+  /** A roll the recipient may answer with it, which ends it (Bardic Inspiration: add the die to a failed D20 Test). */
+  answer: RollAnswerSchema.optional(),
+  /** What a melee hit on the recipient costs the attacker while it lasts (Fire Shield's 2d8). */
+  struck: StruckSchema.optional(),
+  /** The recipient may hold only one effect with these tags at a time ("A creature can have only one Bardic
+   *  Inspiration die at a time"): a grant to a creature that holds one is refused. */
+  onlyOne: z.literal(true).optional(),
+  /** Only another creature may receive it ("inspire another creature"). */
+  notSelf: z.literal(true).optional()
 }).strict();
 
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
@@ -1685,13 +1801,22 @@ export type ActionArea = z.infer<typeof ActionAreaSchema>;
 
 const ReactionRangeFeet = z.number().int().min(5).max(1000).optional();
 
+/** The attack kinds a damage reaction can be limited to ("an attack roll made with a Ranged or Thrown weapon"). */
+const ReactionAttackKindSchema = z.enum(["melee", "ranged", "melee-weapon", "ranged-weapon", "thrown", "spell"]);
+
 /**
  * A reaction the engine offers as a prompt when its trigger happens (ADR-0020); only meaningful on activation
  * "reaction". The response is what answering "use" does:
  * - half-damage (Uncanny Dodge): halve the hit's damage.
+ * - reduce-damage (Deflect Attacks, Stone's Endurance): roll `formula` and take it off the damage, on a hit
+ *   (`hit-by-attack`, limited to `damageTypes` it includes and `attackKinds` it was made as) or on any damage the
+ *   reactor is about to take (`takes-damage`, from a hit or a failed save).
+ * - resist-type (Superior Hunter's Defense): Resistance to the damage's type until the end of the current turn, the
+ *   triggering damage included.
  * - ac-bonus (Parry, Shield): add `amount` to AC against the attack before it lands, possibly turning the hit into a
  *   miss. `melee` limits it to melee attacks; `untilNextTurn` keeps the bonus until the reactor's next turn starts.
- * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action against the creature that dealt the damage.
+ * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action against the creature that dealt the damage, or
+ *   the sibling action `usesAction` names (a rust monster's Antennae).
  * - melee-attack (Retaliation): make one melee attack against that creature instead.
  * - counter (Counterspell): a creature the reactor can see casts a spell with components; the cast waits, and "use"
  *   makes the caster roll an `ability` saving throw against the reactor's spell save DC, its spell lost on a failure.
@@ -1699,6 +1824,16 @@ const ReactionRangeFeet = z.number().int().min(5).max(1000).optional();
  */
 export const ActionReactionSchema = z.discriminatedUnion("response", [
   z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict(),
+  z
+    .object({
+      trigger: z.enum(["hit-by-attack", "takes-damage"]),
+      response: z.literal("reduce-damage"),
+      formula: DamageFormulaSchema,
+      damageTypes: z.array(DamageTypeSchema).min(1).max(13).optional(),
+      attackKinds: z.array(ReactionAttackKindSchema).min(1).max(6).optional()
+    })
+    .strict(),
+  z.object({ trigger: z.literal("takes-damage"), response: z.literal("resist-type") }).strict(),
   z
     .object({
       trigger: z.literal("hit-by-attack"),
@@ -1712,7 +1847,13 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
     .object({
       trigger: z.literal("damaged-by-creature"),
       response: z.literal("strike-back"),
-      rangeFeet: ReactionRangeFeet
+      rangeFeet: ReactionRangeFeet,
+      /** The sibling action it uses instead of itself ("The rust monster uses Antennae"). */
+      usesAction: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(120)
+        .optional()
     })
     .strict(),
   z
@@ -2280,6 +2421,8 @@ export const ActionSchema = z
       .describe(
         'Which spell this action is a casting of. Identity only (every number the action rolls is already on the action itself), so it changes no arithmetic. It exists because the `spell-id-is` rider filter needs something to match: "when you cast Eldritch Blast" cannot be said with `spell-school-is` or `spell-level-is`, which name categories. Absent = not a spell, and every `spell-id-is` gate fails closed'
       ),
+    /** A roll this action answers after it is seen (Indomitable's reroll, Cutting Words); see `RollAnswerSchema`. */
+    answer: RollAnswerSchema.optional(),
     /** Declared reaction the engine can offer as a pending prompt; see `ActionReactionSchema`. */
     reaction: ActionReactionSchema.optional().describe(
       'A declared reaction the engine offers as a pending prompt when its trigger happens: half-damage (Uncanny Dodge), ac-bonus (Parry, Shield), strike-back (Hellish Rebuke) or melee-attack (Retaliation). Only meaningful on activation "reaction"'

@@ -187,6 +187,20 @@ export const ranger: ClassMechanicsModule = {
             }
           ]
         }
+      },
+      // Offered on damage the Ranger is about to take; using it resists the damage's largest type until the turn ends.
+      "superior-hunters-defense": {
+        actions: [
+          {
+            id: "superior-hunters-defense",
+            name: "Superior Hunter's Defense",
+            activation: "reaction",
+            description:
+              "When you take damage, take a Reaction to give yourself Resistance to that damage and any other damage of the same type until the end of the current turn.",
+            damage: [],
+            reaction: { trigger: "takes-damage", response: "resist-type" }
+          }
+        ]
       }
     }
   },

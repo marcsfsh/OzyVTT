@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ActionResolution, HitOffer, HitOptionChoice } from "@vtt/domain";
-import { ForceModeButtons, RerollControl, type DieMode } from "./RollControls";
+import { AnswerOffers, ForceModeButtons, RerollControl, type DieMode } from "./RollControls";
 import { useTargetingTyped, type ResolveOptions } from "./targeting";
 import "./prompts.css";
 
@@ -45,6 +45,7 @@ export function AttackOutcome({ attack, audience }: Readonly<{ attack: Attack; a
                   : attack.outcome.toUpperCase()
           }`}
       {attack.naturalRoll >= 1 ? ` (nat ${attack.naturalRoll})` : ""} vs {attack.targetName}
+      {(attack.answered ?? []).map((line) => `; ${line.name}: ${line.change}`).join("")}
     </p>
   );
 }
@@ -84,7 +85,8 @@ export function PushChoice({
 const titled = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
 
 /** An offer's button label: its name and the dice it adds, if any. */
-const offerLabel = (offer: HitOffer) => (offer.dice ? `${offer.name} +${offer.dice}` : offer.name);
+const offerLabel = (offer: HitOffer) =>
+  offer.rerolls ? `${offer.name} · ${offer.dice} twice` : offer.dice ? `${offer.name} +${offer.dice}` : offer.name;
 
 /** The effects picked with an offer after one more is toggled: on or off, never past how many one hit carries. A
  *  single effect swaps for another. */
@@ -329,6 +331,13 @@ export function AttackPreview({
             }
           />
         )}
+        <AnswerOffers
+          offers={attack.answers}
+          typed={typed}
+          busy={busy}
+          onInvalid={onFeedback}
+          onAnswer={(answer) => resolve({ commit: false, answer })}
+        />
       </span>
     </div>
   );
