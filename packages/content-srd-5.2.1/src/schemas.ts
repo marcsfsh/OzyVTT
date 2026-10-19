@@ -1186,6 +1186,16 @@ export const EquipmentReferenceSchema = z
       ),
     /** It holds other carried things (a Backpack's 30 pounds, a Quiver's 20 Arrows, a Bag of Holding). */
     container: ItemContainerSchema.optional(),
+    /** While its bearer has an effect with this tag, the bearer can't end its attunement (a Dragon Orb's charm: "you
+     *  can't voluntarily end your Attunement to it"). */
+    attunementHeldBy: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(40)
+      .optional()
+      .describe(
+        "An effect tag: while its bearer has an effect with it, the bearer can't end attunement to the item (a Dragon Orb's charm)"
+      ),
     /** What the item does when its carrier takes the Utilize action, with the check it takes ("As a Utilize action,
      *  you can throw the Grappling Hook ... DC 13 Dexterity (Acrobatics) check"). A tool's own Utilize line is read
      *  from its description. */

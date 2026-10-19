@@ -36,6 +36,8 @@ describe("builtin action catalog", () => {
       "help",
       "help-check",
       "hide",
+      "improvised-weapon",
+      "improvised-weapon-thrown",
       "influence",
       "magic",
       "ready",

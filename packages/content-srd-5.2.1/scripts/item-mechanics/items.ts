@@ -3036,7 +3036,31 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `deck-of-illusions` - illusions and card state are not modeled.
   // `dimensional-shackles` - prevents extradimensional movement, which is not modeled.
-  // `dragon-orb` - multi-charge spells, a healing cast, a self-charm on attunement and a curse.
+  // Peering into the orb: a DC 15 Charisma save the user makes. A success controls the orb, a failure leaves the user
+  // Charmed by it, and either lasts while the attunement does. A charmed user can't end the attunement
+  // (`attunement.ts`). The orb's spells, its Suggestion and its calling of dragons are the GM's.
+  "dragon-orb": {
+    attunementHeldBy: "dragon-orb-charmed",
+    actions: [
+      {
+        id: "peer",
+        name: "Peer into the Orb",
+        activation: "action",
+        description:
+          "Peer into the orb's depths and make a DC 15 Charisma saving throw. On a successful save, you control the orb for as long as you remain attuned to it. On a failed save, the orb imposes the Charmed condition on you for as long as you remain attuned to it. While you are Charmed by the orb, you can't voluntarily end your Attunement to it.",
+        damage: [],
+        targets: { count: 1, who: "self" },
+        save: {
+          ability: "cha",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["charmed"],
+          failureEffect: { name: "Charmed by the Dragon Orb", tags: ["dragon-orb-charmed"], modifiers: [] },
+          successEffect: { name: "Controls the Dragon Orb", tags: ["dragon-orb-control"], modifiers: [] }
+        }
+      }
+    ]
+  },
 
   // `dust-of-disappearance` - single use, rolled duration, area effect.
   // 1d6 + 4 pinches. A pinch on an Elemental of water within 5 feet: DC 13 Constitution, 10d6 Necrotic, half on a

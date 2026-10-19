@@ -29,7 +29,9 @@ export function carryingOf(
   catalog: EquipmentCatalog | undefined,
   standing: readonly ResolvedRider[]
 ): Carrying | null {
-  if (!definition) return null;
+  // A definition stub with no ability scores has no Strength to carry with.
+  const strength = (definition?.abilityScores as ActorDefinition["abilityScores"] | undefined)?.str;
+  if (!definition || strength === undefined) return null;
   const rows = carriedPounds(actor.inventory, catalog);
   const purse = actor.currency;
   const coins = purse ? purse.pp + purse.gp + purse.ep + purse.sp + purse.cp : 0;
@@ -39,7 +41,7 @@ export function carryingOf(
       ? 1
       : 0;
   const rank = Math.min(SIZES.length - 1, Math.max(0, SIZES.indexOf(actor.size ?? "medium")) + larger);
-  const capacity = definition.abilityScores.str * POUNDS_PER_STRENGTH[rank]!;
+  const capacity = strength * POUNDS_PER_STRENGTH[rank]!;
   return {
     pounds: Math.round((rows + coins / COINS_PER_POUND) * 10) / 10,
     capacity,

@@ -592,9 +592,13 @@ function endGrantsOfPutAway(
   deps: InventoryDeps
 ): EffectNarration[] {
   const record = rowRecord(deps.catalog, before);
-  if (!record || record.consumedOnUse || !itemIsActive(before, record)) return [];
+  if (!record || record.consumedOnUse) return [];
   const now = actor.inventory.find((entry) => entry.id === before.id);
-  if (now && itemIsActive(now, rowRecord(deps.catalog, now))) return [];
+  // What a Dragon Orb's peering leaves lasts "for as long as you remain attuned to it", held or not.
+  const lasting = record.attunementHeldBy
+    ? (row: InventoryItem | undefined) => row !== undefined && row.quantity > 0 && row.attuned
+    : (row: InventoryItem | undefined) => row !== undefined && itemIsActive(row, rowRecord(deps.catalog, row));
+  if (!lasting(before) || lasting(now)) return [];
   const gone = actor.effects.filter(
     (effect) =>
       effect.sourceActorId === actor.id &&

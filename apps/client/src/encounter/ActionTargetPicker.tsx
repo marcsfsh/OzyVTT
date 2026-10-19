@@ -450,7 +450,13 @@ function ChoicePicks({
         )}
       {choices.bindsWeapon && (
         <label className="action-damage-type">
-          <span>Weapon</span>
+          <span>
+            {choices.bindsWeapon.ammunition === "only"
+              ? "Ammunition"
+              : choices.bindsWeapon.ammunition === "also"
+                ? "Weapon or ammunition"
+                : "Weapon"}
+          </span>
           {weapons.length > 0 ? (
             <Select value={picking.itemId ?? weapons[0]!.id} onChange={(event) => setBoundItem(event.target.value)}>
               {weapons.map((row) => (
@@ -460,7 +466,11 @@ function ChoicePicks({
               ))}
             </Select>
           ) : (
-            <span>No weapon it can be cast on is carried.</span>
+            <span>
+              {choices.bindsWeapon.ammunition === "only"
+                ? "No ammunition is carried."
+                : "No weapon it can be used on is carried."}
+            </span>
           )}
         </label>
       )}

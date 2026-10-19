@@ -1,7 +1,20 @@
+import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { InventoryItem } from "@vtt/schemas";
 import { setInventoryItem } from "../src/inventory.js";
-import { catalog, catalogRow, edit, fighterInput, IDS, tableOf, wizardInput, type Table } from "./equipment-table.js";
+import { answerSave } from "../src/saving-throws.js";
+import {
+  catalog,
+  catalogRow,
+  edit,
+  fight,
+  fighterInput,
+  IDS,
+  resolveAt,
+  tableOf,
+  wizardInput,
+  type Table
+} from "./equipment-table.js";
 
 // SRD 5.2.1 Attunement: "a creature must spend a Short Rest focused on only that item", "a creature can't attune to
 // more than one copy of an item", and an item that "requires attunement by" a class, a species or a spellcaster is
@@ -91,5 +104,81 @@ describe("an item's attunement prerequisites", () => {
       { catalog, role: "gm" }
     );
     expect(table.actor(IDS.fighter).inventory.find((row) => row.id === "holy-avenger")?.attuned).toBe(true);
+  });
+});
+
+// SRD Dragon Orb: peering is a DC 15 Charisma save. A failure Charms the user "for as long as you remain attuned to
+// it", and "while you are Charmed by the orb, you can't voluntarily end your Attunement to it".
+describe("a Dragon Orb", () => {
+  const peer = (table: Table, face: number) => {
+    fight(table, IDS.fighter);
+    resolveAt(table, IDS.fighter, "item-dragon-orb-peer", [], { targetIds: [IDS.fighter] });
+    const pending = table.state.combat.pendingSaves.find((entry) => entry.targetActorId === IDS.fighter)!;
+    expect(pending).toMatchObject({ ability: "cha", dc: 15 });
+    answerSave(
+      table.state,
+      randomUUID(),
+      pending.id,
+      "roll",
+      undefined,
+      true,
+      { role: "gm" },
+      {
+        random: () => face,
+        newRollId: () => randomUUID(),
+        sessionId: randomUUID(),
+        role: "gm",
+        now: () => "2026-10-19T00:00:00.000Z",
+        resolveDefinition: table.resolve
+      }
+    );
+  };
+  const orbOf = (table: Table) => table.actor(IDS.fighter).inventory.find((row) => row.id === "dragon-orb");
+  const tagged = (table: Table, tag: string) =>
+    table.actor(IDS.fighter).effects.some((effect) => effect.tags.includes(tag));
+  const attuned = (table: Table) =>
+    setInventoryItem(table.state, IDS.fighter, catalogRow("dragon-orb", { attuned: true }), table.resolve, {
+      catalog,
+      role: "gm"
+    });
+
+  it("keeps a charmed user attuned until the GM ends it, which ends the charm", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() });
+    attuned(table);
+    peer(table, 2);
+    expect(tagged(table, "dragon-orb-charmed")).toBe(true);
+    const charmed = () => table.actor(IDS.fighter).conditions.some((condition) => condition.id === "charmed");
+    expect(charmed()).toBe(true);
+    resting(table, IDS.fighter);
+    expect(() => asPlayer(table, IDS.fighter, edit(table, IDS.fighter, "dragon-orb", { attuned: false }))).toThrow(
+      "Dragon Orb holds Borin Charmed, so Borin can't end attunement to it."
+    );
+    // Putting it down doesn't end it either: the charm lasts while the attunement does.
+    asPlayer(table, IDS.fighter, edit(table, IDS.fighter, "dragon-orb", { equipped: false }));
+    expect(tagged(table, "dragon-orb-charmed")).toBe(true);
+    setInventoryItem(
+      table.state,
+      IDS.fighter,
+      edit(table, IDS.fighter, "dragon-orb", { attuned: false }),
+      table.resolve,
+      {
+        catalog,
+        role: "gm"
+      }
+    );
+    expect(orbOf(table)?.attuned).toBe(false);
+    expect(tagged(table, "dragon-orb-charmed")).toBe(false);
+    expect(charmed()).toBe(false);
+  });
+
+  it("gives control to a user who saves, whose attunement ends with a Short Rest as any other", () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() });
+    attuned(table);
+    peer(table, 18);
+    expect(tagged(table, "dragon-orb-control")).toBe(true);
+    expect(tagged(table, "dragon-orb-charmed")).toBe(false);
+    resting(table, IDS.fighter);
+    asPlayer(table, IDS.fighter, edit(table, IDS.fighter, "dragon-orb", { attuned: false }));
+    expect(tagged(table, "dragon-orb-control")).toBe(false);
   });
 });

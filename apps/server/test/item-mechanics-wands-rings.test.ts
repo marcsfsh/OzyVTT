@@ -526,13 +526,13 @@ describe("the staffs that cast at their printed charge costs", () => {
       20
     ]);
     expect(casts).toHaveLength(9);
-    // It swings as a magic Quarterstaff too, in one hand or two.
+    // It swings as a magic Quarterstaff too, in one hand or two, and can be thrown as an improvised weapon.
     expect(
       effectiveActions(definition, state.actors[0], catalog)
         .filter((entry) => entry.id.startsWith("item-staff-of-power") && !entry.id.includes("-cast-"))
         .map((entry) => entry.id)
         .sort()
-    ).toEqual(["item-staff-of-power", "item-staff-of-power-two-handed"]);
+    ).toEqual(["item-staff-of-power", "item-staff-of-power-thrown-improvised", "item-staff-of-power-two-handed"]);
   });
 
   it("leaves Staff of the Magi its at-will casts and Ring of Shooting Stars its two cantrips and its own action", () => {

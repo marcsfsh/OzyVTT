@@ -39,7 +39,13 @@ function throwWeapon(ctx: ResolveContext): void {
   const row = attacker.inventory.find((entry) => entry.id === riderItemId && entry.quantity > 0);
   if (!row?.weapon) return;
   const improvised = itemActionRest(action.id) === `${row.id}-${IMPROVISED_THROWN_SUFFIX}`;
-  const thrown = row.weapon.properties?.includes("thrown") === true && ctx.riderFilters.attackKinds?.includes("ranged");
+  // Only a throw the map measured: with no tokens to measure, a Dagger is taken to stay in hand.
+  const target = ctx.targets.find((candidate) => candidate.id === ctx.attack?.targetId);
+  const measured = target !== undefined && (deps.distanceFeet?.(attacker.id, target.id) ?? null) !== null;
+  const thrown =
+    measured &&
+    row.weapon.properties?.includes("thrown") === true &&
+    ctx.riderFilters.attackKinds?.includes("ranged") === true;
   if (!improvised && !thrown) return;
   if (rowRecord(deps.catalog, row)?.weaponChanges?.returns) return;
   leaveHand(attacker, row);

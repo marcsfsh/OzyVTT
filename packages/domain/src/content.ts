@@ -307,6 +307,29 @@ export const ContentEquipmentSummarySchema = z.strictObject({
     .optional()
     .describe(
       "How the item sheds light, as its own text says: lit and put out on its row (item.set-light) unless `always` (it glows while held), with a hood to lower (`hooded`) or a Cone to aim (`cone`). Absent on anything that sheds none"
+    ),
+  /** A container: what it holds, so the sheet can show the load and offer its compartments. */
+  container: z
+    .strictObject({
+      capacityLb: z.number().optional(),
+      pieces: z.number().int().optional(),
+      compartments: z
+        .array(
+          z.strictObject({
+            id: slug(40),
+            name: z.string().max(60),
+            capacityLb: z.number().optional(),
+            count: z.number().int().optional()
+          })
+        )
+        .max(4)
+        .optional(),
+      weighsLb: z.number().optional(),
+      retrieval: z.enum(["utilize", "utilize-or-bonus-action"]).optional()
+    })
+    .optional()
+    .describe(
+      "What a container holds as its text prints it: up to `capacityLb` pounds, `pieces` of ammunition, or a load in each of its `compartments`; `weighsLb` when it weighs the same whatever it holds, and `retrieval` when taking a thing out costs more than the free object interaction in a fight. A row is put in one by its `containerId` (and `compartment`). Absent on anything that holds nothing"
     )
 });
 export type ContentEquipmentSummary = Wire<z.infer<typeof ContentEquipmentSummarySchema>>;
@@ -890,14 +913,16 @@ export const choosesAbility = (action: Readonly<{ grants?: Readonly<{ tags: read
 export type ActionChoices = Readonly<{
   options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
   optionsPerTarget?: true;
-  bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true }>;
+  bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true; ammunition?: "only" | "also" }>;
 }>;
 type ChoosingAction = Readonly<{
   grants?: Readonly<{
     options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
     optionsPerTarget?: true;
-    bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true }>;
+    bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true; ammunition?: true }>;
   }>;
+  /** It remakes a carried Melee weapon or a stack of ammunition (Oil of Sharpness). */
+  rebindsRow?: unknown;
   save?: Readonly<{
     failureEffect?: Readonly<{
       options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
@@ -908,19 +933,22 @@ type ChoosingAction = Readonly<{
 /** What an action asks its user to choose as it resolves, or null when it asks nothing. */
 export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
   const chooser = action.grants?.options ? action.grants : action.save?.failureEffect;
-  const binds = action.grants?.bindsWeapon;
+  const granted = action.grants?.bindsWeapon;
+  // An oil that remakes a row asks for a Melee weapon or a stack of ammunition.
+  const binds: ActionChoices["bindsWeapon"] = granted
+    ? {
+        ...(granted.weaponIds ? { weaponIds: [...granted.weaponIds] } : {}),
+        ...(granted.melee ? { melee: true as const } : {}),
+        ...(granted.ammunition ? { ammunition: "only" as const } : {})
+      }
+    : action.rebindsRow !== undefined
+      ? { melee: true, ammunition: "also" }
+      : undefined;
   if (!chooser?.options && !binds) return null;
   return {
     ...(chooser?.options ? { options: chooser.options.map((option) => ({ id: option.id, name: option.name })) } : {}),
     ...(chooser?.optionsPerTarget ? { optionsPerTarget: true as const } : {}),
-    ...(binds
-      ? {
-          bindsWeapon: {
-            ...(binds.weaponIds ? { weaponIds: [...binds.weaponIds] } : {}),
-            ...(binds.melee ? { melee: true as const } : {})
-          }
-        }
-      : {})
+    ...(binds ? { bindsWeapon: binds } : {})
   };
 }
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */

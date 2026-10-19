@@ -539,12 +539,16 @@ export const ActionAvailabilitySchema = z.strictObject({
       options: z.array(z.strictObject({ id: z.string(), name: z.string() })).optional(),
       optionsPerTarget: z.literal(true).optional(),
       bindsWeapon: z
-        .strictObject({ weaponIds: z.array(z.string()).optional(), melee: z.literal(true).optional() })
+        .strictObject({
+          weaponIds: z.array(z.string()).optional(),
+          melee: z.literal(true).optional(),
+          ammunition: z.enum(["only", "also"]).optional()
+        })
         .optional()
     })
     .optional()
     .describe(
-      "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), and `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`)"
+      "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), and `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`; `ammunition`: only a stack of ammunition (`only`), or one as well as a weapon (`also`))"
     ),
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple), and
    *  the tools its user may help with through Help with a Check, which carry their name. */
@@ -798,18 +802,24 @@ const ActorDerivedSheetSchema = z.strictObject({
     .min(1)
     .max(10)
     .describe("How many items the character can attune to at once: 3, or 4 with Use Magic Device"),
-  /** What the character carries against what it can; over capacity its Speed is at most 5 feet. */
+  /** What the creature carries against what it can; over capacity its Speed is at most 5 feet, over twice it 0. */
   carrying: z
     .strictObject({
-      pounds: z.number().min(0).describe("What its rows and coins weigh, in pounds (fifty coins to the pound)"),
+      pounds: z
+        .number()
+        .min(0)
+        .describe(
+          "What its rows and coins weigh, in pounds (fifty coins to the pound), what its containers hold counted as they weigh it"
+        ),
       capacity: z
         .number()
         .min(0)
-        .describe("The most it can carry: Strength times 15 pounds for a Small or Medium creature, by size")
+        .describe("The most it can carry: Strength times 15 pounds for a Small or Medium creature, by size"),
+      dragLimit: z.number().min(0).describe("The most it can drag, lift or push: twice its capacity")
     })
     .nullable()
     .describe(
-      "What the character carries against its carrying capacity. Beyond it, its Speed is no more than 5 feet. Null for a stat block, which says nothing of what it carries"
+      "What the creature carries against its carrying capacity. Beyond it, its Speed is no more than 5 feet, and beyond twice it 0. Null for a creature with no sheet or stat block"
     ),
   /** The weapon kinds chosen under Weapon Mastery, in the order chosen, each with the property it grants and the SRD
    *  text of what that property does. Empty for a sheet that records no such choice. */

@@ -996,9 +996,10 @@ export function EncounterMap({
                         <MountControl
                           name={actor.name}
                           riding={riding ? (riding.sourceName ?? "its mount") : null}
+                          controls={riding?.tags.includes("controls-mount") ?? true}
                           mounts={mounts}
                           busy={busyActorId === actor.id}
-                          onMount={(mountId) => void commands.mount(actor.id, mountId)}
+                          onMount={(mountId, control) => void commands.mount(actor.id, mountId, control)}
                         />
                         <HeightControl
                           name={actor.name}

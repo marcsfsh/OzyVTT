@@ -159,7 +159,17 @@ describe("a Climber's Kit", () => {
     fight(table, IDS.fighter);
     table.state.combat = {
       ...table.state.combat,
-      tokens: [{ actorId: IDS.fighter, position: { x: 125, y: 125 }, sizePx: 40, sizeCells: 1, altitudeFeet: 60 }]
+      tokens: [
+        {
+          actorId: IDS.fighter,
+          position: { x: 125, y: 125 },
+          sizePx: 40,
+          gridSizePx: null,
+          gridRotationRadians: null,
+          sizeCells: 1,
+          altitudeFeet: 60
+        }
+      ]
     };
     resolveAt(table, IDS.fighter, "item-climbers-kit-anchor", [], { targetIds: [] });
     return table;
