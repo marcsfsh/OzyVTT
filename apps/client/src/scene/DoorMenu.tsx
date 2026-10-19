@@ -104,8 +104,8 @@ export function DoorMenu({
         ["pick", "Pick the lock"],
         ["force", "Force it open"],
         ["pry", "Pry it open with tools"],
-        ["jam", "Jam it with an iron spike"],
-        ["seal", "Seal it with carpenter's tools"]
+        ["jam", "Jam it with an Iron Spike"],
+        ["seal", "Seal it with Carpenter's Tools"]
       ];
   return createPortal(
     <div ref={ref} className="token-context-menu anim-popover scroll-y" role="menu" style={style} aria-label="Door">
