@@ -1,11 +1,25 @@
 import { d20FacesFor } from "@vtt/rules-5e";
 import { wardedConditions } from "../paladin-auras.js";
 import type { ActorDefinition } from "@vtt/schemas";
-import { checkPlan, totalCheck, type CheckSubject, type CheckVersus } from "../ability-checks.js";
+import {
+  checkPlan,
+  passivePerception,
+  toolAbility,
+  toolProficiencies,
+  totalCheck,
+  type CheckSubject,
+  type CheckVersus
+} from "../ability-checks.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { areEnemies } from "../creature-sides.js";
-import { effectiveSkillTier } from "../equipment-derivation.js";
-import { endUsedHelp, useHelp } from "../help-assist.js";
+import {
+  deriveEquipment,
+  effectiveSkillTier,
+  type EquipmentCatalog,
+  type EquipmentDerivation
+} from "../equipment-derivation.js";
+import { isIncapacitated } from "../condition-rules.js";
+import { endUsedHelp, helpToolTag, useHelp } from "../help-assist.js";
 import { checkSightFor, couldSpot } from "../vision/rules.js";
 import { builtinBaseId, END_EFFECT_ID } from "../builtin-actions.js";
 import {
@@ -158,20 +172,42 @@ const skillWords = (id: string) =>
     .map((word, index) => (index > 0 && word === "of" ? word : `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`))
     .join(" ");
 
-/** SRD Help, Assist an Ability Check: one of the helper's skill proficiencies, for an ally. The ally's effect carries
- *  Advantage on checks with that skill, which its next such check uses up (`help-assist.ts`). */
+/** The tools a creature may help with: its tool proficiencies the catalog names with the ability their check uses,
+ *  as the sheet rolls them. */
+export function helpToolsOf(
+  definition: ActorDefinition | undefined,
+  derivation: EquipmentDerivation,
+  catalog: EquipmentCatalog | undefined
+): Array<{ id: string; name: string; ability: CheckSubject["ability"] }> {
+  return toolProficiencies(definition, derivation).flatMap((id) => {
+    const record = catalog?.equipmentRecord(id);
+    const ability = toolAbility(record?.description);
+    // An effect tag holds at most 40 characters.
+    if (!record || !ability || helpToolTag(id).length > 40) return [];
+    return [{ id, name: record.name, ability }];
+  });
+}
+
+const helpTools = (ctx: ResolveContext) =>
+  helpToolsOf(ctx.deps.definition, ctx.derivation, ctx.deps.catalog).map((tool) => tool.id);
+
+/** SRD Help, Assist an Ability Check: one of the helper's skill or tool proficiencies, for an ally. The ally's effect
+ *  carries Advantage on checks with that skill or tool, which its next such check uses up (`help-assist.ts`). */
 function helpWithCheck(ctx: ResolveContext): DefinitionAction {
   const { attacker, action, deps } = ctx;
   const skill = ctx.input.skill ?? undefined;
-  if (skill === undefined || BUILTIN_CHECK_SKILLS["help-check"]![skill] === undefined)
-    throw new CommandRejectedError("Help with a Check names the skill you help with.");
-  if (effectiveSkillTier(deps.definition, ctx.derivation, skill) === "none")
+  const tool = skill !== undefined && helpTools(ctx).includes(skill) ? skill : undefined;
+  if (skill === undefined || (tool === undefined && BUILTIN_CHECK_SKILLS["help-check"]![skill] === undefined))
+    throw new CommandRejectedError("Help with a Check names the skill or tool you help with.");
+  if (tool === undefined && effectiveSkillTier(deps.definition, ctx.derivation, skill) === "none")
     throw new CommandRejectedError(`${attacker.name} isn't proficient in ${skillWords(skill)}, so can't help with it.`);
   const ally = ctx.targets[0];
   if (!ally || ally.id === attacker.id)
     throw new CommandRejectedError("Help with a Check helps an ally, not yourself.");
   if (areEnemies(attacker, ally, deps.resolveDefinition))
     throw new CommandRejectedError(`${ally.name} isn't ${attacker.name}'s ally.`);
+  if (tool !== undefined)
+    return { ...action, grants: { ...action.grants!, tags: [...action.grants!.tags, helpToolTag(tool)] } };
   return {
     ...action,
     grants: {
@@ -295,6 +331,52 @@ function hide(ctx: ResolveContext): void {
     deps
   );
   ctx.effectGranted = { name: effect.name, tags: effect.tags };
+  tellPassiveNoticers(ctx, ctx.check!.total);
+}
+
+/**
+ * SRD Passive Perception: "The GM uses this score when determining whether a creature notices something without
+ * consciously making a Wisdom (Perception) check." The enemies whose score meets the hider's Stealth total are named to
+ * the GM, each 5 lower where the hider is Lightly Obscured to it (Disadvantage on the check), and none whose sight
+ * can't reach the hider. Whether one notices stays the GM's call.
+ */
+function tellPassiveNoticers(ctx: ResolveContext, total: number): void {
+  const { state, attacker, deps } = ctx;
+  const content = {
+    ...(deps.resolveDefinition ? { definition: deps.resolveDefinition } : {}),
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  };
+  const inFight = (actorId: string) =>
+    !state.combat.active || state.combat.initiative.some((entry) => entry.actorId === actorId);
+  const noticing = state.actors.flatMap((other) => {
+    if (other.id === attacker.id || other.hp.current <= 0 || isIncapacitated(other) || !inFight(other.id)) return [];
+    if (!areEnemies(attacker, other, deps.resolveDefinition)) return [];
+    const definition = other.definitionId ? deps.resolveDefinition?.(other.definitionId) : undefined;
+    const sight = checkSightFor(state, other, content, attacker, deps.distanceFeet);
+    // With the map's vision on, a creature that couldn't see the hider anyway (a wall between them) notices nothing.
+    const measured = sight.findingObscured !== null && sight.findingObscured !== undefined;
+    if (measured && !couldSpot(state, content, other.id, attacker.id, deps.distanceFeet)) return [];
+    const plan = checkPlan(
+      other,
+      definition,
+      deriveEquipment(other, definition, deps.catalog),
+      { ability: "wis", skill: "perception" },
+      { finding: attacker, sight }
+    );
+    if (plan.autoFails !== undefined) return [];
+    const score = passivePerception(plan);
+    return score >= total ? [{ other, score, obscured: sight.findingObscured === "light" }] : [];
+  });
+  if (noticing.length === 0) return;
+  const named = noticing.map(
+    ({ other, score, obscured }) => `${other.name} ${score}${obscured ? " (Lightly Obscured, -5)" : ""}`
+  );
+  ctx.tableNarration.push({
+    kind: "effect",
+    text: `Passive Perception that meets ${attacker.name}'s Stealth ${total}: ${named.join(", ")}. Whether they notice is the GM's call.`,
+    actorIds: [attacker.id, ...noticing.map(({ other }) => other.id)],
+    gmOnly: true
+  });
 }
 
 /** SRD Grappling: a Strength (Athletics) or Dexterity (Acrobatics) check against the holding effect's escape DC, the
@@ -585,7 +667,10 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   /** The helped ally carries the effect, named for the helper and the skill. */
   "help-check": {
     prepare: helpWithCheck,
-    grantName: ({ attacker, input }) => `Helped by ${attacker.name} (${skillWords(input.skill ?? "")})`
+    grantName: ({ attacker, input, deps }) => {
+      const id = input.skill ?? "";
+      return `Helped by ${attacker.name} (${deps.catalog?.equipmentRecord(id)?.name ?? skillWords(id)})`;
+    }
   }
 };
 

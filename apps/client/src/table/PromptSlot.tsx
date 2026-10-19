@@ -3,10 +3,11 @@ import type { PlayerActor, PlayerPendingReaction, PlayerView } from "@vtt/domain
 import { useRollPreference } from "../dice/roll-preference";
 import { DyingTracker } from "../encounter/DyingTracker";
 import { plainActionName } from "../encounter/format";
-import { InitiativePrompt } from "../encounter/InitiativePrompt";
+import { InitiativePrompt, InitiativeReroll } from "../encounter/InitiativePrompt";
 import { ReactionPrompt } from "../encounter/ReactionPrompt";
 import { RollCallCard, useRollCallCards, type RollCallCardModel } from "../encounter/RollCallPrompt";
 import { SavePrompt } from "../encounter/SavePrompt";
+import { TurnOrder, turnOrderTitle } from "../encounter/TurnOrder";
 import { abilityName } from "./needs";
 import { playerPrompts, type PlayerPrompt } from "./playerPrompts";
 import "./prompt-slot.css";
@@ -58,6 +59,14 @@ function reactionWords(reaction: PlayerPendingReaction, actor: PlayerActor) {
           reaction.sourceName === actor.name
             ? `${plainActionName(reaction.actionName)} uses your Reaction to take less damage from the fall.`
             : `${plainActionName(reaction.actionName)} uses your Reaction, and ${reaction.sourceName} lands unharmed.`
+      };
+    case "attack-targeted":
+      return {
+        title: `${reaction.sourceName} is attacking ${reaction.targetName ?? actor.name}`,
+        detail:
+          reaction.redirectChoices && reaction.redirectChoices.length > 0
+            ? `${plainActionName(reaction.actionName)} uses your Reaction to make an ally the target instead. The attack waits on your answer.`
+            : `${plainActionName(reaction.actionName)} uses your Reaction to make you the target instead. The attack waits on your answer.`
       };
     case "casts-spell":
       return {
@@ -124,6 +133,9 @@ export function PromptSlot({
   ];
   const first = entries[0];
   const [outcome, setOutcome] = useState("");
+  // The character whose initiative was just rolled, while Heroic Inspiration may still reroll it.
+  const [rerollFor, setRerollFor] = useState<string | null>(null);
+  const rerolling = rerollFor ? state.actors.find((actor) => actor.id === rerollFor) : undefined;
   const heading = useRef<HTMLElement | null>(null);
   const slot = useRef<HTMLElement | null>(null);
   const shownKey = useRef<string | null>(null);
@@ -139,6 +151,8 @@ export function PromptSlot({
         return `DC ${entry.save.dc} ${abilityName(entry.save.ability)} saving throw`;
       case "initiative":
         return "Roll initiative";
+      case "order":
+        return turnOrderTitle(entry.actor.name, entry.waiting.boundary);
       case "roll-call":
         return "The GM calls for a roll";
     }
@@ -253,7 +267,24 @@ export function PromptSlot({
             title={`Roll initiative for ${first.actor.name}`}
             headingRef={headingRef}
           >
-            <InitiativePrompt actorId={first.actor.id} />
+            <InitiativePrompt
+              actorId={first.actor.id}
+              onRolled={() => {
+                if (first.actor.heroicInspiration === true) setRerollFor(first.actor.id);
+              }}
+            />
+          </PromptCard>
+        );
+        break;
+      case "order":
+        card = (
+          <PromptCard
+            eyebrow="Your turn · answer now"
+            title={turnOrderTitle(first.actor.name, first.waiting.boundary)}
+            detail="These happen at the same moment, so you choose their order."
+            headingRef={headingRef}
+          >
+            <TurnOrder key={first.waiting.id} waiting={first.waiting} onFeedback={setOutcome} />
           </PromptCard>
         );
         break;
@@ -280,6 +311,18 @@ export function PromptSlot({
       <p className="nh-sr-only" aria-live="assertive">
         {announcement}
       </p>
+      {!first && rerolling?.heroicInspiration === true && (
+        <section className="prompt-slot scroll-y" aria-label="Answer now">
+          <PromptCard
+            eyebrow="Initiative"
+            title={`Initiative rolled for ${rerolling.name}`}
+            detail="Heroic Inspiration can reroll the die before your first turn."
+            headingRef={headingRef}
+          >
+            <InitiativeReroll actorId={rerolling.id} onDone={() => setRerollFor(null)} />
+          </PromptCard>
+        </section>
+      )}
       {(first || outcome) && (
         <section className="prompt-slot scroll-y" aria-label="Answer now" ref={slot}>
           {card}

@@ -76,6 +76,11 @@ export const HANDS_BOUND_TAG = "hands-bound";
 export const BARKSKIN_TAG = "barkskin";
 /** Death Ward: the first drop to 0 Hit Points leaves the bearer at 1 instead, and ends it. */
 export const DEATH_WARD_TAG = "death-ward";
+/** The bearer's Hit Point maximum can't be reduced while this lasts (Aura of Life). */
+export const KEEPS_MAXIMUM_TAG = "keeps-hp-maximum";
+/** The effect that keeps the creature's Hit Point maximum from dropping, if it holds one. */
+export const maximumKeeper = (actor: Actor): EffectInstance | undefined =>
+  actor.effects.find((effect) => effect.tags.includes(KEEPS_MAXIMUM_TAG));
 /** Protection from Energy: Resistance to the one damage type the caster picks from those the action offers. */
 export const RESISTS_CHOSEN_TYPE_TAG = "resists-chosen-type";
 /** Invisibility: it ends once its bearer makes an attack roll, deals damage or casts a spell. */

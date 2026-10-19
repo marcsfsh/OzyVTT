@@ -4,7 +4,8 @@ import { endEffectIfPresent, type EffectNarration } from "./effects.js";
 
 // SRD Help, Assist an Ability Check: "That ally has Advantage on the next ability check they make with the chosen
 // skill or tool. This benefit expires if the ally doesn't use it before the start of your next turn." The effect on
-// the ally carries the Advantage as a check rider narrowed to the skill; the ally's next check with it uses it up.
+// the ally carries the Advantage as a check rider narrowed to the skill, or a tag naming the tool (no rider narrows to
+// a tool); the ally's next check with it uses it up.
 
 /** The tag on the effect Help with a Check leaves on the ally. */
 export const HELPED_TAG = "helped";
@@ -12,12 +13,29 @@ export const HELPED_TAG = "helped";
 /** Marks a Help whose check was rolled: a reroll of that check still has it, and the next check ends it. */
 const HELP_USED_TAG = "help-used";
 
-/** The skill a Help effect assists, read from its rider. */
+/** The tag naming the tool a Help assists. */
+const HELP_TOOL_PREFIX = "help-tool-";
+export const helpToolTag = (tool: string) => `${HELP_TOOL_PREFIX}${tool}`;
+
+/** The skills and the tool a Help effect assists, read from its rider and its tags. */
 function helpedSkills(effect: Actor["effects"][number]): readonly string[] {
-  return effect.modifiers.flatMap((modifier) =>
-    modifier.type === "roll-mode" && modifier.roll === "check"
-      ? (modifier.when ?? []).flatMap((when) => (when.type === "skill-is" ? when.skills : []))
-      : []
+  return [
+    ...effect.modifiers.flatMap((modifier) =>
+      modifier.type === "roll-mode" && modifier.roll === "check"
+        ? (modifier.when ?? []).flatMap((when) => (when.type === "skill-is" ? when.skills : []))
+        : []
+    ),
+    ...effect.tags.filter((tag) => tag.startsWith(HELP_TOOL_PREFIX)).map((tag) => tag.slice(HELP_TOOL_PREFIX.length))
+  ];
+}
+
+/** The Help an ally gave this creature for a check with `tool`, which gives the check Advantage. */
+export function toolHelp(actor: Actor, tool: string): Actor["effects"][number] | undefined {
+  return actor.effects.find(
+    (effect) =>
+      effect.tags.includes(HELPED_TAG) &&
+      !effect.tags.includes(HELP_USED_TAG) &&
+      effect.tags.includes(helpToolTag(tool))
   );
 }
 
@@ -28,14 +46,15 @@ export function endUsedHelp(state: GameState, actor: Actor): EffectNarration[] {
     .flatMap((effect) => endEffectIfPresent(state, actor.id, effect.id));
 }
 
-/** After a fresh check with a skill: the Help for that skill is used. With `end`, it ends now (a check nothing
+/** After a fresh check with a skill or a tool: the Help for it is used. With `end`, it ends now (a check nothing
  *  rerolls); otherwise it stays marked until the creature's next check. */
 export function useHelp(state: GameState, actor: Actor, subject: CheckSubject, end = false): EffectNarration[] {
-  if (subject.skill === undefined) return [];
+  const used = [subject.skill, subject.tool].filter((id): id is string => id !== undefined);
+  if (used.length === 0) return [];
   const events: EffectNarration[] = [];
   for (const effect of [...actor.effects]) {
     if (!effect.tags.includes(HELPED_TAG) || effect.tags.includes(HELP_USED_TAG)) continue;
-    if (!helpedSkills(effect).includes(subject.skill)) continue;
+    if (!helpedSkills(effect).some((id) => used.includes(id))) continue;
     if (end) events.push(...endEffectIfPresent(state, actor.id, effect.id));
     else
       actor.effects = actor.effects.map((candidate) =>

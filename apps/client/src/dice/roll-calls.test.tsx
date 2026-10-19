@@ -144,6 +144,22 @@ describe("the GM's call for a roll", () => {
     await user.click(card.getByRole("button", { name: "Close" }));
     expect(sent("roll-call:close")).toEqual([{ callId: CALL }]);
   });
+
+  it("offers the situations a character's gear fits the check, and rolls with those turned on", async () => {
+    serve();
+    const user = userEvent.setup();
+    const spyglass = { situation: "looking through the Spyglass", effect: "Advantage", source: "Spyglass" };
+    const call: RollCall = { ...openCall, entries: [openCall.entries[0]!, { actorId: BRANN, situations: [spyglass] }] };
+    render(<RollCallPanel state={gmState([call])} />, { wrapper: ToastProvider });
+    const card = within(screen.getByRole("list", { name: "Open calls" }));
+    const chip = await card.findByRole("button", { name: "Looking through the Spyglass (Advantage)" });
+    await user.click(chip);
+    expect(chip.getAttribute("aria-pressed")).toBe("true");
+    await user.click(card.getByRole("button", { name: "Roll for them" }));
+    expect(sent("roll-call:answer")).toEqual([
+      { callId: CALL, actorId: BRANN, situations: ["looking through the Spyglass"] }
+    ]);
+  });
 });
 
 const playerCall = (over: Partial<PlayerRollCall> = {}): PlayerRollCall => ({

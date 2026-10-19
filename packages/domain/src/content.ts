@@ -870,6 +870,10 @@ export type ContentActionArea = Readonly<{
   shape: "cone" | "line" | "sphere" | "cube" | "emanation" | "cylinder";
   sizeFeet: number;
   widthFeet: number | null;
+  /** How many of these areas one use places (Fire Storm's ten Cubes); `action.resolve`'s `templates`. */
+  count?: number;
+  /** Each area must touch another. */
+  contiguous?: true;
 }>;
 /** A cast whose granted effect carries this tag takes an ability its caster chooses (Hex: the target has Disadvantage on
  *  ability checks made with it). */
@@ -969,9 +973,9 @@ export type ContentActionSummary = Readonly<{
    *  `conditionId`. */ conditionChoices?: readonly string[];
   /** The creature and creature type its user picks when it summons (Find Familiar's forms); `action.resolve`'s
    *  `summon`. */ summonChoices?: SummonChoices;
-  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple);
-   *  `action.resolve`'s `skill`. */ checkSkills?: ReadonlyArray<
-    Readonly<{ id: string; ability: z.infer<typeof AbilitySchema> }>
+  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple),
+   *  and the tools Help with a Check may help with, by name; `action.resolve`'s `skill`. */ checkSkills?: ReadonlyArray<
+    Readonly<{ id: string; ability: z.infer<typeof AbilitySchema>; name?: string }>
   >;
   /** The cast chooses an ability (Hex); `action.resolve`'s `ability`. */ choosesAbility?: boolean;
   /** An option, one for each target, or a carried weapon it asks for (`actionChoicesOf`). */ choices?: ActionChoices;
@@ -983,6 +987,9 @@ export type ContentActionSummary = Readonly<{
   /** The spell list this cast belongs to, by its action id; it is shown under that list. */ castFrom?: string;
   /** The spell it casts. */ spellId?: string;
   /** The ways its caster may shape the cast (Metamagic, Sculpt Spells), from the server's availability read. */ shaping?: CastShapingOffers;
+  /** Its damage may be looked at before it counts, for Empowered Spell or Heroic Inspiration to answer; from the
+   *  server's availability read. */ damageLook?: true;
+  /** How its area grows with a higher slot (Fog Cloud), from the server's availability read. */ areaPerSlot?: ActionAvailability["areaPerSlot"];
   /** The forms a shape-shift may take (Wild Shape, Polymorph), from the server's availability read; `action.resolve`'s
    *  `form`, or `targetForms` when each target takes its own. */ forms?: ActionAvailability["forms"];
   /** The effects a use picks one of (Enlarge or Reduce); `action.resolve`'s `option`. */ options?: ActionAvailability["options"];

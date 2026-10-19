@@ -139,7 +139,11 @@ export function projectPublicInitiative(
   });
 }
 
-function visibleToPlayerAnnotation(state: GameState, annotation: Annotation, playerSessionId: string | undefined) {
+export function visibleToPlayerAnnotation(
+  state: GameState,
+  annotation: Annotation,
+  playerSessionId: string | undefined
+) {
   switch (annotation.visibility) {
     case "public":
       return true;
@@ -328,6 +332,9 @@ const PENDING_REACTION_FIELDS = {
   parkedCast: "never",
   // Sent as `attackRoll`, and only when the roll it came from is in the player's dice log.
   attackTotal: "derived",
+  // The attack's target as it stands, and the allies a Redirect Attack may hand it to: masked or left out when hidden.
+  targetName: "derived",
+  redirectChoices: "derived",
   // What kind of roll the reactor is asked to answer, and what its own answer does.
   rollKind: "player",
   answerDoes: "player",
@@ -509,6 +516,27 @@ export function projectPlayerCombat(
     pendingRuleAsks: state.combat.pendingRuleAsks
       .filter((entry) => ownedBy(state, entry.actorId, playerSessionId))
       .map((entry) => copyPlayerFields(entry, PENDING_RULE_ASK_FIELDS)),
+    // What happens at once as their own character's turn starts or ends, for them to order: each step's name, with a
+    // hidden source left out of it, and the creature it lands on only when they can see it.
+    ...(state.combat.turnSteps && ownedBy(state, state.combat.turnSteps.actorId, playerSessionId)
+      ? {
+          turnSteps: {
+            id: state.combat.turnSteps.id,
+            actorId: state.combat.turnSteps.actorId,
+            boundary: state.combat.turnSteps.boundary,
+            steps: state.combat.turnSteps.steps.map((step) => ({
+              key: step.key,
+              name:
+                step.sourceActorId !== undefined && isHiddenSource(step.sourceActorId, publicActorIds)
+                  ? withoutSourceName(step.name, step.sourceName ?? "")
+                  : step.name,
+              ...(step.targetName && step.targetActorId && publicActorIds.has(step.targetActorId)
+                ? { targetName: step.targetName }
+                : {})
+            }))
+          }
+        }
+      : {}),
     pendingReactions: state.combat.pendingReactions
       .filter((entry) => ownedBy(state, entry.actorId, playerSessionId))
       .map((entry) => {
@@ -516,6 +544,14 @@ export function projectPlayerCombat(
         return {
           ...copyPlayerFields(entry, PENDING_REACTION_FIELDS),
           sourceName: isHiddenSource(entry.sourceActorId, publicActorIds) ? HIDDEN_SOURCE : entry.sourceName,
+          ...(entry.targetName !== undefined
+            ? {
+                targetName: isHiddenSource(entry.targetActorId, publicActorIds) ? HIDDEN_SOURCE : entry.targetName
+              }
+            : {}),
+          ...(entry.redirectChoices
+            ? { redirectChoices: entry.redirectChoices.filter((choice) => publicActorIds.has(choice.actorId)) }
+            : {}),
           // The roll the prompt answers, only when the player already saw it in their dice log.
           ...(attackRoll !== null ? { attackRoll } : {}),
           // Whether the reactor's own reaction lasts (Shield): a fact of their own spell.
@@ -642,6 +678,8 @@ export function projectPlayerRollCalls(state: GameState, playerSessionId: string
         entries: entries.map((entry) => ({
           actorId: entry.actorId,
           ...(entry.saveId !== undefined ? { saveId: entry.saveId } : {}),
+          // Their own character's gear, which their sheet already lists.
+          ...(entry.situations ? { situations: entry.situations.map((one) => ({ ...one })) } : {}),
           answered: entry.result !== undefined,
           ...(entry.result !== undefined && !call.blind ? { result: { ...entry.result } } : {})
         })),

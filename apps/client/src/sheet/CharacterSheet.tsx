@@ -338,6 +338,8 @@ export function CharacterSheet({
       busy={busy}
       edit={edit}
       onEdited={showEdited}
+      helping={controller.inFight ? undefined : state}
+      onFeedback={say}
     />
   ) : null;
   const spellsBody = definition ? (

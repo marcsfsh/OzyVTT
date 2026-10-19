@@ -13,6 +13,7 @@ import {
 import { spellbookRituals } from "./ritual-adept.js";
 import { spellClassOf } from "./class-features.js";
 import { grantedSpellActions } from "./granted-actions.js";
+import { divineInterventionCasts } from "./divine-intervention.js";
 import { withHeadCount } from "./death-traits.js";
 
 /** The action list every actor-scoped consumer must read in place of `definition.actions`: item-derived
@@ -46,8 +47,12 @@ export function effectiveActions(
   const unchanged = taken.every((action, index) => action === declared[index]);
   // What another creature's spell lets this one do while it lasts (Dragon's Breath's exhale).
   const granted = actor ? grantedSpellActions(actor, catalog) : [];
+  // A Cleric's Divine Intervention casts any Cleric spell of level 5 or lower.
+  const divine = divineInterventionCasts(definition, catalog);
   const base =
-    unchanged && rituals.length === 0 && granted.length === 0 ? declared : [...taken, ...rituals, ...granted];
+    unchanged && rituals.length === 0 && granted.length === 0 && divine.length === 0
+      ? declared
+      : [...taken, ...rituals, ...granted, ...divine];
   if (!actor) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
   if (derivation.carriers.length === 0 && derivation.actions.length === 0) return base;

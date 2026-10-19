@@ -4,6 +4,9 @@ import { GameStateSchema, type GameState, type GmActor } from "@vtt/domain";
 import { movementCost } from "../../../server/src/terrain";
 import type { TokenMapGeometry } from "../../../server/src/token-placement";
 import { spaceSharingFor } from "../../../server/src/space-sharing";
+import { addAnnotation } from "../../../server/src/annotations";
+import { zoneMovementOptions } from "../../../server/src/zone-ground";
+import { areaGroundFor } from "../../../server/src/zone-preview";
 import { moveLabel, movementWallsOf, previewMove } from "./movePreview";
 
 // The drag preview and the server's charge must agree, so the preview runs the server's own scenarios.
@@ -414,5 +417,118 @@ describe("the drag preview follows the server through creatures that share space
     expect(charged).toMatchObject({ feet: 25, difficultFeet: 5 });
     expect(previewed?.feet).toBe(charged?.feet);
     expect(previewed?.difficultFeet).toBe(charged?.difficultFeet);
+  });
+});
+
+describe("the drag preview charges the ground spell areas make, as the server does", () => {
+  /** A spell's area on the map with the rule it acts by: a template drawn as the GM places it. */
+  function withArea(
+    state: GameState,
+    id: string,
+    template: Readonly<{
+      shape: "square" | "line";
+      origin: { x: number; y: number };
+      target: { x: number; y: number };
+    }>,
+    area: { shape: "cube" | "line"; sizeFeet: number; widthFeet: number | null },
+    trigger: object
+  ) {
+    addAnnotation(
+      state,
+      {
+        id,
+        kind: "shape",
+        ...template,
+        visibility: "public",
+        actor: { sessionId: "30000000-0000-4000-8000-00000000000a", role: "gm" },
+        now: 0
+      },
+      GRID
+    );
+    state.combat.spellZones = [
+      ...state.combat.spellZones,
+      {
+        id,
+        spellId: "test-area",
+        name: "Test area",
+        laterActionId: "test-area-then-act",
+        casterId: FRIEND,
+        castId: null,
+        rounds: null,
+        startedRound: 1,
+        level: 2,
+        dc: 13,
+        annotationId: id,
+        area,
+        rule: { trigger: { on: [], ...trigger }, damage: [] },
+        damageDealt: 0,
+        entered: [],
+        affected: []
+      } as GameState["combat"]["spellZones"][number]
+    ];
+  }
+  const DEPS = { geometry: GRID, resolveDefinition: () => undefined };
+  const compare = (state: GameState, from: { x: number; y: number }, to: { x: number; y: number }) => {
+    const charged = movementCost(state, GRID, HERO, from, to, zoneMovementOptions(state, HERO, DEPS));
+    const areaGround = areaGroundFor(state, HERO, DEPS, () => true);
+    const previewed = previewMove({
+      calibration: CALIBRATION,
+      size: { width: GRID.width, height: GRID.height },
+      terrain: [],
+      tokens: state.combat.tokens,
+      actorsById: new Map(state.actors.map((actor) => [actor.id, actor as GmActor])),
+      moverId: HERO,
+      from,
+      to,
+      ...(areaGround ? { areaGround } : {})
+    });
+    return { charged: charged?.feet, previewed: previewed?.feet };
+  };
+
+  it("makes a web's cells Difficult Terrain", () => {
+    const state = table([], { [HERO]: cell(0, 5), [FRIEND]: cell(19, 19) });
+    withArea(
+      state,
+      "area-web",
+      { shape: "square", origin: { x: 150, y: 150 }, target: { x: 350, y: 350 } },
+      { shape: "cube", sizeFeet: 20, widthFeet: null },
+      { terrain: { cost: 2 } }
+    );
+    // Into the webs: the last two steps cost double, 15 + 2 x 10.
+    const { charged, previewed } = compare(state, cell(0, 5), cell(5, 5));
+    expect(previewed).toBe(charged);
+    expect(charged).toBe(35);
+  });
+
+  it("charges 4 feet for every foot of overgrowth", () => {
+    const state = table([], { [HERO]: cell(0, 5), [FRIEND]: cell(19, 19) });
+    withArea(
+      state,
+      "area-growth",
+      { shape: "square", origin: { x: 150, y: 150 }, target: { x: 250, y: 250 } },
+      { shape: "cube", sizeFeet: 10, widthFeet: null },
+      { terrain: { cost: 4 } }
+    );
+    // Onto the overgrowth's cell 4: three steps on open ground, then one at 4 feet for every foot.
+    const { charged, previewed } = compare(state, cell(0, 3), cell(4, 3));
+    expect(previewed).toBe(charged);
+    expect(charged).toBe(35);
+  });
+
+  it("charges double for each step toward a Line's caster", () => {
+    const state = table([], { [HERO]: cell(4, 5), [FRIEND]: cell(10, 5) });
+    withArea(
+      state,
+      "area-gust",
+      { shape: "line", origin: cell(10, 5), target: cell(0, 5) },
+      { shape: "line", sizeFeet: 50, widthFeet: 10 },
+      { towardCaster: true }
+    );
+    const toward = compare(state, cell(4, 5), cell(8, 5));
+    expect(toward.previewed).toBe(toward.charged);
+    expect(toward.charged).toBe(40);
+    const away = compare(state, cell(4, 5), cell(1, 5));
+    expect(away.previewed).toBe(away.charged);
+    expect(away.charged).toBe(15);
   });
 });

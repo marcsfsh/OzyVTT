@@ -43,7 +43,6 @@ const SHAPING = {
   points: 5,
   options: [
     { id: "careful-spell", name: "Careful Spell", cost: 1, available: true, counted: true, creatures: { count: 3 } },
-    { id: "empowered-spell", name: "Empowered Spell", cost: 1, available: true, counted: false },
     { id: "quickened-spell", name: "Quickened Spell", cost: 2, available: true, counted: true },
     {
       id: "transmuted-spell",
@@ -174,12 +173,10 @@ describe("the cast offers the Sorcerer's Metamagic", () => {
     const twinned = shape.getByRole("button", { name: /^Twinned Spell/ }) as HTMLButtonElement;
     expect(twinned.disabled).toBe(true);
     expect(twinned.textContent).toContain("and Fire Burst doesn't.");
-    // One counted option a spell: picking Quickened Spell closes the other counted ones, and Empowered Spell stays.
+    // One counted option a spell: picking Quickened Spell closes the other counted ones.
     await user.click(shape.getByRole("button", { name: /^Quickened Spell/ }));
     expect((shape.getByRole("button", { name: /^Careful Spell/ }) as HTMLButtonElement).disabled).toBe(true);
-    expect((shape.getByRole("button", { name: /^Empowered Spell/ }) as HTMLButtonElement).disabled).toBe(false);
-    await user.click(shape.getByRole("button", { name: /^Empowered Spell/ }));
-    expect(detail.getByText("It spends 3 Sorcery Points.")).toBeTruthy();
+    expect(detail.getByText("It spends 2 Sorcery Points.")).toBeTruthy();
   });
 
   it("sends Careful Spell with the creature chosen among the targets", async () => {
@@ -213,5 +210,37 @@ describe("the cast offers the Sorcerer's Metamagic", () => {
     await user.click(picker.getByRole("checkbox", { name: /Wolf/ }));
     await user.click(picker.getByRole("button", { name: "Roll Fire Burst" }));
     expect(resolved()).toMatchObject({ shaping: [{ id: "transmuted-spell", damageType: "cold" }] });
+  });
+});
+
+// SRD Overchannel (Evoker 14): "you can deal maximum damage with that spell". The cast offers it beside Metamagic, at
+// no cost, and it travels with the cast's shaping.
+describe("the cast offers the Evoker's Overchannel", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearTargeting();
+    const overchannel = { id: "overchannel", name: "Overchannel", cost: 0, available: true, counted: false };
+    emit.mockImplementation((event: string, _payload: unknown, ack?: (result: unknown) => void) => {
+      if (event === "actor:available-actions")
+        ack?.({
+          ok: true,
+          rulesMode: "strict",
+          actions: [{ ...BURST_ROW, shaping: { limit: 1, points: 0, options: [overchannel] } }]
+        });
+      else ack?.({ ok: true, resolution: { actionName: "Fire Burst", damage: [], damageTotal: 0 } });
+    });
+  });
+
+  it("names it at no cost and sends it with the cast", async () => {
+    const { user, detail } = await openCast();
+    expect(detail.getByText("Overchannel", { selector: ".cs-eyebrow" })).toBeTruthy();
+    const shape = within(detail.getByRole("group", { name: "Shape the spell" }));
+    expect(shape.getByRole("button", { name: /^Overchannel/ }).textContent).toContain("No cost");
+    await user.click(shape.getByRole("button", { name: /^Overchannel/ }));
+    await user.click(detail.getByRole("button", { name: "Cast at level 3" }));
+    const picker = within(await screen.findByRole("group", { name: "Targets for Fire Burst" }));
+    await user.click(picker.getByRole("checkbox", { name: /Wolf/ }));
+    await user.click(picker.getByRole("button", { name: "Roll Fire Burst" }));
+    expect(resolved()).toMatchObject({ shaping: [{ id: "overchannel" }] });
   });
 });

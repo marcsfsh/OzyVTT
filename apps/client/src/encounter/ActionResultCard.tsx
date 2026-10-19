@@ -2,6 +2,7 @@ import { IconRepeat, IconWarning } from "@vtt/ui";
 import type { ActionResolution, ContentActionSummary, GmActor, GmView } from "@vtt/domain";
 import { ActionResultHead, CheckOutcome, HealingOutcome } from "./ActionResultHead";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
+import { DamageLook } from "./DamageLook";
 import { componentLabel } from "./action-summary";
 import { damageBreakdown } from "./format";
 import type { ResolveOptions } from "./targeting";
@@ -115,7 +116,18 @@ export function ActionResultCard({
           push={result.push}
           {...(result.hitOffers ? { hitOffers: result.hitOffers } : {})}
           knockOutOffered={result.knockOut === "offered"}
+          look={result}
           resolve={resolve}
+        />
+      )}
+      {result.preview && !result.attack && result.heldDamage && (
+        <DamageLook
+          result={result}
+          look={result.heldDamage}
+          busy={resolveBusy}
+          confirmLabel="Confirm"
+          onAnswer={(id, dice) => resolve({ damageLook: true, damageAnswer: { id, dice } })}
+          onConfirm={() => resolve({ commit: true })}
         />
       )}
       {result.save && (

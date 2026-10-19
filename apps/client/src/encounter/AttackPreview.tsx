@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ActionResolution, HitOffer, HitOptionChoice } from "@vtt/domain";
 import { AnswerOffers, ForceModeButtons, RerollControl, type DieMode } from "./RollControls";
+import { DamageLook } from "./DamageLook";
 import { useTargetingTyped, type ResolveOptions } from "./targeting";
 import "./prompts.css";
 
@@ -237,6 +238,7 @@ export function AttackPreview({
   push,
   hitOffers = [],
   knockOutOffered = false,
+  look,
   resolve: resolveWith
 }: Readonly<{
   attack: Attack;
@@ -252,6 +254,8 @@ export function AttackPreview({
   hitOffers?: readonly HitOffer[];
   /** A melee hit may knock its target out instead of dropping it (SRD); the attacker chooses it before Confirm. */
   knockOutOffered?: boolean;
+  /** The hit's damage may be looked at before it counts (`offered`), or the look itself, with its held dice. */
+  look?: ActionResolution;
   resolve: (options: ResolveOptions) => void;
 }>) {
   // The shown die was typed from a physical die, so a player's reroll is typed too.
@@ -296,49 +300,70 @@ export function AttackPreview({
           </div>
         </div>
       )}
-      <span className="save-prompt-confirm">
-        {viewer === "gm" && (
-          <ForceModeButtons
-            current={forced}
-            disabled={busy}
-            onPick={(mode) => {
-              const next = mode === "normal" ? undefined : mode;
-              setForced(next);
-              // Sent as is: going back to the rules' count sends no mode at all.
-              resolveWith({ commit: false, ...(next ? { rollMode: next } : {}) });
-            }}
-          />
-        )}
-        <button type="button" className="encounter-primary" disabled={busy} onClick={() => resolve({ commit: true })}>
-          {outcomeOpen(attack)
-            ? "Confirm"
-            : `Confirm ${
-                attack.outcome === "crit"
-                  ? "crit"
-                  : attack.outcome === "hit" || attack.outcome === "unknown"
-                    ? "hit"
-                    : "miss"
-              }`}
-        </button>
-        {(viewer === "gm" || inspired) && (
-          <RerollControl
-            viewer={viewer}
+      {look?.heldDamage ? (
+        <DamageLook
+          result={look}
+          look={look.heldDamage}
+          busy={busy}
+          confirmLabel={`Confirm ${attack.outcome === "crit" ? "crit" : "hit"}`}
+          onAnswer={(id, dice) => resolve({ commit: false, damageLook: true, damageAnswer: { id, dice } })}
+          onConfirm={() => resolve({ commit: true })}
+        />
+      ) : (
+        <span className="save-prompt-confirm">
+          {viewer === "gm" && (
+            <ForceModeButtons
+              current={forced}
+              disabled={busy}
+              onPick={(mode) => {
+                const next = mode === "normal" ? undefined : mode;
+                setForced(next);
+                // Sent as is: going back to the rules' count sends no mode at all.
+                resolveWith({ commit: false, ...(next ? { rollMode: next } : {}) });
+              }}
+            />
+          )}
+          <button type="button" className="encounter-primary" disabled={busy} onClick={() => resolve({ commit: true })}>
+            {outcomeOpen(attack)
+              ? "Confirm"
+              : `Confirm ${
+                  attack.outcome === "crit"
+                    ? "crit"
+                    : attack.outcome === "hit" || attack.outcome === "unknown"
+                      ? "hit"
+                      : "miss"
+                }`}
+          </button>
+          {(viewer === "gm" || inspired) && (
+            <RerollControl
+              viewer={viewer}
+              typed={typed}
+              busy={busy}
+              onInvalid={onFeedback}
+              onReroll={(face) =>
+                resolve({ commit: false, reroll: true, ...(face !== undefined ? { attackNatural: face } : {}) })
+              }
+            />
+          )}
+          <AnswerOffers
+            offers={attack.answers}
             typed={typed}
             busy={busy}
             onInvalid={onFeedback}
-            onReroll={(face) =>
-              resolve({ commit: false, reroll: true, ...(face !== undefined ? { attackNatural: face } : {}) })
-            }
+            onAnswer={(answer) => resolve({ commit: false, answer })}
           />
-        )}
-        <AnswerOffers
-          offers={attack.answers}
-          typed={typed}
-          busy={busy}
-          onInvalid={onFeedback}
-          onAnswer={(answer) => resolve({ commit: false, answer })}
-        />
-      </span>
+          {look?.damageLook === "offered" && (
+            <button
+              type="button"
+              className="save-die-mode"
+              disabled={busy}
+              onClick={() => resolve({ commit: false, damageLook: true })}
+            >
+              Roll damage
+            </button>
+          )}
+        </span>
+      )}
     </div>
   );
 }

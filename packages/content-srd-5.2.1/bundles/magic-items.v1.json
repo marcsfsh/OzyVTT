@@ -791,7 +791,21 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "catch-the-attack",
+    "name": "Arrow-Catching Shield",
+    "activation": "reaction",
+    "description": "Whenever an attacker makes a ranged attack roll against a target within 5 feet of you, you can take a Reaction to become the target of the attack instead.",
+    "damage": [],
+    "reaction": {
+     "trigger": "other-targeted-by-attack",
+     "response": "become-target",
+     "rangeFeet": 5,
+     "ranged": true
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },

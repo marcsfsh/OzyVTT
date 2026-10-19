@@ -43,6 +43,7 @@ import {
   endKnockOut,
   KNOCKED_OUT_TAG,
   makeEffect,
+  maximumKeeper,
   STABLE_RECOVERY_TAG,
   NO_HEALING_TAG,
   NO_HEALING_ON_LAND_TAG,
@@ -646,9 +647,19 @@ function drainDamage(
       : taken.parts.filter((part) => part.type.toLowerCase() === type).reduce((sum, part) => sum + part.adjusted, 0);
   if (amount <= 0) return { died: false };
   let died = false;
-  const loss = drain.reducesMaximum
-    ? Math.min(amount, Math.max(0, actor.hp.maximum - (drain.keepsOneMaximum ? 1 : 0)))
-    : 0;
+  // SRD Aura of Life: "your Hit Point maximums can't be reduced" while in the aura.
+  const kept = drain.reducesMaximum ? maximumKeeper(actor) : undefined;
+  if (kept)
+    events.push({
+      kind: "damage",
+      text: `${actor.name}'s Hit Point maximum doesn't drop (${kept.name}).`,
+      actorId: actor.id,
+      ...(actor.kind === "player-character" ? {} : { gmOnly: true as const })
+    });
+  const loss =
+    drain.reducesMaximum && !kept
+      ? Math.min(amount, Math.max(0, actor.hp.maximum - (drain.keepsOneMaximum ? 1 : 0)))
+      : 0;
   if (loss > 0) {
     const wasStanding = actor.hp.current > 0;
     actor.hp = {

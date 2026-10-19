@@ -7,6 +7,7 @@ import { useTableCalibration } from "../scene/tableGeometry";
 import { playerTargetCandidates, targetRows } from "../table/targetRows";
 import { ActionList } from "./ActionList";
 import { CastDetail } from "./CastDetail";
+import { SpellPickChooser } from "../encounter/SpellPickChooser";
 import { EconomyPips } from "./PlayTab";
 import { characterLevel, heroicInspirationOf, isDown, type SheetActor, type SheetState } from "./sheet-model";
 import { castOptions, preparedState, type CastOption } from "./spell-model";
@@ -188,6 +189,8 @@ function GmPlayList({
     [definition, actor, derivedRows, serverActions, facts, spellIndex]
   );
   const [casting, setCasting] = useState<TurnOption | null>(null);
+  /** A feature whose spell is being picked (Divine Intervention). */
+  const [choosing, setChoosing] = useState<TurnOption | null>(null);
   const choicesOf = (option: TurnOption): CastOption[] =>
     option.spell
       ? castOptions({
@@ -230,6 +233,10 @@ function GmPlayList({
         myTurn
         busy={false}
         onUse={(option) => {
+          if (option.picks && option.picks.length > 0) {
+            setChoosing(option);
+            return;
+          }
           const choices = choicesOf(option);
           const shapeable = (option.summary.shaping?.options.length ?? 0) > 0;
           if (option.spell && (choices.length > 1 || shapeable)) setCasting(option);
@@ -241,6 +248,17 @@ function GmPlayList({
         <SheetDetail place={place} title={`Cast ${casting.name}`} onClose={() => setCasting(null)}>
           {detail}
         </SheetDetail>
+      )}
+      {choosing && (
+        <SpellPickChooser
+          option={choosing}
+          busy={false}
+          onClose={() => setChoosing(null)}
+          onPick={(pick) => {
+            setChoosing(null);
+            controller.castSpellAction(pick.id);
+          }}
+        />
       )}
     </>
   );

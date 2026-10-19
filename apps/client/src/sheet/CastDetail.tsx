@@ -48,7 +48,7 @@ function blockedReason(offer: Offer, chosen: readonly Offer[], offers: CastShapi
   if (!offer.available) return offer.reason ?? "This spell can't take it.";
   if (offer.counted && chosen.filter((pick) => pick.counted).length >= offers.limit)
     return offers.limit === 1
-      ? "One Metamagic option a spell, Empowered Spell aside."
+      ? "One Metamagic option a spell."
       : "Two Metamagic options a spell while Innate Sorcery is active.";
   if (costOf([...chosen, offer], offers.free === true) > offers.points) return "Not enough Sorcery Points.";
   if (!aimed && PROTECTS.has(offer.id)) return "Aim the spell on your turn in a fight to choose who it protects.";
@@ -66,9 +66,15 @@ function shapingLine(chosen: readonly Offer[], offers: CastShapingOffers, aimed:
   return parts.join(" ");
 }
 
+/** The Evoker's ways of shaping a cast, which are no Metamagic and cost no Sorcery Points. */
+const EVOKER_OPTIONS: Readonly<Record<string, string>> = {
+  "sculpt-spells": "Sculpt Spells",
+  overchannel: "Overchannel"
+};
+
 /**
  * One spell's cast: its slot levels (each with what is left and what it buys), a free casting or a Ritual where it
- * has one, the ways its caster may shape it (Metamagic, Sculpt Spells), a line on what happens next, and one primary
+ * has one, the ways its caster may shape it (Metamagic, Sculpt Spells, Overchannel), a line on what happens next, and one primary
  * that names the result. The sheet places it per width: in place on a phone, in the right column on a laptop, in a
  * drawer on the GM's phone.
  */
@@ -126,7 +132,7 @@ export function CastDetail({
   ]
     .filter(Boolean)
     .join(" · ");
-  const metamagic = (offers?.options ?? []).some((offer) => offer.id !== "sculpt-spells");
+  const metamagic = (offers?.options ?? []).some((offer) => !(offer.id in EVOKER_OPTIONS));
   return (
     <section className="cs-cast" aria-label={`Cast ${spell.name}`}>
       <div className="cs-cast-head">
@@ -160,7 +166,7 @@ export function CastDetail({
           <span className="cs-eyebrow">
             {metamagic
               ? `Metamagic · ${points(offers.points)} left${offers.free ? " · one option free this turn" : ""}`
-              : "Sculpt Spells"}
+              : offers.options.map((offer) => EVOKER_OPTIONS[offer.id] ?? offer.name).join(" · ")}
           </span>
           <div className="cs-cast-options" role="group" aria-label="Shape the spell">
             {offers.options.map((offer) => {

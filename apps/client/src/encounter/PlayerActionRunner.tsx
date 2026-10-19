@@ -19,8 +19,10 @@ import { useSpellReference } from "./spells";
 import { ActionResultHead, CheckOutcome, HealingOutcome } from "./ActionResultHead";
 import { ActionTargetPicker } from "./ActionTargetPicker";
 import { AttackOutcome, AttackPreview } from "./AttackPreview";
+import { DamageLook } from "./DamageLook";
 import { CommonActionChips } from "./CommonActionChips";
 import { ReadyChooser, readyableSpells } from "./ReadyChooser";
+import { SpellPickChooser } from "./SpellPickChooser";
 import { damageBreakdown } from "./format";
 import { modeWords } from "./roll-mode-notes";
 import { AskTheGmPrompt } from "./RuleAsk";
@@ -253,6 +255,8 @@ export function PlayerActionRunner({
   );
   /** A spell waiting for its slot to be chosen. */
   const [casting, setCasting] = useState<TurnOption | null>(null);
+  /** A feature whose spell is being picked (Divine Intervention). */
+  const [choosing, setChoosing] = useState<TurnOption | null>(null);
   const hitExtras = definition.actions.filter(
     (action) => facts.ridesAHit.has(action.id) && action.spellId === undefined
   );
@@ -382,6 +386,10 @@ export function PlayerActionRunner({
   /** A tap on an option: a spell with a choice of slot opens its cast detail, the rest go at once. */
   const pickOption = (option: TurnOption) => {
     setTargetingResult(null);
+    if (option.picks && option.picks.length > 0) {
+      setChoosing(option);
+      return;
+    }
     const choices = option.spell ? castChoices(option) : [];
     // A spell its caster may shape (Metamagic) opens its cast, where the options are offered.
     const shapeable = (option.summary.shaping?.options.length ?? 0) > 0;
@@ -476,6 +484,17 @@ export function PlayerActionRunner({
           />
         </>
       )}
+      {choosing && (
+        <SpellPickChooser
+          option={choosing}
+          busy={busy}
+          onClose={() => setChoosing(null)}
+          onPick={(pick) => {
+            setChoosing(null);
+            take(pick.summary);
+          }}
+        />
+      )}
       {readying && (
         <ReadyChooser
           spells={readySpells}
@@ -526,6 +545,9 @@ export function PlayerActionRunner({
           busy={busy}
           onInvalidFace={onFeedback}
           onRoll={(face) => resolveTargeting(revision, onOutcome, face !== undefined ? { attackNatural: face } : {})}
+          {...(picking.action.damageLook && picking.action.attackBonus === null
+            ? { onLookAtDamage: () => resolveTargeting(revision, onOutcome, { damageLook: true }) }
+            : {})}
         />
       )}
       {result && (
@@ -553,7 +575,21 @@ export function PlayerActionRunner({
               push={result.push}
               {...(result.hitOffers ? { hitOffers: result.hitOffers } : {})}
               knockOutOffered={result.knockOut === "offered"}
+              look={result}
               resolve={(options) => resolveTargeting(revision, onOutcome, options)}
+            />
+          )}
+          {/* A spell's damage looked at before the cast lands (Empowered Spell, Heroic Inspiration). */}
+          {result.preview && !result.attack && result.heldDamage && (
+            <DamageLook
+              result={result}
+              look={result.heldDamage}
+              busy={busy}
+              confirmLabel="Confirm"
+              onAnswer={(id, dice) =>
+                resolveTargeting(revision, onOutcome, { damageLook: true, damageAnswer: { id, dice } })
+              }
+              onConfirm={() => resolveTargeting(revision, onOutcome, { commit: true })}
             />
           )}
           {result.save && (

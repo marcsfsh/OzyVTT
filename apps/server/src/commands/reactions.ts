@@ -2,7 +2,8 @@ import { DamageResolveSchema, ReactionAnswerSchema, ReactionDismissSchema } from
 import { heldRollFor, requireTypedDie } from "../held-rolls.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { resolvePendingDamage, type AppliedDamage } from "../player-damage.js";
-import { pushTokenAway } from "../forced-movement.js";
+import { pushThroughZones } from "../pushed-through.js";
+import type { EffectNarration } from "../effects.js";
 import { answerReaction, dismissReaction, reactionHoldKey, type ReactionOutcome } from "../reactions.js";
 import type { ActionResolution } from "@vtt/domain";
 import { withoutSourceName } from "../hidden-source.js";
@@ -99,6 +100,23 @@ function reactionLine(outcome: ReactionOutcome): { kind: "reaction" | "damage"; 
           : (damage ?? "no damage");
       return { kind: "reaction", text: `${outcome.actorName} ${what} - ${result}.` };
     }
+    case "attack-targeted": {
+      if (!resolution) return null;
+      const swing = `${outcome.sourceName}'s ${resolution.actionName}`;
+      const at = resolution.attack?.targetName;
+      const result =
+        resolution.waitingOnReaction || resolution.reactionPrompts?.length
+          ? "waits on another answer"
+          : verdict
+            ? `${verdict}${damage ? `, ${damage}` : ""}`
+            : "is made";
+      return {
+        kind: "reaction",
+        text: outcome.used
+          ? `${outcome.actorName} used ${outcome.actionName}: ${swing}${at ? ` at ${at}` : ""} ${result}.`
+          : `${outcome.actorName} declined ${outcome.actionName}: ${swing} ${result}.`
+      };
+    }
     case "falls":
       // The landing itself is told by the fall's own line.
       return outcome.used
@@ -154,7 +172,8 @@ export const reactionCommands = [
         pushFeet,
         hitOptions,
         slotLevel,
-        subtract
+        subtract,
+        redirectTo
       } = request;
       const initiator = initiatorOf(principal);
       // The rules count a player's Advantage and Disadvantage; only the GM may force a mode.
@@ -164,6 +183,8 @@ export const reactionCommands = [
       const geometry = mapAssetId ? await kit.context.tokenGeometryFor(mapAssetId) : null;
       const distance = await kit.creatureDistance();
       let outcome: ReturnType<typeof answerReaction> | undefined;
+      // What the spell areas a push moves a creature through did to it.
+      const pushedThrough: EffectNarration[] = [];
       const { state, duplicate } = await execute((draft) => {
         // A typed die must be one the table takes, and not one typed over the strike's thrown die.
         if (attackNatural !== undefined && reroll !== true)
@@ -184,7 +205,9 @@ export const reactionCommands = [
             gmSessionId: sessionIdOf(principal),
             now: () => new Date().toISOString(),
             pushToken: (input) =>
-              draft.combat.mapAssetId === mapAssetId ? pushTokenAway(draft, input, geometry) : null,
+              geometry && draft.combat.mapAssetId === mapAssetId
+                ? pushThroughZones(draft, input, geometry, kit.zoneDeps(draft, geometry), pushedThrough)
+                : null,
             distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
           },
           {
@@ -195,7 +218,8 @@ export const reactionCommands = [
             ...(pushFeet !== undefined ? { pushFeet } : {}),
             ...(hitOptions ? { hitOptions } : {}),
             ...(slotLevel !== undefined ? { slotLevel } : {}),
-            ...(subtract === true ? { subtract: true } : {})
+            ...(subtract === true ? { subtract: true } : {}),
+            ...(redirectTo !== undefined ? { redirectTo } : {})
           }
         );
         // The reaction taken counts toward the sheet's most-used options: the strike's own action, or the prompt's.
@@ -222,14 +246,18 @@ export const reactionCommands = [
       if (outcome.resolution && !outcome.resolution.preview)
         kit.narrateResolution(
           outcome.resolution,
-          outcome.kind === "attack-would-hit" || outcome.kind === "casts-spell" || outcome.kind === "roll-answer"
+          outcome.kind === "attack-would-hit" ||
+            outcome.kind === "casts-spell" ||
+            outcome.kind === "roll-answer" ||
+            outcome.kind === "attack-targeted"
             ? outcome.other!.id
             : outcome.actorId
         );
       kit.publishNarrations(outcome.events);
+      kit.publishNarrations(pushedThrough);
       const resolution =
         outcome.resolution &&
-        (outcome.kind === "attack-would-hit" || outcome.kind === "roll-answer") &&
+        (outcome.kind === "attack-would-hit" || outcome.kind === "roll-answer" || outcome.kind === "attack-targeted") &&
         !isGmGrade(principal)
           ? metAttack(
               outcome.resolution,

@@ -5,10 +5,11 @@ import { resolveDefinitionAction, type ResolveInput } from "../src/action-resolu
 import { importActorDefinition, storedDefinition } from "../src/actor-roster.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
-import { startEncounter } from "../src/encounter.js";
+import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { answerReaction } from "../src/reactions.js";
 import { build, HERO, wizardInput } from "./spell-casters.js";
+import { catalogRow } from "./equipment-table.js";
 
 // SRD 5.2.1 Counterspell: "You attempt to interrupt a creature in the process of casting a spell. The creature makes a
 // Constitution saving throw. On a failed save, the spell dissipates with no effect, and the action, Bonus Action, or
@@ -17,7 +18,7 @@ import { build, HERO, wizardInput } from "./spell-casters.js";
 const library = new ContentLibrary();
 const catalog = equipmentCatalogOf(library.forAudience("gm"));
 const MAGE = "10000000-0000-4000-8000-000000000002";
-const wizard = build(wizardInput(["counterspell", "shield", "magic-missile", "fireball"]));
+const wizard = build(wizardInput(["counterspell", "shield", "magic-missile", "fireball", "alarm"]));
 const GM = { role: "gm" } as const;
 
 /** The wizard (whose turn comes first unless `mageFirst`) against a Mage stat block. Dice come from `faces`. */
@@ -184,5 +185,76 @@ describe("a reaction spell's slot", () => {
     answer(true, 2);
     expect(slotsOf(hero, 2)).toBe(level2 - 1);
     expect(hero.hp.current).toBe(hero.hp.maximum);
+  });
+});
+
+describe("what a Counterspell sees cast", () => {
+  it("sees a spell read from a Spell Scroll, which crumbles whether or not it goes ahead", () => {
+    const { state, cast, answer, hero } = duel([1]);
+    hero.inventory = [...hero.inventory, catalogRow("spell-scroll", { equipped: false, spellId: "magic-missile" })];
+    const resolution = cast(HERO, "item-spell-scroll-read");
+    expect(resolution.waitingOnReaction).toBe(true);
+    expect(state.combat.pendingReactions[0]).toMatchObject({ kind: "casts-spell", actorId: MAGE });
+    expect(hero.inventory.some((row) => row.id === "spell-scroll")).toBe(false);
+    expect(answer(true)).toMatchObject({ countered: true });
+  });
+
+  it("doesn't see a spell cast from a wand, which needs no components", () => {
+    const { state, cast, hero } = duel([2, 2, 2]);
+    hero.inventory = [...hero.inventory, catalogRow("wand-of-magic-missiles", { attuned: true })];
+    const wand = effectiveActions(wizard, hero, catalog).find(
+      (action) => action.spellId === "magic-missile" && action.id.startsWith("item-wand")
+    )!;
+    const resolution = cast(HERO, wand.id);
+    expect(resolution.waitingOnReaction).toBeUndefined();
+    expect(state.combat.pendingReactions).toEqual([]);
+  });
+
+  it("sees a spell cast to be held with the Ready action, and holds it once it goes ahead", () => {
+    const { cast, answer, hero } = duel([]);
+    const before = slotsOf(hero, 1)!;
+    const resolution = cast(HERO, "spell-magic-missile", { ready: true, targetIds: [] });
+    expect(resolution.waitingOnReaction).toBe(true);
+    expect(slotsOf(hero, 1)).toBe(before);
+    answer(false);
+    expect(hero.effects.map((effect) => effect.name)).toContain("Readied: Magic Missile");
+    expect(slotsOf(hero, 1)).toBe(before - 1);
+  });
+
+  it("doesn't see a readied spell's release, which was cast already", () => {
+    const { state, cast, answer } = duel([2, 2, 2]);
+    cast(HERO, "spell-magic-missile", { ready: true, targetIds: [] });
+    answer(false);
+    nextInitiativeTurn(state);
+    const release = cast(HERO, "spell-magic-missile");
+    expect(release.waitingOnReaction).toBeUndefined();
+    expect(state.combat.pendingReactions).toEqual([]);
+  });
+
+  it("sees a long casting as it begins, and not again as it ends", () => {
+    const { state, cast, answer, hero } = duel([20]);
+    const first = cast(HERO, "spell-alarm", { targetIds: [] });
+    expect(first.waitingOnReaction).toBe(true);
+    expect(hero.effects.some((effect) => effect.longCast)).toBe(false);
+    answer(true);
+    const casting = hero.effects.find((effect) => effect.longCast);
+    expect(casting?.longCast).toMatchObject({ actionId: "spell-alarm", turnsLeft: 9, slotLevel: 1 });
+    expect(state.combat.pendingReactions).toEqual([]);
+    casting!.longCast = { ...casting!.longCast!, turnsLeft: 1 };
+    nextInitiativeTurn(state);
+    nextInitiativeTurn(state);
+    state.combat = { ...state.combat, reactionsUsed: [] };
+    const last = cast(HERO, "spell-alarm", { targetIds: [] });
+    expect(last.waitingOnReaction).toBeUndefined();
+    expect(hero.effects.some((effect) => effect.longCast)).toBe(false);
+  });
+
+  it("stops a long casting on its first turn, with no slot spent", () => {
+    const { cast, answer, hero } = duel([1]);
+    const before = slotsOf(hero, 1)!;
+    cast(HERO, "spell-alarm", { targetIds: [] });
+    expect(answer(true)).toMatchObject({ countered: true });
+    expect(hero.effects.some((effect) => effect.longCast)).toBe(false);
+    expect(slotsOf(hero, 1)).toBe(before);
   });
 });

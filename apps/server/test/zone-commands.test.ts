@@ -132,6 +132,82 @@ describe("spell areas through the table's commands", () => {
     expect(server.store.snapshot.combat.spellZones.map((candidate) => candidate.id)).toContain(zone.id);
   });
 
+  // SRD Caltrops: "A creature that enters this area for the first time on a turn must succeed on a DC 15 Dexterity
+  // saving throw or take 1 Piercing damage and have its Speed reduced to 0". The move waits where it entered.
+  it("holds a move where it enters Caltrops until the save is answered, and a failure stops it there", async () => {
+    const { server, place, resolve, post, gmToken } = await fight((state) => carry(state, HERO, "Caltrops"));
+    await resolve({
+      actionId: "item-caltrops-spread",
+      template: { shape: "square", origin: { x: 500, y: 100 }, target: { x: 550, y: 150 } }
+    });
+    await place(FOE, 8, 2);
+    const at = () => server.store.snapshot.combat.tokens.find((token) => token.actorId === FOE)!.position;
+    // Into the Caltrops' square (column 10), where the save waits.
+    expect(at()).toEqual({ x: 525, y: 125 });
+    const save = server.store.snapshot.combat.pendingSaves[0]!;
+    expect(server.store.snapshot.combat.heldMove).toMatchObject({ actorId: FOE, promptIds: [save.id] });
+    const failed = await post(GAME_PATHS.saveAnswer.replace("{saveId}", save.id), gmToken, {
+      saveId: save.id,
+      method: "manual",
+      total: 1,
+      commit: true
+    });
+    expect(failed.status, await failed.clone().text()).toBe(200);
+    expect(server.store.snapshot.combat.heldMove).toBeNull();
+    expect(at()).toEqual({ x: 525, y: 125 });
+  });
+
+  it("carries a move on past Caltrops once the save succeeds", async () => {
+    const { server, place, resolve, post, gmToken } = await fight((state) => carry(state, HERO, "Caltrops"));
+    await resolve({
+      actionId: "item-caltrops-spread",
+      template: { shape: "square", origin: { x: 500, y: 100 }, target: { x: 550, y: 150 } }
+    });
+    await place(FOE, 8, 2);
+    const save = server.store.snapshot.combat.pendingSaves[0]!;
+    const passed = await post(GAME_PATHS.saveAnswer.replace("{saveId}", save.id), gmToken, {
+      saveId: save.id,
+      method: "manual",
+      total: 30,
+      commit: true
+    });
+    expect(passed.status, await passed.clone().text()).toBe(200);
+    expect(server.store.snapshot.combat.heldMove).toBeNull();
+    expect(server.store.snapshot.combat.tokens.find((token) => token.actorId === FOE)!.position).toEqual({
+      x: 425,
+      y: 125
+    });
+  });
+
+  it("meets the areas on the rest of a move that waited on an Opportunity Attack", async () => {
+    const { server, place, resolve, post, gmToken } = await fight((state) => carry(state, HERO, "Caltrops"));
+    await place(FOE, 3, 2);
+    await resolve({
+      actionId: "item-caltrops-spread",
+      template: { shape: "square", origin: { x: 250, y: 100 }, target: { x: 300, y: 150 } }
+    });
+    // On its own turn the goblin leaves the druid's reach, and its move waits on the Opportunity Attack.
+    for (let turn = 0; turn < 2; turn += 1)
+      expect((await post(GAME_PATHS.initiativeNext, gmToken, {})).status).toBe(200);
+    expect(server.store.snapshot.combat.turnActorId).toBe(FOE);
+    await place(FOE, 8, 2);
+    const prompt = server.store.snapshot.combat.pendingReactions.find((entry) => entry.kind === "leaves-reach")!;
+    expect(prompt.actorId).toBe(HERO);
+    expect(server.store.snapshot.combat.pendingSaves).toEqual([]);
+    const declined = await post(GAME_PATHS.reactionDismiss.replace("{reactionId}", prompt.id), gmToken, {
+      reactionId: prompt.id
+    });
+    expect(declined.status, await declined.clone().text()).toBe(200);
+    // On its way again, it walks into the Caltrops and waits there on their save.
+    const save = server.store.snapshot.combat.pendingSaves.find((entry) => entry.targetActorId === FOE)!;
+    expect(save).toMatchObject({ ability: "dex", dc: 15 });
+    expect(server.store.snapshot.combat.heldMove).toMatchObject({ actorId: FOE, promptIds: [save.id] });
+    expect(server.store.snapshot.combat.tokens.find((token) => token.actorId === FOE)!.position).toEqual({
+      x: 275,
+      y: 125
+    });
+  });
+
   it("springs a Hunting Trap on the first creature that steps on it, and takes it off the map", async () => {
     const { server, place, resolve } = await fight((state) => carry(state, HERO, "Hunting Trap"));
     const set = await resolve({

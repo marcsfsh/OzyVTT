@@ -14,6 +14,7 @@ import { revealInRegion } from "../lib/reveal";
 import { weaponChoicesOf, type CarriedRow } from "./weapon-choices";
 import {
   clearTargeting,
+  placeAnotherTemplate,
   setBoundItem,
   setChoiceOption,
   setCheckSkill,
@@ -62,7 +63,8 @@ export function ActionTargetPicker({
   onInvalidFace,
   insideNow,
   carried = [],
-  onMoveFirst
+  onMoveFirst,
+  onLookAtDamage
 }: Readonly<{
   picking: TargetingSession;
   targets: ReadonlyArray<Pick<TargetRow, "id" | "label"> & Partial<TargetRow>>;
@@ -78,6 +80,8 @@ export function ActionTargetPicker({
   carried?: readonly CarriedRow[];
   /** Take the action's own move first (Pounce), when it has one that comes before the rest. */
   onMoveFirst?: () => void;
+  /** Roll the damage and look at it before it counts, for an answer to it (Empowered Spell, Heroic Inspiration). */
+  onLookAtDamage?: () => void;
 }>) {
   const { mayType } = useRollPreference();
   // On a phone the panel under the map is short, so the picker scrolls up to show its first rows.
@@ -125,6 +129,21 @@ export function ActionTargetPicker({
               ? "Drag again to move it. Everything inside is caught when you roll."
               : "Drag on the map to place it. Everything inside is caught when you roll."}
           </p>
+          {/* Several areas a use (Fire Storm's Cubes): each set down in turn, all caught once when you roll. */}
+          {picking.template?.count !== undefined && (
+            <p className="action-targeting-hint">
+              {(picking.template.others?.length ?? 0) + (picking.template.placed ? 1 : 0)} of up to{" "}
+              {picking.template.count} placed.
+              {picking.action.area?.contiguous ? " Each must touch another." : ""}
+            </p>
+          )}
+          {picking.template?.count !== undefined &&
+            picking.template.placed &&
+            (picking.template.others?.length ?? 0) + 1 < picking.template.count && (
+              <Button type="button" variant="secondary" disabled={busy} onClick={() => placeAnotherTemplate()}>
+                Place another
+              </Button>
+            )}
           {picking.template?.placed && insideNow && (
             <>
               <p className="action-targeting-inside">Inside now · {insideNow.length}</p>
@@ -192,7 +211,7 @@ export function ActionTargetPicker({
             {picking.action.id === "escape-grapple" && <option value="">The better one</option>}
             {picking.action.checkSkills.map((skill) => (
               <option key={skill.id} value={skill.id}>
-                {skillName(skill.id)} ({ABILITY_WORDS[skill.ability]})
+                {skill.name ?? skillName(skill.id)} ({ABILITY_WORDS[skill.ability]})
               </option>
             ))}
           </Select>
@@ -319,6 +338,11 @@ export function ActionTargetPicker({
           {picking.action.moveFirst && onMoveFirst && (
             <Button type="button" variant="secondary" disabled={busy} onClick={onMoveFirst}>
               Move first
+            </Button>
+          )}
+          {onLookAtDamage && (
+            <Button type="button" variant="secondary" disabled={busy || !ready} onClick={onLookAtDamage}>
+              Roll damage first
             </Button>
           )}
           <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>

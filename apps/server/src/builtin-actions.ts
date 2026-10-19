@@ -109,7 +109,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Help with a Check",
     activation: "action",
     description:
-      "Choose one of your skill proficiencies and an ally near enough to assist: that ally has Advantage on the next ability check they make with that skill. The benefit expires if they don't use it before the start of your next turn. A tool's assist is the GM's call. (SRD 5.2.1, Help [Action])",
+      "Choose one of your skill or tool proficiencies and an ally near enough to assist: that ally has Advantage on the next ability check they make with that skill or tool. The benefit expires if they don't use it before the start of your next turn. (SRD 5.2.1, Help [Action])",
     damage: [],
     // The rider narrowed to the chosen skill is written by the handler (`resolution/builtins.ts`).
     grants: {

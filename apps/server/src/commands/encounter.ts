@@ -28,12 +28,16 @@ import {
   InitiativeOrderTieSchema,
   RemoveCombatantSchema,
   TurnLegendarySchema,
+  TurnOrderSchema,
   TurnReactionSchema,
   TurnUseSchema
 } from "@vtt/domain/commands";
+import { checkOrder } from "../simultaneous-effects.js";
+import { askEndOrder, playStartSteps } from "../turn-boundaries.js";
 import { CommandRejectedError, type JournalEntry } from "../game-store.js";
 import { requireTypedDie } from "../held-rolls.js";
-import { endTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "../turn-economy.js";
+import { rerollInitiative } from "../initiative-reroll.js";
+import { endTurn, ownsTurn, setLegendaryUsed, setReactionUsed, setTurnSlot } from "../turn-economy.js";
 import { initiatorOf, isGmGrade, principalTag, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 import { refreshVisionMeasure } from "../vision/edit.js";
@@ -97,7 +101,8 @@ export const encounterCommands = [
           (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
           Date.now(),
           kit.equipmentCatalog(),
-          kit.initiativeRollSink(draft, commandId, principal)
+          kit.initiativeRollSink(draft, commandId, principal),
+          (sides) => kit.context.random(sides)
         );
         // The fight may be on another map than the one the walls were drawn on: keep feet and pixels in step.
         refreshVisionMeasure(draft, tokenGeometry);
@@ -363,7 +368,7 @@ export const encounterCommands = [
     type: "initiative.roll-self",
     operationId: "rollOwnInitiative",
     description:
-      "Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied; a player may type one only while the table's typedRolls is open), adds its initiative modifier, sets its score, and clears its pending flag. The rules set the roll mode (Surprise, conditions such as Poisoned, features, Dexterity check riders) and Exhaustion's penalty; `rollMode` is honoured only from a GM-grade session. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.",
+      "Rolls initiative for a character (server rolls the d20 unless a manual `natural` is supplied; a player may type one only while the table's typedRolls is open), adds its initiative modifier, sets its score, and clears its pending flag. The dice are held, so `reroll` throws one again before the character's first turn (a player spends Heroic Inspiration; the GM rerolls freely), with `natural` the face a typed reroll shows. The rules set the roll mode (Surprise, conditions such as Poisoned, features, Dexterity check riders) and Exhaustion's penalty; `rollMode` is honoured only from a GM-grade session. GM-grade for anyone; a player session only for their own claimed character. When the encounter runs in `wait` mode, the last pending roll begins turns.",
     summary: "Roll your own claimed character's initiative (GM anyone); the server rolls unless a manual d20 is given.",
     schema: InitiativeRollSelfSchema,
     malformed: "The initiative roll is malformed.",
@@ -373,6 +378,18 @@ export const encounterCommands = [
       const { state, duplicate } = await execute((draft) => {
         // A player rolls only their own claimed character's initiative; the GM (integration) anyone's.
         requireActorAccess(initiatorOf(principal), draft, actorId, "check");
+        if (request.reroll === true) {
+          score = rerollInitiative(
+            draft,
+            actorId,
+            initiatorOf(principal),
+            natural,
+            () => kit.context.random(20),
+            kit.initiativeRollSink(draft, commandId, principal),
+            kit.initiativeRollDeps(draft)
+          );
+          return;
+        }
         // A typed d20 only while the table lets players type their dice.
         if (natural !== undefined) requireTypedDie(draft, initiatorOf(principal), undefined, natural);
         score = rollSelfInitiative(
@@ -434,8 +451,14 @@ export const encounterCommands = [
       const geometry = await kit.liveGeometry();
       const distance = await mappedDistance(kit);
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
+        const deps = { ...kit.turnAdvanceDeps(draft, geometry, distance), askOrder: true };
+        // What happens at once as the turn ends waits for its creature's controller to order it.
+        if (askEndOrder(draft, effectEvents, { ...deps, newId: kit.context.newId })) return;
         outcome = planNextTurn(draft, timeline, request.confirmRewrite === true, (advancing) =>
-          nextInitiativeTurn(advancing, effectEvents, kit.turnAdvanceDeps(advancing, geometry, distance))
+          nextInitiativeTurn(advancing, effectEvents, {
+            ...kit.turnAdvanceDeps(advancing, geometry, distance),
+            askOrder: true
+          })
         );
       });
       if (duplicate) return;
@@ -475,6 +498,7 @@ export const encounterCommands = [
     async run({ principal, executeTimeline }, kit) {
       // End Turn is a live forward step like the GM's Next. Players cannot advance while the table is rewound.
       const effectEvents: EffectNarration[] = [];
+      let waiting = false;
       const geometry = await kit.liveGeometry();
       const distance = await mappedDistance(kit);
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
@@ -483,8 +507,66 @@ export const encounterCommands = [
             "The GM is reviewing an earlier turn. Try again once play resumes.",
             "history_review"
           );
+        const initiator = initiatorOf(principal);
+        // What happens at once as the turn ends waits for its creature's controller to order it.
+        if (
+          ownsTurn(draft, initiator) &&
+          askEndOrder(draft, effectEvents, {
+            ...kit.turnAdvanceDeps(draft, geometry, distance),
+            newId: kit.context.newId
+          })
+        ) {
+          waiting = true;
+          return;
+        }
         planNextTurn(draft, timeline, false, (advancing) =>
-          endTurn(advancing, initiatorOf(principal), effectEvents, kit.turnAdvanceDeps(advancing, geometry, distance))
+          endTurn(advancing, initiator, effectEvents, {
+            ...kit.turnAdvanceDeps(advancing, geometry, distance),
+            askOrder: true
+          })
+        );
+      });
+      if (duplicate) return;
+      if (!waiting) kit.context.logTurnBegin(state);
+      kit.publishNarrations(effectEvents);
+    }
+  }),
+
+  defineCommand({
+    type: "turn.order",
+    operationId: "orderTurnSteps",
+    description:
+      "Puts in order what happens at once as a turn starts or ends (SRD Simultaneous Effects): ongoing damage, Hit Points or Temporary Hit Points regained, a trait that burns or regenerates. The GM may answer for any creature; a player only for their own claimed character. `order` names every waiting step's key once, first to last. An answer to a turn's start plays the steps out now; an answer to a turn's end plays them out and passes the turn.",
+    summary: "Order what happens at once as a turn starts or ends (GM anyone; a player their own character).",
+    schema: TurnOrderSchema,
+    malformed: "The order is malformed.",
+    async run({ principal, request, execute, executeTimeline }, kit) {
+      const initiator = initiatorOf(principal);
+      const effectEvents: EffectNarration[] = [];
+      const geometry = await kit.liveGeometry();
+      const distance = await mappedDistance(kit);
+      const boundary = kit.read().combat.turnSteps?.boundary;
+      if (boundary === "start") {
+        const { duplicate } = await execute((draft) => {
+          checkOrder(draft, initiator, request.stepsId, request.order);
+          effectEvents.push(...playStartSteps(draft, kit.turnAdvanceDeps(draft, geometry, distance), request.order));
+        });
+        if (!duplicate) kit.publishNarrations(effectEvents);
+        return;
+      }
+      const { state, duplicate } = await executeTimeline((draft, timeline) => {
+        if (draft.combat.historyCursor !== null)
+          throw new CommandRejectedError(
+            "The GM is reviewing an earlier turn. Try again once play resumes.",
+            "history_review"
+          );
+        const waiting = checkOrder(draft, initiator, request.stepsId, request.order);
+        draft.combat = { ...draft.combat, turnSteps: { ...waiting, order: [...request.order] } };
+        planNextTurn(draft, timeline, false, (advancing) =>
+          nextInitiativeTurn(advancing, effectEvents, {
+            ...kit.turnAdvanceDeps(advancing, geometry, distance),
+            askOrder: true
+          })
         );
       });
       if (duplicate) return;

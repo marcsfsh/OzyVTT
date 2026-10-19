@@ -1,7 +1,7 @@
 import type { GameState } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorDefinition, RestTrigger } from "@vtt/schemas";
-import { endEffectIfPresent, sourceOf, type EffectNarration } from "./effects.js";
+import { endEffectIfPresent, maximumKeeper, sourceOf, type EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { killOutright } from "./hit-points.js";
 import { rollSaveAtOnce } from "./saving-throws.js";
@@ -127,6 +127,17 @@ function loseMaximum(
   formula: string,
   deps: RestTriggerDeps
 ): EffectNarration[] {
+  // SRD Aura of Life: "your Hit Point maximums can't be reduced" while in the aura.
+  const kept = maximumKeeper(actor);
+  if (kept)
+    return [
+      {
+        kind: "condition",
+        text: `${actor.name}'s Hit Point maximum doesn't drop (${kept.name}).`,
+        actorId: actor.id,
+        ...sourceOf(effect)
+      }
+    ];
   const rolled = Math.max(0, resolveDice(parseDiceFormula(formula), deps.random).total);
   const loss = Math.min(rolled, actor.hp.maximum);
   if (loss <= 0) return [];

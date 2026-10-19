@@ -20,6 +20,8 @@ import "./prompts.css";
  * - Uncanny Dodge: the hit's damage is parked here, so both buttons apply it, halved on Use. Each names what the
  *   server weighed through the reactor's defences; a prompt parked before that was recorded shows the raw numbers.
  * - Parry or Shield: the attack waits at its roll; both buttons finish it, Use against the raised AC.
+ * - Redirect Attack or Arrow-Catching Shield: the attack waits before its roll; Use turns it to the ally picked (one
+ *   button each) or onto the reactor, and either answer rolls it.
  * - An opportunity attack or Retaliation: Attack rolls a melee swing (or takes a typed d20) to confirm, with the extras
  *   its hit can carry (Sneak Attack) to add; the server holds the die, so only Heroic Inspiration or the GM throws it
  *   again. Let them go clears.
@@ -102,6 +104,7 @@ export function ReactionPrompt({
       mode?: DieMode;
       hitOptions?: HitOptionChoice[];
       subtract?: boolean;
+      redirectTo?: string;
     } = {}
   ) => {
     setBusy(true);
@@ -153,6 +156,16 @@ export function ReactionPrompt({
             landed
               ? `The attack hits${outcome.appliedDamage > 0 ? ` for ${outcome.appliedDamage} damage` : ""}`
               : "The attack misses"
+          }.`
+        );
+      } else if (reaction.kind === "attack-targeted") {
+        const attack = outcome.resolution?.attack;
+        const landed = attack && (attack.outcome === "hit" || attack.outcome === "crit");
+        onFeedback(
+          `${use ? `${actorName} used ${reaction.actionName}` : `${actorName} let the attack roll`}. ${
+            attack
+              ? `The attack ${landed ? "hits" : "misses"} ${attack.targetName}${landed && outcome.appliedDamage > 0 ? ` for ${outcome.appliedDamage} damage` : ""}`
+              : "The attack waits on another answer"
           }.`
         );
       } else if (reaction.kind === "falls") {
@@ -241,8 +254,13 @@ export function ReactionPrompt({
           </>
         ) : reaction.kind === "attack-would-hit" ? (
           <>
-            <strong>{name}</strong> · {reaction.sourceName}'s attack would hit {actorName}. +{reaction.acBonus} AC turns
-            it into a miss.
+            <strong>{name}</strong> · {reaction.sourceName}'s attack would hit {reaction.targetName ?? actorName}. +
+            {reaction.acBonus} AC turns it into a miss.
+          </>
+        ) : reaction.kind === "attack-targeted" ? (
+          <>
+            <strong>{name}</strong> · {reaction.sourceName} is attacking {reaction.targetName ?? actorName}, and the
+            attack waits on the answer before it rolls.
           </>
         ) : reaction.kind === "roll-answer" ? (
           <>
@@ -386,6 +404,42 @@ export function ReactionPrompt({
               >
                 {useLabel}
               </button>
+            </>
+          ) : reaction.kind === "attack-targeted" ? (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                title="Keep the reaction. The attack rolls at its target."
+                onClick={() => answer(false)}
+              >
+                Let it roll
+              </Button>
+              {reaction.redirectChoices && reaction.redirectChoices.length > 0 ? (
+                reaction.redirectChoices.map((choice) => (
+                  <button
+                    key={choice.actorId}
+                    type="button"
+                    className="encounter-primary reaction-use"
+                    disabled={busy}
+                    title={`Spend the reaction, and ${choice.name} becomes the target.`}
+                    onClick={() => answer(true, { redirectTo: choice.actorId })}
+                  >
+                    {name} · {choice.name}
+                  </button>
+                ))
+              ) : (
+                <button
+                  type="button"
+                  className="encounter-primary reaction-use"
+                  disabled={busy}
+                  title={`Spend the reaction to become the target of ${reaction.sourceName}'s attack.`}
+                  onClick={() => answer(true)}
+                >
+                  {useLabel}
+                </button>
+              )}
             </>
           ) : reaction.kind === "roll-answer" ? (
             <>

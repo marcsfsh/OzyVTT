@@ -33,6 +33,7 @@ import { openDamageWindow, reducedParts, resistedTypeOf, respondToDamage } from 
 import { recordRoll, rolledTerms } from "./roll-history.js";
 import { answerAmount, type AnswerDeps } from "./roll-answers.js";
 import { answerSave, type SaveAnswerDependencies, type SaveOutcome } from "./saving-throws.js";
+import { swapPlaces } from "./resolution/redirect.js";
 
 export type ReactionAnswerDependencies = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -97,6 +98,8 @@ export type OpportunityAttackOptions = Readonly<{
   slotLevel?: number;
   /** An answer to another creature's roll that may go either way (Improve Fate) takes its die off. */
   subtract?: boolean;
+  /** Redirect Attack: the ally the attack turns to. */
+  redirectTo?: string;
 }>;
 
 /** The key a reaction's strike holds its d20 under. */
@@ -191,7 +194,77 @@ export function answerReaction(
       return answerFall(answer);
     case "roll-answer":
       return answerRoll(answer, attackOptions.subtract === true);
+    case "attack-targeted":
+      return answerRedirect(answer, attackOptions.redirectTo);
   }
+}
+
+/**
+ * Redirect Attack or Arrow-Catching Shield: the attack held before its roll. "use" spends the reaction and what the
+ * action costs and turns the attack: to the ally picked, the two swapping places where the reaction says so, or onto
+ * the reactor itself. Either answer then rolls the attack at the creature it ends at, and a hit's damage lands.
+ */
+function answerRedirect(answer: Answer, redirectTo: string | undefined): ReactionOutcome {
+  const { state, commandId, pending, reactor, use, deps, clearPrompt } = answer;
+  const { parked } = parkedAttackOf(answer);
+  const choices = pending.redirectChoices ?? [];
+  const picked =
+    use && choices.length > 0 ? (redirectTo ?? (choices.length === 1 ? choices[0]!.actorId : undefined)) : undefined;
+  if (use && choices.length > 0 && !choices.some((choice) => choice.actorId === picked))
+    throw new CommandRejectedError(`Choose the ally ${pending.actionName} turns the attack to.`);
+  const ally = picked
+    ? state.actors.find((candidate) => candidate.id === picked && candidate.hp.current > 0)
+    : undefined;
+  if (picked && !ally) throw new CommandRejectedError("That ally can't take the attack any more. Choose another.");
+  clearPrompt(false);
+  const events: EffectNarration[] = [];
+  let targetId = pending.targetActorId ?? reactor.id;
+  if (use) {
+    const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
+    const siblings = effectiveActions(definition, reactor, deps.catalog);
+    const declared = siblings.find((candidate) => candidate.id === pending.actionId);
+    if (!declared) throw new CommandRejectedError(`${reactor.name} no longer has ${pending.actionName}.`);
+    // The reaction's own cost, checked like any resolve.
+    const economy = planEconomy(
+      state,
+      reactor,
+      declared,
+      { actorId: reactor.id, targetIds: [], commandId },
+      definition,
+      [],
+      undefined,
+      siblings,
+      false,
+      deps.catalog
+    );
+    commitEconomy({ state, attacker: reactor, input: {}, plan: economy.plan, overridden: economy.overridden });
+    if (ally) {
+      if (declared.reaction?.response === "redirect-to-ally" && declared.reaction.swap)
+        swapPlaces(state, reactor.id, ally.id);
+      targetId = ally.id;
+      events.push({
+        kind: "reaction",
+        text:
+          declared.reaction?.response === "redirect-to-ally" && declared.reaction.swap
+            ? `${reactor.name} and ${ally.name} swap places, and ${ally.name} becomes the target of ${pending.sourceName}'s attack (${declared.name}).`
+            : `${ally.name} becomes the target of ${pending.sourceName}'s attack (${declared.name}).`,
+        actorId: reactor.id
+      });
+    } else {
+      targetId = reactor.id;
+      events.push({
+        kind: "reaction",
+        text: `${reactor.name} becomes the target of ${pending.sourceName}'s attack (${declared.name}).`,
+        actorId: reactor.id
+      });
+    }
+  }
+  const finished = replayParkedAttack(answer, {
+    targetId,
+    bonusDice: parked.bonusDice,
+    extra: { redirectSettled: true, ...(pending.asked ? { answersAsked: pending.asked } : {}) }
+  });
+  return { ...finished, used: use, events: [...events, ...finished.events] };
 }
 
 /** The deps a fall lands with, from the answer's. */
@@ -702,6 +775,12 @@ function replayParkedAttack(
 function answerParkedAttack(answer: Answer, slotLevel: number | undefined): ReactionOutcome {
   const { state, commandId, pending, reactor, use, deps, clearPrompt } = answer;
   const { parked } = parkedAttackOf(answer);
+  // A guardian's ward (Shield Guardian's Protection): the attack is at another creature, whose AC the reaction raises.
+  const defender = pending.targetActorId
+    ? state.actors.find((candidate) => candidate.id === pending.targetActorId)
+    : reactor;
+  if (!defender)
+    throw new CommandRejectedError(`${pending.sourceName}'s attack can't be finished any more. Dismiss the prompt.`);
   clearPrompt(false);
   let effectName: string | null = null;
   // Whether the AC rises: the reaction is used, and a scroll it was read from didn't lose the spell.
@@ -732,7 +811,7 @@ function answerParkedAttack(answer: Answer, slotLevel: number | undefined): Reac
       // Lasts until the reactor's next turn starts, so later attacks this round meet it too.
       effectName = addEffect(
         state,
-        reactor.id,
+        defender.id,
         makeEffect({
           id: `${commandId}:reaction`,
           name: declared.name,
@@ -747,7 +826,7 @@ function answerParkedAttack(answer: Answer, slotLevel: number | undefined): Reac
     }
   }
   const finished = replayParkedAttack(answer, {
-    targetId: reactor.id,
+    targetId: defender.id,
     bonusDice: parked.bonusDice,
     extra: {
       acSettled: true,

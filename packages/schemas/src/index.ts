@@ -184,7 +184,8 @@ export const CastShapingIdSchema = z.enum([
   "subtle-spell",
   "transmuted-spell",
   "twinned-spell",
-  "sculpt-spells"
+  "sculpt-spells",
+  "overchannel"
 ]);
 export type CastShapingId = z.infer<typeof CastShapingIdSchema>;
 /** One way a casting is shaped, with what it names: the creatures Careful Spell and Sculpt Spells protect or the one
@@ -3167,7 +3168,14 @@ export const ActionAreaSchema = z
   .object({
     shape: z.enum(["cone", "line", "sphere", "cube", "emanation", "cylinder"]),
     sizeFeet: z.number().int().min(1).max(1000),
-    widthFeet: z.number().int().min(1).max(100).nullable()
+    widthFeet: z.number().int().min(1).max(100).nullable(),
+    /** How many of these areas one use places (Fire Storm's ten Cubes, Meteor Swarm's four Spheres); a creature under
+     *  more than one is caught once. */
+    count: z.number().int().min(2).max(10).optional(),
+    /** Each area must touch another ("Each Cube must be contiguous with at least one other Cube"). */
+    contiguous: z.literal(true).optional(),
+    /** How high a Cylinder rises from the ground it stands on ("5-foot-radius, 40-foot-high Cylinder"). */
+    heightFeet: z.number().int().min(1).max(1000).optional()
   })
   .strict();
 export type ActionArea = z.infer<typeof ActionAreaSchema>;
@@ -3317,6 +3325,39 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
       trigger: z.literal("casts-spell"),
       response: z.literal("counter"),
       ability: AbilitySchema,
+      rangeFeet: ReactionRangeFeet
+    })
+    .strict(),
+  /** Redirect Attack (the Goblin Boss): when a creature it can see makes an attack roll against the reactor, before the
+   *  roll, an ally of a size it names within `rangeFeet` becomes the target instead, the two swapping places when
+   *  `swap` says so. */
+  z
+    .object({
+      trigger: z.literal("targeted-by-attack"),
+      response: z.literal("redirect-to-ally"),
+      rangeFeet: ReactionRangeFeet,
+      allySizes: z.array(SizeSchema).min(1).max(6).optional(),
+      swap: z.literal(true).optional()
+    })
+    .strict(),
+  /** Arrow-Catching Shield: when an attacker makes an attack roll (a ranged one, with `ranged`) against another
+   *  creature within `rangeFeet` of the reactor, before the roll, the reactor becomes the target instead. */
+  z
+    .object({
+      trigger: z.literal("other-targeted-by-attack"),
+      response: z.literal("become-target"),
+      rangeFeet: ReactionRangeFeet,
+      ranged: z.literal(true).optional()
+    })
+    .strict(),
+  /** Shield Guardian's Protection: when an attack roll hits the creature that commands the reactor (the amulet's
+   *  wearer) within `rangeFeet` of it, that creature gains `amount` to AC, against that attack too, until the start of
+   *  the reactor's next turn. */
+  z
+    .object({
+      trigger: z.literal("ward-hit-by-attack"),
+      response: z.literal("ward-ac-bonus"),
+      amount: z.number().int().min(1).max(10),
       rangeFeet: ReactionRangeFeet
     })
     .strict()
@@ -3905,11 +3946,13 @@ export const AreaTriggerSchema = z
     noTeleport: z.literal(true).optional(),
     /** What a creature it affects holds while it stands inside (Holy Aura's Advantage on saving throws, Pass without
      *  Trace's +10 to Stealth checks, Silence's Deafened): one effect, added as the creature comes in and taken away as
-     *  it leaves. A struck save rolls against the cast's save DC. */
+     *  it leaves. A struck save rolls against the cast's save DC. `keepsMaximum`: its Hit Point maximum can't be
+     *  reduced while there (Aura of Life). */
     holds: z
       .object({
         modifiers: EffectModifiersSchema.optional(),
         conditions: z.array(ConditionSchema).min(1).max(2).optional(),
+        keepsMaximum: z.literal(true).optional(),
         struck: StruckSchema.omit({ save: true })
           .extend({
             save: z
@@ -3929,6 +3972,10 @@ export const AreaTriggerSchema = z
     drifts: z.number().int().min(5).max(60).optional(),
     /** An Emanation that stays where its caster stood at the cast ("an immobile barrier": Globe of Invulnerability). */
     stays: z.literal(true).optional(),
+    /** It acts only on the creatures on the ground in it (Earthquake's "each creature on the ground in the area"). */
+    grounded: z.literal(true).optional(),
+    /** A creature in it spends 2 feet of movement for every foot it moves closer to its caster (Gust of Wind). */
+    towardCaster: z.literal(true).optional(),
     /** A spell of this level or lower cast from outside it can't affect anything within, one level higher for each slot
      *  level the spell is cast above its own (Globe of Invulnerability's 5). */
     wardsSpells: z.number().int().min(0).max(9).optional()

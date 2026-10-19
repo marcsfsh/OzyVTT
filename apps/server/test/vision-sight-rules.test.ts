@@ -14,7 +14,7 @@ import { mapDistance } from "../src/movement-narration.js";
 import { applyMovementRules } from "../src/movement-rules.js";
 import { traitsAtTurnStart } from "../src/trait-turns.js";
 import { checkSightFor, frightenedApplies, hidingPlace, lightSensitivities, sightRules } from "../src/vision/rules.js";
-import { cell, DIVIDER, GEOMETRY, GOBLIN, HERO, ORC, visionGame, wall } from "./vision-fixtures.js";
+import { cell, DIVIDER, GEOMETRY, GOBLIN, GOBLIN_NAME, HERO, ORC, visionGame, wall } from "./vision-fixtures.js";
 
 // The rules that read sight (SRD 5.2.1): Cover from walls and creatures, areas that stop at walls, Hide's hiding
 // place, Search finding a hidden creature, Frightened's line of sight, Dodge against a seen attacker, Blinded's failed
@@ -138,6 +138,31 @@ describe("Hide's hiding place", () => {
     });
     expect(hidingPlace(state, content, HERO, [GOBLIN], false)).toBe(false);
     expect(hidingPlace(state, content, HERO, [GOBLIN], true)).toBe(true);
+  });
+
+  // SRD Passive Perception: "The GM uses this score when determining whether a creature notices something without
+  // consciously making a Wisdom (Perception) check"; Lightly Obscured gives Disadvantage on Wisdom (Perception) checks.
+  it("names to the GM the enemies whose Passive Perception meets the Stealth total, 5 lower in Dim Light", () => {
+    // Walls hide three of the hero's corners from the scout (Passive Perception 15): Three-Quarters Cover.
+    const corner = [wall({ x: 110, y: 200 }, { x: 110, y: 290 }), wall({ x: 75, y: 285 }, { x: 75, y: 310 })];
+    expect(mapCover(visionGame({ walls: corner }), GOBLIN, HERO)).toBe("three-quarters");
+    const hideAt = (ambient: "bright" | "dim", walls = corner) => {
+      const state = visionGame({ ambient, walls, actors: { [GOBLIN]: { definitionId: "scout" } } });
+      const resolution = resolveDefinitionAction(
+        state,
+        builtinAction("hide")!,
+        { actorId: HERO, targetIds: [], commandId: commandId(), builtin: true, rollMode: null, override: null },
+        deps(state, [15])
+      );
+      expect(resolution.check?.success).toBe(true);
+      return (resolution.tableNarration ?? []).filter((line) => line.gmOnly === true).map((line) => line.text);
+    };
+    expect(hideAt("bright")).toEqual([
+      `Passive Perception that meets Borin's Stealth 15: ${GOBLIN_NAME} 15. Whether they notice is the GM's call.`
+    ]);
+    expect(hideAt("dim")).toEqual([]);
+    // Behind a wall the scout couldn't see the hero anyway.
+    expect(hideAt("bright", [DIVIDER()])).toEqual([]);
   });
 
   it("refuses the Hide action out in the open, naming the rule", () => {

@@ -34,10 +34,17 @@ export function areaOfProse(description: string): ActionArea | null {
       sizeFeet: Number(radial[1]),
       widthFeet: null
     };
-  const cylinder =
-    /(\d+)-foot-radius,?\s+(?:\d+[- ]foot[- ](?:high|tall)\s+)?Cylinder/i.exec(description) ??
-    /\d+[- ]foot[- ](?:high|tall),\s+(\d+)-foot-radius\s+Cylinder/i.exec(description);
-  if (cylinder) return { shape: "cylinder", sizeFeet: Number(cylinder[1]), widthFeet: null };
+  const tallFirst = /(\d+)[- ]foot[- ](?:high|tall),\s+(\d+)-foot-radius\s+Cylinder/i.exec(description);
+  if (tallFirst)
+    return { shape: "cylinder", sizeFeet: Number(tallFirst[2]), widthFeet: null, heightFeet: Number(tallFirst[1]) };
+  const cylinder = /(\d+)-foot-radius,?\s+(?:(\d+)[- ]foot[- ](?:high|tall)\s+)?Cylinder/i.exec(description);
+  if (cylinder)
+    return {
+      shape: "cylinder",
+      sizeFeet: Number(cylinder[1]),
+      widthFeet: null,
+      ...(cylinder[2] ? { heightFeet: Number(cylinder[2]) } : {})
+    };
   const cube = /(\d+)-foot\s+Cube/i.exec(description) ?? /(\d+)-foot[- ]square\b/i.exec(description);
   if (cube) return { shape: "cube", sizeFeet: Number(cube[1]), widthFeet: null };
   return null;

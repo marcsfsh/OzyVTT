@@ -11,8 +11,8 @@ import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { ActorDefinition, SaveCondition } from "@vtt/schemas";
 import { conditionChoicesOf } from "./item-actions.js";
 import { BUILTIN_TARGETING } from "./builtin-actions.js";
-import { builtinCheckSkills } from "./resolution/builtins.js";
-import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { builtinCheckSkills, helpToolsOf } from "./resolution/builtins.js";
+import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { hitRiderOf } from "./resolution/hit-riders.js";
 import { masteryMissDamage } from "./weapon-mastery.js";
 import { spendAmmunition } from "./resolution/ammunition.js";
@@ -82,6 +82,8 @@ import {
   parkHeldObjectSave,
   parkReaction
 } from "./resolution/pending.js";
+import { parkForRedirect } from "./resolution/redirect.js";
+import { afterDivineWish } from "./divine-intervention.js";
 import {
   markCastTurn,
   markSpellUp,
@@ -103,7 +105,25 @@ import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-
 import { layOutProvisions } from "./resolution/provisions.js";
 import { turnedAwayByWard } from "./resolution/ward.js";
 import { orbLeap } from "./resolution/orb-leap.js";
-import { shapedAction, shapedOutcome, shapingInForce, shapingOffers, withShapedSpell } from "./resolution/metamagic.js";
+import {
+  shapedAction,
+  shapedOutcome,
+  shapingInForce,
+  shapingOf,
+  shapingOffers,
+  withShapedSpell
+} from "./resolution/metamagic.js";
+import {
+  answerHeldDamage,
+  damageLookOffered,
+  damageTape,
+  heldDamageFor,
+  heldDamageLook,
+  holdDamage,
+  releaseHeldDamage,
+  type DamageTape
+} from "./resolution/held-damage.js";
+import { CommandRejectedError } from "./game-store.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -128,20 +148,44 @@ export function resolveDefinitionAction(
   const stepped = longCast?.input ?? declaredInput;
   const { shaping: _sent, ...stepInput } = stepped;
   const shaping = shapingInForce(state, declared, stepped);
-  const input: ResolveInput = shaping.length > 0 ? { ...stepInput, shaping } : stepInput;
-  const deps = withShapedSpell(declaredDeps, declared.spellId, shaping);
-  const ctx = openResolve(state, shapedAction(declared, shaping), input, deps);
+  // Overchannel rides the cast's shaping, beside Metamagic, as the sheet offers it.
+  const input: ResolveInput =
+    shaping.length > 0
+      ? { ...stepInput, shaping, ...(shapingOf(shaping, "overchannel") ? { overchannel: true } : {}) }
+      : stepInput;
+  const shapedDeps = withShapedSpell(declaredDeps, declared.spellId, shaping);
+  // The damage steps throw through a tape, so a look at the damage holds its dice and the confirm deals them.
+  const tape = damageTape(shapedDeps.random);
+  const ctx = openResolve(state, shapedAction(declared, shaping), input, { ...shapedDeps, random: tape.random });
   // Checked against the spell as printed, Transmuted Spell's type and Extended Spell's durations land on what it does.
   ctx.action = shapedOutcome(ctx.action, printed, shaping, ctx.plan.castLevel);
+  const look = input.commit === false && input.damageLook === true;
+  if (look && !ctx.action.damage.some((part) => /\d+d\d+/i.test(part.formula)))
+    throw new CommandRejectedError(`${ctx.action.name} rolls no damage dice to look at.`);
+  if (input.damageAnswer && !look)
+    throw new CommandRejectedError("Answer the damage on a look at it, before it is dealt.");
   checkOverchannel(ctx);
   checkWallTarget(ctx);
   ctx.builtin?.check?.(ctx);
   // A form the action can't give is refused before anything is spent.
   checkShapeShift(ctx);
+  // A look at the damage of an action with no attack roll throws its damage and nothing else.
+  if (look && !ctx.action.attack) {
+    // With no attack to roll it only sets the filters the damage riders read.
+    rollAttack(ctx);
+    return lookAtDamage(ctx, tape);
+  }
   ctx.builtin?.apply?.(ctx);
   // A warded target (Sanctuary) asks its save as the attack or spell is made; a failure spends nothing and stops here.
   if (input.commit !== false && input.economyPaid !== true && turnedAwayByWard(ctx))
     return { ...resolutionOf(ctx), save: null };
+  // A casting is seen as it begins: Counterspell may stop it on its first turn, its action spent and nothing else.
+  if (longCast?.phase === "start" && input.longCastBegins !== true && parkForCounterspell(ctx, true)) {
+    commitEconomy({ ...ctx, plan: { ...ctx.plan, spendSpellSlot: null, spendUse: null, componentSpends: [] } });
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
+  }
   if (longCast && longCast.phase !== "finish") {
     stepLongCast(ctx, longCast);
     releaseHideAndReady(ctx);
@@ -149,8 +193,14 @@ export function resolveDefinitionAction(
     return { ...resolutionOf(ctx), save: null };
   }
   if (longCast) finishLongCast(ctx);
-  // A readied spell is cast now and held: its slot and the action are spent, and nothing else happens yet.
+  // A readied spell is cast now and held: its slot and the action are spent, and nothing else happens yet. It is seen
+  // as it is cast, so a Counterspell may stop it now.
   if (input.ready === true) {
+    if (parkForCounterspell(ctx)) {
+      commitEconomy({ ...ctx, plan: { ...ctx.plan, spendSpellSlot: null, spendUse: null, componentSpends: [] } });
+      useUpConsumable(ctx);
+      return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
+    }
     holdReadiedSpell(ctx);
     commitEconomy(ctx);
     return { ...resolutionOf(ctx), save: null };
@@ -181,15 +231,31 @@ export function resolveDefinitionAction(
     return { ...resolutionOf(ctx), save: null };
   }
   // A cast a Counterspell may stop waits before anything of it happens: its action is spent and it was seen cast, but
-  // its slot, its limited use and the materials it consumes wait to see whether it goes ahead.
-  if (parkForCounterspell(ctx)) {
+  // its slot, its limited use and the materials it consumes wait to see whether it goes ahead. A scroll read is used
+  // up either way. A long casting was offered as it began.
+  if (longCast?.phase !== "finish" && parkForCounterspell(ctx)) {
     commitEconomy({ ...ctx, plan: { ...ctx.plan, spendSpellSlot: null, spendUse: null, componentSpends: [] } });
+    useUpConsumable(ctx);
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
+  }
+  // An attack another creature may turn onto someone else before it rolls (Redirect Attack, Arrow-Catching Shield):
+  // the attack is spent, and the answer rolls it at whichever creature it ends at.
+  if (parkForRedirect(ctx)) {
+    commitEconomy(ctx);
+    recallSpellSlot(ctx);
+    rollLastCharge(ctx);
+    spendAmmunition(ctx);
+    useUpConsumable(ctx);
+    recordLightAttack(ctx);
+    recordLoadingShot(ctx);
     releaseHideAndReady(ctx);
     spendUntilItActs(ctx);
     return { ...resolutionOf(ctx), save: null, waitingOnReaction: true };
   }
   // Disintegrate aimed at a creature in a sphere of force destroys the sphere and harms nothing inside.
-  const shattered = input.commit === false ? null : breakEnclosure(state, ctx.action, ctx.targets, deps.catalog);
+  const shattered = input.commit === false ? null : breakEnclosure(state, ctx.action, ctx.targets, ctx.deps.catalog);
   if (shattered) {
     for (const event of shattered) ctx.tableNarration.push(tableLineOf(ctx, event));
     commitEconomy(ctx);
@@ -201,10 +267,10 @@ export function resolveDefinitionAction(
   checkKnockOut(ctx);
   // Preview: the d20 is rolled and shown, nothing else applies. The economy was validated already, so an
   // illegal attack is blocked before the preview roll.
-  if (ctx.attack !== null && input.commit === false) return previewOf(ctx);
+  if (ctx.attack !== null && input.commit === false) return look ? lookAtDamage(ctx, tape) : previewOf(ctx);
   // The roll is made, so a Vex marker, a Sap or Guiding Bolt's light it read is spent; a finishing replay already
-  // spent them.
-  if (input.economyPaid !== true) {
+  // spent them, unless it was held before its roll.
+  if (input.economyPaid !== true || input.redirectSettled === true) {
     spendVex(ctx);
     spendSap(ctx);
     spendDistraction(ctx);
@@ -235,12 +301,9 @@ export function resolveDefinitionAction(
   // A duplicate of Mirror Image may take the settled hit.
   if (input.commit !== false) strikeADuplicate(ctx);
   spendSundering(ctx);
-  rollWeaponDamage(ctx);
-  ctx.masterySwing = masterySwingOf(ctx);
-  // Graze fires on a miss, when no other damage rolled.
-  ctx.bonusDamage.push(...masteryMissDamage(ctx.masterySwing));
-  rollRiderDamage(ctx);
-  ctx.builtin?.hitDamage?.(ctx);
+  // The dice a look held are dealt now, as they were looked at; without a look the server throws them.
+  rollDamage(ctx, tape, heldDamageFor(state, ctx.attacker.id, ctx.action.id)?.dice ?? []);
+  releaseHeldDamage(state, ctx.attacker.id);
   rollHitOptions(ctx);
   // What the stat block leaves to the GM (damage on later turns) is said where the GM reads the result.
   if (ctx.action.reminder) ctx.warnings.push(ctx.action.reminder);
@@ -286,6 +349,7 @@ export function resolveDefinitionAction(
 
   commitEconomy(ctx);
   recallSpellSlot(ctx);
+  afterDivineWish(ctx);
   rollForAnAnswer(ctx);
   overchannelBacklash(ctx);
   spendHitOptions(ctx);
@@ -300,6 +364,52 @@ export function resolveDefinitionAction(
   releaseHideAndReady(ctx);
   spendUntilItActs(ctx);
   return resolutionOf(ctx);
+}
+
+/** The damage steps: the action's own dice, Graze, the riders' dice and a builtin's. The tape gives back `held` first
+ *  and notes which dice are the action's own. Returns the dice thrown. */
+function rollDamage(
+  ctx: ResolveContext,
+  tape: DamageTape,
+  held: Parameters<DamageTape["start"]>[0]
+): ReturnType<DamageTape["stop"]> {
+  tape.start(held);
+  tape.own(true);
+  rollWeaponDamage(ctx);
+  tape.own(false);
+  ctx.masterySwing = masterySwingOf(ctx);
+  // Graze fires on a miss, when no other damage rolled.
+  ctx.bonusDamage.push(...masteryMissDamage(ctx.masterySwing));
+  rollRiderDamage(ctx);
+  ctx.builtin?.hitDamage?.(ctx);
+  return tape.stop();
+}
+
+/**
+ * A look at the damage before it counts (`held-damage.ts`): an answer the look carries rerolls the held dice it picks
+ * first; then the damage is thrown through the tape, the held dice coming back as they were, and held again. Nothing is
+ * recorded, spent or applied: the confirm deals these dice.
+ */
+function lookAtDamage(ctx: ResolveContext, tape: DamageTape): ActionResolution {
+  const { state, attacker, action, input } = ctx;
+  let held = heldDamageFor(state, attacker.id, action.id);
+  if (input.damageAnswer) {
+    if (!held || held.dice.length === 0)
+      throw new CommandRejectedError("Roll the damage first: an answer rerolls dice that were thrown.");
+    held = answerHeldDamage(ctx, held, input.damageAnswer, tape.random);
+  }
+  ctx.silentRolls = true;
+  const dice = rollDamage(ctx, tape, held?.dice ?? []);
+  ctx.silentRolls = false;
+  const kept = holdDamage(state, { actorId: attacker.id, actionId: action.id, dice, answers: held?.answers ?? [] });
+  const { damage, bonusDamage } = ctx;
+  return {
+    ...previewOf(ctx),
+    damage,
+    damageTotal: owedDamageTotal({ damage, bonusDamage }),
+    ...(bonusDamage.length > 0 ? { bonusDamage } : {}),
+    heldDamage: heldDamageLook(ctx, kept)
+  };
 }
 
 /** The roll mode is reported only when some source shaped it. */
@@ -323,6 +433,13 @@ function previewOf(ctx: ResolveContext): ActionResolution {
     push: offeredPush(ctx),
     preview: true,
     ...withOffers(hitOffersOf(ctx)),
+    // A hit's damage may be looked at before it counts, for an answer to it.
+    ...(ctx.attack !== null &&
+    ctx.attack.outcome !== "miss" &&
+    ctx.attack.outcome !== "fumble" &&
+    damageLookOffered(ctx.state, ctx.attacker, ctx.action, ctx.deps.definition, ctx.siblings)
+      ? { damageLook: "offered" as const }
+      : {}),
     ...(knockOutOffered(ctx) ? { knockOut: "offered" as const } : {})
   };
 }
@@ -444,6 +561,7 @@ export function actionAvailability(
     const reason = unavailableReason(evaluation.violations, { state, attacker, action, siblings, spell });
     const passive = passiveOf(action, builtin);
     const shaping = builtin ? undefined : shapingOffers(state, attacker, action, spell, definition, siblings);
+    const damageLook = !builtin && damageLookOffered(state, attacker, action, definition, siblings);
     const forms = action.shapeShift ? formsOffer(state, attacker, action, definition, catalog) : undefined;
     return {
       id: action.id,
@@ -455,6 +573,11 @@ export function actionAvailability(
       ...(reason !== undefined ? { reason } : {}),
       ...(passive !== undefined ? { passive } : {}),
       ...(shaping !== undefined ? { shaping } : {}),
+      ...(damageLook ? { damageLook: true as const } : {}),
+      // A template drawn for a higher slot grows as the cast's will (Fog Cloud).
+      ...(spell?.effect?.areaPerSlot && action.area && action.spellSlot
+        ? { areaPerSlot: { feet: spell.effect.areaPerSlot, level: spell.level } }
+        : {}),
       ...(forms !== undefined ? { forms } : {}),
       ...(action.effectOptions
         ? { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) }
@@ -508,8 +631,18 @@ export function actionAvailability(
       ...(summonChoicesOf(action.summons) ? { summonChoices: summonChoicesOf(action.summons)! } : {}),
       // An option, one for each target, or the weapon a grant binds to (Fire Shield, Bestow Curse, Magic Weapon).
       ...(actionChoicesOf(action) ? { choices: structuredClone(actionChoicesOf(action)!) } : {}),
-      // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.
-      ...(builtin && builtinCheckSkills(action.id).length > 0 ? { checkSkills: builtinCheckSkills(action.id) } : {})
+      // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks; Help with a Check helps
+      // with a skill or one of its user's tools.
+      ...(builtin && builtinCheckSkills(action.id).length > 0
+        ? {
+            checkSkills: [
+              ...builtinCheckSkills(action.id),
+              ...(action.id === "help-check"
+                ? helpToolsOf(definition, deriveEquipment(attacker, definition, catalog), catalog)
+                : [])
+            ]
+          }
+        : {})
     };
   });
 }

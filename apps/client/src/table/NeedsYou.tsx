@@ -7,6 +7,7 @@ import { DyingTracker } from "../encounter/DyingTracker";
 import { PendingDamagePrompt } from "../encounter/PendingDamagePrompt";
 import { ReactionPrompt } from "../encounter/ReactionPrompt";
 import { SavePrompt } from "../encounter/SavePrompt";
+import { stepLabel, TurnOrder } from "../encounter/TurnOrder";
 import { aidGiverOf, type AidGiver, StabilizeControl } from "../encounter/StabilizeControl";
 import { useMapCalibration } from "../scene/gridPreview";
 import { damageWords, needsItems, needsTitle, type NeedsItem } from "./needs";
@@ -72,6 +73,13 @@ function NeedsCard({
   let detail: string | null = null;
   let body: ReactNode = null;
   switch (item.kind) {
+    case "order": {
+      tone = item.waiting ? "caution" : "info";
+      detail = `${item.steps.steps.map(stepLabel).join(", ")} happen at the same moment.`;
+      const prompt = <TurnOrder key={item.steps.id} waiting={item.steps} onFeedback={onFeedback} />;
+      body = item.waiting ? <AnswerFor name={item.actor.name}>{prompt}</AnswerFor> : prompt;
+      break;
+    }
     case "reaction": {
       const { reaction } = item;
       const parked = reaction.parkedAttack;
@@ -92,7 +100,9 @@ function NeedsCard({
                 ? `${reaction.sourceName}'s fall waits until ${item.actor.name} answers.`
                 : reaction.kind === "casts-spell"
                   ? `${reaction.sourceName}'s spell waits until ${item.actor.name} answers.`
-                  : `${reaction.proposedDamage} damage waits on ${item.actor.name}'s answer.`;
+                  : reaction.kind === "attack-targeted"
+                    ? `${reaction.sourceName}'s attack at ${reaction.targetName ?? item.actor.name} waits until ${item.actor.name} answers.`
+                    : `${reaction.proposedDamage} damage waits on ${item.actor.name}'s answer.`;
       const prompt = (
         <ReactionPrompt
           reaction={reaction}

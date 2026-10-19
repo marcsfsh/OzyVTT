@@ -116,6 +116,9 @@ export type MovementCostOptions = Readonly<{
   costlyGroundAt?: (position: Point, sizeCells: number) => boolean;
   /** Whether a spell's barrier bars the mover's step between these two centres (Antilife Shell, Magic Circle). */
   barredStep?: (from: Point, to: Point, sizeCells: number) => boolean;
+  /** Whether the step between these two centres costs double for the way it goes (Gust of Wind's Line, toward its
+   *  caster). */
+  costlyStep?: (from: Point, to: Point, sizeCells: number) => boolean;
   /** The mover's height as it sets off and where the move ends, in feet; on the ground when absent. */
   altitude?: Readonly<{ fromFeet: number; toFeet: number }>;
 }>;
@@ -268,6 +271,16 @@ export function movementCost(
       return passage === "squeeze" || (options.throughWalls === true && passage === "blocked");
     },
     extraPerStep: extra,
+    ...(options.costlyStep
+      ? {
+          isStepCostly: (stepFrom: { column: number; row: number }, stepTo: { column: number; row: number }) =>
+            options.costlyStep!(
+              gridToImage(calibration, footprintCenter(stepFrom, sizeCells)),
+              gridToImage(calibration, footprintCenter(stepTo, sizeCells)),
+              sizeCells
+            )
+        }
+      : {}),
     ...(halvedAt || costlyGroundAt
       ? {
           isHalved: (column: number, row: number) => {

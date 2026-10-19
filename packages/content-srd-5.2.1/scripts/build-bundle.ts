@@ -780,6 +780,22 @@ const ACTION_ENRICHMENTS: Record<
     }
   },
   "archmage/protective-magic": PROTECTIVE_MAGIC,
+  // "The goblin chooses a Small or Medium ally within 5 feet of itself. The goblin and that ally swap places, and the
+  // ally becomes the target of the attack instead."
+  "goblin-boss/redirect-attack": {
+    reaction: {
+      trigger: "targeted-by-attack",
+      response: "redirect-to-ally",
+      rangeFeet: 5,
+      allySizes: ["small", "medium"],
+      swap: true
+    }
+  },
+  // "An attack roll hits the wearer of the guardian's amulet while the wearer is within 5 feet of the guardian ... The
+  // wearer gains a +5 bonus to AC, including against the triggering attack", until the guardian's next turn starts.
+  "shield-guardian/protection": {
+    reaction: { trigger: "ward-hit-by-attack", response: "ward-ac-bonus", amount: 5, rangeFeet: 5 }
+  },
   "lich/protective-magic": PROTECTIVE_MAGIC,
   "mage/protective-magic": PROTECTIVE_MAGIC,
   "sphinx-of-wonder/burst-of-ingenuity": {

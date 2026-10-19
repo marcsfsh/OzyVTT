@@ -796,9 +796,25 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
+  // "Whenever an attacker makes a ranged attack roll against a target within 5 feet of you, you can take a Reaction to
+  // become the target of the attack instead": offered before the roll. Not modeled: the +2 AC against ranged attack
+  // rolls, since an AC bonus cannot be limited to them.
+  "arrow-catching-shield": {
+    actions: [
+      {
+        id: "catch-the-attack",
+        name: "Arrow-Catching Shield",
+        activation: "reaction",
+        description:
+          "Whenever an attacker makes a ranged attack roll against a target within 5 feet of you, you can take a Reaction to become the target of the attack instead.",
+        damage: [],
+        reaction: { trigger: "other-targeted-by-attack", response: "become-target", rangeFeet: 5, ranged: true }
+      }
+    ]
+  },
+
   // Prose-only items:
-  //   `arrow-catching-shield` - an AC bonus cannot be limited to ranged attacks, and no Reaction moves an attack to
-  //       another target.
+  //   `arrow-catching-shield` - an AC bonus cannot be limited to ranged attacks (its Reaction is authored above).
   //   `dancing-sword` - a sword that attacks from its own space needs an object token that strikes.
   //   `ammunition-of-slaying` - a piece's own hit riders don't ride the shot its launcher makes.
 

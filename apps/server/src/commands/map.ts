@@ -15,6 +15,7 @@ import { pointInRects } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import type { TokenMapGeometry } from "../token-placement.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
+import { requireStartOrdered } from "../simultaneous-effects.js";
 import {
   AnnotationAddSchema,
   AnnotationClearSchema,
@@ -36,6 +37,7 @@ import { airborneAfter, altitudeOf, setAltitude } from "../altitude.js";
 import { startFall } from "../falling.js";
 import { failedTeleport } from "../granted-moves.js";
 import { holdMove } from "../held-moves.js";
+import { walkThroughZones } from "../zone-stops.js";
 import { landJump } from "../jumping.js";
 import { carryRiders, mountOf, mountOrDismount, ridersOf, RIDING_TAG } from "../mounts.js";
 import { timeStopOutOfRange } from "../time-stop.js";
@@ -155,6 +157,8 @@ export const mapCommands = [
           "move",
           "You may only move your claimed character token."
         );
+        // What its turn's start does at once comes first, in the order its player gives.
+        if (mode !== "forced" && mode !== "teleport") requireStartOrdered(state, actorId, initiatorOf(principal));
         // Before a fight the GM sets the scene; players move their own tokens once it starts.
         if (!state.combat.active && !isGmGrade(principal))
           throw new CommandRejectedError("Your GM places the tokens before the fight starts.");
@@ -281,6 +285,16 @@ export const mapCommands = [
         granted = outcome.granted;
         // A move that provokes waits at the edge of reach while the attacks are answered.
         const destination = state.combat.tokens.find((token) => token.actorId === actorId)?.position;
+        // What a stretch of the way costs this mover, the ground spell areas make included.
+        const costFeet = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+          movementCost(
+            state,
+            geometry,
+            actorId,
+            a,
+            b,
+            zoneMovementOptions(state, actorId, kit.zoneDeps(state, geometry))
+          )?.feet ?? null;
         if (outcome.heldAt && destination)
           holdMove(state, geometry, {
             actorId,
@@ -293,7 +307,12 @@ export const mapCommands = [
               : {}),
             promptIds: outcome.heldAt.promptIds,
             refundFeet: outcome.heldAt.refundFeet,
-            dragged
+            dragged,
+            // The areas on the rest of the way act on the mover as it goes on.
+            rest: movementCost(state, geometry, actorId, outcome.heldAt.position, destination)?.path ?? [
+              outcome.heldAt.position,
+              destination
+            ]
           });
         // Time Stop ends once its caster goes more than 1,000 feet from where it cast it.
         landing.push(...timeStopOutOfRange(state, actorId, (a, b) => mapDistance(geometry, a, b)?.value ?? null));
@@ -352,8 +371,38 @@ export const mapCommands = [
             mode === "teleport"
               ? [from, arrived]
               : (movementCost(state, geometry, actorId, from, arrived)?.path ?? [from, arrived]);
+          // A creature's own move goes as far as the first area whose save, failed, stops it, and waits there on the
+          // save; a move already waiting on its Opportunity Attacks meets the areas past them as it goes on.
+          const ownMove = mode !== "teleport" && mode !== "forced" && state.combat.heldMove?.actorId !== actorId;
+          let stoppedAt: number | null = null;
+          if (ownMove) {
+            const walk = walkThroughZones(state, actorId, path, zoneDeps);
+            zoneEvents.push(...walk.events);
+            stoppedAt = walk.stop;
+            if (walk.stop !== null) {
+              const stopAt = path[walk.stop]!;
+              const airborne = airborneAfter(mode, toAltitude, wasAirborne);
+              holdMove(state, geometry, {
+                actorId,
+                at: stopAt,
+                altitudeFeet: toAltitude,
+                to: arrived,
+                toAltitudeFeet: toAltitude,
+                ...(airborne ? { airborne } : {}),
+                promptIds: walk.saveIds,
+                refundFeet: costFeet(stopAt, arrived) ?? 0,
+                dragged,
+                rest: path.slice(walk.stop)
+              });
+            }
+          } else
+            zoneEvents.push(
+              ...zonesAfterMove(state, { moverId: actorId, path, teleported: mode === "teleport" }, zoneDeps)
+            );
+          // A move stopped by an area's save has gone only as far as the stop.
+          const travelled = (way: ReadonlyArray<Readonly<{ x: number; y: number }>>) =>
+            stoppedAt === null ? way : path.slice(0, stoppedAt + 1);
           zoneEvents.push(
-            ...zonesAfterMove(state, { moverId: actorId, path, teleported: mode === "teleport" }, zoneDeps),
             ...(mode === "teleport" ? [] : shellsForcedBy(state, actorId, path, zoneDeps)),
             // The creatures whose spaces it passed into (a gelatinous cube's).
             ...spaceEntryAfterMove(
@@ -363,7 +412,7 @@ export const mapCommands = [
                 path:
                   mode === "teleport"
                     ? path
-                    : (outcome.path ?? entryPathOf(state, geometry, actorId, from, arrived, zoneDeps)),
+                    : travelled(outcome.path ?? entryPathOf(state, geometry, actorId, from, arrived, zoneDeps)),
                 teleported: mode === "teleport"
               },
               zoneDeps
@@ -373,7 +422,7 @@ export const mapCommands = [
           const mover = state.actors.find((actor) => actor.id === actorId);
           if (mover && outcome.path && mode !== "teleport" && mode !== "forced" && geometry.calibration)
             zoneEvents.push(
-              ...fireFormBurns(state, mover, outcome.path, {
+              ...fireFormBurns(state, mover, travelled(outcome.path), {
                 resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
                 catalog: kit.equipmentCatalog(),
                 newId: kit.context.newId,

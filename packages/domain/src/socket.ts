@@ -188,6 +188,7 @@ import type {
   SummonLookSchema,
   SummonRecallSchema,
   TurnLegendarySchema,
+  TurnOrderSchema,
   TurnReactionSchema,
   TurnUseSchema,
   DoorSetOpenSchema,
@@ -792,6 +793,11 @@ export interface ClientToServerEvents {
   ) => void;
   "turn:end": (
     payload: CommandPayload<typeof CommandIdentitySchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** The creature's controller orders what happens at once as its turn starts or ends. */
+  "turn:order": (
+    payload: CommandPayload<typeof TurnOrderSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "dice:roll": (

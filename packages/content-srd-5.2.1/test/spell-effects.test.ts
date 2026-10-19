@@ -57,6 +57,7 @@ describe("what one cast of an SRD spell does", () => {
       "animal-shapes",
       "arcane-sword",
       "conjure-fey",
+      "gust-of-wind",
       "heat-metal",
       "hex",
       // "As a Magic action on your later turns, you can control the hand thus again."
@@ -64,6 +65,11 @@ describe("what one cast of an SRD spell does", () => {
       "moonbeam",
       "spiritual-weapon"
     ]);
+    // "As a Bonus Action on your later turns, you can change the direction in which the Line blasts from you."
+    expect(effectOf("gust-of-wind")!.laterActions?.[1]).toMatchObject({
+      activation: "bonus-action",
+      movesArea: { feet: 60, fromCaster: true }
+    });
     // "Until the spell ends, you can take a Magic action": the turn of the cast too.
     expect(effectOf("produce-flame")!.laterActions?.[0]?.laterTurnsOnly).toBeUndefined();
   });
@@ -208,7 +214,12 @@ describe("what one cast of an SRD spell does", () => {
       creatureTypes: ["fiend", "undead"],
       save: { ability: "con", conditions: ["blinded"] }
     });
-    expect(zoneOf("aura-of-life")).toMatchObject({ on: ["start-turn"], affects: "allies", revives: 1 });
+    expect(zoneOf("aura-of-life")).toMatchObject({
+      on: ["start-turn"],
+      affects: "allies",
+      revives: 1,
+      holds: { keepsMaximum: true }
+    });
     expect(zoneOf("pass-without-trace")?.holds?.modifiers).toEqual([
       {
         type: "check-bonus",
@@ -216,7 +227,10 @@ describe("what one cast of an SRD spell does", () => {
         when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["stealth"] }]
       }
     ]);
-    expect(zoneOf("silence")).toEqual({ on: [], holds: { conditions: ["deafened"] } });
+    expect(zoneOf("silence")).toEqual({
+      on: [],
+      holds: { modifiers: [{ type: "damage-immunity", damageTypes: ["thunder"] }], conditions: ["deafened"] }
+    });
   });
 
   it("marks the ground an area makes difficult, and how long the ground stays", () => {
@@ -233,7 +247,8 @@ describe("what one cast of an SRD spell does", () => {
       feet: 15,
       terrain: { cost: 2, for: "enemies" }
     });
-    expect(zoneOf("earthquake")).toEqual({ on: ["caster-turn-end"], terrain: { cost: 2 } });
+    // "Each creature on the ground in the area."
+    expect(zoneOf("earthquake")).toEqual({ on: ["caster-turn-end"], terrain: { cost: 2 }, grounded: true });
     for (const id of ["black-tentacles", "blade-barrier", "grease", "insect-plague", "sleet-storm"])
       expect(zoneOf(id)?.terrain?.cost, id).toBe(2);
     // A failed save also ends the creature's Concentration.
@@ -246,7 +261,7 @@ describe("what one cast of an SRD spell does", () => {
     expect(areaOf("wall-of-fire")).toEqual({ shape: "line", sizeFeet: 60, widthFeet: 5 });
     expect(areaOf("blade-barrier")).toEqual({ shape: "line", sizeFeet: 100, widthFeet: 5 });
     expect(areaOf("flaming-sphere")).toEqual({ shape: "sphere", sizeFeet: 5, widthFeet: null });
-    expect(areaOf("moonbeam")).toEqual({ shape: "cylinder", sizeFeet: 5, widthFeet: null });
+    expect(areaOf("moonbeam")).toEqual({ shape: "cylinder", sizeFeet: 5, widthFeet: null, heightFeet: 40 });
   });
 
   it("says how many creatures a cast targets, and how many more a higher slot adds", () => {

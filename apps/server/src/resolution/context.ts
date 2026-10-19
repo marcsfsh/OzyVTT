@@ -58,6 +58,10 @@ export type ResolveInput = Readonly<{
   reroll?: boolean;
   /** On a preview, answer the held attack roll with one of the attacker's answers (Peerless Skill, Stroke of Luck). */
   answer?: Readonly<{ id: string; subtract?: boolean; face?: number }>;
+  /** On a preview, roll the damage too and hold its dice for the roller to answer (`held-damage.ts`). */
+  damageLook?: boolean;
+  /** On a look, the answer to the held damage: the dice it rerolls, by their place in the held roll. */
+  damageAnswer?: Readonly<{ id: "empowered-spell" | "heroic-inspiration"; dice: readonly number[] }>;
   /** GM only: a hand-entered attack total, used verbatim vs AC. The natural die is unknown, so a crit is declared
    * via `critical` and a natural 1 via `fumble`. */
   attackTotal?: number;
@@ -92,6 +96,9 @@ export type ResolveInput = Readonly<{
   economyPaid?: boolean;
   /** A parked attack finishing after its target's AC reaction was answered, so it is not offered again. */
   acSettled?: boolean;
+  /** An attack held before its roll while a creature chose whether to turn it (Redirect Attack): its economy was spent
+   *  when it was held, its roll is made now, and it is not offered for turning again. */
+  redirectSettled?: boolean;
   /** A parked attack finishing after others answered its roll: who was asked already. */
   answersAsked?: readonly string[];
   /** A reaction's AC bonus against this attack only (Parry), added to the target's AC. */
@@ -105,6 +112,8 @@ export type ResolveInput = Readonly<{
   areaPlaced?: boolean;
   /** Ready the spell for later: its slot is spent and it is held with Concentration (SRD Ready). */
   ready?: boolean;
+  /** A long casting's first turn going ahead after no Counterspell stopped it: it begins as that turn's cast would. */
+  longCastBegins?: boolean;
   /** Take the action's own move now and the rest of it later (`movement-grants.ts`): the cost is spent, no target. */
   moveFirst?: boolean;
   /** The rest of an action whose move was taken first: its cost was spent then, so it is neither checked nor spent. */
@@ -313,6 +322,8 @@ export type ResolveContext = {
   readonly damageEffectIds: string[];
   /** The creatures this resolve brought onto the map (`resolution/summon.ts`). */
   summoned?: ReadonlyArray<Readonly<{ actorId: string; name: string }>>;
+  /** A look at the damage records no roll: the roller alone sees its dice until the confirm deals them. */
+  silentRolls?: boolean;
 };
 
 /** Records one rolled formula in the shared history, attributed like every roll of this resolve; `label` names a die
@@ -336,7 +347,7 @@ export function recordRoll(
     total: extra.total ?? resolution.total,
     ...(extra.typed ? { typed: true as const } : {})
   };
-  recordRollInHistory(ctx.state, record);
+  if (!ctx.silentRolls) recordRollInHistory(ctx.state, record);
   return record.id;
 }
 

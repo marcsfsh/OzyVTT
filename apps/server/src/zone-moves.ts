@@ -27,10 +27,10 @@ type Placed = Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; ta
 export function areaMoveOf(
   action: Pick<ActorAction, "id" | "spellId">,
   catalog: Pick<EquipmentCatalog, "spellRecord"> | undefined
-): Readonly<{ spell: SpellReference; feet: number }> | null {
+): Readonly<{ spell: SpellReference; feet: number; fromCaster: boolean }> | null {
   const spell = action.spellId ? catalog?.spellRecord?.(action.spellId) : undefined;
-  const feet = spell ? laterRowOf(spell, action.id)?.movesArea?.feet : undefined;
-  return spell && feet !== undefined ? { spell, feet } : null;
+  const moves = spell ? laterRowOf(spell, action.id)?.movesArea : undefined;
+  return spell && moves !== undefined ? { spell, feet: moves.feet, fromCaster: moves.fromCaster === true } : null;
 }
 
 export type AreaMove = Readonly<{
@@ -55,6 +55,7 @@ export function planAreaMove(
     placed: Placed;
     override: RulesOverride | null;
     widthFeet: number | null;
+    fromCaster?: boolean;
   }>,
   geometry: TokenMapGeometry
 ): AreaMove {
@@ -68,9 +69,20 @@ export function planAreaMove(
   if (!zone || !area || area.shape === null)
     throw new CommandRejectedError(`${input.spell.name}'s area isn't on the map. Place it first.`);
   const snapped = shapeGeometry(calibration, input.placed.shape, input.placed.origin, input.placed.target);
-  const moved = mapDistance(geometry, area.geometry.origin, snapped.origin)?.value ?? 0;
-  const note =
-    moved > input.feet + DISTANCE_TOLERANCE_FEET
+  // An area placed again from its caster (Gust of Wind's Line, turned) starts where the caster stands now.
+  const caster = state.combat.tokens.find((token) => token.actorId === input.casterId)?.position;
+  const fromCaster = input.fromCaster === true && caster !== undefined && caster !== null;
+  const moved = mapDistance(geometry, fromCaster ? caster : area.geometry.origin, snapped.origin)?.value ?? 0;
+  const note = fromCaster
+    ? moved > calibration.distancePerCell + DISTANCE_TOLERANCE_FEET
+      ? policeBarrier(
+          state,
+          input.override,
+          "range.out-of-range",
+          `${input.spell.name}'s area starts at its caster; that one starts ${Math.round(moved)} feet away.`
+        )
+      : null
+    : moved > input.feet + DISTANCE_TOLERANCE_FEET
       ? policeBarrier(
           state,
           input.override,

@@ -6,6 +6,7 @@ import { nextInitiativeTurn } from "../src/encounter.js";
 import { zonesAfterMove } from "../src/spell-zones.js";
 import { movementCost } from "../src/terrain.js";
 import { zoneMovementOptions } from "../src/zone-ground.js";
+import { areaGroundFor } from "../src/zone-preview.js";
 import { ALLY, build, druidInput, fight, FOE, FOE2, HERO, wizardInput } from "./spell-casters.js";
 import {
   answer,
@@ -60,6 +61,19 @@ describe("Web: the webs are Difficult Terrain", () => {
     // Three steps across the webs: 3 x 10.
     expect(costOf(state, FOE, [5, 6], [8, 6])).toBe(30);
     expect(costOf(state, FOE, [3, 2], [3, 4])).toBe(10);
+  });
+
+  it("shows a move's preview the webs' cells, only when the asker can see the webs", () => {
+    const { state } = webbed();
+    const ground = areaGroundFor(state, FOE, zoneDeps(), () => true);
+    expect(ground?.difficult).toEqual(
+      expect.arrayContaining([
+        { column: 5, row: 6 },
+        { column: 8, row: 8 }
+      ])
+    );
+    expect(ground?.difficult).not.toContainEqual({ column: 4, row: 6 });
+    expect(areaGroundFor(state, FOE, zoneDeps(), () => false)).toBeUndefined();
   });
 
   it("neither slows nor holds a Web Walker", () => {

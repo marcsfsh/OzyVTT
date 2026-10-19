@@ -88,6 +88,45 @@ describe("the prompt for each trigger", () => {
     expect(screen.getByRole("button", { name: "Take the hit" })).toBeTruthy();
   });
 
+  it("offers Arrow-Catching Shield before a ranged attack rolls at an ally", () => {
+    mount({
+      ...DODGE,
+      kind: "attack-targeted",
+      actionId: "catch-the-attack",
+      actionName: "Arrow-Catching Shield",
+      targetActorId: "10000000-0000-4000-8000-000000000003",
+      targetName: "Bran",
+      proposedDamage: 0,
+      proposedDamageParts: [],
+      weighed: null
+    });
+    expect(
+      screen.getByText(/Dragon is attacking Bran, and the attack waits on the answer before it rolls/)
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use Arrow-Catching Shield" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Let it roll" })).toBeTruthy();
+  });
+
+  it("names each ally Redirect Attack may hand the attack to", () => {
+    mount({
+      ...DODGE,
+      kind: "attack-targeted",
+      actionId: "redirect-attack",
+      actionName: "Redirect Attack",
+      targetActorId: "10000000-0000-4000-8000-000000000002",
+      targetName: "Borin",
+      redirectChoices: [
+        { actorId: "10000000-0000-4000-8000-000000000004", name: "Snik" },
+        { actorId: "10000000-0000-4000-8000-000000000005", name: "Grub" }
+      ],
+      proposedDamage: 0,
+      proposedDamageParts: [],
+      weighed: null
+    });
+    expect(screen.getByRole("button", { name: "Redirect Attack · Snik" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Redirect Attack · Grub" })).toBeTruthy();
+  });
+
   it("strikes back with the spell itself, or with a melee swing to roll first", () => {
     const rebuke: PlayerPendingReaction = {
       ...DODGE,

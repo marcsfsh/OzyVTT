@@ -526,11 +526,98 @@ export const HeldRollSchema = z
   .strict();
 export type HeldRoll = z.infer<typeof HeldRollSchema>;
 
+/** One die of a held damage roll: its size, the face it shows, and whether it is the action's own damage (what
+ *  Empowered Spell rerolls) or a rider's. */
+export const HeldDamageDieSchema = z
+  .object({
+    sides: z.number().int().min(2).max(100),
+    face: z.number().int().min(1).max(100),
+    own: z.boolean()
+  })
+  .strict();
+export type HeldDamageDie = z.infer<typeof HeldDamageDieSchema>;
+
+/**
+ * What happens at the same moment as a creature's turn starts or ends, waiting for that creature's controller to put it
+ * in order (SRD 5.2.1 Rules Glossary, Simultaneous Effects): ongoing damage, Hit Points or Temporary Hit Points
+ * regained, a trait that burns or regenerates. Each step is named for its effect or trait, and for the creature it
+ * lands on when that is another. `order` is the controller's answer to a turn's end, which the turn then plays out.
+ */
+export const TurnStepsSchema = z
+  .object({
+    id: z.uuid(),
+    actorId: z.uuid(),
+    boundary: z.enum(["start", "end"]),
+    steps: z
+      .array(
+        z
+          .object({
+            key: z.string().min(1).max(200),
+            name: z.string().min(1).max(200),
+            targetActorId: z.uuid().optional(),
+            targetName: z.string().min(1).max(200).optional(),
+            /** Whose effect it is, so a player's view can leave out a source hidden from them. */
+            sourceActorId: z.uuid().optional(),
+            sourceName: z.string().min(1).max(200).optional()
+          })
+          .strict()
+      )
+      .min(2)
+      .max(20),
+    order: z.array(z.string().min(1).max(200)).max(20).optional()
+  })
+  .strict();
+export type TurnSteps = z.infer<typeof TurnStepsSchema>;
+
+/**
+ * A damage roll looked at before it counts (SRD Empowered Spell and Heroic Inspiration act "after seeing the roll"): the
+ * dice a look threw for one creature's action this turn, in the order thrown, which the action's confirm deals. What
+ * answered it is kept with it, each answer once. GM-only; the roller saw the dice in the look's reply.
+ */
+export const HeldDamageSchema = z
+  .object({
+    actorId: z.uuid(),
+    actionId: z.string().min(1).max(160),
+    dice: z.array(HeldDamageDieSchema).max(200),
+    answers: z
+      .array(
+        z
+          .object({
+            id: z.enum(["empowered-spell", "heroic-inspiration"]),
+            name: z.string().min(1).max(80),
+            /** The positions of the dice it rerolled. */
+            dice: z.array(z.number().int().min(0).max(199)).min(1).max(20)
+          })
+          .strict()
+      )
+      .max(4)
+      .default([]),
+    round: z.number().int().nonnegative(),
+    turnActorId: z.uuid().nullable(),
+    createdAt: z.number().int().nonnegative()
+  })
+  .strict();
+export type HeldDamage = z.infer<typeof HeldDamageSchema>;
+
 /** One character's part of a call for a roll: who, the pending save a save call opened, and the result once rolled. */
 export const RollCallEntrySchema = z
   .object({
     actorId: z.uuid(),
     saveId: z.uuid().optional(),
+    /** A check call: the situations the character's gear names that fit the check (a Book's topic, prying with a
+     *  Crowbar), each with what it gives and where it comes from, offered as toggles on the call's card. */
+    situations: z
+      .array(
+        z
+          .object({
+            situation: z.string().min(1).max(80),
+            effect: z.string().min(1).max(80),
+            source: z.string().min(1).max(120)
+          })
+          .strict()
+      )
+      .max(6)
+      .optional(),
     result: z
       .object({
         natural: z.number().int().min(0).max(20),
@@ -700,7 +787,12 @@ export const ParkedCastSchema = z
     initiatorRole: z.enum(["gm", "player"]),
     initiatorSessionId: z.string().min(1).max(200),
     /** How the caster shaped the spell (Metamagic, Sculpt Spells); its Sorcery Points were spent with the cast. */
-    shaping: z.array(CastShapingSchema).max(4).optional()
+    shaping: z.array(CastShapingSchema).max(4).optional(),
+    /** It was cast to be held with the Ready action: going ahead holds it until its trigger. */
+    ready: z.literal(true).optional(),
+    /** The first turn of a spell cast over several turns: going ahead begins the casting, and its slot, use and
+     *  materials wait for its last turn as any long casting's do. */
+    beginsLongCast: z.literal(true).optional()
   })
   .strict();
 export type ParkedCast = z.infer<typeof ParkedCastSchema>;
@@ -731,8 +823,9 @@ export const PendingReactionSchema = z
     /** What opened the window: an attack that hit the reactor, an enemy leaving its reach (opportunity attack), an
      *  attack that would hit before its damage (`attack-would-hit`), a creature damaging the reactor, a creature casting
      *  a spell the reactor may counter (`casts-spell`), a roll another creature may answer (`roll-answer`: Cutting
-     *  Words, Countercharm), damage the reactor is about to take from any source (`takes-damage`), or a creature
-     *  falling (`falls`). */
+     *  Words, Countercharm), damage the reactor is about to take from any source (`takes-damage`), a creature
+     *  falling (`falls`), or an attack about to roll that the reactor may give another target (`attack-targeted`:
+     *  Redirect Attack, Arrow-Catching Shield). */
     kind: z
       .enum([
         "hit-by-attack",
@@ -742,9 +835,19 @@ export const PendingReactionSchema = z
         "casts-spell",
         "roll-answer",
         "takes-damage",
-        "falls"
+        "falls",
+        "attack-targeted"
       ])
       .default("hit-by-attack"),
+    /** attack-targeted and a ward's attack-would-hit: the attack's target as it stands, by name. */
+    targetName: z.string().min(1).max(120).optional(),
+    /** attack-targeted (Redirect Attack): the allies the reactor may make the target instead, one picked with the
+     *  answer. */
+    redirectChoices: z
+      .array(z.object({ actorId: z.uuid(), name: z.string().min(1).max(120) }).strict())
+      .min(1)
+      .max(12)
+      .optional(),
     /** falls: how far the falling creature (`targetActorId`) is falling, in feet. */
     fallFeet: z.number().int().min(0).max(10000).optional(),
     actorId: z.uuid(),
@@ -1512,9 +1615,10 @@ export const CombatStateSchema = z
     activeSceneId: z.uuid().nullable().default(null),
     /** Falls waiting on the reactions they opened, on the live table only. GM-only (see PendingFallSchema). */
     pendingFalls: z.array(PendingFallSchema).max(20).default([]),
-    /** A move stopped at the edge of the reach it leaves while the Opportunity Attacks it provoked are answered
-     *  (`held-moves.ts`): where it waits, where it was going, the prompts it waits on, the movement the rest of the way
-     *  cost, and the creatures it drags. Live table only; GM-only. */
+    /** A move stopped at the edge of the reach it leaves while the Opportunity Attacks it provoked are answered, or
+     *  where it entered an area whose save, failed, stops it (`held-moves.ts`): where it waits, where it was going and
+     *  the way there, the prompts and saves it waits on, the movement the rest of the way cost, and the creatures it
+     *  drags. Live table only; GM-only. */
     heldMove: z
       .object({
         actorId: z.uuid(),
@@ -1522,13 +1626,19 @@ export const CombatStateSchema = z
         to: EncounterTokenPositionSchema,
         toAltitudeFeet: z.number().int().min(1).max(10000).optional(),
         airborne: z.enum(["fly", "levitate"]).optional(),
+        /** The prompts and saves it waits on: Opportunity Attacks, or the save of an area that stops its mover. */
         promptIds: z.array(z.uuid()).max(20),
         refundFeet: z.number().min(0).max(100000),
-        dragged: z.array(z.uuid()).max(20)
+        dragged: z.array(z.uuid()).max(20),
+        /** The way it goes on from `at` to `to`, so the areas along it act on the mover as it resumes. */
+        rest: z.array(EncounterTokenPositionSchema).max(400).optional()
       })
       .strict()
       .nullable()
       .default(null),
+    /** The steps of a turn's start or end waiting for the turn's creature's controller to order them. Live table
+     *  only; its own creature's player sees it. */
+    turnSteps: TurnStepsSchema.nullable().default(null),
     /** Time Stop (SRD 5.2.1): the caster takes `turnsLeft` more turns in a row, until it affects another creature or
      *  moves more than 1,000 feet from `at`, where it cast the spell. Live table only; GM-only. */
     timeStop: z
@@ -1730,6 +1840,8 @@ export const GameStateSchema = z.object({
   partyVisibility: PartyVisibilitySchema.default("name-and-class"),
   /** Dice thrown before they count (see HeldRollSchema). GM-only. */
   heldRolls: z.array(HeldRollSchema).max(100).default([]),
+  /** Damage rolls looked at before they count (see HeldDamageSchema). GM-only. */
+  heldDamage: z.array(HeldDamageSchema).max(40).default([]),
   /** The GM's open calls for a roll. A player reads only their own part of each. */
   rollCalls: z.array(RollCallSchema).max(20).default([]),
   /** Game time, Long Rest requests and the party's Short Rest. Players see only their own characters' part. */

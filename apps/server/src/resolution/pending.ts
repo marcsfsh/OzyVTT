@@ -3,6 +3,7 @@ import { prismaticSpray } from "./prismatic.js";
 import type { PendingReaction, PendingSave } from "@vtt/domain";
 import { catalogIdOf, DamageTypeSchema, type ActionReaction, type GrantOption } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
+import { commanderOf } from "../authorization.js";
 import { holdsFeature } from "../class-features.js";
 import { conditionLabel } from "../condition-rules.js";
 import { addEffect, ESCAPE_ATHLETICS_TAG, makeEffect, NO_ACTIONS_TAG } from "../effects.js";
@@ -92,15 +93,19 @@ export function parkReaction(ctx: ResolveContext): void {
 }
 
 /** The attack a prompt holds at its roll, to be finished by its answer with the same die and dice. What answers
- *  added to the roll (a Bardic Inspiration die) rides as one of its dice, since the replay holds no die to read. */
-function parkedAttackOf(ctx: ResolveContext, untilNextTurn: boolean): NonNullable<PendingReaction["parkedAttack"]> {
+ *  added to the roll (a Bardic Inspiration die) rides as one of its dice, since the replay holds no die to read. One
+ *  held before its roll (`redirect.ts`) keeps only a die its roller typed. */
+export function parkedAttackOf(
+  ctx: ResolveContext,
+  untilNextTurn: boolean
+): NonNullable<PendingReaction["parkedAttack"]> {
   const { attack, attacker, input, deps } = ctx;
   const target = ctx.targets[0];
   const cover = input.cover === "half" || input.cover === "three-quarters" ? input.cover : null;
   return {
     actionId: ctx.action.id,
     builtin: input.builtin === true,
-    attackNatural: input.attackTotal === undefined ? attack!.naturalRoll : null,
+    attackNatural: input.attackTotal === undefined ? (attack?.naturalRoll ?? input.attackNatural ?? null) : null,
     attackTotal: input.attackTotal ?? null,
     cover,
     conditionId: input.conditionId ?? null,
@@ -111,13 +116,13 @@ function parkedAttackOf(ctx: ResolveContext, untilNextTurn: boolean): NonNullabl
     slotLevel: ctx.plan.castLevel,
     damageType: input.damageType ?? null,
     bonusDice: [
-      ...(attack!.bonusDice ?? []).flatMap((entry) =>
+      ...(attack?.bonusDice ?? []).flatMap((entry) =>
         entry.total === null ? [] : [{ label: entry.label, dice: entry.dice, total: entry.total }]
       ),
       ...(ctx.attackAnswerBonus
         ? [
             {
-              label: ((attack!.answered ?? []).map((line) => line.name).join(", ") || "Answers").slice(0, 120),
+              label: ((attack?.answered ?? []).map((line) => line.name).join(", ") || "Answers").slice(0, 120),
               dice: "",
               total: Math.max(-48, Math.min(48, ctx.attackAnswerBonus))
             }
@@ -221,15 +226,27 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
   if (target.id === attacker.id) return false;
   const targetAc = attack.targetAc;
   const melee = ctx.riderFilters.attackKinds?.includes("melee") === true;
-  const offer = offerableReaction(
+  const lookup = { resolveDefinition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
+  const own = offerableReaction(
     state,
     target,
     (reaction): reaction is AcBonusReaction =>
       reaction.response === "ac-bonus" &&
       (reaction.melee !== true || melee) &&
       attack.total < targetAc + reaction.amount,
-    { resolveDefinition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) }
+    lookup
   );
+  const ward = own ? null : wardOffer(ctx, attack.total, targetAc);
+  const offer = own
+    ? {
+        reactor: target,
+        action: own.action,
+        amount: own.reaction.amount,
+        untilNextTurn: own.reaction.untilNextTurn === true
+      }
+    : ward
+      ? { reactor: ward.reactor, action: ward.action, amount: ward.reaction.amount, untilNextTurn: true }
+      : null;
   if (!offer) return false;
   state.combat = {
     ...state.combat,
@@ -238,30 +255,66 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
       {
         id: deps.newRollId(),
         kind: "attack-would-hit" as const,
-        actorId: target.id,
+        actorId: offer.reactor.id,
         actionId: offer.action.id,
         actionName: offer.action.name,
         sourceActorId: attacker.id,
         sourceName: attacker.name,
-        targetActorId: null,
+        // A ward's prompt names the creature the attack is at.
+        targetActorId: offer.reactor.id === target.id ? null : target.id,
+        ...(offer.reactor.id === target.id ? {} : { targetName: target.name }),
         triggerCommandId: input.commandId,
         proposedDamage: 0,
         proposedDamageParts: [],
         critical: false,
         weighed: null,
-        acBonus: offer.reaction.amount,
+        acBonus: offer.amount,
         rollsAttack: false,
         attackTotal: attack.total,
-        parkedAttack: parkedAttackOf(ctx, offer.reaction.untilNextTurn === true),
-        ...slotChoiceOf(target, offer.action),
+        parkedAttack: parkedAttackOf(ctx, offer.untilNextTurn),
+        ...slotChoiceOf(offer.reactor, offer.action),
         // The roll's answers were asked before this; the finish doesn't ask them again.
         ...(input.answersAsked ? { asked: [...input.answersAsked] } : {}),
         createdAt: Date.parse(deps.now())
       }
     ]
   };
-  ctx.reactionPrompts.push({ actorId: target.id, actorName: target.name, actionName: offer.action.name });
+  ctx.reactionPrompts.push({
+    actorId: offer.reactor.id,
+    actorName: offer.reactor.name,
+    actionName: offer.action.name
+  });
   return true;
+}
+
+type WardAcReaction = Extract<ActionReaction, { response: "ward-ac-bonus" }>;
+
+/** SRD Shield Guardian, Protection: "An attack roll hits the wearer of the guardian's amulet while the wearer is
+ *  within 5 feet of the guardian." The amulet's wearer is the creature that commands the guardian. Offered only when
+ *  the bonus would turn the hit into a miss. */
+function wardOffer(ctx: ResolveContext, total: number, targetAc: number) {
+  const { state, attacker, targets, deps } = ctx;
+  const target = targets[0]!;
+  const distance = deps.distanceFeet;
+  if (!deps.resolveDefinition || !distance) return null;
+  const lookup = { resolveDefinition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
+  for (const entry of state.combat.initiative) {
+    const guardian = state.actors.find((candidate) => candidate.id === entry.actorId);
+    if (!guardian || guardian.id === attacker.id || guardian.id === target.id) continue;
+    if (commanderOf(state, guardian)?.id !== target.id) continue;
+    const offer = offerableReaction(
+      state,
+      guardian,
+      (reaction): reaction is WardAcReaction =>
+        reaction.response === "ward-ac-bonus" && total < targetAc + reaction.amount,
+      lookup
+    );
+    if (!offer) continue;
+    const apart = distance(guardian.id, target.id);
+    if (apart !== null && apart <= (offer.reaction.rangeFeet ?? 5) + DISTANCE_TOLERANCE_FEET)
+      return { reactor: guardian, ...offer };
+  }
+  return null;
 }
 
 /** What the magic test reads: the action, its user, the item it rides, and the catalog. */

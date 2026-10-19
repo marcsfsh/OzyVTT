@@ -18,6 +18,7 @@ import { createPendingSaves } from "./saving-throws.js";
 import { countZoneDamage, endZone, removeZone, zoneContentOf, type ZoneContent } from "./spell-zone-state.js";
 import type { TokenMapGeometry } from "./token-placement.js";
 import { withArticle } from "@vtt/domain";
+import { altitudeOf, heightSpan } from "./altitude.js";
 
 type Actor = GameState["actors"][number];
 type Point = Readonly<{ x: number; y: number }>;
@@ -105,8 +106,9 @@ function creaturesOnMap(state: GameState): Actor[] {
   });
 }
 
-/** "Is a creature of this size at this point inside the zone?", or null when the map can't say (no grid, the area
- *  not placed, its caster off the map). `casterAt` stands the caster of an Emanation somewhere else. */
+/** "Is a creature of this size, this high, at this point inside the zone?", or null when the map can't say (no grid,
+ *  the area not placed, its caster off the map). `casterAt` stands the caster of an Emanation somewhere else. A
+ *  creature's height is 0 when the caller doesn't give it: on the ground. */
 export function insideTest(
   state: GameState,
   zone: SpellZone,
@@ -114,17 +116,19 @@ export function insideTest(
   source: Pick<ZoneContent, "area">,
   geometry: TokenMapGeometry | null,
   casterAt?: Point
-): ((position: Point, sizeCells: number) => boolean) | null {
+): ((position: Point, sizeCells: number, altitudeFeet?: number) => boolean) | null {
   const calibration = geometry?.calibration ?? null;
   if (!geometry || !calibration) return null;
   const cell = { sizeCells: 1, sizePx: calibration.cellSizePx };
+  // Measured in three dimensions, so a flier far above an Emanation is out of it.
   const within =
-    (from: Readonly<{ position: Point; sizeCells: number; sizePx: number }>, feet: number) =>
-    (position: Point, sizeCells: number) => {
+    (from: Readonly<{ position: Point; sizeCells: number; sizePx: number; altitudeFeet?: number }>, feet: number) =>
+    (position: Point, sizeCells: number, altitudeFeet = 0) => {
       const apart = creatureDistance(geometry, from, {
         position,
         sizeCells,
-        sizePx: calibration.cellSizePx * sizeCells
+        sizePx: calibration.cellSizePx * sizeCells,
+        altitudeFeet
       });
       return apart !== null && apart.value <= feet + DISTANCE_TOLERANCE_FEET;
     };
@@ -134,7 +138,12 @@ export function insideTest(
     const at = zone.anchor ?? casterAt ?? caster?.position;
     if (!at) return null;
     return within(
-      { position: at, sizeCells: caster?.sizeCells ?? 1, sizePx: caster?.sizePx ?? calibration.cellSizePx },
+      {
+        position: at,
+        sizeCells: caster?.sizeCells ?? 1,
+        sizePx: caster?.sizePx ?? calibration.cellSizePx,
+        altitudeFeet: zone.anchor ? 0 : altitudeOf(caster)
+      },
       trigger.feet ?? 5
     );
   }
@@ -144,8 +153,24 @@ export function insideTest(
   if (!area || area.shape === null) return null;
   if (trigger.around === "point") return within({ ...cell, position: area.geometry.origin }, trigger.feet ?? 5);
   const shape = area.shape;
-  return (position, sizeCells) =>
-    footprintInTemplate(calibration, area.geometry, shape, source.area?.widthFeet ?? null, position, sizeCells);
+  const heights = areaHeights(source.area);
+  return (position, sizeCells, altitudeFeet = 0) => {
+    if (heights) {
+      const span = heightSpan({ altitudeFeet, sizeCells }, calibration.distancePerCell);
+      if (span.high <= heights.low || span.low >= heights.high) return false;
+    }
+    return footprintInTemplate(calibration, area.geometry, shape, source.area?.widthFeet ?? null, position, sizeCells);
+  };
+}
+
+/** The heights a placed area spans, from the ground it was placed on: a Sphere its radius above and below its centre,
+ *  a Cube its side, a Cylinder its printed height. Null when the shape sets no top (a wall's Line, an unknown height). */
+function areaHeights(area: ZoneContent["area"]): Readonly<{ low: number; high: number }> | null {
+  if (!area) return null;
+  if (area.shape === "sphere") return { low: -area.sizeFeet, high: area.sizeFeet };
+  if (area.shape === "cube") return { low: 0, high: area.sizeFeet };
+  if (area.shape === "cylinder" && area.heightFeet !== undefined) return { low: 0, high: area.heightFeet };
+  return null;
 }
 
 /** The traits that free a creature from a kind of ground (SRD Web Walker: it "ignores movement restrictions caused by
@@ -197,10 +222,14 @@ export function exposed(
     // "You and your allies": an aura its caster carries reaches the caster too.
     const own = creature.id === zone.casterId;
     if (trigger.around === "caster" && own && trigger.affects !== "allies") return [];
+    // A Line that blasts from its caster (Gust of Wind) starts beside it, not on it.
+    if (own && trigger.towardCaster) return [];
     if (trigger.affects === "enemies" && (!caster || !areEnemies(caster, creature, deps.resolveDefinition))) return [];
     if (trigger.affects === "allies" && !own && (!caster || !areAllies(caster, creature, deps.resolveDefinition)))
       return [];
     if (kind && movesFreelyOn(creature, kind, deps, true)) return [];
+    // "Each creature on the ground in the area": one in the air above it is spared.
+    if (trigger.grounded && altitudeOf(tokenOf(state, creature.id)) > 0) return [];
     if (trigger.types && !trigger.types.includes(typeOf(creature, deps) ?? "")) return [];
     // A defeated creature takes no more; a dying character does (damage at 0 HP is a failed death save).
     if (creature.hp.current <= 0 && (creature.kind !== "player-character" || (creature.deathSaves?.failures ?? 0) >= 3))
@@ -217,10 +246,11 @@ export function exposed(
 export function speedHalvingAt(
   state: GameState,
   actorId: string,
-  deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">
+  deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">,
+  zones: readonly SpellZone[] = liveZones(state)
 ): ((position: Point, sizeCells: number) => boolean) | null {
   const tests: Array<(position: Point, sizeCells: number) => boolean> = [];
-  for (const zone of liveZones(state)) {
+  for (const zone of zones) {
     const content = zoneContentOf(zone, deps.catalog);
     if (!content?.trigger.halvesSpeed) continue;
     if (!exposed(state, zone, content.trigger, deps).some((creature) => creature.id === actorId)) continue;
@@ -362,6 +392,8 @@ function act(
     },
     // A creature can owe this zone a second save before answering the first (entering, then ending its turn there).
     replaceExisting: false,
+    // Gust of Wind's push away from its caster.
+    ...(save.failurePush ? { failurePush: save.failurePush } : {}),
     // Heightened Spell's target has Disadvantage on every save against the spell.
     ...(zone.heightened === creature.id ? { disadvantage: { targetId: creature.id, from: "Heightened Spell" } } : {}),
     newSaveId: deps.newId,
@@ -378,7 +410,7 @@ function act(
 /** The action a zone acts with: its spell's later action at the cast's level, or the rule an item left (Caltrops'
  *  save), in the damage type chosen at the cast (Conjure Elemental's element), with the dice it has gained (Delayed
  *  Blast Fireball's 1d6 a turn). */
-function zoneAction(zone: SpellZone, content: ZoneContent): ActorAction | undefined {
+export function zoneAction(zone: SpellZone, content: ZoneContent): ActorAction | undefined {
   let action: ActorAction;
   if (content.spell && content.row) {
     const { spell, row } = content;
@@ -452,7 +484,7 @@ export function zonesAfterMove(
       if (!trigger.on.includes("enter") || tests.some((test) => test === null)) continue;
       for (const creature of exposed(state, zone, trigger, deps)) {
         const at = tokenOf(state, creature.id)!;
-        const hits = tests.map((test) => test!(at.position!, at.sizeCells));
+        const hits = tests.map((test) => test!(at.position!, at.sizeCells, altitudeOf(at)));
         if (!hits[0] && hits.slice(1).some(Boolean)) act(state, zone, creature, "is caught by", deps, events);
       }
       continue;
@@ -460,7 +492,7 @@ export function zonesAfterMove(
     if (!exposed(state, zone, trigger, deps).some((creature) => creature.id === mover.id)) continue;
     const inside = insideTest(state, zone, trigger, content, deps.geometry);
     if (!inside) continue;
-    const hits = path.map((point) => inside(point, moverToken.sizeCells));
+    const hits = path.map((point) => inside(point, moverToken.sizeCells, altitudeOf(moverToken)));
     if (trigger.on.includes("enter") && !hits[0] && hits.slice(1).some(Boolean))
       act(state, zone, mover, "enters", deps, events);
     if (trigger.on.includes("travel") && !input.teleported && deps.geometry) {
@@ -499,7 +531,7 @@ export function zonesAfterAreaMove(
         : exposed(state, zone, trigger, deps)
             .filter((creature) => {
               const token = tokenOf(state, creature.id)!;
-              return then(token.position!, token.sizeCells);
+              return then(token.position!, token.sizeCells, altitudeOf(token));
             })
             .map((creature) => creature.id)
     );
@@ -507,7 +539,7 @@ export function zonesAfterAreaMove(
     if (!now) continue;
     for (const creature of exposed(state, zone, trigger, deps)) {
       const token = tokenOf(state, creature.id)!;
-      if (!wasInside.has(creature.id) && now(token.position!, token.sizeCells))
+      if (!wasInside.has(creature.id) && now(token.position!, token.sizeCells, altitudeOf(token)))
         act(state, zone, creature, "is caught by", deps, events);
     }
   }
@@ -537,7 +569,8 @@ function zonesAtCasterTurnEnd(state: GameState, casterId: string, deps: ZoneDeps
     if (!inside) continue;
     for (const creature of exposed(state, zone, content.trigger, deps)) {
       const token = tokenOf(state, creature.id)!;
-      if (inside(token.position!, token.sizeCells)) act(state, zone, creature, "is caught in", deps, events);
+      if (inside(token.position!, token.sizeCells, altitudeOf(token)))
+        act(state, zone, creature, "is caught in", deps, events);
     }
   }
   return events;
@@ -637,7 +670,7 @@ function zonesAtCasterTurnStart(state: GameState, casterId: string, deps: ZoneDe
     }
     const reached = exposed(state, zone, trigger, deps).filter((creature) => {
       const token = tokenOf(state, creature.id)!;
-      return inside(token.position!, token.sizeCells);
+      return inside(token.position!, token.sizeCells, altitudeOf(token));
     });
     const origin = area.geometry.origin;
     const nearest = reached
@@ -670,7 +703,7 @@ export function burstEndedZones(state: GameState, deps: ZoneDeps): EffectNarrati
       const caught = inside
         ? creaturesOnMap(state).filter((creature) => {
             const token = tokenOf(state, creature.id)!;
-            return inside(token.position!, token.sizeCells);
+            return inside(token.position!, token.sizeCells, altitudeOf(token));
           })
         : [];
       const action = zoneAction(zone, content);
@@ -726,7 +759,7 @@ function zonesWhereItStands(
     const creature = exposed(state, zone, trigger, deps).find((candidate) => candidate.id === actorId);
     const token = creature ? tokenOf(state, creature.id) : undefined;
     const inside = insideTest(state, zone, trigger, content, deps.geometry);
-    if (!creature || !token || !inside || !inside(token.position!, token.sizeCells)) continue;
+    if (!creature || !token || !inside || !inside(token.position!, token.sizeCells, altitudeOf(token))) continue;
     // SRD Aura of Life: "When an ally with 0 Hit Points starts its turn in the aura, that ally regains 1 Hit Point."
     if (when === "start-turn" && trigger.revives && creature.hp.current <= 0) {
       events.push(

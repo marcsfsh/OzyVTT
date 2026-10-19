@@ -210,7 +210,9 @@ function goAhead(
       ability: parked.ability,
       ...(parked.areaPlaced ? { areaPlaced: true } : {}),
       ...(parked.holdKey !== null ? { holdKey: parked.holdKey } : {}),
-      ...(parked.shaping ? { shaping: parked.shaping } : {})
+      ...(parked.shaping ? { shaping: parked.shaping } : {}),
+      ...(parked.ready ? { ready: true } : {}),
+      ...(parked.beginsLongCast ? { longCastBegins: true } : {})
     },
     {
       random: deps.random,
@@ -226,7 +228,9 @@ function goAhead(
       ...(deps.pushToken ? { pushToken: deps.pushToken } : {})
     }
   );
-  // "If that spell was cast with a spell slot": spent only now that it went ahead, and it is this turn's one slot.
+  // "If that spell was cast with a spell slot": spent only now that it went ahead, and it is this turn's one slot. A
+  // casting that only begins spends them on its last turn.
+  if (parked.beginsLongCast) return { resolution, appliedDamage: 0 };
   if (parked.slot) {
     spendSlot(caster, parked.slot);
     const casters = state.combat.turn.spellSlotCasters ?? [];

@@ -66,7 +66,8 @@ export const alliesByKind = (mover: MapActor, occupant: MapActor) => {
  * would be barred, as the server's movement reply says (`passesCreatures`, `swarmIds`).
  * With dynamic vision on, the walls the view has bar the way as the server's do. A spell's area that halves the
  * mover's Speed (Spirit Guardians) or changes the ground (Web's Difficult Terrain, Plant Growth's 4 feet for every
- * foot) is charged by the server alone.
+ * foot, Gust of Wind's Line toward its caster) is charged as the server's movement reply says (`areaGround`), for the
+ * areas the asker can see.
  */
 export function previewMove(
   input: Readonly<{
@@ -104,6 +105,8 @@ export function previewMove(
     passesCreatures?: boolean;
     /** The swarms on the map, whose spaces any creature may cross (the movement reply's). */
     swarmIds?: readonly string[];
+    /** The ground the spell areas change for the mover (the movement reply's). */
+    areaGround?: ActorMovementReply["areaGround"];
   }>
 ): MovePreview | null {
   const { calibration, size, terrain, tokens, actorsById, moverId } = input;
@@ -162,6 +165,19 @@ export function previewMove(
     b: imageToGridPreview(calibration, wall.b)
   }));
   const crosses = wallCrossing(gridWalls);
+  // The spell areas' ground, on the ground: a mover off it passes over, as the server charges it.
+  const cellKey = (cell: Readonly<{ column: number; row: number }>) => `${cell.column},${cell.row}`;
+  const ground = input.areaGround;
+  const areaDifficult = new Set(lowFeet <= 0 ? (ground?.difficult ?? []).map(cellKey) : []);
+  const halved = new Set([
+    ...(ground?.halved ?? []).map(cellKey),
+    ...(lowFeet <= 0 ? (ground?.costlyGround ?? []).map(cellKey) : [])
+  ]);
+  const toward = (ground?.toward ?? []).map((entry) => ({
+    caster: entry.caster,
+    cells: new Set(entry.cells.map(cellKey))
+  }));
+  const apart = (point: Point, caster: Point) => Math.hypot(point.x - caster.x, point.y - caster.y);
   const passesWalls = input.throughWalls === true || input.throughWallsFree === true;
   const path = movementPath({
     from,
@@ -169,7 +185,24 @@ export function previewMove(
     sizeCells,
     isDifficult: (column, row) =>
       input.ignoresDifficult !== true &&
-      (difficultCells.has(`${column},${row}`) || (lowFeet <= 0 && pointInRects(center(column, row), terrain))),
+      (difficultCells.has(`${column},${row}`) ||
+        areaDifficult.has(`${column},${row}`) ||
+        (lowFeet <= 0 && pointInRects(center(column, row), terrain))),
+    ...(halved.size > 0 ? { isHalved: (column: number, row: number) => halved.has(`${column},${row}`) } : {}),
+    // Gust of Wind: a step closer to the Line's caster, from or into the Line, costs double.
+    ...(toward.length > 0
+      ? {
+          isStepCostly: (
+            stepFrom: Readonly<{ column: number; row: number }>,
+            stepTo: Readonly<{ column: number; row: number }>
+          ) =>
+            toward.some(
+              (entry) =>
+                (entry.cells.has(cellKey(stepFrom)) || entry.cells.has(cellKey(stepTo))) &&
+                apart(centerOf(stepTo), entry.caster) < apart(centerOf(stepFrom), entry.caster) - 0.5
+            )
+        }
+      : {}),
     isOpen: (column, row) => {
       if (closedCells.has(`${column},${row}`)) return false;
       const point = center(column, row);

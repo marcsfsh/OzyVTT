@@ -437,18 +437,18 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       bars: { way: "both", except: ["construct", "undead"], reach: true }
     })
   ],
-  // "While in the aura, you and your allies have Resistance to Necrotic damage", and "if an ally with 0 Hit Points
-  // starts its turn in the aura, that ally regains 1 Hit Point."
+  // "While in the aura, you and your allies have Resistance to Necrotic damage, and your Hit Point maximums can't be
+  // reduced", and "if an ally with 0 Hit Points starts its turn in the aura, that ally regains 1 Hit Point."
   "aura-of-life": [
     lasting(
       "aura",
-      "You and your allies in the aura have Resistance to Necrotic damage; an ally at 0 Hit Points that starts its turn there regains 1 Hit Point.",
+      "You and your allies in the aura have Resistance to Necrotic damage, and your Hit Point maximums can't be reduced; an ally at 0 Hit Points that starts its turn there regains 1 Hit Point.",
       {
         on: ["start-turn"],
         around: "caster",
         feet: 30,
         affects: "allies",
-        holds: { modifiers: [{ type: "damage-resistance", damageTypes: ["necrotic"] }] },
+        holds: { modifiers: [{ type: "damage-resistance", damageTypes: ["necrotic"] }], keepsMaximum: true },
         revives: 1
       }
     )
@@ -620,7 +620,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: "At the end of each of your turns, each creature on the ground in the area makes the save: Prone and its Concentration broken on a failure. The ground is Difficult Terrain.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["prone"], breaksConcentration: true },
       damage: [],
-      zone: { on: ["caster-turn-end"], terrain: DIFFICULT }
+      zone: { on: ["caster-turn-end"], terrain: DIFFICULT, grounded: true }
     }
   ],
   // "For the duration, these plants turn the ground in the area into Difficult Terrain."
@@ -682,6 +682,28 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [{ formula: "2d6", type: "fire" }],
       area: { shape: "sphere", sizeFeet: 5, widthFeet: null },
       movesArea: { feet: 30 }
+    }
+  ],
+  // "A creature that ends its turn in the Line must make the same save. Any creature in the Line must spend 2 feet of
+  // movement for every 1 foot it moves when moving closer to you", and "As a Bonus Action on your later turns, you can
+  // change the direction in which the Line blasts from you."
+  "gust-of-wind": [
+    {
+      name: "gust",
+      activation: "other",
+      when: "A creature that ends its turn in the Line makes the save, and a failure pushes it 15 feet away from you. Moving closer to you in the Line costs 2 feet for every foot.",
+      save: { ability: "str", successDamage: "none", failureConditions: [], failurePush: { feet: 15 } },
+      damage: [],
+      zone: { on: ["end-turn"], towardCaster: true }
+    },
+    {
+      name: "turn",
+      activation: "bonus-action",
+      when: "As a Bonus Action on your later turns, you point the Line another way from you.",
+      laterTurnsOnly: true,
+      damage: [],
+      area: { shape: "line", sizeFeet: 60, widthFeet: 10 },
+      movesArea: { feet: 60, fromCaster: true }
     }
   ],
   grease: [
@@ -899,11 +921,11 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       }
     })
   ],
-  // "Creatures have the Deafened condition while entirely inside it."
+  // "Creatures have the Deafened condition while entirely inside it" and "Immunity to Thunder damage".
   silence: [
-    lasting("aura", "A creature inside the Sphere has the Deafened condition.", {
+    lasting("aura", "A creature inside the Sphere has the Deafened condition and Immunity to Thunder damage.", {
       on: [],
-      holds: { conditions: ["deafened"] }
+      holds: { modifiers: [{ type: "damage-immunity", damageTypes: ["thunder"] }], conditions: ["deafened"] }
     })
   ],
   "sleet-storm": [
@@ -2399,6 +2421,10 @@ const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   "conjure-elemental": { shape: "sphere", sizeFeet: 10, widthFeet: null },
   // "A 100-foot-radius circle centered on that point."
   earthquake: { shape: "cylinder", sizeFeet: 100, widthFeet: null },
+  // "Up to ten 10-foot Cubes, which you arrange as you like. Each Cube must be contiguous with at least one other Cube."
+  "fire-storm": { shape: "cube", sizeFeet: 10, widthFeet: null, count: 10, contiguous: true },
+  // "Four different points ... Each creature in a 40-foot-radius Sphere centered on each of those points."
+  "meteor-swarm": { shape: "sphere", sizeFeet: 40, widthFeet: null, count: 4 },
   // "Up to 40,000 square feet of floor space": a 200-foot square.
   forbiddance: { shape: "cube", sizeFeet: 200, widthFeet: null },
   // The hound and the 5 feet it bites in.

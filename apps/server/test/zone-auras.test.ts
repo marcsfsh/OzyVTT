@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { GameState } from "@vtt/domain";
-import { endEffect, type EffectNarration } from "../src/effects.js";
+import { endEffect, makeEffect, type EffectNarration } from "../src/effects.js";
 import { nextInitiativeTurn } from "../src/encounter.js";
+import { applyDamageDetailed } from "../src/hit-points.js";
+import { afterDays } from "../src/rest-triggers.js";
 import { settleZoneAuras } from "../src/zone-auras.js";
 import { ALLY, build, clericInput, druidInput, fight, FOE, FOE2, HERO } from "./spell-casters.js";
 import { carry, cell, clericAt, drawArea, place, turnDeps, zoneDeps } from "./zone-fixtures.js";
 
 // SRD 5.2.1 spells whose areas give the creatures in them something while they stand there: Holy Aura's Advantage on
 // saving throws and the Disadvantage on attack rolls against them, Aura of Life's Resistance to Necrotic damage and its
-// 1 Hit Point, Pass without Trace's +10 to Stealth checks, and Silence's Deafened.
+// 1 Hit Point and the Hit Point maximum it keeps, Pass without Trace's +10 to Stealth checks, and Silence's Deafened
+// and Immunity to Thunder damage.
 
 const CAST = "64000000-0000-4000-8000-000000000001";
 const auraOf = (state: GameState, actorId: string) =>
@@ -101,6 +104,54 @@ describe("Aura of Life", () => {
     expect(events.map((event) => event.text)).toContain("Bran regains 1 Hit Point in Aura of Life.");
     expect(ally.hp.current).toBe(1);
   });
+
+  it("keeps the Hit Point maximum of a creature in the aura from dropping, and lets it drop outside", () => {
+    const caster = fight(cleric, { ally: true });
+    place(caster.state, { [HERO]: cell(10, 10), [ALLY]: cell(14, 10), [FOE]: cell(30, 30), [FOE2]: cell(40, 40) });
+    befriend(caster.state);
+    caster.resolve("spell-aura-of-life", { targetIds: [], commandId: CAST });
+    settleZoneAuras(caster.state, zoneDeps());
+    const ally = caster.state.actors.find((actor) => actor.id === ALLY)!;
+    const maximum = ally.hp.maximum;
+    const drain = () =>
+      applyDamageDetailed(
+        caster.state,
+        ALLY,
+        { amount: 6, parts: [{ amount: 6, type: "necrotic" }], drain: { reducesMaximum: true } },
+        { role: "gm" },
+        { resolveDefinition: () => undefined, catalog: zoneDeps().catalog }
+      );
+    expect(drain().events.map((event) => event.text)).toContain(
+      "Bran's Hit Point maximum doesn't drop (Aura of Life)."
+    );
+    expect(ally.hp.maximum).toBe(maximum);
+    // A curse's daily loss (a mummy's Rotting Fist) takes nothing either.
+    ally.effects.push(
+      makeEffect({
+        id: "curse",
+        name: "Mummy Rot",
+        tags: ["curse"],
+        startedRound: 1,
+        duration: { type: "manual" },
+        atRest: { at: "day", maximumLoss: "3d6", holdsMaximum: true }
+      })
+    );
+    const days = afterDays(caster.state, new Set([ALLY]), 0, 24 * 60, {
+      random: () => 4,
+      resolveDefinition: () => undefined
+    });
+    expect(days.map((event) => event.text)).toContain("Bran's Hit Point maximum doesn't drop (Aura of Life).");
+    expect(ally.hp.maximum).toBe(maximum);
+    moveTo(caster.state, ALLY, [40, 10]);
+    settleZoneAuras(caster.state, zoneDeps());
+    drain();
+    expect(ally.hp.maximum).toBe(maximum - 6);
+    afterDays(caster.state, new Set([ALLY]), 24 * 60, 2 * 24 * 60, {
+      random: () => 4,
+      resolveDefinition: () => undefined
+    });
+    expect(ally.hp.maximum).toBe(maximum - 6 - 12);
+  });
 });
 
 describe("Pass without Trace and Silence", () => {
@@ -128,5 +179,23 @@ describe("Pass without Trace and Silence", () => {
     moveTo(caster.state, FOE, [30, 10]);
     settleZoneAuras(caster.state, zoneDeps());
     expect(goblin.conditions.map((condition) => condition.id)).not.toContain("deafened");
+  });
+
+  it("Silence: a creature inside the Sphere takes no Thunder damage", () => {
+    const caster = fight(build(clericInput(["silence"])));
+    place(caster.state, { [HERO]: cell(0, 0), [FOE]: cell(10, 10), [FOE2]: cell(40, 40) });
+    caster.resolve("spell-silence", { targetIds: [], commandId: CAST, areaPlaced: true });
+    drawArea(caster.state, CAST, [10, 10], 4);
+    settleZoneAuras(caster.state, zoneDeps());
+    const thunder = (actorId: string) =>
+      applyDamageDetailed(
+        caster.state,
+        actorId,
+        { amount: 8, parts: [{ amount: 8, type: "thunder" }] },
+        { role: "gm" },
+        { resolveDefinition: () => undefined, catalog: zoneDeps().catalog }
+      ).application.totalApplied;
+    expect(thunder(FOE)).toBe(0);
+    expect(thunder(FOE2)).toBe(8);
   });
 });

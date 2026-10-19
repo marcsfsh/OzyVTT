@@ -11,7 +11,6 @@ import { holdsFeature } from "../class-features.js";
 import { endEffect } from "../effects.js";
 import { abilityModifier, endedEffect, recordRoll, type ResolveContext } from "./context.js";
 import { declaredBeforeRoll } from "./hit-riders.js";
-import { empowered } from "./metamagic.js";
 
 /** 2024 crit rule: double every dice term (modifiers once); `extraFirstTermDice` adds Savage Attacks dice. */
 export function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0): DiceExpression {
@@ -102,8 +101,7 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
           input.overchannel === true ? (sides: number) => sides : deps.random
         );
         recordRoll(ctx, thrown, "damage");
-        const rolled = empowered(ctx, thrown);
-        damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
+        damage.push({ formula: thrown.expression.source, type: part.type, total: thrown.total });
         ctx.dartTargetIds.push(targetId);
       }
     }
@@ -127,7 +125,6 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
       recordRoll(ctx, again, "damage", "Savage Attacker");
       if (again.total > rolled.total) rolled = again;
     }
-    rolled = empowered(ctx, rolled);
     damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
   });
 }
@@ -171,7 +168,8 @@ function savageAttack(ctx: ResolveContext): boolean {
     return false;
   }
   const { state, attacker } = ctx;
-  if (state.combat.active) {
+  // A look at the damage spends nothing; the confirm that deals it spends the turn's use.
+  if (state.combat.active && ctx.input.commit !== false) {
     const key = `${attacker.id}:${SAVAGE_ATTACKER}`;
     state.combat = {
       ...state.combat,
@@ -200,9 +198,8 @@ export function potentCantrip(ctx: Pick<ResolveContext, "action" | "deps">): boo
 
 function halfOnAMiss(ctx: ResolveContext, parts: ResolveContext["action"]["damage"]): void {
   for (const part of parts) {
-    const thrown = resolveDice(parseDiceFormula(part.formula), ctx.deps.random);
-    recordRoll(ctx, thrown, "damage");
-    const rolled = empowered(ctx, thrown);
+    const rolled = resolveDice(parseDiceFormula(part.formula), ctx.deps.random);
+    recordRoll(ctx, rolled, "damage");
     const amount = Math.floor(rolled.total / 2);
     if (amount > 0) ctx.bonusDamage.push({ amount, type: part.type, source: `${ctx.action.name} (miss)` });
   }

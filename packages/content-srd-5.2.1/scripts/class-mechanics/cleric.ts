@@ -35,8 +35,8 @@ export const cleric: ClassMechanicsModule = {
 
     /**
      * Gives the existing pool the SRD's Magic action activation (a synthesised action would be "other").
-     * Choosing the spell happens at use time, so it is not a build-time `choice`; Greater Divine
-     * Intervention's 2d4 Long Rest recharge is prose.
+     * Choosing the spell happens at use time, so it is not a build-time `choice`: the server mints a cast for each
+     * spell it may cast, on this pool (`divine-intervention.ts`).
      */
     "divine-intervention": {
       actions: [

@@ -31,6 +31,12 @@ const actorName = (state: GameState, actorId: string | null) =>
   state.actors.find((actor) => actor.id === actorId)?.name ?? "That creature";
 
 /** A player's slots and End Turn belong to their own character's turn. */
+/** Whether the initiator may end the turn: the GM, or the player whose claimed character holds it. */
+export function ownsTurn(state: GameState, initiator: Initiator): boolean {
+  const turnActorId = state.combat.turnActorId;
+  return state.combat.active && turnActorId !== null && canInitiateForActor(initiator, state, turnActorId, "track").ok;
+}
+
 function requireOwnTurn(state: GameState, initiator: Initiator) {
   const turnActorId = state.combat.turnActorId;
   if (turnActorId === null || !canInitiateForActor(initiator, state, turnActorId, "track").ok)

@@ -112,6 +112,10 @@ export const InitiativeRollSelfSchema = z
     actorId: z.uuid(),
     natural: z.number().int().min(1).max(20).optional(),
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
+    /** Reroll the initiative die just thrown (SRD Heroic Inspiration), before the character's first turn: a player
+     *  spends Heroic Inspiration to reroll one die, the GM rerolls freely. With `natural`, the face a physical reroll
+     *  shows, for a die that was typed. */
+    reroll: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -455,6 +459,18 @@ export const ActionResolveSchema = z
       .object({ shape: AnnotationShapeKindSchema, origin: AnnotationPointSchema, target: AnnotationPointSchema })
       .strict()
       .optional(),
+    /** Several areas for an action that places more than one (Fire Storm's Cubes, Meteor Swarm's Spheres), each placed
+     *  as `template` is: up to the area's `count`, each within the spell's range, touching another where the area says
+     *  so. A creature under more than one is caught once. */
+    templates: z
+      .array(
+        z
+          .object({ shape: AnnotationShapeKindSchema, origin: AnnotationPointSchema, target: AnnotationPointSchema })
+          .strict()
+      )
+      .min(1)
+      .max(10)
+      .optional(),
     conditionId: z
       .string()
       .regex(/^[a-z0-9-]+$/)
@@ -503,6 +519,19 @@ export const ActionResolveSchema = z
     /** With `commit: false`, answer the held attack roll with one of the preview's `answers` (Peerless Skill, Stroke of
      *  Luck), which then counts in every later look and the confirm. */
     answer: RollAnswerChoiceSchema.optional(),
+    /** With `commit: false`, roll the damage as well and hold its dice (SRD Empowered Spell, Heroic Inspiration: "after
+     *  seeing the roll"): another look shows the same dice, and the confirm deals them. The extras a hit carries
+     *  (`hitOptions`) roll at the confirm. */
+    damageLook: z.boolean().optional(),
+    /** With `damageLook`, answer the held damage with one of its `heldDamage.answers`: reroll the dice at these
+     *  positions in `heldDamage.dice`. */
+    damageAnswer: z
+      .object({
+        id: z.enum(["empowered-spell", "heroic-inspiration"]),
+        dice: z.array(z.number().int().min(0).max(199)).min(1).max(20)
+      })
+      .strict()
+      .optional(),
     /** The skill a check action is made with: Influence (Deception, Intimidation, Performance, Persuasion or Animal
      *  Handling), Search (Insight, Medicine, Perception or Survival) or Study (Arcana, History, Investigation, Nature or
      *  Religion). */
@@ -586,6 +615,12 @@ export const ActionResolveSchema = z
   .refine((payload) => payload.targetIds === undefined || payload.template === undefined, {
     error: "Provide explicit targets or an area template, and only one of the two."
   })
+  .refine(
+    (payload) => payload.templates === undefined || (payload.template === undefined && payload.targetIds === undefined),
+    {
+      error: "Provide several area templates, or one template or explicit targets."
+    }
+  )
   .refine((payload) => payload.attackNatural === undefined || payload.attackTotal === undefined, {
     error: "Supply a natural d20 or a final total, and only one of the two."
   })
@@ -660,6 +695,8 @@ export const ReactionAnswerSchema = z
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     /** The extras the swing's previewed hit offered that the answerer adds to it (Sneak Attack), sent with the confirm. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
+    /** Redirect Attack: the ally the attack turns to, one of the prompt's `redirectChoices`. */
+    redirectTo: z.uuid().optional(),
     /** The spell slot a reaction spell is cast with (Shield, Hellish Rebuke, Counterspell): absent, its own level or the
      *  lowest above it with a slot left. A higher slot upcasts it as a cast on the caster's turn does. */
     slotLevel: z.number().int().min(1).max(9).optional(),
@@ -954,6 +991,8 @@ export const RollCallAnswerSchema = z
     callId: z.uuid(),
     actorId: z.uuid(),
     face: z.number().int().min(1).max(20).optional(),
+    /** The situations the check fits, of those the call's card offers for the character (a Book's topic). */
+    situations: z.array(z.string().trim().min(3).max(80)).max(6).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1006,6 +1045,16 @@ export const RulesAskSchema = z
     commandId: z.uuid(),
     type: AskableCommandSchema,
     payload: z.unknown(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** The controller of the creature whose turn it is puts what happens at once as the turn starts or ends in order:
+ *  every step's key once, first to last. */
+export const TurnOrderSchema = z
+  .object({
+    commandId: z.uuid(),
+    stepsId: z.uuid(),
+    order: z.array(z.string().min(1).max(200)).min(2).max(20),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

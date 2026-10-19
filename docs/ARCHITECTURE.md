@@ -272,7 +272,8 @@ of a hidden thing. When in doubt, leave it out.
   vision is on and with the conditions and Blindsight, Truesight and See Invisibility by distance
   while it is off: an attack's unseen Advantage and Disadvantage and Invisible, Cover from walls
   and creatures between (`cover.ts`), an area that leaves out what its origin can't reach
-  (`area-targeting.ts`), Hide's hiding place, Search finding a hidden creature, Frightened's line
+  (`area-targeting.ts`), Hide's hiding place and the Passive Perception it tells the GM meets it (5
+  less where the hider is Lightly Obscured), Search finding a hidden creature, Frightened's line
   of sight and its refused approach (`movement-rules.ts`), Dodge and other riders that name who
   sees whom (`sees-other`, `seen-by-other`, `other-lacks-sense`), Blinded and Heavily Obscured
   checks, a save that needs its source seen (a gaze, a pattern), and the traits and features that
@@ -284,8 +285,10 @@ of a hidden thing. When in doubt, leave it out.
   `@vtt/rules-5e`). How a token travels (walking, a special speed, jumping, teleporting, moved by force)
   rides on `token.move`, each speed with its own budget (`speed.ts`), and opportunity attacks are
   read along the whole path (`movement-rules.ts`). A move that provokes waits at the last point of its
-  way still in reach (`combat.heldMove`) until its prompts are answered; the settle step then finishes
-  it, or leaves a mover the attack dropped, Grappled or knocked Prone where it stood and gives back the
+  way still in reach (`combat.heldMove`) until its prompts are answered, and a move that enters an area whose
+  save, failed, stops its mover (Caltrops, Web, Ball Bearings) waits where it entered until the save is answered
+  (`zone-stops.ts`); the settle step then finishes it along the rest of its way, where the areas act on it in turn,
+  or leaves a mover that was dropped, knocked Prone or left with a Speed of 0 where it stood and gives back the
   rest of its movement (`held-moves.ts`). The map's drag preview runs the same function,
   and a mirror test checks the two agree. The `actor:movement` reply tells the preview whether the
   mover shares spaces (Air Form, a swarm) and which creatures' spaces anyone may enter (a swarm's, a
@@ -295,10 +298,13 @@ of a hidden thing. When in doubt, leave it out.
   goes through creatures (a cube's Engulf) keeps to the line drawn and targets only those it entered. Players and the table screen get only the terrain the
   fog reveals, and with vision on only what the party has seen. A spell's area changes the ground while it
   lasts (`zone-ground.ts`): Web, Entangle or Ice Storm's hail make its cells Difficult Terrain, Plant Growth
-  and Wall of Thorns cost 4 feet for every foot, Conjure Minor Elementals' only for the caster's enemies, and
+  and Wall of Thorns cost 4 feet for every foot, Conjure Minor Elementals' only for the caster's enemies,
+  Gust of Wind's Line 2 feet for every foot a creature moves closer to its caster (`costlyStep`), and
   a creature whose trait frees it from that kind of ground (Web Walker, Ice Walk) pays nothing extra. The
-  server alone charges it, on the ground (a mover off the ground passes over it as over painted terrain); the
-  area itself is on the map.
+  server charges it on the ground (a mover off the ground passes over it as over painted terrain), and the
+  `actor:movement` reply gives the preview the cells it changes for the mover, of the areas the asker can see
+  (`areaGround`, `zone-preview.ts`); the area itself is on the map. A cast's template grows with a higher slot as
+  the availability row says (`areaPerSlot`), so the drawn template is the size the server places.
 - Height (`altitude.ts`, `@vtt/rules-5e` `altitude.ts`): a token's `altitudeFeet` is how far its lowest
   point is above the ground, and `airborne` says what holds it up in the air (flying, or a
   levitation); a creature on a ledge or a wall it climbs is up without being airborne. A space is as
@@ -309,7 +315,9 @@ of a hidden thing. When in doubt, leave it out.
   for the height it gains or loses the same way, a mover off the ground passes over painted terrain
   and over creatures wholly below it, and only flying, climbing, jumping, teleporting or a forced
   move changes height (`movement.altitude`). An area reaches only as high as its shape does
-  (`withinAreaHeight`). The GM sets any creature's height free of movement (`token.set-altitude`).
+  (`withinAreaHeight`), and so does a spell's lasting area as creatures meet it: a Sphere its radius above and below,
+  a Cube its side, a Cylinder its printed height, an Emanation its distance in every direction (`insideTest` in
+  `spell-zones.ts`). An area that acts only on the ground (Earthquake's) spares a creature in the air. The GM sets any creature's height free of movement (`token.set-altitude`).
   Height is as public as position, so it travels with the token in every projection.
 - Falling (`falling.ts`): after every command the pipeline lands whoever can no longer stay in the
   air (`settleFalls`, its own commit): a flier that is Prone, Incapacitated or at a Fly Speed of 0
@@ -391,7 +399,11 @@ write goes through `applyCondition` in `effects.ts`, which honours innate and it
 immunities and runs what gaining a condition sets off (an Incapacitated creature drops its
 Concentration and its grapples). In a fight, effects count down at turn start and turn end; the
 start of a turn deals any ongoing damage, and the end opens any repeat saves
-(`turn-boundaries.ts`). What a stat block's traits do, read from their text when the bundle is built
+(`turn-boundaries.ts`). Two or more things that change Hit Points at the same moment (ongoing damage,
+Temporary Hit Points or Hit Points regained, a trait that burns or regenerates) wait in `combat.turnSteps`
+for the creature's controller to order them, the player's own or the GM's (`simultaneous-effects.ts`,
+the `turn.order` command): a turn's start holds that player's actions and moves until the answer, and a
+turn's end keeps the turn until it. What a stat block's traits do, read from their text when the bundle is built
 (`ActorDefinition.traitMechanics`), runs at those boundaries and as damage lands: Regeneration, auras,
 Undead Fortitude, a Death Burst (`trait-turns.ts`, `statblock-traits.ts`). A stat block's spells
 (`castsSpells`) become cast actions as the catalog loads (`monster-spells.ts`), which the stat block prints inside the
@@ -416,15 +428,21 @@ Tiny Hut at its cast pass its dome. A spell's area can cover the creatures behin
 Wind Wall misses. A sphere of force around one creature (Resilient Sphere, Bead of Force) lets no attack,
 spell or area across it either way, and Disintegrate aimed at it breaks it (`enclosures.ts`). A teleport out
 of a Forcecage takes its Charisma save first (`forcecage.ts`). What an area gives the
-creatures in it (Holy Aura's Advantage on saves, Pass without Trace's +10 to Stealth, Silence's Deafened)
-is an effect each one holds while it stands inside (`zone-auras.ts`): the pipeline settles who holds it
+creatures in it (Holy Aura's Advantage on saves, Pass without Trace's +10 to Stealth, Silence's Deafened
+and Thunder immunity, Aura of Life's Hit Point maximum that can't drop) is an effect each one holds while
+it stands inside (`zone-auras.ts`): the pipeline settles who holds it
 after every command, as its own write when anything changed. A later action that moves a spell's area
 (Moonbeam's Magic action, Flaming Sphere's ram) takes a template like a cast: the area moves there if that
 is within the spell's reach of where it stood, its save falls on the creatures the area moves onto, and no
-new shape is drawn (`zone-moves.ts`). A cloud that drifts (Cloudkill) moves straight away from its caster as
-the caster's turn starts. A cast's template grows with its slot where the spell says so (Fog Cloud), an
+new shape is drawn (`zone-moves.ts`). An area that blasts from its caster (Gust of Wind's Line) is turned
+instead: its new template must start at the caster. A cloud that drifts (Cloudkill) moves straight away from its
+caster as the caster's turn starts. A cast's template grows with its slot where the spell says so (Fog Cloud), an
 item's cast may place its own area (Cloak of Arachnida's doubled Web), and an Emanation that stays where
 its caster stood (Globe of Invulnerability) keeps lower spells cast from outside off the creatures in it.
+A use that places several areas (Fire Storm's ten Cubes, Meteor Swarm's four Spheres: `ActionArea.count`) takes them as
+`templates`, each checked for its range, a point of its own and, where the area says so, touching another; a creature
+under more than one is caught once (`multi-templates.ts`).
+A creature pushed or pulled by force meets the areas on its straight way as any mover does (`pushed-through.ts`).
 An item's action with a `zone` (spread Caltrops, a set Hunting Trap) rolls nothing as it is used: it opens
 a zone that carries the action's own save and damage (`SpellZone.rule`), which stays until the GM ends it
 or it goes off once.
@@ -574,12 +592,17 @@ told to the table as cast (`cast-narration.ts`). Before anything is spent the ec
 material the content build lists on the spell) and its targets (`resolution/spell-targets.ts`: the count the spell
 names, its creature type, sight with dynamic vision on, range, and for creatures of the caster's choice in an area,
 the area). A cast with components waits while a creature that sees it may answer with Counterspell
-(`resolution/counter.ts`, `counter-answers.ts`), and a reaction spell's prompt lets its caster pick the slot. A
+(`resolution/counter.ts`, `counter-answers.ts`), and a reaction spell's prompt lets its caster pick the slot. A Spell
+Scroll's cast is seen (a wand's needs no components and isn't), a spell readied with the Ready action is seen as it is
+cast and not when it is let go, and a long casting as it begins. A
 creature's own spell of a minute or more takes the action on each of its turns in a fight and resolves on the last
-(`resolution/long-casting.ts`). Outside a fight a creature's own cast, an item's included, resolves through the same
-path with no turn to spend, and a long one moves the game clock by its whole hours. An item's cast takes the spell's
-own casting time (a Ring of Jumping's Jump is a Bonus Action, a reaction spell answers its trigger) unless the item
-prints another, and a printed bonus to hit stays the item's (Circlet of Blasting's +5).
+(`resolution/long-casting.ts`). A Cleric's Divine Intervention casts any Cleric spell of level 5 or lower (Wish with
+Greater Divine Intervention) as an action of its own, minted in the effective list (`divine-intervention.ts`) and
+picked under the feature's row on the sheet: cast at once, with no slot and no Material components. Outside a fight a
+creature's own cast, an item's included, resolves through the same path with no turn to spend, and a long one moves
+the game clock by its whole hours. An item's cast takes the spell's own casting time (a Ring of Jumping's Jump is a
+Bonus Action, a reaction spell answers its trigger) unless the item prints another, and a printed bonus to hit stays
+the item's (Circlet of Blasting's +5).
 
 A player only spends spell slots (`character.set-slot` refuses a raise from a player); everything that gives a
 resource back is its own checked command. `conversions.ts` is one table of the features that turn one resource
@@ -634,13 +657,21 @@ derived sheet lists each situation (`check-situations.ts`), the sheet offers it 
 that names it gets the rider, its words added to the roll's name for the GM to judge. A die a
 player sees before it counts (a previewed attack, save or death save) is held on the server
 (`held-rolls.ts`, ADR-0012): a second look shows the same die, and a reroll needs Heroic Inspiration or an
-answer. An answer is data on an action, a grant or an effect (`RollAnswerSchema`): what a roll may take after it
+answer. An initiative die is held as it is thrown, so Heroic Inspiration may reroll it before the character's first
+turn (`initiative-reroll.ts`). A damage roll may be looked at before it counts too (`damageLook`): the damage steps
+throw through a tape that holds the dice in order, Empowered Spell or Heroic Inspiration rerolls the dice the roller
+picks, and the confirm reads the held dice back, so it deals what was looked at (`resolution/held-damage.ts`). The
+extras a hit carries roll at the confirm. An answer is data on an action, a grant or an effect (`RollAnswerSchema`): what a roll may take after it
 is seen and before it counts (Bardic Inspiration's die, Indomitable's reroll, Stroke of Luck's 20).
 `roll-answers.ts` offers the roller's own answers on the preview and applies the one picked to the held roll;
 another creature's answer (Cutting Words, Countercharm, Improve Fate) is a `roll-answer` reaction prompt, asked one
 creature at a time in turn order while the attack, save, check or damage waits at its roll. A hit's damage waits in
 the same way (`damage-window.ts`): another creature's answer to the damage roll, then the target's own reaction
 (Uncanny Dodge, Deflect Attacks, Stone's Endurance), and a failed save's damage waits for a reaction to taking damage.
+An attack can wait before its roll too, while a creature that may change its target answers (`attack-targeted`,
+`resolution/redirect.ts`): Redirect Attack hands it to an ally, the two swapping places, and an Arrow-Catching Shield's
+wielder takes it on itself. A guardian's ward (Shield Guardian's Protection) is an `attack-would-hit` prompt to the
+guardian for the creature that commands it, whose AC it raises.
 Players type die faces, never totals, and only while the table allows typed dice. On the client every roll prompt
 shares one set of controls (`RollControls.tsx`, with its answer buttons), and the GM's calls for a roll
 (`GameState.rollCalls`) reach each player as a card that follows them across the app (`RollCallPrompt.tsx`).

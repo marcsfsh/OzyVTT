@@ -18,6 +18,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { holdsFeature } from "./class-features.js";
 import { conditionLabel, exhaustionPenalty } from "./condition-rules.js";
 import { RAGING_TAG } from "./effects.js";
+import { toolHelp } from "./help-assist.js";
 import {
   checkRiderBonus,
   effectiveSkillTier,
@@ -382,6 +383,8 @@ function plainCheckPlan(
     effectiveSkillTier(definition, derivation, subject.skill) !== "none"
   )
     claims.advantage.push({ source: "tool-and-skill", label: "Skill and tool proficiency" });
+  const helped = subject.tool !== undefined ? toolHelp(actor, subject.tool) : undefined;
+  if (helped) claims.advantage.push({ source: "help", label: helped.name });
   const finding = context.finding;
   if (
     finding &&

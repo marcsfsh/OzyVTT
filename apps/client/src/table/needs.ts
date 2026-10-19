@@ -1,11 +1,21 @@
-import type { GmActor, GmView, PendingDamage, PendingReaction, PendingRuleAsk, PendingSave } from "@vtt/domain";
+import type {
+  GmActor,
+  GmView,
+  PendingDamage,
+  PendingReaction,
+  PendingRuleAsk,
+  PendingSave,
+  TurnSteps
+} from "@vtt/domain";
 
 /**
- * Every decision the GM owes, in one queue: a held attack waiting on a reaction, a saving throw, a player's hit to
- * apply, a dying creature, a rules question, initiative still to roll and a rest someone asked for. A prompt a
+ * Every decision the GM owes, in one queue: what happens at once as a turn starts or ends, waiting for its order, a
+ * held attack waiting on a reaction, a saving throw, a player's hit to apply, a dying creature, a rules question,
+ * initiative still to roll and a rest someone asked for. A prompt a
  * player answers on their own device is listed as waiting on them, with a way for the GM to answer it instead.
  */
 export type NeedsItem =
+  | Readonly<{ kind: "order"; key: string; steps: TurnSteps; actor: GmActor; waiting: boolean }>
   | Readonly<{ kind: "reaction"; key: string; reaction: PendingReaction; actor: GmActor; waiting: boolean }>
   | Readonly<{ kind: "save"; key: string; save: PendingSave; actor: GmActor; waiting: boolean }>
   | Readonly<{ kind: "damage"; key: string; proposal: PendingDamage }>
@@ -33,6 +43,10 @@ export function needsItems(state: GmView): NeedsItem[] {
   const byId = new Map(state.actors.map((actor) => [actor.id, actor]));
   const inFight = new Set(state.combat.initiative.map((entry) => entry.actorId));
   const items: NeedsItem[] = [];
+  const steps = state.combat.turnSteps;
+  const ordering = steps ? byId.get(steps.actorId) : undefined;
+  if (steps && ordering)
+    items.push({ kind: "order", key: steps.id, steps, actor: ordering, waiting: answeredByPlayer(ordering) });
   for (const reaction of state.combat.pendingReactions) {
     const actor = byId.get(reaction.actorId);
     if (actor) items.push({ kind: "reaction", key: reaction.id, reaction, actor, waiting: answeredByPlayer(actor) });
@@ -79,6 +93,10 @@ export function damageWords(parts: ReadonlyArray<Readonly<{ amount: number; type
 /** The one line that names an item, for its card title and for announcing it. */
 export function needsTitle(item: NeedsItem, state: GmView): string {
   switch (item.kind) {
+    case "order": {
+      const what = `what happens as ${item.actor.name}'s turn ${item.steps.boundary === "start" ? "starts" : "ends"}`;
+      return item.waiting ? `Waiting on ${item.actor.name} · the order of ${what}` : `Put in order ${what}`;
+    }
     case "reaction":
       return item.waiting
         ? `Waiting on ${item.actor.name} · ${item.reaction.actionName}`

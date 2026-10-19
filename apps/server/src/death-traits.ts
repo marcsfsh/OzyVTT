@@ -201,6 +201,28 @@ export function deathTraitsAtTurnEnd(state: GameState, actorId: string, deps: Tr
   return events;
 }
 
+/** A hydra's heads growing back as its turn ends, when any died since its last turn: a step its controller orders
+ *  among the turn's others, since Fire damage landing first stops it. Null when it has nothing to grow. */
+export function headsAtTurnEnd(
+  state: GameState,
+  actorId: string,
+  deps: Pick<TraitDeps, "resolveDefinition">
+): Readonly<{ name: string; run: () => EffectNarration[] }> | null {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const heads = actor ? traitOf(definitionOf(actor, deps), "multiple-heads") : undefined;
+  if (!actor || !heads || (actor.actionUses[HEADS_LOST] ?? 0) === 0) return null;
+  if (headsOf(actor, heads) === 0 || actor.hp.current <= 0) return null;
+  return {
+    name: heads.name,
+    run: () => {
+      const now = state.actors.find((candidate) => candidate.id === actorId);
+      const events: EffectNarration[] = [];
+      if (now) growHeads(now, definitionOf(now, deps), events);
+      return events;
+    }
+  };
+}
+
 /** "At the end of each of its turns when it has at least one living head, the hydra grows two heads for each of its
  *  heads that died since its last turn, unless it has taken Fire damage since its last turn. The hydra regains 20 Hit
  *  Points when it grows new heads." */

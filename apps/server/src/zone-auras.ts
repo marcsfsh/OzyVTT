@@ -1,13 +1,14 @@
 import type { GameState } from "@vtt/domain";
 import type { EffectInstance } from "@vtt/schemas";
-import { addEffect, endEffectIfPresent, makeEffect } from "./effects.js";
+import { addEffect, endEffectIfPresent, KEEPS_MAXIMUM_TAG, makeEffect } from "./effects.js";
 import { zoneContentOf } from "./spell-zone-state.js";
 import { exposed, insideTest, liveZones, type ZoneDeps } from "./spell-zones.js";
 
 /**
  * What a spell's area gives the creatures standing in it (SRD 5.2.1 Holy Aura: "each creature of your choice in it has
  * Advantage on all saving throws, and other creatures have Disadvantage on attack rolls against them"; Pass without
- * Trace's +10 to Stealth checks; Silence's Deafened): each one it affects holds an effect while it is inside, read by
+ * Trace's +10 to Stealth checks; Silence's Deafened; Aura of Life's Hit Point maximum that can't be reduced): each one
+ * it affects holds an effect while it is inside, read by
  * every roll as any live effect is, and loses it as it leaves or the spell ends. Settled after every command, from
  * where the tokens and areas stand.
  */
@@ -40,12 +41,12 @@ function wanted(
     const caster = state.actors.find((actor) => actor.id === zone.casterId);
     for (const creature of exposed(state, zone, content.trigger, deps)) {
       const token = state.combat.tokens.find((candidate) => candidate.actorId === creature.id);
-      if (!token?.position || !inside(token.position, token.sizeCells)) continue;
+      if (!token?.position || !inside(token.position, token.sizeCells, token.altitudeFeet ?? 0)) continue;
       const id = auraId(zone.id, creature.id);
       const effect = makeEffect({
         id,
         name: content.name,
-        tags: [ZONE_AURA_TAG],
+        tags: [ZONE_AURA_TAG, ...(holds.keepsMaximum ? [KEEPS_MAXIMUM_TAG] : [])],
         sourceActorId: zone.casterId,
         sourceName: caster?.name ?? null,
         startedRound: state.combat.round,

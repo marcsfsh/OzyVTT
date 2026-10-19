@@ -7385,6 +7385,91 @@
             "ability"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "trigger": {
+              "type": "string",
+              "const": "targeted-by-attack"
+            },
+            "response": {
+              "type": "string",
+              "const": "redirect-to-ally"
+            },
+            "rangeFeet": {
+              "$ref": "#/$defs/__schema583"
+            },
+            "allySizes": {
+              "minItems": 1,
+              "maxItems": 6,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema69"
+              }
+            },
+            "swap": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "trigger",
+            "response"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "trigger": {
+              "type": "string",
+              "const": "other-targeted-by-attack"
+            },
+            "response": {
+              "type": "string",
+              "const": "become-target"
+            },
+            "rangeFeet": {
+              "$ref": "#/$defs/__schema583"
+            },
+            "ranged": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "trigger",
+            "response"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "trigger": {
+              "type": "string",
+              "const": "ward-hit-by-attack"
+            },
+            "response": {
+              "type": "string",
+              "const": "ward-ac-bonus"
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            },
+            "rangeFeet": {
+              "$ref": "#/$defs/__schema583"
+            }
+          },
+          "required": [
+            "trigger",
+            "response",
+            "amount"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -7485,6 +7570,20 @@
               "type": "null"
             }
           ]
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 10
+        },
+        "contiguous": {
+          "type": "boolean",
+          "const": true
+        },
+        "heightFeet": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
         }
       },
       "required": [
@@ -7686,6 +7785,10 @@
                 "$ref": "#/$defs/__schema176"
               }
             },
+            "keepsMaximum": {
+              "type": "boolean",
+              "const": true
+            },
             "struck": {
               "type": "object",
               "properties": {
@@ -7736,6 +7839,14 @@
           "maximum": 60
         },
         "stays": {
+          "type": "boolean",
+          "const": true
+        },
+        "grounded": {
+          "type": "boolean",
+          "const": true
+        },
+        "towardCaster": {
           "type": "boolean",
           "const": true
         },

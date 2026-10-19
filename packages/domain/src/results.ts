@@ -156,6 +156,25 @@ export type HitOptionChoice = Readonly<{
   slotLevel?: number;
   effects?: readonly string[];
 }>;
+/** A way the roller may answer its own damage roll after seeing it, sent back as `damageAnswer` with the dice it
+ *  picks: Empowered Spell rerolls up to `dice` of the spell's own dice, Heroic Inspiration one die of any. */
+export type DamageAnswerOffer = Readonly<{
+  id: "empowered-spell" | "heroic-inspiration";
+  name: string;
+  /** How many dice it may reroll. */
+  dice: number;
+  /** Only the action's own dice (`own` on the held dice), never a rider's. */
+  ownOnly: boolean;
+  /** What using it spends ("1 Sorcery Point", "Heroic Inspiration"), or null when it is free now. */
+  cost: string | null;
+}>;
+/** A damage roll looked at before it counts (`damageLook`): its dice in the order thrown, which the confirm deals, what
+ *  answered it, and what may still answer it. */
+export type HeldDamageLook = Readonly<{
+  dice: ReadonlyArray<Readonly<{ sides: number; face: number; own: boolean }>>;
+  answered: readonly RollAnswered[];
+  answers: readonly DamageAnswerOffer[];
+}>;
 /** The damage an action with no attack roll and no save owes one target (Magic Missile, a smite resolved alone). */
 export type DamageTarget = Readonly<{
   targetId: string;
@@ -228,6 +247,11 @@ export type ActionResolution = Readonly<{
   preview?: boolean;
   /** On a previewed hit, the extras the attacker may add when confirming (`hitOptions`). */
   hitOffers?: readonly HitOffer[];
+  /** On a previewed hit, the attacker may answer its damage roll after seeing it: a look (`damageLook`) rolls and holds
+   *  the damage first. */
+  damageLook?: "offered";
+  /** A look at the damage before it counts: the dice the confirm deals, and the answers they may still take. */
+  heldDamage?: HeldDamageLook;
   /** No attack roll and no save, but damage: what each target is owed, applied or proposed like a hit. A darts action
    *  (Magic Missile) owes each creature only what its own darts dealt. */
   damageTargets?: readonly DamageTarget[];
@@ -522,8 +546,11 @@ export const ActionAvailabilitySchema = z.strictObject({
     .describe(
       "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), and `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`)"
     ),
-  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple). */
-  checkSkills: z.array(z.strictObject({ id: z.string(), ability: AbilityIdSchema })).optional(),
+  /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple), and
+   *  the tools its user may help with through Help with a Check, which carry their name. */
+  checkSkills: z
+    .array(z.strictObject({ id: z.string(), ability: AbilityIdSchema, name: z.string().optional() }))
+    .optional(),
   /** The weapon mastery property this character uses with this swing (Graze on Borin's Greatsword): present only when
    *  the character chose the weapon's kind under Weapon Mastery. */
   mastery: z
@@ -541,6 +568,12 @@ export const ActionAvailabilitySchema = z.strictObject({
     ),
   /** The ways its caster may shape this spell's cast (Metamagic, Sculpt Spells), for the cast to offer. */
   shaping: CastShapingOffersSchema.optional(),
+  /** Its user may answer this action's damage roll after seeing it (Empowered Spell on a spell, Heroic Inspiration):
+   *  `action.resolve` with `commit: false` and `damageLook` rolls the damage and holds it for the answer. */
+  damageLook: z.literal(true).optional(),
+  /** Its area grows by `feet` for each slot level above `level`, the spell's own (Fog Cloud's radius by 20), so the
+   *  template drawn for a higher slot is the size the server places. */
+  areaPerSlot: z.strictObject({ feet: z.number().int().min(1), level: z.number().int().min(0).max(9) }).optional(),
   /** The forms a shape-shift may take now, for the user to pick (`action.resolve`'s `form`): Wild Shape's known forms,
    *  the bestiary's Beasts for Polymorph, a werewolf's printed forms with its true form. Wild Shape also lists the
    *  forms its user may learn, how many it knows and whether a Long Rest opened one to replace. */
@@ -908,7 +941,26 @@ export const ActorMovementReplySchema = z.strictObject({
    *  space still costs as Difficult Terrain. */
   passesCreatures: z.boolean().optional(),
   /** The swarms on the map the asker can see. Any creature may cross a swarm's space, as Difficult Terrain. */
-  swarmIds: z.array(z.uuid()).max(200).optional()
+  swarmIds: z.array(z.uuid()).max(200).optional(),
+  /** The ground the spell areas the asker can see change for this mover, in grid cells near it, as the server charges
+   *  it: Difficult Terrain (each cell), and where its footprint (named by its top-left cell) has its Speed halved,
+   *  costs double again on the ground (Plant Growth), or pays double for a step toward an area's caster (Gust of
+   *  Wind's Line, the caster's position in image pixels). */
+  areaGround: z
+    .strictObject({
+      difficult: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
+      halved: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
+      costlyGround: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000),
+      toward: z
+        .array(
+          z.strictObject({
+            caster: z.strictObject({ x: z.number(), y: z.number() }),
+            cells: z.array(z.strictObject({ column: z.number().int(), row: z.number().int() })).max(4000)
+          })
+        )
+        .max(10)
+    })
+    .optional()
 });
 export type ActorMovementReply = Wire<z.infer<typeof ActorMovementReplySchema>>;
 export type ActorMovementResult = { ok: boolean; message?: string } & Partial<ActorMovementReply>;

@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import { contentRoutes, gameRoutes, type ApiRoute } from "@vtt/api-contract/routes";
-import { ContentCompendiumRequestSchema, type GmView, type PlayerView } from "@vtt/domain";
+import { ContentCompendiumRequestSchema, type GmView, type PlayerView, type SpellZone } from "@vtt/domain";
 import { actionAvailability } from "../action-resolution.js";
 import { deriveActorSheet } from "../actor-derived.js";
 import { storedDefinition } from "../actor-roster.js";
@@ -34,6 +34,8 @@ import { flatPolygon } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
 import { movementStatus } from "../movement-rules.js";
 import { spaceSharingFor } from "../space-sharing.js";
+import { areaGroundFor } from "../zone-preview.js";
+import { visibleToPlayerAnnotation } from "../projections.js";
 import { previewScene } from "../scene-preview.js";
 import { nextLevelOf } from "../next-level.js";
 import { GameNotFoundError } from "./failures.js";
@@ -284,12 +286,39 @@ export const gameReads = [
       // The preview charges what the server will: a creature that shares spaces passes others, and anyone may cross a
       // swarm. A player hears only of swarms their characters can see.
       const hidden = initiator.role === "gm" ? () => false : kit.hiddenFor(initiator, state);
+      // The ground the spell areas change for the mover, of those the asker can see: a placed area by its template's
+      // visibility, one around its caster by the caster's.
+      const mapAssetId = state.combat.mapAssetId;
+      const calibration = mapAssetId
+        ? (kit.context.mapCatalog.get(mapAssetId)?.calibration?.calibration ?? null)
+        : null;
+      const sessionId = initiator.role === "player" ? initiator.sessionId : undefined;
+      const seen = (zone: SpellZone) => {
+        if (initiator.role === "gm") return true;
+        const annotation = zone.annotationId
+          ? state.combat.annotations.find((candidate) => candidate.id === zone.annotationId)
+          : undefined;
+        return annotation ? visibleToPlayerAnnotation(state, annotation, sessionId) : !hidden(zone.casterId);
+      };
+      const areaGround = calibration
+        ? areaGroundFor(
+            state,
+            actorId,
+            {
+              geometry: { width: 0, height: 0, calibration },
+              resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
+              catalog: kit.equipmentCatalog()
+            },
+            seen
+          )
+        : undefined;
       return {
         ...movementStatus(state, actorId, {
           resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
           catalog: kit.equipmentCatalog()
         }),
-        ...spaceSharingFor(state, actorId, (definitionId) => kit.resolveDefinition(definitionId), hidden)
+        ...spaceSharingFor(state, actorId, (definitionId) => kit.resolveDefinition(definitionId), hidden),
+        ...(areaGround ? { areaGround } : {})
       };
     }
   },
