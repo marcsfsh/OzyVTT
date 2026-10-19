@@ -440,6 +440,7 @@ export const actionCommands = [
             ...(request.itemId !== undefined ? { itemId: request.itemId } : {}),
             ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
             ...(request.mastery !== undefined ? { mastery: request.mastery } : {}),
+            ...(request.vitalityTo !== undefined ? { vitalityTo: request.vitalityTo } : {}),
             ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),
             ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),

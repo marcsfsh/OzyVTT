@@ -4558,6 +4558,15 @@ export const ActionSchema = z
       .describe(
         "When in its user's own turn it is taken: at the start, before moving or acting (turn-start), or as part of the Attack action (attack-action)"
       ),
+    /** Once it deals damage to a creature, its user gives itself or a creature it picks within `rangeFeet` this many
+     *  Temporary Hit Points, once a use (Improved Potent Spellcasting on a Cleric cantrip). */
+    vitality: z
+      .object({ rangeFeet: z.number().int().min(5).max(300), amount: z.number().int().min(1).max(100) })
+      .strict()
+      .optional()
+      .describe(
+        "Once it deals damage, its user gives itself or a creature it picks within rangeFeet this many Temporary Hit Points (Improved Potent Spellcasting)"
+      ),
     /** The action requires an active self effect carrying this tag (Frenzy requires "raging"). */
     requiresEffectTag: EffectTagSchema.optional().describe(
       'The action requires an active self effect carrying this tag (Frenzy requires "raging")'

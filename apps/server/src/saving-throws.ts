@@ -49,6 +49,7 @@ import {
 } from "./roll-answers.js";
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
 import { applyDamageDetailed, previewDamage, adjustableActor, healActor, killOutright } from "./hit-points.js";
+import { giveVitality } from "./resolution/vitality.js";
 import { openDamageWindow } from "./damage-window.js";
 import { applyHitPointBand, banishOnFailure, hitPointBandOf } from "./fatal-saves.js";
 import { regurgitate, swallowLands, SWALLOWED_TAG } from "./swallow.js";
@@ -1199,6 +1200,8 @@ export function answerSave(
     // Keep the whole application along with its total.
     application = outcome.application;
     events.push(...outcome.events);
+    // The cast's damage landed: its caster's pick gains the vitality (Improved Potent Spellcasting).
+    if (appliedDamage > 0 && pending.vitality) events.push(...giveVitality(state, pending.vitality));
     // A spell area that stops after so much damage counts it (Guardian of Faith).
     events.push(...countZoneDamage(state, pending.zoneId, appliedDamage, deps.catalog));
   }

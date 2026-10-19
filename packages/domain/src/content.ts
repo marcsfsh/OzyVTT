@@ -985,6 +985,11 @@ export type ContentActionSummary = Readonly<{
     Readonly<{ id: string; ability: z.infer<typeof AbilitySchema>; name?: string }>
   >;
   /** The cast chooses an ability (Hex); `action.resolve`'s `ability`. */ choosesAbility?: boolean;
+  /** Once its damage lands, its user gives itself or a creature within `rangeFeet` this many Temporary Hit Points
+   *  (Improved Potent Spellcasting); `action.resolve`'s `vitalityTo`. */ vitality?: Readonly<{
+    rangeFeet: number;
+    amount: number;
+  }>;
   /** An option, one for each target, or a carried weapon it asks for (`actionChoicesOf`). */ choices?: ActionChoices;
   /** A stat block's spell list (Spellcasting, Divine Aid): the numbers its casts are made with. */ spellList?: Readonly<{
     ability: z.infer<typeof AbilitySchema>;

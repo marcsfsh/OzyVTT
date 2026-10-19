@@ -19,6 +19,7 @@ import {
   setChoiceOption,
   setCheckSkill,
   setChosenAbility,
+  setVitalityTo,
   setConditionChoice,
   setDamageType,
   setEffectOption,
@@ -244,6 +245,24 @@ export function ActionTargetPicker({
             {(Object.keys(ABILITY_WORDS) as AbilityId[]).map((ability) => (
               <option key={ability} value={ability}>
                 {ABILITY_WORDS[ability]}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
+      {picking.action.vitality && (
+        <label className="action-damage-type">
+          <span>Temporary Hit Points to</span>
+          <Select
+            value={picking.vitalityTo ?? picking.attackerId}
+            onChange={(event) => setVitalityTo(event.target.value)}
+          >
+            {[
+              { id: picking.attackerId, label: targets.find((row) => row.id === picking.attackerId)?.label ?? "You" },
+              ...targets.filter((row) => row.id !== picking.attackerId)
+            ].map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.label}
               </option>
             ))}
           </Select>

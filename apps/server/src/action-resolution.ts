@@ -71,6 +71,7 @@ import {
   recordLoadingShot
 } from "./resolution/extra-attacks.js";
 import { recordAttackDealings } from "./resolution/dealings.js";
+import { vitalityOnHit, vitalityRecipient } from "./resolution/vitality.js";
 import {
   applyMasteryForces,
   checkTacticalMaster,
@@ -176,6 +177,8 @@ export function resolveDefinitionAction(
     throw new CommandRejectedError("Answer the damage on a look at it, before it is dealt.");
   checkOverchannel(ctx);
   checkTacticalMaster(ctx);
+  // Who a cantrip's vitality goes to is checked before anything rolls.
+  vitalityRecipient(ctx);
   checkWallTarget(ctx);
   ctx.builtin?.check?.(ctx);
   // A form the action can't give is refused before anything is spent.
@@ -361,6 +364,7 @@ export function resolveDefinitionAction(
   applyRageRules(ctx);
 
   commitEconomy(ctx);
+  vitalityOnHit(ctx);
   recallSpellSlot(ctx);
   afterDivineWish(ctx);
   rollForAnAnswer(ctx);

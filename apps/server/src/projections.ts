@@ -251,6 +251,8 @@ const PENDING_SAVE_FIELDS = {
   regurgitates: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
   gmApplies: "player",
+  // Who the caster's Temporary Hit Points go to is the caster's pick, told when they land.
+  vitality: "never",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
   spell: "never",
   // Who was asked to answer it would name them; the player is told only that it waits (`awaitingAnswer`).

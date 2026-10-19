@@ -35,6 +35,7 @@ import { objectFrom } from "../objects.js";
 import { areAllies } from "../creature-sides.js";
 import { chosenEffectOption } from "./effect-options.js";
 import { failureFormOf } from "./shape-shift.js";
+import { vitalityOfCast } from "./vitality.js";
 
 type AcBonusReaction = Extract<ActionReaction, { response: "ac-bonus" }>;
 
@@ -752,11 +753,14 @@ export function parkActionSave(ctx: ResolveContext): void {
         singleTarget: ctx.targets.length === 1 && action.area === undefined && spell.area === null
       }
     : undefined;
+  const vitality = vitalityOfCast(ctx);
   const extra = {
     ...(onSuccessEffect ? { onSuccessEffect } : gmApplies ? { gmApplies: true as const } : {}),
     ...(action.save.breaksConcentration ? { breaksConcentration: true as const } : {}),
     // Moonbeam: a shape-shifted creature that fails reverts to its true form.
     ...(action.save.failureEndsForm ? { endsForm: true as const } : {}),
+    // Improved Potent Spellcasting: the first save of the cast to deal damage gives the caster's pick its vitality.
+    ...(vitality ? { vitality } : {}),
     ...fatal
   };
   for (const { saveBonus, option, advantageFrom, autoSucceeds, swallows, targetIds } of groups.values()) {

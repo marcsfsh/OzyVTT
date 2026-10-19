@@ -405,6 +405,17 @@ export const PendingSaveSchema = z
     /** Nothing the server applies rides the save's outcome (Levitate, Polymorph): the GM applies what it does. The save
      *  card says so, so it never reads as if the engine did. */
     gmApplies: z.literal(true).optional(),
+    /** Temporary Hit Points the cast gives when its damage lands, to the creature its caster picked, once for the cast
+     *  (`key`): the first of its saves to deal damage gives them (Improved Potent Spellcasting). GM bookkeeping, never
+     *  projected. */
+    vitality: z
+      .object({
+        actorId: z.uuid(),
+        amount: z.number().int().min(1).max(100),
+        key: z.string().min(1).max(120)
+      })
+      .strict()
+      .optional(),
     /** The spell the save is against, its school and level, and whether it aimed at this creature alone, for what
      *  answers a save against a spell (Staff of Charming's Resist Enchantment). GM bookkeeping, never projected. */
     spell: z

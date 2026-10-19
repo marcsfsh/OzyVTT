@@ -87,7 +87,10 @@ type Table = Readonly<{
 }>;
 
 /** The Cleric, two Zombies and an ally in a fight, the Cleric first. `distance` is every pair's map distance. */
-function table(level: number, options: Readonly<{ distance?: number; blessed?: "potent-spellcasting" }> = {}): Table {
+function table(
+  level: number,
+  options: Readonly<{ distance?: number; near?: string; blessed?: "potent-spellcasting" | "divine-strike" }> = {}
+): Table {
   const definition = buildCharacterDefinition(clericInput(level, options.blessed), library, policy);
   const zombie = library.monster("zombie")!;
   const undead = (id: string, name: string) => ({
@@ -133,7 +136,12 @@ function table(level: number, options: Readonly<{ distance?: number; blessed?: "
     definition,
     catalog,
     resolveDefinition,
-    ...(options.distance !== undefined ? { distanceFeet: () => options.distance! } : {})
+    ...(options.distance !== undefined
+      ? {
+          distanceFeet: (a: string, b: string) =>
+            options.near !== undefined && (a === options.near || b === options.near) ? 20 : options.distance!
+        }
+      : {})
   });
   return { state, definition, deps };
 }
@@ -188,6 +196,41 @@ describe("Turn Undead ends with its Cleric", () => {
     saveAt(built, ZOMBIE, 1);
     applyDamageDetailed(built.state, HERO, { amount: 500 }, GM);
     expect(turned(built, ZOMBIE)).toBe(false);
+  });
+});
+
+describe("Improved Potent Spellcasting: Temporary Hit Points when a Cleric cantrip deals damage", () => {
+  // Cleric 14, Wisdom 20 (+5): twice the modifier is 10.
+  it("gives the ally picked within 60 feet 10 Temporary Hit Points once Sacred Flame's damage lands", () => {
+    const built = table(14, { distance: 30 });
+    use(built, "spell-sacred-flame", { targetIds: [ZOMBIE], vitalityTo: ALLY }, [4, 4, 4]);
+    expect(actorOf(built, ALLY).hp.temporary).toBe(0);
+    saveAt(built, ZOMBIE, 1);
+    expect(actorOf(built, ALLY).hp.temporary).toBe(10);
+  });
+
+  it("gives the Cleric itself the Temporary Hit Points when no one is picked, and none on a successful save", () => {
+    const built = table(14);
+    use(built, "spell-sacred-flame", { targetIds: [ZOMBIE] }, [4, 4, 4]);
+    saveAt(built, ZOMBIE, 1);
+    expect(actorOf(built, HERO).hp.temporary).toBe(10);
+    const saved = table(14);
+    use(saved, "spell-sacred-flame", { targetIds: [ZOMBIE] }, [4, 4, 4]);
+    saveAt(saved, ZOMBIE, 30);
+    expect(actorOf(saved, HERO).hp.temporary).toBe(0);
+  });
+
+  it("refuses a creature beyond 60 feet, and gives a Divine Strike Cleric nothing", () => {
+    // Every creature 70 feet from the Cleric but the Zombie, 20 feet away.
+    const far = table(14, { distance: 70, near: ZOMBIE });
+    expect(() => use(far, "spell-sacred-flame", { targetIds: [ZOMBIE], vitalityTo: ALLY }, [4, 4, 4])).toThrowError(
+      /Bran is more than 60 feet from Mira/
+    );
+    const striker = table(14, { blessed: "divine-strike" });
+    const flame = effectiveActions(striker.definition, actorOf(striker, HERO), catalog).find(
+      (entry) => entry.id === "spell-sacred-flame"
+    );
+    expect(flame?.vitality).toBeUndefined();
   });
 });
 

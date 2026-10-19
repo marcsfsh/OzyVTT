@@ -38,6 +38,7 @@ export function createPendingSaves(
       | "failureBanishes"
       | "endsForm"
       | "regurgitates"
+      | "vitality"
     >;
     /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
     magical?: boolean;
@@ -106,6 +107,7 @@ export function createPendingSaves(
     ...(input.extra?.failureByHitPoints ? { failureByHitPoints: structuredClone(input.extra.failureByHitPoints) } : {}),
     ...(input.extra?.failureBanishes ? { failureBanishes: [...input.extra.failureBanishes] } : {}),
     ...(input.extra?.regurgitates ? { regurgitates: { ...input.extra.regurgitates } } : {}),
+    ...(input.extra?.vitality ? { vitality: { ...input.extra.vitality } } : {}),
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
     ...(input.drain ? { drain: { ...input.drain } } : {}),
