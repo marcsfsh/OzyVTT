@@ -287,10 +287,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "weapon-of-warning": { modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }] },
 
   // "On your person" is read as equipped. Luck rerolls a failed D20 Test once per dawn (`answer`). Wish casts on 1d3
-  // charges rolled when the blade is added, which never come back; its once-a-dawn limit is the GM's.
+  // charges rolled when the blade is added, which never come back, and once a dawn.
   "luck-blade": {
     charges: { starting: "1d3" },
-    casts: [{ spellId: "wish", uses: { limit: 3, per: "never", pool: "luck-blade-wish" } }],
+    casts: [{ spellId: "wish", uses: { limit: 3, per: "never", pool: "luck-blade-wish" }, alsoUses: { limit: 1 } }],
     modifiers: [
       { type: "save-bonus", amount: 1 },
       { type: "attack-bonus", amount: 1 },
@@ -446,8 +446,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // Life Stealing: a rolled 20 against a creature under 100 Hit Points asks a DC 15 Constitution save, a failure
-  // slaying it; Constructs and Undead succeed. Its 1d8 + 1 charges, one spent per slaying, are the GM's to count.
+  // slaying it; Constructs and Undead succeed. Each slaying spends one of its 1d8 + 1 charges, rolled when the sword is
+  // added, and with none left it slays no more.
   "nine-lives-stealer": {
+    charges: { starting: "1d8 + 1" },
     modifiers: [
       { type: "attack-bonus", amount: 2 },
       { type: "damage-bonus", amount: 2 }
@@ -457,6 +459,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         conditions: [],
         naturalTwenty: true,
         save: { ability: "con", dc: 15 },
+        spendsCharge: { pool: "nine-lives-stealer-charges", limit: 9 },
         kills: { hitPointsUnder: 100, exceptCreatureTypes: ["construct", "undead"] }
       }
     ]
@@ -2411,8 +2414,32 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /** "Your Intelligence is 19 while you wear this headband", or no change from a higher one. */
   "headband-of-intellect": { modifiers: [{ type: "ability-score-minimum", ability: "int", score: 19 }] },
-  // `helm-of-brilliance` - auras, toggled fire damage, a resistance gated on gem count, gem-cost
-  //     spells and a random self-destruct; nothing is expressible.
+  // Its gems, each kind counted when the helm is added (1d10 diamonds, 2d10 rubies, 3d10 fire opals, 4d10 opals) and
+  // never coming back, and its spells at DC 18, each spending one gem of its kind. Diamond Light, Fire Opal Flames and
+  // Ruby Resistance while a gem of their kind is left, the helm losing its magic once every gem is gone, and the d20
+  // that destroys it when Fire from a spell lands are the GM's.
+  "helm-of-brilliance": {
+    charges: {
+      startingByPool: {
+        "helm-of-brilliance-diamonds": "1d10",
+        "helm-of-brilliance-rubies": "2d10",
+        "helm-of-brilliance-fire-opals": "3d10",
+        "helm-of-brilliance-opals": "4d10"
+      }
+    },
+    casts: (
+      [
+        ["daylight", "opals", 40],
+        ["fireball", "fire-opals", 30],
+        ["prismatic-spray", "diamonds", 10],
+        ["wall-of-fire", "rubies", 20]
+      ] as const
+    ).map(([spellId, gems, limit]) => ({
+      spellId,
+      saveDc: 18,
+      uses: { limit, per: "never" as const, pool: `helm-of-brilliance-${gems}` }
+    }))
+  },
 
   // Unlimited cast, as printed. (Compare the belt's Dwarvish: a cast reaches the action list, a language grant does not.)
   "helm-of-comprehending-languages": { casts: [{ spellId: "comprehend-languages" }] },
@@ -3246,23 +3273,56 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
   // `efficient-quiver` - a container.
-  // Opened, an Efreeti appears within 30 feet and the server rolls the d10: on a 1 it attacks its user and leaves after 5
-  // rounds; on 2 to 9 it obeys for 1 hour; on a 10 it grants a Wish (the GM's) and leaves within the hour. That the
-  // first roll sets every later opening, the 24 hours between openings and the bottle losing its magic are the
-  // table's.
+  // Opened the first time, an Efreeti appears within 30 feet and the server rolls the d10, which settles the bottle for
+  // good: on a 1 it attacks its user and leaves after 5 rounds, and on a 10 it grants a Wish (the GM's) and leaves
+  // within the hour, the bottle's magic gone either way; on 2 to 9 it obeys for 1 hour, and the bottle holds a servant
+  // from then on. The servant comes twice more, each opening 24 hours after it returns, and then the bottle is spent.
   "efreeti-bottle": {
+    charges: { lastCharge: "nonmagical" },
+    variantChoice: { by: "gm" },
+    variants: [
+      { id: "unopened", name: "Never opened" },
+      {
+        id: "servant",
+        name: "Bottled servant",
+        suspendsActions: true,
+        actions: [
+          {
+            id: "open-servant",
+            name: "Open the Bottle",
+            activation: "action",
+            description:
+              "Remove the stopper: the Efreeti appears in an unoccupied space within 30 feet, understands your languages and obeys your commands for 1 hour, then returns to the bottle. The stopper can't be removed again for 24 hours. It comes twice more after the first opening; the fourth time it escapes and the bottle loses its magic.",
+            uses: { limit: 1, per: "time", afterHours: "24" },
+            alsoUses: { limit: 2, per: "never" },
+            summons: {
+              creatures: [{ monsterId: "efreeti" }],
+              rangeFeet: 30,
+              lasts: { type: "minutes", minutes: 60 },
+              waitsFromEnd: true
+            }
+          }
+        ]
+      }
+    ],
     actions: [
       {
         id: "open",
         name: "Open the Bottle",
         activation: "action",
         description:
-          "Remove the stopper: an Efreeti appears in an unoccupied space within 30 feet, and the d10 says what it does. 1: it attacks you, and disappears after fighting for 5 rounds. 2-9: it understands your languages and obeys your commands for 1 hour. 10: it can cast Wish once for you, and disappears when it grants the wish or after 1 hour.",
+          "Remove the stopper: an Efreeti appears in an unoccupied space within 30 feet, and the d10 says what it does. 1: it attacks you, disappears after fighting for 5 rounds, and the bottle loses its magic. 2-9: it understands your languages and obeys your commands for 1 hour, then returns to the bottle, which holds it from then on. 10: it can cast Wish once for you, disappears when it grants the wish or after 1 hour, and the bottle loses its magic.",
         summons: {
           creatures: [
-            { monsterId: "efreeti", faces: { from: 1, to: 1 }, allegiance: "hostile", rounds: 5 },
-            { monsterId: "efreeti", faces: { from: 2, to: 9 } },
-            { monsterId: "efreeti", faces: { from: 10, to: 10 } }
+            {
+              monsterId: "efreeti",
+              faces: { from: 1, to: 1 },
+              allegiance: "hostile",
+              rounds: 5,
+              itemBecomes: "nonmagical"
+            },
+            { monsterId: "efreeti", faces: { from: 2, to: 9 }, itemBecomes: { variantId: "servant" } },
+            { monsterId: "efreeti", faces: { from: 10, to: 10 }, itemBecomes: "nonmagical" }
           ],
           die: 10,
           rangeFeet: 30,

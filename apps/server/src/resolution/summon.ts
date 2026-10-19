@@ -101,8 +101,9 @@ export function applySummons(ctx: ResolveContext): void {
           ...(paidHours !== null ? { hoursPaid: paidHours, hoursPool: uses.limit } : {})
         }
       : undefined;
-  // The item that brought it, which its death ends (the Staff of the Python shatters).
-  const row = summon.itemEndsAtZero ? itemRowOfAction(action.id, attacker.inventory) : null;
+  // The item that brought it: its death ends it (the Staff of the Python shatters), and the die may change it (an
+  // Efreeti Bottle).
+  const row = itemRowOfAction(action.id, attacker.inventory);
   const outcome = deps.summon({
     userId: attacker.id,
     summon,
@@ -123,7 +124,8 @@ export function applySummons(ctx: ResolveContext): void {
     numbers: summonerNumbers(ctx, summon),
     ...(waitAfter ? { waitAfter } : {}),
     ...(paidHours !== null ? { lastsMinutes: paidHours * 60 } : {}),
-    ...(row && summon.itemEndsAtZero ? { itemEnd: { itemId: row.id, outcome: summon.itemEndsAtZero } } : {})
+    ...(row && summon.itemEndsAtZero ? { itemEnd: { itemId: row.id, outcome: summon.itemEndsAtZero } } : {}),
+    ...(row ? { itemRowId: row.id } : {})
   });
   for (const event of outcome.events) ctx.tableNarration.push(tableLineOf(ctx, event));
   ctx.summoned = outcome.created.map((entry) => ({ actorId: entry.id, name: entry.name }));

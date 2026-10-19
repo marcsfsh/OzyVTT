@@ -8,6 +8,7 @@ import { endItemMagic } from "../item-spent.js";
 import type { EffectNarration } from "../effects.js";
 import { applyDamageDetailed } from "../hit-points.js";
 import { breakableItemOf, breakChance, brokenLine } from "../item-breaks.js";
+import { rowRecord } from "../item-records.js";
 import { recordRoll, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
 import { useLimitFor, type EconomyPlan } from "./economy.js";
 
@@ -45,6 +46,20 @@ function spendTheItem(ctx: ResolveContext, item: InventoryItem, record: Equipmen
 export function rollLastCharge(ctx: ResolveContext): void {
   afterItemSpend(ctx, ctx.action, ctx.plan.spendUse);
   breaksAfterUse(ctx);
+}
+
+/** A second limit that never comes back, now spent (an Efreeti Bottle opened its last time): the item ends as its
+ *  charges say, with no roll. True when it did. */
+function spentSecondLimit(ctx: ResolveContext, action: DefinitionAction, spendUse: NonNullable<Spend>): boolean {
+  const { attacker, deps, warnings } = ctx;
+  const also = action.alsoUses;
+  if (also?.per !== "never" || !spendUse.also || (attacker.actionUses[spendUse.also] ?? 0) < also.limit) return false;
+  const row = itemRowOfAction(action.id, attacker.inventory);
+  const record = row ? rowRecord(deps.catalog, row) : undefined;
+  if (!row || !record) return false;
+  const line = spendTheItem(ctx, row, record);
+  if (line) warnings.push(`${row.name} is used up. ${line}`);
+  return line !== null;
 }
 
 /** An item whose break stops the use (a Wind Fan: "if the fan fails to work, it tears into useless, nonmagical
@@ -132,6 +147,7 @@ export function afterItemSpend(ctx: ResolveContext, action: DefinitionAction, sp
     const line = startTimedPool(ctx.state, attacker, spendUse.key, action.name, action.uses.afterHours, deps.random);
     if (line) warnings.push(line);
   }
+  if (spentSecondLimit(ctx, action, spendUse)) return;
   const due = lastChargeRollFor(action, attacker.inventory, deps.catalog);
   if (!due || (attacker.actionUses[spendUse.key] ?? 0) < useLimitFor(siblings, action)) return;
   const charges = due.record.charges!;

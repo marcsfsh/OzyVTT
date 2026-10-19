@@ -83,6 +83,8 @@ export type SummonRequest = Readonly<{
   itemEnd?: NonNullable<Actor["summon"]>["itemEnd"];
   /** How long it stays when its use paid for its time (a Goat of Traveling's hours left), over `summon.lasts`. */
   lastsMinutes?: number;
+  /** The carried row of the item that brought it, which the die's row may change (`SummonCreature.itemBecomes`). */
+  itemRowId?: string;
 }>;
 
 export type SummonOutcome = { created: Array<{ id: string; name: string }>; events: EffectNarration[] };
@@ -135,6 +137,26 @@ function hasTraining(
   return has(proficiencies?.weapons, wants.weapons) && has(proficiencies?.armor, wants.armor);
 }
 
+/** What the die does to the item that brought the summon: the kind it holds from now on (an Efreeti Bottle's servant,
+ *  which every later opening brings), or its magic ended (an efreeti that attacks, or grants a wish). */
+function itemBecomes(
+  user: Actor,
+  request: SummonRequest,
+  becomes: NonNullable<SummonCreature["itemBecomes"]>,
+  deps: SummonDeps
+): EffectNarration[] {
+  const row = user.inventory.find((entry) => entry.id === request.itemRowId);
+  if (!row) return [];
+  if (becomes === "nonmagical") {
+    const definition = user.definitionId ? deps.resolveDefinition(user.definitionId) : undefined;
+    return [{ kind: "effect", text: endItemMagic(user, row, "nonmagical", definition, deps.catalog), actorId: user.id }];
+  }
+  user.inventory = user.inventory.map((entry) =>
+    entry.id === row.id ? { ...entry, variantId: becomes.variantId } : entry
+  );
+  return [];
+}
+
 /** The stat blocks and counts this summon makes: rolled on its die, picked by its user, or its first row. */
 function plannedCreatures(request: SummonRequest, deps: SummonDeps, events: EffectNarration[], user: Actor): Planned[] {
   const { summon, choice } = request;
@@ -150,6 +172,7 @@ function plannedCreatures(request: SummonRequest, deps: SummonDeps, events: Effe
       text: `${user.name} rolls ${face} on the d${summon.die} for ${request.action.name}.`,
       actorId: user.id
     });
+    if (row?.itemBecomes) events.push(...itemBecomes(user, request, row.itemBecomes, deps));
     return row ? [plannedOf(row, summonCountAt(row, level, printed))] : [];
   }
   const picks = choice.picks ?? [];

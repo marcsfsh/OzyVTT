@@ -15,9 +15,13 @@ afterEach(async () => {
 });
 
 /** The caster carrying these items, equipped and attuned; "id#kind" is a copy of that kind. */
-async function carrying(...ids: string[]) {
+const carrying = (...ids: string[]) => carryingWith(ids, {});
+
+/** The same, with the uses the caster has already spent. */
+async function carryingWith(ids: readonly string[], spent: Record<string, number>) {
   const state = summonTable();
   const caster = state.actors.find((actor) => actor.id === CASTER)!;
+  caster.actionUses = { ...caster.actionUses, ...spent };
   caster.inventory = [
     ...caster.inventory,
     ...ids.map((entry): InventoryItem => {
@@ -100,6 +104,41 @@ describe("Ring of Djinni Summoning", () => {
       dormant: true,
       attuned: false
     });
+  });
+});
+
+describe("Efreeti Bottle", () => {
+  it("the first opening's d10 settles the bottle: a servant from then on, or its magic gone", async () => {
+    const table = await carrying("efreeti-bottle");
+    const opened = await table.resolve({ actionId: "item-efreeti-bottle-open" });
+    expect(opened.status, await opened.clone().text()).toBe(200);
+    const [efreeti] = table.named("Efreeti");
+    const bottle = table.actor(CASTER)!.inventory.find((row) => row.id === "efreeti-bottle")!;
+    // A 1 brings a hostile efreeti and a 10 a wish, and either spends the bottle; 2 to 9 leaves it holding a servant.
+    if (bottle.dormant) expect(bottle.variantId).toBeUndefined();
+    else {
+      expect(efreeti!.control).toMatchObject({ by: CASTER });
+      expect(bottle.variantId).toBe("servant");
+    }
+  });
+
+  it("the servant comes twice more, 24 hours after each return, and the bottle is spent after the last", async () => {
+    const table = await carrying("efreeti-bottle#servant");
+    const opened = await table.resolve({ actionId: "item-efreeti-bottle-open-servant" });
+    expect(opened.status, await opened.clone().text()).toBe(200);
+    const caster = () => table.actor(CASTER)!;
+    expect(caster().actionUses["item-efreeti-bottle-open-servant-also"]).toBe(1);
+    expect(caster().readyAt["item-efreeti-bottle-open-servant"]).toBeUndefined();
+    const [efreeti] = table.named("Efreeti");
+    await table.damage(efreeti!.id, 1000);
+    expect(caster().readyAt["item-efreeti-bottle-open-servant"]?.minute).toBe(table.now() + 24 * 60);
+    expect(caster().inventory.find((row) => row.id === "efreeti-bottle")?.dormant).toBeUndefined();
+
+    // A bottle whose servant came once already since the first opening.
+    const last = await carryingWith(["efreeti-bottle#servant"], { "item-efreeti-bottle-open-servant-also": 1 });
+    const again = await last.resolve({ actionId: "item-efreeti-bottle-open-servant" });
+    expect(again.status, await again.clone().text()).toBe(200);
+    expect(last.actor(CASTER)!.inventory.find((row) => row.id === "efreeti-bottle")?.dormant).toBe(true);
   });
 });
 

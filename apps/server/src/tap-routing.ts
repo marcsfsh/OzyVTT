@@ -3,8 +3,15 @@ import { d20Die } from "@vtt/rules-5e";
 import type { ActorAction, ActorDefinition } from "@vtt/schemas";
 import { familyModeFor, type RuleId } from "./rules-families.js";
 import { CommandRejectedError } from "./game-store.js";
-import { castSlot, noUsesRemaining, slotsLeft, spendSlot, unpreparedSpell, useLimitFor } from "./resolution/economy.js";
-import { activationCost, notEnoughUses } from "./use-cost.js";
+import {
+  castSlot,
+  noUsesRemaining,
+  slotsLeft,
+  spendSlot,
+  unpreparedSpell,
+  useLimitFor
+} from "./resolution/economy.js";
+import { activationCost, alsoSpentMessage, alsoUsesKey, notEnoughUses } from "./use-cost.js";
 
 /**
  * Where an action tap goes, decided by the server. The sheet sends intent; the server answers:
@@ -80,6 +87,10 @@ export function spendLooseUses(
   const cost = activationCost(action, used, limit);
   if (key && used >= limit) throw new CommandRejectedError(noUsesRemaining(action, limit));
   if (key && used + cost > limit) throw new CommandRejectedError(notEnoughUses(action.name, limit - used, cost));
+  // A second limit it counts against too (a Luck Blade's Wish, once a dawn).
+  const also = key ? alsoUsesKey(action) : null;
+  if (also && (actor.actionUses[also] ?? 0) >= action.alsoUses!.limit)
+    throw new CommandRejectedError(alsoSpentMessage(action));
   const slot = action.spellSlot ? castSlot(actor, action.spellSlot.level, slotLevel) : null;
   const slotRefusal =
     slot && action.spellSlot && slot.level < action.spellSlot.level
@@ -90,6 +101,7 @@ export function spendLooseUses(
   const refusal = unpreparedSpell(actor, action, definition) ?? slotRefusal;
   if (refusal !== null && slots === "strict") throw new CommandRejectedError(refusal);
   if (key) actor.actionUses = { ...actor.actionUses, [key]: used + cost };
+  if (also) actor.actionUses = { ...actor.actionUses, [also]: (actor.actionUses[also] ?? 0) + 1 };
   const spendsSlot = slot !== null && slotRefusal === null;
   if (spendsSlot) spendSlot(actor, slot);
   return {

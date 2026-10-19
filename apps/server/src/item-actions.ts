@@ -223,6 +223,10 @@ export function castAction(
     // Cast through the item's own Scrying (a Crystal Ball's Detect Thoughts), or only after a check (an Amulet of the
     // Planes).
     ...(cast.through ? { castThrough: cast.through } : {}),
+    // Once a dawn as well as from its charges (a Luck Blade's Wish), counted per carried copy.
+    ...(uses && cast.alsoUses
+      ? { alsoUses: { limit: cast.alsoUses.limit, pool: itemPool(item, `${cast.spellId}-dawn`) } }
+      : {}),
     ...(cast.check ? { castCheck: { ...cast.check } } : {})
   };
   if (!spell) return base;

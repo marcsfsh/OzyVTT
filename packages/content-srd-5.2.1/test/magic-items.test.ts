@@ -648,6 +648,7 @@ describe("what a spent last charge does", () => {
       "bag-of-beans": "nonmagical",
       "candle-of-invocation": "destroyed",
       "chime-of-opening": "destroyed",
+      "efreeti-bottle": "nonmagical",
       "gem-of-brightness": "nonmagical",
       "necklace-of-fireballs": "destroyed",
       "ring-of-three-wishes": "nonmagical",

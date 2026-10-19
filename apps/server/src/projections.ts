@@ -238,6 +238,8 @@ const PENDING_SAVE_FIELDS = {
   advantageFrom: "never",
   // What a failure does beyond conditions is narrated when it lands, and an automatic success when it is answered.
   failureKills: "never",
+  // Which of the source's pools a kill spends names its item.
+  spendsOnKill: "never",
   autoSucceeds: "never",
   disadvantageFrom: "never",
   // A failure's return to a creature's true form is narrated when it lands.

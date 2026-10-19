@@ -664,6 +664,15 @@ export const ItemSpellCastSchema = z
       .describe(
         "The spell's options this cast may pick, where the item limits them (a Wand of Fear's Command: \"flee or grovel only\"); the server refuses any other"
       ),
+    /** A second limit each cast counts against, of casts a Long Rest restores (a Luck Blade's Wish: once a dawn, from
+     *  charges that never come back). */
+    alsoUses: z
+      .object({ limit: z.number().int().min(1).max(20) })
+      .strict()
+      .optional()
+      .describe(
+        "A second limit each cast counts against, of casts a Long Rest restores (a Luck Blade's Wish: once a dawn, from charges that never come back)"
+      ),
     /** It is cast through this spell, cast from the item too, while its user concentrates on it: it needs no
      *  Concentration of its own and ends when that spell does (a Crystal Ball's Detect Thoughts through Scrying). */
     through: ContentIdSchema.optional().describe(
@@ -734,7 +743,21 @@ export const ItemChargesSchema = z
      *  count from there. */
     starting: ChargeCountSchema.optional().describe(
       "The charges a copy holds when it is added, rolled then (a Necklace of Fireballs' 1d6 + 3 beads); its pools count from there"
-    )
+    ),
+    /** Each named pool's own count when a copy is added, in place of `starting` (a Helm of Brilliance's 1d10 diamonds
+     *  and 4d10 opals). */
+    startingByPool: z
+      .record(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80),
+        ChargeCountSchema
+      )
+      .optional()
+      .describe(
+        "Each named pool's own count when a copy is added, in place of starting (a Helm of Brilliance's 1d10 diamonds and 4d10 opals)"
+      )
   })
   .strict();
 export type ItemCharges = z.infer<typeof ItemChargesSchema>;

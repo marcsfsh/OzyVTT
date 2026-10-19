@@ -90,6 +90,7 @@ import { suppressConditions } from "./suppressed-conditions.js";
 import { sizeAtMost, sizeRank } from "./resolution/context.js";
 import { lightSensitivities, sightRules } from "./vision/rules.js";
 import { legendaryResistancesPerDay } from "./lair.js";
+import { spendKillCharge } from "./item-charges.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -1261,6 +1262,12 @@ export function answerSave(
         `${commandId}:${saveId}:band`
       )
     );
+  // A slaying that spends its weapon's charge (Nine Lives Stealer) spends it now.
+  const killer =
+    band?.dies && pending.spendsOnKill
+      ? state.actors.find((actor) => actor.id === pending.spendsOnKill!.actorId)
+      : undefined;
+  if (killer) spendKillCharge(killer, pending.spendsOnKill!.key);
   if (!success && pending.failureBanishes)
     events.push(
       ...banishOnFailure(

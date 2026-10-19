@@ -783,7 +783,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The GM says which gem a found one is (item-records.ts): breaking it uses it up, and its elemental appears beside its user, acts right after it and leaves after 1 hour, at 0 Hit Points or when a Bonus Action dismisses it (summons.ts)."
   ),
   "item:efreeti-bottle": guided(
-    "Opened, an Efreeti appears within 30 feet and the server rolls the d10 (summons.ts): on a 1 it attacks its user and leaves after 5 rounds, on 2 to 9 it obeys for 1 hour, on a 10 it stays up to an hour to grant a Wish. The first roll setting every later opening, the 24 hours between openings and the Wish are the GM's."
+    "Opened the first time, an Efreeti appears within 30 feet and the server rolls the d10, which settles the bottle (summons.ts): on a 1 it attacks its user and leaves after 5 rounds, on a 10 it stays up to an hour to grant a Wish, and either way the bottle's magic is gone; on 2 to 9 it obeys for 1 hour and the bottle holds a servant from then on, which comes twice more, each opening 24 hours after it returns (clock-pools.ts), and then the bottle is spent. What the Wish does is the GM's."
   ),
   "item:feather-token": guided(
     "The GM says which token a found one is (item-records.ts). The Bird token is used up for a Roc that can't attack and obeys its user until it is dismissed with a Magic action or drops to 0 Hit Points (summons.ts). The Anchor, Fan, Swan Boat, Tree and Whip are the GM's."
@@ -1393,7 +1393,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "item:iron-flask": guided("The command's save is applied. Trapping the creature in the flask is the GM's."),
   "item:luck-blade": guided(
-    "The +1 to attack and damage rolls and saving throws is applied, and roll-answers.ts offers its Luck reroll on a failed D20 Test once a day while the wielder isn't Incapacitated. Its Wish casts on 1d3 charges rolled when it is added, which never come back; its once a day limit, and what a Wish does, are the GM's."
+    "The +1 to attack and damage rolls and saving throws is applied, and roll-answers.ts offers its Luck reroll on a failed D20 Test once a day while the wielder isn't Incapacitated. Its Wish casts on 1d3 charges rolled when it is added, which never come back, and once a dawn (resolution/economy.ts). What a Wish does is the GM's."
   ),
   "item:gloves-of-missile-snaring": enforced(
     "A hit by a weapon from range opens a reaction prompt (damage-window.ts), and using it takes 1d10 plus the wearer's Dexterity modifier off the damage. Whether a hand is free, and catching the missile, are the GM's."
@@ -1404,8 +1404,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:mace-of-smiting": enforced(
     "The +1 to attack and damage rolls, +3 against Constructs, and the 7 Bludgeoning on a rolled 20 (14 against a Construct) are applied. A Construct that rolled 20 leaves at 25 Hit Points or fewer is destroyed (resolution/kill.ts)."
   ),
-  "item:nine-lives-stealer": guided(
-    "The +2 to attack and damage rolls is applied. On a rolled 20 against a creature with fewer than 100 Hit Points, other than a Construct or an Undead, the target makes the DC 15 Constitution save, and a failure slays it (resolution/kill.ts). The 1d8 + 1 charges, one spent per slaying, are the GM's to count."
+  "item:nine-lives-stealer": enforced(
+    "The +2 to attack and damage rolls is applied. On a rolled 20 against a creature with fewer than 100 Hit Points, other than a Construct or an Undead, the target makes the DC 15 Constitution save, and a failure slays it (resolution/kill.ts). Each slaying spends one of the 1d8 + 1 charges rolled when the sword is added, which never come back, and with none left it slays no more."
+  ),
+  "item:helm-of-brilliance": guided(
+    "inventory.ts counts each kind of gem when the helm is added (1d10 diamonds, 2d10 rubies, 3d10 fire opals, 4d10 opals), which never come back, and each of its spells at DC 18 spends one gem of its kind: Daylight an opal, Fireball a fire opal, Prismatic Spray a diamond, Wall of Fire a ruby. Diamond Light against Undead, Fire Opal Flames, Ruby Resistance while a ruby is left, the helm losing its magic once every gem is gone, and the d20 when Fire from a spell lands are the GM's."
   ),
   "item:pipes-of-haunting": enforced(
     "Its 3 charges come back 1d3 at dawn; each opens the DC 15 Wisdom save against Frightened for a minute on the creatures its user picks within 30 feet, repeated at the end of each turn, and a creature that succeeds is immune to the pipes for the rest of the fight (resolution/pending.ts)."

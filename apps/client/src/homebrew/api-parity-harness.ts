@@ -506,6 +506,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].alsoUses.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "a second limit each use counts against, restored by a Long Rest (a Luck Blade's Wish once a dawn) - synthesised from an item cast's `alsoUses`; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].timePool",
     types: ACTION_CARRIERS,
     reason:
@@ -1261,6 +1268,20 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ["equipment"],
     reason:
       "the most charges a cast may spend, each a level higher (Wand of Fireballs) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].alsoUses.**",
+    types: ["equipment"],
+    reason:
+      "an item cast's once-a-dawn limit beside its charges (a Luck Blade's Wish) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "charges.startingByPool",
+    types: ["equipment"],
+    reason:
+      "each pool's own count when a copy is added (a Helm of Brilliance's gems) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {

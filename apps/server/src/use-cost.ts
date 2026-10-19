@@ -17,6 +17,17 @@ export function activationCost(
   return action.timePool && spent < limit ? limit - spent : useCostOf(action);
 }
 
+/** Where an action's second limit is counted (`alsoUses`), or null when it has none. */
+export function alsoUsesKey(action: Pick<ActorAction, "id" | "alsoUses">): string | null {
+  return action.alsoUses ? (action.alsoUses.pool ?? `${action.id}-also`) : null;
+}
+
+/** Why a use is refused when its second limit is spent. */
+export const alsoSpentMessage = (action: Pick<ActorAction, "name" | "alsoUses">): string =>
+  action.alsoUses?.per === "never"
+    ? `${action.name} has no uses left.`
+    : `${action.name} can't be used again until a Long Rest (${action.alsoUses!.limit} a rest).`;
+
 /** The action as this activation spends it: a `chosen` cost fixed to the amount the user picked (Lay on Hands'
  *  points). An amount for an action that takes none is refused, so a client can't spend more than a use. */
 export function withChosenCost<T extends Pick<ActorAction, "name" | "useCost">>(

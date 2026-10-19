@@ -3,8 +3,9 @@ import { catalogIdOf, type ActorAction, type ActorDefinition, type InventoryItem
 import type { EquipmentReference } from "@vtt/content-srd-5.2.1";
 import { effectiveActions } from "./effective-actions.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
-import { castAction, isItemActionId, itemAction, itemActionRest } from "./item-actions.js";
+import { castAction, isItemActionId, itemAction, itemActionRest, itemPool } from "./item-actions.js";
 import { rowRecord } from "./item-records.js";
+import { alsoUsesKey } from "./use-cost.js";
 
 /**
  * A charged item's charges (SRD magic items): counted per carried copy in `actor.actionUses` under keys that name
@@ -30,7 +31,8 @@ export function lastChargeRollFor(
   inventory: readonly InventoryItem[],
   catalog: EquipmentCatalog | undefined
 ): Readonly<{ item: InventoryItem; record: EquipmentReference }> | null {
-  if (!action.uses || action.uses.per === "turn") return null;
+  // A pool that comes back after a time (an Efreeti Bottle's 24 hours) is no charge of the item's.
+  if (!action.uses || action.uses.per === "turn" || action.uses.per === "time") return null;
   const item = itemRowOfAction(action.id, inventory);
   const record = item ? rowRecord(catalog, item) : undefined;
   return item && record && (record.charges?.lastChargeRoll || record.charges?.lastCharge) ? { item, record } : null;
@@ -78,13 +80,28 @@ export function neverRegained(
   catalog: EquipmentCatalog | undefined
 ): Record<string, number> {
   const kept: Record<string, number> = {};
-  for (const action of effectiveActions(definition, actor, catalog)) {
-    if (action.uses?.per !== "never") continue;
-    const key = action.uses.pool ?? action.id;
+  const keys = [
+    ...effectiveActions(definition, actor, catalog).flatMap((action) => [
+      ...(action.uses?.per === "never" ? [action.uses.pool ?? action.id] : []),
+      // A second limit that never comes back (an Efreeti Bottle's openings).
+      ...(action.alsoUses?.per === "never" ? [alsoUsesKey(action)!] : [])
+    ]),
+    ...actor.inventory.flatMap((row) => [...riderPools(row, catalog).keys()])
+  ];
+  for (const key of keys) {
     const spent = actor.actionUses[key] ?? 0;
     if (spent > 0) kept[key] = spent;
   }
   return kept;
+}
+
+/** A carried copy's pools that only its hit riders spend (Nine Lives Stealer's charges, one a creature slain), which
+ *  never come back: each key with its size. */
+function riderPools(item: InventoryItem, catalog: EquipmentCatalog | undefined): Map<string, number> {
+  const pools = new Map<string, number>();
+  for (const rider of rowRecord(catalog, item)?.onHit ?? [])
+    if (rider.spendsCharge) pools.set(itemPool(item, rider.spendsCharge.pool), rider.spendsCharge.limit);
+  return pools;
 }
 
 /**
@@ -137,7 +154,13 @@ export function chargePoolsOfRow(
     const key = action.uses.pool ?? action.id;
     pools.set(key, Math.max(pools.get(key) ?? 0, action.uses.limit));
   }
+  for (const [key, limit] of riderPools(item, catalog)) pools.set(key, limit);
   return pools;
+}
+
+/** One of the killer's charges is spent on a creature slain (Nine Lives Stealer). */
+export function spendKillCharge(killer: Actor, key: string): void {
+  killer.actionUses = { ...killer.actionUses, [key]: (killer.actionUses[key] ?? 0) + 1 };
 }
 
 /** A copy just added holds the charges its record rolls for it ("1d6 + 3 beads"): its pools start that many short of
@@ -149,15 +172,24 @@ export function rollStartingCharges(
   catalog: EquipmentCatalog | undefined,
   random: (sides: number) => number
 ): number | null {
-  const starting = catalog?.equipmentRecord(catalogIdOf(item))?.charges?.starting;
-  if (!starting) return null;
-  const rolled = rollRegain(starting, random);
+  const charges = catalog?.equipmentRecord(catalogIdOf(item))?.charges;
+  const byPool = new Map(
+    Object.entries(charges?.startingByPool ?? {}).map(([pool, formula]) => [itemPool(item, pool), formula])
+  );
+  if (!charges?.starting && byPool.size === 0) return null;
+  // One roll for the pools that share the item's count; each named pool rolls its own (a helm's four kinds of gem).
+  const shared = charges?.starting ? rollRegain(charges.starting, random) : null;
+  let held = 0;
   const uses = { ...actor.actionUses };
   for (const [key, limit] of chargePoolsOfRow(item, definition, catalog)) {
+    const own = byPool.get(key);
+    const rolled = own !== undefined ? rollRegain(own, random) : shared;
+    if (rolled === null) continue;
+    held += rolled;
     const short = Math.max(0, limit - rolled);
     if (short > 0) uses[key] = short;
     else delete uses[key];
   }
   actor.actionUses = uses;
-  return rolled;
+  return shared ?? held;
 }

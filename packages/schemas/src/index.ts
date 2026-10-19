@@ -3601,6 +3601,21 @@ export const OnHitRiderSchema = z
      *  leaves the rider's conditions; without one the target dies. `beheads`: a Vorpal Sword's cut, which a creature
      *  immune to Slashing, without a head or too big takes as 30 more Slashing damage instead, as one does that spends
      *  a Legendary Resistance. */
+    /** Each creature it slays spends one of its item's charges, which never come back, and it fires only while one is
+     *  left: `pool` holds `limit` (Nine Lives Stealer's 1d8 + 1, rolled when the sword is added). */
+    spendsCharge: z
+      .object({
+        pool: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(120),
+        limit: z.number().int().min(1).max(MAX_ACTION_USES)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "Each creature it slays spends one of its item's charges, which never come back, and it fires only while one is left (Nine Lives Stealer)"
+      ),
     kills: z
       .object({
         hitPointsUnder: z.number().int().min(1).max(1000).optional(),
@@ -4132,6 +4147,14 @@ export const SummonCreatureSchema = z
      *  disappears"). */
     allegiance: z.enum(["user", "none", "hostile"]).optional(),
     rounds: z.number().int().min(1).max(100).optional(),
+    /** What the die bringing this row does to the item that brought it: its kind from then on (an Efreeti Bottle
+     *  opened the first time on 2 to 9 holds a servant), or its magic ended (on a 1 or a 10). */
+    itemBecomes: z
+      .union([z.literal("nonmagical"), z.object({ variantId: RiderSlugSchema }).strict()])
+      .optional()
+      .describe(
+        "What the die bringing this row does to the item that brought it: its kind from then on (an Efreeti Bottle's servant), or its magic ended"
+      ),
     /** How it differs from its stat block ("uses the Riding Horse stat block, except it has a Speed of 100 feet"; a
      *  treant's trees have Intelligence and Charisma scores of 1 and lack Animate Trees). */
     except: z
@@ -4426,6 +4449,24 @@ export const ActionSchema = z
     /** How many of its uses one activation spends: a fixed number (Lay on Hands' 5 points to cure a poison), or
      *  `chosen`, picked by the user each time (Lay on Hands' healing). Absent: one. */
     useCost: z.union([z.number().int().min(2).max(MAX_ACTION_USES), z.literal("chosen")]).optional(),
+    /** A second limit each of its uses counts against too, kept under `pool`: uses a Long Rest restores (a Luck
+     *  Blade's Wish: its charges never come back, and it is cast once a dawn), or with `per: "never"` uses that never
+     *  come back, the last ending the item as its charges say (an Efreeti Bottle's openings). */
+    alsoUses: z
+      .object({
+        limit: z.number().int().min(1).max(MAX_ACTION_USES),
+        per: z.literal("never").optional(),
+        pool: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(120)
+          .optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A second limit each of its uses counts against too: uses a Long Rest restores (a Luck Blade's Wish once a dawn), or with per never uses that never come back, the last ending the item as its charges say (an Efreeti Bottle's openings)"
+      ),
     /** Its uses are time in this unit: a use spends all that is left and lasts that long, and what is left when it ends
      *  early comes back (Boots of Speed's 10 minutes as 100 rounds, a Goat of Traveling's 24 hours). */
     timePool: z
