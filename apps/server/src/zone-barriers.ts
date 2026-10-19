@@ -57,6 +57,7 @@ function barriersFor(
     // The caster of an Emanation carries it; its own shell doesn't hold it.
     if (!content || !bars || !heldBack(bars, type, body)) return [];
     if (content.trigger.around === "caster" && zone.casterId === creature.id) return [];
+    if (bars.insiders && zone.insiders?.includes(creature.id)) return [];
     const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
     return inside ? [{ zone, bars, inside }] : [];
   });

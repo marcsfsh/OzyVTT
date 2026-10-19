@@ -2633,7 +2633,7 @@ export const AreaTriggerSchema = z
      *  either way ("both": Antilife Shell), and with `reach` can't reach through it with a melee attack that isn't
      *  made with a Reach weapon. `types` it holds back, or every type `except` these; every creature when neither.
      *  `sizes` and `flying` narrow it to creatures of those sizes, and to those in the air (Wind Wall: "Small or
-     *  smaller flying creatures"). */
+     *  smaller flying creatures"); with `insiders`, the creatures inside it when it was made pass freely (Tiny Hut). */
     bars: z
       .object({
         way: z.enum(["in", "both"]),
@@ -2641,7 +2641,8 @@ export const AreaTriggerSchema = z
         except: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
         reach: z.literal(true).optional(),
         sizes: z.array(SizeSchema).min(1).max(5).optional(),
-        flying: z.literal(true).optional()
+        flying: z.literal(true).optional(),
+        insiders: z.literal(true).optional()
       })
       .strict()
       .optional(),

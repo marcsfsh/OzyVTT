@@ -1156,6 +1156,8 @@ export const SpellZoneSchema = z
     area: ActionAreaSchema.nullable().default(null),
     /** Where its caster stood at the cast, for an Emanation that stays there (Globe of Invulnerability). */
     anchor: z.object({ x: z.number(), y: z.number() }).strict().optional(),
+    /** The creatures inside it when it was made, which its barrier lets through (Tiny Hut). */
+    insiders: z.array(z.uuid()).max(200).optional(),
     /** What an item's or a creature's area acts with (spread Caltrops' save and damage), kept here since what left it
      *  may be gone; a spell's area reads its spell instead. */
     rule: z

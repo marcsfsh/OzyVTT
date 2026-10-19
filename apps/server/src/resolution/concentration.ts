@@ -7,6 +7,7 @@ import { isItemActionId, itemActionRest, laterRowOf, laterSpellActionId } from "
 import { CommandRejectedError } from "../game-store.js";
 import { itemRowOfAction } from "../item-charges.js";
 import { castThisTurnKey } from "../lasting-spells.js";
+import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { areaAtLevel, endZone } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
 import { tableLineOf, type ResolveContext } from "./context.js";
@@ -195,6 +196,21 @@ function itemCastDc(ctx: ResolveContext, spell: SpellReference): number | undefi
  * game clock and across fights as that effect does. Cast without a template (a player's cast), the area waits for the
  * GM to place it. The creatures the cast itself caught have made this turn's save already.
  */
+/** The caster and every creature within `feet` of it as it casts, measured on the map. */
+function insidersAtCast(ctx: ResolveContext, feet: number): string[] {
+  const { state, attacker, deps } = ctx;
+  const near = (actorId: string) => {
+    const apart = deps.distanceFeet?.(attacker.id, actorId) ?? null;
+    return apart !== null && apart <= feet + DISTANCE_TOLERANCE_FEET;
+  };
+  return [
+    attacker.id,
+    ...state.combat.tokens
+      .filter((token) => token.position !== null && token.actorId !== attacker.id && near(token.actorId))
+      .map((token) => token.actorId)
+  ];
+}
+
 export function openSpellZone(ctx: ResolveContext): void {
   const spell = spellOf(ctx);
   const row = spell ? zoneRowOf(spell) : undefined;
@@ -230,6 +246,8 @@ export function openSpellZone(ctx: ResolveContext): void {
     ...(row.zone.on.includes("spell-end") ? { burstsOnEnd: true as const } : {}),
     // "An immobile barrier": it stays where its caster stood.
     ...(row.zone.stays && casterAt ? { anchor: { x: casterAt.x, y: casterAt.y } } : {}),
+    // Tiny Hut: "Creatures and objects within the Emanation when you cast the spell can move through it freely".
+    ...(row.zone.bars?.insiders ? { insiders: insidersAtCast(ctx, row.zone.feet ?? 5) } : {}),
     entered: [],
     affected: caught ? targets.map((target) => target.id) : []
   };

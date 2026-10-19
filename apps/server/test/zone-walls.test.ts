@@ -6,8 +6,8 @@ import { effectiveActions } from "../src/effective-actions.js";
 import type { ResolveDependencies } from "../src/resolution/context.js";
 import { barredStepFor } from "../src/zone-barriers.js";
 import { deflectingWall, launchesProjectile, zoneCover } from "../src/zone-walls.js";
-import { build, catalog, fight, fighterInput, FOE, HERO } from "./spell-casters.js";
-import { cell, drawArea, place, zoneDeps } from "./zone-fixtures.js";
+import { ALLY, build, catalog, fight, fighterInput, FOE, HERO } from "./spell-casters.js";
+import { cell, drawArea, place, wizardAt, zoneDeps } from "./zone-fixtures.js";
 
 // SRD 5.2.1 Blade Barrier: "The wall provides Three-Quarters Cover". Wind Wall: "Arrows, bolts, and other ordinary
 // projectiles launched at targets behind the wall are deflected upward and miss automatically. Boulders hurled by
@@ -145,5 +145,36 @@ describe("Wind Wall", () => {
     goblin.size = "medium";
     fly(true);
     expect(crosses()).toBe(false);
+  });
+});
+
+describe("Tiny Hut", () => {
+  it("lets the creatures inside at the cast through its dome and bars everyone else", () => {
+    const definition = wizardAt(5, ["tiny-hut"]);
+    const caster = fight(definition, { combat: false, ally: true });
+    place(caster.state, { [HERO]: cell(5, 5), [ALLY]: cell(6, 5), [FOE]: cell(12, 5) });
+    const inside = new Set([HERO, ALLY]);
+    let rolls = 0;
+    resolveDefinitionAction(
+      caster.state,
+      caster.action("spell-tiny-hut"),
+      { actorId: HERO, targetIds: [], commandId: "70000000-0000-4000-8000-000000000001" },
+      {
+        random: () => 3,
+        newRollId: () => `40000000-0000-4000-8000-${String((rolls += 1)).padStart(12, "0")}`,
+        gmSessionId: "30000000-0000-4000-8000-00000000000a",
+        now: () => "2026-10-19T00:00:00.000Z",
+        definition,
+        catalog,
+        resolveDefinition: () => undefined,
+        distanceFeet: (_from, to) => (inside.has(to) ? 5 : 30)
+      }
+    );
+    const hut = caster.state.combat.spellZones.find((zone) => zone.spellId === "tiny-hut");
+    expect(hut?.insiders).toEqual([HERO, ALLY]);
+    expect(hut?.anchor).toEqual(cell(5, 5));
+    // The dome reaches 10 feet from the caster's space: column 7 is inside, column 8 is out.
+    expect(barredStepFor(caster.state, FOE, zoneDeps())?.(cell(8, 5), cell(7, 5), 1)).toBe(true);
+    expect(barredStepFor(caster.state, ALLY, zoneDeps())?.(cell(7, 5), cell(8, 5), 1) ?? false).toBe(false);
   });
 });

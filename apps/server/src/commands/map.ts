@@ -49,6 +49,7 @@ import {
 import { releaseGrapplesOutOfRange, type EffectNarration } from "../effects.js";
 import { endZoneAndItsSpell, placeZone, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
 import { fireFormBurns } from "../wall-passage.js";
+import { teleportOutOfCage } from "../forcecage.js";
 import { zoneContentOf } from "../spell-zone-state.js";
 import { policeBarrier, shellsForcedBy, teleportBarredAt } from "../zone-barriers.js";
 import { zoneMovementOptions } from "../zone-ground.js";
@@ -283,6 +284,20 @@ export const mapCommands = [
               ),
               landing
             );
+        }
+        // A teleport out of a Forcecage takes a Charisma save first; a failure keeps the creature in and wastes it.
+        const landed = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
+        if (mode === "teleport" && from !== null && landed !== null && !outcome.teleportFails) {
+          const caged = teleportOutOfCage(state, actorId, from, landed, {
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+            catalog: kit.equipmentCatalog(),
+            rollDie: (sides) => kit.context.random(sides)
+          });
+          if (caged) landing.push(...caged.events);
+          if (caged?.held) {
+            moveEncounterToken(state, actorId, from, geometry);
+            setAltitude(state, actorId, fromAltitude, wasAirborne);
+          }
         }
         movementWarning = outcome.warning;
         movementOverridden = outcome.overridden;

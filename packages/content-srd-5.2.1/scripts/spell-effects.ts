@@ -635,6 +635,16 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       wardsSpells: 5
     })
   ],
+  // "A 10-foot Emanation springs into existence around you and remains stationary": the creatures inside it at the cast
+  // move through it freely, "all other creatures and objects are barred from passing through it", and "spells of level
+  // 3 or lower can't be cast through it". Its light and its one-way sight are the GM's.
+  "tiny-hut": [
+    lasting(
+      "hut",
+      "Only the creatures inside the dome when it was made can pass through it, and spells of level 3 or lower cast from outside can't reach inside.",
+      { on: [], around: "caster", feet: 10, stays: true, wardsSpells: 3, bars: { way: "both", insiders: true } }
+    )
+  ],
   // Explosive Rune: a creature that sets the glyph off (stepping on it) makes it erupt in a "20-foot-radius Sphere
   // centered on the glyph", and "once a glyph is triggered, this spell ends". The glyph is nearly imperceptible.
   "glyph-of-warding": [

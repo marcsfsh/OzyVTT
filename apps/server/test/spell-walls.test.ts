@@ -7,6 +7,7 @@ import { passGameTime } from "../src/game-time.js";
 import { heldShutAgainst } from "../src/doors.js";
 import { findObject, damageObject } from "../src/objects.js";
 import { pruneEndedWalls } from "../src/spell-walls.js";
+import { teleportOutOfCage } from "../src/forcecage.js";
 import { pruneEndedSight } from "../src/vision/cast-sight.js";
 import { mapCover } from "../src/cover.js";
 import { sceneSight } from "../src/vision/sight.js";
@@ -185,6 +186,31 @@ describe("Forcecage's cage", () => {
     expect(movementCost(caster.state, GRID, FOE, cell(6, 6), cell(10, 6))?.blocked).toBe(true);
     expect(mapCover(caster.state, HERO, FOE)).toBeNull();
     expect(sceneSight(caster.state, { definition: () => undefined }).sees(HERO, FOE)).toBe(true);
+  });
+
+  it("makes a creature teleporting out of it succeed on a Charisma save against the caster's DC first", () => {
+    const caster = fight(wizardAt(13, ["forcecage"]));
+    place(caster.state, { [HERO]: cell(1, 1), [FOE]: cell(6, 6) });
+    carry(caster.state, HERO, "Ruby dust");
+    withVision(caster.state);
+    caster.resolve("spell-forcecage", {
+      targetIds: [],
+      areaPlaced: true,
+      placedArea: { shape: "square", origin: { x: 200, y: 200 }, target: { x: 400, y: 400 } }
+    });
+    const deps = (face: number) => ({
+      resolveDefinition: (id: string) => (id === caster.hero.definitionId ? caster.definition : undefined),
+      rollDie: () => face
+    });
+    const failed = teleportOutOfCage(caster.state, FOE, cell(6, 6), cell(12, 6), deps(2));
+    expect(failed?.held).toBe(true);
+    expect(failed?.events[0]?.text).toMatch(
+      /^Goblin fails a DC \d+ Charisma saving throw \(2\) and stays in the Forcecage/
+    );
+    expect(teleportOutOfCage(caster.state, FOE, cell(6, 6), cell(12, 6), deps(20))?.held).toBe(false);
+    // A teleport inside the cage, or from outside it, takes no save.
+    expect(teleportOutOfCage(caster.state, FOE, cell(6, 6), cell(5, 5), deps(2))).toBeNull();
+    expect(teleportOutOfCage(caster.state, FOE, cell(12, 6), cell(14, 6), deps(2))).toBeNull();
   });
 });
 
