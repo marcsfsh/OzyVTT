@@ -646,43 +646,54 @@ function unarmedDc(attacker: ResolveContext["attacker"], definition: ActorDefini
  *  DC. A failed save is Grappled (escape DC = that DC), Prone, or a 5-foot push the GM moves. */
 function unarmedSave(failure: "grappled" | "prone" | "pushed") {
   return (ctx: ResolveContext): void => {
-    const { state, action, attacker, targets, deps } = ctx;
-    if (targets.length !== 1) throw new CommandRejectedError("Choose exactly one target.");
-    const target = targets[0];
-    const dc = unarmedDc(attacker, deps.definition);
-    const targetDefinition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
-    const ability: "str" | "dex" =
-      saveModifierFor(targetDefinition, "dex") >= saveModifierFor(targetDefinition, "str") ? "dex" : "str";
-    createPendingSaves(state, {
-      sourceActorId: attacker.id,
-      sourceName: attacker.name,
-      actionName: action.name,
-      ability,
-      dc,
-      targetIds: [target.id],
-      proposedDamage: 0,
-      halfOnSuccess: false,
-      conditionIds: failure === "prone" ? ["prone"] : [],
-      ...(failure === "grappled"
-        ? {
-            onFailEffect: {
-              name: `Grappled by ${attacker.name}`,
-              tags: ["grapple"],
-              linkedConditionIds: ["grappled"],
-              escapeDc: dc,
-              sourceActorId: attacker.id,
-              sourceName: attacker.name,
-              endsWhenSourceDefeated: true,
-              rangeFeet: 5
-            }
-          }
-        : {}),
-      newSaveId: deps.newRollId,
-      createdAt: Date.parse(deps.now())
-    });
-    if (failure === "pushed") ctx.warnings.push(`On a failed save, ${target.name} is pushed 5 feet. Move the token.`);
-    ctx.builtinSave = { ability, dc, targets: [{ targetId: target.id, targetName: target.name }] };
+    if (ctx.targets.length !== 1) throw new CommandRejectedError("Choose exactly one target.");
+    openUnarmedSave(ctx, failure, ctx.action.name);
   };
+}
+
+/** The save an Unarmed Strike's Grapple or Shove opens on the one target, named `actionName` (Punch and Grab opens the
+ *  Grapple on a Damage hit). */
+export function openUnarmedSave(
+  ctx: ResolveContext,
+  failure: "grappled" | "prone" | "pushed",
+  actionName: string
+): void {
+  const { state, attacker, targets, deps } = ctx;
+  const action = { name: actionName };
+  const target = targets[0]!;
+  const dc = unarmedDc(attacker, deps.definition);
+  const targetDefinition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
+  const ability: "str" | "dex" =
+    saveModifierFor(targetDefinition, "dex") >= saveModifierFor(targetDefinition, "str") ? "dex" : "str";
+  createPendingSaves(state, {
+    sourceActorId: attacker.id,
+    sourceName: attacker.name,
+    actionName: action.name,
+    ability,
+    dc,
+    targetIds: [target.id],
+    proposedDamage: 0,
+    halfOnSuccess: false,
+    conditionIds: failure === "prone" ? ["prone"] : [],
+    ...(failure === "grappled"
+      ? {
+          onFailEffect: {
+            name: `Grappled by ${attacker.name}`,
+            tags: ["grapple"],
+            linkedConditionIds: ["grappled"],
+            escapeDc: dc,
+            sourceActorId: attacker.id,
+            sourceName: attacker.name,
+            endsWhenSourceDefeated: true,
+            rangeFeet: 5
+          }
+        }
+      : {}),
+    newSaveId: deps.newRollId,
+    createdAt: Date.parse(deps.now())
+  });
+  if (failure === "pushed") ctx.warnings.push(`On a failed save, ${target.name} is pushed 5 feet. Move the token.`);
+  ctx.builtinSave = { ability, dc, targets: [{ targetId: target.id, targetName: target.name }] };
 }
 
 const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {

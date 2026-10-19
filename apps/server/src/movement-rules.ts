@@ -264,7 +264,7 @@ export const CARRIED_FREE_TAG = "carried-free";
 
 /** SRD Grappled: "The grappler can drag or carry you when it moves, but every foot of movement costs it 1 extra foot
  *  unless you are Tiny or two or more sizes smaller than it." A bugbear's Abduct: it "needn't spend extra movement to
- *  move a creature it is grappling". */
+ *  move a creature it is grappling", and Grappler's Fast Wrestler waives it for a creature its size or smaller. */
 export function dragCostsExtra(
   state: GameState,
   grapplerId: string,
@@ -282,8 +282,12 @@ export function dragCostsExtra(
       .find((actor) => actor.id === actorId)
       ?.effects.some((effect) => effect.sourceActorId === grapplerId && effect.tags.includes(CARRIED_FREE_TAG)) ===
     true;
+  // Grappler's Fast Wrestler: no extra movement "to move a creature Grappled by you if the creature is your size or
+  // smaller".
+  const wrestler = holdsFeature(definition, "grappler", "Grappler");
   return grappledIds.some((actorId) => {
     const size = state.actors.find((actor) => actor.id === actorId)?.size ?? "medium";
+    if (wrestler && rank(actorId) <= rank(grapplerId)) return false;
     return size !== "tiny" && rank(grapplerId) - rank(actorId) < 2 && !carriedFree(actorId);
   });
 }

@@ -18,6 +18,7 @@ import { UNARMED_STRIKE_ACTION_ID } from "../src/item-actions.js";
 import { applyDamageDetailed, RELENTLESS_RAGE_KEY } from "../src/hit-points.js";
 import { applyRest } from "../src/rests.js";
 import { currentSpeedFeet } from "../src/speed.js";
+import { dragCostsExtra } from "../src/movement-rules.js";
 
 // Barbarian, Fighter and Monk mechanics, asserted as numbers a player can act on: sheet AC, the DC a
 // target is held to, the die the engine keeps, the counter it spends, or the refusal it prints. Runs
@@ -930,6 +931,66 @@ describe("healing features heal what they print", () => {
     built.hero.hp.current = 10;
     use(built, "wholeness-of-body", [], [4]);
     expect(built.hero.hp.current).toBe(17);
+  });
+});
+
+describe("Grappler: Punch and Grab, and Fast Wrestler", () => {
+  /** A Barbarian 4 who took Grappler (+1 Strength) for the level-4 feat. */
+  const grappler = () => {
+    const input = barbarianInput(4);
+    input.choices = [
+      ...input.choices.filter(
+        (row) => !(row.level === 4 && (row.kind === "asi-or-feat" || row.kind === "ability-score"))
+      ),
+      { level: 4, classId: "barbarian", kind: "asi-or-feat", id: "grappler" },
+      { level: 4, kind: "ability-score", id: "str", payload: { featureId: "grappler" } }
+    ] as Row[];
+    return onTheTable(build(input));
+  };
+  const punch = (built: Built, faces: number[], hitOptions?: Array<{ id: string }>, commit = true) =>
+    resolveDefinitionAction(
+      built.state,
+      builtinActionFor(built.definition, "unarmed-strike")!,
+      {
+        actorId: IDS.hero,
+        targetIds: [IDS.foe],
+        commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
+        builtin: true,
+        commit,
+        ...(hitOptions ? { hitOptions } : {})
+      },
+      deps(built, faces)
+    );
+
+  it("lets an Unarmed Strike hit in the Attack action both damage and open the Grapple, once a turn", () => {
+    const built = grappler();
+    expect(offerIds(punch(built, [15], undefined, false))).toContain("punch-and-grab");
+    const hit = punch(built, [15], [{ id: "punch-and-grab" }]);
+    expect(hit.damageTotal).toBeGreaterThan(0);
+    // Strength 18 (+4) and Proficiency Bonus 2: DC 14, the escape DC too.
+    const save = built.state.combat.pendingSaves.find((entry) => entry.targetActorId === IDS.foe)!;
+    expect(save).toMatchObject({ dc: 14, onFailEffect: { linkedConditionIds: ["grappled"], escapeDc: 14 } });
+    built.state.combat.turn = { ...built.state.combat.turn, actionUsed: false, actionInstance: null };
+    expect(offerIds(punch(built, [15], undefined, false))).not.toContain("punch-and-grab");
+  });
+
+  it("isn't offered without the feat", () => {
+    const built = onTheTable(build(barbarianInput(4)));
+    expect(offerIds(punch(built, [15], undefined, false))).not.toContain("punch-and-grab");
+  });
+
+  it("drags a grappled creature its size or smaller for no extra movement", () => {
+    const built = grappler();
+    const foe = built.state.actors.find((actor) => actor.id === IDS.foe)!;
+    const resolveDefinition = () => built.definition;
+    // The halfling Barbarian is Small: a Small foe comes free, a Medium one still costs the extra foot.
+    foe.size = "small";
+    expect(dragCostsExtra(built.state, IDS.hero, [IDS.foe], resolveDefinition)).toBe(false);
+    foe.size = "medium";
+    expect(dragCostsExtra(built.state, IDS.hero, [IDS.foe], resolveDefinition)).toBe(true);
+    const plain = onTheTable(build(barbarianInput(4)));
+    plain.state.actors.find((actor) => actor.id === IDS.foe)!.size = "small";
+    expect(dragCostsExtra(plain.state, IDS.hero, [IDS.foe], () => plain.definition)).toBe(true);
   });
 });
 

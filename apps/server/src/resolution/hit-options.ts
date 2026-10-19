@@ -15,7 +15,15 @@ import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { SMITE_OF_PROTECTION_TAG } from "../paladin-auras.js";
 import { effectiveModeFor, overrideCovers, overrideWaives } from "../rules-families.js";
 import { useCostOf } from "../use-cost.js";
-import { recordRoll, sizeAtMost, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
+import {
+  recordRoll,
+  sizeAtMost,
+  sizeRank,
+  tableLineOf,
+  type DefinitionAction,
+  type ResolveContext
+} from "./context.js";
+import { openUnarmedSave } from "./builtins.js";
 import { beginConcentration } from "./concentration.js";
 import { criticalExpression, SAVAGE_ATTACKER, savageAttackerReady } from "./damage.js";
 import { commitEconomy, evaluateActionEconomy, planEconomy, spendSlot } from "./economy.js";
@@ -274,6 +282,39 @@ function diceOf(ctx: ResolveContext, action: DefinitionAction, rider: HitRider, 
   return `${dice.join(" + ")} ${types ? types.map(capitalised).join(" or ") : capitalised(action.damage[0]?.type ?? "")}`.trim();
 }
 
+/** Grappler's Punch and Grab. */
+export const PUNCH_AND_GRAB = "punch-and-grab";
+
+/** SRD Grappler, Punch and Grab: "When you hit a creature with an Unarmed Strike as part of the Attack action on your
+ *  turn, you can use both the Damage and the Grapple option. You can use this benefit only once per turn." The target
+ *  is one the Grapple option can take: no more than one size larger. */
+function punchAndGrabReady(ctx: ResolveContext): boolean {
+  const { state, attacker, action } = ctx;
+  if (!landed(ctx) || ctx.targets.length !== 1) return false;
+  if (builtinBaseId(action.id) !== UNARMED_STRIKE_ACTION_ID || action.activation !== "action" || fromFlurry(ctx))
+    return false;
+  if (state.combat.active && state.combat.turnActorId !== attacker.id) return false;
+  if (!holdsFeature(ctx.deps.definition, "grappler", "Grappler")) return false;
+  if ((state.combat.turn.turnUses[`${attacker.id}:${PUNCH_AND_GRAB}`] ?? 0) > 0) return false;
+  return sizeRank(ctx.targets[0]!.size) - sizeRank(attacker.size) <= 1;
+}
+
+/** Opens the Grapple's save on a Damage hit that took Punch and Grab, and spends the turn's use on the confirm. */
+function punchAndGrab(ctx: ResolveContext): void {
+  if (!punchAndGrabReady(ctx)) {
+    refuse(ctx, `${ctx.attacker.name} can't use Punch and Grab on this hit.`);
+    return;
+  }
+  openUnarmedSave(ctx, "grappled", "Punch and Grab");
+  if (ctx.state.combat.active && ctx.input.commit !== false) {
+    const key = `${ctx.attacker.id}:${PUNCH_AND_GRAB}`;
+    ctx.state.combat = {
+      ...ctx.state.combat,
+      turn: { ...ctx.state.combat.turn, turnUses: { ...ctx.state.combat.turn.turnUses, [key]: 1 } }
+    };
+  }
+}
+
 /** The extras a previewed hit may carry, for the card to offer. Empty unless the attack would land. */
 export function hitOffersOf(ctx: ResolveContext): HitOffer[] {
   if (!landed(ctx) || ctx.targets.length !== 1) return [];
@@ -295,6 +336,14 @@ export function hitOffersOf(ctx: ResolveContext): HitOffer[] {
       dice: ctx.action.damage[0]!.formula.replace(/\s*[+-]\s*\d+$/, ""),
       cost: "once per turn",
       rerolls: true
+    });
+  if (punchAndGrabReady(ctx))
+    offers.push({
+      id: PUNCH_AND_GRAB,
+      name: "Punch and Grab",
+      dice: "",
+      save: "The target makes a Strength or Dexterity saving throw against the Grapple DC, or has the Grappled condition.",
+      cost: "once per turn"
     });
   for (const action of ctx.siblings) {
     const rider = hitRiderOf(action);
@@ -426,6 +475,10 @@ export function rollHitOptions(ctx: ResolveContext): void {
     if (choice.id === SAVAGE_ATTACKER) continue;
     if (choice.id === "charge") {
       rollCharge(ctx, roll);
+      continue;
+    }
+    if (choice.id === PUNCH_AND_GRAB) {
+      punchAndGrab(ctx);
       continue;
     }
     const action = ctx.siblings.find((candidate) => candidate.id === choice.id);
