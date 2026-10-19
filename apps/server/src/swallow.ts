@@ -110,6 +110,8 @@ export function swallowLands(state: GameState, prey: Actor, swallowerId: string)
 }
 
 type Violation = Readonly<{ rule: "target.not-allowed"; message: string }>;
+const SIZE_ORDER = ["tiny", "small", "medium", "large", "huge", "gargantuan"];
+const sizeRankOf = (size: string | undefined) => SIZE_ORDER.indexOf(size ?? "medium");
 
 /** Why the creature can't use this action now: it holds as many swallowed as it can ("it can have up to three
  *  creatures swallowed at a time"), or its swallow keeps it from the action ("it can't use Bite while it has a
@@ -117,15 +119,34 @@ type Violation = Readonly<{ rule: "target.not-allowed"; message: string }>;
 export function swallowViolations(
   state: GameState,
   attacker: Pick<Actor, "id" | "name">,
-  action: Readonly<{ id: string; name: string; swallow?: Swallow; holdsAtOnce?: number }>,
-  siblings: ReadonlyArray<Readonly<{ id: string; name: string; swallow?: Swallow }>>
+  action: Readonly<{
+    id: string;
+    name: string;
+    swallow?: Swallow;
+    holdsAtOnce?: number;
+    largeFillsHold?: true;
+    save?: Readonly<{ failureMaxSize?: string }>;
+  }>,
+  siblings: ReadonlyArray<Readonly<{ id: string; name: string; swallow?: Swallow }>>,
+  targetIds: readonly string[] = []
 ): Violation[] {
   const violations: Violation[] = [];
-  // "The shambling mound can have only one creature Grappled by this action at a time."
-  const holding = state.actors.filter((actor) =>
-    actor.effects.some((effect) => effect.sourceActorId === attacker.id && effect.sourceActionId === action.id)
-  ).length;
-  if (action.holdsAtOnce !== undefined && holding >= action.holdsAtOnce)
+  // "The shambling mound can have only one creature Grappled by this action at a time"; a water elemental's Whelm
+  // holds "one Large creature or up to two Medium or smaller creatures".
+  const room = (actor: Actor) =>
+    action.largeFillsHold && sizeRankOf(actor.size) >= sizeRankOf("large") ? (action.holdsAtOnce ?? 1) : 1;
+  // A target too large to be held ("If the target is a Large or smaller creature, it has the Grappled condition") takes
+  // no room.
+  const holdable = (actor: Actor) =>
+    action.save?.failureMaxSize === undefined || sizeRankOf(actor.size) <= sizeRankOf(action.save.failureMaxSize);
+  const holding = state.actors
+    .filter(
+      (actor) =>
+        actor.effects.some((effect) => effect.sourceActorId === attacker.id && effect.sourceActionId === action.id) ||
+        (targetIds.includes(actor.id) && holdable(actor))
+    )
+    .reduce((sum, actor) => sum + room(actor), 0);
+  if (action.holdsAtOnce !== undefined && holding > action.holdsAtOnce)
     violations.push({
       rule: "target.not-allowed",
       message: `${attacker.name} can hold only ${action.holdsAtOnce === 1 ? "one creature" : `${action.holdsAtOnce} creatures`} with ${action.name} at a time.`

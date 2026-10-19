@@ -48,6 +48,8 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
   "water-elemental/whelm": {
     why: "a creature outside can pull the whelmed one free, and the whelmed one holds its breath, which the save's text prints",
     save: {
+      // "If the target is a Large or smaller creature, it has the Grappled condition."
+      failureMaxSize: "large",
       // "Is suffocating unless it can breathe water" while the grapple lasts.
       failureEffect: { name: "Whelmed", tags: ["smothering"], modifiers: [] },
       // "As an action, a creature within 5 feet of the elemental can pull a creature out of it by succeeding on a DC 14
@@ -58,7 +60,9 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
         near: "source",
         check: { ability: "str", skill: "athletics", dc: 14 }
       }
-    }
+    },
+    // The Restrained and the held breath it restated are run.
+    reminder: null
   },
   "darkmantle/crush": {
     why: "the attachment, and detaching it with an action and an Athletics check, are printed in the hit's text",

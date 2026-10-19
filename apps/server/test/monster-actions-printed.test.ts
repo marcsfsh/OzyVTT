@@ -487,3 +487,70 @@ describe("a swarm", () => {
     );
   });
 });
+
+describe("a sphinx of valor's Roar", () => {
+  const roar = (built: Table, step: string) => use(built, `roar-${step}-roar`, IDS.hero);
+  const fresh = (built: Table) => {
+    built.state.combat = {
+      ...built.state.combat,
+      turnActorId: IDS.monster,
+      turn: { ...built.state.combat.turn, actionUsed: false, actionInstance: null }
+    };
+  };
+
+  it("roars in its printed order, each roar its own magical save", () => {
+    const built = table("sphinx-of-valor");
+    expect(() => roar(built, "second")).toThrow(/comes as use 2 of 3, and Sphinx of Valor has spent 0/);
+    roar(built, "first");
+    expect(built.state.combat.pendingSaves).toMatchObject([{ ability: "wis", dc: 20, magical: true }]);
+    answer(built, 5);
+    expect(actor(built, IDS.hero).conditions.map((condition) => condition.id)).toEqual(["frightened"]);
+    fresh(built);
+    expect(() => roar(built, "third")).toThrow(RulesBlockedError);
+    roar(built, "second");
+    answer(built, 5);
+    expect(actor(built, IDS.hero).conditions.map((condition) => condition.id)).toContain("paralyzed");
+  });
+
+  it("takes the next roar in its Multiattack's place for Roar", () => {
+    const built = table("sphinx-of-valor");
+    use(built, "multiattack", IDS.hero);
+    use(built, "claw", IDS.hero, [15, 3, 3, 3, 3]);
+    use(built, "claw", IDS.hero, [15, 3, 3, 3, 3]);
+    roar(built, "first");
+    expect(actor(built, IDS.monster).actionUses).toEqual({ roar: 1 });
+  });
+});
+
+describe("a water elemental's Whelm", () => {
+  it("holds one Large creature or two smaller ones, and a Huge one takes the damage alone", () => {
+    const built = table("water-elemental");
+    actor(built, IDS.hero).size = "large";
+    actor(built, IDS.ally).size = "huge";
+    use(built, "whelm", IDS.hero, [], { targetIds: [IDS.hero, IDS.ally] });
+    answer(built, 5);
+    const ally = built.state.combat.pendingSaves.find((save) => save.targetActorId === IDS.ally)!;
+    answerSave(built.state, nextId(), ally.id, "manual", 5, true, GM, {
+      random: () => 3,
+      newRollId: nextId,
+      sessionId: IDS.gm,
+      role: "gm",
+      now: NOW,
+      resolveDefinition: resolveDefinition(built)
+    });
+    expect(actor(built, IDS.hero).conditions.map((condition) => condition.id)).toEqual(["grappled", "restrained"]);
+    expect(actor(built, IDS.ally).conditions).toEqual([]);
+    expect(actor(built, IDS.ally).hp.current).toBeLessThan(50);
+    // The Large creature fills its hold.
+    actor(built, IDS.ally).size = "medium";
+    actor(built, IDS.monster).actionUses = {};
+    built.state.combat = {
+      ...built.state.combat,
+      turnActorId: IDS.monster,
+      turn: { ...built.state.combat.turn, actionUsed: false, actionInstance: null }
+    };
+    expect(() => use(built, "whelm", IDS.ally)).toThrow(
+      /can hold only 2 creatures with Whelm \(Recharge 4-6\) at a time/
+    );
+  });
+});

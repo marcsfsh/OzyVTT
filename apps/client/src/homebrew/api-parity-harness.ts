@@ -463,6 +463,7 @@ const SAVE_LIFETIME_KEYS = [
   "onlyCreatureTypes",
   "sparesAffected",
   "failureKills.**",
+  "failureMaxSize",
   "repeatDamageAgain",
   "repeatUnseenSource",
   "endsOutOfSight",
@@ -743,6 +744,25 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: "*",
     reason:
       "an action offered only right after its user damages a Bloodied creature (a gnoll's Rampage), read from the printed action; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].largeFillsHold",
+    types: "*",
+    reason: "one SRD author (a water elemental's Whelm: one Large creature or up to two smaller ones)",
+    status: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].useNumber",
+    types: "*",
+    reason: "one SRD author (a sphinx of valor's three roars in their order)",
+    status: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].magical",
+    types: ACTION_CARRIERS,
+    reason:
+      "that an action's saves are against magic (a sphinx's magical roar), read from the printed action; no editor control yet",
     status: "gap"
   },
   {

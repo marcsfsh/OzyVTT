@@ -244,7 +244,7 @@ export function evaluateActionEconomy(
   evaluation.violations.push(
     ...actionTargetViolations({ state, attacker, action, targetIds, definition, resolveDefinition, distanceFeet }),
     // How many it can hold swallowed, and what it can't do while it holds one (a giant toad's Bite).
-    ...swallowViolations(state, attacker, action, siblings),
+    ...swallowViolations(state, attacker, action, siblings, targetIds),
     // What a creature attached to another can't do while it holds on (a stirge's Proboscis).
     ...attachmentViolations(state, attacker, action, targetIds),
     // A Rampage waits on damage to a creature already Bloodied.
@@ -822,6 +822,12 @@ function checkLimitedUse({ state, attacker, action, siblings, violations }: Eval
   const limit = useLimitFor(siblings, action);
   const spent =
     uses.per === "turn" ? (state.combat.turn.turnUses[`${attacker.id}:${key}`] ?? 0) : (attacker.actionUses[key] ?? 0);
+  // "Whenever it roars, the roar has a different effect": a use that comes in its order since the last rest.
+  if (action.useNumber !== undefined && spent + 1 !== action.useNumber && spent < limit)
+    violations.push({
+      rule: "feature.no-uses-remaining",
+      message: `${action.name} comes as use ${action.useNumber} of ${limit}, and ${attacker.name} has spent ${spent}.`
+    });
   // Some activations spend several (Lay on Hands' 5-point cure, or the points its user chose).
   const cost = useCostOf(action);
   if (spent + cost > limit)

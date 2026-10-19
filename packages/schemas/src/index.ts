@@ -2970,6 +2970,11 @@ export const SaveOutcomeFields = {
   /** A creature that still bears this action's failure is left out ("each creature that isn't currently affected by
    *  this breath"). */
   sparesAffected: z.literal(true).optional().describe("A creature still under this action's failure makes no new save"),
+  /** A creature larger than this takes the failure's damage alone, without its conditions or effect (a water
+   *  elemental's Whelm: "If the target is a Large or smaller creature, it has the Grappled condition"). */
+  failureMaxSize: SizeSchema.optional().describe(
+    "A creature larger than this takes the failure's damage alone, without its conditions or effect"
+  ),
   /** A failure kills the target outright, and the source may regain hit points from it (a will-o'-wisp's Consume
    *  Life: "The target dies, and the wisp regains 10 (3d6) Hit Points"). */
   failureKills: z
@@ -4322,6 +4327,13 @@ export const ActionSchema = z
     /** How many creatures its effect can hold at once (a shambling mound's Engulf: "only one creature Grappled by this
      *  action at a time"). */
     holdsAtOnce: z.number().int().min(1).max(10).optional(),
+    /** A Large or larger creature it holds fills all of `holdsAtOnce` (a water elemental's Whelm: "one Large creature
+     *  or up to two Medium or smaller creatures"). */
+    largeFillsHold: z.literal(true).optional(),
+    /** Which use of its pool it is, in order (a sphinx's Second Roar is its Roar's second use since a Long Rest). */
+    useNumber: z.number().int().min(1).max(10).optional(),
+    /** Its saves are against magic (a sphinx's "magical roar"), which Magic Resistance meets with Advantage. */
+    magical: z.literal(true).optional(),
     /** What it does to each target with no roll: conditions, on creatures of `maxTargetSize` or smaller, standing
      *  until ended or for `duration`; and a lost Concentration (a tarrasque's shock wave: "Creatures in that area lose
      *  Concentration and, if Medium or smaller, have the Prone condition"). */

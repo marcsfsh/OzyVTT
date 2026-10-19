@@ -42629,7 +42629,12 @@
      },
      {
       "actionId": "roar",
-      "count": 1
+      "count": 1,
+      "or": [
+       "roar-first-roar",
+       "roar-second-roar",
+       "roar-third-roar"
+      ]
      }
     ]
    },
@@ -42677,20 +42682,7 @@
     "name": "Roar (3/Day)",
     "activation": "action",
     "description": "The sphinx emits a magical roar. Whenever it roars, the roar has a different effect, as detailed below (the sequence resets when it takes a Long Rest): - First Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Frightened condition for 1 minute. - Second Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. - Third Roar: Constitution Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: 44 (8d10) Thunder damage, and the target has the Prone condition. Success: Half damage only.",
-    "save": {
-     "ability": "wis",
-     "dc": 20,
-     "successDamage": "half",
-     "failureConditions": [
-      "frightened"
-     ],
-     "failureDuration": {
-      "type": "rounds",
-      "rounds": 10
-     }
-    },
     "damage": [],
-    "reminder": "Roar runs its First Roar (Frightened for 1 minute). The Second Roar (Paralyzed) and Third Roar (Con save, 44 (8d10) Thunder damage and Prone, half on a success) are applied by hand.",
     "uses": {
      "limit": 3,
      "per": "long-rest"
@@ -42700,6 +42692,113 @@
      "sizeFeet": 500,
      "widthFeet": null
     }
+   },
+   {
+    "id": "roar-first-roar",
+    "name": "Roar: First Roar",
+    "activation": "action",
+    "description": "The sphinx emits a magical roar. Whenever it roars, the roar has a different effect, as detailed below (the sequence resets when it takes a Long Rest): - First Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Frightened condition for 1 minute. - Second Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. - Third Roar: Constitution Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: 44 (8d10) Thunder damage, and the target has the Prone condition. Success: Half damage only.",
+    "save": {
+     "ability": "wis",
+     "dc": 20,
+     "successDamage": "none",
+     "failureConditions": [
+      "frightened"
+     ],
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     }
+    },
+    "damage": [],
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 500,
+     "widthFeet": null
+    },
+    "targets": {
+     "who": "enemies"
+    },
+    "magical": true,
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "roar"
+    },
+    "useNumber": 1,
+    "partOf": "roar"
+   },
+   {
+    "id": "roar-second-roar",
+    "name": "Roar: Second Roar",
+    "activation": "action",
+    "description": "The sphinx emits a magical roar. Whenever it roars, the roar has a different effect, as detailed below (the sequence resets when it takes a Long Rest): - First Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Frightened condition for 1 minute. - Second Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. - Third Roar: Constitution Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: 44 (8d10) Thunder damage, and the target has the Prone condition. Success: Half damage only.",
+    "save": {
+     "ability": "wis",
+     "dc": 20,
+     "successDamage": "none",
+     "failureConditions": [
+      "paralyzed"
+     ],
+     "repeatSave": true,
+     "failureDuration": {
+      "type": "rounds",
+      "rounds": 10
+     }
+    },
+    "damage": [],
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 500,
+     "widthFeet": null
+    },
+    "targets": {
+     "who": "enemies"
+    },
+    "magical": true,
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "roar"
+    },
+    "useNumber": 2,
+    "partOf": "roar"
+   },
+   {
+    "id": "roar-third-roar",
+    "name": "Roar: Third Roar",
+    "activation": "action",
+    "description": "The sphinx emits a magical roar. Whenever it roars, the roar has a different effect, as detailed below (the sequence resets when it takes a Long Rest): - First Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Frightened condition for 1 minute. - Second Roar: Wisdom Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: The target has the Paralyzed condition, and it repeats the save at the end of each of its turns, ending the effect on itself on a success. After 1 minute, it succeeds automatically. - Third Roar: Constitution Saving Throw: DC 20, each enemy in a 500-foot Emanation originating from the sphinx. Failure: 44 (8d10) Thunder damage, and the target has the Prone condition. Success: Half damage only.",
+    "save": {
+     "ability": "con",
+     "dc": 20,
+     "successDamage": "half",
+     "failureConditions": [
+      "prone"
+     ]
+    },
+    "damage": [
+     {
+      "formula": "8d10",
+      "type": "thunder"
+     }
+    ],
+    "area": {
+     "shape": "emanation",
+     "sizeFeet": 500,
+     "widthFeet": null
+    },
+    "targets": {
+     "who": "enemies"
+    },
+    "magical": true,
+    "uses": {
+     "limit": 3,
+     "per": "long-rest",
+     "pool": "roar"
+    },
+    "useNumber": 3,
+    "partOf": "roar"
    },
    {
     "id": "spellcasting",
@@ -48972,6 +49071,7 @@
       ],
       "at": "source-turn-start"
      },
+     "failureMaxSize": "large",
      "failureEffect": {
       "name": "Whelmed",
       "tags": [
@@ -48996,7 +49096,6 @@
       "type": "bludgeoning"
      }
     ],
-    "reminder": "Until the grapple ends, the target has the Restrained condition, is suffocating unless it can breathe water.",
     "targets": {
      "inSpace": true
     },
@@ -49004,7 +49103,9 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 4
-    }
+    },
+    "holdsAtOnce": 2,
+    "largeFillsHold": true
    }
   ],
   "token": {

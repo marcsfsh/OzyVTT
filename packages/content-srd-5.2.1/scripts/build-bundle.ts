@@ -58,6 +58,7 @@ import { PRINTED_NAME_KEYS, printedName, statBlockActionText, statBlockTraitText
 import { lairCountsOf, STATBLOCK_SLUGS, statBlockHeaderOf } from "./monster-statblock.js";
 import { HIT_NOTE_KEYS, withHitNotes } from "./monster-hit-notes.js";
 import { swallowOf } from "./monster-swallow.js";
+import { SEQUENCE_SLUGS, withSequences } from "./monster-sequences.js";
 import { SUMMON_STAT_BLOCKS } from "./summon-stat-blocks.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
@@ -640,6 +641,7 @@ const ACTION_ENRICHMENTS: Record<
       | "area"
       | "inflicts"
       | "afterHurtingBloodied"
+      | "largeFillsHold"
     >
   >
 > = {
@@ -686,6 +688,8 @@ const ACTION_ENRICHMENTS: Record<
   },
   // "The shambling mound can have only one creature Grappled by this action at a time."
   "shambling-mound/engulf": { holdsAtOnce: 1 },
+  // "The elemental can grapple one Large creature or up to two Medium or smaller creatures at a time with Whelm."
+  "water-elemental/whelm": { holdsAtOnce: 2, largeFillsHold: true },
   // "The tarrasque moves up to its Speed. At the end of this movement, the tarrasque creates an instantaneous shock
   // wave in a 60-foot Emanation originating from itself. Creatures in that area lose Concentration and, if Medium or
   // smaller, have the Prone condition."
@@ -1446,7 +1450,7 @@ const monsters: ActorDefinition[] = creatures
     });
     // The spells its actions cast, each a cast action in play; only spells the SRD spell list holds.
     const actions = withSpellcasting(
-      linkedActions(withHitNotes(slug, creatureActions, notedHits), siblingIdOf),
+      withSequences(slug, linkedActions(withHitNotes(slug, creatureActions, notedHits), siblingIdOf)),
       {
         abilityScores: {
           str: fields.ability_score_strength,
@@ -1580,6 +1584,13 @@ const monsters: ActorDefinition[] = creatures
     };
   });
 
+for (const slug of SEQUENCE_SLUGS)
+  if (
+    !monsters.some((monster) => slugOf(monster.source.externalId) === slug && monster.actions.some((a) => a.useNumber))
+  )
+    throw new Error(
+      `A sequence names ${slug}, whose action it no longer finds - check for a typo or an upstream rename.`
+    );
 for (const key of HIT_NOTE_KEYS)
   if (!notedHits.has(key)) throw new Error(`A hit note names ${key}, which no stat block has - check for a typo.`);
 for (const key of Object.keys(MONSTER_ACTION_FIXES))
