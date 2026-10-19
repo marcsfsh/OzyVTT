@@ -228,8 +228,8 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   help: guided(
     "resolution/attack.ts gives the next attack roll by an ally against the distracted enemy Advantage. Helping with an ability check is the GM's to apply."
   ),
-  "heroic-inspiration": enforced(
-    "held-rolls.ts spends it to reroll the d20 of an attack, a check or a save. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn."
+  "heroic-inspiration": guided(
+    "held-rolls.ts spends it to reroll the d20 of an attack, a check, a save or a death save while the roll is shown. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. Rerolling a damage die or Initiative, and giving a second one to another character, are the GM's."
   ),
   hide: enforced(
     "resolution/builtins.ts rolls a DC 15 Dexterity (Stealth) check and makes the creature Invisible on a success, until it attacks. Whether it can hide there is the GM's call."
@@ -516,7 +516,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   "Probing Telepathy": senses,
   "Reactive Heads": reference("The extra Reactions are the GM's to allow."),
-  Reactive: reference("The Reaction on every turn is the GM's to allow."),
+  Reactive: enforced("encounter.ts gives the marilith a fresh Reaction at the start of every turn."),
   "Reflective Carapace": reference("The d6 against spells aimed at it is the GM's to roll."),
   Regeneration: enforced(
     "trait-turns.ts restores the Hit Points at the start of its turns, stopped for a turn by the damage types it names. statblock-traits.ts keeps a troll at 0 Hit Points alive until a turn starts without regenerating."
@@ -649,7 +649,57 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The escape from a grapple rolls with Advantage (resolution/builtins.ts). The app doesn't track carrying capacity, so counting one size larger for it is the GM's."
   ),
   "feature:goliath-giant-ancestry": guided(
-    "The chosen ancestry and its uses are recorded, and Storm's Thunder is offered as a Reaction. The other boons' damage, push and teleport are the GM's."
+    "The chosen ancestry and its uses are recorded. Storm's Thunder is offered as a Reaction, and Stone's Endurance as a Reaction to damage from a hit or a failed save, taking 1d12 plus the Constitution modifier off it before it lands (damage-window.ts). The other boons' damage, push and teleport are the GM's."
+  ),
+
+  // Answers to a roll after it is seen (roll-answers.ts), and reactions to damage about to land (damage-window.ts).
+  "feature:bardic-inspiration": guided(
+    "The Bonus Action gives another creature the Bard's die, a d6 growing to a d12, one die at a time, and roll-answers.ts offers it when that creature fails an attack roll, a save, a check or a death save: the die is added and spent. Measuring the 60 feet, and ending an unused die after an hour, are the GM's."
+  ),
+  "feature:cutting-words": enforced(
+    "roll-answers.ts asks the Bard by a reaction prompt when a creature it can see within 60 feet hits with an attack roll, succeeds on a check or rolls damage. Using it spends a Bardic Inspiration use and the Reaction and takes the die off the roll, which can turn the hit into a miss or lower the damage before it lands (damage-window.ts)."
+  ),
+  "feature:peerless-skill": enforced(
+    "roll-answers.ts offers it on the Bard's failed attack roll or check: the Bardic Inspiration die is added, and the use is kept when the roll still fails."
+  ),
+  "feature:countercharm": enforced(
+    "roll-answers.ts asks the Bard by a reaction prompt when it or a creature within 30 feet fails a save against an effect that would make it Charmed or Frightened. The save waits, and using the Reaction rerolls it with Advantage."
+  ),
+  "feature:indomitable": enforced(
+    "roll-answers.ts offers it on the Fighter's failed save: the save is rerolled with the Fighter level added, and the new roll stands."
+  ),
+  "feature:tactical-mind": enforced(
+    "roll-answers.ts offers it on the Fighter's failed check: a Second Wind use adds 1d10 to the check, and the use is kept when the check still fails."
+  ),
+  "feature:stroke-of-luck": enforced(
+    "roll-answers.ts offers it on the Rogue's failed D20 Test: the d20 becomes a 20, which makes an attack roll a Critical Hit, and the use returns on a Short or Long Rest."
+  ),
+  "feature:dark-ones-own-luck": enforced(
+    "roll-answers.ts offers it on the Warlock's check or save once the roll is seen: 1d10 is added, and a use is spent."
+  ),
+  "feature:halfling-luck": enforced(
+    "roll-answers.ts offers a reroll when the d20 of the Halfling's attack roll, check, save or death save shows a 1, and the new roll stands."
+  ),
+  "feature:deflect-attacks": guided(
+    "A hit whose damage includes Bludgeoning, Piercing or Slashing opens a reaction prompt (damage-window.ts), and using it takes 1d10 plus the Dexterity modifier and Monk level off the damage before it lands. Redirecting the attack's force for a Focus Point after reducing it to 0 is the GM's."
+  ),
+  "feature:deflect-energy": enforced(
+    "character-build.ts lets Deflect Attacks meet a hit of any damage type from Monk level 13 (damage-window.ts)."
+  ),
+  "feature:superior-hunters-defense": enforced(
+    "damage-window.ts offers it when the Ranger is about to take damage from a hit or a failed save. Using it gives Resistance to the damage's largest type, that damage included, until the end of the current turn."
+  ),
+  "action:Stone Giant/deflect-missile": guided(
+    "A ranged hit with Bludgeoning, Piercing or Slashing damage opens the giant's reaction prompt (damage-window.ts), and using it takes 1d10 + 6 off the damage, recharging on a 5 or 6. Redirecting the force at another creature when the damage reaches 0 is the GM's."
+  ),
+  "action:Rust Monster/reflexive-antennae": guided(
+    "damage-reactions.ts offers it when a creature within 5 feet damages the rust monster, and using it resolves Antennae against that creature, opening its Dexterity save. It is offered on any damage, not only a hit's, so the GM declines it for a spell."
+  ),
+  "action:Sphinx of Wonder/burst-of-ingenuity": enforced(
+    "roll-answers.ts offers it on the sphinx's own check or save and asks it by a prompt about another creature's within 30 feet. Using it adds 2 to the roll, twice a day."
+  ),
+  "feature:savage-attacker": enforced(
+    "resolution/hit-options.ts offers it on a weapon hit once a turn. Chosen, resolution/damage.ts rolls the weapon's damage dice twice and uses the higher roll."
   ),
   "feature:divine-order": guided(
     "Protector's training and Thaumaturge's extra cantrip are applied. Thaumaturge's bonus to Arcana and Religion checks is the GM's."
@@ -681,14 +731,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:grappler": guided(
     "The ability score increase is applied. Punch and Grab, Attack Advantage and Fast Wrestler are the GM's."
   ),
-  "feature:boon-of-combat-prowess": guided(
-    "The ability score increase is applied, and Peerless Aim's use is counted each turn. Turning the miss into a hit is the GM's."
+  "feature:boon-of-combat-prowess": enforced(
+    "The ability score increase is applied, and roll-answers.ts offers Peerless Aim on a missed attack roll: the attack hits, and the boon waits for the start of the creature's next turn."
   ),
   "feature:boon-of-dimensional-travel": guided(
     "The ability score increase is applied. The teleport of Blink Steps is the GM's to move."
   ),
-  "feature:boon-of-fate": guided(
-    "The ability score increase is applied, and Improve Fate's use is counted. Adding the 2d4 to the roll is the GM's."
+  "feature:boon-of-fate": enforced(
+    "The ability score increase is applied. roll-answers.ts offers Improve Fate on the holder's own D20 Test, and asks by a prompt about another creature's within 60 feet: 2d4 is added or taken off, and the use returns when Initiative is rolled or on a rest."
   ),
   "feature:boon-of-irresistible-offense": guided(
     "The ability score increase is applied. Overcoming Resistance, and the extra damage on a 20, are the GM's."
@@ -751,7 +801,10 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "item:iron-flask": guided("The command's save is applied. Trapping the creature in the flask is the GM's."),
   "item:luck-blade": guided(
-    "The +1 to attack and damage rolls and saving throws is applied. Its Luck reroll and its Wish are the GM's."
+    "The +1 to attack and damage rolls and saving throws is applied, and roll-answers.ts offers its Luck reroll on a failed D20 Test once a day while the wielder isn't Incapacitated. Its Wish is the GM's."
+  ),
+  "item:gloves-of-missile-snaring": enforced(
+    "A hit by a weapon from range opens a reaction prompt (damage-window.ts), and using it takes 1d10 plus the wearer's Dexterity modifier off the damage. Whether a hand is free, and catching the missile, are the GM's."
   ),
   "item:mace-of-disruption": guided(
     "The extra 2d6 Radiant against Fiends and Undead is applied. The save against destruction at 25 Hit Points or fewer, and the Frightened condition a success leaves, are the GM's."
@@ -766,7 +819,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The save against Frightened, with its repeat at the end of each turn, is applied. The immunity after a success is the GM's."
   ),
   "item:quarterstaff-of-the-acrobat": guided(
-    "The +2 to attack and damage rolls is applied. Its forms, Acrobatic Assist and Attack Deflection are the GM's."
+    "The +2 to attack and damage rolls is applied, and Attack Deflection is offered once a rest when a hit would land, adding 5 to AC against it (resolution/pending.ts). Its forms, its throw and Acrobatic Assist are the GM's."
   ),
   "item:ring-of-shooting-stars": guided(
     "Its at-will cantrips and the one-charge Shooting Stars are applied. Faerie Fire, the Lightning Spheres and the larger Shooting Stars are the GM's."
@@ -793,7 +846,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Spell attack rolls against its holder have Disadvantage (resolution/attack.ts). Advantage on saves against spells and other magical effects is the GM's."
   ),
   "item:staff-of-charming": guided(
-    "Its one-charge casts are cast actions. Reflecting an enchantment, and resisting one, are the GM's."
+    "Its one-charge casts are cast actions, and roll-answers.ts offers to turn a failed save against an Enchantment spell aimed only at the holder into a success once a day. Turning the spell back on its caster is the GM's."
   ),
   "item:staff-of-fire": guided(
     "Resistance to Fire damage and its one-charge Burning Hands are applied. Fireball and Wall of Fire, which cost more charges, are the GM's."
