@@ -1,3 +1,4 @@
+import { WISH_LOST_TAG } from "./wish.js";
 import { reactionSpent, spendReaction } from "../commanded-reactions.js";
 import { formViolations } from "../transform/rules.js";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
@@ -645,6 +646,13 @@ function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition,
     violations.push({
       rule: "condition.no-spells",
       message: `${attacker.name} can't cast spells until ${shownEffectName(state, taxed, resolveDefinition)} ends with a Long Rest.`
+    });
+  // Wish's stress: "there is a 33 percent chance that you are unable to cast Wish ever again".
+  const wishLost = attacker.effects.find((effect) => effect.tags.includes(WISH_LOST_TAG));
+  if (wishLost && action.spellId === "wish")
+    violations.push({
+      rule: "condition.no-spells",
+      message: `${attacker.name} can never cast Wish again.`
     });
   // SRD Rage: "you can't cast spells".
   if ((action.spellId !== undefined || action.spellSlot !== undefined) && hasEffectTag(attacker, RAGING_TAG))

@@ -345,6 +345,7 @@ export function spellCastMechanics(
       | "explodingDice"
       | "teleportOutcome"
       | "identifiesItem"
+      | "wishUses"
     >
   > {
   // No cast model: the save still applies, and the rest is the GM's.
@@ -365,11 +366,14 @@ export function spellCastMechanics(
     ...(effect.teleportOutcome ? { teleportOutcome: true as const } : {}),
     // Identify: the item it is cast on, which its caster's player then knows.
     ...(effect.identifiesItem ? { identifiesItem: true as const } : {}),
+    // Wish: the use picked on the cast (`resolution/wish.ts`).
+    ...(effect.wishUses ? { wishUses: true as const } : {}),
     // The type the caster picks: of the damage (Chromatic Orb), of the Resistance it grants (Protection from Energy), or
     // of the area it leaves (Conjure Elemental's element).
     ...(effect.damageTypes &&
     (damage.length > 0 ||
       effect.grant !== undefined ||
+      effect.wishUses ||
       (effect.laterActions ?? []).some((row) => row.zone !== undefined && row.damage.length > 0))
       ? { damageTypes: [...effect.damageTypes] }
       : {}),

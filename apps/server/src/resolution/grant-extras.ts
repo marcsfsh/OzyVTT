@@ -1,4 +1,5 @@
-import { TELEPORT_FAMILIARITY } from "@vtt/domain";
+import { TELEPORT_FAMILIARITY, WISH_USES } from "@vtt/domain";
+import { checkWishUse } from "./wish.js";
 import { abilityModifier, isMeleeWeapon } from "@vtt/rules-5e";
 import {
   catalogIdOf,
@@ -47,7 +48,9 @@ export function checkChoices(
   catalog: EquipmentCatalog | undefined,
   definition: ActorDefinition | undefined
 ): void {
-  const offered = optionsOf(action)?.options ?? (action.teleportOutcome ? TELEPORT_FAMILIARITY : undefined);
+  const offered =
+    optionsOf(action)?.options ??
+    (action.teleportOutcome ? TELEPORT_FAMILIARITY : action.wishUses ? WISH_USES : undefined);
   const picks = [input.optionId, ...Object.values(input.targetOptions ?? {})].filter(
     (pick): pick is string => typeof pick === "string"
   );
@@ -57,6 +60,7 @@ export function checkChoices(
   if (Object.keys(input.targetOptions ?? {}).some((id) => !input.targetIds.includes(id)))
     throw new CommandRejectedError("Each choice must be for one of the action's targets.");
   const binds = action.grants?.bindsWeapon;
+  if (action.wishUses) checkWishUse(action, input, attacker);
   if (action.identifiesItem) {
     if (input.itemId != null && !attacker.inventory.some((row) => row.id === input.itemId && row.quantity > 0))
       throw new CommandRejectedError(`${attacker.name} isn't carrying that item.`);

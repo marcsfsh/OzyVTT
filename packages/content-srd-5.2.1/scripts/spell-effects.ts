@@ -102,7 +102,9 @@ const DAMAGE_CHOICES: Readonly<Record<string, readonly DamageType[]>> = {
   // The explosive rune's "Acid, Cold, Fire, Lightning, or Thunder damage (your choice when you create the glyph)".
   "glyph-of-warding": ["thunder", "acid", "cold", "fire", "lightning"],
   // The Resistance the touched creature gains: "one damage type of your choice".
-  "protection-from-energy": ["acid", "cold", "fire", "lightning", "thunder"]
+  "protection-from-energy": ["acid", "cold", "fire", "lightning", "thunder"],
+  // Wish's Resistance: "one damage type you choose".
+  wish: [...DamageTypeSchema.options]
 };
 
 /** Spell attack rolls one cast makes, where the text's wording misleads the reader. */
@@ -239,6 +241,8 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   telekinesis: { count: 1 },
   "telepathic-bond": { count: 8 },
   teleport: { count: 9 },
+  // Instant Health: "you and up to twenty other creatures"; Resistance and Spell Immunity take up to ten.
+  wish: { count: 20 },
   tongues: { count: 1 },
   "true-polymorph": { count: 1 },
   "true-resurrection": { count: 1 },
@@ -2794,6 +2798,7 @@ export function spellEffectFor(
     ...(id === "sorcerous-burst" ? { explodingDice: true as const } : {}),
     ...(id === "teleport" ? { teleportOutcome: true as const } : {}),
     ...(id === "identify" ? { identifiesItem: true as const } : {}),
+    ...(id === "wish" ? { wishUses: true as const } : {}),
     ...(NO_CAST_SAVE.has(id) ? { noCastSave: true as const } : {}),
     ...(later ? { laterActions: later.map((row) => ({ ...row, damage: [...row.damage] })) } : {}),
     ...(darts ? { darts } : {}),

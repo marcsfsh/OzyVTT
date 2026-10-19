@@ -260,7 +260,7 @@ export const SpellEffectSchema = z
     /** Damage to each target, every part rolled; with `darts`, what each dart deals. */
     damage: SpellDamageSchema,
     /** The damage types the caster picks from on each cast (Chromatic Orb); the damage carries the first. */
-    damageTypes: z.array(DamageTypeSchema).min(2).max(10).optional(),
+    damageTypes: z.array(DamageTypeSchema).min(2).max(13).optional(),
     /** Each of its damage dice that rolls its highest face adds another such die, up to the caster's spellcasting
      *  ability modifier in dice for the cast (Sorcerous Burst: "If you roll an 8 on a d8 for this spell, you can roll
      *  another d8"). */
@@ -270,6 +270,8 @@ export const SpellEffectSchema = z
     teleportOutcome: z.literal(true).optional(),
     /** The cast names an item its caster carries and learns its properties (Identify). */
     identifiesItem: z.literal(true).optional(),
+    /** The cast picks one of Wish's uses, and every use but duplicating a spell stresses its caster (`wish.ts`). */
+    wishUses: z.literal(true).optional(),
     /** The spell's save is not made when it is cast but later (Spirit Guardians, Web) or never by its target
      *  (Haste, Sanctuary): the cast prompts none. `laterActions` carries one the engine can roll. */
     noCastSave: z.literal(true).optional(),

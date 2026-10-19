@@ -903,8 +903,20 @@ export const TELEPORT_FAMILIARITY: ReadonlyArray<Readonly<{ id: string; name: st
   { id: "viewed-once", name: "Viewed once or described" },
   { id: "false-destination", name: "False destination" }
 ];
+/** Wish's uses, picked as it is cast: duplicating a spell, and the effects the spell lists. */
+export const WISH_USES: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
+  { id: "duplicate", name: "Duplicate a spell" },
+  { id: "object-creation", name: "Object Creation" },
+  { id: "instant-health", name: "Instant Health" },
+  { id: "resistance", name: "Resistance" },
+  { id: "spell-immunity", name: "Spell Immunity" },
+  { id: "sudden-learning", name: "Sudden Learning" },
+  { id: "roll-redo", name: "Roll Redo" },
+  { id: "reshape-reality", name: "Reshape Reality" }
+];
 type ChoosingAction = Readonly<{
   teleportOutcome?: true;
+  wishUses?: true;
   identifiesItem?: true;
   grants?: Readonly<{
     options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
@@ -924,7 +936,9 @@ export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
     ? action.grants
     : action.teleportOutcome
       ? { options: TELEPORT_FAMILIARITY }
-      : action.save?.failureEffect;
+      : action.wishUses
+        ? { options: WISH_USES }
+        : action.save?.failureEffect;
   const binds = action.grants?.bindsWeapon;
   if (!chooser?.options && !binds && !action.identifiesItem) return null;
   return {

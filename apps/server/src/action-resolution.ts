@@ -109,6 +109,7 @@ import { turnedAwayByWard } from "./resolution/ward.js";
 import { orbLeap } from "./resolution/orb-leap.js";
 import { teleportOutcome } from "./resolution/teleport-outcome.js";
 import { identifyOnCast } from "./resolution/identify.js";
+import { wishOnCast, wishStressOnCast } from "./resolution/wish.js";
 import { openStrike, spendStrike } from "./resolution/true-strike.js";
 import {
   shapedAction,
@@ -352,6 +353,8 @@ export function resolveDefinitionAction(
   killOnCast(ctx);
   teleportOutcome(ctx);
   identifyOnCast(ctx);
+  wishStressOnCast(ctx);
+  wishOnCast(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);

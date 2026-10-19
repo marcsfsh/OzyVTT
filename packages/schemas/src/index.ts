@@ -4501,6 +4501,9 @@ export const ActionSchema = z
       .literal(true)
       .optional()
       .describe("The cast names a carried item (itemId) whose properties its caster learns"),
+    /** Wish: the cast picks one of the spell's uses (`optionId`), and any but duplicating a spell stresses its
+     *  caster. */
+    wishUses: z.literal(true).optional().describe("The cast picks one of Wish's uses"),
     /** Hit points each target regains, rolled once and applied when the action resolves (Cure Wounds). */
     healing: z
       .object({
@@ -4549,7 +4552,7 @@ export const ActionSchema = z
     darts: z.number().int().min(2).max(20).optional(),
     /** The damage types the caster picks from on each use (Chromatic Orb); the resolve names one, and every damage
      *  part takes it. Absent: the damage's own types. */
-    damageTypes: z.array(DamageTypeSchema).min(2).max(10).optional(),
+    damageTypes: z.array(DamageTypeSchema).min(2).max(13).optional(),
     /** Compound action: one shared action slot, components tracked (crocodile Multiattack = one Bite + one Tail). A
      *  component's `or` names other actions that can fill its place ("using Scimitar or Shortbow in any combination"). */
     multiattack: z
