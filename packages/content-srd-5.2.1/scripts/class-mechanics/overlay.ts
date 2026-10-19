@@ -22,7 +22,7 @@ type RiderKey =
 type FeatureRiderKey = RiderKey | "extraSpellLists" | "freeCastOf";
 
 /** The rider fields an overlay may add to one pickable option inside a feature's choice. */
-export type OptionMechanics = Partial<Pick<OptionInput, RiderKey | "requires" | "level">>;
+export type OptionMechanics = Partial<Pick<OptionInput, RiderKey | "requires" | "level" | "repeatable">>;
 
 /**
  * The rider fields an overlay may add to a feature. Typed off the schema's input so `.default()`ed

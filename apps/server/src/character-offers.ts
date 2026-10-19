@@ -1206,12 +1206,18 @@ function placeChoices(
           : `"${row.id}" is level ${spellLevel}, above the maximum spell level (${outOfWindow.maxSpellLevel}) for "${outOfWindow.label}".`
       );
     }
+    // A pick held once may be held again only where the choice or the option says it repeats; two offers of one key (a
+    // repeatable option's own picks) count as one ("choose a different eligible cantrip").
+    const heldUnder = (key: string) => scoped.some((other) => other.key === key && other.taken.includes(row.id));
+    const repeats = (candidate: ChoiceOffer) =>
+      candidate.repeatable ||
+      candidate.optionRecords?.some((option) => option.id === row.id && option.repeatable === true) === true;
     const offer = scoped.find(
       (candidate) =>
         candidate.options.has(row.id) &&
         withinSpellWindow(candidate, row.id) &&
         candidate.taken.length < candidate.capacity &&
-        (candidate.repeatable || !candidate.taken.includes(row.id))
+        (repeats(candidate) || !heldUnder(candidate.key))
     );
     if (!offer) {
       const anyHolds = scoped.some((candidate) => candidate.options.has(row.id));

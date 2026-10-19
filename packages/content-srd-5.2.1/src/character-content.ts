@@ -707,6 +707,13 @@ export const FeatureOptionSchema = z
     level: ContentLevelSchema.optional().describe(
       'The class level this option may first be chosen at: an invocation\'s "Prerequisite: Level 5+ Warlock". A build below it is not offered the option'
     ),
+    /** It may be chosen more than once (an invocation's "Repeatable. You can gain this invocation more than once"). */
+    repeatable: z
+      .literal(true)
+      .optional()
+      .describe(
+        'It may be chosen more than once: an invocation\'s "Repeatable. You can gain this invocation more than once"'
+      ),
     /** A pick this option asks for once chosen, from a list of its own. */
     choice: FeatureOptionChoiceSchema.optional().describe(
       "A second-order pick this option owes once chosen, from a list of its own"

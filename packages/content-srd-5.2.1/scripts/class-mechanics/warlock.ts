@@ -52,24 +52,20 @@ export const warlock: ClassMechanicsModule = {
       options: {
         /**
          * Agonizing Blast, Eldritch Spear and Repelling Blast pick one of the character's known cantrips
-         * (`fromPicks`). Agonizing Blast's Charisma damage is gated to Eldritch Blast by id, since the gate
-         * cannot name the picked cantrip; the engine reads Eldritch Spear's and Repelling Blast's picks off the sheet.
+         * (`fromPicks`), which the server reads off the sheet: Charisma on its damage rolls in its own damage type
+         * (effective-actions.ts), its range (effective-actions.ts) and its push (resolution/masteries.ts). Each is
+         * "Repeatable", for a different cantrip each time.
          */
         "agonizing-blast": {
-          choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "deals-damage" } },
-          modifiers: [
-            {
-              type: "extra-damage",
-              abilityModifier: "cha",
-              damageType: "force",
-              when: [{ type: "on-hit" }, { type: "spell-id-is", spellIds: ["eldritch-blast"] }]
-            }
-          ]
+          repeatable: true,
+          choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "deals-damage" } }
         },
         "eldritch-spear": {
+          repeatable: true,
           choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "ranged-damage" } }
         },
         "repelling-blast": {
+          repeatable: true,
           choice: { kind: "cantrip", choose: 1, fromPicks: { offer: "class-cantrips", where: "attack-roll" } }
         },
         // "Advantage on Constitution saving throws that you make to maintain Concentration."
