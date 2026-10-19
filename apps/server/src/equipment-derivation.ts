@@ -18,6 +18,7 @@ import {
   type Modifier
 } from "@vtt/schemas";
 import {
+  ABILITIES,
   armorWeightOf,
   collectRiders,
   effectiveSlot,
@@ -367,7 +368,11 @@ function characterCarriers(definition: ActorDefinition | undefined, catalog: Equ
   const blocks: Array<Readonly<{ name: string; modifiers: readonly Modifier[] }>> = [];
   for (const held of definition?.character?.feats ?? []) {
     const record = catalog.featRecord?.(held.id);
-    if (record) blocks.push({ name: record.name, modifiers: record.feature.modifiers });
+    if (record)
+      blocks.push({
+        name: record.name,
+        modifiers: withIncreasedAbility(record.feature.modifiers, definition, held.id)
+      });
   }
   for (const held of definition?.character?.features ?? []) {
     const record = catalog.featureRecord?.(held);
@@ -377,6 +382,28 @@ function characterCarriers(definition: ActorDefinition | undefined, catalog: Equ
     const modifiers = block.modifiers.filter(ridesOnTheBearer);
     return modifiers.length > 0 ? [{ label: block.name, modifiers }] : [];
   });
+}
+
+/** "The ability score increased by this feat": a rider naming `increased` takes the ability the ledger picked for the
+ *  feat's own increase, and is dropped when there is none. */
+function withIncreasedAbility(
+  modifiers: readonly Modifier[],
+  definition: ActorDefinition | undefined,
+  featId: string
+): readonly Modifier[] {
+  if (!modifiers.some((modifier) => "abilityScore" in modifier && modifier.abilityScore === "increased"))
+    return modifiers;
+  const picked = (definition?.character?.choices ?? []).find(
+    (row) => row.kind === "ability-score" && (row.payload as { featureId?: unknown } | undefined)?.featureId === featId
+  )?.id;
+  const ability = ABILITIES.find((candidate) => candidate === picked);
+  return modifiers.flatMap((modifier) =>
+    "abilityScore" in modifier && modifier.abilityScore === "increased"
+      ? ability
+        ? [{ ...modifier, abilityScore: ability } as Modifier]
+        : []
+      : [modifier]
+  );
 }
 
 /** Own feats/features whose grants block is gated; ungated ones are already baked into the definition. */

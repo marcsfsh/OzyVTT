@@ -659,7 +659,12 @@ function riderIssues(modifiers: readonly Modifier[] | undefined, path: Path, lab
             : `A modifier of ${label} waits for a moment its rule never reaches, so it would never apply. Make it apply ${read.map((entry) => MOMENT_WORDS[entry] ?? entry).join(" or ")}, or remove the moment.`
       );
     }
-    if (modifier.type === "extra-damage" && modifier.formula === undefined && modifier.abilityModifier === undefined) {
+    if (
+      modifier.type === "extra-damage" &&
+      modifier.formula === undefined &&
+      modifier.abilityModifier === undefined &&
+      modifier.abilityScore === undefined
+    ) {
       checks.add(
         [...path, index],
         `An extra damage modifier of ${label} has no dice and no ability modifier, so it would add nothing. Fill in one of the two.`

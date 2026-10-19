@@ -1,4 +1,4 @@
-import { d20Count, d20FacesFor, otherDiceOf, type AggregatedRollMode } from "@vtt/rules-5e";
+import { d20Count, d20FacesFor, effectiveSlot, otherDiceOf, type AggregatedRollMode } from "@vtt/rules-5e";
 import { wardedConditions } from "../paladin-auras.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import {
@@ -621,9 +621,26 @@ function naturalWeaponOf(
   };
 }
 
-/** The DC of an unarmed Grapple or Shove: 8 + Strength modifier + Proficiency Bonus. */
-const unarmedDc = (definition: ActorDefinition | undefined): number =>
-  Math.max(1, 8 + abilityModifier(definition, "str") + (definition?.proficiencyBonus ?? 0));
+/** SRD Martial Arts holds while the Monk wears no armor and wields no Shield. */
+function martialArtsHolds(attacker: ResolveContext["attacker"], definition: ActorDefinition | undefined): boolean {
+  if (definition?.character?.martialArts === undefined) return false;
+  return !attacker.inventory.some(
+    (row) =>
+      row.equipped &&
+      row.quantity > 0 &&
+      row.armor !== undefined &&
+      ["armor", "shield"].includes(effectiveSlot({ slot: row.magic?.slot, category: row.category }))
+  );
+}
+
+/** The DC of an unarmed Grapple or Shove: 8 + Strength modifier + Proficiency Bonus. Martial Arts: "you can use your
+ *  Dexterity modifier instead of your Strength modifier to determine the save DC". */
+function unarmedDc(attacker: ResolveContext["attacker"], definition: ActorDefinition | undefined): number {
+  const ability = martialArtsHolds(attacker, definition)
+    ? Math.max(abilityModifier(definition, "str"), abilityModifier(definition, "dex"))
+    : abilityModifier(definition, "str");
+  return Math.max(1, 8 + ability + (definition?.proficiencyBonus ?? 0));
+}
 
 /** SRD Unarmed Strike Grapple/Shove: the target saves with its better of STR and DEX against the unarmed
  *  DC. A failed save is Grappled (escape DC = that DC), Prone, or a 5-foot push the GM moves. */
@@ -632,7 +649,7 @@ function unarmedSave(failure: "grappled" | "prone" | "pushed") {
     const { state, action, attacker, targets, deps } = ctx;
     if (targets.length !== 1) throw new CommandRejectedError("Choose exactly one target.");
     const target = targets[0];
-    const dc = unarmedDc(deps.definition);
+    const dc = unarmedDc(attacker, deps.definition);
     const targetDefinition = target.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
     const ability: "str" | "dex" =
       saveModifierFor(targetDefinition, "dex") >= saveModifierFor(targetDefinition, "str") ? "dex" : "str";

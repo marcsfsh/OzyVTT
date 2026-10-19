@@ -1051,10 +1051,15 @@ export const ModifierSchema = z
           'One die term plus at most one flat modifier ("1d8 + 3"). Anything richer stays prose (ADR-0008)'
         ),
         abilityModifier: AbilitySchema.optional(),
+        /** The bearer's score in an ability, added whole: `increased` is the one the feat carrying it increased
+         *  (Boon of Irresistible Offense's Overwhelming Strike). */
+        abilityScore: z.union([AbilitySchema, z.literal("increased")]).optional(),
         damageType: DamageTypeSchema.optional(),
         doubleOnCritical: z.boolean().default(true),
         /** It is dealt once a turn at most, whoever's turn it is (Colossus Slayer). */
         oncePerTurn: z.literal(true).optional(),
+        /** It adds to one damage roll of a spell, the first: a spell's later rays don't take it (Empowered Evocation). */
+        oncePerCast: z.literal(true).optional(),
         ...riderGate
       })
       .strict()

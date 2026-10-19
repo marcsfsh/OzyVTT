@@ -2,7 +2,8 @@ import type { HeldRoll, LooseSaveOutcome, RollAnswered, RollAnswerOffer } from "
 import { aggregateRollMode, otherDiceOf } from "@vtt/rules-5e";
 import { GameAccessDeniedError, requireActorAccess, requireGm } from "../authorization.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty } from "../condition-rules.js";
-import { DEATH_SAVE_FLOOR_TAG, rollDeathSave } from "../death-saves.js";
+import { holdsFeature } from "../class-features.js";
+import { DEATH_SAVE_FLOOR_TAG, rollDeathSave, SURVIVOR_CRITICAL } from "../death-saves.js";
 import { startStableRecovery, type EffectNarration } from "../effects.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { stabilizeCreature } from "../stabilize.js";
@@ -380,7 +381,8 @@ export const saveCommands = [
             commit,
             test: { ...test, natural: read.natural },
             total: read.total,
-            ...(derivation.context.effectTags?.includes(DEATH_SAVE_FLOOR_TAG) ? { floor: 10 } : {})
+            ...(derivation.context.effectTags?.includes(DEATH_SAVE_FLOOR_TAG) ? { floor: 10 } : {}),
+            ...(holdsFeature(definition, "survivor", "Survivor") ? { criticalFrom: SURVIVOR_CRITICAL } : {})
           },
           {
             random: kit.context.random,
@@ -416,7 +418,9 @@ export const saveCommands = [
       if (commit) {
         const name = kit.actorName(actorId);
         const text = outcome.regainsOneHitPoint
-          ? `${name} rolled a natural 20 on a death save and regains 1 HP.`
+          ? roll.face < 20
+            ? `${name} rolled ${roll.face} on a death save, which counts as a 20 (Survivor), and regains 1 HP.`
+            : `${name} rolled a natural 20 on a death save and regains 1 HP.`
           : outcome.dead
             ? `${name} failed a third death save and dies.`
             : outcome.state.stable

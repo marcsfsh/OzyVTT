@@ -892,6 +892,40 @@ describe("healing features heal what they print", () => {
   });
 });
 
+describe("Boon of Irresistible Offense: Overwhelming Strike on a rolled 20", () => {
+  // Strength 15 + 2 (Soldier) + 2 (level 4) + 1 (level 6) = 20, and the boon's increase makes it 21.
+  const boonFighter = () => {
+    const input = fighterInput(19);
+    input.choices.push(
+      {
+        level: 19,
+        classId: "fighter",
+        kind: "feat",
+        id: "boon-of-irresistible-offense",
+        payload: { featureId: "epic-boon" }
+      },
+      { level: 19, kind: "ability-score", id: "str", payload: { featureId: "boon-of-irresistible-offense" } }
+    );
+    return onTheTable(build(input));
+  };
+  const overwhelming = (resolution: ReturnType<typeof swing>) =>
+    resolution.damage.filter((part) => part.formula === "21");
+
+  it("adds damage equal to the increased Strength score, of the attack's type, on a natural 20", () => {
+    const built = boonFighter();
+    expect(built.definition.abilityScores.str).toBe(21);
+    const hit = swing(built, "item-greatsword", [20, 3, 3, 3, 3, 3, 3, 3, 3]);
+    expect(overwhelming(hit)).toEqual([{ formula: "21", type: "slashing", total: 21 }]);
+  });
+
+  it("adds nothing on a 19, though the Champion's 19 is a Critical Hit", () => {
+    const built = boonFighter();
+    const hit = swing(built, "item-greatsword", [19, 3, 3, 3, 3, 3, 3, 3, 3]);
+    expect(hit.attack?.outcome).toBe("crit");
+    expect(overwhelming(hit)).toEqual([]);
+  });
+});
+
 describe("Champion: the crit range the resolver reads", () => {
   it("is 19 at level 3, 18 at level 15, and 20 for a Fighter with no subclass yet", () => {
     // The riders name the kinds of attack they widen, so the roll's filters are passed.
@@ -1311,6 +1345,47 @@ describe("Monk: Martial Arts is an Unarmed Strike the engine can really roll", (
   });
 });
 
+describe("Monk: Martial Arts sets the Grapple and Shove DC with Dexterity", () => {
+  const shove = (built: Built) =>
+    resolveDefinitionAction(
+      built.state,
+      builtinActionFor(built.definition, "unarmed-shove-prone")!,
+      {
+        actorId: IDS.hero,
+        targetIds: [IDS.foe],
+        commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
+        builtin: true
+      },
+      deps(built)
+    );
+  const dcOf = (built: Built) => built.state.combat.pendingSaves.find((save) => save.targetActorId === IDS.foe)?.dc;
+
+  it("holds the target to 8 + Dexterity + Proficiency Bonus while Martial Arts holds, and Strength in armor", () => {
+    // Monk 1: Str 12 (+1), Dex 17 (+3), Proficiency Bonus 2.
+    const built = onTheTable(build(monkInput(1)));
+    shove(built);
+    expect(dcOf(built)).toBe(13);
+    const armored = onTheTable(build(monkInput(1)));
+    armored.hero.inventory.push({
+      id: "leather-armor",
+      name: "Leather Armor",
+      quantity: 1,
+      equipped: true,
+      attuned: false,
+      category: "armor",
+      armor: {
+        acBase: 11,
+        addDexModifier: true,
+        dexModifierCap: null,
+        stealthDisadvantage: false,
+        strengthRequired: null
+      }
+    } as (typeof armored.hero.inventory)[number]);
+    shove(armored);
+    expect(dcOf(armored)).toBe(11);
+  });
+});
+
 describe("Monk: Flurry of Blows opens its own Unarmed Strikes", () => {
   it("opens two strikes as a Bonus Action, each spent by an Unarmed Strike, leaving the Attack action alone", () => {
     const built = onTheTable(build(monkInput(5)));
@@ -1694,7 +1769,13 @@ describe("Barbarian: Rage lasts while it is fed, and stops spells and Concentrat
       equipped: true,
       attuned: false,
       category: "armor",
-      armor: { category: "heavy", baseAc: 18, dexCap: 0, strengthRequirement: 15, stealthDisadvantage: true }
+      armor: {
+        acBase: 18,
+        addDexModifier: false,
+        dexModifierCap: null,
+        stealthDisadvantage: true,
+        strengthRequired: 15
+      }
     } as (typeof built.hero.inventory)[number]);
     expect(() => use(built, "rage")).toThrowError("Ozar is wearing Heavy armor and can't enter a Rage.");
     expect(built.hero.actionUses.rage).toBeUndefined();

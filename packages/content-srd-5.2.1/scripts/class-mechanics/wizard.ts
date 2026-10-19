@@ -36,6 +36,8 @@ export const wizard: ClassMechanicsModule = {
           {
             type: "extra-damage",
             abilityModifier: "int",
+            // "One damage roll of that spell": a later ray of Scorching Ray takes none.
+            oncePerCast: true,
             when: [
               { type: "on-damage-roll" },
               { type: "spell-school-is", schools: ["evocation"] },

@@ -899,6 +899,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "acid",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -942,6 +943,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "cold",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -985,6 +987,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "fire",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -1028,6 +1031,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "lightning",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -1071,6 +1075,7 @@
          "type": "extra-damage",
          "abilityModifier": "cha",
          "damageType": "poison",
+         "oncePerCast": true,
          "when": [
           {
            "type": "on-damage-roll"
@@ -1282,6 +1287,7 @@
      {
       "type": "extra-damage",
       "abilityModifier": "int",
+      "oncePerCast": true,
       "when": [
        {
         "type": "on-damage-roll"
