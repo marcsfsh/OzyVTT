@@ -353,8 +353,15 @@ checked as a spell's targets are, in `resolution/action-targets.ts`.
 
 A magic item's charges are an `actionUses` pool keyed by the carried row (`itemPool` in
 `item-actions.ts`), so two copies count separately and the count moves with the row when the GM hands
-it over (`character.give-item`). A Long Rest gives back the item's printed dice (`charges.regain`), not
-every charge, and spending the last one rolls the SRD's d20 for the GM (`item-charges.ts`). Ammunition is
+it over (`character.give-item`). A cast spends its printed cost (`useCost`), and one whose extra charges raise its
+level (`chargesRaiseLevel`, a Wand of Fireballs) is one action for each cost. A pool that never comes back
+(`per: "never"`, a Necklace of Fireballs' beads) starts at a count rolled when the row is added (`charges.starting`).
+A Long Rest gives back the item's printed dice (`charges.regain`), not every charge; when the GM keeps a dawn hour
+(`time.set-dawn`) the clock's dawn gives them back instead (`clock-pools.ts`). Spending the last charge rolls the
+SRD's d20, and the record says what a 1 does (destroyed, or a plain item it becomes) and what a 20 gives back
+(`resolution/charges.ts`, which also rolls a Thief's Use Magic Device d6). A pool spent for a time (`per: "time"`,
+Wings of Flying) waits `afterHours` of game time from its first use (`readyAt` on the actor) and comes back as
+`passGameTime` passes it. Ammunition is
 counted on its row too (`ammunition.ts`): a shot from an Ammunition weapon needs a piece of the kind it fires
 and spends one, and half of the pieces fired come back when the encounter ends. Magic ammunition is bound to a
 kind when it is added, like a magic weapon to its base, so +1 bolts fit only a crossbow, and its bonus rides only
@@ -382,6 +389,18 @@ the area). A cast with components waits while a creature that sees it may answer
 creature's own spell of a minute or more takes the action on each of its turns in a fight and resolves on the last
 (`resolution/long-casting.ts`). Outside a fight a creature's own cast resolves through the same path with no turn to
 spend, and a long one moves the game clock by its whole hours; an item's cast there stays on the loose route.
+
+A player only spends spell slots (`character.set-slot` refuses a raise from a player); everything that gives a
+resource back is its own checked command. `conversions.ts` is one table of the features that turn one resource
+into another or recover one (Font of Magic both ways, Arcane and Natural Recovery, Magical Cunning, restoring a
+use with a slot or points, Pearl of Power), each with its timing, its check and its pick, offered by
+`actor:available-actions` and taken with `actor.convert`. Hit Point Dice are spent only during a Short Rest, a
+player's own or the party's (`rests.ts`). A finished rest opens a step on the actor (`restStep`) where its
+recoveries and re-choices are made until its player taps Done; a re-choice the build reads (a Weapon Mastery pick,
+a Wizard's cantrip, a Hunter's option) is written to the ledger and the sheet rebuilt (`ledger-rechoice.ts`), a
+pick of several one held answer at a time. When Initiative is rolled, `initiative-hooks.ts` opens a window for the
+features that act then (Persistent Rage, Uncanny Metabolism) and gives back what others restore (Perfect Focus,
+Superior Inspiration, Archdruid).
 
 What a save does is data on the action's save block: `successDamage` (half or none) and the
 `failureCondition` a failed save imposes. Nothing parses the description for it. They are written where the content
