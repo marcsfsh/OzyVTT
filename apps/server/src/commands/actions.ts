@@ -9,6 +9,7 @@ import { withSeenTargets } from "../resolution/seen-targets.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
 import { pushTokenAway } from "../forced-movement.js";
+import { pushThroughZones } from "../pushed-through.js";
 import { ActionResolveSchema, ActionUseSchema, DiceRollSchema } from "@vtt/domain/commands";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { heldRollFor, requireTypedDie } from "../held-rolls.js";
@@ -124,6 +125,8 @@ export const actionCommands = [
       let clock = { fromHours: 0, toHours: 0 };
       // A spell's area this action moved, what it did as it came to rest, and a rules note its move let through.
       let areaEvents: EffectNarration[] = [];
+      // What the spell areas a push moves a creature through did to it.
+      const pushedThrough: EffectNarration[] = [];
       let areaMoveNote: string | null = null;
       // The creatures a barrier against spells kept the cast from, for the GM.
       let wardNotes: string[] = [];
@@ -336,7 +339,11 @@ export const actionCommands = [
         // is pushed, already restricted to public combatants for players. If the map changed since the grid
         // was fetched, degrade to null ("move the token") and never throw.
         const pushToken = (input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>) =>
-          draft.combat.mapAssetId === mapAssetId ? pushTokenAway(draft, input, geometry) : null;
+          draft.combat.mapAssetId === mapAssetId
+            ? geometry
+              ? pushThroughZones(draft, input, geometry, kit.zoneDeps(draft, geometry), pushedThrough)
+              : pushTokenAway(draft, input, geometry)
+            : null;
         resolution = resolveDefinitionAction(
           draft,
           force ? struckFrom(action, force) : action,
@@ -555,6 +562,7 @@ export const actionCommands = [
         kit.narrateResolution(resolution, actorId);
         kit.publishNarrations(restBroken);
         kit.publishNarrations(areaEvents);
+        kit.publishNarrations(pushedThrough);
         for (const note of wardNotes)
           kit.context.appendLog({ kind: "action", text: note, actorIds: [actorId], gmOnly: true });
         if (areaMoveNote)

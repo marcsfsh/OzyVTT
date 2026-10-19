@@ -1589,7 +1589,17 @@ export const EffectInstanceSchema = z
         turnActorId: z.uuid().nullable(),
         owedActionId: z.string().min(1).max(120).optional(),
         awayFromActorId: z.uuid().optional(),
-        towardActorId: z.uuid().optional()
+        towardActorId: z.uuid().optional(),
+        /** The action whose save and damage meet each creature whose space the move enters, once (Engulf, Trampling
+         *  Charge): the largest size it passes through, and the creatures met so far. */
+        meets: z
+          .object({
+            actionId: z.string().min(1).max(120),
+            size: SizeSchema,
+            met: z.array(z.uuid()).max(40).default([])
+          })
+          .strict()
+          .optional()
       })
       .strict()
       .optional(),
@@ -3743,14 +3753,17 @@ export type AreaTrigger = z.infer<typeof AreaTriggerSchema>;
  *  it makes one Rend attack"). `speed`: half or all of the way's Speed, measured when it is taken; `mode`: the way it
  *  travels (any of the creature's ways when absent); `provokes: false` for "without provoking Opportunity Attacks";
  *  `straight` for a charge "straight toward an enemy"; `first` when the text moves before the rest of the action
- *  does, so the move can be taken before the attack. */
+ *  does, so the move can be taken before the attack. `entersSpaces`: the action is the move, and each creature whose
+ *  space it enters meets the action's own save and damage once ("Each creature whose space the centaur enters is
+ *  targeted once by the following effect"); the mover may pass through the spaces of creatures up to `size`. */
 export const ActionMoveSchema = z
   .object({
     speed: z.enum(["half", "full"]),
     mode: z.enum(["walk", "fly", "swim", "climb", "burrow"]).optional(),
     provokes: z.boolean().default(true),
     straight: z.literal(true).optional(),
-    first: z.literal(true).optional()
+    first: z.literal(true).optional(),
+    entersSpaces: z.object({ size: SizeSchema }).strict().optional()
   })
   .strict();
 export type ActionMove = z.infer<typeof ActionMoveSchema>;
@@ -4612,6 +4625,8 @@ const TraitSaveSchema = z
 /**
  * What a stat block's trait does that the engine runs, read from the trait's text when the bundle is built (SRD 5.2.1
  * monsters); its prose stays on the sheet. `name` is the trait's printed name, for the feed.
+ * - `enters-space`: damage it deals a creature the first time on a turn its own move enters that creature's space
+ *   (a fire elemental's Fire Form).
  * - `regeneration`: hit points regained at the start of each of its turns, except the turn after it takes one of
  *   `stoppedBy`'s types (the troll's Acid or Fire); only at 1 Hit Point or more (`needsHitPoints`, the oni); and at 0
  *   Hit Points it dies only when a turn starts without regenerating (`deathWaitsForTurn`, the troll).
@@ -4627,6 +4642,7 @@ const TraitSaveSchema = z
  * - `berserk`: starting its turn Bloodied, a d6 of 6 sends it berserk until it is no longer Bloodied.
  */
 export const TraitMechanicSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("enters-space"), name: TraitNameSchema, damage: TraitDamageSchema }).strict(),
   z
     .object({
       kind: z.literal("regeneration"),

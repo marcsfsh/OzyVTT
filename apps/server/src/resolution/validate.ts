@@ -100,6 +100,8 @@ function combatantsOf(
     if (!action.move) throw new CommandRejectedError(`${action.name} makes no move of its own to take first.`);
     return { attacker, targets };
   }
+  // A move that is the whole action (Engulf, Trampling Charge) meets whom it passes through, and names no one first.
+  if (action.move?.entersSpaces) return { attacker, targets: [] };
   if (action.attack && targets.length !== 1)
     throw new CommandRejectedError("An attack roll resolves against exactly one target.");
   // A grant aimed at the action's target (Help) needs exactly one recipient; one for each target (Bless), at least one.

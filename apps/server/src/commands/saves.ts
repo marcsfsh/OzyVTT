@@ -39,7 +39,7 @@ import {
   shownRollMode
 } from "../saving-throws.js";
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
-import { pushTokenAway } from "../forced-movement.js";
+import { pushThroughZones } from "../pushed-through.js";
 import { defineCommand } from "./pipeline.js";
 import { withArticle } from "@vtt/domain";
 
@@ -190,6 +190,8 @@ export const saveCommands = [
       const mapAssetId = kit.read().combat.mapAssetId;
       const geometry = pending?.failurePush ? await kit.liveGeometry() : null;
       let answered: ReturnType<typeof answerSave> | undefined;
+      // What the spell areas a push moves the creature through did to it.
+      const pushedThrough: EffectNarration[] = [];
       const { state, duplicate } = await execute((draft) => {
         answered = answerSave(
           draft,
@@ -209,7 +211,9 @@ export const saveCommands = [
             catalog: kit.equipmentCatalog(),
             distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB),
             pushToken: (input) =>
-              geometry && draft.combat.mapAssetId === mapAssetId ? pushTokenAway(draft, input, geometry) : null
+              geometry && draft.combat.mapAssetId === mapAssetId
+                ? pushThroughZones(draft, input, geometry, kit.zoneDeps(draft, geometry), pushedThrough)
+                : null
           },
           legendaryResistance,
           rollMode,
@@ -238,6 +242,7 @@ export const saveCommands = [
         });
       }
       kit.publishNarrations(answered?.events ?? []);
+      kit.publishNarrations(pushedThrough);
       return outcome ? { outcome } : undefined;
     }
   }),

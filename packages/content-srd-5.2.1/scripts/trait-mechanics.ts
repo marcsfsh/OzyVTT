@@ -252,6 +252,16 @@ function deathBurst(trait: Trait): TraitMechanic | null {
   };
 }
 
+/** "The first time it enters a creature's space on a turn, that creature takes 5 (1d10) Fire damage." (Fire Form) */
+function entersSpace(trait: Trait): TraitMechanic | null {
+  const match =
+    /\bThe first time it enters a creature's space on a turn, that creature takes (\d+ \([^)]+\) [A-Z][a-z]+ damage)\./.exec(
+      trait.description
+    );
+  const damage = match ? typedDamage(match[1]!) : undefined;
+  return match && damage ? { kind: "enters-space", name: trait.name, damage } : null;
+}
+
 /** "A creature that hits the pudding with a melee attack roll takes 4 (1d8) Acid damage." */
 function meleeHitDamage(trait: Trait): TraitMechanic | null {
   const match =
@@ -338,6 +348,7 @@ const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
   grappleTurnStart,
   deathBurst,
   meleeHitDamage,
+  entersSpace,
   berserk,
   illumination,
   lightSensitivity,

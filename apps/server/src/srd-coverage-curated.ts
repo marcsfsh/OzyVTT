@@ -532,8 +532,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Fire Aura": enforced(
     "trait-turns.ts deals the Fire damage at the end of the bearer's turns to each creature in the Emanation, or to an azer's enemies there. A fire elemental's aura also sets them burning."
   ),
-  "Fire Form": guided(
-    "movement-rules.ts lets the elemental end a move in a creature's space, and the map's drag preview (movePreview.ts) charges the same path. The 1d10 Fire damage when it first enters a space on a turn is the GM's to deal."
+  "Fire Form": enforced(
+    "movement-rules.ts lets the elemental end a move in a creature's space, and the map's drag preview (movePreview.ts) charges the same path. The first time on a turn its own move enters a creature's space, path-meetings.ts deals that creature the 1d10 Fire damage."
   ),
   Flyby: enforced("movement-rules.ts opens no Opportunity Attack when it flies out of an enemy's reach."),
   Freeze: reference("The slower Speed after Cold damage is the GM's to apply."),
@@ -867,8 +867,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Dryad/tree-stride": guided(
     "A teleport of up to 65 feet is granted (granted-moves.ts). Whether a Large tree stands at each end is the GM's, since trees aren't on the map."
   ),
-  "action:Centaur Trooper/trampling-charge-recharge-5-6": guided(
-    "It can be taken move first: a move of its Speed that provokes no Opportunity Attacks is granted (granted-moves.ts), and the Strength save, damage and Prone apply to the creatures the GM picks. Passing through Medium or smaller creatures' spaces needs the GM's go-ahead on the map."
+  "action:Centaur Trooper/trampling-charge-recharge-5-6": enforced(
+    "A move of its Speed that provokes no Opportunity Attacks is granted (granted-moves.ts), and it passes through the spaces of Medium or smaller creatures (terrain.ts). Each creature whose space it enters makes the Strength save once, against the damage and Prone (path-meetings.ts)."
   ),
   "action:Weretiger/prowl-tiger-or-hybrid-form-only": guided(
     "It works only in the tiger and hybrid forms (transform/rules.ts), and a move of its Speed that provokes no Opportunity Attacks is granted (granted-moves.ts). The Hide at the end of it is the GM's."

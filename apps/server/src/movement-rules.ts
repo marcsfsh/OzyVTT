@@ -735,6 +735,8 @@ function costOptions(
       resolveDefinition: input.resolveDefinition,
       ...(input.perceives ? { perceives: input.perceives } : {}),
       ...(sharesSpace(state, input.actorId, input) || incorporeal(moverDefinition) ? { passesCreatures: true } : {}),
+      // A move that meets the creatures it passes through (Trampling Charge) goes through their spaces.
+      ...(activeMoveGrant(state, mover)?.meets ? { passesUpTo: activeMoveGrant(state, mover)!.meets!.size } : {}),
       ...(incorporeal(moverDefinition) ? { throughWalls: true } : {}),
       ...(freeOfDifficultTerrain(mover) ? { ignoresDifficult: true } : {}),
       ...(fromAltitude !== 0 || toAltitude !== 0 ? { altitude: { fromFeet: fromAltitude, toFeet: toAltitude } } : {})

@@ -2,7 +2,8 @@ import { DamageResolveSchema, ReactionAnswerSchema, ReactionDismissSchema } from
 import { heldRollFor, requireTypedDie } from "../held-rolls.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
 import { resolvePendingDamage, type AppliedDamage } from "../player-damage.js";
-import { pushTokenAway } from "../forced-movement.js";
+import { pushThroughZones } from "../pushed-through.js";
+import type { EffectNarration } from "../effects.js";
 import { answerReaction, dismissReaction, reactionHoldKey, type ReactionOutcome } from "../reactions.js";
 import type { ActionResolution } from "@vtt/domain";
 import { withoutSourceName } from "../hidden-source.js";
@@ -164,6 +165,8 @@ export const reactionCommands = [
       const geometry = mapAssetId ? await kit.context.tokenGeometryFor(mapAssetId) : null;
       const distance = await kit.creatureDistance();
       let outcome: ReturnType<typeof answerReaction> | undefined;
+      // What the spell areas a push moves a creature through did to it.
+      const pushedThrough: EffectNarration[] = [];
       const { state, duplicate } = await execute((draft) => {
         // A typed die must be one the table takes, and not one typed over the strike's thrown die.
         if (attackNatural !== undefined && reroll !== true)
@@ -184,7 +187,9 @@ export const reactionCommands = [
             gmSessionId: sessionIdOf(principal),
             now: () => new Date().toISOString(),
             pushToken: (input) =>
-              draft.combat.mapAssetId === mapAssetId ? pushTokenAway(draft, input, geometry) : null,
+              geometry && draft.combat.mapAssetId === mapAssetId
+                ? pushThroughZones(draft, input, geometry, kit.zoneDeps(draft, geometry), pushedThrough)
+                : null,
             distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
           },
           {
@@ -227,6 +232,7 @@ export const reactionCommands = [
             : outcome.actorId
         );
       kit.publishNarrations(outcome.events);
+      kit.publishNarrations(pushedThrough);
       const resolution =
         outcome.resolution &&
         (outcome.kind === "attack-would-hit" || outcome.kind === "roll-answer") &&

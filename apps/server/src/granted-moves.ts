@@ -57,6 +57,7 @@ export function grantMove(
     owedActionId?: string;
     awayFromActorId?: string;
     towardActorId?: string;
+    meets?: Readonly<{ actionId: string; size: NonNullable<MoveGrant["meets"]>["size"] }>;
   }>
 ): void {
   const grant: MoveGrant = {
@@ -69,7 +70,8 @@ export function grantMove(
     turnActorId: state.combat.turnActorId,
     ...(input.owedActionId ? { owedActionId: input.owedActionId } : {}),
     ...(input.awayFromActorId ? { awayFromActorId: input.awayFromActorId } : {}),
-    ...(input.towardActorId ? { towardActorId: input.towardActorId } : {})
+    ...(input.towardActorId ? { towardActorId: input.towardActorId } : {}),
+    ...(input.meets ? { meets: { actionId: input.meets.actionId, size: input.meets.size, met: [] } } : {})
   };
   actor.effects = [
     ...actor.effects.filter((effect) => effect.grantedMove === undefined),
@@ -139,6 +141,25 @@ export function spendMoveGrant(actor: Actor, effectId: string, feet: number): vo
     if (left <= 0 && effect.grantedMove.owedActionId === undefined) return [];
     return [{ ...effect, grantedMove: { ...effect.grantedMove, feet: Math.round(left) } }];
   });
+}
+
+/** Notes the creatures a meeting move has met, so each meets it once during the move. */
+export function noteMet(actor: Actor, effectId: string, metIds: readonly string[]): void {
+  if (metIds.length === 0) return;
+  actor.effects = actor.effects.map((effect) =>
+    effect.id === effectId && effect.grantedMove?.meets
+      ? {
+          ...effect,
+          grantedMove: {
+            ...effect.grantedMove,
+            meets: {
+              ...effect.grantedMove.meets,
+              met: [...new Set([...effect.grantedMove.meets.met, ...metIds])].slice(-40)
+            }
+          }
+        }
+      : effect
+  );
 }
 
 /** The teleport is taken: its grant goes. */

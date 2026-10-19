@@ -46,12 +46,14 @@ export function applyMovementGrants(ctx: ResolveContext): void {
       ...(move.mode ? { mode: move.mode } : {}),
       provokes: move.provokes,
       ...(move.straight ? { straight: true as const } : {}),
-      ...(input.moveFirst === true ? { owedActionId: action.id } : {})
+      // A move that is the action (Trampling Charge) owes nothing after it: its save meets whom it passes through.
+      ...(input.moveFirst === true && !move.entersSpaces ? { owedActionId: action.id } : {}),
+      ...(move.entersSpaces ? { meets: { actionId: action.id, size: move.entersSpaces.size } } : {})
     });
     const verb =
       move.mode === "fly" ? "fly" : move.mode === "swim" ? "swim" : move.mode === "burrow" ? "burrow" : "move";
     say(
-      `${attacker.name} may ${verb} ${feet} ft${move.provokes ? "" : " without provoking Opportunity Attacks"}${move.straight ? " straight toward an enemy" : ""}${input.moveFirst === true ? `, then finish ${action.name}` : ""}.`
+      `${attacker.name} may ${verb} ${feet} ft${move.provokes ? "" : " without provoking Opportunity Attacks"}${move.straight ? " straight toward an enemy" : ""}${move.entersSpaces ? `, and each creature whose space it enters meets ${action.name}` : input.moveFirst === true ? `, then finish ${action.name}` : ""}.`
     );
   }
   if (input.moveFirst === true) return;

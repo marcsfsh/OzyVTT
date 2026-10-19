@@ -172,8 +172,9 @@ export function resolveDefinitionAction(
     commitEconomy(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
-  // The action's move taken before the rest of it: its cost is spent and the move granted, and the rest waits.
-  if (input.moveFirst === true) {
+  // The action's move taken before the rest of it: its cost is spent and the move granted, and the rest waits. A move
+  // that is the whole action (Trampling Charge) works the same way: its save meets the creatures it passes through.
+  if (input.moveFirst === true || ctx.action.move?.entersSpaces !== undefined) {
     commitEconomy(ctx);
     applyMovementGrants(ctx);
     return { ...resolutionOf(ctx), save: null };
@@ -579,6 +580,8 @@ function tapTargeting(
   usesUpItem: boolean,
   spell: SpellReference | undefined
 ): "none" | "single" | "multi" | null {
+  // A move that is the whole action (Trampling Charge) meets whom it passes through, and aims at no one.
+  if (action.move?.entersSpaces) return "none";
   // A shape-shift on its user (Wild Shape, a werewolf's Shape-Shift), and leaving a form, aim at no one.
   if (action.endsForm || (action.shapeShift && !action.shapeShift.onTargets && !action.save)) return "none";
   if (action.attack || action.grants?.target === "target" || action.targets?.count === 1) return "single";

@@ -26,6 +26,9 @@ import { intersectRegions, subtractRect, unionRect, type Rect } from "./rect-reg
 import type { TokenMapGeometry } from "./token-placement.js";
 import { blocksMovement } from "./vision/sight.js";
 
+const SIZE_ORDER = ["tiny", "small", "medium", "large", "huge", "gargantuan"] as const;
+const sizeRank = (size: string | undefined) => SIZE_ORDER.indexOf((size ?? "medium") as (typeof SIZE_ORDER)[number]);
+
 /** Difficult terrain (SRD 5.2.1): the GM paints it per scene; entering a cell whose centre lies in it costs
  *  double. Stored as disjoint rects, so marking an area twice costs nothing and clearing can cut any shape. */
 
@@ -91,6 +94,8 @@ export type MovementCostOptions = Readonly<{
   perceives?: (actorId: string) => boolean;
   /** The mover may stop in other creatures' spaces (an air elemental's Air Form), so none bars its way. */
   passesCreatures?: boolean;
+  /** The mover may pass through the spaces of creatures up to this size (Trampling Charge's Medium or smaller). */
+  passesUpTo?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
   /** The mover passes through walls as through Difficult Terrain (a ghost's Incorporeal Movement). */
   throughWalls?: boolean;
   /** Difficult Terrain costs the mover nothing extra (Freedom of Movement). */
@@ -181,7 +186,11 @@ export function movementCost(
       occupant.definitionId !== null &&
       occupant.definitionId !== undefined &&
       holdsFeature(options.resolveDefinition?.(occupant.definitionId), "swarm", "Swarm");
-    const passage = printed === "blocked" && (options.passesCreatures || swarm) ? "difficult" : printed;
+    const passes =
+      options.passesCreatures === true ||
+      swarm ||
+      (options.passesUpTo !== undefined && sizeRank(occupant.size) <= sizeRank(options.passesUpTo));
+    const passage = printed === "blocked" && passes ? "difficult" : printed;
     if (passage === "open") continue;
     const cells = passage === "blocked" ? closedCells : difficultCells;
     const origin = footprintOrigin(imageToGrid(calibration, token.position), token.sizeCells);

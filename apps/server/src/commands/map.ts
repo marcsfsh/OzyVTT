@@ -34,6 +34,7 @@ import { startFall } from "../falling.js";
 import { failedTeleport } from "../granted-moves.js";
 import { holdMove } from "../held-moves.js";
 import { walkThroughZones } from "../zone-stops.js";
+import { meetAlongPath, meetingGrantOf } from "../path-meetings.js";
 import { landJump } from "../jumping.js";
 import { carryRiders, mountOf, mountOrDismount, ridersOf, RIDING_TAG } from "../mounts.js";
 import { timeStopOutOfRange } from "../time-stop.js";
@@ -171,6 +172,9 @@ export const mapCommands = [
                 (heldId) => state.combat.tokens.find((token) => token.actorId === heldId)?.position
               )
             : [];
+        // A move an action grants that meets the creatures it passes through (Trampling Charge), before it is spent.
+        const moverNow = state.actors.find((actor) => actor.id === actorId);
+        const meeting = moverNow && state.combat.active ? meetingGrantOf(state, moverNow) : null;
         moveEncounterToken(state, actorId, position, geometry);
         // The height it ends at, and what holds it up there; back in the tray it is on the ground.
         const toAltitude = position === null ? 0 : (request.altitudeFeet ?? fromAltitude);
@@ -349,6 +353,13 @@ export const mapCommands = [
               ...zonesAfterMove(state, { moverId: actorId, path, teleported: mode === "teleport" }, zoneDeps)
             );
           if (mode !== "teleport") zoneEvents.push(...shellsForcedBy(state, actorId, path, zoneDeps));
+          // The creatures whose spaces its own move enters: an action's save met once (Engulf, Trampling Charge), a
+          // trait's damage the first time on a turn (Fire Form).
+          const reached = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? arrived;
+          if (mode !== "teleport" && mode !== "forced")
+            zoneEvents.push(
+              ...meetAlongPath(state, actorId, from, reached, zoneDeps, outcome.granted !== undefined ? meeting : null)
+            );
         }
         // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.
         // A creature hidden from the table after the move is left out of the table's line. Setting the scene before
