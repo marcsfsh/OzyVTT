@@ -10,6 +10,8 @@ import { z } from "zod";
 import {
   AbilitySchema,
   ActionAreaSchema,
+  AreaTriggerSchema,
+  type AreaTrigger,
   ActionGrantSchema,
   AmmunitionKindSchema,
   BurstSchema,
@@ -77,37 +79,9 @@ const SpellDamageSchema = z
   )
   .max(4);
 
-/**
- * Where and when what a spell leaves behind acts on a creature, so the server raises the save or deals the damage:
- * a creature entering it (or the area moving onto the creature), starting or ending its turn there, or travelling in
- * it (Spike Growth's damage for every 5 feet); the start of each of its caster's turns, on the one creature in it
- * nearest its point (Faithful Hound's bite); or the spell's end, on every creature in it (Delayed Blast Fireball's
- * bead). The area is the one the cast places on the map, or within `feet` of the caster (an Emanation) or of the point
- * the spell is placed at (Flaming Sphere, a guardian). `oncePerTurn`: "A creature makes this save only once per turn"
- * (entering counts once a turn anyway); `affects` "enemies" spares the caster's allies (Guardian of Faith; spirits that
- * harm the creatures the caster chooses); `damageCap` ends it once it has dealt that much (Guardian of Faith's 60).
- */
-export const SpellZoneSchema = z
-  .object({
-    on: z
-      .array(z.enum(["enter", "start-turn", "end-turn", "travel", "caster-turn-start", "spell-end"]))
-      .min(1)
-      .max(3),
-    oncePerTurn: z.literal(true).optional(),
-    around: z.enum(["caster", "point"]).optional(),
-    feet: z.number().int().min(5).max(120).optional(),
-    affects: z.literal("enemies").optional(),
-    damageCap: z.number().int().min(1).max(1000).optional(),
-    /** The creatures it affects move at half Speed inside it (Spirit Guardians). */
-    halvesSpeed: z.literal(true).optional(),
-    /** It acts on no one while a creature it restrained is still held (Conjure Elemental: "if the spirit has no creature
-     *  Restrained"). */
-    holdsOne: z.literal(true).optional(),
-    /** Its damage grows by one die each time its caster's turn ends while it lasts (Delayed Blast Fireball). */
-    grows: z.literal(true).optional()
-  })
-  .strict();
-export type SpellZone = z.infer<typeof SpellZoneSchema>;
+/** Where and when the area a spell leaves acts (`AreaTriggerSchema`, shared with the actions of items and creatures). */
+export const SpellZoneSchema = AreaTriggerSchema;
+export type SpellZone = AreaTrigger;
 
 /** Something a spell lets its caster do after the cast, as an action of its own: Produce Flame's hurl, Spiritual
  *  Weapon's later attacks, or the save a creature makes when it enters Spirit Guardians (`activation` "other": no
@@ -137,7 +111,13 @@ export const SpellLaterActionSchema = z
     /** What its damage drains as it lands (Vampiric Touch's later touches). */
     drain: DamageDrainSchema.optional(),
     /** The area the spell leaves, whose trigger the server watches (an "other" action only). */
-    zone: SpellZoneSchema.optional()
+    zone: SpellZoneSchema.optional(),
+    /** It moves the area the spell left up to this many feet, to where its template is placed (Moonbeam's Magic
+     *  action: 60 feet; Flaming Sphere's ram: 30). Its save, if any, falls on the creatures the area moves onto. */
+    movesArea: z
+      .object({ feet: z.number().int().min(5).max(300) })
+      .strict()
+      .optional()
   })
   .strict();
 export type SpellLaterAction = z.infer<typeof SpellLaterActionSchema>;
@@ -283,7 +263,9 @@ export const SpellEffectSchema = z
     rangeDoubles: z.literal(true).optional(),
     /** No sound can be made in the area its cast places (Silence), so a creature standing there can't cast a spell
      *  with a Verbal component while the spell lasts. */
-    silencesArea: z.literal(true).optional()
+    silencesArea: z.literal(true).optional(),
+    /** Feet its area's size grows for each slot level above the spell's (Fog Cloud's radius: 20; Confusion's: 5). */
+    areaPerSlot: z.number().int().min(5).max(100).optional()
   })
   .strict();
 export type SpellEffect = z.infer<typeof SpellEffectSchema>;
@@ -560,6 +542,25 @@ export const ItemSpellCastSchema = z
       .describe('A flat printed DC ("save DC 15"). It overrides any derivation'),
     /** Charges. Share one pool across several casts with `uses.pool`. */
     uses: FeatureUsesSchema.optional().describe("Charges. Share one pool across several casts with `uses.pool`"),
+    /** Charges one cast spends, when more than one (Staff of Fire's Fireball: 3). */
+    useCost: z
+      .number()
+      .int()
+      .min(2)
+      .max(50)
+      .optional()
+      .describe("Charges one cast spends, when more than one (Staff of Fire's Fireball: 3)"),
+    /** The most charges one cast may spend, each charge after the first casting it one level higher (Wand of
+     *  Fireballs: 3, for levels 3 to 5). The sheet offers each as its own cast. */
+    chargesRaiseLevel: z
+      .number()
+      .int()
+      .min(2)
+      .max(9)
+      .optional()
+      .describe(
+        "The most charges one cast may spend, each charge after the first casting it one level higher (Wand of Fireballs: 3, for levels 3 to 5). Each becomes its own cast on the sheet"
+      ),
     /** Whether casting it also spends one of the bearer's own spell slots. */
     consumesSpellSlot: z
       .boolean()
@@ -568,6 +569,11 @@ export const ItemSpellCastSchema = z
     /** Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear: Beasts only). */
     targets: ActionTargetsSchema.optional().describe(
       "Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear affects Beasts only), checked on the server"
+    ),
+    /** The area the item's cast covers in place of the spell's own (Wand of Fear's 60-foot Cone, Cloak of Arachnida's
+     *  Web filling twice its area). */
+    area: ActionAreaSchema.optional().describe(
+      "The area the item's cast covers in place of the spell's own (a wand's 60-foot Cone of Fear), placed as the template"
     )
   })
   .strict()
@@ -581,14 +587,37 @@ export type ItemSpellCast = z.infer<typeof ItemSpellCastSchema>;
  * Long Rest ("regains 1d6 + 1 expended charges daily at dawn"; absent = all come back), and `lastChargeRoll` rolls a
  * d20 when the last charge is spent, whose 1 does what the item's text says (most crumble).
  */
+/** A charge count as the SRD prints one: dice ("1d6 + 1"; a d3 is a die of its own here) or a flat number ("1"). */
+const ChargeCountSchema = z
+  .string()
+  .regex(
+    /^(?:\d+d(?:3|4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?|\d{1,2})$/i,
+    "Use a dice formula such as 1d6 + 1, or a number."
+  );
+
 export const ItemChargesSchema = z
   .object({
     // The SRD's own grammar here includes a d3 ("regains 1d3 expended charges"), which the dice roller lacks.
-    regain: z
-      .string()
-      .regex(/^\d+d(?:3|4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?$/i, "Use a dice formula such as 1d6 + 1.")
-      .optional(),
-    lastChargeRoll: z.boolean().default(false)
+    regain: ChargeCountSchema.optional(),
+    lastChargeRoll: z.boolean().default(false),
+    /** What spending the last charge does to the item: with `lastChargeRoll`, on a d20 of 1, and otherwise always (a
+     *  Chime of Opening cracks). `destroyed` takes the row away; `becomes` turns it into that plain item (a Staff of
+     *  Striking becomes a Quarterstaff). Absent: the GM is told, and decides. */
+    lastCharge: z
+      .union([z.literal("destroyed"), z.object({ becomes: ContentIdSchema }).strict()])
+      .optional()
+      .describe(
+        "What spending the last charge does to the item: with lastChargeRoll on a d20 of 1, otherwise always. destroyed takes the row away; becomes turns it into that plain item. Absent: the GM is told"
+      ),
+    /** With `lastChargeRoll`, the charges a d20 of 20 gives back (Staff of Power: 1d8 + 2). */
+    lastChargeTwenty: ChargeCountSchema.optional().describe(
+      "With lastChargeRoll, the charges a d20 of 20 gives back (Staff of Power: 1d8 + 2)"
+    ),
+    /** The charges a copy holds when it is added, rolled then (a Necklace of Fireballs' 1d6 + 3 beads). Its pools
+     *  count from there. */
+    starting: ChargeCountSchema.optional().describe(
+      "The charges a copy holds when it is added, rolled then (a Necklace of Fireballs' 1d6 + 3 beads); its pools count from there"
+    )
   })
   .strict();
 export type ItemCharges = z.infer<typeof ItemChargesSchema>;
@@ -804,7 +833,8 @@ export const EquipmentReferenceSchema = z
       ),
     casts: z
       .array(ItemSpellCastSchema)
-      .max(8)
+      // A Staff of the Magi casts 18 spells.
+      .max(24)
       .default([])
       .describe("Spells the item can cast (Amulet of Message, Wand of Fireballs)"),
     charges: ItemChargesSchema.optional().describe(

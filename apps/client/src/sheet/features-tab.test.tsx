@@ -79,7 +79,7 @@ const LAND: Rechoice = {
   chosen: "polar"
 };
 
-const mountRest = (rechoices: readonly Rechoice[], afterLongRest: boolean, onRechoose = vi.fn()) =>
+const mountRest = (rechoices: readonly Rechoice[], afterLongRest: boolean, onRechoose = vi.fn(), afterAnyRest = true) =>
   render(
     <ToastProvider>
       <FeaturesTab
@@ -91,7 +91,7 @@ const mountRest = (rechoices: readonly Rechoice[], afterLongRest: boolean, onRec
         pools={[]}
         serverActions={[]}
         onUse={() => {}}
-        rest={{ rechoices, afterLongRest, busy: false, onRechoose }}
+        rest={{ rechoices, afterLongRest, afterAnyRest, busy: false, onRechoose }}
       />
     </ToastProvider>
   );
@@ -110,6 +110,12 @@ describe("the Rests area on the Features tab", () => {
     const land = screen.getByRole("combobox", { name: "Circle of the Land Spells" }) as HTMLSelectElement;
     expect(land.disabled).toBe(true);
     expect(screen.getByText("Chosen again after a Long Rest")).toBeTruthy();
+  });
+
+  it("waits for a rest before Fiendish Resilience is chosen again", () => {
+    mountRest([RESILIENCE], false, vi.fn(), false);
+    const resilience = screen.getByRole("combobox", { name: "Fiendish Resilience" }) as HTMLSelectElement;
+    expect(resilience.disabled).toBe(true);
   });
 
   it("is left out when nothing is chosen again on a rest", () => {

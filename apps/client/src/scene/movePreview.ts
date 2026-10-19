@@ -64,7 +64,8 @@ export const alliesByKind = (mover: MapActor, occupant: MapActor) => {
  * A creature that shares spaces (Air Form, a swarm) and any creature crossing a swarm pay Difficult Terrain where they
  * would be barred, as the server's movement reply says (`passesCreatures`, `swarmIds`).
  * With dynamic vision on, the walls the view has bar the way as the server's do. A spell's area that halves the
- * mover's Speed (Spirit Guardians) is charged by the server alone.
+ * mover's Speed (Spirit Guardians) or changes the ground (Web's Difficult Terrain, Plant Growth's 4 feet for every
+ * foot) is charged by the server alone.
  */
 export function previewMove(
   input: Readonly<{

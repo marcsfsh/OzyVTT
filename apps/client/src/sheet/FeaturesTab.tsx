@@ -1,9 +1,11 @@
 import { useState, type ReactNode } from "react";
-import type { ActorDefinition, ActorDerivedSheet, ContentActionSummary, Rechoice } from "@vtt/domain";
+import type { ActorDefinition, ActorDerivedSheet, ContentActionSummary, ConversionOffer, Rechoice } from "@vtt/domain";
 import { Button, IconLevelUp, Select } from "@vtt/ui";
 import { RichText } from "../encounter/RichText";
 import type { SrdExtension } from "../encounter/sheet-extension";
+import { ConversionList, RestStep } from "./Conversions";
 import type { SheetActor } from "./sheet-model";
+import type { SheetEdit } from "./useSheetEdit";
 import { plainActionName } from "../encounter/format";
 import { UseList, type Pool, type Spender } from "./Uses";
 import { ExperienceLine } from "./Experience";
@@ -91,17 +93,19 @@ const REST_WORDS: Readonly<Record<Rechoice["per"], string>> = {
 
 /**
  * The picks a feature lets the character make again after a rest (Fiendish Resilience's damage type, a Circle of the
- * Land's land), each with its answer in force. A Long Rest pick waits for the step that rest opens; the GM can make it
- * any time. The server checks each one.
+ * Land's land), each with its answer in force. A pick waits for the step its rest opens; the GM can make it any time.
+ * The server checks each one.
  */
 function RestChoices({
   rechoices,
   afterLongRest,
+  afterAnyRest,
   busy,
   onRechoose
 }: Readonly<{
   rechoices: readonly Rechoice[];
   afterLongRest: boolean;
+  afterAnyRest: boolean;
   busy: boolean;
   onRechoose: (choice: Rechoice, option: Rechoice["options"][number]) => void;
 }>) {
@@ -109,7 +113,18 @@ function RestChoices({
     <section className="cs-group" aria-label="Rests">
       <span className="cs-eyebrow">Rests</span>
       {rechoices.map((choice) => {
-        const open = choice.per === "short-rest" || afterLongRest;
+        const open = choice.per === "short-rest" ? afterAnyRest : afterLongRest;
+        // A pick of several (Weapon Mastery) is changed one answer at a time in the step its rest opens.
+        if (choice.held)
+          return (
+            <p key={choice.offer} className="cs-field">
+              <span className="cs-use-name">{choice.label}</span>
+              <span className="cs-sub">{REST_WORDS[choice.per]}</span>
+              <span>
+                {choice.held.map((id) => choice.options.find((option) => option.id === id)?.name ?? id).join(", ")}
+              </span>
+            </p>
+          );
         return (
           <label key={choice.offer} className="cs-field">
             <span className="cs-use-name">{choice.label}</span>
@@ -192,9 +207,10 @@ function FeatureRow({ entry }: Readonly<{ entry: Entry }>) {
 }
 
 /**
- * The Features tab: the uses first (their boxes, when they come back, and Use), the Weapon Mastery picks, then every
- * feature grouped by where it comes from, one line each with the full text a tap away. It ends with what the next level
- * brings and the way to it, when the table's builder lets this caller level the character.
+ * The Features tab: the step a finished rest opened, the uses (their boxes, when they come back, and Use), what the
+ * features turn into what (Font of Magic, restoring a use), the Weapon Mastery picks, then every feature grouped by
+ * where it comes from, one line each with the full text a tap away. It ends with what the next level brings and the way
+ * to it, when the table's builder lets this caller level the character.
  */
 export function FeaturesTab({
   actor,
@@ -204,6 +220,11 @@ export function FeaturesTab({
   derived,
   pools,
   serverActions,
+  conversions = [],
+  rechoices = [],
+  busy = false,
+  edit,
+  onFeedback = () => {},
   onUse,
   rest,
   experience,
@@ -216,12 +237,21 @@ export function FeaturesTab({
   derived: ActorDerivedSheet | null;
   pools: readonly Pool[];
   serverActions: readonly ContentActionSummary[];
+  /** What the features turn into what, and recover, as the server checks them now. */
+  conversions?: readonly ConversionOffer[];
+  /** The picks the character may re-make after a rest. */
+  rechoices?: readonly Rechoice[];
+  busy?: boolean;
+  /** Sends a conversion, a re-choice or the rest step's Done; absent where the sheet only shows. */
+  edit?: SheetEdit;
+  onFeedback?: (text: string) => void;
   /** Uses a pool's own action through the server, which applies what it does (Second Wind's healing). */
   onUse: (actionId: string) => void;
   /** The picks a rest lets the character make again, out of a fight; absent or empty leaves the area out. */
   rest?: Readonly<{
     rechoices: readonly Rechoice[];
     afterLongRest: boolean;
+    afterAnyRest: boolean;
     busy: boolean;
     onRechoose: (choice: Rechoice, option: Rechoice["options"][number]) => void;
   }>;
@@ -268,9 +298,26 @@ export function FeaturesTab({
   }
   // The monster's own actions, which have no uses to count but say what it can do.
   const monsterActions = actor.kind === "player-character" ? [] : definition.actions;
+  const converting = conversions.filter((offer) => offer.timing !== "after-short-rest");
   const columns = derived?.classColumns ?? [];
+  // While a finished rest's step is open, its picks are made there; the Rests area shows them the rest of the time.
+  const step = edit ? actor.restStep : null;
+  const stepPicks = step
+    ? rechoices.filter((choice) => step.after === "long-rest" || choice.per === "short-rest").length
+    : 0;
   return (
     <div className="cs-features">
+      {edit && step && (
+        <RestStep
+          actorId={actor.id}
+          after={step.after}
+          offers={conversions}
+          rechoices={rechoices}
+          busy={busy}
+          edit={edit}
+          onFeedback={onFeedback}
+        />
+      )}
       {experience && <ExperienceLine {...experience} />}
       {columns.length > 0 && <ClassColumns columns={columns} />}
       {pools.length > 0 && (
@@ -286,7 +333,13 @@ export function FeaturesTab({
           />
         </section>
       )}
-      {rest && rest.rechoices.length > 0 && <RestChoices {...rest} />}
+      {edit && converting.length > 0 && (
+        <section className="cs-group" aria-label="Convert and recover">
+          <span className="cs-eyebrow">Convert and recover</span>
+          <ConversionList actorId={actor.id} offers={converting} busy={busy} edit={edit} onFeedback={onFeedback} />
+        </section>
+      )}
+      {rest && rest.rechoices.length > 0 && stepPicks === 0 && <RestChoices {...rest} />}
       {masteries.length > 0 && <MasteryBlock masteries={masteries} />}
       {groups.map((group) => (
         <section key={group.key} className="cs-group" aria-label={group.title}>

@@ -18,3 +18,12 @@ export function holdsFeature(definition: ActorDefinition | undefined, id: string
     );
   });
 }
+
+/** The feet Improved Potent Spellcasting adds to a Druid cantrip's range, or 0. */
+export function potentRangeFeet(
+  definition: ActorDefinition | undefined,
+  spell: Readonly<{ level: number; classes: readonly string[] }> | undefined
+): number {
+  if (!spell || spell.level !== 0 || !spell.classes.includes("druid")) return 0;
+  return holdsFeature(definition, "improved-potent-spellcasting", "Improved Potent Spellcasting") ? 300 : 0;
+}

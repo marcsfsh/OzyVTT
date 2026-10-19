@@ -33,6 +33,7 @@ import { sceneSight } from "../vision/sight.js";
 import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
 import { scrollOfAction } from "../scrolls.js";
 import { creatureTypeOf } from "../statblock-facts.js";
+import { reachBarredBy } from "../zone-barriers.js";
 import { builtinHandlerFor } from "./builtins.js";
 import {
   resolveHiddenCheck,
@@ -113,6 +114,10 @@ function combatantsOf(
     consumableRowFor(action, attacker.inventory, catalog) !== null;
   // A spell that lasts and acts again later (Produce Flame, a lingering area) starts with no creature under it yet.
   const startsALastingSpell = castsASpell && (spell?.effect?.laterActions ?? []).length > 0;
+  // Moving a spell's area (Moonbeam, Flaming Sphere's ram) is something done, whoever it moves onto.
+  const movesAnArea = spell !== undefined && laterRowOf(spell, action.id)?.movesArea !== undefined;
+  // Spreading Caltrops leaves an area that acts on whoever meets it later.
+  const leavesAnArea = action.zone !== undefined && !castsASpell;
   const rollsOnTargets =
     action.attack !== undefined ||
     action.save !== undefined ||
@@ -125,6 +130,8 @@ function combatantsOf(
     action.multiattack !== undefined ||
     spendsALimitedUse ||
     startsALastingSpell ||
+    movesAnArea ||
+    leavesAnArea ||
     // A move, jump or teleport of its own (a troll's Charge, a bulette's Leap) is something done.
     action.move !== undefined ||
     action.leap !== undefined ||
@@ -148,6 +155,7 @@ function combatantsOf(
     action.endsCurses === undefined &&
     !spendsALimitedUse &&
     !castsASpell &&
+    !movesAnArea &&
     action.sight === undefined &&
     action.move === undefined &&
     action.leap === undefined &&
@@ -308,6 +316,9 @@ export function openResolve(
       "light.too-bright",
       `${attacker.name} stands in Bright Light. ${action.name} needs Dim Light or darkness.`
     ]);
+  // A melee attack can't reach through a barrier that holds its attacker back (Antilife Shell).
+  const shell = reachBarredBy(state, attacker, action, targets, deps);
+  if (shell) sightBlocks.push(["range.out-of-reach", shell]);
   for (const [rule, message] of sightBlocks) {
     const mode = effectiveModeFor(state.combat, rule);
     if (mode === "freeform") continue;
