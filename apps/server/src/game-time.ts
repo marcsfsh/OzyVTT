@@ -1,6 +1,7 @@
 import { ROUNDS_PER_MINUTE, type GameState } from "@vtt/domain";
 import { ageEffects, type EffectNarration } from "./effects.js";
 import { endZone } from "./spell-zone-state.js";
+import { zoneHeld } from "./spell-zones.js";
 
 /**
  * The game clock (ADR-0029) and what lasts on it. A round is 6 seconds, so 10 rounds make a minute: in a fight, what
@@ -32,7 +33,7 @@ function creaturesInTime(state: GameState): Set<string> {
 
 /**
  * Moves the game clock `minutes` on, and counts the time down on every creature's effects (`ageEffects`). A spell
- * area of the running fight that lasts a set number of rounds ends once the time outlasts them. Returns what ended.
+ * area ends with the effect that keeps it, or once the time outlasts the rounds it lasts. Returns what ended.
  */
 export function passGameTime(state: GameState, minutes: number): EffectNarration[] {
   if (minutes <= 0) return [];
@@ -40,9 +41,11 @@ export function passGameTime(state: GameState, minutes: number): EffectNarration
   state.rest = { ...state.rest, clockHours: Math.floor(total / 60), clockMinutes: total % 60 };
   const events = ageEffects(state, creaturesInTime(state), minutes);
   for (const zone of [...state.combat.spellZones]) {
-    if (zone.rounds === null) continue;
-    const left = zone.rounds - (state.combat.round - zone.startedRound);
-    if (left > minutes * ROUNDS_PER_MINUTE) continue;
+    const ends =
+      zone.rounds !== null
+        ? zone.rounds - (state.combat.round - zone.startedRound) <= minutes * ROUNDS_PER_MINUTE
+        : !zoneHeld(state, zone);
+    if (!ends || zone.bursting) continue;
     endZone(state, zone.id);
     events.push({ kind: "effect", text: `${zone.name} ends.`, actorId: zone.casterId });
   }

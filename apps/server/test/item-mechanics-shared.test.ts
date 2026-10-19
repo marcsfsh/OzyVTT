@@ -9,6 +9,7 @@ import { builtinAction } from "../src/builtin-actions.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { effectiveActions } from "../src/effective-actions.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
+import { castAction } from "../src/item-actions.js";
 import { setInventoryItem } from "../src/inventory.js";
 import { initiativeRollMode, startEncounter } from "../src/encounter.js";
 
@@ -154,7 +155,6 @@ const REFUSED_CASTS: ReadonlyArray<readonly [string, string]> = [
     "{roll: null, types: []} -> no damage, no save, no attack: a Rod of Resurrection that restores nothing and debits a charge"
   ],
   ["magic-missile", "{roll: '1d4 + 1'} is ONE of the THREE darts the SRD prints - ~3.5 where the spell averages ~10.5"],
-  ["web", "{roll: '2d4', types: ['fire']} is the damage of BURNING webs, and the cast rolls it on every press"],
   [
     "ray-of-enfeeblement",
     "{roll: '1d8', types: []} -> a 1d8 Force damage action; the 1d8 is what the TARGET subtracts from its own damage rolls"
@@ -168,11 +168,27 @@ describe("the cast rules apply to every authored cast", () => {
     expect(AUTHORED_CASTS.length).toBeGreaterThan(0);
   });
 
-  it("names none of the seven spells whose record does not describe what a cast rolls", () => {
+  it("names none of the six spells whose record does not describe what a cast rolls", () => {
     for (const [spellId, why] of REFUSED_CASTS) {
       const found = AUTHORED_CASTS.filter((cast) => cast.spellId === spellId).map((cast) => cast.itemId);
       expect(found, `${spellId} is cast by ${found.join(", ")} and it must not be: ${why}`).toEqual([]);
     }
+  });
+
+  it("casts Web from the Cloak of Arachnida with nothing rolled at the cast", () => {
+    // The record's 2d4 Fire is the webs burning. The cast rolls what the spell's cast model holds, which for Web is
+    // nothing: its save is the webs' own, made as a creature enters them or starts its turn there.
+    const web = view.spellRecord!("web")!;
+    const cast = castAction(
+      { id: "cloak" },
+      { spellId: "web", saveDc: 13, consumesSpellSlot: false },
+      "Cloak",
+      undefined,
+      web
+    );
+    expect(cast.damage).toEqual([]);
+    expect(cast.save).toBeUndefined();
+    expect(cast.attack).toBeUndefined();
   });
 
   it("names no spell whose damage roll carries no damage type", () => {

@@ -403,7 +403,8 @@ export function deriveEquipment(
     const entry = { item, record };
     if (item.equipped) equipped.push(entry);
     if (item.equipped && itemIsActive(item, record)) active.push(entry);
-    else if (record?.consumedOnUse) packed.push(entry);
+    // Caltrops are spread straight from their bag, as a potion is drunk from the pack.
+    else if (record?.consumedOnUse || record?.actions.some((action) => action.zone !== undefined)) packed.push(entry);
     if (item.attuned && record) cursedVulnerabilities.push(...curseVulnerabilitiesOf(record, item));
   }
   const carriers: RiderCarrier[] = [
