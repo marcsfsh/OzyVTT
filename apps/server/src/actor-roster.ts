@@ -559,6 +559,9 @@ export function rebuildActorDefinition(
   const rebuilt = rememberHitPointRolls(previous, definition);
 
   const inventory = actor.inventory.map((item) => ({ ...item }));
+  const previousPools = previous
+    ? new Set(actionPools(effectiveActions(previous, { ...actor, inventory }, catalog)).map((pool) => pool.id))
+    : new Set<string>();
   const armorClass = storedArmorClass({ ...actor, inventory } as Actor, definition, catalog);
   const derivation = deriveEquipment({ ...actor, inventory } as Actor, definition, catalog);
   const previousMaximum = actor.hp.maximum;
@@ -581,7 +584,11 @@ export function rebuildActorDefinition(
   );
   actor.pactSlots = carriedPactSlots(actor.pactSlots, pactSlotMaximum(previous), seedPactSlots(definition));
   actor.preparedSpellIds = carriedPreparedSpells(actor.preparedSpellIds, previous, definition);
-  actor.actionUses = carriedUses(actor.actionUses, effectiveActions(definition, { ...actor, inventory }, catalog));
+  actor.actionUses = carriedUses(
+    actor.actionUses,
+    effectiveActions(definition, { ...actor, inventory }, catalog),
+    previousPools
+  );
   actor.size = definition.size;
   actor.sizeCells = Math.max(definition.token.footprint.width, definition.token.footprint.height);
   state.definitions = state.definitions.map((entry) =>
@@ -605,13 +612,23 @@ function dropsAClass(previous: ActorDefinition | undefined, next: ActorDefinitio
   return before.some((entry) => !kept.has(entry.id) && !(sequence !== null && sequence.indexOf(entry.id) + 1 > level));
 }
 
-/** Spent counts kept against the new limits; a pool the new sheet no longer has is dropped. */
-function carriedUses(spent: Actor["actionUses"], actions: readonly ActorAction[]): Actor["actionUses"] {
+/**
+ * Spent counts kept against the new limits; a pool the new sheet no longer has is dropped. A key that was no pool
+ * of the old sheet is a counter a rule keeps (Relentless Rage's DC, Overchannel's uses, a Healer's Kit's spent uses,
+ * a once-per-rest conversion), so it is kept as it stands.
+ */
+function carriedUses(
+  spent: Actor["actionUses"],
+  actions: readonly ActorAction[],
+  previousPools: ReadonlySet<string>
+): Actor["actionUses"] {
   const limits = new Map(actionPools(actions).map((pool) => [pool.id, pool.limit]));
   const carried: Record<string, number> = {};
   for (const [key, used] of Object.entries(spent)) {
+    if (used <= 0) continue;
     const limit = limits.get(key);
-    if (limit !== undefined && used > 0) carried[key] = Math.min(used, limit);
+    if (limit !== undefined) carried[key] = Math.min(used, limit);
+    else if (!previousPools.has(key)) carried[key] = used;
   }
   return carried;
 }
