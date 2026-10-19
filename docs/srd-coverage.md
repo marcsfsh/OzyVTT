@@ -685,7 +685,7 @@ Notes on the curated rows:
 | --- | --- | --- |
 | Book | enforced | While it is equipped, the sheet offers "consulting an accurate Book about its topic" beside the checks (check-situations.ts), and an Intelligence (Arcana, History, Nature or Religion) check that names it gains +5 (ability-checks.ts). Whether the Book is accurate and on topic is the GM's. |
 | Costume | enforced | While it is worn (equipped), the sheet offers "impersonating whom the Costume represents" beside the checks (check-situations.ts), and a check that names it has Advantage (ability-checks.ts). |
-| Crowbar | enforced | While it is equipped, the sheet offers "where the Crowbar's leverage applies" beside the checks (check-situations.ts), and a Strength check that names it has Advantage (ability-checks.ts). Whether its leverage applies is the GM's. |
+| Crowbar | enforced | While it is equipped, the sheet offers "prying with the Crowbar" beside the checks (check-situations.ts), and a Strength check that names it has Advantage (ability-checks.ts). Whether the Crowbar can pry there is the GM's. |
 | Healer's Kit | enforced | stabilize.ts spends one use of the kit to make a creature at 0 Hit Points Stable with no check, and the last use takes the kit. |
 | Magnifying Glass | enforced | While it is equipped, the sheet offers "appraising or inspecting a highly detailed item" beside the checks (check-situations.ts), and a check that names it has Advantage (ability-checks.ts). Lighting a fire with it is the GM's. |
 | Map | enforced | While it is equipped, the sheet offers "finding the way in the place an accurate Map shows" beside the checks (check-situations.ts), and a Wisdom (Survival) check that names it gains +5 (ability-checks.ts). |
