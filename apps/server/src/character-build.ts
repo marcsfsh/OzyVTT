@@ -55,6 +55,7 @@ import { bindTemplateItem } from "./inventory.js";
 import { BUILDER_SOURCE_NAME } from "./actor-roster.js";
 import { CONTENT_STAMP } from "./content-stamp.js";
 import { withProficiencyEdit } from "./sheet-proficiency-edits.js";
+import { studyIncreasesOf } from "./study-ledger.js";
 import { featHoldings, featPrerequisiteFailure } from "./feat-prerequisites.js";
 import { CommandRejectedError } from "./game-store.js";
 
@@ -849,6 +850,9 @@ export function buildCharacterDefinition(
       });
     });
   }
+  // A studied manual or tome lands after its level's own increases, so an Ability Score Improvement taken later still
+  // stops at 20.
+  const studies = studyIncreasesOf(input.choices, input.level);
   const holdings = featHoldings({ classes, granted });
   const featChecks = [
     ...(originFeat ? [{ feat: originFeat, level: 1 }] : []),
@@ -876,6 +880,11 @@ export function buildCharacterDefinition(
           `${increase.ability.toUpperCase()} would be ${finalScores[increase.ability]}; ${increase.source} cannot raise a score above ${increase.maximum}. Choose another ability.`
         );
     }
+    for (const study of studies.filter((candidate) => candidate.level === level))
+      finalScores[study.ability] = Math.max(
+        finalScores[study.ability],
+        Math.min(study.maximum, finalScores[study.ability] + study.amount)
+      );
   }
 
   // ---- 5c. Feature `ability-score` riders, before any feature is interpreted: `interpretAction`

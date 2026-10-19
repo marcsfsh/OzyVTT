@@ -39,6 +39,7 @@ import type { ContentView } from "./content-library.js";
 import type { CharacterFeatureRef } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 import { SHEET_PROFICIENCIES_KIND } from "./sheet-proficiency-edits.js";
+import { STUDIED_ITEM_KIND } from "./study-ledger.js";
 
 /**
  * The offer survey: everything the content asks a build to pick, with its legal options, and the ledger
@@ -1350,14 +1351,16 @@ function placeChoices(
   }
 
   // Pass B: everything else. Class spells/cantrips (step 9), equipment, size and the subclass row aren't
-  // offers. `hp-roll`, `ability-scores` and `class-levels` rows are build output, so an echoed ledger is accepted.
+  // offers. `hp-roll`, `ability-scores` and `class-levels` rows are build output, so an echoed ledger is accepted. A
+  // sheet's hand edit and its studied books are the sheet's own records.
   const separateKinds = new Set([
     "equipment",
     "size",
     "hp-roll",
     "ability-scores",
     CLASS_LEVELS_KIND,
-    SHEET_PROFICIENCIES_KIND
+    SHEET_PROFICIENCIES_KIND,
+    STUDIED_ITEM_KIND
   ]);
   const casterIds = casters.map(({ entry }) => entry.record.id);
   const classSpellRows = new Map<string, { cantrips: CharacterChoice[]; spells: CharacterChoice[] }>();

@@ -30,6 +30,7 @@ import { CommandRejectedError } from "../game-store.js";
 import { recordRoll } from "../roll-history.js";
 import { sendsSheetScores, sheetAbilityScores, sheetSourceOf } from "../sheet-abilities.js";
 import { proficiencyEditOf } from "../sheet-proficiency-edits.js";
+import { withStoredStudies } from "../study-ledger.js";
 import { checkPlayerLevelChange } from "../level-up-picks.js";
 import type { HitDie } from "@vtt/rules-5e";
 import { GameInputError } from "./failures.js";
@@ -144,7 +145,8 @@ export const characterCommands = [
           // Validated inside the command against the stored policy; the caller's catalog keeps GM-only
           // homebrew out of a player's build.
           const catalog = kit.catalogFor(principal);
-          const { input, thrown } = settleBuilderDice(state, request, {
+          // A new character has studied nothing yet.
+          const { input, thrown } = settleBuilderDice(state, { ...request, choices: withStoredStudies(request.choices, []) }, {
             gm: isGmGrade(principal),
             sessionId: sessionIdOf(principal),
             previous: undefined,
@@ -260,7 +262,11 @@ export const characterCommands = [
         const previous = actor.definitionId ? storedDefinition(state, actor.definitionId) : undefined;
         // The sheet's hand edit isn't one of the builder's picks, so the wizard never sends it back.
         const handEdit = proficiencyEditOf(previous?.character?.choices ?? []);
-        const choices = handEdit && !proficiencyEditOf(build.choices) ? [...build.choices, handEdit] : build.choices;
+        // Nor are the books it has studied, which only the GM's study command records.
+        const choices = withStoredStudies(
+          handEdit && !proficiencyEditOf(build.choices) ? [...build.choices, handEdit] : build.choices,
+          previous?.character?.choices
+        );
         // The name stays the live actor's: a rebuild changes what a character can do, and who they are stays the same.
         const { input, thrown } = settleBuilderDice(
           state,

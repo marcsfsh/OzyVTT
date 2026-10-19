@@ -1052,7 +1052,10 @@ export const InventoryItemSchema = z
      *  server keeps it. */
     ammunitionFired: z.number().int().min(0).max(10_000).optional(),
     /** Display-only marker so the sheet can offer Attune without the catalog; never the riders. */
-    magic: ItemMagicMarkerSchema.optional()
+    magic: ItemMagicMarkerSchema.optional(),
+    /** A copy whose magic is spent for now: a manual or tome after its study (`character.study-item`), until it
+     *  regains it in a century. The server keeps it. */
+    dormant: z.boolean().optional()
   })
   .strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;

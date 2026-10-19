@@ -563,6 +563,12 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   Wishes: reference("The djinni's wishes are the GM's to run.")
 };
 
+/** A manual or tome, whose study the GM marks done. */
+const studied = (ability: string) =>
+  enforced(
+    `item-study.ts records the study in the reader's build, so ${ability} rises by 2 (to at most 30) and stays through every rebuild, and the copy's magic is spent. The 48 hours of study are downtime the GM gives, and the GM moves the clock.`
+  );
+
 /**
  * Records the data-driven pass gets wrong: those the engine handles in code by id or by name, the base rows of a choice
  * whose chosen row carries the mechanics, and records whose data applies only part of what they do. Keyed `spell:`,
@@ -702,6 +708,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:boon-of-truesight": guided(
     "The ability score increase is applied. Truesight on a character sheet isn't read in play, so the GM applies it."
   ),
+
+  // Manuals and tomes: the GM marks the 48 hours of study done, and the score rises for good.
+  "item:manual-of-bodily-health": studied("Constitution"),
+  "item:manual-of-gainful-exercise": studied("Strength"),
+  "item:manual-of-quickness-of-action": studied("Dexterity"),
+  "item:tome-of-clear-thought": studied("Intelligence"),
+  "item:tome-of-leadership-and-influence": studied("Charisma"),
+  "item:tome-of-understanding": studied("Wisdom"),
 
   // Magic items whose riders apply part of what they do, and leave a property the table would expect applied.
   "item:armor-of-invulnerability": guided(

@@ -657,6 +657,21 @@ export const EquipmentReferenceSchema = z
       .describe(
         "A Spell Scroll: each carried copy bears one spell of these levels (0 is a cantrip), stored as the row's `spellId` and checked by the server when it is added. Reading it casts the spell at its level with the Spell Scroll table's save DC and attack bonus, no spell slot and no Material components, and uses it up; a reader whose spell list lacks the spell can't read it, and one above the reader's levels needs a check first. Needs `consumedOnUse`"
       ),
+    /** A manual or tome: studied for its reading time, it raises its reader's score for good, and its magic then
+     *  sleeps. */
+    study: z
+      .object({
+        ability: AbilityShortSchema,
+        amount: z.number().int().min(1).max(4),
+        maximum: z.number().int().min(20).max(30),
+        hours: z.number().int().min(1).max(1000),
+        days: z.number().int().min(1).max(365)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A manual or tome (\"If you spend 48 hours over a period of 6 days or fewer studying the book's contents and practicing its guidelines, your Constitution increases by 2, to a maximum of 30\"): `hours` of study within `days`, after which the reader's `ability` rises by `amount`, never above `maximum`, for good. The GM marks the study done (the time is downtime the GM gives); the server records it in the reader's build, so a rebuild keeps it, and the copy's magic is spent, so no one else gains from it"
+      ),
     /** "The GM chooses the type": the types the GM may pick for this item's one granted resistance, which then
      *  replaces the printed default in `grants.damageResistances` for that carried copy. */
     damageTypeChoice: z

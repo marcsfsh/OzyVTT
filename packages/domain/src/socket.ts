@@ -97,6 +97,7 @@ import type {
   CharacterSetIdentitySchema,
   CharacterSetInventorySchema,
   CharacterGiveItemSchema,
+  CharacterStudyItemSchema,
   CharacterRecoverAmmunitionSchema,
   CharacterSetPreparedSchema,
   CharacterFinishPreparingSchema,
@@ -651,6 +652,11 @@ export interface ClientToServerEvents {
   "character:give-item": (
     payload: CommandPayload<typeof CharacterGiveItemSchema>,
     acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM: a carried manual or tome is studied; the score rises and the copy's magic is spent. */
+  "character:study-item": (
+    payload: CommandPayload<typeof CharacterStudyItemSchema>,
+    acknowledgement: (result: MutationResult & { ability?: string; before?: number; after?: number }) => void
   ) => void;
   "character:recover-ammunition": (
     payload: CommandPayload<typeof CharacterRecoverAmmunitionSchema>,

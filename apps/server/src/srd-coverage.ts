@@ -178,7 +178,7 @@ export function featureState(feature: FeatureRecord): CoverageState {
   return "reference";
 }
 
-/** An item is enforced when it is a weapon or armor or carries riders, a scroll's spell or ammunition. An item that
+/** An item is enforced when it is a weapon or armor or carries riders, a scroll's spell, ammunition or a study. An item that
  *  casts spells takes the state of the spells it casts, as a stat block's casting does. Guided when the app only
  *  tracks it (attunement, charges, a curse, an action that only spends a use), uses it as a base weapon or armor
  *  without its magic, or rolls its checks (a tool). */
@@ -190,6 +190,7 @@ export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<str
     item.grantsFeatIds.length > 0 ||
     (item.ammunition ?? null) !== null ||
     item.spellScroll !== undefined ||
+    item.study !== undefined ||
     item.removesArmorDrawbacks === true ||
     ridersApply(item);
   if (applies) return unreadModifier(item) ? "guided" : "enforced";

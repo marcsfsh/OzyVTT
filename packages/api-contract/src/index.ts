@@ -289,6 +289,7 @@ export const GAME_PATHS = {
   characterAddToSpellbook: `${API_NAMESPACE}/game/actors/{actorId}/spellbook`,
   characterSetInventory: `${API_NAMESPACE}/game/actors/{actorId}/inventory`,
   characterGiveItem: `${API_NAMESPACE}/game/actors/{actorId}/inventory/give`,
+  characterStudyItem: `${API_NAMESPACE}/game/actors/{actorId}/inventory/study`,
   characterRecoverAmmunition: `${API_NAMESPACE}/game/actors/{actorId}/inventory/recover-ammunition`,
   characterSetCurrency: `${API_NAMESPACE}/game/actors/{actorId}/currency`,
   characterSetFavourites: `${API_NAMESPACE}/game/actors/{actorId}/favourites`,
@@ -714,6 +715,7 @@ export const GAME_COMMANDS = {
   "character.add-to-spellbook": { scope: "actor:write", method: "post", path: GAME_PATHS.characterAddToSpellbook },
   "character.set-inventory": { scope: "actor:write", method: "post", path: GAME_PATHS.characterSetInventory },
   "character.give-item": { scope: "actor:write", method: "post", path: GAME_PATHS.characterGiveItem },
+  "character.study-item": { scope: "actor:write", method: "post", path: GAME_PATHS.characterStudyItem },
   "character.recover-ammunition": {
     scope: "actor:write",
     method: "post",

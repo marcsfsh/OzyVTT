@@ -1239,6 +1239,18 @@ export const CharacterGiveItemSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** The GM marks a carried manual or tome studied by the character carrying it. */
+export const CharacterStudyItemSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    itemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** The options a character pins to the sheet's turn card, in order. An empty list clears them. */
 export const CharacterSetFavouritesSchema = z
   .object({
