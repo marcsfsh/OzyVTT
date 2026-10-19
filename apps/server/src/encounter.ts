@@ -37,7 +37,8 @@ import {
   type EffectNarration
 } from "./effects.js";
 import { closeInitiativeWindow, rolledInitiative } from "./initiative-hooks.js";
-import { leaveShortRest } from "./short-rest-interruptions.js";
+import { interruptRests } from "./rest-interruptions.js";
+import { endTravelFor } from "./travel.js";
 import { releaseSwallowedBy } from "./swallow.js";
 import { endOfTurn, playStartSteps, startOfTurn } from "./turn-boundaries.js";
 import { zoneHeld, zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
@@ -419,10 +420,14 @@ export function startEncounter(
     historyDirty: false
   };
   if (resolveDefinition) clearPerEncounterUses(state, actorIds, resolveDefinition, catalog);
-  // Rolling Initiative stops a Short Rest; the GM's rest panel shows who left it.
-  leaveShortRest(state, actorIds, "rolled Initiative");
+  // Rolling Initiative stops a rest and the party's travel; the GM's rest panel shows who left the rest.
+  const interrupted = interruptRests(state, actorIds, "rolled Initiative", {
+    ...(resolveDefinition ? { resolveDefinition } : {}),
+    ...(catalog ? { catalog } : {})
+  });
+  endTravelFor(state, actorIds);
   // What happens "when you roll Initiative": Superior Inspiration's regain, Persistent Rage's window.
-  return rolledInitiative(state, actorIds, { resolveDefinition, catalog });
+  return [...interrupted, ...rolledInitiative(state, actorIds, { resolveDefinition, catalog })];
 }
 
 /**
@@ -520,8 +525,9 @@ export function addCombatant(
     ]
   };
   if (deps.resolveDefinition) clearPerEncounterUses(state, new Set([actorId]), deps.resolveDefinition, deps.catalog);
-  leaveShortRest(state, new Set([actorId]), "rolled Initiative");
-  return rolledInitiative(state, [actorId], deps);
+  const interrupted = interruptRests(state, new Set([actorId]), "rolled Initiative", deps);
+  endTravelFor(state, [actorId]);
+  return [...interrupted, ...rolledInitiative(state, [actorId], deps)];
 }
 
 /**

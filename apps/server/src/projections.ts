@@ -692,18 +692,56 @@ export function projectPlayerRollCalls(state: GameState, playerSessionId: string
   });
 }
 
-/** Resting as one player sees it: their own characters' requests, and the party's Short Rest only when one of their
- *  characters is in it, cut down to those characters. Who else rests, and the game clock, stay with the GM. */
+/** Resting as one player sees it: their own characters' requests, and the party's Short and Long Rests only when one of
+ *  their characters is in them, cut down to those characters. Who else rests, and the game clock, stay with the GM. */
 function playerRest(state: GameState, yourActorIds: ReadonlySet<string>): PlayerView["rest"] {
   const shortRest = state.rest.shortRest;
   const members = shortRest?.actorIds.filter((id) => yourActorIds.has(id)) ?? [];
+  // The Long Rest's own members only: neither when it started nor who else rests reaches a player.
+  const yours = (state.rest.longRest?.members ?? []).filter((member) => yourActorIds.has(member.actorId));
   return {
     requests: state.rest.requests.filter((id) => yourActorIds.has(id)),
     shortRest:
       shortRest && members.length > 0
         ? { actorIds: members, done: shortRest.done.filter((id) => yourActorIds.has(id)) }
+        : null,
+    longRest:
+      yours.length > 0
+        ? {
+            actorIds: yours.map((member) => member.actorId),
+            interrupted: yours.filter((member) => member.interrupted).map((member) => member.actorId),
+            shortRestEarned: yours.filter((member) => member.shortRestEarned).map((member) => member.actorId)
+          }
         : null
   };
+}
+
+/** The party's crafting projects as a player sees them, from an allow-list: those of their own characters and of the
+ *  visible party characters, so a character can offer to help. What a project cost stays with its crafter's player (a
+ *  purse is owner-only), and when one started and a scroll's numbers stay with the GM. A helper is named only when it
+ *  is one of theirs or a visible party character. */
+function playerCrafting(state: GameState, yourActorIds: ReadonlySet<string>): PlayerView["crafting"] {
+  const named = (actorId: string) =>
+    yourActorIds.has(actorId) ||
+    state.actors.some(
+      (actor) =>
+        actor.id === actorId && actor.kind === "player-character" && actor.visibility === "public" && !actor.archived
+    );
+  return state.crafting.projects
+    .filter((project) => named(project.crafterId))
+    .map((project) => ({
+      id: project.id,
+      crafterId: project.crafterId,
+      itemId: project.itemId,
+      itemName: project.itemName,
+      kind: project.kind,
+      toolId: project.toolId,
+      ...(project.spellId !== undefined ? { spellId: project.spellId } : {}),
+      helperIds: project.helperIds.filter(named),
+      workMinutes: project.workMinutes,
+      doneMinutes: project.doneMinutes,
+      ...(yourActorIds.has(project.crafterId) ? { paidCp: project.paidCp } : {})
+    }));
 }
 
 /** "Fighter 5 / Rogue 2" for the identity card; null (field omitted) when the sheet records no class. */
@@ -898,6 +936,7 @@ export function projectPlayerView(
     rollCalls: projectPlayerRollCalls(state, playerSessionId),
     combat: projectPlayerCombat(state, playerSessionId, now, content, sight),
     rest: playerRest(state, yourActorIds),
+    crafting: playerCrafting(state, yourActorIds),
     // Tiers subtract fields. An actor is removed only by gm-only visibility, archiving or sight.
     actors: state.actors
       .filter((actor) => actor.visibility === "public" && !actor.archived && !sight.hidden.has(actor.id))

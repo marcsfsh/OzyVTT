@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 15 GameState fields · 167 commands · 343 HTTP paths
+- 16 GameState fields · 173 commands · 350 HTTP paths
 
 ## GameState shape
 
@@ -15,6 +15,7 @@ single JSON blob the server persists and projects per role.
 - `actors`
 - `builderPolicy`
 - `combat`
+- `crafting`
 - `definitions`
 - `heldDamage`
 - `heldRolls`
@@ -36,7 +37,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 one table entry under `apps/server/src/commands/`. Both transports register from that table, and
 the OpenAPI document generates the command's operation from it. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `item`, `light`, `object`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `summon`, `survival`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `crafting`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `item`, `light`, `object`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `summon`, `survival`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
 
 | Command | Scope |
 | --- | --- |
@@ -113,6 +114,10 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `check.answer` | `combat:write` |
 | `check.reroll` | `combat:write` |
 | `check.roll` | `combat:write` |
+| `crafting.cancel` | `actor:write` |
+| `crafting.help` | `actor:write` |
+| `crafting.start` | `actor:write` |
+| `crafting.work` | `actor:write` |
 | `damage.resolve` | `combat:write` |
 | `death-save.roll` | `combat:write` |
 | `dice.roll` | `roll:create` |
@@ -154,8 +159,10 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `rest.answer` | `actor:write` |
 | `rest.ask` | `actor:write` |
 | `rest.finish` | `actor:write` |
+| `rest.interrupt` | `actor:write` |
 | `rest.mark-done` | `actor:write` |
 | `rest.party` | `actor:write` |
+| `rest.resume` | `actor:write` |
 | `roll-call.answer` | `combat:write` |
 | `roll-call.close` | `combat:write` |
 | `roll-call.start` | `combat:write` |
@@ -325,6 +332,8 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/check/reroll`
 - `POST /api/v1/game/actors/{actorId}/conditions`
 - `POST /api/v1/game/actors/{actorId}/convert`
+- `POST /api/v1/game/actors/{actorId}/crafting`
+- `GET /api/v1/game/actors/{actorId}/crafting-offers`
 - `POST /api/v1/game/actors/{actorId}/currency`
 - `POST /api/v1/game/actors/{actorId}/damage`
 - `POST /api/v1/game/actors/{actorId}/death-save`
@@ -398,6 +407,9 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/claims/{actorId}/force-release`
 - `POST /api/v1/game/claims/release`
 - `GET POST /api/v1/game/commands`
+- `POST /api/v1/game/crafting/{projectId}/cancel`
+- `POST /api/v1/game/crafting/{projectId}/helpers`
+- `POST /api/v1/game/crafting/{projectId}/work`
 - `POST /api/v1/game/damage/resolve`
 - `POST /api/v1/game/definitions/import`
 - `POST /api/v1/game/doors/{wallId}/open`
@@ -433,6 +445,8 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/reactions/{reactionId}/dismiss`
 - `POST /api/v1/game/rests/party`
 - `POST /api/v1/game/rests/party/{actorId}/done`
+- `POST /api/v1/game/rests/party/{actorId}/interrupt`
+- `POST /api/v1/game/rests/party/{actorId}/resume`
 - `POST /api/v1/game/rests/party/finish`
 - `POST /api/v1/game/roll-calls`
 - `POST /api/v1/game/roll-calls/{callId}/answer`

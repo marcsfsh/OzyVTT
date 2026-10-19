@@ -25,6 +25,7 @@ import { checkSituations } from "../check-situations.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { gainHeroicInspiration, giveHeroicInspiration } from "../heroic-inspiration.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
+import { rollItemUse, rollUtilizeCheck, spendFastHandsCheck } from "../tool-uses.js";
 import type { TokenMapGeometry } from "../token-placement.js";
 import { initiatorOf, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -86,7 +87,7 @@ export const rollCommands = [
     type: "check.roll",
     operationId: "rollCheck",
     description:
-      "Rolls an ability check on the server: an ability, a skill, or a tool (with the skill it uses, when one does). The server works out the bonus (proficiency or Expertise, Jack of All Trades, a stat block's printed skill, check riders, Exhaustion) and the Advantage or Disadvantage the rules give (items, armor's Stealth Disadvantage, armor worn without training, Poisoned, Frightened, Hex, Hunter's Mark on the creature named by `findActorId`, a tool used with a proficient skill, and the riders of the `situations` the roller says it fits, from the sheet's list, such as a Book's topic), applies Reliable Talent, records the roll and, with a `dc`, says whether it succeeded. `face` is a typed d20 (a player only while the table's typedRolls is open); `rollMode` is the GM's alone. A player can't roll GM-only, a hidden creature's roll is always the GM's, and a blind roll's numbers stay with the GM. GM-grade for anyone; a player session only for their own claimed character. The response carries `check`.",
+      "Rolls an ability check on the server: an ability, a skill, or a tool (with the skill it uses, when one does). The server works out the bonus (proficiency or Expertise, Jack of All Trades, a stat block's printed skill, check riders, Exhaustion) and the Advantage or Disadvantage the rules give (items, armor's Stealth Disadvantage, armor worn without training, Poisoned, Frightened, Hex, Hunter's Mark on the creature named by `findActorId`, a tool used with a proficient skill, and the riders of the `situations` the roller says it fits, from the sheet's list, such as a Book's topic), applies Reliable Talent, records the roll and, with a `dc`, says whether it succeeded. A tool's or gear's printed Utilize use (`use`, with `tool` or `item`) rolls the record's own check at its DC, and a check with a `tool` and a `dc` is a use too: the item must be carried, and in a fight it takes the Utilize action on the roller's turn, or with `bonusAction` a Thief's Bonus Action (Fast Hands, which also makes a Dexterity (Sleight of Hand) check as a Bonus Action). Cobbler's Tools' success gives the wearer (`forActorId`, within 5 feet) Advantage on its next Dexterity (Acrobatics) check. `face` is a typed d20 (a player only while the table's typedRolls is open); `rollMode` is the GM's alone. A player can't roll GM-only, a hidden creature's roll is always the GM's, and a blind roll's numbers stay with the GM. GM-grade for anyone; a player session only for their own claimed character. The response carries `check`.",
     summary: "Roll an ability, skill or tool check on the server, with the rules' bonus and Advantage or Disadvantage.",
     schema: CheckRollSchema,
     malformed: "The check is malformed.",
@@ -103,33 +104,67 @@ export const rollCommands = [
         rollMode,
         findActorId,
         sense,
-        situations
+        situations,
+        item,
+        use,
+        bonusAction,
+        forActorId
       } = request;
       const initiator = initiatorOf(principal);
       let result: CheckResult | undefined;
       const geometry = await kit.liveGeometry();
       const { state, duplicate } = await execute((draft) => {
-        result = rollAbilityCheck(
-          draft,
-          initiator,
-          {
-            commandId,
-            actorId,
-            subject: {
-              ability,
-              ...(skill !== undefined ? { skill } : {}),
-              ...(tool !== undefined ? { tool } : {}),
-              ...(sense !== undefined ? { sense } : {})
+        const deps = checkDeps(kit, principal, draft, geometry);
+        const subject = {
+          ability,
+          ...(skill !== undefined ? { skill } : {}),
+          ...(tool !== undefined ? { tool } : {}),
+          ...(sense !== undefined ? { sense } : {})
+        };
+        const shared = {
+          commandId,
+          actorId,
+          visibility,
+          ...(face !== undefined ? { face } : {}),
+          ...(rollMode !== undefined ? { forcedMode: rollMode } : {}),
+          ...(situations !== undefined ? { situations } : {}),
+          ...(bonusAction !== undefined ? { bonusAction } : {})
+        };
+        // A tool's or gear's printed use is the Utilize action: the record's check at its DC, the item in the pack.
+        if (use !== undefined)
+          result = rollItemUse(
+            draft,
+            initiator,
+            { ...shared, itemId: (tool ?? item)!, use, ...(forActorId !== undefined ? { forActorId } : {}) },
+            deps
+          );
+        // A check with a tool against a DC is one of its uses too.
+        else if (tool !== undefined && dc !== undefined)
+          result = rollUtilizeCheck(
+            draft,
+            initiator,
+            { ...shared, itemId: tool, subject, dc, label: checkLabel(subject, deps.names) },
+            deps
+          );
+        else {
+          if (bonusAction) spendFastHandsCheck(draft, initiator, actorId, subject, deps);
+          result = rollAbilityCheck(
+            draft,
+            initiator,
+            {
+              commandId,
+              actorId,
+              subject,
+              dc: dc ?? null,
+              visibility,
+              ...(face !== undefined ? { face } : {}),
+              ...(rollMode !== undefined ? { forcedMode: rollMode } : {}),
+              ...(findActorId !== undefined ? { findActorId } : {}),
+              ...(situations !== undefined ? { situations } : {})
             },
-            dc: dc ?? null,
-            visibility,
-            ...(face !== undefined ? { face } : {}),
-            ...(rollMode !== undefined ? { forcedMode: rollMode } : {}),
-            ...(findActorId !== undefined ? { findActorId } : {}),
-            ...(situations !== undefined ? { situations } : {})
-          },
-          checkDeps(kit, principal, draft, geometry)
-        );
+            deps
+          );
+        }
       });
       if (duplicate || !result) return;
       kit.publishRolls(state, commandId);

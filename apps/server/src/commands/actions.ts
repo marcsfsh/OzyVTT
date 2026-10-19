@@ -31,7 +31,7 @@ import type { EffectNarration } from "../effects.js";
 import { grantOutsideFight } from "../resolution/grant.js";
 import { lastChargeLine, lastChargeRollFor } from "../item-charges.js";
 import { consumableRowFor, withOneUsedUp } from "../consumables.js";
-import { leaveShortRest } from "../short-rest-interruptions.js";
+import { interruptRests } from "../rest-interruptions.js";
 import { ammunitionLabel, shotFrom, spendPiece } from "../ammunition.js";
 import { checkPlan } from "../ability-checks.js";
 import { rollSettledCheck } from "../check-rolls.js";
@@ -50,6 +50,7 @@ import { enclosedFrom } from "../enclosures.js";
 import { areaMoveOf, moveArea, planAreaMove, type AreaMove } from "../zone-moves.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withAreaCost, withChosenCost } from "../use-cost.js";
+import { withFastHands } from "../fast-hands.js";
 import { applyLooseHealing, looseHealTargets, partyMember } from "../loose-healing.js";
 import { countOptionUse } from "../option-uses.js";
 import { castLine, castSpellOf } from "../cast-narration.js";
@@ -161,12 +162,14 @@ export const actionCommands = [
         const listed = statBlockAction ?? builtinActionFor(definition, actionId, attacker);
         if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
         // An action whose user picks its cost (Lay on Hands) resolves at the amount picked, and one whose every area
-        // spends a use (Ring of Shooting Stars) at the areas placed.
-        const costed = withChosenCost(
+        // spends a use (Ring of Shooting Stars) at the areas placed; a Thief's Fast Hands takes an item's Utilize or
+        // Magic action as a Bonus Action.
+        const chosen = withChosenCost(
           withAreaCost(listed, templates?.length ?? 1),
           request.spend,
           request.conditionIds
         );
+        const costed = request.fastHands === true ? withFastHands(chosen, attacker, definition) : chosen;
         // What the spell's area asks of it: a stage it waits for (Storm of Vengeance's bolts), and the dice a storm adds
         // (Call Lightning).
         const areaSpell = costed.spellId ? kit.equipmentCatalog().spellRecord?.(costed.spellId) : undefined;
@@ -599,7 +602,10 @@ export const actionCommands = [
         restBroken = [
           ...clockEvents,
           ...(spell && spell.level > 0 && !draft.combat.active
-            ? leaveShortRest(draft, new Set([actorId]), `cast ${spell.name}`)
+            ? interruptRests(draft, new Set([actorId]), `cast ${spell.name}`, {
+                resolveDefinition: kit.resolveDefinition,
+                catalog: kit.equipmentCatalog()
+              })
             : [])
         ];
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
@@ -982,7 +988,13 @@ export const actionCommands = [
         spend = spendLooseUses(live, action, available, castLevel, slotsModeFor(draft), definition);
         // Casting a spell other than a cantrip stops a Short Rest.
         if (spell && spell.level > 0)
-          narrations = [...narrations, ...leaveShortRest(draft, new Set([actorId]), `cast ${spell.name}`)];
+          narrations = [
+            ...narrations,
+            ...interruptRests(draft, new Set([actorId]), `cast ${spell.name}`, {
+              resolveDefinition: kit.resolveDefinition,
+              catalog: kit.equipmentCatalog()
+            })
+          ];
         // A potion drunk or a flask thrown outside a fight is used up all the same.
         const consumable = consumableRowFor(action, live.inventory, kit.equipmentCatalog());
         if (consumable) live.inventory = withOneUsedUp(live.inventory, consumable.id);
