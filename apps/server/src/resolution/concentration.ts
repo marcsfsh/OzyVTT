@@ -8,7 +8,7 @@ import { castThisTurnKey } from "../lasting-spells.js";
 import { endZone } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
 import { tableLineOf, type ResolveContext } from "./context.js";
-import { shapingOf } from "./metamagic.js";
+import { shapedZone, shapingOf } from "./metamagic.js";
 
 type SpellLifetime = Pick<SpellReference, "duration" | "concentration" | "upcastDurations">;
 
@@ -192,10 +192,11 @@ export function openSpellZone(ctx: ResolveContext): void {
     annotationId: !aroundCaster && input.areaPlaced === true ? input.commandId : null,
     area: aroundCaster ? null : (spell.area ?? null),
     damageDealt: 0,
-    // The damage type the caster chose for it (Conjure Elemental's element).
+    // The damage type the caster chose for it (Conjure Elemental's element), or Transmuted Spell's.
     ...(input.damageType && (spell.effect?.damageTypes ?? []).includes(input.damageType as never)
       ? { damageType: input.damageType }
       : {}),
+    ...shapedZone(ctx, row.damage),
     ...(row.zone.on.includes("spell-end") ? { burstsOnEnd: true as const } : {}),
     entered: [],
     affected: caught ? targets.map((target) => target.id) : []

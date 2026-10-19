@@ -7,7 +7,7 @@ import { buildCharacterDefinition, type CharacterCreateRequestInput } from "../s
 import { ContentLibrary } from "../src/content-library.js";
 import { addEffect, CANT_SPEAK_TAG, makeEffect } from "../src/effects.js";
 import { effectiveActions } from "../src/effective-actions.js";
-import { startEncounter } from "../src/encounter.js";
+import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { answerSave, saveRollSources, type SaveAnswerDependencies } from "../src/saving-throws.js";
 import { openRepeatSaves } from "../src/turn-boundaries.js";
@@ -66,7 +66,15 @@ function sorcerer(level: number, picks: readonly string[]): ActorDefinition {
       { level: 1, kind: "equipment", id: "sorcerer-a" },
       { level: 1, kind: "equipment", id: "acolyte-a" },
       ...["fire-bolt", "shocking-grasp"].map((id) => ({ level: 1, classId: "sorcerer", kind: "cantrip", id })),
-      ...["fireball", "hold-person", "fly", "mage-armor", "scorching-ray", "magic-missile"].map((id) => ({
+      ...[
+        "fireball",
+        "hold-person",
+        "fly",
+        "mage-armor",
+        "scorching-ray",
+        "magic-missile",
+        ...(level >= 9 ? ["cloudkill"] : [])
+      ].map((id) => ({
         level: 1,
         classId: "sorcerer",
         kind: "spell",
@@ -481,6 +489,36 @@ describe("Transmuted Spell: change Acid, Cold, Fire, Lightning, Poison or Thunde
       ).toMatch(
         /Choose the type Transmuted Spell changes Fireball's damage to: acid, cold, lightning, poison, thunder/
       );
+  });
+});
+
+describe("a spell whose area acts later keeps its shaping there", () => {
+  it("leaves Cloudkill's area dealing the transmuted type", () => {
+    const table = sorcerer10(["transmuted-spell", "heightened-spell", "quickened-spell", "subtle-spell"]);
+    cast(table, "spell-cloudkill", [{ id: "transmuted-spell", damageType: "acid" }], { targetIds: [FOE] });
+    expect(table.state.combat.spellZones[0]).toMatchObject({ spellId: "cloudkill", damageType: "acid" });
+    expect(savesOf(table.state)[0]!.proposedDamageParts?.map((part) => part.type)).toEqual(["acid"]);
+  });
+
+  it("marks Heightened Spell's target on the area, for the saves it asks later", () => {
+    const table = sorcerer10(["transmuted-spell", "heightened-spell", "quickened-spell", "subtle-spell"]);
+    cast(table, "spell-cloudkill", [{ id: "heightened-spell", creatureIds: [FOE] }], { targetIds: [FOE, FOE2] });
+    expect(table.state.combat.spellZones[0]).toMatchObject({ heightened: FOE });
+    expect(savesOf(table.state).find((save) => save.targetActorId === FOE)?.disadvantageFrom).toBe("Heightened Spell");
+    expect(savesOf(table.state).find((save) => save.targetActorId === FOE2)?.disadvantageFrom).toBeUndefined();
+  });
+});
+
+describe("a readied spell keeps the shaping it was readied with", () => {
+  it("releases a readied Fireball transmuted, its point spent once when it was readied", () => {
+    const table = sorcerer10(["transmuted-spell", "heightened-spell", "quickened-spell", "subtle-spell"]);
+    cast(table, "spell-fireball", [{ id: "transmuted-spell", damageType: "thunder" }], { ready: true });
+    expect(points(table)).toBe(1);
+    nextInitiativeTurn(table.state);
+    const released = cast(table, "spell-fireball", [], { targetIds: [FOE] });
+    expect(released.damage.map((part) => part.type)).toEqual(["thunder"]);
+    expect(table.state.combat.reactionsUsed).toContain(HERO);
+    expect(points(table)).toBe(1);
   });
 });
 

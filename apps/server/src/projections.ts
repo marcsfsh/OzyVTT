@@ -493,7 +493,9 @@ function playerEffect(
   } = effect;
   const visible = repeatSave ? { ...rest, repeatSave: { ability: repeatSave.ability, dc: repeatSave.dc } } : rest;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
-  const yours = mine ? { yours: true as const, ...(readiedSpell ? { readiedSpell: { ...readiedSpell } } : {}) } : {};
+  // A readied spell's Metamagic picks are the engine's to apply at its release.
+  const held = readiedSpell ? (({ shaping: _shaping, ...kept }) => kept)(readiedSpell) : undefined;
+  const yours = mine ? { yours: true as const, ...(held ? { readiedSpell: held } : {}) } : {};
   if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...yours };
   return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
 }

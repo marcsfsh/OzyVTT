@@ -1065,7 +1065,9 @@ export const EffectInstanceSchema = z
       .object({
         actionId: z.string().min(1).max(120),
         level: z.number().int().min(0).max(9),
-        raysLeft: z.number().int().min(1).max(20).optional()
+        raysLeft: z.number().int().min(1).max(20).optional(),
+        /** How the caster shaped it when it was readied (Metamagic), which its release keeps. */
+        shaping: z.array(CastShapingSchema).max(4).optional()
       })
       .strict()
       .optional(),

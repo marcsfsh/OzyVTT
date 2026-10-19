@@ -165,12 +165,11 @@ export function evaluateActionEconomy(
   /** Any combatant's stat block, for the side a creature fights on (Help distracts an enemy). */
   resolveDefinition?: (definitionId: string) => ActorDefinition | undefined,
   /** What the map says of the cast: the caster stands where no sound can be made (Silence), and the targets are a
-   *  placed template's catch. How its caster shapes it (Metamagic), and whether it is readied for later. */
+   *  placed template's catch. And how its caster shapes it (Metamagic). */
   cast: Readonly<{
     silenced?: boolean;
     areaPlaced?: boolean;
     shaping?: readonly CastShaping[];
-    readied?: boolean;
   }> = {}
 ): EconomyEvaluation {
   const evaluation: Evaluation = {
@@ -255,7 +254,6 @@ export function evaluateActionEconomy(
         shaping,
         targetIds,
         siblings,
-        readied: cast.readied === true,
         resolveDefinition,
         catalog
       })
@@ -1515,8 +1513,7 @@ export function planEconomy(
     {
       ...(input.silenced === true ? { silenced: true } : {}),
       ...(input.areaPlaced === true ? { areaPlaced: true } : {}),
-      ...(input.shaping && input.shaping.length > 0 ? { shaping: input.shaping } : {}),
-      ...(input.ready === true ? { readied: true } : {})
+      ...(input.shaping && input.shaping.length > 0 ? { shaping: input.shaping } : {})
     }
   );
   warnings.push(...notes);

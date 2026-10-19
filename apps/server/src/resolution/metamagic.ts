@@ -5,7 +5,7 @@ import { parseDiceFormula, resolveDice, type DiceResolution } from "@vtt/rules-5
 import type { ActorDefinition, CastShaping, CastShapingId, DamageType } from "@vtt/schemas";
 import { holdsFeature } from "../class-features.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
-import { hasEffectTag } from "../effects.js";
+import { hasEffectTag, READIED_TAG } from "../effects.js";
 import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
 import type { RuleId } from "../rules-families.js";
 import { sceneSight } from "../vision/sight.js";
@@ -152,10 +152,15 @@ function unfitFor(id: CastShapingId, facts: CastFacts): string | null {
   const { state, attacker, action, spell, castLevel } = facts;
   const name = SHAPINGS[id].name;
   const saves = action.save !== undefined && action.save.bySelf !== true;
+  // A spell whose area asks its saves later (Moonbeam) makes creatures save too, which Heightened Spell reaches.
+  const savesLater = (spell.effect?.laterActions ?? []).some((row) => row.zone !== undefined && row.save !== undefined);
   switch (id) {
     case "careful-spell":
-    case "heightened-spell":
       return saves ? null : `${name} shapes a spell that makes creatures save, and ${spell.name} doesn't.`;
+    case "heightened-spell":
+      return saves || savesLater
+        ? null
+        : `${name} shapes a spell that makes creatures save, and ${spell.name} doesn't.`;
     case "sculpt-spells":
       if (spell.school !== "evocation") return `${name} shapes an Evocation spell, and ${spell.name} isn't one.`;
       return saves ? null : `${name} shapes a spell that makes creatures save, and ${spell.name} doesn't.`;
@@ -223,7 +228,8 @@ export function castInstanceOf(
   return opened ?? null;
 }
 
-/** How a resolve is shaped: a later ray keeps its cast's shaping, anything else takes what it was sent with. */
+/** How a resolve is shaped: a later ray keeps its cast's shaping, a readied spell's release the shaping it was readied
+ *  with, and anything else takes what it was sent with. */
 export function shapingInForce(
   state: GameState,
   action: Pick<DefinitionAction, "id" | "spellId">,
@@ -231,7 +237,15 @@ export function shapingInForce(
 ): readonly CastShaping[] {
   if (action.spellId === undefined) return [];
   const open = castInstanceOf(state, { id: input.actorId }, action);
-  return open ? (open.shaping ?? []) : (input.shaping ?? []);
+  if (open) return open.shaping ?? [];
+  const caster = state.actors.find((actor) => actor.id === input.actorId);
+  const readied =
+    state.combat.active && state.combat.turnActorId !== input.actorId
+      ? caster?.effects.find(
+          (effect) => effect.tags.includes(READIED_TAG) && effect.readiedSpell?.actionId === action.id
+        )?.readiedSpell
+      : undefined;
+  return readied ? (readied.shaping ?? []) : (input.shaping ?? []);
 }
 
 /** The level a cast counts as: Twinned Spell's "increase the spell's effective level by 1". */
@@ -259,7 +273,6 @@ export function shapingCheck(
       shaping: readonly CastShaping[];
       targetIds: readonly string[];
       siblings: ReadonlyArray<DefinitionAction>;
-      readied: boolean;
       resolveDefinition: ((definitionId: string) => ActorDefinition | undefined) | undefined;
       catalog: EquipmentCatalog | undefined;
     }>
@@ -273,14 +286,6 @@ export function shapingCheck(
       message: `${attacker.name} used Quickened Spell this turn, so no other level 1+ spell can be cast until the turn ends.`
     });
   if (shaping.length === 0) return { violations, plan: null };
-  if (facts.readied)
-    return {
-      violations: [
-        ...violations,
-        { rule: "metamagic.unfit", message: "Metamagic and Sculpt Spells can't shape a readied spell." }
-      ],
-      plan: null
-    };
   for (const entry of shaping) {
     const name = SHAPINGS[entry.id].name;
     if (!knowsShaping(definition, entry.id)) {
@@ -373,7 +378,8 @@ function choiceViolations(
       const target = heightenedTargetOf(entry, facts.targetIds);
       if (target === null)
         return [{ rule: "metamagic.choice", message: `Choose the one target ${name} gives Disadvantage.` }];
-      return facts.targetIds.includes(target)
+      // A readied spell has no targets until it is released.
+      return facts.targetIds.length === 0 || facts.targetIds.includes(target)
         ? []
         : [{ rule: "metamagic.choice", message: `${nameOf(target)} isn't one of ${spell.name}'s targets.` }];
     }
@@ -628,6 +634,21 @@ export function heightenedTarget(ctx: Pick<ResolveContext, "input" | "targets">)
     ctx.targets.map((creature) => creature.id)
   );
   return target !== null && ctx.targets.some((creature) => creature.id === target) ? target : null;
+}
+
+/** What a cast's shaping leaves on the area it opens (`SpellZone`): Transmuted Spell's type for damage of the listed
+ *  types, and Heightened Spell's target, whose saves there have Disadvantage too. */
+export function shapedZone(
+  ctx: Pick<ResolveContext, "input" | "targets">,
+  damage: ReadonlyArray<Readonly<{ type: string }>>
+): Readonly<{ damageType?: string; heightened?: string }> {
+  const type = shapingOf(ctx.input.shaping, "transmuted-spell")?.damageType;
+  const transmutes =
+    type !== undefined &&
+    damage.length > 0 &&
+    damage.every((part) => (TRANSMUTABLE as readonly string[]).includes(part.type));
+  const heightened = heightenedTarget(ctx);
+  return { ...(transmutes ? { damageType: type } : {}), ...(heightened !== null ? { heightened } : {}) };
 }
 
 /** What Empowered Spell has left to reroll in each resolve, and whether its point is paid. */
