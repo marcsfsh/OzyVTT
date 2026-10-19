@@ -22,6 +22,7 @@ import { heightenedTarget, shieldedFromSave } from "./metamagic.js";
 import { effectNameOf } from "../effect-names.js";
 import { sightRules } from "../vision/rules.js";
 import { sceneSight } from "../vision/sight.js";
+import { objectFrom } from "../objects.js";
 
 type AcBonusReaction = Extract<ActionReaction, { response: "ac-bonus" }>;
 
@@ -353,6 +354,7 @@ export function failureEffectFor(
     ...(castId !== null ? { castId } : {}),
     ...(cast ? { spell: { id: cast.spell.id, level: cast.level } } : {}),
     ...(isMagicalAction(ctx) ? { magical: true as const } : {}),
+    ...(save.heldBy ? { heldBy: objectFrom(save.heldBy) } : {}),
     sourceActionId: action.id
   };
 }

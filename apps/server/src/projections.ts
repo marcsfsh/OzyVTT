@@ -264,7 +264,9 @@ const ON_FAIL_EFFECT_FIELDS = {
   sourceActionId: "never",
   ongoingDamage: "never",
   currentTurn: "player",
-  magical: "never"
+  magical: "never",
+  // What holds the creature a failure restrains (a Net's AC and Hit Points) reaches players by name on the effect.
+  heldBy: "never"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {
@@ -518,11 +520,15 @@ function playerEffect(
     light: _light,
     findDc: _findDc,
     detects: _detects,
+    // What holds the creature reaches players by name, so anyone can attack it; its Armor Class and the Hit Points
+    // it has left are the GM's.
+    heldBy,
     // Its ability and DC; what gives the repeats Disadvantage (Heightened Spell) is read when each is answered.
     repeatSave,
     ...rest
   } = effect;
-  const visible = repeatSave ? { ...rest, repeatSave: { ability: repeatSave.ability, dc: repeatSave.dc } } : rest;
+  const holding = heldBy ? { ...rest, heldBy: { name: heldBy.name } } : rest;
+  const visible = repeatSave ? { ...holding, repeatSave: { ability: repeatSave.ability, dc: repeatSave.dc } } : holding;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
   // A readied spell's Metamagic picks are the engine's to apply at its release.
   const held = readiedSpell ? (({ shaping: _shaping, ...kept }) => kept)(readiedSpell) : undefined;

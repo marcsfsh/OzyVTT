@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
+import { loadEquipment, loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
+import { resolveDefinitionAction } from "../src/action-resolution.js";
 import { addEffect, makeEffect } from "../src/effects.js";
 import { RulesBlockedError } from "../src/game-store.js";
 import { mapDistance } from "../src/movement-narration.js";
 import { strikeObject, type ObjectStrikeDeps } from "../src/object-strikes.js";
 import { damageObject, findObject, objectFrom, objectOf, setWallObject, weighObjectDamage } from "../src/objects.js";
+import { projectPlayerView } from "../src/projections.js";
+import { answerSave } from "../src/saving-throws.js";
 import { sceneSight } from "../src/vision/sight.js";
 import { movementCost } from "../src/terrain.js";
-import { cell, GEOMETRY, GOBLIN, HERO, visionGame, wall } from "./vision-fixtures.js";
+import { cell, GEOMETRY, GOBLIN, HERO, SESSION_A, visionGame, wall } from "./vision-fixtures.js";
 
 // SRD 5.2.1 Breaking Objects and Damage Threshold: an object's Armor Class and Hit Points, its Immunity to Poison and
 // Psychic damage, the threshold below which damage does nothing, and what breaking it does on the map.
@@ -232,5 +235,90 @@ describe("attacking an object", () => {
     expect(struck.hit?.destroyed).toBe(true);
     expect(hero.effects.some((effect) => effect.id === "net")).toBe(false);
     expect(hero.conditions.some((condition) => condition.id === "restrained")).toBe(false);
+  });
+});
+
+describe("what holds a restrained creature", () => {
+  // SRD Giant Spider, Web: "the Restrained condition until the web is destroyed (AC 10; HP 5; Vulnerability to Fire
+  // damage; Immunity to Poison and Psychic damage)".
+  const SPIDER = statBlock("giant-spider");
+
+  function webbed() {
+    const state = visionGame({
+      positions: { [GOBLIN]: cell(3, 5) },
+      actors: { [GOBLIN]: { definitionId: "giant-spider" } }
+    });
+    state.combat.turnActorId = GOBLIN;
+    const web = SPIDER.actions.find((action) => action.id === "web")!;
+    resolveDefinitionAction(
+      state,
+      web,
+      { actorId: GOBLIN, targetIds: [HERO], commandId: nextId(), rollMode: null, override: null },
+      {
+        random: () => 1,
+        newRollId: nextId,
+        gmSessionId: "30000000-0000-4000-8000-00000000000a",
+        now: () => "2026-10-19T00:00:00.000Z",
+        definition: SPIDER,
+        resolveDefinition: (id) => (id === "giant-spider" ? SPIDER : undefined)
+      }
+    );
+    const save = state.combat.pendingSaves.find((pending) => pending.targetActorId === HERO)!;
+    answerSave(
+      state,
+      nextId(),
+      save.id,
+      "manual",
+      5,
+      true,
+      { role: "gm" },
+      {
+        random: () => 10,
+        newRollId: nextId,
+        sessionId: "30000000-0000-4000-8000-00000000000a",
+        role: "gm",
+        now: () => "2026-10-19T00:00:00.000Z",
+        resolveDefinition: () => undefined
+      }
+    );
+    const hero = state.actors.find((actor) => actor.id === HERO)!;
+    return { state, hero };
+  }
+
+  it("leaves the web on the restrained creature as an object", () => {
+    const { hero } = webbed();
+    const held = hero.effects.find((effect) => effect.heldBy !== undefined);
+    expect(held?.heldBy).toEqual({
+      name: "Web",
+      armorClass: 10,
+      hitPoints: { current: 5, maximum: 5 },
+      vulnerabilities: ["fire"]
+    });
+    expect(hero.conditions.map((condition) => condition.id)).toContain("restrained");
+  });
+
+  it("frees the creature when 3 Fire damage, doubled, destroys the web", () => {
+    const { state, hero } = webbed();
+    const held = hero.effects.find((effect) => effect.heldBy !== undefined)!;
+    const hit = damageObject(state, { actorId: HERO, effectId: held.id }, [{ amount: 3, type: "fire" }]);
+    expect(hit).toMatchObject({ destroyed: true, damage: { total: 6 } });
+    expect(hero.conditions.map((condition) => condition.id)).not.toContain("restrained");
+  });
+
+  it("sends players the web by name alone", () => {
+    const { state } = webbed();
+    const view = projectPlayerView(state, SESSION_A, () => null);
+    const hero = view.actors.find((actor) => actor.id === HERO)!;
+    expect(hero.effects.find((effect) => effect.heldBy !== undefined)?.heldBy).toEqual({ name: "Web" });
+  });
+
+  it("gives the Net its AC 10 and 5 Hit Points", () => {
+    const net = loadEquipment().find((item) => item.id === "net")!;
+    expect(net.actions?.[0]?.save?.heldBy).toEqual({
+      name: "Net",
+      armorClass: 10,
+      hitPoints: 5,
+      immunities: ["bludgeoning"]
+    });
   });
 });

@@ -34,6 +34,7 @@ import {
 import { outDir, sourcePath } from "./paths.js";
 import {
   failureDurationOf,
+  heldByFromTraits,
   hitPointLossOf,
   SPELL_SAVE_OVERRIDE_IDS,
   spellSaveOutcomeFor,
@@ -252,6 +253,15 @@ for (const trait of traits) {
   const list = traitsByCreature.get(trait.fields.parent) ?? [];
   list.push(trait);
   traitsByCreature.set(trait.fields.parent, list);
+}
+
+/** What a creature's trait says holds the creature its action restrains (the erinyes' Magic Rope). */
+function heldByFromTraitsOf(creaturePk: string, description: string) {
+  const held = heldByFromTraits(
+    description,
+    (traitsByCreature.get(creaturePk) ?? []).map((trait) => trait.fields.desc)
+  );
+  return held ? { heldBy: held } : {};
 }
 
 const slugOf = (pk: string) => pk.replace(/^srd-2024_/, "");
@@ -1158,6 +1168,9 @@ const monsters: ActorDefinition[] = creatures
                 ability: ABILITY_BY_NAME[save[1] as keyof typeof ABILITY_BY_NAME],
                 dc: Number.parseInt(save[2], 10),
                 ...saveOutcome!,
+                ...(saveOutcome?.heldBy === undefined && saveOutcome?.failureConditions.includes("restrained")
+                  ? heldByFromTraitsOf(creature.pk, action.fields.desc)
+                  : {}),
                 ...(loss ? { failureEffect: loss.failureEffect, ongoingDamage: loss.ongoingDamage } : {}),
                 ...(poisonStopsHealing
                   ? { failureEffect: { name: "Poisoned", tags: ["no-healing"], modifiers: [] } }

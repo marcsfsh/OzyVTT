@@ -2239,7 +2239,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Command the other end of the rope to dart forward and entangle one creature you can see within 20 feet of yourself. The target must succeed on a DC 15 Dexterity saving throw or have the Restrained condition. You can release the target by letting go of your end of the rope or by using a Bonus Action to repeat the command.",
-        save: { ability: "dex", dc: 15, successDamage: "none", failureConditions: ["restrained"], escapeDc: 15 },
+        save: {
+          ability: "dex",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["restrained"],
+          escapeDc: 15,
+          // "The rope has AC 20 and 20 Hit Points": attacking it to 0 frees the target.
+          heldBy: { name: "Rope", armorClass: 20, hitPoints: 20 }
+        },
         targets: { count: 1, rangeFeet: 20, seen: true }
       }
     ]

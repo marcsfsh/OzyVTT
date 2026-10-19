@@ -250,7 +250,9 @@ const PendingSaveEffectSchema = z
     light: EffectInstanceSchema.shape.light,
     /** "Until the end of the current turn" for a save made at the start of the bearer's own turn (Stinking Cloud),
      *  where "until the end of its next turn" would run a turn longer. */
-    currentTurn: z.literal(true).optional()
+    currentTurn: z.literal(true).optional(),
+    /** What holds the creature (a Net, a giant spider's web), which can be attacked; destroying it ends the effect. */
+    heldBy: EffectInstanceSchema.shape.heldBy
   })
   .strict();
 

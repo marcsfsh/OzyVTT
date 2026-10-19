@@ -8011,7 +8011,12 @@
      "failureConditions": [
       "restrained"
      ],
-     "escapeDc": 15
+     "escapeDc": 15,
+     "heldBy": {
+      "name": "Rope",
+      "armorClass": 20,
+      "hitPoints": 20
+     }
     }
    }
   ],

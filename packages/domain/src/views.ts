@@ -53,8 +53,11 @@ export type PlayerEffect = Omit<
   | "light"
   | "findDc"
   | "detects"
+  | "heldBy"
 > & {
   yours?: true;
+  /** What holds the creature (a Net), by name: the object any creature can attack to free it. */
+  heldBy?: Readonly<{ name: string }>;
 };
 /** A creature as one player sees it. Their own claimed character gets everything; another player's is limited by
  * `GameState.partyVisibility` (see apps/server/src/projections.ts). */
