@@ -732,9 +732,13 @@ button.cs-lastroll-open {
 }
 
 /* ---- Checks ---- */
+/* Three to a row where each box fits its two 44px buttons side by side, else fewer (the laptop's left column). */
 .cs-abilities {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(max(calc(2 * var(--tap-min) + 3 * var(--space-1) + 2px), calc((100% - 2 * var(--space-1)) / 3)), 1fr)
+  );
   gap: var(--space-1);
 }
 .cs-ability {
@@ -787,7 +791,7 @@ button.cs-lastroll-open {
 .cs-roll.is-stacked {
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
+  min-width: var(--tap-min);
   padding: var(--space-1) 2px;
 }
 .cs-roll.is-proficient {
