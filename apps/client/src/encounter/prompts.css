@@ -370,3 +370,29 @@
   font-size: var(--fs-xs);
   font-weight: 400;
 }
+.turn-order {
+  display: grid;
+  gap: var(--space-2);
+}
+.turn-order-steps {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-4);
+}
+.turn-order-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+  min-height: var(--tap-min);
+}
+.turn-order-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.turn-order-moves {
+  display: inline-flex;
+  gap: var(--space-1);
+}

@@ -5,6 +5,7 @@ import { addAnnotation, shapeGeometry, templateOfArea } from "../annotations.js"
 import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
 import { areaOriginHeight, creatureAtPoint, withinAreaHeight } from "../altitude.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
+import { requireStartOrdered } from "../simultaneous-effects.js";
 import { withSeenTargets } from "../resolution/seen-targets.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
@@ -139,6 +140,8 @@ export const actionCommands = [
         requireActorAccess(initiator, draft, actorId, "attack");
         const attacker = draft.actors.find((item) => item.id === actorId);
         if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
+        // What its turn's start does at once comes first, in the order its player gives.
+        requireStartOrdered(draft, actorId, initiator);
         const definition = attacker.definitionId ? kit.resolveDefinitionIn(draft, attacker.definitionId) : undefined;
         // Effective actions, so `item-<itemId>` ids resolve and item-raised numbers apply. A stat-block
         // action wins on id collision; builtins cover every combatant.

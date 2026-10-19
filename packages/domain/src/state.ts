@@ -529,6 +529,38 @@ export const HeldDamageDieSchema = z
 export type HeldDamageDie = z.infer<typeof HeldDamageDieSchema>;
 
 /**
+ * What happens at the same moment as a creature's turn starts or ends, waiting for that creature's controller to put it
+ * in order (SRD 5.2.1 Rules Glossary, Simultaneous Effects): ongoing damage, Hit Points or Temporary Hit Points
+ * regained, a trait that burns or regenerates. Each step is named for its effect or trait, and for the creature it
+ * lands on when that is another. `order` is the controller's answer to a turn's end, which the turn then plays out.
+ */
+export const TurnStepsSchema = z
+  .object({
+    id: z.uuid(),
+    actorId: z.uuid(),
+    boundary: z.enum(["start", "end"]),
+    steps: z
+      .array(
+        z
+          .object({
+            key: z.string().min(1).max(200),
+            name: z.string().min(1).max(200),
+            targetActorId: z.uuid().optional(),
+            targetName: z.string().min(1).max(200).optional(),
+            /** Whose effect it is, so a player's view can leave out a source hidden from them. */
+            sourceActorId: z.uuid().optional(),
+            sourceName: z.string().min(1).max(200).optional()
+          })
+          .strict()
+      )
+      .min(2)
+      .max(20),
+    order: z.array(z.string().min(1).max(200)).max(20).optional()
+  })
+  .strict();
+export type TurnSteps = z.infer<typeof TurnStepsSchema>;
+
+/**
  * A damage roll looked at before it counts (SRD Empowered Spell and Heroic Inspiration act "after seeing the roll"): the
  * dice a look threw for one creature's action this turn, in the order thrown, which the action's confirm deals. What
  * answered it is kept with it, each answer once. GM-only; the roller saw the dice in the look's reply.
@@ -1493,6 +1525,9 @@ export const CombatStateSchema = z
       .strict()
       .nullable()
       .default(null),
+    /** The steps of a turn's start or end waiting for the turn's creature's controller to order them. Live table
+     *  only; its own creature's player sees it. */
+    turnSteps: TurnStepsSchema.nullable().default(null),
     /** Time Stop (SRD 5.2.1): the caster takes `turnsLeft` more turns in a row, until it affects another creature or
      *  moves more than 1,000 feet from `at`, where it cast the spell. Live table only; GM-only. */
     timeStop: z

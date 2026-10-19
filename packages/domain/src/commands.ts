@@ -1031,6 +1031,16 @@ export const RulesAskSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** The controller of the creature whose turn it is puts what happens at once as the turn starts or ends in order:
+ *  every step's key once, first to last. */
+export const TurnOrderSchema = z
+  .object({
+    commandId: z.uuid(),
+    stepsId: z.uuid(),
+    order: z.array(z.string().min(1).max(200)).min(2).max(20),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** GM answers a parked ask: Allow re-runs the command with an override, Deny tells the player. Reason optional. */
 export const RulesAnswerSchema = z
   .object({

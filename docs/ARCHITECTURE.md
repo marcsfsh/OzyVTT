@@ -377,7 +377,11 @@ write goes through `applyCondition` in `effects.ts`, which honours innate and it
 immunities and runs what gaining a condition sets off (an Incapacitated creature drops its
 Concentration and its grapples). In a fight, effects count down at turn start and turn end; the
 start of a turn deals any ongoing damage, and the end opens any repeat saves
-(`turn-boundaries.ts`). What a stat block's traits do, read from their text when the bundle is built
+(`turn-boundaries.ts`). Two or more things that change Hit Points at the same moment (ongoing damage,
+Temporary Hit Points or Hit Points regained, a trait that burns or regenerates) wait in `combat.turnSteps`
+for the creature's controller to order them, the player's own or the GM's (`simultaneous-effects.ts`,
+the `turn.order` command): a turn's start holds that player's actions and moves until the answer, and a
+turn's end keeps the turn until it. What a stat block's traits do, read from their text when the bundle is built
 (`ActorDefinition.traitMechanics`), runs at those boundaries and as damage lands: Regeneration, auras,
 Undead Fortitude, a Death Burst (`trait-turns.ts`, `statblock-traits.ts`). A stat block's spells
 (`castsSpells`) become cast actions as the catalog loads (`monster-spells.ts`). A spell that leaves an area acting later (Moonbeam, Spirit Guardians, a

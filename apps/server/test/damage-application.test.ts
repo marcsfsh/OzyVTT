@@ -421,11 +421,12 @@ describe("a stat block's conditional damage", () => {
     expect(game.actors[1].conditions.map((condition) => condition.id)).toContain("prone");
   });
 
-  it("reminds the GM of what the stat block leaves to them, but not the later-turn damage or the breath the engine runs", () => {
+  it("leaves the GM no reminder of the move, the later-turn damage or the breath the engine runs", () => {
     const { strike } = monsterFight("gelatinous-cube");
     const engulf = strike("engulf", [3, 3, 3]);
-    expect(engulf.warnings).toContainEqual(expect.stringMatching(/^The cube moves up to its Speed first/));
-    expect(engulf.warnings ?? []).not.toContainEqual(expect.stringMatching(/Acid damage at the start|suffocating/));
+    expect(engulf.warnings ?? []).not.toContainEqual(
+      expect.stringMatching(/moves up to its Speed first|Acid damage at the start|suffocating/)
+    );
   });
 });
 

@@ -7,6 +7,7 @@ import { InitiativePrompt, InitiativeReroll } from "../encounter/InitiativePromp
 import { ReactionPrompt } from "../encounter/ReactionPrompt";
 import { RollCallCard, useRollCallCards, type RollCallCardModel } from "../encounter/RollCallPrompt";
 import { SavePrompt } from "../encounter/SavePrompt";
+import { TurnOrder, turnOrderTitle } from "../encounter/TurnOrder";
 import { abilityName } from "./needs";
 import { playerPrompts, type PlayerPrompt } from "./playerPrompts";
 import "./prompt-slot.css";
@@ -142,6 +143,8 @@ export function PromptSlot({
         return `DC ${entry.save.dc} ${abilityName(entry.save.ability)} saving throw`;
       case "initiative":
         return "Roll initiative";
+      case "order":
+        return turnOrderTitle(entry.actor.name, entry.waiting.boundary);
       case "roll-call":
         return "The GM calls for a roll";
     }
@@ -262,6 +265,18 @@ export function PromptSlot({
                 if (first.actor.heroicInspiration === true) setRerollFor(first.actor.id);
               }}
             />
+          </PromptCard>
+        );
+        break;
+      case "order":
+        card = (
+          <PromptCard
+            eyebrow="Your turn · answer now"
+            title={turnOrderTitle(first.actor.name, first.waiting.boundary)}
+            detail="These happen at the same moment, so you choose their order."
+            headingRef={headingRef}
+          >
+            <TurnOrder key={first.waiting.id} waiting={first.waiting} onFeedback={setOutcome} />
           </PromptCard>
         );
         break;

@@ -54,15 +54,70 @@ const bloodied = (actor: Actor) => actor.hp.current > 0 && actor.hp.current * 2 
 /** The start of `actorId`'s turn: its own Regeneration, Berserk and Barbed Hide, then the auras it starts its turn
  *  in. */
 export function traitsAtTurnStart(state: GameState, actorId: string, deps: TraitTurnDeps): EffectNarration[] {
+  return [
+    ...ownTraitsAtTurnStart(state, actorId, deps).flatMap((trait) => trait.run()),
+    ...aurasAtTurnStart(state, actorId, deps)
+  ];
+}
+
+/** One trait's part of a turn's start or end, run on its own so the turn's controller can order it among the turn's
+ *  other steps. */
+export type TraitStep = Readonly<{ name: string; run: () => EffectNarration[] }>;
+
+/** The traits of `actorId`'s own stat block that act as its turn starts, each only when it would do something now:
+ *  Regeneration, Berserk, Barbed Hide and Sunlight. */
+export function ownTraitsAtTurnStart(state: GameState, actorId: string, deps: TraitTurnDeps): TraitStep[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const definition = definitionOf(actor, deps);
-  const events: EffectNarration[] = [];
-  regenerate(state, actor, definition, events);
-  goBerserk(state, actor, definition, deps, events);
+  // Each runs against the creature as it is when its turn in the order comes.
+  const step = (name: string, body: (now: Actor, events: EffectNarration[]) => void): TraitStep => ({
+    name,
+    run: () => {
+      const now = state.actors.find((candidate) => candidate.id === actorId);
+      if (!now) return [];
+      const events: EffectNarration[] = [];
+      body(now, events);
+      return events;
+    }
+  });
+  const steps: TraitStep[] = [];
+  const regeneration = traitOf(definition, "regeneration");
+  if (regeneration && regenerationActs(actor))
+    steps.push(step(regeneration.name, (now, events) => regenerate(state, now, definition, events)));
+  const berserk = traitOf(definition, "berserk");
+  const raging = actor.effects.some((effect) => effect.tags.includes(BERSERK_TAG));
+  if (berserk && actor.hp.current > 0 && raging !== bloodied(actor))
+    steps.push(step(berserk.name, (now, events) => goBerserk(state, now, definition, deps, events)));
   for (const aura of traitMechanicsOf(definition))
-    if (aura.kind === "aura" && aura.trigger === "bearer-turn-start") grappleDamage(state, actor, aura, deps, events);
-  burnInSunlight(state, actor, definition, deps, events);
+    if (aura.kind === "aura" && aura.trigger === "bearer-turn-start" && grapplePartners(state, actor, aura).length > 0)
+      steps.push(step(aura.name, (now, events) => grappleDamage(state, now, aura, deps, events)));
+  const sunlight = traitMechanicsOf(definition).find(
+    (trait) => trait.kind === "light-sensitivity" && trait.damageAtTurnStart !== undefined
+  );
+  if (
+    sunlight &&
+    actor.hp.current > 0 &&
+    sightRules(state, sightContentOf(deps), deps.distanceFeet).lightAt(actor.id)?.sunlight === true
+  )
+    steps.push(step(sunlight.name, (now, events) => burnInSunlight(state, now, definition, deps, events)));
+  return steps;
+}
+
+/** Whether Regeneration does anything as this turn starts: Hit Points to regain, or a stopped one that leaves a
+ *  creature at 0 Hit Points dead. */
+function regenerationActs(actor: Actor): boolean {
+  const stopped = actor.effects.some((effect) => effect.tags.includes(REGENERATION_STOPPED_TAG));
+  const down = actor.effects.some((effect) => effect.tags.includes(REGENERATING_AT_ZERO_TAG));
+  if (actor.hp.current <= 0 && !down) return false;
+  return stopped || actor.hp.current < actor.hp.maximum;
+}
+
+/** The saves of the auras `actorId` starts its turn in (Stench, Fear Aura, Gibbering). */
+export function aurasAtTurnStart(state: GameState, actorId: string, deps: TraitTurnDeps): EffectNarration[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return [];
+  const events: EffectNarration[] = [];
   aurasStartedIn(state, actor, deps, events);
   return events;
 }
@@ -93,17 +148,51 @@ function burnInSunlight(
 
 /** The end of `actorId`'s turn: its auras that burn what is near it, or ask a save of it (Mucus Cloud). */
 export function traitsAtTurnEnd(state: GameState, actorId: string, deps: TraitTurnDeps): EffectNarration[] {
+  return [
+    ...aurasSavingAtTurnEnd(state, actorId, deps),
+    ...burningTraitsAtTurnEnd(state, actorId, deps).flatMap((trait) => trait.run())
+  ];
+}
+
+/** The auras that burn what is near `actorId` as its turn ends (Fire Aura, Heat Aura), each only when it reaches
+ *  someone or the map can't say. */
+export function burningTraitsAtTurnEnd(state: GameState, actorId: string, deps: TraitTurnDeps): TraitStep[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return [];
+  return endAuras(state, actor, deps)
+    .filter(
+      (aura) =>
+        !aura.save && aura.damage && auraActive(actor, aura) && (reached(state, actor, aura, deps)?.length ?? 1) > 0
+    )
+    .map((aura) => ({
+      name: aura.name,
+      run: () => {
+        const now = state.actors.find((candidate) => candidate.id === actorId);
+        const events: EffectNarration[] = [];
+        if (now) burnAround(state, now, aura, deps, events);
+        return events;
+      }
+    }));
+}
+
+/** The auras that ask a save of what is near `actorId` as its turn ends (Mucus Cloud): prompts, answered in any
+ *  order. */
+export function aurasSavingAtTurnEnd(state: GameState, actorId: string, deps: TraitTurnDeps): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const events: EffectNarration[] = [];
-  for (const aura of traitMechanicsOf(definitionOf(actor, deps))) {
-    if (aura.kind !== "aura" || aura.trigger !== "bearer-turn-end") continue;
-    // "While underwater": only in an underwater fight.
-    if (aura.underwaterOnly && !state.combat.underwater) continue;
-    if (aura.save) saveAround(state, actor, aura, deps, events);
-    else burnAround(state, actor, aura, deps, events);
-  }
+  for (const aura of endAuras(state, actor, deps)) if (aura.save) saveAround(state, actor, aura, deps, events);
   return events;
+}
+
+function endAuras(state: GameState, actor: Actor, deps: TraitTurnDeps): Aura[] {
+  return traitMechanicsOf(definitionOf(actor, deps)).filter(
+    (aura): aura is Aura =>
+      aura.kind === "aura" &&
+      aura.trigger === "bearer-turn-end" &&
+      // "While underwater": only in an underwater fight.
+      (!aura.underwaterOnly || state.combat.underwater)
+  );
 }
 
 /** "Constitution Saving Throw: DC 14, each creature in a 5-foot Emanation originating from the aboleth at the end of
@@ -382,15 +471,20 @@ function burnAround(state: GameState, bearer: Actor, aura: Aura, deps: TraitTurn
 /** SRD Barbed Hide: "At the start of each of its turns, the devil deals 5 (1d10) Piercing damage to any creature it
  *  is grappling or any creature grappling it." */
 function grappleDamage(state: GameState, bearer: Actor, aura: Aura, deps: TraitTurnDeps, events: EffectNarration[]) {
-  if (!aura.damage || !auraActive(bearer, aura)) return;
-  const grapples = (holder: Actor, held: Actor) =>
-    held.effects.some((effect) => effect.sourceActorId === holder.id && effect.linkedConditionIds.includes("grappled"));
-  const partners = fighting(state).filter(
-    (other) => other.id !== bearer.id && other.hp.current > 0 && (grapples(bearer, other) || grapples(other, bearer))
-  );
-  if (partners.length === 0) return;
+  const partners = grapplePartners(state, bearer, aura);
+  if (partners.length === 0 || !aura.damage) return;
   const parts = rollTraitDamage(aura.damage, deps.rollDie);
   for (const partner of partners) events.push(...dealTraitDamage(state, bearer, partner, aura.name, parts, deps));
+}
+
+/** The creatures Barbed Hide reaches: any the bearer grapples or that grapples it, while the aura acts. */
+function grapplePartners(state: GameState, bearer: Actor, aura: Aura): Actor[] {
+  if (!aura.damage || !auraActive(bearer, aura)) return [];
+  const grapples = (holder: Actor, held: Actor) =>
+    held.effects.some((effect) => effect.sourceActorId === holder.id && effect.linkedConditionIds.includes("grappled"));
+  return fighting(state).filter(
+    (other) => other.id !== bearer.id && other.hp.current > 0 && (grapples(bearer, other) || grapples(other, bearer))
+  );
 }
 
 /**

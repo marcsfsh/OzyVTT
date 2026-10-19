@@ -12,6 +12,7 @@ import {
 } from "../annotations.js";
 import { pointInRects } from "@vtt/rules-5e";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
+import { requireStartOrdered } from "../simultaneous-effects.js";
 import {
   AnnotationAddSchema,
   AnnotationClearSchema,
@@ -130,6 +131,8 @@ export const mapCommands = [
           "move",
           "You may only move your claimed character token."
         );
+        // What its turn's start does at once comes first, in the order its player gives.
+        if (mode !== "forced" && mode !== "teleport") requireStartOrdered(state, actorId, initiatorOf(principal));
         // Before a fight the GM sets the scene; players move their own tokens once it starts.
         if (!state.combat.active && !isGmGrade(principal))
           throw new CommandRejectedError("Your GM places the tokens before the fight starts.");

@@ -11,9 +11,25 @@ import { confusedTurn } from "./random-outcomes.js";
 import { holyNimbusBurns } from "./paladin-auras.js";
 import { endEffectsOutOfSight, openEndingSave, openRepeatSaves } from "./save-stages.js";
 import { sceneSight, type SceneSight } from "./vision/sight.js";
-import { traitsAtTurnEnd, traitsAtTurnStart } from "./trait-turns.js";
-import { deathTraitsAtTurnEnd } from "./death-traits.js";
+import {
+  aurasAtTurnStart,
+  aurasSavingAtTurnEnd,
+  burningTraitsAtTurnEnd,
+  ownTraitsAtTurnStart,
+  type TraitStep
+} from "./trait-turns.js";
+import { deathTraitsAtTurnEnd, headsAtTurnEnd } from "./death-traits.js";
 import { riseAtTurnStart } from "./risen.js";
+import {
+  askOrder,
+  clearTurnSteps,
+  inOrder,
+  orderOf,
+  runSteps,
+  waitingNarration,
+  waitingSteps,
+  type TurnStep
+} from "./simultaneous-effects.js";
 
 type Actor = GameState["actors"][number];
 type Effect = Actor["effects"][number];
@@ -38,6 +54,8 @@ export type TurnStartDeps = Readonly<{
   now?: () => string;
   /** Creature-to-creature distance on the map, for the auras a creature starts its turn in. */
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** Two or more steps at once wait for the creature's controller to order them (`simultaneous-effects.ts`). */
+  askOrder?: boolean;
 }>;
 
 /**
@@ -45,8 +63,8 @@ export type TurnStartDeps = Readonly<{
  * 1. "until the end of its/your next turn" durations it owns end (`expireEffectsAtTurnEnd`);
  * 2. each effect it bears that "repeats the save at the end of each of its turns" opens that save (`openRepeatSaves`:
  *    a success ends the effect, unless the text counts them or makes the failure worse);
- * 3. its stat block's traits that act as its turn ends (Fire Aura) do (`traitsAtTurnEnd`), and the ongoing damage
- *    printed for the end of a turn lands.
+ * 3. its stat block's traits that act as its turn ends (Fire Aura, a hydra's heads) do, and the ongoing damage printed
+ *    for the end of a turn lands, in the order its controller gave (`endSteps`), then a troll's limbs come off.
  */
 export function endOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps?: TurnEndDeps): void {
   events.push(...expireEffectsAtTurnEnd(state, actorId));
@@ -58,14 +76,78 @@ export function endOfTurn(state: GameState, actorId: string, events: EffectNarra
     events.push(...endEffectsOutOfSight(state, actorId, { ...deps, sees }));
     events.push(...openRepeatSaves(state, actorId, "turn-end", { ...deps, sees }));
   }
-  if (!deps?.rollDie || !deps.resolveDefinition) return;
+  if (!deps?.rollDie || !deps.resolveDefinition) {
+    clearTurnSteps(state);
+    return;
+  }
   const dice = { ...deps, rollDie: deps.rollDie, resolveDefinition: deps.resolveDefinition };
-  events.push(...traitsAtTurnEnd(state, actorId, dice));
-  // A hydra grows back its heads and a Bloodied troll loses a limb (Multiple Heads, Loathsome Limbs).
+  events.push(...aurasSavingAtTurnEnd(state, actorId, dice));
+  const waiting = waitingSteps(state, actorId, "end");
+  events.push(...runSteps(inOrder(endSteps(state, actorId, dice), waiting ? orderOf(waiting) : undefined)));
+  clearTurnSteps(state);
+  // A Bloodied troll loses a limb (Loathsome Limbs), and a hydra's lost-head count starts again.
   events.push(...deathTraitsAtTurnEnd(state, actorId, dice));
-  // "Takes 10 (3d6) Acid damage at the end of each of the toad's turns."
-  dealOngoingAt(state, actorId, "end", events, dice);
 }
+
+/**
+ * What happens at once as `actorId`'s turn ends, each a step its controller may order: the auras that burn what is
+ * near it (Fire Aura), a hydra's heads growing back, and the ongoing damage printed for the end of a turn ("Takes 10
+ * (3d6) Acid damage at the end of each of the toad's turns"). `ending` names effects that end with the turn before
+ * any of this happens, for an order asked before the turn's durations lapse.
+ */
+export function endSteps(
+  state: GameState,
+  actorId: string,
+  deps: TurnStartDeps,
+  ending: ReadonlySet<string> = new Set()
+): TurnStep[] {
+  const heads = headsAtTurnEnd(state, actorId, deps);
+  return [
+    ...burningTraitsAtTurnEnd(state, actorId, deps).map((trait) => traitStep("aura", trait)),
+    ...(heads ? [traitStep("heads", heads)] : []),
+    ...ongoingSteps(state, actorId, "end", deps).filter((step) => !ending.has(step.key.split(":")[2] ?? ""))
+  ];
+}
+
+/**
+ * Before the turn passes: two or more things happening at once as it ends wait for its creature's controller to put
+ * them in order, and the turn stays with it until the answer (`turn.order`). What the turn's start left waiting happens
+ * first, as it was listed. Returns whether the turn now waits.
+ */
+export function askEndOrder(
+  state: GameState,
+  events: EffectNarration[],
+  deps: TurnStartDeps & Readonly<{ newId: () => string }>
+): boolean {
+  const actorId = state.combat.turnActorId;
+  if (!state.combat.active || !actorId || state.combat.historyCursor !== null) return false;
+  // Asked already: ending the turn again goes in the order listed.
+  if (waitingSteps(state, actorId, "end")) return false;
+  events.push(...playStartSteps(state, deps));
+  const steps = endSteps(state, actorId, deps, endingWithTurn(state, actorId));
+  if (!askOrder(state, actorId, "end", steps, deps.newId)) return false;
+  events.push(waitingNarration(state, state.combat.turnSteps!));
+  return true;
+}
+
+/** The effects whose "until the end of its turn" durations lapse as `actorId`'s turn ends. */
+export function endingWithTurn(state: GameState, actorId: string): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (const actor of state.actors)
+    for (const effect of actor.effects) {
+      const duration = effect.duration;
+      if (duration.type !== "until-bearer-turn-end" && duration.type !== "until-source-turn-end") continue;
+      const owner = duration.type === "until-bearer-turn-end" ? actor.id : (effect.sourceActorId ?? actor.id);
+      if (owner === actorId && !duration.skipsCurrentTurn) ids.add(effect.id);
+    }
+  return ids;
+}
+
+const traitStep = (kind: string, trait: TraitStep): TurnStep => ({
+  key: `${kind}:${trait.name}`,
+  name: trait.name,
+  run: trait.run
+});
 
 /** Whether one creature sees another on the live map, worked out only when a rule asks; true when vision is off, so a
  *  rule that needs a creature out of sight leaves it to the GM. */
@@ -85,8 +167,10 @@ function sightOf(state: GameState, deps: TurnEndDeps): (viewerId: string, target
  * (`expireEffectsAtTurnStart`), each effect whose ongoing damage falls on this turn deals it: one the creature bears
  * ("each of its turns") or one it is the source of ("each of the behir's turns"; a source at 0 HP has no turns to
  * deal it on). The dice roll here and the damage meets the bearer's defences like any hit. A save that follows the
- * damage opens next, a success ending the effect (Searing Smite). Before that, its stat block's traits act
- * (`traitsAtTurnStart`: Regeneration, Berserk, Barbed Hide) and the auras it starts its turn in ask their saves.
+ * damage opens next, a success ending the effect (Searing Smite). Its stat block's traits act (Regeneration, Berserk,
+ * Barbed Hide), and so do Temporary Hit Points and Hit Points it regains each turn: two or more of these at once wait
+ * for its controller's order when `askOrder` says so (`startSteps`). Then the auras it starts its turn in ask their
+ * saves.
  */
 export function startOfTurn(state: GameState, actorId: string, events: EffectNarration[], deps: TurnStartDeps): void {
   // "A Humanoid killed by this spell rises at the start of your next turn as a Zombie" (Finger of Death).
@@ -108,130 +192,226 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
         rollDie: deps.rollDie
       })
     );
-  temporaryHitPointsEachTurn(state, actorId, events);
   // SRD Confusion: "it rolls 1d10 at the start of each of its turns to determine its behavior for that turn".
   events.push(...confusedTurn(state, actorId, deps.rollDie));
   // A Berserker Axe's berserk ends on a turn that starts with no creature within 60 feet.
   const calm = calmAtTurnStart(state, actorId, deps.distanceFeet);
   if (calm) events.push(...endEffect(state, actorId, calm));
-  hitPointsEachTurn(state, actorId, events, deps);
-  events.push(...traitsAtTurnStart(state, actorId, deps));
-  holyNimbus(state, actorId, events, deps);
-  dealOngoingAt(state, actorId, "start", events, deps);
+  const steps = startSteps(state, actorId, deps);
+  if (deps.askOrder && deps.newId && askOrder(state, actorId, "start", steps, deps.newId))
+    events.push(waitingNarration(state, state.combat.turnSteps!));
+  else events.push(...runSteps(steps));
+  events.push(...aurasAtTurnStart(state, actorId, deps));
+}
+
+/**
+ * What happens at once as `actorId`'s turn starts, each a step its controller may order: Temporary Hit Points and Hit
+ * Points it regains each turn (Heroism, Regenerate, Heroic Rally), its stat block's traits (Regeneration, Berserk,
+ * Barbed Hide, Sunlight), a Paladin's Holy Nimbus, and the ongoing damage that falls now.
+ */
+export function startSteps(state: GameState, actorId: string, deps: TurnStartDeps): TurnStep[] {
+  return [
+    ...temporaryHitPointSteps(state, actorId),
+    ...hitPointSteps(state, actorId, deps),
+    ...ownTraitsAtTurnStart(state, actorId, deps).map((trait) => traitStep("trait", trait)),
+    ...holyNimbusSteps(state, actorId, deps),
+    ...ongoingSteps(state, actorId, "start", deps)
+  ];
+}
+
+/** Plays out the steps waiting as `actorId`'s turn started, in `order` or as they were listed. */
+export function playStartSteps(state: GameState, deps: TurnStartDeps, order?: readonly string[]): EffectNarration[] {
+  const waiting = state.combat.turnSteps;
+  if (!waiting || waiting.boundary !== "start") return [];
+  clearTurnSteps(state);
+  return runSteps(inOrder(startSteps(state, waiting.actorId, deps), order ?? orderOf(waiting)));
 }
 
 /** SRD Holy Nimbus: an enemy that starts its turn in the Paladin's aura takes its Radiant damage, which meets the
  *  creature's defences like any damage. Unmeasurable on a map that can't say where creatures stand. */
-function holyNimbus(state: GameState, actorId: string, events: EffectNarration[], deps: TurnStartDeps): void {
+function holyNimbusSteps(state: GameState, actorId: string, deps: TurnStartDeps): TurnStep[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor) return;
-  for (const { paladin, amount } of holyNimbusBurns(state, actor, deps)) {
-    const { application, events: landed } = applyDamageDetailed(
-      state,
-      actor.id,
-      { amount, parts: [{ amount, type: "radiant" }], sourceName: paladin.name, sourceActorId: paladin.id },
-      { role: "gm" },
-      {
-        resolveDefinition: deps.resolveDefinition,
-        rollDie: deps.rollDie,
-        ...(deps.catalog ? { catalog: deps.catalog } : {}),
-        ...(deps.newId ? { newId: deps.newId } : {}),
-        ...(deps.now ? { now: deps.now } : {}),
-        ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
-      }
-    );
-    events.push(
-      {
-        kind: "damage",
-        text: `${actor.name} takes ${application.totalApplied} Radiant damage from ${paladin.name}'s Holy Nimbus${damageAdjustmentDetail(application)}.`,
-        actorId: actor.id,
-        source: { actorId: paladin.id, name: paladin.name }
-      },
-      ...landed
-    );
-  }
+  if (!actor) return [];
+  return holyNimbusBurns(state, actor, deps).map(({ paladin, amount }) => ({
+    key: `nimbus:${paladin.id}`,
+    name: "Holy Nimbus",
+    sourceActorId: paladin.id,
+    sourceName: paladin.name,
+    run: () => (actor.hp.current > 0 ? holyNimbus(state, actor, paladin, amount, deps) : [])
+  }));
+}
+
+function holyNimbus(
+  state: GameState,
+  actor: Actor,
+  paladin: Actor,
+  amount: number,
+  deps: TurnStartDeps
+): EffectNarration[] {
+  const { application, events: landed } = applyDamageDetailed(
+    state,
+    actor.id,
+    { amount, parts: [{ amount, type: "radiant" }], sourceName: paladin.name, sourceActorId: paladin.id },
+    { role: "gm" },
+    {
+      resolveDefinition: deps.resolveDefinition,
+      rollDie: deps.rollDie,
+      ...(deps.catalog ? { catalog: deps.catalog } : {}),
+      ...(deps.newId ? { newId: deps.newId } : {}),
+      ...(deps.now ? { now: deps.now } : {}),
+      ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
+    }
+  );
+  return [
+    {
+      kind: "damage",
+      text: `${actor.name} takes ${application.totalApplied} Radiant damage from ${paladin.name}'s Holy Nimbus${damageAdjustmentDetail(application)}.`,
+      actorId: actor.id,
+      source: { actorId: paladin.id, name: paladin.name }
+    },
+    ...landed
+  ];
 }
 
 /** The ongoing damage (or hit point loss) that falls as `actorId`'s turn starts or ends: an effect it bears ("each of
- *  its turns") or one it is the source of ("each of the behir's turns"; a source at 0 HP has no turns to deal it on). */
-function dealOngoingAt(
-  state: GameState,
-  actorId: string,
-  boundary: "start" | "end",
-  events: EffectNarration[],
-  deps: TurnStartDeps
-): void {
+ *  its turns") or one it is the source of ("each of the behir's turns"; a source at 0 HP has no turns to deal it on).
+ *  One step per effect, keyed `ongoing:<bearer>:<effect>`. */
+function ongoingSteps(state: GameState, actorId: string, boundary: "start" | "end", deps: TurnStartDeps): TurnStep[] {
   const inFight = new Set(state.combat.initiative.map((entry) => entry.actorId));
+  const steps: TurnStep[] = [];
   for (const bearer of state.actors) {
-    if (!inFight.has(bearer.id)) continue;
-    for (const effect of [...bearer.effects]) {
+    if (!inFight.has(bearer.id) || beyondHarm(bearer)) continue;
+    for (const effect of bearer.effects) {
       const ongoing = effect.ongoingDamage;
       if (!ongoing || !ongoing.at.endsWith(`-turn-${boundary}`)) continue;
       const bearers = ongoing.at.startsWith("bearer-");
       if ((bearers ? bearer.id : effect.sourceActorId) !== actorId) continue;
-      // Damage dealt earlier this turn may have ended it (a death, a cascade).
-      if (!bearer.effects.some((candidate) => candidate.id === effect.id) || beyondHarm(bearer)) continue;
       const source = state.actors.find((candidate) => candidate.id === effect.sourceActorId);
       if (!bearers && (!source || source.hp.current <= 0)) continue;
-      events.push(...dealOngoingDamage(state, bearer, effect, deps));
-      const stillOn = bearer.effects.some((candidate) => candidate.id === effect.id);
-      if (ongoing.saveToEnd && stillOn && deps.newId)
-        events.push(
-          openEndingSave(state, bearer, effect, ongoing.saveToEnd, "makes", {
-            newId: deps.newId,
-            now: deps.now ?? (() => new Date().toISOString())
-          })
-        );
+      steps.push({
+        key: `ongoing:${bearer.id}:${effect.id}`,
+        name: effect.name,
+        ...(bearer.id !== actorId ? { targetActorId: bearer.id, targetName: bearer.name } : {}),
+        sourceActorId: effect.sourceActorId,
+        sourceName: effect.sourceName,
+        run: () => ongoingDamageNow(state, bearer.id, effect.id, deps)
+      });
     }
   }
+  return steps;
+}
+
+/** One effect's ongoing damage, unless what landed before it ended the effect or its bearer (a death, a cascade). A
+ *  save that follows the damage opens next, a success ending the effect. */
+function ongoingDamageNow(
+  state: GameState,
+  bearerId: string,
+  effectId: string,
+  deps: TurnStartDeps
+): EffectNarration[] {
+  const bearer = state.actors.find((candidate) => candidate.id === bearerId);
+  const effect = bearer?.effects.find((candidate) => candidate.id === effectId);
+  if (!bearer || !effect?.ongoingDamage || beyondHarm(bearer)) return [];
+  const ongoing = effect.ongoingDamage;
+  if (!ongoing.at.startsWith("bearer-")) {
+    const source = state.actors.find((candidate) => candidate.id === effect.sourceActorId);
+    if (!source || source.hp.current <= 0) return [];
+  }
+  const events = dealOngoingDamage(state, bearer, effect, deps);
+  const stillOn = bearer.effects.some((candidate) => candidate.id === effect.id);
+  if (ongoing.saveToEnd && stillOn && deps.newId)
+    events.push(
+      openEndingSave(state, bearer, effect, ongoing.saveToEnd, "makes", {
+        newId: deps.newId,
+        now: deps.now ?? (() => new Date().toISOString())
+      })
+    );
+  return events;
 }
 
 /** SRD Heroism: "gains Temporary Hit Points equal to your spellcasting ability modifier at the start of each of its
  *  turns". Temporary Hit Points don't add up, so the creature keeps the higher of what it has and the new. */
-function temporaryHitPointsEachTurn(state: GameState, actorId: string, events: EffectNarration[]): void {
+function temporaryHitPointSteps(state: GameState, actorId: string): TurnStep[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor || actor.hp.current <= 0) return;
-  for (const effect of actor.effects) {
-    const amount = effect.temporaryHitPointsEachTurn;
-    if (amount === undefined || amount <= actor.hp.temporary) continue;
-    actor.hp = { ...actor.hp, temporary: amount };
-    events.push({
-      kind: "effect",
-      text: `${actor.name} gains ${amount} Temporary Hit Points (${effect.name}).`,
-      actorId,
-      ...sourceOf(effect)
-    });
-  }
+  if (!actor || actor.hp.current <= 0) return [];
+  return actor.effects
+    .filter((effect) => (effect.temporaryHitPointsEachTurn ?? 0) > actor.hp.temporary)
+    .map((effect) => ({
+      key: `temporary:${effect.id}`,
+      name: effect.name,
+      sourceActorId: effect.sourceActorId,
+      sourceName: effect.sourceName,
+      run: () => {
+        const now = state.actors.find((candidate) => candidate.id === actorId);
+        const amount = effect.temporaryHitPointsEachTurn ?? 0;
+        if (!now || now.hp.current <= 0 || amount <= now.hp.temporary) return [];
+        if (!now.effects.some((candidate) => candidate.id === effect.id)) return [];
+        now.hp = { ...now.hp, temporary: amount };
+        return [
+          {
+            kind: "effect",
+            text: `${now.name} gains ${amount} Temporary Hit Points (${effect.name}).`,
+            actorId,
+            ...sourceOf(effect)
+          }
+        ];
+      }
+    }));
 }
 
 /** Hit points an effect restores at the start of each of its bearer's turns (SRD Regenerate: "regains 1 Hit Point at
  *  the start of each of its turns"), and the Champion's Heroic Rally ("5 plus your Constitution modifier if you are
- *  Bloodied and have at least 1 Hit Point"). Through the healing rules, so a dying creature wakes and the dead don't. */
-function hitPointsEachTurn(state: GameState, actorId: string, events: EffectNarration[], deps: TurnStartDeps): void {
+ *  Bloodied and have at least 1 Hit Point"), each read when its turn in the order comes. Through the healing rules, so
+ *  a dying creature wakes and the dead don't. */
+function hitPointSteps(state: GameState, actorId: string, deps: TurnStartDeps): TurnStep[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor || isDead(actor)) return;
-  const heals: Array<Readonly<{ amount: number; source: string; effect?: (typeof actor.effects)[number] }>> =
-    actor.effects.flatMap((effect) =>
-      effect.hitPointsEachTurn !== undefined ? [{ amount: effect.hitPointsEachTurn, source: effect.name, effect }] : []
-    );
+  if (!actor || isDead(actor)) return [];
+  const heal = (amountNow: (now: Actor) => number, source: string, effect?: Effect) => (): EffectNarration[] => {
+    const now = state.actors.find((candidate) => candidate.id === actorId);
+    if (!now || isDead(now) || now.hp.current >= now.hp.maximum) return [];
+    if (effect && !now.effects.some((candidate) => candidate.id === effect.id)) return [];
+    const amount = amountNow(now);
+    if (amount <= 0) return [];
+    const before = now.hp.current;
+    const woke = healActor(state, now.id, amount, { role: "gm" });
+    const regained = now.hp.current - before;
+    return [
+      ...(regained > 0
+        ? [
+            {
+              kind: "effect" as const,
+              text: `${now.name} regains ${regained} ${regained === 1 ? "hit point" : "hit points"} (${source}).`,
+              actorId,
+              ...(effect ? sourceOf(effect) : {})
+            }
+          ]
+        : []),
+      ...woke
+    ];
+  };
+  const room = actor.hp.current < actor.hp.maximum;
+  const steps: TurnStep[] = actor.effects
+    .filter((effect) => room && (effect.hitPointsEachTurn ?? 0) > 0)
+    .map((effect) => ({
+      key: `regains:${effect.id}`,
+      name: effect.name,
+      sourceActorId: effect.sourceActorId,
+      sourceName: effect.sourceName,
+      run: heal(() => effect.hitPointsEachTurn ?? 0, effect.name, effect)
+    }));
   const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
-  const bloodied = actor.hp.current >= 1 && actor.hp.current * 2 <= actor.hp.maximum;
-  if (bloodied && definition && holdsFeature(definition, "survivor", "Survivor"))
-    heals.push({ amount: Math.max(0, 5 + abilityModifier(definition.abilityScores.con)), source: "Heroic Rally" });
-  for (const heal of heals) {
-    if (heal.amount <= 0 || actor.hp.current >= actor.hp.maximum) continue;
-    const before = actor.hp.current;
-    const woke = healActor(state, actor.id, heal.amount, { role: "gm" });
-    const regained = actor.hp.current - before;
-    if (regained > 0)
-      events.push({
-        kind: "effect",
-        text: `${actor.name} regains ${regained} ${regained === 1 ? "hit point" : "hit points"} (${heal.source}).`,
-        actorId,
-        ...(heal.effect ? sourceOf(heal.effect) : {})
+  const bloodied = (now: Actor) => now.hp.current >= 1 && now.hp.current * 2 <= now.hp.maximum;
+  if (room && bloodied(actor) && definition && holdsFeature(definition, "survivor", "Survivor")) {
+    const rally = Math.max(0, 5 + abilityModifier(definition.abilityScores.con));
+    if (rally > 0)
+      steps.push({
+        key: "regains:heroic-rally",
+        name: "Heroic Rally",
+        // "If you are Bloodied": what landed before it can lift the creature out of it.
+        run: heal((now) => (bloodied(now) ? rally : 0), "Heroic Rally")
       });
-    events.push(...woke);
   }
+  return steps;
 }
 
 /** SRD Champion, Heroic Warrior: "During combat, you can give yourself Heroic Inspiration whenever you start your turn

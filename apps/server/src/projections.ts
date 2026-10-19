@@ -505,6 +505,27 @@ export function projectPlayerCombat(
     pendingRuleAsks: state.combat.pendingRuleAsks
       .filter((entry) => ownedBy(state, entry.actorId, playerSessionId))
       .map((entry) => copyPlayerFields(entry, PENDING_RULE_ASK_FIELDS)),
+    // What happens at once as their own character's turn starts or ends, for them to order: each step's name, with a
+    // hidden source left out of it, and the creature it lands on only when they can see it.
+    ...(state.combat.turnSteps && ownedBy(state, state.combat.turnSteps.actorId, playerSessionId)
+      ? {
+          turnSteps: {
+            id: state.combat.turnSteps.id,
+            actorId: state.combat.turnSteps.actorId,
+            boundary: state.combat.turnSteps.boundary,
+            steps: state.combat.turnSteps.steps.map((step) => ({
+              key: step.key,
+              name:
+                step.sourceActorId !== undefined && isHiddenSource(step.sourceActorId, publicActorIds)
+                  ? withoutSourceName(step.name, step.sourceName ?? "")
+                  : step.name,
+              ...(step.targetName && step.targetActorId && publicActorIds.has(step.targetActorId)
+                ? { targetName: step.targetName }
+                : {})
+            }))
+          }
+        }
+      : {}),
     pendingReactions: state.combat.pendingReactions
       .filter((entry) => ownedBy(state, entry.actorId, playerSessionId))
       .map((entry) => {

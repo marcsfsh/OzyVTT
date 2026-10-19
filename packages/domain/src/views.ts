@@ -263,7 +263,15 @@ export type PlayerCombatView = Readonly<{
   pendingSaves: readonly PlayerPendingSave[];
   pendingReactions: readonly PlayerPendingReaction[];
   /** The player's own parked Ask-the-GM questions only. */ pendingRuleAsks: readonly PlayerPendingRuleAsk[];
+  /** What happens at once as their own character's turn starts or ends, waiting for them to order it. */ turnSteps?: PlayerTurnSteps | null;
   /** True while the GM has the table viewing an earlier turn (no labels, since those can name hidden combatants). */ rewound: boolean;
+}>;
+/** The steps of a turn's start or end a player orders: each named, with the creature it lands on when they see it. */
+export type PlayerTurnSteps = Readonly<{
+  id: string;
+  actorId: string;
+  boundary: "start" | "end";
+  steps: ReadonlyArray<Readonly<{ key: string; name: string; targetName?: string }>>;
 }>;
 /** An archived, public character the GM shared for preview: id and name only. */
 export type PlayerArchivedCharacter = Readonly<{ id: string; name: string }>;

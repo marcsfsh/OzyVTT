@@ -31,7 +31,7 @@ import {
 import { closeInitiativeWindow, rolledInitiative } from "./initiative-hooks.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
 import { releaseSwallowedBy } from "./swallow.js";
-import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
+import { endOfTurn, playStartSteps, startOfTurn } from "./turn-boundaries.js";
 import { zoneHeld, zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
@@ -525,6 +525,7 @@ export function endEncounter(state: GameState) {
     pendingRuleAsks: [],
     pendingInitiative: [],
     initiativeWindow: [],
+    turnSteps: null,
     historyCursor: null,
     historyDirty: false
   };
@@ -698,6 +699,8 @@ export type TurnAdvanceDeps = Readonly<{
   geometry?: TokenMapGeometry | null;
   /** Creature-to-creature distance on the map, for the auras that reach creatures as turns start and end. */
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** Two or more things happening at once as the new turn starts wait for its creature's controller to order them. */
+  askOrder?: boolean;
 }>;
 
 /** SRD Recharge X-Y: at the start of the owner's turn, a d6 at or above the threshold re-arms the spent
@@ -804,6 +807,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
   const ending: EffectNarration[] = [];
   const outgoingId = state.combat.turnActorId;
+  // What its turn's start did at once, never put in order, happens now as it was listed.
+  if (deps) ending.push(...playStartSteps(state, deps));
   // Its first turn over, a creature has done what it does when it rolled Initiative.
   closeInitiativeWindow(state, outgoingId);
   // "If you somehow end a turn in a space with another creature, you have the Prone condition" (SRD 5.2.1).
