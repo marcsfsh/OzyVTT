@@ -642,7 +642,7 @@ test("the GM plays music on the table screen and sees that the room hears it", a
   await expect(music).toHaveCount(0);
 });
 
-test("a player turns on the situation their Crowbar names and rolls the Strength check it fits", async ({ open }) => {
+test("a player turns on the situation their Crowbar names and rolls a Strength check it fits", async ({ open }) => {
   const hero = PARTY[0];
   const player = await open("/");
   await ensureGmPassword(player.request);
@@ -672,9 +672,9 @@ test("a player turns on the situation their Crowbar names and rolls the Strength
   await expectPageFits(player);
   await press(prying);
   await expect(prying).toHaveAttribute("aria-pressed", "true");
-  await press(sheet.getByRole("button", { name: /^Roll a Strength check/ }));
+  await press(sheet.getByRole("button", { name: /^Roll Athletics,/ }).first());
   // The roll names the situation for the GM, and the toggle is spent.
-  await expect(player.getByText(/Strength check, prying with the Crowbar/).first()).toBeVisible();
+  await expect(player.getByText(/Strength \(Athletics\), prying with the Crowbar/).first()).toBeVisible();
   await expect(prying).toHaveAttribute("aria-pressed", "false");
   await expectPageFits(player);
 });

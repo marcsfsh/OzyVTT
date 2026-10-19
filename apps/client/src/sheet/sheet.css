@@ -397,6 +397,7 @@
   gap: var(--space-2);
 }
 .cs-situations .cs-toggle {
+  min-height: var(--tap-min);
   max-width: 100%;
   text-align: left;
   overflow-wrap: anywhere;
