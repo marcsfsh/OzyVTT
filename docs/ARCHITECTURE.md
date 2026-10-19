@@ -556,7 +556,10 @@ A grant or a failed save can offer options (Fire Shield's warm or chill, Bestow 
 each target where the text says so. The resolve carries the pick (`optionId`, `targetOptions`), which is
 checked before anything rolls and kept on the effect with what it adds (`resolution/grant-extras.ts`). A
 grant can also bind to one carried weapon (`itemId`): its `this-item` riders reach that row's rolls and
-its `weapon` changes how the row swings, until the row leaves the pack (`bound-weapons.ts`). A live effect
+its `weapon` changes how the row swings, until the row leaves the pack (`bound-weapons.ts`). A binding can conjure
+the row it binds, lend proficiency with it and make it a Spellcasting Focus; Pact of the Blade's does, and its bonded
+weapon carries Thirsting and Devouring Blade's attacks and Eldritch Smite's and Lifedrinker's hits (`pact-weapon.ts`).
+A live effect
 can offer its bearer actions: a Bonus Action Dash or Disengage, an action that ends it with a save or a
 check, and another creature's spell action at the numbers it was cast with (`builtinActionsFor` in
 `builtin-actions.ts`, `granted-actions.ts`).
@@ -678,7 +681,9 @@ Rolling Initiative, damage, a spell above a cantrip and the GM's interrupt for e
 (`rest-interruptions.ts`), and resuming adds an hour. A finished rest opens a step on the actor (`restStep`) where its
 recoveries and re-choices are made until its player taps Done; a re-choice the build reads (a Weapon Mastery pick,
 a Wizard's cantrip, a Hunter's option) is written to the ledger and the sheet rebuilt (`ledger-rechoice.ts`), a
-pick of several one held answer at a time. When Initiative is rolled, `initiative-hooks.ts` opens a window for the
+pick of several one held answer at a time, and a feature's picks of different kinds each under its own offer (Pact of
+the Tome's cantrips and rituals). Pact of the Tome's book is a gear row the rest conjures anew (`book-of-shadows.ts`):
+its spells are prepared, and it serves as a focus, only while it is carried. When Initiative is rolled, `initiative-hooks.ts` opens a window for the
 features that act then (Persistent Rage, Uncanny Metabolism) and gives back what others restore (Perfect Focus,
 Superior Inspiration, Archdruid).
 
@@ -805,6 +810,14 @@ names no family is the GM's own ruling on the whole command.
   imported as an actor definition. What a character's next level brings is read from the same
   survey at the next level (`next-level.ts`, `character:next-level`), for whoever may level it.
   The builder's own rolls carry the purpose `builder`, so a sheet's latest roll leaves them out.
+- A feature's granted spell can change how it is cast: components its castings go without (`waives`), a cast on its
+  caster only (`self`) or healing dice at their highest (`maximized`), merged with any other source of the same spell
+  (`character-build.ts`). `freeCastOf` spends a feature's own uses on free castings of what other features grant
+  (Natural Recovery). A spell pick can be held to a casting time, the Ritual tag or the character's spellbook, which
+  `spellbook.ts` checks as a build or a re-choice makes the pick, and a pick with a `default` is filled by the build
+  when the ledger names none, so a sheet made before the pick existed still builds. A `replaces` clause's `shares`
+  name lets several clauses spend one allowance (Mystic Arcanum's one swap a level). A kit item with `pickFrom` asks
+  which item the kit gives (a Bard's instrument), answered in its own ledger row.
 - A fresh table starts with a sample party (`sample-party.ts`): three level 7 characters made by the
   same builder from a fixed seed, so they level like any built character. Each is marked `sample`
   (GM-only), and one command (`actor.remove-samples`) removes every sample the roster rules let go and

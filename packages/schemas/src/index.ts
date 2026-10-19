@@ -1517,7 +1517,13 @@ export const EffectWeaponSchema = z
   .object({
     ability: AbilitySchema.optional(),
     dice: DiceFormulaSchema.optional(),
-    damageTypes: z.array(DamageTypeSchema).min(1).max(3).optional()
+    damageTypes: z.array(DamageTypeSchema).min(1).max(3).optional(),
+    /** Its wielder is proficient with it while bound (Pact of the Blade). */
+    proficient: z.literal(true).optional(),
+    /** Its wielder can use it as a Spellcasting Focus while bound (Pact of the Blade). */
+    focus: z.literal(true).optional(),
+    /** It was conjured with the binding and disappears when the binding ends (a conjured pact weapon). */
+    conjured: z.literal(true).optional()
   })
   .strict();
 /** The generic actions an effect or a feature can let its bearer take as a Bonus Action. */
@@ -2809,8 +2815,17 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
         .min(1)
         .max(4)
         .optional(),
-      /** The damage types its wielder may pick on a hit besides the weapon's own (Shillelagh: Force). */
-      damageTypes: z.array(DamageTypeSchema).min(1).max(2).optional(),
+      /** The damage types its wielder may pick on a hit besides the weapon's own (Shillelagh: Force; a pact weapon:
+       *  Necrotic, Psychic or Radiant). */
+      damageTypes: z.array(DamageTypeSchema).min(1).max(3).optional(),
+      /** Only a magic weapon (Pact of the Blade: "create a bond with a magic weapon you touch"). */
+      magical: z.literal(true).optional(),
+      /** Its wielder is proficient with it, and can use it as a Spellcasting Focus (`focus`), while bound. */
+      proficient: z.literal(true).optional(),
+      focus: z.literal(true).optional(),
+      /** With no weapon picked on the resolve, it conjures one of the kind its user picked for this feature, which
+       *  disappears when the binding ends (Pact of the Blade: "conjure a pact weapon in your hand"). */
+      conjures: z.object({ pickOf: RiderSlugSchema }).strict().optional(),
       /** The granter's modifier in this ability, at least `minimum`, added to its attack rolls (Sacred Weapon's
        *  Charisma, minimum +1). */
       attackBonusAbility: z
@@ -4675,6 +4690,8 @@ export const ActionSchema = z
           ),
         /** Attack rolls this action grants (Extra Attack 2, Eldritch Blast beams). Absent = 1. */
         count: z.number().int().min(1).max(10).optional(),
+        /** Its extra attacks are made with this weapon alone (Thirsting Blade: "for your pact weapon only"). */
+        countWithItself: z.literal(true).optional(),
         /** Extra weapon dice on a critical hit beyond crit doubling (Savage Attacks). Applies to the first damage part. */
         criticalBonusDice: z.number().int().min(1).max(4).optional(),
         /** The roll has Advantage when the printing says so: against a creature its user grapples ("with Advantage if
@@ -4753,7 +4770,9 @@ export const ActionSchema = z
         /** Each target regains all its hit points, whatever the formula says (Power Word Heal). */
         toMaximum: z.literal(true).optional(),
         /** The roll is Temporary Hit Points, which a creature takes only when they beat what it has (False Life). */
-        temporary: z.literal(true).optional()
+        temporary: z.literal(true).optional(),
+        /** Its dice give their highest faces with no roll (Fiendish Vigor's False Life). */
+        maximized: z.literal(true).optional()
       })
       .strict()
       .optional(),
@@ -5006,6 +5025,13 @@ export const ActionSchema = z
     /** Its spell is cast with this action alone, whatever the spell's casting time (Pact of the Chain: "cast it as a
      *  Magic action without expending a spell slot"). */
     castsAtOnce: z.literal(true).optional(),
+    /** The spell components its cast goes without, as the feature that gives it says (Wild Companion's Find Familiar
+     *  "without Material components"). */
+    waives: z
+      .array(z.enum(["verbal", "somatic", "material"]))
+      .min(1)
+      .max(3)
+      .optional(),
     /** A jump the action allows this turn ("jumps up to 30 feet by spending 10 feet of movement"). */
     leap: z
       .object({ feet: z.number().int().min(5).max(120), costFeet: z.number().int().min(0).max(60) })

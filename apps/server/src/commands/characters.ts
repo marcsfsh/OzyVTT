@@ -32,6 +32,7 @@ import { sendsSheetScores, sheetAbilityScores, sheetSourceOf } from "../sheet-ab
 import { proficiencyEditOf } from "../sheet-proficiency-edits.js";
 import { withStoredStudies } from "../study-ledger.js";
 import { checkPlayerLevelChange } from "../level-up-picks.js";
+import { spellbookPickRefusal } from "../spellbook.js";
 import type { HitDie } from "@vtt/rules-5e";
 import { GameInputError } from "./failures.js";
 import { initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
@@ -158,6 +159,9 @@ export const characterCommands = [
             }
           );
           const definition = buildCharacterDefinition(input, catalog, state.builderPolicy);
+          // Spell Mastery's and Signature Spells' picks come from the spellbook the build writes.
+          const unbooked = spellbookPickRefusal(null, definition, catalog);
+          if (unbooked) throw new CommandRejectedError(unbooked);
           importActorDefinition(state, definition, actorId, "public", kit.equipmentCatalog());
           claimForCreator(state, actorId, principal);
           recordHitPointRoll(state, {
@@ -291,6 +295,8 @@ export const characterCommands = [
         // A player's level up changes only what the level allows; a respec is the GM's.
         if (!isGmGrade(principal)) checkPlayerLevelChange(previous, input, catalog, state.builderPolicy);
         const definition = buildCharacterDefinition(input, catalog, state.builderPolicy);
+        const unbooked = spellbookPickRefusal(actor, definition, catalog, previous);
+        if (unbooked) throw new CommandRejectedError(unbooked);
         rebuildActorDefinition(state, actorId, definition, kit.equipmentCatalog());
         recordHitPointRoll(state, {
           id: kit.context.newId(),

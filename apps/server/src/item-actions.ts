@@ -763,8 +763,12 @@ export function weaponSwing(
   const trained = definition.proficiencies?.weapons;
   // A bound template row also answers to its base weapon's id for proficiency.
   const ids = item.baseId !== undefined ? [catalogIdOf(item), item.baseId] : [catalogIdOf(item)];
+  // A binding may lend proficiency with the weapon (a pact weapon).
   const proficient =
-    trained === undefined || trainingCovers(grantedWeapons, weapon, ids) || trainingCovers(trained, weapon, ids);
+    trained === undefined ||
+    bound?.proficient === true ||
+    trainingCovers(grantedWeapons, weapon, ids) ||
+    trainingCovers(trained, weapon, ids);
   // What acid or rust took off the weapon's attack rolls (`row-penalties.ts`).
   const bonus = modifier + (proficient ? definition.proficiencyBonus : 0) - (item.penalty ?? 0);
   const pickable = bound?.damageTypes ? [...new Set([weapon.damageType as DamageType, ...bound.damageTypes])] : [];

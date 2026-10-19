@@ -885,6 +885,9 @@ const SpellChoicesSchema = z.strictObject({
     .strictObject({
       spellIds: z.array(z.string()),
       freeLeft: z.number().int().min(0),
+      /** Free additions a feature gives for spells of one school, beyond the levels' (Evocation Savant's one each time
+       *  a new level of spell slots opens). */
+      freeOfSchool: z.strictObject({ school: z.string(), left: z.number().int().min(0) }).nullable(),
       maxLevel: z.number().int().min(0).max(9),
       addable: z.array(z.string())
     })

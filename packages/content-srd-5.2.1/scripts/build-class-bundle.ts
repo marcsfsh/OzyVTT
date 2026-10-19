@@ -610,14 +610,14 @@ function equipmentOf(text: string, classId: string, catalog: CatalogIndex, unres
   const options: {
     id: string;
     label: string;
-    items: { id: string; name: string; quantity: number }[];
+    items: { id: string; name: string; quantity: number; pickFrom?: string[] }[];
     goldPieces: number;
   }[] = [];
   const parts = [...text.matchAll(/\(([A-C])\)\s*([^;]+?)(?=;\s*or\s*\(|;\s*\(|$)/g)];
   for (const [, letter, chunk] of parts) {
     const label = chunk.replace(/^\s*|\s*$/g, "").replace(/\.$/, "");
     const gold = Number(label.match(/(\d+)\s*GP\s*$/i)?.[1] ?? 0);
-    const items: { id: string; name: string; quantity: number }[] = [];
+    const items: { id: string; name: string; quantity: number; pickFrom?: string[] }[] = [];
     const body = label.replace(/,?\s*(and\s+)?\d+\s*GP\s*$/i, "");
     for (let piece of body.split(/,\s*|\s+and\s+/)) {
       piece = piece.trim().replace(/^and\s+/i, "");
@@ -634,7 +634,13 @@ function equipmentOf(text: string, classId: string, catalog: CatalogIndex, unres
       }
       // "20 Arrows" is one "Arrows (20)": a bundle row counts its pieces itself.
       const bundle = Number(/-(\d+)$/.exec(resolved)?.[1] ?? 0);
-      items.push({ id: resolved, name: catalog.get(resolved) ?? name, quantity: bundle === qty ? 1 : qty });
+      items.push({
+        id: resolved,
+        name: catalog.get(resolved) ?? name,
+        quantity: bundle === qty ? 1 : qty,
+        // "Musical Instrument of your choice" (the Bard's kit): any instrument, picked with the kit.
+        ...(key === "musical-instrument-of-your-choice" ? { pickFrom: [...INSTRUMENTS] } : {})
+      });
     }
     options.push({ id: `${classId}-${letter.toLowerCase()}`, label, items, goldPieces: gold });
   }

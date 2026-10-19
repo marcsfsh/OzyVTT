@@ -57,6 +57,7 @@ import { markRising } from "./risen.js";
 import { dropStable } from "./stable-at-zero.js";
 import { mistyEscape, regainedHitPoints, restorationAtDeath, tallyTurnDamage } from "./death-traits.js";
 import { holdsFeature } from "./class-features.js";
+import { giftOfTheProtectors } from "./book-of-shadows.js";
 import { rollSaveAtOnce } from "./saving-throws.js";
 import { offerDamageReaction } from "./damage-reactions.js";
 import { offerDamagedReaction } from "./triggered-reactions.js";
@@ -920,6 +921,13 @@ export function applyDamageDetailed(
       relentlessEndurance(actor, definition, damageToHp - hpBefore, events))
   ) {
     // Up at 1 Hit Point: nothing falls.
+  } else if (
+    !wasAtZero &&
+    actor.hp.current === 0 &&
+    damageToHp > 0 &&
+    giftOfTheProtectors(state, actor, damageToHp - hpBefore, events)
+  ) {
+    // A name on a Warlock's page: up at 1 Hit Point.
   } else if (
     !wasAtZero &&
     actor.hp.current === 0 &&

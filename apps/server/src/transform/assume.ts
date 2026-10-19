@@ -4,7 +4,7 @@ import { storedArmorClass } from "../actor-roster.js";
 import { addEffect, endEffect, type ConditionImmunitySource, type EffectNarration } from "../effects.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
-import { composeOwnForm, composeStatBlockForm } from "./compose.js";
+import { composeOwnForm, composeStatBlockForm, featureDefences } from "./compose.js";
 import { formDefinitionId, formEffectOf, refreshSize, type CreatureSize } from "./forms.js";
 
 /** What taking a form reads: stat blocks (the bearer's own and the form's) and the catalog its Armor Class needs. */
@@ -64,7 +64,9 @@ export function takeForm(
   const statBlock = form.statBlockId !== undefined ? deps.resolveDefinition(form.statBlockId) : undefined;
   if (form.statBlockId !== undefined && !statBlock)
     throw new CommandRejectedError("That form's stat block is no longer in the bestiary.");
-  const composed = statBlock ? composeStatBlockForm(own, statBlock, form) : composeOwnForm(own, form);
+  const composed = statBlock
+    ? composeStatBlockForm(own, statBlock, form, featureDefences(own, deps.catalog))
+    : composeOwnForm(own, form);
   const size = statBlock ? (statBlock.size as CreatureSize) : (form.size as CreatureSize | undefined);
   const taken: Form = {
     ...form,

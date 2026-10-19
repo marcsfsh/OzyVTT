@@ -40,7 +40,9 @@ import {
   SPELLCASTING_ABILITY_KIND,
   spellSlotsOf,
   surveyForBuild,
+  KIT_ITEM_KIND,
   type BuildClass,
+  type ChoiceOffer,
   type CharacterFeatureOrigin
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
@@ -54,6 +56,7 @@ import {
   UNARMED_STRIKE_ACTION_ID
 } from "./item-actions.js";
 import { bindTemplateItem } from "./inventory.js";
+import { bookOfShadowsRow } from "./book-of-shadows.js";
 import { BUILDER_SOURCE_NAME } from "./actor-roster.js";
 import { CONTENT_STAMP } from "./content-stamp.js";
 import { withProficiencyEdit } from "./sheet-proficiency-edits.js";
@@ -149,7 +152,16 @@ type InterpretedFeatures = {
     /** Which of its castings are a Magic action, whatever the spell's casting time (Pact of the Chain, Wild
      *  Companion). */
     asMagicAction?: MagicActionCasting;
+    /** How the granting feature changes its castings: components they go without, and a free casting only on its
+     *  caster or with its healing dice at their highest. */
+    casting?: CastingChange;
+    /** The feature that grants it: its own id, or for a chosen option the feature it was chosen under. */
+    grantedBy: string;
   }>;
+  /** Free castings a feature gives the spells other features grant, on its own uses (Natural Recovery). */
+  freeCastsOf: Array<
+    Readonly<{ features: ReadonlySet<string>; minLevel: number; uses: NonNullable<ActorAction["uses"]> }>
+  >;
   /** The free casting a feature with limited uses gives the spell picked for it (Magic Initiate's level 1 spell). */
   pickedSpellUses: Map<string, NonNullable<ActorAction["uses"]>>;
   /** Hit points the features add: each `hit-points-per-level` rider times the level that scales it (a Sorcerer level
@@ -528,7 +540,51 @@ type SpellEntry = {
   free?: ActorAction["uses"] | null;
   summon?: SummonChange;
   asMagicAction?: MagicActionCasting;
+  casting?: CastingChange;
 };
+
+/** What a feature changes about a granted spell's castings (`FeatureGrants.spells[]`): the components every casting
+ *  goes without, and its free casting cast only on its caster or with its healing dice at their highest. */
+type CastingChange = Readonly<{
+  waives?: ReadonlyArray<"verbal" | "somatic" | "material">;
+  freeSelf?: true;
+  freeMaximized?: true;
+}>;
+
+/** The casting change a granted spell carries, or undefined when it changes nothing. */
+function castingChangeOf(spell: NonNullable<FeatureRecord["grants"]>["spells"][number]): CastingChange | undefined {
+  const change: CastingChange = {
+    ...(spell.waives ? { waives: [...spell.waives] } : {}),
+    ...(spell.self ? { freeSelf: true as const } : {}),
+    ...(spell.maximized ? { freeMaximized: true as const } : {})
+  };
+  return Object.keys(change).length > 0 ? change : undefined;
+}
+
+/** Two sources' changes to one spell's castings, together. */
+function mergedCasting(first: CastingChange | undefined, second: CastingChange | undefined): CastingChange | undefined {
+  if (!first || !second) return first ?? second;
+  const waives = [...new Set([...(first.waives ?? []), ...(second.waives ?? [])])];
+  return {
+    ...(waives.length > 0 ? { waives } : {}),
+    ...(first.freeSelf || second.freeSelf ? { freeSelf: true as const } : {}),
+    ...(first.freeMaximized || second.freeMaximized ? { freeMaximized: true as const } : {})
+  };
+}
+
+/** A cast with its feature's change: the components it goes without, and for a free casting, its caster as its only
+ *  target ("on yourself") and its healing dice at their highest (Fiendish Vigor). */
+function withCastingChange(action: ActorAction, change: CastingChange | undefined, free: boolean): ActorAction {
+  if (!change) return action;
+  return {
+    ...action,
+    ...(change.waives ? { waives: [...change.waives] } : {}),
+    ...(free && change.freeSelf ? { targets: { ...(action.targets ?? {}), who: "self" as const } } : {}),
+    ...(free && change.freeMaximized && action.healing
+      ? { healing: { ...action.healing, maximized: true as const } }
+      : {})
+  };
+}
 
 /** Which castings a feature makes a Magic action (`FeatureGrants.spells[].asMagicAction`). */
 type MagicActionCasting = NonNullable<NonNullable<FeatureRecord["grants"]>["spells"][number]["asMagicAction"]>;
@@ -593,16 +649,18 @@ function linkSpellActions(
       into.push(action);
       entry[key] = action.id;
     };
-    if (record.level === 0) mint(cantripActionFor(record, numbers), "actionId");
-    else {
+    if (record.level === 0) {
+      const cantrip = cantripActionFor(record, numbers);
+      mint(cantrip ? withCastingChange(cantrip, entry.casting, false) : null, "actionId");
+    } else {
       if (hasSlots && entry.withSlot !== false) {
-        const cast = leveledSpellActionFor(record, numbers);
+        const cast = withCastingChange(leveledSpellActionFor(record, numbers), entry.casting, false);
         mint(entry.asMagicAction === "every-casting" ? asMagicActionCast(cast) : cast, "actionId");
         // SRD Rituals: a prepared ritual spell can be cast without a slot and takes 10 minutes longer.
         if (record.ritual) mint(ritualActionOf(cast, record), "ritualActionId");
       }
       if (entry.free !== undefined) {
-        const free = leveledSpellActionFor(record, numbers, entry.free);
+        const free = withCastingChange(leveledSpellActionFor(record, numbers, entry.free), entry.casting, true);
         // "Cast it as a Magic action without expending a spell slot" (Pact of the Chain).
         mint(entry.asMagicAction ? asMagicActionCast(free) : free, "freeActionId");
       }
@@ -642,6 +700,7 @@ const sheetSpell = ({
   free: _free,
   summon: _summon,
   asMagicAction: _asMagicAction,
+  casting: _casting,
   ...entry
 }: SpellEntry) => entry;
 
@@ -690,7 +749,8 @@ function interpretFeature(
   context: BuildContext,
   source: SpellSource,
   classId: string | null = null,
-  className: string | null = null
+  className: string | null = null,
+  grantedBy: string = feature.id
 ): void {
   into.traits.push({ name: feature.name, description: feature.description });
   /** An action or pool id as this class owns it, and the action's name when that id had to change. */
@@ -719,7 +779,15 @@ function interpretFeature(
         ...(feature.uses!.afterHours ? { afterHours: feature.uses!.afterHours } : {})
       }
     : undefined;
-  const freeCastGrant = feature.grants?.spells.some((spell) => spell.withoutSlot === "free") === true;
+  // A free casting of what other features grant (Natural Recovery) spends this feature's counter on those casts.
+  const freeCastOf = feature.freeCastOf !== undefined && carriesUses;
+  if (freeCastOf)
+    into.freeCastsOf.push({
+      features: new Set(feature.freeCastOf!.features),
+      minLevel: feature.freeCastOf!.minLevel ?? 0,
+      uses: freeUses!
+    });
+  const freeCastGrant = freeCastOf || feature.grants?.spells.some((spell) => spell.withoutSlot === "free") === true;
   // A spell picked for a feature with limited uses is cast with them (Magic Initiate once per Long Rest, Mystic
   // Arcanum), so the counter rides that spell's free-cast action, with no action of its own.
   const freeCastPick = carriesUses && featurePicks(feature).some((pick) => pick.kind === "spell");
@@ -770,8 +838,10 @@ function interpretFeature(
         ability: spell.ability,
         withSlot: spell.withSlot,
         source,
+        grantedBy,
         ...(spell.summon ? { summon: spell.summon } : {}),
         ...(spell.asMagicAction ? { asMagicAction: spell.asMagicAction } : {}),
+        ...(castingChangeOf(spell) ? { casting: castingChangeOf(spell) } : {}),
         ...(spell.withoutSlot === "at-will" ? { free: null } : {}),
         // A free casting with no counter to spend is refused at build, so nothing casts without limit.
         ...(spell.withoutSlot === "free"
@@ -916,12 +986,36 @@ export function storedHitPointRolls(choices: readonly CharacterChoice[], level: 
   return rolls;
 }
 
+/** The ledger rows a pick with a default answer takes when the ledger holds none (the High Elf's Prestidigitation). */
+function defaultedRows(offers: readonly ChoiceOffer[]): CharacterChoice[] {
+  return offers.flatMap((offer) =>
+    offer.defaultId !== null && offer.taken.length === 0 && offer.options.has(offer.defaultId)
+      ? [
+          {
+            level: offer.levels[0] ?? 1,
+            ...(offer.classId ? { classId: offer.classId } : {}),
+            kind: offer.kind,
+            id: offer.defaultId,
+            ...(offer.featureId ? { payload: { featureId: offer.featureId } } : {})
+          }
+        ]
+      : []
+  );
+}
+
 export function buildCharacterDefinition(
-  input: CharacterCreateRequestInput,
+  requested: CharacterCreateRequestInput,
   library: ContentView,
   policy: BuilderPolicy
 ): ActorDefinition {
-  const survey = surveyForBuild(input, library, policy);
+  let input = requested;
+  let survey = surveyForBuild(input, library, policy);
+  // A pick the ledger doesn't answer takes its default, which the stored ledger then records.
+  const defaults = defaultedRows(survey.offers);
+  if (defaults.length > 0) {
+    input = { ...input, choices: [...input.choices, ...defaults] };
+    survey = surveyForBuild(input, library, policy);
+  }
   const {
     offers,
     classes,
@@ -1081,6 +1175,7 @@ export function buildCharacterDefinition(
     damageImmunities: [],
     conditionImmunities: [],
     grantedSpells: [],
+    freeCastsOf: [],
     pickedSpellUses: new Map(),
     hitPointBonus: 0,
     speedBonus: 0,
@@ -1118,8 +1213,17 @@ export function buildCharacterDefinition(
       contextOf(classId),
       spellSourceOf(record, origin, classId),
       classId,
-      classId === null ? null : (classOf.get(classId)?.record.name ?? null)
+      classId === null ? null : (classOf.get(classId)?.record.name ?? null),
+      origin?.kind === "option" ? origin.sourceId : record.id
     );
+  // A free casting that other features' spells share (Natural Recovery's one Circle Spell a Long Rest): each such
+  // spell of its level or higher is cast free on the one counter, unless another feature already casts it free.
+  for (const spec of interpreted.freeCastsOf)
+    for (const grantedSpell of interpreted.grantedSpells) {
+      const level = grantedSpell.level ?? library.spellRecord(grantedSpell.id)?.level ?? 0;
+      if (spec.features.has(grantedSpell.grantedBy) && level >= spec.minLevel && grantedSpell.free === undefined)
+        grantedSpell.free = spec.uses;
+    }
   // Martial Arts reads its own class's column (a Monk's), and runs after the features so an id a feature already
   // declared keeps it.
   const martialContext = [...classContexts.values()].find((context) => martialArtsDieOf(context) !== null);
@@ -1294,7 +1398,8 @@ export function buildCharacterDefinition(
       source: grantedSpell.source,
       ...(grantedSpell.free !== undefined ? { free: grantedSpell.free } : {}),
       ...(grantedSpell.summon ? { summon: grantedSpell.summon } : {}),
-      ...(grantedSpell.asMagicAction ? { asMagicAction: grantedSpell.asMagicAction } : {})
+      ...(grantedSpell.asMagicAction ? { asMagicAction: grantedSpell.asMagicAction } : {}),
+      ...(grantedSpell.casting ? { casting: grantedSpell.casting } : {})
     };
   };
   /** Adds a spell once; a second source of the same spell adds only its free casting and what it changes about the
@@ -1311,6 +1416,8 @@ export function buildCharacterDefinition(
       if (entry.summon && !existing.summon) existing.summon = entry.summon;
       if (entry.asMagicAction && existing.asMagicAction !== "every-casting")
         existing.asMagicAction = entry.asMagicAction;
+      const casting = mergedCasting(existing.casting, entry.casting);
+      if (casting) existing.casting = casting;
     }
   };
   // The ability each source casts with: a class's own, the species' or a feat's chosen one, else an ability the grant
@@ -1351,6 +1458,22 @@ export function buildCharacterDefinition(
         : `"${row.id}" is chosen for "${row.classId}", a class this character has no levels in.`
     );
   }
+  // Pact of the Tome: "they must be spells you don't already have prepared", so a book pick the sheet already holds
+  // would be merged away and lost.
+  const featurePicked = [...featurePicksOf("cantrip"), ...featurePicksOf("spell")];
+  const bookPick = featurePicked
+    .filter((pick) => pick.featureId === "pact-of-the-tome")
+    .find((pick) =>
+      [
+        ...classSpells.flatMap((budget) => [...budget.cantripRows, ...budget.spellRows]),
+        ...interpreted.grantedSpells,
+        ...featurePicked.filter((other) => other.featureId !== "pact-of-the-tome")
+      ].some((held) => held.id === pick.id)
+    );
+  if (bookPick)
+    reject(
+      `"${bookPick.id}" is already prepared. The Book of Shadows holds spells the character doesn't already have prepared.`
+    );
   let spellcasting: Record<string, unknown> | undefined;
   if (classSpells.length > 0) {
     const { slots, pact } = spellSlotsOf(classes);
@@ -1497,13 +1620,25 @@ export function buildCharacterDefinition(
       reject(`Choose exactly one ${source} equipment option (${options.map((option) => option.id).join(", ")}).`);
     const chosen = options.find((option) => option.id === matches[0].id)!;
     goldPieces += chosen.goldPieces;
+    // The item the kit lets its taker pick ("Musical Instrument of your choice"), recorded in its own row.
+    const kitPicks = input.choices
+      .filter(
+        (row) => row.kind === KIT_ITEM_KIND && (row.classId ?? null) === (source === "class" ? classRecord.id : null)
+      )
+      .map((row) => row.id);
     // A kit item that is one of this source's tool choices is the tool chosen there ("Gaming Set (same as above)").
     const chosenTools = [...(offers.find((offer) => offer.key === `${source}-tools`)?.taken ?? [])];
     const picked = chosen.items.map((item) => {
+      const pick = item.pickFrom ? kitPicks.findIndex((id) => item.pickFrom!.includes(id)) : -1;
+      if (pick >= 0) {
+        const id = kitPicks.splice(pick, 1)[0]!;
+        return { ...item, id, name: library.equipmentRecord(id)?.name ?? item.name };
+      }
       if (!toolChoices.includes(item.id) || chosenTools.length === 0 || chosenTools.includes(item.id)) return item;
       const tool = chosenTools.shift()!;
       return { ...item, id: tool, name: library.equipmentRecord(tool)?.name ?? item.name };
     });
+    if (kitPicks.length > 0) reject(`"${kitPicks[0]}" isn't one of the items ${chosen.label} offers a choice of.`);
     // An equipment pack is the things it holds, each its own row ("10 Torches" a stack of ten).
     const items = picked.flatMap((item) => {
       const contents = library.equipmentRecord(item.id)?.contents;
@@ -1530,8 +1665,12 @@ export function buildCharacterDefinition(
             id: item.id,
             name: record?.name ?? item.name,
             quantity: item.quantity,
+            // A focus that is also a weapon (the Wizard's staff, "also used as a Quarterstaff") is in hand too.
             equipped: record
-              ? record.category === "armor" || record.category === "shield" || record.category === "weapon"
+              ? record.category === "armor" ||
+                record.category === "shield" ||
+                record.category === "weapon" ||
+                record.weapon !== undefined
               : false,
             attuned: false,
             ...(record?.weightLb !== null && record?.weightLb !== undefined ? { weightEach: record.weightLb } : {}),
@@ -1579,6 +1718,8 @@ export function buildCharacterDefinition(
   );
   if (strayEquipment)
     reject(`"${strayEquipment.id}" is not ${withArticle(classRecord.name)} or ${background.name} equipment option.`);
+  // Pact of the Tome's book, conjured before the first adventure as at the end of a rest.
+  if (heldFeatures.some((ref) => ref.id === "pact-of-the-tome")) inventory.push(bookOfShadowsRow());
   // Only one body armor stays equipped (two would fight over derived AC); keep the best base.
   const equippedArmor = inventory.filter((item) => item.category === "armor" && item.equipped);
   for (const extra of equippedArmor
