@@ -4,6 +4,8 @@ import type { EffectInstance, SpellZone } from "@vtt/domain";
 import { catalogIdOf, MAX_EFFECT_MINUTES, type SaveFailureDuration } from "@vtt/schemas";
 import { addEffect, CONCENTRATING_TAG, makeEffect, turnEndDuration, type EffectNarration } from "../effects.js";
 import { isItemActionId, itemActionRest, laterRowOf, laterSpellActionId } from "../item-actions.js";
+import { CommandRejectedError } from "../game-store.js";
+import { itemRowOfAction } from "../item-charges.js";
 import { castThisTurnKey } from "../lasting-spells.js";
 import { areaAtLevel, endZone } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
@@ -230,4 +232,55 @@ export function openSpellZone(ctx: ResolveContext): void {
   state.combat = { ...state.combat, spellZones: [...state.combat.spellZones, zone].slice(-20) };
   if (!aroundCaster && zone.annotationId === null)
     ctx.warnings.push(`Place ${spell.name}'s area on the map (Spell areas), and the server will run it.`);
+}
+
+/**
+ * An item's action that leaves an area acting on creatures later (spread Caltrops, spilled Ball Bearings, a set Hunting
+ * Trap): its zone, carrying the action's own save and damage, on the area placed with it. Nothing is rolled as it is
+ * set down, and it stays until the GM ends it (the items gathered up) or it goes off once. Returns whether it opened
+ * one.
+ */
+export function openActionZone(ctx: ResolveContext): boolean {
+  const { state, attacker, input, action, deps } = ctx;
+  const trigger = action.zone;
+  if (!trigger || action.spellId !== undefined) return false;
+  const aroundCaster = trigger.around === "caster";
+  const row = itemRowOfAction(action.id, attacker.inventory);
+  const record = row ? deps.catalog?.equipmentRecord(catalogIdOf(row)) : undefined;
+  // "Caltrops (bag of 20)" lies on the map as Caltrops.
+  const name = (record?.name.replace(/\s*\([^)]*\)$/, "") || action.name).slice(0, 120);
+  // A bag already spread lies on the map until it is gathered up (the GM ends its area).
+  const down = state.combat.spellZones.filter(
+    (zone) => zone.rule && zone.casterId === attacker.id && zone.laterActionId === action.id
+  ).length;
+  if (row && down >= row.quantity)
+    throw new CommandRejectedError(
+      `${name}: ${attacker.name} has none left to set down. Gather up the ones on the map first.`
+    );
+  const zone: SpellZone = {
+    id: input.commandId,
+    spellId: record?.id ?? "area",
+    name,
+    laterActionId: action.id.slice(0, 120),
+    casterId: attacker.id,
+    castId: null,
+    rounds: null,
+    startedRound: state.combat.round,
+    level: 0,
+    dc: action.save?.dc ?? 10,
+    annotationId: !aroundCaster && input.areaPlaced === true ? input.commandId : null,
+    area: aroundCaster ? null : (action.area ?? null),
+    rule: {
+      trigger: structuredClone(trigger),
+      ...(action.save ? { save: structuredClone(action.save) } : {}),
+      damage: structuredClone(action.damage)
+    },
+    damageDealt: 0,
+    entered: [],
+    affected: []
+  };
+  state.combat = { ...state.combat, spellZones: [...state.combat.spellZones, zone].slice(-20) };
+  if (!aroundCaster && zone.annotationId === null)
+    ctx.warnings.push(`Place ${name}'s area on the map (Spell areas), and the server will run it.`);
+  return true;
 }

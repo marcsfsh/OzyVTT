@@ -1,14 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { GAME_PATHS } from "@vtt/api-contract";
-import { GameStateSchema } from "@vtt/domain";
+import { GameStateSchema, type GameState } from "@vtt/domain";
 import { afterEach, describe, expect, it } from "vitest";
 import { importActorDefinition } from "../src/actor-roster.js";
 import { bootServer } from "./boot-server.js";
 import { png } from "./image-fixtures.js";
 import { build, catalog, druidInput, FOE, HERO } from "./spell-casters.js";
+import { carry } from "./zone-fixtures.js";
 
 // The spell areas through the commands the table sends: an aura settles onto a creature the GM moves into it, and
-// Moonbeam's Magic action moves the Cylinder it already placed onto a creature, which owes the save.
+// Moonbeam's Magic action moves the Cylinder it already placed onto a creature, which owes the save; spread Caltrops and
+// a set Hunting Trap wait for a creature to walk in.
 
 const ALLY = "10000000-0000-4000-8000-0000000000c2";
 const druid = build(druidInput(["moonbeam", "pass-without-trace"]));
@@ -19,7 +21,7 @@ afterEach(async () => {
 });
 
 /** A fight on a 50px, 5-foot grid: the druid, a party ally and a goblin. */
-async function fight() {
+async function fight(setup?: (state: GameState) => void) {
   const state = GameStateSchema.parse({
     schemaVersion: 1,
     actors: [
@@ -28,6 +30,7 @@ async function fight() {
     ]
   });
   importActorDefinition(state, druid, HERO, "public", catalog);
+  setup?.(state);
   const booted = await bootServer(state);
   closers.push(booted.close);
   const { server, gmToken, post } = booted;
@@ -109,5 +112,38 @@ describe("spell areas through the table's commands", () => {
     expect(combat.pendingSaves).toEqual([
       expect.objectContaining({ targetActorId: FOE, ability: "con", zoneId: zone.id })
     ]);
+  });
+
+  it("spreads Caltrops that roll nothing as they land and catch the creature that walks in", async () => {
+    const { server, place, resolve } = await fight((state) => carry(state, HERO, "Caltrops"));
+    const spread = await resolve({
+      actionId: "item-caltrops-spread",
+      template: { shape: "square", origin: { x: 500, y: 100 }, target: { x: 550, y: 150 } }
+    });
+    expect(spread.status, JSON.stringify(await spread.clone().json())).toBe(200);
+    const zone = server.store.snapshot.combat.spellZones.find((candidate) => candidate.name === "Caltrops")!;
+    expect(zone).toMatchObject({ dc: 15, castId: null, rule: { trigger: { on: ["enter"] } } });
+    expect(server.store.snapshot.combat.pendingSaves).toEqual([]);
+    // The goblin comes west along the row, over the Caltrops.
+    await place(FOE, 8, 2);
+    expect(server.store.snapshot.combat.pendingSaves).toEqual([
+      expect.objectContaining({ targetActorId: FOE, ability: "dex", dc: 15, zoneId: zone.id })
+    ]);
+    expect(server.store.snapshot.combat.spellZones.map((candidate) => candidate.id)).toContain(zone.id);
+  });
+
+  it("springs a Hunting Trap on the first creature that steps on it, and takes it off the map", async () => {
+    const { server, place, resolve } = await fight((state) => carry(state, HERO, "Hunting Trap"));
+    const set = await resolve({
+      actionId: "item-hunting-trap-set",
+      template: { shape: "square", origin: { x: 500, y: 100 }, target: { x: 550, y: 150 } }
+    });
+    expect(set.status, JSON.stringify(await set.clone().json())).toBe(200);
+    expect(server.store.snapshot.combat.spellZones.map((zone) => zone.name)).toEqual(["Hunting Trap"]);
+    await place(FOE, 8, 2);
+    expect(server.store.snapshot.combat.pendingSaves).toEqual([
+      expect.objectContaining({ targetActorId: FOE, ability: "dex", dc: 13 })
+    ]);
+    expect(server.store.snapshot.combat.spellZones).toEqual([]);
   });
 });

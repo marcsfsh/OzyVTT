@@ -99,6 +99,8 @@ function combatantsOf(
   const startsALastingSpell = castsASpell && (spell?.effect?.laterActions ?? []).length > 0;
   // Moving a spell's area (Moonbeam, Flaming Sphere's ram) is something done, whoever it moves onto.
   const movesAnArea = spell !== undefined && laterRowOf(spell, action.id)?.movesArea !== undefined;
+  // Spreading Caltrops leaves an area that acts on whoever meets it later.
+  const leavesAnArea = action.zone !== undefined && !castsASpell;
   const rollsOnTargets =
     action.attack !== undefined ||
     action.save !== undefined ||
@@ -112,6 +114,7 @@ function combatantsOf(
     spendsALimitedUse ||
     startsALastingSpell ||
     movesAnArea ||
+    leavesAnArea ||
     (castsASpell && !rollsOnTargets) ||
     input.builtin === true ||
     // A light or a cloud is something done, with no creature under it (a magmin's flames, a darkmantle's aura).

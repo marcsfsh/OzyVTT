@@ -48,7 +48,7 @@ function barriersFor(
     // The caster of an Emanation carries it; its own shell doesn't hold it.
     if (!content || !bars || !heldBack(bars, type)) return [];
     if (content.trigger.around === "caster" && zone.casterId === creature.id) return [];
-    const inside = insideTest(state, zone, content.trigger, content.spell, deps.geometry);
+    const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
     return inside ? [{ zone, bars, inside }] : [];
   });
 }
@@ -101,8 +101,8 @@ export function spellWardedTargets(
     const content = zoneContentOf(zone, deps.catalog);
     const wards = content?.trigger.wardsSpells;
     if (!content || wards === undefined) continue;
-    if (input.castLevel > wards + Math.max(0, zone.level - content.spell.level)) continue;
-    const inside = insideTest(state, zone, content.trigger, content.spell, deps.geometry);
+    if (input.castLevel > wards + Math.max(0, zone.level - (content.spell?.level ?? zone.level))) continue;
+    const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
     if (!inside) continue;
     const within = (actorId: string) => {
       const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
@@ -127,7 +127,7 @@ export function teleportBarredAt(
   for (const zone of liveZones(state)) {
     const content = zoneContentOf(zone, deps.catalog);
     if (!content?.trigger.noTeleport) continue;
-    const inside = insideTest(state, zone, content.trigger, content.spell, deps.geometry);
+    const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
     if (inside?.(to, sizeCells)) return zone.name;
   }
   return null;
@@ -192,14 +192,7 @@ export function shellsForcedBy(
       const token = state.combat.tokens.find((candidate) => candidate.actorId === creature.id);
       if (creature.id === casterId || !token?.position || !heldBack(bars, typeOf(creature, deps))) return false;
       const sides = path.map((point) =>
-        insideTest(
-          state,
-          zone,
-          content.trigger,
-          content.spell,
-          deps.geometry,
-          point
-        )?.(token.position!, token.sizeCells)
+        insideTest(state, zone, content.trigger, content, deps.geometry, point)?.(token.position!, token.sizeCells)
       );
       return sides.some((side) => side !== sides[0]);
     });

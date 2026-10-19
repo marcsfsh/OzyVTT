@@ -154,6 +154,8 @@ export const actionCommands = [
         let resolvedTargetIds: readonly string[];
         let originAtCaster = false;
         let areaMove: AreaMove | null = null;
+        // An item's action that leaves an area to act later (spread Caltrops) catches no one as it is used.
+        const leavesArea = action.zone !== undefined && action.spellId === undefined;
         // The template as the action's area makes it, which the table's drawn shape records.
         let placed: Readonly<{ shape: AnnotationShapeKind; origin: AnnotationPoint; target: AnnotationPoint }> | null =
           null;
@@ -194,10 +196,16 @@ export const actionCommands = [
             action.healing !== undefined ||
             action.grants !== undefined ||
             action.endsConditions !== undefined;
-          if (!resolvedTargetIds.some((id) => !unseen.has(id)) && !(spell && (zoneRowOf(spell) || !catches)))
+          if (
+            !resolvedTargetIds.some((id) => !unseen.has(id)) &&
+            !(spell && (zoneRowOf(spell) || !catches)) &&
+            !leavesArea
+          )
             throw new CommandRejectedError(
               isPlayer ? "No creatures you can see are inside that area." : "No combatants are inside that area."
             );
+          // Caltrops spread under a creature catch it only as it moves in.
+          if (leavesArea) resolvedTargetIds = [];
           // What moves the spell's area (Moonbeam's move, Flaming Sphere's ram) places that area there instead, and
           // its save falls on the creatures the area moves onto.
           const moving = areaMoveOf(action, kit.equipmentCatalog());
@@ -217,7 +225,7 @@ export const actionCommands = [
             resolvedTargetIds = action.save ? areaMove.movedOnto : [];
           }
         } else {
-          resolvedTargetIds = targetIds ?? [];
+          resolvedTargetIds = leavesArea ? [] : (targetIds ?? []);
           // A player may target only public combatants they can see: resolving against a hidden actor would leak
           // its name/AC/outcome through the ack (and in direct mode damage it). The refusal is the one a missing
           // creature gets, at the same point, so it says nothing of what is hidden.
@@ -363,7 +371,7 @@ export const actionCommands = [
         // so one from a caster hidden from the table is drawn for the GM alone: it would point at where it hides.
         const fromHiddenCaster = originAtCaster && kit.hiddenFromTable(draft)(actorId);
         // A nearly imperceptible glyph is drawn for the GM and its caster's player alone.
-        const unseenArea = spell ? zoneRowOf(spell)?.zone?.hidden === true : false;
+        const unseenArea = spell ? zoneRowOf(spell)?.zone?.hidden === true : action.zone?.hidden === true;
         if (placed && areaMove) {
           areaMoveNote = areaMove.note;
           areaEvents = moveArea(

@@ -15,7 +15,7 @@ import { creatureDistance, DISTANCE_TOLERANCE_FEET, mapDistance } from "./moveme
 import { CommandRejectedError } from "./game-store.js";
 import { failureEffectFor } from "./resolution/pending.js";
 import { createPendingSaves } from "./saving-throws.js";
-import { countZoneDamage, endZone, removeZone, zoneContentOf } from "./spell-zone-state.js";
+import { countZoneDamage, endZone, removeZone, zoneContentOf, type ZoneContent } from "./spell-zone-state.js";
 import type { TokenMapGeometry } from "./token-placement.js";
 import { withArticle } from "@vtt/domain";
 
@@ -111,7 +111,7 @@ export function insideTest(
   state: GameState,
   zone: SpellZone,
   trigger: ZoneTrigger,
-  spell: SpellReference,
+  source: Pick<ZoneContent, "area">,
   geometry: TokenMapGeometry | null,
   casterAt?: Point
 ): ((position: Point, sizeCells: number) => boolean) | null {
@@ -145,7 +145,7 @@ export function insideTest(
   if (trigger.around === "point") return within({ ...cell, position: area.geometry.origin }, trigger.feet ?? 5);
   const shape = area.shape;
   return (position, sizeCells) =>
-    footprintInTemplate(calibration, area.geometry, shape, spell.area?.widthFeet ?? null, position, sizeCells);
+    footprintInTemplate(calibration, area.geometry, shape, source.area?.widthFeet ?? null, position, sizeCells);
 }
 
 /** The traits that free a creature from a kind of ground (SRD Web Walker: it "ignores movement restrictions caused by
@@ -224,7 +224,7 @@ export function speedHalvingAt(
     const content = zoneContentOf(zone, deps.catalog);
     if (!content?.trigger.halvesSpeed) continue;
     if (!exposed(state, zone, content.trigger, deps).some((creature) => creature.id === actorId)) continue;
-    const inside = insideTest(state, zone, content.trigger, content.spell, deps.geometry);
+    const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
     if (inside) tests.push(inside);
   }
   return tests.length > 0 ? (position, sizeCells) => tests.some((inside) => inside(position, sizeCells)) : null;
@@ -249,7 +249,7 @@ function act(
   const content = zoneContentOf(zone, deps.catalog);
   const caster = state.actors.find((actor) => actor.id === zone.casterId);
   if (!content || !caster || times < 1) return;
-  const { spell, row, trigger } = content;
+  const { trigger } = content;
   // "If the spirit has no creature Restrained": while one is still held by the cast, the zone waits.
   if (trigger.holdsOne && zone.castId !== null && holdsACreature(state, zone.castId)) return;
   const travelling = meeting === "moves through";
@@ -268,7 +268,7 @@ function act(
   if (trigger.alerts) {
     events.push({
       kind: "effect",
-      text: `${spell.name}: ${creature.name} ${meeting} ${caster.name}'s warded area.`,
+      text: `${content.name}: ${creature.name} ${meeting} ${caster.name}'s warded area.`,
       actorId: creature.id,
       gmOnly: true
     });
@@ -279,15 +279,16 @@ function act(
   if (trigger.once && trigger.on.includes("spell-end")) {
     events.push({
       kind: "effect",
-      text: `${creature.name} sets off ${spell.name}.`,
+      text: `${creature.name} sets off ${content.name}.`,
       actorId: creature.id,
       source: { actorId: caster.id, name: caster.name }
     });
     events.push(...endZoneAndItsSpell(state, zone.id));
     return;
   }
+  const action = zoneAction(zone, content);
+  if (!action) return;
   if (trigger.once) events.push(...endZoneAndItsSpell(state, zone.id));
-  const action = zoneAction(zone, spell, row);
   const parts = Array.from({ length: times }, () =>
     action.damage.map((part) => ({
       amount: Math.max(0, resolveDice(parseDiceFormula(part.formula), deps.rollDie).total),
@@ -309,7 +310,7 @@ function act(
     const { application, events: landed } = applyDamageDetailed(
       state,
       creature.id,
-      { amount: total, parts, sourceName: spell.name, sourceActorId: caster.id },
+      { amount: total, parts, sourceName: content.name, sourceActorId: caster.id },
       { role: "gm" },
       {
         resolveDefinition: deps.resolveDefinition,
@@ -322,7 +323,7 @@ function act(
     events.push(
       {
         kind: "damage",
-        text: `${creature.name} ${meeting} ${spell.name} and takes ${application.totalApplied}${typed} damage${damageAdjustmentDetail(application)}.`,
+        text: `${creature.name} ${meeting} ${content.name} and takes ${application.totalApplied}${typed} damage${damageAdjustmentDetail(application)}.`,
         actorId: creature.id,
         ...source
       },
@@ -335,14 +336,14 @@ function act(
   const onFail = failureEffectFor(
     { action, attacker: caster, castId: zone.castId, riderItemId: null, deps: { catalog: deps.catalog } },
     conditionIds,
-    { spell, level: zone.level }
+    content.spell ? { spell: content.spell, level: zone.level } : undefined
   );
   // A save at the start of the creature's own turn that lasts "until the end of that turn" ends with this one.
   const currentTurn = meeting === "starts its turn in" && save.failureDuration?.type === "until-bearer-turn-end";
   createPendingSaves(state, {
     sourceActorId: caster.id,
     sourceName: caster.name,
-    actionName: spell.name,
+    actionName: content.name,
     ability: save.ability,
     dc: save.dc,
     targetIds: [creature.id],
@@ -364,21 +365,32 @@ function act(
   });
   events.push({
     kind: "effect",
-    text: `${creature.name} ${meeting} ${spell.name} and makes ${withArticle(`${save.ability.toUpperCase()} save`)} (DC ${save.dc}).`,
+    text: `${creature.name} ${meeting} ${content.name} and makes ${withArticle(`${save.ability.toUpperCase()} save`)} (DC ${save.dc}).`,
     actorId: creature.id,
     ...source
   });
 }
 
-/** The action a zone acts with: its spell's later action at the cast's level, in the damage type chosen at the cast
- *  (Conjure Elemental's element), with the dice it has gained (Delayed Blast Fireball's 1d6 a turn). */
-function zoneAction(
-  zone: SpellZone,
-  spell: SpellReference,
-  row: NonNullable<ReturnType<typeof zoneContentOf>>["row"]
-): ActorAction {
-  const built = laterSpellAction(spell, row, { attackBonus: 0, saveDc: zone.dc, bearersDc: false, modifier: 0 });
-  const action = zone.level > spell.level ? upcastAction(built, spell, zone.level) : built;
+/** The action a zone acts with: its spell's later action at the cast's level, or the rule an item left (Caltrops'
+ *  save), in the damage type chosen at the cast (Conjure Elemental's element), with the dice it has gained (Delayed
+ *  Blast Fireball's 1d6 a turn). */
+function zoneAction(zone: SpellZone, content: ZoneContent): ActorAction | undefined {
+  let action: ActorAction;
+  if (content.spell && content.row) {
+    const { spell, row } = content;
+    const built = laterSpellAction(spell, row, { attackBonus: 0, saveDc: zone.dc, bearersDc: false, modifier: 0 });
+    action = zone.level > spell.level ? upcastAction(built, spell, zone.level) : built;
+  } else if (zone.rule) {
+    const { save, damage } = zone.rule;
+    action = {
+      id: zone.laterActionId,
+      name: zone.name,
+      activation: "other",
+      description: zone.name,
+      damage: structuredClone(damage),
+      ...(save ? { save: { ...structuredClone(save), dc: zone.dc } } : {})
+    };
+  } else return undefined;
   return {
     ...action,
     damage: action.damage.map((part, index) => ({
@@ -416,10 +428,10 @@ export function zonesAfterMove(
   for (const zone of liveZones(state)) {
     const content = zoneContentOf(zone, deps.catalog);
     if (!content) continue;
-    const { spell, trigger } = content;
+    const { trigger } = content;
     // An Emanation moves with its caster, over whoever it reaches.
     if (trigger.around === "caster" && zone.casterId === mover.id && !zone.anchor) {
-      const tests = path.map((point) => insideTest(state, zone, trigger, spell, deps.geometry, point));
+      const tests = path.map((point) => insideTest(state, zone, trigger, content, deps.geometry, point));
       if (!trigger.on.includes("enter") || tests.some((test) => test === null)) continue;
       for (const creature of exposed(state, zone, trigger, deps)) {
         const at = tokenOf(state, creature.id)!;
@@ -429,7 +441,7 @@ export function zonesAfterMove(
       continue;
     }
     if (!exposed(state, zone, trigger, deps).some((creature) => creature.id === mover.id)) continue;
-    const inside = insideTest(state, zone, trigger, spell, deps.geometry);
+    const inside = insideTest(state, zone, trigger, content, deps.geometry);
     if (!inside) continue;
     const hits = path.map((point) => inside(point, moverToken.sizeCells));
     if (trigger.on.includes("enter") && !hits[0] && hits.slice(1).some(Boolean))
@@ -459,11 +471,11 @@ export function zonesAfterAreaMove(
     if (zone.annotationId !== annotationId) continue;
     const content = zoneContentOf(zone, deps.catalog);
     if (!content || !content.trigger.on.includes("enter")) continue;
-    const { spell, trigger } = content;
-    const now = insideTest(state, zone, trigger, spell, deps.geometry);
+    const { trigger } = content;
+    const now = insideTest(state, zone, trigger, content, deps.geometry);
     const after = area.geometry;
     area.geometry = { ...after, origin: before.origin, target: before.target };
-    const then = insideTest(state, zone, trigger, spell, deps.geometry);
+    const then = insideTest(state, zone, trigger, content, deps.geometry);
     const wasInside = new Set(
       then === null
         ? []
@@ -504,7 +516,7 @@ function zonesAtCasterTurnEnd(state: GameState, casterId: string, deps: ZoneDeps
     if (zone.casterId !== casterId) continue;
     const content = zoneContentOf(zone, deps.catalog);
     if (!content || !content.trigger.on.includes("caster-turn-end")) continue;
-    const inside = insideTest(state, zone, content.trigger, content.spell, deps.geometry);
+    const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
     if (!inside) continue;
     for (const creature of exposed(state, zone, content.trigger, deps)) {
       const token = tokenOf(state, creature.id)!;
@@ -592,8 +604,8 @@ function zonesAtCasterTurnStart(state: GameState, casterId: string, deps: ZoneDe
     if (zone.casterId !== casterId) continue;
     const content = zoneContentOf(zone, deps.catalog);
     if (!content || !content.trigger.on.includes("caster-turn-start")) continue;
-    const { spell, trigger } = content;
-    const inside = insideTest(state, zone, trigger, spell, deps.geometry);
+    const { trigger } = content;
+    const inside = insideTest(state, zone, trigger, content, deps.geometry);
     const area = zone.annotationId
       ? state.combat.annotations.find((annotation) => annotation.id === zone.annotationId)
       : undefined;
@@ -634,27 +646,27 @@ export function burstEndedZones(state: GameState, deps: ZoneDeps): EffectNarrati
     const content = zoneContentOf(zone, deps.catalog);
     const caster = state.actors.find((actor) => actor.id === zone.casterId);
     if (content && caster) {
-      const { spell, row, trigger } = content;
+      const { trigger } = content;
       // The burst fills the whole area the cast placed, whatever set it off (a glyph stepped on).
       const { around: _around, ...whole } = trigger;
-      const inside = insideTest(state, zone, whole, spell, deps.geometry);
+      const inside = insideTest(state, zone, whole, content, deps.geometry);
       const caught = inside
         ? creaturesOnMap(state).filter((creature) => {
             const token = tokenOf(state, creature.id)!;
             return inside(token.position!, token.sizeCells);
           })
         : [];
-      const action = zoneAction(zone, spell, row);
-      const parts = action.damage.map((part) => ({
+      const action = zoneAction(zone, content);
+      const parts = (action?.damage ?? []).map((part) => ({
         amount: Math.max(0, resolveDice(parseDiceFormula(part.formula), deps.rollDie).total),
         type: part.type
       }));
-      const save = action.save;
+      const save = action?.save;
       if (save && caught.length > 0)
         createPendingSaves(state, {
           sourceActorId: caster.id,
           sourceName: caster.name,
-          actionName: spell.name,
+          actionName: content.name,
           ability: save.ability,
           dc: save.dc,
           targetIds: caught.map((creature) => creature.id),
@@ -693,15 +705,15 @@ function zonesWhereItStands(
   for (const zone of liveZones(state)) {
     const content = zoneContentOf(zone, deps.catalog);
     if (!content || !content.trigger.on.includes(when)) continue;
-    const { spell, trigger } = content;
+    const { trigger } = content;
     const creature = exposed(state, zone, trigger, deps).find((candidate) => candidate.id === actorId);
     const token = creature ? tokenOf(state, creature.id) : undefined;
-    const inside = insideTest(state, zone, trigger, spell, deps.geometry);
+    const inside = insideTest(state, zone, trigger, content, deps.geometry);
     if (!creature || !token || !inside || !inside(token.position!, token.sizeCells)) continue;
     // SRD Aura of Life: "When an ally with 0 Hit Points starts its turn in the aura, that ally regains 1 Hit Point."
     if (when === "start-turn" && trigger.revives && creature.hp.current <= 0) {
       events.push(
-        { kind: "effect", text: `${creature.name} regains ${trigger.revives} Hit Point in ${spell.name}.`, actorId },
+        { kind: "effect", text: `${creature.name} regains ${trigger.revives} Hit Point in ${content.name}.`, actorId },
         ...healActor(state, creature.id, trigger.revives, { role: "gm" })
       );
       continue;

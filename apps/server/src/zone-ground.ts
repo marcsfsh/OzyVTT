@@ -34,7 +34,7 @@ export function zoneMovementOptions(
     const caster = state.actors.find((actor) => actor.id === zone.casterId);
     if (terrain.for === "enemies" && (!caster || !areEnemies(caster, mover, deps.resolveDefinition))) continue;
     if (terrain.kind && movesFreelyOn(mover, terrain.kind, deps)) continue;
-    const inside = insideTest(state, zone, content.trigger, content.spell, deps.geometry);
+    const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
     if (!inside) continue;
     difficult.push(inside);
     // 4 feet for every foot: Difficult Terrain's 2, doubled.

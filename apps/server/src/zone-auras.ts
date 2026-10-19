@@ -35,7 +35,7 @@ function wanted(
     const content = zoneContentOf(zone, deps.catalog);
     const holds = content?.trigger.holds;
     if (!content || !holds) continue;
-    const inside = insideTest(state, zone, content.trigger, content.spell, deps.geometry);
+    const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
     if (!inside) continue;
     const caster = state.actors.find((actor) => actor.id === zone.casterId);
     for (const creature of exposed(state, zone, content.trigger, deps)) {
@@ -44,7 +44,7 @@ function wanted(
       const id = auraId(zone.id, creature.id);
       const effect = makeEffect({
         id,
-        name: content.spell.name,
+        name: content.name,
         tags: [ZONE_AURA_TAG],
         sourceActorId: zone.casterId,
         sourceName: caster?.name ?? null,
@@ -53,7 +53,7 @@ function wanted(
         modifiers: structuredClone(holds.modifiers ?? []),
         ...(holds.conditions ? { linkedConditionIds: [...holds.conditions] } : {}),
         ...(holds.struck ? { struck: struckAt(holds.struck, zone.dc) } : {}),
-        spell: { id: content.spell.id, level: zone.level },
+        ...(content.spell ? { spell: { id: content.spell.id, level: zone.level } } : {}),
         // A Concentration spell's aura ends with the Concentration at once.
         ...(zone.castId !== null ? { castId: zone.castId } : {}),
         magical: true

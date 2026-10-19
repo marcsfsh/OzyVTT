@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
   ActionAreaSchema,
+  ActionSchema,
+  AreaTriggerSchema,
   ActorDefinitionSchema,
   DamageDrainSchema,
   ForcedPushSchema,
@@ -1045,6 +1047,12 @@ export const SpellZoneSchema = z
     area: ActionAreaSchema.nullable().default(null),
     /** Where its caster stood at the cast, for an Emanation that stays there (Globe of Invulnerability). */
     anchor: z.object({ x: z.number(), y: z.number() }).strict().optional(),
+    /** What an item's or a creature's area acts with (spread Caltrops' save and damage), kept here since what left it
+     *  may be gone; a spell's area reads its spell instead. */
+    rule: z
+      .object({ trigger: AreaTriggerSchema, save: ActionSchema.shape.save, damage: ActionSchema.shape.damage })
+      .strict()
+      .optional(),
     /** Damage dealt so far, against a cap the spell prints (Guardian of Faith's 60). */
     damageDealt: z.number().int().nonnegative().max(100000).default(0),
     /** The damage type the caster chose at the cast (Conjure Elemental's element); absent, the spell's own. */

@@ -154,6 +154,8 @@ export function itemAction(
     // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
     ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
     ...(declared.area ? { area: { ...declared.area } } : {}),
+    // The area it leaves to act later (spread Caltrops).
+    ...(declared.zone ? { zone: structuredClone(declared.zone) } : {}),
     // Who it may target (a flask's one creature within 20 feet) and the hit it rides (a staff's charge on a hit).
     ...(declared.targets ? { targets: structuredClone(declared.targets) } : {}),
     ...(declared.ridesHit ? { ridesHit: itemHitRider(declared.ridesHit, definition) } : {}),
