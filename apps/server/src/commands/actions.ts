@@ -35,6 +35,7 @@ import { castSlotLevel, untrainedArmorCast } from "../resolution/economy.js";
 import { areaAtLevel } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
 import { spellWardedTargets } from "../zone-barriers.js";
+import { deflectingWall, zoneCover } from "../zone-walls.js";
 import { areaMoveOf, moveArea, planAreaMove, type AreaMove } from "../zone-moves.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
@@ -363,7 +364,16 @@ export const actionCommands = [
             distanceFeet,
             resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
             catalog: kit.equipmentCatalog(),
-            pushToken
+            pushToken,
+            // The spell walls between two creatures that cover one or turn a shot (Blade Barrier, Wind Wall).
+            ...(geometry?.calibration
+              ? {
+                  zoneCover: (fromId: string, targetId: string) =>
+                    zoneCover(draft, fromId, targetId, kit.zoneDeps(draft, geometry)),
+                  deflectedBy: (fromId: string, targetId: string) =>
+                    deflectingWall(draft, fromId, targetId, kit.zoneDeps(draft, geometry))
+                }
+              : {})
           }
         );
         // A committed use counts toward the sheet's most-used options; a preview counts with its confirm.

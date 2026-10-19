@@ -524,6 +524,7 @@ export function parkActionSave(ctx: ResolveContext): void {
             bestCover(
               coverFor(null, target),
               input.areaPlaced === true ? null : mapCover(state, attacker.id, target.id),
+              input.areaPlaced === true ? null : deps.zoneCover?.(attacker.id, target.id),
               deps.resolveDefinition
                 ? smiteOfProtectionCover(state, target, {
                     resolveDefinition: deps.resolveDefinition,

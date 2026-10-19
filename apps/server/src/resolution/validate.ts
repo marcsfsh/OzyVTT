@@ -259,7 +259,11 @@ export function openResolve(
       : null;
   // With dynamic vision on, the walls and creatures between them cover the target too (`mapCover`); an area's
   // creatures were caught by what its point of origin reaches, so a placed area reads no cover from the caster.
-  const fromMap = (target: LiveActor) => (input.areaPlaced === true ? null : mapCover(state, attacker.id, target.id));
+  // A spell wall between them that doesn't block the way covers the target as its text says (Blade Barrier).
+  const fromMap = (target: LiveActor) =>
+    input.areaPlaced === true
+      ? null
+      : bestCover(mapCover(state, attacker.id, target.id), deps.zoneCover?.(attacker.id, target.id));
   const attackCover =
     targets.length === 1
       ? (input.cover ?? bestCover(coverFor(null, targets[0]), fromMap(targets[0]), auraCover(targets[0])))

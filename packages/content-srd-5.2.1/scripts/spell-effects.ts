@@ -440,10 +440,10 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN} Its space is Difficult Terrain.`,
+      when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN} Its space is Difficult Terrain, and the wall gives Three-Quarters Cover.`,
       save: save("dex"),
       damage: [{ formula: "6d10", type: "force" }],
-      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT }
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT, cover: "three-quarters" }
     }
   ],
   // "Until the spell ends, you can take a Magic action to call down lightning in that way again."
@@ -925,6 +925,15 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [{ formula: "7d8", type: "slashing" }],
       zone: { ...ENTER_OR_END_ONCE, terrain: { cost: 4, kind: "plants" } }
     }
+  ],
+  // "Arrows, bolts, and other ordinary projectiles launched at targets behind the wall are deflected upward and miss
+  // automatically"; "Small or smaller flying creatures or objects can't pass through the wall."
+  "wind-wall": [
+    lasting(
+      "wall",
+      "Arrows, bolts and other ordinary projectiles shot or thrown across the wall miss, and Small or smaller flying creatures can't pass through it.",
+      { on: [], deflects: true, bars: { way: "both", sizes: ["tiny", "small"], flying: true } }
+    )
   ],
   web: [
     {

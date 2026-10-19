@@ -143,6 +143,11 @@ export type ResolveDependencies = Readonly<{
   pushToken?: (
     input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number; toward?: boolean }>
   ) => Readonly<{ value: number; unit: string }> | null;
+  /** The cover the spell walls between two combatants give the second from the first (Blade Barrier), measured on the
+   *  map by the operation layer. */
+  zoneCover?: (fromActorId: string, targetId: string) => "half" | "three-quarters" | "total" | null;
+  /** The wall that deflects an ordinary projectile from the first combatant at the second (Wind Wall), or null. */
+  deflectedBy?: (fromActorId: string, targetId: string) => string | null;
 }>;
 
 type RollBase = Pick<

@@ -28,8 +28,15 @@ type Actor = GameState["actors"][number];
 type Point = Readonly<{ x: number; y: number }>;
 type Bars = NonNullable<ZoneTrigger["bars"]>;
 
-/** Whether a barrier holds this creature back: the types it names, or every type but the ones it lets through. */
-function heldBack(bars: Bars, type: string | null): boolean {
+/** Whether a barrier holds this creature back: the types it names, or every type but the ones it lets through, of the
+ *  sizes it names and in the air when it says so. */
+function heldBack(
+  bars: Bars,
+  type: string | null,
+  creature?: Readonly<{ size: string | undefined; flying: boolean }>
+): boolean {
+  if (bars.sizes && !bars.sizes.some((size) => size === (creature?.size ?? "medium"))) return false;
+  if (bars.flying && !creature?.flying) return false;
   if (bars.types) return type !== null && bars.types.includes(type);
   if (bars.except) return type === null || !bars.except.includes(type);
   return true;
@@ -42,11 +49,13 @@ function barriersFor(
   deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">
 ) {
   const type = typeOf(creature, deps);
+  const token = state.combat.tokens.find((candidate) => candidate.actorId === creature.id);
+  const body = { size: creature.size, flying: token?.airborne !== undefined };
   return liveZones(state).flatMap((zone) => {
     const content = zoneContentOf(zone, deps.catalog);
     const bars = content?.trigger.bars;
     // The caster of an Emanation carries it; its own shell doesn't hold it.
-    if (!content || !bars || !heldBack(bars, type)) return [];
+    if (!content || !bars || !heldBack(bars, type, body)) return [];
     if (content.trigger.around === "caster" && zone.casterId === creature.id) return [];
     const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
     return inside ? [{ zone, bars, inside }] : [];

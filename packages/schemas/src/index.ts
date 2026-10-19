@@ -2631,16 +2631,26 @@ export const AreaTriggerSchema = z
     hidden: z.literal(true).optional(),
     /** A barrier at its edge: the creatures it holds back can't move across it, into it (`way` "in": Magic Circle) or
      *  either way ("both": Antilife Shell), and with `reach` can't reach through it with a melee attack that isn't
-     *  made with a Reach weapon. `types` it holds back, or every type `except` these; every creature when neither. */
+     *  made with a Reach weapon. `types` it holds back, or every type `except` these; every creature when neither.
+     *  `sizes` and `flying` narrow it to creatures of those sizes, and to those in the air (Wind Wall: "Small or
+     *  smaller flying creatures"). */
     bars: z
       .object({
         way: z.enum(["in", "both"]),
         types: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
         except: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
-        reach: z.literal(true).optional()
+        reach: z.literal(true).optional(),
+        sizes: z.array(SizeSchema).min(1).max(5).optional(),
+        flying: z.literal(true).optional()
       })
       .strict()
       .optional(),
+    /** The cover it gives a creature behind it, from a creature on its other side (Blade Barrier's Three-Quarters
+     *  Cover). */
+    cover: z.enum(["half", "three-quarters"]).optional(),
+    /** Ordinary projectiles launched across it at a creature on its other side miss (Wind Wall's arrows and bolts);
+     *  hurled boulders and spells go through. */
+    deflects: z.literal(true).optional(),
     /** No creature can teleport into it (Forbiddance). */
     noTeleport: z.literal(true).optional(),
     /** What a creature it affects holds while it stands inside (Holy Aura's Advantage on saving throws, Pass without
