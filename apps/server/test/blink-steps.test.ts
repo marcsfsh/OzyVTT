@@ -7,14 +7,17 @@ import { build, fight, fighterInput } from "./spell-casters.js";
 // you can teleport up to 30 feet to an unoccupied space you can see."
 
 const base = build(fighterInput());
+/** The Fighter 5 with the boon on its sheet, as the build writes a feat it takes (a trait by the feat's name). */
+const bag = base.extensions!["open5e.srd-2024"] as { traits: Array<{ name: string; description: string }> };
 const withBoon: ActorDefinition = {
   ...base,
   character: {
     ...base.character!,
-    features: [
-      ...(base.character?.features ?? []),
-      { id: "boon-of-dimensional-travel", kind: "feat", sourceId: "feat" }
-    ]
+    feats: [...(base.character?.feats ?? []), { id: "boon-of-dimensional-travel", name: "Boon of Dimensional Travel" }]
+  },
+  extensions: {
+    ...base.extensions,
+    "open5e.srd-2024": { ...bag, traits: [...bag.traits, { name: "Boon of Dimensional Travel", description: "" }] }
   }
 };
 
