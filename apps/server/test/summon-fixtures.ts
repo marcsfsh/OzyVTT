@@ -59,10 +59,17 @@ const monsterActor = (state: GameState, monsterId: string, id: string, hp?: numb
 };
 
 /** The table: the Wizard with three slots of every level, a living bandit and a wolf, and two dead bandits; spell
- *  components left to the GM so the tests need no priced materials. */
-export function summonTable(): GameState {
+ *  components left to the GM so the tests need no priced materials. `extraActions` go on the Wizard's sheet (a
+ *  feature's free casting). */
+export function summonTable(extraActions: readonly ActorAction[] = []): GameState {
   const state = GameStateSchema.parse({ schemaVersion: 1 });
-  importActorDefinition(state, summoner, CASTER, "public", catalog);
+  importActorDefinition(
+    state,
+    { ...summoner, actions: [...summoner.actions, ...extraActions] },
+    CASTER,
+    "public",
+    catalog
+  );
   const caster = state.actors.find((actor) => actor.id === CASTER)!;
   caster.spellSlots = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((level) => ({ level, remaining: 3 }));
   monsterActor(state, "bandit", BANDIT);

@@ -78,7 +78,8 @@ const ROWS: Readonly<Record<string, SummonInput>> = {
     noAttacks: true,
     onlyOne: true,
     sight: "bonus-action",
-    dismiss: "action"
+    dismiss: "action",
+    deliversTouch: 100
   },
   // The Otherworldly Steed at the slot's level, a Celestial, Fey or Fiend, within 30 feet. It shares the caster's
   // Initiative count and disappears at 0 Hit Points or when the caster dies; a new casting replaces it.

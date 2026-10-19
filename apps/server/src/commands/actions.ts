@@ -41,7 +41,7 @@ import { castLine, castSpellOf } from "../cast-narration.js";
 import { castingMinutesOf } from "../resolution/long-casting.js";
 import { passTime } from "../rests.js";
 import { standsInSilence } from "../silence.js";
-import { bringSummons } from "../summons.js";
+import { bringSummons, familiarDelivery } from "../summons.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -234,8 +234,20 @@ export const actionCommands = [
           }
         }
         // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, measured edge to edge.
-        const distanceFeet = (actorIdA: string, actorIdB: string): number | null =>
+        const measured = (actorIdA: string, actorIdB: string): number | null =>
           geometry ? (tokenCreatureDistance(draft, geometry, actorIdA, actorIdB)?.value ?? null) : null;
+        // A familiar delivering a touch spell: the touch reaches from the familiar, which takes its Reaction.
+        const courier =
+          request.deliveredBy !== undefined
+            ? familiarDelivery(draft, {
+                casterId: actorId,
+                familiarId: request.deliveredBy,
+                spell: action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined,
+                distanceFeet: measured
+              })
+            : null;
+        const distanceFeet = (actorIdA: string, actorIdB: string): number | null =>
+          courier && actorIdA === actorId ? measured(courier, actorIdB) : measured(actorIdA, actorIdB);
         // The attack's d20 is held between a preview and its confirm, one per creature and turn (ADR-0012), so a
         // second look at the attack shows the same die. A typed die must be one the table takes.
         const holdKey = `attack:${actorId}`;
@@ -314,12 +326,18 @@ export const actionCommands = [
         );
         // A committed use counts toward the sheet's most-used options; a preview counts with its confirm.
         if (!resolution.preview) countOptionUse(draft, actorId, actionId);
+        // The familiar's Reaction delivered the touch.
+        if (courier && !resolution.preview && draft.combat.active && !draft.combat.reactionsUsed.includes(courier))
+          draft.combat = { ...draft.combat, reactionsUsed: [...draft.combat.reactionsUsed, courier] };
         const spell = castSpellOf(action, kit.equipmentCatalog().spellRecord);
         cast = spell ? { name: spell.name, targetIds: resolvedTargetIds } : null;
         // A casting under way on later turns, and outside a fight the hours a long one takes (SRD Longer Casting
         // Times): the cast completes at once and the game clock moves by its whole hours.
         castingOnward = attacker.effects.some((effect) => effect.longCast?.actionId === action.id);
-        const hours = spell && !draft.combat.active ? Math.floor(castingMinutesOf(spell, action.id) / 60) : 0;
+        const hours =
+          spell && !draft.combat.active && !action.castsAtOnce
+            ? Math.floor(castingMinutesOf(spell, action.id) / 60)
+            : 0;
         clock = { fromHours: draft.rest.clockHours, toHours: draft.rest.clockHours };
         if (!resolution.preview && hours > 0) {
           passTime(draft, hours);

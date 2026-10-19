@@ -9,6 +9,7 @@ import { endZone } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
 import { tableLineOf, type ResolveContext } from "./context.js";
 import { shapedZone, shapingOf } from "./metamagic.js";
+import { castWithoutConcentration } from "./summon.js";
 
 type SpellLifetime = Pick<SpellReference, "duration" | "concentration" | "upcastDurations">;
 
@@ -72,6 +73,8 @@ const isLaterAction = (ctx: ResolveContext, spell: SpellReference) => laterRowOf
 export function startConcentration(ctx: ResolveContext): void {
   const spell = spellOf(ctx);
   if (!spell || !castsWithConcentration(spell, castLevelOf(ctx, spell))) return;
+  // Cast without Concentration where its caster may (Dragon Companion): it lasts its minute on its own.
+  if (castWithoutConcentration(ctx)) return;
   // What the spell lets its caster do once it is up (Spirit Guardians' save, moving Hex) is no new cast.
   if (isLaterAction(ctx, spell)) return;
   ctx.castId = ctx.input.commandId;

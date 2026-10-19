@@ -1,6 +1,7 @@
 import { isDead, type GameState, type InitiativeEntry } from "@vtt/domain";
 import type { ActorDefinition, EffectInstance, Summon, SummonCreature } from "@vtt/schemas";
 import { addSummonedActor } from "./actor-roster.js";
+import { isIncapacitated as isIncapacitatedActor } from "./condition-rules.js";
 import { sideOf } from "./creature-sides.js";
 import {
   addEffect,
@@ -53,6 +54,8 @@ export type SummonChoice = Readonly<{
   damageType?: string;
   resistance?: string;
   at?: Point;
+  /** Cast without Concentration, for 1 minute (`Summon.concentrationOptional`). */
+  withoutConcentration?: boolean;
 }>;
 
 export type SummonRequest = Readonly<{
@@ -241,11 +244,14 @@ function initiativeEntryFor(
   deps: SummonDeps
 ): InitiativeEntry {
   const userEntry = state.combat.initiative.find((entry) => entry.actorId === user.id);
-  if (summon.turn === "own" && state.combat.active) {
-    const score = rollJoiningInitiative(state, actor.id, () => deps.rollDie(20), {
-      resolveDefinition: deps.resolveDefinition,
-      ...(deps.catalog ? { catalog: deps.catalog } : {})
-    });
+  if (summon.turn === "own") {
+    // Outside a fight it waits in the order unrolled; the encounter's start rolls for it like anyone else.
+    const score = state.combat.active
+      ? rollJoiningInitiative(state, actor.id, () => deps.rollDie(20), {
+          resolveDefinition: deps.resolveDefinition,
+          ...(deps.catalog ? { catalog: deps.catalog } : {})
+        })
+      : 0;
     return { actorId: actor.id, score, tieBreaker: actor.initiative ?? 0 };
   }
   return {
@@ -337,6 +343,8 @@ export function bringSummons(state: GameState, request: SummonRequest, deps: Sum
   if (!user) throw new CommandRejectedError("That combatant no longer exists.");
   const { summon, choice } = request;
   const events: EffectNarration[] = [];
+  const renewed = reassertCommand(state, request, user);
+  if (renewed) return renewed;
   const corpses = corpsesFor(state, request, deps);
   const planned = plannedCreatures(request, deps, events, user);
   if (corpses.length > 0) {
@@ -406,7 +414,8 @@ export function bringSummons(state: GameState, request: SummonRequest, deps: Sum
       ...(summon.turn === "none" ? { noTurns: true as const } : {}),
       ...(summon.commandMove !== undefined ? { commandMove: summon.commandMove } : {}),
       ...(summon.sight ? { sight: summon.sight } : {}),
-      ...(summon.dismiss ? { dismiss: summon.dismiss } : {})
+      ...(summon.dismiss ? { dismiss: summon.dismiss } : {}),
+      ...(summon.deliversTouch !== undefined ? { deliversTouch: summon.deliversTouch } : {})
     };
     if (summon.allegiance === "user")
       actor.control = {
@@ -437,6 +446,51 @@ export function bringSummons(state: GameState, request: SummonRequest, deps: Sum
       actorId: user.id
     });
   return { created, events };
+}
+
+/**
+ * "Casting this spell on the creature again ... reasserts your control over up to four creatures you have animated with
+ * this spell rather than animating a new creature": a cast aimed at creatures the user still commands from this spell
+ * renews their time under command. Null when its targets are anything else, which then must be corpses.
+ */
+function reassertCommand(state: GameState, request: SummonRequest, user: Actor): SummonOutcome | null {
+  const { summon, spell } = request;
+  if (!summon.reasserts || !spell || request.corpseIds.length === 0) return null;
+  const targets = request.corpseIds.map((id) => state.actors.find((actor) => actor.id === id));
+  const ours = (actor: Actor | undefined): actor is Actor =>
+    actor !== undefined && actor.summon?.by === user.id && actor.summon.spell?.id === spell.id;
+  if (!targets.some(ours)) return null;
+  if (!targets.every(ours) || targets.some((actor) => actor.control?.by !== user.id))
+    throw new CommandRejectedError(
+      `${spell.name} renews ${user.name}'s command only over creatures ${user.name} still commands from it.`
+    );
+  const most = summon.reasserts.count + (summon.reasserts.perSlot ?? 0) * Math.max(0, spell.level - spell.printedLevel);
+  if (targets.length > most)
+    throw new CommandRejectedError(
+      `${spell.name} renews ${user.name}'s command over up to ${most} creatures at this level; ${targets.length} were chosen.`
+    );
+  const lasts = summon.lasts?.type === "minutes" ? summon.lasts.minutes : null;
+  for (const creature of targets) {
+    const keptBy = creature.control?.keptBy;
+    creature.effects = creature.effects.map((effect) =>
+      effect.id === keptBy && lasts !== null
+        ? {
+            ...effect,
+            duration: lasts <= 10 ? { type: "rounds", remaining: lasts * 10 } : { type: "minutes", remaining: lasts }
+          }
+        : effect
+    );
+  }
+  return {
+    created: [],
+    events: [
+      {
+        kind: "effect",
+        text: `${user.name} renews ${spell.name}'s command over ${listOf(targets.map((actor) => actor.name))}.`,
+        actorId: user.id
+      }
+    ]
+  };
 }
 
 const listOf = (names: readonly string[]) =>
@@ -659,6 +713,39 @@ export function settleSummons(state: GameState, deps: SettleSummonDeps): EffectN
     events.push({ kind: "effect", text: `${actor.name} obeys ${commander.name}.`, actorId: actor.id });
   }
   return events;
+}
+
+/**
+ * "When you cast a spell with a range of touch, your familiar can deliver the touch. Your familiar must be within 100
+ * feet of you, and it must take a Reaction to deliver the touch": the familiar that delivers it, checked, so the cast
+ * measures its touch from there and spends the familiar's Reaction once it lands.
+ */
+export function familiarDelivery(
+  state: GameState,
+  input: Readonly<{
+    casterId: string;
+    familiarId: string;
+    spell: Readonly<{ name: string; range: Readonly<{ text: string | null }> }> | undefined;
+    distanceFeet: (a: string, b: string) => number | null;
+  }>
+): string {
+  const familiar = state.actors.find((actor) => actor.id === input.familiarId);
+  const caster = state.actors.find((actor) => actor.id === input.casterId);
+  const reach = familiar?.summon?.by === input.casterId ? familiar.summon.deliversTouch : undefined;
+  if (!familiar || !caster || reach === undefined)
+    throw new CommandRejectedError(`Only ${caster?.name ?? "the caster"}'s familiar can deliver the touch.`);
+  if (!input.spell || !/^touch\b/i.test(input.spell.range.text ?? ""))
+    throw new CommandRejectedError(`${familiar.name} delivers only a spell with a range of touch.`);
+  const apart = input.distanceFeet(caster.id, familiar.id);
+  if (apart !== null && apart > reach + DISTANCE_TOLERANCE_FEET)
+    throw new CommandRejectedError(
+      `${familiar.name} is ${Math.round(apart)} ft away; it delivers the touch within ${reach} ft.`
+    );
+  if (state.combat.active && state.combat.reactionsUsed.includes(familiar.id))
+    throw new CommandRejectedError(`${familiar.name} has used its Reaction, which delivering the touch takes.`);
+  if (familiar.hp.current <= 0 || isIncapacitatedActor(familiar))
+    throw new CommandRejectedError(`${familiar.name} can't take the Reaction that delivers the touch.`);
+  return familiar.id;
 }
 
 /** Whether a summoned creature that leaves now holds the fight's turn, which then ends first. */

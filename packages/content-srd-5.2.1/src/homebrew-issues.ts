@@ -197,7 +197,23 @@ const LABELS: Readonly<Record<string, string>> = {
   coins: "coins",
   waives: "components it goes without",
   targetTypes: "creature types it affects",
-  chainFeet: "distance between targets"
+  chainFeet: "distance between targets",
+  summons: "creatures it summons",
+  summonScaling: "how it scales with the spell's level",
+  creatures: "creatures",
+  monsterId: "stat block",
+  perSlot: "more for each higher spell slot",
+  minLevel: "lowest spell slot",
+  fromCorpse: "corpses it raises",
+  commandedWith: "action that commands it",
+  commandFeet: "range of a command",
+  commandMove: "distance a command moves it",
+  leashFeet: "distance it may be from its summoner",
+  allegiance: "who commands it",
+  creatureTypes: "creature types",
+  forms: "forms",
+  formActions: "actions only some forms have",
+  castsAtOnce: "cast with one action"
 };
 /** A key whose words depend on what holds it: a weapon's category is its weapon kind, as the editor labels it. */
 const NESTED_LABELS: Readonly<Record<string, string>> = { "weapon.category": "weapon kind" };

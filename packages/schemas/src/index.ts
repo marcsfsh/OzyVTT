@@ -1545,7 +1545,9 @@ export const SummonedSchema = z
     /** Its commander's player sees what it sees: always (Arcane Eye), or after a Bonus Action (a familiar). */
     sight: z.enum(["always", "bonus-action"]).optional(),
     /** How its user dismisses it (a Bonus Action for an elemental from a bowl, a Magic action for a familiar). */
-    dismiss: z.enum(["bonus-action", "action"]).optional()
+    dismiss: z.enum(["bonus-action", "action"]).optional(),
+    /** Its user's touch spells can be delivered through it within this many feet (a familiar: 100). */
+    deliversTouch: z.number().int().min(5).max(1000).optional()
   })
   .strict();
 export type Summoned = z.infer<typeof SummonedSchema>;
@@ -2730,8 +2732,11 @@ export const SummonSchema = z
     noAttacks: z.literal(true).optional(),
     /** Its user can have only one from this source; a new one replaces the old (Find Steed, Find Familiar). */
     onlyOne: z.literal(true).optional(),
-    /** The creature type its user picks for it, in place of its stat block's (a familiar is a Celestial, Fey or Fiend). */
-    creatureTypes: z.array(RiderSlugSchema).min(2).max(6).optional(),
+    /** The creature type its user picks for it, in place of its stat block's (a familiar is a Celestial, Fey or Fiend;
+     *  a Druid's Wild Companion is Fey). */
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
+    /** Its user may cast it without Concentration, and it then lasts 1 minute (a Draconic Sorcerer's Dragon Companion). */
+    concentrationOptional: z.literal(true).optional(),
     /** It can't be harmed or blocked and has no turns of its own (Arcane Eye, Faithful Hound, Mislead's double). */
     intangible: z.literal(true).optional(),
     /** Its user's player sees what it sees: always (Arcane Eye), or after a Bonus Action until the start of its user's
@@ -2743,6 +2748,9 @@ export const SummonSchema = z
     /** Its user gains Resistance, until it is gone, to one damage type its stat block resists, picked at the summon
      *  (a Draconic Spirit's Shared Resistances). */
     sharedResistance: z.literal(true).optional(),
+    /** Its user's spells with a range of touch can be delivered through it, with its Reaction, while it is within this
+     *  many feet of its user (a familiar: 100). */
+    deliversTouch: z.number().int().min(5).max(1000).optional(),
     /** Its user's spell attack bonus, spell save DC and spellcasting ability modifier, which a scaled stat block reads
      *  (`summonScaling`). The engine fills them when it makes a cast action. */
     numbers: z
@@ -3001,6 +3009,9 @@ export const ActionSchema = z
     teleport: ActionTeleportSchema.optional(),
     /** The creatures it brings onto the map (Summon Dragon, a Bowl of Commanding Water Elementals), see `SummonSchema`. */
     summons: SummonSchema.optional(),
+    /** Its spell is cast with this action alone, whatever the spell's casting time (Pact of the Chain: "cast it as a
+     *  Magic action without expending a spell slot"). */
+    castsAtOnce: z.literal(true).optional(),
     /** A jump the action allows this turn ("jumps up to 30 feet by spending 10 feet of movement"). */
     leap: z
       .object({ feet: z.number().int().min(5).max(120), costFeet: z.number().int().min(0).max(60) })

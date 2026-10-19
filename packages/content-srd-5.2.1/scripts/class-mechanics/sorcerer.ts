@@ -208,10 +208,13 @@ export const sorcerer: ClassMechanicsModule = {
           }
         ]
       },
-      // The only route to Summon Dragon, with one free casting per Long Rest. The no-Material,
-      // no-Concentration modifications stay prose.
+      // The only route to Summon Dragon, with one free casting per Long Rest, and "whenever you start casting the
+      // spell, you can modify it so that it doesn't require Concentration": then it lasts 1 minute. The no-Material
+      // modification stays prose.
       "dragon-companion": {
-        grants: { spells: [{ id: "summon-dragon", level: 5, withoutSlot: "free" }] },
+        grants: {
+          spells: [{ id: "summon-dragon", level: 5, withoutSlot: "free", summon: { concentrationOptional: true } }]
+        },
         uses: { limit: 1, per: "long-rest" }
       }
     }

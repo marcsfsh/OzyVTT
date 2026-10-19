@@ -393,7 +393,9 @@ export const SummonPickSchema = z
     creatureType: SummonSlugSchema.optional(),
     damageType: DamageTypeSchema.optional(),
     resistance: DamageTypeSchema.optional(),
-    at: AnnotationPointSchema.optional()
+    at: AnnotationPointSchema.optional(),
+    /** Cast without Concentration, for 1 minute, where the caster may (a Draconic Sorcerer's Dragon Companion). */
+    withoutConcentration: z.boolean().optional()
   })
   .strict();
 export const ActionResolveSchema = z
@@ -485,6 +487,9 @@ export const ActionResolveSchema = z
      *  spider, Summon Dragon's breath and the Resistance it shares), and the point they appear at, within the action's
      *  range. The server checks each pick against what the action offers at the cast's level. */
     summon: SummonPickSchema.optional(),
+    /** A familiar delivers this spell with a range of touch (SRD 5.2.1 Find Familiar): the touch is measured from the
+     *  familiar, which must be within 100 feet of its caster and takes its Reaction. */
+    deliveredBy: z.uuid().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()

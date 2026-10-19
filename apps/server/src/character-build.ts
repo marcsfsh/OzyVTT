@@ -144,6 +144,11 @@ type InterpretedFeatures = {
     withSlot: boolean;
     /** Whose spellcasting ability casts it; see `SpellSource`. */
     source: SpellSource;
+    /** How the granting feature changes the creatures the spell brings (Wild Companion's Fey familiar). */
+    summon?: SummonChange;
+    /** Which of its castings are a Magic action, whatever the spell's casting time (Pact of the Chain, Wild
+     *  Companion). */
+    asMagicAction?: MagicActionCasting;
   }>;
   /** The free casting a feature with limited uses gives the spell picked for it (Magic Initiate's level 1 spell). */
   pickedSpellUses: Map<string, NonNullable<ActorAction["uses"]>>;
@@ -504,7 +509,48 @@ type SpellEntry = {
   ritualActionId?: string;
   source: SpellSource;
   free?: ActorAction["uses"] | null;
+  summon?: SummonChange;
+  asMagicAction?: MagicActionCasting;
 };
+
+/** Which castings a feature makes a Magic action (`FeatureGrants.spells[].asMagicAction`). */
+type MagicActionCasting = NonNullable<NonNullable<FeatureRecord["grants"]>["spells"][number]["asMagicAction"]>;
+
+/** The cast as a Magic action that takes effect at once, whatever the spell's casting time. */
+const asMagicActionCast = (action: ActorAction): ActorAction => ({
+  ...action,
+  activation: "action",
+  castsAtOnce: true
+});
+
+/** What a feature changes about the creatures a granted spell brings (`FeatureGrants.spells[].summon`). */
+type SummonChange = NonNullable<NonNullable<FeatureRecord["grants"]>["spells"][number]["summon"]>;
+
+/** A cast action with its feature's change to what it summons: the creature type, that it leaves at its caster's Long
+ *  Rest, more forms to pick, and casting without Concentration (Wild Companion, Pact of the Chain, Dragon Companion). */
+function withSummonChange(action: ActorAction, change: SummonChange | undefined): ActorAction {
+  const summons = action.summons;
+  if (!summons || !change) return action;
+  return {
+    ...action,
+    summons: {
+      ...summons,
+      ...(change.creatureTypes ? { creatureTypes: [...change.creatureTypes] } : {}),
+      ...(change.untilLongRest ? { lasts: { type: "until-long-rest" as const } } : {}),
+      ...(change.moreCreatures
+        ? {
+            creatures: [
+              ...summons.creatures,
+              ...change.moreCreatures.filter(
+                (row) => !summons.creatures.some((existing) => existing.monsterId === row.monsterId)
+              )
+            ].slice(0, 24)
+          }
+        : {}),
+      ...(change.concentrationOptional ? { concentrationOptional: true as const } : {})
+    }
+  };
+}
 
 /**
  * Mints and links each spell's actions: a cantrip's (`actionId`), a leveled spell's slot cast (`actionId`, when the
@@ -523,7 +569,8 @@ function linkSpellActions(
     const record = library.spellRecord(entry.id);
     if (!record) continue;
     const numbers = numbersOf(entry.source);
-    const mint = (action: ActorAction | null, key: "actionId" | "freeActionId" | "ritualActionId") => {
+    const mint = (minted: ActorAction | null, key: "actionId" | "freeActionId" | "ritualActionId") => {
+      const action = minted ? withSummonChange(minted, entry.summon) : null;
       if (!action || into.length >= MAX_DEFINITION_ACTIONS || into.some((existing) => existing.id === action.id))
         return;
       into.push(action);
@@ -533,11 +580,15 @@ function linkSpellActions(
     else {
       if (hasSlots && entry.withSlot !== false) {
         const cast = leveledSpellActionFor(record, numbers);
-        mint(cast, "actionId");
+        mint(entry.asMagicAction === "every-casting" ? asMagicActionCast(cast) : cast, "actionId");
         // SRD Rituals: a prepared ritual spell can be cast without a slot and takes 10 minutes longer.
         if (record.ritual) mint(ritualActionOf(cast, record), "ritualActionId");
       }
-      if (entry.free !== undefined) mint(leveledSpellActionFor(record, numbers, entry.free), "freeActionId");
+      if (entry.free !== undefined) {
+        const free = leveledSpellActionFor(record, numbers, entry.free);
+        // "Cast it as a Magic action without expending a spell slot" (Pact of the Chain).
+        mint(entry.asMagicAction ? asMagicActionCast(free) : free, "freeActionId");
+      }
     }
     // What the spell lets its caster do once it is up (Produce Flame's hurl, Spirit Guardians' save), with no slot.
     const tier =
@@ -556,7 +607,13 @@ function linkSpellActions(
 }
 
 /** The sheet's spell entry without the build-only fields. */
-const sheetSpell = ({ source: _source, free: _free, ...entry }: SpellEntry) => entry;
+const sheetSpell = ({
+  source: _source,
+  free: _free,
+  summon: _summon,
+  asMagicAction: _asMagicAction,
+  ...entry
+}: SpellEntry) => entry;
 
 /** The Martial Arts unarmed strike from the printed `classResources` column, or null without one. Uses
  *  the better of DEX or STR (SRD Dexterous Attacks). A non-dice amount keeps the generic builtin. Monk weapons
@@ -677,6 +734,8 @@ function interpretFeature(
         ability: spell.ability,
         withSlot: spell.withSlot,
         source,
+        ...(spell.summon ? { summon: spell.summon } : {}),
+        ...(spell.asMagicAction ? { asMagicAction: spell.asMagicAction } : {}),
         ...(spell.withoutSlot === "at-will" ? { free: null } : {}),
         // A free casting with no counter to spend is refused at build, so nothing casts without limit.
         ...(spell.withoutSlot === "free"
@@ -1192,17 +1251,25 @@ export function buildCharacterDefinition(
       alwaysPrepared: grantedSpell.alwaysPrepared,
       ...(grantedSpell.withSlot ? {} : { withSlot: false as const }),
       source: grantedSpell.source,
-      ...(grantedSpell.free !== undefined ? { free: grantedSpell.free } : {})
+      ...(grantedSpell.free !== undefined ? { free: grantedSpell.free } : {}),
+      ...(grantedSpell.summon ? { summon: grantedSpell.summon } : {}),
+      ...(grantedSpell.asMagicAction ? { asMagicAction: grantedSpell.asMagicAction } : {})
     };
   };
-  /** Adds a spell once; a second source of the same spell adds only its free casting. */
+  /** Adds a spell once; a second source of the same spell adds only its free casting and what it changes about the
+   *  creatures the spell brings. */
   const addSpell = (spells: SpellEntry[], entry: SpellEntry) => {
     const existing = spells.find((candidate) => candidate.id === entry.id);
     if (!existing) spells.push(entry);
-    else if (existing.free === undefined && entry.free !== undefined) {
-      existing.free = entry.free;
-      existing.prepared = true;
-      existing.alwaysPrepared = true;
+    else {
+      if (existing.free === undefined && entry.free !== undefined) {
+        existing.free = entry.free;
+        existing.prepared = true;
+        existing.alwaysPrepared = true;
+      }
+      if (entry.summon && !existing.summon) existing.summon = entry.summon;
+      if (entry.asMagicAction && existing.asMagicAction !== "every-casting")
+        existing.asMagicAction = entry.asMagicAction;
     }
   };
   // The ability each source casts with: a class's own, the species' or a feat's chosen one, else an ability the grant

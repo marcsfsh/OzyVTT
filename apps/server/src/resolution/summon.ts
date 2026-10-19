@@ -20,6 +20,12 @@ export function summonOf(ctx: Pick<ResolveContext, "action" | "deps">): Summon |
   return spell.effect?.summons;
 }
 
+/** "Whenever you start casting the spell, you can modify it so that it doesn't require Concentration" (a Draconic
+ *  Sorcerer's Dragon Companion): picked at the cast, where the cast's summons allow it. */
+export function castWithoutConcentration(ctx: Pick<ResolveContext, "action" | "deps" | "input">): boolean {
+  return ctx.input.summon?.withoutConcentration === true && summonOf(ctx)?.concentrationOptional === true;
+}
+
 /** The user's spell attack bonus, spell save DC, spellcasting ability modifier and Proficiency Bonus: the cast's own
  *  numbers when the action carries them, else its sheet's. */
 function summonerNumbers(ctx: ResolveContext, summon: Summon): SummonerNumbers {
@@ -55,7 +61,10 @@ export function applySummons(ctx: ResolveContext): void {
     ...(spell && level !== null
       ? {
           spell: { id: spell.id, name: spell.name, level, printedLevel: spell.level },
-          spellDuration: spellEffectDuration(spell, level)
+          // Cast without Concentration (Dragon Companion), "the spell's duration becomes 1 minute for that casting".
+          spellDuration: castWithoutConcentration(ctx)
+            ? { type: "rounds" as const, remaining: 10 }
+            : spellEffectDuration(spell, level)
         }
       : {}),
     castId: ctx.castId,
