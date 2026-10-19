@@ -623,6 +623,7 @@ const MOMENTS_READ: Partial<Record<Modifier["type"], readonly string[]>> = {
   "ability-score-minimum": [],
   "base-armor-class": [],
   "speed-minimum": [],
+  "carrying-capacity-larger": [],
   "ignores-cover": ["on-attack-roll"],
   "no-critical-hits": ["on-attack-roll"],
   "healing-received-maximized": [],

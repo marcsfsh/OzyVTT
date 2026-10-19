@@ -97,7 +97,7 @@ export function useSheetRolls(
     return face;
   };
 
-  const rollCheck = async (subject: CheckSubject, label: string, findActorId?: string) => {
+  const rollCheck = async (subject: CheckSubject, label: string, findActorId?: string, dc?: number) => {
     const face = rollMode === "manual" ? await typedFace(`Roll ${label}`) : undefined;
     if (face === null) return;
     const fitting = declared.filter((situation) => situationFits(situation, subject)).map((entry) => entry.situation);
@@ -110,6 +110,7 @@ export function useSheetRolls(
       visibility,
       ...(face !== undefined ? { face } : {}),
       ...(findActorId ? { findActorId } : {}),
+      ...(dc !== undefined ? { dc } : {}),
       ...(fitting.length > 0 ? { situations: fitting } : {})
     });
     setRolling(false);

@@ -220,6 +220,7 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "healing-bonus": "at-its-moment", // resolution/heal.ts, on the healer
   "ability-score-minimum": "standing", // live-abilities.ts raises the score every rule reads, from items and effects
   "speed-minimum": "standing", // speed.ts, a floor under the movement budget
+  "carrying-capacity-larger": "standing", // carrying.ts, read with what the creature carries
   "ignores-cover": "at-its-moment", // resolution/attack.ts sets the target's cover aside on the attack roll
   "base-armor-class": "standing", // actor-roster.ts storedArmorClass offers it like Unarmored Defense
   "no-critical-hits": "at-its-moment", // resolution/attack.ts turns a Critical Hit on the bearer into a hit
@@ -1489,10 +1490,20 @@ export function buildCharacterDefinition(
     goldPieces += chosen.goldPieces;
     // A kit item that is one of this source's tool choices is the tool chosen there ("Gaming Set (same as above)").
     const chosenTools = [...(offers.find((offer) => offer.key === `${source}-tools`)?.taken ?? [])];
-    const items = chosen.items.map((item) => {
+    const picked = chosen.items.map((item) => {
       if (!toolChoices.includes(item.id) || chosenTools.length === 0 || chosenTools.includes(item.id)) return item;
       const tool = chosenTools.shift()!;
       return { ...item, id: tool, name: library.equipmentRecord(tool)?.name ?? item.name };
+    });
+    // An equipment pack is the things it holds, each its own row ("10 Torches" a stack of ten).
+    const items = picked.flatMap((item) => {
+      const contents = library.equipmentRecord(item.id)?.contents;
+      if (!contents) return [item];
+      return contents.map((content) => ({
+        id: content.id,
+        name: library.equipmentRecord(content.id)?.name ?? content.id,
+        quantity: content.quantity * item.quantity
+      }));
     });
     for (const item of items) {
       const existing = inventory.find((candidate) => candidate.id === item.id);

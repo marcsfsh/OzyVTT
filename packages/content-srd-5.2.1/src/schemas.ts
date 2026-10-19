@@ -1065,6 +1065,15 @@ export const EquipmentReferenceSchema = z
       .describe(
         "While the item is in use, its bearer and the creatures allied with it within `feet` have Advantage on saving throws against spells and other magical effects (Holy Avenger); `widerAt` widens it from a class level. Read as each save is rolled, from the map's distances"
       ),
+    /** What an equipment pack holds ("A Dungeoneer's Pack contains ... 10 Torches"): carried, it is these rows. */
+    contents: z
+      .array(z.object({ id: ContentIdSchema, quantity: z.number().int().min(1).max(100) }).strict())
+      .min(1)
+      .max(16)
+      .optional()
+      .describe(
+        "What the item holds, which it is unpacked into wherever a character comes by it (its starting equipment, or adding it to the sheet): each record id and how many (an Explorer's Pack's 10 Torches)"
+      ),
     /** "You can make one attack with it as a Bonus Action on each of your turns" (Scimitar of Speed). */
     bonusActionAttack: z
       .literal(true)

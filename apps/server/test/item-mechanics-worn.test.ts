@@ -802,18 +802,20 @@ describe("the worn items left as prose, by name", () => {
   const rows = loadMagicItems();
   const worn = rows.filter((row) => row.category === "wondrous-item" && row.slot !== "wondrous");
 
-  it("leaves the three casts that produced the wrong thing unauthored, by name", () => {
-    // Each of these produced the wrong effect when driven (e.g. a Helm of Teleportation dealing 1d100
-    // Force damage). Re-authoring one adds a `casts` entry and fails here.
+  it("leaves the cast that produced the wrong thing unauthored, by name", () => {
+    // It produced the wrong effect when driven. Re-authoring it adds a `casts` entry and fails here.
     for (const [id, why] of [
-      ["helm-of-teleportation", "teleport's damage.roll is the SRD's 1d100 MISHAP table"],
-      ["circlet-of-blasting", "scorching-ray's 2d6 is ONE of three rays, at the wearer's bonus not the circlet's +5"],
       ["cloak-of-the-bat", "polymorph's Wis save is an unwilling target's; the cloak casts on yourself"]
     ] as const) {
       const row = view.equipmentRecord(id)!;
       expect(row.casts ?? [], `${id} - ${why}`).toEqual([]);
       expect(row.actions ?? [], `${id} - the charge-alone shape does not rescue a cast`).toEqual([]);
     }
+    // Teleport deals no damage of its own now, and Scorching Ray makes its three rays at the circlet's printed +5.
+    expect(view.spellRecord?.("teleport")?.effect?.damage).toEqual([]);
+    expect(view.equipmentRecord("helm-of-teleportation")!.casts?.map((cast) => cast.spellId)).toEqual(["teleport"]);
+    expect(view.spellRecord?.("scorching-ray")?.effect?.attacks).toBe(3);
+    expect(view.equipmentRecord("circlet-of-blasting")!.casts?.map((cast) => cast.attackBonus)).toEqual([5]);
     // Two came back once the engine could carry them: the Cape's Dimension Door is a teleport whose 4d6 lands only on
     // an arrival in a filled space, and the Boots levitate their wearer with no save to make against themselves.
     expect(view.equipmentRecord("cape-of-the-mountebank")!.casts?.map((cast) => cast.spellId)).toEqual([
@@ -856,7 +858,7 @@ describe("the worn items left as prose, by name", () => {
     }
   });
 
-  it("splits the eight 'Advantage on a check' rows 4 authored / 4 prose, and says why for each", () => {
+  it("splits the eight 'Advantage on a check' rows 5 authored / 3 prose, and says why for each", () => {
     // Of the eight "Advantage on ... checks" rows, only those whose clause the engine can express exactly
     // are authored; authoring the rest would over-grant.
     const advantageOnChecks = worn
@@ -891,16 +893,20 @@ describe("the worn items left as prose, by name", () => {
       });
     }
 
-    // The Eyes of the Eagle's "checks that rely on sight" is a situation the roller names beside the check.
+    // The Eyes of the Eagle's "checks that rely on sight" and the Eyes of Minute Seeing's search within a foot are
+    // situations the roller names beside the check.
     expect(view.equipmentRecord("eyes-of-the-eagle")!.modifiers[0]?.when).toContainEqual({
       type: "situation-is",
       situation: "relying on sight"
     });
+    expect(view.equipmentRecord("eyes-of-minute-seeing")!.modifiers[0]?.when).toContainEqual({
+      type: "situation-is",
+      situation: "examining something within 1 foot"
+    });
 
-    // Still prose (4), each for its own reason, which the failure message names.
+    // Still prose (3), each for its own reason, which the failure message names.
     for (const [id, why] of [
       ["belt-of-dwarvenkind", "Persuasion narrowed to dwarves and duergar - no trigger names who you are influencing"],
-      ["eyes-of-minute-seeing", "Investigation within ONE FOOT - nothing measures a distance"],
       ["robe-of-eyes", "Perception 'that rely on sight', on a robe whose own Drawbacks Blind you"],
       ["talisman-of-the-sphere", "Arcana to control a Sphere of Annihilation, which the engine does not hold"]
     ] as const) {

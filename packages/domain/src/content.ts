@@ -259,6 +259,13 @@ export const ContentEquipmentSummarySchema = z.strictObject({
     .describe(
       "The spell levels one copy of a Spell Scroll can bear (0 is a cantrip), for the picker's spell step; absent on anything else"
     ),
+  /** The uses one carried copy holds (a Healer's Kit's ten). */
+  uses: z
+    .strictObject({ limit: z.number().int().min(1).max(100) })
+    .optional()
+    .describe(
+      "The uses one carried copy holds (a Healer's Kit's ten), spent from its row and counted in its holder's `actionUses` under `<row id>-uses`; spending the last takes one copy from the stack. Absent on anything else"
+    ),
   /** A manual or tome: its study raises a score for good (`character.study-item`). */
   study: z
     .strictObject({

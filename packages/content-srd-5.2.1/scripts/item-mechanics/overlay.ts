@@ -136,6 +136,7 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
   "healing-bonus": "at-its-moment",
   "ability-score-minimum": "standing",
   "speed-minimum": "standing",
+  "carrying-capacity-larger": "standing",
   "ignores-cover": "at-its-moment",
   "base-armor-class": "standing",
   "no-critical-hits": "at-its-moment",

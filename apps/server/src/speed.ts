@@ -3,6 +3,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { collectRiders, sumRiders } from "@vtt/rules-5e";
 import { exhaustionLevel } from "./condition-rules.js";
 import type { EquipmentDerivation } from "./equipment-derivation.js";
+import { OVERLOADED_SPEED_FEET, overloaded } from "./carrying.js";
 import { STATBLOCK_EXTENSION } from "./statblock-facts.js";
 
 /** The bearer's Speed is halved while this lasts (Slow, a Stunning Strike the target saved against). */
@@ -53,14 +54,24 @@ function speedFloor(derivation: EquipmentDerivation): number {
   );
 }
 
+/** Whether a load beyond carrying capacity holds the creature's Speed to 5 feet: a `speed-minimum` with
+ *  `ignoresArmor` keeps it (Boots of Striding and Springing). */
+function loadSlows(derivation: EquipmentDerivation): boolean {
+  if (!overloaded(derivation.carrying)) return false;
+  const riders = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
+  return !riders.some((rider) => rider.modifier.type === "speed-minimum" && rider.modifier.ignoresArmor === true);
+}
+
 /** Current Speed in feet, before Dash: base (raised to any `speed-minimum`) minus 5 x exhaustion (floored at 0, so no
- *  debt carries), plus the standing `speed` riders, floored again, then doubled or halved where an effect does so. A
- *  Speed-0 condition returns 0. Never writes `actor.speedFeet`. Null when base speed is unknown. */
+ *  debt carries), plus the standing `speed` riders, floored again, then doubled or halved where an effect does so,
+ *  and no more than 5 feet under a load beyond carrying capacity. A Speed-0 condition returns 0. Never writes
+ *  `actor.speedFeet`. Null when base speed is unknown. */
 export function currentSpeedFeet(actor: Actor, derivation: EquipmentDerivation): number | null {
   if (actor.speedFeet === undefined) return null;
   if (speedZeroed(actor)) return 0;
   const base = Math.max(0, Math.max(actor.speedFeet, speedFloor(derivation)) - 5 * exhaustionLevel(actor));
-  return multipliedSpeed(actor, Math.max(0, base + riderSpeed(derivation)));
+  const speed = multipliedSpeed(actor, Math.max(0, base + riderSpeed(derivation)));
+  return loadSlows(derivation) ? Math.min(OVERLOADED_SPEED_FEET, speed) : speed;
 }
 
 /** How many Dashes the creature has taken this turn, and whether one predates the stored grant (then it doubles). */

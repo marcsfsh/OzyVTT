@@ -1288,6 +1288,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "^contents[].**",
+    types: ["equipment"],
+    reason:
+      "what an equipment pack holds, unpacked where a character comes by it (an Explorer's Pack's 10 Torches) - authored in the gear source; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "^magicSaveAura.**",
     types: ["equipment"],
     reason:

@@ -65,7 +65,7 @@ export const CONDITION_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "It counts as Incapacitated. saving-throws.ts fails its Strength and Dexterity saves, and resolution/attack.ts gives attack rolls against it Advantage."
   ),
   unconscious: enforced(
-    "effects.ts adds Prone, and it counts as Incapacitated with Speed 0. saving-throws.ts fails its Strength and Dexterity saves. resolution/attack.ts gives attack rolls against it Advantage and makes a hit from within 5 feet a Critical Hit. Dropping what it holds is the GM's."
+    "effects.ts adds Prone, and it counts as Incapacitated with Speed 0. saving-throws.ts fails its Strength and Dexterity saves. resolution/attack.ts gives attack rolls against it Advantage and makes a hit from within 5 feet a Critical Hit. held-items.ts drops what it holds: its weapons and held items are no longer in hand."
   )
 };
 
@@ -134,7 +134,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   cantrip: enforced(
     "Every cantrip a sheet or stat block knows is a cast action with no slot (character-build.ts, monster-spells.ts), and its damage grows at the character levels its row prints (cantripTierAt in the content package)."
   ),
-  "carrying-capacity": reference("Weight carried isn't checked against Strength."),
+  "carrying-capacity": enforced(
+    "carrying.ts weighs a character's rows and coins (fifty to the pound) against its Strength times its size's figure, and speed.ts holds its Speed to 5 feet while it carries more; the Gear tab shows the load. Dragging, lifting or pushing something it doesn't carry is the GM's."
+  ),
   "challenge-rating": guided(
     "The bestiary shows each monster's CR and XP, and the encounter budget (EncounterBudget.tsx, encounters.ts in rules-5e) rates a fight for the party's levels. The GM decides what to run."
   ),
@@ -405,7 +407,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   ),
   unconscious: condition("unconscious"),
   "unoccupied-space": enforced("movement-rules.ts ends a move only in a space no other creature fills."),
-  utilize: guided("resolution/economy.ts spends the action. What the object does is the GM's."),
+  utilize: guided(
+    "resolution/economy.ts spends the action, and a Shield donned or doffed in a fight takes it (held-items.ts). The sheet offers each tool's Utilize uses as checks at their printed DCs. What the object does is the GM's."
+  ),
   vulnerability: enforced("hit-points.ts doubles damage of a type the creature is vulnerable to, once per instance."),
   weapon: reference("A definition. Each weapon's own row under Weapons says what the app does with it."),
   "weapon-attack": enforced(
@@ -419,6 +423,10 @@ const revives = guided(
 );
 /** A trait about breathing, which the app doesn't track. */
 const breath = reference("Breathing isn't tracked.");
+/** A tool's row: its check and its Utilize uses are the sheet's; crafting with it is the GM's. */
+const toolUse = guided(
+  "The sheet rolls its check with the ability it names and offers its Utilize uses at their printed DCs (ability-checks.ts toolUses). In a fight that is the Utilize action, and crafting with it is the GM's."
+);
 /** A trait that lights the map around its creature. */
 const sheds = enforced("vision/senses.ts gives the creature its printed Bright and Dim Light, carried with its token.");
 /** A trait that hinders a creature standing in sunlight, read from the light where its token stands. */
@@ -466,7 +474,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Barbed Hide": enforced(
     "trait-turns.ts deals 1d10 Piercing damage at the start of the devil's turns to each creature it grapples or that grapples it."
   ),
-  "Beast of Burden": reference("Carrying capacity isn't tracked."),
+  "Beast of Burden": reference("A stat block carries nothing the app weighs, so what the creature hauls is the GM's."),
   Berserk: enforced(
     "trait-turns.ts rolls the d6 when the golem starts its turn Bloodied and keeps it berserk until it isn't Bloodied. Choosing what it attacks is the GM's."
   ),
@@ -798,7 +806,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The action gives a Fly Speed of 60 feet for an hour, or until the wearer ends it on the sheet; a creature in the air when it ends falls (falling.ts). clock-pools.ts keeps the wings from being used again until 1d12 + 1 hours of game time have passed from their use (the hour they last, then the wait)."
   ),
   "item:broom-of-flying": guided(
-    "The action gives the rider a Fly Speed of 50 feet with hover until it ends it on the sheet. The 30 feet while carrying over 200 pounds is the GM's, since weight isn't tracked."
+    "The action gives the rider a Fly Speed of 50 feet with hover until it ends it on the sheet. The slower 30 feet while it carries over 200 pounds is the GM's."
   ),
   "item:cape-of-the-mountebank": guided(
     "The cast of Dimension Door, once a dawn, teleports the wearer on the map (granted-moves.ts). The smoke cloud is the GM's."
@@ -875,7 +883,79 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "item-light.ts lights a Candle, Lamp, Lantern or Torch in hand only when its bearer holds a Tinderbox or another flame, spending its Bonus Action in a fight. Lighting any other fire is the GM's."
   ),
   "item:healers-kit": enforced(
-    "stabilize.ts spends one use of the kit to make a creature at 0 Hit Points Stable with no check, and the last use takes the kit."
+    "stabilize.ts spends one of the kit's ten uses to make a creature at 0 Hit Points Stable with no check, and spending the tenth takes the kit. The Gear tab shows the uses left in it."
+  ),
+  "item:chain": guided(
+    "Its action binds a creature within 5 feet that is Grappled, Incapacitated or Restrained: the creature is Restrained until a DC 18 Dexterity (Acrobatics) check, its action, frees it. The DC 13 Strength (Athletics) check to bind it and bursting the Chain are the GM's."
+  ),
+  "item:rope": enforced(
+    "Its action binds a creature within 5 feet that is Grappled, Incapacitated or Restrained: the creature is Restrained until a DC 15 Dexterity (Acrobatics) check, its action, frees it. Bursting the Rope is the GM's."
+  ),
+  "item:manacles": guided(
+    "Its action binds a Small or Medium creature within 5 feet that is Grappled, Incapacitated or Restrained: it has Disadvantage on attack rolls until a DC 20 Dexterity (Sleight of Hand) check, its action, frees it. The DC 13 check to bind it, the Restrained condition while they are fixed in place, and bursting them are the GM's."
+  ),
+  "item:arcane-focus-staff": enforced(
+    "It swings as a Quarterstaff: 1d6 Bludgeoning, Versatile (1d8), the Topple mastery."
+  ),
+  "item:druidic-focus-wooden-staff": enforced(
+    "It swings as a Quarterstaff: 1d6 Bludgeoning, Versatile (1d8), the Topple mastery."
+  ),
+  ...Object.fromEntries(
+    [
+      "burglars-pack",
+      "diplomats-pack",
+      "dungeoneers-pack",
+      "entertainers-pack",
+      "explorers-pack",
+      "priests-pack",
+      "scholars-pack"
+    ].map((id) => [
+      `item:${id}`,
+      enforced(
+        "A character who comes by it at the build (character-build.ts) or on the sheet (inventory.ts) gets what it holds, each in its own stack."
+      )
+    ])
+  ),
+  ...Object.fromEntries(
+    [
+      "alchemists-supplies",
+      "brewers-supplies",
+      "calligraphers-supplies",
+      "carpenters-tools",
+      "cartographers-tools",
+      "cobblers-tools",
+      "cooks-utensils",
+      "glassblowers-tools",
+      "jewelers-tools",
+      "leatherworkers-tools",
+      "masons-tools",
+      "painters-supplies",
+      "potters-tools",
+      "smiths-tools",
+      "tinkers-tools",
+      "weavers-tools",
+      "woodcarvers-tools",
+      "disguise-kit",
+      "forgery-kit",
+      "herbalism-kit",
+      "navigators-tools",
+      "poisoners-kit",
+      "thieves-tools",
+      "gaming-set-dice",
+      "gaming-set-playing-cards",
+      "gaming-set-dragonchess",
+      "gaming-set-three-dragon-ante",
+      "instrument-bagpipes",
+      "instrument-drum",
+      "instrument-dulcimer",
+      "instrument-flute",
+      "instrument-horn",
+      "instrument-lute",
+      "instrument-lyre",
+      "instrument-pan-flute",
+      "instrument-shawm",
+      "instrument-viol"
+    ].map((id) => [`item:${id}`, toolUse])
   ),
   "item:book": enforced(
     'While it is equipped, the sheet offers "consulting an accurate Book about its topic" beside the checks (check-situations.ts), and an Intelligence (Arcana, History, Nature or Religion) check that names it gains +5 (ability-checks.ts). Whether the Book is accurate and on topic is the GM\'s.'
@@ -966,7 +1046,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The Bonus Action makes the Goliath Large for 10 minutes, with +10 feet of Speed and Advantage on Strength checks, and its token takes the bigger space (transform/forms.ts). resolution/grant.ts refuses it while a creature stands in that space."
   ),
   "feature:goliath-powerful-build": enforced(
-    "The escape from a grapple rolls with Advantage (resolution/builtins.ts). The app doesn't track carrying capacity, so counting one size larger for it is the GM's."
+    "The escape from a grapple rolls with Advantage (resolution/builtins.ts), and carrying.ts counts the character one size larger for its carrying capacity."
   ),
   "feature:goliath-giant-ancestry": enforced(
     "Fire's Burn, Frost's Chill and Hill's Tumble ride a hit that deals damage (resolution/hit-options.ts), Storm's Thunder is offered as a Reaction, and Stone's Endurance as a Reaction to damage from a hit or a failed save, taking 1d12 plus the Constitution modifier off it before it lands (damage-window.ts). Cloud's Jaunt gives a 30-foot teleport taken on the map at once to an unoccupied space the Goliath can see (granted-moves.ts)."

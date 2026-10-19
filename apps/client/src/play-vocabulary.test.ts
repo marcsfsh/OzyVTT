@@ -85,6 +85,12 @@ const ALLOWED: ReadonlyArray<readonly [file: string, text: string, why: string]>
     "The same SRD field, in the monster form's own schema: the label the rider form above reads. " +
       "Two files, two rows: a (file, string) exemption is scoped on purpose, so excusing the word here " +
       "does not excuse it in a token picker, where it WAS drift and was fixed instead."
+  ],
+  [
+    "apps/client/src/homebrew/schemas.ts",
+    "A class, a species, spellcaster, or creature-attuned-to-a- followed by an item's id. Any one is enough. It's shown on the sheet, and a player can't attune a character that meets none. You can still attune anyone.",
+    "creature-attuned-to-a- is the id prefix an item prerequisite is written with in the content, which " +
+      "the author types as it stands; the word is part of that id, not copy that talks about a creature."
   ]
 ];
 

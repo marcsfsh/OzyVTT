@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { catalogIdOf, type ContentActionSummary, type ContentEquipmentSummary } from "@vtt/domain";
+import { catalogIdOf, rowUsesKey, type ContentActionSummary, type ContentEquipmentSummary } from "@vtt/domain";
 import { ABILITY_NAMES } from "@vtt/rules-5e";
 import type { InventoryItem } from "@vtt/schemas";
 import { Button, GmOnlyTag, IconChevronLeft, IconChevronRight, Input, NumberField, Select, Stepper } from "@vtt/ui";
@@ -95,6 +95,7 @@ export function GearTab({
   serverActions,
   facts,
   attunementSlots = 3,
+  carrying = null,
   inFight,
   others = [],
   actionBlocked = null,
@@ -110,6 +111,8 @@ export function GearTab({
   facts: ReadonlyMap<string, RowFacts>;
   /** 3, or 4 with Use Magic Device; the server enforces it. */
   attunementSlots?: number;
+  /** What the character carries against its carrying capacity, as the server weighs it. */
+  carrying?: Readonly<{ pounds: number; capacity: number }> | null;
   /** In a running fight fired ammunition comes back when the fight ends, so there is nothing to pick up yet. */
   inFight: boolean;
   /** The characters the GM can hand an item to. */
@@ -138,6 +141,11 @@ export function GearTab({
   const attuned = inventory.filter((item) => item.attuned && item.quantity > 0);
   const fired = inventory.reduce((sum, item) => sum + (item.ammunitionFired ?? 0), 0);
   const summaryOf = (item: InventoryItem) => catalog.find((entry) => entry.id === catalogIdOf(item));
+  // The uses left in the copy in hand (a Healer's Kit's ten), which the server counts on the row.
+  const usesOf = (item: InventoryItem) => {
+    const limit = summaryOf(item)?.uses?.limit;
+    return limit === undefined ? null : { left: Math.max(0, limit - (spent[rowUsesKey(item)] ?? 0)), limit };
+  };
   const nameOf = (item: InventoryItem) => {
     const base = item.baseId ? catalog.find((entry) => entry.id === item.baseId) : undefined;
     const baseName = item.baseId
@@ -198,6 +206,7 @@ export function GearTab({
     const rows = itemActions(item, serverActions);
     const mastery = facts.get(`item-${item.id}`)?.mastery ?? null;
     const charges = chargesOf(rows, spent);
+    const uses = usesOf(item);
     return (
       <li key={item.id}>
         <button
@@ -223,6 +232,7 @@ export function GearTab({
                 itemLine(item),
                 item.ammunitionLeft !== undefined ? `${item.ammunitionLeft} left` : null,
                 item.ammunitionFired ? `${item.ammunitionFired} fired` : null,
+                uses ? `${uses.left} of ${uses.limit} uses left` : null,
                 item.dormant ? "Magic spent" : null
               ]
                 .filter(Boolean)
@@ -283,6 +293,20 @@ export function GearTab({
             {open.ammunitionLeft !== undefined && (
               <p className="cs-sub">{open.ammunitionLeft} left in the open bundle.</p>
             )}
+            {(() => {
+              const uses = usesOf(open);
+              return (
+                uses && (
+                  <p className="cs-item-charges">
+                    <UseBoxes left={uses.left} limit={uses.limit} label={`${uses.left} of ${uses.limit} uses left`} />
+                    <span className="cs-sub">
+                      {uses.left} of {uses.limit} uses left
+                      {open.quantity > 1 ? " in this one. The next starts full." : ". Spending the last uses it up."}
+                    </span>
+                  </p>
+                )
+              );
+            })()}
             {role === "player" && open.chosenDamageType && (
               <p className="cs-sub">Resists {titleCase(open.chosenDamageType)}.</p>
             )}
@@ -640,8 +664,18 @@ export function GearTab({
         </section>
       )}
       <section className="cs-group" aria-label="In the pack">
-        <span className="cs-eyebrow">In the pack</span>
+        <span className="cs-section-head">
+          <span className="cs-eyebrow">In the pack</span>
+          {carrying && (
+            <span className={`cs-count${carrying.pounds > carrying.capacity ? " is-over" : ""}`}>
+              {carrying.pounds} of {carrying.capacity} lb.
+            </span>
+          )}
+        </span>
         {pack.length > 0 ? <ul className="cs-items">{pack.map(row)}</ul> : <p className="cs-sub">The pack is empty.</p>}
+        {carrying && carrying.pounds > carrying.capacity && (
+          <p className="cs-sub">That is more than {actor.name} can carry, so their Speed is at most 5 feet.</p>
+        )}
       </section>
       {/* SRD Ammunition: a minute after shooting, half the pieces fired can be picked up again. */}
       {fired > 0 && !inFight && (

@@ -758,9 +758,10 @@ describe("the absences that were measured and must stay absent", () => {
     expect(regeneration.modifiers).toEqual([]);
   });
 
-  it("the Bead of Force and the Horn of Blasting carry no action", () => {
-    // The bead is destroyed on use, which no `per` value can say.
-    expect(view.equipmentRecord("bead-of-force")!.actions).toEqual([]);
+  it("the Horn of Blasting carries no action, and a Bead of Force is used up as it is thrown", () => {
+    // The bead is destroyed on use: it is a consumable, one fewer in the stack each throw.
+    const bead = view.equipmentRecord("bead-of-force")!;
+    expect([bead.consumedOnUse, bead.actions.map((action) => action.id)]).toEqual([true, ["throw"]]);
     // The horn is absent for its 20% explosion chance.
     const horn = view.equipmentRecord("horn-of-blasting")!;
     expect(horn.description).toContain("20 percent chance of causing the horn to explode");

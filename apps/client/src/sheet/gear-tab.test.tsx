@@ -40,6 +40,7 @@ const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) =
   ...(item.damageTypeChoice ? { damageTypeChoice: [...item.damageTypeChoice] } : {}),
   ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {}),
   ...(item.study ? { study: { ...item.study } } : {}),
+  ...(item.uses?.limit !== undefined && item.uses.per === "never" ? { uses: { limit: item.uses.limit } } : {}),
   ...(item.variants
     ? {
         variants: item.variants.map((variant) => ({ id: variant.id, name: variant.name })),
@@ -60,9 +61,13 @@ const SPELLS = loadSpells().map((spell) => ({
 })) as unknown as readonly ContentSpellSummary[];
 
 const emit = socket.emit as unknown as ReturnType<typeof vi.fn>;
-/** Answers the catalog and spell reads, the sheet's action rows and derived numbers (`attunementSlots`), and every
- *  command with ok. */
-function serve(attunementSlots = 3, actions: readonly unknown[] = []) {
+/** Answers the catalog and spell reads, the sheet's action rows and derived numbers (`attunementSlots`, `carrying`),
+ *  and every command with ok. */
+function serve(
+  attunementSlots = 3,
+  actions: readonly unknown[] = [],
+  carrying: Readonly<{ pounds: number; capacity: number }> | null = null
+) {
   emit.mockImplementation((event: string, _payload: unknown, ack?: (result: unknown) => void) => {
     if (event === "content:equipment") ack?.({ ok: true, equipment: CATALOG, attribution: "SRD 5.2.1, CC BY 4.0." });
     else if (event === "content:spells") ack?.({ ok: true, spells: SPELLS, attribution: "SRD 5.2.1, CC BY 4.0." });
@@ -78,7 +83,8 @@ function serve(attunementSlots = 3, actions: readonly unknown[] = []) {
           skills: [],
           defences: { resistances: [], immunities: [], vulnerabilities: [] },
           spellSaveDcBonus: 0,
-          attunementSlots
+          attunementSlots,
+          carrying
         }
       });
     else ack?.({ ok: true });
@@ -638,5 +644,31 @@ describe("an item's kinds, forms and attunement prerequisites", () => {
     ]);
     await user.click(forms.getByRole("button", { name: "Its own" }));
     expect(sent("item:set-form").at(-1)).toMatchObject({ variantId: null });
+  });
+});
+
+describe("what the character carries", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("shows the uses left in a Healer's Kit on its row", async () => {
+    serve();
+    const actor = hero({
+      inventory: [{ id: "healers-kit", name: "Healer's Kit", quantity: 2, equipped: false, attuned: false }],
+      actionUses: { "healers-kit-uses": 3 }
+    });
+    render(<CharacterSheet actor={actor} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await openGear(user);
+    expect(rowOf(/Healer's Kit/).textContent).toContain("7 of 10 uses left");
+    await user.click(rowOf(/Healer's Kit/));
+    expect(await screen.findByText("7 of 10 uses left in this one. The next starts full.")).toBeTruthy();
+  });
+
+  it("weighs the load, and says when it is more than the character can carry", async () => {
+    serve(3, [], { pounds: 160, capacity: 150 });
+    render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    await openGear(userEvent.setup());
+    expect(await screen.findByText("160 of 150 lb.")).toBeTruthy();
+    expect(screen.getByText("That is more than Aria can carry, so their Speed is at most 5 feet.")).toBeTruthy();
   });
 });

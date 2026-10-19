@@ -864,6 +864,26 @@ button.cs-lastroll-open {
   flex-direction: column;
   gap: var(--space-2);
 }
+/* A tool's Utilize uses: the printed words wrap, and the roll at its DC stays beside them. */
+.cs-tool-uses {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.cs-tool-uses li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--fs-xs);
+}
+.cs-tool-uses em {
+  font-style: normal;
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+}
 .cs-skill-edit {
   display: grid;
   gap: 2px;

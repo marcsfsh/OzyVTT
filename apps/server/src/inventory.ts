@@ -1,6 +1,6 @@
 import type { Actor, GameState } from "@vtt/domain";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
-import { catalogIdOf, type ActorDefinition, type Currency, type InventoryItem } from "@vtt/schemas";
+import { catalogIdOf, rowUsesKey, type ActorDefinition, type Currency, type InventoryItem } from "@vtt/schemas";
 import { effectiveSlot, wornBodyArmor } from "@vtt/rules-5e";
 import { refreshBaseArmorClass, spellSlotMaxima, storedArmorClass } from "./actor-roster.js";
 import { deriveEquipment, itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
@@ -26,6 +26,7 @@ import { requireActorAccess, type Initiator } from "./authorization.js";
 import { spendBonusAction } from "./item-light.js";
 import { withVariantPick } from "./item-variants.js";
 import { attunementRefusal } from "./attunement.js";
+import { donInFight } from "./held-items.js";
 
 const MAX_ITEMS = 200;
 /** SRD: "a creature can't be attuned to more than three magic items at a time"; Use Magic Device raises it. */
@@ -396,6 +397,26 @@ export function setInventoryItem(
     const { recordId: _same, ...plain } = item;
     item = plain;
   }
+  // A pack added to the sheet is the things it holds, each joining its stack or starting one.
+  const contents = deps.catalog?.equipmentRecord(catalogIdOf(item))?.contents;
+  if (contents && item.quantity > 0 && !actor.inventory.some((entry) => entry.id === item.id))
+    return contents.flatMap((content) => {
+      const record = deps.catalog!.equipmentRecord(content.id);
+      const stack = actor.inventory.find((entry) => entry.id === content.id);
+      const quantity = content.quantity * item.quantity;
+      const row: InventoryItem = stack
+        ? { ...stack, quantity: stack.quantity + quantity }
+        : {
+            id: content.id,
+            name: record?.name ?? content.id,
+            quantity,
+            equipped: false,
+            attuned: false,
+            ...(record ? { category: record.category } : {}),
+            ...(record?.weightLb !== null && record?.weightLb !== undefined ? { weightEach: record.weightLb } : {})
+          };
+      return setInventoryItem(state, actorId, row, resolveDefinition, deps);
+    });
   // What the item is (a found copy's kind, which the GM says) is read before it binds, since a form can change how it
   // swings.
   item = withVariantPick(actor, item, deps);
@@ -431,6 +452,15 @@ export function setInventoryItem(
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   enforceCurse(actor, item, deps);
   enforceEquipRules(actor, item, definition, deps);
+  // Armor goes on and comes off on the clock: body armor not at all in a fight, a Shield with the Utilize action.
+  donInFight(
+    state,
+    actor,
+    actor.inventory.find((entry) => entry.id === item.id),
+    item,
+    deps.catalog?.equipmentRecord(catalogIdOf(item))?.slot ?? item.magic?.slot,
+    deps.role
+  );
   // When attunement may start or end is a player's rule; the GM attunes anyone at any time.
   if (deps.role === "player") {
     const refusal = attunementRefusal(
@@ -560,6 +590,7 @@ function chargeKeysOf(item: InventoryItem, definition: ActorDefinition | undefin
   const keys = actions.flatMap((action) =>
     action.uses && action.uses.per !== "turn" ? [action.uses.pool ?? action.id] : []
   );
+  if (record.uses) keys.push(rowUsesKey(item));
   return keys.filter((key, index) => keys.indexOf(key) === index);
 }
 

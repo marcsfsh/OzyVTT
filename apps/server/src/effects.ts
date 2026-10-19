@@ -10,6 +10,7 @@ import { refreshSize, revertForm } from "./transform/forms.js";
 import { DESCENDS_SAFELY_TAG, descendSafely } from "./altitude.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import { restoreSuppressed } from "./suppressed-conditions.js";
+import { dropHeldItems } from "./held-items.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
  *  end, which clears linked conditions and fires onEnd grants. Returns narration events and writes nothing to
@@ -251,6 +252,8 @@ export function applyCondition(
   const selfApplied =
     options.selfApplied === true && (!existing || existing.selfApplied === true) ? { selfApplied: true as const } : {};
   writeCondition(actor, { id: conditionId, ...level, ...selfApplied, ...standalone });
+  // SRD Unconscious: "You drop whatever you're holding."
+  if (conditionId === "unconscious" && !existing) dropHeldItems(actor, options.immunities);
   if (conditionId === "unconscious" && !hasCondition(actor, "prone")) applyCondition(actor, "prone", options);
   if (conditionId === "petrified") removeConditionDirect(actor, "poisoned");
   return "applied";

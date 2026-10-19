@@ -263,6 +263,7 @@ const LABELS: Readonly<Record<string, string>> = {
   weaponChanges: "changes to its weapon",
   damageTypeOptions: "damage types it can deal instead",
   bonusActionAttack: "Bonus Action attack",
+  contents: "what it holds",
   magicSaveAura: "aura of Advantage on saves against magic",
   widerAt: "wider aura from a class level",
   addProperties: "properties it adds",

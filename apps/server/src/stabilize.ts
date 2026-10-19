@@ -1,6 +1,6 @@
 import { isDead, type DeathSaves, type GameState } from "@vtt/domain";
 import type { RandomSource } from "@vtt/rules-5e";
-import { catalogIdOf, type ActorDefinition } from "@vtt/schemas";
+import { catalogIdOf, rowUsesKey, type ActorDefinition } from "@vtt/schemas";
 import { checkPlan } from "./ability-checks.js";
 import { canPlayerTarget, requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { rollSettledCheck } from "./check-rolls.js";
@@ -260,14 +260,35 @@ export function stabilizeCreature(
     events.push(...settle(state, target, condition, line, deps, input.commandId));
     return { stabilized: condition === "dying", woke: condition === "knocked-out", check, events, overridden };
   }
-  // One use of the kit, counted on the carried row's quantity as a potion is; the last one takes the row.
-  if (input.method === "healers-kit" && kit) helper.inventory = withOneUsedUp(helper.inventory, kit.id);
+  // "A Healer's Kit has ten uses": counted on the carried row, and spending a kit's last use takes one kit.
+  let left: number | null = null;
+  if (input.method === "healers-kit" && kit) left = spendKitUse(helper, kit, deps.catalog);
   const line =
     input.method === "healers-kit"
-      ? `${helper.name} stabilized ${target.name} with a Healer's Kit.`
+      ? `${helper.name} stabilized ${target.name} with a Healer's Kit${left !== null && left > 0 ? ` (${left} ${left === 1 ? "use" : "uses"} left in it)` : ""}.`
       : `${helper.name} cast Spare the Dying, and ${target.name} is stable.`;
   events.push(...settle(state, target, condition, line, deps, input.commandId));
   return { stabilized: true, woke: false, check: null, events, overridden };
+}
+
+/** Spends one of a kit's uses (its record's `uses`, one when it names none). The last takes one kit from the stack,
+ *  and the next kit starts full. Returns the uses left in the kit in hand, or null when the row's last kit went. */
+function spendKitUse(
+  helper: LiveActor,
+  kit: LiveActor["inventory"][number],
+  catalog: EquipmentCatalog | undefined
+): number | null {
+  const limit = catalog?.equipmentRecord(catalogIdOf(kit))?.uses?.limit ?? 1;
+  const key = rowUsesKey(kit);
+  const spent = (helper.actionUses[key] ?? 0) + 1;
+  if (spent < limit) {
+    helper.actionUses = { ...helper.actionUses, [key]: spent };
+    return limit - spent;
+  }
+  const { [key]: _spent, ...rest } = helper.actionUses;
+  helper.actionUses = rest;
+  helper.inventory = withOneUsedUp(helper.inventory, kit.id);
+  return kit.quantity > 1 ? limit : null;
 }
 
 /** A spell's cast that makes a dying creature Stable (Spare the Dying): its 1d4 hours to 1 Hit Point start counting on

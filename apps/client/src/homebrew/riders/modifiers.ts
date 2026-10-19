@@ -45,6 +45,7 @@ const MODIFIER_LABELS: Readonly<
   "ability-score-minimum": ["The character", "Ability score of at least"],
   speed: ["The character", "Speed"],
   "speed-minimum": ["The character", "Speed of at least"],
+  "carrying-capacity-larger": ["The character", "Carries as one size larger"],
   "special-speed": ["The character", "Fly, swim, climb or burrow speed"],
   movement: ["The character", "Falling and jumping"],
   "extra-attack": ["The character", "Extra attack"],

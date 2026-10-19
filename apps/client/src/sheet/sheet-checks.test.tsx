@@ -72,6 +72,7 @@ function derivedSheet(over: Partial<ActorDerivedSheet> = {}): ActorDerivedSheet 
     defences: { resistances: [], immunities: [], vulnerabilities: [] },
     spellSaveDcBonus: 0,
     attunementSlots: 3,
+    carrying: null,
     weaponMasteries: [],
     classColumns: [],
     situations: [],
@@ -189,6 +190,29 @@ describe("the sheet's checks", () => {
       { actorId: HERO, ability: "str", visibility: "public", situations: ["prying with the Crowbar"] }
     ]);
     await waitFor(() => expect(toggle.getAttribute("aria-pressed")).toBe("false"));
+  });
+
+  it("rolls a tool's Utilize use at its printed DC", async () => {
+    const thieves = {
+      id: "thieves-tools",
+      name: "Thieves' Tools",
+      ability: "dex" as const,
+      bonus: 5,
+      mode: NORMAL,
+      reliableTalent: false,
+      uses: [
+        { label: "Pick a lock", dc: 15 },
+        { label: "Disarm a trap", dc: 15 }
+      ]
+    };
+    serve(derivedSheet({ tools: [thieves] }));
+    render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await openTab(user, "Checks");
+    await user.click(await screen.findByRole("button", { name: "Roll Pick a lock with Thieves' Tools, DC 15" }));
+    expect(sent("check:roll")).toEqual([
+      { actorId: HERO, ability: "dex", tool: "thieves-tools", visibility: "public", dc: 15 }
+    ]);
   });
 
   it("says an before a vowel: Roll an Intelligence check", async () => {

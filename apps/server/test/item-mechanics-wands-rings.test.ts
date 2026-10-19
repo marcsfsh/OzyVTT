@@ -427,10 +427,10 @@ describe("a held item's bonus to spell attack rolls", () => {
       ["talisman-of-ultimate-evil", 2]
     ] as const)
       expect(view.equipmentRecord(id)!.modifiers, id).toContainEqual({ type: "spell-attack-bonus", amount });
-    // Ring of Warmth stays prose.
+    // A ring that prints no such bonus gets none: the Ring of Warmth only takes 2d8 off Cold damage.
     const warmth = view.equipmentRecord("ring-of-warmth")!;
     expect(warmth.category).toBe("ring");
-    expect(warmth.modifiers).toEqual([]);
+    expect(warmth.modifiers.map((modifier) => modifier.type)).toEqual(["damage-reduction"]);
   });
 
   it("lands on its holder's spell attacks and on no weapon swing", () => {

@@ -48,6 +48,7 @@ import {
 import { freesLightExtraAttack, IMPLEMENTED_MASTERIES, type MasteryInForce } from "./weapon-mastery.js";
 import { copyKeyOf, rowRecord } from "./item-records.js";
 import { animatedRowIds } from "./animated-items.js";
+import { carryingOf, type Carrying } from "./carrying.js";
 
 /**
  * Every rider contribution is a pure function of (actor, definition, catalog), recomputed whole on every read
@@ -162,6 +163,8 @@ export type EquipmentDerivation = Readonly<{
   untrainedArmor: WornItem | null;
   /** An equipped Shield the bearer has no training with: it gives no AC. */
   untrainedShield: WornItem | null;
+  /** What a character carries against its carrying capacity; null for a stat block. */
+  carrying: Carrying | null;
 }>;
 
 /** An equipped item the rules name in a refusal or a roll card. */
@@ -188,7 +191,8 @@ export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
   sources: [],
   attunementSlots: 0,
   untrainedArmor: null,
-  untrainedShield: null
+  untrainedShield: null,
+  carrying: null
 });
 
 /** Whether an item's riders apply: equipped, present and (if required) attuned. A cursed item contributes
@@ -708,7 +712,8 @@ export function deriveEquipment(
     masteryByActionId,
     sources,
     attunementSlots: sumRiders(standing, "attunement-slots"),
-    ...training
+    ...training,
+    carrying: carryingOf(actor, definition, catalog, standing)
   };
 }
 

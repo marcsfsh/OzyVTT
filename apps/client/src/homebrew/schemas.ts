@@ -988,7 +988,7 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           label: "Only by",
           kind: "tags",
           placeholder: "cleric",
-          help: "A class, a species, spellcaster, or creature-attuned-to-a- and an item. Any one is enough. It's shown on the sheet, and a player can't attune a character that meets none. You can still attune anyone.",
+          help: "A class, a species, spellcaster, or creature-attuned-to-a- followed by an item's id. Any one is enough. It's shown on the sheet, and a player can't attune a character that meets none. You can still attune anyone.",
           visibleWhen: (draft) => draft.isMagic === true && getAt(draft, "attunement.required") === true
         },
         {

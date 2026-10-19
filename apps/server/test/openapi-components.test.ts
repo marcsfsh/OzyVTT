@@ -526,6 +526,7 @@ describe("generated OpenAPI components", () => {
       movement: { rule: "leap", feet: 30, costFeet: 10 },
       "ability-score-minimum": { ability: "str", score: 19 },
       "speed-minimum": { feet: 30, ignoresArmor: true },
+      "carrying-capacity-larger": {},
       "ignores-cover": {
         degree: "half",
         when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["spell"] }]

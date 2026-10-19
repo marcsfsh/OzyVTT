@@ -743,7 +743,8 @@ export const ModifierSchema = z
         "Change walking speed in feet, signed (Longstrider +10, the `slow` mastery -10). On a feature it is baked into the sheet's speed when the character is built, unless gated (Unarmored Movement's `while-unarmored`), when it is read with the live loadout; on an item or an effect it is summed live into the movement budget, so the feet come back when the item comes off or the effect ends."
       ),
     /** "Your Speed becomes 30 feet unless your Speed is higher": a floor under the bearer's Speed; with `ignoresArmor`,
-     *  Heavy Armor's Strength requirement takes nothing from it either (Boots of Striding and Springing). */
+     *  Heavy Armor's Strength requirement and a load beyond carrying capacity take nothing from it either (Boots of
+     *  Striding and Springing). */
     z
       .object({
         type: z.literal("speed-minimum"),
@@ -753,7 +754,14 @@ export const ModifierSchema = z
       })
       .strict()
       .describe(
-        "The bearer's Speed is at least `feet` while it holds (\"Your Speed becomes 30 feet unless your Speed is higher\"), read live with the movement budget. With `ignoresArmor`, armor whose Strength requirement the bearer doesn't meet takes no Speed from it."
+        "The bearer's Speed is at least `feet` while it holds (\"Your Speed becomes 30 feet unless your Speed is higher\"), read live with the movement budget. With `ignoresArmor`, neither armor whose Strength requirement the bearer doesn't meet nor a load beyond its carrying capacity takes Speed from it."
+      ),
+    /** "You count as one size larger when determining your carrying capacity" (Powerful Build). */
+    z
+      .object({ type: z.literal("carrying-capacity-larger"), ...riderGate })
+      .strict()
+      .describe(
+        "The bearer counts as one size larger when its carrying capacity is worked out (Powerful Build: a Medium creature carries Strength x 30 pounds). Read live with what it carries."
       ),
     /** A Fly, Swim, Climb or Burrow Speed: `feet` (Fly's 60, a Ring of Swimming's 40), or with `equalToSpeed` the
      *  creature's Speed as it stands (Spider Climb); `hover` lets a flier hover. Read live by the movement rules from
@@ -1926,6 +1934,9 @@ export type InventoryItem = z.infer<typeof InventoryItemSchema>;
 export function catalogIdOf(item: Readonly<{ id: string; recordId?: string | undefined }>): string {
   return item.recordId ?? item.id;
 }
+
+/** The `actionUses` key counting a carried row's own uses (a Healer's Kit's ten), which belong to that copy. */
+export const rowUsesKey = (item: Readonly<{ id: string }>): string => `${item.id}-uses`;
 export const CurrencySchema = z
   .object({
     cp: z.number().int().min(0).max(1_000_000).default(0),

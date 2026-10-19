@@ -22,6 +22,7 @@ const derivedWith = (defences: ActorDerivedSheet["defences"]) =>
     defences,
     spellSaveDcBonus: 0,
     attunementSlots: 3,
+    carrying: null,
     weaponMasteries: [],
     classColumns: [],
     situations: []

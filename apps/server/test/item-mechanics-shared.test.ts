@@ -195,14 +195,14 @@ describe("the cast rules apply to every authored cast", () => {
     expect(cure.healing?.formula).toMatch(/^2d8/);
   });
 
-  it("names no spell the record marks as an attack roll", () => {
-    // An item's cast takes its attack from the spell's cast model, so none of them relies on this column.
+  it("takes an attack spell's attacks from its cast model, at the bonus the item prints", () => {
+    // An item's cast takes its attack from the spell's cast model, so an attack spell must have one; the wearer's own
+    // bonus is not the item's, so the item prints its own (Circlet of Blasting's +5).
     for (const cast of AUTHORED_CASTS) {
       const spell = view.spellRecord!(cast.spellId)!;
-      expect(
-        spell.attackRoll,
-        `${cast.itemId} casts ${cast.spellId}, which the record marks attackRoll - castAction would hang an attack block on it`
-      ).toBe(false);
+      if (!spell.attackRoll) continue;
+      expect(spell.effect?.attacks ?? 0, `${cast.spellId} has no attacks in its cast model`).toBeGreaterThan(0);
+      expect(cast.cast.attackBonus, `${cast.itemId} prints no bonus to hit for ${cast.spellId}`).toBeDefined();
     }
   });
 });

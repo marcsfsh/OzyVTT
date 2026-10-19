@@ -521,6 +521,17 @@ it Prone, and Fire damage on an oiled creature within the minute deals 5 more. A
 Poison are effects the item grants its user; a coat's damage lasts a set number of hits (`damageUses`), in a fight
 or out of one.
 
+Adventuring gear follows the same rows. An equipment pack is the things it holds (`contents`): the build and a
+write to the sheet unpack it into its stacks (`character-build.ts`, `setInventoryItem`). A record's own `uses`
+with `per: "never"` (a Healer's Kit's ten) are counted per carried row under `rowUsesKey`, and spending the last
+takes one copy from the stack (`stabilize.ts`). Bindings (Chain, Rope, Manacles) are actions that grant their
+target an effect with an `endAction` check, the escape at its printed DC. In a fight a player can't don or doff
+body armor, which takes minutes, and a Shield takes the Utilize action on their turn (`held-items.ts`); an
+Unconscious creature drops what it holds, so its weapons and held items are no longer equipped. `carrying.ts`
+weighs what a character carries, coins included, against its Strength times its size's figure (a
+`carrying-capacity-larger` rider counts it one size up), and `speed.ts` holds its Speed to 5 feet beyond that. The
+sheet offers each tool's Utilize uses as checks at the DCs its record prints (`toolUses` in `ability-checks.ts`).
+
 Every spell a sheet or stat block knows is a cast action (`character-build.ts`, `monster-spells.ts`), so even
 one with nothing to roll (Light) spends its casting time and slot, holds its Concentration, places its area and is
 told to the table as cast (`cast-narration.ts`). Before anything is spent the economy checks the cast's components

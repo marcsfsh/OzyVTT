@@ -689,6 +689,8 @@ function buildCatalogData(homebrew: HomebrewCatalogSlice) {
     ...(item.spellScroll ? { spellScroll: { ...item.spellScroll } } : {}),
     // A manual's or tome's study, as its text prints it, so the GM's sheet can offer it.
     ...(item.study ? { study: { ...item.study } } : {}),
+    // The uses one copy holds (a Healer's Kit's ten), which its row counts down.
+    ...(item.uses?.limit !== undefined && item.uses.per === "never" ? { uses: { limit: item.uses.limit } } : {}),
     // The kinds its text lists (an Ioun Stone's stones) or the forms its holder picks (a Rod of Lordly Might's), by
     // name only: what a carried copy is stays on its row.
     ...(item.variants
