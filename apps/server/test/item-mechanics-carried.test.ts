@@ -676,13 +676,19 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
     expect(state.combat.pendingSaves[0]).toMatchObject({ ability: "dex", dc: 15, conditionIds: ["restrained"] });
   });
 
-  it("gives the Iron Flask a DC 17 Wis save and applies NO condition: nothing spurious off the prose", () => {
+  it("gives the Iron Flask a DC 17 Wis save whose failure traps and applies no condition", () => {
     const definition = definitionOf();
     const state = fight(stateWith([carried("iron-flask", "Iron Flask", { attuned: false })]));
     const action = effectiveActions(definition, state.actors[0], catalog).find(
       (entry) => entry.id === "item-iron-flask-trap"
     )!;
-    expect(action.save).toEqual({ ability: "wis", dc: 17, successDamage: "none", failureConditions: [] });
+    expect(action.save).toEqual({
+      ability: "wis",
+      dc: 17,
+      successDamage: "none",
+      failureConditions: [],
+      failureEffect: { name: "Trapped in the Iron Flask", tags: ["off-plane", "iron-flask"], modifiers: [] }
+    });
     expect(action.damage).toEqual([]);
 
     resolveDefinitionAction(

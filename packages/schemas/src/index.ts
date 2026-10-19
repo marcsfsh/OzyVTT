@@ -4817,6 +4817,24 @@ export const ActionSchema = z
     /** A teleport the action grants ("teleports up to 60 feet to an unoccupied space it can see"), see
      *  `ActionTeleportSchema`. */
     teleport: ActionTeleportSchema.optional(),
+    /** It holds the creatures its failed save takes off the map, `capacity` at a time, by the effect tagged `tag` (an
+     *  Iron Flask: one at a time); used while it holds that many, it is refused. */
+    holds: z
+      .object({ tag: EffectTagSchema, capacity: z.number().int().min(1).max(20) })
+      .strict()
+      .optional()
+      .describe(
+        "It holds the creatures its failed save takes off the map, `capacity` at a time, by the effect tagged `tag` (an Iron Flask: one); used while full, it is refused"
+      ),
+    /** It frees the creature its user holds by the effect tagged `tag`, beside its user; with `commandMinutes`, the
+     *  creature obeys its user that long (an Iron Flask's prisoner: 60). */
+    releases: z
+      .object({ tag: EffectTagSchema, commandMinutes: z.number().int().min(1).max(1440).optional() })
+      .strict()
+      .optional()
+      .describe(
+        "It frees the creature its user holds by the effect tagged `tag`, beside its user; with `commandMinutes`, it obeys its user that long (an Iron Flask: 60)"
+      ),
     /** It swallows its target (a behir's, a giant toad's), see `SwallowSchema`. */
     swallow: SwallowSchema.optional(),
     /** Each target is pulled straight toward the user as it resolves, stopping beside it (a roper's Reel: "pulls each

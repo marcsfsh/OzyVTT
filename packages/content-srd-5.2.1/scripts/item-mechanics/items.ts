@@ -1471,7 +1471,36 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `rod-of-security` - no plane model, and "once per 10 days" is not a `per` value.
+  // "Transports you and up to 199 other willing creatures you can see to a demiplane ... When the time runs out or you
+  // take a Magic action to end the effect, all visitors reappear in the location they occupied when you activated the
+  // rod or an unoccupied space nearest that location. Once used, this property can't be used again until 10 days have
+  // passed": off the map and back (`off-plane.ts`), up to 20 creatures a use as the target picker holds them, and 240
+  // hours of game time before the next. The hourly healing and the time limit are the GM's.
+  "rod-of-security": {
+    actions: [
+      {
+        id: "demiplane",
+        name: "Activate the Rod of Security",
+        activation: "action",
+        description:
+          "Transport yourself and willing creatures you can see to the rod's demiplane. Take this action again to bring every visitor back to the space it left, or the nearest unoccupied one.",
+        damage: [],
+        uses: { limit: 1, per: "time", afterHours: "240" },
+        targets: { count: 20, seen: true, who: "allies" },
+        grants: {
+          name: "In the Rod of Security's demiplane",
+          tags: ["off-plane", "rod-of-security"],
+          target: "self-and-targets",
+          toggles: true,
+          duration: { type: "manual" },
+          modifiers: [],
+          onEnd: [],
+          voidWhileIncapacitated: false,
+          concentration: false
+        }
+      }
+    ]
+  },
 
   // ---- The scroll ------------------------------------------------------------------------------
 
@@ -3727,8 +3756,24 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Target a creature you can see within 60 feet of yourself. If the flask is empty and the target is native to a plane of existence other than the one you are on, the target must succeed on a DC 17 Wisdom saving throw or be trapped in the flask. Once trapped, a creature remains in the flask until released.",
-        save: { ability: "wis", dc: 17, successDamage: "none", failureConditions: [] },
-        targets: { count: 1, rangeFeet: 60, seen: true, creatureTypes: ["celestial", "elemental", "fey", "fiend"] }
+        save: {
+          ability: "wis",
+          dc: 17,
+          successDamage: "none",
+          failureConditions: [],
+          failureEffect: { name: "Trapped in the Iron Flask", tags: ["off-plane", "iron-flask"], modifiers: [] }
+        },
+        targets: { count: 1, rangeFeet: 60, seen: true, creatureTypes: ["celestial", "elemental", "fey", "fiend"] },
+        holds: { tag: "iron-flask", capacity: 1 }
+      },
+      {
+        id: "release",
+        name: "Release the Creature",
+        activation: "action",
+        description:
+          "Remove the flask's stopper and release the creature in it. It appears beside you and obeys your commands for 1 hour; given none, or one likely to end in its death or imprisonment, it defends itself and takes no other actions.",
+        damage: [],
+        releases: { tag: "iron-flask", commandMinutes: 60 }
       }
     ]
   },

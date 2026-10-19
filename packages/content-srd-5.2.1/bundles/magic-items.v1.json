@@ -6564,11 +6564,34 @@
      ],
      "seen": true
     },
+    "holds": {
+     "tag": "iron-flask",
+     "capacity": 1
+    },
     "save": {
      "ability": "wis",
      "dc": 17,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureEffect": {
+      "name": "Trapped in the Iron Flask",
+      "tags": [
+       "off-plane",
+       "iron-flask"
+      ],
+      "modifiers": []
+     }
+    }
+   },
+   {
+    "id": "release",
+    "name": "Release the Creature",
+    "activation": "action",
+    "description": "Remove the flask's stopper and release the creature in it. It appears beside you and obeys your commands for 1 hour; given none, or one likely to end in its death or imprisonment, it defends itself and takes no other actions.",
+    "damage": [],
+    "releases": {
+     "tag": "iron-flask",
+     "commandMinutes": 60
     }
    }
   ],
@@ -12048,7 +12071,41 @@
   "casts": [],
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "demiplane",
+    "name": "Activate the Rod of Security",
+    "activation": "action",
+    "description": "Transport yourself and willing creatures you can see to the rod's demiplane. Take this action again to bring every visitor back to the space it left, or the nearest unoccupied one.",
+    "damage": [],
+    "targets": {
+     "count": 20,
+     "seen": true,
+     "who": "allies"
+    },
+    "grants": {
+     "name": "In the Rod of Security's demiplane",
+     "tags": [
+      "off-plane",
+      "rod-of-security"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self-and-targets",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "toggles": true
+    },
+    "uses": {
+     "limit": 1,
+     "per": "time",
+     "afterHours": "240"
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },

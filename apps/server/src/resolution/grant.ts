@@ -114,7 +114,9 @@ export function applyGrant(ctx: ResolveContext): void {
  *  lasts ends it on each recipient instead. True when it did. */
 function endToggled(ctx: ResolveContext, recipients: readonly LiveActor[]): boolean {
   const { state, action, attacker } = ctx;
-  const given = recipients.flatMap((recipient) =>
+  // What its user and its companions went to together, they all come back from (a Rod of Security's visitors).
+  const ending = action.grants!.target === "self-and-targets" ? state.actors : recipients;
+  const given = ending.flatMap((recipient) =>
     recipient.effects
       .filter((effect) => effect.sourceActorId === attacker.id && effect.sourceActionId === action.id)
       .map((effect) => ({ recipient, effect }))

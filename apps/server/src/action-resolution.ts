@@ -52,6 +52,7 @@ import { inflictOnTargets } from "./resolution/inflicts.js";
 import { applyGrant } from "./resolution/grant.js";
 import { spendStudy, studyAMiss } from "./resolution/studied.js";
 import { applyShapeShift, checkShapeShift } from "./resolution/shape-shift.js";
+import { checkHolding, releaseHeld } from "./resolution/held-creatures.js";
 import { formsOffer } from "./transform/offer.js";
 import { applyMovementGrants } from "./resolution/movement-grants.js";
 import { applyTimeStop } from "./time-stop.js";
@@ -176,8 +177,9 @@ export function resolveDefinitionAction(
   checkOverchannel(ctx);
   checkWallTarget(ctx);
   ctx.builtin?.check?.(ctx);
-  // A form the action can't give is refused before anything is spent.
+  // A form the action can't give is refused before anything is spent, and so is a full flask.
   checkShapeShift(ctx);
+  checkHolding(ctx);
   // A look at the damage of an action with no attack roll throws its damage and nothing else.
   if (look && !ctx.action.attack) {
     // With no attack to roll it only sets the filters the damage riders read.
@@ -232,6 +234,12 @@ export function resolveDefinitionAction(
     useUpConsumable(ctx);
     releaseHideAndReady(ctx);
     spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // Opening a flask frees the creature it holds, beside its user and at its command.
+  if (releaseHeld(ctx)) {
+    commitEconomy(ctx);
+    useUpConsumable(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
   // A spell that Slow's chance makes fail spends its slot and its action, and nothing else happens.

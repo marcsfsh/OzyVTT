@@ -103,7 +103,10 @@ export function settlePlanes(state: GameState, geometry: TokenMapGeometry, deps?
       events.push(...sentHome(state, actor, deps));
       continue;
     }
-    const landing = nearestOpenSpace(state, actor.id, kept.position, geometry);
+    const beside = kept.besideActorId
+      ? state.combat.tokens.find((candidate) => candidate.actorId === kept.besideActorId)?.position
+      : undefined;
+    const landing = nearestOpenSpace(state, actor.id, beside ?? kept.position, geometry);
     moveEncounterToken(state, actor.id, landing, geometry);
     if (landing === kept.position) setAltitude(state, actor.id, kept.altitudeFeet ?? 0, kept.airborne);
     events.push({

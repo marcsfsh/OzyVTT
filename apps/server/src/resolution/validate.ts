@@ -146,6 +146,8 @@ function combatantsOf(
     action.move !== undefined ||
     action.leap !== undefined ||
     action.teleport !== undefined ||
+    // Opening a flask frees the creature it holds.
+    action.releases !== undefined ||
     (castsASpell && !rollsOnTargets) ||
     input.builtin === true ||
     // A light or a cloud is something done, with no creature under it (a magmin's flames, a darkmantle's aura).
@@ -181,6 +183,7 @@ function combatantsOf(
     action.move === undefined &&
     action.leap === undefined &&
     action.teleport === undefined &&
+    action.releases === undefined &&
     action.summons === undefined &&
     action.raisesCorpse === undefined &&
     action.swallow?.conditions === undefined &&
