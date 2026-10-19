@@ -2238,7 +2238,7 @@ describe("a settled pick the character may re-make (`replaces`): through both pa
     expect(field.validate?.("f1", { id: "f2" }, EMPTY_CONTEXT)).toBeNull();
   });
 
-  it("2. SRD content authors the same shape: 2 replaceable picks and 7 superseding features", () => {
+  it("2. SRD content authors the same shape: 2 picks re-made on a rest and 7 superseding features", () => {
     const library = new ContentLibrary().forAudience("gm");
     const clauses: Array<{ id: string; clause: Record<string, unknown> }> = [];
     const supersedes: Array<{ id: string; replaced: string }> = [];
@@ -2261,8 +2261,13 @@ describe("a settled pick the character may re-make (`replaces`): through both pa
     for (const summary of library.subclassSummaries()) walk(library.subclassRecord(summary.id));
     for (const summary of library.featSummaries()) walk(library.featRecord(summary.id));
 
-    // Two clauses at the time of writing, both on subclass features, each naming its own feature's pick.
-    expect(clauses.map((entry) => entry.id).sort()).toEqual(["circle-of-the-land-spells", "fiendish-resilience"]);
+    // Two rest clauses at the time of writing, both on subclass features, each naming its own feature's pick. The
+    // level-up clauses are the replacements a player may make when levelling (`level-up-picks.ts`).
+    const onRests = clauses.filter((entry) => entry.clause.when !== "level-up");
+    expect(onRests.map((entry) => entry.id).sort()).toEqual(["circle-of-the-land-spells", "fiendish-resilience"]);
+    expect(clauses.filter((entry) => entry.clause.when === "level-up").map((entry) => entry.id)).toEqual(
+      expect.arrayContaining(["eldritch-invocations", "metamagic", "magic-initiate-cleric", "spellcasting"])
+    );
     expect(clauses.find((entry) => entry.id === REOPENED.srdFeatureId)?.clause).toEqual({
       offer: REOPENED.srdOffer,
       when: "short-rest",
@@ -2634,6 +2639,7 @@ const boonMonk = (boonId: string, tagId: string): CharacterCreateRequestInput =>
       { level: 1, kind: "language", id: "giant" },
       { level: 1, classId: "monk", kind: "skill", id: "acrobatics" },
       { level: 1, classId: "monk", kind: "skill", id: "insight" },
+      { level: 1, classId: "monk", kind: "tool", id: "instrument-flute" },
       { level: 3, classId: "monk", kind: "subclass", id: "warrior-of-the-open-hand" },
       ...(
         [
