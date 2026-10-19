@@ -48,6 +48,7 @@ import { withoutSourceName } from "../hidden-source.js";
 import { sizeRank, type DefinitionAction, type LiveActor, type ResolveContext, type ResolveInput } from "./context.js";
 import { readComponents, spendComponents, type ComponentSpend } from "./components.js";
 import { spellTargetViolations } from "./spell-targets.js";
+import { NO_CASTING_TAG, raiseViolations, revivalViolations } from "./revival.js";
 import {
   castInstanceOf,
   commitShaping,
@@ -225,7 +226,8 @@ export function evaluateActionEconomy(
   checkTargeting(evaluation, distanceFeet);
   // Who a non-spell action may target: its count, range and creatures (`ActionSchema.targets`).
   evaluation.violations.push(
-    ...actionTargetViolations({ state, attacker, action, targetIds, definition, resolveDefinition, distanceFeet })
+    ...actionTargetViolations({ state, attacker, action, targetIds, definition, resolveDefinition, distanceFeet }),
+    ...raiseViolations({ state, attacker, action, targetIds })
   );
   if (spell) checkMarkMove(evaluation, spell);
   if (spell) checkSpellUp(evaluation, spell);
@@ -254,6 +256,9 @@ export function evaluateActionEconomy(
         catalog
       })
     );
+  // A revival's dead creature: dead, not too long ago, and with a body it can bring back.
+  if (spell && newCast)
+    evaluation.violations.push(...revivalViolations({ state, spell, targetIds, resolveDefinition }));
   const shaped = newCast
     ? shapingCheck({
         state,
@@ -552,6 +557,13 @@ function checkAbleToAct({ state, attacker, action, resolveDefinition, violations
     violations.push({
       rule: "condition.no-spells",
       message: `${attacker.name} can't cast spells or take the Magic action while ${shownEffectName(state, befuddled, resolveDefinition)} lasts.`
+    });
+  // Resurrection's toll on its caster: "Until you finish a Long Rest, you can't cast spells again".
+  const taxed = attacker.effects.find((effect) => effect.tags.includes(NO_CASTING_TAG));
+  if (taxed && (action.spellId !== undefined || action.spellSlot !== undefined))
+    violations.push({
+      rule: "condition.no-spells",
+      message: `${attacker.name} can't cast spells until ${shownEffectName(state, taxed, resolveDefinition)} ends with a Long Rest.`
     });
   // SRD Rage: "you can't cast spells".
   if ((action.spellId !== undefined || action.spellSlot !== undefined) && hasEffectTag(attacker, RAGING_TAG))

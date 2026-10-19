@@ -4821,6 +4821,29 @@
   },
   "cursed": false,
   "casts": [],
+  "onHit": [
+   {
+    "conditions": [
+     {
+      "id": "frightened"
+     }
+    ],
+    "duration": {
+     "type": "until-source-turn-end"
+    },
+    "save": {
+     "ability": "wis",
+     "dc": 15
+    },
+    "creatureTypes": [
+     "fiend",
+     "undead"
+    ],
+    "kills": {
+     "afterHitAtOrBelow": 25
+    }
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -4878,7 +4901,9 @@
     "creatureTypes": [
      "construct"
     ],
-    "reminder": "A Construct with 25 Hit Points or fewer after this damage is destroyed."
+    "kills": {
+     "afterHitAtOrBelow": 25
+    }
    }
   ],
   "grantsFeatIds": [],
@@ -5450,6 +5475,23 @@
   },
   "cursed": false,
   "casts": [],
+  "onHit": [
+   {
+    "conditions": [],
+    "save": {
+     "ability": "con",
+     "dc": 15
+    },
+    "naturalTwenty": true,
+    "kills": {
+     "hitPointsUnder": 100,
+     "exceptCreatureTypes": [
+      "construct",
+      "undead"
+     ]
+    }
+   }
+  ],
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -5695,7 +5737,23 @@
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
-  "effects": [],
+  "effects": [
+   {
+    "name": "Wound Closure",
+    "tags": [
+     "death-save-floor",
+     "hit-dice-doubled"
+    ],
+    "duration": {
+     "type": "manual"
+    },
+    "modifiers": [],
+    "onEnd": [],
+    "target": "self",
+    "voidWhileIncapacitated": false,
+    "concentration": false
+   }
+  ],
   "modifiers": []
  },
  {
@@ -10842,7 +10900,9 @@
    {
     "conditions": [],
     "naturalTwenty": true,
-    "reminder": "On a rolled 20 the sword cuts off one of the creature's heads, and it dies if it can't survive without it. A creature with Immunity to Slashing damage, no head or one too big for the blade takes an extra 30 Slashing damage instead, and Legendary Resistance can trade the head for that damage."
+    "kills": {
+     "beheads": true
+    }
    }
   ],
   "grantsFeatIds": [],

@@ -2,7 +2,7 @@ import type { HeldRoll, LooseSaveOutcome, RollAnswered, RollAnswerOffer } from "
 import { aggregateRollMode, otherDiceOf } from "@vtt/rules-5e";
 import { GameAccessDeniedError, requireActorAccess, requireGm } from "../authorization.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty } from "../condition-rules.js";
-import { rollDeathSave } from "../death-saves.js";
+import { DEATH_SAVE_FLOOR_TAG, rollDeathSave } from "../death-saves.js";
 import { startStableRecovery, type EffectNarration } from "../effects.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { stabilizeCreature } from "../stabilize.js";
@@ -371,7 +371,12 @@ export const saveCommands = [
         roll = rollDeathSave(
           draft,
           actor,
-          { commit, test: { ...test, natural: read.natural }, total: read.total },
+          {
+            commit,
+            test: { ...test, natural: read.natural },
+            total: read.total,
+            ...(derivation.context.effectTags?.includes(DEATH_SAVE_FLOOR_TAG) ? { floor: 10 } : {})
+          },
           {
             random: kit.context.random,
             rollId,

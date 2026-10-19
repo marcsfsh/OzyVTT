@@ -1,7 +1,6 @@
 import { ALIVE_AT_ZERO_TAG, type Actor, type GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { CANT_SPEAK_TAG, makeEffect, type EffectNarration } from "../effects.js";
-import { effectNameOf } from "../effect-names.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { sightRules } from "../vision/rules.js";
 import { takeForm } from "./assume.js";
@@ -23,57 +22,39 @@ export function inSunlight(state: GameState, actor: Actor, deps: AtZeroDeps): bo
   return sightRules(state, content, deps.distanceFeet).lightAt(actor.id)?.sunlight === true;
 }
 
-/** An id one per creature per turn, as the troll's hold at 0 Hit Points has. */
-const turnKey = (state: GameState, actor: Actor) =>
-  `${actor.id}:${state.combat.round}:${state.combat.turnActorId ?? "none"}`;
-
 /**
- * A vampire's Misty Escape: "If the vampire drops to 0 Hit Points outside its resting place, the vampire uses
- * Shape-Shift to become mist (no action required). If it can't use Shape-Shift, it is destroyed. While it has 0 Hit
- * Points in mist form, it can't return to its vampire form, and it must reach its resting place within 2 hours or be
- * destroyed." The mist form's effect keeps it alive at 0 Hit Points while it lasts; when it ends, the creature is
- * dead. Reaching the resting place, its Paralyzed condition and the Hit Point it regains are the GM's. True when it
- * escaped.
+ * The printed form a stat block's Shape-Shift takes at 0 Hit Points (a vampire's Misty Escape: "the vampire uses
+ * Shape-Shift to become mist"), taken as its form with the tags the escape gives (alive at 0, no actions, no speech) and
+ * for the hours its Shape-Shift says: "it must reach its resting place within 2 hours or be destroyed", so the form's
+ * end leaves it dead, and Hit Points regained at its resting place end it first. False when its stat block prints no
+ * such form.
  */
-export function escapeAtZero(
+export function escapeIntoForm(
   state: GameState,
   actor: Actor,
   definition: ActorDefinition | undefined,
   deps: AtZeroDeps,
+  escape: Readonly<{ id: string; name: string; tags: readonly string[] }>,
   events: EffectNarration[]
 ): boolean {
   const action = (definition?.actions ?? []).find((entry) => entry.shapeShift?.escapesAtZero);
   const shift = action?.shapeShift;
-  const escape = shift?.escapesAtZero;
-  const printed = shift?.printed?.find((entry) => entry.id === escape?.form);
-  if (!action || !shift || !escape || !printed) return false;
-  if (shift.notInSunlight && inSunlight(state, actor, deps)) {
-    events.push({
-      kind: "condition",
-      text: `${actor.name} can't shape-shift in sunlight, so it is destroyed.`,
-      actorId: actor.id
-    });
-    return false;
-  }
+  const printed = shift?.printed?.find((entry) => entry.id === shift.escapesAtZero?.form);
+  if (!action || !shift?.escapesAtZero || !printed) return false;
   const form = formRecord(shift, { name: printed.name, printed }, {});
   const effect = makeEffect({
-    id: `${turnKey(state, actor)}:escape-at-zero`,
-    name: `${effectNameOf(action.name)} (${printed.name})`.slice(0, 120),
-    tags: [ALIVE_AT_ZERO_TAG, ...(form.noSpeech ? [CANT_SPEAK_TAG] : [])],
+    id: escape.id,
+    name: escape.name,
+    tags: [...new Set([ALIVE_AT_ZERO_TAG, ...escape.tags, ...(form.noSpeech ? [CANT_SPEAK_TAG] : [])])],
     sourceActorId: actor.id,
     sourceName: actor.name,
     sourceActionId: action.id,
     startedRound: state.combat.round,
-    duration: { type: "minutes", remaining: escape.hours * 60 },
+    duration: { type: "minutes", remaining: shift.escapesAtZero.hours * 60 },
     form,
     modifiers: structuredClone(printed.modifiers)
   });
   events.push(...takeForm(state, actor.id, effect, deps));
-  events.push({
-    kind: "condition",
-    text: `${actor.name} drops to 0 HP and turns to ${printed.name.toLowerCase()} with no action. It can't change form at 0 HP, and it is destroyed unless it reaches its resting place within ${escape.hours} hours.`,
-    actorId: actor.id
-  });
   return true;
 }
 

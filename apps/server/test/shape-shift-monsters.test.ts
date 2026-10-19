@@ -160,7 +160,10 @@ describe("a vampire's Shape-Shift", () => {
     expect(isDead(vampire)).toBe(false);
     const mist = vampire.effects.find((effect) => effect.form?.printedId === "mist")!;
     expect(mist.duration).toEqual({ type: "minutes", remaining: 120 });
-    expect(result.events.map((event) => event.text).join(" ")).toMatch(/turns to mist with no action/);
+    expect(result.events.map((event) => event.text).join(" ")).toMatch(/escapes as mist \(Misty Escape\)/);
+    // The mist is its printed form: Medium, flying, Resistance to all damage.
+    expect(vampire.size).toBe("medium");
+    expect(mist.modifiers).toContainEqual(expect.objectContaining({ type: "damage-resistance" }));
     turnOf(fight, FOE);
     expect(refusal(() => fight.resolve(FOE, "shape-shift", { form: "true" }))).toMatch(/0 HP/);
     endEffect(fight.state, FOE, mist.id);
@@ -199,7 +202,7 @@ describe("the other printed forms", () => {
   });
 });
 
-describe("a dragon's Shapechange", () => {
+describe("a stat block's Shapechange", () => {
   it("casts Shapechange from its Spellcasting into a Beast", () => {
     const fight = table(druid(1), { [FOE]: "adult-gold-dragon" });
     turnOf(fight, FOE);
@@ -209,5 +212,17 @@ describe("a dragon's Shapechange", () => {
     expect(fight.definitionOf(FOE)?.abilityScores.str).toBe(bear.abilityScores.str);
     expect(fight.actor(FOE).size).toBe(bear.size);
     expect(dragon.effects.find((effect) => effect.form)?.concentration).toBe(true);
+  });
+
+  it("a deva's at-will Shapechange takes a form of its Challenge Rating or lower, and refuses an Undead", () => {
+    const fight = table(druid(1), { [FOE]: "deva" });
+    turnOf(fight, FOE);
+    expect(refusal(() => fight.resolve(FOE, "spellcasting-shapechange", { form: "vampire", gear: "worn" }))).toMatch(
+      /is an Undead, so Shapechange can't take that form/
+    );
+    fight.resolve(FOE, "spellcasting-shapechange", { form: "giant-eagle", gear: "worn" });
+    expect(fight.actor(FOE).effects.find((effect) => effect.form)?.form?.statBlockId).toBe("giant-eagle");
+    // It keeps its mind and its Spellcasting, so it can still cast.
+    expect(fight.definitionOf(FOE)?.abilityScores.wis).toBe(resolverOf(fight.state)("deva")!.abilityScores.wis);
   });
 });

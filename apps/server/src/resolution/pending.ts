@@ -20,6 +20,7 @@ import { openDamageWindow, type DamageWindowDeps } from "../damage-window.js";
 import { answerKeyOf, answersFromOthers, askAnswer } from "../roll-answers.js";
 import { heightenedTarget, shieldedFromSave } from "./metamagic.js";
 import { effectNameOf } from "../effect-names.js";
+import { fatalFailureOf } from "../fatal-saves.js";
 import { sightRules } from "../vision/rules.js";
 import { sceneSight } from "../vision/sight.js";
 import { areAllies } from "../creature-sides.js";
@@ -546,6 +547,7 @@ export function parkActionSave(ctx: ResolveContext): void {
   const onSuccessEffect = successEffectFor(ctx, cast);
   // A spell's save whose outcome the engine applies nothing of (Command, Polymorph): the card and the GM's result say
   // the GM applies it, so it never reads as if the server had.
+  const fatal = fatalFailureOf(action.save);
   const gmApplies =
     action.spellId !== undefined &&
     parts.every((part) => part.amount <= 0) &&
@@ -553,7 +555,8 @@ export function parkActionSave(ctx: ResolveContext): void {
     conditionIds.length === 0 &&
     !onFailEffect &&
     !onSuccessEffect &&
-    !action.save.failurePush;
+    !action.save.failurePush &&
+    fatal === null;
   if (gmApplies)
     ctx.warnings.push(
       `The server applies nothing of ${action.name}'s save. Apply what a failure or a success does from the spell's text.`
@@ -594,7 +597,8 @@ export function parkActionSave(ctx: ResolveContext): void {
     ...(onSuccessEffect ? { onSuccessEffect } : gmApplies ? { gmApplies: true as const } : {}),
     ...(action.save.breaksConcentration ? { breaksConcentration: true as const } : {}),
     // Moonbeam: a shape-shifted creature that fails reverts to its true form.
-    ...(action.save.failureEndsForm ? { endsForm: true as const } : {})
+    ...(action.save.failureEndsForm ? { endsForm: true as const } : {}),
+    ...fatal
   };
   for (const [saveBonus, targetIds] of groups)
     createPendingSaves(state, {

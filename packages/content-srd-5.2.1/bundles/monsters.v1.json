@@ -179,6 +179,12 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 3
   },
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Eldritch Restoration"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
@@ -9106,6 +9112,11 @@
       "type": "piercing"
      }
     ]
+   },
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
    }
   ],
   "extensions": {
@@ -10832,6 +10843,13 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 9,
@@ -12230,6 +12248,13 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -14897,6 +14922,13 @@
   "damageResistances": [
    "radiant"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Exalted Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
@@ -15255,6 +15287,13 @@
   "damageImmunities": [
    "lightning",
    "thunder"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Elemental Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -17039,6 +17078,13 @@
   "damageImmunities": [
    "fire"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Elemental Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -17448,6 +17494,13 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -22743,7 +22796,13 @@
       ],
       "maxTargetSize": "medium"
      }
-    ]
+    ],
+    "drain": {
+     "killsAtZero": {
+      "cause": "Bite",
+      "bodyGone": true
+     }
+    }
    },
    {
     "id": "blinding-spittle",
@@ -23021,6 +23080,13 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -25330,6 +25396,12 @@
    "poisoned",
    "restrained"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Celestial Restoration"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 10,
@@ -25983,6 +26055,11 @@
       "type": "until-bearer-next-turn"
      }
     }
+   },
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
    }
   ],
   "extensions": {
@@ -26915,6 +26992,13 @@
   "conditionImmunities": [
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -27121,6 +27205,20 @@
     "height": 3
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "multiple-heads",
+    "name": "Multiple Heads",
+    "heads": 5,
+    "damagePerHead": 25,
+    "regrowHitPoints": 20,
+    "stoppedBy": [
+     "fire"
+    ],
+    "attackId": "bite",
+    "reactiveHeads": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 8,
@@ -27430,6 +27528,13 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -29408,6 +29513,12 @@
    "frightened",
    "poisoned"
   ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Hellish Restoration"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 0,
@@ -29761,6 +29872,12 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 4
   },
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Spirit Jar"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
@@ -30973,6 +31090,13 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -32206,9 +32330,15 @@
       "tags": [
        "no-healing"
       ],
-      "reminder": "While cursed, the target can't regain Hit Points, its Hit Point maximum doesn't return to normal when finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse. A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
+      "reminder": "While cursed, the target can't regain Hit Points, its Hit Point maximum doesn't return to normal when finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse."
      }
-    ]
+    ],
+    "drain": {
+     "killsAtZero": {
+      "cause": "Rotting Fist",
+      "bodyGone": true
+     }
+    }
    },
    {
     "id": "dreadful-glare",
@@ -32422,9 +32552,15 @@
       "tags": [
        "no-healing"
       ],
-      "reminder": "While cursed, the target can't regain Hit Points, it gains no benefit from finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse. A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
+      "reminder": "While cursed, the target can't regain Hit Points, it gains no benefit from finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse."
      }
-    ]
+    ],
+    "drain": {
+     "killsAtZero": {
+      "cause": "Rotting Fist",
+      "bodyGone": true
+     }
+    }
    },
    {
     "id": "channel-negative-energy",
@@ -32566,6 +32702,12 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 3
   },
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Undead Restoration"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 15,
@@ -32754,6 +32896,13 @@
   "conditionImmunities": [
    "frightened",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -35289,6 +35438,11 @@
      },
      "immuneOnSuccess": true
     }
+   },
+   {
+    "kind": "restoration",
+    "name": "Diabolical Restoration",
+    "bodyGoes": true
    }
   ],
   "extensions": {
@@ -35539,6 +35693,13 @@
   },
   "damageResistances": [
    "radiant"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Exalted Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -37057,6 +37218,13 @@
     "height": 1
    }
   },
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Fiendish Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 13,
@@ -39198,10 +39366,20 @@
      "ability": "wis",
      "dc": 11,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureByHitPoints": [
+      {
+       "atOrBelow": 20,
+       "dropsToZero": true
+      }
+     ]
     },
-    "damage": [],
-    "reminder": "On a failed save: a target with 20 Hit Points or fewer drops to 0 Hit Points; any other target takes 13 (3d8) Psychic damage.",
+    "damage": [
+     {
+      "formula": "3d8",
+      "type": "psychic"
+     }
+    ],
     "targets": {
      "count": 1,
      "conditions": [
@@ -40418,10 +40596,24 @@
      "ability": "dex",
      "dc": 21,
      "successDamage": "none",
-     "failureConditions": []
+     "failureConditions": [],
+     "failureByHitPoints": [
+      {
+       "atOrBelow": 100,
+       "dies": true
+      }
+     ]
     },
-    "damage": [],
-    "reminder": "On a failed save: a creature with 100 Hit Points or fewer dies; any other takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage.",
+    "damage": [
+     {
+      "formula": "4d8 + 6",
+      "type": "piercing"
+     },
+     {
+      "formula": "8d8",
+      "type": "radiant"
+     }
+    ],
     "targets": {
      "count": 1,
      "rangeFeet": 600,
@@ -40496,6 +40688,13 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 4
   },
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Exalted Restoration",
+    "bodyGoes": true
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 21,
@@ -41634,6 +41833,12 @@
   "conditionImmunities": [
    "charmed",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Fiendish Restoration"
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -44822,6 +45027,13 @@
      "fire"
     ],
     "deathWaitsForTurn": true
+   },
+   {
+    "kind": "severed-limbs",
+    "name": "Loathsome Limbs",
+    "uses": 4,
+    "slashing": 15,
+    "limbMonsterId": "troll-limb"
    }
   ],
   "extensions": {
@@ -45711,6 +45923,10 @@
      "amount": 20,
      "type": "radiant"
     }
+   },
+   {
+    "kind": "misty-escape",
+    "name": "Misty Escape"
    }
   ],
   "extensions": {
@@ -46429,6 +46645,13 @@
   ],
   "conditionImmunities": [
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "restoration",
+    "name": "Demonic Restoration",
+    "bodyGoes": true
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -49263,7 +49486,19 @@
     "name": "Create Specter",
     "activation": "action",
     "description": "The wraith targets a Humanoid corpse within 10 feet of itself that has been dead for no longer than 1 minute. The target's spirit rises as a Specter in the space of its corpse or in the nearest unoccupied space. The specter is under the wraith's control. The wraith can have no more than seven specters under its control at a time.",
-    "damage": []
+    "damage": [],
+    "raisesCorpse": {
+     "monsterId": "specter",
+     "withinMinutes": 1,
+     "most": 7
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 10,
+     "creatureTypes": [
+      "humanoid"
+     ]
+    }
    }
   ],
   "token": {

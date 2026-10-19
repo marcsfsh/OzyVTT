@@ -223,6 +223,9 @@ export type ResolveContext = {
   readonly hiddenFromInitiator: (actorId: string) => boolean;
   readonly attacker: LiveActor;
   readonly targets: readonly LiveActor[];
+  /** Targets the cast's damage passes over: killed outright by it, or saved from that by Death Ward (Power Word
+   *  Kill). */
+  spared?: Set<string>;
   /** The builtin's special cases; only for an action taken from the builtin catalog. */
   readonly builtin: BuiltinHandler | undefined;
   /** The attacker's equipment contribution. */
