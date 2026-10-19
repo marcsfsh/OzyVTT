@@ -387,6 +387,14 @@ function engulfsEntrants(trait: Trait): TraitMechanic | null {
     : null;
 }
 
+/** "The ground in a 10-foot Emanation originating from the mouther is Difficult Terrain." */
+function difficultGround(trait: Trait): TraitMechanic | null {
+  const match = /^The ground in a (\d+)-foot Emanation originating from the [\w -]+? is Difficult Terrain\.$/.exec(
+    trait.description
+  );
+  return match ? { kind: "difficult-ground", name: trait.name, rangeFeet: Number(match[1]) } : null;
+}
+
 const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
   regeneration,
   undeadFortitude,
@@ -403,7 +411,8 @@ const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
   absorption,
   damageWeakens,
   blurredForm,
-  engulfsEntrants
+  engulfsEntrants,
+  difficultGround
 ];
 
 /** Every trait the engine can run, in the stat block's order; the rest stay prose. */

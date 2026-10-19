@@ -313,7 +313,8 @@ export const gameReads = [
               resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
               catalog: kit.equipmentCatalog()
             },
-            seen
+            seen,
+            (creatureId) => !hidden(creatureId)
           )
         : undefined;
       return {

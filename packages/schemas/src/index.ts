@@ -5256,6 +5256,15 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
   z
     .object({ kind: z.literal("engulfs-entrants"), name: TraitNameSchema, actionId: z.string().min(1).max(120) })
     .strict(),
+  /** "The ground in a 10-foot Emanation originating from the mouther is Difficult Terrain" (Aberrant Ground): ground
+   *  that moves with the creature, costing every other creature double. */
+  z
+    .object({
+      kind: z.literal("difficult-ground"),
+      name: TraitNameSchema,
+      rangeFeet: z.number().int().min(5).max(120)
+    })
+    .strict(),
   /** A vampire's Misty Escape: dropped to 0 Hit Points, it turns to mist and lives on at 0 unless it stands in
    *  sunlight, where it can't shape-shift and is destroyed. */
   z.object({ kind: z.literal("misty-escape"), name: TraitNameSchema }).strict(),

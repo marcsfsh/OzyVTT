@@ -13,20 +13,22 @@ const REACH_CELLS = 30;
 /**
  * The ground the spell areas change for one mover, in grid cells near it, for the client's move preview: the same tests
  * the server charges a move with (`zone-ground.ts`), read at each cell. Only the areas `seen` passes are read, so an
- * area hidden from the asker stays hidden until a move meets it. Undefined when no area changes this mover's ground.
+ * area hidden from the asker stays hidden until a move meets it; so do only the creatures `seenCreature` passes, for
+ * the ground they make Difficult round them. Undefined when nothing changes this mover's ground.
  */
 export function areaGroundFor(
   state: GameState,
   actorId: string,
   deps: Pick<ZoneDeps, "geometry" | "resolveDefinition" | "catalog">,
-  seen: (zone: SpellZone) => boolean
+  seen: (zone: SpellZone) => boolean,
+  seenCreature: (actorId: string) => boolean = () => true
 ): AreaGround | undefined {
   const calibration = deps.geometry?.calibration;
   const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId);
   if (!calibration || !token?.position) return undefined;
   const zones = state.combat.spellZones.filter((zone) => !zone.bursting && zoneHeld(state, zone) && seen(zone));
-  if (zones.length === 0) return undefined;
-  const ground = zoneGround(state, actorId, deps, zones);
+  // The ground a creature makes Difficult round it is read only round those the asker can see.
+  const ground = zoneGround(state, actorId, deps, zones, seenCreature);
   if (
     !ground ||
     (ground.difficult.length === 0 &&

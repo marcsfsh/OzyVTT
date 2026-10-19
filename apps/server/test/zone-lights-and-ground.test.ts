@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { loadMonsterDefinitions } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
 import type { EffectNarration } from "../src/effects.js";
 import { nextInitiativeTurn } from "../src/encounter.js";
@@ -8,6 +9,7 @@ import { movementCost } from "../src/terrain.js";
 import { igniteUnder } from "../src/zone-fire.js";
 import { zoneMovementOptions } from "../src/zone-ground.js";
 import { leaveOut } from "../src/zone-later.js";
+import { areaGroundFor } from "../src/zone-preview.js";
 import { settleZoneOutcomes } from "../src/zone-outcomes.js";
 import { ALLY, build, druidInput, fight, FOE, FOE2, HERO, heroTurnAgain, view, wizardInput } from "./spell-casters.js";
 import { cell, clericAt, drawArea, GRID, hpOf, place, savesOf, turnDeps, zoneDeps } from "./zone-fixtures.js";
@@ -170,6 +172,73 @@ describe("Plant Growth: ground left out of the overgrowth", () => {
         zoneDeps()
       )
     ).toThrow(/as it is cast/);
+  });
+});
+
+describe("Aberrant Ground round a gibbering mouther", () => {
+  const mouther = loadMonsterDefinitions().find((entry) => entry.source?.externalId === "gibbering-mouther")!;
+  const resolveDefinition = (id: string) => (id === "mouther" ? mouther : undefined);
+  const costNear = (state: GameState, from: readonly [number, number], to: readonly [number, number]) =>
+    movementCost(
+      state,
+      GRID,
+      HERO,
+      cell(...from),
+      cell(...to),
+      zoneMovementOptions(state, HERO, { ...zoneDeps(), resolveDefinition })
+    )!.feet;
+
+  /** The orc is a gibbering mouther at (10,10). */
+  function ground() {
+    const caster = fight(build(wizardInput(["magic-missile"])));
+    caster.state.actors.find((actor) => actor.id === FOE2)!.definitionId = "mouther";
+    place(caster.state, { [HERO]: cell(0, 10), [FOE]: cell(40, 40), [FOE2]: cell(10, 10) });
+    return caster;
+  }
+
+  it("charges double for ground within 10 feet of it, and the usual beyond", () => {
+    const { state } = ground();
+    expect(costNear(state, [7, 10], [8, 10])).toBe(10);
+    expect(costNear(state, [6, 10], [7, 10])).toBe(5);
+  });
+
+  it("moves with the mouther", () => {
+    const { state } = ground();
+    state.combat.tokens = state.combat.tokens.map((token) =>
+      token.actorId === FOE2 ? { ...token, position: cell(3, 10) } : token
+    );
+    expect(costNear(state, [7, 10], [8, 10])).toBe(5);
+    expect(costNear(state, [0, 10], [1, 10])).toBe(10);
+  });
+
+  it("shows its ground in the move preview only to someone who can see the mouther", () => {
+    const { state } = ground();
+    const deps = { ...zoneDeps(), resolveDefinition };
+    const shown = areaGroundFor(state, HERO, deps, () => true);
+    expect(shown?.difficult).toContainEqual({ column: 8, row: 10 });
+    expect(
+      areaGroundFor(
+        state,
+        HERO,
+        deps,
+        () => true,
+        (id) => id !== FOE2
+      )
+    ).toBeUndefined();
+  });
+
+  it("leaves the mouther's own steps at the usual cost", () => {
+    const { state } = ground();
+    expect(
+      movementCost(
+        state,
+        GRID,
+        FOE2,
+        cell(10, 10),
+        cell(11, 10),
+        zoneMovementOptions(state, FOE2, { ...zoneDeps(), resolveDefinition })
+      )!.feet
+    ).toBe(5);
   });
 });
 
