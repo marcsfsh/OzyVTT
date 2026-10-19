@@ -113,6 +113,36 @@ describe("a damage type the caster picks", () => {
   });
 });
 
+describe("Chromatic Orb's leap", () => {
+  const withDiamond = (table: ReturnType<typeof fight>) =>
+    table.hero.inventory.push({ id: "diamond", name: "Diamond", quantity: 1, equipped: false, attuned: false });
+
+  it("leaps on matching d8s to another creature within 30 feet, at no cost, of the same type, each creature once", () => {
+    const table = fight(wizard, { distance: 25 });
+    withDiamond(table);
+    // d20 15, then the d8s 3, 3, 5: two match.
+    table.resolve("spell-chromatic-orb", { damageType: "fire" }, [15, 3, 3, 5]);
+    const slots = table.hero.spellSlots!.find((slot) => slot.level === 1)!.remaining;
+    expect(() => table.resolve("spell-chromatic-orb", { targetIds: [FOE] }, [15, 1, 2, 4])).toThrowError(
+      /already struck/
+    );
+    const leap = table.resolve("spell-chromatic-orb", { targetIds: [FOE2] }, [15, 1, 1, 4]);
+    expect(leap.damage[0]).toMatchObject({ type: "fire" });
+    expect(table.hero.spellSlots!.find((slot) => slot.level === 1)!.remaining).toBe(slots);
+    // A level 1 slot leaps once: matching dice again open no second leap.
+    expect(table.state.combat.turn.actionInstance?.components["spell-chromatic-orb"]).toBe(0);
+  });
+
+  it("leaps only within 30 feet of the last target", () => {
+    const table = fight(wizard, { distance: 40 });
+    withDiamond(table);
+    table.resolve("spell-chromatic-orb", {}, [15, 3, 3, 5]);
+    expect(() => table.resolve("spell-chromatic-orb", { targetIds: [FOE2] }, [15, 1, 2, 4])).toThrowError(
+      /within 30 feet/
+    );
+  });
+});
+
 describe("Produce Flame", () => {
   it("is cast with no attack; the hurl is a Magic action out to 60 feet, scaling with the caster's level", () => {
     expect(druid.actions.find((action) => action.id === "spell-produce-flame")).toMatchObject({

@@ -336,7 +336,6 @@ export function resolveDefinitionAction(
   applySummons(ctx);
   applyShapeShift(ctx);
   layOutProvisions(ctx);
-  orbLeap(ctx);
   placeCastSight(ctx);
   applyCastWalls(ctx);
   refuseThePrayedFor(ctx);
@@ -358,6 +357,8 @@ export function resolveDefinitionAction(
   applyRageRules(ctx);
 
   commitEconomy(ctx);
+  // After the economy, which writes the action's instance that a leap continues.
+  orbLeap(ctx);
   recallSpellSlot(ctx);
   spendStoredCast(ctx);
   afterDivineWish(ctx);

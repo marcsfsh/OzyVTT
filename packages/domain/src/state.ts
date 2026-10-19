@@ -1404,7 +1404,18 @@ const sceneCombatShape = {
           parentId: z.string().max(120).optional(),
           replacements: z.record(z.string(), z.number().int().nonnegative()).optional(),
           /** How the spell whose rays it holds was shaped (Metamagic), which every later ray keeps. Never projected. */
-          shaping: z.array(CastShapingSchema).max(4).optional()
+          shaping: z.array(CastShapingSchema).max(4).optional(),
+          /** Chromatic Orb leaping: the creature it leaps from, those it struck this cast, the leaps left and its damage
+           *  type. Never projected. */
+          leap: z
+            .object({
+              fromId: z.uuid(),
+              struck: z.array(z.uuid()).max(10),
+              left: z.number().int().min(0).max(9),
+              damageType: z.string().min(1).max(40).optional()
+            })
+            .strict()
+            .optional()
         })
         .strict()
         .nullable()

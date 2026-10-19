@@ -34,6 +34,7 @@ import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
 import { reachBarredBy } from "../zone-barriers.js";
 import { bearsCastOf, levitatedBy, takenWithCast } from "../lasting-spells.js";
 import { checkStoredRelease } from "../stored-casts.js";
+import { checkOrbLeap } from "./orb-leap.js";
 import { swallowCover } from "../swallow.js";
 import { enclosureBlocks } from "../enclosures.js";
 import { builtinHandlerFor } from "./builtins.js";
@@ -501,6 +502,8 @@ export function openResolve(
     ...(withCast ? { withCast: true } : {})
   };
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
+  // A leaping Chromatic Orb: a new creature within 30 feet of the last, of the cast's type.
+  ctx.action = checkOrbLeap(ctx);
   if (!input.economyPaid) warnings.push(...laterActionReminders(spell, action));
   return ctx;
 }

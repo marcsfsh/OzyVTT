@@ -1584,8 +1584,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:blur": enforced(
     "Attack rolls against the caster have Disadvantage while it lasts, except from an attacker whose Blindsight or Truesight reaches it (resolution/attack.ts)."
   ),
-  "spell:chromatic-orb": guided(
-    "The attack and the chosen damage type are applied, and when two of the d8s match the server says the orb leaps (resolution/orb-leap.ts). Aiming each leap is the caster's to make as another attack."
+  "spell:chromatic-orb": enforced(
+    "The attack and the chosen damage type are applied, 1d8 more a slot level above 1, and it needs a 50 GP diamond (resolution/components.ts). When two of a hit's d8s match, the cast's action stays open for one more orb: cast again at no cost, it attacks a creature within 30 feet of the last target that this casting hasn't struck, with the same damage type and a new damage roll, up to the slot's level in leaps, one for a level 1 slot (resolution/orb-leap.ts)."
   ),
   "spell:confusion": guided(
     "A failed save bars the target's Bonus Actions and Reactions, with the save repeated at the end of each of its turns (save-stages.ts), and random-outcomes.ts rolls its d10 at the start of each of its turns and takes for that turn what the roll forbids. The Sphere grows by 5 feet for each slot level above 4 (spell-zone-state.ts). The wandering move and the random attack are said to the table."

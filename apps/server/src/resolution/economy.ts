@@ -87,6 +87,7 @@ export type EconomyPlan = Readonly<{
     parentId?: string;
     replacements?: Record<string, number>;
     shaping?: readonly CastShaping[];
+    leap?: Readonly<{ fromId: string; struck: readonly string[]; left: number; damageType?: string }>;
   }> | null;
   /** The same for a compound Bonus Action (Flurry of Blows), or a spell's rays cast as one (Quickened Spell). */
   bonusInstance: Readonly<{
@@ -1274,6 +1275,8 @@ function checkActionSlot(evaluation: Evaluation): SlotPlan {
       components: open.components,
       ...(active.slotLevel !== undefined ? { slotLevel: active.slotLevel } : {}),
       ...(active.shaping !== undefined ? { shaping: active.shaping } : {}),
+      // A leaping Chromatic Orb keeps who it struck (`orb-leap.ts`).
+      ...(active.leap !== undefined ? { leap: active.leap } : {}),
       ...(active.parentId !== undefined ? planRecord(active.parentId, open.replacements) : {})
     }
   });
@@ -1730,6 +1733,9 @@ export function commitEconomy({
         ...(plan.instance.slotLevel !== undefined ? { slotLevel: plan.instance.slotLevel } : {}),
         ...(plan.instance.shaping !== undefined
           ? { shaping: plan.instance.shaping.map((entry) => ({ ...entry })) }
+          : {}),
+        ...(plan.instance.leap !== undefined
+          ? { leap: { ...plan.instance.leap, struck: [...plan.instance.leap.struck] } }
           : {}),
         ...(plan.instance.parentId !== undefined
           ? planRecord(plan.instance.parentId, plan.instance.replacements ?? {})
