@@ -1651,8 +1651,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:true-resurrection": enforced(
     "resolution/revival.ts refuses a target dead more than 200 years, and brings back one whose body is gone (Disintegrate) in a new body. It returns with all its Hit Points, its poison, curses and Contagion ended. Where a new body appears, and the stat block of an Undead returned to life, are the GM's."
   ),
-  "spell:reincarnate": guided(
-    "resolution/revival.ts refuses a target dead more than 10 days and returns it with all its Hit Points in a new body, rolling the d10 for its species (a 1 rolls again) and noting it on the creature. Rebuilding the sheet with the new species, and the soul's consent, are the GM's."
+  "spell:reincarnate": enforced(
+    "resolution/revival.ts refuses a target dead more than 10 days and returns it with all its Hit Points in a new body, rolling the d10 for its species (a 1 rolls again). A character built here is then rebuilt from its ledger as that species (reincarnation.ts): the old species' traits and picks go, its classes, background and scores stay, and the new species' picks take their first legal options, which the narration names and the GM can change in the Level flow. A creature with no build ledger keeps the note for the GM. The soul's consent is the table's."
   ),
   "spell:gentle-repose": enforced(
     "resolution/revival.ts takes only a corpse, and the game time it spends under the spell's 10 days doesn't count against a revival's limit (death.ts). Keeping it from becoming Undead is the GM's."

@@ -4,7 +4,9 @@ import { keepDeathRecords, roundsDead, stampDeath } from "../src/death.js";
 import { addEffect, makeEffect } from "../src/effects.js";
 import { passGameTime } from "../src/game-time.js";
 import { applyRest } from "../src/rests.js";
-import { ALLY, FOE, HERO, view } from "./spell-casters.js";
+import { importActorDefinition } from "../src/actor-roster.js";
+import { settleReincarnations } from "../src/reincarnation.js";
+import { ALLY, build, catalog, FOE, HERO, view, wizardInput } from "./spell-casters.js";
 import { actorOf, cast, caster, effectNames, endFight, wizard } from "./spell-lifetimes-kit.js";
 
 // SRD 5.2.1 revival spells. Revivify: "You touch a creature that has died within the last minute. That creature
@@ -16,6 +18,7 @@ import { actorOf, cast, caster, effectNames, endFight, wizard } from "./spell-li
 // limit of spells such as Raise Dead."
 
 const DAY = 24 * 60;
+const FRIEND = "10000000-0000-4000-8000-0000000000bb";
 
 const diamond = (gp: number) => ({
   id: `diamond-${gp}`,
@@ -279,6 +282,55 @@ describe("Reincarnate", () => {
     expect(result.tableNarration?.map((line) => line.text).join(" ")).toMatch(
       /Bran's new body is a Halfling \(d10: 7\)/
     );
+  });
+
+  // "It loses the traits of its previous species and gains the traits of its new one."
+  it("rebuilds a character as the rolled species: its old species' traits and picks go, its class levels stay", () => {
+    const table = caster({ combat: false });
+    table.hero.inventory.push({ id: "rare-oils", name: "Rare oils", quantity: 1, equipped: false, attuned: false });
+    importActorDefinition(table.state, build(wizardInput(["shield"])), FRIEND, "public", catalog);
+    const friend = actorOf(table.state, FRIEND);
+    command(table.state, () => {
+      friend.hp = { ...friend.hp, current: 0 };
+      friend.deathSaves = { successes: 0, failures: 3, stable: false };
+    });
+    expect(isDead(friend)).toBe(true);
+    cast(table, "reincarnate", { targetIds: [FRIEND] }, [3]);
+    const events = settleReincarnations(table.state, {
+      library: view,
+      policy: table.state.builderPolicy,
+      catalog
+    });
+    const sheet = table.state.definitions.find((entry) => entry.id === friend.definitionId)!.definition;
+    expect(sheet.character?.race?.id).toBe("dwarf");
+    const features = (sheet.character?.features ?? []).map((feature) => feature.id);
+    expect(features).toEqual(expect.arrayContaining(["dwarf-darkvision", "dwarf-resilience", "dwarf-toughness"]));
+    expect(features).not.toContain("human-skillful");
+    // Alert came from the human's Versatile: it goes with the species.
+    expect((sheet.character?.feats ?? []).map((feat) => feat.id)).not.toContain("alert");
+    expect(sheet.character?.classes.map((entry) => [entry.id, entry.level])).toEqual([["wizard", 5]]);
+    expect(friend.hp.current).toBe(friend.hp.maximum);
+    expect(events.map((event) => event.text).join(" ")).toMatch(/Dwarf traits/);
+    // The species is applied once.
+    expect(settleReincarnations(table.state, { library: view, policy: table.state.builderPolicy, catalog })).toEqual(
+      []
+    );
+  });
+
+  it("fills the new species' picks with their first options, which the narration names", () => {
+    const table = caster({ combat: false });
+    table.hero.inventory.push({ id: "rare-oils", name: "Rare oils", quantity: 1, equipped: false, attuned: false });
+    importActorDefinition(table.state, build(wizardInput(["shield"])), FRIEND, "public", catalog);
+    const friend = actorOf(table.state, FRIEND);
+    command(table.state, () => {
+      friend.hp = { ...friend.hp, current: 0 };
+      friend.deathSaves = { successes: 0, failures: 3, stable: false };
+    });
+    cast(table, "reincarnate", { targetIds: [FRIEND] }, [2]);
+    const events = settleReincarnations(table.state, { library: view, policy: table.state.builderPolicy, catalog });
+    const sheet = table.state.definitions.find((entry) => entry.id === friend.definitionId)!.definition;
+    expect(sheet.character?.race?.id).toBe("dragonborn");
+    expect(events.map((event) => event.text).join(" ")).toMatch(/the GM can change these in the Level flow/);
   });
 });
 

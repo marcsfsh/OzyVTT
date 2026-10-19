@@ -1,3 +1,4 @@
+import { settleReincarnations } from "../reincarnation.js";
 import type { ActionResolution, AnnotationPoint, AnnotationShapeKind, GameState, RollRecord } from "@vtt/domain";
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
@@ -51,13 +52,7 @@ import { castingMinutesOf } from "../resolution/long-casting.js";
 import { passTime } from "../rests.js";
 import { standsInSilence } from "../silence.js";
 import { bringSummons, familiarDelivery } from "../summons.js";
-import {
-  distanceFromForce,
-  settleForce,
-  settleInterposing,
-  strikeOriginFor,
-  struckFrom
-} from "../summon-strikes.js";
+import { distanceFromForce, settleForce, settleInterposing, strikeOriginFor, struckFrom } from "../summon-strikes.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
 
@@ -554,6 +549,15 @@ export const actionCommands = [
             ? leaveShortRest(draft, new Set([actorId]), `cast ${spell.name}`)
             : [])
         ];
+        // Reincarnate's new body: a character is rebuilt with the rolled species.
+        if (!resolution.preview)
+          restBroken.push(
+            ...settleReincarnations(draft, {
+              library: kit.playCatalog(),
+              policy: draft.builderPolicy,
+              catalog: kit.equipmentCatalog()
+            })
+          );
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
         // by default, or applied directly), so the player never mutates a creature they don't own.
         if (isPlayer)
