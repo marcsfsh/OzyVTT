@@ -246,6 +246,7 @@ const ELEMENT_REFERENCES: Readonly<Record<string, Readonly<Record<string, RefKin
  *   `while-proficient-with.ids` for weapon/armor/tool: groups (the `"skill"` kind is checked).
  *   `sense` - an open name: dynamic vision reads the ones it knows (`vision/senses.ts`), the rest are shown.
  *   `actions[].id`, `multiattack[].actionId` - local to the item's own action list.
+ *   `casts[].optionIds` - local to the cast spell's own options.
  *   `grants.saves` - already a closed zod enum.
  */
 export const OPEN_BY_DESIGN: readonly string[] = Object.freeze([
@@ -258,7 +259,8 @@ export const OPEN_BY_DESIGN: readonly string[] = Object.freeze([
   "armor",
   "sense",
   "saves",
-  "actionId"
+  "actionId",
+  "optionIds"
 ]);
 
 /** Levenshtein, only ever run against one vocabulary to turn a refusal into a fix. */

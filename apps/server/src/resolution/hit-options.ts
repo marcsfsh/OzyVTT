@@ -16,6 +16,7 @@ import { SMITE_OF_PROTECTION_TAG } from "../paladin-auras.js";
 import { effectiveModeFor, overrideCovers, overrideWaives } from "../rules-families.js";
 import { useCostOf } from "../use-cost.js";
 import { recordRoll, sizeAtMost, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
+import { afterItemSpend } from "./charges.js";
 import { beginConcentration } from "./concentration.js";
 import { criticalExpression, SAVAGE_ATTACKER, savageAttackerReady } from "./damage.js";
 import { commitEconomy, evaluateActionEconomy, planEconomy, spendSlot } from "./economy.js";
@@ -702,5 +703,7 @@ export function spendHitOptions(ctx: ResolveContext): void {
       plan: economy.plan,
       overridden: economy.overridden
     });
+    // A staff's charge spent on a hit rolls its last charge's d20 as any use of the staff does.
+    afterItemSpend(ctx, action, economy.plan.spendUse);
   }
 }

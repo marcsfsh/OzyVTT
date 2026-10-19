@@ -624,3 +624,32 @@ describe("the eligibility column", () => {
     ).toEqual(["ammunition-1", "ammunition-2", "ammunition-3", "ammunition-of-slaying"]);
   });
 });
+
+describe("what a spent last charge does", () => {
+  it("declares the outcome of every last charge's d20 whose 1 the SRD text prints", () => {
+    const rolled = rows.filter((row) => row.charges?.lastChargeRoll);
+    for (const row of rolled) {
+      const printsOne = /roll 1d20\. On a 1\b/.test(row.description ?? "");
+      expect(row.charges?.lastCharge !== undefined, `${row.id}: lastCharge`).toBe(printsOne);
+    }
+    // The Staff of the Magi's d20 prints only a 20.
+    expect(rolled.filter((row) => row.charges?.lastCharge === undefined).map((row) => row.id)).toEqual([
+      "staff-of-the-magi"
+    ]);
+  });
+
+  it("ends the item where its text says the last charge or use does, with no d20", () => {
+    const outcomes = Object.fromEntries(
+      rows
+        .filter((row) => row.charges?.lastCharge !== undefined && !row.charges.lastChargeRoll)
+        .map((row) => [row.id, row.charges!.lastCharge])
+    );
+    expect(outcomes).toEqual({
+      "chime-of-opening": "destroyed",
+      "gem-of-brightness": "nonmagical",
+      "necklace-of-fireballs": "destroyed",
+      "ring-of-three-wishes": "nonmagical",
+      "scarab-of-protection": "destroyed"
+    });
+  });
+});

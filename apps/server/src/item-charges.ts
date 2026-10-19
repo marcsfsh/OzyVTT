@@ -43,6 +43,22 @@ export function lastChargeLine(itemName: string, face: number): string {
     : `${itemName}'s last charge is spent; the d20 shows ${face}, so it keeps working.`;
 }
 
+/** A 20 on the last charge's d20 gives some back where the item says so (Staff of Power: 1d8 + 2). Returns the line
+ *  for the table. */
+export function regainOnTwenty(
+  actor: Actor,
+  key: string,
+  itemName: string,
+  formula: string,
+  random: (sides: number) => number
+): string {
+  const spent = actor.actionUses[key] ?? 0;
+  const back = Math.min(rollRegain(formula, random), spent);
+  const { [key]: _spent, ...others } = actor.actionUses;
+  actor.actionUses = spent - back > 0 ? { ...others, [key]: spent - back } : others;
+  return `${itemName}'s last charge is spent and the d20 shows 20, so it regains ${back} charge${back === 1 ? "" : "s"}.`;
+}
+
 /** Rolls a charge count ("1d6 + 1", "1d3", or a flat "1") with the server's dice. A d3 is a die of its own here, as
  *  the SRD prints it. */
 export function rollRegain(formula: string, random: (sides: number) => number): number {

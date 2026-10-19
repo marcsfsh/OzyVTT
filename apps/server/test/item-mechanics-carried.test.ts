@@ -748,7 +748,8 @@ describe("what no carried item can carry", () => {
       "potion-of-poison",
       "potion-of-resistance",
       "potion-of-speed",
-      "potion-of-vitality"
+      "potion-of-vitality",
+      "potion-of-water-breathing"
     ]);
   });
 

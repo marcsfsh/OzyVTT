@@ -840,8 +840,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:boots-of-striding-and-springing": guided(
     "Its wearer's Speed is at least 30 feet and armor's Strength requirement takes none of it (speed.ts), and the once-a-turn leap of 30 feet for 10 feet of movement is applied (jumping.ts). Carried weight is the GM's."
   ),
-  "item:boots-of-levitation": guided(
-    "The action levitates the wearer with no save for the spell's 10 minutes: it rises 20 feet, moves only as if climbing, and floats down when the levitation ends (falling.ts). Concentration on it is the wearer's to end sooner on the sheet."
+  "item:boots-of-levitation": enforced(
+    "The action levitates the wearer with no save for up to 10 minutes on its Concentration (effects.ts), which damage, another Concentration spell or Incapacitation ends: it rises 20 feet, moves only as if climbing, and floats down when the levitation ends (falling.ts)."
   ),
   "item:wings-of-flying": enforced(
     "The action gives a Fly Speed of 60 feet for an hour, or until the wearer ends it on the sheet; a creature in the air when it ends falls (falling.ts). clock-pools.ts keeps the wings from being used again until 1d12 + 1 hours of game time have passed from their use (the hour they last, then the wait)."
@@ -1326,8 +1326,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
 
   // Magic items whose riders apply part of what they do, and leave a property the table would expect applied.
-  "item:armor-of-invulnerability": guided(
-    "Resistance to Bludgeoning, Piercing and Slashing damage is applied. The once-a-day Immunity to them is the GM's."
+  "item:armor-of-invulnerability": enforced(
+    "Resistance to Bludgeoning, Piercing and Slashing damage is applied, and Metal Shell's Magic action gives Immunity to them for 10 minutes once a dawn, ending if the armor comes off (inventory.ts)."
   ),
   "item:berserker-axe": guided(
     "The +1 to attack and damage rolls and the curse's lock on Attunement are applied. berserker-axe.ts asks the DC 15 Wisdom save when another creature damages the bearer, and ends the berserk on a turn that starts with no creature within 60 feet. Its attacks on the nearest creature, and the extra Hit Points, are the GM's."
@@ -1398,8 +1398,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:nine-lives-stealer": guided(
     "The +2 to attack and damage rolls is applied. On a rolled 20 against a creature with fewer than 100 Hit Points, other than a Construct or an Undead, the target makes the DC 15 Constitution save, and a failure slays it (resolution/kill.ts). The 1d8 + 1 charges, one spent per slaying, are the GM's to count."
   ),
-  "item:pipes-of-haunting": guided(
-    "The save against Frightened, with its repeat at the end of each turn, is applied. The immunity after a success is the GM's."
+  "item:pipes-of-haunting": enforced(
+    "Its 3 charges come back 1d3 at dawn; each opens the DC 15 Wisdom save against Frightened for a minute on the creatures its user picks within 30 feet, repeated at the end of each turn, and a creature that succeeds is immune to the pipes for the rest of the fight (resolution/pending.ts)."
   ),
   "item:quarterstaff-of-the-acrobat": enforced(
     "The +2 to attack and damage rolls and Advantage on Dexterity (Acrobatics) checks are applied, it is thrown 30/120, and Attack Deflection is offered once a rest when a hit would land (resolution/pending.ts). A Bonus Action makes it a rod or a pole (inventory.ts setItemForm), where it neither swings nor deflects."
@@ -1407,8 +1407,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:ring-of-shooting-stars": guided(
     "Its at-will cantrips and the one-charge Shooting Stars are applied. Faerie Fire, the Lightning Spheres and the larger Shooting Stars are the GM's."
   ),
-  "item:robe-of-scintillating-colors": guided(
-    "The save against Stunned is applied. The light, the Disadvantage on attacks against the wearer and ending the stun are the GM's."
+  "item:robe-of-scintillating-colors": enforced(
+    "Its 3 charges (1d3 back at dawn) each make the robe shed Bright Light 30 feet and Dim Light 30 more until the end of the wearer's next turn, give Disadvantage to attackers that see it, and Stun until then a creature within 30 feet that sees it and fails the DC 15 Wisdom save (resolution/pending.ts, vision/rules.ts)."
   ),
   "item:robe-of-stars": guided(
     "The +1 to saving throws is applied, and its six stars each cast a level 5 Magic Missile, 1d6 coming back at dusk or a Long Rest. The trip to the Astral Plane is the GM's."
@@ -1438,7 +1438,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Resistance to Cold damage is applied, and Fog Cloud, Cone of Cold, Ice Storm and Wall of Ice spend their printed charges (item-actions.ts); a 1 on the last charge's d20 destroys it (resolution/charges.ts)."
   ),
   "item:staff-of-power": guided(
-    "It swings as a +2 Quarterstaff, the +2 to AC, saving throws and spell attack rolls is applied, and its spells spend their printed charges; a 20 on the last charge's d20 gives 1d8 + 2 back (resolution/charges.ts). Retributive Strike, and a 1 on that d20, are the GM's."
+    "It swings as a +2 Quarterstaff, the +2 to AC, saving throws and spell attack rolls is applied, and its spells spend their printed charges; the last charge's d20 gives 1d8 + 2 back on a 20 and leaves only a +2 Quarterstaff on a 1 (resolution/charges.ts). Retributive Strike is the GM's."
   ),
   "item:staff-of-the-magi": guided(
     "It swings as a +2 Quarterstaff, the +2 to spell attack rolls is applied, and its spells spend their printed charges from 50; a 20 on the last charge's d20 gives 1d12 + 1 back (resolution/charges.ts). Advantage on saves against spells, Spell Absorption and Retributive Strike are the GM's."
@@ -1447,16 +1447,16 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "It swings as a +2 Quarterstaff, the +2 to spell attack rolls is applied, its spells spend their printed charges and Tree Form's use is counted. A 1 on the last charge's d20 leaves a plain Quarterstaff (resolution/charges.ts)."
   ),
   "item:staff-of-thunder-and-lightning": enforced(
-    "It swings as a +2 Quarterstaff. Lightning and Thunder ride a melee hit, Thunder and Lightning does both as a Bonus Action (resolution/hit-options.ts), and Lightning Strike and Thunderclap are actions, each once a day."
+    "It swings as a +2 Quarterstaff. Lightning and Thunder ride a melee hit, Thunder and Lightning does both as a Bonus Action (resolution/hit-options.ts), and Lightning Strike's 120-foot Line and Thunderclap's 60-foot Emanation are actions (area-targeting.ts), each once a day."
   ),
   "item:staff-of-striking": enforced(
-    "It swings as a +3 Quarterstaff, and a melee hit can spend 1, 2 or 3 of its 10 charges for 1d6 Force each (resolution/hit-options.ts)."
+    "It swings as a +3 Quarterstaff, a melee hit can spend 1, 2 or 3 of its 10 charges for 1d6 Force each (resolution/hit-options.ts), and a 1 on the last charge's d20 leaves a plain Quarterstaff (resolution/charges.ts)."
   ),
   "item:staff-of-withering": enforced(
-    "It swings as a Quarterstaff, and a hit can spend a charge for 2d10 Necrotic and a DC 15 Constitution save against Disadvantage on Strength and Constitution checks and saves (resolution/hit-options.ts). The hour it lasts is the GM's."
+    "It swings as a Quarterstaff, and a hit can spend a charge for 2d10 Necrotic and a DC 15 Constitution save against an hour of Disadvantage on Strength and Constitution checks and saves (resolution/hit-options.ts), counted on the game clock after a fight (game-time.ts)."
   ),
-  "item:rod-of-lordly-might": guided(
-    "It swings as a +3 Mace; Drain Life and Paralyze ride a melee hit and Terrify is an action, each once a day. Its buttons are forms its holder picks for a Bonus Action (inventory.ts setItemForm): a flaming Longsword or Shortsword with 2d6 Fire and its light, a +3 Battleaxe or Spear, a pole or a battering ram (+10 to break through). Drain Life's healing, the pole's length and the north it finds are the GM's."
+  "item:rod-of-lordly-might": enforced(
+    "It swings as a +3 Mace; Drain Life (healing its wielder half the Necrotic damage a failed save deals) and Paralyze ride a melee hit and Terrify is an action, each once a day. Its buttons are forms its holder picks for a Bonus Action (inventory.ts setItemForm): a flaming Longsword or Shortsword with 2d6 Fire and its light, a +3 Battleaxe or Spear, a pole or a battering ram (+10 to break through). The pole's length and anchoring, magnetic north and the depth or height it tells are story."
   ),
   "item:sun-blade": enforced(
     "It swings as a +2 Finesse Longsword that deals Radiant damage, with 1d8 Radiant more against an Undead, and its blade sheds its sunlight. A Bonus Action puts the blade away to the hilt or brings it back (inventory.ts setItemForm). The radius its Magic action adjusts is the GM's."
@@ -1471,7 +1471,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The +2 to spell attack rolls is applied. The 8d6 Necrotic it deals a creature other than a Fiend or an Undead that touches it, and Ultimate End's fissure on its charges, are the GM's."
   ),
   "item:sword-of-wounding": enforced(
-    "The extra Necrotic damage is applied, and a hit opens a DC 15 Constitution save whose failure stops the target regaining Hit Points until it succeeds on the save it repeats at the end of each of its turns (resolution/on-hit.ts)."
+    "The extra Necrotic damage is applied, and a hit opens a DC 15 Constitution save whose failure stops the target regaining Hit Points for 1 hour or until it succeeds on the save it repeats at the end of each of its turns (resolution/on-hit.ts); the hour runs on the game clock after a fight (game-time.ts)."
   ),
   "item:vorpal-sword": guided(
     "The +3 to attack and damage rolls is applied. On a rolled 20 it cuts off the target's head (resolution/kill.ts): the creature dies, and only a revival that restores lost parts brings it back. A creature with no head, Immunity to Slashing damage, a neck too big (larger than Large) or Legendary Resistance to spend takes 30 Slashing damage more instead, and a hydra loses one head. Ignoring Resistance to Slashing damage, and a creature that lives without its head, are the GM's."
@@ -1930,8 +1930,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:potion-of-growth": enforced(
     "Drinking it makes the drinker one size larger for 10 minutes, with Advantage on Strength checks and saves and 1d4 more damage with weapons and Unarmed Strikes. The token takes the new size (transform/forms.ts)."
   ),
-  "item:potion-of-diminution": guided(
-    "Drinking it makes the drinker one size smaller for 1d4 hours, rolled by the server, with Disadvantage on Strength checks and saves. The 1d4 less damage is the GM's."
+  "item:potion-of-diminution": enforced(
+    "Drinking it makes the drinker one size smaller for 1d4 hours, rolled by the server, with Disadvantage on Strength checks and saves and 1d4 less damage with weapons and Unarmed Strikes, never below 1 (resolution/damage.ts)."
   ),
   "item:potion-of-gaseous-form": enforced(
     "Drinking it gives Gaseous Form's misty cloud for 1 hour with no Concentration, ended early as a Bonus Action or at 0 Hit Points."
@@ -2065,19 +2065,37 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Each metal is its own action: 2 to 5 Berserkers appear within 60 feet for 1 hour, immune to Charmed and Frightened (summons.ts). They obey a user whose sheet has the metal's training and attack one whose sheet lacks it. clock-pools.ts keeps it from being blown again until 7 days have passed on the game clock."
   ),
   "item:necklace-of-fireballs": enforced(
-    "inventory.ts rolls its 1d6 + 3 beads when it is added, and each bead casts a level 3 Fireball at DC 15 and never comes back. Hurling several beads at once is the GM's."
+    "inventory.ts rolls its 1d6 + 3 beads when it is added, and each bead casts a level 3 Fireball at DC 15 and never comes back; up to five hurled at once add 1d6 each, to 12d6 (item-actions.ts)."
   ),
   "item:chime-of-opening": enforced(
     "Each strike casts Knock on its 10 charges, which never come back, and the last one cracks it (resolution/charges.ts)."
   ),
   "item:ring-of-three-wishes": guided(
-    "Its three Wish casts are counted and never come back (resolution/charges.ts). What a Wish does is the GM's."
+    "Its three Wish casts are counted and never come back, and the ring is nonmagical after the last (resolution/charges.ts, item-spent.ts). What a Wish does is the GM's."
   ),
   "item:gem-of-brightness": enforced(
-    "Its light is lit and put out on the row, and its beam (1 charge) and flare (5 charges) open the DC 15 Constitution save against Blinded on its 50 charges, which never come back."
+    "Its light is lit and put out on the row, and its beam (1 charge) and flare (5 charges) open the DC 15 Constitution save against Blinded on its 50 charges, which never come back; with none left it is a plain jewel that no longer lights (item-spent.ts)."
   ),
   "item:rod-of-resurrection": enforced(
     "Its casts spend their printed charges, and it regains 1 charge at dawn or at a Long Rest (item-charges.ts)."
+  ),
+  "item:cube-of-force": guided(
+    "Mage Armor, Shield (a Reaction when its holder is hit), Tiny Hut, Private Sanctum, Resilient Sphere and Wall of Force are casts at DC 17 on its 10 charges at their printed costs, 1d6 back at dawn (item-actions.ts). It takes the state of Tiny Hut and Private Sanctum."
+  ),
+  "item:potion-of-water-breathing": enforced(
+    "Drinking it lets the drinker breathe underwater for 24 hours of game time (breath.ts)."
+  ),
+  "item:well-of-many-worlds": guided(
+    "Opening a portal starts its wait of 1d8 hours of game time before the next (clock-pools.ts). Where a portal leads, and what passes through, are the GM's."
+  ),
+  "item:wand-of-paralysis": enforced(
+    "Its ray (1 of 7 charges, 1d6 + 1 back at dawn) opens a DC 15 Constitution save against Paralyzed for 1 minute on one creature it sees within 60 feet, repeated at each turn's end, and a 1 on the last charge's d20 destroys it (resolution/charges.ts). Only a spellcaster attunes to it."
+  ),
+  "item:wand-of-polymorph": enforced(
+    "Polymorph at DC 15 on 7 charges, 1d6 + 1 back at dawn, a 1 on the last charge's d20 destroying it (resolution/charges.ts); only a spellcaster attunes to it."
+  ),
+  "item:wand-of-fear": guided(
+    "Command (Flee or Grovel only, 1 charge) and Fear in a 60-foot Cone (3 charges) at DC 15 on 7 charges, 1d6 + 1 back at dawn, a 1 on the last charge's d20 destroying it (item-actions.ts, resolution/charges.ts). It takes Fear's state."
   ),
 
   // Walls, doors and objects on the map (spell-walls.ts, doors.ts, objects.ts, enclosures.ts, zone-walls.ts).

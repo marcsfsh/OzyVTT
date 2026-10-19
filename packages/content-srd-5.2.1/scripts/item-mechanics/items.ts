@@ -116,8 +116,27 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // "The GM chooses the type or determines it randomly": lightning (the d10 table's row 5) until the GM picks.
   "armor-of-resistance": { grants: { damageResistances: ["lightning"] }, damageTypeChoice: RESISTANCE_TABLE },
 
-  // Metal Shell (timed immunity, once per dawn) is not authored: a standing immunity grant would be permanent.
-  "armor-of-invulnerability": { grants: { damageResistances: ["bludgeoning", "piercing", "slashing"] } },
+  // Metal Shell is an effect on the wearer for 10 minutes, once a dawn; taking the armor off ends it.
+  "armor-of-invulnerability": {
+    grants: { damageResistances: ["bludgeoning", "piercing", "slashing"] },
+    actions: [
+      {
+        id: "metal-shell",
+        name: "Metal Shell",
+        activation: "action",
+        description:
+          "Give yourself Immunity to Bludgeoning, Piercing, and Slashing damage for 10 minutes or until you are no longer wearing the armor. Once this property is used, it can't be used again until the next dawn.",
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        grants: {
+          name: "Metal Shell",
+          tags: ["metal-shell"],
+          duration: { type: "rounds", rounds: 100 },
+          modifiers: [{ type: "damage-immunity", damageTypes: ["bludgeoning", "piercing", "slashing"] }]
+        }
+      }
+    ]
+  },
 
   // Resistance to the type the GM picks per copy (bludgeoning until then), and the curse: attuning locks the armor
   // on and leaves Vulnerability to the other two while the curse holds, worn or not.
@@ -593,12 +612,18 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     light: { brightFeet: 40, dimFeet: 40, ridersWhileLit: true }
   },
 
-  // The DC 15 Constitution save against healing, repeated at the end of each of the target's turns. Its hour outlasts
-  // any fight, so the effect lasts until the save ends it.
+  // The DC 15 Constitution save against healing for 1 hour, repeated at the end of each of the target's turns; the
+  // hour runs on the game clock once the fight ends.
   "sword-of-wounding": {
     modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "necrotic", doubleOnCritical: true }],
     onHit: [
-      { conditions: [], name: "Wounded", tags: ["no-healing"], save: { ability: "con", dc: 15, repeatSave: true } }
+      {
+        conditions: [],
+        name: "Wounded",
+        tags: ["no-healing"],
+        duration: { type: "minutes", minutes: 60 },
+        save: { ability: "con", dc: 15, repeatSave: true }
+      }
     ]
   },
 
@@ -1151,9 +1176,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "ring-of-telekinesis": { casts: [{ spellId: "telekinesis" }] },
 
   // `ring-of-the-ram` - a flat +7 attack bonus and per-charge damage are not expressible.
-  /** "you can expend 1 of its 3 charges to cast Wish from it": three Wishes in all, which never come back. The ring
-   *  becoming nonmagical at the last is the GM's. */
+  /** "you can expend 1 of its 3 charges to cast Wish from it": three Wishes in all, which never come back, and "the
+   *  ring becomes nonmagical when you use the last charge". */
   "ring-of-three-wishes": {
+    charges: { lastCharge: "nonmagical" },
     casts: [{ spellId: "wish", uses: { limit: 3, per: "never", pool: "ring-of-three-wishes-charges" } }]
   },
 
@@ -1236,8 +1262,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // A +3 Mace, Drain Life and Paralyze on its melee hits, and Terrify. Its buttons are forms its holder picks with a
   // Bonus Action: a flaming Longsword or Shortsword (2d6 Fire, its light, no +3), a +3 Battleaxe or Spear, a climbing
   // pole or a battering ram (+10 to Strength (Athletics) checks to break through barriers); its own form is the Mace.
-  // Not modeled: the pole's length and weight, and the north and depth it tells (button 6). Drain Life's healing is
-  // said with the hit.
+  // Drain Life heals its wielder half the Necrotic damage a failed save deals. The pole's length and weight, and the
+  // north and depth it tells (button 6), are the table's.
   "rod-of-lordly-might": {
     variantChoice: { by: "holder", activation: "bonus-action" },
     variants: [
@@ -1354,11 +1380,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "When you hit a creature with a melee attack using the rod, force it to make a DC 17 Constitution saving throw. On a failed save, it takes an extra 4d6 Necrotic damage, and you regain Hit Points equal to half that damage.",
         save: { ability: "con", dc: 17, successDamage: "none", failureConditions: [] },
         damage: [{ formula: "4d6", type: "necrotic" }],
+        drain: { heals: "half", failedSaveOnly: true },
         uses: { limit: 1, per: "long-rest" },
-        ridesHit: {
-          rides: "melee-this-weapon",
-          reminder: "On a failed save you regain Hit Points equal to half the Necrotic damage it takes."
-        }
+        ridesHit: { rides: "melee-this-weapon" }
       },
       {
         id: "paralyze",
@@ -1519,8 +1543,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /**
    * The +2 Quarterstaff, the AC, save and spell attack bonuses, and the spells at their printed charge costs on 20
-   * charges; a 20 on the last charge's d20 gives back 1d8 + 2, and a 1 (keeping only the +2 to attack and damage) is
-   * the GM's. Not authored: Retributive Strike (damage from the live charge count).
+   * charges; a 20 on the last charge's d20 gives back 1d8 + 2, and a 1 leaves a +2 Quarterstaff with no other magic.
    */
   "staff-of-power": {
     modifiers: [
@@ -1530,7 +1553,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       { type: "save-bonus", amount: 2 },
       { type: "spell-attack-bonus", amount: 2 }
     ],
-    charges: { regain: "2d8 + 4", lastChargeRoll: true, lastChargeTwenty: "1d8 + 2" },
+    charges: {
+      regain: "2d8 + 4",
+      lastChargeRoll: true,
+      lastChargeTwenty: "1d8 + 2",
+      lastCharge: { becomes: "weapon-2", baseId: "quarterstaff" }
+    },
     casts: [
       { spellId: "cone-of-cold", useCost: 5, uses: { limit: 20, per: "long-rest", pool: "staff-of-power-charges" } },
       {
@@ -1559,9 +1587,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // A +3 Quarterstaff whose melee hit can spend 1, 2 or 3 charges for 1d6 Force each: one rider per count on the one
-  // pool, of which a hit takes one.
+  // pool, of which a hit takes one. A 1 on the last charge's d20 leaves a nonmagical Quarterstaff.
   "staff-of-striking": {
-    charges: { regain: "1d6 + 4", lastChargeRoll: true },
+    charges: { regain: "1d6 + 4", lastChargeRoll: true, lastCharge: { becomes: "quarterstaff" } },
     modifiers: [
       { type: "attack-bonus", amount: 3 },
       { type: "damage-bonus", amount: 3 }
@@ -1780,6 +1808,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "A bolt of lightning leaps from the staff's tip in a Line 5 feet wide and 120 feet long. Each creature in that Line makes a DC 17 Dexterity saving throw, taking 9d6 Lightning damage on a failed save or half as much damage on a successful one.",
+        area: { shape: "line", sizeFeet: 120, widthFeet: 5 },
         save: { ability: "dex", dc: 17, successDamage: "half", failureConditions: [] },
         damage: [{ formula: "9d6", type: "lightning" }],
         uses: { limit: 1, per: "long-rest" }
@@ -1804,8 +1833,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // A Quarterstaff whose hit can spend a charge for 2d10 Necrotic and a DC 15 Constitution save. The failure's hour of
-  // Disadvantage on Strength and Constitution checks and saves outlasts a fight, so it lasts until the GM ends it.
+  // A Quarterstaff whose hit can spend a charge for 2d10 Necrotic and a DC 15 Constitution save, a failure leaving an
+  // hour of Disadvantage on Strength and Constitution checks and saves.
   "staff-of-withering": {
     charges: { regain: "1d3" },
     actions: [
@@ -1829,6 +1858,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
                 ability: "con",
                 failureEffect: {
                   name: "Withered",
+                  duration: { type: "minutes", minutes: 60 },
                   modifiers: [
                     {
                       type: "roll-mode",
@@ -1873,9 +1903,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The detection is GM information; the charge is real.
+  // The detection is GM information; the charge is real, and a 1 on the last charge's d20 crumbles the wand.
   "wand-of-enemy-detection": {
-    charges: { regain: "1d6 + 1", lastChargeRoll: true },
+    charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
     actions: [
       {
         id: "detect-enemies",
@@ -1888,10 +1918,24 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Command at the wand's printed DC. Fear (3 charges) is multi-charge.
+  // Command (Flee or Grovel only) for 1 charge and Fear in a 60-foot Cone for 3, at the wand's printed DC 15.
   "wand-of-fear": {
     charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
-    casts: [{ spellId: "command", saveDc: 15, uses: { limit: 7, per: "long-rest", pool: "wand-of-fear-charges" } }]
+    casts: [
+      {
+        spellId: "command",
+        saveDc: 15,
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-fear-charges" },
+        optionIds: ["flee", "grovel"]
+      },
+      {
+        spellId: "fear",
+        saveDc: 15,
+        useCost: 3,
+        area: { shape: "cone", sizeFeet: 60, widthFeet: null },
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-fear-charges" }
+      }
+    ]
   },
 
   /** Fireball at the printed DC 15 off a 7-charge pool: level 3 for 1 charge, one level higher for each charge after,
@@ -1939,9 +1983,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The wand's own effect.
+  // The wand's own effect; a 1 on the last charge's d20 crumbles the wand.
   "wand-of-paralysis": {
-    charges: { regain: "1d6 + 1", lastChargeRoll: true },
+    charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
     actions: [
       {
         id: "paralyzing-ray",
@@ -1963,9 +2007,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  /** "expend 1 charge to cast Polymorph (save DC 15) from it." One charge, one spell, printed DC. Complete. */
+  /** "expend 1 charge to cast Polymorph (save DC 15) from it." One charge, one spell, printed DC; a 1 on the last
+   *  charge's d20 crumbles the wand. */
   "wand-of-polymorph": {
-    charges: { regain: "1d6 + 1", lastChargeRoll: true },
+    charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
     casts: [
       { spellId: "polymorph", saveDc: 15, uses: { limit: 7, per: "long-rest", pool: "wand-of-polymorph-charges" } }
     ]
@@ -1997,9 +2042,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     casts: [{ spellId: "web", saveDc: 13, uses: { limit: 7, per: "long-rest", pool: "wand-of-web-charges" } }]
   },
 
-  // The d100 effect table is GM-rolled; the charge is real.
+  // The d100 effect table is GM-rolled; the charge is real, and a 1 on the last charge's d20 crumbles the wand.
   "wand-of-wonder": {
-    charges: { regain: "1d6 + 1", lastChargeRoll: true },
+    charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
     actions: [
       {
         id: "wild-surge",
@@ -2085,8 +2130,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // "You can cast Levitate on yourself at will": the levitation lands on the wearer with no save to make against its
-  // own boots, and the movement rules raise it 20 feet and let it move only as if climbing (`falling.ts`). It lasts
-  // the spell's 10 minutes; ending it sooner (the spell's Concentration) is the wearer's, on the sheet.
+  // own boots, and the movement rules raise it 20 feet and let it move only as if climbing (`falling.ts`). It is the
+  // spell, so it lasts up to 10 minutes on the wearer's Concentration.
   "boots-of-levitation": {
     actions: [
       {
@@ -2094,13 +2139,14 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         name: "Levitate (Self)",
         activation: "action",
         description:
-          "Cast Levitate on yourself: you rise up to 20 feet and stay suspended, moving only by pushing or pulling along a surface as if climbing. You can move up or down as part of your move. When it ends, you float gently to the ground. End it on your sheet.",
+          "Cast Levitate on yourself: you rise up to 20 feet and stay suspended for up to 10 minutes while you keep Concentration, moving only by pushing or pulling along a surface as if climbing. You can move up or down as part of your move. When it ends, you float gently to the ground.",
         damage: [],
         grants: {
           name: "Levitate",
           tags: ["levitating"],
           duration: { type: "minutes", minutes: 10 },
-          modifiers: []
+          modifiers: [],
+          concentration: true
         }
       }
     ]
@@ -2352,11 +2398,18 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // "Advantage on saving throws made to avoid or end the Poisoned condition"; breathing anywhere is the GM's.
   "necklace-of-adaptation": { modifiers: [poisonedSaves()] },
-  /** 1d6 + 3 beads rolled when the necklace is added, each a level 3 Fireball (DC 15) that never comes back. Hurling
-   *  several beads at once for more damage is the GM's. */
+  /** 1d6 + 3 beads rolled when the necklace is added, each a level 3 Fireball (DC 15) that never comes back. Several
+   *  hurled at once add 1d6 each to 12d6, which is Fireball's own 1d6 a level: five beads cast it at level 7. */
   "necklace-of-fireballs": {
     charges: { starting: "1d6 + 3", lastCharge: "destroyed" },
-    casts: [{ spellId: "fireball", saveDc: 15, uses: { limit: 9, per: "never", pool: "necklace-of-fireballs-beads" } }]
+    casts: [
+      {
+        spellId: "fireball",
+        saveDc: 15,
+        chargesRaiseLevel: 5,
+        uses: { limit: 9, per: "never", pool: "necklace-of-fireballs-beads" }
+      }
+    ]
   },
   // `necklace-of-prayer-beads` - the bead composition is per copy, and Cure Wounds has no healing.
   // A Magic action regains 2d4 + 2 Hit Points once a dawn, and saves to avoid or end Poisoned have Advantage.
@@ -2535,9 +2588,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   /**
-   * A real DC 15 Wisdom save that Stuns until the end of the wearer's next turn, at creatures within 30 feet, and the
-   * robe's light and the Disadvantage of attackers that can see the wearer until the end of its next turn. Not modeled:
-   * the save only for those in the Bright Light that see it.
+   * A DC 15 Wisdom save that Stuns until the end of the wearer's next turn, made by each creature within the robe's 30
+   * feet of Bright Light that can see its wearer, and the robe's light and the Disadvantage of attackers that can see
+   * the wearer until the end of its next turn.
    */
   "robe-of-scintillating-colors": {
     charges: { regain: "1d3" },
@@ -2557,6 +2610,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         },
         uses: { limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" },
         targets: { rangeFeet: 30 },
+        sight: { seenBy: "user" },
         grants: {
           name: "Scintillating Colors",
           tags: ["scintillating-colors"],
@@ -2906,12 +2960,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     casts: [{ spellId: "scrying", saveDc: 17 }]
   },
 
-  /** Five faces at their printed charge costs and DC 17, on 10 charges that regain 1d6 at dawn. The Shield face is
-   *  the GM's: a Reaction spell from an item isn't offered on its trigger. */
+  /** Six faces at their printed charge costs and DC 17, on 10 charges that regain 1d6 at dawn. The Shield face is a
+   *  Reaction cast, offered when its holder is hit. */
   "cube-of-force": {
     charges: { regain: "1d6" },
     casts: [
       { spellId: "mage-armor", saveDc: 17, uses: { limit: 10, per: "long-rest", pool: "cube-of-force-charges" } },
+      { spellId: "shield", saveDc: 17, uses: { limit: 10, per: "long-rest", pool: "cube-of-force-charges" } },
       {
         spellId: "tiny-hut",
         saveDc: 17,
@@ -3353,10 +3408,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
   // `folding-boat` - a vehicle.
   // Its first command's light ("Bright Light in a 30-foot radius and Dim Light for an additional 30 feet"), lit and put
-  // out on the row, and its beam (1 charge) and flare (5) on 50 charges that never return. The gem turning
-  // nonmagical when they are gone is the GM's.
+  // out on the row, and its beam (1 charge) and flare (5) on 50 charges that never return. With the last spent it is
+  // a nonmagical jewel, whose light no longer lights.
   "gem-of-brightness": {
     light: { brightFeet: 30, dimFeet: 30 },
+    charges: { lastCharge: "nonmagical" },
     actions: [
       {
         id: "beam",
@@ -3649,7 +3705,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /**
    * Spends a charge and puts a real DC 15 Wisdom save on the target that Frightens on a failure for 1 minute,
-   * repeating the save at the end of each of its turns. Not modeled: the 24-hour immunity after a success.
+   * repeating the save at the end of each of its turns; a creature that succeeds is immune to the pipes after.
    */
   "pipes-of-haunting": {
     charges: { regain: "1d3" },
@@ -3666,7 +3722,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           successDamage: "none",
           failureConditions: ["frightened"],
           failureDuration: { type: "rounds", rounds: 10 },
-          repeatSave: true
+          repeatSave: true,
+          immuneOnSuccess: true
         },
         uses: { limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" },
         targets: { rangeFeet: 30 }
@@ -3767,7 +3824,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // `universal-solvent` - consumed ounces.
-  // `well-of-many-worlds` - a rolled 1d8-hour cooldown and planar travel.
+
+  // Opening a portal starts its 1d8-hour wait on the game clock; where the portal leads is the GM's.
+  "well-of-many-worlds": {
+    actions: [
+      {
+        id: "open-portal",
+        name: "Open a Portal",
+        activation: "action",
+        description:
+          "Unfold the cloth on a solid surface: it forms a two-way, 6-foot-diameter, circular portal to another world or plane of existence, which the GM chooses. The portal stays open until a creature within 5 feet of it takes a Magic action to close it. Once it has opened a portal, the Well can't do so again for 1d8 hours.",
+        damage: [],
+        uses: { limit: 1, per: "time", afterHours: "1d8" }
+      }
+    ]
+  },
   // `wind-fan` - each reuse risks tearing it; authoring the cast alone would remove the risk.
 
   // ---- Potions -----------------------------------------------------------------------------------
@@ -3831,7 +3902,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // "You gain the 'reduce' effect of the Enlarge/Reduce spell for 1d4 hours (no Concentration required)": one size
-  // smaller and Disadvantage on Strength checks and saves. Its 1d4 less weapon damage is the GM's.
+  // smaller, Disadvantage on Strength checks and saves, and 1d4 less weapon and Unarmed Strike damage, never below 1.
   "potion-of-diminution": {
     consumedOnUse: true,
     actions: [
@@ -3848,7 +3919,16 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           duration: { type: "manual" },
           hoursRolled: "1d4",
           sizeChange: { step: -1 },
-          modifiers: strengthRolls("disadvantage")
+          modifiers: [
+            ...strengthRolls("disadvantage"),
+            {
+              type: "damage-bonus",
+              amount: 0,
+              dice: "-1d4",
+              leavesOne: true,
+              when: [{ type: "on-damage-roll" }, { type: "attack-kind-is", kinds: ["weapon", "unarmed"] }]
+            }
+          ]
         }
       }
     ]
@@ -4039,6 +4119,19 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           ]
         }
       )
+    ]
+  },
+
+  // "You can breathe underwater for 24 hours after drinking this potion": the Water Breathing spell's tag, which the
+  // breath rules read.
+  "potion-of-water-breathing": {
+    consumedOnUse: true,
+    actions: [
+      drink("Potion of Water Breathing", "Drink it: you can breathe underwater for 24 hours.", {
+        name: "Potion of Water Breathing",
+        tags: ["water-breathing"],
+        duration: { type: "minutes", minutes: 1440 }
+      })
     ]
   },
 

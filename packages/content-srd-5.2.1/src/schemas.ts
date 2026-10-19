@@ -653,6 +653,16 @@ export const ItemSpellCastSchema = z
       .optional()
       .describe(
         "What casting it from the item takes, where the item says so in place of the spell's casting time (a prayer bead: a Bonus Action)"
+      ),
+    /** The spell's options the item's cast may pick, where the item limits them (Wand of Fear's Command: "flee or
+     *  grovel only"). */
+    optionIds: z
+      .array(ContentIdSchema)
+      .min(2)
+      .max(6)
+      .optional()
+      .describe(
+        "The spell's options this cast may pick, where the item limits them (a Wand of Fear's Command: \"flee or grovel only\"); the server refuses any other"
       )
   })
   .strict()
@@ -680,13 +690,19 @@ export const ItemChargesSchema = z
     regain: ChargeCountSchema.optional(),
     lastChargeRoll: z.boolean().default(false),
     /** What spending the last charge does to the item: with `lastChargeRoll`, on a d20 of 1, and otherwise always (a
-     *  Chime of Opening cracks). `destroyed` takes the row away; `becomes` turns it into that plain item (a Staff of
-     *  Striking becomes a Quarterstaff). Absent: the GM is told, and decides. */
+     *  Chime of Opening cracks). `destroyed` takes the row away; `nonmagical` keeps the row with its magic spent for
+     *  good (a Gem of Brightness is a plain jewel); `becomes` turns it into that item (a Staff of Striking becomes a
+     *  Quarterstaff), bound to `baseId` where that item is a template (a Staff of Power keeps a +2 Quarterstaff).
+     *  Absent: the GM is told, and decides. */
     lastCharge: z
-      .union([z.literal("destroyed"), z.object({ becomes: ContentIdSchema }).strict()])
+      .union([
+        z.literal("destroyed"),
+        z.literal("nonmagical"),
+        z.object({ becomes: ContentIdSchema, baseId: ContentIdSchema.optional() }).strict()
+      ])
       .optional()
       .describe(
-        "What spending the last charge does to the item: with lastChargeRoll on a d20 of 1, otherwise always. destroyed takes the row away; becomes turns it into that plain item. Absent: the GM is told"
+        "What spending the last charge does to the item: with lastChargeRoll on a d20 of 1, otherwise always. destroyed takes the row away; nonmagical keeps the row with its magic spent for good; becomes turns it into that item, bound to baseId when that item is a template. Absent: the GM is told"
       ),
     /** With `lastChargeRoll`, the charges a d20 of 20 gives back (Staff of Power: 1d8 + 2). */
     lastChargeTwenty: ChargeCountSchema.optional().describe(
