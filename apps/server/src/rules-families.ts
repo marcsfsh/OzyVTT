@@ -121,6 +121,16 @@ export function familyModeFor(combat: Pick<CombatState, "rulesMode" | "ruleExcep
   return combat.ruleExceptions[family] ?? combat.rulesMode;
 }
 
+/** The rules in force: the fight's dial and exceptions while one runs, else the table's standing policy, which the
+ *  next fight starts from. */
+export function rulesInForce(
+  state: Pick<GameState, "combat" | "rulesPolicy">
+): Pick<CombatState, "rulesMode" | "ruleExceptions"> {
+  return state.combat.active
+    ? state.combat
+    : { rulesMode: state.rulesPolicy.dial, ruleExceptions: state.rulesPolicy.exceptions };
+}
+
 /** The mode in force for one rule id. The single reader: never read `combat.rulesMode` at a rule site. */
 export function effectiveModeFor(combat: Pick<CombatState, "rulesMode" | "ruleExceptions">, rule: RuleId): RuleMode {
   return familyModeFor(combat, familyOf(rule));

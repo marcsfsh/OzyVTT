@@ -5,8 +5,9 @@ import { withShotAmmunitionOnly } from "../ammunition.js";
 import { consumableRowFor } from "../consumables.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
-import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives } from "../rules-families.js";
+import { effectiveModeFor, overrideCovers, overrideReason, overrideWaives, rulesInForce } from "../rules-families.js";
 import {
+  isItemActionId,
   isLongCastingTime,
   laterRowOf,
   laterSpellActionId,
@@ -42,15 +43,30 @@ function combatantsOf(
   catalog: ResolveDependencies["catalog"],
   spell: SpellReference | undefined
 ): { attacker: LiveActor; targets: LiveActor[] } {
-  if (!state.combat.active) throw new CommandRejectedError("Start an encounter before resolving actions.");
-  const inFight = (actorId: string) => state.combat.initiative.some((entry) => entry.actorId === actorId);
+  // Casting a spell is something done even when it rolls nothing (Light, Guidance): it spends its casting time and is
+  // told to the table. What a spell lets its caster do later is no new cast.
+  const castsASpell = action.spellId !== undefined && !(spell !== undefined && laterRowOf(spell, action.id));
+  // Outside a fight a creature's own cast still starts what it starts (a grant, Concentration, a save, an area), with
+  // no turn to spend; an item's use stays on the loose route, which spends its charges.
+  const outsideFight = !state.combat.active;
+  if (outsideFight && !(castsASpell && !isItemActionId(action.id)))
+    throw new CommandRejectedError("Start an encounter before resolving actions.");
+  const inFight = (actorId: string) =>
+    outsideFight
+      ? state.actors.some((actor) => actor.id === actorId)
+      : state.combat.initiative.some((entry) => entry.actorId === actorId);
   const attacker = state.actors.find((item) => item.id === input.actorId);
   if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
   if (!inFight(input.actorId)) throw new CommandRejectedError("That combatant is not in this encounter.");
   // A target named twice is one target (a second dart is the only reason to name it again).
   const targets = [...new Set(input.targetIds)].map((targetId) => {
     const target = state.actors.find((item) => item.id === targetId);
-    if (!target || !inFight(targetId)) throw new CommandRejectedError("Every target must be in this encounter.");
+    if (!target || !inFight(targetId))
+      throw new CommandRejectedError(
+        outsideFight
+          ? "Choose members of the party or creatures you can see."
+          : "Every target must be in this encounter."
+      );
     return target;
   });
   // A readied spell is cast now and aimed when its trigger comes (SRD Ready), so it names no target yet.
@@ -70,9 +86,6 @@ function combatantsOf(
     action.spellSlot !== undefined ||
     action.legendary !== undefined ||
     consumableRowFor(action, attacker.inventory, catalog) !== null;
-  // Casting a spell is something done even when it rolls nothing (Light, Guidance): it spends its casting time and is
-  // told to the table. What a spell lets its caster do later is no new cast.
-  const castsASpell = action.spellId !== undefined && !(spell !== undefined && laterRowOf(spell, action.id));
   // A spell that lasts and acts again later (Produce Flame, a lingering area) starts with no creature under it yet.
   const startsALastingSpell = castsASpell && (spell?.effect?.laterActions ?? []).length > 0;
   const rollsOnTargets =
@@ -185,7 +198,7 @@ export function openResolve(
   // GM-adjudicated cover (SRD Cover, no line-of-sight engine): the GM's choice for this resolve, else the cover the
   // GM marked the target with, whoever attacks. Total cover can't be targeted; half/three-quarters add to AC and
   // Dexterity saves.
-  const coverMode = effectiveModeFor(state.combat, "cover.total");
+  const coverMode = effectiveModeFor(rulesInForce(state), "cover.total");
   // A Paladin's Smite of Protection gives Half Cover to the creatures in its aura.
   const auraCover = (target: LiveActor) =>
     deps.resolveDefinition

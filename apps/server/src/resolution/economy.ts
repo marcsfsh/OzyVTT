@@ -29,6 +29,7 @@ import {
   overrideReason,
   overrideWaives,
   rememberOverride,
+  rulesInForce,
   type RuleId
 } from "../rules-families.js";
 import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
@@ -527,15 +528,25 @@ function checkArmorTraining(
   definition: ActorDefinition | undefined,
   catalog: EquipmentCatalog | undefined
 ) {
-  if (action.spellId === undefined && action.spellSlot === undefined) return;
+  const message = untrainedArmorCast(attacker, action, definition, catalog);
+  if (message !== null) violations.push({ rule: "spell.untrained-armor", message });
+}
+
+/** Why this action can't be cast in the armor its caster wears, or null; read by the loose route too, so an item's
+ *  cast outside a fight meets the same rule. */
+export function untrainedArmorCast(
+  attacker: LiveActor,
+  action: Pick<DefinitionAction, "spellId" | "spellSlot">,
+  definition: ActorDefinition | undefined,
+  catalog: EquipmentCatalog | undefined
+): string | null {
+  if (action.spellId === undefined && action.spellSlot === undefined) return null;
   const { untrainedArmor } = catalog
     ? deriveEquipment(attacker, definition, catalog)
     : armorTrainingGaps(attacker.inventory, definition);
-  if (untrainedArmor)
-    violations.push({
-      rule: "spell.untrained-armor",
-      message: `${attacker.name} can't cast spells while wearing ${untrainedArmor.name} without training in it.`
-    });
+  return untrainedArmor
+    ? `${attacker.name} can't cast spells while wearing ${untrainedArmor.name} without training in it.`
+    : null;
 }
 
 /** SRD: a Two-Handed weapon "requires two hands when you attack with it", and a Shield is strapped to one arm. Read
@@ -814,6 +825,8 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
     bonusInstance: state.combat.turn.bonusActionInstance,
     extraAction: null
   };
+  // Outside a fight there is no turn: a cast spends no action, Bonus Action or Reaction.
+  if (!state.combat.active) return unchanged;
   // An open compound Bonus Action (Flurry of Blows) spends its own strikes first and costs no further slot.
   const bonusOpen = state.combat.turn.bonusActionInstance;
   if (onOwnTurn && bonusOpen && bonusOpen.actorId === attacker.id && !action.multiattack) {
@@ -1109,7 +1122,7 @@ function checkSpellSlot({ state, attacker, action, slotLevel, violations }: Eval
     });
   }
   // SRD: "On a turn, you can expend only one spell slot to cast a spell", whoever's turn it is.
-  if (state.combat.turn.spellSlotCasters?.includes(attacker.id))
+  if (state.combat.active && state.combat.turn.spellSlotCasters?.includes(attacker.id))
     violations.push({
       rule: "slots.one-per-turn",
       message: `${attacker.name} has already cast a spell with a spell slot this turn, and only one is allowed per turn.`
@@ -1369,8 +1382,9 @@ export function planEconomy(
   warnings.push(...notes);
 
   // The mode is per rule family: a violation whose family is Off is not a violation for this table.
+  const rules = rulesInForce(state);
   const policed = [...violations, ...softViolations].filter(
-    (violation) => effectiveModeFor(state.combat, violation.rule) !== "freeform"
+    (violation) => effectiveModeFor(rules, violation.rule) !== "freeform"
   );
   if (policed.length === 0) return { plan, overridden: null };
   // This command's override, or a GM override earlier this turn, covers its families; other families still
@@ -1378,7 +1392,7 @@ export function planEconomy(
   const waived = policed.find((violation) => overrideWaives(input.override, violation.rule));
   const covered = (rule: RuleId) => overrideWaives(input.override, rule) || overrideCovers(state.combat.turn, rule);
   const blocking = violations.filter(
-    (violation) => !covered(violation.rule) && effectiveModeFor(state.combat, violation.rule) === "strict"
+    (violation) => !covered(violation.rule) && effectiveModeFor(rules, violation.rule) === "strict"
   );
   if (blocking.length > 0) throw new RulesBlockedError(blocking[0].rule, blocking[0].message);
   warnings.push(...policed.filter((violation) => !covered(violation.rule)).map((violation) => violation.message));
@@ -1458,8 +1472,8 @@ export function commitEconomy({
       }
     };
   }
-  // Cleared on turn advance.
-  if (overridden) rememberOverride(state, overridden.rule, input.override);
+  // Cleared on turn advance; outside a fight the override covers this command alone.
+  if (overridden && state.combat.active) rememberOverride(state, overridden.rule, input.override);
   if (plan.spendLegendary) {
     state.combat = {
       ...state.combat,
@@ -1473,7 +1487,7 @@ export function commitEconomy({
   if (plan.spendSpellSlot) {
     spendSlot(attacker, plan.spendSpellSlot);
     const casters = state.combat.turn.spellSlotCasters ?? [];
-    if (!casters.includes(attacker.id))
+    if (state.combat.active && !casters.includes(attacker.id))
       state.combat = {
         ...state.combat,
         turn: { ...state.combat.turn, spellSlotCasters: [...casters, attacker.id] }
@@ -1492,11 +1506,7 @@ export function commitEconomy({
 }
 
 /** Records `amount` uses of a limited use: this turn's for a per-turn use, else the creature's own count. */
-export function commitUse(
-  state: GameState,
-  attacker: LiveActor,
-  spendUse: NonNullable<EconomyPlan["spendUse"]>
-): void {
+export function commitUse(state: GameState, attacker: LiveActor, spendUse: NonNullable<EconomyPlan["spendUse"]>): void {
   if (spendUse.per === "turn") {
     const key = `${attacker.id}:${spendUse.key}`;
     state.combat = {
