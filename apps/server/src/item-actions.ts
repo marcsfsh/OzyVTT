@@ -761,7 +761,8 @@ export function weaponSwing(
   const ids = item.baseId !== undefined ? [catalogIdOf(item), item.baseId] : [catalogIdOf(item)];
   const proficient =
     trained === undefined || trainingCovers(grantedWeapons, weapon, ids) || trainingCovers(trained, weapon, ids);
-  const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
+  // What acid or rust took off the weapon's attack rolls (`row-penalties.ts`).
+  const bonus = modifier + (proficient ? definition.proficiencyBonus : 0) - (item.penalty ?? 0);
   const pickable = bound?.damageTypes ? [...new Set([weapon.damageType as DamageType, ...bound.damageTypes])] : [];
   const action: ActorAction = {
     id: itemActionId(item.id, options.twoHanded ? TWO_HANDED_SUFFIX : undefined),

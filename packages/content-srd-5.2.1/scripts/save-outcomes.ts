@@ -201,7 +201,7 @@ export function failureDurationOf(clause: string): SaveFailureDuration | undefin
   }
   if (timed[1] === "start") return { type: "until-source-next-turn" };
   // "Until the end of the target's next turn" is the bearer's, as "its" is.
-  return timed[2] === "its" || /^the target[’']s$/.test(timed[2]!)
+  return timed[2] === "its" || /^the target[\u2019']s$/.test(timed[2]!)
     ? { type: "until-bearer-turn-end" }
     : { type: "until-source-turn-end" };
 }
@@ -435,7 +435,7 @@ const CREATURE_TYPES: ReadonlySet<string> = new Set([
  *  types and species the save spares. */
 export function sparedOf(description: string): Pick<SaveOutcome, "sparesCreatureTypes" | "sparesSpecies"> {
   const clause =
-    /\bIf the target is a creature that isn[’']t an? ([A-Za-z]+(?:,? (?:or )?(?:an? )?[A-Za-z]+)*), it is subjected to the following effect\b/.exec(
+    /\bIf the target is a creature that isn[\u2019']t an? ([A-Za-z]+(?:,? (?:or )?(?:an? )?[A-Za-z]+)*), it is subjected to the following effect\b/.exec(
       description
     )?.[1];
   if (!clause) return {};
@@ -511,7 +511,7 @@ export type FailureRestrictions = Readonly<{
 
 /** "Its Speed decreases by 10 feet": the feet a failure takes off the bearer's Speed. */
 const speedCutOf = (clause: string): Modifier[] => {
-  const cut = /\b(?:its|the target[’']s) Speed decreases by (\d+) feet\b/.exec(clause);
+  const cut = /\b(?:its|the target[\u2019']s) Speed decreases by (\d+) feet\b/.exec(clause);
   return cut ? [{ type: "speed", amount: -Number.parseInt(cut[1]!, 10) }] : [];
 };
 
@@ -555,7 +555,7 @@ export function failureRestrictionsOf(description: string, name: string): Failur
   if (namedConditions(clause).conditions.length > 0) return null;
   const tags = [
     ...(/\bcan[\u2019']t take Reactions\b/.test(clause) ? ["no-reactions"] : []),
-    ...(/\b(?:its|the target[’']s) Speed is halved\b/.test(clause) ? ["speed-halved"] : []),
+    ...(/\b(?:its|the target[\u2019']s) Speed is halved\b/.test(clause) ? ["speed-halved"] : []),
     ...(/\bcan take either an action or a Bonus Action on its turn, not both\b/.test(clause) ? ["action-or-bonus"] : [])
   ];
   const penalty = /\bsubtracts \d+ \((\d+d\d+)\) from its damage rolls\b/.exec(clause);
@@ -608,7 +608,7 @@ export function failureCompanionRidersOf(
   if (!sentence || !conditions.includes(sentence[1]!.toLowerCase() as SaveCondition)) return null;
   const riders = sentence[0];
   const tags = [
-    ...(/\bcan[’']t take Reactions\b/.test(riders) ? ["no-reactions"] : []),
+    ...(/\bcan[\u2019']t take Reactions\b/.test(riders) ? ["no-reactions"] : []),
     ...(/\bcan take either an action or a Bonus Action on its turn, not both\b/.test(riders) ? ["action-or-bonus"] : [])
   ];
   const modifiers = [...disadvantagesOf(riders), ...speedCutOf(riders)];

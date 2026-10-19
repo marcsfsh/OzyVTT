@@ -6,8 +6,6 @@
  */
 import type { ActorAction } from "@vtt/schemas";
 
-const ARMOR_PENALTY =
-  "Nonmagical armor the target wears takes a cumulative -1 penalty to the AC it offers, and is destroyed when the penalty reduces its AC to 10. Mending removes the penalty. Change the armor by hand.";
 const HURL_FLAME =
   "A flammable object the target hit that isn't worn or carried starts burning; objects are the GM's to burn.";
 
@@ -17,8 +15,6 @@ const HIT_NOTES: Readonly<Record<string, string>> = {
   "animated-rug-of-smothering/smother":
     "The rug smothers one creature at a time. While it grapples the target, the target is suffocating, and the rug halves the damage it takes (round down) while the target takes the same amount.",
   "barbed-devil/hurl-flame": HURL_FLAME,
-  "black-pudding/dissolving-pseudopod": ARMOR_PENALTY,
-  "gray-ooze/pseudopod": ARMOR_PENALTY,
   "horned-devil/hurl-flame": HURL_FLAME
 };
 

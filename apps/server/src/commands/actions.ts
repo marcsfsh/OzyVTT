@@ -453,6 +453,7 @@ export const actionCommands = [
             ...(request.optionId !== undefined ? { optionId: request.optionId } : {}),
             ...(request.targetOptions !== undefined ? { targetOptions: request.targetOptions } : {}),
             ...(request.itemId !== undefined ? { itemId: request.itemId } : {}),
+            ...(request.objectItemId !== undefined ? { objectItemId: request.objectItemId } : {}),
             ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
             ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),

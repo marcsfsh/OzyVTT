@@ -1644,6 +1644,17 @@ export const FormSchema = z
   .strict();
 export type Form = z.infer<typeof FormSchema>;
 
+/** What a teleport's arrival does to the creatures near its destination: `conditions` on each enemy its traveler can
+ *  see within `withinFeet` of the space it lands in, until the end of the traveler's next turn (a mummy lord's
+ *  Whirlwind of Sand: "Each creature of its choice that it can see within 5 feet of its destination space has the
+ *  Blinded condition until the end of the mummy's next turn"). */
+export const TeleportLandingSchema = z
+  .object({
+    conditions: z.array(ConditionIdSchema).min(1).max(2),
+    withinFeet: z.number().int().min(5).max(60)
+  })
+  .strict();
+export type TeleportLanding = z.infer<typeof TeleportLandingSchema>;
 /** A live rules-engine effect on an actor (Rage, a grapple), with source links, duration and typed modifiers.
  * Ids derive from the commandId so retries mint the same effect. */
 export const EffectInstanceSchema = z
@@ -1727,7 +1738,14 @@ export const EffectInstanceSchema = z
         round: z.number().int().positive(),
         turnActorId: z.uuid().nullable(),
         unseen: z.literal(true).optional(),
-        failDamage: DiceFormulaSchema.optional()
+        failDamage: DiceFormulaSchema.optional(),
+        /** Its destination must be within `feet` of this creature (a nalfeshnee's Pursuit). */
+        near: z
+          .object({ actorId: z.uuid(), feet: z.number().int().min(5).max(120) })
+          .strict()
+          .optional(),
+        /** What its arrival does near the destination (a mummy lord's Whirlwind of Sand). */
+        landing: TeleportLandingSchema.optional()
       })
       .strict()
       .optional(),
@@ -2114,7 +2132,11 @@ export const InventoryItemSchema = z
     magic: ItemMagicMarkerSchema.optional(),
     /** A copy whose magic is spent for now: a manual or tome after its study (`character.study-item`), until it
      *  regains it in a century. The server keeps it. */
-    dormant: z.boolean().optional()
+    dormant: z.boolean().optional(),
+    /** The cumulative penalty acid or rust left on this armor or weapon (a black pudding's Pseudopod, a rust monster's
+     *  Antennae): armor offers that much less AC and a weapon that much less to its attack rolls, until Mending removes
+     *  it. Armor whose AC it takes to 10, or a weapon it takes to -5, is destroyed. The server keeps it. */
+    penalty: z.number().int().min(1).max(10).optional()
   })
   .strict();
 export type InventoryItem = z.infer<typeof InventoryItemSchema>;
@@ -3309,8 +3331,13 @@ const ReactionAttackKindSchema = z.enum(["melee", "ranged", "melee-weapon", "ran
  *   triggering damage included.
  * - ac-bonus (Parry, Shield): add `amount` to AC against the attack before it lands, possibly turning the hit into a
  *   miss. `melee` limits it to melee attacks; `untilNextTurn` keeps the bonus until the reactor's next turn starts.
- * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action against the creature that dealt the damage, or
- *   the sibling action `usesAction` names (a rust monster's Antennae).
+ * - strike-back (Hellish Rebuke, Storm's Thunder): resolve this action, or the sibling action `usesAction` names (a rust
+ *   monster's Reflexive Antennae uses Antennae), against the creature that dealt the damage, that hit the reactor with
+ *   an attack roll (`hit-by-attack`), or that started its turn within `rangeFeet` (`starts-turn-near`: a chain devil's
+ *   Unnerving Gaze).
+ * - use-on-self (an octopus's Ink Cloud): resolve this action by the reactor on itself, its area centred on the reactor.
+ * - teleport-near (a nalfeshnee's Pursuit): the sibling Teleport `usesAction` names, its destination near the creature.
+ * - split (a black pudding's Split): the reactor becomes two smaller creatures of its stat block.
  * - melee-attack (Retaliation): make one melee attack against that creature instead.
  * - counter (Counterspell): a creature the reactor can see casts a spell with components; the cast waits, and "use"
  *   makes the caster roll an `ability` saving throw against the reactor's spell save DC, its spell lost on a failure.
@@ -3324,7 +3351,11 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
       response: z.literal("reduce-damage"),
       formula: DamageFormulaSchema,
       damageTypes: z.array(DamageTypeSchema).min(1).max(13).optional(),
-      attackKinds: z.array(ReactionAttackKindSchema).min(1).max(6).optional()
+      attackKinds: z.array(ReactionAttackKindSchema).min(1).max(6).optional(),
+      /** When the reduction takes the damage to 0, the reactor turns this action's own save on one creature it picks
+       *  within the action's range (a stone giant's Deflect Missile: "the giant can redirect some of the attack's
+       *  force"). */
+      redirect: z.literal(true).optional()
     })
     .strict(),
   z.object({ trigger: z.literal("takes-damage"), response: z.literal("resist-type") }).strict(),
@@ -3334,12 +3365,17 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
       response: z.literal("ac-bonus"),
       amount: z.number().int().min(1).max(10),
       melee: z.boolean().optional(),
-      untilNextTurn: z.boolean().optional()
+      untilNextTurn: z.boolean().optional(),
+      /** Offered on every hit, even one the bonus can't turn into a miss, for what else the action does (a mummy
+       *  lord's Whirlwind of Sand teleports it). */
+      anyHit: z.literal(true).optional()
     })
     .strict(),
   z
     .object({
-      trigger: z.literal("damaged-by-creature"),
+      /** Damage from a creature (Hellish Rebuke), an attack roll that hits (a rust monster's Reflexive Antennae), or a
+       *  creature starting its turn within `rangeFeet` (a chain devil's Unnerving Gaze). */
+      trigger: z.enum(["damaged-by-creature", "hit-by-attack", "starts-turn-near"]),
       response: z.literal("strike-back"),
       rangeFeet: ReactionRangeFeet,
       /** The sibling action it uses instead of itself ("The rust monster uses Antennae"). */
@@ -3347,7 +3383,48 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
         .string()
         .regex(/^[a-z0-9-]+$/)
         .max(120)
-        .optional()
+        .optional(),
+      /** The reactor must see the creature, and with `mutual` the creature must see it too ("A creature the devil can
+       *  see starts its turn within 30 feet of the devil and can see the devil"). */
+      sight: z.enum(["reactor", "mutual"]).optional()
+    })
+    .strict(),
+  /** Ink Cloud: when a creature ends its turn within `rangeFeet` of the reactor (`ends-turn-near`), or the reactor takes
+   *  damage (`damaged`), the reactor uses this action on itself, its area centred on it and its move granted.
+   *  `underwater` offers it only in a fight the GM marked as underwater. */
+  z
+    .object({
+      trigger: z.enum(["ends-turn-near", "damaged"]),
+      response: z.literal("use-on-self"),
+      rangeFeet: ReactionRangeFeet,
+      underwater: z.literal(true).optional()
+    })
+    .strict(),
+  /** Pursuit: when another creature the reactor can see ends a move within `rangeFeet` of it, the reactor uses the
+   *  sibling action `usesAction` names (its Teleport), its destination within `nearFeet` of that creature. */
+  z
+    .object({
+      trigger: z.literal("ends-move-near"),
+      response: z.literal("teleport-near"),
+      rangeFeet: ReactionRangeFeet,
+      usesAction: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(120),
+      nearFeet: z.number().int().min(5).max(120)
+    })
+    .strict(),
+  /** Split: while the reactor is one of `sizes` and has `minHitPoints` or more, it becomes Bloodied (`bloodied`) or
+   *  takes damage of one of `damageTypes`; it splits into two creatures of its own stat block, each one size smaller
+   *  with half its Hit Points (round down), and leaves the fight. */
+  z
+    .object({
+      trigger: z.literal("damaged"),
+      response: z.literal("split"),
+      damageTypes: z.array(DamageTypeSchema).min(1).max(13).optional(),
+      bloodied: z.literal(true).optional(),
+      sizes: z.array(SizeSchema).min(1).max(6),
+      minHitPoints: z.number().int().min(1).max(1000)
     })
     .strict(),
   z
@@ -3607,6 +3684,9 @@ export const OnHitRiderSchema = z
       ),
     /** What the engine leaves to the GM, said with the hit: a curse that acts at rests, a creature killed outright. */
     reminder: z.string().min(1).max(400).optional(),
+    /** The hit gives the nonmagical body armor its target wears a cumulative -1 to the AC it offers, destroyed when that
+     *  reaches 10 (a black pudding's Dissolving Pseudopod); Mending removes it. */
+    armorPenalty: z.literal(true).optional(),
     /** The hit lowers one of the target's ability scores by `dice`, cumulatively and until ended (a shadow's Draining
      *  Swipe: "the target's Strength score decreases by 1d4"); with `killsAtZero` the target dies if it reaches 0. */
     lowersScore: z
@@ -4085,7 +4165,9 @@ export const ActionTeleportSchema = z
     failDamage: DiceFormulaSchema.optional(),
     /** It may teleport the one willing creature its targets name instead of its user (a balor's "itself or a willing
      *  demon within 10 feet of itself"). */
-    orAnother: z.literal(true).optional()
+    orAnother: z.literal(true).optional(),
+    /** What its arrival does to the enemies near its destination (a mummy lord's Whirlwind of Sand). */
+    landing: TeleportLandingSchema.optional()
   })
   .strict();
 export type ActionTeleport = z.infer<typeof ActionTeleportSchema>;
@@ -4633,6 +4715,23 @@ export const ActionSchema = z
     magical: z.literal(true).optional(),
     /** It can be used only in a fight underwater ("While underwater, the seahorse moves", a kraken's Toxic Ink). */
     underwaterOnly: z.literal(true).optional().describe("It can be used only in a fight the GM marked as underwater"),
+    /** The object it acts on, worn or carried by its target: a nonmagical armor or weapon (`metal`: of metal) a failed
+     *  save gives a cumulative -1 (a rust monster's Antennae). The resolve names the row (`objectItemId`); absent, the
+     *  target's worn armor, else its weapon in hand. */
+    object: z
+      .object({
+        kinds: z
+          .array(z.enum(["armor", "weapon"]))
+          .min(1)
+          .max(2),
+        metal: z.literal(true).optional(),
+        does: z.enum(["penalty-on-failure"])
+      })
+      .strict()
+      .optional()
+      .describe(
+        "The object it acts on, worn or carried by its target: a nonmagical armor or weapon (of metal with `metal`) that a failed save gives a cumulative -1 (a rust monster's Antennae), named by the resolve's `objectItemId`, else the target's worn armor or its weapon in hand"
+      ),
     /** What it does to each target with no roll: conditions, on creatures of `maxTargetSize` or smaller, standing
      *  until ended or for `duration`; and a lost Concentration (a tarrasque's shock wave: "Creatures in that area lose
      *  Concentration and, if Medium or smaller, have the Prone condition"). */
@@ -5183,6 +5282,17 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
   /** "Attack rolls against the mephit are made with Disadvantage unless the mephit has the Incapacitated condition"
    *  (Blurred Form). */
   z.object({ kind: z.literal("blurred"), name: TraitNameSchema }).strict(),
+  /** What touching the creature does to gear (a black pudding's and a gray ooze's Corrosive Form): a nonmagical weapon
+   *  that hits and damages it takes a cumulative -1 to attack rolls, destroyed at -5 (`weapons`), and nonmagical
+   *  ammunition that hits it is destroyed (`ammunition`). */
+  z
+    .object({
+      kind: z.literal("corrodes-gear"),
+      name: TraitNameSchema,
+      weapons: z.literal(true).optional(),
+      ammunition: z.literal(true).optional()
+    })
+    .strict(),
   /** A choice the stat block leaves to the GM for each creature (a half-dragon's Draconic Origin: "one of the following
    *  damage types (DM's choice)"; a commoner's Training: "proficiency in one skill of the DM's choice"), stored on the
    *  creature under `key`. A damage-type pick is what the actions' parts with this `pick` deal; a skill pick with

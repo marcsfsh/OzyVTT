@@ -1,10 +1,19 @@
 import type { EffectInstance, GameState } from "@vtt/domain";
-import type { ActionMove, ActionTeleport, ActorDefinition } from "@vtt/schemas";
+import type { ActionMove, ActionTeleport, ActorDefinition, TeleportLanding } from "@vtt/schemas";
 import { rollDice } from "@vtt/rules-5e";
-import { makeEffect, NO_REACTIONS_TAG, type EffectNarration } from "./effects.js";
+import {
+  addEffect,
+  makeEffect,
+  NO_REACTIONS_TAG,
+  turnEndDuration,
+  type ConditionImmunitySource,
+  type EffectNarration
+} from "./effects.js";
+import { areEnemies } from "./creature-sides.js";
+import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import type { FallDeps } from "./falling.js";
 import { applyDamageDetailed, damageAdjustmentDetail } from "./hit-points.js";
-import { isIncapacitated } from "./condition-rules.js";
+import { conditionLabel, isIncapacitated } from "./condition-rules.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { currentTravelSpeedFeet, type TravelMode } from "./speed.js";
 
@@ -103,7 +112,8 @@ export function grantTeleport(
         round: state.combat.round,
         turnActorId: state.combat.turnActorId,
         ...(input.teleport.unseen ? { unseen: true as const } : {}),
-        ...(input.teleport.failDamage ? { failDamage: input.teleport.failDamage } : {})
+        ...(input.teleport.failDamage ? { failDamage: input.teleport.failDamage } : {}),
+        ...(input.teleport.landing ? { landing: structuredClone(input.teleport.landing) } : {})
       }
     })
   ];
@@ -276,6 +286,50 @@ export function compelledMoves(
       actorId: actor.id,
       ...(flee.sourceName ? { source: { actorId: flee.sourceActorId, name: flee.sourceName } } : {})
     });
+  }
+  return events;
+}
+
+/**
+ * What a granted teleport's arrival does near the space it lands in (a mummy lord's Whirlwind of Sand: "Each creature
+ * of its choice that it can see within 5 feet of its destination space has the Blinded condition until the end of the
+ * mummy's next turn"): each enemy the traveler sees that near takes the conditions, until the end of its next turn.
+ */
+export function landTeleport(
+  state: GameState,
+  traveler: Actor,
+  landing: TeleportLanding,
+  name: string,
+  deps: ConditionImmunitySource &
+    Readonly<{
+      commandId: string;
+      distanceFeet: (actorIdA: string, actorIdB: string) => number | null;
+      sees: (viewerId: string, targetId: string) => boolean;
+    }>
+): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const entry of state.combat.initiative) {
+    const other = state.actors.find((candidate) => candidate.id === entry.actorId);
+    if (!other || other.id === traveler.id || other.hp.current <= 0) continue;
+    if (!areEnemies(traveler, other, deps.resolveDefinition)) continue;
+    const distance = deps.distanceFeet(traveler.id, other.id);
+    if (distance === null || distance > landing.withinFeet + DISTANCE_TOLERANCE_FEET) continue;
+    if (!deps.sees(traveler.id, other.id)) continue;
+    addEffect(
+      state,
+      other.id,
+      makeEffect({
+        id: `${deps.commandId}:landing:${other.id}`,
+        name: `${landing.conditions.map(conditionLabel).join(" and ")} by ${name}`.slice(0, 120),
+        sourceActorId: traveler.id,
+        sourceName: traveler.name,
+        startedRound: state.combat.round,
+        duration: turnEndDuration(state, "until-source-turn-end", traveler.id),
+        linkedConditionIds: [...landing.conditions]
+      }),
+      events,
+      deps
+    );
   }
   return events;
 }

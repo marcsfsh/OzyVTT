@@ -34,6 +34,7 @@ import { objectFrom } from "../objects.js";
 import { areAllies } from "../creature-sides.js";
 import { chosenEffectOption } from "./effect-options.js";
 import { failureFormOf } from "./shape-shift.js";
+import { objectRowOf } from "../row-penalties.js";
 
 type AcBonusReaction = Extract<ActionReaction, { response: "ac-bonus" }>;
 
@@ -214,7 +215,7 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
   const { state, attack, attacker, targets, input, deps } = ctx;
   if (
     attack === null ||
-    attack.outcome !== "hit" ||
+    (attack.outcome !== "hit" && attack.outcome !== "crit") ||
     attack.targetAc === null ||
     input.acSettled === true ||
     !deps.resolveDefinition ||
@@ -233,10 +234,11 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
     (reaction): reaction is AcBonusReaction =>
       reaction.response === "ac-bonus" &&
       (reaction.melee !== true || melee) &&
-      attack.total < targetAc + reaction.amount,
+      // A critical hit hits whatever the AC; only a reaction that does more than raise it answers one.
+      (reaction.anyHit === true || (attack.outcome === "hit" && attack.total < targetAc + reaction.amount)),
     lookup
   );
-  const ward = own ? null : wardOffer(ctx, attack.total, targetAc);
+  const ward = own || attack.outcome !== "hit" ? null : wardOffer(ctx, attack.total, targetAc);
   const offer = own
     ? {
         reactor: target,
@@ -712,7 +714,20 @@ export function parkActionSave(ctx: ResolveContext): void {
   const failureMaxSize = action.save.failureMaxSize ?? action.swallow?.maxSize;
   const swallowsOf = (target: (typeof targets)[number]) =>
     failureMaxSize === undefined || sizeAtMost(target.size, failureMaxSize);
-  // One prompt group for each cover bonus, pick, Advantage, success without a roll, and swallow.
+  // The armor or weapon a failure marks, for each creature that carries one (a rust monster's Antennae); one that
+  // carries none has nothing for the action to act on.
+  const objects = new Map<string, string>();
+  if (action.object)
+    saving = saving.filter((target) => {
+      const row = objectRowOf(target, action.object!, input.objectItemId, deps.catalog);
+      if (row) objects.set(target.id, row.id);
+      else
+        ctx.warnings.push(
+          `${target.name} wears or carries no ${action.object!.metal ? "nonmagical metal" : "nonmagical"} ${action.object!.kinds.join(" or ")}, so ${action.name} does nothing.`
+        );
+      return row !== null;
+    });
+  // One prompt group for each cover bonus, pick, Advantage, success without a roll, swallow, and object.
   const groups = new Map<
     string,
     {
@@ -721,6 +736,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       advantageFrom: string;
       autoSucceeds: string;
       swallows: boolean;
+      objectRowId: string | null;
       targetIds: string[];
     }
   >();
@@ -730,8 +746,17 @@ export function parkActionSave(ctx: ResolveContext): void {
     const advantageFrom = fightingOf(target);
     const autoSucceeds = autoSuccessOf(ctx, target);
     const swallows = swallowsOf(target);
-    const key = `${saveBonus}|${option?.id ?? ""}|${advantageFrom}|${autoSucceeds}|${swallows}`;
-    const group = groups.get(key) ?? { saveBonus, option, advantageFrom, autoSucceeds, swallows, targetIds: [] };
+    const objectRowId = objects.get(target.id) ?? null;
+    const key = `${saveBonus}|${option?.id ?? ""}|${advantageFrom}|${autoSucceeds}|${swallows}|${objectRowId ? `${target.id}:${objectRowId}` : ""}`;
+    const group = groups.get(key) ?? {
+      saveBonus,
+      option,
+      advantageFrom,
+      autoSucceeds,
+      swallows,
+      objectRowId,
+      targetIds: []
+    };
     group.targetIds.push(target.id);
     groups.set(key, group);
   }
@@ -754,8 +779,14 @@ export function parkActionSave(ctx: ResolveContext): void {
     ...(action.save.failureByMargin ? { failureByMargin: structuredClone(action.save.failureByMargin) } : {}),
     ...fatal
   };
-  for (const { saveBonus, option, advantageFrom, autoSucceeds, swallows, targetIds } of groups.values()) {
-    const onFailEffect = swallows ? onFailFor(option) : undefined;
+  for (const { saveBonus, option, advantageFrom, autoSucceeds, swallows, objectRowId, targetIds } of groups.values()) {
+    const failed = swallows ? onFailFor(option) : undefined;
+    // "Until the end of its turn", read as the target's own turn starts, ends with that turn (a chain devil's gaze).
+    const onFailEffect =
+      failed && input.currentTurnOf !== undefined && targetIds.includes(input.currentTurnOf)
+        ? { ...failed, currentTurn: true as const }
+        : failed;
+    const marked = objectRowId !== null ? { ...extra, objectPenalty: { rowId: objectRowId } } : extra;
     createPendingSaves(state, {
       sourceActorId: attacker.id,
       sourceName: attacker.name,
@@ -770,7 +801,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       // A pick's own Prone stays bare, as the action's does (Command's Grovel).
       conditionIds: swallows ? [...conditionIds, ...barePicks(option)] : [],
       ...(onFailEffect ? { onFailEffect } : {}),
-      ...(Object.keys(extra).length > 0 ? { extra } : {}),
+      ...(Object.keys(marked).length > 0 ? { extra: marked } : {}),
       ...(action.drain ? { drain: action.drain } : {}),
       ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
       ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),

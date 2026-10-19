@@ -35,7 +35,7 @@ import {
 import { CommandRejectedError } from "../game-store.js";
 import { airborneAfter, altitudeOf, setAltitude } from "../altitude.js";
 import { startFall } from "../falling.js";
-import { failedTeleport } from "../granted-moves.js";
+import { failedTeleport, landTeleport } from "../granted-moves.js";
 import { holdMove } from "../held-moves.js";
 import { walkThroughZones } from "../zone-stops.js";
 import { landJump } from "../jumping.js";
@@ -67,6 +67,7 @@ import { HIDDEN_SOURCE } from "../hidden-source.js";
 import { insidePolygon } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
+import { offerNearbyReactions } from "../triggered-reactions.js";
 import { defineCommand } from "./pipeline.js";
 
 // Token movement and the drawings, measurements and pings on the encounter map.
@@ -145,6 +146,7 @@ export const mapCommands = [
       const zoneEvents: EffectNarration[] = [];
       const draggedNames: string[] = [];
       const landing: EffectNarration[] = [];
+      const pursuits: EffectNarration[] = [];
       let granted: string | undefined;
       let moverHiddenAtStart = false;
       const { state: moved, duplicate } = await execute((state) => {
@@ -347,6 +349,20 @@ export const mapCommands = [
             moveEncounterToken(state, actorId, from, geometry);
             setAltitude(state, actorId, fromAltitude, wasAirborne);
           }
+          // What the granted teleport's arrival does near where it lands (a mummy lord's Whirlwind of Sand).
+          const traveler = state.actors.find((actor) => actor.id === actorId);
+          if (outcome.teleportLanding && traveler && !caged?.held) {
+            const arrival = sceneSight(state, kit.sightContent());
+            landing.push(
+              ...landTeleport(state, traveler, outcome.teleportLanding, granted ?? "the teleport", {
+                commandId,
+                distanceFeet: (a, b) => tokenCreatureDistance(state, geometry, a, b)?.value ?? null,
+                sees: (viewer, target) => !arrival.enabled || arrival.sees(viewer, target),
+                resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+                catalog: kit.equipmentCatalog()
+              })
+            );
+          }
         }
         movementWarning = outcome.warning;
         movementOverridden = outcome.overridden;
@@ -484,6 +500,19 @@ export const mapCommands = [
           (a, b) => tokenCreatureDistance(state, geometry, a, b)?.value ?? null,
           DISTANCE_TOLERANCE_FEET
         );
+        // A move that ends here, unheld by an Opportunity Attack or an area's save, can open another creature's
+        // reaction to it (a nalfeshnee's Pursuit). A teleport or a shove is no move of the creature's own.
+        if (mode !== "forced" && mode !== "teleport" && position !== null && state.combat.heldMove?.actorId !== actorId)
+          pursuits.push(
+            ...offerNearbyReactions(state, actorId, "ends-move-near", {
+              newId: kit.context.newId,
+              now: () => new Date().toISOString(),
+              resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+              catalog: kit.equipmentCatalog(),
+              distanceFeet: (a, b) => tokenCreatureDistance(state, geometry, a, b)?.value ?? null,
+              commandId
+            })
+          );
       });
       if (duplicate) return;
       if (landing.length > 0) kit.publishRolls(moved, commandId);
@@ -501,6 +530,7 @@ export const mapCommands = [
       // What the spell areas did to the mover follows the move itself, as does a jump's landing.
       kit.publishNarrations(zoneEvents);
       kit.publishNarrations(landing);
+      kit.publishNarrations(pursuits);
       if (movementWarning)
         kit.context.appendLog({
           kind: "movement",

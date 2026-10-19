@@ -17,7 +17,9 @@ describe("trait mechanics in the monster bundle", () => {
     const ran = new Map<string, number>();
     const printed = new Map<string, number>();
     for (const monster of monsters.values()) {
-      for (const mechanic of monster.traitMechanics ?? []) ran.set(mechanic.name, (ran.get(mechanic.name) ?? 0) + 1);
+      // A trait read as two mechanics (Corrosive Form's acid and its corroding) counts once for its stat block.
+      for (const name of new Set((monster.traitMechanics ?? []).map((mechanic) => mechanic.name)))
+        ran.set(name, (ran.get(name) ?? 0) + 1);
       for (const name of printedTraits(monster)) printed.set(name, (printed.get(name) ?? 0) + 1);
     }
     for (const name of [
@@ -41,7 +43,7 @@ describe("trait mechanics in the monster bundle", () => {
       "Vampire Weakness",
       "Invisibility"
     ])
-      expect(ran.get(name) ?? 0, name).toBe(name === "Corrosive Form" ? 1 : printed.get(name));
+      expect(ran.get(name) ?? 0, name).toBe(printed.get(name));
   });
 
   it("gives the troll its stopping types and its death that waits for its turn, and the oni its 1 HP", () => {

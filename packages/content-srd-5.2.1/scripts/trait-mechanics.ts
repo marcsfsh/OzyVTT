@@ -397,7 +397,9 @@ export const pickKeyOf = (name: string) =>
 /** "Related to a type of dragon associated with one of the following damage types (DM's choice): Acid, Cold, Fire,
  *  Lightning, or Poison" (a half-dragon's Draconic Origin): the GM's pick for each creature, which its actions deal. */
 function damageTypePick(trait: Trait): TraitMechanic | null {
-  const listed = /\bone of the following damage types \(DM[’']s choice\): ([A-Za-z, ]+)\./.exec(trait.description)?.[1];
+  const listed = /\bone of the following damage types \(DM[\u2019']s choice\): ([A-Za-z, ]+)\./.exec(
+    trait.description
+  )?.[1];
   if (!listed) return null;
   const options = listed
     .split(/,\s*(?:or\s+)?|\s+or\s+/)
@@ -411,7 +413,7 @@ function damageTypePick(trait: Trait): TraitMechanic | null {
 /** "The commoner has proficiency in one skill of the DM's choice and has Advantage whenever it makes an ability check
  *  using that skill" (Training). */
 function skillPick(trait: Trait): TraitMechanic | null {
-  return /\bproficiency in one skill of the DM[’']s choice and has Advantage whenever it makes an ability check using that skill\b/.test(
+  return /\bproficiency in one skill of the DM[\u2019']s choice and has Advantage whenever it makes an ability check using that skill\b/.test(
     trait.description
   )
     ? { kind: "pick", name: trait.name, key: pickKeyOf(trait.name), of: "skill", skillAdvantage: true }
@@ -439,13 +441,33 @@ const READERS: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [
   engulfsEntrants
 ];
 
+/** "Nonmagical ammunition is destroyed immediately after hitting the pudding ... Any nonmagical weapon takes a
+ *  cumulative -1 penalty to attack rolls immediately after dealing damage to the pudding" (Corrosive Form). */
+function corrodesGear(trait: Trait): TraitMechanic | null {
+  const ammunition = /\bNonmagical ammunition is destroyed immediately after hitting\b/.test(trait.description);
+  const weapons = /\bAny nonmagical weapon takes a cumulative -1 penalty to attack rolls\b/.test(trait.description);
+  return ammunition || weapons
+    ? {
+        kind: "corrodes-gear",
+        name: trait.name,
+        ...(weapons ? { weapons: true as const } : {}),
+        ...(ammunition ? { ammunition: true as const } : {})
+      }
+    : null;
+}
+
+/** Readers that run beside the one a trait matches, for what a trait does besides it (Corrosive Form's acid on whoever
+ *  hits the pudding, and on their gear). */
+const ALSO: ReadonlyArray<(trait: Trait) => TraitMechanic | null> = [corrodesGear];
+
 /** Every trait the engine can run, in the stat block's order; the rest stay prose. */
 export function traitMechanicsOf(traits: readonly Trait[]): TraitMechanic[] {
   return traits.flatMap((trait) => {
+    const also = ALSO.flatMap((read) => read(trait) ?? []);
     for (const read of READERS) {
       const mechanic = read(trait);
-      if (mechanic) return [mechanic];
+      if (mechanic) return [mechanic, ...also];
     }
-    return [];
+    return also;
   });
 }

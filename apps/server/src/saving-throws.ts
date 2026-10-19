@@ -52,6 +52,7 @@ import { applyDamageDetailed, previewDamage, adjustableActor, healActor, killOut
 import { openDamageWindow } from "./damage-window.js";
 import { applyHitPointBand, banishOnFailure, hitPointBandOf } from "./fatal-saves.js";
 import { applyMarginCompanion, marginBandOf, withMarginBand } from "./save-margins.js";
+import { penalizeRow } from "./row-penalties.js";
 import { regurgitate, swallowLands, SWALLOWED_TAG } from "./swallow.js";
 import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
@@ -1259,6 +1260,14 @@ export function answerSave(
         ...applyMarginCompanion(state, target.id, onFail, margin, `${commandId}:${saveId}:margin`, immunities)
       );
   }
+  // A rust monster's Antennae: the armor or weapon the failure marks takes a cumulative -1.
+  if (!success && pending.objectPenalty)
+    events.push(
+      ...penalizeRow(state, target.id, pending.objectPenalty.rowId, {
+        resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
+        ...(deps.catalog ? { catalog: deps.catalog } : {})
+      })
+    );
   // A gibbering mouther's d8 decides what the creature does this turn.
   if (!success && pending.onFailEffect?.tags.includes(GIBBERING_TAG))
     events.push(...gibberingTurn(target, deps.random));

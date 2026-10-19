@@ -246,6 +246,8 @@ const PENDING_SAVE_FIELDS = {
   failureByHitPoints: "never",
   // What a failure by a margin does is the stat block's text; it is narrated as it lands.
   failureByMargin: "never",
+  // Which of the target's things a failure marks is narrated when it lands.
+  objectPenalty: "never",
   failureBanishes: "never",
   // What a swallower's failure lets out is narrated when it lands.
   regurgitates: "never",
@@ -334,6 +336,8 @@ const PENDING_REACTION_FIELDS = {
   parkedCast: "never",
   // Sent as `attackRoll`, and only when the roll it came from is in the player's dice log.
   attackTotal: "derived",
+  // What set off a stat block's reaction: a hit, a turn's start or end, a move's end, damage. Public as the event was.
+  cause: "player",
   // The attack's target as it stands, and the allies a Redirect Attack may hand it to: masked or left out when hidden.
   targetName: "derived",
   redirectChoices: "derived",

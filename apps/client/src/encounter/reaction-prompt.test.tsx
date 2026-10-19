@@ -83,7 +83,7 @@ describe("the prompt for each trigger", () => {
       weighed: null,
       acBonus: 2
     });
-    expect(screen.getByText(/attack would hit Borin\. \+2 AC turns it into a miss/)).toBeTruthy();
+    expect(screen.getByText(/attack would hit Borin\. \+2 AC may turn it into a miss/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Use Parry" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Take the hit" })).toBeTruthy();
   });

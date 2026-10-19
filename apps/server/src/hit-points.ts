@@ -59,6 +59,7 @@ import { mistyEscape, regainedHitPoints, restorationAtDeath, tallyTurnDamage } f
 import { holdsFeature } from "./class-features.js";
 import { rollSaveAtOnce } from "./saving-throws.js";
 import { offerDamageReaction } from "./damage-reactions.js";
+import { offerDamagedReaction } from "./triggered-reactions.js";
 import { releaseSwallowedBy, tallyDamageFromInside } from "./swallow.js";
 import { markBloodiedHit } from "./bloodied-hits.js";
 import { damageTypeTraits } from "./damage-traits.js";
@@ -1005,6 +1006,21 @@ export function applyDamageDetailed(
   // Damage from a creature can open the target's strike-back reaction (Hellish Rebuke). Skipped without an id-minter.
   if (totalAdjusted > 0 && input.sourceActorId && deps) {
     const offered = offerDamageReaction(state, actor, input.sourceActorId, deps);
+    if (offered) events.push(offered);
+  }
+  // Damage can open the creature's own reaction to taking it (a giant octopus's Ink Cloud, a black pudding's Split).
+  if (totalRequested > 0 && deps?.newId) {
+    const offered = offerDamagedReaction(
+      state,
+      actor,
+      {
+        types: parts.filter((part) => part.amount > 0).map((part) => part.type.trim().toLowerCase()),
+        applied: totalAdjusted,
+        hpBefore,
+        sourceActorId: input.sourceActorId ?? null
+      },
+      { ...deps, newId: deps.newId }
+    );
     if (offered) events.push(offered);
   }
 

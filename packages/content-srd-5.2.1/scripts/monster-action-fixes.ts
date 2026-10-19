@@ -208,10 +208,15 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
     why: "a failure's pull toward the devil is a forced move no save failure makes yet",
     reminder: "If the target is Large or smaller, move it up to 30 feet straight toward the devil."
   },
-  "rust-monster/antennae": {
-    why: "the penalty is on one carried armor or weapon, which items don't track",
-    reminder:
-      "On a failure, the armor or weapon the rust monster targeted takes a cumulative -1 penalty: to the AC it offers, or to its attack rolls. Change the item by hand. Armor whose AC falls to 10, or a weapon at -5, is destroyed, and Mending removes the penalty."
+  "chain-devil/unnerving-gaze": {
+    why: "the reaction prints its failure and success in italic labels the save reader doesn't take apart",
+    // "Failure: The target has the Frightened condition until the end of its turn. Success: The target is immune to
+    // this devil's Unnerving Gaze for 24 hours."
+    save: {
+      failureConditions: ["frightened"],
+      failureDuration: { type: "until-bearer-turn-end" },
+      immuneOnSuccess: true
+    }
   }
 };
 

@@ -40,7 +40,10 @@ export function placeCastSight(ctx: ResolveContext): void {
     effectId,
     targetIds: ctx.targets.map((target) => target.id),
     areaPlaced: input.areaPlaced === true,
-    widthFeet: ctx.action.area?.widthFeet ?? spell?.area?.widthFeet ?? null
+    widthFeet: ctx.action.area?.widthFeet ?? spell?.area?.widthFeet ?? null,
+    ...(input.areaAt && ctx.action.area
+      ? { centredAt: { x: input.areaAt.x, y: input.areaAt.y, sizeFeet: ctx.action.area.sizeFeet } }
+      : {})
   });
   for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
 }

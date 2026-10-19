@@ -36,6 +36,7 @@ export function createPendingSaves(
       | "gmApplies"
       | "failureByHitPoints"
       | "failureByMargin"
+      | "objectPenalty"
       | "failureBanishes"
       | "endsForm"
       | "regurgitates"
@@ -107,6 +108,7 @@ export function createPendingSaves(
     ...(input.extra?.failureByHitPoints ? { failureByHitPoints: structuredClone(input.extra.failureByHitPoints) } : {}),
     ...(input.extra?.failureBanishes ? { failureBanishes: [...input.extra.failureBanishes] } : {}),
     ...(input.extra?.failureByMargin ? { failureByMargin: structuredClone(input.extra.failureByMargin) } : {}),
+    ...(input.extra?.objectPenalty ? { objectPenalty: { ...input.extra.objectPenalty } } : {}),
     ...(input.extra?.regurgitates ? { regurgitates: { ...input.extra.regurgitates } } : {}),
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),

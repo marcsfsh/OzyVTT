@@ -585,6 +585,13 @@ export const ActionResolveSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(80)
       .optional(),
+    /** The armor or weapon its target wears or carries that the action acts on (a rust monster's Antennae, Mending);
+     *  absent, the target's worn armor, else its weapon in hand. */
+    objectItemId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
     /** Push mastery (SRD "up to 10 feet"): how far to push on this hit, 0 to decline; absent pushes the full 10. */
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     /** The spell slot to cast with (upcasting rolls that slot's dice); absent, the spell's own level, else the lowest
@@ -713,7 +720,8 @@ export const ReactionAnswerSchema = z
     pushFeet: z.number().int().min(0).max(10).multipleOf(5).optional(),
     /** The extras the swing's previewed hit offered that the answerer adds to it (Sneak Attack), sent with the confirm. */
     hitOptions: z.array(HitOptionChoiceSchema).max(6).optional(),
-    /** Redirect Attack: the ally the attack turns to, one of the prompt's `redirectChoices`. */
+    /** Redirect Attack: the ally the attack turns to; Deflect Missile: the creature the force turns on if the damage is
+     *  reduced to 0. One of the prompt's `redirectChoices`. */
     redirectTo: z.uuid().optional(),
     /** The spell slot a reaction spell is cast with (Shield, Hellish Rebuke, Counterspell): absent, its own level or the
      *  lowest above it with a slot left. A higher slot upcasts it as a cast on the caster's turn does. */

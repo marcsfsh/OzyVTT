@@ -66,9 +66,9 @@ const CARRIED: Readonly<Record<ActionClause, (action: ActorAction, effects: read
 const PRINTED: Readonly<Record<ActionClause, RegExp>> = {
   speed: /\bSpeed (?:decreases by \d+ feet|is halved|becomes 0|is 0)\b|\bSpeed of 0\b/,
   disadvantage: /\bDisadvantage on\b/,
-  "no-reactions": /\bcan[’']t take (?:a Bonus Action or )?Reactions?\b/,
+  "no-reactions": /\bcan[\u2019']t take (?:a Bonus Action or )?Reactions?\b/,
   size: /\bIf the target is (?:an? )?(?:Tiny|Small|Medium|Large|Huge)(?: creature)? or smaller\b/,
-  "not-type": /\bisn[’']t an? [A-Z][a-z]+\b/,
+  "not-type": /\bisn[\u2019']t an? [A-Z][a-z]+\b/,
   "each-enemy": /\beach enemy\b/i,
   "sees-user": /\bthat can see (?:the|it)\b/
 };

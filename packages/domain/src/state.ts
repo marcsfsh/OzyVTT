@@ -389,6 +389,17 @@ export const PendingSaveSchema = z
     /** What a failure by this much or more does instead ("Failure by 5 or More"). GM bookkeeping, never projected: the
      *  result says what landed. */
     failureByMargin: FailureMarginSchema.optional(),
+    /** The carried armor or weapon of the target that a failure gives a cumulative -1 (a rust monster's Antennae). GM
+     *  bookkeeping, never projected: the result says what it did. */
+    objectPenalty: z
+      .object({
+        rowId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80)
+      })
+      .strict()
+      .optional(),
     /** A creature of these types that fails leaves for its home plane for 24 hours (Divine Word). GM bookkeeping. */
     failureBanishes: z
       .array(
@@ -829,13 +840,14 @@ export const PendingReactionSchema = z
      *  a spell the reactor may counter (`casts-spell`), a roll another creature may answer (`roll-answer`: Cutting
      *  Words, Countercharm), damage the reactor is about to take from any source (`takes-damage`), a creature
      *  falling (`falls`), or an attack about to roll that the reactor may give another target (`attack-targeted`:
-     *  Redirect Attack, Arrow-Catching Shield). */
+     *  Redirect Attack, Arrow-Catching Shield), or another trigger a stat block names (`triggered`, with its `cause`). */
     kind: z
       .enum([
         "hit-by-attack",
         "leaves-reach",
         "attack-would-hit",
         "damaged-by-creature",
+        "triggered",
         "casts-spell",
         "roll-answer",
         "takes-damage",
@@ -846,7 +858,7 @@ export const PendingReactionSchema = z
     /** attack-targeted and a ward's attack-would-hit: the attack's target as it stands, by name. */
     targetName: z.string().min(1).max(120).optional(),
     /** attack-targeted (Redirect Attack): the allies the reactor may make the target instead, one picked with the
-     *  answer. */
+     *  answer; hit-by-attack (a stone giant's Deflect Missile): the creatures it may turn the deflected force on. */
     redirectChoices: z
       .array(z.object({ actorId: z.uuid(), name: z.string().min(1).max(120) }).strict())
       .min(1)
@@ -860,7 +872,12 @@ export const PendingReactionSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(120),
     actionName: z.string().min(1).max(120),
-    /** leaves-reach and damaged-by-creature: the creature the reaction would strike. */
+    /** triggered: what happened. A creature's attack roll hit the reactor (`hit`: a rust monster's Reflexive Antennae), a
+     *  creature started or ended its turn, or ended a move, near it (`turn-start`: a chain devil's Unnerving Gaze;
+     *  `turn-end`: an octopus's Ink Cloud; `move-end`: a nalfeshnee's Pursuit), or the reactor took damage (`damaged`:
+     *  a giant octopus's Ink Cloud, a black pudding's Split). The declared reaction's response says what "use" does. */
+    cause: z.enum(["hit", "turn-start", "turn-end", "move-end", "damaged"]).optional(),
+    /** leaves-reach, damaged-by-creature and triggered: the creature the reaction would strike or answer. */
     targetActorId: z.uuid().nullable().default(null),
     /** Source actor for GM bookkeeping; stripped from player projections. */
     sourceActorId: z.uuid().nullable().default(null),
