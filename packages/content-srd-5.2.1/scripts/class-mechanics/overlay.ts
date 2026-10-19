@@ -19,7 +19,7 @@ type OptionInput = z.input<typeof FeatureOptionSchema>;
 type RiderKey =
   "tags" | "actions" | "effects" | "modifiers" | "grants" | "uses" | "extraPicks" | "replaces" | "choice" | "choices";
 /** Feature-only rider keys (an option cannot carry them). */
-type FeatureRiderKey = RiderKey | "extraSpellLists";
+type FeatureRiderKey = RiderKey | "extraSpellLists" | "freeCastOf";
 
 /** The rider fields an overlay may add to one pickable option inside a feature's choice. */
 export type OptionMechanics = Partial<Pick<OptionInput, RiderKey | "requires" | "level">>;

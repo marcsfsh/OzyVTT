@@ -152,7 +152,13 @@ type InterpretedFeatures = {
     /** How the granting feature changes its castings: components they go without, and a free casting only on its
      *  caster or with its healing dice at their highest. */
     casting?: CastingChange;
+    /** The feature that grants it: its own id, or for a chosen option the feature it was chosen under. */
+    grantedBy: string;
   }>;
+  /** Free castings a feature gives the spells other features grant, on its own uses (Natural Recovery). */
+  freeCastsOf: Array<
+    Readonly<{ features: ReadonlySet<string>; minLevel: number; uses: NonNullable<ActorAction["uses"]> }>
+  >;
   /** The free casting a feature with limited uses gives the spell picked for it (Magic Initiate's level 1 spell). */
   pickedSpellUses: Map<string, NonNullable<ActorAction["uses"]>>;
   /** Hit points the features add: each `hit-points-per-level` rider times the level that scales it (a Sorcerer level
@@ -731,7 +737,8 @@ function interpretFeature(
   context: BuildContext,
   source: SpellSource,
   classId: string | null = null,
-  className: string | null = null
+  className: string | null = null,
+  grantedBy: string = feature.id
 ): void {
   into.traits.push({ name: feature.name, description: feature.description });
   /** An action or pool id as this class owns it, and the action's name when that id had to change. */
@@ -760,7 +767,15 @@ function interpretFeature(
         ...(feature.uses!.afterHours ? { afterHours: feature.uses!.afterHours } : {})
       }
     : undefined;
-  const freeCastGrant = feature.grants?.spells.some((spell) => spell.withoutSlot === "free") === true;
+  // A free casting of what other features grant (Natural Recovery) spends this feature's counter on those casts.
+  const freeCastOf = feature.freeCastOf !== undefined && carriesUses;
+  if (freeCastOf)
+    into.freeCastsOf.push({
+      features: new Set(feature.freeCastOf!.features),
+      minLevel: feature.freeCastOf!.minLevel ?? 0,
+      uses: freeUses!
+    });
+  const freeCastGrant = freeCastOf || feature.grants?.spells.some((spell) => spell.withoutSlot === "free") === true;
   // A spell picked for a feature with limited uses is cast with them (Magic Initiate once per Long Rest, Mystic
   // Arcanum), so the counter rides that spell's free-cast action, with no action of its own.
   const freeCastPick = carriesUses && featurePicks(feature).some((pick) => pick.kind === "spell");
@@ -811,6 +826,7 @@ function interpretFeature(
         ability: spell.ability,
         withSlot: spell.withSlot,
         source,
+        grantedBy,
         ...(spell.summon ? { summon: spell.summon } : {}),
         ...(spell.asMagicAction ? { asMagicAction: spell.asMagicAction } : {}),
         ...(castingChangeOf(spell) ? { casting: castingChangeOf(spell) } : {}),
@@ -1123,6 +1139,7 @@ export function buildCharacterDefinition(
     damageImmunities: [],
     conditionImmunities: [],
     grantedSpells: [],
+    freeCastsOf: [],
     pickedSpellUses: new Map(),
     hitPointBonus: 0,
     speedBonus: 0,
@@ -1160,8 +1177,17 @@ export function buildCharacterDefinition(
       contextOf(classId),
       spellSourceOf(record, origin, classId),
       classId,
-      classId === null ? null : (classOf.get(classId)?.record.name ?? null)
+      classId === null ? null : (classOf.get(classId)?.record.name ?? null),
+      origin?.kind === "option" ? origin.sourceId : record.id
     );
+  // A free casting that other features' spells share (Natural Recovery's one Circle Spell a Long Rest): each such
+  // spell of its level or higher is cast free on the one counter, unless another feature already casts it free.
+  for (const spec of interpreted.freeCastsOf)
+    for (const grantedSpell of interpreted.grantedSpells) {
+      const level = grantedSpell.level ?? library.spellRecord(grantedSpell.id)?.level ?? 0;
+      if (spec.features.has(grantedSpell.grantedBy) && level >= spec.minLevel && grantedSpell.free === undefined)
+        grantedSpell.free = spec.uses;
+    }
   // Martial Arts reads its own class's column (a Monk's), and runs after the features so an id a feature already
   // declared keeps it.
   const martialContext = [...classContexts.values()].find((context) => martialArtsDieOf(context) !== null);

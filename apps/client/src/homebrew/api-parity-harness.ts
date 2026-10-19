@@ -1290,6 +1290,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "freeCastOf.**",
+    types: "*",
+    reason:
+      "a free casting a feature gives the spells other features grant (Natural Recovery's Circle Spell): no control at feature scope yet",
+    status: "gap"
+  },
+  {
     at: "extraSpellLists",
     types: "*",
     reason:

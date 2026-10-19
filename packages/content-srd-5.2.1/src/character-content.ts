@@ -830,6 +830,20 @@ export const FeatureRecordSchema = z
       .describe(
         "Spell lists the class's own prepared and cantrip picks may also draw on, the spells counting as that class's (Magical Secrets: the Bard's picks may come from the Cleric, Druid and Wizard lists). Widens an existing budget; it adds no picks"
       ),
+    /** A free casting of a spell other features grant, on this feature's own uses, which the spells share (Natural
+     *  Recovery: "one of the level 1+ spells that you have prepared from your Circle Spells feature"). */
+    freeCastOf: z
+      .object({
+        /** The features whose granted spells it casts, with the options chosen under them. */
+        features: z.array(ContentIdSchema).min(1).max(8),
+        /** The lowest level of spell it casts (Natural Recovery's "level 1+"). */
+        minLevel: z.number().int().min(0).max(9).optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A free casting of a spell other features grant, on this feature's own `uses`, which every such spell shares: Natural Recovery casts \"one of the level 1+ spells that you have prepared from your Circle Spells feature\" once per Long Rest. `features` names the granting features (their chosen options' grants count)"
+      ),
     ...featureRiders,
     /** This feature replaces an earlier one of the same id lineage (Indomitable at 9/13/17). */
     replacesFeatureId: ContentIdSchema.optional().describe(

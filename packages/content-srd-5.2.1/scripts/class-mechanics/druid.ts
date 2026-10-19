@@ -244,8 +244,8 @@ export const druid: ClassMechanicsModule = {
       choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     }
 
-    // Not modeled: Wild Resurgence, Archdruid and Natural Recovery (resource conversion between pools)
-    // and Beast Spells (a permission, not a rider).
+    // Wild Resurgence, Archdruid and Natural Recovery's slots are the server's conversions (`conversions.ts`), and Beast
+    // Spells is a form rule (`transform/`).
   },
 
   // "You have the spells listed for your Druid level and lower prepared": each later row is a staged feature
@@ -323,6 +323,24 @@ export const druid: ClassMechanicsModule = {
             description: `${land.tiers.map(([level, spells]) => `Level ${level}: ${spells.map(([, name]) => name).join(", ")}`).join(". ")}.`,
             grants: { spells: land.tiers[0][1].map(([id, , level]) => ({ id, level, alwaysPrepared: true })) }
           }))
+        }
+      },
+
+      /**
+       * "You can cast one of the level 1+ spells that you have prepared from your Circle Spells feature without
+       * expending a spell slot, and you must finish a Long Rest before you do so again": a free casting of each land
+       * spell of level 1+, on one counter. The slots recovered after a Short Rest are a conversion (`conversions.ts`).
+       */
+      "natural-recovery": {
+        uses: { limit: 1, per: "long-rest", pool: "natural-recovery-cast" },
+        freeCastOf: {
+          features: [
+            "circle-of-the-land-spells",
+            "circle-of-the-land-spells-5",
+            "circle-of-the-land-spells-7",
+            "circle-of-the-land-spells-9"
+          ],
+          minLevel: 1
         }
       },
 
