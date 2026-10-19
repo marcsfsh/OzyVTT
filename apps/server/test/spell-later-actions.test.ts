@@ -4,6 +4,7 @@ import { builtinAction } from "../src/builtin-actions.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
 import { setAltitude } from "../src/altitude.js";
 import { passGameTime } from "../src/game-time.js";
+import { applyRest } from "../src/rests.js";
 import { ALLY, catalog, FOE, HERO } from "./spell-casters.js";
 import { actorOf, answer, cast, caster, laterAction, nextCommand, resolveAs, wizard } from "./spell-lifetimes-kit.js";
 
@@ -219,6 +220,24 @@ describe("Levitate's altitude", () => {
     resolveAs(table, laterAction("levitate", "lower"), { targetIds: [] });
     expect(heightOf(table, HERO)).toBe(0);
     expect(table.state.combat.turn.actionUsed).toBe(false);
+  });
+});
+
+describe("Dream", () => {
+  it("entrances its messenger, and a failed save against the terrifying message spoils the target's rest", () => {
+    const table = caster({ combat: false });
+    cast(table, "dream");
+    const trance = actorOf(table.state, HERO).effects.find((effect) => effect.name === "Dream messenger's trance")!;
+    expect(trance).toMatchObject({ linkedConditionIds: ["incapacitated"], speedZero: true });
+    resolveAs(table, laterAction("dream", "terrifying message"));
+    answer(table.state, FOE, 1);
+    const target = actorOf(table.state, FOE);
+    target.hp = { ...target.hp, current: 100 };
+    const events = applyRest(table.state, FOE, "long", () => undefined, catalog, { random: () => 3, lines: [] });
+    expect(events.map((event) => event.text).join(" ")).toMatch(/no benefit/);
+    // No Hit Points come back, and 3d6 Psychic lands as it wakes.
+    expect(actorOf(table.state, FOE).hp.current).toBe(91);
+    expect(actorOf(table.state, FOE).effects.some((effect) => effect.name === "Dream's nightmare")).toBe(false);
   });
 });
 

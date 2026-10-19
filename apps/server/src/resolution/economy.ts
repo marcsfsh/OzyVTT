@@ -544,7 +544,9 @@ const ANSWERS_A_ROLL: ReadonlySet<string> = new Set([
   "orc-relentless-endurance",
   "relentless-endurance",
   "dark-ones-own-luck",
-  "boon-of-fate"
+  "boon-of-fate",
+  // Dream's messenger delivers its terrifying message from the trance that leaves it Incapacitated.
+  "spell-dream-then-terrifying-message"
 ]);
 
 /** What a creature limited to Dash may still do (Wind Walk): the Dash action, as an action or a Bonus Action, and the

@@ -311,7 +311,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       ...(grant.light ? { light: { ...grant.light } } : {}),
       // The creatures it lets its bearer sense (Divine Sense), drawn for its player alone (`vision/detect.ts`).
       ...(grant.detects ? { detects: { ...grant.detects, creatureTypes: [...grant.detects.creatureTypes] } } : {}),
-      ...(steadyAim ? { speedZero: true } : {}),
+      ...(steadyAim || grant.speedZero ? { speedZero: true } : {}),
       ...grantedMovement,
       // Heroism: immune to Frightened, and Temporary Hit Points at the start of each of the bearer's turns.
       ...(conditionImmunities.length > 0 ? { conditionImmunities: conditionImmunities.slice(0, 6) } : {}),

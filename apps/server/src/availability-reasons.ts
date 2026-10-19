@@ -250,7 +250,8 @@ const TAKEN_ON_A_TURN: ReadonlySet<string> = new Set([
   "action-surge",
   // A spell's harm its caster or the GM deals by hand, with no action (Phantasmal Force's 2d8, Geas's 5d10).
   "spell-phantasmal-force-then-harm",
-  "spell-geas-then-defiance"
+  "spell-geas-then-defiance",
+  "spell-dream-then-terrifying-message"
 ]);
 /** Features used outside a fight that their text doesn't tie to a rest's end. */
 const USED_BETWEEN_FIGHTS: ReadonlySet<string> = new Set(["magical-cunning"]);

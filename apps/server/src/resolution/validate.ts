@@ -71,7 +71,10 @@ function combatantsOf(
   const itemGrant = isItemActionId(action.id) && action.grants !== undefined;
   // So is helping an ally with a check (picking a lock, calming a horse), which needs no turn.
   const helps = action.id === "help-check";
-  if (outsideFight && !castsASpell && !shapeShifts && !itemGrant && !helps)
+  // And what a lasting spell does by its caster's hand away from a fight (Dream's message to a sleeper, Geas's harm
+  // to a defiant creature, Levitate's lift), so long as the spell is up.
+  const lasting = spell !== undefined && laterRowOf(spell, action.id) !== undefined && laterRowOf(spell, action.id)!.zone === undefined;
+  if (outsideFight && !castsASpell && !shapeShifts && !itemGrant && !helps && !lasting)
     throw new CommandRejectedError("Start an encounter before resolving actions.");
   const inFight = (actorId: string) =>
     outsideFight

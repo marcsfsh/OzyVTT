@@ -1428,11 +1428,16 @@ export const RestTriggerSchema = z
       .optional(),
     maximumLoss: DiceFormulaSchema.optional(),
     noBenefit: z.enum(["short", "long", "both"]).optional(),
-    holdsMaximum: z.literal(true).optional()
+    holdsMaximum: z.literal(true).optional(),
+    /** Damage it deals as the rest ends, its bearer waking (Dream's terrifying messenger: 3d6 Psychic). */
+    damage: RepeatFailureDamageSchema.optional(),
+    /** It acts once and ends (Dream: "the target gains no benefit from its rest, and it takes 3d6 Psychic damage when
+     *  it wakes up"). */
+    once: z.literal(true).optional()
   })
   .strict()
   .describe(
-    "What the effect does as its bearer finishes a Long Rest or as each day passes: a save that ends it, a Hit Point maximum loss, the rests that give no benefit, and a maximum a Long Rest doesn't restore"
+    "What the effect does as its bearer finishes a Long Rest or as each day passes: a save that ends it, a Hit Point maximum loss, the rests that give no benefit, a maximum a Long Rest doesn't restore, damage as it wakes, and whether it acts only once"
   );
 export type RestTrigger = z.infer<typeof RestTriggerSchema>;
 
@@ -2780,6 +2785,8 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
     })
     .strict()
     .optional(),
+  /** The recipient's Speed is 0 while it lasts (Dream's messenger in its trance). */
+  speedZero: z.literal(true).optional(),
   /** The recipient's Speed is multiplied by this while it lasts, after every other change (Haste: 2). */
   speedMultiplier: z.number().int().min(2).max(4).optional(),
   /** A base AC the recipient may use while it wears no armor: this plus its Dexterity modifier, a Shield adding

@@ -9431,10 +9431,61 @@
    "attacks": 0,
    "damage": [],
    "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "terrifying message",
+     "activation": "other",
+     "when": "The messenger turns terrifying: after its message of ten words or fewer, the target makes the Wisdom save, and a failure denies it the benefit of its rest and deals it 3d6 Psychic damage as it wakes.",
+     "save": {
+      "ability": "wis",
+      "successDamage": "none",
+      "failureConditions": [],
+      "failureDuration": {
+       "type": "minutes",
+       "minutes": 1440
+      },
+      "atRest": {
+       "at": "long-rest",
+       "noBenefit": "long",
+       "damage": [
+        {
+         "formula": "3d6",
+         "type": "psychic"
+        }
+       ],
+       "once": true
+      }
+     },
+     "failureEffect": {
+      "name": "Dream's nightmare",
+      "tags": [],
+      "modifiers": []
+     },
+     "damage": []
+    }
+   ],
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Dream messenger's trance",
+    "tags": [
+     "dream-trance"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    },
+    "conditions": [
+     "incapacitated"
+    ],
+    "speedZero": true
+   }
   },
   "classes": [
    "bard",

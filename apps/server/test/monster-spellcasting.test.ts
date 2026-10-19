@@ -259,3 +259,13 @@ describe("a stat block's Invisibility", () => {
     expect(imp.effects).toEqual([]);
   });
 });
+
+describe("what a stat block's spells let it do later", () => {
+  it("gives a couatl Dream's terrifying message, and a djinni Wind Walk's return to cloud form, at its numbers", () => {
+    const message = actionOf("couatl", "spell-dream-then-terrifying-message");
+    const spellcasting = actionOf("couatl", "spellcasting");
+    expect(message).toMatchObject({ partOf: spellcasting.id, save: { ability: "wis", dc: spellcasting.castsSpells!.saveDc } });
+    expect(actionOf("djinni", "spell-wind-walk-then-cloud-form").shapeShift).toMatchObject({ takesRounds: 10 });
+  });
+});
+

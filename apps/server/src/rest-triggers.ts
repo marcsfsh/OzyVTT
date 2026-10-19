@@ -3,7 +3,7 @@ import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorDefinition, RestTrigger } from "@vtt/schemas";
 import { endEffectIfPresent, maximumKeeper, sourceOf, type EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
-import { killOutright } from "./hit-points.js";
+import { applyDamageDetailed, killOutright } from "./hit-points.js";
 import { rollSaveAtOnce } from "./saving-throws.js";
 
 /**
@@ -116,6 +116,31 @@ function triggerOnce(
     if (success) return [...events, ...endEffectIfPresent(state, actor.id, effect.id)];
   }
   if (trigger.maximumLoss) events.push(...loseMaximum(state, actor, effect, trigger.maximumLoss, deps));
+  // "It takes 3d6 Psychic damage when it wakes up" (Dream), meeting its defences like any damage.
+  if (trigger.damage) {
+    const parts = trigger.damage.map((part) => ({
+      amount: Math.max(0, resolveDice(parseDiceFormula(part.formula), deps.random).total),
+      type: part.type
+    }));
+    const amount = parts.reduce((sum, part) => sum + part.amount, 0);
+    const outcome = applyDamageDetailed(
+      state,
+      actor.id,
+      { amount, parts, sourceActorId: effect.sourceActorId, sourceName: effect.sourceName ?? effect.name },
+      { role: "gm" },
+      { resolveDefinition: deps.resolveDefinition, rollDie: deps.random, ...(deps.catalog ? { catalog: deps.catalog } : {}) }
+    );
+    events.push(
+      {
+        kind: "damage",
+        text: `${actor.name} wakes and takes ${outcome.application.totalApplied} damage (${effect.name}).`,
+        actorId: actor.id,
+        ...sourceOf(effect)
+      },
+      ...outcome.events
+    );
+  }
+  if (trigger.once) events.push(...endEffectIfPresent(state, actor.id, effect.id));
   return events;
 }
 

@@ -799,6 +799,26 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       zone: { on: ["enter", "start-turn"], around: "point", feet: 10, affects: "enemies", damageCap: 60 }
     }
   ],
+  // "You can make the messenger terrifying to the target. If you do so, the messenger can deliver a message of no more
+  // than ten words, and then the target makes a Wisdom saving throw. On a failed save, the target gains no benefit from
+  // its rest, and it takes 3d6 Psychic damage when it wakes up."
+  dream: [
+    {
+      name: "terrifying message",
+      activation: "other",
+      when: "The messenger turns terrifying: after its message of ten words or fewer, the target makes the Wisdom save, and a failure denies it the benefit of its rest and deals it 3d6 Psychic damage as it wakes.",
+      save: {
+        ability: "wis",
+        successDamage: "none",
+        failureConditions: [],
+        // It waits for the sleeper's next rest, past the 8 hours the spell lasts.
+        failureDuration: { type: "minutes", minutes: 1440 },
+        atRest: { at: "long-rest", noBenefit: "long", damage: [{ formula: "3d6", type: "psychic" }], once: true }
+      },
+      failureEffect: { name: "Dream's nightmare", tags: [], modifiers: [] },
+      damage: []
+    }
+  ],
   // "As a Magic action on your next turn, you can try to probe deeper into the target's mind. If you probe deeper, the
   // target makes a Wisdom saving throw. ... On a successful save, the spell ends. Either way, the target knows that you
   // are probing into its mind, and ... the target can take an action on its turn to make an Intelligence (Arcana) check
@@ -1819,6 +1839,16 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "self",
     duration: rounds(10),
     storeAwaits: { via: "glyph", maxLevel: 3 }
+  }),
+  // "You or a willing creature you touch enters a trance state to act as a dream messenger. While in the trance, the
+  // messenger is Incapacitated and has a Speed of 0." Ending the effect is emerging from the trance, which ends the spell.
+  dream: spellGrant({
+    name: "Dream messenger's trance",
+    tags: ["dream-trance"],
+    target: "self",
+    duration: { type: "manual" },
+    conditions: ["incapacitated"],
+    speedZero: true
   }),
   // "Until the spell ends, the target can revert to cloud form": each target keeps the spell, and its action to become
   // a cloud again, for the spell's duration.
