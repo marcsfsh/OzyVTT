@@ -842,16 +842,22 @@ export const LONG_REST_MINUTES = 8 * 60;
  *  has already moved those hours for everyone (`clockMoved`, a party rest), what of its own would run out in them ends
  *  here. What lasts longer waits for the GM to pass the hours, so they never count twice; "until ended" ones (a curse, a
  *  disease) stay. */
-export function endEffectsAtLongRest(state: GameState, actorId: string, clockMoved = false): EffectNarration[] {
+export function endEffectsAtLongRest(
+  state: GameState,
+  actorId: string,
+  clockMoved = false,
+  holdsMaximum = false
+): EffectNarration[] {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const events: EffectNarration[] = [...endConcentrationSustainedBy(state, actorId)];
   if (!clockMoved) events.push(...ageEffects(state, new Set([actorId]), LONG_REST_MINUTES, false));
-  // SRD Long Rest: "If your Hit Point maximum was reduced, it returns to normal." A gain kept until ended (one from
-  // before gains counted game time) is spent by the rest's end too.
+  // SRD Long Rest: "If your Hit Point maximum was reduced, it returns to normal", unless a curse holds it down (a
+  // mummy's: "its Hit Point maximum doesn't return to normal when finishing a Long Rest"). A gain kept until ended
+  // (one from before gains counted game time) is spent by the rest's end too.
   for (const effect of [...actor.effects])
     if (
-      effect.hitPointMaximumLoss !== undefined ||
+      (effect.hitPointMaximumLoss !== undefined && !holdsMaximum && effect.atRest === undefined) ||
       (effect.hitPointMaximumGain !== undefined && effect.duration.type === "manual")
     )
       endEffectInternal(state, actor, effect.id, events, true);

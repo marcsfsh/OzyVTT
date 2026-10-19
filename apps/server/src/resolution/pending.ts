@@ -15,7 +15,7 @@ import { coverBonusOf, coverFor } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf } from "./damage.js";
 import { spellOf, spellSaveDuration } from "./concentration.js";
-import { repeatSaveOf } from "../save-stages.js";
+import { endedByAt, repeatSaveOf } from "../save-stages.js";
 import { areEnemies } from "../creature-sides.js";
 import { AURA_IMMUNE_TAG, traitActionId } from "../statblock-traits.js";
 import { creatureTypeOf } from "../statblock-facts.js";
@@ -358,6 +358,10 @@ export function failureEffectFor(
     ...(declared?.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
     ...(save.speedZero || declared?.speedZero ? { speedZero: true } : {}),
     ...(save.endsOutOfSight ? { endsOutOfSight: true as const } : {}),
+    // The action that ends it: waking a sleeper, stanching a wound, studying an illusion.
+    ...(save.endedBy ? { endedBy: endedByAt(save.endedBy, save.dc) } : {}),
+    // What it does as its bearer rests or days pass (a death dog's poison).
+    ...(save.atRest ? { atRest: structuredClone(save.atRest) } : {}),
     ...(grapple ? { endsWhenSourceDefeated: true, rangeFeet: save.rangeFeet ?? action.attack?.reachFeet ?? 5 } : {}),
     // "Until the aboleth dies".
     ...(save.endsWhenSourceDies && !grapple ? { endsWhenSourceDefeated: true } : {}),
@@ -605,9 +609,16 @@ function subjectToSave(ctx: ResolveContext, target: ResolveContext["targets"][nu
       return false;
     }
   }
+  // The same failure from this action, or one of the same name from any source ("doesn't already have an infernal
+  // wound").
+  const same = save.failureEffect?.name;
   if (
     save.sparesAffected &&
-    target.effects.some((effect) => effect.sourceActorId === attacker.id && effect.sourceActionId === action.id)
+    target.effects.some(
+      (effect) =>
+        (effect.sourceActorId === attacker.id && effect.sourceActionId === action.id) ||
+        (same !== undefined && effect.name === same)
+    )
   ) {
     ctx.warnings.push(`${target.name} is still under ${attacker.name}'s ${action.name}, so it makes no save.`);
     return false;

@@ -5,6 +5,10 @@ import { checkPlan, totalCheck, type CheckSubject } from "../ability-checks.js";
 import { builtinBaseId } from "../builtin-actions.js";
 import { addEffect, endEffect, ESCAPE_ATHLETICS_TAG, makeEffect } from "../effects.js";
 import { putOutFire } from "../hazards.js";
+import { endingOptions } from "../ending-actions.js";
+import { openEndingSave } from "../save-stages.js";
+import { applyDamageDetailed } from "../hit-points.js";
+import { rollPlain } from "./hit-rider-outcomes.js";
 import { CommandRejectedError } from "../game-store.js";
 import { createPendingSaves, saveModifierFor, shownRollMode } from "../saving-throws.js";
 import {
@@ -181,6 +185,73 @@ function escapeGrapple(ctx: ResolveContext): void {
   }
 }
 
+/**
+ * End an Effect: the action an effect's text prints to end it, on the one creature targeted (the user itself when none
+ * is). Repeating a save by action opens that save (a success ends it, as any repeat does); a check must succeed, and
+ * the creature that succeeds takes what the text deals it (a gelatinous cube's acid); an action alone ends it (waking a
+ * sleeper).
+ */
+function endAnEffect(ctx: ResolveContext): void {
+  const { state, attacker, input, deps } = ctx;
+  const bearer = ctx.targets[0] ?? attacker;
+  const options = endingOptions(attacker, bearer, deps.distanceFeet);
+  const chosen = input.effectId ? options.find((option) => option.effect.id === input.effectId) : options[0];
+  if (!chosen)
+    throw new CommandRejectedError(
+      bearer.id === attacker.id
+        ? `${attacker.name} has no effect it can end with an action.`
+        : `${bearer.name} has no effect ${attacker.name} can end from where it stands.`
+    );
+  const { effect } = chosen;
+  if (chosen.kind === "repeat") {
+    const line = openEndingSave(state, bearer, effect, effect.repeatSave!, "repeats", {
+      newId: deps.newRollId,
+      now: deps.now,
+      rollDie: deps.random
+    });
+    ctx.tableNarration.push(tableLineOf(ctx, line));
+    return;
+  }
+  const ended = effect.endedBy!;
+  if (ended.check) {
+    const subject: CheckSubject = {
+      ability: ended.check.ability,
+      ...(ended.check.skill !== undefined ? { skill: ended.check.skill } : {})
+    };
+    if (rollCheck(ctx, subject, ended.check.dc ?? null, `${ended.name}: check`) !== true) return;
+  }
+  endEffect(state, bearer.id, effect.id);
+  ctx.effectsEnded.push(endedEffect(bearer, effect));
+  ctx.tableNarration.push({
+    kind: "effect",
+    text: `${attacker.name} ends ${effect.name} on ${bearer.name} (${ended.name}).`,
+    actorIds: [attacker.id, bearer.id]
+  });
+  // "The puller takes 10 (3d6) Acid damage."
+  for (const part of ended.takerDamage ?? []) {
+    const rolled = rollPlain(ctx, part.formula, part.type, ended.name);
+    const { application, events } = applyDamageDetailed(
+      state,
+      attacker.id,
+      { amount: rolled.amount, parts: [rolled], sourceName: effect.sourceName ?? effect.name },
+      { role: "gm" },
+      {
+        resolveDefinition: deps.resolveDefinition ?? (() => undefined),
+        newId: deps.newRollId,
+        now: deps.now,
+        rollDie: deps.random,
+        ...(deps.catalog ? { catalog: deps.catalog } : {})
+      }
+    );
+    ctx.tableNarration.push({
+      kind: "effect",
+      text: `${attacker.name} takes ${application.totalApplied} ${part.type[0]!.toUpperCase()}${part.type.slice(1)} damage (${ended.name}).`,
+      actorIds: [attacker.id]
+    });
+    for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
+  }
+}
+
 /** SRD Burning: rolling on the ground puts out the fire on yourself, and leaves you Prone. */
 function rollOnTheGround(ctx: ResolveContext): void {
   const { state, attacker, deps } = ctx;
@@ -249,6 +320,7 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   study: { check: searchOrStudy("int") },
   "escape-grapple": { check: escapeGrapple },
   "extinguish-fire": { apply: rollOnTheGround },
+  "end-effect": { check: endAnEffect },
 
   /** Strength + Proficiency Bonus to hit, then flat 1 + Strength Bludgeoning damage. A Monk's Martial Arts strike taken
    *  as a Bonus Action brings its own numbers, which stand. */

@@ -23,9 +23,10 @@ function saveBlocksIn(file: string): Array<{ path: string; save: SaveBlock }> {
       const record = node as Record<string, unknown>;
       if (record.save && typeof record.save === "object")
         found.push({ path: `${path}${record.id ? `(${String(record.id)})` : ""}`, save: record.save as SaveBlock });
-      // A hit rider's save (a Cunning Strike's Trip, Giant Slayer's) does nothing on a success by its own shape.
+      // A hit rider's save (a Cunning Strike's Trip, Giant Slayer's) does nothing on a success by its own shape, and
+      // a rest trigger's (an otyugh's poison after a Long Rest) ends its effect on a success.
       for (const [key, child] of Object.entries(record))
-        if (key !== "ridesHit" && key !== "onHit") walk(child, `${path}.${key}`);
+        if (key !== "ridesHit" && key !== "onHit" && key !== "atRest") walk(child, `${path}.${key}`);
     }
   };
   walk(JSON.parse(readFileSync(join(bundlesDir, file), "utf8")), file);
@@ -211,8 +212,14 @@ describe("save outcomes in the shipped content", () => {
     ]);
     // A rider that waits on a charge stays prose.
     expect(monsterAction("elk", "ram").onHit).toBeUndefined();
-    // No end printed in the hit's sentence: it lasts until ended (the otyugh's save after a Long Rest is the GM's).
-    expect(monsterAction("otyugh", "bite").onHit).toEqual([{ conditions: [{ id: "poisoned" }] }]);
+    // No end printed in the hit's sentence: it lasts until a save after a Long Rest ends it.
+    expect(monsterAction("otyugh", "bite").onHit).toEqual([
+      {
+        conditions: [{ id: "poisoned" }],
+        name: "Poisoned",
+        atRest: { at: "long-rest", save: { ability: "con", dc: 15 }, maximumLoss: "1d10" }
+      }
+    ]);
   });
 
   it("reads damage a failure brings at the start of each turn, and leaves it out of the GM's reminder", () => {

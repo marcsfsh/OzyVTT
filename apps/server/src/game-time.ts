@@ -1,6 +1,7 @@
 import { ROUNDS_PER_MINUTE, type GameState } from "@vtt/domain";
 import { ageEffects, type EffectNarration } from "./effects.js";
 import { endZone } from "./spell-zone-state.js";
+import { afterDays, type RestTriggerDeps } from "./rest-triggers.js";
 
 /**
  * The game clock (ADR-0029) and what lasts on it. A round is 6 seconds, so 10 rounds make a minute: in a fight, what
@@ -32,13 +33,17 @@ function creaturesInTime(state: GameState): Set<string> {
 
 /**
  * Moves the game clock `minutes` on, and counts the time down on every creature's effects (`ageEffects`). A spell
- * area of the running fight that lasts a set number of rounds ends once the time outlasts them. Returns what ended.
+ * area of the running fight that lasts a set number of rounds ends once the time outlasts them. With dice, what acts
+ * every 24 hours does (`afterDays`: a mummy's curse). Returns what ended or acted.
  */
-export function passGameTime(state: GameState, minutes: number): EffectNarration[] {
+export function passGameTime(state: GameState, minutes: number, deps?: RestTriggerDeps): EffectNarration[] {
   if (minutes <= 0) return [];
-  const total = Math.min(CLOCK_LIMIT_MINUTES, clockMinutesOf(state) + minutes);
+  const before = clockMinutesOf(state);
+  const total = Math.min(CLOCK_LIMIT_MINUTES, before + minutes);
   state.rest = { ...state.rest, clockHours: Math.floor(total / 60), clockMinutes: total % 60 };
-  const events = ageEffects(state, creaturesInTime(state), minutes);
+  const inTime = creaturesInTime(state);
+  const events = ageEffects(state, inTime, minutes);
+  if (deps) events.push(...afterDays(state, inTime, before, total, deps));
   for (const zone of [...state.combat.spellZones]) {
     if (zone.rounds === null) continue;
     const left = zone.rounds - (state.combat.round - zone.startedRound);

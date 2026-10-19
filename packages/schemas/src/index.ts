@@ -936,6 +936,60 @@ const RepeatFailureDamageSchema = z
   .min(1)
   .max(2);
 
+/**
+ * An action that ends an effect, and who may take it: the bearer, other creatures within 5 feet of the bearer (`near`
+ * "bearer", the default) or of the effect's source (`near` "source": pulling a creature out of a gelatinous cube), or
+ * either. With `check`, the action is an ability check that must succeed, against `dc` or the save's own DC; without,
+ * the action alone ends it ("a creature within 5 feet of it takes an action to wake it"). `takerDamage` is what the
+ * creature that succeeds takes (the cube's acid).
+ */
+export const EndedBySchema = z
+  .object({
+    name: z.string().min(1).max(60),
+    by: z.enum(["bearer", "others", "either"]),
+    near: z.enum(["bearer", "source"]).optional(),
+    check: z
+      .object({
+        ability: AbilitySchema,
+        skill: RiderSlugSchema.optional(),
+        dc: z.number().int().min(1).max(40).optional()
+      })
+      .strict()
+      .optional(),
+    takerDamage: RepeatFailureDamageSchema.optional()
+  })
+  .strict()
+  .describe(
+    "An action that ends the effect: who may take it (the bearer, others within 5 feet of the bearer or the source, or either), the ability check it needs if any, and the damage the one who succeeds takes"
+  );
+export type EndedBy = z.infer<typeof EndedBySchema>;
+
+/**
+ * What an effect does as its bearer rests or as days pass (a mummy's curse, an otyugh's poison):
+ * - `at`: as the bearer finishes a Long Rest (`long-rest`), or as each 24 hours of game time pass (`day`).
+ * - `save`: the save it makes then, a success ending the effect.
+ * - `maximumLoss`: what the bearer's Hit Point maximum loses then (on a failed save, or each time when there is no
+ *   save), held until the effect ends.
+ * - `noBenefit`: the rests that give the bearer nothing ("gains no benefit from finishing a Short or Long Rest").
+ * - `holdsMaximum`: "its Hit Point maximum doesn't return to normal when finishing a Long Rest".
+ */
+export const RestTriggerSchema = z
+  .object({
+    at: z.enum(["long-rest", "day"]).optional(),
+    save: z
+      .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional(),
+    maximumLoss: DiceFormulaSchema.optional(),
+    noBenefit: z.enum(["short", "long", "both"]).optional(),
+    holdsMaximum: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "What the effect does as its bearer finishes a Long Rest or as each day passes: a save that ends it, a Hit Point maximum loss, the rests that give no benefit, and a maximum a Long Rest doesn't restore"
+  );
+export type RestTrigger = z.infer<typeof RestTriggerSchema>;
+
 /** What an effect turns into when its repeat save fails ("Second Failure: The target has the Petrified condition
  *  instead"): its name and conditions, how long they last (absent: until ended, or with the caster's Concentration),
  *  whether damage ends them, and whether the target keeps repeating the save at the end of each of its turns. */
@@ -945,7 +999,8 @@ export const EffectStageSchema = z
     linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),
     duration: SaveFailureDurationSchema.optional(),
     endsOnDamage: z.literal(true).optional(),
-    repeats: z.literal(true).optional()
+    repeats: z.literal(true).optional(),
+    endedBy: EndedBySchema.optional()
   })
   .strict();
 export type EffectStage = z.infer<typeof EffectStageSchema>;
@@ -1115,6 +1170,13 @@ export const EffectInstanceSchema = z
     endsOnSpellHealing: z.literal(true).optional(),
     /** It ends when the bearer ends its turn where it can't see the effect's source (Horror Nimbus). */
     endsOutOfSight: z.literal(true).optional(),
+    /** An action that ends it: waking a sleeper, stanching a wound, studying an illusion, detaching a stirge. */
+    endedBy: EndedBySchema.optional(),
+    /** What it does as its bearer rests or days pass (a mummy's curse); `dayMark` is the game-clock minute its next 24
+     *  hours count from. */
+    atRest: RestTriggerSchema.extend({ dayMark: z.number().int().min(0).optional() })
+      .strict()
+      .optional(),
     /** On a caster's Concentration: the spell is nothing but what it leaves on creatures (Hold Person's paralysis,
      *  Bless's d4), so it ends once no living creature keeps any of it. */
     endsWhenUnaffected: z.literal(true).optional(),
@@ -1896,13 +1958,19 @@ export const SaveOutcomeFields = {
       conditions: z.array(SaveConditionSchema).max(4).default([]),
       duration: SaveFailureDurationSchema.optional(),
       endsOnDamage: z.literal(true).optional(),
-      repeatSave: z.literal(true).optional()
+      repeatSave: z.literal(true).optional(),
+      endedBy: EndedBySchema.optional()
     })
     .strict()
     .optional()
     .describe(
       "What a failed repeat save leaves in place of the first failure: its conditions, how long they last, whether damage ends them and whether the save repeats each turn"
     ),
+  /** An action that ends the failure's effect ("a creature within 5 feet of it takes an action to wake it", "stanch the
+   *  wound ... DC 12 Wisdom (Medicine) check"). */
+  endedBy: EndedBySchema.optional(),
+  /** What the failure's effect does as its bearer rests or days pass (a death dog's poison). */
+  atRest: RestTriggerSchema.optional(),
   /** A failed repeat deals the cast's damage again (Phantasmal Killer: "it takes the Psychic damage again"). */
   repeatDamageAgain: z
     .literal(true)
@@ -2180,7 +2248,14 @@ export const OnHitRiderSchema = z
      *  poison), ended by this hit. Without one it doesn't fire. */
     spendsEffectTag: EffectTagSchema.optional(),
     /** What the engine leaves to the GM, said with the hit: a curse that acts at rests, a creature killed outright. */
-    reminder: z.string().min(1).max(400).optional()
+    reminder: z.string().min(1).max(400).optional(),
+    /** An action that ends the effect ("The target or a creature within 5 feet of it can detach the stirge as an
+     *  action"). */
+    endedBy: EndedBySchema.optional(),
+    /** What the effect does as its bearer rests or days pass (a mummy's curse, an otyugh's poison). */
+    atRest: RestTriggerSchema.optional(),
+    /** It ends when the attacker dies ("cursed for 24 hours or until the incubus dies"). */
+    endsWhenSourceDies: z.literal(true).optional()
   })
   .strict()
   .describe(

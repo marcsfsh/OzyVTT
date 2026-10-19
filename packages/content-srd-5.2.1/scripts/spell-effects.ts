@@ -1153,6 +1153,8 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   "bestow-curse": { name: "Bestow Curse", tags: ["curse"], modifiers: [] },
   // "A Remove Curse, Greater Restoration, or Wish spell ends this spell."
   geas: { name: "Geas", tags: ["curse"], modifiers: [] },
+  // "You create a phantasmal object, creature, or other phenomenon ... perceivable only to the target for the duration."
+  "phantasmal-force": { name: "Phantasmal Force", tags: [], modifiers: [] },
   // "It can't end the Prone condition on itself" while it laughs.
   "hideous-laughter": { name: "Hideous Laughter", tags: ["cant-stand"], modifiers: [] },
   // "Has Disadvantage on Dexterity saving throws and attack rolls, and other creatures have Advantage on attack rolls

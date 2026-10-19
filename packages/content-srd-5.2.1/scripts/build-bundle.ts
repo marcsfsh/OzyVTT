@@ -387,12 +387,15 @@ const parseOnHitRiders = (desc: string): OnHitRider[] | null => {
     const blinded = /\bWhile (?:the [\w -]+? is )?attached, the target has the ([A-Z][a-z]+) condition\b/.exec(desc);
     const conditions = blinded ? riderConditionIds(blinded[1]!).map((id) => ({ id })) : [];
     const ongoingDamage = riderOngoingDamage(desc);
+    // "The target or a creature within 5 feet of it can detach the stirge as an action."
+    const detach = /\bThe target or a creature within 5 feet of it can detach the [a-z' -]+ as an action\b/.test(desc);
     if (conditions.length > 0 || ongoingDamage)
       riders.push({
         conditions,
         name: "Attached",
         ...(maxTargetSize ? { maxTargetSize } : {}),
-        ...(ongoingDamage ? { ongoingDamage } : {})
+        ...(ongoingDamage ? { ongoingDamage } : {}),
+        ...(detach ? { endedBy: { name: "Detach", by: "either" as const } } : {})
       });
   }
   // An unconditional rider in the hit's own sentence (not one opening with "If"): timed, or with no end printed there
@@ -1118,7 +1121,14 @@ const monsters: ActorDefinition[] = creatures
                 ability: ABILITY_BY_NAME[save[1] as keyof typeof ABILITY_BY_NAME],
                 dc: Number.parseInt(save[2], 10),
                 ...saveOutcome!,
-                ...(loss ? { failureEffect: loss.failureEffect, ongoingDamage: loss.ongoingDamage } : {}),
+                ...(loss
+                  ? {
+                      failureEffect: loss.failureEffect,
+                      ongoingDamage: loss.ongoingDamage,
+                      ...(loss.endedBy ? { endedBy: loss.endedBy } : {}),
+                      ...(loss.oneAtATime ? { sparesAffected: true as const } : {})
+                    }
+                  : {}),
                 ...(poisonStopsHealing
                   ? { failureEffect: { name: "Poisoned", tags: ["no-healing"], modifiers: [] } }
                   : {}),
@@ -1160,6 +1170,8 @@ const monsters: ActorDefinition[] = creatures
         ...(enrichment ?? {}),
         ...fixedFields(actionFix)
       });
+      // A reviewed fix may finish the save the reader read (how a creature is pulled out of a gelatinous cube).
+      if (actionFix?.save && built.save) built.save = { ...built.save, ...structuredClone(actionFix.save) };
       if (actionFix?.reminder === null) delete built.reminder;
       return built;
     });

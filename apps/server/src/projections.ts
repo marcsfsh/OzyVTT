@@ -253,6 +253,10 @@ const ON_FAIL_EFFECT_FIELDS = {
   rangeFeet: "player",
   endsOnSpellHealing: "player",
   endsOutOfSight: "player",
+  // Who may end it and the check it takes are the printed text's, read by the one who owes the save.
+  endedBy: "player",
+  // What a rest or a day does to its bearer is the stat block's text; its effect lands when it happens.
+  atRest: "never",
   armorClassBonus: "player",
   name: "derived",
   sourceName: "derived",
@@ -490,6 +494,8 @@ function playerEffect(
     longCast: _longCast,
     // What a hit on the bearer costs its attacker names a save's DC; the server applies it.
     struck: _struck,
+    // What a rest or a day does to its bearer names dice and a DC; it lands when it happens.
+    atRest: _atRest,
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);

@@ -205,6 +205,14 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     damage: []
   },
   {
+    id: "end-effect",
+    name: "End an Effect",
+    activation: "action",
+    description:
+      "Take the action an effect's text names to end it: wake a creature within 5 feet, stanch a wound with a Wisdom (Medicine) check, study a phantasm with an Intelligence (Investigation) check, pull a creature out of a cube or a whelm with a Strength (Athletics) check, or detach a stirge. Target yourself to collect yourself and repeat a save that allows it (Irresistible Dance). (SRD 5.2.1)",
+    damage: []
+  },
+  {
     id: "extinguish-fire",
     name: "Put Out the Fire",
     activation: "action",
@@ -356,6 +364,7 @@ export function builtinBaseId(actionId: string): string {
  *  targets the creature it would sway, whose Intelligence can raise its DC. */
 export const BUILTIN_TARGETING: Readonly<Record<string, "single">> = {
   help: "single",
+  "end-effect": "single",
   influence: "single",
   "unarmed-strike": "single",
   "unarmed-grapple": "single",

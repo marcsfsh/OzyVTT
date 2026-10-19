@@ -30,6 +30,7 @@ describe("builtin action catalog", () => {
       "dash",
       "disengage",
       "dodge",
+      "end-effect",
       "escape-grapple",
       "extinguish-fire",
       "help",

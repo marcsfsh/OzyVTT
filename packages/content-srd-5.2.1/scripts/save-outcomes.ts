@@ -8,6 +8,7 @@ import {
   DamageTypeSchema,
   SaveConditionSchema,
   type DamageType,
+  type EndedBy,
   type ForcedPush,
   type OngoingDamage,
   type SaveCondition,
@@ -41,6 +42,7 @@ export type SaveOutcome = {
   advantageIfFighting?: true;
   immuneOnSuccess?: true;
   endsWhenSourceDies?: true;
+  endedBy?: EndedBy;
   onlyCreatureTypes?: string[];
   sparesAffected?: true;
   failureKills?: { sourceRegains?: string };
@@ -57,6 +59,7 @@ export type SecondFailure = {
   duration?: SaveFailureDuration;
   endsOnDamage?: true;
   repeatSave?: true;
+  endedBy?: EndedBy;
 };
 
 /** The push a failure clause prints: "is pushed 10 feet away from you", "pushed up to 30 feet straight away from the
@@ -197,6 +200,9 @@ export function hitPointLossOf(description: string): Readonly<{
     modifiers: [];
   };
   ongoingDamage: OngoingDamage;
+  endedBy?: EndedBy;
+  /** "If the target ... doesn't already have an infernal wound": one wound at a time. */
+  oneAtATime?: true;
   reminder: string | null;
 }> | null {
   const loss = /\bloses \d+ \((\d+d\d+(?: [+-] \d+)?)\) Hit Points at the start of each of its turns\b/.exec(
@@ -220,9 +226,17 @@ export function hitPointLossOf(description: string): Readonly<{
       modifiers: []
     },
     ongoingDamage: { damage: [{ formula: loss[1]! }], at: "bearer-turn-start", hitPointLoss: true },
-    reminder: stanch
-      ? `The ${name.toLowerCase()} also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC ${stanch[1]} Wisdom (Medicine) check: end it by hand.`
-      : null
+    ...(stanch
+      ? {
+          endedBy: {
+            name: "Stanch the wound",
+            by: "either" as const,
+            check: { ability: "wis" as const, skill: "medicine", dc: Number.parseInt(stanch[1]!, 10) }
+          }
+        }
+      : {}),
+    ...(/\bdoesn[\u2019']t already have an? [a-z]+ wound\b/.test(description) ? { oneAtATime: true as const } : {}),
+    reminder: null
   };
 }
 
@@ -315,6 +329,7 @@ export function statBlockSaveOutcome(description: string): SaveOutcome {
     ...(/\buntil it ends its turn with the [a-z' -]+ out of line of sight\b/.test(failure)
       ? { endsOutOfSight: true as const }
       : {}),
+    ...(WAKE.test(failure) && !second ? { endedBy: { ...WAKE_ACTION } } : {}),
     // "Until the aboleth dies".
     ...(/\buntil the [a-z' -]+? dies\b/.test(failure) && lifetime.failureConditions.length > 0
       ? { endsWhenSourceDies: true as const }
@@ -403,6 +418,12 @@ export function lycanthropyCurseOf(description: string): { name: string; tags: s
   return curse ? { name: `Lycanthropy (${curse[1]})`, tags: ["curse", LYCANTHROPY_TAG], modifiers: [] } : null;
 }
 
+/** "Or a creature within 5 feet of it takes an action to wake it", "someone within 5 feet of it takes an action to shake
+ *  it out of the spell's effect". */
+const WAKE =
+  /\b(?:a creature|someone) within 5 feet of it takes an action to (?:wake it|shake it out of the spell[\u2019']s effect)\b/;
+const WAKE_ACTION: EndedBy = { name: "Wake", by: "others" };
+
 /** Where one stat-block save clause ends: the next printed label. */
 const STAT_BLOCK_LABEL =
   /\b(?:Failure or Success:|Success:|Second Failure|Subsequent Failures:|Failure by \d+ or More)|\s-\s(?:Second|Third) /;
@@ -425,7 +446,8 @@ export function secondFailureOf(description: string): SecondFailure | undefined 
     conditions,
     ...(duration ? { duration } : {}),
     ...(ENDS_ON_DAMAGE.test(clause) ? { endsOnDamage: true as const } : {}),
-    ...(repeatsEachTurn(clause) ? { repeatSave: true as const } : {})
+    ...(repeatsEachTurn(clause) ? { repeatSave: true as const } : {}),
+    ...(WAKE.test(clause) ? { endedBy: { ...WAKE_ACTION } } : {})
   };
 }
 
@@ -504,10 +526,17 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   },
   // "At which point it must repeat the save. If the target fails the second save, the target has the Unconscious
   // condition for the duration"; elves and creatures immune to Exhaustion succeed outright.
+  // "Or someone within 5 feet of it takes an action to shake it out of the spell's effect", at either stage.
   sleep: {
     repeatOnce: true,
-    secondFailure: { conditions: ["unconscious"], endsOnDamage: true },
-    autoSuccess: { sleepless: true }
+    secondFailure: { conditions: ["unconscious"], endsOnDamage: true, endedBy: { name: "Wake", by: "others" } },
+    autoSuccess: { sleepless: true },
+    endedBy: { name: "Wake", by: "others" }
+  },
+  // "The target can take a Study action to examine the phantasm with an Intelligence (Investigation) check against your
+  // spell save DC. If the check succeeds, ... the spell ends."
+  "phantasmal-force": {
+    endedBy: { name: "Study the illusion", by: "bearer", check: { ability: "int", skill: "investigation" } }
   },
   // "A Frightened target makes a Wisdom saving throw at the end of each of its turns. On a failed save, it takes 5d10
   // Psychic damage."

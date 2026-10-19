@@ -8,6 +8,7 @@ import type { DefinitionAction, LiveActor } from "./resolution/context.js";
 import { hitRiderOf } from "./resolution/hit-riders.js";
 import { markMoveOf } from "./resolution/marks.js";
 import { familyOf, type RuleId } from "./rules-families.js";
+import { END_EFFECT_ACTION_ID, NO_ENDING_OPTION } from "./ending-actions.js";
 
 /**
  * What the sheet says about an option it can't use now, and which options stay off the turn list. The availability
@@ -81,6 +82,7 @@ function requiresReason({ attacker, action, spell }: ReasonFacts): string {
     return `Only while ${conditionLabel(action.requiresEffectTag)}.`;
   if (spell && markMoveOf(spell, action.id)) return `You aren't concentrating on ${spell.name}.`;
   if (spell && laterRowOf(spell, action.id)) return `Cast ${spell.name} first.`;
+  if (action.id === END_EFFECT_ACTION_ID) return NO_ENDING_OPTION;
   return "It needs an effect you don't have now.";
 }
 

@@ -1,6 +1,6 @@
 import type { AbilityId, GameState, PendingSave } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
-import type { EffectStage, RepeatSave, SaveFailureDuration } from "@vtt/schemas";
+import type { EffectStage, EndedBy, RepeatSave, SaveFailureDuration } from "@vtt/schemas";
 import { conditionLabel } from "./condition-rules.js";
 import {
   effectDurationOf,
@@ -41,6 +41,7 @@ export type RepeatFields = Readonly<{
     duration?: SaveFailureDuration;
     endsOnDamage?: true;
     repeatSave?: true;
+    endedBy?: EndedBy;
   }>;
 }>;
 
@@ -80,11 +81,19 @@ export function repeatSaveOf(
             linkedConditionIds: [...second.conditions],
             ...(second.duration ? { duration: second.duration } : {}),
             ...(second.endsOnDamage ? { endsOnDamage: true as const } : {}),
-            ...(second.repeatSave ? { repeats: true as const } : {})
+            ...(second.repeatSave ? { repeats: true as const } : {}),
+            ...(second.endedBy ? { endedBy: endedByAt(second.endedBy, save.dc) } : {})
           }
         }
       : {})
   };
+}
+
+/** An ending action as an effect carries it: a check that prints no DC takes the save's own (Phantasmal Force: "against
+ *  your spell save DC"). */
+export function endedByAt(endedBy: EndedBy, dc: number): EndedBy {
+  const copy = structuredClone(endedBy);
+  return copy.check && copy.check.dc === undefined ? { ...copy, check: { ...copy.check, dc } } : copy;
 }
 
 /** A repeat save as it lands on its bearer: one that comes once, at the end of the bearer's next turn, skips the end
@@ -313,6 +322,7 @@ function nextStage(
     linkedConditionIds: [...stage.linkedConditionIds],
     ...(stage.endsOnDamage ? { endsOnDamage: true } : {}),
     ...(stage.repeats ? { repeatSave: { ability: repeat.ability, dc: repeat.dc } } : {}),
+    ...(stage.endedBy ? { endedBy: structuredClone(stage.endedBy) } : {}),
     ...(effect.castId !== undefined ? { castId: effect.castId } : {}),
     ...(effect.spell ? { spell: { ...effect.spell } } : {}),
     ...(effect.magical ? { magical: true as const } : {})

@@ -223,7 +223,11 @@ export const restingCommands = [
         timed(
           state,
           () => {
-            events = passTime(state, request.hours ?? 0, request.minutes ?? 0);
+            events = passTime(state, request.hours ?? 0, request.minutes ?? 0, {
+              random: (sides) => kit.context.random(sides),
+              resolveDefinition: kit.resolveDefinition,
+              catalog: kit.equipmentCatalog()
+            });
           },
           span
         )

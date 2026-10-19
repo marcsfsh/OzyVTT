@@ -231,6 +231,10 @@ const PendingSaveEffectSchema = z
     endsOnSpellHealing: EffectInstanceSchema.shape.endsOnSpellHealing,
     /** It ends when the bearer ends its turn where it can't see its source (Horror Nimbus). */
     endsOutOfSight: EffectInstanceSchema.shape.endsOutOfSight,
+    /** An action that ends it (waking a sleeper, stanching a wound). */
+    endedBy: EffectInstanceSchema.shape.endedBy,
+    /** What it does as its bearer rests or days pass (a death dog's poison). */
+    atRest: EffectInstanceSchema.shape.atRest,
     /** What the effect does while it lasts (Bane's -1d4 on attack rolls and saves). */
     modifiers: EffectModifiersSchema.default([]),
     /** What it adds to AC while it lasts (Slow's -2). */
@@ -295,7 +299,9 @@ export const PendingSaveSchema = z
         actorId: z.uuid(),
         effectId: z.string().min(1).max(120),
         /** The effect's own repeat save, so a failure counts toward its tally or brings its next stage. */
-        repeat: z.literal(true).optional()
+        repeat: z.literal(true).optional(),
+        /** The save it asks as its bearer rests or a day passes: a failure costs Hit Point maximum (`atRest`). */
+        rest: z.literal(true).optional()
       })
       .strict()
       .optional(),

@@ -677,7 +677,8 @@ describe("the casts that survived the spell-record check", () => {
       dc: 13,
       successDamage: "none",
       failureConditions: ["charmed"],
-      endsOnSourceSideDamage: true
+      endsOnSourceSideDamage: true,
+      advantageIfFighting: true
     });
     expect(cast.uses).toEqual({ limit: 3, per: "long-rest", pool: "eyes-of-charming-charges" });
     resolveDefinitionAction(

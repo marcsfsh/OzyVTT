@@ -6,6 +6,8 @@ import type { ActorAction, OnHitRider } from "@vtt/schemas";
 
 export type MonsterActionFix = Readonly<{
   why: string;
+  /** Save fields merged over the reader's. */
+  save?: Partial<NonNullable<ActorAction["save"]>>;
   /** The damage in place of the reader's. */
   damage?: ActorAction["damage"];
   /** The damage types a use picks from (Chromatic Orb's shape). */
@@ -21,6 +23,97 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
     why: "the damage is of the type chosen for the Draconic Origin trait, which each use picks",
     damage: [{ formula: "8d6", type: "fire" }],
     damageTypes: ["acid", "cold", "fire", "lightning", "poison"]
+  },
+  "gelatinous-cube/engulf": {
+    why: "the escape and the pull from outside are printed in the action and the Ooze Cube trait",
+    save: {
+      // "An engulfed target can try to escape by taking an action to make a DC 12 Strength (Athletics) check."
+      escapeDc: 12,
+      escapeAthletics: true,
+      // "Can't cast spells with a Verbal component."
+      failureEffect: { name: "Engulfed", tags: ["cant-speak"], modifiers: [] },
+      // "As an action, a creature within 5 feet of the cube can pull a creature ... out of the cube by succeeding on a
+      // DC 12 Strength (Athletics) check, and the puller takes 10 (3d6) Acid damage."
+      endedBy: {
+        name: "Pull free",
+        by: "others",
+        near: "source",
+        check: { ability: "str", skill: "athletics", dc: 12 },
+        takerDamage: [{ formula: "3d6", type: "acid" }]
+      }
+    },
+    reminder: "An engulfed target is suffocating."
+  },
+  "water-elemental/whelm": {
+    why: "a creature outside can pull the whelmed one free, which the save's text prints",
+    save: {
+      // "As an action, a creature within 5 feet of the elemental can pull a creature out of it by succeeding on a DC 14
+      // Strength (Athletics) check."
+      endedBy: {
+        name: "Pull free",
+        by: "others",
+        near: "source",
+        check: { ability: "str", skill: "athletics", dc: 14 }
+      }
+    }
+  },
+  "otyugh/bite": {
+    why: "the save comes after each Long Rest, and its failure lowers the Hit Point maximum until the poison ends",
+    onHit: [
+      {
+        conditions: [{ id: "poisoned" }],
+        name: "Poisoned",
+        atRest: { at: "long-rest", save: { ability: "con", dc: 15 }, maximumLoss: "1d10" }
+      }
+    ],
+    reminder: null
+  },
+  "death-dog/bite": {
+    why: "the save repeats every 24 hours, and later failures lower the Hit Point maximum, which a Long Rest leaves low",
+    save: { atRest: { at: "day", save: { ability: "con", dc: 12 }, maximumLoss: "1d10", holdsMaximum: true } },
+    reminder: null
+  },
+  "mummy/rotting-fist": {
+    why: "the curse lowers the Hit Point maximum every 24 hours, which a Long Rest leaves low",
+    onHit: [
+      {
+        conditions: [],
+        name: "Cursed",
+        tags: ["no-healing", "curse"],
+        atRest: { at: "day", maximumLoss: "3d6", holdsMaximum: true }
+      }
+    ],
+    reminder: "A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
+  },
+  "mummy-lord/rotting-fist": {
+    why: "the curse lowers the Hit Point maximum every 24 hours, and the creature gains no benefit from a Long Rest",
+    onHit: [
+      {
+        conditions: [],
+        name: "Cursed",
+        tags: ["no-healing", "curse"],
+        atRest: { at: "day", maximumLoss: "3d6", noBenefit: "long" }
+      }
+    ],
+    reminder: "A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
+  },
+  "rakshasa/cursed-touch": {
+    why: "the curse takes the benefit of every rest, which the reader has no phrase for",
+    onHit: [{ conditions: [], name: "Cursed", tags: ["curse"], atRest: { noBenefit: "both" } }]
+  },
+  "incubus/restless-touch": {
+    why: "the curse takes the Short Rest's benefit for 24 hours or until the incubus dies",
+    onHit: [
+      {
+        conditions: [],
+        name: "Cursed",
+        tags: ["curse"],
+        duration: { type: "minutes", minutes: 1440 },
+        endsWhenSourceDies: true,
+        atRest: { noBenefit: "short" }
+      }
+    ],
+    reminder: null
   },
   "rust-monster/antennae": {
     why: "the penalty is on one carried armor or weapon, which items don't track",

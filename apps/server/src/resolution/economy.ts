@@ -39,6 +39,7 @@ import { carriesSpellbook, hasClassFeature } from "../ritual-adept.js";
 import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
 import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
+import { END_EFFECT_ACTION_ID, hasEndingOption, NO_ENDING_OPTION } from "../ending-actions.js";
 import { castMarks, markMoveOf } from "./marks.js";
 import { actionTargetViolations } from "./action-targets.js";
 import { hitRiderOf } from "./hit-riders.js";
@@ -440,7 +441,7 @@ function shownEffectName(
 /** Incapacitation and 0 HP forbid every action, Bonus Action and Reaction (SRD 2024 "Incapacitated"), legendary
  *  actions and feature activations included; a required effect (Frenzy needs Rage) must be active, and a raging
  *  Barbarian can't cast spells. */
-function checkAbleToAct({ state, attacker, action, resolveDefinition, violations }: Evaluation): void {
+function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition, violations }: Evaluation): void {
   if (action.activation !== "other" || !(ANSWERS_A_ROLL.has(action.id) || action.answer !== undefined)) {
     const incapacitating = incapacitatingCondition(attacker);
     if (incapacitating !== null)
@@ -494,6 +495,9 @@ function checkAbleToAct({ state, attacker, action, resolveDefinition, violations
       message: `${action.name} requires an active ${conditionLabel(action.requiresEffectTag)} effect.`
     });
   }
+  // End an Effect needs an effect an action ends, on the creature named or anywhere before one is.
+  if (action.id === END_EFFECT_ACTION_ID && !hasEndingOption(state, attacker, targetIds))
+    violations.push({ rule: "feature.requires-effect", message: NO_ENDING_OPTION });
 }
 
 /** An extra attack (SRD Light, Cleave) is owed only once the swing that opens it has happened this turn: an attack

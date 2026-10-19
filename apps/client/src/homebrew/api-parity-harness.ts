@@ -466,7 +466,9 @@ const SAVE_LIFETIME_KEYS = [
   "repeatDamageAgain",
   "repeatUnseenSource",
   "endsOutOfSight",
-  "autoSuccess.**"
+  "autoSuccess.**",
+  "endedBy.**",
+  "atRest.**"
 ] as const;
 
 /** The exemption table. First match wins, so specific rows sit above general ones. */
