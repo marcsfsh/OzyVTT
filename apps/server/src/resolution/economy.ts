@@ -11,6 +11,7 @@ import { areAllies } from "../creature-sides.js";
 import {
   CANT_ATTACK_TAG,
   DASH_ONLY_TAG,
+  DODGE_ONLY_TAG,
   HASTED_TAG,
   hasEffectTag,
   NO_ACTIONS_TAG,
@@ -43,6 +44,7 @@ import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
 import { carriesSpellbook, hasClassFeature } from "../ritual-adept.js";
 import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
 import { notEnoughUses, useCostOf } from "../use-cost.js";
+import { builtinBaseId } from "../builtin-actions.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { planThisTurn, usedMarkOf } from "./multiattack-after.js";
 import { END_EFFECT_ACTION_ID, hasEndingOption, NO_ENDING_OPTION } from "../ending-actions.js";
@@ -402,6 +404,14 @@ function checkSpellUp({ attacker, action, siblings, violations }: Evaluation, sp
  *  turn after the one its caster cast it on. */
 function checkLaterTurn({ state, attacker, action, violations }: Evaluation, spell: SpellReference): void {
   const row = laterRowOf(spell, action.id);
+  // "On each of your turns" (Phantasmal Force): only on its caster's own turn in a fight.
+  if (row?.ownTurnOnly && state.combat.active && state.combat.turnActorId !== attacker.id) {
+    violations.push({
+      rule: "spell.later-turn",
+      message: `${action.name} comes only on ${attacker.name}'s own turn.`
+    });
+    return;
+  }
   if (!row?.laterTurnsOnly || state.combat.turnActorId !== attacker.id) return;
   if ((state.combat.turn.turnUses[castThisTurnKey(attacker.id, spell.id)] ?? 0) === 0) return;
   violations.push({
@@ -609,6 +619,14 @@ function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition,
     violations.push({
       rule: "condition.dash-only",
       message: `${attacker.name} can take only the Dash action or end ${shownEffectName(state, dashOnly, resolveDefinition)} while it lasts.`
+    });
+  // SRD Bestow Curse: a failed Wisdom save at the start of its turn means it is "forced to take the Dodge action on
+  // that turn".
+  const dodgeOnly = attacker.effects.find((effect) => effect.tags.includes(DODGE_ONLY_TAG));
+  if (dodgeOnly && action.activation === "action" && builtinBaseId(action.id) !== "dodge")
+    violations.push({
+      rule: "condition.dash-only",
+      message: `${attacker.name} must take the Dodge action this turn while ${shownEffectName(state, dodgeOnly, resolveDefinition)} lasts.`
     });
   // SRD Befuddlement: the target "can't cast spells or take the Magic action".
   const befuddled = attacker.effects.find((effect) => effect.tags.includes(NO_SPELLS_TAG));

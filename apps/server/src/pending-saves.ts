@@ -32,6 +32,7 @@ export function createPendingSaves(
       | "onSuccessEffect"
       | "failureNote"
       | "breaksConcentration"
+      | "successEndsSpell"
       | "zoneId"
       | "gmApplies"
       | "failureByHitPoints"
@@ -100,6 +101,7 @@ export function createPendingSaves(
     ...(input.extra?.onSuccessEffect ? { onSuccessEffect: structuredClone(input.extra.onSuccessEffect) } : {}),
     ...(input.extra?.failureNote ? { failureNote: input.extra.failureNote } : {}),
     ...(input.extra?.breaksConcentration ? { breaksConcentration: true as const } : {}),
+    ...(input.extra?.successEndsSpell ? { successEndsSpell: true as const } : {}),
     ...(input.extra?.zoneId !== undefined ? { zoneId: input.extra.zoneId } : {}),
     ...(input.extra?.gmApplies ? { gmApplies: true as const } : {}),
     ...(input.extra?.endsForm ? { endsForm: true as const } : {}),

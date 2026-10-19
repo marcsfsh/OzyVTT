@@ -32,7 +32,7 @@ import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
 import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
 import { reachBarredBy } from "../zone-barriers.js";
-import { bearsCastOf, takenWithCast } from "../lasting-spells.js";
+import { bearsCastOf, levitatedBy, takenWithCast } from "../lasting-spells.js";
 import { swallowCover } from "../swallow.js";
 import { enclosureBlocks } from "../enclosures.js";
 import { builtinHandlerFor } from "./builtins.js";
@@ -127,7 +127,9 @@ function combatantsOf(
   // So is moving a spell's force between its caster and harm (Arcane Hand's Interposing Hand).
   const movesAnArea =
     spell !== undefined &&
-    (laterRowOf(spell, action.id)?.movesArea !== undefined || laterRowOf(spell, action.id)?.interposes === true);
+    (laterRowOf(spell, action.id)?.movesArea !== undefined ||
+      laterRowOf(spell, action.id)?.interposes === true ||
+      laterRowOf(spell, action.id)?.liftFeet !== undefined);
   // Spreading Caltrops leaves an area that acts on whoever meets it later.
   const leavesAnArea = action.zone !== undefined && !castsASpell;
   const rollsOnTargets =
@@ -266,9 +268,15 @@ export function openResolve(
   const chosen = withChosenDamageType(upcast, input.damageType ?? null);
   // The cast's own free use of a later action costs nothing more (Arcane Hand's first effect).
   const withCast = spell !== undefined && takenWithCast(state, attacker.id, spell, chosen.id);
-  const action = withCast ? { ...chosen, activation: "other" as const } : chosen;
+  // Levitating itself, the caster rises or sinks as part of its move (Levitate: "If you are the target, you can move
+  // up or down as part of your move").
+  const laterRow = spell ? laterRowOf(spell, chosen.id) : undefined;
+  const ownLift = laterRow?.liftFeet !== undefined && levitatedBy(state, attacker.id)?.id === attacker.id;
+  const action = withCast || ownLift ? { ...chosen, activation: "other" as const } : chosen;
+  // What the GM alone judges has happened (Geas's defiance) is the GM's to take.
+  if (laterRow?.gmOnly && deps.initiatorRole === "player")
+    throw new CommandRejectedError(`The GM takes ${action.name} when the spell's trigger happens.`);
   // A later action that takes only a creature bearing the caster's spell (Arcane Hand's crush) refuses any other.
-  const laterRow = spell ? laterRowOf(spell, action.id) : undefined;
   if (spell && laterRow?.bearerOnly)
     for (const target of targets)
       if (!bearsCastOf(target, attacker.id, spell.id))

@@ -55,6 +55,7 @@ import { applyShapeShift, checkShapeShift } from "./resolution/shape-shift.js";
 import { formsOffer } from "./transform/offer.js";
 import { applyMovementGrants } from "./resolution/movement-grants.js";
 import { applyTimeStop } from "./time-stop.js";
+import { liftOnAction } from "./resolution/later-steps.js";
 import { applySpellEndings } from "./resolution/dispel.js";
 import { applySummons } from "./resolution/summon.js";
 import { readScroll } from "./resolution/scroll.js";
@@ -318,6 +319,7 @@ export function resolveDefinitionAction(
   markCastTurn(ctx);
   openSpellZone(ctx);
   applyMovementGrants(ctx);
+  liftOnAction(ctx);
   applyTimeStop(ctx);
   applyGrant(ctx);
   swallowOnAction(ctx);

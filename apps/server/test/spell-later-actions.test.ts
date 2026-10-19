@@ -1,152 +1,224 @@
 import { describe, expect, it } from "vitest";
-import type { GameState, SpellZone } from "@vtt/domain";
-import { addAnnotation } from "../src/annotations.js";
-import { endEffect } from "../src/effects.js";
-import { nextInitiativeTurn } from "../src/encounter.js";
-import { burstEndedZones, zonesAfterMove, type ZoneDeps } from "../src/spell-zones.js";
-import type { TokenMapGeometry } from "../src/token-placement.js";
-import { ALLY, catalog, FOE, FOE2, HERO } from "./spell-casters.js";
-import { actorOf, answer, cast, caster, laterAction, resolveAs } from "./spell-lifetimes-kit.js";
+import { resolveDefinitionAction } from "../src/action-resolution.js";
+import { builtinAction } from "../src/builtin-actions.js";
+import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
+import { setAltitude } from "../src/altitude.js";
+import { passGameTime } from "../src/game-time.js";
+import { ALLY, catalog, FOE, HERO } from "./spell-casters.js";
+import { actorOf, answer, cast, caster, laterAction, nextCommand, resolveAs, wizard } from "./spell-lifetimes-kit.js";
 
-// SRD 5.2.1 later actions with no action of their own, run by the server at their trigger: Faithful Hound "At the
-// start of each of your turns, the hound attempts to bite one enemy within 5 feet of it"; Delayed Blast Fireball "When
-// the spell ends, the bead explodes ... The spell's base damage is 12d6, and the damage increases by 1d6 whenever your
-// turn ends and the spell hasn't ended"; Conjure Elemental's save, "if the spirit has no creature Restrained".
+// SRD 5.2.1 spells whose caster acts again while they last: Phantasmal Force's 2d8 on each of its caster's turns,
+// Geas's 5d10 the GM deals once a day, Detect Thoughts' probe and the Arcana check that pushes it out, Levitate's
+// raising and lowering, Ensnaring Strike's vines torn away by another creature, Bestow Curse's forced Dodge and
+// Prismatic Spray's Violet ray.
 
-/** 50px cells, 5 ft each: cell (c,r) centre = (25 + 50c, 25 + 50r). */
-const GRID: TokenMapGeometry = {
-  width: 2000,
-  height: 2000,
-  calibration: { kind: "square", origin: { x: 0, y: 0 }, cellSizePx: 50, rotationRadians: 0, distancePerCell: 5 }
-};
-const cell = (column: number, row: number) => ({ x: 25 + 50 * column, y: 25 + 50 * row });
-
-const zoneDeps = (faces: number[] = []): ZoneDeps => ({
-  geometry: GRID,
-  resolveDefinition: () => undefined,
-  catalog,
-  rollDie: () => faces.shift() ?? 3,
-  newId: () => crypto.randomUUID(),
-  now: () => "2026-10-18T00:00:00.000Z"
+const concentrating = (table: ReturnType<typeof caster>) =>
+  actorOf(table.state, HERO).effects.some((effect) => effect.concentration);
+const turnDeps = (table: ReturnType<typeof caster>) => ({
+  resolveDefinition: (definitionId: string) =>
+    table.state.definitions.find((entry) => entry.id === definitionId)?.definition,
+  rollDie: () => 3,
+  random: () => 3,
+  newId: nextCommand,
+  now: () => "2026-10-18T00:00:00.000Z",
+  catalog
 });
-const turnDeps = (faces: number[] = []) => ({
-  ...zoneDeps(faces),
-  geometry: GRID,
-  resolveDefinition: () => undefined
-});
-
-function place(state: GameState, positions: Readonly<Record<string, readonly [number, number]>>): void {
-  state.combat.tokens = state.combat.tokens.map((token) => {
-    const at = positions[token.actorId];
-    return { ...token, position: at ? cell(at[0], at[1]) : token.position, sizeCells: 1 };
-  });
+/** Moves the fight on until it is `actorId`'s turn. */
+function toTurnOf(table: ReturnType<typeof caster>, actorId: string) {
+  for (let guard = 0; guard < 8; guard += 1) {
+    nextInitiativeTurn(table.state, [], turnDeps(table));
+    if (table.state.combat.turnActorId === actorId) return;
+  }
+  throw new Error(`${actorId} never came up.`);
 }
 
-/** The circle a cast's template drew: `radius` cells around `center`, under the cast's own id. */
-function drawArea(state: GameState, id: string, center: readonly [number, number], radius: number): void {
-  addAnnotation(
-    state,
-    {
-      id,
-      kind: "shape",
-      shape: "circle",
-      origin: cell(center[0], center[1]),
-      target: cell(center[0] + radius, center[1]),
-      visibility: "public",
-      actor: { sessionId: "30000000-0000-4000-8000-00000000000a", role: "gm" },
-      now: 0
-    },
-    GRID
-  );
-}
-
-const zoneOf = (state: GameState, spellId: string) =>
-  state.combat.spellZones.find((zone) => zone.spellId === spellId) as SpellZone;
-
-describe("Faithful Hound", () => {
-  it("bites the enemy nearest it within 5 feet as its caster's turn starts", () => {
+describe("Phantasmal Force's harm", () => {
+  it("deals 2d8 Psychic to the creature under it once on each of its caster's turns", () => {
     const table = caster();
-    cast(table, "faithful-hound", { targetIds: [], areaPlaced: true, commandId: "hound" });
-    drawArea(table.state, "hound", [10, 10], 1);
-    place(table.state, { [HERO]: [2, 2], [FOE]: [11, 10], [FOE2]: [20, 20], [ALLY]: [10, 9] });
-    const events: Parameters<typeof nextInitiativeTurn>[1] = [];
-    for (let step = 0; step < 4; step += 1) nextInitiativeTurn(table.state, events, turnDeps([5, 5, 5, 5]));
-    expect(table.state.combat.turnActorId).toBe(HERO);
-    expect(table.state.combat.pendingSaves).toMatchObject([
-      { targetActorId: FOE, ability: "dex", dc: 15, proposedDamage: 20, actionName: "Faithful Hound" }
-    ]);
-    expect(events.map((event) => event.text)).toContain(
-      "Goblin is set upon by Faithful Hound and makes a DEX save (DC 15)."
-    );
-  });
-
-  it("refuses the bite by hand while the hound isn't up", () => {
-    const table = caster();
-    expect(() => resolveAs(table, laterAction("faithful-hound", "bite"), { targetIds: [FOE] })).toThrow(
-      "Ansel doesn't have Faithful Hound up. Cast it first."
-    );
+    cast(table, "phantasmal-force");
+    answer(table.state, FOE, 1);
+    const harm = laterAction("phantasmal-force", "harm");
+    expect(resolveAs(table, harm, {}, [4, 5]).damage).toEqual([{ formula: "2d8", type: "psychic", total: 9 }]);
+    // Once a turn, and only on the caster's own.
+    expect(() => resolveAs(table, harm)).toThrow();
+    toTurnOf(table, FOE);
+    expect(() => resolveAs(table, harm)).toThrow(/own turn/);
+    toTurnOf(table, HERO);
+    expect(resolveAs(table, harm, {}, [1, 1]).damage?.[0]?.total).toBe(2);
+    // Another creature isn't under the phantasm.
+    expect(() => resolveAs(table, harm, { targetIds: [ALLY] })).toThrow(/isn't under/);
   });
 });
 
-describe("Delayed Blast Fireball", () => {
-  it("bursts when the spell ends, 12d6 and 1d6 for each of its caster's turns that ended, on everyone in it", () => {
-    const table = caster();
-    cast(table, "delayed-blast-fireball", { targetIds: [], areaPlaced: true, commandId: "bead" });
-    drawArea(table.state, "bead", [10, 10], 4);
-    place(table.state, { [HERO]: [2, 2], [FOE]: [11, 10], [FOE2]: [12, 12], [ALLY]: [30, 30] });
-    const bead = zoneOf(table.state, "delayed-blast-fireball");
-    expect(bead).toMatchObject({ burstsOnEnd: true });
-    // Two of the caster's turns end while it lasts.
-    for (let step = 0; step < 8; step += 1) nextInitiativeTurn(table.state, [], turnDeps());
-    expect(zoneOf(table.state, "delayed-blast-fireball").grown).toBe(2);
-    const concentration = actorOf(table.state, HERO).effects.find((effect) => effect.tags.includes("concentrating"))!;
-    endEffect(table.state, HERO, concentration.id);
-    expect(zoneOf(table.state, "delayed-blast-fireball")).toMatchObject({ bursting: true });
-    const told = burstEndedZones(table.state, zoneDeps());
-    expect(table.state.combat.spellZones).toEqual([]);
-    expect(table.state.combat.pendingSaves.map((save) => [save.targetActorId, save.proposedDamage])).toEqual([
-      [FOE, 42],
-      [FOE2, 42]
-    ]);
-    expect(told.map((event) => event.text)).toEqual([
-      "Delayed Blast Fireball explodes: Goblin, Orc make a DEX save (DC 15)."
-    ]);
-  });
-});
-
-describe("Conjure Elemental", () => {
-  it("makes a creature entering the spirit save in the element chosen, and waits while it holds one Restrained", () => {
-    const table = caster();
-    cast(table, "conjure-elemental", { targetIds: [], areaPlaced: true, commandId: "spirit", damageType: "fire" });
-    drawArea(table.state, "spirit", [10, 10], 2);
-    place(table.state, { [HERO]: [2, 2], [FOE]: [16, 10], [FOE2]: [10, 16], [ALLY]: [30, 30] });
-    const walk = (actorId: string, path: ReadonlyArray<readonly [number, number]>) => {
-      table.state.combat.tokens = table.state.combat.tokens.map((token) =>
-        token.actorId === actorId ? { ...token, position: cell(...path[path.length - 1]!) } : token
+describe("Geas's defiance", () => {
+  it("is the GM's to deal, 5d10 Psychic once a day of game time", () => {
+    // Its casting time is a minute: cast outside the fight, which then starts.
+    const table = caster({ combat: false });
+    cast(table, "geas");
+    answer(table.state, FOE, 1);
+    startEncounter(
+      table.state,
+      {
+        mapAssetId: "20000000-0000-5000-8000-000000000009",
+        entries: [
+          { actorId: HERO, score: 20 },
+          { actorId: FOE, score: 10 }
+        ]
+      },
+      () => 1,
+      { width: 900, height: 600, calibration: null }
+    );
+    expect(actorOf(table.state, FOE).conditions.map((condition) => condition.id)).toContain("charmed");
+    const defiance = laterAction("geas", "defiance");
+    const asPlayer = () =>
+      resolveDefinitionAction(
+        table.state,
+        defiance,
+        { actorId: HERO, targetIds: [FOE], commandId: nextCommand() },
+        {
+          random: () => 3,
+          newRollId: () => crypto.randomUUID(),
+          gmSessionId: "30000000-0000-4000-8000-00000000000a",
+          initiatorRole: "player",
+          now: () => "2026-10-18T00:00:00.000Z",
+          definition: wizard,
+          catalog
+        }
       );
-      return zonesAfterMove(table.state, { moverId: actorId, path: path.map(([c, r]) => cell(c, r)) }, zoneDeps());
-    };
-    walk(FOE, [
-      [16, 10],
-      [12, 10]
-    ]);
-    expect(table.state.combat.pendingSaves).toMatchObject([
-      { targetActorId: FOE, ability: "dex", proposedDamage: 24, proposedDamageParts: [{ type: "fire", amount: 24 }] }
-    ]);
-    answer(table.state, FOE, 2);
-    expect(actorOf(table.state, FOE).conditions.map((condition) => condition.id)).toContain("restrained");
-    // At the start of each of its turns it repeats the save, a failure costing 4d8 of the chosen element.
-    expect(actorOf(table.state, FOE).effects.find((effect) => effect.repeatSave)?.repeatSave).toMatchObject({
-      ability: "dex",
-      timing: "turn-start",
-      failureDamage: [{ formula: "4d8", type: "fire" }]
-    });
-    // The spirit holds the goblin, so the orc walks in unchallenged.
-    expect(
-      walk(FOE2, [
-        [10, 16],
-        [10, 12]
-      ])
-    ).toEqual([]);
+    expect(asPlayer).toThrow(/The GM takes/);
+    expect(resolveAs(table, defiance).damage).toEqual([{ formula: "5d10", type: "psychic", total: 15 }]);
+    expect(() => resolveAs(table, defiance)).toThrow();
+    passGameTime(table.state, 24 * 60, turnDeps(table));
+    expect(resolveAs(table, defiance).damage?.[0]?.total).toBe(15);
   });
 });
+
+describe("Detect Thoughts", () => {
+  it("opens no save as it is cast; the probe on a later turn does, and a success ends the spell", () => {
+    const table = caster();
+    cast(table, "detect-thoughts");
+    expect(table.state.combat.pendingSaves).toEqual([]);
+    expect(concentrating(table)).toBe(true);
+    const probe = laterAction("detect-thoughts", "probe");
+    expect(() => resolveAs(table, probe)).toThrow();
+    toTurnOf(table, HERO);
+    resolveAs(table, probe);
+    answer(table.state, FOE, 20);
+    expect(concentrating(table)).toBe(false);
+  });
+
+  it("lets a probed creature end the spell with an Intelligence (Arcana) check against the spell save DC", () => {
+    const table = caster();
+    cast(table, "detect-thoughts");
+    toTurnOf(table, HERO);
+    resolveAs(table, laterAction("detect-thoughts", "probe"));
+    answer(table.state, FOE, 1);
+    const probed = actorOf(table.state, FOE).effects.find((effect) => effect.name === "Detect Thoughts")!;
+    expect(probed.endedBy).toMatchObject({ by: "bearer", check: { ability: "int", skill: "arcana", dc: 15 } });
+    toTurnOf(table, FOE);
+    resolveAs(table, builtinAction("end-an-effect")!, { targetIds: [FOE], builtin: true }, [20], FOE);
+    expect(actorOf(table.state, FOE).effects.some((effect) => effect.name === "Detect Thoughts")).toBe(false);
+    expect(concentrating(table)).toBe(false);
+  });
+});
+
+describe("Ensnaring Strike's vines", () => {
+  it("can be torn away by a creature within reach of the target with a Strength (Athletics) check", () => {
+    const table = caster();
+    cast(table, "ensnaring-strike");
+    answer(table.state, FOE, 1);
+    const vines = actorOf(table.state, FOE).effects[0]!;
+    expect(vines.endedBy).toMatchObject({ by: "either", check: { ability: "str", skill: "athletics", dc: 15 } });
+    toTurnOf(table, ALLY);
+    resolveAs(table, builtinAction("end-an-effect")!, { targetIds: [FOE], builtin: true }, [20], ALLY);
+    expect(actorOf(table.state, FOE).conditions.map((condition) => condition.id)).not.toContain("restrained");
+  });
+});
+
+describe("Bestow Curse's forced Dodge", () => {
+  it("asks a Wisdom save at the start of each of the target's turns; a failure leaves it only the Dodge action", () => {
+    const table = caster();
+    cast(table, "bestow-curse", { optionId: "dodge" });
+    answer(table.state, FOE, 1);
+    toTurnOf(table, FOE);
+    const save = table.state.combat.pendingSaves.find((pending) => pending.targetActorId === FOE)!;
+    expect(save).toMatchObject({ ability: "wis", dc: 15 });
+    answer(table.state, FOE, 1);
+    const attack = laterAction("phantasmal-force", "harm");
+    expect(() =>
+      resolveAs(table, { ...attack, id: "swing", activation: "action" }, { targetIds: [HERO] }, [], FOE)
+    ).toThrow(/Dodge/);
+    resolveAs(table, builtinAction("dodge")!, { targetIds: [], builtin: true }, [], FOE);
+    // The curse stays; a success on its next turn leaves the turn free.
+    toTurnOf(table, FOE);
+    answer(table.state, FOE, 20);
+    expect(actorOf(table.state, FOE).effects.some((effect) => effect.name.startsWith("Bestow Curse"))).toBe(true);
+    expect(actorOf(table.state, FOE).effects.some((effect) => effect.tags.includes("dodge-only"))).toBe(false);
+  });
+});
+
+describe("Prismatic Spray's Violet ray", () => {
+  /** Faces for the 12d6, then the target's d8 ray. */
+  const violet = [...Array(12).fill(3), 7];
+
+  it("Blinds, and at the caster's next turn a success ends it", () => {
+    const table = caster();
+    cast(table, "prismatic-spray", { targetIds: [FOE] }, [...violet]);
+    answer(table.state, FOE, 1);
+    expect(actorOf(table.state, FOE).conditions.map((condition) => condition.id)).toContain("blinded");
+    toTurnOf(table, HERO);
+    answer(table.state, FOE, 20);
+    expect(actorOf(table.state, FOE).conditions.map((condition) => condition.id)).not.toContain("blinded");
+    expect(actorOf(table.state, FOE).effects).toEqual([]);
+  });
+
+  it("sends a creature that fails the Wisdom save to another plane", () => {
+    const table = caster();
+    cast(table, "prismatic-spray", { targetIds: [FOE] }, [...violet]);
+    answer(table.state, FOE, 1);
+    toTurnOf(table, HERO);
+    answer(table.state, FOE, 1);
+    const target = actorOf(table.state, FOE);
+    expect(target.conditions.map((condition) => condition.id)).not.toContain("blinded");
+    expect(target.effects.some((effect) => effect.tags.includes("off-plane"))).toBe(true);
+  });
+});
+
+describe("Levitate's altitude", () => {
+  const heightOf = (table: ReturnType<typeof caster>, id: string) =>
+    table.state.combat.tokens.find((token) => token.actorId === id)?.altitudeFeet ?? 0;
+  const placed = () => {
+    const table = caster();
+    table.state.combat.tokens.forEach((token, index) => {
+      token.position = { x: 125 + index * 100, y: 125 };
+    });
+    return table;
+  };
+
+  it("raises or lowers the creature it holds 20 feet with a Magic action, once on each of the caster's turns", () => {
+    const table = placed();
+    cast(table, "levitate");
+    answer(table.state, FOE, 1);
+    setAltitude(table.state, FOE, 20, "levitate");
+    toTurnOf(table, HERO);
+    resolveAs(table, laterAction("levitate", "raise"), { targetIds: [] });
+    expect(heightOf(table, FOE)).toBe(40);
+    expect(table.state.combat.turn.actionUsed).toBe(true);
+    expect(() => resolveAs(table, laterAction("levitate", "lower"), { targetIds: [] })).toThrow();
+    toTurnOf(table, HERO);
+    resolveAs(table, laterAction("levitate", "lower"), { targetIds: [] });
+    expect(heightOf(table, FOE)).toBe(20);
+    expect(table.state.combat.tokens.find((token) => token.actorId === FOE)?.airborne).toBe("levitate");
+  });
+
+  it("moves a caster levitating itself as part of its move, with no action", () => {
+    const table = placed();
+    cast(table, "levitate", { targetIds: [HERO] });
+    setAltitude(table.state, HERO, 20, "levitate");
+    toTurnOf(table, HERO);
+    resolveAs(table, laterAction("levitate", "lower"), { targetIds: [] });
+    expect(heightOf(table, HERO)).toBe(0);
+    expect(table.state.combat.turn.actionUsed).toBe(false);
+  });
+});
+

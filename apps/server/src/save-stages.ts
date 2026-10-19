@@ -3,6 +3,7 @@ import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { EffectStage, EndedBy, RepeatSave, SaveFailureDuration } from "@vtt/schemas";
 import { conditionLabel } from "./condition-rules.js";
 import {
+  addEffect,
   effectDurationOf,
   endEffectIfPresent,
   makeEffect,
@@ -122,7 +123,8 @@ export type EndingSaveDeps = Readonly<{
 }>;
 
 /** The repeat saves `actorId` owes as its turn starts or ends: one per effect that repeats then. A once-only repeat
- *  armed during this very turn waits for the next. */
+ *  armed during this very turn waits for the next. As a creature's turn starts, the creatures bearing its effects that
+ *  repeat then make theirs too (Prismatic Spray's Violet ray: "at the start of your next turn"). */
 export function openRepeatSaves(
   state: GameState,
   actorId: string,
@@ -132,6 +134,11 @@ export function openRepeatSaves(
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) return [];
   const events: EffectNarration[] = [];
+  if (timing === "turn-start")
+    for (const bearer of state.actors)
+      for (const effect of [...bearer.effects])
+        if (effect.sourceActorId === actorId && effect.repeatSave?.timing === "source-turn-start")
+          events.push(openEndingSave(state, bearer, effect, effect.repeatSave, "makes", deps));
   for (const effect of [...actor.effects]) {
     const repeat = effect.repeatSave;
     if (!repeat || (repeat.timing ?? "turn-end") !== timing) continue;
@@ -239,7 +246,9 @@ export function openEndingSave(
   const tally = repeat?.tally;
   const ends = tally
     ? `${tally.successes} of ${tally.needed} successes and ${tally.failures} of ${tally.needed} failures so far`
-    : "a success ends it";
+    : repeat?.failureTurnTags
+      ? "a failure holds it to what the effect allows this turn"
+      : "a success ends it";
   return {
     kind: "condition",
     text: `${bearer.name} ${verb} the ${save.ability.toUpperCase()} save against ${effect.name} (DC ${save.dc}); ${ends}.`,
@@ -265,7 +274,8 @@ export function settleEndingSave(
   const bearer = state.actors.find((actor) => actor.id === reference.actorId);
   const effect = bearer?.effects.find((candidate) => candidate.id === reference.effectId);
   if (!bearer || !effect) return [];
-  const repeat = reference.repeat ? effect.repeatSave : undefined;
+  const repeat = reference.repeat ? effect.repeatSave : (effect.repeatSave?.timing === "source-turn-start" ? effect.repeatSave : undefined);
+  if (repeat?.failureTurnTags) return success ? [] : compelledTurn(state, bearer, effect, repeat.failureTurnTags, id);
   if (!repeat) return success ? endEffectIfPresent(state, bearer.id, effect.id) : [];
   const tally = repeat.tally;
   if (tally) {
@@ -314,7 +324,7 @@ function nextStage(
   const replacement = makeEffect({
     id: id.slice(0, 120),
     name: stage.name,
-    tags: [...effect.tags],
+    tags: [...new Set([...effect.tags, ...(stage.tags ?? [])])].slice(0, 8),
     modifiers: structuredClone(effect.modifiers),
     sourceActorId: effect.sourceActorId,
     sourceName: effect.sourceName,
@@ -339,6 +349,36 @@ function nextStage(
       actorId: bearer.id,
       ...sourceOf(effect)
     },
+    ...events
+  ];
+}
+
+/** A compelling save failed (Bestow Curse): the bearer carries the tags until its turn ends, and the effect stays. */
+function compelledTurn(
+  state: GameState,
+  bearer: Actor,
+  effect: Effect,
+  tags: readonly string[],
+  id: string
+): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  addEffect(
+    state,
+    bearer.id,
+    makeEffect({
+      id: `${id}:turn`.slice(0, 120),
+      name: `${effect.name} (this turn)`.slice(0, 120),
+      tags: [...tags],
+      sourceActorId: effect.sourceActorId,
+      sourceName: effect.sourceName,
+      startedRound: state.combat.round,
+      // Made as the bearer's turn starts, it ends as that same turn ends.
+      duration: { type: "until-bearer-turn-end", skipsCurrentTurn: false }
+    }),
+    events
+  );
+  return [
+    { kind: "condition", text: `${bearer.name} fails: ${effect.name} holds it this turn.`, actorId: bearer.id, ...sourceOf(effect) },
     ...events
   ];
 }

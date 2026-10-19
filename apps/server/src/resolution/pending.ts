@@ -450,6 +450,17 @@ export function failureEffectFor(
     sourceName: attacker.name,
     ...(duration ? { duration } : {}),
     ...(repeat ? { repeatSave: repeat } : {}),
+    // Bestow Curse's forced Dodge: a save at the start of each of the bearer's turns that compels it that turn.
+    ...(!repeat && option?.turnStartSave
+      ? {
+          repeatSave: {
+            ability: option.turnStartSave.ability,
+            dc: save.dc,
+            timing: "turn-start" as const,
+            failureTurnTags: [...option.turnStartSave.failureTags]
+          }
+        }
+      : {}),
     ...(save.endsOnDamage || option?.endsOnDamage ? { endsOnDamage: true } : {}),
     ...(save.endsOnSourceSideDamage ? { endsOnSourceSideDamage: true as const } : {}),
     ...(declared?.endsOnSpellHealing ? { endsOnSpellHealing: true as const } : {}),
@@ -753,6 +764,7 @@ export function parkActionSave(ctx: ResolveContext): void {
   const extra = {
     ...(onSuccessEffect ? { onSuccessEffect } : gmApplies ? { gmApplies: true as const } : {}),
     ...(action.save.breaksConcentration ? { breaksConcentration: true as const } : {}),
+    ...(action.save.successEndsSpell ? { successEndsSpell: true as const } : {}),
     // Moonbeam: a shape-shifted creature that fails reverts to its true form.
     ...(action.save.failureEndsForm ? { endsForm: true as const } : {}),
     ...fatal

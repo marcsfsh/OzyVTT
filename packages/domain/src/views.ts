@@ -182,6 +182,7 @@ export type PlayerPendingSave = Omit<
   | "onSuccessEffect"
   | "failureNote"
   | "breaksConcentration"
+  | "successEndsSpell"
   | "zoneId"
   | "magical"
   | "immuneOnSuccess"

@@ -515,6 +515,7 @@ export function laterSpellAction(
                     }
                   }
                 : {}),
+              ...(later.failureEffect ? { failureEffect: structuredClone(later.failureEffect) } : {}),
               dc: numbers.saveDc,
               ...(numbers.bearersDc ? { spellcasting: true } : {})
             }
@@ -527,6 +528,8 @@ export function laterSpellAction(
     ...(later.movesGrant && spell.effect?.grant ? { grants: structuredClone(spell.effect.grant) } : {}),
     // A new form while the spell lasts (Shapechange).
     ...(later.shapeShift ? { shapeShift: structuredClone(later.shapeShift) } : {}),
+    // How often it is taken (Phantasmal Force's once a turn, Geas's once a day).
+    ...(later.uses ? { uses: { ...later.uses } } : {}),
     spellId: spell.id
   };
 }

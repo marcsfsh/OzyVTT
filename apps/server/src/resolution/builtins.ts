@@ -34,6 +34,7 @@ import {
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { putOutFire } from "../hazards.js";
 import { endingOptions } from "../ending-actions.js";
+import { endCasterSpell } from "../spell-endings.js";
 import { openEndingSave } from "../save-stages.js";
 import { applyDamageDetailed } from "../hit-points.js";
 import { rollPlain } from "./hit-rider-outcomes.js";
@@ -510,6 +511,10 @@ function endAnEffect(ctx: ResolveContext): void {
     text: `${attacker.name} ends ${effect.name} on ${bearer.name} (${ended.name}).`,
     actorIds: [attacker.id, bearer.id]
   });
+  // "ending the spell on a success" (Detect Thoughts): the caster's hold on it ends too.
+  if (ended.endsSpell && effect.sourceActorId && effect.spell)
+    for (const event of endCasterSpell(state, effect.sourceActorId, effect.spell.id))
+      ctx.tableNarration.push(tableLineOf(ctx, event));
   // "The puller takes 10 (3d6) Acid damage."
   for (const part of ended.takerDamage ?? []) {
     const rolled = rollPlain(ctx, part.formula, part.type, ended.name);

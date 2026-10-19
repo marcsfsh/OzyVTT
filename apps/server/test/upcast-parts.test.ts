@@ -54,7 +54,8 @@ describe("per-part upcast scaling", () => {
 /** Clauses of a higher-level text that a reader other than the damage dice handles, by spell, with the field that
  *  reads them. A new spell whose clause isn't damage, targets or Hit Points fails until it is reviewed here. */
 const READ_ELSEWHERE: Readonly<Record<string, (record: SpellReference) => boolean>> = {
-  // The Concentration's longer maximum by slot (`spellDurationAt`).
+  // The longer duration by slot (`spellDurationAt`).
+  geas: () => true,
   hex: () => true,
   "hunters-mark": () => true,
   "magic-circle": () => true,

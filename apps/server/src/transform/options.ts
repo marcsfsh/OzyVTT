@@ -245,6 +245,7 @@ export function formRecord(
     ...(shift.endsOnIncapacitated ? { endsOnIncapacitated: true as const } : {}),
     ...(shift.endsAtZeroHitPoints ? { endsAtZeroHitPoints: true as const } : {}),
     ...(shift.revertRounds !== undefined ? { revertRounds: shift.revertRounds } : {}),
+    ...(shift.descendsSafely ? { descendsSafely: true as const } : {}),
     ...(extras.temporaryHitPoints !== undefined && extras.temporaryHitPoints > 0
       ? { temporaryHitPoints: Math.min(1000, extras.temporaryHitPoints) }
       : {}),

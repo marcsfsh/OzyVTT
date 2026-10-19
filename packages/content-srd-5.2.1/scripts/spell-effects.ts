@@ -338,6 +338,8 @@ const NO_CAST_SAVE: ReadonlySet<string> = new Set([
   "conjure-elemental",
   "conjure-woodland-beings",
   "delayed-blast-fireball",
+  // The Wisdom save belongs to probing deeper on a later turn (`LATER_ACTIONS`).
+  "detect-thoughts",
   "dragons-breath",
   "dream",
   "faithful-hound",
@@ -795,6 +797,106 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       save: save("dex"),
       damage: [{ formula: "20", type: "radiant" }],
       zone: { on: ["enter", "start-turn"], around: "point", feet: 10, affects: "enemies", damageCap: 60 }
+    }
+  ],
+  // "As a Magic action on your next turn, you can try to probe deeper into the target's mind. If you probe deeper, the
+  // target makes a Wisdom saving throw. ... On a successful save, the spell ends. Either way, the target knows that you
+  // are probing into its mind, and ... the target can take an action on its turn to make an Intelligence (Arcana) check
+  // against your spell save DC, ending the spell on a success." What the caster learns is the GM's.
+  "detect-thoughts": [
+    {
+      name: "probe",
+      activation: "action",
+      laterTurnsOnly: true,
+      when: "On a later turn, a Magic action probes the target's mind: it makes the Wisdom save, a success ending the spell, and may then take an action for an Intelligence (Arcana) check that ends it.",
+      save: {
+        ability: "wis",
+        successDamage: "none",
+        failureConditions: [],
+        successEndsSpell: true,
+        endedBy: { name: "Push the probe out", by: "bearer", check: { ability: "int", skill: "arcana" }, endsSpell: true }
+      },
+      failureEffect: { name: "Detect Thoughts", tags: [], modifiers: [] },
+      damage: []
+    }
+  ],
+  // "While Charmed, the creature takes 5d10 Psychic damage if it acts in a manner directly counter to your command. It
+  // takes this damage no more than once each day." The GM judges the defiance.
+  geas: [
+    {
+      name: "defiance",
+      activation: "other",
+      bearerOnly: true,
+      gmOnly: true,
+      uses: { limit: 1, per: "time", afterHours: "24" },
+      when: "When the charmed creature acts directly counter to the command, the GM deals it 5d10 Psychic damage, once a day at most.",
+      damage: [{ formula: "5d10", type: "psychic" }]
+    }
+  ],
+  // "If you are the target, you can move up or down as part of your move. Otherwise, you can take a Magic action to
+  // move the target, which must remain within the spell's range."
+  levitate: [
+    {
+      name: "raise",
+      activation: "action",
+      liftFeet: 20,
+      ownTurnOnly: true,
+      uses: { limit: 1, per: "turn", pool: "levitate-height" },
+      when: "On your turn, a Magic action raises the levitated creature 20 feet, keeping it within the spell's range; levitating yourself, you rise as part of your move.",
+      damage: []
+    },
+    {
+      name: "lower",
+      activation: "action",
+      liftFeet: -20,
+      ownTurnOnly: true,
+      uses: { limit: 1, per: "turn", pool: "levitate-height" },
+      when: "On your turn, a Magic action lowers the levitated creature 20 feet, keeping it within the spell's range; levitating yourself, you sink as part of your move.",
+      damage: []
+    }
+  ],
+  // "On each of your turns, such a phantasm can deal 2d8 Psychic damage to the target if it is in the phantasm's area
+  // or within 5 feet of the phantasm." Where the phantasm is, and whether the target is near it, are the caster's to
+  // say and the GM's to refuse.
+  "phantasmal-force": [
+    {
+      name: "harm",
+      activation: "other",
+      bearerOnly: true,
+      ownTurnOnly: true,
+      uses: { limit: 1, per: "turn" },
+      when: "On each of your turns, the phantasm can deal 2d8 Psychic damage to the creature that perceives it, if it is in the phantasm's area or within 5 feet of it.",
+      damage: [{ formula: "2d8", type: "psychic" }]
+    }
+  ],
+  // "Until the spell ends, the target can revert to cloud form, which also requires a Magic action followed by a
+  // 1-minute transformation."
+  "wind-walk": [
+    {
+      name: "cloud form",
+      activation: "action",
+      when: "Until the spell ends, a target in its normal form takes a Magic action to become a cloud again, with the Stunned condition for the minute of its transformation.",
+      shapeShift: {
+        from: "printed",
+        printed: [
+          {
+            id: "cloud",
+            name: "Cloud",
+            speeds: { walk: 0, fly: 300, hover: true },
+            noActions: true,
+            allowsActions: ["dash"],
+            conditionImmunities: ["prone"],
+            modifiers: [{ type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] }]
+          }
+        ],
+        keeps: [],
+        gear: "worn",
+        leaveAs: "action",
+        revertRounds: 10,
+        descendsSafely: true,
+        takesRounds: 10
+      },
+      damage: []
     }
   ],
   // "If the target drops to 0 Hit Points before this spell ends, you can take a Bonus Action on a later turn to curse a
@@ -1699,6 +1801,15 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
   }),
   // "Until the spell ends, the target can take a Magic action to exhale", the type chosen at the cast: the touched
   // creature's own action, at the caster's numbers.
+  // "Until the spell ends, the target can revert to cloud form": each target keeps the spell, and its action to become
+  // a cloud again, for the spell's duration.
+  "wind-walk": spellGrant({
+    name: "Wind Walk",
+    tags: ["wind-walk"],
+    target: "targets",
+    duration: { type: "manual" },
+    grantsLaterAction: "cloud form"
+  }),
   "dragons-breath": spellGrant({
     name: "Dragon's Breath",
     tags: ["dragons-breath"],
@@ -2127,7 +2238,12 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
           }
         ]
       }),
-      option("dodge", "Forced to Dodge", { tags: ["curse-dodge"] }),
+      // "In combat, the target must succeed on a Wisdom saving throw at the start of each of its turns or be forced to
+      // take the Dodge action on that turn."
+      option("dodge", "Forced to Dodge", {
+        tags: ["curse-dodge"],
+        turnStartSave: { ability: "wis", failureTags: ["dodge-only"] }
+      }),
       option("necrotic", "Extra Necrotic damage", {
         modifiers: [
           {
@@ -2383,7 +2499,8 @@ const CAST_SHAPE_SHIFTS: Readonly<Record<string, ShapeShift>> = {
   // "You and up to ten willing creatures ... assume gaseous forms ... a Fly Speed of 300 feet and can hover ... Immunity
   // to the Prone condition ... Resistance to Bludgeoning, Piercing, and Slashing damage. The only actions a target can
   // take in this form are the Dash action or a Magic action to begin reverting ... Reverting takes 1 minute, during
-  // which the target has the Stunned condition." Turning back into a cloud, and the descent when it ends, are the GM's.
+  // which the target has the Stunned condition." "If a target is in cloud form and flying when the effect ends, the
+  // target descends 60 feet per round for 1 minute until it lands, which it does safely."
   "wind-walk": {
     from: "printed",
     onTargets: true,
@@ -2401,7 +2518,8 @@ const CAST_SHAPE_SHIFTS: Readonly<Record<string, ShapeShift>> = {
     keeps: [],
     gear: "worn",
     leaveAs: "action",
-    revertRounds: 10
+    revertRounds: 10,
+    descendsSafely: true
   }
 };
 

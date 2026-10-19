@@ -635,9 +635,12 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   "phantasmal-killer": { repeatSave: true, repeatDamageAgain: true, autoSuccess: { truesight: true } },
   // "While Restrained, the target takes 1d6 Piercing damage at the start of each of its turns", and "A Large or larger
   // creature has Advantage on this save".
+  // "The target or a creature within reach of it can take an action to make a Strength (Athletics) check against your
+  // spell save DC. On a success, the vines wither away."
   "ensnaring-strike": {
     ongoingDamage: { damage: [{ formula: "1d6", type: "piercing" }], at: "bearer-turn-start" },
-    advantageAtSize: "large"
+    advantageAtSize: "large",
+    endedBy: { name: "Tear the vines away", by: "either", check: { ability: "str", skill: "athletics" } }
   },
   // "If the creature is shape-shifted (as a result of the Polymorph spell, for example), it reverts to its true form and
   // can't shape-shift until it leaves the Cylinder."

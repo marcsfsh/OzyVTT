@@ -258,7 +258,8 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       tags: [...new Set([...(rage ? rage.tags : grant.tags), ...parts.tags])].slice(0, 8),
       sourceActorId: attacker.id,
       sourceName: attacker.name,
-      sourceActionId: action.id,
+      // A cast that also shape-shifts its targets (Wind Walk) keeps its grant beside the form it gives.
+      sourceActionId: action.shapeShift ? `${action.id}:grant` : action.id,
       startedRound: rage?.startedRound ?? state.combat.round,
       duration: rage?.duration
         ? rage.duration

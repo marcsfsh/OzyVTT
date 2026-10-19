@@ -1396,11 +1396,14 @@ export const EndedBySchema = z
       })
       .strict()
       .optional(),
-    takerDamage: RepeatFailureDamageSchema.optional()
+    takerDamage: RepeatFailureDamageSchema.optional(),
+    /** Its success ends the whole spell the effect came from, the caster's Concentration on it included (Detect
+     *  Thoughts: "ending the spell on a success"). */
+    endsSpell: z.literal(true).optional()
   })
   .strict()
   .describe(
-    "An action that ends the effect: who may take it (the bearer, others within 5 feet of the bearer or the source, or either), the ability check it needs if any, and the damage the one who succeeds takes"
+    "An action that ends the effect: who may take it (the bearer, others within 5 feet of the bearer or the source, or either), the ability check it needs if any, the damage the one who succeeds takes, and whether it ends the whole spell"
   );
 export type EndedBy = z.infer<typeof EndedBySchema>;
 
@@ -1440,7 +1443,9 @@ export const EffectStageSchema = z
     duration: SaveFailureDurationSchema.optional(),
     endsOnDamage: z.literal(true).optional(),
     repeats: z.literal(true).optional(),
-    endedBy: EndedBySchema.optional()
+    endedBy: EndedBySchema.optional(),
+    /** Tags the stage adds to the effect's own (Prismatic Spray's Violet ray: `off-plane`, sent to another plane). */
+    tags: z.array(EffectTagSchema).min(1).max(2).optional()
   })
   .strict();
 export type EffectStage = z.infer<typeof EffectStageSchema>;
@@ -1448,7 +1453,10 @@ export type EffectStage = z.infer<typeof EffectStageSchema>;
 /**
  * The save an effect's bearer repeats to end it (Hold Person), and when:
  * - `timing`: at the end of each of its turns (absent), at the start of each (`turn-start`, Conjure Elemental's
- *   restraint), or only when something else opens it (`none`: Dominate Person's damage).
+ *   restraint), at the start of the effect's source's turns (`source-turn-start`, Prismatic Spray's Violet ray), or
+ *   only when something else opens it (`none`: Dominate Person's damage).
+ * - `failureTurnTags`: a save that compels: a failure gives the bearer these tags until its turn ends, a success leaves
+ *   that turn free, and the effect stays either way (Bestow Curse's forced Dodge).
  * - `once`: only at the end of its next turn (a basilisk's gaze); `skipsCurrentTurn` marks one that began during that
  *   creature's own turn, so the end of that turn doesn't count.
  * - `onDamage`: each time the bearer takes damage too, with Advantage (`advantage`, Hideous Laughter), or only damage
@@ -1463,9 +1471,10 @@ export const RepeatSaveSchema = z
   .object({
     ability: AbilitySchema,
     dc: z.number().int().min(1).max(40),
-    timing: z.enum(["turn-start", "none"]).optional(),
+    timing: z.enum(["turn-start", "source-turn-start", "none"]).optional(),
     once: z.literal(true).optional(),
     skipsCurrentTurn: z.literal(true).optional(),
+    failureTurnTags: z.array(EffectTagSchema).min(1).max(2).optional(),
     onDamage: z
       .object({ advantage: z.literal(true).optional(), notFromSource: z.literal(true).optional() })
       .strict()
@@ -1639,6 +1648,9 @@ export const FormSchema = z
     endsAtZeroHitPoints: z.literal(true).optional(),
     /** Leaving it early takes this many rounds, with the Stunned condition (Wind Walk: 1 minute). */
     revertRounds: z.number().int().min(1).max(100).optional(),
+    /** Ending in the air, it lowers its creature 60 feet a round for a minute to a safe landing, and the creature falls
+     *  the rest (Wind Walk's cloud). */
+    descendsSafely: z.literal(true).optional(),
     /** It ends when the bearer has the Incapacitated condition (Wild Shape). */
     endsOnIncapacitated: z.literal(true).optional(),
     /** The Temporary Hit Points the form gave, any left of which vanish when it ends. */
@@ -2673,6 +2685,13 @@ export const GrantOptionSchema = z
     bonusActions: z.array(BonusActionBaseSchema).min(1).max(3).optional(),
     /** The damage type this option sets for what the effect deals (Dragon's Breath's acid, Fire Shield's cold). */
     damageType: DamageTypeSchema.optional(),
+    /** In a fight, the bearer makes this save at the start of each of its turns against the effect's DC; a failure gives
+     *  it these tags until that turn ends (Bestow Curse: "succeed on a Wisdom saving throw at the start of each of its
+     *  turns or be forced to take the Dodge action on that turn"). */
+    turnStartSave: z
+      .object({ ability: AbilitySchema, failureTags: z.array(EffectTagSchema).min(1).max(2) })
+      .strict()
+      .optional(),
     /** The bearer's Unarmed Strike deals this die of this type while it lasts, using this ability, or the granter's
      *  spellcasting ability, for its attack and damage rolls (Alter Self's claws: 1d6 Slashing). */
     unarmedStrike: z
@@ -3181,6 +3200,12 @@ export const SaveOutcomeFields = {
     .max(6)
     .optional()
     .describe("A creature of these types that fails is sent back to its home plane for 24 hours"),
+  /** A success ends the spell the save is against, its caster's Concentration on it included (Detect Thoughts' probe:
+   *  "On a successful save, the spell ends"). */
+  successEndsSpell: z
+    .literal(true)
+    .optional()
+    .describe("A success ends the spell the save is against, and its caster's Concentration on it"),
   /** A failure also breaks the creature's Concentration (Earthquake: "its Concentration is broken"; Sleet Storm). */
   breaksConcentration: z
     .literal(true)
@@ -3886,6 +3911,12 @@ export const ShapeShiftSchema = z
     endsAtZeroHitPoints: z.literal(true).optional(),
     leaveAs: z.enum(["bonus-action", "action"]).optional(),
     revertRounds: z.number().int().min(1).max(100).optional(),
+    /** A form that ends in the air lowers its creature gently, landing it safely within a minute's 60 feet a round and
+     *  letting it fall the rest (Wind Walk). */
+    descendsSafely: z.literal(true).optional(),
+    /** Taking it takes this many rounds, with the Stunned condition (Wind Walk's return to cloud form: "a Magic action
+     *  followed by a 1-minute transformation"). */
+    takesRounds: z.number().int().min(1).max(100).optional(),
     /** It lasts this many minutes (a Potion of Gaseous Form's hour). */
     durationMinutes: z.number().int().min(1).max(1440).optional(),
     /** It lasts hours equal to half the user's level in this class (Wild Shape). Absent: the spell's duration, or until

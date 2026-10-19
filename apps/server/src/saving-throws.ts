@@ -84,6 +84,7 @@ import {
 } from "./equipment-derivation.js";
 import { countZoneDamage } from "./spell-zone-state.js";
 import { followPushed, forceOf } from "./summon-strikes.js";
+import { endCasterSpell } from "./spell-endings.js";
 import { armedRepeat, durationUntilRepeat, settleEndingSave } from "./save-stages.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import { suppressConditions } from "./suppressed-conditions.js";
@@ -1287,6 +1288,9 @@ export function answerSave(
   if (!success && pending.regurgitates) events.push(...regurgitate(state, target.id, pending.regurgitates.withinFeet));
   // SRD Sleet Storm: a failure "and lose Concentration".
   if (!success && pending.breaksConcentration) events.push(...endConcentrationSustainedBy(state, target.id));
+  // "On a successful save, the spell ends" (Detect Thoughts' probe).
+  if (success && pending.successEndsSpell && pending.sourceActorId && pending.spell)
+    events.push(...endCasterSpell(state, pending.sourceActorId, pending.spell.id));
   // SRD Moonbeam: a shape-shifted creature that fails "reverts to its true form and can't shape-shift until it leaves".
   if (!success && pending.endsForm) {
     const zone = state.combat.spellZones.find((entry) => entry.id === pending.zoneId);

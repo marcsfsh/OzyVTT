@@ -2937,7 +2937,13 @@
       "tags": [
        "curse-dodge"
       ],
-      "modifiers": []
+      "modifiers": [],
+      "turnStartSave": {
+       "ability": "wis",
+       "failureTags": [
+        "dodge-only"
+       ]
+      }
      },
      {
       "id": "necrotic",
@@ -7994,6 +8000,36 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "probe",
+     "activation": "action",
+     "laterTurnsOnly": true,
+     "when": "On a later turn, a Magic action probes the target's mind: it makes the Wisdom save, a success ending the spell, and may then take an action for an Intelligence (Arcana) check that ends it.",
+     "save": {
+      "ability": "wis",
+      "successDamage": "none",
+      "failureConditions": [],
+      "successEndsSpell": true,
+      "endedBy": {
+       "name": "Push the probe out",
+       "by": "bearer",
+       "check": {
+        "ability": "int",
+        "skill": "arcana"
+       },
+       "endsSpell": true
+      }
+     },
+     "failureEffect": {
+      "name": "Detect Thoughts",
+      "tags": [],
+      "modifiers": []
+     },
+     "damage": []
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -10098,7 +10134,15 @@
     ],
     "at": "bearer-turn-start"
    },
-   "advantageAtSize": "large"
+   "advantageAtSize": "large",
+   "endedBy": {
+    "name": "Tear the vines away",
+    "by": "either",
+    "check": {
+     "ability": "str",
+     "skill": "athletics"
+    }
+   }
   },
   "target": {
    "type": "creature",
@@ -13287,6 +13331,26 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "defiance",
+     "activation": "other",
+     "bearerOnly": true,
+     "gmOnly": true,
+     "uses": {
+      "limit": 1,
+      "per": "time",
+      "afterHours": "24"
+     },
+     "when": "When the charmed creature acts directly counter to the command, the GM deals it 5d10 Psychic damage, once a day at most.",
+     "damage": [
+      {
+       "formula": "5d10",
+       "type": "psychic"
+      }
+     ]
+    }
+   ],
    "targets": {
     "count": 1
    },
@@ -18006,6 +18070,34 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "raise",
+     "activation": "action",
+     "liftFeet": 20,
+     "ownTurnOnly": true,
+     "uses": {
+      "limit": 1,
+      "per": "turn",
+      "pool": "levitate-height"
+     },
+     "when": "On your turn, a Magic action raises the levitated creature 20 feet, keeping it within the spell's range; levitating yourself, you rise as part of your move.",
+     "damage": []
+    },
+    {
+     "name": "lower",
+     "activation": "action",
+     "liftFeet": -20,
+     "ownTurnOnly": true,
+     "uses": {
+      "limit": 1,
+      "per": "turn",
+      "pool": "levitate-height"
+     },
+     "when": "On your turn, a Magic action lowers the levitated creature 20 feet, keeping it within the spell's range; levitating yourself, you sink as part of your move.",
+     "damage": []
+    }
+   ],
    "targets": {
     "count": 1
    },
@@ -20971,6 +21063,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "harm",
+     "activation": "other",
+     "bearerOnly": true,
+     "ownTurnOnly": true,
+     "uses": {
+      "limit": 1,
+      "per": "turn"
+     },
+     "when": "On each of your turns, the phantasm can deal 2d8 Psychic damage to the creature that perceives it, if it is in the phantasm's area or within 5 feet of it.",
+     "damage": [
+      {
+       "formula": "2d8",
+       "type": "psychic"
+      }
+     ]
+    }
+   ],
    "targets": {
     "count": 1
    },
@@ -29738,10 +29849,70 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "cloud form",
+     "activation": "action",
+     "when": "Until the spell ends, a target in its normal form takes a Magic action to become a cloud again, with the Stunned condition for the minute of its transformation.",
+     "shapeShift": {
+      "from": "printed",
+      "printed": [
+       {
+        "id": "cloud",
+        "name": "Cloud",
+        "speeds": {
+         "walk": 0,
+         "fly": 300,
+         "hover": true
+        },
+        "noActions": true,
+        "allowsActions": [
+         "dash"
+        ],
+        "conditionImmunities": [
+         "prone"
+        ],
+        "modifiers": [
+         {
+          "type": "damage-resistance",
+          "damageTypes": [
+           "bludgeoning",
+           "piercing",
+           "slashing"
+          ]
+         }
+        ]
+       }
+      ],
+      "keeps": [],
+      "gear": "worn",
+      "leaveAs": "action",
+      "revertRounds": 10,
+      "descendsSafely": true,
+      "takesRounds": 10
+     },
+     "damage": []
+    }
+   ],
    "targets": {
     "count": 11
    },
    "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Wind Walk",
+    "tags": [
+     "wind-walk"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    },
+    "grantsLaterAction": "cloud form"
+   },
    "shapeShift": {
     "from": "printed",
     "onTargets": true,
@@ -29776,7 +29947,8 @@
     "keeps": [],
     "gear": "worn",
     "leaveAs": "action",
-    "revertRounds": 10
+    "revertRounds": 10,
+    "descendsSafely": true
    }
   },
   "classes": [

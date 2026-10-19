@@ -176,6 +176,19 @@ export const SpellLaterActionSchema = z
     /** The hand stands between the caster and harm: Half Cover from its space, which is Difficult Terrain for the
      *  caster's enemies, until another of its effects (Arcane Hand's Interposing Hand). */
     interposes: z.literal(true).optional(),
+    /** How often it can be taken (Phantasmal Force's harm: once a turn; Geas's 5d10: once a day of game time). */
+    uses: ActionSchema.shape.uses,
+    /** It is taken only on the caster's own turn ("On each of your turns": Phantasmal Force). */
+    ownTurnOnly: z.literal(true).optional(),
+    /** Only the GM takes it, judging when the text's trigger has happened (Geas: "if it acts in a manner directly
+     *  counter to your command"). */
+    gmOnly: z.literal(true).optional(),
+    /** What its save's failure leaves on the creature (Detect Thoughts' probe: the mind it can push out). */
+    failureEffect: SaveFailureEffectSchema.optional(),
+    /** It raises (more than 0) or lowers the creature this caster's levitation holds by this many feet, never below
+     *  the ground (Levitate: "You can change the target's altitude by up to 20 feet in either direction on your
+     *  turn"). The caster's own levitation moves as part of its move, with no action. */
+    liftFeet: z.number().int().min(-60).max(60).optional(),
     /** What its damage drains as it lands (Vampiric Touch's later touches). */
     drain: DamageDrainSchema.optional(),
     /** The area the spell leaves, whose trigger the server watches (an "other" action only). */

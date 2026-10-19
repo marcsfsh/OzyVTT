@@ -713,6 +713,15 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:arcane-eye": enforced(
     "An Invisible, invulnerable eye appears within 30 feet (summons.ts) with Darkvision 30 feet, and the caster's player sees what it sees (vision/audience.ts). A Bonus Action moves it up to 30 feet (summon-orders.ts). Gaps an inch wide are the GM's."
   ),
+  "spell:geas": enforced(
+    "A failed Wisdom save leaves the target Charmed for the spell's duration at its slot (resolution/pending.ts). When it acts directly counter to the command, the GM deals it the 5d10 Psychic damage, which a player can't take, at most once a day of game time (lasting-spells.ts, use-pools.ts). Remove Curse ends it, and Greater Restoration ends it as that spell's own row says. Whether the creature defies or understands the command is the GM's."
+  ),
+  "spell:detect-thoughts": guided(
+    "The cast holds Concentration and opens no save. On a later turn a Magic action probes the target's mind: it makes the Wisdom save, and a success ends the spell; on a failure it may take an action for an Intelligence (Arcana) check against the spell save DC, which ends the spell (lasting-spells.ts, ending-actions.ts, spell-endings.ts). Sensing the thinking creatures within 30 feet is the GM's until detection reads more than creature types, and what the caster reads in a mind is the GM's."
+  ),
+  "spell:ensnaring-strike": enforced(
+    "The hit's target makes the Strength save, with Advantage if Large or larger, or is Restrained while the caster concentrates, taking 1d6 Piercing, 1d6 more a slot level, at the start of each of its turns (resolution/pending.ts, turn-boundaries.ts). It, or a creature within reach of it with End an Effect, breaks free with a Strength (Athletics) check against the spell save DC (ending-actions.ts)."
+  ),
   "spell:arcane-hand": enforced(
     "The hand appears within 120 feet with AC 20 and the caster's Hit Point maximum, and the spell ends when it drops to 0 (summons.ts). The cast and each later Bonus Action move it up to 60 feet and cause one effect, the cast's at no further cost (lasting-spells.ts): Clenched Fist's attack (5d8 Force, 2d8 more a slot level above 5) and the saves reach from the hand (summon-strikes.ts); Forceful Hand pushes a Huge or smaller creature that fails its Strength save 5 feet plus five times the spellcasting modifier, the hand following (saving-throws.ts); Grasping Hand grapples a Huge or smaller creature that fails its Dexterity save, escaped against the spell save DC, and only that creature can be crushed (4d6 plus the modifier, 2d6 more a slot level above 5); Interposing Hand gives the caster Half Cover from or through its space, which is Difficult Terrain for the caster's enemies (cover.ts, zone-ground.ts)."
   ),
@@ -816,8 +825,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:jump": enforced(
     "Each target can leap up to 30 feet for 10 feet of movement once on each of its turns for 1 minute (jumping.ts)."
   ),
-  "spell:levitate": guided(
-    "A creature on the caster's side rises 20 feet with no save, and any other creature only on a failed Constitution save (falling.ts); while levitating it moves only as if climbing (altitude.ts), and it floats gently down when the spell ends. Raising or lowering it on the caster's turn, and an object, are the GM's, who sets its height."
+  "spell:levitate": enforced(
+    "A creature on the caster's side rises 20 feet with no save, and any other creature only on a failed Constitution save (falling.ts); while levitating it moves only as if climbing (altitude.ts), and it floats gently down when the spell ends. On the caster's turn a Magic action raises or lowers it 20 feet, kept within 60 feet of the caster, and a caster levitating itself rises or sinks as part of its move with no action (resolution/later-steps.ts). A smaller change of height is set with the GM's height control, and a levitated object has no token, so it is the GM's."
   ),
   "spell:banishment": guided(
     "A failed save Incapacitates the target and takes it off the map while the caster concentrates (off-plane.ts); it can't be targeted, and it returns to the space it left or the nearest unoccupied one. An extraplanar creature that stays gone after the full minute is the GM's."
@@ -1562,7 +1571,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A failed save deals the Psychic damage and bars the target from casting spells and the Magic action (resolution/economy.ts). The save every 30 days, and Greater Restoration, Heal or Wish ending it, are the GM's."
   ),
   "spell:bestow-curse": enforced(
-    "A failed save leaves the curse the caster picks for the slot's duration (resolution/pending.ts, resolution/concentration.ts): Disadvantage on one ability's checks and saves, Disadvantage on its attack rolls against the caster (resolution/attack.ts), or an extra 1d8 Necrotic when the caster's attack hits it (resolution/damage.ts). Remove Curse or Dispel Magic ends it. The forced Dodge's save at the start of each turn is the GM's to ask."
+    "A failed save leaves the curse the caster picks for the slot's duration (resolution/pending.ts, resolution/concentration.ts): Disadvantage on one ability's checks and saves, Disadvantage on its attack rolls against the caster (resolution/attack.ts), a Wisdom save at the start of each of its turns in a fight whose failure leaves it only the Dodge action that turn (save-stages.ts, resolution/economy.ts), or an extra 1d8 Necrotic when the caster's attack hits it (resolution/damage.ts). Remove Curse or Dispel Magic ends it."
   ),
   "spell:blur": enforced(
     "Attack rolls against the caster have Disadvantage while it lasts, except from an attacker whose Blindsight or Truesight reaches it (resolution/attack.ts)."
@@ -1573,11 +1582,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:confusion": guided(
     "A failed save bars the target's Bonus Actions and Reactions, with the save repeated at the end of each of its turns (save-stages.ts), and random-outcomes.ts rolls its d10 at the start of each of its turns and takes for that turn what the roll forbids. The Sphere grows by 5 feet for each slot level above 4 (spell-zone-state.ts). The wandering move and the random attack are said to the table."
   ),
-  "spell:phantasmal-force": guided(
-    "A failed save leaves the illusion on the target for the spell's duration, and End an Effect lets it study the illusion with an Intelligence (Investigation) check to end it (ending-actions.ts). The illusion, and the 2d8 Psychic damage it deals on the caster's turns, are the GM's."
+  "spell:phantasmal-force": enforced(
+    "A failed Intelligence save leaves the illusion on the target for the spell's duration, and a creature with Truesight succeeds. On each of the caster's turns its sheet offers the phantasm's 2d8 Psychic damage against that creature once, and against no other (lasting-spells.ts, resolution/economy.ts). The target's Study, an Intelligence (Investigation) check against the spell save DC, ends it (ending-actions.ts). What the phantasm is, and whether the target stands in it or within 5 feet of it, are the GM's."
   ),
-  "spell:prismatic-spray": guided(
-    "resolution/prismatic.ts rolls the d8 for each creature in the Cone, two rays on an 8, and the 12d6 once. Red to Blue ask the Dexterity save against their damage, half on a success. Indigo Restrains on a failure, with the Constitution saves counted until three successes end it or three failures Petrify it (save-stages.ts). Violet Blinds on a failure until the start of the caster's next turn; its Wisdom save then, and the trip to another plane, are the GM's."
+  "spell:prismatic-spray": enforced(
+    "resolution/prismatic.ts rolls the d8 for each creature in the Cone, two rays on an 8, and the 12d6 once. Red to Blue ask the Dexterity save against their damage, half on a success. Indigo Restrains on a failure, with the Constitution saves counted until three successes end it or three failures Petrify it (save-stages.ts). Violet Blinds on a failure, and at the start of the caster's next turn the creature makes the Wisdom save: a success ends the Blinded condition, a failure ends it and takes the creature off the map to another plane (save-stages.ts, off-plane.ts). Which plane, and bringing it back, are the GM's."
   ),
   "spell:goodberry": enforced(
     "resolution/provisions.ts puts ten berries in the caster's inventory, gone when the spell's 24 hours end (effects.ts). Eating one (actor.nourish) restores 1 Hit Point, takes the eater's Bonus Action on its turn in a fight, and counts as a day's food while the GM tracks food and water (survival.ts)."
@@ -1947,8 +1956,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:gaseous-form": enforced(
     "The willing target becomes a misty cloud: its only speed is a Fly Speed of 10 feet that hovers, it can share a creature's space, has Resistance to Bludgeoning, Piercing and Slashing damage, Immunity to Prone and Advantage on Strength, Dexterity and Constitution saves, and it can't attack, speak or cast spells. A Magic action or 0 Hit Points ends it. Narrow openings and liquids are the GM's."
   ),
-  "spell:wind-walk": guided(
-    "Each willing target becomes a cloud with a Fly Speed of 300 feet that hovers, Immunity to Prone and Resistance to Bludgeoning, Piercing and Slashing damage; it can only Dash or take the Magic action that ends the form, which leaves it Stunned for 1 minute. Turning back into a cloud while the spell lasts, and the descent when it ends, are the GM's."
+  "spell:wind-walk": enforced(
+    "Each willing target becomes a cloud with a Fly Speed of 300 feet that hovers, Immunity to Prone and Resistance to Bludgeoning, Piercing and Slashing damage; it can only Dash or take the Magic action that ends the form, which leaves it Stunned for 1 minute. While the spell lasts each target keeps a Magic action that makes it a cloud again, Stunned for the minute of the change (resolution/shape-shift.ts, granted-actions.ts). A cloud whose form ends in the air drifts down safely, and one more than 600 feet up falls the rest (altitude.ts, falling.ts)."
   ),
   "spell:magic-jar": castOnly(
     "The container, the possession of a host and the return to the body are the GM's: control of one creature passing to another is not modeled."

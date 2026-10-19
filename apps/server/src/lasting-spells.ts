@@ -1,6 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
 import type { ActorAction } from "@vtt/schemas";
+import { altitudeOf, setAltitude } from "./altitude.js";
 import { CONCENTRATING_TAG } from "./effects.js";
 import { laterRowOf, upcastAction } from "./item-actions.js";
 
@@ -75,4 +76,31 @@ export function takenWithCast(
  *  (`bearerOnly`: Arcane Hand's crush, Phantasmal Force's harm). */
 export function bearsCastOf(target: Pick<Actor, "effects">, casterId: string, spellId: string): boolean {
   return target.effects.some((effect) => effect.spell?.id === spellId && effect.sourceActorId === casterId);
+}
+
+/** The tag a levitation's effect carries (`falling.ts` lowers its creature gently when it ends). */
+const LEVITATING = "levitating";
+
+/** The creature this caster's levitation holds up (Levitate's target), if any. */
+export function levitatedBy(state: Pick<GameState, "actors">, casterId: string): Actor | undefined {
+  return state.actors.find((actor) =>
+    actor.effects.some((effect) => effect.tags.includes(LEVITATING) && effect.sourceActorId === casterId)
+  );
+}
+
+/** SRD 5.2.1 Levitate: "You can change the target's altitude by up to 20 feet in either direction on your turn." The
+ *  creature the caster's levitation holds rises or sinks, never below the ground, still held by the levitation. Null
+ *  when no levitation of the caster's holds a creature on the map. */
+export function liftLevitated(
+  state: GameState,
+  casterId: string,
+  feet: number
+): Readonly<{ actorId: string; name: string; from: number; to: number }> | null {
+  const held = levitatedBy(state, casterId);
+  const token = held ? state.combat.tokens.find((candidate) => candidate.actorId === held.id) : undefined;
+  if (!held || !token?.position) return null;
+  const from = altitudeOf(token);
+  const to = Math.max(0, from + feet);
+  setAltitude(state, held.id, to, "levitate");
+  return { actorId: held.id, name: held.name, from, to };
 }

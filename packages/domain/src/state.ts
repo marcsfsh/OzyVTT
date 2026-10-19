@@ -332,6 +332,8 @@ export const PendingSaveSchema = z
     failureNote: z.string().min(1).max(300).optional(),
     /** A failure also breaks the creature's Concentration (Sleet Storm). */
     breaksConcentration: z.literal(true).optional(),
+    /** A success ends the spell the save is against, its caster's Concentration included (Detect Thoughts' probe). */
+    successEndsSpell: z.literal(true).optional(),
     /** A swallower's save against the damage from inside it: a failure lets out every creature it swallowed, Prone
      *  within this many feet of it. */
     regurgitates: z

@@ -227,6 +227,8 @@ const PENDING_SAVE_FIELDS = {
   onSuccessEffect: "never",
   failureNote: "never",
   breaksConcentration: "never",
+  // What a success ends is narrated when it lands.
+  successEndsSpell: "never",
   zoneId: "never",
   // Whether a hidden source's save is magical says something about it; only Magic Resistance reads it.
   magical: "never",
