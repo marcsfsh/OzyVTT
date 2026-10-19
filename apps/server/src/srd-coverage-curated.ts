@@ -513,7 +513,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   "Hellish Restoration": revives,
   "Hold Breath": breath,
-  "Ice Walk": reference("Ice and snow aren't marked on the map, so the GM waives the cost."),
+  "Ice Walk": enforced(
+    "zone-ground.ts charges the creature nothing extra on the ice a spell leaves (Ice Storm's hail, Sleet Storm). Ice and snow the GM paints as Difficult Terrain still cost it, so the GM waives that cost."
+  ),
   Illumination: sheds,
   "Immutable Form": reference("Shape-changing isn't modeled, so there is nothing to refuse."),
   "Incorporeal Movement": reference(
@@ -595,7 +597,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Water Breathing": breath,
   "Water Form": sharesSpace("the elemental"),
   "Water Susceptibility": reference("Water on the map isn't tracked, so the Cold damage is the GM's to deal."),
-  "Web Walker": reference("Webs aren't marked on the map; the GM waives what they would cost it."),
+  "Web Walker": enforced(
+    "Web's webs cost the creature nothing extra (zone-ground.ts), and spell-zones.ts asks it for no save there. Webs the GM paints as Difficult Terrain still cost it, so the GM waives that cost."
+  ),
   Wishes: reference("The djinni's wishes are the GM's to run.")
 };
 
@@ -870,8 +874,17 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Proficiency with the Longbow and Shortbow is applied. The +2 damage with them is the GM's."
   ),
   "item:brooch-of-shielding": guided("Resistance to Force damage is applied. Immunity to Magic Missile is the GM's."),
-  "item:cloak-of-arachnida": guided(
-    "Resistance to Poison damage is applied. Climbing like a spider, and the Web cast, are the GM's."
+  "item:cloak-of-arachnida": enforced(
+    "Resistance to Poison damage and a Climb Speed equal to its wearer's Speed are applied. The webs of a Web spell can't hold the wearer (spell-zones.ts), and its Web cast is DC 13 over a 40-foot Cube once a Long Rest. Climbing upside down on ceilings is the GM's to allow."
+  ),
+  "item:caltrops": enforced(
+    "Spreading them from the pack places a 5-foot square that rolls nothing as it lands (resolution/concentration.ts). spell-zones.ts asks a creature that enters it for the DC 15 Dexterity save, once a turn: 1 Piercing damage and a Speed of 0 until the start of its next turn on a failure. The square stays until the GM ends it, which is gathering them up."
+  ),
+  "item:ball-bearings": enforced(
+    "Spilling them from the pack places a 10-foot square that rolls nothing as it lands (resolution/concentration.ts). spell-zones.ts asks a creature that enters it for the DC 10 Dexterity save, once a turn, and a failure leaves it Prone. The square stays until the GM ends it, which is gathering them up."
+  ),
+  "item:hunting-trap": guided(
+    "Setting it places a 5-foot square (resolution/concentration.ts). The first creature that enters it makes the DC 13 Dexterity save, with 1d4 Piercing damage and a Speed of 0 until the start of its next turn on a failure, and the trap springs and leaves the map (spell-zones.ts). The chain that holds the creature after that, and the Strength (Athletics) check to break free, are the GM's."
   ),
   "item:cloak-of-the-bat": guided(
     "Advantage on Dexterity (Stealth) checks is applied. The Fly Speed in darkness and the Polymorph cast are the GM's."
@@ -1047,7 +1060,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The save's 11d8 Necrotic damage and Poisoned condition are applied. The Disadvantage on saves with the chosen ability, and the three repeat saves, are the GM's."
   ),
   "spell:delayed-blast-fireball": guided(
-    "Cast in a fight, the bead waits at its point and spell-zones.ts explodes it when the spell ends, Concentration broken included: the Dexterity save and 12d6 Fire damage, plus 1d6 for each of the caster's turns that ended while it waited. A creature touching the bead, and a bead left outside a fight, are the GM's."
+    "The bead waits at its point, in a fight or out of one, and spell-zones.ts explodes it when the spell ends, Concentration broken included: the Dexterity save and 12d6 Fire damage, plus 1d6 for each of the caster's turns that ended while it waited. A creature that touches or throws the bead is the GM's to run."
   ),
   "spell:dispel-magic": enforced(
     "resolution/dispel.ts ends each spell on the target creature of the slot's level or lower, and for each higher one rolls the caster's spellcasting ability check against DC 10 plus its level. The GM can aim it at a spell's area on the map instead. A spell on an object the app doesn't track is the GM's."
@@ -1068,13 +1081,13 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts). The repeat save each time the target takes damage, and its orders, are the GM's."
   ),
   "spell:earthquake": guided(
-    "The cast's Dexterity save and Prone condition are applied. The save at the end of each of the caster's turns, the broken Concentration and the fissures are the GM's."
+    "The cast places the 100-foot circle, and its Dexterity save leaves a creature Prone with its Concentration broken on a failure. spell-zones.ts repeats the save for each creature in the circle at the end of each of the caster's turns, and zone-ground.ts makes the circle Difficult Terrain. Sparing a creature off the ground is the GM's. So are the fissures and the damage to structures."
   ),
   "spell:fear": guided(
     "A failed save imposes Frightened. The Dash away on each of its turns, and the save out of the caster's sight, are the GM's."
   ),
   "spell:faithful-hound": guided(
-    "Cast in a fight, spell-zones.ts makes the hound bite at the start of each of the caster's turns: the enemy nearest it within 5 feet makes the Dexterity save against 4d8 Force damage. Cast before a fight, the bite is a later action the GM runs. Its warning bark and its sight of Invisible creatures are the GM's."
+    "The hound stays at its point in a fight or out of one, and spell-zones.ts makes it bite at the start of each of the caster's turns in a fight: the enemy nearest it within 5 feet makes the Dexterity save against 4d8 Force damage. Moving the hound and its warning bark are the GM's, and so is its sight of Invisible creatures."
   ),
   "spell:flesh-to-stone": guided(
     "A failed save imposes Restrained. The repeat saves toward Petrified, and Speed 0 on a success, are the GM's."
@@ -1140,7 +1153,88 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A failed save imposes Incapacitated until the end of the target's next turn, and damage ends it. The second save, and Unconscious on its failure, are the GM's."
   ),
   "spell:sleet-storm": guided(
-    "spell-zones.ts asks for the Dexterity save when a creature enters the area or starts its turn there, and a failure leaves it Prone and ends its Concentration. The Cylinder is Heavily Obscured for dynamic vision (vision/cast-sight.ts). The Difficult Terrain is the GM's to paint, and the doused flames are the GM's."
+    "spell-zones.ts asks for the Dexterity save when a creature enters the Cylinder or starts its turn there, and a failure leaves it Prone and ends its Concentration. zone-ground.ts makes the Cylinder Difficult Terrain of ice, and it is Heavily Obscured for dynamic vision (vision/cast-sight.ts). Dousing the flames in it is the GM's."
+  ),
+  "spell:alarm": enforced(
+    "The warded area lasts 8 hours, in a fight or out of one, on the game clock (spell-zones.ts, game-time.ts). When an enemy of the caster enters it, the GM is told who in a line only the GM sees. The GM wards a door or a window by hand, and passes on the bell or the ping."
+  ),
+  "spell:antilife-shell": enforced(
+    "zone-barriers.ts holds every creature but Constructs and Undead out of the 10-foot Emanation. A walk goes round its edge, and strict rules refuse a move or a melee attack across it (resolution/validate.ts). A Ranged attack, a Reach weapon and a spell go through. The caster's move that forces the edge across such a creature ends the spell."
+  ),
+  "spell:aura-of-life": guided(
+    "zone-auras.ts gives the caster and its allies Resistance to Necrotic damage while they stand in the 30-foot Emanation. spell-zones.ts gives an ally at 0 Hit Points that starts its turn there 1 Hit Point. Keeping their Hit Point maximums from dropping is the GM's."
+  ),
+  "spell:black-tentacles": enforced(
+    "spell-zones.ts asks for the Strength save on the cast and when a creature enters the square or ends its turn there, once a turn: 3d6 Bludgeoning damage and Restrained, escaped with a Strength (Athletics) check against the spell save DC. zone-ground.ts makes the square Difficult Terrain."
+  ),
+  "spell:blade-barrier": guided(
+    "spell-zones.ts asks for the Dexterity save against 6d10 Force damage on the cast and when a creature enters the wall or ends its turn there, once a turn. zone-ground.ts makes the wall's space Difficult Terrain. Its Three-Quarters Cover and its ring form are the GM's."
+  ),
+  "spell:call-lightning": guided(
+    "The cast and each later Magic action strike a 5-foot Sphere with the Dexterity save against 3d10 Lightning damage, at the cast's slot level. Keeping the bolts under the cloud, and the extra 1d10 in a storm, are the GM's."
+  ),
+  "spell:cloudkill": enforced(
+    "spell-zones.ts asks for the Constitution save against 5d8 Poison damage on the cast and when a creature enters the Sphere or ends its turn there, once a turn. At the start of each of the caster's turns it moves the Sphere 10 feet straight away from the caster, and a creature the Sphere moves onto makes the save. The Sphere is Heavily Obscured for dynamic vision (vision/cast-sight.ts)."
+  ),
+  "spell:conjure-minor-elementals": guided(
+    "zone-ground.ts makes the ground in the 15-foot Emanation Difficult Terrain for the caster's enemies. The extra 2d8 damage on the caster's hits within it is the GM's."
+  ),
+  "spell:entangle": enforced(
+    "The cast's Strength save leaves a creature in the square Restrained, escaped with a Strength (Athletics) check against the spell save DC. zone-ground.ts makes the square Difficult Terrain for the duration. Leaving the caster out of its own square is the GM's."
+  ),
+  "spell:flaming-sphere": enforced(
+    "spell-zones.ts asks for the Dexterity save against 2d6 Fire damage when a creature ends its turn within 5 feet of the sphere. The Bonus Action moves the sphere up to 30 feet (zone-moves.ts), and a creature it rams makes the save. It sheds its light for dynamic vision (vision/cast-sight.ts)."
+  ),
+  "spell:fog-cloud": enforced(
+    "The Sphere is Heavily Obscured for dynamic vision (vision/cast-sight.ts), and its radius grows 20 feet for each slot level above 1 (spell-zone-state.ts). Gust of Wind disperses it."
+  ),
+  "spell:forbiddance": enforced(
+    "The warded area, up to a 200-foot square, lasts a day on the game clock (spell-zones.ts, game-time.ts). An Aberration, Celestial, Elemental, Fey, Fiend or Undead that enters it for the first time on a turn or ends its turn there takes 5d10 Radiant or Necrotic damage, chosen at the cast. Strict rules refuse a teleport into it (zone-barriers.ts). The password that spares a creature is the GM's."
+  ),
+  "spell:globe-of-invulnerability": enforced(
+    "The 10-foot Emanation stays where its caster stood (spell-zones.ts). zone-barriers.ts keeps a spell of level 5 or lower cast from outside from affecting the creatures within, one level higher for each slot level above 6."
+  ),
+  "spell:glyph-of-warding": guided(
+    "The explosive rune lasts until it goes off, in a fight or out of one, drawn for the GM and the caster's player alone. The first creature that steps onto it sets it off: each creature in the 20-foot Sphere makes the Dexterity save against 5d8 damage of the type chosen at the cast, and the spell ends (spell-zones.ts). Other triggers, noticing the glyph and the spell glyph are the GM's."
+  ),
+  "spell:grease": enforced(
+    "spell-zones.ts asks for the Dexterity save when a creature enters the square or ends its turn there, and a failure leaves it Prone. zone-ground.ts makes the square Difficult Terrain."
+  ),
+  "spell:holy-aura": enforced(
+    "While the caster and its allies stand in the 30-foot Emanation, zone-auras.ts gives them Advantage on saving throws and Disadvantage to attack rolls against them. A Fiend or an Undead that hits one with a melee attack makes the Constitution save or is Blinded until the end of its next turn (resolution/struck.ts)."
+  ),
+  "spell:ice-storm": enforced(
+    "The cast's Dexterity save deals the Bludgeoning and Cold damage, half on a success. zone-ground.ts makes the Cylinder Difficult Terrain of ice until the end of the caster's next turn."
+  ),
+  "spell:incendiary-cloud": guided(
+    "spell-zones.ts asks for the Dexterity save against 10d8 Fire damage on the cast and when a creature enters the cloud or ends its turn there, once a turn. At the start of each of the caster's turns it moves the cloud 10 feet straight away from the caster, and a creature the cloud moves onto makes the save. The cloud is Heavily Obscured for dynamic vision (vision/cast-sight.ts). Choosing another direction is the GM's, who drags the area."
+  ),
+  "spell:insect-plague": enforced(
+    "spell-zones.ts asks for the Constitution save against 4d10 Piercing damage on the cast and when a creature enters the Sphere or ends its turn there, once a turn. zone-ground.ts makes the Sphere Difficult Terrain, and it is Lightly Obscured for dynamic vision (vision/cast-sight.ts)."
+  ),
+  "spell:magic-circle": guided(
+    "zone-barriers.ts keeps Celestials, Elementals, Fey, Fiends and Undead from walking into the Cylinder, and strict rules refuse their move across its edge. Their Disadvantage on attacks into it, their teleport save and the inverted circle are the GM's."
+  ),
+  "spell:moonbeam": enforced(
+    "spell-zones.ts asks for the Constitution save against 2d10 Radiant damage on the cast and when a creature enters the Cylinder or ends its turn there, once a turn. On the caster's later turns a Magic action moves the Cylinder up to 60 feet (zone-moves.ts), and a creature it moves onto makes the save. Its Dim Light is placed for dynamic vision (vision/cast-sight.ts), and the shape-shifter's change back is the GM's."
+  ),
+  "spell:pass-without-trace": enforced(
+    "zone-auras.ts gives the caster and its allies +10 to Dexterity (Stealth) checks while they stand in the 30-foot Emanation. Leaving no tracks is the GM's to narrate."
+  ),
+  "spell:plant-growth": guided(
+    "Overgrowth makes a creature spend 4 feet of movement for every foot it moves in the Sphere (zone-ground.ts), until the GM ends the area. Leaving parts of the Sphere out, and the 8-hour Enrichment, are the GM's."
+  ),
+  "spell:silence": guided(
+    "zone-auras.ts makes a creature Deafened while it stands in the Sphere. Its Immunity to Thunder damage there, and the refusal of spells with a Verbal component, are the GM's."
+  ),
+  "spell:spike-growth": enforced(
+    "spell-zones.ts deals 2d4 Piercing damage for every 5 feet a creature travels into or within the Sphere, and zone-ground.ts makes the Sphere Difficult Terrain. Whether a creature saw the danger before it moved in is the GM's."
+  ),
+  "spell:wall-of-thorns": enforced(
+    "spell-zones.ts asks for the Dexterity save against 7d8 Slashing damage when a creature enters the wall or ends its turn there, once a turn, after the cast's 7d8 Piercing. zone-ground.ts makes a creature spend 4 feet of movement for every foot it moves through the wall. The wall's block on sight and its circle form are the GM's."
+  ),
+  "spell:web": enforced(
+    "spell-zones.ts asks for the Dexterity save the first time a creature enters the webs on a turn or starts its turn there, and a failure leaves it Restrained, escaped with a Strength (Athletics) check against the spell save DC. zone-ground.ts makes the webs Difficult Terrain, and they are Lightly Obscured for dynamic vision (vision/cast-sight.ts). Burning the webs away is the GM's, who ends the area."
   ),
   "action:Octopus/ink-cloud": guided(
     "The Reaction fills its 5-foot Cube with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts). Offering it when a creature ends its turn beside the octopus underwater, and its swim away, are the GM's."

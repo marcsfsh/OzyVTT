@@ -2727,10 +2727,10 @@ export const ActionSchema = z
     /** The area it covers, for the map template. Filled from the description where the action enters the system
      *  (the content build, a homebrew save, an import), so play never reads the prose. */
     area: ActionAreaSchema.optional(),
-    /** The area it leaves on the map, which then acts with the action's own save and damage on the creatures that meet
-     *  it (spread Caltrops, a set Hunting Trap), in place of acting on those under it when it is used. */
+    /** The area it leaves on the map (spread Caltrops, a set Hunting Trap). The area acts later with the action's own
+     *  save and damage on the creatures that meet it, and using the action rolls nothing. */
     zone: AreaTriggerSchema.optional().describe(
-      "The area it leaves on the map, which then acts with the action's own save and damage on the creatures that meet it (spread Caltrops), in place of acting when it is used"
+      "The area it leaves on the map (spread Caltrops). The area acts later with the action's own save and damage on the creatures that meet it, and using the action rolls nothing"
     ),
     /** What it does to light and sight while it lasts (a darkmantle's Darkness Aura, an octopus's ink). */
     sight: SightEffectSchema.optional(),
