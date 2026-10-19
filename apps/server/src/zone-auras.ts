@@ -40,7 +40,7 @@ function wanted(
     const caster = state.actors.find((actor) => actor.id === zone.casterId);
     for (const creature of exposed(state, zone, content.trigger, deps)) {
       const token = state.combat.tokens.find((candidate) => candidate.actorId === creature.id);
-      if (!token?.position || !inside(token.position, token.sizeCells)) continue;
+      if (!token?.position || !inside(token.position, token.sizeCells, token.altitudeFeet ?? 0)) continue;
       const id = auraId(zone.id, creature.id);
       const effect = makeEffect({
         id,

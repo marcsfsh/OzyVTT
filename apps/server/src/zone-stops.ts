@@ -58,8 +58,9 @@ export function stoppingEntry(
     if (!stopsOnFailure(zone, content)) continue;
     if (!exposed(state, zone, trigger, deps).some((creature) => creature.id === moverId)) continue;
     const inside = insideTest(state, zone, trigger, content, deps.geometry);
-    if (!inside || inside(path[0]!, token.sizeCells)) continue;
-    const index = path.findIndex((point, at) => at > 0 && inside(point, token.sizeCells));
+    const high = token.altitudeFeet ?? 0;
+    if (!inside || inside(path[0]!, token.sizeCells, high)) continue;
+    const index = path.findIndex((point, at) => at > 0 && inside(point, token.sizeCells, high));
     if (index > 0 && (first === null || index < first)) first = index;
   }
   return first;

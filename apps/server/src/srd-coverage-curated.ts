@@ -1454,7 +1454,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Only a Humanoid can be the target. A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts), with Advantage on the save while its side is fighting the caster's, and a repeat save each time the target takes damage (save-stages.ts). It puts the target under the caster's command and on its side while it lasts (summons.ts): the caster's player acts for it on its turns."
   ),
   "spell:earthquake": guided(
-    "The cast places the 100-foot circle, and its Dexterity save leaves a creature Prone with its Concentration broken on a failure. spell-zones.ts repeats the save for each creature in the circle at the end of each of the caster's turns, and zone-ground.ts makes the circle Difficult Terrain. Sparing a creature off the ground is the GM's. So are the fissures and the damage to structures."
+    "The cast places the 100-foot circle, and its Dexterity save leaves a creature Prone with its Concentration broken on a failure. spell-zones.ts repeats the save for each creature on the ground in the circle at the end of each of the caster's turns, sparing one in the air, as the cast does, and zone-ground.ts makes the circle Difficult Terrain. The fissures and the damage to structures are the GM's."
   ),
   "spell:fear": guided(
     "A failed save imposes Frightened and drops what the creature holds (effects.ts), and a creature that ends its turn out of the caster's sight repeats the save (save-stages.ts, with dynamic vision on). The Dash away on each of its turns is the GM's."

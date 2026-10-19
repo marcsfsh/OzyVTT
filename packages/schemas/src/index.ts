@@ -3021,7 +3021,9 @@ export const ActionAreaSchema = z
      *  more than one is caught once. */
     count: z.number().int().min(2).max(10).optional(),
     /** Each area must touch another ("Each Cube must be contiguous with at least one other Cube"). */
-    contiguous: z.literal(true).optional()
+    contiguous: z.literal(true).optional(),
+    /** How high a Cylinder rises from the ground it stands on ("5-foot-radius, 40-foot-high Cylinder"). */
+    heightFeet: z.number().int().min(1).max(1000).optional()
   })
   .strict();
 export type ActionArea = z.infer<typeof ActionAreaSchema>;
@@ -3748,6 +3750,8 @@ export const AreaTriggerSchema = z
     drifts: z.number().int().min(5).max(60).optional(),
     /** An Emanation that stays where its caster stood at the cast ("an immobile barrier": Globe of Invulnerability). */
     stays: z.literal(true).optional(),
+    /** It acts only on the creatures on the ground in it (Earthquake's "each creature on the ground in the area"). */
+    grounded: z.literal(true).optional(),
     /** A spell of this level or lower cast from outside it can't affect anything within, one level higher for each slot
      *  level the spell is cast above its own (Globe of Invulnerability's 5). */
     wardsSpells: z.number().int().min(0).max(9).optional()

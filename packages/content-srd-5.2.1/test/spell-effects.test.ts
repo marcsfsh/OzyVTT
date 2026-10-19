@@ -231,7 +231,8 @@ describe("what one cast of an SRD spell does", () => {
       feet: 15,
       terrain: { cost: 2, for: "enemies" }
     });
-    expect(zoneOf("earthquake")).toEqual({ on: ["caster-turn-end"], terrain: { cost: 2 } });
+    // "Each creature on the ground in the area."
+    expect(zoneOf("earthquake")).toEqual({ on: ["caster-turn-end"], terrain: { cost: 2 }, grounded: true });
     for (const id of ["black-tentacles", "blade-barrier", "grease", "insect-plague", "sleet-storm"])
       expect(zoneOf(id)?.terrain?.cost, id).toBe(2);
     // A failed save also ends the creature's Concentration.
@@ -244,7 +245,7 @@ describe("what one cast of an SRD spell does", () => {
     expect(areaOf("wall-of-fire")).toEqual({ shape: "line", sizeFeet: 60, widthFeet: 5 });
     expect(areaOf("blade-barrier")).toEqual({ shape: "line", sizeFeet: 100, widthFeet: 5 });
     expect(areaOf("flaming-sphere")).toEqual({ shape: "sphere", sizeFeet: 5, widthFeet: null });
-    expect(areaOf("moonbeam")).toEqual({ shape: "cylinder", sizeFeet: 5, widthFeet: null });
+    expect(areaOf("moonbeam")).toEqual({ shape: "cylinder", sizeFeet: 5, widthFeet: null, heightFeet: 40 });
   });
 
   it("says how many creatures a cast targets, and how many more a higher slot adds", () => {

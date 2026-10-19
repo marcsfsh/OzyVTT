@@ -308,7 +308,9 @@ of a hidden thing. When in doubt, leave it out.
   for the height it gains or loses the same way, a mover off the ground passes over painted terrain
   and over creatures wholly below it, and only flying, climbing, jumping, teleporting or a forced
   move changes height (`movement.altitude`). An area reaches only as high as its shape does
-  (`withinAreaHeight`). The GM sets any creature's height free of movement (`token.set-altitude`).
+  (`withinAreaHeight`), and so does a spell's lasting area as creatures meet it: a Sphere its radius above and below,
+  a Cube its side, a Cylinder its printed height, an Emanation its distance in every direction (`insideTest` in
+  `spell-zones.ts`). An area that acts only on the ground (Earthquake's) spares a creature in the air. The GM sets any creature's height free of movement (`token.set-altitude`).
   Height is as public as position, so it travels with the token in every projection.
 - Falling (`falling.ts`): after every command the pipeline lands whoever can no longer stay in the
   air (`settleFalls`, its own commit): a flier that is Prone, Incapacitated or at a Fly Speed of 0

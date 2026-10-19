@@ -246,6 +246,11 @@ export const actionCommands = [
             },
             calibration.distancePerCell
           );
+          // "Each creature on the ground in the area" (Earthquake): one in the air above it is spared.
+          if (spell && zoneRowOf(spell)?.zone?.grounded)
+            resolvedTargetIds = resolvedTargetIds.filter(
+              (id) => (draft.combat.tokens.find((token) => token.actorId === id)?.altitudeFeet ?? 0) <= 0
+            );
           // An area catches everyone under it, seen or not. Whether it holds anyone is judged on what the caster's
           // player can see, so an empty refusal never tells them a hidden creature is there. A spell that leaves its
           // area behind (Moonbeam, Web, a wall), or does nothing to whoever is in it (Minor Illusion's image), may be

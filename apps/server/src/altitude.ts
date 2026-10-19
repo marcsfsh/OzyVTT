@@ -110,7 +110,7 @@ type AreaShape = "cone" | "line" | "sphere" | "cube" | "emanation" | "cylinder" 
 export function withinAreaHeight(
   state: GameState,
   ids: readonly string[],
-  area: Readonly<{ shape: AreaShape; sizeFeet: number; widthFeet: number | null }>,
+  area: Readonly<{ shape: AreaShape; sizeFeet: number; widthFeet: number | null; heightFeet?: number }>,
   origin: AreaOrigin,
   feetAcross: (actorId: string) => number | null,
   feetPerCell = FEET_PER_SQUARE
@@ -122,7 +122,8 @@ export function withinAreaHeight(
     const apart = (low: number, high: number) => Math.max(0, span.low - high, low - span.high);
     switch (area.shape) {
       case "cylinder":
-        return span.high > origin.low;
+        // From the ground it stands on up to its printed height (Moonbeam's 40 feet).
+        return span.high > origin.low && (area.heightFeet === undefined || span.low < origin.low + area.heightFeet);
       case "cube":
       case "square": {
         // A Cube from its caster rises from the caster's feet; one placed on a creature sits around its middle.

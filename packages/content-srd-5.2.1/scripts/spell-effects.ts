@@ -618,7 +618,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: "At the end of each of your turns, each creature on the ground in the area makes the save: Prone and its Concentration broken on a failure. The ground is Difficult Terrain.",
       save: { ability: "dex", successDamage: "none", failureConditions: ["prone"], breaksConcentration: true },
       damage: [],
-      zone: { on: ["caster-turn-end"], terrain: DIFFICULT }
+      zone: { on: ["caster-turn-end"], terrain: DIFFICULT, grounded: true }
     }
   ],
   // "For the duration, these plants turn the ground in the area into Difficult Terrain."
