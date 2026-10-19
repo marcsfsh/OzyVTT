@@ -23,16 +23,16 @@ const reference = (note: string): CuratedCoverage => ({ state: "reference", note
 
 export const CONDITION_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   blinded: enforced(
-    "resolution/attack.ts: its attack rolls have Disadvantage and attack rolls against it have Advantage. ability-checks.ts fails its Perception check to find a creature unless its Blindsight reaches it. movement-rules.ts: it makes an Opportunity Attack only against a mover in its Blindsight, and with dynamic vision on vision/sight.ts lets it see only within Blindsight. The GM rules on other checks that need sight."
+    "resolution/attack.ts: its attack rolls have Disadvantage and attack rolls against it have Advantage. ability-checks.ts fails its Perception check to find a creature unless its Blindsight reaches it, and any check the GM marks as needing sight (check-rolls.ts, a call for a roll). movement-rules.ts: it makes an Opportunity Attack only against a mover in its Blindsight, and with dynamic vision on vision/sight.ts lets it see only within Blindsight."
   ),
-  charmed: guided(
-    "resolution/economy.ts: a creature Charmed by a spell or an action can't attack its charmer or target it with a save or damage. A Charmed chip the GM sets names no charmer, so nothing is refused. The charmer's Advantage on social checks is the GM's."
+  charmed: enforced(
+    "resolution/economy.ts: a Charmed creature can't attack its charmer or target it with a save, damage or a spell, whether the condition came from a spell, an action or the GM's chip naming the charmer (actor-conditions.ts). ability-checks.ts gives the charmer Advantage on Charisma checks and Animal Handling against it (Influence, or a check the GM calls naming it)."
   ),
-  deafened: guided(
-    "actor-conditions.ts tracks it on the creature. The GM rules on checks that need hearing; nothing else in the condition changes a roll."
+  deafened: enforced(
+    "ability-checks.ts fails a check the GM marks as needing hearing (check-rolls.ts, a call for a roll); nothing else in the condition changes a roll."
   ),
   exhaustion: enforced(
-    "condition-rules.ts takes 2 per level from every D20 Test, and speed.ts takes 5 feet per level from Speed. effects.ts kills the creature at level 6, and rests.ts removes a level on each Long Rest."
+    "condition-rules.ts takes 2 per level from every D20 Test, and speed.ts takes 5 feet per level from Speed. effects.ts kills the creature at level 6, and rests.ts removes a level on each Long Rest, except the levels hunger and thirst hold until the creature eats and drinks its fill (survival.ts). Breathing again takes off the levels suffocating gave (breath.ts)."
   ),
   frightened: enforced(
     "resolution/attack.ts, ability-checks.ts and encounter.ts give it Disadvantage on attack rolls, ability checks and Initiative while the source of its fear is within line of sight (vision/rules.ts; always with dynamic vision off, or when the GM set the condition by hand). movement-rules.ts refuses a willing move that takes it closer to the source."
@@ -65,7 +65,7 @@ export const CONDITION_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "It counts as Incapacitated. saving-throws.ts fails its Strength and Dexterity saves, and resolution/attack.ts gives attack rolls against it Advantage."
   ),
   unconscious: enforced(
-    "effects.ts adds Prone, and it counts as Incapacitated with Speed 0. saving-throws.ts fails its Strength and Dexterity saves. resolution/attack.ts gives attack rolls against it Advantage and makes a hit from within 5 feet a Critical Hit. Dropping what it holds is the GM's."
+    "effects.ts adds Prone, and it counts as Incapacitated with Speed 0. saving-throws.ts fails its Strength and Dexterity saves. resolution/attack.ts gives attack rolls against it Advantage and makes a hit from within 5 feet a Critical Hit. effects.ts and hit-points.ts take the weapons, wands, staffs and rods it holds out of its hands; they stay carried."
   )
 };
 
@@ -106,7 +106,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/economy.ts counts the attacks the Attack action allows, Extra Attack included, and lets the creature move between them. Equipping or stowing a weapon is the table's."
   ),
   "attack-roll": enforced("resolution/attack.ts rolls it on the server and compares it with the target's AC."),
-  attitude: reference("Attitudes aren't tracked. The GM decides how a monster responds to Influence."),
+  attitude: guided(
+    "The GM sets a monster's or NPC's attitude from its row (actor.set-attitude), Indifferent until then and never sent to a player. ability-checks.ts reads it in Influence and in Charisma checks naming the creature: Advantage against a Friendly one, Disadvantage against a Hostile one. What the creature does about it is the GM's."
+  ),
   attunement: enforced(
     "inventory.ts holds a creature to three attuned items, and an item that needs Attunement gives nothing until it has it."
   ),
@@ -192,7 +194,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   "death-saving-throw": enforced(
     "death-saves.ts rolls it from the dying character's sheet: 10 or more succeeds, a 1 counts as two failures and a 20 restores 1 Hit Point. hit-points.ts adds a failure for damage taken at 0 Hit Points, two for a Critical Hit."
   ),
-  dehydration: reference("Water isn't tracked."),
+  dehydration: enforced(
+    "survival.ts, while the GM tracks food and water: each character drinks from its Waterskins as the game day ends, as far as its need goes; less than half its water costs a level of Exhaustion that no rest removes until it drinks its fill. The GM gives a drink at a source."
+  ),
   "difficult-terrain": enforced(
     "The GM paints difficult terrain on the map (terrain.ts), and movement-rules.ts charges double through it and through an enemy's space."
   ),
@@ -226,7 +230,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "movement-rules.ts lets a creature with a Fly Speed fly a move. Whether it falls when Incapacitated, Prone or at Fly Speed 0 is the GM's."
   ),
   "fly-speed": enforced("speed.ts gives a creature with a Fly Speed its own budget for flying."),
-  friendly: reference("Attitudes aren't tracked; the GM applies the Advantage on Influence."),
+  friendly: enforced(
+    "ability-checks.ts gives an Influence check, or a Charisma check naming the creature, Advantage against a creature the GM set Friendly."
+  ),
   frightened: condition("frightened"),
   grappled: condition("grappled"),
   grappling: enforced(
@@ -240,7 +246,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "With dynamic vision on, no one sees into a Heavily Obscured space (darkness beyond a creature's senses, a painted fog or foliage area, a spell's cloud) in vision/sight.ts, so an attack there is against an unseen target, a creature there may Hide, and a Perception check to find a creature there fails (ability-checks.ts)."
   ),
   help: guided(
-    "resolution/attack.ts gives the next attack roll by an ally against the distracted enemy Advantage. Helping with an ability check is the GM's to apply."
+    "resolution/attack.ts gives the next attack roll by an ally against the distracted enemy Advantage. Help with a Check gives an ally Advantage on its next check with one of the helper's skill proficiencies before the helper's next turn (help-assist.ts). A tool's assist, and help outside a fight, are the GM's."
   ),
   "heroic-inspiration": guided(
     "held-rolls.ts spends it to reroll the d20 of an attack, a check, a save or a death save while the roll is shown. Only the GM gives it by hand. rests.ts gives it to a Human on a Long Rest, and turn-boundaries.ts to a Champion at the start of its turn. A character who gains a second one passes it to a player character without it or lets it go (heroic-inspiration.ts). Rerolling a damage die or Initiative is the GM's."
@@ -255,7 +261,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   "hit-points": enforced(
     "hit-points.ts keeps Hit Points between 0 and the maximum, and a creature at 0 falls Unconscious or dies."
   ),
-  hostile: reference("Attitudes aren't tracked; the GM applies the Disadvantage on Influence."),
+  hostile: enforced(
+    "ability-checks.ts gives an Influence check, or a Charisma check naming the creature, Disadvantage against a creature the GM set Hostile."
+  ),
   hover: guided("speed.ts records whether a creature hovers. Falling while flying is the GM's to apply."),
   illusions: reference("Illusions are the GM's to run."),
   immunity: enforced(
@@ -263,12 +271,14 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "improvised-weapons": reference("An improvised attack is the GM's to set up."),
   incapacitated: condition("incapacitated"),
-  indifferent: reference("Attitudes aren't tracked."),
+  indifferent: enforced(
+    "A creature is Indifferent until the GM sets another attitude: its checks roll normally, and Perfume's Advantage reads it (ability-checks.ts)."
+  ),
   influence: guided(
-    "resolution/builtins.ts rolls the chosen Charisma or Wisdom check against 15 or the monster's Intelligence, whichever is higher. The GM decides what the monster does."
+    "resolution/builtins.ts rolls the chosen Charisma or Wisdom check against 15 or the monster's Intelligence, whichever is higher, with Advantage against a Friendly creature or its charmer and Disadvantage against a Hostile one (ability-checks.ts). Animal Handling is refused against a creature that is neither a Beast nor a Monstrosity. The GM decides what the monster does."
   ),
   initiative: enforced(
-    "encounter.ts rolls Initiative as a Dexterity check with its Advantage and Disadvantage, and orders the turns."
+    "encounter.ts rolls Initiative as a Dexterity check, with its Advantage, Disadvantage and the bonuses Dexterity checks take (a Stone of Good Luck), and orders the turns. The players order their characters tied on a score before either acts (initiative.order-tie); the GM orders tied monsters."
   ),
   invisible: condition("invisible"),
   jumping: reference("Jumps aren't measured."),
@@ -289,7 +299,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   "magical-effect": enforced(
     "resolution/pending.ts marks a save against a spell or a magic item as magical, which Magic Resistance reads."
   ),
-  malnutrition: reference("Food isn't tracked."),
+  malnutrition: enforced(
+    "survival.ts, while the GM tracks food and water: each character eats its Rations as the game day ends, as far as its need goes; less than half its food asks a DC 10 Constitution save against a level of Exhaustion, and five days with no food give a level each day. Those levels stay until it eats its fill. The GM gives a meal."
+  ),
   monster: reference("A definition; there is nothing to apply."),
   "nonplayer-character": reference("A definition; there is nothing to apply."),
   object: reference("Objects have no game statistics in the app."),
@@ -329,7 +341,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   "round-down": enforced("The server rounds down wherever a rule divides (halved damage, half Speed, DCs)."),
   save: enforced("Another name for a saving throw; see that row."),
   "saving-throw": enforced(
-    "saving-throws.ts opens a save prompt for each target and rolls it on the server, with the proficiency, riders, Advantage and Disadvantage that apply."
+    "saving-throws.ts opens a save prompt for each target and rolls it on the server, with the proficiency, riders, Advantage and Disadvantage that apply. A creature may choose to fail it without a roll (save.answer)."
   ),
   search: guided(
     "resolution/builtins.ts rolls the chosen Wisdom check. With dynamic vision on, a Perception search finds each hidden creature in its line of sight whose Hide total it meets and ends its hiding. The GM sets any other DC and says what else the creature finds."
@@ -338,7 +350,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   "short-rest": enforced(
     "rests.ts needs 1 Hit Point, lets Hit Point Dice be spent, gives back what a Short Rest restores and ends what lasts until one. The party's Short Rest moves the game clock an hour when the GM finishes it. short-rest-interruptions.ts ends it for anyone who rolls Initiative, takes damage or casts a spell above a cantrip."
   ),
-  "simultaneous-effects": reference("The order of simultaneous effects is the table's."),
+  "simultaneous-effects": reference(
+    "The order of simultaneous effects is the table's: turn-boundaries.ts runs what a turn's start and end set off in one fixed order, and asking the turn's creature to order them is not offered."
+  ),
   size: enforced(
     "token-placement.ts sizes each token's space by its size, and size limits (grappling, shoving) are checked on the server."
   ),
@@ -364,7 +378,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/builtins.ts rolls the chosen Intelligence check. The GM sets the DC and says what the creature learns."
   ),
   stunned: condition("stunned"),
-  suffocation: reference("Breath isn't tracked."),
+  suffocation: enforced(
+    "breath.ts: a creature out of air holds its breath for 1 plus its Constitution modifier minutes (at least 30 seconds, or a Hold Breath trait's time), counted as its turns end and as game time passes, then gains a level of Exhaustion at the end of each of its turns; breathing again takes those levels off. The GM starts it from the creature's row, and an underwater fight, a gelatinous cube's Engulf or a water elemental's Whelm starts it too. Amphibious, Water Breathing and a Cloak of the Manta Ray spare a creature."
+  ),
   surprise: enforced("encounter.ts gives a creature the GM marks as surprised Disadvantage on its Initiative roll."),
   swimming: enforced(
     "movement-rules.ts charges an extra foot per foot of swimming without a Swim Speed. A check in rough water is the GM's."
@@ -404,7 +420,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
 /** A trait that brings a creature back to life somewhere else, which happens off the table. */
 const revives = reference("Its return after death happens off the table; the GM runs it.");
 /** A trait about breathing, which the app doesn't track. */
-const breath = reference("Breathing isn't tracked.");
+const breath = enforced(
+  "breath.ts reads it: the creature breathes water, or holds its breath for the time it prints, when it is out of air."
+);
 /** A trait that lights the map around its creature. */
 const sheds = enforced("vision/senses.ts gives the creature its printed Bright and Dim Light, carried with its token.");
 /** A trait that hinders a creature standing in sunlight, read from the light where its token stands. */
@@ -502,8 +520,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   ),
   Flyby: enforced("movement-rules.ts opens no Opportunity Attack when it flies out of an enemy's reach."),
   Freeze: reference("The slower Speed after Cold damage is the GM's to apply."),
-  Gibbering: guided(
-    "trait-turns.ts opens the Wisdom save for each creature that starts its turn within 20 feet. The d8 table on a failure is the GM's to roll."
+  Gibbering: enforced(
+    "trait-turns.ts opens the Wisdom save for each creature that starts its turn within 20 feet, and on a failure random-outcomes.ts rolls the d8: doing nothing takes its actions, Bonus Action, Reaction and Speed for the turn, wandering its actions and Bonus Action, and the random attack is said to the table."
   ),
   "Greater Magic Resistance": enforced(
     "saving-throws.ts makes the rakshasa succeed on saves against spells and magic items without a roll, and resolution/attack.ts makes spell attack rolls miss it. Hiding from divination is the GM's."
@@ -531,7 +549,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "resolution/attack.ts gives the cloaker Disadvantage on attack rolls while it stands in Bright Light (vision/rules.ts). With dynamic vision off, the light is the GM's."
   ),
   "Lightning Absorption": absorbs("Lightning"),
-  "Limited Amphibiousness": breath,
+  "Limited Amphibiousness": guided(
+    "breath.ts lets it breathe water. Its four hours out of water before it starts to suffocate are the GM's to count."
+  ),
   "Loathsome Limbs": reference("Severed limbs are the GM's to place as Troll Limb stat blocks."),
   "Magic Resistance": enforced(
     "saving-throws.ts gives it Advantage on saves against spells and magic items, saves a spell asks it to repeat included."
@@ -539,7 +559,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Magic Rope": reference("The rope and its statistics are the GM's to run."),
   Mimicry: senses,
   "Misty Escape": reference("Turning to mist at 0 Hit Points is the GM's to run."),
-  "Mucus Cloud": reference("The save at the end of the aboleth's turn and its curse are the GM's to run."),
+  "Mucus Cloud": enforced(
+    "trait-turns.ts asks the Constitution save of each creature within 5 feet at the end of the aboleth's turn while the fight is underwater, and a failure curses it: it breathes water, and it regains no Hit Points out of water (hit-points.ts, rests.ts). The acid out of water every 10 minutes is the GM's."
+  ),
   "Multiple Heads": reference("Heads lost and regrown, and the Hit Points that come with them, are the GM's to track."),
   "Ooze Cube": reference("Entering the cube, and pulling a creature out, are the GM's to run with its Engulf."),
   "Pack Tactics": enforced(
@@ -631,6 +653,19 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:healers-kit": enforced(
     "stabilize.ts spends one use of the kit to make a creature at 0 Hit Points Stable with no check, and the last use takes the kit."
   ),
+  "item:rations": enforced(
+    "survival.ts, while the GM tracks food and water: a character eats a Ration from its inventory on its own (actor.nourish) or as the game day ends, a pound of food each, as far as its need goes."
+  ),
+  "item:waterskin": enforced(
+    "survival.ts, while the GM tracks food and water: a character drinks from its Waterskin (actor.nourish) or as the game day ends, as far as its need goes; each holds 4 pints, and the GM fills it at a source."
+  ),
+  "item:perfume": enforced(
+    "Applying it, in a fight or out of one, uses up the vial and gives its bearer the Perfume effect for an hour. ability-checks.ts then gives Advantage on a Persuasion check against an Indifferent Humanoid within 5 feet on the map, in Influence or a check the GM calls naming it."
+  ),
+  "item:bedroll": reference(
+    "Its help against extreme cold and the Long Rest in light armor come from rules outside the SRD, so nothing applies them."
+  ),
+  "item:blanket": reference("Its help against extreme cold comes from rules outside the SRD, so nothing applies it."),
   "feature:spellcasting": enforced(
     "character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows."
   ),
@@ -864,7 +899,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Resistance to Bludgeoning, Piercing and Slashing damage is applied. The once-a-day Immunity to them is the GM's."
   ),
   "item:berserker-axe": guided(
-    "The +1 to attack and damage rolls and the curse's lock on Attunement are applied. The extra Hit Points and the curse's save are the GM's."
+    "The +1 to attack and damage rolls and the curse's lock on Attunement are applied. berserker-axe.ts asks the DC 15 Wisdom save when another creature damages the bearer, and ends the berserk on a turn that starts with no creature within 60 feet. Its attacks on the nearest creature, and the extra Hit Points, are the GM's."
   ),
   "item:bracers-of-archery": guided(
     "Proficiency with the Longbow and Shortbow is applied. The +2 damage with them is the GM's."
@@ -1029,7 +1064,40 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Attack rolls against the caster have Disadvantage while it lasts, except from an attacker whose Blindsight or Truesight reaches it (resolution/attack.ts)."
   ),
   "spell:chromatic-orb": guided(
-    "The attack and the chosen damage type are applied. The leap to another target on matching dice is the GM's."
+    "The attack and the chosen damage type are applied, and when two of the d8s match the server says the orb leaps (resolution/cast-tables.ts). Aiming each leap is the caster's to make as another attack."
+  ),
+  "spell:confusion": guided(
+    "A failed save bars the target's Bonus Actions and Reactions, with the save repeated at the end of each of its turns (save-stages.ts), and random-outcomes.ts rolls its d10 at the start of each of its turns and takes for that turn what the roll forbids. The wandering move and the random attack are said to the table, and a higher slot's wider Sphere is the GM's."
+  ),
+  "spell:ray-of-enfeeblement": guided(
+    "A failed save gives the target Disadvantage on its Strength attack rolls, checks and saves, with the save repeated at the end of each of its turns (save-stages.ts); a success gives Disadvantage on its next attack roll before the caster's next turn. Taking 1d8 from its damage rolls is the GM's."
+  ),
+  "spell:phantasmal-force": guided(
+    "A failed save leaves the illusion on the target for the spell's duration, and End an Effect lets it study the illusion with an Intelligence (Investigation) check to end it (ending-actions.ts). The illusion, and the 2d8 Psychic damage it deals on the caster's turns, are the GM's."
+  ),
+  "spell:prismatic-spray": guided(
+    "resolution/prismatic.ts rolls the d8 for each creature in the Cone, two rays on an 8, and the 12d6 once. Red to Blue ask the Dexterity save against their damage, half on a success. Indigo Restrains on a failure, with the Constitution saves counted until three successes end it or three failures Petrify it (save-stages.ts). Violet Blinds on a failure until the start of the caster's next turn; its Wisdom save then, and the trip to another plane, are the GM's."
+  ),
+  "spell:augury": guided(
+    "Each casting before a Long Rest is counted, and from the second on resolution/cast-tables.ts rolls the d100 against the cumulative 25 percent chance of no answer. The omen is the GM's."
+  ),
+  "spell:commune": guided(
+    "Each casting before a Long Rest is counted, and from the second on resolution/cast-tables.ts rolls the d100 against the cumulative 25 percent chance of no answer. The answers are the GM's."
+  ),
+  "spell:reincarnate": guided(
+    "resolution/cast-tables.ts rolls the d10 for the new species, rolling a 1 again, and says it to the table. Bringing the creature back and rebuilding its species are the GM's."
+  ),
+  "spell:goodberry": enforced(
+    "resolution/provisions.ts puts ten berries in the caster's inventory, gone when the spell's 24 hours end (effects.ts). Eating one (actor.nourish) restores 1 Hit Point, takes the eater's Bonus Action on its turn in a fight, and counts as a day's food while the GM tracks food and water (survival.ts)."
+  ),
+  "spell:create-food-and-water": guided(
+    "The cast says what appears, and the characters eat and drink from it with the GM's meal and fill (actor.nourish, survival.ts). Where the food and water lie, and the food spoiling after 24 hours, are the GM's."
+  ),
+  "spell:sanctuary": enforced(
+    "resolution/ward.ts asks the Wisdom save of a creature that targets the warded creature with an attack roll or a damaging spell; a failure spends nothing and turns it away from the warded creature for the rest of its turn, so it picks another target. Areas aren't stopped, and the spell ends when the warded creature makes an attack roll, casts a spell or deals damage (resolution/attack.ts)."
+  ),
+  "spell:water-breathing": enforced(
+    "The cast gives each target the water-breathing effect for 24 hours, which ends any breath it holds and spares it from holding one (breath.ts)."
   ),
   "spell:compulsion": guided(
     "A failed save imposes Charmed. The move it forces each turn, and the save after it, are the GM's."
@@ -1037,14 +1105,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:conjure-celestial": guided(
     "The Healing Light on the cast is applied, and Bright Light fills the Cylinder for dynamic vision (vision/cast-sight.ts). Searing Light, and moving the Cylinder, are the GM's."
   ),
-  "spell:conjure-elemental": guided(
-    "spell-zones.ts asks for the spirit's Dexterity save when an enemy enters its space or starts its turn within 5 feet of it, while it has no creature Restrained: 8d8 damage of its element and Restrained until the spell ends on a failure. The Restrained creature's repeat save with 4d8 damage at the start of each of its turns is the GM's."
+  "spell:conjure-elemental": enforced(
+    "spell-zones.ts asks for the spirit's Dexterity save when an enemy enters its space or starts its turn within 5 feet of it, while it has no creature Restrained: 8d8 damage of its element and Restrained until the spell ends on a failure. The Restrained creature repeats the save at the start of each of its turns, taking 4d8 of the element on a failure and going free on a success (save-stages.ts)."
   ),
   "spell:contact-other-plane": enforced(
     "The caster makes the DC 15 Intelligence save (resolution/pending.ts); a failure deals 6d6 Psychic damage and leaves it Incapacitated until it finishes a Long Rest (rests.ts). The entity's answers, and a Greater Restoration ending the condition, are the GM's."
   ),
   "spell:contagion": guided(
-    "The save's 11d8 Necrotic damage and Poisoned condition are applied. The Disadvantage on saves with the chosen ability, and the three repeat saves, are the GM's."
+    "The save's 11d8 Necrotic damage and Poisoned condition are applied, with the repeat saves counted until three successes end it or three failures leave it Poisoned for 7 days (save-stages.ts). The Disadvantage on saves with the chosen ability is the GM's."
   ),
   "spell:delayed-blast-fireball": guided(
     "Cast in a fight, the bead waits at its point and spell-zones.ts explodes it when the spell ends, Concentration broken included: the Dexterity save and 12d6 Fire damage, plus 1d6 for each of the caster's turns that ended while it waited. A creature touching the bead, and a bead left outside a fight, are the GM's."
@@ -1059,25 +1127,25 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The save and its Psychic damage are applied. The target's move away with its Reaction is the GM's."
   ),
   "spell:dominate-beast": guided(
-    "A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts). The repeat save each time the target takes damage, and its orders, are the GM's."
+    "A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts), with Advantage on the save while its side is fighting the caster's, and a repeat save each time the target takes damage (save-stages.ts). The target's orders are the GM's."
   ),
   "spell:dominate-monster": guided(
-    "A failed save imposes Charmed for the spell's duration, longer from a level 9 slot (resolution/concentration.ts). The repeat save each time the target takes damage, and its orders, are the GM's."
+    "A failed save imposes Charmed for the spell's duration, longer from a level 9 slot (resolution/concentration.ts), with Advantage on the save while its side is fighting the caster's, and a repeat save each time the target takes damage (save-stages.ts). The target's orders are the GM's."
   ),
   "spell:dominate-person": guided(
-    "A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts). The repeat save each time the target takes damage, and its orders, are the GM's."
+    "A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts), with Advantage on the save while its side is fighting the caster's, and a repeat save each time the target takes damage (save-stages.ts). The target's orders are the GM's."
   ),
   "spell:earthquake": guided(
     "The cast's Dexterity save and Prone condition are applied. The save at the end of each of the caster's turns, the broken Concentration and the fissures are the GM's."
   ),
   "spell:fear": guided(
-    "A failed save imposes Frightened. The Dash away on each of its turns, and the save out of the caster's sight, are the GM's."
+    "A failed save imposes Frightened and drops what the creature holds (effects.ts), and a creature that ends its turn out of the caster's sight repeats the save (save-stages.ts, with dynamic vision on). The Dash away on each of its turns is the GM's."
   ),
   "spell:faithful-hound": guided(
     "Cast in a fight, spell-zones.ts makes the hound bite at the start of each of the caster's turns: the enemy nearest it within 5 feet makes the Dexterity save against 4d8 Force damage. Cast before a fight, the bite is a later action the GM runs. Its warning bark and its sight of Invisible creatures are the GM's."
   ),
-  "spell:flesh-to-stone": guided(
-    "A failed save imposes Restrained. The repeat saves toward Petrified, and Speed 0 on a success, are the GM's."
+  "spell:flesh-to-stone": enforced(
+    "A failed save imposes Restrained, and the repeat saves are counted: three successes end it, three failures Petrify it (save-stages.ts). A success leaves Speed 0 until the start of the caster's next turn, and a Construct succeeds without a roll."
   ),
   "spell:freedom-of-movement": guided(
     "speed.ts gives the target a Swim Speed equal to its Speed. Ignoring Difficult Terrain, the immunity to magical Paralyzed and Restrained, and slipping free of restraints are the GM's."
@@ -1085,11 +1153,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:gust-of-wind": guided(
     "The cast's save pushes a creature that fails 15 feet away from the caster, and the Line disperses the fog and clouds it overlaps (vision/cast-sight.ts). The save at the end of a creature's turn in the Line, the doubled cost of moving toward the caster and turning the Line are the GM's."
   ),
-  "spell:hideous-laughter": guided(
-    "A failed save imposes Prone and Incapacitated, repeated at the end of each of the target's turns. The save with Advantage each time it takes damage is the GM's."
+  "spell:hideous-laughter": enforced(
+    "A failed save imposes Prone and Incapacitated, repeated at the end of each of the target's turns and each time it takes damage, with Advantage then (save-stages.ts). It can't stand up while it laughs (actor-conditions.ts)."
   ),
-  "spell:irresistible-dance": guided(
-    "A failed save imposes Charmed. The dance's Disadvantage, the Advantage against the dancer and its save to collect itself are the GM's."
+  "spell:irresistible-dance": enforced(
+    "A failed save imposes Charmed with Speed 0, Disadvantage on its Dexterity saves and attack rolls and Advantage for attacks against it; End an Effect lets the dancer collect itself and repeat the save. A success leaves it dancing in place until its next turn ends."
   ),
   "spell:major-image": guided(
     "resolution/concentration.ts holds the caster's Concentration on it, and from a level 4 slot it lasts until dispelled with none. The illusion itself is the GM's to run."
@@ -1097,8 +1165,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:mass-heal": enforced(
     "resolution/heal.ts divides the 700 Hit Points evenly among the creatures the caster picks, none past its maximum, and ends Blinded, Deafened and Poisoned on each. A different split is the caster's to make by hand."
   ),
-  "spell:phantasmal-killer": guided(
-    "The save and its 4d10 Psychic damage are applied, and a failure leaves Disadvantage on the target's ability checks and attack rolls, with the save repeated at the end of each of its turns until it succeeds (resolution/pending.ts). The 4d10 damage on each failed repeat is the GM's."
+  "spell:phantasmal-killer": enforced(
+    "The save and its 4d10 Psychic damage are applied, and a failure leaves Disadvantage on the target's ability checks and attack rolls, with the save repeated at the end of each of its turns until it succeeds and the 4d10 again on each failed repeat (save-stages.ts)."
   ),
   "spell:power-word-heal": enforced(
     "resolution/heal.ts restores all the target's Hit Points and ends Charmed, Frightened, Paralyzed, Poisoned and Stunned, for one creature (resolution/spell-targets.ts). Standing up from Prone with its Reaction is the creature's choice."
@@ -1125,7 +1193,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The 2d8 Hit Points are applied. The Short Rest's benefits, and the limit of once per Long Rest, are the GM's."
   ),
   "spell:prismatic-wall": guided(
-    "The save against Blinded for a creature near the wall is applied. Each layer's save and effect are the GM's."
+    "The save against Blinded for a creature near the wall is applied. Each layer's save and effect are the GM's: the wall is not a lasting area the engine runs."
   ),
   "spell:protection-from-poison": enforced(
     "The cast ends Poisoned and leaves Resistance to Poison damage and Advantage on saves to avoid or end Poisoned, for an hour counted on the game clock (game-time.ts)."
@@ -1136,8 +1204,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:regenerate": guided(
     "The 4d8 + 15 Hit Points are applied to one creature (resolution/spell-targets.ts). The 1 Hit Point at the start of each of the target's turns, and regrowing severed parts, are the GM's."
   ),
-  "spell:sleep": guided(
-    "A failed save imposes Incapacitated until the end of the target's next turn, and damage ends it. The second save, and Unconscious on its failure, are the GM's."
+  "spell:sleep": enforced(
+    "A failed save imposes Incapacitated until the end of the target's next turn, then the second save leaves it Unconscious on a failure (save-stages.ts). Damage ends either stage, and a creature within 5 feet wakes it with End an Effect. An elf or a creature immune to Exhaustion succeeds without a roll."
   ),
   "spell:sleet-storm": guided(
     "spell-zones.ts asks for the Dexterity save when a creature enters the area or starts its turn there, and a failure leaves it Prone and ends its Concentration. The Cylinder is Heavily Obscured for dynamic vision (vision/cast-sight.ts). The Difficult Terrain is the GM's to paint, and the doused flames are the GM's."
@@ -1163,8 +1231,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:wall-of-ice": guided(
     "The save and its Cold damage for creatures in the wall's space are applied. The wall itself and its frigid air are the GM's."
   ),
-  "spell:weird": guided(
-    "The save, its Psychic damage and Frightened are applied, with the repeat save at the end of each turn. The 5d10 Psychic damage on a failed repeat is the GM's."
+  "spell:weird": enforced(
+    "The save, its Psychic damage and Frightened are applied, with the repeat save at the end of each turn and 5d10 Psychic damage on each failed repeat (save-stages.ts)."
   ),
   "spell:wind-wall": guided(
     "The save and its Bludgeoning damage are applied. The projectiles the wall turns aside are the GM's."

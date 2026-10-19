@@ -146,7 +146,9 @@ audience. There are five:
   player's dice log. An unclaimed character carries its species and class line for the claim
   picker, since any player could claim it and read its sheet. The options a player pins to the
   sheet's turn card and how often each option resolved (`favouriteOptionIds`, `optionUseCounts`)
-  reach the owner and the GM only, whatever the party tier.
+  reach the owner and the GM only, whatever the party tier. A creature's `attitude`, which the GM sets
+  for Influence, never reaches a player; a character's food and water for the day (`nourishment`) goes
+  wherever its sheet resources go.
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
   room that may hold non-players. It follows the live scene, before and during its fight, unless
   the GM paused it. Only public actors with a position become tokens; annotations
@@ -319,6 +321,9 @@ dispelled with no Concentration. An effect can also last until its bearer's next
 (`until-rest`), which that rest ends. A creature's own Long Rest (the GM approving a request) ends what
 would run out in its 8 hours and leaves longer effects for the GM to pass those hours, so they count
 once. The clock also runs a Stable creature's 1d4 hours to 1 Hit Point and a knocked-out creature's hour.
+While the GM tracks food and water (`rest.survival`), each midnight it crosses ends a day for every
+character, which eats and drinks what it carries and meets the hunger and thirst rules (`survival.ts`).
+A creature out of air counts its held breath down on the clock as it does at its turns' ends (`breath.ts`).
 
 Each effect a spell leaves records the spell and the level it was cast at (`spell`), so a spell can be
 ended as a whole: Dispel Magic and Remove Curse resolve in `resolution/dispel.ts`, which ends the
