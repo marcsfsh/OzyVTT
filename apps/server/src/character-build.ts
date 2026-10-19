@@ -199,6 +199,15 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "damage-reduction": "at-its-moment", // hit-points.ts damageReductionsFor, taken off the hit before resistances
   "damage-resistance": "standing", // derivation.damageResistances, beside the definition's own
   "damage-vulnerability": "standing", // derivation.damageVulnerabilities, beside the definition's own
+  "damage-immunity": "standing", // derivation.damageImmunities, beside the definition's own
+  "ignores-resistance": "standing", // hit-points.ts resistanceIgnoredBy, read on the creature dealing the damage
+  "d20-minimum": "at-its-moment", // ability-checks.ts d20MinimumOf and saving-throws.ts flooredSaveTotal
+  "total-minimum": "at-its-moment", // ability-checks.ts totalMinimumOf and saving-throws.ts flooredSaveTotal
+  "damage-die-minimum": "at-its-moment", // resolution/damage.ts, on the attack's own damage dice
+  "advantage-denied": "at-its-moment", // resolution/attack.ts drops the attack's Advantage against the bearer
+  "healing-received-maximized": "at-its-moment", // resolution/heal.ts, on the creature healed
+  "healing-dice-maximized": "at-its-moment", // resolution/heal.ts, on the healer
+  "healing-bonus": "at-its-moment", // resolution/heal.ts, on the healer
   sense: "display-only" // like `darkvision`: the trait prose carries it; no definition field models senses
 };
 
@@ -1105,12 +1114,15 @@ export function buildCharacterDefinition(
   const featureSpellEntries = featurePicksOf("spell").map((pick) => pickedEntry(pick, "spell"));
   const grantedSpellEntry = (grantedSpell: InterpretedFeatures["grantedSpells"][number]): SpellEntry => {
     const record = library.spellRecord(grantedSpell.id);
+    // A subclass's spells count as its class's spells (Draconic Spells are Sorcerer spells).
+    const castsAs = castingClassOf(grantedSpell.source);
     return {
       id: grantedSpell.id,
       name: record?.name ?? grantedSpell.id,
       level: grantedSpell.level ?? record?.level ?? 0,
       prepared: true,
       alwaysPrepared: grantedSpell.alwaysPrepared,
+      ...(castsAs ? { classId: castsAs } : {}),
       ...(grantedSpell.withSlot ? {} : { withSlot: false as const }),
       source: grantedSpell.source,
       ...(grantedSpell.free !== undefined ? { free: grantedSpell.free } : {})
@@ -1216,6 +1228,8 @@ export function buildCharacterDefinition(
           level: 0,
           prepared: true,
           alwaysPrepared: true,
+          // The class a cantrip is cast as, which a rider on that class's spells reads (Innate Sorcery).
+          classId: budget.classId,
           source: `class:${budget.classId}`
         });
       }

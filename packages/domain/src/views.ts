@@ -30,8 +30,8 @@ export type PlayerHp =
   { kind: "exact"; current: number; maximum: number; temporary: number } | { kind: "band"; band: HealthBand };
 /** An effect as players see it: source ids never cross the wire, and a hidden source's name is masked server-side
  * (viewer safety). Its ongoing damage stays with the GM, since the dice are the stat block's, and so does its magic
- * mark, which only Magic Resistance reads, the amounts and immunities a spell's level or caster set, and a long casting's
- * targets and slot. `yours` marks one the
+ * mark, which only Magic Resistance reads, the amounts and immunities a spell's level or caster set, a long casting's
+ * targets and slot, and what an effect gives or wards and the row it is bound to. `yours` marks one the
  * viewing player's own character is the source of (their grapple, their Concentration), which they may end. */
 export type PlayerEffect = Omit<
   EffectInstance,
@@ -47,6 +47,17 @@ export type PlayerEffect = Omit<
   | "conditionImmunities"
   | "endsWhenUnaffected"
   | "longCast"
+  | "hitPointsEachTurn"
+  | "conditionWards"
+  | "suppressedConditions"
+  | "itemId"
+  | "weapon"
+  | "optionId"
+  | "bonusActions"
+  | "grantedSpellAction"
+  | "endAction"
+  | "usedOnTurn"
+  | "shrinksEachLongRest"
 > & {
   yours?: true;
 };

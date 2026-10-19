@@ -180,7 +180,23 @@ const LABELS: Readonly<Record<string, string>> = {
   coins: "coins",
   waives: "components it goes without",
   targetTypes: "creature types it affects",
-  chainFeet: "distance between targets"
+  chainFeet: "distance between targets",
+  dice: "dice",
+  abilityModifier: "ability modifier",
+  abilityScore: "ability score",
+  leavesOne: "least damage it leaves",
+  oncePerTurn: "once a turn",
+  proficientOnly: "only with a proficiency",
+  perSlotLevel: "the slot's level it adds",
+  conditionWards: "conditions it wards against",
+  suppressesConditions: "conditions it holds off",
+  hitPointsEachTurn: "hit points it restores each turn",
+  bonusActions: "Bonus Actions it gives",
+  grantsLaterAction: "action it gives",
+  endAction: "action that ends it",
+  bindsWeapon: "weapon it binds to",
+  optionsPerTarget: "an option for each target",
+  shrinksEachLongRest: "penalty that shrinks each Long Rest"
 };
 /** A key whose words depend on what holds it: a weapon's category is its weapon kind, as the editor labels it. */
 const NESTED_LABELS: Readonly<Record<string, string>> = { "weapon.category": "weapon kind" };

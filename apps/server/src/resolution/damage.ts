@@ -100,13 +100,29 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
     }
     return;
   }
+  // Great Weapon Fighting: a die of the attack's own damage under the floor counts as the floor.
+  const floor = damageDieFloor(ctx);
+  const random = floor > 1 ? (sides: number) => Math.max(Math.min(floor, sides), deps.random(sides)) : deps.random;
   parts.forEach((part, index) => {
     const expression = parseDiceFormula(part.formula);
     const extraCritDice = index === 0 ? (action.attack?.criticalBonusDice ?? 0) : 0;
-    const rolled = resolveDice(ctx.crit ? criticalExpression(expression, extraCritDice) : expression, deps.random);
+    const rolled = resolveDice(ctx.crit ? criticalExpression(expression, extraCritDice) : expression, random);
     recordRoll(ctx, rolled, "damage");
     damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
   });
+}
+
+/** The face a `damage-die-minimum` rider raises the attack's own damage dice to (Great Weapon Fighting's 3), read at
+ *  the damage roll with the attack's filters (`two-handed`, `melee-weapon`); 1 when none does. */
+function damageDieFloor(ctx: ResolveContext): number {
+  const { derivation, riderFilters, attack } = ctx;
+  const moments: Array<RiderMoment | null> = [null, "on-damage-roll"];
+  if (attack === null || attack.outcome === "hit" || attack.outcome === "crit") moments.push("on-hit");
+  let floor = 1;
+  for (const moment of moments)
+    for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment }))
+      if (rider.modifier.type === "damage-die-minimum") floor = Math.max(floor, rider.modifier.minimum ?? 1);
+  return floor;
 }
 
 const missed = (attack: ActionResolutionAttack | null) =>
@@ -175,13 +191,19 @@ export function rollRiderDamage(ctx: ResolveContext): void {
     ];
     for (const rider of riders) {
       const modifier = rider.modifier;
-      // Standing flat bonuses (moment null) were already folded into the formula by `withStandingRiders`.
+      // Standing flat bonuses (moment null) were already folded into the formula by `withStandingRiders`; their dice
+      // are rolled here at every moment (Ray of Enfeeblement's -1d8).
       if (modifier.type === "damage-bonus") {
-        if (moment === null || already.has(modifier)) continue;
-        const amount = modifier.amount ?? 0;
-        if (amount === 0 || damage.length === 0) continue;
+        if (already.has(modifier) || damage.length === 0) continue;
+        const amount = moment === null ? 0 : (modifier.amount ?? 0);
+        const dice = modifier.dice === undefined ? 0 : rollSignedDice(ctx, modifier.dice, rider.label);
+        if (amount + dice === 0) continue;
         already.add(modifier);
-        bonusDamage.push({ amount, type: damage[0].type, source: rider.label });
+        bonusDamage.push({
+          amount: modifier.leavesOne ? leavingOne(ctx, amount + dice) : amount + dice,
+          type: damage[0].type,
+          source: rider.label
+        });
         continue;
       }
       if (modifier.type !== "extra-damage" || already.has(modifier)) continue;
@@ -210,6 +232,25 @@ export function rollRiderDamage(ctx: ResolveContext): void {
       if (rider.sourceEffectId !== undefined) ctx.damageEffectIds.push(rider.sourceEffectId);
     }
   }
+}
+
+/** Signed dice a rider adds to the damage ("1d4") or takes off it ("-1d8"), rolled and recorded. */
+function rollSignedDice(ctx: ResolveContext, dice: string, label: string): number {
+  const negative = dice.startsWith("-");
+  const rolled = resolveDice(parseDiceFormula(negative ? dice.slice(1) : dice), ctx.deps.random);
+  recordRoll(ctx, rolled, "damage", `${ctx.action.name}: ${label}`);
+  return negative ? -rolled.total : rolled.total;
+}
+
+/** A penalty that "can't reduce the damage below 1" (Reduce): no more than leaves the hit's first type at 1. */
+function leavingOne(ctx: ResolveContext, amount: number): number {
+  if (amount >= 0) return amount;
+  const type = ctx.damage[0]?.type;
+  const so = [
+    ...ctx.damage.filter((part) => part.type === type).map((part) => part.total),
+    ...ctx.bonusDamage.filter((part) => part.type === type).map((part) => part.amount)
+  ].reduce((sum, value) => sum + value, 0);
+  return Math.max(amount, Math.min(0, 1 - so));
 }
 
 /** A coat of Basic Poison is spent "once its damage is dealt": an effect with damage uses loses one each hit its

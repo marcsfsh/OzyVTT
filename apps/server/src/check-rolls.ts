@@ -106,7 +106,7 @@ function recordCheck(
   const roll = totalCheck(plan, faces, readAs, deps.random, options.others ?? []);
   const visibility = checkVisibility(state, scope, actor.id, input.visibility);
   const rollId = deps.newId();
-  const label = `${options.label ?? plan.label}${roll.reliableTalent ? " (Reliable Talent)" : ""}`;
+  const label = `${options.label ?? plan.label}${roll.reliableTalent ? " (Reliable Talent)" : ""}${roll.raisedBy ? ` (${roll.raisedBy})` : ""}`;
   const record: RollRecord = {
     id: rollId,
     commandId: input.commandId,
@@ -187,7 +187,11 @@ export function rollSettledCheck(
     initiatorSessionId: record.sessionId,
     initiatorRole: record.role,
     initiatorLabel: actor.name,
-    label: `${record.label}${roll.reliableTalent ? " (Reliable Talent)" : ""}`.slice(0, 80),
+    label:
+      `${record.label}${roll.reliableTalent ? " (Reliable Talent)" : ""}${roll.raisedBy ? ` (${roll.raisedBy})` : ""}`.slice(
+        0,
+        80
+      ),
     actorId: actor.id,
     purpose: "check",
     visibility: record.visibility,

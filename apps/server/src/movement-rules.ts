@@ -7,7 +7,13 @@ import { holdsFeature } from "./class-features.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
 import { effectiveActions } from "./effective-actions.js";
-import { NO_OPPORTUNITY_ATTACKS_TAG, NO_REACTIONS_TAG, READIED_TAG, releaseReadied } from "./effects.js";
+import {
+  NO_OPPORTUNITY_ATTACKS_TAG,
+  NO_REACTIONS_TAG,
+  ONE_THING_A_TURN_TAG,
+  READIED_TAG,
+  releaseReadied
+} from "./effects.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
 import { travelBudgetFeet, travelCostsExtra, type TravelMode } from "./speed.js";
@@ -345,6 +351,21 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   if ((counted || input.byPlayer) && endsInOccupiedSpace(state, input, to))
     police(state, input, "movement.occupied", `${mover.name} can't end its move in another creature's space.`, outcome);
   if (mode === "teleport" || !counted) return done();
+  // SRD Abjure Foes: a creature limited to one of moving, an action or a Bonus Action that took either can't move.
+  const limited = mover.effects.find((effect) => effect.tags.includes(ONE_THING_A_TURN_TAG));
+  if (
+    limited &&
+    !readied &&
+    state.combat.turnActorId === actorId &&
+    (state.combat.turn.actionUsed || state.combat.turn.bonusActionUsed)
+  )
+    police(
+      state,
+      input,
+      "condition.one-thing-a-turn",
+      `${mover.name} has acted this turn, and ${limited.name} allows only one of moving, an action or a Bonus Action.`,
+      outcome
+    );
 
   // The budget for this way of moving; Prone, the only way is to crawl (SRD Prone: "Your only movement options are
   // to crawl or to spend an amount of movement equal to half your Speed ... to right yourself").

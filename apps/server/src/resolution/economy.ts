@@ -6,10 +6,14 @@ import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { wardingAura } from "../paladin-auras.js";
 import { areAllies } from "../creature-sides.js";
 import {
+  CANT_ATTACK_TAG,
+  DASH_ONLY_TAG,
   HASTED_TAG,
   hasEffectTag,
   NO_ACTIONS_TAG,
+  NO_BONUS_ACTIONS_TAG,
   NO_REACTIONS_TAG,
+  ONE_THING_A_TURN_TAG,
   SLOWED_TAG,
   NO_SPELLS_TAG,
   RAGING_TAG,
@@ -419,6 +423,10 @@ const ANSWERS_A_ROLL: ReadonlySet<string> = new Set([
   "boon-of-fate"
 ]);
 
+/** What a creature limited to Dash may still do (Wind Walk): the Dash action, as an action or a Bonus Action, and the
+ *  action that ends its cloud form. */
+const DASH_ONLY_ALLOWED: ReadonlySet<string> = new Set(["dash", "dash-bonus", "end-effect"]);
+
 /** An effect's name in a refusal, as the creature's own sheet shows it: a caster hidden from the table is "A hidden
  *  threat" there. */
 function shownEffectName(
@@ -463,6 +471,33 @@ function checkAbleToAct({ state, attacker, action, resolveDefinition, violations
     violations.push({
       rule: "condition.incapacitated",
       message: `${attacker.name} is reeling from ${shownEffectName(state, reeling, resolveDefinition)} and can't take an action or a Bonus Action this turn.`
+    });
+  // SRD Confusion: "The target can't take Bonus Actions or Reactions".
+  const noBonus = attacker.effects.find((effect) => effect.tags.includes(NO_BONUS_ACTIONS_TAG));
+  if (noBonus && action.activation === "bonus-action")
+    violations.push({
+      rule: "condition.no-bonus-actions",
+      message: `${attacker.name} can't take Bonus Actions while ${shownEffectName(state, noBonus, resolveDefinition)} lasts.`
+    });
+  // SRD Gaseous Form: the cloud "can't attack".
+  const unarmed = action.id.startsWith("unarmed-");
+  const cantAttack = attacker.effects.find((effect) => effect.tags.includes(CANT_ATTACK_TAG));
+  if (cantAttack && (action.attack !== undefined || action.multiattack !== undefined || unarmed))
+    violations.push({
+      rule: "condition.cant-attack",
+      message: `${attacker.name} can't attack while ${shownEffectName(state, cantAttack, resolveDefinition)} lasts.`
+    });
+  // SRD Wind Walk: "The only actions it can take in this form are the Dash action or a Magic action to begin reverting".
+  const dashOnly = attacker.effects.find((effect) => effect.tags.includes(DASH_ONLY_TAG));
+  if (
+    dashOnly &&
+    !DASH_ONLY_ALLOWED.has(action.id) &&
+    action.activation !== "reaction" &&
+    action.activation !== "other"
+  )
+    violations.push({
+      rule: "condition.dash-only",
+      message: `${attacker.name} can take only the Dash action or end ${shownEffectName(state, dashOnly, resolveDefinition)} while it lasts.`
     });
   // SRD Befuddlement: the target "can't cast spells or take the Magic action".
   const befuddled = attacker.effects.find((effect) => effect.tags.includes(NO_SPELLS_TAG));
@@ -850,6 +885,21 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
     violations.push({
       rule: "economy.action-used",
       message: `${attacker.name} took a Bonus Action this turn, and ${shownEffectName(state, slowed, evaluation.resolveDefinition)} leaves no action as well.`
+    });
+  // SRD Abjure Foes: "it can do only one of the following on its turns: move, take an action, or take a Bonus
+  // Action."
+  const limited = onOwnTurn ? attacker.effects.find((effect) => effect.tags.includes(ONE_THING_A_TURN_TAG)) : undefined;
+  const turn = state.combat.turn;
+  const already =
+    action.activation === "action"
+      ? turn.bonusActionUsed || turn.movementUsedFeet > 0
+      : action.activation === "bonus-action"
+        ? turn.actionUsed || turn.movementUsedFeet > 0
+        : false;
+  if (limited && already && !(action.activation === "action" && turn.actionUsed))
+    violations.push({
+      rule: "condition.one-thing-a-turn",
+      message: `${attacker.name} has already ${turn.movementUsedFeet > 0 ? "moved" : action.activation === "action" ? "taken a Bonus Action" : "taken an action"} this turn, and ${shownEffectName(state, limited, evaluation.resolveDefinition)} allows only one of moving, an action or a Bonus Action.`
     });
   if (onOwnTurn && action.activation === "bonus-action") {
     if (state.combat.turn.bonusActionUsed)

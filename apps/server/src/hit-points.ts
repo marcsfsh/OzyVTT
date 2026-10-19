@@ -14,8 +14,10 @@ import {
   droppedToZero,
   halveDamageParts,
   normalizeDamageType,
+  parseDiceFormula,
   reduceDamageParts,
   rescaleDamageParts,
+  resolveDice,
   type DamagePart,
   type DamageReduction,
   type RandomSource,
@@ -149,8 +151,18 @@ export function damageAdjustmentDetail(
 /** Flat `damage-reduction` riders on the receiving side, each with the types it covers: standing ones cover every
  *  type, `on-taking-damage` ones the incoming types their `damage-type-is` matches. Riders sharing a `stackKey` are
  *  one game effect, so only the largest counts. */
-function damageReductionsFor(derivation: EquipmentDerivation, damageTypes: readonly string[]): DamageReduction[] {
-  const isReduction = (rider: ResolvedRider) => rider.modifier.type === "damage-reduction";
+function damageReductionsFor(
+  derivation: EquipmentDerivation,
+  damageTypes: readonly string[],
+  rolling: ReductionRolling | null
+): DamageReduction[] {
+  // A once-a-turn reduction (Resistance) already spent this turn gives nothing more until the next one.
+  const spentThisTurn = (rider: ResolvedRider) =>
+    rider.modifier.oncePerTurn === true &&
+    rider.sourceEffectId !== undefined &&
+    rolling?.turnKey !== undefined &&
+    rolling.spentEffectIds(rider.sourceEffectId);
+  const isReduction = (rider: ResolvedRider) => rider.modifier.type === "damage-reduction" && !spentThisTurn(rider);
   const covered = new Map<ResolvedRider["modifier"], { rider: ResolvedRider; types: string[] | null }>();
   for (const rider of collectRiders(derivation.carriers, { ...derivation.context, moment: null }).filter(isReduction))
     covered.set(rider.modifier, { rider, types: null });
@@ -169,12 +181,50 @@ function damageReductionsFor(derivation: EquipmentDerivation, damageTypes: reado
   const strongest = new Map<string, { amount: number; types: string[] | null }>();
   const reductions: DamageReduction[] = [];
   for (const { rider, types } of covered.values()) {
-    const amount = rider.modifier.amount ?? 0;
+    // Dice roll only as the damage lands; a preview leaves them out.
+    const dice = rider.modifier.dice !== undefined && rolling ? rolling.roll(rider.modifier.dice) : 0;
+    const amount = (rider.modifier.amount ?? 0) + dice;
     if (amount <= 0) continue;
+    if (rider.modifier.oncePerTurn === true && rider.sourceEffectId !== undefined)
+      rolling?.used.push(rider.sourceEffectId);
     if (rider.stackKey === undefined) reductions.push({ amount, types });
     else if ((strongest.get(rider.stackKey)?.amount ?? 0) < amount) strongest.set(rider.stackKey, { amount, types });
   }
   return [...reductions, ...strongest.values()];
+}
+
+/** How a landing hit rolls a reduction's dice and spends a once-a-turn one: the turn it lands in (`round:actorId`,
+ *  absent outside a fight, where each hit may use it), which effects are already spent this turn, and those it spends. */
+type ReductionRolling = Readonly<{
+  roll: (formula: string) => number;
+  turnKey?: string;
+  spentEffectIds: (effectId: string) => boolean;
+  used: string[];
+}>;
+
+/** The rolling a landing hit on `actor` uses, or null without the server's dice (a preview). */
+function reductionRolling(state: GameState, actor: Actor, rollDie: RandomSource | undefined): ReductionRolling | null {
+  if (!rollDie) return null;
+  const turnKey = state.combat.active ? `${state.combat.round}:${state.combat.turnActorId ?? ""}` : undefined;
+  return {
+    roll: (formula) => resolveDice(parseDiceFormula(formula), rollDie).total,
+    ...(turnKey !== undefined ? { turnKey } : {}),
+    spentEffectIds: (effectId) =>
+      turnKey !== undefined && actor.effects.some((effect) => effect.id === effectId && effect.usedOnTurn === turnKey),
+    used: []
+  };
+}
+
+/** The damage types whose Resistance the dealer's damage ignores (Boon of Irresistible Offense), from its standing
+ *  `ignores-resistance` riders. */
+function resistanceIgnoredBy(state: GameState, sourceActorId: string | null, deps: DamageDeps | undefined): string[] {
+  const source = sourceActorId === null ? undefined : state.actors.find((actor) => actor.id === sourceActorId);
+  if (!source || !deps) return [];
+  const definition = source.definitionId ? deps.resolveDefinition(source.definitionId) : undefined;
+  const derivation = deriveEquipment(source, definition, deps.catalog);
+  return collectRiders(derivation.carriers, { ...derivation.context, moment: null }).flatMap((rider) =>
+    rider.modifier.type === "ignores-resistance" ? [...(rider.modifier.damageTypes ?? [])] : []
+  );
 }
 
 /** The stat block's defences minus any a rest-time re-choice superseded (chosen options are baked in). */
@@ -225,7 +275,13 @@ export function standingDefences(
 
 /** What a hit would come to on this actor: each typed part through its defences, then flat reduction off
  *  the total. Pure, so a prompt can show the number Confirm will land. */
-function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: DamageDeps): DamageWeighing {
+function weighDamage(
+  state: GameState,
+  actor: Actor,
+  input: DamageInput,
+  deps?: DamageDeps,
+  rolling: ReductionRolling | null = null
+): DamageWeighing {
   let totalRequested: number;
   let totalAdjusted: number;
   let flatReduction = 0;
@@ -270,7 +326,8 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
       typed,
       damageReductionsFor(
         derivation,
-        typed.map((part) => normalizeDamageType(part.type))
+        typed.map((part) => normalizeDamageType(part.type)),
+        rolling
       )
     );
     flatReduction = reduction.reduced;
@@ -279,7 +336,8 @@ function weighDamage(state: GameState, actor: Actor, input: DamageInput, deps?: 
       immunities: types(standing.immunities),
       // Effects and items can make a target vulnerable as a stat block can; with a same-type resistance both apply.
       vulnerabilities: types(standing.vulnerabilities),
-      resistAll: petrified
+      resistAll: petrified,
+      ignoresResistance: resistanceIgnoredBy(state, input.sourceActorId ?? null, deps)
     });
     parts = adjusted.map((part) => {
       const type = part.type.trim().toLowerCase();
@@ -564,7 +622,19 @@ export function applyDamageDetailed(
 ): DamageOutcome {
   const actor = adjustableActor(state, actorId, scope);
   const events: EffectNarration[] = [];
-  const { totalRequested, totalAdjusted, flatReduction, parts, oilIgnited } = weighDamage(state, actor, input, deps);
+  const rolling = reductionRolling(state, actor, deps?.rollDie);
+  const { totalRequested, totalAdjusted, flatReduction, parts, oilIgnited } = weighDamage(
+    state,
+    actor,
+    input,
+    deps,
+    rolling
+  );
+  // A once-a-turn reduction that helped is spent for this turn (Resistance).
+  if (rolling?.turnKey !== undefined && rolling.used.length > 0)
+    actor.effects = actor.effects.map((effect) =>
+      rolling.used.includes(effect.id) ? { ...effect, usedOnTurn: rolling.turnKey } : effect
+    );
   // Burning oil is spent once it flares.
   if (oilIgnited) {
     events.push({ kind: "damage", text: `The oil on ${actor.name} catches fire (5 Fire damage).`, actorId: actor.id });

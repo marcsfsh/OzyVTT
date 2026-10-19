@@ -11,6 +11,7 @@ import {
   type AggregatedRollMode,
   type DiceResolution,
   type RandomSource,
+  type ResolvedRider,
   type RiderAbility,
   type ThrownDie
 } from "@vtt/rules-5e";
@@ -153,6 +154,11 @@ export type CheckPlan = Readonly<{
   reliableTalent: boolean;
   /** Dice effects add to the check (" + 1d4"), as formula terms. */
   diceTerms: string;
+  /** A d20 that shows less counts as this (Glibness's 15), and what says so; null when nothing raises it. Reliable
+   *  Talent's 10 is `reliableTalent`. */
+  d20Minimum: Readonly<{ face: number; label: string }> | null;
+  /** A total that comes out lower counts as this (Indomitable Might's Strength score), and what says so. */
+  totalMinimum: Readonly<{ total: number; label: string }> | null;
 }>;
 
 export type CheckContext = Readonly<{
@@ -268,16 +274,52 @@ function plainCheckPlan(
   const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
   const atCheck = collectRiders(derivation.carriers, { ...derivation.context, ...narrow, moment: "on-ability-check" });
   const exhaustion = exhaustionPenalty(actor);
+  const riders = [...standing, ...atCheck];
   return {
     subject,
     label: checkLabel(subject, context.names),
-    modifier: base + checkRiderBonus(derivation, narrow) + exhaustion,
+    modifier: base + checkRiderBonus(derivation, narrow, definition?.abilityScores) + exhaustion,
     exhaustion,
     rollMode: aggregateRollMode(claims.advantage, claims.disadvantage),
     proficient,
     reliableTalent: proficient && holdsFeature(definition, "reliable-talent", "Reliable Talent"),
-    diceTerms: diceRiderTerms(diceRiders([...standing, ...atCheck], "check-bonus"))
+    diceTerms: diceRiderTerms(diceRiders(riders, "check-bonus")),
+    d20Minimum: d20MinimumOf(riders, "check", proficient),
+    totalMinimum: totalMinimumOf(riders, "check", definition)
   };
+}
+
+/** The highest face a `d20-minimum` rider on this roll raises a lower d20 to, and the carrier that says so; one marked
+ *  `proficientOnly` counts only on a check that uses a proficiency. */
+export function d20MinimumOf(
+  riders: readonly ResolvedRider[],
+  roll: "check" | "save",
+  proficient: boolean
+): CheckPlan["d20Minimum"] {
+  let best: CheckPlan["d20Minimum"] = null;
+  for (const rider of riders) {
+    const { type, roll: riderRoll, minimum, proficientOnly } = rider.modifier;
+    if (type !== "d20-minimum" || riderRoll !== roll || minimum === undefined) continue;
+    if (proficientOnly && !proficient) continue;
+    if (best === null || minimum > best.face) best = { face: minimum, label: rider.label };
+  }
+  return best;
+}
+
+/** The highest ability score a `total-minimum` rider on this roll raises a lower total to, and the carrier. */
+export function totalMinimumOf(
+  riders: readonly ResolvedRider[],
+  roll: "check" | "save",
+  definition: ActorDefinition | undefined
+): CheckPlan["totalMinimum"] {
+  let best: CheckPlan["totalMinimum"] = null;
+  for (const rider of riders) {
+    const { type, roll: riderRoll, abilityScore } = rider.modifier;
+    if (type !== "total-minimum" || riderRoll !== roll || abilityScore === undefined || !definition) continue;
+    const score = definition.abilityScores[abilityScore];
+    if (best === null || score > best.total) best = { total: score, label: rider.label };
+  }
+  return best;
 }
 
 /** A check rolled: its d20 faces, the one that counts, and the total. */
@@ -287,6 +329,8 @@ export type CheckRoll = Readonly<{
   total: number;
   /** Reliable Talent counted a d20 of 9 or lower as 10. */
   reliableTalent: boolean;
+  /** What else raised the roll (Glibness's 15, Indomitable Might's Strength score); null when nothing did. */
+  raisedBy: string | null;
   resolution: DiceResolution;
 }>;
 
@@ -305,11 +349,17 @@ export function totalCheck(
   const resolution = resolveWithD20s(d20TestFormula(mode, plan.modifier) + plan.diceTerms, faces, random, held);
   const natural = keptD20(faces, mode);
   const reliable = plan.reliableTalent && natural <= 9;
+  // A d20 floor above Reliable Talent's 10 (Glibness's 15) counts instead.
+  const floor = plan.d20Minimum !== null && natural < plan.d20Minimum.face && (!reliable || plan.d20Minimum.face > 10);
+  const raised = floor ? plan.d20Minimum!.face - natural : reliable ? 10 - natural : 0;
+  const rolled = resolution.total + raised;
+  const lifted = plan.totalMinimum !== null && plan.totalMinimum.total > rolled ? plan.totalMinimum : null;
   return {
     faces,
     natural,
-    total: resolution.total + (reliable ? 10 - natural : 0),
-    reliableTalent: reliable,
+    total: lifted ? lifted.total : rolled,
+    reliableTalent: reliable && !floor && lifted === null,
+    raisedBy: lifted?.label ?? (floor ? plan.d20Minimum!.label : null),
     resolution
   };
 }

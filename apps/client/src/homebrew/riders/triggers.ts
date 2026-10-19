@@ -35,6 +35,7 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
   "on-ability-check": "Making an ability check",
   "on-initiative-roll": "Rolling initiative",
   "on-taking-damage": "Taking damage",
+  "on-healing": "Healing a creature",
   "attack-kind-is": "A kind of attack",
   "weapon-property-is": "A weapon property",
   "damage-type-is": "A damage type",
@@ -46,12 +47,18 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
   "versus-size": "A target's size",
   "versus-condition": "A target's condition",
   "versus-creature-type": "A target's kind",
-  "by-effect-source": "The creature that put this effect on"
+  "by-effect-source": "The creature that put this effect on",
+  "source-creature-type-is": "The other creature's kind",
+  "versus-effect-source": "Against the creature that put this effect on",
+  "versus-marked": "A target it marked",
+  "versus-hurt": "A target missing Hit Points",
+  "versus-within": "A target within a distance",
+  "spell-class-is": "A spell of one class"
 };
 
 /** Read only on an effect the engine puts on another creature (Hunter's Mark), never on an item or a feature, so the
  *  editor doesn't offer it. */
-const ENGINE_ONLY_TRIGGERS: ReadonlySet<string> = new Set(["by-effect-source"]);
+const ENGINE_ONLY_TRIGGERS: ReadonlySet<string> = new Set(["by-effect-source", "versus-effect-source"]);
 
 const TRIGGER_TYPES: readonly SelectOption[] = (Object.keys(TRIGGER_LABELS) as RiderTrigger["type"][])
   .filter((type) => !ENGINE_ONLY_TRIGGERS.has(type))
@@ -105,7 +112,14 @@ function blankTrigger(type: string): Draft {
     case "versus-condition":
       return { type, conditionIds: [] };
     case "versus-creature-type":
+    case "source-creature-type-is":
       return { type, creatureTypes: [] };
+    case "versus-marked":
+      return { type, tags: [] };
+    case "versus-within":
+      return { type, feet: 5 };
+    case "spell-class-is":
+      return { type, classIds: [] };
     default:
       return { type };
   }
@@ -155,6 +169,7 @@ function triggerRowLabel(row: Draft): string {
     .map(String);
   if (values.length > 0) return `${name} · ${values.slice(0, 3).join(", ")}${values.length > 3 ? "…" : ""}`;
   if (typeof row.percent === "number") return `${name} · ${row.percent}% or less`;
+  if (typeof row.feet === "number") return `${name} · ${row.feet} ft`;
   if (row.type === "while-shield") return row.wielding === false ? "Not holding a shield" : name;
   return name;
 }
@@ -217,7 +232,7 @@ export const whenField = (): FieldDef => ({
       label: "Classes",
       kind: "multiselect",
       options: (ctx) => ctx.classes,
-      visibleWhen: hasType("while-character-is")
+      visibleWhen: hasType("while-character-is", "spell-class-is")
     },
     {
       key: "speciesIds",
@@ -244,8 +259,8 @@ export const whenField = (): FieldDef => ({
       key: "tags",
       label: "Effect tags",
       kind: "tags",
-      visibleWhen: hasType("while-effect-tag"),
-      suggestions: ["raging", "blessed", "concentrating", "inspired"]
+      visibleWhen: hasType("while-effect-tag", "versus-marked"),
+      suggestions: ["raging", "blessed", "concentrating", "inspired", "grapple", "hunters-mark"]
     },
     {
       key: "percent",
@@ -284,7 +299,8 @@ export const whenField = (): FieldDef => ({
         opt("unarmed", "Unarmed"),
         opt("thrown", "Thrown"),
         opt("reaction", "Reaction"),
-        opt("opportunity", "Opportunity")
+        opt("opportunity", "Opportunity"),
+        opt("two-handed", "Held in two hands")
       ],
       visibleWhen: hasType("attack-kind-is")
     },
@@ -345,9 +361,19 @@ export const whenField = (): FieldDef => ({
       key: "creatureTypes",
       label: "Kinds of creature",
       kind: "tags",
-      visibleWhen: hasType("versus-creature-type"),
+      visibleWhen: hasType("versus-creature-type", "source-creature-type-is"),
       suggestions: (ctx) => ctx.creatureTypes,
-      help: "Read from the target's stat block. A character has no kind recorded, so it never matches one."
+      help: "Read from the other creature's stat block."
+    },
+    {
+      key: "feet",
+      label: "Within",
+      kind: "number",
+      min: 5,
+      max: 300,
+      unit: "ft",
+      visibleWhen: hasType("versus-within"),
+      help: "Measured on the map. Where the map can't measure, it doesn't apply."
     }
   ]
 });

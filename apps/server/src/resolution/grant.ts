@@ -1,5 +1,5 @@
 import { CHOSEN_ABILITY_TAG, ENHANCED_ABILITY_TAG, type GameState } from "@vtt/domain";
-import { abilityModifier } from "@vtt/rules-5e";
+import { abilityModifier, rollDice } from "@vtt/rules-5e";
 import type { DamageType, EffectInstance, Modifier } from "@vtt/schemas";
 import { ABILITY_NAMES } from "../ability-checks.js";
 import { setCondition } from "../actor-conditions.js";
@@ -24,7 +24,7 @@ import { refreshBaseArmorClass } from "../actor-roster.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { currentSpeedFeet } from "../speed.js";
 import { spellEffectDuration, spellOf } from "./concentration.js";
-import type { DefinitionAction, LiveActor, ResolveContext } from "./context.js";
+import { recordRoll, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 import { moveMark } from "./marks.js";
 
 /** Reckless Attack's Advantage is on attack rolls using Strength. A sheet built before that gate was authored carries
@@ -220,8 +220,9 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       // Heroism: immune to Frightened, and Temporary Hit Points at the start of each of the bearer's turns.
       ...(grant.conditionImmunities ? { conditionImmunities: [...grant.conditionImmunities] } : {}),
       ...turnStartTemporaryHitPoints(grant.temporaryHitPointsEachTurn, deps.definition),
-      // Aid: the Hit Point maximum and current hit points rise while it lasts (`addEffect`).
-      ...(grant.hitPointMaximumGain ? { hitPointMaximumGain: grant.hitPointMaximumGain.amount } : {})
+      // Aid: the Hit Point maximum and current hit points rise while it lasts (`addEffect`); Heroes' Feast rolls its
+      // 2d10 for each creature.
+      ...hitPointMaximumGainOf(ctx, grant.hitPointMaximumGain, recipient.name)
     }),
     replaced,
     deps
@@ -257,6 +258,22 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       conditionIds: [...(grant.conditions ?? [])]
     });
   else ctx.effectGranted = { name: effect.name, tags: effect.tags };
+}
+
+/** What a grant adds to its recipient's Hit Point maximum: its amount, and its dice rolled for this recipient. */
+function hitPointMaximumGainOf(
+  ctx: ResolveContext,
+  gain: NonNullable<DefinitionAction["grants"]>["hitPointMaximumGain"],
+  recipientName: string
+): Partial<Pick<EffectInstance, "hitPointMaximumGain">> {
+  if (!gain) return {};
+  let amount = gain.amount;
+  if (gain.formula !== undefined) {
+    const rolled = rollDice(gain.formula, ctx.deps.random);
+    recordRoll(ctx, rolled, "healing", `${ctx.action.name}: ${recipientName}`);
+    amount += rolled.total;
+  }
+  return amount >= 1 ? { hitPointMaximumGain: Math.min(1000, amount) } : {};
 }
 
 /** A grant's printed duration as an effect's. One that lasts until ended, on a spell, lasts the spell's own duration at

@@ -10,7 +10,7 @@ import { hasType, slugValidate, whenField } from "./triggers";
     and vulnerability through `grants`; only an effect carries them as modifiers. */
 const MODIFIER_LABELS: Readonly<
   Record<
-    Exclude<Modifier["type"], "damage-resistance" | "damage-vulnerability">,
+    Exclude<Modifier["type"], "damage-resistance" | "damage-vulnerability" | "damage-immunity">,
     readonly [group: string, label: string]
   >
 > = {
@@ -19,11 +19,19 @@ const MODIFIER_LABELS: Readonly<
   "check-bonus": ["Rolls", "Ability checks"],
   initiative: ["Rolls", "Initiative"],
   "roll-mode": ["Rolls", "Advantage or disadvantage"],
+  "d20-minimum": ["Rolls", "Lowest d20"],
+  "total-minimum": ["Rolls", "Lowest total"],
   "damage-bonus": ["Damage and defence", "Damage rolls"],
   "extra-damage": ["Damage and defence", "Extra damage"],
   "critical-range": ["Damage and defence", "Critical hit range"],
   "critical-bonus-dice": ["Damage and defence", "Extra dice on a critical hit"],
   "damage-reduction": ["Damage and defence", "Damage taken"],
+  "damage-die-minimum": ["Damage and defence", "Lowest damage die"],
+  "ignores-resistance": ["Damage and defence", "Damage that ignores Resistance"],
+  "advantage-denied": ["Damage and defence", "No Advantage on attacks against it"],
+  "healing-received-maximized": ["Healing", "Healing received at its most"],
+  "healing-dice-maximized": ["Healing", "Healing dice at their most"],
+  "healing-bonus": ["Healing", "More healing"],
   "armor-class": ["Damage and defence", "Armour class"],
   "unarmored-defense": ["Damage and defence", "Unarmoured defence"],
   "hit-points-per-level": ["Damage and defence", "Hit points per level"],
@@ -104,6 +112,18 @@ function blankModifier(type: string): Draft {
       return { type, amount: 1 };
     case "sense":
       return { type, sense: "", feet: 30 };
+    case "d20-minimum":
+      return { type, roll: "check", minimum: 10 };
+    case "total-minimum":
+      return { type, roll: "check", abilityScore: "str" };
+    case "damage-die-minimum":
+      return { type, minimum: 3 };
+    case "ignores-resistance":
+      return { type, damageTypes: [] };
+    case "advantage-denied":
+      return { type, roll: "incoming-attack" };
+    case "healing-bonus":
+      return { type, amount: 2 };
     default:
       return { type };
   }
@@ -120,8 +140,28 @@ export const ROLL_MODE_ROLLS: readonly SelectOption[] = [
   opt("save", "Saving throws"),
   opt("check", "Ability checks"),
   opt("initiative", "Initiative"),
-  opt("concentration", "Concentration")
+  opt("concentration", "Concentration"),
+  opt("death-save", "Death saving throws")
 ];
+/** The rolls a floor can raise. */
+const FLOORED_ROLLS: readonly SelectOption[] = [opt("check", "Ability checks"), opt("save", "Saving throws")];
+
+/** A switch over a key the schema takes only as `true`: on writes it, off removes it. */
+const trueOnly = (key: string): Pick<FieldDef, "read" | "write"> => ({
+  read: (row) => row[key] === true,
+  write: (next, row) => {
+    const rest = { ...row };
+    delete rest[key];
+    return next === true ? { ...rest, [key]: true } : rest;
+  }
+});
+
+/** Signed dice ("1d4", or "-1d4" to take them off), as `SignedDiceSchema` takes them. */
+const signedDiceValidate = (value: unknown): string | null => {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (text === "" || /^-?[1-4]d(?:4|6|8|10|12)$/.test(text)) return null;
+  return `"${text}" isn't dice this takes. Try 1d4, or -1d4 to take them off.`;
+};
 export const ROLL_MODE_WAYS: readonly SelectOption[] = [
   opt("advantage", "Advantage"),
   opt("disadvantage", "Disadvantage")
@@ -301,9 +341,132 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       key: "amount",
       label: "Damage reduced by",
       kind: "number",
-      min: 1,
+      min: 0,
       max: 30,
       visibleWhen: hasType("damage-reduction")
+    },
+    {
+      key: "amount",
+      label: "More hit points",
+      kind: "number",
+      min: 0,
+      max: 20,
+      visibleWhen: hasType("healing-bonus")
+    },
+    {
+      key: "dice",
+      label: "Plus dice",
+      placeholder: "1d4",
+      validate: signedDiceValidate,
+      visibleWhen: hasType("attack-bonus", "save-bonus", "check-bonus", "damage-bonus"),
+      emptyValue: "omit",
+      help: "Rolled on top of the amount, as Bless adds 1d4. Write -1d4 to take them off."
+    },
+    {
+      key: "dice",
+      label: "Plus dice",
+      placeholder: "1d4",
+      validate: diceValidate,
+      visibleWhen: hasType("damage-reduction"),
+      emptyValue: "omit",
+      help: "Rolled as the damage lands, as Resistance takes off 1d4."
+    },
+    {
+      key: "oncePerTurn",
+      label: "Once a turn",
+      kind: "switch",
+      visibleWhen: hasType("damage-reduction"),
+      ...trueOnly("oncePerTurn"),
+      help: "On an effect, it reduces one hit a turn."
+    },
+    {
+      key: "leavesOne",
+      label: "Leaves at least 1 damage",
+      kind: "switch",
+      visibleWhen: hasType("damage-bonus"),
+      ...trueOnly("leavesOne"),
+      help: "For a penalty that can't take the damage below 1."
+    },
+    {
+      key: "abilityModifier",
+      label: "Plus an ability modifier",
+      kind: "select",
+      options: ABILITIES,
+      emptyValue: "omit",
+      visibleWhen: hasType("check-bonus"),
+      help: "Adds the character's own modifier in that ability to the check."
+    },
+    {
+      key: "minimum",
+      label: "At least",
+      kind: "number",
+      allowNegative: true,
+      min: -5,
+      max: 10,
+      emptyValue: "omit",
+      visibleWhen: (row) => row.type === "check-bonus" && row.abilityModifier !== undefined,
+      help: "The least the ability modifier counts as, such as +1."
+    },
+    {
+      key: "roll",
+      label: "On which roll",
+      kind: "select",
+      options: FLOORED_ROLLS,
+      visibleWhen: hasType("d20-minimum", "total-minimum")
+    },
+    {
+      key: "minimum",
+      label: "A lower d20 counts as",
+      kind: "number",
+      min: 2,
+      max: 20,
+      visibleWhen: hasType("d20-minimum")
+    },
+    {
+      key: "proficientOnly",
+      label: "Only with a proficiency",
+      kind: "switch",
+      ...trueOnly("proficientOnly"),
+      visibleWhen: hasType("d20-minimum"),
+      help: "On for a check that uses one of the character's skill or tool proficiencies."
+    },
+    {
+      key: "abilityScore",
+      label: "A lower total counts as the score in",
+      kind: "select",
+      options: ABILITIES,
+      visibleWhen: hasType("total-minimum")
+    },
+    {
+      key: "minimum",
+      label: "A lower die counts as",
+      kind: "number",
+      min: 2,
+      max: 12,
+      visibleWhen: hasType("damage-die-minimum")
+    },
+    {
+      key: "damageTypes",
+      label: "Damage types",
+      kind: "multiselect",
+      options: DAMAGE_TYPES,
+      visibleWhen: hasType("ignores-resistance")
+    },
+    {
+      key: "perSlotLevel",
+      label: "Plus the spell slot's level",
+      kind: "switch",
+      ...trueOnly("perSlotLevel"),
+      visibleWhen: hasType("healing-bonus"),
+      help: "Only on a spell cast with a spell slot."
+    },
+    {
+      key: "self",
+      label: "The healer regains it",
+      kind: "switch",
+      ...trueOnly("self"),
+      visibleWhen: hasType("healing-bonus"),
+      help: "Once the healing reaches another creature."
     },
     {
       key: "amount",

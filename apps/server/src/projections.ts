@@ -252,7 +252,10 @@ const ON_FAIL_EFFECT_FIELDS = {
   sourceActionId: "never",
   ongoingDamage: "never",
   currentTurn: "player",
-  magical: "never"
+  magical: "never",
+  // The DC of the action that ends it is the caster's number; the option it carries shows in its name.
+  endAction: "never",
+  optionId: "never"
 } as const satisfies Record<keyof NonNullable<PendingSave["onFailEffect"]>, FieldAudience>;
 
 const PENDING_REACTION_FIELDS = {
@@ -465,6 +468,21 @@ function playerEffect(
     endsWhenUnaffected: _endsWhenUnaffected,
     // A long casting's targets and slot are the caster's plan; its name says what is being cast.
     longCast: _longCast,
+    // What a spell's level, its caster's numbers or its choice set, and the engine's bookkeeping: the hit points it
+    // restores each turn, the kinds of creature it wards against, the conditions it holds off, the carried row it is
+    // bound to and how that row swings, the actions it gives (their DCs and damage types), and its once-a-turn and
+    // shrinking marks. Its name says what it is; the owner's sheet reads its actions from the available-actions read.
+    hitPointsEachTurn: _hitPointsEachTurn,
+    conditionWards: _conditionWards,
+    suppressedConditions: _suppressedConditions,
+    itemId: _itemId,
+    weapon: _weapon,
+    optionId: _optionId,
+    bonusActions: _bonusActions,
+    grantedSpellAction: _grantedSpellAction,
+    endAction: _endAction,
+    usedOnTurn: _usedOnTurn,
+    shrinksEachLongRest: _shrinksEachLongRest,
     ...visible
   } = effect;
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);

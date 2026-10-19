@@ -66,6 +66,13 @@ export type ResolveInput = Readonly<{
   skill?: string | null;
   /** The ability a cast chooses (Hex). */
   ability?: "str" | "dex" | "con" | "int" | "wis" | "cha" | null;
+  /** The option picked for an action that offers several (`grants.options`, `failureEffect.options`); absent, the
+   *  first. */
+  optionId?: string | null;
+  /** An option for each target, for an action that asks for one per target; a target left out takes `optionId`. */
+  targetOptions?: Readonly<Record<string, string>>;
+  /** The carried weapon a grant binds to (`grants.bindsWeapon`). */
+  itemId?: string | null;
   /** How this attack is made, for `attack-kind-is` riders. Melee/ranged/thrown are derived; opportunity and
    *  reaction can't be, so `reactions.ts` announces them here. */
   attackKinds?: readonly AttackKind[];

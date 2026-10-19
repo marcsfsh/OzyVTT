@@ -592,7 +592,7 @@ export function deriveEquipment(
     saves,
     damageResistances: [...damageResistances, ...defencesOf(standing, "damage-resistance")],
     damageVulnerabilities: [...defencesOf(standing, "damage-vulnerability"), ...cursedVulnerabilities],
-    damageImmunities,
+    damageImmunities: [...damageImmunities, ...defencesOf(standing, "damage-immunity")],
     conditionImmunities,
     armorClass: sumRiders(standing, "armor-class"),
     // "Add your Proficiency Bonus" is proficiency, so it counts once however many carriers grant it.
@@ -675,7 +675,10 @@ function heavyWeaponCarrier(item: InventoryItem, definition: ActorDefinition | u
 }
 
 /** The damage types standing `damage-resistance` or `damage-vulnerability` riders name, each with its carrier. */
-function defencesOf(riders: readonly ResolvedRider[], type: "damage-resistance" | "damage-vulnerability"): Defence[] {
+function defencesOf(
+  riders: readonly ResolvedRider[],
+  type: "damage-resistance" | "damage-vulnerability" | "damage-immunity"
+): Defence[] {
   return riders.flatMap((rider) =>
     rider.modifier.type === type ? (rider.modifier.damageTypes ?? []).map((id) => ({ id, source: rider.label })) : []
   );
@@ -732,10 +735,12 @@ export function skillTierSources(derivation: EquipmentDerivation, skillId: strin
 }
 
 /** The whole rider bonus to one ability check: the standing `derivation.checkBonus` plus the momentary
- *  `on-ability-check` riders that `narrow` lets through. */
+ *  `on-ability-check` riders that `narrow` lets through, and the ability modifiers riders add, each at least its
+ *  minimum (Thaumaturge's Wisdom, minimum +1), read from `scores`. */
 export function checkRiderBonus(
   derivation: EquipmentDerivation,
-  narrow: Readonly<{ ability?: RiderAbility; skill?: string }>
+  narrow: Readonly<{ ability?: RiderAbility; skill?: string }>,
+  scores?: Readonly<Record<RiderAbility, number>>
 ): number {
   const momentary = collectRiders(derivation.carriers, {
     ...derivation.context,
@@ -743,7 +748,34 @@ export function checkRiderBonus(
     ...(narrow.skill !== undefined ? { skill: narrow.skill } : {}),
     moment: "on-ability-check"
   });
-  return derivation.checkBonus + sumRiders(momentary, "check-bonus");
+  const standing = collectRiders(derivation.carriers, { ...derivation.context, moment: null });
+  return (
+    derivation.checkBonus +
+    sumRiders(momentary, "check-bonus") +
+    abilityModifierBonus([...standing, ...momentary], "check-bonus", scores)
+  );
+}
+
+/** What riders of one type add from an ability modifier (`abilityModifier`), each counted as at least its `minimum`;
+ *  without the scores, the minimum alone. Riders sharing a `stackKey` count once. */
+export function abilityModifierBonus(
+  riders: readonly ResolvedRider[],
+  type: string,
+  scores: Readonly<Record<RiderAbility, number>> | undefined
+): number {
+  const counted = new Set<string>();
+  let total = 0;
+  for (const rider of riders) {
+    const { abilityModifier: ability, minimum } = rider.modifier;
+    if (rider.modifier.type !== type || ability === undefined) continue;
+    if (rider.stackKey !== undefined) {
+      if (counted.has(rider.stackKey)) continue;
+      counted.add(rider.stackKey);
+    }
+    const modifier = scores ? Math.floor((scores[ability] - 10) / 2) : (minimum ?? 0);
+    total += Math.max(minimum ?? modifier, modifier);
+  }
+  return total;
 }
 
 export type RollModeClaims = { advantage: RollModeSource[]; disadvantage: RollModeSource[] };

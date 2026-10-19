@@ -235,7 +235,11 @@ const PendingSaveEffectSchema = z
     armorClassBonus: EffectInstanceSchema.shape.armorClassBonus,
     /** "Until the end of the current turn" for a save made at the start of the bearer's own turn (Stinking Cloud),
      *  where "until the end of its next turn" would run a turn longer. */
-    currentTurn: z.literal(true).optional()
+    currentTurn: z.literal(true).optional(),
+    /** An action the bearer may take to end it (Irresistible Dance's "collect itself"). */
+    endAction: EffectInstanceSchema.shape.endAction,
+    /** The option the caster picked for the failure (Bestow Curse's curse). */
+    optionId: EffectInstanceSchema.shape.optionId
   })
   .strict();
 

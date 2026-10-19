@@ -40,6 +40,14 @@ const RULE_FAMILIES = {
   // An effect that takes away Reactions (Slow).
   "condition.no-reactions": "economy",
   "condition.no-spells": "economy",
+  // Effects that take away Bonus Actions (Confusion), attacks (Gaseous Form), every action but Dash (Wind Walk), or
+  // all but one of moving, an action and a Bonus Action a turn (Abjure Foes).
+  "condition.no-bonus-actions": "economy",
+  "condition.cant-attack": "economy",
+  "condition.dash-only": "economy",
+  "condition.one-thing-a-turn": "economy",
+  // A creature that can't end the Prone condition on itself (Hideous Laughter).
+  "movement.cant-stand": "movement",
   // "Legendary actions are taken on other creatures' turns" is a timing/economy rule...
   "legendary.own-turn": "economy",
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.
