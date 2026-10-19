@@ -703,8 +703,9 @@ change as a new numbered migration in the owning store.
 
 ## Client
 
-A routed single-page app (`apps/client/src/router.ts`); every surface has an address. `main.tsx` only
-mounts `shell/App.tsx`, where `useSession` holds the sign-in, the socket and the projected state, and
+A routed single-page app (`apps/client/src/router.ts`); every surface has an address. `main.tsx` installs
+the zoom guard (`lib/zoom-guard.ts`, which holds a phone's page at its own size, as the other two entries do)
+and mounts `shell/App.tsx`, where `useSession` holds the sign-in, the socket and the projected state, and
 the GM and player shells render the surface the address names. The game arrives over the socket; the
 Codex and homebrew are fetched over HTTP. Socket request/replies go through `lib/command.ts`
 (`command` adds the `commandId`, `read` does not, and a lost reply becomes a refusal) and `/api/v1`

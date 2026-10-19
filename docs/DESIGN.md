@@ -111,6 +111,13 @@ mouse is a bug.
 - Every element with `touch-action: none` takes its ref from `useDragSurface` (`@vtt/ui`), which
   cancels its touchmove. Without it, a drag that lifts mid-motion starts a browser fling, and the
   browser spends the next tap on stopping it. `drag-surfaces.test.tsx` fails on a surface without it.
+- The page itself never zooms on a touch screen. The zoom guard (`apps/client/src/lib/zoom-guard.ts`) stops a
+  stray pinch or double tap, and one finger still scrolls every region. An element with `touch-action: none`
+  handles its own fingers, so the battle map and the atlas still pinch to zoom. Settings > Device has "Let pinch
+  zoom the page" for anyone who needs the page larger, off by default and kept per device.
+- On a touch screen every field a person types in or picks from is at least 16px (`--fs-field-touch`), because
+  iOS zooms the page into a focused field with smaller text. The floor in `design-tokens.css` sees to it, so a
+  field's own rule may stay smaller for a laptop.
 - A focused input inside a locked region must stay visible above the on-screen keyboard.
 - `prefers-reduced-motion` freezes animations; reduced transparency replaces blur with a solid
   surface.

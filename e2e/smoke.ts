@@ -88,9 +88,10 @@ export async function fillIn(field: Locator, value: string) {
 }
 
 /**
- * The page never scrolls (docs/DESIGN.md): the document fits the viewport, no `.scroll-y` region can
- * scroll sideways, and nothing outside those regions has been scrolled. A box that clips its overflow
- * still scrolls when focus lands in its hidden part, which pushes the page out of place.
+ * The page never scrolls or zooms (docs/DESIGN.md): the document fits the viewport at its own scale, no
+ * `.scroll-y` region can scroll sideways, and nothing outside those regions has been scrolled. A box that
+ * clips its overflow still scrolls when focus lands in its hidden part, which pushes the page out of place.
+ * On a touch screen no field is under 16px, because iOS zooms the page into a focused field below that.
  */
 export async function expectPageFits(page: Page) {
   const found = await page.evaluate(() => {
@@ -111,16 +112,24 @@ export async function expectPageFits(page: Page) {
         );
       })
       .map((element) => `${name(element)} scrolled to ${element.scrollLeft},${element.scrollTop}`);
+    const small = [...document.querySelectorAll<HTMLInputElement>("input, select, textarea")]
+      .filter((field) => field.offsetWidth > 0 && !/^(checkbox|radio|range|color|file)$/.test(field.type))
+      .filter((field) => parseFloat(getComputedStyle(field).fontSize) < 16)
+      .map((field) => `${name(field)} at ${getComputedStyle(field).fontSize}`);
     return {
       size: `${root.scrollWidth}x${root.scrollHeight}`,
       viewport: `${window.innerWidth}x${window.innerHeight}`,
+      scale: window.visualViewport?.scale ?? 1,
       sideways,
-      shifted
+      shifted,
+      small
     };
   });
   expect.soft(found.size, "page size").toBe(found.viewport);
+  expect.soft(found.scale, "page zoom").toBe(1);
   expect.soft(found.sideways, "scroll regions that scroll sideways").toEqual([]);
   expect.soft(found.shifted, "clipped boxes scrolled out of place").toEqual([]);
+  if (touchPages.has(page)) expect.soft(found.small, "fields a phone zooms into on focus").toEqual([]);
 }
 
 /**
@@ -287,6 +296,25 @@ export async function pinchDuringDrag(page: Page, target: Locator, map: Locator)
   await touch.send("touchEnd", []);
   await touch.detach();
 }
+
+/** Two fingers land on the middle of `target`, spread apart and lift: a pinch that would zoom the page in. */
+export async function pinch(page: Page, target: Locator) {
+  const box = (await target.boundingBox())!;
+  const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const spread = (step: number) => [
+    { x: centre.x - 20 - step * 12, y: centre.y - 20 - step * 15 },
+    { x: centre.x + 20 + step * 12, y: centre.y + 20 + step * 15 }
+  ];
+  const touch = await fingers(page);
+  await touch.send("touchStart", spread(0).slice(0, 1));
+  await touch.send("touchStart", spread(0));
+  for (let step = 1; step <= 8; step++) await touch.send("touchMove", spread(step));
+  await touch.send("touchEnd", []);
+  await touch.detach();
+}
+
+/** How far the page itself is zoomed: 1 at its own size. */
+export const pageScale = (page: Page) => page.evaluate(() => window.visualViewport?.scale ?? 1);
 
 /** A PNG battle map: a checkerboard of 64px squares, built here so the suite carries no binary. */
 export function battleMap(width = 700, height = 500): Buffer {
