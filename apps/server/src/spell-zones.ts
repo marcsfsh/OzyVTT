@@ -10,7 +10,7 @@ import { areAllies, areEnemies } from "./creature-sides.js";
 import { CONCENTRATING_TAG, endEffectIfPresent, type EffectNarration } from "./effects.js";
 import { itemIsActive, type EquipmentCatalog } from "./equipment-derivation.js";
 import { applyDamageDetailed, damageAdjustmentDetail, healActor } from "./hit-points.js";
-import { laterRowOf, laterSpellAction, upcastAction } from "./item-actions.js";
+import { laterRowOf, laterSpellAction, laterSpellActionId, upcastAction } from "./item-actions.js";
 import { creatureDistance, DISTANCE_TOLERANCE_FEET, mapDistance } from "./movement-narration.js";
 import { CommandRejectedError } from "./game-store.js";
 import { failureEffectFor } from "./resolution/pending.js";
@@ -20,6 +20,8 @@ import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js"
 import { withArticle } from "@vtt/domain";
 import { altitudeOf, heightSpan } from "./altitude.js";
 import { bandTest, ringTest } from "./zone-shapes.js";
+import { breakTimeStop } from "./time-stop.js";
+import { applyCastSight } from "./vision/cast-sight.js";
 
 type Actor = GameState["actors"][number];
 type Point = Readonly<{ x: number; y: number }>;
@@ -349,6 +351,11 @@ function act(
   const caster = state.actors.find((actor) => actor.id === zone.casterId);
   if (!content || !caster || times < 1) return;
   const { trigger } = content;
+  // A glyph not yet set off acts on no one (`glow`).
+  if (trigger.glyph && !zone.glowing) return;
+  // SRD Time Stop ends if "any effects that you create during it, affects a creature other than you".
+  if (zone.inTimeStop && creature.id !== zone.casterId)
+    events.push(...breakTimeStop(state, zone.casterId, `made ${content.name}, which affected another creature`));
   // "If the spirit has no creature Restrained": while one is still held by the cast, the zone waits.
   if (trigger.holdsOne && zone.castId !== null && holdsACreature(state, zone.castId)) return;
   const travelling = meeting === "moves through";
@@ -552,6 +559,25 @@ export function zonesAfterMove(
     const content = zoneContentOf(zone, deps.catalog);
     if (!content) continue;
     const { trigger } = content;
+    // A hidden glyph waits for a creature to come onto it (Symbol).
+    if (trigger.glyph && !zone.glowing) {
+      if (mover.id === zone.casterId) continue;
+      const glyph = insideTest(
+        state,
+        zone,
+        { on: [], around: "point", feet: trigger.glyph.feet },
+        content,
+        deps.geometry
+      );
+      const height = altitudeOf(moverToken);
+      if (
+        glyph &&
+        !glyph(path[0]!, moverToken.sizeCells, height) &&
+        path.slice(1).some((point) => glyph(point, moverToken.sizeCells, height))
+      )
+        events.push(...glow(state, zone, mover, deps));
+      continue;
+    }
     // An Emanation moves with its caster, over whoever it reaches.
     if (trigger.around === "caster" && zone.casterId === mover.id && !zone.anchor) {
       const tests = path.map((point) => insideTest(state, zone, trigger, content, deps.geometry, point));
@@ -577,6 +603,66 @@ export function zonesAfterMove(
     }
   }
   events.push(...warnings(state, mover, path, deps), ...leashedZones(state, deps));
+  return events;
+}
+
+/**
+ * SRD Symbol: "Once triggered, the glyph glows, filling a 60-foot-radius Sphere with Dim Light for 10 minutes, after
+ * which time the spell ends. Each creature in the Sphere when the glyph activates is targeted by its effect." The glyph
+ * grows to its Sphere, drawn now for everyone, its Dim Light fills it, the spell's time runs from now, and it acts on
+ * each creature in it.
+ */
+function glow(state: GameState, zone: SpellZone, setter: Actor, deps: ZoneDeps): EffectNarration[] {
+  const content = zoneContentOf(zone, deps.catalog);
+  const glyph = content?.trigger.glyph;
+  const calibration = deps.geometry?.calibration;
+  if (!content || !glyph) return [];
+  zone.glowing = true;
+  const events: EffectNarration[] = [
+    { kind: "effect", text: `${setter.name} sets off ${content.name}, and the glyph glows.`, actorId: setter.id }
+  ];
+  const annotation = state.combat.annotations.find((candidate) => candidate.id === zone.annotationId);
+  if (annotation && calibration) {
+    const reach = (glyph.growsToFeet / calibration.distancePerCell) * calibration.cellSizePx;
+    const origin = annotation.geometry.origin;
+    state.combat = {
+      ...state.combat,
+      annotations: state.combat.annotations.map((candidate) =>
+        candidate.id === annotation.id
+          ? {
+              ...annotation,
+              visibility: "public",
+              visibleToActorId: null,
+              geometry: shapeGeometry(calibration, "circle", origin, { x: origin.x + reach, y: origin.y })
+            }
+          : candidate
+      )
+    };
+    applyCastSight(state, {
+      commandId: annotation.id,
+      casterId: zone.casterId,
+      sight: { light: { on: "area", brightFeet: 0, dimFeet: glyph.growsToFeet } },
+      spellId: zone.spellId,
+      level: zone.level,
+      castId: zone.castId,
+      effectId: zone.effectId ?? null,
+      targetIds: [],
+      areaPlaced: true
+    });
+  }
+  // Its time now runs, in a fight or on the game clock: the effect that keeps it lasts that long from here.
+  const keeper = zone.effectId
+    ? state.actors.find((actor) => actor.id === zone.casterId)?.effects.find((effect) => effect.id === zone.effectId)
+    : undefined;
+  if (keeper) keeper.duration = { type: "rounds", remaining: glyph.rounds };
+  zone.area = { shape: "sphere", sizeFeet: glyph.growsToFeet, widthFeet: null };
+  const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
+  if (inside)
+    for (const creature of exposed(state, zone, content.trigger, deps)) {
+      const token = tokenOf(state, creature.id)!;
+      if (inside(token.position!, token.sizeCells, altitudeOf(token)))
+        act(state, zone, creature, "is caught in", deps, events);
+    }
   return events;
 }
 
@@ -715,6 +801,35 @@ function zonesAtCasterTurnEnd(state: GameState, casterId: string, deps: ZoneDeps
 }
 
 /**
+ * SRD Storm of Vengeance: "At the start of each of your later turns, the storm produces different effects." The spell's
+ * turn is counted at each of its caster's turn starts, and on a turn its schedule names the area becomes that later row
+ * (acid, then lightning, hail and freezing rain), its area Heavily Obscured from a row that obscures.
+ */
+function nextStage(state: GameState, zone: SpellZone, deps: ZoneDeps): EffectNarration[] {
+  const spell = deps.catalog?.spellRecord?.(zone.spellId);
+  const schedule = spell ? zoneRowOf(spell)?.zone?.schedule : undefined;
+  if (!spell || !schedule || !state.combat.active) return [];
+  zone.stage = Math.min(1000, (zone.stage ?? 1) + 1);
+  const entry = schedule.find((candidate) => candidate.turn === zone.stage);
+  const row = entry ? (spell.effect?.laterActions ?? []).find((candidate) => candidate.name === entry.row) : undefined;
+  if (!entry || !row) return [];
+  zone.laterActionId = laterSpellActionId(spell.id, row.name);
+  if (row.zone?.obscures && zone.annotationId)
+    applyCastSight(state, {
+      commandId: zone.annotationId,
+      casterId: zone.casterId,
+      sight: { area: { kind: "heavily-obscured" } },
+      spellId: zone.spellId,
+      level: zone.level,
+      castId: zone.castId,
+      effectId: zone.effectId ?? null,
+      targetIds: [],
+      areaPlaced: true
+    });
+  return [{ kind: "effect", text: `${spell.name} turns to its ${row.name}.`, actorId: zone.casterId }];
+}
+
+/**
  * A turn's start: a spell that lasts its duration ends once its caster's turn comes round after it (`rounds`), a cloud
  * its caster's turn moves drifts away from it, and the zones the incoming creature starts its turn inside act on it.
  * Each zone's marks are cleared first: "once per turn" counts afresh.
@@ -730,6 +845,7 @@ export function zonesAtTurnStart(state: GameState, actorId: string, deps: ZoneDe
       events.push({ kind: "effect", text: `${zone.name} ends.`, actorId: zone.casterId });
       continue;
     }
+    if (zoneHeld(state, zone)) events.push(...nextStage(state, zone, deps));
     const trigger = zoneContentOf(zone, deps.catalog)?.trigger;
     const drifts = trigger?.drifts;
     if (drifts === undefined || !zoneHeld(state, zone)) continue;
@@ -855,6 +971,11 @@ function zonesAtCasterTurnStart(state: GameState, casterId: string, deps: ZoneDe
       const token = tokenOf(state, creature.id)!;
       return inside(token.position!, token.sizeCells, altitudeOf(token));
     });
+    // Storm of Vengeance's rain falls on "each creature under the cloud".
+    if (trigger.everyone) {
+      for (const creature of reached) act(state, zone, creature, "is caught in", deps, events);
+      continue;
+    }
     const origin = area.geometry.origin;
     const nearest = reached
       .map((creature) => {
@@ -889,6 +1010,8 @@ export function burstEndedZones(state: GameState, deps: ZoneDeps): EffectNarrati
             return inside(token.position!, token.sizeCells, altitudeOf(token));
           })
         : [];
+      if (zone.inTimeStop && caught.some((creature) => creature.id !== zone.casterId))
+        events.push(...breakTimeStop(state, zone.casterId, `made ${content.name}, which affected another creature`));
       const action = zoneAction(zone, content);
       const parts = (action?.damage ?? []).map((part) => ({
         amount: Math.max(0, resolveDice(parseDiceFormula(part.formula), deps.rollDie).total),

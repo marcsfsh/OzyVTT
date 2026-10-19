@@ -279,8 +279,10 @@ export function passiveOf(
   // A rider tapped before its roll (Brutal Strike) is on the turn list; any other is chosen on a hit.
   if (hitRiderOf(action)) return hitRiderOf(action)!.declaredBeforeRoll ? undefined : "rider";
   if (action.activation !== "other") return undefined;
-  // Moving a spell's area with the caster's move (Conjure Animals' pack) costs nothing and is the caster's to take.
-  if (spell && laterRowOf(spell, action.id)?.movesArea) return undefined;
+  // Moving a spell's area with the caster's move (Conjure Animals' pack), or a storm's bolts the caster aims, costs
+  // nothing and is the caster's to take.
+  const row = spell ? laterRowOf(spell, action.id) : undefined;
+  if (row?.movesArea || row?.atRow) return undefined;
   if (/^spell-.+-then-/.test(action.id)) return "automatic";
   if (structured(action) || TAKEN_ON_A_TURN.has(action.id)) return undefined;
   if (/\bas (?:a|an|your) (?:magic action|bonus action|action|reaction)\b/i.test(action.description)) return undefined;

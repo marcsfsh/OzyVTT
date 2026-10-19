@@ -4044,7 +4044,36 @@ export const AreaTriggerSchema = z
     fadesFeet: z.number().int().min(5).max(300).optional(),
     /** A creature in it can't move on its turn unless it first succeeds on a Strength (Athletics) check against the
      *  save DC, rolled as its turn starts (Tsunami: "must succeed on a Strength (Athletics) check ... to move at all"). */
-    athleticsToMove: z.literal(true).optional()
+    athleticsToMove: z.literal(true).optional(),
+    /** What the area becomes at the start of its caster's later turns: on the spell's `turn` (the cast's turn is 1) it
+     *  turns into the spell's later row named `row`, and keeps that until another entry (Storm of Vengeance's acid,
+     *  lightning, hail and freezing rain). */
+    schedule: z
+      .array(z.object({ turn: z.number().int().min(2).max(100), row: z.string().min(1).max(60) }).strict())
+      .min(1)
+      .max(10)
+      .optional(),
+    /** At its caster's turn start it acts on every creature in it, not only the nearest (Storm of Vengeance's rain). */
+    everyone: z.literal(true).optional(),
+    /** Its area is Heavily Obscured while it stands as this (Storm of Vengeance's freezing rain). */
+    obscures: z.literal(true).optional(),
+    /** Ranged weapon attacks made from it or at a creature in it miss (Storm of Vengeance: "ranged attacks with
+     *  weapons are impossible there"). */
+    stopsRangedWeapons: z.literal(true).optional(),
+    /** A glyph that waits hidden until a creature other than its caster comes within `feet` of its point (Symbol). Set
+     *  off, it glows: its area grows to `growsToFeet` and is filled with Dim Light and drawn for everyone, it acts on
+     *  each creature in it at once and as its trigger says after, and the spell ends `rounds` later. */
+    glyph: z
+      .object({
+        feet: z.number().int().min(5).max(30),
+        growsToFeet: z.number().int().min(5).max(120),
+        rounds: z.number().int().min(1).max(100)
+      })
+      .strict()
+      .optional(),
+    /** The spell's damage has this many more dice while it stands, on the cast and every later action (Call
+     *  Lightning cast in a storm: "the spell's damage increases by 1d10"). */
+    extraDice: z.number().int().min(1).max(10).optional()
   })
   .strict();
 export type AreaTrigger = z.infer<typeof AreaTriggerSchema>;

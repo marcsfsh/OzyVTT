@@ -405,6 +405,98 @@ function wallOfFireForms(): Later[] {
   ];
 }
 
+/** Symbol's six glyphs, each a hidden glyph that glows when a creature comes onto it (SRD 5.2.1 text): Death,
+ *  Discord, Fear, Pain, Sleep and Stunning. Fear's "must move at least 30 feet away from the glyph" is the
+ *  Frightened creature's to obey. */
+function symbolGlyphs(): Later[] {
+  const MINUTE = { type: "rounds" as const, rounds: 10 };
+  const glyph = (
+    id: string,
+    name: string,
+    when: string,
+    saved: NonNullable<Later["save"]>,
+    damage: Later["damage"] = []
+  ): Later => ({
+    name: `${id} glyph`,
+    activation: "other",
+    when: `A creature that comes onto the glyph sets it off: it glows for 10 minutes, and each creature in its 60-foot Sphere, or entering it or ending its turn there once a turn, ${when}`,
+    save: saved,
+    damage,
+    zone: {
+      on: ["enter", "end-turn"],
+      oncePerTurn: true,
+      around: "point",
+      feet: 60,
+      hidden: true,
+      glyph: { feet: 5, growsToFeet: 60, rounds: 100 }
+    },
+    option: { id, name }
+  });
+  const fails = (
+    ability: "con" | "wis",
+    rest: Partial<NonNullable<Later["save"]>> = {}
+  ): NonNullable<Later["save"]> => ({
+    ability,
+    successDamage: "none",
+    failureConditions: [],
+    ...rest
+  });
+  return [
+    glyph(
+      "death",
+      "Death",
+      "makes a Constitution save against 10d10 Necrotic damage, half on a success.",
+      { ability: "con", successDamage: "half", failureConditions: [] },
+      [{ formula: "10d10", type: "necrotic" }]
+    ),
+    glyph(
+      "discord",
+      "Discord",
+      "makes a Wisdom save or argues for 1 minute, with Disadvantage on attack rolls and ability checks.",
+      fails("wis", {
+        failureDuration: MINUTE,
+        failureEffect: {
+          name: "Discord",
+          tags: ["discord"],
+          modifiers: [
+            { type: "roll-mode", roll: "attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] },
+            { type: "roll-mode", roll: "check", mode: "disadvantage", when: [{ type: "on-ability-check" }] }
+          ]
+        }
+      })
+    ),
+    glyph(
+      "fear",
+      "Fear",
+      "makes a Wisdom save or is Frightened for 1 minute.",
+      fails("wis", { failureConditions: ["frightened"], failureDuration: MINUTE })
+    ),
+    glyph(
+      "pain",
+      "Pain",
+      "makes a Constitution save or is Incapacitated for 1 minute.",
+      fails("con", { failureConditions: ["incapacitated"], failureDuration: MINUTE })
+    ),
+    glyph(
+      "sleep",
+      "Sleep",
+      "makes a Wisdom save or is Unconscious for 10 minutes, until it takes damage or is shaken awake.",
+      fails("wis", {
+        failureConditions: ["unconscious"],
+        failureDuration: { type: "rounds", rounds: 100 },
+        endsOnDamage: true,
+        failureEffect: { name: "Symbol of Sleep", tags: ["wakeable"], modifiers: [] }
+      })
+    ),
+    glyph(
+      "stunning",
+      "Stunning",
+      "makes a Wisdom save or is Stunned for 1 minute.",
+      fails("wis", { failureConditions: ["stunned"], failureDuration: MINUTE })
+    )
+  ];
+}
+
 /**
  * What a spell lets its caster do after the cast (SRD 5.2.1 text): the attacks a summoned thing or a held flame
  * makes on later turns, and the saves or damage an area deals when a creature enters it or starts or ends its turn
@@ -550,7 +642,9 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       option: { id: "ring", name: "Ringed wall" }
     }
   ],
-  // "Until the spell ends, you can take a Magic action to call down lightning in that way again."
+  // "A storm cloud appears at a point within range that you can see above yourself. It takes the shape of a Cylinder
+  // that is 10 feet tall with a 60-foot radius", and each bolt strikes "a point you can see under the cloud". "If you're
+  // outdoors in a storm when you cast this spell ... the spell's damage increases by 1d10."
   "call-lightning": [
     {
       name: "bolt",
@@ -558,7 +652,27 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       when: "Until the spell ends, a Magic action calls down another bolt at a point under the cloud.",
       save: save("dex"),
       damage: [{ formula: "3d10", type: "lightning" }],
-      area: { shape: "sphere", sizeFeet: 5, widthFeet: null }
+      area: { shape: "sphere", sizeFeet: 5, widthFeet: null },
+      inArea: true
+    },
+    {
+      ...lasting("cloud", "The storm cloud stays where it formed, reaching 60 feet out from its middle.", {
+        on: [],
+        around: "caster",
+        feet: 60,
+        stays: true
+      }),
+      option: { id: "clear", name: "No storm" }
+    },
+    {
+      ...lasting("storm cloud", "In a storm, the cloud is the storm's, and the spell's damage is 1d10 more.", {
+        on: [],
+        around: "caster",
+        feet: 60,
+        stays: true,
+        extraDice: 1
+      }),
+      option: { id: "storm", name: "Outdoors in a storm" }
     }
   ],
   cloudkill: [
@@ -1130,6 +1244,64 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       // "The cloud lingers in the air for the duration or until a strong wind (such as the one created by Gust of Wind)
       // disperses it."
       zone: { on: ["start-turn"], endsBy: ["wind"] }
+    }
+  ],
+  // "The glyph is nearly imperceptible", and "Once triggered, the glyph glows, filling a 60-foot-radius Sphere with Dim
+  // Light for 10 minutes, after which time the spell ends. Each creature in the Sphere when the glyph activates is
+  // targeted by its effect, as is a creature that enters the Sphere for the first time on a turn or ends its turn there.
+  // A creature is targeted only once per turn." The effect is picked as it is inscribed.
+  symbol: symbolGlyphs(),
+  // "At the start of each of your later turns, the storm produces different effects": acid on turn 2, six lightning
+  // bolts on turn 3, hail on turn 4, and on turns 5 to 10 freezing rain that leaves the area "Difficult Terrain and
+  // Heavily Obscured, ranged attacks with weapons are impossible there, and strong wind blows through the area".
+  "storm-of-vengeance": [
+    lasting("storm", "At the start of each of your later turns, the storm under the cloud changes.", {
+      on: [],
+      schedule: [
+        { turn: 2, row: "acid rain" },
+        { turn: 3, row: "lightning" },
+        { turn: 4, row: "hail" },
+        { turn: 5, row: "freezing rain" }
+      ]
+    }),
+    {
+      name: "acid rain",
+      activation: "other",
+      when: "Turn 2: each creature under the cloud takes the damage.",
+      damage: [{ formula: "4d6", type: "acid" }],
+      zone: { on: ["caster-turn-start"], everyone: true }
+    },
+    lasting("lightning", "Turn 3: you call six bolts down on six creatures under the cloud.", { on: [] }),
+    {
+      name: "bolts",
+      activation: "other",
+      when: "On the storm's third turn, six bolts strike six different creatures you pick under the cloud; each makes the save.",
+      save: save("dex"),
+      damage: [{ formula: "10d6", type: "lightning" }],
+      inArea: true,
+      targetCount: 6,
+      atRow: "lightning"
+    },
+    {
+      name: "hail",
+      activation: "other",
+      when: "Turn 4: each creature under the cloud takes the damage.",
+      damage: [{ formula: "2d6", type: "bludgeoning" }],
+      zone: { on: ["caster-turn-start"], everyone: true }
+    },
+    {
+      name: "freezing rain",
+      activation: "other",
+      when: "Turns 5 to 10: each creature under the cloud takes the damage; the area is Difficult Terrain and Heavily Obscured, ranged weapon attacks there miss, and a strong wind blows.",
+      damage: [{ formula: "1d6", type: "cold" }],
+      zone: {
+        on: ["caster-turn-start"],
+        everyone: true,
+        terrain: DIFFICULT,
+        obscures: true,
+        stopsRangedWeapons: true,
+        wind: true
+      }
     }
   ],
   // "At the start of each of your turns after the wall appears, the wall, along with any creatures in it, moves 50 feet
@@ -2603,6 +2775,8 @@ const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   "prismatic-wall": { shape: "line", sizeFeet: 90, widthFeet: 5 },
   // "Spreading to a radius of 300 feet": the creatures under the cloud.
   "storm-of-vengeance": { shape: "cylinder", sizeFeet: 300, widthFeet: null },
+  // The glyph itself, "no larger than 10 feet in diameter"; set off, it fills a 60-foot-radius Sphere.
+  symbol: { shape: "sphere", sizeFeet: 5, widthFeet: null },
   // "Up to 300 feet long, 300 feet high, and 50 feet thick."
   tsunami: { shape: "line", sizeFeet: 300, widthFeet: 50, heightFeet: 300 },
   "wall-of-fire": { shape: "line", sizeFeet: 60, widthFeet: 5 },

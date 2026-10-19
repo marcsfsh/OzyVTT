@@ -258,6 +258,10 @@ export function openSpellZone(ctx: ResolveContext): void {
     ...(row.zone.stays && casterAt ? { anchor: { x: casterAt.x, y: casterAt.y } } : {}),
     // Tiny Hut: "Creatures and objects within the Emanation when you cast the spell can move through it freely".
     ...(row.zone.bars?.insiders ? { insiders: insidersAtCast(ctx, row.zone.feet ?? 5) } : {}),
+    // Made during its caster's Time Stop, so it ends the Time Stop when it affects another creature.
+    ...(state.combat.timeStop?.actorId === attacker.id ? { inTimeStop: true as const } : {}),
+    // Storm of Vengeance counts its turns from the cast's.
+    ...(row.zone.schedule ? { stage: 1 } : {}),
     entered: [],
     affected: caught ? targets.map((target) => target.id) : []
   };
@@ -312,6 +316,7 @@ export function openActionZone(ctx: ResolveContext): boolean {
       damage: structuredClone(action.damage)
     },
     damageDealt: 0,
+    ...(state.combat.timeStop?.actorId === attacker.id ? { inTimeStop: true as const } : {}),
     entered: [],
     affected: []
   };

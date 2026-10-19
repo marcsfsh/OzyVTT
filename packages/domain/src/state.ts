@@ -1379,6 +1379,12 @@ export const SpellZoneSchema = z
      *  whether it drifted this turn. */
     faded: z.number().int().nonnegative().max(100).optional(),
     driftedThisTurn: z.literal(true).optional(),
+    /** The spell's turn it is on, counted at its caster's turn starts from the cast's 1 (Storm of Vengeance). */
+    stage: z.number().int().positive().max(1000).optional(),
+    /** A glyph set off and glowing (Symbol). */
+    glowing: z.literal(true).optional(),
+    /** It was made while its caster's Time Stop ran, so it ends the Time Stop when it affects another creature. */
+    inTimeStop: z.literal(true).optional(),
     /** It acts when its spell ends (Delayed Blast Fireball's bead), so ending it leaves it `bursting` until the server
      *  has raised the saves. */
     burstsOnEnd: z.literal(true).optional(),

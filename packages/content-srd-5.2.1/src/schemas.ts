@@ -141,7 +141,12 @@ export const SpellLaterActionSchema = z
     /** Conditions its hit lands (Conjure Fey's spirit: Frightened until the start of the caster's next turn). */
     onHit: z.array(OnHitRiderSchema).max(2).optional(),
     save: z
-      .object({ ability: AbilityShortSchema, ...SaveOutcomeFields })
+      .object({
+        ability: AbilityShortSchema,
+        ...SaveOutcomeFields,
+        /** What a failure leaves besides conditions (a Symbol of Discord's Disadvantage). */
+        failureEffect: SaveFailureEffectSchema.optional()
+      })
       .strict()
       .optional(),
     damage: SpellDamageSchema,
@@ -180,6 +185,14 @@ export const SpellLaterActionSchema = z
       })
       .strict()
       .optional(),
+    /** Its template's point, or each creature it targets, must be inside the area the spell left (Call Lightning's
+     *  bolt "under the cloud", Storm of Vengeance's bolts "beneath it"). */
+    inArea: z.literal(true).optional(),
+    /** How many creatures it strikes (Storm of Vengeance's six bolts). */
+    targetCount: z.number().int().min(1).max(10).optional(),
+    /** It is taken only while the spell's area stands as this row of its schedule, once (Storm of Vengeance's bolts on
+     *  its third turn). */
+    atRow: z.string().min(1).max(60).optional(),
     /** The cast leaves this row's zone only when its caster picks this option as it casts (Wall of Fire's ring, a
      *  Symbol's glyph); a cast that picks none leaves the first such row's. With an `area`, the cast is placed as that
      *  area. */

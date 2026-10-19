@@ -77,7 +77,23 @@ export function launchesProjectile(
   return PROJECTILE_NAMES.test(action.name);
 }
 
-/** The wall that deflects an ordinary projectile launched from one creature at the other (Wind Wall), or null. */
+/** The wall that deflects an ordinary projectile launched from one creature at the other (Wind Wall), or the storm
+ *  either one stands in where "ranged attacks with weapons are impossible" (Storm of Vengeance's freezing rain), or
+ *  null. */
 export function deflectingWall(state: GameState, fromId: string, targetId: string, deps: Deps): string | null {
-  return zonesBetween(state, fromId, targetId, deps, (trigger) => trigger.deflects === true)[0]?.name ?? null;
+  const wall = zonesBetween(state, fromId, targetId, deps, (trigger) => trigger.deflects === true)[0]?.name;
+  if (wall) return wall;
+  for (const zone of liveZones(state)) {
+    const content = zoneContentOf(zone, deps.catalog);
+    if (!content?.trigger.stopsRangedWeapons) continue;
+    const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
+    const stands = (actorId: string) => {
+      const token = state.combat.tokens.find(
+        (candidate) => candidate.actorId === actorId && candidate.position !== null
+      );
+      return token ? (inside?.(token.position!, token.sizeCells, token.altitudeFeet ?? 0) ?? false) : false;
+    };
+    if (stands(fromId) || stands(targetId)) return zone.name;
+  }
+  return null;
 }

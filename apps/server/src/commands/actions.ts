@@ -23,7 +23,8 @@ import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { effectiveModeFor, overrideWaives, rulesInForce } from "../rules-families.js";
 import { looseRollPlan, routeForTap, slotsModeFor, spendLooseUses } from "../tap-routing.js";
-import { conditionChoicesOf, isItemActionId, upcastAction } from "../item-actions.js";
+import { conditionChoicesOf, isItemActionId, laterRowOf, upcastAction } from "../item-actions.js";
+import { checkAimInArea, markStageUse, stageRefusal, withAreaDice } from "../zone-later.js";
 import { BURNING_TAG, PUT_OUT_FIRE_ACTION_ID, putOutFire } from "../hazards.js";
 import type { EffectNarration } from "../effects.js";
 import { grantOutsideFight } from "../resolution/grant.js";
@@ -135,6 +136,8 @@ export const actionCommands = [
       // What the spell areas a push moves a creature through did to it.
       const pushedThrough: EffectNarration[] = [];
       let areaMoveNote: string | null = null;
+      // A bolt aimed outside its spell's cloud that a rules mode let through.
+      let areaAimNote: string | null = null;
       // The creatures a barrier against spells kept the cast from, for the GM.
       let wardNotes: string[] = [];
       const { state, duplicate } = await execute((draft) => {
@@ -154,7 +157,15 @@ export const actionCommands = [
         const listed = statBlockAction ?? builtinActionFor(definition, actionId, attacker);
         if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
         // An action whose user picks its cost (Lay on Hands) resolves at the amount picked.
-        const action = withChosenCost(listed, request.spend);
+        const costed = withChosenCost(listed, request.spend);
+        // What the spell's area asks of it: a stage it waits for (Storm of Vengeance's bolts), and the dice a storm adds
+        // (Call Lightning).
+        const areaSpell = costed.spellId ? kit.equipmentCatalog().spellRecord?.(costed.spellId) : undefined;
+        const areaRow = areaSpell ? laterRowOf(areaSpell, costed.id) : undefined;
+        const waiting =
+          areaSpell && areaRow ? stageRefusal(draft, actorId, areaRow, areaSpell, kit.equipmentCatalog()) : null;
+        if (waiting) throw new CommandRejectedError(waiting);
+        const action = withAreaDice(draft, actorId, costed, areaSpell, request.option, kit.equipmentCatalog());
         // The GM may impose any condition; a player picks only among the ones the action lets its caster choose
         // (Blindness/Deafness), read from the spell too for a sheet built before the action carried them.
         const offered = conditionChoicesOf(
@@ -337,6 +348,21 @@ export const actionCommands = [
               throw new CommandRejectedError(OUTSIDE_FIGHT_TARGETS);
           }
         }
+        // A bolt from a spell's cloud strikes under it (Call Lightning, Storm of Vengeance).
+        if (areaSpell && geometry?.calibration && commit !== false)
+          areaAimNote = checkAimInArea(
+            draft,
+            {
+              casterId: actorId,
+              action,
+              spell: areaSpell,
+              point: placed?.origin ?? null,
+              targetIds: template || templates ? [] : resolvedTargetIds,
+              override: isPlayer ? null : (override ?? null),
+              option: request.option
+            },
+            kit.zoneDeps(draft, geometry)
+          );
         // A spell's force (Spiritual Weapon's, an Arcane Eye) can't be harmed: an area passes over it, and nothing
         // harmful targets it.
         const untouchable = resolvedTargetIds.find(
@@ -519,6 +545,7 @@ export const actionCommands = [
         );
         // A committed use counts toward the sheet's most-used options; a preview counts with its confirm.
         if (!resolution.preview) countOptionUse(draft, actorId, actionId);
+        if (!resolution.preview && areaSpell && areaRow?.atRow) markStageUse(draft, actorId, areaRow, areaSpell);
         // The force moved before it struck again.
         if (force && geometry && !resolution.preview) settleForce(draft, force, geometry);
         if (force?.note) resolution = { ...resolution, warnings: [...(resolution.warnings ?? []), force.note] };
@@ -662,13 +689,14 @@ export const actionCommands = [
         kit.publishNarrations(pushedThrough);
         for (const note of wardNotes)
           kit.context.appendLog({ kind: "action", text: note, actorIds: [actorId], gmOnly: true });
-        if (areaMoveNote)
-          kit.context.appendLog({
-            kind: "action",
-            text: `Rules note: ${areaMoveNote}`,
-            actorIds: [actorId],
-            gmOnly: true
-          });
+        for (const note of [areaMoveNote, areaAimNote])
+          if (note)
+            kit.context.appendLog({
+              kind: "action",
+              text: `Rules note: ${note}`,
+              actorIds: [actorId],
+              gmOnly: true
+            });
         for (const { outcome, targetId, sourceActorId, label } of playerDamageApplied) {
           // Narrated like actor:apply-damage. Both actors ride actorIds so the line is gm-only if either is hidden.
           const detail = damageAdjustmentDetail(outcome.application);
