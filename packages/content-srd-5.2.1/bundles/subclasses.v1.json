@@ -113,7 +113,14 @@
     "id": "survivor",
     "name": "Survivor",
     "level": 18,
-    "description": "You attain the pinnacle of resilience in battle. You have Advantage on Death Saving Throws, and at the start of each of your turns you regain Hit Points equal to 5 plus your Constitution modifier if you are Bloodied and have at least 1 Hit Point."
+    "description": "You attain the pinnacle of resilience in battle. You have Advantage on Death Saving Throws, and at the start of each of your turns you regain Hit Points equal to 5 plus your Constitution modifier if you are Bloodied and have at least 1 Hit Point.",
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "death-save",
+      "mode": "advantage"
+     }
+    ]
    }
   ]
  },
@@ -832,6 +839,21 @@
            "damageTypes": [
             "acid"
            ]
+          },
+          {
+           "type": "spell-level-is",
+           "levels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+           ]
           }
          ]
         }
@@ -859,6 +881,21 @@
            "type": "damage-type-is",
            "damageTypes": [
             "cold"
+           ]
+          },
+          {
+           "type": "spell-level-is",
+           "levels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
            ]
           }
          ]
@@ -888,6 +925,21 @@
            "damageTypes": [
             "fire"
            ]
+          },
+          {
+           "type": "spell-level-is",
+           "levels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+           ]
           }
          ]
         }
@@ -916,6 +968,21 @@
            "damageTypes": [
             "lightning"
            ]
+          },
+          {
+           "type": "spell-level-is",
+           "levels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+           ]
           }
          ]
         }
@@ -943,6 +1010,21 @@
            "type": "damage-type-is",
            "damageTypes": [
             "poison"
+           ]
+          },
+          {
+           "type": "spell-level-is",
+           "levels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
            ]
           }
          ]
@@ -1123,7 +1205,30 @@
     "id": "empowered-evocation",
     "name": "Empowered Evocation",
     "level": 10,
-    "description": "You can add your Intelligence modifier to one damage roll of any Wizard Evocation spell you cast."
+    "description": "You can add your Intelligence modifier to one damage roll of any Wizard Evocation spell you cast.",
+    "modifiers": [
+     {
+      "type": "extra-damage",
+      "abilityModifier": "int",
+      "when": [
+       {
+        "type": "on-damage-roll"
+       },
+       {
+        "type": "spell-school-is",
+        "schools": [
+         "evocation"
+        ]
+       },
+       {
+        "type": "spell-class-is",
+        "classIds": [
+         "wizard"
+        ]
+       }
+      ]
+     }
+    ]
    },
    {
     "id": "overchannel",
@@ -1464,7 +1569,28 @@
       {
        "id": "colossus-slayer",
        "name": "Colossus Slayer",
-       "description": "Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn."
+       "description": "Your tenacity can wear down even the most resilient foes. When you hit a creature with a weapon, the weapon deals an extra 1d8 damage to the target if it's missing any of its Hit Points. You can deal this extra damage only once per turn.",
+       "modifiers": [
+        {
+         "type": "extra-damage",
+         "formula": "1d8",
+         "oncePerTurn": true,
+         "when": [
+          {
+           "type": "on-hit"
+          },
+          {
+           "type": "attack-kind-is",
+           "kinds": [
+            "weapon"
+           ]
+          },
+          {
+           "type": "versus-hurt"
+          }
+         ]
+        }
+       ]
       },
       {
        "id": "horde-breaker",
@@ -1643,7 +1769,19 @@
     "id": "disciple-of-life",
     "name": "Disciple of Life",
     "level": 3,
-    "description": "When a spell you cast with a spell slot restores Hit Points to a creature, that creature regains additional Hit Points on the turn you cast the spell. The additional Hit Points equal 2 plus the spell slot's level."
+    "description": "When a spell you cast with a spell slot restores Hit Points to a creature, that creature regains additional Hit Points on the turn you cast the spell. The additional Hit Points equal 2 plus the spell slot's level.",
+    "modifiers": [
+     {
+      "type": "healing-bonus",
+      "amount": 2,
+      "perSlotLevel": true,
+      "when": [
+       {
+        "type": "on-healing"
+       }
+      ]
+     }
+    ]
    },
    {
     "id": "preserve-life",
@@ -1680,13 +1818,36 @@
     "id": "blessed-healer",
     "name": "Blessed Healer",
     "level": 6,
-    "description": "The healing spells you cast on others heal you as well. Immediately after you cast a spell with a spell slot that restores Hit Points to one or more creatures other than yourself, you regain Hit Points equal to 2 plus the spell slot's level."
+    "description": "The healing spells you cast on others heal you as well. Immediately after you cast a spell with a spell slot that restores Hit Points to one or more creatures other than yourself, you regain Hit Points equal to 2 plus the spell slot's level.",
+    "modifiers": [
+     {
+      "type": "healing-bonus",
+      "amount": 2,
+      "perSlotLevel": true,
+      "self": true,
+      "when": [
+       {
+        "type": "on-healing"
+       }
+      ]
+     }
+    ]
    },
    {
     "id": "supreme-healing",
     "name": "Supreme Healing",
     "level": 17,
-    "description": "When you would normally roll one or more dice to restore Hit Points to a creature with a spell or Channel Divinity, don't roll those dice for the healing; instead use the highest number possible for each die. For example, instead of restoring 2d6 Hit Points to a creature with a spell, you restore 12."
+    "description": "When you would normally roll one or more dice to restore Hit Points to a creature with a spell or Channel Divinity, don't roll those dice for the healing; instead use the highest number possible for each die. For example, instead of restoring 2d6 Hit Points to a creature with a spell, you restore 12.",
+    "modifiers": [
+     {
+      "type": "healing-dice-maximized",
+      "when": [
+       {
+        "type": "on-healing"
+       }
+      ]
+     }
+    ]
    }
   ]
  },
@@ -1738,7 +1899,32 @@
       "name": "Channel Divinity: Sacred Weapon",
       "activation": "other",
       "description": "When you take the Attack action, you can expend one use of your Channel Divinity to imbue one Melee weapon you are holding with positive energy. For 10 minutes or until you use this feature again, you add your Charisma modifier to attack rolls with that weapon (minimum bonus of +1), and each time you hit with it you can make it deal Radiant damage instead of its normal type. The weapon emits Bright Light in a 20-foot radius and Dim Light 20 feet beyond that.",
-      "damage": []
+      "damage": [],
+      "grants": {
+       "name": "Sacred Weapon",
+       "tags": [
+        "sacred-weapon"
+       ],
+       "duration": {
+        "type": "rounds",
+        "rounds": 100
+       },
+       "modifiers": [],
+       "onEnd": [],
+       "target": "self",
+       "voidWhileIncapacitated": false,
+       "concentration": false,
+       "bindsWeapon": {
+        "melee": true,
+        "attackBonusAbility": {
+         "ability": "cha",
+         "minimum": 1
+        },
+        "damageTypes": [
+         "radiant"
+        ]
+       }
+      }
      }
     ]
    },

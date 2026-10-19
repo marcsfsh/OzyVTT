@@ -269,7 +269,25 @@
           "str",
           "dex"
         ]
-      }
+      },
+      "modifiers": [
+        {
+          "type": "roll-mode",
+          "roll": "attack",
+          "mode": "advantage",
+          "when": [
+            {
+              "type": "on-attack-roll"
+            },
+            {
+              "type": "versus-marked",
+              "tags": [
+                "grapple"
+              ]
+            }
+          ]
+        }
+      ]
     }
   },
   {
@@ -303,13 +321,7 @@
             {
               "type": "attack-kind-is",
               "kinds": [
-                "ranged"
-              ]
-            },
-            {
-              "type": "weapon-property-is",
-              "properties": [
-                "ammunition"
+                "ranged-weapon-kind"
               ]
             }
           ]
@@ -365,6 +377,23 @@
       "description": "When you roll damage for an attack you make with a Melee weapon that you are holding with two hands, you can treat any 1 or 2 on a damage die as a 3. The weapon must have the Two-Handed or Versatile property to gain this benefit.",
       "tags": [
         "fighting-style"
+      ],
+      "modifiers": [
+        {
+          "type": "damage-die-minimum",
+          "minimum": 3,
+          "when": [
+            {
+              "type": "on-damage-roll"
+            },
+            {
+              "type": "attack-kind-is",
+              "kinds": [
+                "two-handed"
+              ]
+            }
+          ]
+        }
       ]
     }
   },
@@ -523,7 +552,17 @@
           "str",
           "dex"
         ]
-      }
+      },
+      "modifiers": [
+        {
+          "type": "ignores-resistance",
+          "damageTypes": [
+            "bludgeoning",
+            "piercing",
+            "slashing"
+          ]
+        }
+      ]
     }
   },
   {
