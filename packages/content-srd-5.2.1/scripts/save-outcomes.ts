@@ -50,6 +50,7 @@ export type SaveOutcome = {
   repeatUnseenSource?: true;
   endsOutOfSight?: true;
   autoSuccess?: { creatureTypes?: string[]; sleepless?: true };
+  failureEndsForm?: true;
   breaksConcentration?: true;
 };
 
@@ -403,22 +404,6 @@ export function failureRestrictionsOf(description: string, name: string): Failur
   };
 }
 
-/** The tag on a lycanthrope's curse, which the engine reads when its bearer drops to 0 Hit Points. */
-export const LYCANTHROPY_TAG = "lycanthropy";
-
-/**
- * A lycanthrope's bite: "Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a
- * Werewolf under the DM's control and has 10 Hit Points." The curse lasts until something ends it (Remove Curse ends a
- * curse). Null for any other printing.
- */
-export function lycanthropyCurseOf(description: string): { name: string; tags: string[]; modifiers: [] } | null {
-  const curse =
-    /\bThe target is cursed\. If the cursed target drops to 0 Hit Points, it instead becomes an? ([A-Z][a-z]+) under the DM's control and has 10 Hit Points\b/.exec(
-      description
-    );
-  return curse ? { name: `Lycanthropy (${curse[1]})`, tags: ["curse", LYCANTHROPY_TAG], modifiers: [] } : null;
-}
-
 /** "Or a creature within 5 feet of it takes an action to wake it", "someone within 5 feet of it takes an action to shake
  *  it out of the spell's effect". */
 const WAKE =
@@ -578,7 +563,10 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   "ensnaring-strike": {
     ongoingDamage: { damage: [{ formula: "1d6", type: "piercing" }], at: "bearer-turn-start" },
     advantageAtSize: "large"
-  }
+  },
+  // "If the creature is shape-shifted (as a result of the Polymorph spell, for example), it reverts to its true form and
+  // can't shape-shift until it leaves the Cylinder."
+  moonbeam: { failureEndsForm: true }
 };
 
 /** `spellSaveOutcome` with the reviewed corrections applied. Unset fields an override names are dropped. */

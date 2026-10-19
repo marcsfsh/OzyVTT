@@ -902,6 +902,53 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].shapeShift.**",
+    types: "*",
+    reason:
+      "how an action shape-shifts a creature (Wild Shape's known forms, Polymorph's Beast, a werewolf's printed forms) - authored in the class, spell and stat block content; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsForm",
+    types: "*",
+    reason: "the action that leaves a form early, added by the form itself as it is taken; zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].formOnly",
+    types: "*",
+    reason:
+      "the printed forms an action works in (a werewolf's Bite), read from the stat block as the catalog is built; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].effectOptions[].**",
+    types: "*",
+    reason:
+      "the effects a use picks one of (Enlarge or Reduce), copied from the spell's cast model by the character build; zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].save.failureEndsForm",
+    types: "*",
+    reason:
+      "a failed save that returns a shape-shifted creature to its true form (Moonbeam), copied from the spell by the character build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.failureEndsForm",
+    types: ["spell"],
+    reason: "one SRD author (Moonbeam), a reviewed override in the content build; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].save.unwillingOnly",
+    types: "*",
+    reason:
+      "a save only an unwilling target makes (Enlarge/Reduce, True Polymorph), copied from the spell by the character build; zero hand authors",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].spendsNoUses",
     types: "*",
     reason:

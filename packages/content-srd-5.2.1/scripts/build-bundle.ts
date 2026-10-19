@@ -39,7 +39,6 @@ import {
   spellSaveOutcomeFor,
   statBlockSaveOutcome,
   failureRestrictionsOf,
-  lycanthropyCurseOf,
   withoutOngoingDamage
 } from "./save-outcomes.js";
 import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
@@ -54,6 +53,7 @@ import { traitMechanicsOf } from "./trait-mechanics.js";
 import { deathTraitMechanicsOf, monsterDeathFor } from "./death-traits.js";
 import { withSpellcasting } from "./monster-spells.js";
 import { fixedFields, MONSTER_ACTION_FIXES } from "./monster-action-fixes.js";
+import { formOnlyOf, lycanthropeCurseOf, shapeShiftOf } from "./monster-forms.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -115,6 +115,8 @@ type ActionFields = {
   uses_type: string | null;
   uses_param: number | null;
   legendary_action_cost: number | null;
+  /** "Wolf or Hybrid Form Only", "Requires Soul Bag". */
+  limited_to_form?: string | null;
 };
 type AttackFields = {
   parent: string;
@@ -972,6 +974,8 @@ const report = {
   legendaryCreatures: 0,
   traitMechanics: 0,
   castingActions: 0,
+  shapeShifts: 0,
+  formOnlyActions: 0,
   typedDefenses: 0,
   corrections: [] as string[],
   untypedDamage: [] as string[],
@@ -1028,7 +1032,9 @@ const monsters: ActorDefinition[] = creatures
       const prose = row ? null : parseProseAttack(action.fields.desc);
       const fix = SAVE_ACTION_FIXES[`${slug}/${idSafe(slugOf(action.pk).replace(`${slug}_`, ""))}`];
       if (fix) report.saveActionFixes.push(`${slug}: ${fix.why}`);
-      const save = fix?.drop === "save" ? null : action.fields.desc.match(SAVE_PATTERN);
+      // A lycanthrope's curse is a save its hit opens on a Humanoid, so the action keeps no save of its own.
+      const curse = lycanthropeCurseOf(slug, fields.name, action.fields.desc);
+      const save = fix?.drop === "save" || curse ? null : action.fields.desc.match(SAVE_PATTERN);
       const legendary = action.fields.action_type === "LEGENDARY_ACTION";
       const legendaryPrefix = legendary
         ? `Legendary Action${(action.fields.legendary_action_cost ?? 1) > 1 ? ` (costs ${action.fields.legendary_action_cost} actions)` : ""}. `
@@ -1047,10 +1053,9 @@ const monsters: ActorDefinition[] = creatures
         : null;
       // Hit points a failure takes each turn (an infernal wound) are the failure's own effect; stanching it is the GM's.
       const loss = save && fix?.drop !== "outcome" ? hitPointLossOf(action.fields.desc) : null;
-      // A failure that restricts with no condition (Slowing Breath, Weakening Breath), or a lycanthrope's curse.
+      // A failure that restricts with no condition (Slowing Breath, Weakening Breath).
       const restriction =
         save && fix?.drop !== "outcome" ? failureRestrictionsOf(action.fields.desc, action.fields.name.trim()) : null;
-      const lycanthropy = save && fix?.drop !== "outcome" ? lycanthropyCurseOf(action.fields.desc) : null;
       // Later-turn damage the engine deals itself (`ongoingDamage`) leaves the GM's reminder.
       const laterDamage = saveDamage?.laterDamage ?? null;
       // "While Poisoned, the target can't regain Hit Points" (a pit fiend's Bite): the poison's own effect stops healing,
@@ -1124,11 +1129,17 @@ const monsters: ActorDefinition[] = creatures
         !legendary && action.fields.action_type === "ACTION" && /multiattack/i.test(action.fields.name)
           ? multiattackOfProse(action.fields.desc, siblingIdOf)
           : null;
-      const onHit = attack !== null && !save ? parseOnHitRiders(action.fields.desc) : null;
+      const parsedOnHit = attack !== null && !save ? parseOnHitRiders(action.fields.desc) : null;
+      const onHit = curse ? [...(parsedOnHit ?? []), curse] : parsedOnHit;
       const uses = usesOf(action.fields);
       const enrichment = ACTION_ENRICHMENTS[`${slug}/${actionId}`];
       const actionFix = MONSTER_ACTION_FIXES[`${slug}/${actionId}`];
       if (actionFix) fixedActions.add(`${slug}/${actionId}`);
+      // A Shape-Shift's printed forms, and the forms an action works in ("Bite (Wolf or Hybrid Form Only)").
+      const shapeShift = shapeShiftOf(slug, actionId);
+      const formOnly = formOnlyOf(slug, action.fields.limited_to_form, action.fields.name);
+      if (shapeShift) report.shapeShifts += 1;
+      if (formOnly) report.formOnlyActions += 1;
       report.actionsTotal += 1;
       if (row) report.structuredAttacks += 1;
       if (prose) report.proseAttacks += 1;
@@ -1177,7 +1188,6 @@ const monsters: ActorDefinition[] = creatures
                       ...(restriction.repeatSave ? { repeatSave: true as const } : {})
                     }
                   : {}),
-                ...(lycanthropy ? { failureEffect: lycanthropy } : {}),
                 ...(fatal.failureByHitPoints ? { failureByHitPoints: fatal.failureByHitPoints } : {})
               }
             }
@@ -1209,6 +1219,8 @@ const monsters: ActorDefinition[] = creatures
               }
             }
           : {}),
+        ...(shapeShift ?? {}),
+        ...(formOnly ? { formOnly } : {}),
         ...(enrichment ?? {}),
         ...fixedFields(actionFix)
       });

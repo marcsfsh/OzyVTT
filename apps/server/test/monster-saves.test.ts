@@ -12,8 +12,8 @@ import { currentSpeedFeet } from "../src/speed.js";
 import { RulesBlockedError } from "../src/game-store.js";
 
 // What a stat block's save does, read from the shipped monsters: a second failure that turns Incapacitated to
-// Unconscious or Paralyzed and Restrained to Petrified, a breath that slows or weakens, an Exhaustion level, a kill, a
-// lycanthrope's curse, immunity after a success, and a charm repeated when the target takes damage.
+// Unconscious or Paralyzed and Restrained to Petrified, a breath that slows or weakens, an Exhaustion level, a kill,
+// immunity after a success, and a charm repeated when the target takes damage.
 
 const MONSTERS = loadMonsterDefinitions();
 const IDS = {
@@ -374,36 +374,22 @@ describe("a failure with no condition", () => {
   });
 });
 
-describe("a lycanthrope's curse", () => {
-  it("curses a Humanoid that fails, and turns it at 10 Hit Points when it drops to 0", () => {
-    const built = table("werewolf");
-    use(built, "bite", [18, 3]);
-    answer(built, 5);
-    expect(hero(built).effects).toMatchObject([{ name: "Lycanthropy (Werewolf)", tags: ["curse", "lycanthropy"] }]);
-    const { events } = hurt(built, 200);
-    expect(hero(built).hp.current).toBe(10);
-    expect(hero(built).conditions).toEqual([]);
-    expect(events.map((event) => event.text).join(" ")).toMatch(
-      /a Werewolf under the GM's control, with 10 Hit Points/
-    );
-    expect(hero(built).effects).toMatchObject([{ name: "Werewolf under the GM's control" }]);
-  });
-
-  it("makes no save for a creature that isn't a Humanoid, and none for one that succeeded before", () => {
-    const built = table("werewolf");
+describe("a save only some creature types make", () => {
+  it("makes no save for a creature of a type the text leaves out", () => {
+    const built = table("cloaker");
+    const moan = built.definition.actions.find((action) => action.id === "moan")!;
+    // "If the target is a Humanoid, it is subjected to the following effect", on a stat block's own save.
+    built.definition.actions.push({
+      ...moan,
+      id: "humanoid-moan",
+      save: { ...moan.save!, onlyCreatureTypes: ["humanoid"] }
+    });
     const wolfish = { ...heroDefinition, extensions: { "open5e.srd-2024": { type: "beast" } } } as ActorDefinition;
     extraDefinitions.set("beast-def", wolfish);
     built.state.actors.find((actor) => actor.id === IDS.ally)!.definitionId = "beast-def";
-    const bit = use(built, "bite", [18, 3], IDS.ally);
+    const heard = use(built, "humanoid-moan", [15], IDS.ally);
     expect(built.state.combat.pendingSaves).toEqual([]);
-    expect(bit.warnings?.join(" ")).toMatch(/Ally isn't a humanoid, so it makes no save/);
-    freshTurn(built);
-    use(built, "bite", [18, 3]);
-    answer(built, 20);
-    freshTurn(built);
-    const again = use(built, "bite", [18, 3]);
-    expect(pending(built)).toEqual([]);
-    expect(again.warnings?.join(" ")).toMatch(/Hero is immune to Werewolf's Bite/);
+    expect(heard.warnings?.join(" ")).toMatch(/Ally isn't a humanoid, so it makes no save/);
   });
 });
 

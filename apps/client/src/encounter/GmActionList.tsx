@@ -22,6 +22,9 @@ const isResolvable = (action: ContentActionSummary) =>
  *  no-target builtins (Dodge, Hide) resolve with a single Use tap; single-target builtins (Help, Unarmed Strike) go
  *  through targeting, as do check actions that ask for a skill (Search, Study). */
 const isTargetless = (action: ContentActionSummary) =>
+  // A shape-shift picks its form first (a werewolf's hybrid), and Enlarge/Reduce its effect.
+  action.forms === undefined &&
+  action.options === undefined &&
   action.checkSkills === undefined &&
   action.attackBonus === null &&
   action.saveAbility === null &&
@@ -32,7 +35,8 @@ const isTargetless = (action: ContentActionSummary) =>
     action.multiattack !== null ||
     action.usesLimit !== null ||
     action.legendaryCost !== undefined ||
-    action.builtin === true);
+    action.builtin === true ||
+    action.targeting === "none");
 
 /** How many places an open action has left for this action: its own, and those it shares ("Claw or Tail"). */
 const placesLeft = (components: Readonly<Record<string, number>>, actionId: string) =>

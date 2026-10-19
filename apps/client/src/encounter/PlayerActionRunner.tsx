@@ -76,6 +76,23 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
   };
 }
 
+/** A sheet's own action with what the server offers for it when it shape-shifts: the forms it may take, the effects
+ *  it picks one of, and whom it aims at (Wild Shape at no one, leaving a form too). */
+export function withShapeOffer(
+  action: ContentActionSummary,
+  row: ContentActionSummary | undefined
+): ContentActionSummary {
+  // The action a form adds to leave it early (its id is the server's).
+  const leaving = action.id === "leave-form";
+  if (!row || (!row.forms && !row.options && !leaving)) return action;
+  return {
+    ...action,
+    ...(row.forms ? { forms: row.forms } : {}),
+    ...(row.options ? { options: row.options } : {}),
+    ...(row.targeting && action.targeting === undefined ? { targeting: row.targeting } : {})
+  };
+}
+
 /** What the server lists for this character beyond its own rows: the generic actions it can take (with the Bonus
  *  Action forms its features give), which of its rows are added to a hit, which wait for their spell, and why any
  *  can't be used now. Read once per sheet; the server still decides each use. */
@@ -292,12 +309,14 @@ export function PlayerActionRunner({
     darts?: number,
     shaping: readonly CastShaping[] = []
   ) => {
-    if (isTargetlessOwn(action))
+    const shaped = withShapeOffer(action, facts.rows.get(action.id));
+    // A shape-shift picks its form first (Wild Shape), and Enlarge/Reduce its effect.
+    if (!shaped.forms && !shaped.options && isTargetlessOwn(shaped))
       resolveActionDirect(actorId, action.id, revision, onOutcome, undefined, undefined, {
         ...(slotLevel !== undefined ? { slotLevel } : {}),
         ...(shaping.length > 0 ? { shaping } : {})
       });
-    else beginTargeting(action, actorId, slotLevel, darts, shaping);
+    else beginTargeting(shaped, actorId, slotLevel, darts, shaping);
   };
   /** The ways a spell option can be cast now. The fight's own rules decide; the list only offers what it can. */
   const castChoices = (option: TurnOption): CastOption[] =>

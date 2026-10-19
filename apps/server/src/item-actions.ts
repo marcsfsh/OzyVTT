@@ -154,6 +154,8 @@ export function itemAction(
     ...(declared.replacesAttack ? { replacesAttack: true } : {}),
     // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
     ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
+    // The form drinking it gives (a Potion of Gaseous Form).
+    ...(declared.shapeShift ? { shapeShift: structuredClone(declared.shapeShift) } : {}),
     ...(declared.area ? { area: { ...declared.area } } : {}),
     // The area it leaves to act later (spread Caltrops).
     ...(declared.zone ? { zone: structuredClone(declared.zone) } : {}),
@@ -332,6 +334,8 @@ export function spellCastMechanics(
       | "endsOneCondition"
       | "dispel"
       | "endsCurses"
+      | "shapeShift"
+      | "effectOptions"
     >
   > {
   // No cast model: the save still applies, and the rest is the GM's.
@@ -376,7 +380,9 @@ export function spellCastMechanics(
                 ? { dc: effect.selfSave.dc, bySelf: true as const }
                 : { dc: numbers.saveDc, ...(numbers.bearersDc ? { spellcasting: true } : {}) }),
               ...(effect.failureEffect ? { failureEffect: structuredClone(effect.failureEffect) } : {}),
-              ...(effect.successEffect ? { successEffect: structuredClone(effect.successEffect) } : {})
+              ...(effect.successEffect ? { successEffect: structuredClone(effect.successEffect) } : {}),
+              // Only an unwilling creature saves (Enlarge/Reduce); one on the caster's side takes the effect.
+              ...(effect.unwillingOnly ? { unwillingOnly: true as const } : {})
             }
           }
         : {}),
@@ -403,7 +409,10 @@ export function spellCastMechanics(
       : {}),
     // The spells it ends on its target (Dispel Magic), and the curses (Remove Curse).
     ...(effect.dispel ? { dispel: { ...effect.dispel } } : {}),
-    ...(effect.endsCurses ? { endsCurses: true as const } : {})
+    ...(effect.endsCurses ? { endsCurses: true as const } : {}),
+    // The form it shape-shifts a creature into (Polymorph), and the effects it picks one of (Enlarge or Reduce).
+    ...(effect.shapeShift ? { shapeShift: structuredClone(effect.shapeShift) } : {}),
+    ...(effect.effectOptions ? { effectOptions: structuredClone(effect.effectOptions) } : {})
   };
 }
 
@@ -472,6 +481,8 @@ export function laterSpellAction(
     ...(later.drain ? { drain: { ...later.drain } } : {}),
     // Moving a mark lands the cast's grant on the new creature (`moveMark`).
     ...(later.movesGrant && spell.effect?.grant ? { grants: structuredClone(spell.effect.grant) } : {}),
+    // A new form while the spell lasts (Shapechange).
+    ...(later.shapeShift ? { shapeShift: structuredClone(later.shapeShift) } : {}),
     spellId: spell.id
   };
 }
@@ -513,7 +524,8 @@ export function withSpellEffects(action: ActorAction, spell: SpellReference | un
     return {
       ...action,
       ...(action.attack && action.onHit === undefined && later.onHit ? { onHit: structuredClone(later.onHit) } : {}),
-      ...(action.drain === undefined && later.drain ? { drain: { ...later.drain } } : {})
+      ...(action.drain === undefined && later.drain ? { drain: { ...later.drain } } : {}),
+      ...(action.shapeShift === undefined && later.shapeShift ? { shapeShift: structuredClone(later.shapeShift) } : {})
     };
   const hitRiders =
     action.attack !== undefined
@@ -545,15 +557,35 @@ export function withSpellEffects(action: ActorAction, spell: SpellReference | un
       ? structuredClone(effect.successEffect)
       : undefined;
   const saveFields = action.save ? newerSaveFields(action.save, spell.save) : {};
-  if (!grants && !failureEffect && !successEffect && Object.keys(saveFields).length === 0) return action;
+  // What a sheet built before shape-shifting was authored lacks: the form the cast gives (Polymorph), the effects it
+  // picks among (Enlarge or Reduce) and its save for unwilling creatures alone.
+  const shapeShift =
+    action.shapeShift === undefined && effect.shapeShift ? structuredClone(effect.shapeShift) : undefined;
+  const effectOptions =
+    action.effectOptions === undefined && effect.effectOptions ? structuredClone(effect.effectOptions) : undefined;
+  const unwilling =
+    action.save && !action.save.unwillingOnly && effect.unwillingOnly ? { unwillingOnly: true as const } : {};
+  if (
+    !grants &&
+    !failureEffect &&
+    !successEffect &&
+    !shapeShift &&
+    !effectOptions &&
+    Object.keys(unwilling).length === 0 &&
+    Object.keys(saveFields).length === 0
+  )
+    return action;
   return {
     ...action,
     ...(grants ? { grants } : {}),
+    ...(shapeShift ? { shapeShift } : {}),
+    ...(effectOptions ? { effectOptions } : {}),
     ...(action.save
       ? {
           save: {
             ...action.save,
             ...saveFields,
+            ...unwilling,
             ...(failureEffect ? { failureEffect } : {}),
             ...(successEffect ? { successEffect } : {})
           }

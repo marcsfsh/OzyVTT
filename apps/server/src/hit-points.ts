@@ -1,3 +1,5 @@
+import { formsAfterDamage } from "./transform/rules.js";
+import { lycanthropyAtZero } from "./transform/at-zero.js";
 import {
   isDead,
   type Actor,
@@ -55,7 +57,6 @@ import { offerDamageReaction } from "./damage-reactions.js";
 import { releaseSwallowedBy } from "./swallow.js";
 import { openRepeatSavesOnDamage } from "./save-stages.js";
 import { berserkerCurse } from "./berserker-axe.js";
-import { lycanthropyAtZero } from "./curses.js";
 import { leaveShortRest } from "./short-rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
@@ -804,8 +805,6 @@ export function applyDamageDetailed(
     stampDeath(state, actor, { cause, ...(kill.bodyGone ? { bodyGone: true } : {}) });
     instantDeath = fell.instantDeath;
     defeated = fell.defeated;
-  } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && lycanthropyAtZero(state, actor, events)) {
-    // A lycanthrope's curse turned it instead, at 10 Hit Points.
   } else if (
     isPlayerCharacter &&
     !wasAtZero &&
@@ -815,6 +814,14 @@ export function applyDamageDetailed(
       relentlessEndurance(actor, definition, damageToHp - hpBefore, events))
   ) {
     // Up at 1 Hit Point: nothing falls.
+  } else if (
+    !wasAtZero &&
+    actor.hp.current === 0 &&
+    damageToHp > 0 &&
+    deps &&
+    lycanthropyAtZero(state, actor, deps, events)
+  ) {
+    // A lycanthrope's curse: it becomes the lycanthrope instead of dropping.
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
     const fell = fallToZero(state, actor, definition, damageToHp - hpBefore, deps, events);
     instantDeath = fell.instantDeath;
@@ -833,6 +840,9 @@ export function applyDamageDetailed(
     instantDeath ||= drained.died && isPlayerCharacter;
     defeated ||= drained.died && !isPlayerCharacter;
   }
+  // A form the damage ends: Polymorph with no Temporary Hit Points left, Wild Shape on falling Unconscious, any form
+  // on death.
+  if (totalAdjusted > 0) events.push(...formsAfterDamage(state, actor));
   // Finger of Death: a Humanoid it kills rises as a Zombie at the start of its caster's next turn.
   if (input.drain?.slainRise && totalAdjusted > 0 && !deadBefore && isDead(actor))
     events.push(...markRising(state, actor, definition, input.drain.slainRise, input.sourceActorId));

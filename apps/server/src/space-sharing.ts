@@ -1,6 +1,7 @@
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition } from "@vtt/schemas";
 import { holdsFeature } from "./class-features.js";
+import { formEffectOf } from "./transform/forms.js";
 
 /**
  * Creatures that share spaces, as the map's drag preview needs to know them. SRD 5.2.1 Air Form: "The elemental can
@@ -34,8 +35,11 @@ export function spaceSharingFor(
     .filter((token) => token.actorId !== actorId && token.position && !hidden(token.actorId))
     .map((token) => token.actorId)
     .filter((id) => isSwarm(definitionOf(id)));
+  // A form that can enter a creature's space and stop there (a vampire's mist, Gaseous Form's cloud) passes them too.
+  const mover = state.actors.find((actor) => actor.id === actorId);
+  const formShares = mover !== undefined && formEffectOf(mover)?.form?.sharesSpaces === true;
   return {
-    ...(passesCreatures(definitionOf(actorId)) ? { passesCreatures: true as const } : {}),
+    ...(passesCreatures(definitionOf(actorId)) || formShares ? { passesCreatures: true as const } : {}),
     ...(swarmIds.length > 0 ? { swarmIds } : {})
   };
 }

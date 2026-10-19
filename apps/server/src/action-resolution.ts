@@ -43,6 +43,8 @@ import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
+import { applyShapeShift, checkShapeShift } from "./resolution/shape-shift.js";
+import { formsOffer } from "./transform/offer.js";
 import { applyMovementGrants } from "./resolution/movement-grants.js";
 import { applyTimeStop } from "./time-stop.js";
 import { applySpellEndings } from "./resolution/dispel.js";
@@ -123,6 +125,8 @@ export function resolveDefinitionAction(
   ctx.action = shapedOutcome(ctx.action, printed, shaping, ctx.plan.castLevel);
   checkOverchannel(ctx);
   ctx.builtin?.check?.(ctx);
+  // A form the action can't give is refused before anything is spent.
+  checkShapeShift(ctx);
   ctx.builtin?.apply?.(ctx);
   // A warded target (Sanctuary) asks its save as the attack or spell is made; a failure spends nothing and stops here.
   if (input.commit !== false && input.economyPaid !== true && turnedAwayByWard(ctx))
@@ -230,6 +234,7 @@ export function resolveDefinitionAction(
   applyMovementGrants(ctx);
   applyTimeStop(ctx);
   applyGrant(ctx);
+  applyShapeShift(ctx);
   layOutProvisions(ctx);
   orbLeap(ctx);
   placeCastSight(ctx);
@@ -410,6 +415,7 @@ export function actionAvailability(
     const reason = unavailableReason(evaluation.violations, { state, attacker, action, siblings, spell });
     const passive = passiveOf(action, builtin);
     const shaping = builtin ? undefined : shapingOffers(state, attacker, action, spell, definition, siblings);
+    const forms = action.shapeShift ? formsOffer(state, attacker, action, definition, catalog) : undefined;
     return {
       id: action.id,
       name: action.name,
@@ -420,6 +426,10 @@ export function actionAvailability(
       ...(reason !== undefined ? { reason } : {}),
       ...(passive !== undefined ? { passive } : {}),
       ...(shaping !== undefined ? { shaping } : {}),
+      ...(forms !== undefined ? { forms } : {}),
+      ...(action.effectOptions
+        ? { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) }
+        : {}),
       usesRemaining,
       componentsRemaining,
       ...(builtin ? { builtin: true } : {}),
@@ -480,6 +490,8 @@ function tapTargeting(
   usesUpItem: boolean,
   spell: SpellReference | undefined
 ): "none" | "single" | "multi" | null {
+  // A shape-shift on its user (Wild Shape, a werewolf's Shape-Shift), and leaving a form, aim at no one.
+  if (action.endsForm || (action.shapeShift && !action.shapeShift.onTargets && !action.save)) return "none";
   if (action.attack || action.grants?.target === "target" || action.targets?.count === 1) return "single";
   if (action.save || action.damage.length > 0 || action.grants?.target === "targets") return "multi";
   if (action.healing) return action.healing.self ? "none" : action.healing.divided ? "multi" : "single";

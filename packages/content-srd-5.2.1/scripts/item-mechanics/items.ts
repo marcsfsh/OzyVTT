@@ -7,6 +7,7 @@
  */
 import type { DamageType, Modifier } from "@vtt/schemas";
 import type { ItemMechanics, ItemMechanicsModule } from "./overlay.js";
+import { MISTY_CLOUD } from "../spell-effects.js";
 
 /** The d10 table Armor of Resistance and Ring of Resistance roll on for their type. */
 /** Extra damage when the weapon hits a creature of one of these types ("an extra 3d6 damage of the weapon's type if the
@@ -2328,11 +2329,110 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         }
       }
     ]
+  },
+
+  // "You gain the 'enlarge' effect of the Enlarge/Reduce spell for 10 minutes (no Concentration required)": one size
+  // larger, Advantage on Strength checks and saves, and 1d4 more damage with weapons and Unarmed Strikes.
+  "potion-of-growth": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "drink",
+        name: "Drink Potion of Growth",
+        activation: "bonus-action",
+        description:
+          "Drink it: for 10 minutes your size increases by one category, you have Advantage on Strength checks and Strength saving throws, and your attacks with weapons or Unarmed Strikes deal an extra 1d4 damage on a hit.",
+        damage: [],
+        grants: {
+          name: "Potion of Growth",
+          tags: ["enlarged"],
+          duration: { type: "rounds", rounds: 100 },
+          sizeChange: { step: 1 },
+          modifiers: [
+            ...strengthRolls("advantage"),
+            {
+              type: "extra-damage",
+              formula: "1d4",
+              doubleOnCritical: true,
+              when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["weapon", "unarmed"] }]
+            }
+          ]
+        }
+      }
+    ]
+  },
+
+  // "You gain the 'reduce' effect of the Enlarge/Reduce spell for 1d4 hours (no Concentration required)": one size
+  // smaller and Disadvantage on Strength checks and saves. Its 1d4 less weapon damage is the GM's.
+  "potion-of-diminution": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "drink",
+        name: "Drink Potion of Diminution",
+        activation: "bonus-action",
+        description:
+          "Drink it: for 1d4 hours your size decreases by one category, you have Disadvantage on Strength checks and Strength saving throws, and your attacks with weapons or Unarmed Strikes deal 1d4 less damage on a hit (never below 1).",
+        damage: [],
+        grants: {
+          name: "Potion of Diminution",
+          tags: ["reduced"],
+          duration: { type: "manual" },
+          hoursRolled: "1d4",
+          sizeChange: { step: -1 },
+          modifiers: strengthRolls("disadvantage")
+        }
+      }
+    ]
+  },
+
+  // "When you drink this potion, you gain the effect of the Gaseous Form spell for 1 hour (no Concentration required) or
+  // until you end the effect as a Bonus Action."
+  "potion-of-gaseous-form": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "drink",
+        name: "Drink Potion of Gaseous Form",
+        activation: "bonus-action",
+        description:
+          "Drink it: for 1 hour you are a misty cloud, as the Gaseous Form spell, with no Concentration. End it early as a Bonus Action.",
+        damage: [],
+        shapeShift: {
+          from: "printed",
+          printed: [MISTY_CLOUD],
+          keeps: [],
+          noSpells: true,
+          gear: "worn",
+          endsAtZeroHitPoints: true,
+          leaveAs: "bonus-action",
+          durationMinutes: 60
+        }
+      }
+    ]
   }
 
   // The other potions and the oils stay prose: their effects last an hour or more, which an effect can't count
   // without the GM ending it.
 };
+
+/** Strength checks and saves with Advantage (enlarged) or Disadvantage (reduced). */
+function strengthRolls(mode: "advantage" | "disadvantage"): Modifier[] {
+  return [
+    {
+      type: "roll-mode",
+      roll: "check",
+      mode,
+      when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["str"] }]
+    },
+    {
+      type: "roll-mode",
+      roll: "save",
+      mode,
+      when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["str"] }]
+    }
+  ];
+}
 
 /** A potion that heals its printed dice when drunk or given to a creature within 5 feet, and is used up. */
 function healingPotion(name: string, formula: string): ItemMechanics {

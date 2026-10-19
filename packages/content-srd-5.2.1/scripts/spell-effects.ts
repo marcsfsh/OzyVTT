@@ -377,6 +377,41 @@ const lasting = (name: string, when: string, zone: Zone): Later => ({
  * that moment; the rest stay with the GM, whom the cast reminds.
  */
 const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
+  "animal-shapes": [
+    {
+      name: "transform again",
+      activation: "action",
+      when: "On your later turns, a Magic action transforms the targets again, each into a Large or smaller Beast of Challenge Rating 4 or lower.",
+      laterTurnsOnly: true,
+      damage: [],
+      shapeShift: {
+        from: "bestiary",
+        onTargets: true,
+        creatureTypes: ["beast"],
+        maxChallenge: 4,
+        maxSize: "large",
+        keeps: ["mental", "type"],
+        noSpells: true,
+        gear: "merged",
+        leaveAs: "bonus-action"
+      }
+    }
+  ],
+  shapechange: [
+    {
+      name: "new form",
+      activation: "action",
+      when: "Until the spell ends, a Magic action shape-shifts you into a different eligible form.",
+      damage: [],
+      shapeShift: {
+        from: "bestiary",
+        notCreatureTypes: ["construct", "undead"],
+        challengeOf: "user",
+        keeps: ["mental", "proficiencies", "spellcasting", "type"],
+        gear: "choice"
+      }
+    }
+  ],
   // "An alarm alerts you whenever a creature touches or enters the warded area", sparing the creatures you designate:
   // your allies.
   alarm: [
@@ -754,7 +789,8 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       name: "save",
       activation: "other",
       when: `A creature the Cylinder moves into, or that enters it or ends its turn there, makes the save. ${ONCE_PER_TURN} A Magic action on your later turns moves the Cylinder up to 60 feet.`,
-      save: save("con"),
+      // A shape-shifted creature that fails reverts to its true form.
+      save: { ...save("con"), failureEndsForm: true },
       damage: [{ formula: "2d10", type: "radiant" }],
       zone: ENTER_OR_END_ONCE
     },
@@ -1602,6 +1638,182 @@ const SAVE_SUCCESS_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   }
 };
 
+type ShapeShift = NonNullable<SpellEffect["shapeShift"]>;
+type PrintedForm = NonNullable<ShapeShift["printed"]>[number];
+
+/**
+ * The forms a cast shape-shifts creatures into (SRD 5.2.1 text): where they come from, what each creature keeps of its
+ * own statistics, and what ends the form. Every one keeps its Hit Points and Hit Point Dice.
+ */
+/** Gaseous Form's misty cloud, which a Potion of Gaseous Form gives too. */
+export const MISTY_CLOUD: PrintedForm = {
+  id: "misty-cloud",
+  name: "Misty cloud",
+  speeds: { walk: 0, fly: 10, hover: true },
+  noSpeech: true,
+  noAttacks: true,
+  sharesSpaces: true,
+  conditionImmunities: ["prone"],
+  modifiers: [
+    { type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] },
+    ...(["str", "dex", "con"] as const).map((ability): Modifier => ({
+      type: "roll-mode",
+      roll: "save",
+      mode: "advantage",
+      when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: [ability] }]
+    }))
+  ]
+};
+
+const CAST_SHAPE_SHIFTS: Readonly<Record<string, ShapeShift>> = {
+  // "Any Beast you choose that has a Challenge Rating equal to or less than the target's ... retains its alignment,
+  // personality, creature type, Hit Points, and Hit Point Dice ... gains a number of Temporary Hit Points equal to the
+  // Hit Points of the Beast form ... The spell ends early on the target if it has no Temporary Hit Points left ... it
+  // can't speak or cast spells. The target's gear melds into the new form."
+  polymorph: {
+    from: "bestiary",
+    creatureTypes: ["beast"],
+    challengeOf: "target",
+    keeps: ["type"],
+    noSpells: true,
+    noSpeech: true,
+    gear: "merged",
+    temporaryHitPoints: "each-form",
+    endsWithoutTemporaryHitPoints: true
+  },
+  // Creature into Creature: "any kind you choose that has a Challenge Rating equal to or less than the target's ...
+  // retains its Hit Points, Hit Point Dice, alignment, and personality ... Temporary Hit Points equal to the Hit Points
+  // of the new form ... can't speak or cast spells. The target's gear melds".
+  "true-polymorph": {
+    from: "bestiary",
+    challengeOf: "target",
+    keeps: [],
+    noSpells: true,
+    noSpeech: true,
+    gear: "merged",
+    temporaryHitPoints: "each-form"
+  },
+  // "A Challenge Rating no higher than your level or Challenge Rating ... can't be a Construct or an Undead ... you
+  // retain your creature type; alignment; personality; Intelligence, Wisdom, and Charisma scores; Hit Points; Hit Point
+  // Dice; proficiencies; and ability to communicate. If you have the Spellcasting feature, you retain it too ... you
+  // determine whether your equipment drops to the ground or changes in size and shape to fit the new form."
+  shapechange: {
+    from: "bestiary",
+    notCreatureTypes: ["construct", "undead"],
+    challengeOf: "user",
+    keeps: ["mental", "proficiencies", "spellcasting", "type"],
+    gear: "choice",
+    temporaryHitPoints: "first-form"
+  },
+  // "Each target shape-shifts into a Large or smaller Beast of your choice that has a Challenge Rating of 4 or lower ...
+  // retains its creature type; Hit Points; Hit Point Dice; alignment; ability to communicate; and Intelligence, Wisdom,
+  // and Charisma scores ... can't cast spells. The target's equipment melds ... Temporary Hit Points equal to the Hit
+  // Points of the first form ... until the target ends it as a Bonus Action."
+  "animal-shapes": {
+    from: "bestiary",
+    onTargets: true,
+    creatureTypes: ["beast"],
+    maxChallenge: 4,
+    maxSize: "large",
+    keeps: ["mental", "type"],
+    noSpells: true,
+    gear: "merged",
+    temporaryHitPoints: "first-form",
+    leaveAs: "bonus-action"
+  },
+  // "A willing creature you touch shape-shifts ... into a misty cloud ... ends on the target if it drops to 0 Hit Points
+  // or if it takes a Magic action to end the spell on itself ... only method of movement is a Fly Speed of 10 feet, and
+  // it can hover ... can enter and occupy the space of another creature ... Resistance to Bludgeoning, Piercing, and
+  // Slashing damage ... Immunity to the Prone condition ... Advantage on Strength, Dexterity, and Constitution saving
+  // throws ... can't talk ... can't attack or cast spells." Narrow openings and liquids stay the GM's.
+  "gaseous-form": {
+    from: "printed",
+    onTargets: true,
+    printed: [MISTY_CLOUD],
+    keeps: [],
+    noSpells: true,
+    gear: "worn",
+    endsAtZeroHitPoints: true,
+    leaveAs: "action"
+  },
+  // "You and up to ten willing creatures ... assume gaseous forms ... a Fly Speed of 300 feet and can hover ... Immunity
+  // to the Prone condition ... Resistance to Bludgeoning, Piercing, and Slashing damage. The only actions a target can
+  // take in this form are the Dash action or a Magic action to begin reverting ... Reverting takes 1 minute, during
+  // which the target has the Stunned condition." Turning back into a cloud, and the descent when it ends, are the GM's.
+  "wind-walk": {
+    from: "printed",
+    onTargets: true,
+    printed: [
+      {
+        id: "cloud",
+        name: "Cloud",
+        speeds: { walk: 0, fly: 300, hover: true },
+        noActions: true,
+        allowsActions: ["dash"],
+        conditionImmunities: ["prone"],
+        modifiers: [{ type: "damage-resistance", damageTypes: ["bludgeoning", "piercing", "slashing"] }]
+      }
+    ],
+    keeps: [],
+    gear: "worn",
+    leaveAs: "action",
+    revertRounds: 10
+  }
+};
+
+/** Strength checks and saves with Advantage (Enlarge) or Disadvantage (Reduce). */
+const strengthRolls = (mode: "advantage" | "disadvantage"): Modifier[] => [
+  {
+    type: "roll-mode",
+    roll: "check",
+    mode,
+    when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["str"] }]
+  },
+  {
+    type: "roll-mode",
+    roll: "save",
+    mode,
+    when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["str"] }]
+  }
+];
+
+/** Effects a cast picks one of, each landing as a failed save's effect or on a willing creature (SRD 5.2.1 text). */
+const CAST_EFFECT_OPTIONS: Readonly<Record<string, NonNullable<SpellEffect["effectOptions"]>>> = {
+  // "Enlarge. The target's size increases by one category ... Advantage on Strength checks and Strength saving throws.
+  // The target's attacks with its enlarged weapons or Unarmed Strikes deal an extra 1d4 damage on a hit." "Reduce. The
+  // target's size decreases by one category ... Disadvantage on Strength checks and Strength saving throws." Reduce's
+  // 1d4 less damage (never below 1) is the GM's: no rider takes dice away.
+  enlargereduce: [
+    {
+      id: "enlarge",
+      name: "Enlarge",
+      effect: {
+        name: "Enlarged",
+        tags: ["enlarged"],
+        sizeChange: { step: 1 },
+        modifiers: [
+          ...strengthRolls("advantage"),
+          {
+            type: "extra-damage",
+            formula: "1d4",
+            doubleOnCritical: true,
+            when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["weapon", "unarmed"] }]
+          }
+        ]
+      }
+    },
+    {
+      id: "reduce",
+      name: "Reduce",
+      effect: { name: "Reduced", tags: ["reduced"], sizeChange: { step: -1 }, modifiers: strengthRolls("disadvantage") }
+    }
+  ]
+};
+
+/** Spells whose save only an unwilling creature makes ("If the target is an unwilling creature, it can make a ...
+ *  saving throw"): a creature on the caster's side takes the effect with no save. */
+const UNWILLING_ONLY: ReadonlySet<string> = new Set(["enlargereduce", "true-polymorph"]);
+
 /** Saves the caster makes itself at a printed DC (SRD Contact Other Plane: "When you cast this spell, make a DC 15
  *  Intelligence saving throw"). */
 const CAST_SELF_SAVES: Readonly<Record<string, NonNullable<SpellEffect["selfSave"]>>> = {
@@ -1682,6 +1894,8 @@ export function spellEffectFor(
   const teleport = CAST_TELEPORTS[id];
   const dispel = CAST_DISPELS[id];
   const selfSave = CAST_SELF_SAVES[id];
+  const shapeShift = CAST_SHAPE_SHIFTS[id];
+  const effectOptions = CAST_EFFECT_OPTIONS[id];
   return {
     attacks,
     ...(attackRange ? { attackRange } : {}),
@@ -1715,6 +1929,9 @@ export function spellEffectFor(
     ...(SILENCES_AREA.has(id) ? { silencesArea: true as const } : {}),
     ...(PICKS_IN_AREA.has(id) ? { picksInArea: true as const } : {}),
     ...(CHAIN_FEET[id] !== undefined ? { chainFeet: CHAIN_FEET[id] } : {}),
+    ...(shapeShift ? { shapeShift: structuredClone(shapeShift) } : {}),
+    ...(effectOptions ? { effectOptions: structuredClone(effectOptions) } : {}),
+    ...(UNWILLING_ONLY.has(id) ? { unwillingOnly: true as const } : {}),
     ...(AREA_PER_SLOT[id] !== undefined ? { areaPerSlot: AREA_PER_SLOT[id] } : {})
   };
 }

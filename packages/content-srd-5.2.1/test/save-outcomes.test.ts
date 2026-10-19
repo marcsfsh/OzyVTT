@@ -327,21 +327,6 @@ describe("what a stat block's failure does beyond its first conditions", () => {
     expect(weakening.reminder).toMatch(/subtracts 1d10 from its damage rolls/);
   });
 
-  it("reads a lycanthrope's curse, which only a Humanoid is subjected to", () => {
-    for (const [slug, id] of [
-      ["werebear", "bite"],
-      ["wereboar", "gore"],
-      ["wererat", "bite"],
-      ["weretiger", "bite"],
-      ["werewolf", "bite"]
-    ] as const)
-      expect(monsterAction(slug, id).save).toMatchObject({
-        onlyCreatureTypes: ["humanoid"],
-        immuneOnSuccess: true,
-        failureEffect: { tags: ["curse", "lycanthropy"] }
-      });
-  });
-
   it("keeps the words a source tag stood beside", () => {
     expect(monsterAction("rakshasa", "cursed-touch").description).toMatch(
       /While cursed, the target gains no benefit from finishing a Short or Long Rest\.$/
