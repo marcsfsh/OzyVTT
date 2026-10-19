@@ -343,7 +343,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/attack.ts rolls it with the caster's spell attack bonus, Advantage and Disadvantage included."
   ),
   "spellcasting-focus": enforced(
-    "resolution/components.ts checks a cast's components: a Verbal one needs a caster who can speak outside Silence, a Somatic one a free hand (a Shield or bound hands fill one), and a Material one a Component Pouch, the focus the class names or the material itself. A priced material must be carried, a consumed one is used up, and a stat block's \"requiring no components\" waives them."
+    "resolution/components.ts checks a cast's components: a Verbal one needs a caster who can speak outside Silence, a Somatic one a free hand (a Shield or bound hands fill one), and a Material one a Component Pouch, the focus the class names or the material itself. A priced material must be carried, and a consumed one is used up. A stat block's cast is held to its Verbal component unless its text says it needs none; its hands and materials are the GM's."
   ),
   sphere: areaShape("a Sphere is a circle of its radius, and the point it starts from is in it."),
   stable: enforced(
