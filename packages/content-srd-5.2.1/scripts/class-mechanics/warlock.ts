@@ -218,29 +218,37 @@ export const warlock: ClassMechanicsModule = {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 6, maxSpellLevel: 6 },
       uses: { limit: 1, per: "long-rest" },
       // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
-      // same level."
-      replaces: [{ offer: "feature:mystic-arcanum-level-6-spell", when: "level-up", amount: 1 }]
+      // same level": one swap a level across the four arcana, which share it.
+      replaces: [
+        { offer: "feature:mystic-arcanum-level-6-spell", when: "level-up", amount: 1, shares: "mystic-arcanum" }
+      ]
     },
     "mystic-arcanum-level-7-spell": {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 7, maxSpellLevel: 7 },
       uses: { limit: 1, per: "long-rest" },
       // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
       // same level."
-      replaces: [{ offer: "feature:mystic-arcanum-level-7-spell", when: "level-up", amount: 1 }]
+      replaces: [
+        { offer: "feature:mystic-arcanum-level-7-spell", when: "level-up", amount: 1, shares: "mystic-arcanum" }
+      ]
     },
     "mystic-arcanum-level-8-spell": {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 8, maxSpellLevel: 8 },
       uses: { limit: 1, per: "long-rest" },
       // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
       // same level."
-      replaces: [{ offer: "feature:mystic-arcanum-level-8-spell", when: "level-up", amount: 1 }]
+      replaces: [
+        { offer: "feature:mystic-arcanum-level-8-spell", when: "level-up", amount: 1, shares: "mystic-arcanum" }
+      ]
     },
     "mystic-arcanum-level-9-spell": {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 9, maxSpellLevel: 9 },
       uses: { limit: 1, per: "long-rest" },
       // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
       // same level."
-      replaces: [{ offer: "feature:mystic-arcanum-level-9-spell", when: "level-up", amount: 1 }]
+      replaces: [
+        { offer: "feature:mystic-arcanum-level-9-spell", when: "level-up", amount: 1, shares: "mystic-arcanum" }
+      ]
     },
     "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "feats" } }
   },

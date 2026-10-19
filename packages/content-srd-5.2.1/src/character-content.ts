@@ -531,7 +531,12 @@ export const ReplaceableChoiceSchema = z
       .min(1)
       .max(5)
       .default(1)
-      .describe("How many of that offer's answers may be swapped at once")
+      .describe("How many of that offer's answers may be swapped at once"),
+    /** A name several clauses share one allowance under (Mystic Arcanum: "replace one of your arcanum spells" across
+     *  its four arcana). */
+    shares: ContentIdSchema.optional().describe(
+      'A name several clauses share one allowance under: Mystic Arcanum\'s "replace one of your arcanum spells" is one swap across its four arcana'
+    )
   })
   .strict()
   .describe(
