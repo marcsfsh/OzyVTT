@@ -3272,7 +3272,8 @@
    "failureConditions": [
     "charmed"
    ],
-   "endsOnSourceSideDamage": true
+   "endsOnSourceSideDamage": true,
+   "advantageIfFighting": true
   },
   "target": {
    "type": "creature",
@@ -3365,7 +3366,8 @@
    "failureConditions": [
     "charmed"
    ],
-   "endsOnSourceSideDamage": true
+   "endsOnSourceSideDamage": true,
+   "advantageIfFighting": true
   },
   "target": {
    "type": "creature",
@@ -4495,7 +4497,8 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "repeatSave": true
   },
   "target": {
    "type": "creature",
@@ -4515,6 +4518,15 @@
    "attacks": 0,
    "damage": [],
    "healing": null,
+   "failureEffect": {
+    "name": "Confusion",
+    "tags": [
+     "confused",
+     "no-bonus-actions",
+     "no-reactions"
+    ],
+    "modifiers": []
+   },
    "areaPerSlot": 5
   },
   "classes": [
@@ -4818,6 +4830,13 @@
       "successDamage": "none",
       "failureConditions": [
        "restrained"
+      ],
+      "repeatAtTurnStart": true,
+      "repeatFailureDamage": [
+       {
+        "formula": "4d8",
+        "type": "lightning"
+       }
       ]
      },
      "damage": [
@@ -5310,7 +5329,17 @@
    "successDamage": "none",
    "failureConditions": [
     "poisoned"
-   ]
+   ],
+   "repeatTally": 3,
+   "secondFailure": {
+    "conditions": [
+     "poisoned"
+    ],
+    "duration": {
+     "type": "minutes",
+     "minutes": 10080
+    }
+   }
   },
   "target": {
    "type": "creature",
@@ -7529,7 +7558,9 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "repeatOnDamage": {},
+   "advantageIfFighting": true
   },
   "target": {
    "type": "creature",
@@ -7628,7 +7659,9 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "repeatOnDamage": {},
+   "advantageIfFighting": true
   },
   "target": {
    "type": "creature",
@@ -7711,7 +7744,9 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "repeatOnDamage": {},
+   "advantageIfFighting": true
   },
   "target": {
    "type": "creature",
@@ -9178,7 +9213,8 @@
    "successDamage": "none",
    "failureConditions": [
     "frightened"
-   ]
+   ],
+   "repeatUnseenSource": true
   },
   "target": {
    "type": "creature",
@@ -9197,7 +9233,14 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Fear",
+    "tags": [
+     "drops-held"
+    ],
+    "modifiers": []
+   }
   },
   "classes": [
    "bard",
@@ -10299,7 +10342,18 @@
    "successDamage": "none",
    "failureConditions": [
     "restrained"
-   ]
+   ],
+   "repeatTally": 3,
+   "secondFailure": {
+    "conditions": [
+     "petrified"
+    ]
+   },
+   "autoSuccess": {
+    "creatureTypes": [
+     "construct"
+    ]
+   }
   },
   "target": {
    "type": "creature",
@@ -10314,6 +10368,15 @@
     "count": 1
    },
    "healing": null,
+   "successEffect": {
+    "name": "Flesh to Stone",
+    "tags": [],
+    "speedZero": true,
+    "duration": {
+     "type": "until-source-next-turn"
+    },
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -13410,7 +13473,10 @@
     "prone",
     "incapacitated"
    ],
-   "repeatSave": true
+   "repeatSave": true,
+   "repeatOnDamage": {
+    "advantage": true
+   }
   },
   "target": {
    "type": "creature",
@@ -13426,6 +13492,13 @@
     "perSlot": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Hideous Laughter",
+    "tags": [
+     "cant-stand"
+    ],
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -14964,7 +15037,9 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "speedZero": true,
+   "repeatByAction": true
   },
   "target": {
    "type": "creature",
@@ -14979,6 +15054,57 @@
     "count": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Irresistible Dance",
+    "tags": [],
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "attack",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     },
+     {
+      "type": "roll-mode",
+      "roll": "save",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-saving-throw"
+       },
+       {
+        "type": "ability-is",
+        "abilities": [
+         "dex"
+        ]
+       }
+      ]
+     },
+     {
+      "type": "roll-mode",
+      "roll": "incoming-attack",
+      "mode": "advantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     }
+    ]
+   },
+   "successEffect": {
+    "name": "Dancing",
+    "tags": [],
+    "speedZero": true,
+    "duration": {
+     "type": "until-bearer-turn-end"
+    },
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -18071,7 +18197,15 @@
   "save": {
    "ability": "int",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "endedBy": {
+    "name": "Study the illusion",
+    "by": "bearer",
+    "check": {
+     "ability": "int",
+     "skill": "investigation"
+    }
+   }
   },
   "target": {
    "type": "creature",
@@ -18094,6 +18228,11 @@
     "count": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Phantasmal Force",
+    "tags": [],
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -18138,7 +18277,8 @@
    "ability": "wis",
    "successDamage": "half",
    "failureConditions": [],
-   "repeatSave": true
+   "repeatSave": true,
+   "repeatDamageAgain": true
   },
   "target": {
    "type": "creature",
@@ -19821,7 +19961,8 @@
   "save": {
    "ability": "con",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "repeatSave": true
   },
   "target": {
    "type": "creature",
@@ -19835,7 +19976,82 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Ray of Enfeeblement",
+    "tags": [],
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "attack",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       },
+       {
+        "type": "ability-is",
+        "abilities": [
+         "str"
+        ]
+       }
+      ]
+     },
+     {
+      "type": "roll-mode",
+      "roll": "save",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-saving-throw"
+       },
+       {
+        "type": "ability-is",
+        "abilities": [
+         "str"
+        ]
+       }
+      ]
+     },
+     {
+      "type": "roll-mode",
+      "roll": "check",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-ability-check"
+       },
+       {
+        "type": "ability-is",
+        "abilities": [
+         "str"
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "successEffect": {
+    "name": "Ray of Enfeeblement",
+    "tags": [
+     "until-own-attack"
+    ],
+    "duration": {
+     "type": "until-source-next-turn"
+    },
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "attack",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-attack-roll"
+       }
+      ]
+     }
+    ]
+   }
   },
   "classes": [
    "warlock",
@@ -20683,7 +20899,26 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Sanctuary",
+    "tags": [
+     "sanctuary",
+     "until-it-acts"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "ward": {
+     "ability": "wis"
+    }
+   }
   },
   "classes": [
    "cleric"
@@ -22032,6 +22267,24 @@
    "endsOnDamage": true,
    "failureDuration": {
     "type": "until-bearer-turn-end"
+   },
+   "repeatOnce": true,
+   "secondFailure": {
+    "conditions": [
+     "unconscious"
+    ],
+    "endsOnDamage": true,
+    "endedBy": {
+     "name": "Wake",
+     "by": "others"
+    }
+   },
+   "autoSuccess": {
+    "sleepless": true
+   },
+   "endedBy": {
+    "name": "Wake",
+    "by": "others"
    }
   },
   "target": {
@@ -25616,7 +25869,21 @@
    "targets": {
     "count": 10
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Water Breathing",
+    "tags": [
+     "water-breathing"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "druid",
@@ -25809,7 +26076,13 @@
    "failureConditions": [
     "frightened"
    ],
-   "repeatSave": true
+   "repeatSave": true,
+   "repeatFailureDamage": [
+    {
+     "formula": "5d10",
+     "type": "psychic"
+    }
+   ]
   },
   "target": {
    "type": "creature",
