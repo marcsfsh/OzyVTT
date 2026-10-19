@@ -272,6 +272,7 @@ function initiativeEntryFor(
     // Outside a fight it waits in the order unrolled; the encounter's start rolls for it like anyone else.
     const score = state.combat.active
       ? rollJoiningInitiative(state, actor.id, () => deps.rollDie(20), {
+          rollDie: deps.rollDie,
           resolveDefinition: deps.resolveDefinition,
           ...(deps.catalog ? { catalog: deps.catalog } : {})
         })

@@ -17,7 +17,15 @@ import { holdsFeature } from "./class-features.js";
 import { wardedConditions } from "./paladin-auras.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
-import { aggregateRollMode, d20FacesFor, keptD20 } from "@vtt/rules-5e";
+import {
+  aggregateRollMode,
+  collectRiders,
+  d20FacesFor,
+  diceRiders,
+  keptD20,
+  parseDiceFormula,
+  resolveDice
+} from "@vtt/rules-5e";
 import { holdRoll } from "./held-rolls.js";
 import { checkRiderBonus, deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
 import { effectiveActions } from "./effective-actions.js";
@@ -93,6 +101,8 @@ type RollMode = "advantage" | "disadvantage" | "normal";
 export type InitiativeRollDeps = Readonly<{
   resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
   catalog?: EquipmentCatalog;
+  /** Rolls the dice a rider adds to or takes off the check (a curse's -1d6); without it they add nothing. */
+  rollDie?: (sides: number) => number;
 }>;
 
 /**
@@ -107,9 +117,15 @@ export function initiativeRollFor(
   actorId: string,
   surprised: boolean,
   deps: InitiativeRollDeps = {}
-): { mode: RollMode; penalty: number; checkBonus: number; reasons: string[] } {
+): {
+  mode: RollMode;
+  penalty: number;
+  checkBonus: number;
+  reasons: string[];
+  dice: ReadonlyArray<Readonly<{ label: string; dice: string }>>;
+} {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor) return { mode: "normal", penalty: 0, checkBonus: 0, reasons: [] };
+  if (!actor) return { mode: "normal", penalty: 0, checkBonus: 0, reasons: [], dice: [] };
   const definition = actor.definitionId ? deps.resolveDefinition?.(actor.definitionId) : undefined;
   const derivation = deriveEquipment(actor, definition, deps.catalog);
   const claims = rollModeClaims(derivation, ["initiative"], "on-initiative-roll");
@@ -137,9 +153,31 @@ export function initiativeRollFor(
   const penalty = exhaustionPenalty(actor);
   // A bonus to ability checks reaches a Dexterity check (a Stone of Good Luck's +1), which Initiative is.
   const checkBonus = checkRiderBonus(derivation, { ability: "dex" });
+  // So do the dice a rider adds to or takes off an ability check.
+  const dice = diceRiders(
+    [
+      ...collectRiders(derivation.carriers, { ...derivation.context, moment: null }),
+      ...collectRiders(derivation.carriers, { ...derivation.context, ability: "dex", moment: "on-ability-check" })
+    ],
+    "check-bonus"
+  );
   const reasons = [...claims.advantage, ...claims.disadvantage].map((claim) => claim.label);
   if (penalty !== 0) reasons.push(`Exhaustion ${penalty}`);
-  return { mode: aggregateRollMode(claims.advantage, claims.disadvantage).mode, penalty, checkBonus, reasons };
+  for (const rider of dice) reasons.push(`${rider.label} (${rider.dice})`);
+  return { mode: aggregateRollMode(claims.advantage, claims.disadvantage).mode, penalty, checkBonus, reasons, dice };
+}
+
+/** The dice riders' total, each signed as its rider says ("-1d6" takes the roll off). */
+function riderDiceTotal(
+  dice: ReadonlyArray<Readonly<{ dice: string }>>,
+  rollDie: ((sides: number) => number) | undefined
+): number {
+  if (!rollDie) return 0;
+  return dice.reduce((sum, rider) => {
+    const negative = rider.dice.startsWith("-");
+    const rolled = resolveDice(parseDiceFormula(negative ? rider.dice.slice(1) : rider.dice), rollDie).total;
+    return sum + (negative ? -rolled : rolled);
+  }, 0);
 }
 
 /** The roll mode alone, from riders and conditions, for a combatant who isn't surprised. */
@@ -171,8 +209,9 @@ function rollUnderMode(rollD20: () => number, mode: RollMode): number {
   return rollD20();
 }
 
-/** One combatant's initiative: the d20 (rolled, or a hand-typed `natural`) plus its modifier and the
- *  Exhaustion penalty. Every path that rolls initiative goes through here, so they all follow the same rules. */
+/** One combatant's initiative: the d20 (rolled, or a hand-typed `natural`) plus its modifier, the dice its check
+ *  riders add and the Exhaustion penalty. Every path that rolls initiative goes through here, so they all follow the
+ *  same rules. */
 export function rollInitiative(
   state: GameState,
   actorId: string,
@@ -182,9 +221,9 @@ export function rollInitiative(
   natural?: number
 ): { natural: number; modifier: number; total: number; mode: RollMode } {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  const { mode, penalty, checkBonus } = initiativeRollFor(state, actorId, surprised, deps);
+  const { mode, penalty, checkBonus, dice } = initiativeRollFor(state, actorId, surprised, deps);
   const die = natural ?? rollUnderMode(rollD20, mode);
-  const modifier = (actor?.initiative ?? 0) + checkBonus + penalty;
+  const modifier = (actor?.initiative ?? 0) + checkBonus + penalty + riderDiceTotal(dice, deps.rollDie);
   const total = die + modifier;
   if (!validScore(total)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
   return { natural: die, modifier, total, mode };
@@ -282,7 +321,8 @@ export function startEncounter(
   resolveDefinition?: (definitionId: string) => ActorDefinition | undefined,
   now: number = Date.now(),
   catalog?: EquipmentCatalog,
-  onRoll?: InitiativeRollSink
+  onRoll?: InitiativeRollSink,
+  rollDie?: (sides: number) => number
 ): EffectNarration[] {
   if (state.combat.active) throw new CommandRejectedError("End the active encounter before starting another one.");
   if (input.entries.length === 0 || input.entries.length > 200)
@@ -324,7 +364,14 @@ export function startEncounter(
         ? `${actor.definitionId}|${surprised}`
         : null;
     const shared = groupKey === null ? undefined : groupDice.get(groupKey);
-    const roll = rollInitiative(state, actor.id, surprised, rollD20, { resolveDefinition, catalog }, shared);
+    const roll = rollInitiative(
+      state,
+      actor.id,
+      surprised,
+      rollD20,
+      { resolveDefinition, catalog, ...(rollDie ? { rollDie } : {}) },
+      shared
+    );
     // A group's die reaches the feed once, on its first member.
     if (shared === undefined) onRoll?.({ actorId: actor.id, ...roll });
     if (groupKey !== null && shared === undefined) groupDice.set(groupKey, roll.natural);

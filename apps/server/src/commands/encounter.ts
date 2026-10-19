@@ -101,7 +101,8 @@ export const encounterCommands = [
           (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
           Date.now(),
           kit.equipmentCatalog(),
-          kit.initiativeRollSink(draft, commandId, principal)
+          kit.initiativeRollSink(draft, commandId, principal),
+          (sides) => kit.context.random(sides)
         );
         // The fight may be on another map than the one the walls were drawn on: keep feet and pixels in step.
         refreshVisionMeasure(draft, tokenGeometry);

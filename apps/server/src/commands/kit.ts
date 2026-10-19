@@ -344,7 +344,8 @@ export function createKit(context: CommandContext) {
     /** What an initiative roll reads about its roller in `state`: stat blocks and items for its riders. */
     initiativeRollDeps: (state: GameState): InitiativeRollDeps => ({
       resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
-      catalog: equipmentCatalogOf(playCatalog())
+      catalog: equipmentCatalogOf(playCatalog()),
+      rollDie: (sides) => context.random(sides)
     }),
 
     /** Server-thrown initiative dice land in `state.rolls` attributed to the combatant; hidden ones are GM-only. */

@@ -595,6 +595,24 @@ describe("Bardic Inspiration: the counter the class is built around", () => {
     expect(give).toThrowError(/no uses remaining \(3\/Long Rest\)/);
   });
 
+  // SRD 5.2.1: "inspire another creature within 60 feet of yourself ... which it can roll and add to a failed D20 Test
+  // once within the next hour."
+  it("reaches a creature within 60 feet, and the die lasts an hour", () => {
+    const definition = build(bard(1, 15));
+    const state = encounterWith(definition);
+    const inspire = actionOf(definition, "bardic-inspiration")!;
+    const give = (feet: number) =>
+      resolveDefinitionAction(
+        state,
+        inspire,
+        { actorId: HERO, targetIds: [FOE], commandId: command() },
+        { ...deps(definition), distanceFeet: () => feet }
+      );
+    expect(() => give(65)).toThrowError(/65 ft away, beyond Bardic Inspiration/);
+    give(60);
+    expect(state.actors[1].effects[0]?.duration).toEqual({ type: "minutes", remaining: 60 });
+  });
+
   it("gives a d8 from level 5, and a d12 from level 15", () => {
     const dieAt = (level: number) =>
       actionOf(

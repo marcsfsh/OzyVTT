@@ -11,6 +11,7 @@ import {
 } from "../src/encounter.js";
 import { evaluateActionEconomy } from "../src/resolution/economy.js";
 import { rerollInitiative } from "../src/initiative-reroll.js";
+import { makeEffect } from "../src/effects.js";
 
 const PC = "10000000-0000-4000-8000-000000000001";
 const PC2 = "10000000-0000-4000-8000-000000000003";
@@ -321,5 +322,38 @@ describe("Heroic Inspiration on an initiative roll", () => {
     expect(() => rerollInitiative(game, PC, player, undefined, queue([18]))).toThrowError(
       /rerolled only right after it is rolled, before Alpha's first turn/
     );
+  });
+});
+
+// SRD 5.2.1 Initiative: "you make a Dexterity check", so the dice a rider adds to or takes off an ability check reach
+// it (here a homebrew curse's -1d6).
+describe("dice riders on initiative", () => {
+  it("rolls the dice a check rider adds and counts them in the score", () => {
+    const game = fresh("immediate");
+    game.actors
+      .find((actor) => actor.id === PC)!
+      .effects.push(
+        makeEffect({
+          id: "curse",
+          name: "Muddled",
+          startedRound: 1,
+          duration: { type: "rounds", remaining: 10 },
+          modifiers: [{ type: "check-bonus", amount: 0, dice: "-1d6", when: [{ type: "on-ability-check" }] }]
+        })
+      );
+    startEncounter(
+      game,
+      { mapAssetId: MAP, entries: [{ actorId: PC }, { actorId: MON }] },
+      queue([12, 9]),
+      GEOMETRY,
+      undefined,
+      Date.now(),
+      undefined,
+      undefined,
+      () => 4
+    );
+    // Alpha: 12 + 2 - 4.
+    expect(scoreOf(game, PC)).toBe(10);
+    expect(scoreOf(game, MON)).toBe(9);
   });
 });
