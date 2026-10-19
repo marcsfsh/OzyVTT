@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { effectNameOf } from "../src/effect-names.js";
 
-// An effect named after the action that left it carries the action's name, not the stat block's note on how often the
-// action is used.
+// An effect named after the action that left it carries the action's name alone. The stat block's note on how often the
+// action is used stays with the action.
 
 describe("an effect named after its action", () => {
   it("leaves out a recharge, a daily count and a legendary cost", () => {
