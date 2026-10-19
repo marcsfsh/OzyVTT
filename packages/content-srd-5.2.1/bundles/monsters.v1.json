@@ -35823,7 +35823,50 @@
      "limit": 1,
      "per": "recharge",
      "recharge": 4
-    }
+    },
+    "castsSpells": {
+     "ability": "cha",
+     "saveDc": 21,
+     "attackBonus": 13,
+     "waives": [
+      "material"
+     ],
+     "spells": [
+      {
+       "id": "hellfire-spellcasting-fireball-level-5",
+       "spellId": "fireball",
+       "name": "Fireball",
+       "atLevel": 5
+      },
+      {
+       "id": "hellfire-spellcasting-hold-monster-level-7",
+       "spellId": "hold-monster",
+       "name": "Hold Monster",
+       "atLevel": 7
+      },
+      {
+       "id": "hellfire-spellcasting-wall-of-fire",
+       "spellId": "wall-of-fire",
+       "name": "Wall of Fire"
+      }
+     ]
+    },
+    "multiattack": [
+     {
+      "actionId": "hellfire-spellcasting-fireball-level-5",
+      "count": 2
+     }
+    ],
+    "multiattackReplacements": [
+     {
+      "actionIds": [
+       "hellfire-spellcasting-hold-monster-level-7",
+       "hellfire-spellcasting-wall-of-fire"
+      ],
+      "attacks": 1,
+      "of": "hellfire-spellcasting-fireball-level-5"
+     }
+    ]
    }
   ],
   "token": {

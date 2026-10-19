@@ -793,6 +793,9 @@ function checkLimitedUse({ state, attacker, action, siblings, violations }: Eval
   if (action.grants?.tags.includes(RAGING_TAG) && hasEffectTag(attacker, RAGING_TAG)) return null;
   const uses = action.uses;
   const key = uses.pool ?? action.id;
+  // A cast in the plan its pool's own action opened (the second Fireball of a pit fiend's Hellfire Spellcasting) shares
+  // the use that opened it.
+  if (paidByOpenPlan(state, attacker, action, key)) return null;
   // The counter is keyed on the pool, so the gate is the pool's size (see `useLimitFor`).
   const limit = useLimitFor(siblings, action);
   const spent =
@@ -805,6 +808,16 @@ function checkLimitedUse({ state, attacker, action, siblings, violations }: Eval
       message: spent >= limit ? noUsesRemaining(action, limit) : notEnoughUses(action.name, limit - spent, cost)
     });
   return { key, per: uses.per, amount: cost };
+}
+
+/** Whether this turn's open action is the plan of the pool's own action (a Hellfire Spellcasting's two casts), with a
+ *  place or a replacement left for this one. */
+function paidByOpenPlan(state: GameState, attacker: LiveActor, action: DefinitionAction, pool: string): boolean {
+  const open = state.combat.turn.actionInstance;
+  if (!open || open.actorId !== attacker.id || open.parentId !== pool || state.combat.turnActorId !== attacker.id)
+    return false;
+  if (placeFor(open.components, action.id) !== null) return true;
+  return Object.entries(open.replacements ?? {}).some(([key, left]) => left > 0 && key.split("|").includes(action.id));
 }
 
 /** Why a limited-use action is refused, in and out of a fight. */

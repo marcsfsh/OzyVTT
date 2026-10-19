@@ -3959,7 +3959,13 @@ describe("legendary actions + Legendary Resistance (SRD 2024; Foundry-parity ado
   it("the SRD bundle carries legendary resources (adult red dragon golden check + coverage floors)", () => {
     const monsters = loadMonsterDefinitions();
     const dragon = monsters.find((monster) => monster.source.externalId === "adult-red-dragon")!;
-    expect(dragon.legendary).toEqual({ actionsPerRound: 3, resistancesPerDay: 3 });
+    // "Legendary Action Uses: 3 (4 in Lair)" and "Legendary Resistance (3/Day, or 4/Day in Lair)".
+    expect(dragon.legendary).toEqual({
+      actionsPerRound: 3,
+      resistancesPerDay: 3,
+      actionsInLair: 4,
+      resistancesInLair: 4
+    });
     // "The dragon can't take this action again until the start of its next turn."
     expect(dragon.actions.find((action) => action.id === "commanding-presence")!.legendary).toEqual({
       cost: 1,

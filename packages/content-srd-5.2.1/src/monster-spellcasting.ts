@@ -135,6 +135,8 @@ export function withSpellcasting(
   const cast = actions.map((action): ActorAction => {
     if (action === spellcasting || action.activation === "reaction" || action.castsSpells) return action;
     const body = action.description.replace(/^Legendary Action[^.]*\.\s*/, "");
+    const twice = castsTwice(action, body, creature, listNumbers, knownSpell);
+    if (twice) return twice;
     // "The dragon uses Spellcasting to cast Fear" / "... Guiding Bolt (level 2 version)" / "Invisibility on itself".
     const viaList =
       /\buses Spellcasting to cast ([A-Z][A-Za-z'\u2019 ]+?(?: \(level \d version\))?)(?= on itself|[.,])/.exec(body);
@@ -224,6 +226,48 @@ export function withSpellcasting(
     const counter = counterspellOf(action, listNumbers, knownSpell);
     return counter && !actions.some((other) => other.id === counter.id) ? [action, counter] : [action];
   });
+}
+
+/**
+ * "The pit fiend casts Fireball (level 5 version) twice, requiring no Material components and using Charisma as the
+ * spellcasting ability (spell save DC 21). It can replace one Fireball with Hold Monster (level 7 version) or Wall of
+ * Fire." One use is two casts: a plan of two, like a Multiattack's, either of which may be one of the others, sharing
+ * the action and its uses. Null when the action casts nothing twice.
+ */
+function castsTwice(
+  action: ActorAction,
+  body: string,
+  creature: Readonly<{ abilityScores: Readonly<Record<AbilityId, number>>; proficiencyBonus: number }>,
+  listNumbers: Numbers | null,
+  knownSpell: (spellId: string) => boolean
+): ActorAction | null {
+  const match =
+    /\bcasts ([A-Z][A-Za-z'\u2019 ]+?(?: \(level \d version\))?) twice, (?:requiring [^,]+ and )?using (the same spellcasting ability as Spellcasting|[A-Z][a-z]+ as (?:the )?spellcasting ability)[^.]*\.(?:\s*It can replace one [A-Z][A-Za-z'\u2019 ]+? with ([^.]+)\.)?/.exec(
+      body
+    );
+  if (!match) return null;
+  const numbers = match[2]!.startsWith("the same")
+    ? listNumbers && { ...listNumbers, ...waivedComponents(body) }
+    : numbersOf(body, creature);
+  const spells = [spellOf(match[1]!), ...(match[3] ? namedSpells(match[3]) : [])]
+    .map(({ name, atLevel }) => ({ name, atLevel, spellId: spellIdOfName(name) }))
+    .filter(({ spellId }) => knownSpell(spellId));
+  if (!numbers || spells.length === 0) return null;
+  const entries = spells.map(({ name, atLevel, spellId }) => ({
+    id: entryId(action.id, spellId, atLevel),
+    spellId,
+    name,
+    ...(atLevel !== undefined ? { atLevel } : {})
+  }));
+  const [main, ...others] = entries;
+  return {
+    ...action,
+    castsSpells: { ...numbers, spells: entries },
+    multiattack: [{ actionId: main!.id, count: 2 }],
+    ...(others.length > 0
+      ? { multiattackReplacements: [{ actionIds: others.map((entry) => entry.id), attacks: 1, of: main!.id }] }
+      : {})
+  };
 }
 
 /**
