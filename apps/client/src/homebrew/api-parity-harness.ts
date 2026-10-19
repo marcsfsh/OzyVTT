@@ -784,6 +784,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].attack.advantageWhen",
+    types: ["monster"],
+    reason:
+      "the Advantage a stat block's attack prints for itself (against a creature it grapples, one missing Hit Points, or in the first round), read from its text as the catalog is built; no control on the action row yet",
+    status: "gap"
+  },
+  {
     at: "actions[].castsSpells.**",
     types: ACTION_CARRIERS,
     reason:

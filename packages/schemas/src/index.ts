@@ -2955,6 +2955,14 @@ export const OnHitRiderSchema = z
     /** It spends the coat the bearer put on the weapon: an effect on the attacker with this tag (a Dagger of Venom's
      *  poison), ended by this hit. Without one it doesn't fire. */
     spendsEffectTag: EffectTagSchema.optional(),
+    /** The hit sets the target burning (SRD Burning: 1d4 Fire at the start of each of its turns until it is put out),
+     *  as a fire elemental's Burn does. */
+    hazard: z
+      .literal("burning")
+      .optional()
+      .describe(
+        "The hit sets the target burning (SRD Burning): 1d4 Fire at the start of each of its turns until it is put out"
+      ),
     /** What the engine leaves to the GM, said with the hit: a curse that acts at rests, a creature killed outright. */
     reminder: z.string().min(1).max(400).optional(),
     /** The hit can kill outright (Nine Lives Stealer, Mace of Disruption, Mace of Smiting, Vorpal Sword): only against a
@@ -3415,7 +3423,16 @@ export const ActionSchema = z
         /** Attack rolls this action grants (Extra Attack 2, Eldritch Blast beams). Absent = 1. */
         count: z.number().int().min(1).max(10).optional(),
         /** Extra weapon dice on a critical hit beyond crit doubling (Savage Attacks). Applies to the first damage part. */
-        criticalBonusDice: z.number().int().min(1).max(4).optional()
+        criticalBonusDice: z.number().int().min(1).max(4).optional(),
+        /** The roll has Advantage when the printing says so: against a creature its user grapples ("with Advantage if
+         *  the target is Grappled by the ankheg"), against one missing Hit Points (a shark's Bite), or in the first round
+         *  of a fight (a doppelganger's Slam). */
+        advantageWhen: z
+          .enum(["target-grappled-by-self", "target-hurt", "first-round"])
+          .optional()
+          .describe(
+            "When the roll has Advantage as printed: against a creature its user grapples, against one missing Hit Points, or in a fight's first round"
+          )
       })
       .optional()
       .describe("A printed to-hit bonus; the stat block knows its own numbers"),
@@ -3683,9 +3700,9 @@ export const ActionSchema = z
             when: z.enum(["advantage", "self-bloodied", "target-bloodied", "target-grappled-by-self", "charge"]),
             /** `instead` replaces the first damage part; `plus` adds to the hit. */
             mode: z.enum(["instead", "plus"]),
+            /** None for a charge that only knocks its target down (an elephant's Gore). */
             damage: z
               .array(z.object({ formula: DamageFormulaSchema, type: z.string().min(1).max(40) }).strict())
-              .min(1)
               .max(2),
             /** A charge's run-up, in feet. */
             feet: z.number().int().min(5).max(120).optional(),

@@ -54,6 +54,7 @@ import { withSpellcasting } from "./monster-spells.js";
 import { formOnlyOf, lycanthropeCurseOf, shapeShiftOf } from "./monster-forms.js";
 import { PRINTED_NAME_KEYS, printedName, statBlockActionText, statBlockTraitText } from "./monster-text.js";
 import { lairCountsOf, STATBLOCK_SLUGS, statBlockHeaderOf } from "./monster-statblock.js";
+import { HIT_NOTE_KEYS, withHitNotes } from "./monster-hit-notes.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -337,6 +338,7 @@ type OnHitRider = {
   pull?: { feet: number; upTo?: true };
   self?: true;
   reminder?: string;
+  hazard?: "burning";
 };
 /** "takes 5 (2d4) Necrotic damage at the start of each of the stirge's turns" (the source's) or "... of its turns". */
 function riderOngoingDamage(text: string): OngoingDamage | undefined {
@@ -506,6 +508,24 @@ function effectRiders(desc: string, maxTargetSize: OnHitRider["maxTargetSize"], 
       modifiers: [{ type: "roll-mode", roll: "attack", mode: "advantage" }],
       duration: { type: "until-source-turn-end" }
     });
+  // "If the target is a creature or a flammable object, it starts burning" (a fire elemental's Burn): the object is the
+  // GM's.
+  if (
+    /\bIf the target is a creature or a flammable object(?: that isn[\u2019']t being worn or carried)?, it starts burning\b/.test(
+      desc
+    )
+  )
+    found.push({ conditions: [], name: "Burning", hazard: "burning" });
+  // "Until the grapple ends, the target has the Restrained condition and can't teleport" (a tarrasque's Bite).
+  if (/\bUntil the grapple ends, the target has the [A-Z][a-z]+ condition and can[\u2019']t teleport\b/.test(desc)) {
+    const grapple = riders.find((rider) => rider.conditions.some((condition) => condition.id === "grappled"));
+    if (grapple) grapple.tags = [...(grapple.tags ?? []), "no-teleport"];
+  }
+  // "Ability checks made to escape this grapple have Disadvantage" (a mimic's Pseudopod): on the grapple's effect.
+  if (/\bAbility checks made to escape this grapple have Disadvantage\b/.test(desc)) {
+    const grapple = riders.find((rider) => rider.conditions.some((condition) => condition.id === "grappled"));
+    if (grapple) grapple.tags = [...(grapple.tags ?? []), "escape-disadvantage"];
+  }
   // A mummy's curse: no healing is the engine's; what it does at rests and over days, the GM's. Its death to dust is the
   // hit's own (`drain.killsAtZero`).
   const cursed = /\bit is cursed\. (While cursed, the target can[\u2019']t regain Hit Points[^.]*\.)/.exec(desc);
@@ -1005,6 +1025,9 @@ const SRD_SPELL_IDS: ReadonlySet<string> = new Set(
   spells.filter((spell) => spell.fields.document === "srd-2024").map((spell) => slugOf(spell.pk))
 );
 
+/** The hit notes the build used, so one naming no action fails the build out loud. */
+const notedHits = new Set<string>();
+
 const monsters: ActorDefinition[] = creatures
   .filter((creature) => creature.fields.document === "srd-2024" && !EXCLUSIONS.has(creature.pk))
   .sort((left, right) => left.pk.localeCompare(right.pk))
@@ -1128,6 +1151,19 @@ const monsters: ActorDefinition[] = creatures
             }
           : null;
       const actionId = idSafe(slugOf(action.pk).replace(`${slug}_`, ""));
+      // "(with Advantage if the target is Grappled by the ankheg)", "... doesn't have all its Hit Points)", "...
+      // during the first round of each combat)".
+      const advantage =
+        /\(with Advantage (if the target is Grappled by the|if the target doesn[\u2019']t have all its Hit Points|during the first round of each combat)/.exec(
+          action.fields.desc
+        )?.[1];
+      const advantageWhen = !advantage
+        ? undefined
+        : advantage.startsWith("if the target is Grappled")
+          ? ("target-grappled-by-self" as const)
+          : advantage.startsWith("during")
+            ? ("first-round" as const)
+            : ("target-hurt" as const);
       // ADR-0020 structured mechanics, all confident-pattern-only with prose fallback.
       // A Multiattack's plan, the plans it can be instead and what can replace its attacks, read from its text against
       // the stat block's other actions.
@@ -1173,7 +1209,7 @@ const monsters: ActorDefinition[] = creatures
           0,
           12000
         ),
-        ...(attack ? { attack } : {}),
+        ...(attack ? { attack: { ...attack, ...(advantageWhen ? { advantageWhen } : {}) } } : {}),
         ...(save
           ? {
               save: {
@@ -1222,7 +1258,7 @@ const monsters: ActorDefinition[] = creatures
     });
     // The spells its actions cast, each a cast action in play; only spells the SRD spell list holds.
     const actions = withSpellcasting(
-      linkedActions(creatureActions, siblingIdOf),
+      linkedActions(withHitNotes(slug, creatureActions, notedHits), siblingIdOf),
       {
         abilityScores: {
           str: fields.ability_score_strength,
@@ -1356,6 +1392,9 @@ const monsters: ActorDefinition[] = creatures
       }
     };
   });
+
+for (const key of HIT_NOTE_KEYS)
+  if (!notedHits.has(key)) throw new Error(`A hit note names ${key}, which no stat block has - check for a typo.`);
 
 for (const monster of monsters) {
   const parsed = ActorDefinitionSchema.safeParse(monster);

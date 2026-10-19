@@ -96,6 +96,22 @@ export function printedHitDamage(
       damage: [{ formula: formulaOf(charge[3]), type: charge[4].toLowerCase() }],
       ...(charge[5] ? { conditions: ["prone"] } : {})
     });
+  // A charge that only knocks its target down: "If the target is a Huge or smaller creature and the elephant moved 20+
+  // feet straight toward it immediately before the hit, the target has the Prone condition."
+  const knockdown = charge
+    ? null
+    : /If (?:the )?target is (?:a )?(Tiny|Small|Medium|Large|Huge|Gargantuan) or smaller(?: creature)? and the [^,]*? moved (\d+)\+ feet straight toward it immediately before the hit, the target has the Prone condition/.exec(
+        clause.rest
+      );
+  if (knockdown)
+    conditionalDamage.push({
+      when: "charge",
+      mode: "plus",
+      feet: Number(knockdown[2]),
+      maxTargetSize: knockdown[1].toLowerCase() as NonNullable<ConditionalDamage["maxTargetSize"]>,
+      damage: [],
+      conditions: ["prone"]
+    });
   return { damage, conditionalDamage };
 }
 

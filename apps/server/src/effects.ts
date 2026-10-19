@@ -77,6 +77,12 @@ export const RESISTS_CHOSEN_TYPE_TAG = "resists-chosen-type";
 export const UNTIL_IT_ACTS_TAG = "until-it-acts";
 /** On an escapable effect: the escape is a Strength (Athletics) check alone (a spell's restraint: Web, Entangle). */
 export const ESCAPE_ATHLETICS_TAG = "escape-athletics";
+/** Checks to escape this effect have Disadvantage (a mimic's Pseudopod: "Ability checks made to escape this grapple
+ *  have Disadvantage"). */
+export const ESCAPE_DISADVANTAGE_TAG = "escape-disadvantage";
+/** The bearer can't teleport while it lasts (a tarrasque's Bite: "Until the grapple ends, the target ... can't
+ *  teleport"). */
+export const NO_TELEPORT_TAG = "no-teleport";
 /** The tag on a caster's own "Concentrating on X" effect; ending it ends everything its cast made. */
 export const CONCENTRATING_TAG = "concentrating";
 /** The Barbarian's Rage: it ends early on Incapacitated or in Heavy armor, and blocks spells and Concentration. */

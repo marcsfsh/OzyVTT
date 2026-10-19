@@ -141,6 +141,8 @@ const LABELS: Readonly<Record<string, string>> = {
   struck: "what a melee hit costs the attacker",
   usesAction: "action it uses",
   partOf: "entry it is printed in",
+  advantageWhen: "when the attack has Advantage",
+  hazard: "hazard it starts",
   multiattack: "Multiattack",
   count: "number of attacks",
   bonus: "bonus",

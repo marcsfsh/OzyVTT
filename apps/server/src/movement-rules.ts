@@ -18,7 +18,13 @@ import { ridesWith } from "./mounts.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
 import { effectiveActions } from "./effective-actions.js";
-import { NO_OPPORTUNITY_ATTACKS_TAG, NO_REACTIONS_TAG, READIED_TAG, releaseReadied } from "./effects.js";
+import {
+  NO_OPPORTUNITY_ATTACKS_TAG,
+  NO_REACTIONS_TAG,
+  NO_TELEPORT_TAG,
+  READIED_TAG,
+  releaseReadied
+} from "./effects.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
 import { jumpLimits, leapRider } from "./jumping.js";
@@ -402,6 +408,17 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   if (!mover || from === null || to === null || mode === "forced") return done();
   const fromAltitude = input.fromAltitudeFeet ?? 0;
   const toAltitude = input.toAltitudeFeet ?? fromAltitude;
+  // A creature held so that it can't teleport (a tarrasque's Bite) is refused one, a granted one too.
+  const holder =
+    mode === "teleport" ? mover.effects.find((effect) => effect.tags.includes(NO_TELEPORT_TAG)) : undefined;
+  if (holder)
+    police(
+      state,
+      input,
+      "movement.teleport",
+      `${mover.name} can't teleport while ${holder.sourceName ?? "something"} holds it.`,
+      outcome
+    );
   // A granted teleport the move keeps to the terms of is taken now, by anyone, with nothing more to ask.
   if (mode === "teleport") {
     const teleport = activeTeleportGrant(state, mover);

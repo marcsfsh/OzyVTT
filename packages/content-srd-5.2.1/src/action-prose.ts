@@ -240,7 +240,18 @@ export function drainOfProse(description: string, name?: string): DamageDrain | 
  *  giant". Null when the text prints none. */
 export function hitPushOfProse(description: string): ForcedPush | null {
   const push = /\bthe target is pushed (up to )?(\d+) feet (?:straight )?away from\b/.exec(description);
-  return push ? { feet: Number.parseInt(push[2]!, 10), ...(push[1] ? { upTo: true as const } : {}) } : null;
+  if (push) return { feet: Number.parseInt(push[2]!, 10), ...(push[1] ? { upTo: true as const } : {}) };
+  // "If the target is a Medium or smaller creature, the satyr pushes the target up to 10 feet straight away from itself."
+  const pushes =
+    /\b(?:If the target is an? (Tiny|Small|Medium|Large|Huge) or smaller creature, )?the [a-z -]+? pushes the target (up to )?(\d+) feet straight away from itself\b/.exec(
+      description
+    );
+  if (!pushes) return null;
+  return {
+    feet: Number.parseInt(pushes[3]!, 10),
+    ...(pushes[2] ? { upTo: true as const } : {}),
+    ...(pushes[1] ? { maxTargetSize: pushes[1].toLowerCase() as NonNullable<ForcedPush["maxTargetSize"]> } : {})
+  };
 }
 
 const SPEED_MODES = { fly: "fly", swim: "swim", climb: "climb", burrow: "burrow" } as const;

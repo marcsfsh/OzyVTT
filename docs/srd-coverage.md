@@ -21,7 +21,7 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | Records | Enforced | Guided | Reference |
 | --- | --- | --- | --- |
 | Spells (339) | 176 | 163 | 0 |
-| Monster actions (992) | 923 | 55 | 14 |
+| Monster actions (992) | 859 | 119 | 14 |
 | Monster traits (106) | 40 | 16 | 50 |
 | Barbarian features (23) | 22 | 0 | 1 |
 | Bard features (16) | 15 | 1 | 0 |
@@ -44,7 +44,7 @@ stops matching the engine. Known gaps in enforced records are GitHub issues.
 | Armor (13) | 13 | 0 | 0 |
 | Conditions (15) | 13 | 2 | 0 |
 | Rules glossary (155) | 116 | 11 | 28 |
-| All records (2423) | 1763 | 424 | 236 |
+| All records (2423) | 1699 | 488 | 236 |
 
 ## How records are classified
 
@@ -58,10 +58,12 @@ Most records are classified from the mechanics their content bundle carries, bec
   Guided when the app spends the slot and holds the Concentration, the area or a save while a person applies
   what the spell does. A spell whose cast leaves a rider to the table (Storm of Vengeance's later turns) is
   curated as guided, with a note.
-- **Monster actions:** enforced when the attack, save, damage, healing or effect resolves, or when the server
-  offers the action as the generic action it names (Nimble Escape's Disengage or Hide). An action that casts
-  spells takes the state of the spells it casts, each a cast action at the stat block's numbers. Guided when the
-  server resolves it and reminds the GM of the rest, or only counts a use, a legendary cost or a recharge.
+- **Monster actions:** enforced when the attack, damage, healing or effect resolves, a save's failure leaves
+  something, or the server offers the action as the generic action it names (Nimble Escape's Disengage or Hide).
+  An action that casts one spell takes that spell's state; a list takes the least of the spells it casts whose
+  outcome isn't the story's (what Detect Magic senses), each a cast action at the stat block's numbers. Guided when
+  the server resolves it and reminds the GM of the rest (a hit's rider the build doesn't read), rolls a save whose
+  failure is the GM's, or only counts a use, a legendary cost or a recharge.
 - **Class features, species traits and feats:** enforced when their riders (an action that resolves, an
   effect, a modifier the engine reads, a grant) or the builder's picks apply them. Guided when the app counts
   their uses or offers an action that only spends a use, or when part of what they do is left to a person.
@@ -227,9 +229,9 @@ Notes on the curated rows:
 
 ## Monster actions
 
-**Enforced (923):** too many to list, so the guided and reference actions below stand out.
+**Enforced (859):** too many to list, so the guided and reference actions below stand out.
 
-**Guided (55):** Adult Black Dragon: Frightful Presence · Adult White Dragon: Frightful Presence · Ancient Black Dragon: Frightful Presence · Ancient White Dragon: Frightful Presence · Balor: Teleport · Bearded Devil: Infernal Glaive · Behir: Swallow · Centaur Trooper: Trampling Charge (Recharge 5-6) · Djinni: Create Whirlwind · Doppelganger: Read Thoughts · Dryad: Tree Stride · Dust Mephit: Sleep (1/Day) · Frost Giant: War Cry (Recharge 5-6) · Gelatinous Cube: Engulf · Ghost: Etherealness · Giant Hyena: Rampage (1/Day) · Giant Octopus: Ink Cloud (1/Day) · Gnoll Warrior: Rampage (1/Day) · Horned Devil: Infernal Tail · Ice Devil: Ice Wall (Recharge 6) · Incubus: Nightmare (Recharge 6) · Invisible Stalker: Vortex · Kraken: Swallow · Lich: Deathly Teleport · Lich: Frightening Gaze · Mimic: Shape-Shift · Mummy Lord: Necrotic Strike · Mummy Lord: Whirlwind of Sand · Night Hag: Nightmare Haunting (1/Day) · Octopus: Ink Cloud (1/Day) · Otyugh: Bite · Pit Fiend: Hellfire Spellcasting (Recharge 4-6) · Purple Worm: Swallow · Remorhaz: Swallow · Roc: Swoop (Recharge 5-6) · Rust Monster: Reflexive Antennae · Sea Hag: Illusory Appearance · Shambling Mound: Engulf · Sphinx of Valor: Roar (3/Day) · Stone Giant: Deflect Missile (Recharge 5-6) · Storm Giant: Spellcasting · Succubus: Charm · Tarrasque: Onslaught · Tarrasque: Swallow · Tarrasque: World-Shaking Movement · Treant: Animate Trees (1/Day) · Unicorn: Shimmering Shield · Vampire: Shape-Shift · Water Elemental: Whelm (Recharge 4-6) · Werebear: Bite (Bear or Hybrid Form Only) · Wereboar: Gore (Boar or Hybrid Form Only) · Wererat: Bite (Rat or Hybrid Form Only) · Weretiger: Bite (Tiger or Hybrid Form Only) · Weretiger: Prowl (Tiger or Hybrid Form Only) · Werewolf: Bite (Wolf or Hybrid Form Only)
+**Guided (119):** Adult Black Dragon: Frightful Presence · Adult Black Dragon: Spellcasting · Adult Brass Dragon: Spellcasting · Adult Bronze Dragon: Spellcasting · Adult Copper Dragon: Slowing Breath · Adult Copper Dragon: Spellcasting · Adult Gold Dragon: Spellcasting · Adult Gold Dragon: Weakening Breath · Adult Silver Dragon: Spellcasting · Adult White Dragon: Frightful Presence · Allosaurus: Claws · Ancient Black Dragon: Frightful Presence · Ancient Black Dragon: Spellcasting · Ancient Brass Dragon: Spellcasting · Ancient Bronze Dragon: Spellcasting · Ancient Copper Dragon: Slowing Breath · Ancient Copper Dragon: Spellcasting · Ancient Gold Dragon: Spellcasting · Ancient Gold Dragon: Weakening Breath · Ancient Silver Dragon: Spellcasting · Ancient White Dragon: Frightful Presence · Animated Rug of Smothering: Smother · Archmage: Spellcasting · Balor: Teleport · Barbed Devil: Hurl Flame · Bearded Devil: Infernal Glaive · Behir: Swallow · Black Pudding: Dissolving Pseudopod · Centaur Trooper: Trampling Charge (Recharge 5-6) · Cloaker: Attach · Cloud Giant: Spellcasting · Copper Dragon Wyrmling: Slowing Breath · Couatl: Divine Aid (2/Day) · Couatl: Spellcasting · Cultist Fanatic: Spellcasting · Darkmantle: Crush · Djinni: Create Whirlwind · Djinni: Spellcasting · Doppelganger: Read Thoughts · Dryad: Tree Stride · Dust Mephit: Sleep (1/Day) · Efreeti: Spellcasting · Frost Giant: War Cry (Recharge 5-6) · Gelatinous Cube: Engulf · Ghost: Etherealness · Giant Hyena: Rampage (1/Day) · Giant Octopus: Ink Cloud (1/Day) · Glabrezu: Spellcasting · Gnoll Warrior: Rampage (1/Day) · Gold Dragon Wyrmling: Weakening Breath · Gray Ooze: Pseudopod · Green Hag: Spellcasting · Half-Dragon: Dragon's Breath (Recharge 5-6) · Horned Devil: Hurl Flame · Horned Devil: Infernal Tail · Ice Devil: Ice Wall (Recharge 6) · Incubus: Nightmare (Recharge 6) · Incubus: Spellcasting · Invisible Stalker: Vortex · Kraken: Swallow · Lamia: Spellcasting · Lich: Deathly Teleport · Lich: Frightening Gaze · Lich: Spellcasting · Mage: Spellcasting · Mimic: Shape-Shift · Mummy Lord: Necrotic Strike · Mummy Lord: Spellcasting · Mummy Lord: Whirlwind of Sand · Night Hag: Nightmare Haunting (1/Day) · Night Hag: Spellcasting · Octopus: Ink Cloud (1/Day) · Oni: Spellcasting · Otyugh: Bite · Phase Spider: Bite · Pit Fiend: Hellfire Spellcasting (Recharge 4-6) · Planetar: Spellcasting · Priest Acolyte: Divine Aid (1/Day) · Priest Acolyte: Spellcasting · Priest: Spellcasting · Purple Worm: Swallow · Rakshasa: Cursed Touch · Rakshasa: Spellcasting · Remorhaz: Swallow · Roc: Swoop (Recharge 5-6) · Rust Monster: Antennae · Rust Monster: Reflexive Antennae · Sea Hag: Illusory Appearance · Shambling Mound: Engulf · Solar: Spellcasting · Sphinx of Lore: Spellcasting · Sphinx of Lore: Weight of Years · Sphinx of Valor: Roar (3/Day) · Sphinx of Valor: Spellcasting · Sphinx of Valor: Weight of Years · Spirit Naga: Spellcasting · Sprite: Heart Sight · Stirge: Proboscis · Stone Giant: Deflect Missile (Recharge 5-6) · Storm Giant: Spellcasting · Succubus: Charm · Tarrasque: Onslaught · Tarrasque: Swallow · Tarrasque: World-Shaking Movement · Treant: Animate Trees (1/Day) · Unicorn: Shimmering Shield · Unicorn: Spellcasting · Vampire Familiar: Umbral Dagger · Vampire: Shape-Shift · Water Elemental: Whelm (Recharge 4-6) · Werebear: Bite (Bear or Hybrid Form Only) · Wereboar: Gore (Boar or Hybrid Form Only) · Wererat: Bite (Rat or Hybrid Form Only) · Weretiger: Bite (Tiger or Hybrid Form Only) · Weretiger: Prowl (Tiger or Hybrid Form Only) · Werewolf: Bite (Wolf or Hybrid Form Only) · Will-o'-Wisp: Consume Life · Young Copper Dragon: Slowing Breath · Young Gold Dragon: Weakening Breath
 
 **Reference (14):** Black Pudding: Split · Chain Devil: Unnerving Gaze · Ettercap: Reel · Giant Frog: Swallow · Giant Toad: Swallow · Goblin Boss: Redirect Attack · Nalfeshnee: Pursuit · Nightmare: Ethereal Stride · Ochre Jelly: Split · Phase Spider: Ethereal Jaunt · Roper: Reel · Rust Monster: Destroy Metal · Shield Guardian: Protection · Shrieker Fungus: Shriek
 
@@ -237,32 +239,71 @@ Notes on the curated rows:
 
 | Record | State | How |
 | --- | --- | --- |
+| Adult Black Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Fear applies only as its own row says. |
+| Adult Brass Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Minor Illusion applies only as its own row says. |
+| Adult Bronze Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Water Breathing applies only as its own row says. |
+| Adult Copper Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Minor Illusion, Greater Restoration, Major Image apply only as their own rows say. |
+| Adult Gold Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Zone of Truth applies only as its own row says. |
+| Adult Silver Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Zone of Truth applies only as its own row says. |
+| Ancient Black Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Fear, Create Undead apply only as their own rows say. |
+| Ancient Brass Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Minor Illusion applies only as its own row says. |
+| Ancient Bronze Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Control Water, Water Breathing apply only as their own rows say. |
+| Ancient Copper Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Minor Illusion, Greater Restoration, Major Image, Project Image apply only as their own rows say. |
+| Ancient Gold Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Zone of Truth applies only as its own row says. |
+| Ancient Silver Dragon: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Zone of Truth applies only as its own row says. |
+| Archmage: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Light applies only as its own row says. |
 | Balor: Teleport | guided | A 60-foot teleport is granted (granted-moves.ts). Teleporting a willing demon within 10 feet instead is the GM's. |
 | Centaur Trooper: Trampling Charge (Recharge 5-6) | guided | It can be taken move first: a move of its Speed that provokes no Opportunity Attacks is granted (granted-moves.ts), and the Strength save, damage and Prone apply to the creatures the GM picks. Passing through Medium or smaller creatures' spaces needs the GM's go-ahead on the map. |
+| Cloud Giant: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Light, Telekinesis apply only as their own rows say. |
+| Couatl: Divine Aid (2/Day) | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Sanctuary applies only as its own row says. |
+| Couatl: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Dream, Greater Restoration, Sleep apply only as their own rows say. |
+| Cultist Fanatic: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Light applies only as its own row says. |
+| Djinni: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Wind Walk, Major Image, Plane Shift apply only as their own rows say. |
 | Doppelganger: Shape-Shift | enforced | transform/assume.ts takes a Medium or Small Humanoid, its size changing on the map, or returns to the true form, as a Bonus Action or an action as printed; the rest of its statistics stay its own. |
 | Dryad: Tree Stride | guided | A teleport of up to 65 feet is granted (granted-moves.ts). Whether a Large tree stands at each end is the GM's, since trees aren't on the map. |
+| Efreeti: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Elementalism, Major Image, Plane Shift apply only as their own rows say. |
 | Giant Hyena: Rampage (1/Day) | guided | It can be taken move first: the use is spent and a move of half its Speed granted (granted-moves.ts). The Bite it then makes, and the Bloodied creature it needs to have damaged, are the GM's. |
 | Giant Octopus: Ink Cloud (1/Day) | guided | The Reaction fills its 10-foot Cube with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). Offering it when the octopus takes damage underwater is the GM's. |
 | Gibbering Mouther: Bite | enforced | The hit's damage, and Prone on a Medium or smaller target, are applied. A creature it drops to 0 Hit Points dies outright with nothing left of its body (hit-points.ts). |
+| Glabrezu: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Confusion applies only as its own row says. |
 | Gnoll Warrior: Rampage (1/Day) | guided | It can be taken move first: the use is spent and a move of half its Speed granted (granted-moves.ts). The Rend it then makes, and the Bloodied creature it needs to have damaged, are the GM's. |
+| Green Hag: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Minor Illusion applies only as its own row says. |
 | Hydra: Multiattack | enforced | effective-actions.ts makes the Multiattack one Bite per living head, which death-traits.ts counts as heads die and grow back (Multiple Heads). |
 | Imp: Shape-Shift | enforced | transform/assume.ts takes a rat, a raven or a spider, each with its own speeds, or returns to the true form, as a Bonus Action or an action as printed; the rest of its statistics stay its own. |
+| Incubus: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Etherealness, Dream apply only as their own rows say. |
+| Lamia: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Minor Illusion, Major Image apply only as their own rows say. |
 | Lich: Deathly Teleport | guided | The legendary use is spent and a 60-foot teleport granted (granted-moves.ts). Who stood within 10 feet of the space it left, for the Necrotic damage, is the GM's to pick. |
+| Lich: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Animate Dead, Dimension Door, Plane Shift apply only as their own rows say. |
+| Mage: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Light applies only as its own row says. |
 | Mimic: Shape-Shift | guided | transform/assume.ts takes a Medium or Small object, or returns to the true form, as a Bonus Action or an action as printed; the rest of its statistics stay its own. Its Adhesive in object form is the GM's. |
+| Mummy Lord: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Animate Dead applies only as its own row says. |
 | Mummy Lord: Whirlwind of Sand | guided | The Reaction gives a 60-foot teleport (granted-moves.ts). The +2 AC against the triggering attack and the creatures it blinds are the GM's. |
 | Night Hag: Shape-Shift | enforced | transform/assume.ts takes a Small or Medium Humanoid, its size changing on the map, or returns to the true form, as a Bonus Action or an action as printed; the rest of its statistics stay its own. |
+| Night Hag: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Etherealness, Phantasmal Killer, Plane Shift apply only as their own rows say. |
 | Octopus: Ink Cloud (1/Day) | guided | The Reaction fills its 5-foot Cube with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). Offering it when a creature ends its turn beside the octopus underwater is the GM's. |
 | Oni: Shape-Shift | enforced | transform/assume.ts takes a Small or Medium Humanoid or a Large Giant, its size changing on the map, or returns to the true form, as a Bonus Action or an action as printed; the rest of its statistics stay its own. |
+| Oni: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Sleep applies only as its own row says. |
+| Planetar: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Dispel Evil and Good applies only as its own row says. |
+| Priest Acolyte: Divine Aid (1/Day) | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Sanctuary applies only as its own row says. |
+| Priest Acolyte: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Light applies only as its own row says. |
+| Priest: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Light applies only as its own row says. |
 | Quasit: Shape-Shift | enforced | transform/assume.ts takes a bat, a centipede or a toad, each with its own speeds, or returns to the true form, as a Bonus Action or an action as printed; the rest of its statistics stay its own. |
+| Rakshasa: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Minor Illusion, Major Image, Plane Shift apply only as their own rows say. |
 | Roc: Swoop (Recharge 5-6) | guided | The recharge is spent and a flight of half its Fly Speed granted that provokes no Opportunity Attacks (granted-moves.ts). Dropping the grappled creature is the GM's, who makes it fall (actor.fall). |
 | Rust Monster: Reflexive Antennae | guided | damage-reactions.ts offers it when a creature within 5 feet damages the rust monster, and using it resolves Antennae against that creature, opening its Dexterity save. It is offered on any damage, not only a hit's, so the GM declines it for a spell. |
 | Sea Hag: Death Glare (Recharge 5-6) | enforced | Only a Frightened creature the hag can see within 30 feet can be targeted (resolution/action-targets.ts). On a failed save one with 20 Hit Points or fewer drops to 0, and any other takes 3d8 Psychic damage (fatal-saves.ts). |
 | Solar: Slaying Bow | enforced | On a failed DC 21 Dexterity save a creature with 100 Hit Points or fewer dies outright, a character with no death saves, and Death Ward turns it aside; any other takes the Piercing and Radiant damage (fatal-saves.ts). |
+| Solar: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Dispel Evil and Good applies only as its own row says. |
+| Sphinx of Lore: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Minor Illusion, Plane Shift apply only as their own rows say. |
+| Sphinx of Valor: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Greater Restoration, Zone of Truth apply only as their own rows say. |
 | Sphinx of Wonder: Burst of Ingenuity (2/Day) | enforced | roll-answers.ts offers it on the sphinx's own check or save and asks it by a prompt about another creature's within 30 feet. Using it adds 2 to the roll, twice a day. |
+| Spirit Naga: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Minor Illusion, Water Breathing, Dimension Door apply only as their own rows say. |
 | Stone Giant: Deflect Missile (Recharge 5-6) | guided | A ranged hit with Bludgeoning, Piercing or Slashing damage opens the giant's reaction prompt (damage-window.ts), and using it takes 1d10 + 6 off the damage, recharging on a 5 or 6. Redirecting the force at another creature when the damage reaches 0 is the GM's. |
+| Storm Giant: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Light applies only as its own row says. |
 | Succubus: Shape-Shift | enforced | transform/assume.ts takes a Medium or Small Humanoid with no Fly Speed, or returns to the true form, as a Bonus Action or an action as printed; the rest of its statistics stay its own. |
 | Tarrasque: Onslaught | guided | It can be taken move first: the legendary use is spent and a move of half its Speed granted (granted-moves.ts). The Claw or Tail attack it then makes is the GM's to take. |
 | Tarrasque: World-Shaking Movement | guided | The legendary use is spent, a move of its Speed granted (granted-moves.ts) and its Emanation offered. Ending Concentration and knocking Medium or smaller creatures Prone in it are the GM's. |
+| Unicorn: Spellcasting | guided | Casts its listed spells at the stat block's numbers (monster-spells.ts); Dispel Evil and Good applies only as its own row says. |
 | Vampire: Shape-Shift | guided | transform/assume.ts takes the Tiny bat (no speech) or the Medium mist (no actions or speech, Resistance to all damage, and it can share a space), each with its speeds, and returns to the vampire form. It is refused in sunlight with dynamic vision on, and its Multiattack and Grave Strike work only in the vampire form. Running water, and the sunlight's own damage getting through the mist's Resistance, are the GM's. |
 | Werebear: Bite (Bear or Hybrid Form Only) | guided | It works only in the animal and hybrid forms (transform/rules.ts). A hit opens the curse's Constitution save on a Humanoid, and a cursed creature that drops to 0 Hit Points becomes a Werebear with 10 Hit Points instead (transform/at-zero.ts). The 24 hours of immunity after a success, and the GM's control of the cursed creature, are the GM's. |
 | Werebear: Shape-Shift | enforced | transform/assume.ts takes the Large hybrid or the Large bear, or returns to the true form, as a Bonus Action or an action as printed; the rest of its statistics stay its own. |

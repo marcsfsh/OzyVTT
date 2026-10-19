@@ -3531,7 +3531,20 @@
       "formula": "1d8 + 4",
       "type": "slashing"
      }
-    ]
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 30,
+      "maxTargetSize": "large",
+      "damage": [],
+      "conditions": [
+       "prone"
+      ]
+     }
+    ],
+    "reminder": "After a charge that knocks the target Prone, the allosaurus can make one Bite attack against it; take it from the turn list."
    }
   ],
   "token": {
@@ -7017,7 +7030,8 @@
       },
       "insteadOfDamage": true
      }
-    ]
+    ],
+    "reminder": "The rug smothers one creature at a time. While it grapples the target, the target is suffocating, and the rug halves the damage it takes (round down) while the target takes the same amount."
    }
   ],
   "token": {
@@ -7114,7 +7128,8 @@
     "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the ankheg), reach 5 ft. 10 (2d6 + 3) Slashing damage plus 3 (1d6) Acid damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 13).",
     "attack": {
      "bonus": 5,
-     "reachFeet": 5
+     "reachFeet": 5,
+     "advantageWhen": "target-grappled-by-self"
     },
     "damage": [
      {
@@ -9217,7 +9232,8 @@
       "formula": "5d6",
       "type": "fire"
      }
-    ]
+    ],
+    "reminder": "A flammable object the target hit that isn't worn or carried starts burning; objects are the GM's to burn."
    }
   ],
   "token": {
@@ -10315,7 +10331,8 @@
       "formula": "4d6 + 3",
       "type": "acid"
      }
-    ]
+    ],
+    "reminder": "Nonmagical armor the target wears takes a cumulative -1 penalty to the AC it offers, and is destroyed when the penalty reduces its AC to 10. Mending removes the penalty. Change the armor by hand."
    },
    {
     "id": "black-pudding-split",
@@ -11610,7 +11627,8 @@
     "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the bugbear), reach 10 ft. 12 (2d8 + 3) Piercing damage.",
     "attack": {
      "bonus": 5,
-     "reachFeet": 10
+     "reachFeet": 10,
+     "advantageWhen": "target-grappled-by-self"
     },
     "damage": [
      {
@@ -11742,7 +11760,8 @@
      "bonus": 4,
      "reachFeet": 10,
      "rangeFeet": 60,
-     "rangeNormalFeet": 20
+     "rangeNormalFeet": 20,
+     "advantageWhen": "target-grappled-by-self"
     },
     "damage": [
      {
@@ -13108,7 +13127,8 @@
       "name": "Attached",
       "maxTargetSize": "large"
      }
-    ]
+    ],
+    "reminder": "While attached, the cloaker can't make Attach attacks against other targets, and it halves the damage it takes (round down) while the target takes the same amount. It detaches with 5 feet of its movement, and the target or a creature within 5 feet can detach it with an action and a DC 14 Strength (Athletics) check."
    },
    {
     "id": "phantasms-recharge-after-a-short-or-long-rest",
@@ -14668,7 +14688,8 @@
       "formula": "1d6 + 3",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "reminder": "The darkmantle attaches to the target: it moves with the target at Speed 0 and attacks only it, with Advantage. With Advantage on this hit against a Medium or smaller target, it covers the target, which is Blinded and suffocating while it is attached. The target detaches it with an action and a DC 13 Strength (Athletics) check, and the darkmantle with 5 feet of its movement."
    },
    {
     "id": "darkness-aura",
@@ -15625,7 +15646,8 @@
     "description": "Melee Attack Roll: +6 (with Advantage during the first round of each combat), reach 5 ft. 11 (2d6 + 4) Bludgeoning damage.",
     "attack": {
      "bonus": 6,
-     "reachFeet": 5
+     "reachFeet": 5,
+     "advantageWhen": "first-round"
     },
     "damage": [
      {
@@ -17431,6 +17453,18 @@
       "formula": "2d8 + 6",
       "type": "piercing"
      }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "huge",
+      "damage": [],
+      "conditions": [
+       "prone"
+      ]
+     }
     ]
    }
   ],
@@ -18170,6 +18204,13 @@
      {
       "formula": "2d6 + 3",
       "type": "fire"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Burning",
+      "hazard": "burning"
      }
     ]
    }
@@ -22138,7 +22179,8 @@
     "description": "Melee Attack Roll: +9 (with Advantage if the target doesn't have all its Hit Points), reach 5 ft. 22 (3d10 + 6) Piercing damage.",
     "attack": {
      "bonus": 9,
-     "reachFeet": 5
+     "reachFeet": 5,
+     "advantageWhen": "target-hurt"
     },
     "damage": [
      {
@@ -24374,6 +24416,18 @@
       "formula": "2d12 + 5",
       "type": "piercing"
      }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "large",
+      "damage": [],
+      "conditions": [
+       "prone"
+      ]
+     }
     ]
    },
    {
@@ -24517,7 +24571,8 @@
       "formula": "2d8 + 1",
       "type": "acid"
      }
-    ]
+    ],
+    "reminder": "Nonmagical armor the target wears takes a cumulative -1 penalty to the AC it offers, and is destroyed when the penalty reduces its AC to 10. Mending removes the penalty. Change the armor by hand."
    }
   ],
   "token": {
@@ -27197,7 +27252,8 @@
       "formula": "5d8 + 4",
       "type": "fire"
      }
-    ]
+    ],
+    "reminder": "A flammable object the target hit that isn't worn or carried starts burning; objects are the GM's to burn."
    },
    {
     "id": "infernal-tail",
@@ -27350,7 +27406,8 @@
     "description": "Melee Attack Roll: +6 (with Advantage if the target doesn't have all its Hit Points), reach 5 ft. 14 (3d6 + 4) Piercing damage.",
     "attack": {
      "bonus": 6,
-     "reachFeet": 5
+     "reachFeet": 5,
+     "advantageWhen": "target-hurt"
     },
     "damage": [
      {
@@ -30927,6 +30984,13 @@
       "formula": "2d4 + 2",
       "type": "fire"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Burning",
+      "hazard": "burning"
+     }
     ]
    }
   ],
@@ -31082,6 +31146,18 @@
      {
       "formula": "2d10 + 7",
       "type": "piercing"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "huge",
+      "damage": [],
+      "conditions": [
+       "prone"
+      ]
      }
     ]
    }
@@ -32063,7 +32139,8 @@
     "description": "Melee Attack Roll: +5 (with Advantage if the target is Grappled by the mimic), reach 5 ft. 7 (1d8 + 3) Piercing damage—or 12 (2d8 + 3) Piercing damage if the target is Grappled by the mimic—plus 4 (1d8) Acid damage.",
     "attack": {
      "bonus": 5,
-     "reachFeet": 5
+     "reachFeet": 5,
+     "advantageWhen": "target-grappled-by-self"
     },
     "damage": [
      {
@@ -32141,7 +32218,10 @@
        }
       ],
       "escapeDc": 13,
-      "maxTargetSize": "large"
+      "maxTargetSize": "large",
+      "tags": [
+       "escape-disadvantage"
+      ]
      }
     ]
    }
@@ -35108,7 +35188,8 @@
       "formula": "2d8",
       "type": "poison"
      }
-    ]
+    ],
+    "reminder": "A target this damage drops to 0 Hit Points becomes Stable instead, and has the Poisoned condition for 1 hour, with the Paralyzed condition while Poisoned. Apply both by hand."
    }
   ],
   "token": {
@@ -35207,7 +35288,8 @@
     "description": "Melee Attack Roll: +5 (with Advantage if the target doesn't have all its Hit Points), reach 5 ft. 1 Piercing damage.",
     "attack": {
      "bonus": 5,
-     "reachFeet": 5
+     "reachFeet": 5,
+     "advantageWhen": "target-hurt"
     },
     "damage": [
      {
@@ -37478,7 +37560,8 @@
       "formula": "3d12",
       "type": "necrotic"
      }
-    ]
+    ],
+    "reminder": "The target is cursed: it gains no benefit from finishing a Short or Long Rest until the curse ends. Remove Curse ends it."
    },
    {
     "id": "baleful-command",
@@ -39385,7 +39468,12 @@
       "formula": "1d4 + 3",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "onHitPush": {
+     "feet": 10,
+     "upTo": true,
+     "maxTargetSize": "medium"
+    }
    },
    {
     "id": "mockery",
@@ -42788,7 +42876,8 @@
        "at": "source-turn-start"
       }
      }
-    ]
+    ],
+    "reminder": "While attached, the stirge can't make Proboscis attacks. It detaches with 5 feet of its movement, and the target or a creature within 5 feet can detach it with an action."
    }
   ],
   "token": {
@@ -44012,7 +44101,8 @@
     "description": "Melee Attack Roll: +5 (with Advantage if the target doesn't have all its Hit Points), reach 5 ft. 8 (2d4 + 3) Piercing damage, or 5 (1d4 + 3) Piercing damage if the swarm is Bloodied.",
     "attack": {
      "bonus": 5,
-     "reachFeet": 5
+     "reachFeet": 5,
+     "advantageWhen": "target-hurt"
     },
     "damage": [
      {
@@ -44579,7 +44669,10 @@
         "id": "restrained"
        }
       ],
-      "escapeDc": 20
+      "escapeDc": 20,
+      "tags": [
+       "no-teleport"
+      ]
      }
     ]
    },
@@ -45048,7 +45141,12 @@
       "formula": "2d8 + 3",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "onHitPush": {
+     "feet": 10,
+     "upTo": true,
+     "maxTargetSize": "large"
+    }
    },
    {
     "id": "heavy-crossbow",
@@ -46503,7 +46601,8 @@
       "formula": "3d4",
       "type": "necrotic"
      }
-    ]
+    ],
+    "reminder": "A target this damage drops to 0 Hit Points becomes Stable instead, and has the Poisoned condition for 1 hour, with the Paralyzed condition while Poisoned. Apply both by hand."
    }
   ],
   "token": {
@@ -47403,6 +47502,18 @@
      {
       "formula": "1d6 + 4",
       "type": "bludgeoning"
+     }
+    ],
+    "conditionalDamage": [
+     {
+      "when": "charge",
+      "mode": "plus",
+      "feet": 20,
+      "maxTargetSize": "large",
+      "damage": [],
+      "conditions": [
+       "prone"
+      ]
      }
     ]
    }

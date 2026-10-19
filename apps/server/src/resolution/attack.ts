@@ -474,6 +474,19 @@ function traitClaims(ctx: ResolveContext, target: LiveActor, sources: RollModeCl
   // Points."
   if (target.hp.current < target.hp.maximum && holdsFeature(deps.definition, "blood-frenzy", "Blood Frenzy"))
     sources.advantage.push({ source: "blood-frenzy", label: "Blood Frenzy (target is hurt)" });
+  // What the attack's own printing gives it (SRD 5.2.1: "with Advantage if the target is Grappled by the ankheg").
+  const printed = ctx.action.attack?.advantageWhen;
+  if (
+    printed === "target-grappled-by-self" &&
+    target.effects.some(
+      (effect) => effect.sourceActorId === attacker.id && effect.linkedConditionIds.includes("grappled")
+    )
+  )
+    sources.advantage.push({ source: "printed", label: `${ctx.action.name} (target Grappled by ${attacker.name})` });
+  if (printed === "target-hurt" && target.hp.current < target.hp.maximum)
+    sources.advantage.push({ source: "printed", label: `${ctx.action.name} (target is hurt)` });
+  if (printed === "first-round" && state.combat.active && state.combat.round === 1)
+    sources.advantage.push({ source: "printed", label: `${ctx.action.name} (first round)` });
   const authority = auraOfAuthority(state, attacker, deps);
   if (authority) sources.advantage.push(authority);
   if (!deps.distanceFeet || !holdsFeature(deps.definition, "pack-tactics", "Pack Tactics")) return;
