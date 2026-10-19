@@ -262,6 +262,14 @@ export function GearTab({
                 onChange={(quantity) => save({ ...open, quantity })}
               />
             </div>
+            {summary?.light && !summary.light.always && (
+              <LightControls
+                item={open}
+                light={summary.light}
+                busy={busy}
+                onChange={(change) => void edit("item:set-light", { actorId: actor.id, itemId: open.id, ...change })}
+              />
+            )}
             {!open.spellId && summary?.spellScroll && (
               <Button size="sm" variant="secondary" disabled={busy} onClick={() => setScrollRowId(open.id)}>
                 Choose its spell
@@ -587,5 +595,71 @@ function GiveTo({
         Give
       </Button>
     </form>
+  );
+}
+
+/** Where a Bullseye Lantern's Cone points, as the map shows it: 0 is to the right, turning clockwise. */
+const AIMS = [
+  { degrees: 0, label: "Right" },
+  { degrees: 45, label: "Down and right" },
+  { degrees: 90, label: "Down" },
+  { degrees: 135, label: "Down and left" },
+  { degrees: 180, label: "Left" },
+  { degrees: 225, label: "Up and left" },
+  { degrees: 270, label: "Up" },
+  { degrees: 315, label: "Up and right" }
+] as const;
+
+/** A light source on its row: light it or put it out (it must be in hand, and lighting it takes a Tinderbox or another
+ *  flame, which the server checks), lower its hood, and aim its Cone. */
+function LightControls({
+  item,
+  light,
+  busy,
+  onChange
+}: Readonly<{
+  item: InventoryItem;
+  light: NonNullable<ContentEquipmentSummary["light"]>;
+  busy: boolean;
+  onChange: (change: Readonly<{ lit?: boolean; hoodLowered?: boolean; facingDegrees?: number }>) => void;
+}>) {
+  if (!item.equipped) return <p className="cs-sub">Equip it to light it.</p>;
+  return (
+    <div className="cs-chiprow" role="group" aria-label={`Light of the ${item.name}`}>
+      <button
+        type="button"
+        className={`cs-toggle interactive${item.lit ? " is-on" : ""}`}
+        aria-pressed={item.lit === true}
+        disabled={busy}
+        onClick={() => onChange({ lit: item.lit !== true })}
+      >
+        {item.lit ? "Lit" : "Light it"}
+      </button>
+      {light.hooded && (
+        <button
+          type="button"
+          className={`cs-toggle interactive${item.hoodLowered ? " is-on" : ""}`}
+          aria-pressed={item.hoodLowered === true}
+          disabled={busy}
+          onClick={() => onChange({ hoodLowered: item.hoodLowered !== true })}
+        >
+          {item.hoodLowered ? "Hood down" : "Lower the hood"}
+        </button>
+      )}
+      {light.cone && (
+        <Select
+          aria-label={`Aim the ${item.name}`}
+          disabled={busy}
+          value={String(item.facingDegrees ?? 0)}
+          onChange={(event) => onChange({ facingDegrees: Number(event.target.value) })}
+        >
+          {AIMS.map((aim) => (
+            <option key={aim.degrees} value={aim.degrees}>
+              Aimed {aim.label.toLowerCase()}
+            </option>
+          ))}
+        </Select>
+      )}
+    </div>
   );
 }

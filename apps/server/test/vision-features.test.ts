@@ -149,11 +149,14 @@ describe("Divine Sense and Detect Evil and Good", () => {
     );
   });
 
-  it("shows nothing to another player or the table, beyond 60 feet, or while the paladin is Incapacitated", () => {
+  it("shows nothing to another player or the table, beyond 60 feet, of a GM-only creature, or while the paladin is Incapacitated", () => {
     expect(sensed(dark(), SESSION_B)).toEqual([]);
     expect(sensed(dark())).toEqual([]);
     expect(sensed(dark({ positions: { [GOBLIN]: cell(15, 5) } }), SESSION_A)).toEqual([]);
     expect(sensed(dark({ actors: { [HERO]: { conditions: [{ id: "stunned" }] } } }), SESSION_A)).toEqual([]);
+    // A GM-only creature stays the GM's secret.
+    const secret = { [GOBLIN]: { definitionId: "zombie", visibility: "gm-only" } };
+    expect(sensed(dark({ actors: secret }), SESSION_A)).toEqual([]);
   });
 
   it("needs no marker for a creature the paladin already sees, and reaches through walls", () => {

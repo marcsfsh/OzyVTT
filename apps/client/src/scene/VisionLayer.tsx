@@ -1,3 +1,5 @@
+import { AREA_KINDS } from "./mapTools";
+
 type Point = Readonly<{ x: number; y: number }>;
 type Wall = Readonly<{ id: string; kind: "wall" | "door" | "window"; a: Point; b: Point; open?: boolean }>;
 type Light = Readonly<{
@@ -6,6 +8,16 @@ type Light = Readonly<{
   actorId: string | null;
   brightFeet: number;
   dimFeet: number;
+}>;
+/** An area of light or obscurement as the scene stores it; a spell's template draws itself as its annotation. */
+type Area = Readonly<{
+  id: string;
+  kind: string;
+  shape:
+    | Readonly<{ type: "rect"; x: number; y: number; width: number; height: number }>
+    | Readonly<{ type: "circle"; x: number; y: number; radiusFeet: number }>
+    | Readonly<{ type: "template"; annotationId: string }>
+    | Readonly<{ type: "emanation"; actorId: string; radiusFeet: number }>;
 }>;
 
 /**
@@ -17,6 +29,7 @@ export function VisionLayer({
   role,
   walls,
   lights = [],
+  areas = [],
   tokenPositions,
   pixelsPerFoot,
   cellSizePx,
@@ -27,6 +40,8 @@ export function VisionLayer({
   role: "gm" | "player";
   walls: readonly Wall[];
   lights?: readonly Light[];
+  /** Areas of light and obscurement (the GM's view). */
+  areas?: readonly Area[];
   /** Where each placed token stands, for the lights creatures carry. */
   tokenPositions: ReadonlyMap<string, Point>;
   pixelsPerFoot: number | null;
@@ -41,6 +56,37 @@ export function VisionLayer({
   const handle = Math.max(6, cellSizePx * 0.18);
   return (
     <g className={`vision-layer${erasing ? " erasing" : ""}`}>
+      {role === "gm" &&
+        areas.map((area) => {
+          const label = AREA_KINDS.find((entry) => entry.id === area.kind)?.label ?? area.kind;
+          const className = `vision-area vision-area-${area.kind}`;
+          const shape = area.shape;
+          if (shape.type === "rect")
+            return (
+              <g key={area.id} data-area-id={area.id}>
+                <title>{label}</title>
+                <rect className={className} x={shape.x} y={shape.y} width={shape.width} height={shape.height} />
+                {erasing && (
+                  <rect className="vision-hit" x={shape.x} y={shape.y} width={shape.width} height={shape.height} />
+                )}
+              </g>
+            );
+          const at =
+            shape.type === "circle"
+              ? shape
+              : shape.type === "emanation"
+                ? tokenPositions.get(shape.actorId)
+                : undefined;
+          if (!at || pixelsPerFoot === null || shape.type === "template") return null;
+          const radius = shape.radiusFeet * pixelsPerFoot;
+          return (
+            <g key={area.id} data-area-id={area.id}>
+              <title>{label}</title>
+              <circle className={className} cx={at.x} cy={at.y} r={radius} />
+              {erasing && <circle className="vision-hit" cx={at.x} cy={at.y} r={radius} />}
+            </g>
+          );
+        })}
       {role === "gm" &&
         lights.map((light) => {
           const at = light.position ?? (light.actorId ? tokenPositions.get(light.actorId) : undefined);

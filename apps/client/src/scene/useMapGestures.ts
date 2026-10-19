@@ -10,7 +10,7 @@ import type {
 import { setTemplatePlacement, toggleTarget, type TargetingSession } from "../encounter/targeting";
 import type { GridCalibration } from "./gridPreview";
 import { imagePointFromClient } from "./mapImage";
-import { isVisionTool, type MapTool } from "./mapTools";
+import { isVisionTool, type AreaKindId, type MapTool } from "./mapTools";
 import type { MapCommands } from "./useMapCommands";
 import {
   anchoredCamera,
@@ -41,6 +41,7 @@ export type Gesture =
   | Readonly<{ kind: "fog"; op: "reveal" | "hide"; origin: Point; current: Point }>
   | Readonly<{ kind: "terrain"; op: "difficult" | "clear"; origin: Point; current: Point }>
   | Readonly<{ kind: "wall"; wallKind: "wall" | "door" | "window"; origin: Point; current: Point }>
+  | Readonly<{ kind: "vision-area"; origin: Point; current: Point }>
   | Readonly<{ kind: "annotation-move"; id: string; grab: Point; geometry: Readonly<{ origin: Point; target: Point }> }>
   | Readonly<{ kind: "annotation-resize"; id: string; anchor: Point; current: Point }>
   /** Two fingers. Every field is read when the pinch begins and never updated, so zoom is absolute
@@ -85,6 +86,7 @@ export function useMapGestures({
   onSelect,
   onContextMenu: openMenu,
   onPlaceLight,
+  areaKind = "heavily-obscured",
   onTokenPress,
   readOnly = false,
   armedActorId = null,
@@ -113,6 +115,8 @@ export function useMapGestures({
   onContextMenu: (menu: Readonly<{ actorId: string; x: number; y: number }>) => void;
   /** The GM's Light tool: a tap places the chosen light there. */
   onPlaceLight?: (point: Point) => void;
+  /** What the GM's Paint area tool paints. */
+  areaKind?: AreaKindId;
   /** A token pressed with the Select tool, or opened for its menu. */
   onTokenPress?: (actorId: string) => void;
   /** The map only shows: a drag pans and two fingers zoom, and nothing is sent. */
@@ -333,13 +337,21 @@ export function useMapGestures({
       if (tool === "vision-erase") {
         const wallId = target.closest("[data-wall-id]")?.getAttribute("data-wall-id");
         const lightId = target.closest("[data-light-id]")?.getAttribute("data-light-id");
+        const areaId = target.closest("[data-area-id]")?.getAttribute("data-area-id");
         if (wallId) void commands.removeWall(wallId);
         else if (lightId) void commands.removeLight(lightId);
-        else setMessage("Tap a wall, door, window or light to remove it.");
+        else if (areaId) void commands.removeArea(areaId);
+        else setMessage("Tap a wall, door, window, light or area to remove it.");
         return;
       }
       if (tool === "vision-light") {
         onPlaceLight?.(point);
+        return;
+      }
+      if (tool === "vision-area") {
+        capturePointer(event);
+        setMessage("");
+        setGesture({ kind: "vision-area", origin: point, current: point });
         return;
       }
       capturePointer(event);
@@ -624,6 +636,12 @@ export function useMapGestures({
       const { wallKind, origin, current } = gesture;
       setGesture(null);
       commands.addWall(wallKind, origin, current);
+      return;
+    }
+    if (gesture.kind === "vision-area") {
+      const { origin, current } = gesture;
+      setGesture(null);
+      commands.addArea(areaKind, origin, current);
       return;
     }
     if (gesture.kind === "measure") {
