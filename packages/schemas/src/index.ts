@@ -4351,7 +4351,9 @@ export const ActionSchema = z
         /** Each target regains all its hit points, whatever the formula says (Power Word Heal). */
         toMaximum: z.literal(true).optional(),
         /** The roll is Temporary Hit Points, which a creature takes only when they beat what it has (False Life). */
-        temporary: z.literal(true).optional()
+        temporary: z.literal(true).optional(),
+        /** Its dice give their highest faces with no roll (Fiendish Vigor's False Life). */
+        maximized: z.literal(true).optional()
       })
       .strict()
       .optional(),
@@ -4572,6 +4574,13 @@ export const ActionSchema = z
     /** Its spell is cast with this action alone, whatever the spell's casting time (Pact of the Chain: "cast it as a
      *  Magic action without expending a spell slot"). */
     castsAtOnce: z.literal(true).optional(),
+    /** The spell components its cast goes without, as the feature that gives it says (Wild Companion's Find Familiar
+     *  "without Material components"). */
+    waives: z
+      .array(z.enum(["verbal", "somatic", "material"]))
+      .min(1)
+      .max(3)
+      .optional(),
     /** A jump the action allows this turn ("jumps up to 30 feet by spending 10 feet of movement"). */
     leap: z
       .object({ feet: z.number().int().min(5).max(120), costFeet: z.number().int().min(0).max(60) })

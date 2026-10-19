@@ -9,6 +9,8 @@ import { spellTableStages, type ClassMechanicsModule } from "./overlay.js";
 
 /** An invocation's spell: cast at will without a slot, and never with one, since the Warlock does not know it. */
 const atWill = (id: string, level: number) => ({ id, level, withoutSlot: "at-will" as const, withSlot: false });
+/** An invocation's spell cast "on yourself" only. */
+const onYourself = (id: string, level: number) => ({ ...atWill(id, level), self: true as const });
 
 /** Every SRD damage type Fiendish Resilience may name: the printed twelve, less Force. */
 const RESILIENCE_TYPES: ReadonlyArray<readonly [id: string, name: string]> = [
@@ -78,9 +80,10 @@ export const warlock: ClassMechanicsModule = {
         // "You have Truesight with a range of 30 feet."
         "witch-sight": { modifiers: [{ type: "sense", sense: "truesight", feet: 30 }] },
         // ---- castings without a spell slot ---------------------------------------------------------
-        "armor-of-shadows": { grants: { spells: [atWill("mage-armor", 1)] } },
-        "ascendant-step": { grants: { spells: [atWill("levitate", 2)] } },
-        "fiendish-vigor": { grants: { spells: [atWill("false-life", 1)] } },
+        "armor-of-shadows": { grants: { spells: [onYourself("mage-armor", 1)] } },
+        "ascendant-step": { grants: { spells: [onYourself("levitate", 2)] } },
+        // "You don't roll the die for the Temporary Hit Points; you automatically get the highest number on the die."
+        "fiendish-vigor": { grants: { spells: [{ ...onYourself("false-life", 1), maximized: true }] } },
         /**
          * The only one limited to once per Long Rest, so it also takes a counter. The Swim Speed stays
          * prose (no per-movement-mode speed).
@@ -92,9 +95,10 @@ export const warlock: ClassMechanicsModule = {
         "mask-of-many-faces": { grants: { spells: [atWill("disguise-self", 1)] } },
         "master-of-myriad-forms": { grants: { spells: [atWill("alter-self", 2)] } },
         "misty-visions": { grants: { spells: [atWill("silent-image", 1)] } },
-        /** The "while you're in Dim Light or Darkness" gate stays prose: there is no light-level trigger. */
-        "one-with-shadows": { grants: { spells: [atWill("invisibility", 2)] } },
-        "otherworldly-leap": { grants: { spells: [atWill("jump", 1)] } },
+        // "While you're in an area of Dim Light or Darkness": the light at the Warlock's space is read as the cast is
+        // made (resolution/validate.ts).
+        "one-with-shadows": { grants: { spells: [onYourself("invisibility", 2)] } },
+        "otherworldly-leap": { grants: { spells: [onYourself("jump", 1)] } },
         "visions-of-distant-realms": { grants: { spells: [atWill("arcane-eye", 4)] } },
         "whispers-of-the-grave": { grants: { spells: [atWill("speak-with-dead", 3)] } },
         // ---- picks an invocation makes on top of itself --------------------------------------------

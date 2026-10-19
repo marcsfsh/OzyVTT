@@ -361,6 +361,17 @@ export const FeatureGrantsFieldsSchema = z
             /** Which of its castings are a Magic action, whatever the spell's casting time: the one without a slot
              *  (Pact of the Chain's Find Familiar) or every one the feature gives (Wild Companion's). */
             asMagicAction: z.enum(["without-slot", "every-casting"]).optional(),
+            /** The components every casting the feature gives goes without (Wild Companion's and Dragon Companion's
+             *  "without Material components"). */
+            waives: z
+              .array(z.enum(["verbal", "somatic", "material"]))
+              .min(1)
+              .max(3)
+              .optional(),
+            /** Its casting without a slot targets only its caster ("cast Mage Armor on yourself"). */
+            self: z.literal(true).optional(),
+            /** Its casting without a slot gives its healing dice their highest faces (Fiendish Vigor). */
+            maximized: z.literal(true).optional(),
             /** How the feature changes the creatures the spell brings when cast this way: the creature type it takes
              *  (Wild Companion's Fey familiar), that it leaves when its caster finishes a Long Rest, more forms to pick
              *  (Pact of the Chain), and casting it without Concentration for a minute (Dragon Companion). */

@@ -155,7 +155,7 @@ export const druid: ClassMechanicsModule = {
     },
 
     // Find Familiar always prepared, and cast "as a Magic action" with a slot or a use of Wild Shape (the shared
-    // pool): "the familiar is Fey and disappears when you finish a Long Rest".
+    // pool) "without Material components": "the familiar is Fey and disappears when you finish a Long Rest".
     "wild-companion": {
       uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest", pool: "wild-shape" },
       grants: {
@@ -166,6 +166,7 @@ export const druid: ClassMechanicsModule = {
             alwaysPrepared: true,
             withoutSlot: "free",
             asMagicAction: "every-casting",
+            waives: ["material"],
             summon: { creatureTypes: ["fey"], untilLongRest: true }
           }
         ]

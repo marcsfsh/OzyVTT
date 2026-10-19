@@ -149,6 +149,9 @@ type InterpretedFeatures = {
     /** Which of its castings are a Magic action, whatever the spell's casting time (Pact of the Chain, Wild
      *  Companion). */
     asMagicAction?: MagicActionCasting;
+    /** How the granting feature changes its castings: components they go without, and a free casting only on its
+     *  caster or with its healing dice at their highest. */
+    casting?: CastingChange;
   }>;
   /** The free casting a feature with limited uses gives the spell picked for it (Magic Initiate's level 1 spell). */
   pickedSpellUses: Map<string, NonNullable<ActorAction["uses"]>>;
@@ -527,7 +530,51 @@ type SpellEntry = {
   free?: ActorAction["uses"] | null;
   summon?: SummonChange;
   asMagicAction?: MagicActionCasting;
+  casting?: CastingChange;
 };
+
+/** What a feature changes about a granted spell's castings (`FeatureGrants.spells[]`): the components every casting
+ *  goes without, and its free casting cast only on its caster or with its healing dice at their highest. */
+type CastingChange = Readonly<{
+  waives?: ReadonlyArray<"verbal" | "somatic" | "material">;
+  freeSelf?: true;
+  freeMaximized?: true;
+}>;
+
+/** The casting change a granted spell carries, or undefined when it changes nothing. */
+function castingChangeOf(spell: NonNullable<FeatureRecord["grants"]>["spells"][number]): CastingChange | undefined {
+  const change: CastingChange = {
+    ...(spell.waives ? { waives: [...spell.waives] } : {}),
+    ...(spell.self ? { freeSelf: true as const } : {}),
+    ...(spell.maximized ? { freeMaximized: true as const } : {})
+  };
+  return Object.keys(change).length > 0 ? change : undefined;
+}
+
+/** Two sources' changes to one spell's castings, together. */
+function mergedCasting(first: CastingChange | undefined, second: CastingChange | undefined): CastingChange | undefined {
+  if (!first || !second) return first ?? second;
+  const waives = [...new Set([...(first.waives ?? []), ...(second.waives ?? [])])];
+  return {
+    ...(waives.length > 0 ? { waives } : {}),
+    ...(first.freeSelf || second.freeSelf ? { freeSelf: true as const } : {}),
+    ...(first.freeMaximized || second.freeMaximized ? { freeMaximized: true as const } : {})
+  };
+}
+
+/** A cast with its feature's change: the components it goes without, and for a free casting, its caster as its only
+ *  target ("on yourself") and its healing dice at their highest (Fiendish Vigor). */
+function withCastingChange(action: ActorAction, change: CastingChange | undefined, free: boolean): ActorAction {
+  if (!change) return action;
+  return {
+    ...action,
+    ...(change.waives ? { waives: [...change.waives] } : {}),
+    ...(free && change.freeSelf ? { targets: { ...(action.targets ?? {}), who: "self" as const } } : {}),
+    ...(free && change.freeMaximized && action.healing
+      ? { healing: { ...action.healing, maximized: true as const } }
+      : {})
+  };
+}
 
 /** Which castings a feature makes a Magic action (`FeatureGrants.spells[].asMagicAction`). */
 type MagicActionCasting = NonNullable<NonNullable<FeatureRecord["grants"]>["spells"][number]["asMagicAction"]>;
@@ -592,16 +639,18 @@ function linkSpellActions(
       into.push(action);
       entry[key] = action.id;
     };
-    if (record.level === 0) mint(cantripActionFor(record, numbers), "actionId");
-    else {
+    if (record.level === 0) {
+      const cantrip = cantripActionFor(record, numbers);
+      mint(cantrip ? withCastingChange(cantrip, entry.casting, false) : null, "actionId");
+    } else {
       if (hasSlots && entry.withSlot !== false) {
-        const cast = leveledSpellActionFor(record, numbers);
+        const cast = withCastingChange(leveledSpellActionFor(record, numbers), entry.casting, false);
         mint(entry.asMagicAction === "every-casting" ? asMagicActionCast(cast) : cast, "actionId");
         // SRD Rituals: a prepared ritual spell can be cast without a slot and takes 10 minutes longer.
         if (record.ritual) mint(ritualActionOf(cast, record), "ritualActionId");
       }
       if (entry.free !== undefined) {
-        const free = leveledSpellActionFor(record, numbers, entry.free);
+        const free = withCastingChange(leveledSpellActionFor(record, numbers, entry.free), entry.casting, true);
         // "Cast it as a Magic action without expending a spell slot" (Pact of the Chain).
         mint(entry.asMagicAction ? asMagicActionCast(free) : free, "freeActionId");
       }
@@ -633,6 +682,7 @@ const sheetSpell = ({
   free: _free,
   summon: _summon,
   asMagicAction: _asMagicAction,
+  casting: _casting,
   ...entry
 }: SpellEntry) => entry;
 
@@ -763,6 +813,7 @@ function interpretFeature(
         source,
         ...(spell.summon ? { summon: spell.summon } : {}),
         ...(spell.asMagicAction ? { asMagicAction: spell.asMagicAction } : {}),
+        ...(castingChangeOf(spell) ? { casting: castingChangeOf(spell) } : {}),
         ...(spell.withoutSlot === "at-will" ? { free: null } : {}),
         // A free casting with no counter to spend is refused at build, so nothing casts without limit.
         ...(spell.withoutSlot === "free"
@@ -1285,7 +1336,8 @@ export function buildCharacterDefinition(
       source: grantedSpell.source,
       ...(grantedSpell.free !== undefined ? { free: grantedSpell.free } : {}),
       ...(grantedSpell.summon ? { summon: grantedSpell.summon } : {}),
-      ...(grantedSpell.asMagicAction ? { asMagicAction: grantedSpell.asMagicAction } : {})
+      ...(grantedSpell.asMagicAction ? { asMagicAction: grantedSpell.asMagicAction } : {}),
+      ...(grantedSpell.casting ? { casting: grantedSpell.casting } : {})
     };
   };
   /** Adds a spell once; a second source of the same spell adds only its free casting and what it changes about the
@@ -1302,6 +1354,8 @@ export function buildCharacterDefinition(
       if (entry.summon && !existing.summon) existing.summon = entry.summon;
       if (entry.asMagicAction && existing.asMagicAction !== "every-casting")
         existing.asMagicAction = entry.asMagicAction;
+      const casting = mergedCasting(existing.casting, entry.casting);
+      if (casting) existing.casting = casting;
     }
   };
   // The ability each source casts with: a class's own, the species' or a feat's chosen one, else an ability the grant

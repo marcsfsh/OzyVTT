@@ -51,17 +51,22 @@ const SPELLBOOK_FOCUS: Readonly<Record<string, string>> = { wizard: "spellbook" 
 const carried = (row: InventoryItem) => row.quantity > 0;
 const equipped = (row: InventoryItem) => row.equipped && carried(row);
 
-/** The components a stat block's Spellcasting says this cast goes without. */
-function waivedBy(definition: ActorDefinition | undefined, action: DefinitionAction): ReadonlySet<Component> {
+/** The components this cast goes without: what the feature that gives it says (Wild Companion's Find Familiar, Divine
+ *  Intervention) or a stat block's Spellcasting. */
+export function waivedBy(
+  definition: ActorDefinition | undefined,
+  action: Pick<DefinitionAction, "id" | "waives">
+): ReadonlySet<Component> {
+  const waived = new Set<Component>(action.waives ?? []);
   // Divine Intervention: "without expending a spell slot or needing Material components".
-  if (isDivineCast(action.id)) return new Set(["material"]);
+  if (isDivineCast(action.id)) waived.add("material");
   for (const parent of definition?.actions ?? []) {
     const casts = parent.castsSpells;
     if (!casts?.waives) continue;
     if ((casts.self && parent.id === action.id) || casts.spells.some((entry) => entry.id === action.id))
-      return new Set(casts.waives);
+      for (const component of casts.waives) waived.add(component);
   }
-  return new Set();
+  return waived;
 }
 
 /** The focus kinds this cast may use: the spell's own class's, else any of the character's classes'. */

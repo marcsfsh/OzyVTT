@@ -1,12 +1,12 @@
 import type { ActionReaction } from "@vtt/schemas";
 import { areAllies } from "../creature-sides.js";
 import { isItemActionId, laterRowOf } from "../item-actions.js";
-import { isDivineCast } from "../divine-intervention.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { offerableReaction, slotChoiceOf } from "../reaction-offers.js";
 import { scrollOfAction } from "../scrolls.js";
 import { hiddenFrom } from "../vision/audience.js";
 import { sceneSight } from "../vision/sight.js";
+import { waivedBy } from "./components.js";
 import { spellOf } from "./concentration.js";
 import type { ResolveContext } from "./context.js";
 import { heldReadiedSpell } from "./economy.js";
@@ -21,17 +21,7 @@ function castWithComponents(ctx: ResolveContext): boolean {
   if (!spell || laterRowOf(spell, ctx.action.id) !== undefined) return false;
   const scroll = scrollOfAction(ctx.action, ctx.attacker.inventory, ctx.deps.catalog) !== null;
   if (isItemActionId(ctx.action.id) && !scroll) return false;
-  const waived = new Set(
-    (ctx.deps.definition?.actions ?? []).flatMap((parent) =>
-      parent.castsSpells &&
-      ((parent.castsSpells.self && parent.id === ctx.action.id) ||
-        parent.castsSpells.spells.some((entry) => entry.id === ctx.action.id))
-        ? (parent.castsSpells.waives ?? [])
-        : []
-    )
-  );
-  // Divine Intervention casts with no Material components.
-  if (isDivineCast(ctx.action.id)) waived.add("material");
+  const waived = waivedBy(ctx.deps.definition, ctx.action);
   // A Subtle Spell is cast with no components but a consumed or priced material, which can still be seen.
   const subtle = shapingOf(ctx.input.shaping, "subtle-spell") !== undefined;
   return (["verbal", "somatic", "material"] as const).some(

@@ -562,6 +562,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].waives",
+    types: ACTION_CARRIERS,
+    reason:
+      "the spell components a feature's cast goes without (Wild Companion's Find Familiar) - set by the builder from the feature's grant",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "summonScaling.**",
     types: ["monster"],
     reason:
