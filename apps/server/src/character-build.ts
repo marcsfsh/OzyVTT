@@ -283,11 +283,17 @@ function builtHitRider(
   rider: FeatureHitRider,
   context: BuildContext
 ): NonNullable<ActorAction["ridesHit"]> {
-  const { saveDc, effectsChooseByLevel, ...rest } = rider;
+  const { saveDc, effectsChooseByLevel, appliesDaysPerLevel, ...rest } = rider;
   const rows = (effectsChooseByLevel ?? []).filter((row) => row.level <= context.level);
   const choose = rows.length > 0 ? Math.max(...rows.map((row) => row.choose)) : rest.effectsChoose;
+  // "Which last for a number of days equal to your Monk level", counted on the game clock.
+  const applies =
+    appliesDaysPerLevel && rest.applies
+      ? { applies: { ...rest.applies, duration: { type: "minutes" as const, minutes: context.level * 24 * 60 } } }
+      : {};
   return {
     ...rest,
+    ...applies,
     ...(saveDc !== undefined ? { saveDc: Math.max(1, Math.min(40, featureDc(feature, saveDc, context))) } : {}),
     ...(choose !== undefined ? { effectsChoose: choose } : {})
   };

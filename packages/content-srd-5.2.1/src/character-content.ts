@@ -216,7 +216,13 @@ export const FeatureHitRiderSchema = HitRiderSchema.omit({ saveDc: true })
       .array(z.object({ level: ContentLevelSchema, choose: z.number().int().min(1).max(3) }).strict())
       .max(4)
       .optional()
-      .describe("How many effects one hit may carry from a class level on; the highest matching level wins")
+      .describe("How many effects one hit may carry from a class level on; the highest matching level wins"),
+    appliesDaysPerLevel: z
+      .literal(true)
+      .optional()
+      .describe(
+        "What the hit applies lasts a number of days equal to the class level, in game minutes (Quivering Palm's vibrations)"
+      )
   })
   .strict();
 

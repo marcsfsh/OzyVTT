@@ -1266,7 +1266,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "As the Monk's turn ends, self-restoration.ts ends one of its Charmed, Frightened or Poisoned conditions (the first in that order when it has several), with an effect that imposes nothing else, and going without food and drink gives it no Exhaustion (survival.ts)."
   ),
   "feature:quivering-palm": enforced(
-    "An Unarmed Strike's hit can spend 4 Focus Points to set the vibrations on its target, one creature at a time (resolution/hit-rider-outcomes.ts). The ending action targets only that creature: a Constitution save for 10d12 Force, half on a success. The days they last are the GM's."
+    "An Unarmed Strike's hit can spend 4 Focus Points to set the vibrations on its target, one creature at a time (resolution/hit-rider-outcomes.ts). The vibrations last the Monk's level in days on the game clock (character-build.ts), and the Monk's player ends them harmlessly from the creature's row (effect.end lets a character's player end what it is the source of). The ending action targets only that creature: a Constitution save for 10d12 Force, half on a success."
   ),
   "feature:cunning-strike": enforced(
     "Sneak Attack's hit can trade dice for Poison (with a Poisoner's Kit), Trip or Withdraw, with saves against 8 + Dexterity + Proficiency Bonus (resolution/hit-options.ts). Withdraw's move of half the Rogue's Speed provokes no Opportunity Attacks (granted-moves.ts)."

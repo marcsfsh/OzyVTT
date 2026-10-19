@@ -304,8 +304,8 @@ export const monk: ClassMechanicsModule = {
             ridesHit: {
               rides: "unarmed",
               applies: { name: "Quivering Palm", tags: ["quivering-palm"], onePerSource: true },
-              reminder:
-                "Quivering Palm: the vibrations last a number of days equal to the Monk's level. End the effect to end them harmlessly."
+              appliesDaysPerLevel: true,
+              reminder: "Quivering Palm: to end the vibrations harmlessly, end the effect from the creature's row."
             }
           },
           {
@@ -327,7 +327,6 @@ export const monk: ClassMechanicsModule = {
           }
         ]
       }
-      // Not modeled: Fleet Step (extra Bonus Action).
     }
   },
   liveResources: ["focus-points"]

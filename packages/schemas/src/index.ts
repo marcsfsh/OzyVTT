@@ -3636,7 +3636,7 @@ export const HitOutcomeSchema = z
     conditions: z.array(SaveConditionSchema).max(3).optional(),
     tags: z.array(EffectTagSchema).max(6).default([]),
     modifiers: EffectModifiersSchema.default([]),
-    /** Absent: until ended (Quivering Palm's vibrations, which last days). */
+    /** Absent: until ended. */
     duration: SaveFailureDurationSchema.optional(),
     /** A creature has one at a time, the most recent (Hamstring Blow): a new one replaces any other. */
     onePerTarget: z.literal(true).optional(),

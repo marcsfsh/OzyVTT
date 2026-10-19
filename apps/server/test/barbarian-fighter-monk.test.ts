@@ -1820,7 +1820,15 @@ describe("Monk: Quivering Palm starts on an Unarmed Strike hit and ends on the m
     swing(built, "unarmed-strike", [17, 6], { hitOptions: [{ id: "quivering-palm-start" }] });
     expect(built.hero.actionUses["focus-points"]).toBe(4);
     const foe = built.state.actors.find((actor) => actor.id === IDS.foe)!;
-    expect(foe.effects).toMatchObject([{ name: "Quivering Palm", tags: ["quivering-palm"], sourceActorId: IDS.hero }]);
+    // "Which last for a number of days equal to your Monk level": 20 days on the game clock.
+    expect(foe.effects).toMatchObject([
+      {
+        name: "Quivering Palm",
+        tags: ["quivering-palm"],
+        sourceActorId: IDS.hero,
+        duration: { type: "minutes", remaining: 20 * 24 * 60 }
+      }
+    ]);
     // Ending it: the Constitution save against 10d12 Force, and no Focus Point.
     const ended = use(built, "quivering-palm", [IDS.foe], [12, 12, 12, 12, 12, 12, 12, 12, 12, 12]);
     expect(ended.damage).toEqual([{ formula: "10d12", type: "force", total: 120 }]);

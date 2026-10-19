@@ -2627,7 +2627,8 @@
         ],
         "onePerSource": true
        },
-       "reminder": "Quivering Palm: the vibrations last a number of days equal to the Monk's level. End the effect to end them harmlessly."
+       "appliesDaysPerLevel": true,
+       "reminder": "Quivering Palm: to end the vibrations harmlessly, end the effect from the creature's row."
       }
      },
      {
