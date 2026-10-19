@@ -358,10 +358,8 @@ describe("Warlock: Contact Patron hands over the spell and the free casting (aud
       deps(built, [3, 3, 3, 3, 3, 3])
     );
     expect(built.hero.actionUses["contact-patron"]).toBe(1);
-    // "When you cast this spell, make a DC 15 Intelligence saving throw": the caster's own, with 6d6 Psychic on it.
-    expect(built.state.combat.pendingSaves).toMatchObject([
-      { targetActorId: IDS.hero, ability: "int", dc: 15, proposedDamage: 18 }
-    ]);
+    // "you automatically succeed on the spell's saving throw": the free cast to the patron opens no save.
+    expect(built.state.combat.pendingSaves).toEqual([]);
     expect(() =>
       resolveDefinitionAction(
         built.state,
@@ -1393,28 +1391,26 @@ const wizardInput = (): CharacterCreateRequestInput => ({
   ] as CharacterCreateRequestInput["choices"]
 });
 
-describe("Wizard: Signature Spells becomes two free castings that a Short Rest gives back", () => {
-  it("spends both, refuses the third, and re-arms on a Short Rest", () => {
+describe("Wizard: Signature Spells casts each spell once free, and a Short Rest gives them back", () => {
+  it("casts Fireball free once, refuses a second while Counterspell's stays open, and re-arms on a Short Rest", () => {
     const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
-    // "you can cast each of them once at level 3 without expending a spell slot ... until you finish a
-    // Short or Long Rest": two uses, recovered on a Short Rest.
-    // One pool for both spells' free castings; the per-spell split stays in the text.
-    for (const id of ["spell-fireball-free", "spell-counterspell-free"])
-      expect(actionOf(built, id).uses).toMatchObject({ limit: 2, per: "short-rest", pool: "signature-spells" });
+    // "you can cast each of them once at level 3 without expending a spell slot. Once you do so, you can't cast that
+    // spell in this way again until you finish a Short or Long Rest": a counter for each spell.
+    for (const spell of ["fireball", "counterspell"])
+      expect(actionOf(built, `spell-${spell}-free`).uses).toMatchObject({
+        limit: 1,
+        per: "short-rest",
+        pool: `signature-spells-${spell}`
+      });
 
-    for (const [commandId, id] of [
-      ["50000000-0000-4000-8000-000000000130", "spell-fireball-free"],
-      ["50000000-0000-4000-8000-000000000131", "spell-counterspell-free"]
-    ] as const) {
-      resolveDefinitionAction(
-        built.state,
-        actionOf(built, id),
-        { actorId: IDS.hero, targetIds: [], commandId },
-        // Fireball rolls its 8d6 even with no one in the area.
-        deps(built, Array<number>(8).fill(3))
-      );
-    }
-    expect(built.hero.actionUses["signature-spells"]).toBe(2);
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, "spell-fireball-free"),
+      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000130" },
+      // Fireball rolls its 8d6 even with no one in the area.
+      deps(built, Array<number>(8).fill(3))
+    );
+    expect(built.hero.actionUses["signature-spells-fireball"]).toBe(1);
     expect(() =>
       resolveDefinitionAction(
         built.state,
@@ -1423,22 +1419,43 @@ describe("Wizard: Signature Spells becomes two free castings that a Short Rest g
         deps(built, [])
       )
     ).toThrow();
-    expect(built.hero.actionUses["signature-spells"]).toBe(2); // the refusal spent nothing
+    expect(built.hero.actionUses["signature-spells-fireball"]).toBe(1); // the refusal spent nothing
+    expect(built.hero.actionUses["signature-spells-counterspell"]).toBeUndefined();
 
-    // A Short Rest gives them back. Overchannel, once per Long Rest, is the control and must not come back.
+    // A Short Rest gives it back. Overchannel, once per Long Rest, is the control and must not come back.
     built.hero.actionUses = { ...built.hero.actionUses, overchannel: 1 };
     endEncounter(built.state);
     applyRest(built.state, IDS.hero, "short", () => built.definition, built.catalog);
-    expect(built.hero.actionUses["signature-spells"]).toBeUndefined();
+    expect(built.hero.actionUses["signature-spells-fireball"]).toBeUndefined();
     expect(built.hero.actionUses["overchannel"]).toBe(1);
   });
 
+  // SRD Spell Mastery: "You can cast them at their lowest level without expending a spell slot".
+  it("casts Spell Mastery's picks at will at their own level, with no slot and no counter", () => {
+    const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
+    for (const spell of ["magic-missile", "acid-arrow"]) {
+      const free = actionOf(built, `spell-${spell}-free`);
+      expect(free.uses).toBeUndefined();
+      expect(free.spellSlot).toBeUndefined();
+    }
+    const slots = JSON.stringify(built.hero.spellSlots);
+    const uses = JSON.stringify(built.hero.actionUses);
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, "spell-magic-missile-free"),
+      { actorId: IDS.hero, targetIds: [IDS.foe, IDS.foe, IDS.foe], commandId: "50000000-0000-4000-8000-000000000140" },
+      deps(built, Array<number>(3).fill(2))
+    );
+    // Nothing is spent, so the next turn can cast it again.
+    expect(JSON.stringify(built.hero.spellSlots)).toBe(slots);
+    expect(JSON.stringify(built.hero.actionUses)).toBe(uses);
+  });
+
   it("holds the counters and picks the hand-authored record already carried", () => {
-    // Arcane Recovery and Overchannel are the Wizard's pools, and Spell Mastery's two spells and the Epic
-    // Boon are picks the level-20 build owes.
+    // Arcane Recovery is the Wizard's pool (Overchannel counts its uses on the cast), and Spell Mastery's two spells
+    // and the Epic Boon are picks the level-20 build owes.
     const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
     expect(actionOf(built, "arcane-recovery").uses).toMatchObject({ limit: 1, per: "long-rest" });
-    expect(actionOf(built, "overchannel").uses).toMatchObject({ limit: 1, per: "long-rest" });
     expect((built.definition.character?.feats ?? []).map((feat) => feat.id)).toContain("boon-of-dimensional-travel");
     for (const id of ["magic-missile", "acid-arrow", "fireball", "counterspell", "burning-hands", "shatter"]) {
       expect(spellOf(built.definition, id)).toMatchObject({ id });
@@ -1626,5 +1643,95 @@ describe("Spell picks keep to the level and school the SRD prints", () => {
     // The printed pick lands in the spellbook: known, prepared like any other Wizard spell.
     const built = buildCharacterDefinition(wizardInput(), library, POLICY);
     expect(spellOf(built, "burning-hands")).toMatchObject({ prepared: false, alwaysPrepared: false });
+  });
+});
+
+// SRD 5.2.1 Boon of Spell Recall, Free Casting: "Whenever you cast a spell with a level 1-4 spell slot, roll 1d4. If the
+// number you roll is the same as the slot's level, the slot isn't expended."
+describe("Boon of Spell Recall", () => {
+  const recaller = () =>
+    table(
+      buildCharacterDefinition(
+        {
+          ...wizardInput(),
+          choices: wizardInput().choices.map((row) =>
+            row.id === "boon-of-dimensional-travel"
+              ? { ...row, id: "boon-of-spell-recall" }
+              : row.payload?.featureId === "boon-of-dimensional-travel"
+                ? { ...row, payload: { featureId: "boon-of-spell-recall" } }
+                : row
+          ) as CharacterCreateRequestInput["choices"]
+        },
+        library,
+        POLICY
+      )
+    );
+  const thirdLeft = (built: Built) => built.hero.spellSlots?.find((slot) => slot.level === 3)?.remaining;
+
+  it("keeps a level 3 slot when the d4 shows 3, and spends it on a 2", () => {
+    for (const [d4, kept] of [
+      [3, true],
+      [2, false]
+    ] as const) {
+      const built = recaller();
+      const before = thirdLeft(built)!;
+      const result = resolveDefinitionAction(
+        built.state,
+        actionOf(built, "spell-fireball"),
+        { actorId: IDS.hero, targetIds: [], commandId: `50000000-0000-4000-8000-00000000015${d4}` },
+        // Fireball's 8d6, then the boon's d4.
+        deps(built, [...Array<number>(8).fill(3), d4])
+      );
+      expect(thirdLeft(built)).toBe(kept ? before : before - 1);
+      if (kept) expect(result.warnings?.join(" ")).toMatch(/Boon of Spell Recall: the d4 shows 3/);
+    }
+  });
+});
+
+// SRD 5.2.1 Overchannel: "you can deal maximum damage with that spell on the turn you cast it. The first time you do
+// so, you suffer no adverse effect. If you use this feature again before you finish a Long Rest, you take 2d12 Necrotic
+// damage for each level of the spell slot ... Each time you use this feature again ... increases by 1d12."
+describe("Overchannel", () => {
+  const overchannel = (built: Built, commandId: string, faces: number[]) =>
+    resolveDefinitionAction(
+      built.state,
+      actionOf(built, "spell-fireball"),
+      { actorId: IDS.hero, targetIds: [], commandId, overchannel: true },
+      deps(built, faces)
+    );
+
+  it("maximises Fireball, then burns the Evoker for 6d12 and 9d12 Necrotic on later uses", () => {
+    const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
+    endEncounter(built.state);
+    built.hero.hp = { ...built.hero.hp, current: 200, maximum: 200 };
+    const first = overchannel(built, "50000000-0000-4000-8000-000000000160", []);
+    // Eight d6 at 6 each; Empowered Evocation's Intelligence rides as its own part.
+    expect(first.damage[0]).toMatchObject({ type: "fire", total: 48 });
+    expect(built.hero.hp.current).toBe(200);
+    overchannel(built, "50000000-0000-4000-8000-000000000161", Array<number>(6).fill(2));
+    expect(built.hero.hp.current).toBe(200 - 12);
+    overchannel(built, "50000000-0000-4000-8000-000000000162", Array<number>(9).fill(2));
+    expect(built.hero.hp.current).toBe(200 - 12 - 18);
+    applyRest(built.state, IDS.hero, "long", () => built.definition, built.catalog);
+    expect(built.hero.actionUses["overchannel"]).toBeUndefined();
+  });
+
+  it("refuses a cantrip or a slot above level 5", () => {
+    const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
+    endEncounter(built.state);
+    expect(() =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "spell-fireball"),
+        {
+          actorId: IDS.hero,
+          targetIds: [],
+          commandId: "50000000-0000-4000-8000-000000000163",
+          overchannel: true,
+          slotLevel: 6
+        },
+        deps(built, [])
+      )
+    ).toThrow(/level 1 to 5 spell slot/);
   });
 });

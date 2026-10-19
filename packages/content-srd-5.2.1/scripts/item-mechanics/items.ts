@@ -210,9 +210,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Bearer only: the 30-foot ally aura and the surprise/sleep clause are not expressible.
   "weapon-of-warning": { modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }] },
 
-  // "On your person" is read as equipped. Luck rerolls a failed D20 Test once per dawn (`answer`). Not modeled: Wish
-  // (a rolled charge count that never comes back).
+  // "On your person" is read as equipped. Luck rerolls a failed D20 Test once per dawn (`answer`). Wish casts on 1d3
+  // charges rolled when the blade is added, which never come back; its once-a-dawn limit is the GM's.
   "luck-blade": {
+    charges: { starting: "1d3" },
+    casts: [{ spellId: "wish", uses: { limit: 3, per: "never", pool: "luck-blade-wish" } }],
     modifiers: [
       { type: "save-bonus", amount: 1 },
       { type: "attack-bonus", amount: 1 },
@@ -641,7 +643,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "ring-of-telekinesis": { casts: [{ spellId: "telekinesis" }] },
 
   // `ring-of-the-ram` - a flat +7 attack bonus and per-charge damage are not expressible.
-  // `ring-of-three-wishes` - every `per` value recharges, so three lifetime Wishes would become three a day.
+  /** "you can expend 1 of its 3 charges to cast Wish from it": three Wishes in all, which never come back. The ring
+   *  becoming nonmagical at the last is the GM's. */
+  "ring-of-three-wishes": {
+    casts: [{ spellId: "wish", uses: { limit: 3, per: "never", pool: "ring-of-three-wishes-charges" } }]
+  },
 
   // `ring-of-warmth` - needs a damage-taken moment with dice-valued `damage-reduction`.
 
@@ -769,7 +775,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `rod-of-resurrection` - `heal` has no healing in the spell model; Resurrection costs 5 charges.
+  /** Heal for 1 charge and Resurrection for 5, on 5 charges that come back one at dawn; a 1 on the last charge's d20 and
+   *  the rod disappears. */
+  "rod-of-resurrection": {
+    charges: { regain: "1", lastChargeRoll: true, lastCharge: "destroyed" },
+    casts: [
+      { spellId: "heal", uses: { limit: 5, per: "long-rest", pool: "rod-of-resurrection-charges" } },
+      { spellId: "resurrection", useCost: 5, uses: { limit: 5, per: "long-rest", pool: "rod-of-resurrection-charges" } }
+    ]
+  },
 
   "rod-of-rulership": {
     actions: [
@@ -800,7 +814,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // printed. Resist Enchantment turns a failed save against an Enchantment spell aimed only at the holder into a
   // success once a day. Not modeled: Reflect Enchantment (turning the spell back on its caster).
   "staff-of-charming": {
-    charges: { regain: "1d8 + 2", lastChargeRoll: true },
+    charges: { regain: "1d8 + 2", lastChargeRoll: true, lastCharge: "destroyed" },
     actions: [
       {
         id: "resist-enchantment",
@@ -825,26 +839,56 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Fireball (3) and Wall of Fire (4) are multi-charge.
+  // Each spell at its printed charge cost, with the wielder's spell save DC.
   "staff-of-fire": {
-    charges: { regain: "1d6 + 4", lastChargeRoll: true },
+    charges: { regain: "1d6 + 4", lastChargeRoll: true, lastCharge: "destroyed" },
     grants: { damageResistances: ["fire"] },
-    casts: [{ spellId: "burning-hands", uses: { limit: 10, per: "long-rest", pool: "staff-of-fire-charges" } }]
+    casts: [
+      { spellId: "burning-hands", uses: { limit: 10, per: "long-rest", pool: "staff-of-fire-charges" } },
+      { spellId: "fireball", useCost: 3, uses: { limit: 10, per: "long-rest", pool: "staff-of-fire-charges" } },
+      { spellId: "wall-of-fire", useCost: 4, uses: { limit: 10, per: "long-rest", pool: "staff-of-fire-charges" } }
+    ]
   },
 
-  // Wall of Ice, Ice Storm and Cone of Cold are multi-charge.
+  // Each spell at its printed charge cost, with the wielder's spell save DC.
   "staff-of-frost": {
-    charges: { regain: "1d6 + 4", lastChargeRoll: true },
+    charges: { regain: "1d6 + 4", lastChargeRoll: true, lastCharge: "destroyed" },
     grants: { damageResistances: ["cold"] },
-    casts: [{ spellId: "fog-cloud", uses: { limit: 10, per: "long-rest", pool: "staff-of-frost-charges" } }]
+    casts: [
+      { spellId: "fog-cloud", uses: { limit: 10, per: "long-rest", pool: "staff-of-frost-charges" } },
+      { spellId: "cone-of-cold", useCost: 5, uses: { limit: 10, per: "long-rest", pool: "staff-of-frost-charges" } },
+      { spellId: "ice-storm", useCost: 4, uses: { limit: 10, per: "long-rest", pool: "staff-of-frost-charges" } },
+      { spellId: "wall-of-ice", useCost: 4, uses: { limit: 10, per: "long-rest", pool: "staff-of-frost-charges" } }
+    ]
   },
 
-  // `staff-of-healing` - Cure Wounds would deal 2d8 Force (no healing in the spell model); the rest
-  // is multi-charge.
+  /** Cure Wounds at 1 charge per spell level up to 4, Lesser Restoration for 2 and Mass Cure Wounds for 5, with the
+   *  wielder's spellcasting ability; a 1 on the last charge's d20 and the staff vanishes. */
+  "staff-of-healing": {
+    charges: { regain: "1d6 + 4", lastChargeRoll: true, lastCharge: "destroyed" },
+    casts: [
+      {
+        spellId: "cure-wounds",
+        chargesRaiseLevel: 4,
+        uses: { limit: 10, per: "long-rest", pool: "staff-of-healing-charges" }
+      },
+      {
+        spellId: "lesser-restoration",
+        useCost: 2,
+        uses: { limit: 10, per: "long-rest", pool: "staff-of-healing-charges" }
+      },
+      {
+        spellId: "mass-cure-wounds",
+        useCost: 5,
+        uses: { limit: 10, per: "long-rest", pool: "staff-of-healing-charges" }
+      }
+    ]
+  },
 
   /**
-   * The +2 Quarterstaff and the AC, save and spell attack bonuses. Not authored: Magic Missile and Ray of
-   * Enfeeblement (wrong cast effects), the multi-charge spells, and Retributive Strike (damage from live charge count).
+   * The +2 Quarterstaff, the AC, save and spell attack bonuses, and the spells at their printed charge costs on 20
+   * charges; a 20 on the last charge's d20 gives back 1d8 + 2, and a 1 (keeping only the +2 to attack and damage) is
+   * the GM's. Not authored: Retributive Strike (damage from the live charge count).
    */
   "staff-of-power": {
     modifiers: [
@@ -853,6 +897,32 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       { type: "armor-class", amount: 2 },
       { type: "save-bonus", amount: 2 },
       { type: "spell-attack-bonus", amount: 2 }
+    ],
+    charges: { regain: "2d8 + 4", lastChargeRoll: true, lastChargeTwenty: "1d8 + 2" },
+    casts: [
+      { spellId: "cone-of-cold", useCost: 5, uses: { limit: 20, per: "long-rest", pool: "staff-of-power-charges" } },
+      {
+        spellId: "fireball",
+        atLevel: 5,
+        useCost: 5,
+        uses: { limit: 20, per: "long-rest", pool: "staff-of-power-charges" }
+      },
+      {
+        spellId: "globe-of-invulnerability",
+        useCost: 6,
+        uses: { limit: 20, per: "long-rest", pool: "staff-of-power-charges" }
+      },
+      { spellId: "hold-monster", useCost: 5, uses: { limit: 20, per: "long-rest", pool: "staff-of-power-charges" } },
+      { spellId: "levitate", useCost: 2, uses: { limit: 20, per: "long-rest", pool: "staff-of-power-charges" } },
+      {
+        spellId: "lightning-bolt",
+        atLevel: 5,
+        useCost: 5,
+        uses: { limit: 20, per: "long-rest", pool: "staff-of-power-charges" }
+      },
+      { spellId: "magic-missile", uses: { limit: 20, per: "long-rest", pool: "staff-of-power-charges" } },
+      { spellId: "ray-of-enfeeblement", uses: { limit: 20, per: "long-rest", pool: "staff-of-power-charges" } },
+      { spellId: "wall-of-force", useCost: 5, uses: { limit: 20, per: "long-rest", pool: "staff-of-power-charges" } }
     ]
   },
 
@@ -876,10 +946,22 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     }))
   },
 
-  // Insect Cloud: a Heavily Obscured Emanation round the holder, who sees through it. Giant Insect and Insect Plague are
-  // multi-charge.
+  // Insect Cloud: a Heavily Obscured Emanation round the holder, who sees through it. Giant Insect and Insect Plague at
+  // their printed charge costs.
   "staff-of-swarming-insects": {
-    charges: { regain: "1d6 + 4", lastChargeRoll: true },
+    charges: { regain: "1d6 + 4", lastChargeRoll: true, lastCharge: "destroyed" },
+    casts: [
+      {
+        spellId: "giant-insect",
+        useCost: 4,
+        uses: { limit: 10, per: "long-rest", pool: "staff-of-swarming-insects-charges" }
+      },
+      {
+        spellId: "insect-plague",
+        useCost: 5,
+        uses: { limit: 10, per: "long-rest", pool: "staff-of-swarming-insects-charges" }
+      }
+    ],
     actions: [
       {
         id: "insect-cloud",
@@ -895,9 +977,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   /**
-   * The +2 Quarterstaff, the four zero-charge casts and the +2 to spell attack rolls; 50 charges exceed the pool cap.
-   * Not authored: Protection from Evil and Good (bogus attack roll), advantage on saves against spells, the
-   * multi-charge rows, Spell Absorption and Retributive Strike.
+   * The +2 Quarterstaff, the +2 to spell attack rolls, the zero-charge casts, and the rest at their printed charge
+   * costs on 50 charges; a 20 on the last charge's d20 gives back 1d12 + 1. Not authored: Advantage on saves against
+   * spells, Spell Absorption and Retributive Strike.
    */
   "staff-of-the-magi": {
     modifiers: [
@@ -905,23 +987,66 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       { type: "damage-bonus", amount: 2 },
       { type: "spell-attack-bonus", amount: 2 }
     ],
-    casts: [{ spellId: "arcane-lock" }, { spellId: "detect-magic" }, { spellId: "enlargereduce" }, { spellId: "light" }]
+    charges: { regain: "4d6 + 2", lastChargeRoll: true, lastChargeTwenty: "1d12 + 1" },
+    casts: [
+      { spellId: "arcane-lock" },
+      { spellId: "detect-magic" },
+      { spellId: "enlargereduce" },
+      { spellId: "light" },
+      { spellId: "protection-from-evil-and-good" },
+      ...(
+        [
+          ["conjure-elemental", 7, undefined],
+          ["dispel-magic", 3, undefined],
+          ["fireball", 7, 7],
+          ["flaming-sphere", 2, undefined],
+          ["ice-storm", 4, undefined],
+          ["invisibility", 2, undefined],
+          ["knock", 2, undefined],
+          ["lightning-bolt", 7, 7],
+          ["passwall", 5, undefined],
+          ["plane-shift", 7, undefined],
+          ["telekinesis", 5, undefined],
+          ["wall-of-fire", 4, undefined],
+          ["web", 2, undefined]
+        ] as const
+      ).map(([spellId, useCost, atLevel]) => ({
+        spellId,
+        useCost,
+        ...(atLevel !== undefined ? { atLevel } : {}),
+        uses: { limit: 50, per: "long-rest" as const, pool: "staff-of-the-magi-charges" }
+      }))
+    ]
   },
 
   // `staff-of-the-python` - summoning a controlled creature is not expressible.
 
-  // The +2 Quarterstaff, the three one-charge properties on the 6-charge pool and the +2 to spell attack rolls. Not
-  // authored: the multi-charge spells.
+  // The +2 Quarterstaff, the spells at their printed charge costs on the 6-charge pool, Tree Form and the +2 to spell
+  // attack rolls; a 1 on the last charge's d20 leaves a nonmagical Quarterstaff.
   "staff-of-the-woodlands": {
     modifiers: [
       { type: "attack-bonus", amount: 2 },
       { type: "damage-bonus", amount: 2 },
       { type: "spell-attack-bonus", amount: 2 }
     ],
-    charges: { regain: "1d6", lastChargeRoll: true },
+    charges: { regain: "1d6", lastChargeRoll: true, lastCharge: { becomes: "quarterstaff" } },
     casts: [
       { spellId: "animal-friendship", uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" } },
-      { spellId: "speak-with-animals", uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" } }
+      { spellId: "speak-with-animals", uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" } },
+      ...(
+        [
+          ["awaken", 5],
+          ["barkskin", 2],
+          ["locate-animals-or-plants", 2],
+          ["pass-without-trace", 2],
+          ["speak-with-plants", 3],
+          ["wall-of-thorns", 6]
+        ] as const
+      ).map(([spellId, useCost]) => ({
+        spellId,
+        useCost,
+        uses: { limit: 6, per: "long-rest" as const, pool: "staff-of-the-woodlands-charges" }
+      }))
     ],
     actions: [
       {
@@ -1077,7 +1202,24 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ---- Wands -----------------------------------------------------------------------------------
 
-  // `wand-of-binding` - both properties cost more than one charge.
+  /** Hold Monster for 5 charges and Hold Person for 2, at DC 17; a 1 on the last charge's d20 and the wand crumbles. */
+  "wand-of-binding": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
+    casts: [
+      {
+        spellId: "hold-monster",
+        saveDc: 17,
+        useCost: 5,
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-binding-charges" }
+      },
+      {
+        spellId: "hold-person",
+        saveDc: 17,
+        useCost: 2,
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-binding-charges" }
+      }
+    ]
+  },
 
   // The detection is GM information; the charge is real.
   "wand-of-enemy-detection": {
@@ -1096,32 +1238,32 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // Command at the wand's printed DC. Fear (3 charges) is multi-charge.
   "wand-of-fear": {
-    charges: { regain: "1d6 + 1", lastChargeRoll: true },
+    charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
     casts: [{ spellId: "command", saveDc: 15, uses: { limit: 7, per: "long-rest", pool: "wand-of-fear-charges" } }]
   },
 
-  /**
-   * Fireball at the printed DC 15 off a 7-charge pool. No `atLevel`: the cast uses the spell's own
-   * level. The 2-3 charge upcasts are multi-charge.
-   */
+  /** Fireball at the printed DC 15 off a 7-charge pool: level 3 for 1 charge, one level higher for each charge after,
+   *  up to 3. A 1 on the last charge's d20 and the wand crumbles. */
   "wand-of-fireballs": {
-    charges: { regain: "1d6 + 1", lastChargeRoll: true },
+    charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
     casts: [
       {
         spellId: "fireball",
         saveDc: 15,
+        chargesRaiseLevel: 3,
         uses: { limit: 7, per: "long-rest", pool: "wand-of-fireballs-charges" }
       }
     ]
   },
 
-  /** The Fireball wand's twin: Lightning Bolt (save DC 15), 1 charge, 7 charges. Upcasts are multi-charge. */
+  /** The Fireball wand's twin: Lightning Bolt (save DC 15), levels 3 to 5 for 1 to 3 charges, on 7 charges. */
   "wand-of-lightning-bolts": {
-    charges: { regain: "1d6 + 1", lastChargeRoll: true },
+    charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
     casts: [
       {
         spellId: "lightning-bolt",
         saveDc: 15,
+        chargesRaiseLevel: 3,
         uses: { limit: 7, per: "long-rest", pool: "wand-of-lightning-bolts-charges" }
       }
     ]
@@ -1133,7 +1275,17 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     casts: [{ spellId: "detect-magic", uses: { limit: 3, per: "long-rest", pool: "wand-of-magic-detection-charges" } }]
   },
 
-  // `wand-of-magic-missiles` - the spell record's damage is one dart of three.
+  /** Magic Missile at levels 1 to 3 for 1 to 3 charges, on 7 charges; a 1 on the last charge's d20 and it crumbles. */
+  "wand-of-magic-missiles": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
+    casts: [
+      {
+        spellId: "magic-missile",
+        chargesRaiseLevel: 3,
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-magic-missiles-charges" }
+      }
+    ]
+  },
 
   // The wand's own effect.
   "wand-of-paralysis": {
@@ -1187,7 +1339,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "wand-of-the-war-mage-2": { modifiers: [{ type: "spell-attack-bonus", amount: 2 }] },
   "wand-of-the-war-mage-3": { modifiers: [{ type: "spell-attack-bonus", amount: 3 }] },
 
-  // `wand-of-web` - the spell record's 2d4 Fire would be dealt on every cast.
+  /** Web at DC 13 on 7 charges; the cast places the webs, whose saves come as creatures enter them. A 1 on the last
+   *  charge's d20 and the wand crumbles. */
+  "wand-of-web": {
+    charges: { regain: "1d6 + 1", lastChargeRoll: true, lastCharge: "destroyed" },
+    casts: [{ spellId: "web", saveDc: 13, uses: { limit: 7, per: "long-rest", pool: "wand-of-web-charges" } }]
+  },
 
   // The d100 effect table is GM-rolled; the charge is real.
   "wand-of-wonder": {
@@ -1371,12 +1528,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `circlet-of-blasting` - the Scorching Ray cast would roll one ray at the wearer's bonus, not +5.
 
-  // One-charge Charm Person at DC 13. Higher-level casts for extra charges are not expressible.
+  // Charm Person at DC 13: level 1 for 1 charge, a level higher for each charge after, up to its 3.
   "eyes-of-charming": {
     casts: [
       {
         spellId: "charm-person",
         saveDc: 13,
+        chargesRaiseLevel: 3,
         uses: { limit: 3, per: "long-rest", pool: "eyes-of-charming-charges" }
       }
     ]
@@ -1434,7 +1592,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // `necklace-of-adaptation` - breathing anywhere, and Poisoned-save advantage (save source).
-  // `necklace-of-fireballs` - beads never come back; an unlimited cast would be worse.
+  /** 1d6 + 3 beads rolled when the necklace is added, each a level 3 Fireball (DC 15) that never comes back. Hurling
+   *  several beads at once for more damage is the GM's. */
+  "necklace-of-fireballs": {
+    charges: { starting: "1d6 + 3", lastCharge: "destroyed" },
+    casts: [{ spellId: "fireball", saveDc: 15, uses: { limit: 9, per: "never", pool: "necklace-of-fireballs-beads" } }]
+  },
   // `necklace-of-prayer-beads` - the bead composition is per copy, and Cure Wounds has no healing.
   // `periapt-of-health` - healing, and Poisoned-save advantage (save source).
 
@@ -1588,14 +1751,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // The level-5 Magic Missile stars and Astral travel are not expressible.
-  "robe-of-stars": { modifiers: [{ type: "save-bonus", amount: 1 }] },
+  // The +1 to saves, and the six stars, each a level 5 Magic Missile; 1d6 come back at dusk, which is the Long Rest
+  // here. The trip to the Astral Plane is the GM's.
+  "robe-of-stars": {
+    modifiers: [{ type: "save-bonus", amount: 1 }],
+    charges: { regain: "1d6" },
+    casts: [{ spellId: "magic-missile", atLevel: 5, uses: { limit: 6, per: "long-rest", pool: "robe-of-stars-stars" } }]
+  },
 
   // `robe-of-the-archmagi` - `spell-save-dc` would raise every printed DC on the sheet; spell attack
   //     bonus has no reader; the AC 15 + Dex base replacement and spell-save advantage are not expressible.
 
   // `robe-of-useful-items` - per-copy patches that become objects and creatures.
-  // "Turn this cloak into a pair of wings ... a Fly Speed of 60 feet ... for 1 hour or until you end the effect"; the
-  // 1d12 hours before the wings work again are the GM's to count.
+
+  // The wings last up to an hour and then can't be used for 1d12 hours, so the wait runs 1d12 + 1 hours from the
+  // use. Ending them early doesn't start the wait sooner. Falling when they disappear is the GM's.
   "wings-of-flying": {
     actions: [
       {
@@ -1605,6 +1775,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         description:
           "Turn the cloak into wings on your back: a Fly Speed of 60 feet for 1 hour or until you end it with a Magic action. If you are in the air when they vanish, you fall. Once they vanish, you can't use them again for 1d12 hours.",
         damage: [],
+        uses: { limit: 1, per: "time", afterHours: "1d12+1" },
         grants: {
           name: "Wings of Flying",
           tags: ["wings-of-flying"],
@@ -1733,7 +1904,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `chime-of-opening` - ten uses that never come back.
+  /** Knock ten times, which never come back; after the tenth the chime cracks and is gone. */
+  "chime-of-opening": {
+    charges: { lastCharge: "destroyed" },
+    casts: [{ spellId: "knock", uses: { limit: 10, per: "never", pool: "chime-of-opening-uses" } }]
+  },
 
   /**
    * Scrying at the printed DC 17 (the save Scrying's target makes). Any `spell-save-dc` rider in the
@@ -1762,7 +1937,38 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     casts: [{ spellId: "scrying", saveDc: 17 }]
   },
 
-  // `cube-of-force` - faces cost 1 to 5 charges; one-charge buttons would over-grant.
+  /** Five faces at their printed charge costs and DC 17, on 10 charges that regain 1d6 at dawn. The Shield face is
+   *  the GM's: a Reaction spell from an item isn't offered on its trigger. */
+  "cube-of-force": {
+    charges: { regain: "1d6" },
+    casts: [
+      { spellId: "mage-armor", saveDc: 17, uses: { limit: 10, per: "long-rest", pool: "cube-of-force-charges" } },
+      {
+        spellId: "tiny-hut",
+        saveDc: 17,
+        useCost: 3,
+        uses: { limit: 10, per: "long-rest", pool: "cube-of-force-charges" }
+      },
+      {
+        spellId: "private-sanctum",
+        saveDc: 17,
+        useCost: 4,
+        uses: { limit: 10, per: "long-rest", pool: "cube-of-force-charges" }
+      },
+      {
+        spellId: "resilient-sphere",
+        saveDc: 17,
+        useCost: 4,
+        uses: { limit: 10, per: "long-rest", pool: "cube-of-force-charges" }
+      },
+      {
+        spellId: "wall-of-force",
+        saveDc: 17,
+        useCost: 5,
+        uses: { limit: 10, per: "long-rest", pool: "cube-of-force-charges" }
+      }
+    ]
+  },
 
   // Gate and Plane Shift on one shared 3-charge pool. Which plane each side opens is the GM's.
   "cubic-gate": {
@@ -1819,8 +2025,48 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `figurine-of-wondrous-power` - ten figurines, summons, multi-day cooldowns.
   // `folding-boat` - a vehicle.
   // Its first command's light ("Bright Light in a 30-foot radius and Dim Light for an additional 30 feet"), lit and put
-  // out on the row. Not modeled: the 50 charges that never return, and the beam and flare that Blind.
-  "gem-of-brightness": { light: { brightFeet: 30, dimFeet: 30 } },
+  // out on the row, and its beam (1 charge) and flare (5) on 50 charges that never return. The gem turning
+  // nonmagical when they are gone is the GM's.
+  "gem-of-brightness": {
+    light: { brightFeet: 30, dimFeet: 30 },
+    actions: [
+      {
+        id: "beam",
+        name: "Beam of Light",
+        activation: "action",
+        description:
+          "Expend 1 charge to fire a beam of light at one creature you can see within 60 feet. It must succeed on a DC 15 Constitution saving throw or have the Blinded condition for 1 minute, repeating the save at the end of each of its turns.",
+        save: {
+          ability: "con",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["blinded"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          repeatSave: true
+        },
+        uses: { limit: 50, per: "never", pool: "gem-of-brightness-charges" },
+        targets: { count: 1, rangeFeet: 60, seen: true }
+      },
+      {
+        id: "flare",
+        name: "Flare",
+        activation: "action",
+        description:
+          "Expend 5 charges to flare with intense light in a 30-foot Cone. Each creature in it must succeed on a DC 15 Constitution saving throw or have the Blinded condition for 1 minute, repeating the save at the end of each of its turns.",
+        area: { shape: "cone", sizeFeet: 30, widthFeet: null },
+        save: {
+          ability: "con",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["blinded"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          repeatSave: true
+        },
+        useCost: 5,
+        uses: { limit: 50, per: "never", pool: "gem-of-brightness-charges" }
+      }
+    ]
+  },
 
   // Not cast as True Seeing (that spell targets someone you touch): the charge gives its user Truesight 120 feet for
   // 10 minutes, which dynamic vision reads.
@@ -1848,7 +2094,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `hat-of-many-spells` - a cast gated on an Arcana check outcome with a wild-magic table.
   // `horn-of-blasting` - authorable except its 20% chance to explode and damage the user; authoring
   //     only the blast would make it strictly better than printed.
-  // `horn-of-valhalla` - a 7-day cooldown, summoned berserkers, four metals in one row.
+
+  // The 7-day wait only. The spirits (2 to 5 Berserkers by the horn's metal) are placed by the GM, and the four
+  // metals share one row, so the requirement isn't checked.
+  "horn-of-valhalla": {
+    actions: [
+      {
+        id: "blow",
+        name: "Blow the Horn",
+        activation: "action",
+        description:
+          "Magic action: warrior spirits (Berserkers) appear within 60 feet of you for 1 hour: 2 from a silver horn, 3 from brass, 4 from bronze, 5 from iron. If you don't meet the horn's requirement, they attack you. The horn can't be used again until 7 days have passed.",
+        uses: { limit: 1, per: "time", afterHours: "168" }
+      }
+    ]
+  },
   // `horseshoes-of-a-zephyr` - movement and travel are not modeled.
   // `horseshoes-of-speed` - speed reaches nothing from an item, and it is worn by a horse.
   // `instant-fortress` - a building.

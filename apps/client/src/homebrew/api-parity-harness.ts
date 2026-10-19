@@ -1030,6 +1030,48 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "casts[].useCost",
+    types: ["equipment"],
+    reason:
+      "an item cast's charge cost above one (Staff of Fire's Fireball: 3) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].chargesRaiseLevel",
+    types: ["equipment"],
+    reason:
+      "the most charges a cast may spend, each a level higher (Wand of Fireballs) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "charges.lastCharge.**",
+    types: ["equipment"],
+    reason:
+      "what the last charge does to the item (destroyed, or a plain item it becomes) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "charges.lastChargeTwenty",
+    types: ["equipment"],
+    reason:
+      "the charges a 20 on the last charge's d20 gives back (Staff of Power) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "charges.starting",
+    types: ["equipment"],
+    reason:
+      "the charges a copy holds when it is added (Necklace of Fireballs' beads) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "uses.afterHours",
+    types: "*",
+    reason:
+      "the hours of game time before uses spent for a time come back (Wings of Flying's 1d12) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "extraPicks[].**",
     types: "*",
     reason: "extra-pick rows beyond what the resolver reads: no rows control at feature scope",

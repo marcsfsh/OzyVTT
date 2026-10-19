@@ -1242,6 +1242,13 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
   }),
   // "Any creature has Disadvantage on attack rolls against you. An attacker is immune to this effect if it perceives
   // you with Blindsight or Truesight."
+  // Three duplicates for a minute, counted on the tag; the server rolls their d6s on each hit (`mirror-image.ts`).
+  "mirror-image": spellGrant({
+    name: "Mirror Image",
+    tags: ["mirror-image", "mirror-image-3"],
+    target: "self",
+    duration: rounds(10)
+  }),
   blur: spellGrant({
     name: "Blur",
     tags: ["blur"],

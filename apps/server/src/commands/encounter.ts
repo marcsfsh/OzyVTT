@@ -76,12 +76,13 @@ export const encounterCommands = [
           state.combat.scenes.some((candidate) => candidate.id === state.combat.activeSceneId);
         return live ? state.combat.initiative.map((entry) => ({ actorId: entry.actorId })) : [];
       };
+      let regains: EffectNarration[] = [];
       const { state, duplicate } = await executeTimeline((draft, timeline) => {
         const entries = request.entries ?? stagedEntries(draft);
         // Hidden from the table before the new fight: one this start leaves off the map stays unknown.
         const unseenBefore = hiddenCombatants(draft, kit.sightContent());
         // A fresh fight starts from the table's standing rules policy unless this command names its own.
-        startEncounter(
+        regains = startEncounter(
           draft,
           {
             mapAssetId,
@@ -123,6 +124,7 @@ export const encounterCommands = [
             gmOnly: kit.actorHidden(entry.actorId)
           });
       }
+      kit.publishNarrations(regains);
       kit.context.logTurnBegin(state);
     }
   }),
@@ -231,8 +233,9 @@ export const encounterCommands = [
       if (!mapAssetId) throw new CommandRejectedError("Start an encounter before adding a combatant.");
       const { commandId, actorId, score } = request;
       const geometry = await kit.context.tokenGeometryFor(mapAssetId);
-      const { state, duplicate } = await execute((draft) =>
-        addCombatant(
+      let regains: EffectNarration[] = [];
+      const { state, duplicate } = await execute((draft) => {
+        regains = addCombatant(
           draft,
           actorId,
           score,
@@ -241,9 +244,11 @@ export const encounterCommands = [
           Date.now(),
           kit.initiativeRollSink(draft, commandId, principal),
           kit.initiativeRollDeps(draft)
-        )
-      );
-      if (!duplicate) kit.publishRolls(state, commandId);
+        );
+      });
+      if (duplicate) return;
+      kit.publishRolls(state, commandId);
+      kit.publishNarrations(regains);
     }
   }),
 

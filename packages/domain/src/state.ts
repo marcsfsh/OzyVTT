@@ -619,7 +619,7 @@ export const ParkedCastSchema = z
     use: z
       .object({
         key: z.string().min(1).max(120),
-        per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge"]),
+        per: z.enum(["turn", "own-turn", "encounter", "long-rest", "short-rest", "recharge", "never", "time"]),
         amount: z.number().int().min(1).max(100)
       })
       .strict()
@@ -1336,7 +1336,11 @@ const sceneCombatShape = {
   /** A player sees only their own (see PendingRuleAskSchema). */
   pendingRuleAsks: z.array(PendingRuleAskSchema).max(10).default([]),
   /** Claimed-PC actorIds whose owner still owes an initiative roll. */
-  pendingInitiative: z.array(z.uuid()).max(200).default([])
+  pendingInitiative: z.array(z.uuid()).max(200).default([]),
+  /** Combatants that rolled Initiative this fight and haven't ended their first turn: a feature that acts "when you
+   *  roll Initiative" and is the creature's to choose (Persistent Rage) may be used until then. Engine bookkeeping,
+   *  never projected. */
+  initiativeWindow: z.array(z.uuid()).max(200).default([])
 };
 
 /** A parked scene's frozen combat: same fields and invariants as the live combat, minus the map (the Scene owns that). */
@@ -1563,6 +1567,9 @@ export const RestStateSchema = z
     clockMinutes: z.number().int().min(0).max(59).default(0),
     /** Characters whose players asked for a Long Rest, oldest first. */
     requests: z.array(z.uuid()).max(50).default([]),
+    /** The hour of the day dawn comes, when the GM keeps the clock: what "regains at dawn" (a wand's charges) comes
+     *  back as the clock passes it. Null: at each Long Rest. GM-set. */
+    dawnHour: z.number().int().min(0).max(23).nullable().default(null),
     shortRest: PartyShortRestSchema.nullable().default(null),
     /** The table tracks food and water: as each game day ends, every character eats and drinks what it carries and
      *  what it lacks costs it (SRD Malnutrition, Dehydration). Off by default. */

@@ -7,7 +7,8 @@ import {
   RestMarkDoneSchema,
   RestPartySchema,
   SurvivalSetTrackingSchema,
-  TimePassSchema
+  TimePassSchema,
+  TimeSetDawnSchema
 } from "@vtt/domain/commands";
 import { breathesWater, startHoldingBreath } from "../breath.js";
 import { endEffect } from "../effects.js";
@@ -318,9 +319,9 @@ export const restingCommands = [
           state,
           () => {
             events = passTime(state, request.hours ?? 0, request.minutes ?? 0, {
-              random: (sides) => kit.context.random(sides),
               resolveDefinition: kit.resolveDefinition,
-              catalog: kit.equipmentCatalog()
+              catalog: kit.equipmentCatalog(),
+              random: (sides) => kit.context.random(sides)
             });
           },
           span
@@ -335,6 +336,31 @@ export const restingCommands = [
       });
       if (pace) kit.context.appendLog({ kind: "encounter", text: travelLine(minutes / 60, pace), gmOnly: false });
       kit.publishNarrations(events);
+    }
+  }),
+
+  defineCommand({
+    type: "time.set-dawn",
+    operationId: "setDawnHour",
+    description:
+      "GM-only: sets the hour of the day dawn comes on the game clock (0 to 23), or null. With an hour, what a magic item regains daily at dawn comes back as time.pass or a rest moves the clock past it, rolled with the server's dice, and a Long Rest leaves those charges to the dawn. With null, a Long Rest gives them back, as when nobody keeps the clock.",
+    summary: "Set the hour dawn comes, or let a Long Rest stand in for it.",
+    schema: TimeSetDawnSchema,
+    malformed: "Choose an hour from 0 to 23, or none.",
+    gmOnly: "Only the GM sets when dawn comes.",
+    async run({ request, execute }, kit) {
+      const { duplicate } = await execute((state) => {
+        state.rest = { ...state.rest, dawnHour: request.hour };
+      });
+      if (duplicate) return;
+      kit.context.appendLog({
+        kind: "encounter",
+        text:
+          request.hour === null
+            ? "Items regain their dawn charges at a Long Rest."
+            : `Dawn comes at ${String(request.hour).padStart(2, "0")}:00.`,
+        gmOnly: true
+      });
     }
   })
 ];

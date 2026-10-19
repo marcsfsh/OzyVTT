@@ -154,7 +154,7 @@ export function CharacterSheet({
     role === "gm" && state && "definitions" in state && "definitionId" in actor
       ? (state as GmView).definitions.find((entry) => entry.id === actor.definitionId)?.definition
       : undefined;
-  const { definitionId, definition, serverActions, facts, derived, rechoices, spellChoices, showEdited } =
+  const { definitionId, definition, serverActions, facts, derived, rechoices, spellChoices, conversions, showEdited } =
     useSheetDefinition(actor, role, sayUnloaded, liveDefinition);
   const { busy, edit } = useSheetEdit(say);
   // With the roll history the latest-roll line shows each result, so only a refusal is a toast.
@@ -228,6 +228,7 @@ export function CharacterSheet({
   const hp = exactHp(actor);
   const pools = poolsOf(serverActions);
   const restAsked = state?.rest?.requests.includes(actor.id) ?? false;
+  const restOpen = state?.rest?.shortRest?.actorIds.includes(actor.id) ?? false;
   const session = useSessionRoll(state, actor.id);
   const canReroll =
     rolls.lastCheck !== null &&
@@ -319,6 +320,7 @@ export function CharacterSheet({
       phoneViews={phoneViews}
       showHitDice={layout !== "wide"}
       restAsked={restAsked}
+      restOpen={restOpen}
       inFight={controller.inFight}
       savesOwed={controller.savesOwed}
       death={deathCard}
@@ -413,6 +415,11 @@ export function CharacterSheet({
       derived={derived}
       pools={pools}
       serverActions={serverActions}
+      conversions={conversions}
+      rechoices={rechoices}
+      busy={busy}
+      edit={edit}
+      onFeedback={say}
       onUse={(actionId) => controller.sendThroughServer(actionId)}
       experience={
         experience !== undefined && level !== null
@@ -428,7 +435,8 @@ export function CharacterSheet({
         : {
             rest: {
               rechoices,
-              afterLongRest: role === "gm" || Boolean(actor.preparation),
+              afterLongRest: role === "gm" || actor.restStep?.after === "long-rest" || Boolean(actor.preparation),
+              afterAnyRest: role === "gm" || Boolean(actor.restStep) || Boolean(actor.preparation),
               busy,
               onRechoose: (choice, option) =>
                 void edit("actor:rechoose", { actorId: actor.id, offer: choice.offer, id: option.id }).then(
@@ -587,7 +595,13 @@ export function CharacterSheet({
           <div className="cs-col cs-col-right scroll-y" aria-label="Hit Points and details">
             <HpCard actor={actor} role={role} onFeedback={say} />
             {hitDice && hitDice.entries.length > 0 && actor.kind === "player-character" && (
-              <HitPointDice actorId={actor.id} hitDice={hitDice} constitution={constitution} onFeedback={say} />
+              <HitPointDice
+                actorId={actor.id}
+                hitDice={hitDice}
+                constitution={constitution}
+                canSpend={role === "gm" || restOpen}
+                onFeedback={say}
+              />
             )}
             {role === "gm" && <GmTools actor={actor} state={state} onFeedback={say} />}
             <div ref={setDetailHost} className="cs-detail-host" />

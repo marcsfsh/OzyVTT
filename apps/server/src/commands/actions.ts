@@ -328,6 +328,7 @@ export const actionCommands = [
             ...(request.damageType !== undefined ? { damageType: request.damageType } : {}),
             ...(request.hitOptions ? { hitOptions: request.hitOptions } : {}),
             ...(request.knockOut === true ? { knockOut: true } : {}),
+            ...(request.overchannel === true ? { overchannel: true } : {}),
             ...(request.shaping && request.shaping.length > 0 ? { shaping: request.shaping } : {}),
             ...(template ? { areaPlaced: true } : {}),
             ...(request.ready === true ? { ready: true } : {}),
@@ -365,19 +366,22 @@ export const actionCommands = [
         castingOnward = attacker.effects.some((effect) => effect.longCast?.actionId === action.id);
         const hours = spell && !draft.combat.active ? Math.floor(castingMinutesOf(spell, action.id) / 60) : 0;
         clock = { fromHours: draft.rest.clockHours, toHours: draft.rest.clockHours };
+        let clockEvents: EffectNarration[] = [];
         if (!resolution.preview && hours > 0) {
-          passTime(draft, hours, 0, {
-            random: (sides) => kit.context.random(sides),
-            resolveDefinition: kit.resolveDefinition,
-            catalog: kit.equipmentCatalog()
+          clockEvents = passTime(draft, hours, 0, {
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+            catalog: kit.equipmentCatalog(),
+            random: (sides) => kit.context.random(sides)
           });
           clock = { ...clock, toHours: draft.rest.clockHours };
         }
         // Casting a spell other than a cantrip stops a Short Rest, as it does on the loose route.
-        restBroken =
-          spell && spell.level > 0 && !draft.combat.active
+        restBroken = [
+          ...clockEvents,
+          ...(spell && spell.level > 0 && !draft.combat.active
             ? leaveShortRest(draft, new Set([actorId]), `cast ${spell.name}`)
-            : [];
+            : [])
+        ];
         // A player's confirmed hit is settled server-side per the player-damage policy (GM-confirmed proposal
         // by default, or applied directly), so the player never mutates a creature they don't own.
         if (isPlayer)

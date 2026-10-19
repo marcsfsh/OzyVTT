@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { gameTimeSpanLabel, isDead, longRestWait, rosterActors, type GmActor, type GmView } from "@vtt/domain";
-import { Badge, Button, Modal, SegmentedControl, Stepper, Switch, useToast } from "@vtt/ui";
+import { Badge, Button, Field, Modal, SegmentedControl, Select, Stepper, Switch, useToast } from "@vtt/ui";
 import { pathForSection } from "../codex/routes";
 import { command } from "../lib/command";
 import { navigate } from "../router";
@@ -12,9 +12,13 @@ const NO_REST = {
   clockHours: 0,
   clockMinutes: 0,
   requests: [] as readonly string[],
+  dawnHour: null as number | null,
   shortRest: null,
   survival: false
 };
+
+/** "06:00" for an hour of the day. */
+const hourLabel = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
 
 /** "Food 1/1 lb · Water 4/8 pints · 2 days unfed": what a character ate and drank today, against its need. */
 function nourishmentNote(actor: GmActor): string {
@@ -243,6 +247,33 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
               Time that passes here moves the Codex calendar too, and counts down spells and effects: a minute is 10
               rounds. A fight&apos;s rounds don&apos;t move the clock. A Long Rest can start 16 hours after a
               character&apos;s last one ends.
+            </p>
+            <Field label="Dawn" htmlFor="party-rest-dawn">
+              <Select
+                id="party-rest-dawn"
+                value={rest.dawnHour === null || rest.dawnHour === undefined ? "" : String(rest.dawnHour)}
+                disabled={busy}
+                onChange={(event) => {
+                  const hour = event.target.value === "" ? null : Number(event.target.value);
+                  void send(
+                    () => command("time:set-dawn", { hour }),
+                    hour === null
+                      ? "Items regain their dawn charges at a Long Rest."
+                      : `Dawn comes at ${hourLabel(hour)}.`
+                  );
+                }}
+              >
+                <option value="">At each Long Rest</option>
+                {Array.from({ length: 24 }, (_, hour) => (
+                  <option key={hour} value={hour}>
+                    {hourLabel(hour)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <p className="party-rest-hint">
+              What a magic item regains at dawn comes back when the clock passes this hour. Left at each Long Rest, a
+              Long Rest gives it back.
             </p>
           </section>
 

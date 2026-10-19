@@ -45,16 +45,18 @@ export function StatTile({
 
 /** Rests through the server, which refuses one in a fight, at 0 Hit Points, or a Long Rest within 16 hours of the last,
  *  and says why. A player asks the GM for a Long Rest, which the GM approves. */
-function useRest(actorId: string, onFeedback: (text: string) => void) {
+function useRest(actorId: string, role: "gm" | "player", onFeedback: (text: string) => void) {
   const [busy, setBusy] = useState(false);
   const rest = (kind: "short" | "long") => {
     setBusy(true);
     void command("actor:rest", { actorId, kind }).then((result) => {
       setBusy(false);
       onFeedback(
-        result.ok
-          ? `Finished a ${kind === "short" ? "Short Rest" : "Long Rest"}.`
-          : (result.message ?? "The rest could not be taken.")
+        !result.ok
+          ? (result.message ?? "The rest could not be taken.")
+          : role === "player" && kind === "short"
+            ? "Short Rest started. Spend Hit Point Dice, then tap Done. The GM ends the rest."
+            : `Finished a ${kind === "short" ? "Short Rest" : "Long Rest"}.`
       );
     });
   };
@@ -80,14 +82,26 @@ export function RestButtons({
   actorId,
   role,
   asked,
+  restOpen = false,
   onFeedback
-}: Readonly<{ actorId: string; role: "gm" | "player"; asked: boolean; onFeedback: (text: string) => void }>) {
-  const { busy, rest, ask } = useRest(actorId, onFeedback);
+}: Readonly<{
+  actorId: string;
+  role: "gm" | "player";
+  asked: boolean;
+  /** The character is in the Short Rest under way, which the GM ends. */
+  restOpen?: boolean;
+  onFeedback: (text: string) => void;
+}>) {
+  const { busy, rest, ask } = useRest(actorId, role, onFeedback);
   return (
     <div className="cs-rest" role="group" aria-label="Rest">
-      <Button disabled={busy} onClick={() => rest("short")}>
-        <IconMoon /> Short Rest
-      </Button>
+      {role === "player" && restOpen ? (
+        <span className="cs-sub">Short Rest under way · the GM ends it</span>
+      ) : (
+        <Button disabled={busy} onClick={() => rest("short")}>
+          <IconMoon /> Short Rest
+        </Button>
+      )}
       {role === "player" &&
         (asked ? (
           <>
@@ -112,7 +126,7 @@ export function RestMenu({
   asked,
   onFeedback
 }: Readonly<{ actorId: string; role: "gm" | "player"; asked: boolean; onFeedback: (text: string) => void }>) {
-  const { busy, rest, ask } = useRest(actorId, onFeedback);
+  const { busy, rest, ask } = useRest(actorId, role, onFeedback);
   return (
     <Menu
       trigger={
@@ -426,6 +440,7 @@ function Vitals({
   derived,
   inFight,
   restAsked,
+  restOpen,
   onFeedback
 }: Readonly<{
   actor: SheetActor;
@@ -435,6 +450,8 @@ function Vitals({
   derived: ActorDerivedSheet | null;
   inFight: boolean;
   restAsked: boolean;
+  /** The character is in the Short Rest under way, so its player may spend Hit Point Dice. */
+  restOpen: boolean;
   onFeedback: (text: string) => void;
 }>) {
   const speed = speedOf(actor, definition, extension, derived?.speedFeet ?? null);
@@ -465,7 +482,14 @@ function Vitals({
         {passive !== null && <StatTile label="Passive Perception" value={passive} />}
       </div>
       {hitDice && hitDiceEntries(actor).length > 0 && (
-        <HitPointDice actorId={actor.id} hitDice={hitDice} constitution={constitution} boxes onFeedback={onFeedback} />
+        <HitPointDice
+          actorId={actor.id}
+          hitDice={hitDice}
+          constitution={constitution}
+          boxes
+          canSpend={role === "gm" || restOpen}
+          onFeedback={onFeedback}
+        />
       )}
       <div className="cs-vitals-pair">
         {inspired !== undefined && (
@@ -487,7 +511,9 @@ function Vitals({
         <span className="cs-eyebrow">Conditions and effects</span>
         <StatusStrip actor={actor} role={role} inFight={inFight} inspiration={false} onFeedback={onFeedback} />
       </div>
-      {!inFight && <RestButtons actorId={actor.id} role={role} asked={restAsked} onFeedback={onFeedback} />}
+      {!inFight && (
+        <RestButtons actorId={actor.id} role={role} asked={restAsked} restOpen={restOpen} onFeedback={onFeedback} />
+      )}
     </section>
   );
 }
@@ -528,6 +554,7 @@ export function PlayCalm({
   phoneViews,
   showHitDice,
   restAsked,
+  restOpen,
   inFight,
   savesOwed,
   death,
@@ -545,6 +572,8 @@ export function PlayCalm({
   /** False where the laptop's right column already lists them. */
   showHitDice: boolean;
   restAsked: boolean;
+  /** The character is in the Short Rest under way. */
+  restOpen: boolean;
   inFight: boolean;
   savesOwed: ReadonlyArray<PendingSave | PlayerPendingSave>;
   death: ReactNode;
@@ -566,15 +595,22 @@ export function PlayCalm({
           derived={derived}
           inFight={inFight}
           restAsked={restAsked}
+          restOpen={restOpen}
           onFeedback={onFeedback}
         />
       ) : (
         (actor.kind === "player-character" || role === "gm") && (
           <section className="cs-group" aria-label="Rest">
             <span className="cs-eyebrow">Rest</span>
-            <RestButtons actorId={actor.id} role={role} asked={restAsked} onFeedback={onFeedback} />
+            <RestButtons actorId={actor.id} role={role} asked={restAsked} restOpen={restOpen} onFeedback={onFeedback} />
             {showHitDice && hitDice && actor.kind === "player-character" && (
-              <HitPointDice actorId={actor.id} hitDice={hitDice} constitution={constitution} onFeedback={onFeedback} />
+              <HitPointDice
+                actorId={actor.id}
+                hitDice={hitDice}
+                constitution={constitution}
+                canSpend={role === "gm" || restOpen}
+                onFeedback={onFeedback}
+              />
             )}
           </section>
         )

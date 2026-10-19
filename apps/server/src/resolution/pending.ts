@@ -3,6 +3,7 @@ import { prismaticSpray } from "./prismatic.js";
 import type { PendingReaction, PendingSave } from "@vtt/domain";
 import { catalogIdOf, DamageTypeSchema, type ActionReaction } from "@vtt/schemas";
 import { setCondition } from "../actor-conditions.js";
+import { holdsFeature } from "../class-features.js";
 import { conditionLabel } from "../condition-rules.js";
 import { addEffect, ESCAPE_ATHLETICS_TAG, makeEffect, NO_ACTIONS_TAG } from "../effects.js";
 import { HAZARDS } from "../hazards.js";
@@ -14,13 +15,12 @@ import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { recordRoll, tableLineOf, type ResolveContext } from "./context.js";
 import { bestCover, coverBonusOf, coverFor, mapCover } from "../cover.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
-import { damagePartsOf } from "./damage.js";
+import { damagePartsOf, potentCantrip } from "./damage.js";
 import { spellOf, spellSaveDuration } from "./concentration.js";
 import { endedByAt, repeatSaveOf } from "../save-stages.js";
 import { areEnemies } from "../creature-sides.js";
 import { AURA_IMMUNE_TAG, traitActionId } from "../statblock-traits.js";
 import { creatureTypeOf } from "../statblock-facts.js";
-import { holdsFeature } from "../class-features.js";
 import { openDamageWindow, type DamageWindowDeps } from "../damage-window.js";
 import { answerKeyOf, answersFromOthers, askAnswer } from "../roll-answers.js";
 import { heightenedTarget, shieldedFromSave } from "./metamagic.js";
@@ -452,8 +452,19 @@ export function parkActionSave(ctx: ResolveContext): void {
   if (!action.save) return;
   const rider = attack !== null;
   if (rider && attack.outcome !== "hit" && attack.outcome !== "crit") return;
-  // The GM's explicit choice wins over the condition the action declares. Exhaustion stacks, a level per entry (Weight
-  // of Years: "The target gains 1 Exhaustion level").
+  // The GM's explicit choice wins over the condition the action declares.
+  // SRD Contact Patron: "you can cast the spell without expending a spell slot to contact your patron, and you
+  // automatically succeed on the spell's saving throw."
+  if (
+    action.save.bySelf &&
+    action.spellId === "contact-other-plane" &&
+    action.id.endsWith("-free") &&
+    holdsFeature(deps.definition, "contact-patron", "Contact Patron")
+  ) {
+    ctx.warnings.push(`Contact Patron: ${attacker.name} succeeds on the Intelligence saving throw.`);
+    return;
+  }
+  // Exhaustion stacks, a level per entry (Weight of Years: "The target gains 1 Exhaustion level").
   const conditionIds = [
     ...(input.conditionId ? [input.conditionId] : action.save.failureConditions),
     ...Array.from({ length: action.save.failureExhaustion ?? 0 }, () => "exhaustion")
@@ -598,7 +609,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       proposedDamage: parts.reduce((sum, part) => sum + part.amount, 0),
       proposedDamageParts: parts,
       saveBonus,
-      halfOnSuccess: action.save.successDamage === "half",
+      halfOnSuccess: action.save.successDamage === "half" || potentCantrip(ctx),
       conditionIds,
       ...(onFailEffect ? { onFailEffect } : {}),
       ...(Object.keys(extra).length > 0 ? { extra } : {}),

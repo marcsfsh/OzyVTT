@@ -6,7 +6,7 @@ import { actorOf, answer, cast, caster, endFight } from "./spell-lifetimes-kit.j
 import { FOE, FOE2 } from "./spell-casters.js";
 
 // Tables the server rolls on (SRD 5.2.1): Prismatic Spray's ray per creature, Confusion's d10 each turn, Gibbering's
-// d8, the cumulative chance Augury gives no answer, Reincarnate's species and Chromatic Orb's leap.
+// d8, Reincarnate's species and Chromatic Orb's leap.
 
 const twelve = (face: number) => Array.from({ length: 12 }, () => face);
 /** The costly materials (tokens, oils, a diamond) are the components rules' business, waived here. */
@@ -95,22 +95,7 @@ describe("Gibbering", () => {
   });
 });
 
-describe("Augury and Reincarnate", () => {
-  it("gives a cumulative 25 percent chance of no answer for each casting of Augury after the first", () => {
-    const fight = caster();
-    endFight(fight.state);
-    const first = cast(fight, "augury", { targetIds: [], ...waived });
-    expect(first.tableNarration ?? []).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ kind: "effect" })])
-    );
-    const second = cast(fight, "augury", { targetIds: [], ...waived }, [20]);
-    expect((second.tableNarration ?? []).map((line) => line.text)).toContain(
-      "Augury gives Ansel no answer (d100 20, 25 or lower fails)."
-    );
-    const third = cast(fight, "augury", { targetIds: [], ...waived }, [70]);
-    expect((third.tableNarration ?? []).map((line) => line.text)).toContain("Augury answers Ansel (d100 70, over 50).");
-  });
-
+describe("Reincarnate", () => {
   it("rolls Reincarnate's species, a 1 rolling again", () => {
     const fight = caster();
     endFight(fight.state);

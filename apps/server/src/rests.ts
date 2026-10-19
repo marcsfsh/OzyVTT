@@ -17,18 +17,13 @@ import {
   type EffectNarration
 } from "./effects.js";
 import { passGameTime } from "./game-time.js";
+import { dawnPoolKeys, timedSpent, type ClockDeps } from "./clock-pools.js";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { openPreparation } from "./spellcasting.js";
-import { healActor } from "./hit-points.js";
+import { healActor, RELENTLESS_RAGE_KEY } from "./hit-points.js";
 import { gainHeroicInspiration } from "./heroic-inspiration.js";
-import { chargesAfterDawn } from "./item-charges.js";
-import {
-  afterLongRest,
-  deniedRestLine,
-  holdsMaximumAtRest,
-  restDeniedBy,
-  type RestTriggerDeps
-} from "./rest-triggers.js";
+import { chargesAfterDawn, neverRegained } from "./item-charges.js";
+import { afterLongRest, deniedRestLine, holdsMaximumAtRest, restDeniedBy } from "./rest-triggers.js";
 
 /** SRD Resting: a Short Rest is 1 hour and a Long Rest at least 8. */
 export const SHORT_REST_HOURS = 1;
@@ -58,7 +53,13 @@ export function hitDieSizesToSpend(entries: readonly HitDiceEntry[], count: numb
     .slice(0, count);
 }
 
+/** Whether `actorId` is in the Short Rest under way (the party's, or one its player started). */
+export const inShortRest = (state: GameState, actorId: string) =>
+  state.rest.shortRest?.actorIds.includes(actorId) ?? false;
+
 /** Spends Hit Point Dice to heal (SRD 5.2.1 Short Rest): each die heals `face + Con modifier`, minimum 1.
+ *  "A creature can spend Hit Dice during a Short Rest", so a player spends them only while their character is in the
+ *  Short Rest under way; the GM resting a creature spends them for it outside a fight.
  *  The caller rolls the faces before the store executes (so retries never reroll) and records them; this
  *  owns validation, healing (via healActor) and the pool decrement. */
 export function spendHitDice(
@@ -74,6 +75,10 @@ export function spendHitDice(
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   if (state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actorId))
     throw new CommandRejectedError("Hit Dice are spent on a rest. End the fight first.");
+  if (scope.role !== "gm" && !inShortRest(state, actorId))
+    throw new CommandRejectedError(
+      `Hit Point Dice are spent during a Short Rest. Start one for ${actor.name} first, and spend them before it ends.`
+    );
   refuseRestAtZero(actor, "Hit Dice are spent on a Short Rest, which needs");
   if (!actor.hitDice)
     throw new CommandRejectedError(`${actor.name} has no Hit Dice pool (its stat block has no hit-point formula).`);
@@ -161,12 +166,6 @@ function usesAfterShortRest(
   return after;
 }
 
-/** Which re-choices a rest ends: a Short Rest clears those naming it; a Long Rest clears everything. */
-function clearOverrides(overrides: Actor["choiceOverrides"], kind: "long" | "short"): Actor["choiceOverrides"] {
-  if (kind === "long") return {};
-  return Object.fromEntries(Object.entries(overrides).filter(([, override]) => override.per !== "short-rest"));
-}
-
 /** SRD Pact Magic: every expended pact slot comes back on a Short or Long Rest. */
 function restorePactSlots(actor: Actor, definition: ActorDefinition | undefined): void {
   const maximum = actor.pactSlots ? pactSlotMaximum(definition) : null;
@@ -223,13 +222,21 @@ export function applyRest(
       effectiveActions(definition, actor, catalog),
       shortRestRegains(deriveEquipment(actor, definition, catalog))
     );
-    // A pick re-made "whenever you finish a Short or Long Rest" lapses here; the build's own answer stands
-    // until the character chooses again.
-    actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "short");
+    // SRD Relentless Rage: "When you finish a Short or Long Rest, the DC resets to 10."
+    const { [RELENTLESS_RAGE_KEY]: _relentless, ...uses } = actor.actionUses;
+    actor.actionUses = uses;
+    // A pick re-made on a rest stands until the character chooses again (Fiendish Resilience: "until you choose a
+    // different one"), so the rest leaves `choiceOverrides` as they are.
     restorePactSlots(actor, definition);
     // SRD Tireless: "Whenever you finish a Short Rest, your Exhaustion level, if any, also decreases by 1."
     if (holdsFeature(definition, "tireless", "Tireless")) reduceExhaustion(actor);
     events.push(...endEffectsAtRest(state, actorId, "short"));
+    // SRD Memorize Spell (Wizard 5): "Whenever you finish a Short Rest, you can study your spellbook and replace one of
+    // the level 1+ Wizard spells you have prepared ... with another level 1+ spell from the book": one change.
+    if (actor.preparation === null && holdsFeature(definition, "memorize-spell", "Memorize Spell"))
+      actor.preparation = { changesLeft: 1 };
+    // What a feature does "when you finish a Short Rest" (Arcane Recovery, a re-choice) is made in the step this opens.
+    actor.restStep = { after: "short-rest" };
     return events;
   }
   // Eight hours with sleep: Concentration ends and what lasts less runs out; "until ended" ones (a curse) stay.
@@ -255,13 +262,17 @@ export function applyRest(
   actor.deathSaves = null;
   removeConditionDirect(actor, "unconscious");
   const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
-  if (charges) {
+  // A pool spent for a time waits on the clock, not the rest (a Horn of Valhalla's 7 days); with a dawn hour, what
+  // an item regains at dawn waits for the clock's dawn too.
+  const waiting: Record<string, number> = timedSpent(actor);
+  if (state.rest.dawnHour !== null)
+    for (const key of dawnPoolKeys(actor, longRestDefinition, catalog))
+      if ((actor.actionUses[key] ?? 0) > 0) waiting[key] = actor.actionUses[key]!;
+  if (charges && state.rest.dawnHour === null) {
     const dawn = chargesAfterDawn(actor, longRestDefinition, catalog, charges.random);
-    actor.actionUses = dawn.stillSpent;
+    actor.actionUses = { ...dawn.stillSpent, ...waiting };
     charges.lines.push(...dawn.lines);
-  } else actor.actionUses = {};
-  // Both kinds lapse on a Long Rest.
-  actor.choiceOverrides = clearOverrides(actor.choiceOverrides, "long");
+  } else actor.actionUses = { ...neverRegained(actor, longRestDefinition, catalog), ...waiting };
   reduceExhaustion(actor);
   actor.lastLongRestAt = state.rest.clockHours;
   // Rested, by whatever path: nothing left to ask the GM for.
@@ -284,6 +295,7 @@ export function applyRest(
   restorePactSlots(actor, longRestDefinition);
   // The prepared list stands; a caster that prepares after a Long Rest gets the step to change it.
   openPreparation(actor, longRestDefinition);
+  actor.restStep = { after: "long-rest" };
   // SRD Human, Resourceful: "You gain Heroic Inspiration whenever you finish a Long Rest." One at most.
   if (
     holdsFeature(longRestDefinition, "human-resourceful", "Resourceful") ||
@@ -391,11 +403,30 @@ export function startPartyRest(
   const events = passGameTime(
     state,
     LONG_REST_MINUTES,
-    random ? { random, resolveDefinition, ...(catalog ? { catalog } : {}) } : undefined
+    random ? { resolveDefinition, ...(catalog ? { catalog } : {}), random } : undefined
   );
   events.push(...members.flatMap((actor) => longRest(state, actor.id, resolveDefinition, catalog, random, true)));
   for (const actor of members) actor.lastLongRestAt = state.rest.clockHours;
   return events;
+}
+
+/** A player starts a Short Rest for their own character. It is under way, as the party's is: its player spends Hit
+ *  Point Dice during it and marks it done, and the GM ends it, when its benefits land and an hour passes. A Short
+ *  Rest already under way takes the character in. Returns whether it joined one. */
+export function startOwnShortRest(state: GameState, actorId: string, scope: Initiator): boolean {
+  requireActorAccess(scope, state, actorId, "resource");
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  const refusal = restRefusal(state, actor, "short");
+  if (refusal) throw new CommandRejectedError(refusal);
+  const rest = state.rest.shortRest;
+  if (rest?.actorIds.includes(actorId)) throw new CommandRejectedError(`${actor.name} is already in the Short Rest.`);
+  if (rest && rest.actorIds.length >= 12) throw new CommandRejectedError("The Short Rest under way is full.");
+  state.rest = {
+    ...state.rest,
+    shortRest: rest ? { ...rest, actorIds: [...rest.actorIds, actorId] } : { actorIds: [actorId], done: [] }
+  };
+  return rest !== null;
 }
 
 /** A member of the party's Short Rest is done spending Hit Dice (or not after all). Their player or the GM. */
@@ -443,14 +474,14 @@ export function finishPartyShortRest(
     ...passGameTime(
       state,
       SHORT_REST_HOURS * 60,
-      random ? { random, resolveDefinition, ...(catalog ? { catalog } : {}) } : undefined
+      random ? { resolveDefinition, ...(catalog ? { catalog } : {}), random } : undefined
     )
   );
   return { events, rested };
 }
 
-/** The GM moves game time forward by hours and minutes, and what runs out in that time ends (`passGameTime`); with dice,
- *  what acts every 24 hours acts. */
-export function passTime(state: GameState, hours: number, minutes = 0, deps?: RestTriggerDeps): EffectNarration[] {
+/** The GM moves game time forward by hours and minutes, and what runs out in that time ends (`passGameTime`); with
+ *  `deps`, what comes back on the clock does too, and what acts every 24 hours acts. */
+export function passTime(state: GameState, hours: number, minutes = 0, deps?: ClockDeps): EffectNarration[] {
   return passGameTime(state, hours * 60 + minutes, deps);
 }

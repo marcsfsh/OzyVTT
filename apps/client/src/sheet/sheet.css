@@ -1007,6 +1007,13 @@ button.cs-lastroll-open {
   align-items: center;
   gap: var(--space-2);
 }
+/* A recovery's slot levels, one stepper each, wrapping on a phone. */
+.cs-recover {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
 .cs-death {
   border-color: var(--danger);
   box-shadow: var(--glow-danger);
@@ -1527,6 +1534,14 @@ button.cs-lastroll-open {
 .cs-pip.is-on {
   background: var(--grad-sun);
   box-shadow: none;
+}
+/* A player's spent pip shows the slot and takes no tap. */
+.cs-pip.is-spent {
+  display: inline-block;
+  cursor: default;
+}
+.cs-pip.is-spent::after {
+  content: none;
 }
 .cs-slotpips .cs-count {
   margin-left: var(--space-1);
