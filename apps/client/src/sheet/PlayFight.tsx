@@ -94,6 +94,7 @@ export function PlayFight({
           effectTags={actor.effects.flatMap((effect) => effect.tags)}
           actor={actor}
           myTurn={combat.myTurn || readied}
+          offTurn={readied && !combat.myTurn}
           castPlace={place}
           look={card ? "card" : "list"}
           round={state?.combat.round ?? null}

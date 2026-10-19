@@ -131,6 +131,7 @@ export function PlayerActionRunner({
   insideNow,
   actor = null,
   myTurn = true,
+  offTurn = false,
   header,
   pickOnly,
   castPlace = { kind: "inline" },
@@ -158,6 +159,8 @@ export function PlayerActionRunner({
   actor?: SheetActor | null;
   /** The character acts now; off its turn the list stays in view and only reactions are live. */
   myTurn?: boolean;
+  /** It acts off its own turn (a readied spell or action), so a result it gets stays until its player closes it. */
+  offTurn?: boolean;
   /** What sits above the list (the economy on the sheet's own Play tab). */
   header?: ReactNode;
   /** Only the aim and its result, for a use started from another tab of the sheet; Done closes it. */
@@ -243,12 +246,20 @@ export function PlayerActionRunner({
     },
     []
   );
-  // The turn moved on: what was being aimed on it goes, as when the runner was mounted only for the turn.
+  // The turn moved on: what was being aimed on it goes, as when the runner was mounted only for the turn. A result got
+  // off the turn (a readied spell released, which ends the Ready) stays until its player closes it.
   const wasMyTurn = useRef(myTurn);
+  const resultOffTurn = useRef(false);
+  const offTurnNow = useRef(offTurn);
+  offTurnNow.current = offTurn;
+  // Whether the result in view arrived off the turn, read when it arrives.
+  useEffect(() => {
+    resultOffTurn.current = result !== null && offTurnNow.current;
+  }, [result]);
   useEffect(() => {
     if (wasMyTurn.current && !myTurn) {
       clearTargeting();
-      setTargetingResult(null);
+      if (!resultOffTurn.current) setTargetingResult(null);
     }
     wasMyTurn.current = myTurn;
   }, [myTurn]);
