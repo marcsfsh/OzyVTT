@@ -9,6 +9,7 @@ import { resolveDefinitionAction, type ResolveDependencies } from "../src/action
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { specialSpeedsOf } from "../src/speed.js";
 import { effectiveActions } from "../src/effective-actions.js";
+import { shapingOffers } from "../src/resolution/metamagic.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { applyFailureEffect } from "../src/saving-throws.js";
 import { endEncounter, startEncounter } from "../src/encounter.js";
@@ -1729,6 +1730,36 @@ describe("Overchannel", () => {
     expect(built.hero.hp.current).toBe(200 - 12 - 18);
     applyRest(built.state, IDS.hero, "long", () => built.definition, built.catalog);
     expect(built.hero.actionUses["overchannel"]).toBeUndefined();
+  });
+
+  it("is offered on the cast beside Metamagic, and sent with the cast's shaping", () => {
+    const built = table(buildCharacterDefinition(wizardInput(), library, POLICY));
+    endEncounter(built.state);
+    const fireball = actionOf(built, "spell-fireball");
+    const offers = shapingOffers(
+      built.state,
+      built.hero,
+      fireball,
+      built.catalog.spellRecord!("fireball"),
+      built.definition,
+      effectiveActions(built.definition, built.hero, built.catalog)
+    );
+    expect(offers?.options).toContainEqual(
+      expect.objectContaining({ id: "overchannel", name: "Overchannel", cost: 0, available: true })
+    );
+    const cast = resolveDefinitionAction(
+      built.state,
+      fireball,
+      {
+        actorId: IDS.hero,
+        targetIds: [],
+        commandId: "50000000-0000-4000-8000-000000000164",
+        shaping: [{ id: "overchannel" }]
+      },
+      deps(built, [])
+    );
+    expect(cast.damage[0]).toMatchObject({ type: "fire", total: 48 });
+    expect(built.hero.actionUses["overchannel"]).toBe(1);
   });
 
   it("refuses a cantrip or a slot above level 5", () => {

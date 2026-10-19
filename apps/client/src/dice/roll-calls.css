@@ -166,3 +166,14 @@ body:has(.roll-call-dock) .nh-toast-viewport {
   top: calc(var(--space-4) + env(safe-area-inset-top));
   bottom: auto;
 }
+/* A call card's situations: chips that wrap, each wide enough for its words on a phone. */
+.roll-call-situations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.roll-call-situation {
+  max-width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+}

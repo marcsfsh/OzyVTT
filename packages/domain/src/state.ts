@@ -595,6 +595,20 @@ export const RollCallEntrySchema = z
   .object({
     actorId: z.uuid(),
     saveId: z.uuid().optional(),
+    /** A check call: the situations the character's gear names that fit the check (a Book's topic, prying with a
+     *  Crowbar), each with what it gives and where it comes from, offered as toggles on the call's card. */
+    situations: z
+      .array(
+        z
+          .object({
+            situation: z.string().min(1).max(80),
+            effect: z.string().min(1).max(80),
+            source: z.string().min(1).max(120)
+          })
+          .strict()
+      )
+      .max(6)
+      .optional(),
     result: z
       .object({
         natural: z.number().int().min(0).max(20),

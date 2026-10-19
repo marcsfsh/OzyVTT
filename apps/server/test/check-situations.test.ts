@@ -3,11 +3,15 @@ import { GameStateSchema, type GameState } from "@vtt/domain";
 import { ModifierSchema, type ActorDefinition } from "@vtt/schemas";
 import { deriveActorSheet } from "../src/actor-derived.js";
 import {
+  answerRollCall,
   rerollAbilityCheck,
   rollAbilityCheck,
+  startRollCall,
   type CheckRollDependencies,
   type CheckRollInput
 } from "../src/check-rolls.js";
+import { checkSituations } from "../src/check-situations.js";
+import { projectPlayerRollCalls } from "../src/projections.js";
 import { deriveEquipment } from "../src/equipment-derivation.js";
 import { catalog, library } from "./equipment-table.js";
 
@@ -171,5 +175,49 @@ describe("a situation the roller names", () => {
         when: [{ type: "on-ability-check" }, { type: "situation-is", situation: "reading the stars" }]
       }).success
     ).toBe(true);
+  });
+});
+
+describe("a call for a check offers the situations that fit it", () => {
+  const call = (state: GameState, subject: CheckRollInput["subject"]) =>
+    startRollCall(
+      state,
+      { id: COMMAND, kind: "check", subject, dc: 15, actorIds: [SAGE], blind: false },
+      {
+        newId: () => "40000000-0000-4000-8000-0000000000e1",
+        now: () => 0,
+        situationsOf: () => checkSituations(deriveEquipment(state.actors[0]!, SAGE_SHEET, catalog))
+      }
+    );
+  const offered = (state: GameState) => state.rollCalls[0]!.entries[0]!.situations?.map((one) => one.situation);
+
+  it("lists a Book's topic on an Intelligence (History) call, and prying on a Strength one", () => {
+    const history = tableWith([gear("book", "Book"), gear("crowbar", "Crowbar")]);
+    call(history, { ability: "int", skill: "history" });
+    expect(offered(history)).toEqual([BOOK_TOPIC]);
+    const strength = tableWith([gear("book", "Book"), gear("crowbar", "Crowbar")]);
+    call(strength, { ability: "str" });
+    expect(offered(strength)).toEqual([PRYING]);
+  });
+
+  it("rolls the answer with the situations picked from those offered, and only those", () => {
+    const state = tableWith([gear("book", "Book")]);
+    call(state, { ability: "int", skill: "history" });
+    const answered = answerRollCall(
+      state,
+      { role: "gm" },
+      { commandId: COMMAND, callId: COMMAND, actorId: SAGE, situations: [BOOK_TOPIC, PRYING] },
+      depsFor([10])
+    );
+    // d20 10 + 4 + the Book's 5.
+    expect(answered.outcome.total).toBe(19);
+  });
+
+  it("reaches the character's own player on the call's card", () => {
+    const state = tableWith([gear("book", "Book")]);
+    call(state, { ability: "int", skill: "history" });
+    expect(projectPlayerRollCalls(state, SESSION)[0]!.entries[0]!.situations).toEqual([
+      expect.objectContaining({ situation: BOOK_TOPIC, effect: "+5" })
+    ]);
   });
 });

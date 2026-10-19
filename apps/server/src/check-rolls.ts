@@ -1,5 +1,14 @@
 import { checkSightFor } from "./vision/rules.js";
-import type { Actor, CheckRollOutcome, GameState, HeldRoll, RollCall, RollRecord, RollVisibility } from "@vtt/domain";
+import type {
+  Actor,
+  ActorDerivedSheet,
+  CheckRollOutcome,
+  GameState,
+  HeldRoll,
+  RollCall,
+  RollRecord,
+  RollVisibility
+} from "@vtt/domain";
 import { d20FacesFor, otherDiceOf, rerollLowestD20, type RandomSource } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
 import {
@@ -528,7 +537,12 @@ export function startRollCall(
     actorIds: readonly string[];
     blind: boolean;
   }>,
-  deps: Readonly<{ newId: () => string; now: () => number }>
+  deps: Readonly<{
+    newId: () => string;
+    now: () => number;
+    /** The situations a character's gear names for its checks (`check-situations.ts`). */
+    situationsOf?: (actorId: string) => ReadonlyArray<ActorDerivedSheet["situations"][number]>;
+  }>
 ): RollCall {
   if (state.rollCalls.length >= MAX_CALLS)
     throw new CommandRejectedError("Close an earlier call for a roll before starting another.");
@@ -537,10 +551,25 @@ export function startRollCall(
     if (!actor || actor.archived) throw new CommandRejectedError("Every character you call on must be on the roster.");
   }
   if (input.kind === "save" && input.dc === null) throw new CommandRejectedError("A saving throw needs a DC.");
-  const entries = input.actorIds.map((actorId) => ({
-    actorId,
-    ...(input.kind === "save" ? { saveId: deps.newId() } : {})
-  }));
+  // A check's card offers the situations each character's gear names that fit it.
+  const fitting = (actorId: string) =>
+    (deps.situationsOf?.(actorId) ?? [])
+      .filter(
+        (entry) =>
+          (entry.abilities.length === 0 || entry.abilities.includes(input.subject.ability)) &&
+          (entry.skills.length === 0 ||
+            (input.subject.skill !== undefined && entry.skills.includes(input.subject.skill)))
+      )
+      .slice(0, 6)
+      .map((entry) => ({ situation: entry.situation, effect: entry.effect, source: entry.source }));
+  const entries = input.actorIds.map((actorId) => {
+    const situations = input.kind === "check" ? fitting(actorId) : [];
+    return {
+      actorId,
+      ...(input.kind === "save" ? { saveId: deps.newId() } : {}),
+      ...(situations.length > 0 ? { situations } : {})
+    };
+  });
   if (input.kind === "save") {
     // The saves are made in target order, so each takes the id its call entry holds.
     const saveIds = entries.map((entry) => entry.saveId!);
@@ -577,7 +606,13 @@ export function startRollCall(
 export function answerRollCall(
   state: GameState,
   scope: Initiator,
-  input: Readonly<{ commandId: string; callId: string; actorId: string; face?: number }>,
+  input: Readonly<{
+    commandId: string;
+    callId: string;
+    actorId: string;
+    face?: number;
+    situations?: readonly string[];
+  }>,
   deps: CheckRollDependencies
 ): CheckResult {
   const call = state.rollCalls.find((candidate) => candidate.id === input.callId);
@@ -590,6 +625,9 @@ export function answerRollCall(
   if (entry.result) throw new CommandRejectedError("That character has already rolled for this call.");
   // A blind call is the GM's: a player rolls blind, and the GM's own roll for them stays GM-only.
   const visibility: RollVisibility = call.blind ? (scope.role === "gm" ? "gm-only" : "blind") : "public";
+  // Only the situations the card offered for the character.
+  const offered = new Set((entry.situations ?? []).map((one) => one.situation));
+  const situations = (input.situations ?? []).filter((one) => offered.has(one));
   return rollAbilityCheck(
     state,
     scope,
@@ -600,7 +638,8 @@ export function answerRollCall(
       dc: call.dc,
       visibility,
       callId: call.id,
-      ...(input.face !== undefined ? { face: input.face } : {})
+      ...(input.face !== undefined ? { face: input.face } : {}),
+      ...(situations.length > 0 ? { situations } : {})
     },
     deps
   );

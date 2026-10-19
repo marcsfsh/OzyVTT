@@ -663,6 +663,8 @@ export function projectPlayerRollCalls(state: GameState, playerSessionId: string
         entries: entries.map((entry) => ({
           actorId: entry.actorId,
           ...(entry.saveId !== undefined ? { saveId: entry.saveId } : {}),
+          // Their own character's gear, which their sheet already lists.
+          ...(entry.situations ? { situations: entry.situations.map((one) => ({ ...one })) } : {}),
           answered: entry.result !== undefined,
           ...(entry.result !== undefined && !call.blind ? { result: { ...entry.result } } : {})
         })),

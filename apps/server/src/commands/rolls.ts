@@ -21,6 +21,8 @@ import {
   type CheckRollDependencies
 } from "../check-rolls.js";
 import { CommandRejectedError } from "../game-store.js";
+import { checkSituations } from "../check-situations.js";
+import { deriveEquipment } from "../equipment-derivation.js";
 import { gainHeroicInspiration, giveHeroicInspiration } from "../heroic-inspiration.js";
 import { tokenCreatureDistance } from "../movement-narration.js";
 import type { TokenMapGeometry } from "../token-placement.js";
@@ -225,7 +227,17 @@ export const rollCommands = [
         startRollCall(
           draft,
           { id: commandId, kind, subject, dc: dc ?? null, actorIds, blind: blind === true },
-          { newId: kit.context.newId, now: () => Date.now() }
+          {
+            newId: kit.context.newId,
+            now: () => Date.now(),
+            // What each character's gear lets the check fit (a Book's topic), offered on its card.
+            situationsOf: (actorId) => {
+              const actor = draft.actors.find((candidate) => candidate.id === actorId);
+              if (!actor) return [];
+              const definition = actor.definitionId ? kit.resolveDefinitionIn(draft, actor.definitionId) : undefined;
+              return checkSituations(deriveEquipment(actor, definition, kit.equipmentCatalog()));
+            }
+          }
         );
       });
       if (!committed.duplicate) {
@@ -272,7 +284,8 @@ export const rollCommands = [
             commandId: request.commandId,
             callId: request.callId,
             actorId: request.actorId,
-            ...(request.face !== undefined ? { face: request.face } : {})
+            ...(request.face !== undefined ? { face: request.face } : {}),
+            ...(request.situations !== undefined ? { situations: request.situations } : {})
           },
           checkDeps(kit, principal, draft, geometry)
         );

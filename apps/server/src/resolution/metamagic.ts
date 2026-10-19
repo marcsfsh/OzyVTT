@@ -9,6 +9,7 @@ import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
 import type { RuleId } from "../rules-families.js";
 import { sceneSight } from "../vision/sight.js";
 import { abilityModifier, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
+import { OVERCHANNEL_KEY } from "./overchannel.js";
 
 /**
  * SRD 5.2.1 Metamagic ("You use the chosen options to temporarily modify spells you cast. To use an option, you must
@@ -42,12 +43,16 @@ export const SHAPINGS: Readonly<Record<CastShapingId, ShapingRule>> = {
   "subtle-spell": { name: "Subtle Spell", cost: 1, counted: true },
   "transmuted-spell": { name: "Transmuted Spell", cost: 1, counted: true },
   "twinned-spell": { name: "Twinned Spell", cost: 1, counted: true },
-  "sculpt-spells": { name: "Sculpt Spells", cost: 0, counted: false }
+  "sculpt-spells": { name: "Sculpt Spells", cost: 0, counted: false },
+  overchannel: { name: "Overchannel", cost: 0, counted: false }
 };
+
+/** The Evoker's ways of shaping a cast, which are no Metamagic. */
+const EVOKER_SHAPINGS: ReadonlySet<string> = new Set(["sculpt-spells", "overchannel"]);
 
 /** The Metamagic option ids, Seeking Spell among them. */
 const METAMAGIC_IDS: ReadonlySet<string> = new Set([
-  ...Object.keys(SHAPINGS).filter((id) => id !== "sculpt-spells"),
+  ...Object.keys(SHAPINGS).filter((id) => !EVOKER_SHAPINGS.has(id)),
   SEEKING_SPELL
 ]);
 
@@ -70,6 +75,7 @@ export function knowsShaping(
   id: CastShapingId | typeof SEEKING_SPELL
 ): boolean {
   if (id === "sculpt-spells") return holdsFeature(definition, "sculpt-spells", "Sculpt Spells");
+  if (id === "overchannel") return holdsFeature(definition, "overchannel", "Overchannel");
   const picked = (definition?.character?.features ?? []).some(
     (feature) => feature.kind === "option" && feature.sourceId === "metamagic" && feature.id === id
   );
@@ -163,6 +169,12 @@ function unfitFor(id: CastShapingId, facts: CastFacts): string | null {
     case "sculpt-spells":
       if (spell.school !== "evocation") return `${name} shapes an Evocation spell, and ${spell.name} isn't one.`;
       return saves ? null : `${name} shapes a spell that makes creatures save, and ${spell.name} doesn't.`;
+    case "overchannel":
+      if (!spell.classes.includes("wizard") || action.damage.length === 0)
+        return `${name} works on a Wizard spell that deals damage, and ${spell.name} isn't one.`;
+      return action.spellSlot && castLevel <= 5
+        ? null
+        : `${name} works on a spell cast with a level 1 to 5 spell slot.`;
     case "distant-spell":
       return spellRangeFeet(printedSpell(spell).range) !== null ||
         /^touch\b/i.test(printedSpell(spell).range.text ?? "")
@@ -289,10 +301,9 @@ export function shapingCheck(
     if (!knowsShaping(definition, entry.id)) {
       violations.push({
         rule: "metamagic.unknown",
-        message:
-          entry.id === "sculpt-spells"
-            ? `${attacker.name} doesn't have Sculpt Spells.`
-            : `${attacker.name} doesn't know the Metamagic option ${name}.`
+        message: EVOKER_SHAPINGS.has(entry.id)
+          ? `${attacker.name} doesn't have ${name}.`
+          : `${attacker.name} doesn't know the Metamagic option ${name}.`
       });
       continue;
     }
@@ -439,9 +450,11 @@ export function shapingOffers(
       const rule = SHAPINGS[id];
       const unfit = unfitFor(id, facts);
       const reason = unfit ?? (rule.cost > points.left && !free ? "Not enough Sorcery Points." : undefined);
+      // From the second Overchannel before a Long Rest, the Evoker takes Necrotic damage for each slot level.
+      const used = id === "overchannel" ? (attacker.actionUses[OVERCHANNEL_KEY] ?? 0) : 0;
       return {
         id,
-        name: rule.name,
+        name: used > 0 ? `${rule.name} (you take ${used + 1}d12 Necrotic per slot level)` : rule.name,
         cost: rule.cost,
         available: reason === undefined,
         ...(reason !== undefined ? { reason } : {}),

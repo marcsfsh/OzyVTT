@@ -1864,8 +1864,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:elemental-affinity": guided(
     "Resistance to the chosen type is applied, and the Charisma modifier is added to a spell's damage of that type, never a weapon's (resolution/damage.ts). A spell of several rolls gets it on each, which the GM trims to one."
   ),
-  "feature:overchannel": guided(
-    "A cast sent with overchannel (action.resolve) deals a Wizard spell's maximum damage with a level 1 to 5 slot, and from the second use before a Long Rest the Evoker takes 2d12 Necrotic a slot level, 1d12 more each time, past its defences (resolution/overchannel.ts). The sheet has no control for it yet, so the table asks for it through the API."
+  "feature:overchannel": enforced(
+    "The cast offers Overchannel beside Metamagic (resolution/metamagic.ts): it deals a Wizard spell's maximum damage with a level 1 to 5 slot, and from the second use before a Long Rest the Evoker takes 2d12 Necrotic a slot level, 1d12 more each time, past its defences (resolution/overchannel.ts)."
   ),
   "feature:signature-spells": guided(
     "Both spells are always prepared, and each is cast once at level 3 with no slot, back on a Short or Long Rest, on its own counter (character-build.ts). That they come from the spellbook is the player's to keep."

@@ -287,6 +287,8 @@ export type PlayerRollCall = Readonly<{
     Readonly<{
       actorId: string;
       saveId?: string;
+      /** The situations their own character's gear names that fit the check, to toggle on the card. */
+      situations?: NonNullable<RollCall["entries"][number]["situations"]>;
       answered: boolean;
       result?: NonNullable<RollCall["entries"][number]["result"]>;
     }>

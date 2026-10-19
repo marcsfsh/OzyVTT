@@ -978,6 +978,8 @@ export const RollCallAnswerSchema = z
     callId: z.uuid(),
     actorId: z.uuid(),
     face: z.number().int().min(1).max(20).optional(),
+    /** The situations the check fits, of those the call's card offers for the character (a Book's topic). */
+    situations: z.array(z.string().trim().min(3).max(80)).max(6).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

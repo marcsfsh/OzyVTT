@@ -99,7 +99,14 @@ import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-
 import { layOutProvisions } from "./resolution/provisions.js";
 import { turnedAwayByWard } from "./resolution/ward.js";
 import { orbLeap } from "./resolution/orb-leap.js";
-import { shapedAction, shapedOutcome, shapingInForce, shapingOffers, withShapedSpell } from "./resolution/metamagic.js";
+import {
+  shapedAction,
+  shapedOutcome,
+  shapingInForce,
+  shapingOf,
+  shapingOffers,
+  withShapedSpell
+} from "./resolution/metamagic.js";
 import {
   answerHeldDamage,
   damageLookOffered,
@@ -135,7 +142,11 @@ export function resolveDefinitionAction(
   const stepped = longCast?.input ?? declaredInput;
   const { shaping: _sent, ...stepInput } = stepped;
   const shaping = shapingInForce(state, declared, stepped);
-  const input: ResolveInput = shaping.length > 0 ? { ...stepInput, shaping } : stepInput;
+  // Overchannel rides the cast's shaping, beside Metamagic, as the sheet offers it.
+  const input: ResolveInput =
+    shaping.length > 0
+      ? { ...stepInput, shaping, ...(shapingOf(shaping, "overchannel") ? { overchannel: true } : {}) }
+      : stepInput;
   const shapedDeps = withShapedSpell(declaredDeps, declared.spellId, shaping);
   // The damage steps throw through a tape, so a look at the damage holds its dice and the confirm deals them.
   const tape = damageTape(shapedDeps.random);

@@ -151,7 +151,8 @@ export const CastShapingIdSchema = z.enum([
   "subtle-spell",
   "transmuted-spell",
   "twinned-spell",
-  "sculpt-spells"
+  "sculpt-spells",
+  "overchannel"
 ]);
 export type CastShapingId = z.infer<typeof CastShapingIdSchema>;
 /** One way a casting is shaped, with what it names: the creatures Careful Spell and Sculpt Spells protect or the one
