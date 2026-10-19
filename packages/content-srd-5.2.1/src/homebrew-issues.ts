@@ -282,6 +282,7 @@ const LABELS: Readonly<Record<string, string>> = {
   forms: "forms",
   formActions: "actions only some forms have",
   castsAtOnce: "cast with one action",
+  maximized: "dice at their highest",
   dice: "dice",
   abilityModifier: "ability modifier",
   abilityScore: "ability score",

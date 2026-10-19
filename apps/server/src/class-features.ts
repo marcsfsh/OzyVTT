@@ -19,6 +19,14 @@ export function holdsFeature(definition: ActorDefinition | undefined, id: string
   });
 }
 
+/** The ids a sheet picked for a feature, of one kind ("one of your known Warlock cantrips" for Agonizing Blast), every
+ *  pick a repeatable option made included. */
+export function picksFor(definition: ActorDefinition | undefined, featureId: string, kind: string): string[] {
+  return (definition?.character?.choices ?? [])
+    .filter((choice) => choice.kind === kind && choice.payload?.featureId === featureId)
+    .map((choice) => choice.id);
+}
+
 /** The class a creature casts a spell as (its sheet entry's class), for riders on that class's spells (Innate
  *  Sorcery's Sorcerer spells); null for a spell from a species or a feat, or a sheet that names none. */
 export function spellClassOf(definition: ActorDefinition | undefined, spellId: string | undefined): string | null {

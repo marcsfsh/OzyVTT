@@ -1,3 +1,4 @@
+import { featurePicks } from "@vtt/content-srd-5.2.1";
 import type { BuilderPolicy, GameState, Rechoice } from "@vtt/domain";
 import type { Actor, ActorDefinition, CharacterChoice } from "@vtt/schemas";
 import { rebuildActorDefinition } from "./actor-roster.js";
@@ -8,6 +9,7 @@ import type { ContentView } from "./content-library.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 import { sheetAbilityScores, sheetSourceOf } from "./sheet-abilities.js";
+import { spellbookOf } from "./spellbook.js";
 
 /**
  * A pick re-made on a rest whose answer the build itself reads. SRD Circle of the Land: "Whenever you finish a Long
@@ -54,8 +56,9 @@ function rowIndexOf(choices: readonly CharacterChoice[], offer: string): number 
 }
 
 /** Every ledger row answering a pick of several (`feature:weapon-mastery`): rows for the feature, or of its own kind
- *  (a Weapon Mastery pick is a `weapon-mastery` row). */
-function rowIndexesOf(definition: ActorDefinition | undefined, offer: string): number[] {
+ *  (a Weapon Mastery pick is a `weapon-mastery` row). `kind` narrows a feature's rows to one of its picks (Pact of the
+ *  Tome's cantrips, `feature:pact-of-the-tome`, and its rituals, `feature:pact-of-the-tome/2`). */
+function rowIndexesOf(definition: ActorDefinition | undefined, offer: string, kind?: string | null): number[] {
   const choices = definition?.character?.choices ?? [];
   // A class's own cantrips (`class-cantrips:wizard`): its cantrip rows, the starting class's carrying no class.
   const cantrips = /^class-cantrips:([a-z0-9-]+)$/.exec(offer);
@@ -65,9 +68,22 @@ function rowIndexesOf(definition: ActorDefinition | undefined, offer: string): n
       row.kind === "cantrip" && !row.payload?.featureId && (row.classId ?? starting) === cantrips[1] ? [at] : []
     );
   }
-  const match = /^feature:([a-z0-9-]+)$/.exec(offer);
+  const match = /^feature:([a-z0-9-]+)(?:\/\d+)?$/.exec(offer);
   if (!match) return [];
-  return choices.flatMap((row, at) => (row.payload?.featureId === match[1] || row.kind === match[1] ? [at] : []));
+  return choices.flatMap((row, at) =>
+    (row.payload?.featureId === match[1] || row.kind === match[1]) && (!kind || row.kind === kind) ? [at] : []
+  );
+}
+
+/** The row a feature's pick with a default answer stands for when the ledger holds none (a High Elf made before its
+ *  cantrip was a pick). */
+function defaultedRowFor(definition: ActorDefinition, offer: string, library: ContentView): CharacterChoice | null {
+  const match = /^feature:([a-z0-9-]+)$/.exec(offer);
+  const ref = match ? definition.character?.features?.find((feature) => feature.id === match[1]) : undefined;
+  const record = ref ? library.featureRecord(ref) : undefined;
+  const pick = record ? featurePicks(record)[0] : undefined;
+  if (!ref || !pick?.default) return null;
+  return { level: 1, kind: pick.kind, id: pick.default, payload: { featureId: ref.id } };
 }
 
 /** Re-makes the ledger's answer to `offer` and rebuilds the character from it. False when the answer is already `id`. */
@@ -77,7 +93,8 @@ export function rechooseInLedger(
   offer: string,
   id: string,
   deps: Readonly<{ library: ContentView; policy: BuilderPolicy; catalog?: EquipmentCatalog }>,
-  replacing?: string
+  replacing?: string,
+  kind?: string | null
 ): boolean {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -86,27 +103,36 @@ export function rechooseInLedger(
   let index = rowIndexOf(choices, offer);
   if (replacing !== undefined) {
     // A pick of several: the held answer named goes, and the new one may not already be held.
-    const held = rowIndexesOf(definition, offer);
+    const held = rowIndexesOf(definition, offer, kind);
     if (held.some((at) => choices[at].id === id)) throw new CommandRejectedError(`${actor.name} already has that one.`);
     index = held.find((at) => choices[at].id === replacing) ?? -1;
     if (index < 0 && held.length > 0) throw new CommandRejectedError(`${actor.name} has no "${replacing}" to change.`);
+  }
+  // A pick whose answer was its default before the ledger recorded one gets its row now.
+  let rows = choices;
+  if (index < 0 && replacing === undefined && definition) {
+    const row = defaultedRowFor(definition, offer, deps.library);
+    if (row) {
+      rows = [...choices, row];
+      index = rows.length - 1;
+    }
   }
   const request = definition && index >= 0 ? buildRequestOf(definition, deps.library) : null;
   if (!request)
     throw new CommandRejectedError(
       `${actor.name}'s sheet doesn't record how it was built, so this pick can't change here. Make it in the Level flow.`
     );
-  if (choices[index].id === id) return false;
-  const rechosen = choices.map((row, at) => (at === index ? { ...row, id } : row));
+  if (rows[index].id === id) return false;
+  const rechosen = rows.map((row, at) => (at === index ? { ...row, id } : row));
   const rebuilt = buildCharacterDefinition({ ...request, choices: rechosen }, deps.library, deps.policy);
   rebuildActorDefinition(state, actorId, rebuilt, deps.catalog);
   return true;
 }
 
 /** The ledger's answers to a pick of several, in ledger order. */
-function ledgerAnswersOf(definition: ActorDefinition | undefined, offer: string): string[] {
+function ledgerAnswersOf(definition: ActorDefinition | undefined, offer: string, kind: string | null): string[] {
   const choices = definition?.character?.choices ?? [];
-  return rowIndexesOf(definition, offer).map((at) => choices[at].id);
+  return rowIndexesOf(definition, offer, kind).map((at) => choices[at].id);
 }
 
 /** The ledger's answer to `offer`, or null when the sheet records none. */
@@ -119,17 +145,18 @@ function ledgerAnswerOf(definition: ActorDefinition | undefined, offer: string):
 /** The picks a character may re-make on a rest, as its sheet offers them: each option's name, and the answer in force
  *  (a rest-time override, else the ledger's). */
 export function rechoicesOf(
-  actor: Pick<Actor, "choiceOverrides">,
+  actor: Pick<Actor, "choiceOverrides" | "spellbook">,
   definition: ActorDefinition | undefined,
   library: ContentView
 ): Rechoice[] {
-  return replaceableOffers(definition, library).map((offer) => ({
+  const spellbook = definition ? spellbookOf(actor, definition, library) : undefined;
+  return replaceableOffers(definition, library, spellbook).map((offer) => ({
     offer: offer.offer,
     label: offer.label,
     per: offer.per,
     options: offer.options.map((id) => ({ id, name: offer.optionNames[id] ?? id })),
     chosen:
       (offer.rebuilds ? undefined : actor.choiceOverrides[offer.offer]?.id) ?? ledgerAnswerOf(definition, offer.offer),
-    ...(offer.multi ? { held: ledgerAnswersOf(definition, offer.offer), swaps: offer.swaps } : {})
+    ...(offer.multi ? { held: ledgerAnswersOf(definition, offer.offer, offer.kind), swaps: offer.swaps } : {})
   }));
 }

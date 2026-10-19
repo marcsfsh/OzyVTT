@@ -42,7 +42,11 @@ export function SpellbookPanel({
 }>) {
   const named = namedFrom(spellIndex);
   const [picked, setPicked] = useState<Pick | null>(null);
-  const addable = spellbook.addable.map(named);
+  const ofSchool = spellbook.freeOfSchool !== null && spellbook.freeOfSchool.left > 0 ? spellbook.freeOfSchool : null;
+  // With only a school's free additions left, only that school's spells go in free.
+  const addable = spellbook.addable
+    .filter((id) => spellbook.freeLeft > 0 || spellIndex.get(id)?.school === ofSchool?.school)
+    .map(named);
   const title = mode === "add" ? "Add to the spellbook" : "Copy into the spellbook";
   const school = (id: string) => {
     const word = spellIndex.get(id)?.school;
@@ -98,6 +102,9 @@ export function SpellbookPanel({
         <>
           <p className="cs-sub">
             {spellbook.freeLeft} more from the Wizard levels, up to level {spellbook.maxLevel}.
+            {ofSchool
+              ? ` ${ofSchool.left} more ${titleCase(ofSchool.school)} ${ofSchool.left === 1 ? "spell" : "spells"} free.`
+              : ""}
           </p>
           <SpellList spells={addable} onPick={(spell) => setPicked({ spell, from: "level" })} />
         </>

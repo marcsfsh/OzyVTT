@@ -207,3 +207,36 @@ describe("Beast Spells", () => {
     );
   });
 });
+
+describe("Wild Shape: the defences class features and feats give", () => {
+  it("keeps Nature's Ward in the form, and drops what only a species trait gave", () => {
+    // A Polar Land Druid 10: Nature's Ward's Cold Resistance and immunity to the Poisoned condition. The Poison
+    // Resistance is a species trait's (Dwarven Resilience), which the Beast's statistics replace.
+    const own = druid(10);
+    const sheet = {
+      ...own,
+      damageResistances: [...(own.damageResistances ?? []), "poison"],
+      character: {
+        ...own.character!,
+        features: [
+          ...(own.character?.features ?? []),
+          { id: "dwarven-resilience", kind: "species" as const, sourceId: "dwarf" }
+        ]
+      }
+    };
+    expect(sheet.damageResistances).toEqual(expect.arrayContaining(["cold", "poison"]));
+    const fight = table(sheet, { [FOE]: "ogre" });
+    setKnownForms(fight.state, HERO, ["wolf"], { resolveDefinition: resolverOf(fight.state), catalog }, true);
+    fight.resolve(HERO, "wild-shape", { form: "wolf" });
+    const form = fight.definitionOf(HERO)!;
+    expect(form.damageResistances).toContain("cold");
+    expect(form.damageResistances).not.toContain("poison");
+    expect(form.conditionImmunities).toContain("poisoned");
+    const hero = fight.actor(HERO);
+    const before = hero.hp.current + hero.hp.temporary;
+    applyDamageDetailed(fight.state, HERO, { amount: 10, damageType: "cold" }, { role: "gm" }, deps(fight));
+    expect(hero.hp.current + hero.hp.temporary).toBe(before - 5);
+    applyDamageDetailed(fight.state, HERO, { amount: 10, damageType: "poison" }, { role: "gm" }, deps(fight));
+    expect(hero.hp.current + hero.hp.temporary).toBe(before - 15);
+  });
+});

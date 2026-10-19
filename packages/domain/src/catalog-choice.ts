@@ -18,6 +18,7 @@ import type {
  *                               "no category is specified" in the SRD's feat rules; `weapons` is the kinds of
  *                               weapon, without the magic weapons made from them).
  *   - `<table>-languages`    -> languages printed in one SRD table ("standard-languages").
+ *   - `spells`               -> every spell, from any class's list (Pact of the Tome's cantrips and rituals).
  *   - `<listId>-spells`      -> spells whose `classes` includes the class's `spellcasting.spellListId`.
  *   - `<listId>-spells-of-<school>` -> those spells of one school ("wizard-spells-of-evocation").
  *   - `<classId>-subclasses` -> that class's subclasses.
@@ -172,6 +173,13 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
       `No languages are printed in the "${table}" table.`
     );
   }
+  if (slug === "spells") {
+    return nonEmpty(
+      slug,
+      catalogs.spells.map((spell) => ({ id: spell.id, name: spell.name, level: spell.level })),
+      "The spells catalog is empty."
+    );
+  }
   if (slug.endsWith("-spells")) {
     const listId = slug.slice(0, -"-spells".length);
     return nonEmpty(
@@ -216,7 +224,7 @@ export function resolveCatalogChoice(slug: string, catalogs: CatalogChoiceCatalo
   }
   throw new CatalogChoiceError(
     slug,
-    `The catalog slug "${slug}" matches no known family (skills, weapons, tools, languages, feats, *-languages, *-spells, *-spells-of-<school>, *-subclasses, *-feats, *-lineages).`
+    `The catalog slug "${slug}" matches no known family (skills, weapons, tools, languages, feats, spells, *-languages, *-spells, *-spells-of-<school>, *-subclasses, *-feats, *-lineages).`
   );
 }
 

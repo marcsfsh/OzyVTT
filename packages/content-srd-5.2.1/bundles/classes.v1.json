@@ -1225,7 +1225,19 @@
      {
       "id": "instrument-lute",
       "name": "Musical Instrument (Lute)",
-      "quantity": 1
+      "quantity": 1,
+      "pickFrom": [
+       "instrument-bagpipes",
+       "instrument-drum",
+       "instrument-dulcimer",
+       "instrument-flute",
+       "instrument-horn",
+       "instrument-lute",
+       "instrument-lyre",
+       "instrument-pan-flute",
+       "instrument-shawm",
+       "instrument-viol"
+      ]
      },
      {
       "id": "entertainers-pack",
@@ -4015,6 +4027,9 @@
        "alwaysPrepared": true,
        "withoutSlot": "free",
        "asMagicAction": "every-casting",
+       "waives": [
+        "material"
+       ],
        "summon": {
         "creatureTypes": [
          "fey"
@@ -10891,6 +10906,7 @@
        "name": "Agonizing Blast",
        "description": "Prerequisite: Level 2+ Warlock, a Warlock Cantrip That Deals Damage Choose one of your known Warlock cantrips that deals damage. You can add your Charisma modifier to that spell's damage rolls. Repeatable. You can gain this invocation more than once. Each time you do so, choose a different eligible cantrip.",
        "level": 2,
+       "repeatable": true,
        "choice": {
         "kind": "cantrip",
         "choose": 1,
@@ -10898,25 +10914,7 @@
          "offer": "class-cantrips",
          "where": "deals-damage"
         }
-       },
-       "modifiers": [
-        {
-         "type": "extra-damage",
-         "abilityModifier": "cha",
-         "damageType": "force",
-         "when": [
-          {
-           "type": "on-hit"
-          },
-          {
-           "type": "spell-id-is",
-           "spellIds": [
-            "eldritch-blast"
-           ]
-          }
-         ]
-        }
-       ]
+       }
       },
       {
        "id": "armor-of-shadows",
@@ -10928,7 +10926,8 @@
           "id": "mage-armor",
           "level": 1,
           "withoutSlot": "at-will",
-          "withSlot": false
+          "withSlot": false,
+          "self": true
          }
         ]
        }
@@ -10944,7 +10943,8 @@
           "id": "levitate",
           "level": 2,
           "withoutSlot": "at-will",
-          "withSlot": false
+          "withSlot": false,
+          "self": true
          }
         ]
        }
@@ -11031,6 +11031,7 @@
        "name": "Eldritch Spear",
        "description": "Prerequisite: Level 2+ Warlock, a Warlock Cantrip That Deals Damage Choose one of your known Warlock cantrips that deals damage and has a range of 10+ feet. When you cast that spell, its range increases by a number of feet equal to 30 times your Warlock level. Repeatable. You can gain this invocation more than once. Each time you do so, choose a different eligible cantrip.",
        "level": 2,
+       "repeatable": true,
        "choice": {
         "kind": "cantrip",
         "choose": 1,
@@ -11051,7 +11052,9 @@
           "id": "false-life",
           "level": 1,
           "withoutSlot": "at-will",
-          "withSlot": false
+          "withSlot": false,
+          "self": true,
+          "maximized": true
          }
         ]
        }
@@ -11067,6 +11070,13 @@
        "name": "Gift of the Depths",
        "description": "Prerequisite: Level 5+ Warlock You can breathe underwater, and you gain a Swim Speed equal to your Speed. You can also cast Water Breathing once without expending a spell slot. You regain the ability to cast it in this way again when you finish a Long Rest.",
        "level": 5,
+       "modifiers": [
+        {
+         "type": "special-speed",
+         "movement": "swim",
+         "equalToSpeed": true
+        }
+       ],
        "grants": {
         "spells": [
          {
@@ -11090,7 +11100,38 @@
        "requires": {
         "offer": "feature:eldritch-invocations",
         "id": "pact-of-the-tome"
-       }
+       },
+       "actions": [
+        {
+         "id": "gift-of-the-protectors",
+         "name": "Gift of the Protectors",
+         "activation": "other",
+         "description": "With your permission, a creature takes an action to write its name on the page in your Book of Shadows. The page holds as many names as your Charisma modifier (minimum one), and a new book starts a blank page.",
+         "damage": [],
+         "grants": {
+          "name": "Gift of the Protectors",
+          "target": "target",
+          "tags": [
+           "gift-of-the-protectors",
+           "ends-on-death"
+          ],
+          "duration": {
+           "type": "manual"
+          }
+         }
+        },
+        {
+         "id": "gift-of-the-protectors-page",
+         "name": "Gift of the Protectors: 1 Hit Point",
+         "activation": "other",
+         "description": "Spent when a creature named on the page is reduced to 0 Hit Points but not killed outright, and drops to 1 Hit Point instead. No creature benefits again until you finish a Long Rest.",
+         "damage": [],
+         "uses": {
+          "limit": 1,
+          "per": "long-rest"
+         }
+        }
+       ]
       },
       {
        "id": "investment-of-the-chain-master",
@@ -11106,7 +11147,13 @@
        "id": "lessons-of-the-first-ones",
        "name": "Lessons of the First Ones",
        "description": "Prerequisite: Level 2+ Warlock You have received knowledge from an elder entity of the multiverse, allowing you to gain one Origin feat of your choice (see \"Feats\"). Repeatable. You can gain this invocation more than once. Each time you do so, choose a different Origin feat.",
-       "level": 2
+       "level": 2,
+       "repeatable": true,
+       "choice": {
+        "kind": "feat",
+        "choose": 1,
+        "fromCatalog": "origin-feats"
+       }
       },
       {
        "id": "lifedrinker",
@@ -11207,7 +11254,8 @@
           "id": "invisibility",
           "level": 2,
           "withoutSlot": "at-will",
-          "withSlot": false
+          "withSlot": false,
+          "self": true
          }
         ]
        }
@@ -11223,7 +11271,8 @@
           "id": "jump",
           "level": 1,
           "withoutSlot": "at-will",
-          "withSlot": false
+          "withSlot": false,
+          "self": true
          }
         ]
        }
@@ -11235,8 +11284,43 @@
        "choice": {
         "kind": "weapon",
         "choose": 1,
-        "fromCatalog": "weapons"
-       }
+        "fromCatalog": "melee-weapons"
+       },
+       "actions": [
+        {
+         "id": "pact-of-the-blade",
+         "name": "Pact of the Blade",
+         "activation": "bonus-action",
+         "description": "Conjure your pact weapon in your hand (the kind you chose), or bond with a magic weapon you carry. Until the bond ends you have proficiency with it, can use it as a Spellcasting Focus, can use your Charisma modifier for its attack and damage rolls, and can make it deal Necrotic, Psychic or Radiant damage. The bond ends when you use this Bonus Action again or die, and a conjured weapon disappears with it.",
+         "damage": [],
+         "grants": {
+          "name": "Pact Weapon",
+          "target": "self",
+          "tags": [
+           "pact-weapon",
+           "ends-on-death"
+          ],
+          "duration": {
+           "type": "manual"
+          },
+          "bindsWeapon": {
+           "melee": true,
+           "magical": true,
+           "ability": "cha",
+           "damageTypes": [
+            "necrotic",
+            "psychic",
+            "radiant"
+           ],
+           "proficient": true,
+           "focus": true,
+           "conjures": {
+            "pickOf": "pact-of-the-blade"
+           }
+          }
+         }
+        }
+       ]
       },
       {
        "id": "pact-of-the-chain",
@@ -11282,18 +11366,41 @@
        "id": "pact-of-the-tome",
        "name": "Pact of the Tome",
        "description": "Stitching together strands of shadow, you conjure forth a book in your hand at the end of a Short or Long Rest. This Book of Shadows (you determine its appearance) contains eldritch magic that only you can access, granting you the benefits below. The book disappears if you conjure another book with this feature or if you die. Cantrips and Rituals. When the book appears, choose three cantrips, and choose two level 1 spells that have the Ritual tag. The spells can be from any class's spell list, and they must be spells you don't already have prepared. While the book is on your person, you have the chosen spells prepared, and they function as Warlock spells for you. Spellcasting Focus. You can use the book as a Spellcasting Focus.",
-       "choice": {
-        "kind": "cantrip",
-        "choose": 3,
-        "fromCatalog": "warlock-spells",
-        "maxSpellLevel": 0
-       }
+       "choices": [
+        {
+         "kind": "cantrip",
+         "choose": 3,
+         "fromCatalog": "spells",
+         "maxSpellLevel": 0
+        },
+        {
+         "kind": "spell",
+         "choose": 2,
+         "fromCatalog": "spells",
+         "minSpellLevel": 1,
+         "maxSpellLevel": 1,
+         "ritual": true
+        }
+       ],
+       "replaces": [
+        {
+         "offer": "feature:pact-of-the-tome",
+         "when": "short-rest",
+         "amount": 3
+        },
+        {
+         "offer": "feature:pact-of-the-tome/2",
+         "when": "short-rest",
+         "amount": 2
+        }
+       ]
       },
       {
        "id": "repelling-blast",
        "name": "Repelling Blast",
        "description": "Prerequisite: Level 2+ Warlock, a Warlock Cantrip That Deals Damage via an Attack Roll Choose one of your known Warlock cantrips that requires an attack roll. When you hit a Large or smaller creature with that cantrip, you can push the creature up to 10 feet straight away from you. Repeatable. You can gain this invocation more than once. Each time you do so, choose a different eligible cantrip.",
        "level": 2,
+       "repeatable": true,
        "choice": {
         "kind": "cantrip",
         "choose": 1,
@@ -11470,7 +11577,8 @@
      {
       "offer": "feature:mystic-arcanum-level-6-spell",
       "when": "level-up",
-      "amount": 1
+      "amount": 1,
+      "shares": "mystic-arcanum"
      }
     ]
    },
@@ -11494,7 +11602,8 @@
      {
       "offer": "feature:mystic-arcanum-level-7-spell",
       "when": "level-up",
-      "amount": 1
+      "amount": 1,
+      "shares": "mystic-arcanum"
      }
     ]
    },
@@ -11518,7 +11627,8 @@
      {
       "offer": "feature:mystic-arcanum-level-8-spell",
       "when": "level-up",
-      "amount": 1
+      "amount": 1,
+      "shares": "mystic-arcanum"
      }
     ]
    },
@@ -11542,7 +11652,8 @@
      {
       "offer": "feature:mystic-arcanum-level-9-spell",
       "when": "level-up",
-      "amount": 1
+      "amount": 1,
+      "shares": "mystic-arcanum"
      }
     ]
    },
@@ -11615,8 +11726,8 @@
       "quantity": 2
      },
      {
-      "id": "quarterstaff",
-      "name": "Quarterstaff"
+      "id": "arcane-focus-staff",
+      "name": "Arcane Focus (Staff)"
      },
      {
       "id": "robe",
@@ -12289,20 +12400,31 @@
     "name": "Spell Mastery",
     "level": 18,
     "description": "You have achieved such mastery over certain spells that you can cast them at will. Choose a level 1 and a level 2 spell in your spellbook that have a casting time of an action. You always have those spells prepared, and you can cast them at their lowest level without expending a spell slot. To cast either spell at a higher level, you must expend a spell slot. Whenever you finish a Long Rest, you can study your spellbook and replace one of those spells with an eligible spell of the same level from the book.",
+    "replaces": [
+     {
+      "offer": "feature:spell-mastery",
+      "when": "long-rest",
+      "amount": 1
+     }
+    ],
     "choices": [
      {
       "kind": "spell",
       "choose": 1,
       "fromCatalog": "wizard-spells",
       "minSpellLevel": 1,
-      "maxSpellLevel": 1
+      "maxSpellLevel": 1,
+      "castingTime": "action",
+      "fromSpellbook": true
      },
      {
       "kind": "spell",
       "choose": 1,
       "fromCatalog": "wizard-spells",
       "minSpellLevel": 2,
-      "maxSpellLevel": 2
+      "maxSpellLevel": 2,
+      "castingTime": "action",
+      "fromSpellbook": true
      }
     ]
    },
@@ -12330,7 +12452,8 @@
      "choose": 2,
      "fromCatalog": "wizard-spells",
      "minSpellLevel": 3,
-     "maxSpellLevel": 3
+     "maxSpellLevel": 3,
+     "fromSpellbook": true
     }
    }
   ]
