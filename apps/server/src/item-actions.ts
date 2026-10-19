@@ -138,12 +138,27 @@ export function itemAction(
     // A Potion of Healing's 2d4 + 2.
     ...(declared.healing ? { healing: { ...declared.healing } } : {}),
     ...(uses ? { uses } : {}),
+    // Charges one use spends (a Staff of Striking's 2 or 3).
+    ...(declared.useCost !== undefined ? { useCost: declared.useCost } : {}),
     // A thrown flask uses one attack of the Attack action; the action's other attacks stay open.
     ...(declared.replacesAttack ? { replacesAttack: true } : {}),
     // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
     ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
-    ...(declared.area ? { area: { ...declared.area } } : {})
+    ...(declared.area ? { area: { ...declared.area } } : {}),
+    // Who it may target (a flask's one creature within 20 feet) and the hit it rides (a staff's charge on a hit).
+    ...(declared.targets ? { targets: structuredClone(declared.targets) } : {}),
+    ...(declared.ridesHit ? { ridesHit: itemHitRider(declared.ridesHit, definition) } : {}),
+    ...(declared.onHit ? { onHit: structuredClone(declared.onHit) } : {})
   };
+}
+
+/** An item's hit rider with its DC as the bearer's number; how many effects it carries doesn't grow with level. */
+function itemHitRider(
+  rider: NonNullable<FeatureAction["ridesHit"]>,
+  definition: ActorDefinition | undefined
+): NonNullable<ActorAction["ridesHit"]> {
+  const { saveDc, effectsChooseByLevel: _byLevel, ...rest } = structuredClone(rider);
+  return { ...rest, ...(saveDc !== undefined ? { saveDc: resolveSaveDc(saveDc, definition) } : {}) };
 }
 
 /** `FeatureSaveDcSchema`'s three forms, resolved against the bearer. Clamped to the action schema's 1-40. */
@@ -181,7 +196,9 @@ export function castAction(
     spellId: cast.spellId,
     ...(uses ? { uses } : {}),
     // The bearer's own slot is spent on top of the item's charges when the item says so.
-    ...(cast.consumesSpellSlot && level >= 1 ? { spellSlot: { level: Math.min(9, level) } } : {})
+    ...(cast.consumesSpellSlot && level >= 1 ? { spellSlot: { level: Math.min(9, level) } } : {}),
+    // Who the item's cast may affect beside the spell's own targets (a ring's Fear: Beasts only).
+    ...(cast.targets ? { targets: structuredClone(cast.targets) } : {})
   };
   if (!spell) return base;
 

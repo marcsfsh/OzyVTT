@@ -1,9 +1,9 @@
 /**
  * Warlock and Fiend Patron mechanics, merged over the ETL-generated prose.
  *
- * Stays prose throughout: "whenever you gain a Warlock level, you can replace..." clauses; anything
- * scoped to "your pact weapon" (the trigger vocabulary cannot name one conjured weapon, and unscoped
- * riders would apply to every weapon); and senses, which are display-only.
+ * Stays prose throughout: "whenever you gain a Warlock level, you can replace..." clauses; the pact weapon's
+ * own riders (Charisma for its rolls, its damage types), since the trigger vocabulary cannot name one conjured
+ * weapon; and senses, which are display-only. Eldritch Smite and Lifedrinker ride its hits.
  */
 import { spellTableStages, type ClassMechanicsModule } from "./overlay.js";
 
@@ -95,6 +95,55 @@ export const warlock: ClassMechanicsModule = {
          * filtered). Proficiency with the chosen weapon stays prose: `grants.weapons` names groups only.
          */
         "pact-of-the-blade": { choice: { kind: "weapon", choose: 1, fromCatalog: "weapons" } },
+        /**
+         * Both ride a hit with the pact weapon, once per turn: Eldritch Smite spends a Pact Magic slot for 1d8 Force
+         * plus 1d8 per slot level, and may knock a Huge or smaller target Prone; Lifedrinker adds 1d6 of the type
+         * picked and may spend a Hit Point Die to heal. The pact weapon is the kind picked for Pact of the Blade; any
+         * other weapon is one the Warlock vouches for.
+         */
+        "eldritch-smite": {
+          actions: [
+            {
+              id: "eldritch-smite",
+              name: "Eldritch Smite",
+              activation: "other",
+              description:
+                "Once per turn when you hit a creature with your pact weapon, expend a Pact Magic spell slot to deal an extra 1d8 Force damage to the target, plus another 1d8 per level of the spell slot, and you can give the target the Prone condition if it is Huge or smaller. Choose it on the hit's result.",
+              damage: [{ formula: "1d8", type: "force" }],
+              ridesHit: {
+                rides: "pact-weapon",
+                oncePerTurn: true,
+                pactSlotDie: "1d8",
+                effects: [
+                  {
+                    id: "prone",
+                    name: "Knock Prone",
+                    maxTargetSize: "huge",
+                    applies: { name: "Eldritch Smite", conditions: ["prone"] }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        lifedrinker: {
+          actions: [
+            {
+              id: "lifedrinker",
+              name: "Lifedrinker",
+              activation: "other",
+              description:
+                "Once per turn when you hit a creature with your pact weapon, deal an extra 1d6 Necrotic, Psychic or Radiant damage (your choice) to the creature, and you can expend one of your Hit Point Dice to regain Hit Points equal to its roll plus your Constitution modifier (minimum of 1). Choose it on the hit's result.",
+              damage: [{ formula: "1d6", type: "necrotic" }],
+              ridesHit: {
+                rides: "pact-weapon",
+                oncePerTurn: true,
+                damageTypes: ["necrotic", "psychic", "radiant"],
+                effects: [{ id: "hit-point-die", name: "Spend a Hit Point Die", spendsHitPointDie: true }]
+              }
+            }
+          ]
+        },
         /** "You learn Find Familiar and can cast it ... without a slot." */
         "pact-of-the-chain": { grants: { spells: [{ id: "find-familiar", level: 1, withoutSlot: "at-will" }] } },
         /**
@@ -103,9 +152,9 @@ export const warlock: ClassMechanicsModule = {
          */
         "pact-of-the-tome": { choice: { kind: "cantrip", choose: 3, fromCatalog: "warlock-spells", maxSpellLevel: 0 } }
         // Not modeled: Lessons of the First Ones (a feat pick on an option's nested choice cannot be
-        // settled by the build's pass ordering), Devil's Sight and Witch Sight (senses are display-only),
-        // the pact-weapon invocations, and Gaze of Two Minds, Gift of the Protectors and Investment of the Chain
-        // Master.
+        // settled by the build's pass ordering), Devil's Sight and Witch Sight (senses are display-only), the pact
+        // weapon itself with Thirsting Blade and Devouring Blade, and Gaze of Two Minds, Gift of the Protectors and
+        // Investment of the Chain Master.
       }
     },
     /** The sheet's spellcasting grouping slug, exactly as the hand-authored Wizard tags its own. */
@@ -199,8 +248,9 @@ export const warlock: ClassMechanicsModule = {
         }
       },
       /**
-       * `activation: "other"`: the trigger is "once per turn when you hit", which the action economy has
-       * no slot for. The Fiend exemption and restoring the use with a Pact Magic slot stay prose.
+       * It rides any attack roll's hit, once per turn, and opens the Charisma save on that target: a failure deals
+       * the 8d10 Psychic unless it is a Fiend, and the target is Incapacitated and gone (`off-plane`, which no action
+       * can target) until the end of the Warlock's next turn. Restoring the use with a Pact Magic slot stays prose.
        */
       "hurl-through-hell": {
         uses: { limit: 1, per: "long-rest" },
@@ -210,15 +260,23 @@ export const warlock: ClassMechanicsModule = {
             name: "Hurl Through Hell",
             activation: "other",
             description:
-              "Once per turn when you hit a creature with an attack roll, the target must succeed on a Charisma saving throw or hurtle through the Lower Planes, taking 8d10 Psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn.",
+              "Once per turn when you hit a creature with an attack roll, the target must succeed on a Charisma saving throw or disappear and hurtle through the Lower Planes, taking 8d10 Psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn, when it returns to the space it left or the nearest unoccupied one. Choose it on the hit's result.",
             save: {
               ability: "cha",
               dc: "spellcasting",
               successDamage: "none",
               failureConditions: ["incapacitated"],
-              failureDuration: { type: "until-source-turn-end" }
+              failureDuration: { type: "until-source-turn-end" },
+              failureEffect: { name: "Hurled Through Hell", tags: ["off-plane"] }
             },
-            damage: [{ formula: "8d10", type: "psychic" }]
+            damage: [{ formula: "8d10", type: "psychic" }],
+            ridesHit: {
+              rides: "attack-roll",
+              oncePerTurn: true,
+              sparesCreatureTypes: ["fiend"],
+              reminder:
+                "Hurl Through Hell: on a failed save the target leaves the map until the end of the Warlock's next turn, then returns to the space it left or the nearest unoccupied one."
+            }
           }
         ]
       }

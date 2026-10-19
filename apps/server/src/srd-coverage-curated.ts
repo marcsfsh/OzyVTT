@@ -265,7 +265,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   invisible: condition("invisible"),
   jumping: reference("Jumps aren't measured."),
   "knocking-out-a-creature": enforced(
-    "hit-points.ts leaves a creature dropped by a melee attack chosen to knock out at 1 Hit Point and Unconscious until it regains Hit Points, stabilize.ts gives it first aid, or an hour passes on the game clock and its Short Rest ends (game-time.ts)."
+    "A melee hit's confirm offers Knock out (resolution/knock-out.ts), and every apply path then lands it: hit-points.ts leaves a creature it drops at 1 Hit Point and Unconscious until it regains Hit Points, stabilize.ts gives it first aid, or an hour passes on the game clock and its Short Rest ends (game-time.ts)."
   ),
   "lightly-obscured": reference("The map has no obscurement."),
   line: areaShape("a Line has a fixed width, and the point it starts from isn't in it."),
@@ -648,7 +648,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
 
   // Features and feats whose riders or picks apply part of what they do, and leave a part to the table.
   "feature:abjure-foes": guided(
-    "The Wisdom save against the Paladin's spell save DC, its Frightened and the Channel Divinity use are applied. The number of targets and the frightened creature's limit of one thing a turn are the GM's."
+    "The Wisdom save against the Paladin's spell save DC, its Frightened and the Channel Divinity use are applied, on up to the Charisma modifier's number of creatures it can see within 60 feet (resolution/action-targets.ts). resolution/economy.ts holds the frightened creature to one of an action or a Bonus Action on its turn; a move after acting is the GM's."
   ),
   "feature:aura-of-courage": enforced(
     "paladin-auras.ts makes the Paladin and its allies in its Aura of Protection immune to Frightened while it isn't Incapacitated, and an ally already Frightened has no Disadvantage from it there (resolution/attack.ts, check-rolls.ts)."
@@ -672,13 +672,13 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The escape from a grapple rolls with Advantage (resolution/builtins.ts). The app doesn't track carrying capacity, so counting one size larger for it is the GM's."
   ),
   "feature:goliath-giant-ancestry": guided(
-    "The chosen ancestry and its uses are recorded, and Storm's Thunder is offered as a Reaction. The other boons' damage, push and teleport are the GM's."
+    "Fire's Burn, Frost's Chill and Hill's Tumble ride a hit that deals damage (resolution/hit-options.ts), and Storm's Thunder is offered as a Reaction. Stone's Endurance and Cloud's Jaunt are the GM's."
   ),
   "feature:divine-order": guided(
     "Protector's training and Thaumaturge's extra cantrip are applied. Thaumaturge's bonus to Arcana and Religion checks is the GM's."
   ),
   "feature:eldritch-invocations": guided(
-    "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied. The senses (Devil's Sight, Witch Sight), the pact-weapon invocations, Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
+    "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied. Eldritch Smite's Pact Magic slot dice and Prone, and Lifedrinker's damage and Hit Point Die, ride a pact weapon's hit (resolution/hit-options.ts). The senses (Devil's Sight, Witch Sight), Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
   ),
   "feature:elemental-fury": enforced(
     "Primal Strike's extra damage, of the type the Druid picks, is applied once a turn. Potent Spellcasting adds the Druid's Wisdom modifier to the damage of Poison Spray, Produce Flame and Starry Wisp."
@@ -696,7 +696,43 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Magician's extra cantrip and Warden's training are applied. The Wisdom bonus to the checks each role names is the GM's."
   ),
   "feature:stunning-strike": enforced(
-    "A target that fails its Constitution save against the Monk's DC is Stunned until the start of the Monk's next turn, once a turn for a Focus Point. On a success resolution/pending.ts halves its Speed until then (speed.ts), and the next attack roll against it before then has Advantage and spends it (resolution/attack.ts)."
+    "It rides a hit with a Monk weapon or an Unarmed Strike (resolution/hit-options.ts), never tapped alone: a target that fails its Constitution save against the Monk's DC is Stunned until the start of the Monk's next turn, once a turn for a Focus Point. On a success resolution/pending.ts halves its Speed until then (speed.ts), and the next attack roll against it before then has Advantage and spends it (resolution/attack.ts)."
+  ),
+  "feature:brutal-strike": enforced(
+    "After Reckless Attack, the tap forgoes the Advantage of the Barbarian's next Strength attack this turn (resolution/attack.ts), and its hit carries 1d10 of the weapon's type and one effect (resolution/hit-options.ts): Forceful Blow's 15-foot push and half Speed of movement, or Hamstring Blow's 15 feet less Speed, one at a time on a creature."
+  ),
+  "feature:improved-brutal-strike": enforced(
+    "Staggering Blow (Disadvantage on the next save and no Opportunity Attacks) and Sundering Blow (+5 to the next attack roll another creature makes against the target) join Brutal Strike's effects, and from Barbarian 17 a hit carries 2d10 and two effects (resolution/hit-options.ts, resolution/attack.ts)."
+  ),
+  "feature:open-hand-technique": enforced(
+    "A Flurry of Blows hit carries Addle, Push or Topple (resolution/hit-options.ts): no Opportunity Attacks until the target's next turn, a Strength save against a 15-foot push, or a Dexterity save against Prone."
+  ),
+  "feature:quivering-palm": enforced(
+    "An Unarmed Strike's hit can spend 4 Focus Points to set the vibrations on its target, one creature at a time (resolution/hit-rider-outcomes.ts). The ending action targets only that creature: a Constitution save for 10d12 Force, half on a success. The days they last are the GM's."
+  ),
+  "feature:cunning-strike": enforced(
+    "Sneak Attack's hit can trade dice for Poison (with a Poisoner's Kit), Trip or Withdraw, with saves against 8 + Dexterity + Proficiency Bonus (resolution/hit-options.ts)."
+  ),
+  "feature:improved-cunning-strike": enforced(
+    "A Sneak Attack hit carries two Cunning Strike effects (resolution/hit-options.ts)."
+  ),
+  "feature:devious-strikes": enforced(
+    "Daze (one of moving, an action or a Bonus Action, resolution/economy.ts), Knock Out (Unconscious that ends on damage, with repeat saves) and Obscure (Blinded) join Cunning Strike's effects. A Dazed creature's move after acting is the GM's."
+  ),
+  "feature:supreme-sneak": guided(
+    "Stealth Attack joins Cunning Strike's effects, and the attack leaves the Rogue's Invisible from the Hide action on (resolution/release.ts). Whether it ends the turn behind Three-Quarters or Total Cover is the GM's, said with the hit."
+  ),
+  "feature:hurl-through-hell": guided(
+    "It rides an attack roll's hit once a Long Rest: the Charisma save, 8d10 Psychic unless the target is a Fiend, and Incapacitated with nothing able to target it until the end of the Warlock's next turn (resolution/action-targets.ts). Its return to its space, or the nearest, is the GM's."
+  ),
+  "feature:lay-on-hands": enforced(
+    "The Bonus Action spends the points the Paladin picks to heal one creature it touches, within 5 feet (resolution/action-targets.ts), or 5 points to end Poisoned."
+  ),
+  "feature:superior-hunters-prey": guided(
+    "The tap deals the mark's 1d6 Force (1d10 from Foe Slayer) to one other creature the Ranger can see, once a turn. That the marked creature took the Ranger's damage this turn, and the 30 feet from it, are the GM's."
+  ),
+  "feature:words-of-creation": enforced(
+    "Power Word Heal and Power Word Kill are always prepared, and either may take a second creature within 10 feet of the first (resolution/action-targets.ts)."
   ),
   "feature:use-magic-device": guided(
     "The fourth attuned item is applied (inventory.ts). The roll to save a charge, and reading any Spell Scroll, are the GM's."
@@ -743,8 +779,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:cloak-of-the-bat": guided(
     "Advantage on Dexterity (Stealth) checks is applied. The Fly Speed in darkness and the Polymorph cast are the GM's."
   ),
-  "item:dagger-of-venom": guided(
-    "The +1 to attack and damage rolls is applied. The poison it can coat its blade with is the GM's."
+  "item:dagger-of-venom": enforced(
+    "The +1 to attack and damage rolls is applied. Coating the blade is a Bonus Action once a day, and the dagger's next hit spends it on a DC 15 Constitution save against 2d10 Poison and Poisoned for 1 minute (resolution/on-hit.ts)."
   ),
   "item:defender": guided("The +3 to attack and damage rolls is applied. Moving the bonus to AC is the GM's."),
   "item:demon-armor": guided(
@@ -757,8 +793,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:dwarven-thrower": guided(
     "The +3 to attack and damage rolls is applied. Throwing it, its return and the extra damage against Giants are the GM's."
   ),
-  "item:giant-slayer": guided(
-    "The +1 to attack and damage rolls and the extra 2d6 against Giants are applied. The Giant's save against Prone is the GM's."
+  "item:giant-slayer": enforced(
+    "The +1 to attack and damage rolls and the extra 2d6 against Giants are applied, and a hit on a Giant opens its DC 15 Strength save against Prone (resolution/on-hit.ts)."
   ),
   "item:hammer-of-thunderbolts": guided(
     "The +1 to attack and damage rolls is applied. Its thrown thunderclap and its powers against Giants are the GM's."
@@ -780,7 +816,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The extra 2d6 Radiant against Fiends and Undead is applied. The save against destruction at 25 Hit Points or fewer, and the Frightened condition a success leaves, are the GM's."
   ),
   "item:mace-of-smiting": guided(
-    "The +1 to attack and damage rolls, +3 against Constructs, and the 7 Bludgeoning on a Critical Hit (14 against a Construct) are applied. Destroying a Construct left at 25 Hit Points or fewer is the GM's."
+    "The +1 to attack and damage rolls, +3 against Constructs, and the 7 Bludgeoning on a rolled 20 (14 against a Construct) are applied. Destroying a Construct left at 25 Hit Points or fewer is the GM's, said with the hit."
   ),
   "item:nine-lives-stealer": guided(
     "The +2 to attack and damage rolls is applied. Life Stealing on a Critical Hit is the GM's."
@@ -825,16 +861,31 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Resistance to Cold damage and its one-charge Fog Cloud are applied. The spells that cost more charges are the GM's."
   ),
   "item:staff-of-power": guided(
-    "The +2 to AC, saving throws and spell attack rolls is applied. Its weapon bonus, its spells and its Retributive Strike are the GM's."
+    "It swings as a +2 Quarterstaff, and the +2 to AC, saving throws and spell attack rolls is applied. Its spells and its Retributive Strike are the GM's."
   ),
   "item:staff-of-the-magi": guided(
-    "Its four casts that cost no charge and the +2 to spell attack rolls are applied. Its weapon bonus, the spells that cost charges, Spell Absorption and Retributive Strike are the GM's."
+    "It swings as a +2 Quarterstaff, and its four casts that cost no charge and the +2 to spell attack rolls are applied. The spells that cost charges, Spell Absorption and Retributive Strike are the GM's."
   ),
   "item:staff-of-the-woodlands": guided(
-    "Its one-charge casts are cast actions, Tree Form's use is counted, and the +2 to spell attack rolls is applied. Its weapon bonus and the spells that cost more charges are the GM's."
+    "It swings as a +2 Quarterstaff, its one-charge casts are cast actions, Tree Form's use is counted, and the +2 to spell attack rolls is applied. The spells that cost more charges are the GM's."
   ),
-  "item:staff-of-thunder-and-lightning": guided(
-    "Lightning Strike and Thunderclap are applied, each once a day. Its weapon bonus and the powers on a hit are the GM's."
+  "item:staff-of-thunder-and-lightning": enforced(
+    "It swings as a +2 Quarterstaff. Lightning and Thunder ride a melee hit, Thunder and Lightning does both as a Bonus Action (resolution/hit-options.ts), and Lightning Strike and Thunderclap are actions, each once a day."
+  ),
+  "item:staff-of-striking": enforced(
+    "It swings as a +3 Quarterstaff, and a melee hit can spend 1, 2 or 3 of its 10 charges for 1d6 Force each (resolution/hit-options.ts)."
+  ),
+  "item:staff-of-withering": enforced(
+    "It swings as a Quarterstaff, and a hit can spend a charge for 2d10 Necrotic and a DC 15 Constitution save against Disadvantage on Strength and Constitution checks and saves (resolution/hit-options.ts). The hour it lasts is the GM's."
+  ),
+  "item:rod-of-lordly-might": guided(
+    "It swings as a +3 Mace. Drain Life and Paralyze ride a melee hit and Terrify is an action, each once a day. The buttons' other forms, and Drain Life's healing, are the GM's."
+  ),
+  "item:sun-blade": guided(
+    "It swings as a +2 Finesse Longsword that deals Radiant damage, with 1d8 Radiant more against an Undead. The Bonus Action that makes the blade appear, and its sunlight, are the GM's."
+  ),
+  "item:sword-of-sharpness": guided(
+    "A rolled 20 against a creature adds 14 Slashing damage and a level of Exhaustion (resolution/damage.ts, resolution/on-hit.ts). Maximized damage against an object is the GM's."
   ),
   "item:talisman-of-pure-good": guided(
     "The +2 to spell attack rolls is applied. The 8d6 Radiant it deals a Fiend or an Undead that touches it, and Pure Rebuke's fissure on its charges, are the GM's."
@@ -842,11 +893,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:talisman-of-ultimate-evil": guided(
     "The +2 to spell attack rolls is applied. The 8d6 Necrotic it deals a creature other than a Fiend or an Undead that touches it, and Ultimate End's fissure on its charges, are the GM's."
   ),
-  "item:sword-of-wounding": guided(
-    "The extra Necrotic damage is applied. The save that stops the target regaining Hit Points is the GM's."
+  "item:sword-of-wounding": enforced(
+    "The extra Necrotic damage is applied, and a hit opens a DC 15 Constitution save whose failure stops the target regaining Hit Points until it succeeds on the save it repeats at the end of each of its turns (resolution/on-hit.ts)."
   ),
   "item:vorpal-sword": guided(
-    "The +3 to attack and damage rolls is applied. Ignoring Resistance to Slashing damage, and the head it takes on a 20, are the GM's."
+    "The +3 to attack and damage rolls is applied. Ignoring Resistance to Slashing damage, and the head it takes on a rolled 20, are the GM's, said with the hit."
   ),
   "item:wand-of-fireballs": guided(
     "Fireball at DC 15 on its charges is applied. Spending more charges for a higher-level Fireball is the GM's."

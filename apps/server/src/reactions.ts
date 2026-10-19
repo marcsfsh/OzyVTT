@@ -523,6 +523,8 @@ function answerParkedAttack(answer: Answer, slotLevel: number | undefined): Reac
       ...(parked.damageType !== null ? { damageType: parked.damageType } : {}),
       attackBonusDice: parked.bonusDice,
       ...(parked.hitOptions.length > 0 ? { hitOptions: parked.hitOptions } : {}),
+      ...(parked.forgoneAdvantageBy !== undefined ? { forgoneAdvantageBy: parked.forgoneAdvantageBy } : {}),
+      ...(parked.knockOut === true ? { knockOut: true } : {}),
       economyPaid: true,
       ...(raised && effectName === null && pending.acBonus !== null
         ? { reactionAcBonus: { amount: pending.acBonus, source: pending.actionName } }

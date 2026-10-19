@@ -135,6 +135,30 @@ export const ranger: ClassMechanicsModule = {
         }
       },
 
+      /**
+       * Tapped once the Ranger's damage lands on its marked creature: the mark's extra damage (1d6 Force, 1d10 from
+       * Foe Slayer at Ranger 20) to one other creature it can see, once per turn. That the mark took damage this turn
+       * and the 30 feet from it stay the table's.
+       */
+      "superior-hunters-prey": {
+        actions: [
+          {
+            id: "superior-hunters-prey",
+            name: "Superior Hunter's Prey",
+            activation: "other",
+            description:
+              "Once per turn when you deal damage to a creature marked by your Hunter's Mark, deal that spell's extra damage to a different creature you can see within 30 feet of the first creature.",
+            damage: [{ formula: "1d6", type: "force" }],
+            damageByLevel: [
+              { level: 11, formula: "1d6", type: "force" },
+              { level: 20, formula: "1d10", type: "force" }
+            ],
+            uses: { limit: 1, per: "turn", pool: "superior-hunters-prey" },
+            targets: { count: 1, seen: true, who: "others" }
+          }
+        ]
+      },
+
       // Escape the Horde's Disadvantage is read on every Opportunity Attack against the Ranger. Multiattack
       // Defense is marked on the Ranger by the engine after a hit (`resolution/struck.ts`).
       "defensive-tactics": {

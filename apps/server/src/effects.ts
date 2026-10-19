@@ -32,6 +32,8 @@ export const MAGE_ARMOR_TAG = "mage-armor";
 export const NO_ACTIONS_TAG = "no-actions";
 /** The bearer can't take Reactions while this lasts. */
 export const NO_REACTIONS_TAG = "no-reactions";
+/** The bearer can't take a Bonus Action while this lasts (an ice devil's Ice Spear). */
+export const NO_BONUS_ACTIONS_TAG = "no-bonus-actions";
 /** The bearer can't make Opportunity Attacks while this lasts (Shocking Grasp). */
 export const NO_OPPORTUNITY_ATTACKS_TAG = "no-opportunity-attacks";
 /** The bearer can't regain Hit Points while this lasts (Chill Touch). */

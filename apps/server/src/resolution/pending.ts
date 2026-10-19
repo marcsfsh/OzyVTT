@@ -144,7 +144,13 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
           initiatorSessionId: deps.initiatorSessionId ?? deps.gmSessionId,
           untilNextTurn: offer.reaction.untilNextTurn === true,
           // The extras chosen for the hit ride the replay, spent only if it still hits.
-          hitOptions: (input.hitOptions ?? []).map((choice) => ({ ...choice }))
+          hitOptions: (input.hitOptions ?? []).map(({ effects, ...choice }) => ({
+            ...choice,
+            ...(effects ? { effects: [...effects] } : {})
+          })),
+          // A roll that forwent its Advantage for Brutal Strike still offers its hit when it lands.
+          ...(ctx.forgoneAdvantageBy !== null ? { forgoneAdvantageBy: ctx.forgoneAdvantageBy } : {}),
+          ...(input.knockOut === true ? { knockOut: true as const } : {})
         },
         ...slotChoiceOf(target, offer.action),
         createdAt: Date.parse(deps.now())
@@ -212,7 +218,8 @@ export function failureEffectFor(
   if (linked.length === 0 && !declared && !hazard) return undefined;
   const grapple = linked.includes("grappled");
   const athletics =
-    action.spellId !== undefined && ATHLETICS_ESCAPES.has(action.spellId) && linked.includes("restrained");
+    (action.spellId !== undefined && ATHLETICS_ESCAPES.has(action.spellId) && linked.includes("restrained")) ||
+    (save.escapeAthletics === true && !grapple);
   const duration =
     save.failureDuration ??
     declared?.duration ??
@@ -236,7 +243,8 @@ export function failureEffectFor(
     linkedConditionIds: linked,
     // An escape DC the text doesn't print is the grapple's own DC, as the 2024 rules set it; a spell's restraint is
     // escaped against the spell save DC.
-    escapeDc: grapple ? (save.escapeDc ?? save.dc) : athletics ? save.dc : null,
+    // A restraint that prints its own escape DC (a Net's 10) is escaped against that.
+    escapeDc: grapple || athletics ? (save.escapeDc ?? save.dc) : (save.escapeDc ?? null),
     sourceActorId: attacker.id,
     sourceName: attacker.name,
     ...(duration ? { duration } : {}),
@@ -256,9 +264,9 @@ export function failureEffectFor(
 
 /** What a successful save leaves on its target instead, as the action declares it (Stunning Strike: the target's Speed
  *  halved and the next attack roll against it with Advantage, until the start of the Monk's next turn). */
-function successEffectFor(
+export function successEffectFor(
   ctx: MagicalSource & Pick<ResolveContext, "castId">,
-  cast: SpellCast | undefined
+  cast?: SpellCast
 ): PendingSave["onSuccessEffect"] {
   const { action, attacker, castId } = ctx;
   const declared = action.save?.successEffect;

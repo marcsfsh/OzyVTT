@@ -148,6 +148,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "target.wrong-type": () => "It can't target that kind of creature.",
   "target.unseen": () => "You can't see that creature.",
   "target.outside-area": () => "Those creatures don't fit in one of its areas.",
+  "target.not-allowed": () => "It can't affect that creature.",
   "attack.hit-option-unqualified": () => "That hit can't carry it.",
   "condition.charmed-charmer": () => "You can't attack the creature that charmed you.",
   "slots.none-remaining": slotsReason,
@@ -231,7 +232,8 @@ const structured = (action: DefinitionAction): boolean =>
  */
 export function passiveOf(action: DefinitionAction, builtin: boolean): PassiveOption | undefined {
   if (builtin) return undefined;
-  if (hitRiderOf(action)) return "rider";
+  // A rider tapped before its roll (Brutal Strike) is on the turn list; any other is chosen on a hit.
+  if (hitRiderOf(action)) return hitRiderOf(action)!.declaredBeforeRoll ? undefined : "rider";
   if (action.activation !== "other") return undefined;
   if (/^spell-.+-then-/.test(action.id)) return "automatic";
   if (structured(action) || TAKEN_ON_A_TURN.has(action.id)) return undefined;

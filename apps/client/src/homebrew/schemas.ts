@@ -840,7 +840,8 @@ const MAGIC_KEYS = [
   "actions",
   "effects",
   "tags",
-  "appliesTo"
+  "appliesTo",
+  "onHit"
 ];
 
 const EQUIPMENT_SCHEMA: HomebrewSchema = {

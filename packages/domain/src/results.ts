@@ -110,9 +110,25 @@ export type HitOffer = Readonly<{
   slotLevels?: readonly number[];
   /** What the engine could not check, so the attacker vouches for it ("No map to check for an ally within 5 feet"). */
   unverified?: string;
+  /** The save it opens on the target and what a failure deals, as sentences ("The target makes a Charisma saving
+   *  throw. A failure deals 8d10 Psychic."). */
+  save?: string;
+  /** Effects to pick with it (Brutal Strike's Forceful Blow, a Cunning Strike's Trip), each with what it costs. */
+  effects?: ReadonlyArray<HitOfferEffect>;
+  /** How many different effects one hit may carry. */
+  effectsChoose?: number;
+  /** It is chosen with one effect or not at all (Open Hand Technique). */
+  effectRequired?: true;
 }>;
+/** One effect a hit offer carries: its id, its name and what it costs ("-1d6"). */
+export type HitOfferEffect = Readonly<{ id: string; name: string; cost?: string }>;
 /** One extra chosen at confirm, and how. */
-export type HitOptionChoice = Readonly<{ id: string; damageType?: string; slotLevel?: number }>;
+export type HitOptionChoice = Readonly<{
+  id: string;
+  damageType?: string;
+  slotLevel?: number;
+  effects?: readonly string[];
+}>;
 /** The damage an action with no attack roll and no save owes one target (Magic Missile, a smite resolved alone). */
 export type DamageTarget = Readonly<{
   targetId: string;
@@ -135,6 +151,9 @@ export type ActionResolution = Readonly<{
   rollMode?: ActionRollMode;
   /** Flat typed damage added by active effects (Rage +2 melee), included in damageTotal. */
   bonusDamage?: ReadonlyArray<{ amount: number; type: string; source: string }>;
+  /** A melee hit can knock its target out (SRD Knocking Out a Creature): on a preview, offered; on a confirm, chosen,
+   *  so the damage it owes leaves the target at 1 Hit Point and Unconscious if it would drop it to 0. */
+  knockOut?: "offered" | "chosen";
   /** Source-linked effects the hit applied to targets (Bite: Grappled + Restrained). */
   effectsApplied?: ReadonlyArray<{
     targetId: string;
@@ -350,6 +369,11 @@ export const ActionAvailabilitySchema = z.strictObject({
     .int()
     .nullable()
     .describe("Normal range band; shots beyond it up to rangeFeet roll at disadvantage"),
+  targetRangeFeet: z
+    .number()
+    .int()
+    .optional()
+    .describe("How far its targets may be when it says so without an attack (Lay on Hands' touch is 5)"),
   attackCount: z.number().int().nullable(),
   saveAbility: z.string().nullable(),
   saveDc: z.number().int().nullable().describe("Save DC including item riders"),

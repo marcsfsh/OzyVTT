@@ -193,6 +193,7 @@ export function itemState(item: EquipmentReference, spellStates: ReadonlyMap<str
     (item.ammunition ?? null) !== null ||
     item.spellScroll !== undefined ||
     item.removesArmorDrawbacks === true ||
+    (item.onHit?.length ?? 0) > 0 ||
     ridersApply(item);
   if (applies) return unreadModifier(item) ? "guided" : "enforced";
   const casts = item.casts.map((cast) => spellStates.get(cast.spellId) ?? "reference");

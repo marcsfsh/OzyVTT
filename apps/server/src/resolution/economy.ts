@@ -9,6 +9,7 @@ import {
   HASTED_TAG,
   hasEffectTag,
   NO_ACTIONS_TAG,
+  NO_BONUS_ACTIONS_TAG,
   NO_REACTIONS_TAG,
   SLOWED_TAG,
   NO_SPELLS_TAG,
@@ -38,6 +39,7 @@ import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.j
 import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { castMarks, markMoveOf } from "./marks.js";
+import { actionTargetViolations } from "./action-targets.js";
 import { hitRiderOf } from "./hit-riders.js";
 import { hiddenFrom } from "../vision/audience.js";
 import { withoutSourceName } from "../hidden-source.js";
@@ -187,6 +189,10 @@ export function evaluateActionEconomy(
     if (unprepared) evaluation.violations.push({ rule: "slots.not-prepared", message: unprepared });
   }
   checkTargeting(evaluation, distanceFeet);
+  // Who a non-spell action may target: its count, range and creatures (`ActionSchema.targets`).
+  evaluation.violations.push(
+    ...actionTargetViolations({ state, attacker, action, targetIds, definition, resolveDefinition, distanceFeet })
+  );
   if (spell) checkMarkMove(evaluation, spell);
   if (spell) checkSpellUp(evaluation, spell);
   if (spell) checkLaterTurn(evaluation, spell);
@@ -389,11 +395,9 @@ function checkSteadyAim({ state, attacker, action, onOwnTurn, violations }: Eval
 }
 
 /** "Once per turn" beside a pool of its own (Stunning Strike spends a Focus Point), counted in the turn's uses, which
- *  start afresh with each turn. Keyed by id, so sheets built earlier get it. */
-const ONCE_PER_TURN: ReadonlySet<string> = new Set(["stunning-strike"]);
-
+ *  start afresh with each turn. Read from the hit rider, whose table covers sheets built earlier. */
 function checkOncePerTurn({ state, attacker, action, violations }: Evaluation): string | null {
-  if (!state.combat.active || !ONCE_PER_TURN.has(action.id)) return null;
+  if (!state.combat.active || hitRiderOf(action)?.oncePerTurn !== true) return null;
   const key = `${attacker.id}:${action.id}`;
   if ((state.combat.turn.turnUses[key] ?? 0) > 0)
     violations.push({
@@ -456,6 +460,12 @@ function checkAbleToAct({ state, attacker, action, resolveDefinition, violations
     violations.push({
       rule: "condition.no-reactions",
       message: `${attacker.name} can't take Reactions while ${shownEffectName(state, unreacting, resolveDefinition)} lasts.`
+    });
+  const slowed = attacker.effects.find((effect) => effect.tags.includes(NO_BONUS_ACTIONS_TAG));
+  if (slowed && action.activation === "bonus-action")
+    violations.push({
+      rule: "economy.bonus-action-used",
+      message: `${attacker.name} can't take a Bonus Action while ${shownEffectName(state, slowed, resolveDefinition)} lasts.`
     });
   // SRD Stinking Cloud: while poisoned by it, "the creature can't take an action or a Bonus Action".
   const reeling = attacker.effects.find((effect) => effect.tags.includes(NO_ACTIONS_TAG));
@@ -616,12 +626,22 @@ function checkLoading({ state, attacker, action, onOwnTurn, violations }: Evalua
 
 /** Sneak Attack, a smite and the like add their dice to a hit, so they're chosen on the attack's result before it
  *  is confirmed; taken alone they would deal damage with no hit to ride. */
-function checkTakenAlone({ action, violations }: Evaluation): void {
-  if (hitRiderOf(action))
-    violations.push({
-      rule: "attack.rides-a-hit",
-      message: `${action.name} adds to a hit: choose it on the attack's result before you confirm the hit.`
-    });
+function checkTakenAlone({ state, attacker, action, onOwnTurn, violations }: Evaluation): void {
+  const rider = hitRiderOf(action);
+  if (!rider) return;
+  // Brutal Strike is decided before the roll, so its tap stands alone, on the Barbarian's own turn.
+  if (rider.declaredBeforeRoll) {
+    if (rider.ownTurn && state.combat.active && !onOwnTurn)
+      violations.push({
+        rule: "economy.not-your-turn",
+        message: `${action.name} is used on ${attacker.name}'s own turn.`
+      });
+    return;
+  }
+  violations.push({
+    rule: "attack.rides-a-hit",
+    message: `${action.name} adds to a hit: choose it on the attack's result before you confirm the hit.`
+  });
 }
 
 const USE_SCOPE_LABELS: Readonly<Record<"turn" | "encounter" | "short-rest" | "long-rest", string>> = {
@@ -809,6 +829,31 @@ function componentMap(plan: readonly PlanComponent[] | undefined): Record<string
   return components;
 }
 
+/** On its turn the bearer can do only one of these: move, take an action, or take a Bonus Action (a Rogue's Daze,
+ *  Abjure Foes' Frightened). */
+export const DAZED_TAG = "dazed";
+
+/** Refuses a second of the three things a dazed creature may do on its turn; a move it made counts as its one. */
+function checkDazed({ state, attacker, action, onOwnTurn, resolveDefinition, violations }: Evaluation): void {
+  if (!onOwnTurn || (action.activation !== "action" && action.activation !== "bonus-action")) return;
+  const dazed = attacker.effects.find((effect) => effect.tags.includes(DAZED_TAG));
+  if (!dazed) return;
+  const turn = state.combat.turn;
+  const done =
+    turn.movementUsedFeet > 0
+      ? "moved"
+      : action.activation === "action" && turn.bonusActionUsed
+        ? "taken a Bonus Action"
+        : action.activation === "bonus-action" && turn.actionUsed
+          ? "taken an action"
+          : null;
+  if (done)
+    violations.push({
+      rule: action.activation === "action" ? "economy.action-used" : "economy.bonus-action-used",
+      message: `${attacker.name} has ${done} this turn, and ${shownEffectName(state, dazed, resolveDefinition)} leaves only one of moving, an action or a Bonus Action.`
+    });
+}
+
 type SlotPlan = Pick<
   EconomyPlan,
   "markAction" | "markBonus" | "markReaction" | "instance" | "bonusInstance" | "extraAction"
@@ -839,6 +884,7 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
       return { ...unchanged, bonusInstance: { actorId: attacker.id, components } };
     }
   }
+  checkDazed(evaluation);
   // SRD Slow: "On its turns, it can take either an action or a Bonus Action, not both."
   const slowed = onOwnTurn ? attacker.effects.find((effect) => effect.tags.includes(SLOWED_TAG)) : undefined;
   if (slowed && action.activation === "bonus-action" && state.combat.turn.actionUsed)

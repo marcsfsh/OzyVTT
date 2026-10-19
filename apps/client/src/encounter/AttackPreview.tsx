@@ -83,9 +83,22 @@ export function PushChoice({
 
 const titled = (type: string) => (type.length > 0 ? `${type[0].toUpperCase()}${type.slice(1)}` : type);
 
+/** An offer's button label: its name and the dice it adds, if any. */
+const offerLabel = (offer: HitOffer) => (offer.dice ? `${offer.name} +${offer.dice}` : offer.name);
+
+/** The effects picked with an offer after one more is toggled: on or off, never past how many one hit carries. A
+ *  single effect swaps for another. */
+function toggledEffects(offer: HitOffer, picked: readonly string[], id: string): string[] {
+  if (picked.includes(id))
+    return offer.effectRequired && picked.length === 1 ? [...picked] : picked.filter((e) => e !== id);
+  const most = offer.effectsChoose ?? 1;
+  return most === 1 ? [id] : picked.length < most ? [...picked, id] : [...picked];
+}
+
 /**
- * The extras a hit can carry (Sneak Attack, a smite, Divine Strike, a charge): each a toggle, with its type or slot
- * picked once it is on. What it costs and what the engine couldn't check are said under it.
+ * The extras a hit can carry (Sneak Attack, a smite, Divine Strike, a charge): each a toggle, with its type, slot or
+ * effects picked once it is on. What it costs, the save it opens and what the engine couldn't check are said under
+ * it.
  */
 export function HitOfferChoices({
   offers,
@@ -125,13 +138,36 @@ export function HitOfferChoices({
                     ? null
                     : {
                         ...(offer.damageTypes ? { damageType: offer.damageTypes[0] } : {}),
-                        ...(offer.slotLevels ? { slotLevel: offer.slotLevels[0] } : {})
+                        ...(offer.slotLevels ? { slotLevel: offer.slotLevels[0] } : {}),
+                        // One that needs an effect starts with its first.
+                        ...(offer.effectRequired && offer.effects?.[0] ? { effects: [offer.effects[0].id] } : {})
                       }
                 )
               }
             >
-              {offer.name} +{offer.dice}
+              {offerLabel(offer)}
             </button>
+            {pick && offer.effects && (
+              <span className="hit-offer-picks" role="group" aria-label={`${offer.name} effects`}>
+                {offer.effects.map((effect) => {
+                  const on = (pick.effects ?? []).includes(effect.id);
+                  return (
+                    <button
+                      key={effect.id}
+                      type="button"
+                      className={`save-die-mode${on ? " active" : ""}`}
+                      aria-pressed={on}
+                      disabled={busy}
+                      onClick={() =>
+                        update(offer.id, { effects: toggledEffects(offer, pick.effects ?? [], effect.id) })
+                      }
+                    >
+                      {effect.cost ? `${effect.name} ${effect.cost}` : effect.name}
+                    </button>
+                  );
+                })}
+              </span>
+            )}
             {pick && offer.damageTypes && (
               <span className="hit-offer-picks" role="group" aria-label={`${offer.name} damage type`}>
                 {offer.damageTypes.map((type) => (
@@ -164,9 +200,16 @@ export function HitOfferChoices({
                 ))}
               </span>
             )}
-            {(offer.cost || offer.unverified) && (
+            {(offer.cost || offer.save || offer.unverified) && (
               <small className="hit-offer-note">
-                {[offer.cost ? `Costs ${offer.cost}.` : null, offer.unverified].filter(Boolean).join(" ")}
+                {[
+                  offer.cost ? `Costs ${offer.cost}.` : null,
+                  offer.save ?? null,
+                  offer.effectsChoose && offer.effectsChoose > 1 ? `Pick up to ${offer.effectsChoose} effects.` : null,
+                  offer.unverified
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               </small>
             )}
           </div>
@@ -180,8 +223,8 @@ export function HitOfferChoices({
  * An attack previewed but not yet applied: Confirm resolves the hit for real (damage, riders, economy) with the die
  * shown, which the server holds (ADR-0012). The GM may force Advantage or Disadvantage and reroll freely; a player
  * rerolls only by spending Heroic Inspiration, and types the reroll's face when the shown die was typed. A hit that offers
- * a Push asks how far first, and a hit that can carry extras (Sneak Attack, a smite) offers them; Confirm sends those
- * choices.
+ * a Push asks how far first, and a hit that can carry extras (Sneak Attack, a smite) offers them, as a melee hit offers
+ * to knock its target out; Confirm sends those choices.
  */
 export function AttackPreview({
   attack,
@@ -191,6 +234,7 @@ export function AttackPreview({
   onFeedback,
   push,
   hitOffers = [],
+  knockOutOffered = false,
   resolve: resolveWith
 }: Readonly<{
   attack: Attack;
@@ -204,6 +248,8 @@ export function AttackPreview({
   push?: ActionResolution["push"];
   /** The extras this hit can carry; chosen ones ride the Confirm. */
   hitOffers?: readonly HitOffer[];
+  /** A melee hit may knock its target out instead of dropping it (SRD); the attacker chooses it before Confirm. */
+  knockOutOffered?: boolean;
   resolve: (options: ResolveOptions) => void;
 }>) {
   // The shown die was typed from a physical die, so a player's reroll is typed too.
@@ -212,6 +258,7 @@ export function AttackPreview({
   const [pushPick, setPushPick] = useState<number | null>(null);
   const pushFeet = push ? Math.min(pushPick ?? push.maxFeet, push.maxFeet) : undefined;
   const [extras, setExtras] = useState<HitOptionChoice[]>([]);
+  const [knockOut, setKnockOut] = useState(false);
   // The GM's forced mode, sent with every later look at the held die so Confirm reads it the same way.
   const [forced, setForced] = useState<DieMode | undefined>(undefined);
   // A reroll can change what is offered (a miss offers nothing), so only choices still offered are sent.
@@ -222,13 +269,30 @@ export function AttackPreview({
       ...(forced ? { rollMode: forced } : {}),
       // Only a confirming call carries the push and extras; previews ignore them.
       ...(options.commit && pushFeet !== undefined ? { pushFeet } : {}),
-      ...(options.commit && hitOptions.length > 0 ? { hitOptions } : {})
+      ...(options.commit && hitOptions.length > 0 ? { hitOptions } : {}),
+      ...(options.commit && knockOutOffered && knockOut ? { knockOut: true } : {})
     });
   return (
     <div className="action-preview">
       {push && pushFeet !== undefined && <PushChoice push={push} value={pushFeet} busy={busy} onPick={setPushPick} />}
       {hitOffers.length > 0 && (
         <HitOfferChoices offers={hitOffers} chosen={hitOptions} busy={busy} onChange={setExtras} />
+      )}
+      {knockOutOffered && (
+        <div className="hit-offers" role="group" aria-label="If the hit drops the target to 0">
+          <div className="hit-offer">
+            <button
+              type="button"
+              className={`save-die-mode${knockOut ? " active" : ""}`}
+              aria-pressed={knockOut}
+              disabled={busy}
+              onClick={() => setKnockOut(!knockOut)}
+            >
+              Knock out
+            </button>
+            <small className="hit-offer-note">At 0 Hit Points it is left at 1 Hit Point and Unconscious instead.</small>
+          </div>
+        </div>
       )}
       <span className="save-prompt-confirm">
         {viewer === "gm" && (

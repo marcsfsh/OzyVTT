@@ -221,9 +221,9 @@ describe("the bind: one shipped row, two picked bases, two different numbers", (
     expect(action.damage).toEqual([{ formula: "1d8 + 4", type: "bludgeoning" }]);
   });
 
-  it("Sun Blade and Energy Bow do NOT bind: a wrong swing may not replace an honest absence", () => {
-    // Their printed effect is more than the base (damage-type conversion plus bonuses), so the ETL
-    // withholds their appliesTo and the rows stay unbound.
+  it("Sun Blade and Energy Bow do NOT bind: the Sun Blade swings as its own radiant Longsword, the Energy Bow not at all", () => {
+    // Their printed effect is more than the base (damage-type conversion plus bonuses), so the ETL withholds their
+    // appliesTo. The Sun Blade's row carries its own block instead; the Energy Bow stays unbound.
     const state = stateWith();
     setInventoryItem(
       state,
@@ -233,8 +233,20 @@ describe("the bind: one shipped row, two picked bases, two different numbers", (
       { catalog: CATALOG }
     );
     expect(state.actors[0].inventory[0].baseId).toBeUndefined();
+    expect(state.actors[0].inventory[0].weapon).toMatchObject({ damageType: "radiant", damageDice: "1d8" });
     expect(
-      effectiveActions(DEFINITION, state.actors[0], CATALOG).find((entry) => entry.id === "item-sun-blade")
+      effectiveActions(DEFINITION, state.actors[0], CATALOG).find((entry) => entry.id === "item-sun-blade")?.damage[0]
+    ).toMatchObject({ type: "radiant" });
+    const bow = stateWith();
+    setInventoryItem(
+      bow,
+      IDS.hero,
+      row({ id: "energy-bow", name: "Energy Bow", equipped: true, attuned: true, category: "weapon" }),
+      resolve,
+      { catalog: CATALOG }
+    );
+    expect(
+      effectiveActions(DEFINITION, bow.actors[0], CATALOG).find((entry) => entry.id === "item-energy-bow")
     ).toBeUndefined();
   });
 

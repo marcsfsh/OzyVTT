@@ -15,6 +15,7 @@ import {
   EffectGrantSchema,
   GrantWhenSchema,
   HitDieSchema,
+  HitRiderSchema,
   ModifierSchema,
   PickBudgetScalingSchema,
   SaveFailureEffectSchema,
@@ -191,11 +192,31 @@ export const FeatureSaveSchema = z
     "A save a feature forces. `ability` is what the target rolls; `dc` is how the number is derived; the outcome fields are a stat block's."
   );
 
+/** A hit rider on a feature: the DC of its saves is derived like a feature save's ("8 plus your Dexterity modifier and
+ *  Proficiency Bonus"), and how many effects one hit carries may grow with level (Improved Cunning Strike's two). */
+export const FeatureHitRiderSchema = HitRiderSchema.omit({ saveDc: true })
+  .extend({
+    saveDc: FeatureSaveDcSchema.optional(),
+    effectsChooseByLevel: z
+      .array(z.object({ level: ContentLevelSchema, choose: z.number().int().min(1).max(3) }).strict())
+      .max(4)
+      .optional()
+      .describe("How many effects one hit may carry from a class level on; the highest matching level wins")
+  })
+  .strict();
+
 /** A rollable action a feature adds (Second Wind, Breath Weapon): `ActionSchema` with derived attack/save. */
-export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true })
+export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true, ridesHit: true })
   .extend({
     attack: FeatureAttackSchema.optional(),
     save: FeatureSaveSchema.optional(),
+    ridesHit: FeatureHitRiderSchema.optional(),
+    /** It spends none of its feature's uses, where another of the feature's actions does (ending Quivering Palm's
+     *  vibrations, which the 4 Focus Points paid for when they started). */
+    spendsNoUses: z
+      .literal(true)
+      .optional()
+      .describe("It spends none of its feature's uses, where another of the feature's actions does"),
     /** Damage that grows with level. It replaces `damage` at the highest matching level (Sneak Attack, Divine Smite). */
     damageByLevel: z
       .array(

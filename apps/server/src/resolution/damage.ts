@@ -9,6 +9,7 @@ import {
 } from "@vtt/rules-5e";
 import { endEffect } from "../effects.js";
 import { abilityModifier, endedEffect, recordRoll, type ResolveContext } from "./context.js";
+import { declaredBeforeRoll } from "./hit-riders.js";
 
 /** 2024 crit rule: double every dice term (modifiers once); `extraFirstTermDice` adds Savage Attacks dice. */
 export function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0): DiceExpression {
@@ -82,6 +83,8 @@ function damageInForce(ctx: ResolveContext): ResolveContext["action"]["damage"] 
  *  its own and assigns it: dart i strikes the i-th target listed, the list wrapping round when darts remain. */
 export function rollWeaponDamage(ctx: ResolveContext): void {
   const { action, deps, damage, input } = ctx;
+  // A strike declared before its roll (Brutal Strike) rolls its dice with the hit it rides, never with its tap.
+  if (declaredBeforeRoll(action)) return;
   const parts = damageInForce(ctx);
   if (parts.length > 0 && action.missDamage === "half" && missed(ctx.attack)) {
     halfOnAMiss(ctx, parts);
@@ -158,13 +161,16 @@ function markCarriers(ctx: ResolveContext): RiderCarrier[] {
  *  put on the creature it hit): typed `extra-damage` as its own `damage[]` entry (crit-doubled unless
  *  `doubleOnCritical` is false: a Critical Hit rolls the attack's other damage dice twice too) and moment-gated flat
  *  `damage-bonus` as a bonus line. A rider with no `when` fires on every damage roll of its action;
- *  `on-hit`/`on-critical-hit` narrow it. The moments collected here are `DAMAGE_ROLL_MOMENTS`. */
+ *  `on-hit`/`on-critical-hit`/`on-natural-20` narrow it. The moments collected here are `DAMAGE_ROLL_MOMENTS`. */
 export function rollRiderDamage(ctx: ResolveContext): void {
   const { attack, crit, derivation, riderFilters, deps, damage, bonusDamage, warnings } = ctx;
-  if (!rollsDamage(attack)) return;
+  if (!rollsDamage(attack) || declaredBeforeRoll(ctx.action)) return;
   const passes: Array<RiderMoment | null> = [null, "on-damage-roll"];
   if (attack === null || attack.outcome === "hit" || attack.outcome === "crit") passes.push("on-hit");
   if (crit) passes.push("on-critical-hit");
+  // "When you roll a 20": the die itself, so a wider crit range or an auto-crit on a Paralyzed target isn't one.
+  if (attack !== null && attack.naturalRoll === 20 && (attack.outcome === "hit" || attack.outcome === "crit"))
+    passes.push("on-natural-20");
   const marks = markCarriers(ctx);
   const already = new Set<unknown>();
   for (const moment of passes) {

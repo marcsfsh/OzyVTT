@@ -54,7 +54,8 @@ export const paladin: ClassMechanicsModule = {
             "As a Bonus Action, touch a creature (which could be yourself) and draw power from the pool of healing to restore a number of Hit Points to that creature, up to the maximum amount remaining in the pool.",
           damage: [],
           useCost: "chosen",
-          healing: { formula: "1", perUse: true }
+          healing: { formula: "1", perUse: true },
+          targets: { count: 1, rangeFeet: 5 }
         },
         {
           id: "lay-on-hands-cure-poison",
@@ -64,7 +65,8 @@ export const paladin: ClassMechanicsModule = {
             "As a Bonus Action, touch a creature and expend 5 Hit Points from the pool of healing to remove the Poisoned condition from it; those points don't also restore Hit Points to the creature.",
           damage: [],
           useCost: 5,
-          endsConditions: ["poisoned"]
+          endsConditions: ["poisoned"],
+          targets: { count: 1, rangeFeet: 5 }
         }
       ]
     },
@@ -106,9 +108,9 @@ export const paladin: ClassMechanicsModule = {
     },
 
     /**
-     * Spends the shared Channel Divinity pool against the Paladin's own spell save DC; the Frightened lasts 1
-     * minute or until the target takes damage. The Charisma-scaled target count and the one-thing-per-turn limit
-     * stay prose.
+     * Spends the shared Channel Divinity pool against the Paladin's own spell save DC, at up to the Charisma modifier's
+     * creatures (minimum one) the Paladin can see within 60 feet; the Frightened lasts 1 minute or until the target
+     * takes damage, and leaves it only one of moving, an action or a Bonus Action on its turns (`dazed`).
      */
     "abjure-foes": {
       uses: { scaling: { type: "class-resource", id: "channel-divinity" }, per: "long-rest", pool: "channel-divinity" },
@@ -126,8 +128,10 @@ export const paladin: ClassMechanicsModule = {
             successDamage: "none",
             failureConditions: ["frightened"],
             failureDuration: { type: "rounds", rounds: 10 },
-            endsOnDamage: true
-          }
+            endsOnDamage: true,
+            failureEffect: { name: "Abjured", tags: ["dazed"] }
+          },
+          targets: { countAbility: "cha", rangeFeet: 60, seen: true }
         }
       ]
     },

@@ -323,6 +323,16 @@ everything the sheet stores (AC, initiative, slots, senses). Riders name damage 
 conditions from the SRD's closed sets, and the homebrew publish gate (`homebrew-validate.ts`)
 refuses a rider gated on a moment its reader never collects.
 
+What rides a hit is data on its action (`ridesHit`): the hits it rides, once a turn or on its user's own
+turn, the dice it gives up, its cost, the save it opens and the effects picked with it (Sneak Attack's
+Cunning Strikes, Brutal Strike, Stunning Strike, a staff's charges). The attack's preview offers it and
+the confirm checks and spends it with the hit (`resolution/hit-options.ts`); it is never tapped alone.
+What a stat block's or a magic weapon's hit leaves by itself (`onHit`: conditions, tags and modifiers on
+one effect, a pull, a save at a printed DC, only on a rolled 20 or against some creature types) lands in
+`resolution/on-hit.ts`. Who an action that isn't a spell may target (`targets`: how many, how far,
+creature types, size, sight, grappled by its user, a condition, in its space, enemies or allies) is
+checked as a spell's targets are, in `resolution/action-targets.ts`.
+
 A magic item's charges are an `actionUses` pool keyed by the carried row (`itemPool` in
 `item-actions.ts`), so two copies count separately and the count moves with the row when the GM hands
 it over (`character.give-item`). A Long Rest gives back the item's printed dice (`charges.regain`), not

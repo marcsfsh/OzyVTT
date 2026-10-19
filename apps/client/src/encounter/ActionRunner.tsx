@@ -7,6 +7,7 @@ import { componentLabel } from "./action-summary";
 import { ConfirmRow } from "./ConfirmRow";
 import { damageAdjustments } from "./format";
 import { GmActionList } from "./GmActionList";
+import { isDeadOnSheet } from "./mortality";
 import {
   beginTargeting,
   clearBlockedPrompt,
@@ -24,7 +25,7 @@ import { registerContentCache } from "../content/invalidate";
 import { useRollPreference } from "../dice/roll-preference";
 import { useTableCalibration } from "../scene/tableGeometry";
 import { caughtByArea } from "../table/targetHints";
-import { foesFirst, targetRows } from "../table/targetRows";
+import { foesFirst, offeredTargets, targetRows } from "../table/targetRows";
 import "./action-runner.css";
 
 /** Per-definition action cache. Cleared on `homebrew:changed` (`content/invalidate.ts`), since a GM
@@ -172,7 +173,9 @@ export function ActionRunner({
       // Names the action, so the server lands what its damage drains (a Life Drain's lower Hit Point maximum).
       ...(result.actionId !== undefined && result.actionId.length <= 120 ? { sourceActionId: result.actionId } : {}),
       sourceName: `${actor.name}'s ${result.actionName}`,
-      critical: result.crit
+      critical: result.crit,
+      // The attacker chose to knock the target out with this melee hit.
+      ...(result.knockOut === "chosen" ? { nonlethal: true } : {})
     }).then((response) => {
       setBusy(false);
       if (!response.ok) {
@@ -254,19 +257,26 @@ export function ActionRunner({
         <ActionTargetPicker
           picking={picking}
           targets={foesFirst(
-            targetRows(
-              actor.id,
-              combatants
-                .filter((target) => target.id !== actor.id)
-                .map((target) => ({
-                  id: target.id,
-                  name: target.name,
-                  kind: target.kind,
-                  ...(target.armorClass !== undefined ? { armorClass: armorClassInPlay(target) } : {})
-                })),
-              state.combat.tokens,
-              calibration,
-              combatants
+            offeredTargets(
+              targetRows(
+                actor.id,
+                combatants
+                  .filter((target) => target.id !== actor.id)
+                  .map((target) => ({
+                    id: target.id,
+                    name: target.name,
+                    kind: target.kind,
+                    ...(target.armorClass !== undefined ? { armorClass: armorClassInPlay(target) } : {})
+                  })),
+                state.combat.tokens,
+                calibration,
+                combatants
+              ),
+              picking.action,
+              (id) => {
+                const target = combatants.find((candidate) => candidate.id === id);
+                return target !== undefined && isDeadOnSheet(target);
+              }
             ),
             actor.kind,
             picking.action.healing != null

@@ -466,12 +466,29 @@ export const ParkedAttackSchema = z
               .regex(/^[a-z]+$/)
               .max(40)
               .optional(),
-            slotLevel: z.number().int().min(1).max(9).optional()
+            slotLevel: z.number().int().min(1).max(9).optional(),
+            effects: z
+              .array(
+                z
+                  .string()
+                  .regex(/^[a-z0-9-]+$/)
+                  .max(80)
+              )
+              .max(3)
+              .optional()
           })
           .strict()
       )
       .max(6)
-      .default([])
+      .default([]),
+    /** The attack forwent its Advantage for this declared rider (Brutal Strike), so the replay offers its hit. */
+    forgoneAdvantageBy: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120)
+      .optional(),
+    /** The attacker chose to knock the target out (SRD Knocking Out a Creature), so the replay's damage does. */
+    knockOut: z.literal(true).optional()
   })
   .strict();
 export type ParkedAttack = z.infer<typeof ParkedAttackSchema>;
@@ -610,6 +627,8 @@ export const PendingDamageSchema = z
     critical: z.boolean().default(false),
     /** What the damage drains as it lands (Vampiric Touch's healing). */
     drain: DamageDrainSchema.optional(),
+    /** The attacker knocks the target out: a drop to 0 leaves it at 1 Hit Point and Unconscious (SRD). */
+    nonlethal: z.literal(true).optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();

@@ -29,6 +29,7 @@ import {
   type ClassLevelRow,
   type ClassReference,
   type FeatureRecord,
+  type FeatureSaveDc,
   type Modifier,
   type SpellReference
 } from "@vtt/content-srd-5.2.1";
@@ -236,14 +237,57 @@ function resolvedUseLimit(uses: NonNullable<FeatureRecord["uses"]>, context: Bui
   return rows.length > 0 ? rows[rows.length - 1].limit : 0;
 }
 
+type FeatureHitRider = NonNullable<FeatureRecord["actions"][number]["ridesHit"]>;
+
+/** A feature's DC in one of `FeatureSaveDcSchema`'s three forms, as the character's number. */
+function featureDc(feature: FeatureRecord, dc: FeatureSaveDc, context: BuildContext): number {
+  if (dc === "spellcasting") {
+    if (context.spellcastingAbility === null)
+      reject(`"${feature.name}" uses the spell save DC, but this class has no spellcasting.`);
+    return spellSaveDc(context.finalScores[context.spellcastingAbility!], context.proficiencyBonus);
+  }
+  if (typeof dc === "number") return dc;
+  return (
+    dc.base + abilityModifier(context.finalScores[dc.ability]) + (dc.proficiencyBonus ? context.proficiencyBonus : 0)
+  );
+}
+
+/** A feature's hit rider with its DC as the character's number and the effects one hit carries at this level. */
+function builtHitRider(
+  feature: FeatureRecord,
+  rider: FeatureHitRider,
+  context: BuildContext
+): NonNullable<ActorAction["ridesHit"]> {
+  const { saveDc, effectsChooseByLevel, ...rest } = rider;
+  const rows = (effectsChooseByLevel ?? []).filter((row) => row.level <= context.level);
+  const choose = rows.length > 0 ? Math.max(...rows.map((row) => row.choose)) : rest.effectsChoose;
+  return {
+    ...rest,
+    ...(saveDc !== undefined ? { saveDc: Math.max(1, Math.min(40, featureDc(feature, saveDc, context))) } : {}),
+    ...(choose !== undefined ? { effectsChoose: choose } : {})
+  };
+}
+
 /** A feature action as a definition action. The rider templates' to-hit and DC come from the character's numbers. */
 function interpretAction(
   feature: FeatureRecord,
   action: FeatureRecord["actions"][number],
   context: BuildContext
 ): ActorAction {
-  const { attack, save, damageByLevel, multiattackByLevel, healingByLevel, adds, grantScaling, ...carried } = action;
+  const {
+    attack,
+    save,
+    damageByLevel,
+    multiattackByLevel,
+    healingByLevel,
+    adds,
+    grantScaling,
+    ridesHit,
+    spendsNoUses,
+    ...carried
+  } = action;
   const assembled: Record<string, unknown> = { ...carried };
+  if (ridesHit) assembled.ridesHit = builtHitRider(feature, ridesHit, context);
   if (attack) {
     const ability = attack.ability === "spellcasting" ? context.spellcastingAbility : attack.ability;
     if (!ability)
@@ -255,18 +299,9 @@ function interpretAction(
     };
   }
   if (save) {
-    if (save.dc === "spellcasting" && context.spellcastingAbility === null)
-      reject(`"${feature.name}" uses the spell save DC, but this class has no spellcasting.`);
     // `FeatureSaveDcSchema` has three forms: "spellcasting", a number, and `{base, ability,
     // proficiencyBonus}` (Dragonborn Breath Weapon, 8 + CON + PB). All must resolve to a number.
-    const dc =
-      save.dc === "spellcasting"
-        ? spellSaveDc(context.finalScores[context.spellcastingAbility!], context.proficiencyBonus)
-        : typeof save.dc === "number"
-          ? save.dc
-          : save.dc.base +
-            abilityModifier(context.finalScores[save.dc.ability]) +
-            (save.dc.proficiencyBonus ? context.proficiencyBonus : 0);
+    const dc = featureDc(feature, save.dc, context);
     assembled.save = { ...save, dc, ...(save.dc === "spellcasting" ? { spellcasting: true } : {}) };
   }
   if (damageByLevel && damageByLevel.length > 0) {
@@ -308,8 +343,8 @@ function interpretAction(
       assembled.description = `${action.description} ${amount.name}: +${amount.amount}.`.slice(0, 12000);
     }
   }
-  // The feature's limited uses ride the action when the action declares none of its own.
-  if (feature.uses && assembled.uses === undefined) {
+  // The feature's limited uses ride the action when the action declares none of its own and spends them.
+  if (feature.uses && assembled.uses === undefined && spendsNoUses !== true) {
     const limit = resolvedUseLimit(feature.uses, context);
     if (limit >= 1) {
       assembled.uses = {

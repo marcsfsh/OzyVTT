@@ -123,6 +123,74 @@ export const barbarian: ClassMechanicsModule = {
     "feral-instinct": {
       modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }]
     },
+    /**
+     * Tapped before the roll, on a turn with Reckless Attack: the next Strength attack roll gives up its Advantage
+     * (refused with Disadvantage), and its hit offers the 1d10 of the weapon's type (2d10 from level 17) and one effect
+     * (two different ones from level 17). Improved Brutal Strike's two effects need its feature.
+     */
+    "brutal-strike": {
+      actions: [
+        {
+          id: "brutal-strike",
+          name: "Brutal Strike",
+          activation: "other",
+          description:
+            "With Reckless Attack, forgo the Advantage on your next Strength-based attack roll this turn (it mustn't have Disadvantage). If it hits, the target takes an extra 1d10 damage of the weapon's type, and you can cause one Brutal Strike effect. Forceful Blow: the target is pushed 15 feet straight away from you, and you can then move up to half your Speed straight toward it without provoking Opportunity Attacks. Hamstring Blow: the target's Speed is reduced by 15 feet until the start of your next turn.",
+          damage: [],
+          damageByLevel: [
+            { level: 9, formula: "1d10", type: "weapon" },
+            { level: 17, formula: "2d10", type: "weapon" }
+          ],
+          requiresEffectTag: "reckless-attack",
+          uses: { limit: 1, per: "turn", pool: "brutal-strike" },
+          grants: {
+            name: "Brutal Strike",
+            tags: ["forgoes-advantage"],
+            duration: { type: "until-source-next-turn" }
+          },
+          ridesHit: {
+            rides: "strength-attack",
+            declaredBeforeRoll: true,
+            ownTurn: true,
+            weaponType: true,
+            effectsChooseByLevel: [
+              { level: 9, choose: 1 },
+              { level: 17, choose: 2 }
+            ],
+            effects: [
+              { id: "forceful-blow", name: "Forceful Blow", push: { feet: 15 }, grantsHalfSpeedMove: true },
+              {
+                id: "hamstring-blow",
+                name: "Hamstring Blow",
+                applies: {
+                  name: "Hamstring Blow",
+                  modifiers: [{ type: "speed", amount: -15 }],
+                  duration: { type: "until-source-next-turn" },
+                  onePerTarget: true
+                }
+              },
+              {
+                id: "staggering-blow",
+                name: "Staggering Blow",
+                requiresFeature: "improved-brutal-strike",
+                applies: {
+                  name: "Staggering Blow",
+                  tags: ["no-opportunity-attacks", "until-own-save"],
+                  modifiers: [{ type: "roll-mode", roll: "save", mode: "disadvantage" }],
+                  duration: { type: "until-source-next-turn" }
+                }
+              },
+              {
+                id: "sundering-blow",
+                name: "Sundering Blow",
+                requiresFeature: "improved-brutal-strike",
+                applies: { name: "Sundering Blow", tags: ["sundered"], duration: { type: "until-source-next-turn" } }
+              }
+            ]
+          }
+        }
+      ]
+    },
     // Once per Long Rest; using it regains every expended Rage. The engine reads the feature by its id for the Rage
     // that lasts 10 minutes outright and ends early only on Unconscious.
     "persistent-rage": {

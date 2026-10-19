@@ -1943,7 +1943,11 @@
                       "formula": "1d10",
                       "type": "fire"
                     }
-                  ]
+                  ],
+                  "ridesHit": {
+                    "rides": "attack-roll",
+                    "dealsDamage": true
+                  }
                 }
               ],
               "uses": {
@@ -1969,7 +1973,16 @@
                       "formula": "1d6",
                       "type": "cold"
                     }
-                  ]
+                  ],
+                  "ridesHit": {
+                    "rides": "attack-roll",
+                    "dealsDamage": true,
+                    "applies": {
+                      "name": "Frost's Chill",
+                      "modifiers": [{ "type": "speed", "amount": -10 }],
+                      "duration": { "type": "until-source-next-turn" }
+                    }
+                  }
                 }
               ],
               "uses": {
@@ -1990,7 +2003,13 @@
                   "name": "Hill's Tumble",
                   "activation": "other",
                   "description": "When you hit a Large or smaller creature with an attack roll and deal damage to it, give that target the Prone condition.",
-                  "damage": []
+                  "damage": [],
+                  "ridesHit": {
+                    "rides": "attack-roll",
+                    "dealsDamage": true,
+                    "maxTargetSize": "large",
+                    "applies": { "name": "Hill's Tumble", "conditions": ["prone"] }
+                  }
                 }
               ],
               "uses": {

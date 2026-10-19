@@ -15,6 +15,7 @@ import {
   BurstSchema,
   ActionReactionSchema,
   ActionSchema,
+  ActionTargetsSchema,
   ActorDefinitionSchema,
   DamageDrainSchema,
   DamageFormulaSchema,
@@ -515,7 +516,11 @@ export const ItemSpellCastSchema = z
     consumesSpellSlot: z
       .boolean()
       .default(false)
-      .describe("Whether casting it also spends one of the bearer's own spell slots")
+      .describe("Whether casting it also spends one of the bearer's own spell slots"),
+    /** Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear: Beasts only). */
+    targets: ActionTargetsSchema.optional().describe(
+      "Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear affects Beasts only), checked on the server"
+    )
   })
   .strict()
   .describe(
@@ -781,6 +786,15 @@ export const EquipmentReferenceSchema = z
       .describe(
         "Armor of Vulnerability's curse: while the bearer is attuned, worn or not, Vulnerability to every `damageTypeChoice` type except the one it resists. Needs `cursed` and `damageTypeChoice`"
       ),
+    /** What a hit with this weapon does beside its damage (Giant Slayer's save against Prone, a Sword of Wounding's
+     *  stopped healing, a Sword of Sharpness's Exhaustion on a rolled 20). */
+    onHit: z
+      .array(OnHitRiderSchema)
+      .max(4)
+      .optional()
+      .describe(
+        "What a hit with this weapon does beside its damage: each rider rides every attack the item makes (both grips, its Light extra attack) and lands as the monster on-hit riders do, a save at its DC (Giant Slayer), a rolled 20 only (Sword of Sharpness), a creature type only, or the coat its own action put on (Dagger of Venom). Needs a `weapon` block or `appliesTo`"
+      ),
     /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
     grantsFeatIds: z
       .array(ContentIdSchema)
@@ -826,6 +840,13 @@ export const EquipmentReferenceSchema = z
         code: "custom",
         path: ["vulnerableToOtherChoices"],
         message: "Vulnerability to the other choices needs a cursed item whose resistance the GM chooses."
+      });
+    // A hit rider rides the item's own attacks, so the item has to make one.
+    if (item.onHit && !item.weapon && !item.appliesTo)
+      context.addIssue({
+        code: "custom",
+        path: ["onHit"],
+        message: "What a hit does needs a weapon to hit with: give the item weapon stats or a base weapon."
       });
     // Enforced on the item carrier only: the identical rider on a feat is valid.
     item.modifiers.forEach((modifier, index) => {

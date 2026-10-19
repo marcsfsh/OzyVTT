@@ -921,7 +921,122 @@
     "id": "brutal-strike",
     "name": "Brutal Strike",
     "level": 9,
-    "description": "If you use Reckless Attack, you can forgo any Advantage on one Strength-based attack roll of your choice on your turn. The chosen attack roll mustn't have Disadvantage. If the chosen attack roll hits, the target takes an extra 1d10 damage of the same type dealt by the weapon or Unarmed Strike, and you can cause one Brutal Strike effect of your choice. You have the following effect options. Forceful Blow. The target is pushed 15 feet straight away from you. You can then move up to half your Speed straight toward the target without provoking Opportunity Attacks. Hamstring Blow. The target's Speed is reduced by 15 feet until the start of your next turn. A target can be affected by only one Hamstring Blow at a time—the most recent one."
+    "description": "If you use Reckless Attack, you can forgo any Advantage on one Strength-based attack roll of your choice on your turn. The chosen attack roll mustn't have Disadvantage. If the chosen attack roll hits, the target takes an extra 1d10 damage of the same type dealt by the weapon or Unarmed Strike, and you can cause one Brutal Strike effect of your choice. You have the following effect options. Forceful Blow. The target is pushed 15 feet straight away from you. You can then move up to half your Speed straight toward the target without provoking Opportunity Attacks. Hamstring Blow. The target's Speed is reduced by 15 feet until the start of your next turn. A target can be affected by only one Hamstring Blow at a time—the most recent one.",
+    "actions": [
+     {
+      "id": "brutal-strike",
+      "name": "Brutal Strike",
+      "activation": "other",
+      "description": "With Reckless Attack, forgo the Advantage on your next Strength-based attack roll this turn (it mustn't have Disadvantage). If it hits, the target takes an extra 1d10 damage of the weapon's type, and you can cause one Brutal Strike effect. Forceful Blow: the target is pushed 15 feet straight away from you, and you can then move up to half your Speed straight toward it without provoking Opportunity Attacks. Hamstring Blow: the target's Speed is reduced by 15 feet until the start of your next turn.",
+      "damage": [],
+      "damageByLevel": [
+       {
+        "level": 9,
+        "formula": "1d10",
+        "type": "weapon"
+       },
+       {
+        "level": 17,
+        "formula": "2d10",
+        "type": "weapon"
+       }
+      ],
+      "requiresEffectTag": "reckless-attack",
+      "uses": {
+       "limit": 1,
+       "per": "turn",
+       "pool": "brutal-strike"
+      },
+      "grants": {
+       "name": "Brutal Strike",
+       "tags": [
+        "forgoes-advantage"
+       ],
+       "duration": {
+        "type": "until-source-next-turn"
+       }
+      },
+      "ridesHit": {
+       "rides": "strength-attack",
+       "declaredBeforeRoll": true,
+       "ownTurn": true,
+       "weaponType": true,
+       "effectsChooseByLevel": [
+        {
+         "level": 9,
+         "choose": 1
+        },
+        {
+         "level": 17,
+         "choose": 2
+        }
+       ],
+       "effects": [
+        {
+         "id": "forceful-blow",
+         "name": "Forceful Blow",
+         "push": {
+          "feet": 15
+         },
+         "grantsHalfSpeedMove": true
+        },
+        {
+         "id": "hamstring-blow",
+         "name": "Hamstring Blow",
+         "applies": {
+          "name": "Hamstring Blow",
+          "modifiers": [
+           {
+            "type": "speed",
+            "amount": -15
+           }
+          ],
+          "duration": {
+           "type": "until-source-next-turn"
+          },
+          "onePerTarget": true
+         }
+        },
+        {
+         "id": "staggering-blow",
+         "name": "Staggering Blow",
+         "requiresFeature": "improved-brutal-strike",
+         "applies": {
+          "name": "Staggering Blow",
+          "tags": [
+           "no-opportunity-attacks",
+           "until-own-save"
+          ],
+          "modifiers": [
+           {
+            "type": "roll-mode",
+            "roll": "save",
+            "mode": "disadvantage"
+           }
+          ],
+          "duration": {
+           "type": "until-source-next-turn"
+          }
+         }
+        },
+        {
+         "id": "sundering-blow",
+         "name": "Sundering Blow",
+         "requiresFeature": "improved-brutal-strike",
+         "applies": {
+          "name": "Sundering Blow",
+          "tags": [
+           "sundered"
+          ],
+          "duration": {
+           "type": "until-source-next-turn"
+          }
+         }
+        }
+       ]
+      }
+     }
+    ]
    },
    {
     "id": "relentless-rage",
@@ -1716,7 +1831,12 @@
       "name": "Bardic Inspiration",
       "activation": "bonus-action",
       "description": "As a Bonus Action, inspire another creature within 60 feet of yourself who can see or hear you. That creature gains one of your Bardic Inspiration dice, which it can roll and add to a failed D20 Test once within the next hour. A creature can have only one Bardic Inspiration die at a time. The die is a d6, becoming a d8 at level 5, a d10 at level 10 and a d12 at level 15.",
-      "damage": []
+      "damage": [],
+      "targets": {
+       "count": 1,
+       "rangeFeet": 60,
+       "who": "others"
+      }
      }
     ]
    },
@@ -2621,6 +2741,16 @@
       ],
       "adds": {
        "abilityModifier": "wis"
+      },
+      "damageTypes": [
+       "necrotic",
+       "radiant"
+      ],
+      "targets": {
+       "count": 1,
+       "rangeFeet": 30,
+       "seen": true,
+       "who": "others"
       }
      },
      {
@@ -2652,6 +2782,12 @@
       ],
       "adds": {
        "abilityModifier": "wis"
+      },
+      "targets": {
+       "count": 1,
+       "rangeFeet": 30,
+       "seen": true,
+       "who": "others"
       }
      },
      {
@@ -2673,7 +2809,13 @@
        },
        "endsOnDamage": true
       },
-      "damage": []
+      "damage": [],
+      "targets": {
+       "rangeFeet": 30,
+       "creatureTypes": [
+        "undead"
+       ]
+      }
      }
     ],
     "uses": {
@@ -5542,8 +5684,12 @@
       "id": "stunning-strike",
       "name": "Stunning Strike",
       "activation": "other",
-      "description": "Once per turn, when you hit a creature with a Monk weapon or an Unarmed Strike, expend 1 Focus Point: the target makes a Constitution saving throw or has the Stunned condition until the start of your next turn. On a success its Speed is halved until the start of your next turn and the next attack roll against it before then has Advantage.",
+      "description": "Once per turn, when you hit a creature with a Monk weapon or an Unarmed Strike, expend 1 Focus Point: the target makes a Constitution saving throw or has the Stunned condition until the start of your next turn. On a success its Speed is halved until the start of your next turn and the next attack roll against it before then has Advantage. Choose it on the hit's result.",
       "damage": [],
+      "ridesHit": {
+       "rides": "monk-weapon-or-unarmed",
+       "oncePerTurn": true
+      },
       "save": {
        "ability": "con",
        "dc": {
@@ -6541,6 +6687,10 @@
       "healing": {
        "formula": "1",
        "perUse": true
+      },
+      "targets": {
+       "count": 1,
+       "rangeFeet": 5
       }
      },
      {
@@ -6552,7 +6702,11 @@
       "useCost": 5,
       "endsConditions": [
        "poisoned"
-      ]
+      ],
+      "targets": {
+       "count": 1,
+       "rangeFeet": 5
+      }
      }
     ]
    },
@@ -6742,7 +6896,18 @@
         "type": "rounds",
         "rounds": 10
        },
-       "endsOnDamage": true
+       "endsOnDamage": true,
+       "failureEffect": {
+        "name": "Abjured",
+        "tags": [
+         "dazed"
+        ]
+       }
+      },
+      "targets": {
+       "countAbility": "cha",
+       "rangeFeet": 60,
+       "seen": true
       }
      }
     ]
@@ -8234,8 +8399,126 @@
       "id": "sneak-attack",
       "name": "Sneak Attack",
       "activation": "other",
-      "description": "Once per turn, deal this extra damage to one creature you hit with an attack roll, if you have Advantage on the roll (or an ally is within 5 feet of the target, that ally isn't Incapacitated, and you don't have Disadvantage) and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's. Add it when you confirm a qualifying hit.",
+      "description": "Once per turn, deal this extra damage to one creature you hit with an attack roll, if you have Advantage on the roll (or an ally is within 5 feet of the target, that ally isn't Incapacitated, and you don't have Disadvantage) and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's. Add it when you confirm a qualifying hit, with any Cunning Strike effects, each forgoing its die cost.",
       "damage": [],
+      "ridesHit": {
+       "rides": "finesse-or-ranged-weapon",
+       "sneakAttack": true,
+       "weaponType": true,
+       "saveDc": {
+        "base": 8,
+        "ability": "dex",
+        "proficiencyBonus": true
+       },
+       "effectsChooseByLevel": [
+        {
+         "level": 5,
+         "choose": 1
+        },
+        {
+         "level": 11,
+         "choose": 2
+        }
+       ],
+       "effects": [
+        {
+         "id": "poison",
+         "name": "Poison",
+         "forgoesDice": 1,
+         "requiresFeature": "cunning-strike",
+         "requiresItem": "poisoners-kit",
+         "save": {
+          "ability": "con",
+          "failureConditions": [
+           "poisoned"
+          ],
+          "failureDuration": {
+           "type": "rounds",
+           "rounds": 10
+          },
+          "repeatSave": true
+         }
+        },
+        {
+         "id": "trip",
+         "name": "Trip",
+         "forgoesDice": 1,
+         "requiresFeature": "cunning-strike",
+         "maxTargetSize": "large",
+         "save": {
+          "ability": "dex",
+          "failureConditions": [
+           "prone"
+          ]
+         }
+        },
+        {
+         "id": "withdraw",
+         "name": "Withdraw",
+         "forgoesDice": 1,
+         "requiresFeature": "cunning-strike",
+         "grantsHalfSpeedMove": true
+        },
+        {
+         "id": "stealth-attack",
+         "name": "Stealth Attack",
+         "forgoesDice": 1,
+         "requiresFeature": "supreme-sneak",
+         "keepsHidden": true
+        },
+        {
+         "id": "daze",
+         "name": "Daze",
+         "forgoesDice": 2,
+         "requiresFeature": "devious-strikes",
+         "save": {
+          "ability": "con",
+          "failureEffect": {
+           "name": "Dazed",
+           "tags": [
+            "dazed"
+           ],
+           "duration": {
+            "type": "until-bearer-turn-end"
+           }
+          }
+         }
+        },
+        {
+         "id": "knock-out",
+         "name": "Knock Out",
+         "forgoesDice": 6,
+         "requiresFeature": "devious-strikes",
+         "save": {
+          "ability": "con",
+          "failureConditions": [
+           "unconscious"
+          ],
+          "failureDuration": {
+           "type": "rounds",
+           "rounds": 10
+          },
+          "repeatSave": true,
+          "endsOnDamage": true
+         }
+        },
+        {
+         "id": "obscure",
+         "name": "Obscure",
+         "forgoesDice": 3,
+         "requiresFeature": "devious-strikes",
+         "save": {
+          "ability": "dex",
+          "failureConditions": [
+           "blinded"
+          ],
+          "failureDuration": {
+           "type": "until-bearer-turn-end"
+          }
+         }
+        }
+       ]
+      },
       "damageByLevel": [
        {
         "level": 1,
@@ -9971,7 +10254,39 @@
        "requires": {
         "offer": "feature:eldritch-invocations",
         "id": "pact-of-the-blade"
-       }
+       },
+       "actions": [
+        {
+         "id": "eldritch-smite",
+         "name": "Eldritch Smite",
+         "activation": "other",
+         "description": "Once per turn when you hit a creature with your pact weapon, expend a Pact Magic spell slot to deal an extra 1d8 Force damage to the target, plus another 1d8 per level of the spell slot, and you can give the target the Prone condition if it is Huge or smaller. Choose it on the hit's result.",
+         "damage": [
+          {
+           "formula": "1d8",
+           "type": "force"
+          }
+         ],
+         "ridesHit": {
+          "rides": "pact-weapon",
+          "oncePerTurn": true,
+          "pactSlotDie": "1d8",
+          "effects": [
+           {
+            "id": "prone",
+            "name": "Knock Prone",
+            "maxTargetSize": "huge",
+            "applies": {
+             "name": "Eldritch Smite",
+             "conditions": [
+              "prone"
+             ]
+            }
+           }
+          ]
+         }
+        }
+       ]
       },
       {
        "id": "eldritch-spear",
@@ -10063,7 +10378,37 @@
        "requires": {
         "offer": "feature:eldritch-invocations",
         "id": "pact-of-the-blade"
-       }
+       },
+       "actions": [
+        {
+         "id": "lifedrinker",
+         "name": "Lifedrinker",
+         "activation": "other",
+         "description": "Once per turn when you hit a creature with your pact weapon, deal an extra 1d6 Necrotic, Psychic or Radiant damage (your choice) to the creature, and you can expend one of your Hit Point Dice to regain Hit Points equal to its roll plus your Constitution modifier (minimum of 1). Choose it on the hit's result.",
+         "damage": [
+          {
+           "formula": "1d6",
+           "type": "necrotic"
+          }
+         ],
+         "ridesHit": {
+          "rides": "pact-weapon",
+          "oncePerTurn": true,
+          "damageTypes": [
+           "necrotic",
+           "psychic",
+           "radiant"
+          ],
+          "effects": [
+           {
+            "id": "hit-point-die",
+            "name": "Spend a Hit Point Die",
+            "spendsHitPointDie": true
+           }
+          ]
+         }
+        }
+       ]
       },
       {
        "id": "mask-of-many-faces",

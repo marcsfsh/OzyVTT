@@ -288,7 +288,9 @@ export function openResolve(
     opens: null,
     castId: null,
     hitRiders: [],
-    damageEffectIds: []
+    damageEffectIds: [],
+    forgoneAdvantageBy: input.forgoneAdvantageBy ?? null,
+    keepsHidden: false
   };
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
   if (!input.economyPaid)

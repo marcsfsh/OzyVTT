@@ -28,7 +28,7 @@ const hoursText = (hours: number) => `${hours} ${hours === 1 ? "hour" : "hours"}
 
 /** Takes `count` dice off a multiclass pool, biggest die first (the order the roll uses). The caller has
  *  already checked the pool holds enough. */
-function spendFromPool(entries: readonly HitDiceEntry[], count: number): HitDiceEntry[] {
+export function spendFromPool(entries: readonly HitDiceEntry[], count: number): HitDiceEntry[] {
   let left = count;
   return [...entries]
     .sort((a, b) => Number(b.die.slice(1)) - Number(a.die.slice(1)))

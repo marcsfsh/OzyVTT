@@ -447,7 +447,8 @@ const SAVE_LIFETIME_KEYS = [
   "ongoingDamage.**",
   "failureHazard",
   "failurePush.**",
-  "advantageAtSize"
+  "advantageAtSize",
+  "escapeAthletics"
 ] as const;
 
 /** The exemption table. First match wins, so specific rows sit above general ones. */
@@ -765,6 +766,41 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ACTION_CARRIERS,
     reason: "one SRD author (a lone record)",
     status: "permanent: lone SRD record"
+  },
+  {
+    at: "actions[].ridesHit.**",
+    types: "*",
+    reason:
+      "what an action adds to a hit (Sneak Attack's Cunning Strikes, Brutal Strike, a staff's charges): the hits it rides, its cost, its save and the effects picked with it - authored in the class and item overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].targets.**",
+    types: "*",
+    reason:
+      "who an action that isn't a spell may target (how many, how far, which creatures) - authored in the overlays or read from a stat block's save text as the catalog is built; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].spendsNoUses",
+    types: "*",
+    reason:
+      "an action that spends none of its feature's uses (Quivering Palm's ending, paid when the hit set it) - authored in the class overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^onHit[].**",
+    types: ["equipment"],
+    reason:
+      "what a magic weapon's hit does beside its damage (Giant Slayer's save, a Sword of Sharpness's rolled 20) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].targets.**",
+    types: ["equipment"],
+    reason:
+      "who an item's cast may affect beside the spell's own targets (a ring's Fear on Beasts only) - authored in the item overlay; no editor control yet",
+    status: "gap"
   },
 
   // ---- effect rider surface ----

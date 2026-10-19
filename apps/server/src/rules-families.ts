@@ -92,6 +92,9 @@ const RULE_FAMILIES = {
   "target.unseen": "targeting",
   // A target picked among those in a spell's area that the area doesn't cover.
   "target.outside-area": "targeting",
+  // A creature the action can't affect: the wrong creature type or size, unseen, not grappled or marked by the user,
+  // an ally where it names an enemy, or a creature gone from the plane.
+  "target.not-allowed": "targeting",
   // The hit an extra is added to can't carry it (no Advantage or ally for Sneak Attack, a ranged smite).
   "attack.hit-option-unqualified": "targeting",
   // Being Charmed by your target is a targeting restriction.
