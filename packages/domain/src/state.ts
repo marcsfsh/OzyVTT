@@ -975,7 +975,19 @@ export const VisionWallSchema = z
     door: DoorStateSchema.optional(),
     object: ObjectStatsSchema.optional(),
     openings: z.array(WallOpeningSchema).max(8).optional(),
-    source: VisionSourceSchema.optional()
+    source: VisionSourceSchema.optional(),
+    /** Bars that no creature passes and sight, attacks and spells go between (Forcecage's cage): a window that gives no
+     *  cover and stops no area. */
+    bars: z.literal(true).optional(),
+    /** A spell's wall that stays for good once what keeps it has lasted this long (Wall of Stone held for its full 10
+     *  minutes): through this round of the fight, or to this game-clock minute. */
+    permanentAfter: z
+      .object({
+        round: z.number().int().positive().optional(),
+        minute: z.number().int().min(0).max(1_000_000_000).optional()
+      })
+      .strict()
+      .optional()
   })
   .strict();
 export type VisionWall = z.infer<typeof VisionWallSchema>;

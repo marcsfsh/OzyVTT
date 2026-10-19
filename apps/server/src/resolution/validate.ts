@@ -139,7 +139,9 @@ function combatantsOf(
     (castsASpell && !rollsOnTargets) ||
     input.builtin === true ||
     // A light or a cloud is something done, with no creature under it (a magmin's flames, a darkmantle's aura).
-    action.sight !== undefined;
+    action.sight !== undefined ||
+    // A door or a wall is what it acts on (Knock, Passwall, Disintegrate aimed at a wall of force).
+    (spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined));
   // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
   const touchesSomeone = action.endsConditions !== undefined || action.healing?.perUse === true;
   if (targets.length === 0 && (touchesSomeone || (!structuredWithoutTargets && action.grants?.target !== "target")))
@@ -160,7 +162,8 @@ function combatantsOf(
     action.move === undefined &&
     action.leap === undefined &&
     action.teleport === undefined &&
-    input.builtin !== true
+    input.builtin !== true &&
+    !(spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined))
   )
     throw new CommandRejectedError("That action has no structured effect to resolve. Run it from its description.");
   return { attacker, targets };

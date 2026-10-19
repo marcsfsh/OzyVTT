@@ -1235,6 +1235,9 @@
    "damage": [],
    "healing": null
   },
+  "walls": {
+   "door": "arcane-lock"
+  },
   "classes": [
    "wizard"
   ],
@@ -6892,6 +6895,9 @@
    "healing": null,
    "seenTargets": true
   },
+  "walls": {
+   "disintegrates": true
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -8217,6 +8223,9 @@
    "attacks": 0,
    "damage": [],
    "healing": null
+  },
+  "walls": {
+   "door": "close"
   },
   "classes": [
    "druid",
@@ -10736,12 +10745,23 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
    "noCastSave": true,
    "healing": null
+  },
+  "walls": {
+   "raises": {
+    "kind": "bars",
+    "pushes": true,
+    "force": true
+   }
   },
   "classes": [
    "bard",
@@ -15152,6 +15172,9 @@
    "damage": [],
    "healing": null
   },
+  "walls": {
+   "door": "knock"
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -15882,7 +15905,19 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "control",
+     "activation": "action",
+     "when": "As a Magic action on your later turns, you control the hand again, opening or closing an unlocked door within 30 feet.",
+     "damage": [],
+     "laterTurnsOnly": true
+    }
+   ],
    "healing": null
+  },
+  "walls": {
+   "door": "open-or-close"
   },
   "classes": [
    "bard",
@@ -18048,6 +18083,12 @@
    "damage": [],
    "healing": null
   },
+  "walls": {
+   "cuts": {
+    "feet": 5,
+    "lasting": false
+   }
+  },
   "classes": [
    "wizard"
   ],
@@ -19143,7 +19184,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "line",
+   "sizeFeet": 90,
+   "widthFeet": 5
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -19155,6 +19200,9 @@
     "on": "area",
     "brightFeet": 100,
     "dimFeet": 100
+   },
+   "area": {
+    "kind": "heavily-obscured"
    }
   },
   "classes": [
@@ -23232,6 +23280,13 @@
    "damage": [],
    "healing": null
   },
+  "walls": {
+   "door": "seal",
+   "cuts": {
+    "feet": 5,
+    "lasting": true
+   }
+  },
   "classes": [
    "cleric",
    "druid",
@@ -24043,6 +24098,9 @@
    "attacks": 0,
    "damage": [],
    "healing": null
+  },
+  "walls": {
+   "door": "open-or-close"
   },
   "classes": [
    "cleric"
@@ -25199,6 +25257,11 @@
    ],
    "healing": null
   },
+  "sight": {
+   "area": {
+    "kind": "heavily-obscured"
+   }
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -25272,11 +25335,22 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "line",
+   "sizeFeet": 100,
+   "widthFeet": 5
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
    "healing": null
+  },
+  "walls": {
+   "raises": {
+    "kind": "window",
+    "pushes": true,
+    "force": true
+   }
   },
   "classes": [
    "wizard"
@@ -25340,6 +25414,24 @@
     }
    ],
    "healing": null
+  },
+  "walls": {
+   "raises": {
+    "kind": "window",
+    "panelFeet": 10,
+    "panel": {
+     "name": "Ice section",
+     "armorClass": 12,
+     "hitPoints": 30,
+     "immunities": [
+      "cold"
+     ],
+     "vulnerabilities": [
+      "fire"
+     ]
+    },
+    "pushes": true
+   }
   },
   "classes": [
    "wizard"
@@ -25406,11 +25498,29 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "line",
+   "sizeFeet": 100,
+   "widthFeet": 5
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
+  },
+  "walls": {
+   "raises": {
+    "kind": "wall",
+    "panelFeet": 10,
+    "panel": {
+     "name": "Stone panel",
+     "armorClass": 15,
+     "hitPoints": 180
+    },
+    "pushes": true,
+    "permanentAfterFull": true
+   }
   },
   "classes": [
    "druid",
@@ -25504,6 +25614,11 @@
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "area": {
+    "kind": "heavily-obscured"
+   }
   },
   "classes": [
    "druid"

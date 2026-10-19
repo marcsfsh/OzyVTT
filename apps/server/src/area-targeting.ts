@@ -106,7 +106,10 @@ function blockedFromOrigin(
 ): (cell: GridPoint) => boolean {
   const vision = state.combat.vision;
   if (!vision?.enabled || vision.walls.length === 0) return () => true;
-  const obstacles = vision.walls.filter((wall) => wall.kind !== "door" || wall.open !== true).flatMap(segmentsOf);
+  // Bars (Forcecage's cage) stop no line: attacks, spells and areas go between them.
+  const obstacles = vision.walls
+    .filter((wall) => (wall.kind !== "door" || wall.open !== true) && wall.bars !== true)
+    .flatMap(segmentsOf);
   const origin =
     shape === "square"
       ? { x: (geometry.origin.x + geometry.target.x) / 2, y: (geometry.origin.y + geometry.target.y) / 2 }

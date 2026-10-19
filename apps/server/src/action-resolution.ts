@@ -78,6 +78,7 @@ import {
 } from "./resolution/concentration.js";
 import { parkForCounterspell } from "./resolution/counter.js";
 import { placeCastSight } from "./resolution/cast-sight.js";
+import { applyCastWalls, checkWallTarget } from "./resolution/cast-walls.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
@@ -117,6 +118,7 @@ export function resolveDefinitionAction(
   // Checked against the spell as printed, Transmuted Spell's type and Extended Spell's durations land on what it does.
   ctx.action = shapedOutcome(ctx.action, printed, shaping, ctx.plan.castLevel);
   checkOverchannel(ctx);
+  checkWallTarget(ctx);
   ctx.builtin?.check?.(ctx);
   ctx.builtin?.apply?.(ctx);
   if (longCast && longCast.phase !== "finish") {
@@ -223,6 +225,7 @@ export function resolveDefinitionAction(
   applyTimeStop(ctx);
   applyGrant(ctx);
   placeCastSight(ctx);
+  applyCastWalls(ctx);
   refuseThePrayedFor(ctx);
   applyHealing(ctx);
   prayerShortRest(ctx);

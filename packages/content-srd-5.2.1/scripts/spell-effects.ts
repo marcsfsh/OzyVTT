@@ -344,6 +344,8 @@ const NO_CAST_SAVE: ReadonlySet<string> = new Set([
   "sleet-storm",
   "spirit-guardians",
   "stinking-cloud",
+  // Only a creature the wall would enclose saves, which is the GM's to see; the line itself asks no one.
+  "wall-of-stone",
   "web",
   "zone-of-truth"
 ]);
@@ -760,6 +762,16 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [],
       area: { shape: "cylinder", sizeFeet: 5, widthFeet: null },
       movesArea: { feet: 60 }
+    }
+  ],
+  // "As a Magic action on your later turns, you can control the hand thus again": it opens or closes an unlocked door.
+  "mage-hand": [
+    {
+      name: "control",
+      activation: "action",
+      when: "As a Magic action on your later turns, you control the hand again, opening or closing an unlocked door within 30 feet.",
+      damage: [],
+      laterTurnsOnly: true
     }
   ],
   // A creature of a chosen type "can't willingly enter the Cylinder by nonmagical means". Every type the spell names is
@@ -1538,14 +1550,22 @@ const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   // The hound and the 5 feet it bites in.
   "faithful-hound": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "flaming-sphere": { shape: "sphere", sizeFeet: 5, widthFeet: null },
+  // The cage, "up to 20 feet on a side".
+  forcecage: { shape: "cube", sizeFeet: 20, widthFeet: null },
   "guardian-of-faith": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  // "Up to 90 feet long, 30 feet high, and 1 inch thick"; the globe is the GM's to draw.
+  "prismatic-wall": { shape: "line", sizeFeet: 90, widthFeet: 5 },
   // "Spreading to a radius of 300 feet": the creatures under the cloud.
   "storm-of-vengeance": { shape: "cylinder", sizeFeet: 300, widthFeet: null },
   // "Up to 300 feet long, 300 feet high, and 50 feet thick."
   tsunami: { shape: "line", sizeFeet: 300, widthFeet: 50 },
   "wall-of-fire": { shape: "line", sizeFeet: 60, widthFeet: 5 },
+  // "A flat surface made up of ten 10-foot-by-10-foot panels" in a row; the dome and the globe are the GM's to draw.
+  "wall-of-force": { shape: "line", sizeFeet: 100, widthFeet: 5 },
   // Ten 10-foot panels in a row; the text's "radius of up to 10 feet" names the dome, which the GM draws.
   "wall-of-ice": { shape: "line", sizeFeet: 100, widthFeet: 5 },
+  // "Ten 10-foot-by-10-foot panels", in a row.
+  "wall-of-stone": { shape: "line", sizeFeet: 100, widthFeet: 5 },
   "wall-of-thorns": { shape: "line", sizeFeet: 60, widthFeet: 5 },
   // "Up to 50 feet long, 15 feet high, and 1 foot thick."
   "wind-wall": { shape: "line", sizeFeet: 50, widthFeet: 5 }

@@ -331,6 +331,15 @@ export const actionCommands = [
             ...(request.overchannel === true ? { overchannel: true } : {}),
             ...(request.shaping && request.shaping.length > 0 ? { shaping: request.shaping } : {}),
             ...(template ? { areaPlaced: true } : {}),
+            // The template as the map draws it, for the walls a cast raises on it (Wall of Force).
+            ...(placed && geometry?.calibration
+              ? {
+                  placedArea: (({ origin, target }) => ({ shape: placed.shape, origin, target }))(
+                    shapeGeometry(geometry.calibration, placed.shape, placed.origin, placed.target)
+                  )
+                }
+              : {}),
+            ...(request.wallId !== undefined ? { wallId: request.wallId } : {}),
             ...(request.ready === true ? { ready: true } : {}),
             ...(request.moveFirst === true ? { moveFirst: true } : {}),
             // The rest of an action whose move was taken first was paid for then.

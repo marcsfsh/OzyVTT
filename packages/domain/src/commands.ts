@@ -409,6 +409,8 @@ export const ActionResolveSchema = z
     /** GM only: the spell area a cast that ends spells is aimed at (Dispel Magic on a Moonbeam), from
      *  `combat.spellZones`. */
     zoneId: z.string().min(1).max(120).optional(),
+    /** The door or wall on the live map a cast is aimed at (Knock, Arcane Lock, Mage Hand opening a door). */
+    wallId: z.uuid().optional(),
     /** false previews the attack roll only (no damage/riders/economy). The server holds the previewed d20, so a second
      *  preview of the same attack shows the same die, and the confirm (`commit: true`) uses it. Non-attack actions
      *  ignore it. */

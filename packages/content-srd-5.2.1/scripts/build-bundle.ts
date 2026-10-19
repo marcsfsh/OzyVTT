@@ -45,6 +45,7 @@ import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
 import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } from "./spell-effects.js";
 import { costlyMaterialsFor } from "./spell-materials.js";
 import { spellSightFor } from "./spell-sight.js";
+import { spellWallsFor } from "./spell-walls.js";
 import { castingTimeText, SPELL_FIELD_CORRECTIONS } from "./spell-corrections.js";
 import { UPCAST_DURATION_IDS, upcastDurationsFor } from "./spell-durations.js";
 import { printedHitDamage, printedSaveDamage } from "./monster-damage.js";
@@ -1457,6 +1458,7 @@ const spellRecords = onlySrd(spells).map((spell) => {
     area: spellAreaFor(slugOf(spell.pk), fields.desc),
     effect,
     ...(spellSightFor(slugOf(spell.pk)) ? { sight: spellSightFor(slugOf(spell.pk)) } : {}),
+    ...(spellWallsFor(slugOf(spell.pk)) ? { walls: spellWallsFor(slugOf(spell.pk)) } : {}),
     classes: fields.classes.map(slugOf).sort(),
     description: fields.desc,
     higherLevel: fields.higher_level || null,

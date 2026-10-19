@@ -46,8 +46,12 @@ const SPELL_SIGHT: Readonly<Record<string, SightEffect>> = {
   // "A mote of brilliant radiance shines above you ... It sheds Bright Light in a 30-foot radius and Dim Light for an
   // additional 30 feet. This light is sunlight."
   sunbeam: { light: { on: "caster", brightFeet: 30, dimFeet: 30, sunlight: true } },
-  // "The wall sheds Bright Light within 100 feet and Dim Light for an additional 100 feet."
-  "prismatic-wall": { light: { on: "area", brightFeet: 100, dimFeet: 100 } },
+  // "The wall sheds Bright Light within 100 feet and Dim Light for an additional 100 feet", and it is opaque.
+  "prismatic-wall": { light: { on: "area", brightFeet: 100, dimFeet: 100 }, area: { kind: "heavily-obscured" } },
+  // "The wall is opaque."
+  "wall-of-fire": { area: { kind: "heavily-obscured" } },
+  // "The wall blocks line of sight."
+  "wall-of-thorns": { area: { kind: "heavily-obscured" } },
   // "Each creature in the area who can see the pattern makes a Wisdom saving throw."
   "hypnotic-pattern": { seenBy: "area" }
 };

@@ -95,7 +95,10 @@ export function mapCover(state: GameState, fromActorId: string, targetId: string
   const target = tokens.find((token) => token.actorId === targetId && token.position !== null);
   const source = tokens.find((token) => token.actorId === fromActorId && token.position !== null);
   if (!target || (!source && !origin)) return null;
-  const obstacles = vision.walls.filter((wall) => wall.kind !== "door" || wall.open !== true).flatMap(segmentsOf);
+  // Bars (Forcecage's cage) stop no line: attacks, spells and areas go between them.
+  const obstacles = vision.walls
+    .filter((wall) => (wall.kind !== "door" || wall.open !== true) && wall.bars !== true)
+    .flatMap(segmentsOf);
   const space = spaceOf(target);
   const targetCorners = cornersOf(space.at, space.half);
   const from = origin ? [origin] : cornersOf(spaceOf(source!).at, spaceOf(source!).half);
