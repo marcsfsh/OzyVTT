@@ -218,7 +218,16 @@ const LABELS: Readonly<Record<string, string>> = {
   autoSuccess: "creatures that succeed without rolling",
   sleepless: "creatures that don't sleep",
   successEffect: "what a success leaves",
-  chainFeet: "distance between targets"
+  chainFeet: "distance between targets",
+  areaPerSlot: "area growth for each higher slot",
+  movesArea: "how far it moves the spell's area",
+  terrain: "ground it changes",
+  bars: "creatures its edge holds back",
+  noTeleport: "no teleporting in",
+  holds: "what a creature in it holds",
+  revives: "Hit Points regained at 0",
+  drifts: "feet it drifts each turn",
+  untilCasterNextTurnEnd: "lasts until the end of the caster's next turn"
 };
 /** A key whose words depend on what holds it: a weapon's category is its weapon kind, as the editor labels it. */
 const NESTED_LABELS: Readonly<Record<string, string>> = { "weapon.category": "weapon kind" };

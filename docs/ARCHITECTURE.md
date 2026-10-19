@@ -287,7 +287,12 @@ of a hidden thing. When in doubt, leave it out.
   and a mirror test checks the two agree. The `actor:movement` reply tells the preview whether the
   mover shares spaces (Air Form, a swarm) and which swarms its viewer can see (`space-sharing.ts`),
   so it charges those spaces as the server does. Players and the table screen get only the terrain the
-  fog reveals, and with vision on only what the party has seen.
+  fog reveals, and with vision on only what the party has seen. A spell's area changes the ground while it
+  lasts (`zone-ground.ts`): Web, Entangle or Ice Storm's hail make its cells Difficult Terrain, Plant Growth
+  and Wall of Thorns cost 4 feet for every foot, Conjure Minor Elementals' only for the caster's enemies, and
+  a creature whose trait frees it from that kind of ground (Web Walker, Ice Walk) pays nothing extra. The
+  server alone charges it, on the ground (a mover off the ground passes over it as over painted terrain); the
+  area itself is on the map.
 - Height (`altitude.ts`, `@vtt/rules-5e` `altitude.ts`): a token's `altitudeFeet` is how far its lowest
   point is above the ground, and `airborne` says what holds it up in the air (flying, or a
   levitation); a creature on a ledge or a wall it climbs is up without being airborne. A space is as
@@ -371,7 +376,26 @@ Undead Fortitude, a Death Burst (`trait-turns.ts`, `statblock-traits.ts`). A sta
 wall of fire) opens a zone on the template the cast placed, or around its caster, which the server
 runs as tokens move, as the area moves and at each turn's end and start (`spell-zones.ts`); what
 such a spell lets its caster do on later turns is offered while it lasts, at the level it was cast
-(`lasting-spells.ts`).
+(`lasting-spells.ts`). A zone lasts while its caster's Concentration does, or the effect a spell with none
+leaves on its caster, so it opens outside a fight too (where it acts on the creatures the GM moves into
+it), counts down on the game clock, outlasts a fight and is carried into the next one on the same map.
+A zone may act only on the creature types it names (Forbiddance), tell the GM who came in (Alarm), end
+its spell the first time it acts and burst over its area (Glyph of Warding, drawn for the GM and its
+caster alone), or raise a barrier at its edge (`zone-barriers.ts`): a step across it closes the path
+for the creatures it holds back (Antilife Shell, Magic Circle), a melee attack without a Reach weapon
+can't reach through Antilife Shell, and no creature teleports into Forbiddance. What an area gives the
+creatures in it (Holy Aura's Advantage on saves, Pass without Trace's +10 to Stealth, Silence's Deafened)
+is an effect each one holds while it stands inside (`zone-auras.ts`): the pipeline settles who holds it
+after every command, as its own write when anything changed. A later action that moves a spell's area
+(Moonbeam's Magic action, Flaming Sphere's ram) takes a template like a cast: the area moves there if that
+is within the spell's reach of where it stood, its save falls on the creatures the area moves onto, and no
+new shape is drawn (`zone-moves.ts`). A cloud that drifts (Cloudkill) moves straight away from its caster as
+the caster's turn starts. A cast's template grows with its slot where the spell says so (Fog Cloud), an
+item's cast may place its own area (Cloak of Arachnida's doubled Web), and an Emanation that stays where
+its caster stood (Globe of Invulnerability) keeps lower spells cast from outside off the creatures in it.
+An item's action with a `zone` (spread Caltrops, a set Hunting Trap) rolls nothing as it is used: it opens
+a zone that carries the action's own save and damage (`SpellZone.rule`), which stays until the GM ends it
+or it goes off once.
 
 Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
 (`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long

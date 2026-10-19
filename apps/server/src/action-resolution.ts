@@ -64,7 +64,13 @@ import {
   parkHeldObjectSave,
   parkReaction
 } from "./resolution/pending.js";
-import { markCastTurn, markSpellUp, openSpellZone, startConcentration } from "./resolution/concentration.js";
+import {
+  markCastTurn,
+  markSpellUp,
+  openActionZone,
+  openSpellZone,
+  startConcentration
+} from "./resolution/concentration.js";
 import { parkForCounterspell } from "./resolution/counter.js";
 import { placeCastSight } from "./resolution/cast-sight.js";
 import { applyRageRules } from "./resolution/rage.js";
@@ -136,6 +142,14 @@ export function resolveDefinitionAction(
   if (readScroll(ctx)) {
     commitEconomy(ctx);
     useUpConsumable(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // Spread Caltrops or a set trap acts on whoever meets it later, so nothing is rolled now.
+  if (openActionZone(ctx)) {
+    commitEconomy(ctx);
+    useUpConsumable(ctx);
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
   // A spell that Slow's chance makes fail spends its slot and its action, and nothing else happens.

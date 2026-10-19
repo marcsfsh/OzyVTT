@@ -50,6 +50,7 @@ export type SaveOutcome = {
   repeatUnseenSource?: true;
   endsOutOfSight?: true;
   autoSuccess?: { creatureTypes?: string[]; sleepless?: true };
+  breaksConcentration?: true;
 };
 
 /** What a failed repeat leaves in place of the first failure ("Second Failure"). */
@@ -561,6 +562,10 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   "vitriolic-sphere": {
     ongoingDamage: { damage: [{ formula: "5d4", type: "acid" }], at: "bearer-turn-end" }
   },
+  // "On a failed save, a creature has the Prone condition, and its Concentration is broken"; the tremor deals no damage.
+  earthquake: { successDamage: "none", breaksConcentration: true },
+  // "Have the Prone condition and lose Concentration".
+  "sleet-storm": { breaksConcentration: true },
   // "Make a DC 15 Intelligence saving throw" yourself: "you take 6d6 Psychic damage and have the Incapacitated condition
   // until you finish a Long Rest" (`spell-effects.ts` makes it the caster's own save).
   "contact-other-plane": { failureDuration: { type: "until-rest", rest: "long" } },

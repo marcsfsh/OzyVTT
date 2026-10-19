@@ -537,6 +537,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].zone.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the area an action leaves on the map to act later (spread Caltrops, a set Hunting Trap) - authored in the catalog; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].drain.**",
     types: ACTION_CARRIERS,
     reason:
@@ -611,6 +618,20 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
       "how a failed save's conditions end, where it pushes and who has Advantage on it, read from the spell's description as the catalog is built",
     status: "gap"
   })),
+  {
+    at: "actions[].save.breaksConcentration",
+    types: ACTION_CARRIERS,
+    reason:
+      "a failed save that also breaks the creature's Concentration (Earthquake, Sleet Storm) - authored with the spell's save outcomes; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.breaksConcentration",
+    types: ["spell"],
+    reason:
+      "a failed save that also breaks the creature's Concentration (Earthquake, Sleet Storm), authored with the save outcomes as the catalog is built",
+    status: "gap"
+  },
   {
     at: "actions[].save.bySelf",
     types: ACTION_CARRIERS,
@@ -875,6 +896,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ["equipment"],
     reason:
       "who an item's cast may affect beside the spell's own targets (a ring's Fear on Beasts only) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].area.**",
+    types: ["equipment"],
+    reason:
+      "the area an item's cast covers in place of the spell's own (Cloak of Arachnida's doubled Web) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
 

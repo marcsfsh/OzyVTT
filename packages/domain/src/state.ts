@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
   ActionAreaSchema,
+  ActionSchema,
+  AreaTriggerSchema,
   ActorDefinitionSchema,
   DamageDrainSchema,
   ForcedPushSchema,
@@ -1100,6 +1102,9 @@ export const SpellZoneSchema = z
     casterId: z.uuid(),
     /** The Concentration cast it ends with; null for a spell that lasts `rounds` from `startedRound`, or until ended. */
     castId: z.string().min(1).max(120).nullable(),
+    /** The effect on its caster that keeps a spell with no Concentration (Glyph of Warding, Guardian of Faith): the
+     *  area lasts while that effect does, in a fight and on the game clock outside one. */
+    effectId: z.string().min(1).max(120).optional(),
     rounds: z.number().int().min(1).max(100).nullable().default(null),
     startedRound: z.number().int().positive(),
     /** The slot level it was cast at, which its damage rolls at. */
@@ -1109,6 +1114,14 @@ export const SpellZoneSchema = z
     annotationId: z.string().min(1).max(120).nullable(),
     /** The template the GM places it with: the spell's own area. Null for an Emanation, which is its caster's. */
     area: ActionAreaSchema.nullable().default(null),
+    /** Where its caster stood at the cast, for an Emanation that stays there (Globe of Invulnerability). */
+    anchor: z.object({ x: z.number(), y: z.number() }).strict().optional(),
+    /** What an item's or a creature's area acts with (spread Caltrops' save and damage), kept here since what left it
+     *  may be gone; a spell's area reads its spell instead. */
+    rule: z
+      .object({ trigger: AreaTriggerSchema, save: ActionSchema.shape.save, damage: ActionSchema.shape.damage })
+      .strict()
+      .optional(),
     /** Damage dealt so far, against a cap the spell prints (Guardian of Faith's 60). */
     damageDealt: z.number().int().nonnegative().max(100000).default(0),
     /** The damage type the caster chose at the cast (Conjure Elemental's element, Transmuted Spell's); absent, the

@@ -344,6 +344,8 @@ export function GmEncounterPanel({
           <h2 id="gm-encounter-title">Start a fight</h2>
         </div>
       </div>
+      {/* Spell areas outlast a fight and can be cast outside one (Glyph of Warding, Alarm), so they are listed here too. */}
+      <SpellAreas state={state} busy={busy} run={run} onFeedback={setMessage} />
       <ScenePrepPanel
         actors={state.actors}
         staged={stagedIds}

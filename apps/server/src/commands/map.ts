@@ -47,8 +47,10 @@ import {
   type MovementNarration
 } from "../movement-narration.js";
 import { releaseGrapplesOutOfRange, type EffectNarration } from "../effects.js";
-import { endZone } from "../spell-zone-state.js";
-import { placeZone, speedHalvingAt, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
+import { endZoneAndItsSpell, placeZone, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
+import { zoneContentOf } from "../spell-zone-state.js";
+import { policeBarrier, shellsForcedBy, teleportBarredAt } from "../zone-barriers.js";
+import { zoneMovementOptions } from "../zone-ground.js";
 import { movementCost } from "../terrain.js";
 import { moveEncounterToken, moveSceneToken } from "../token-placement.js";
 import { HIDDEN_SOURCE } from "../hidden-source.js";
@@ -184,10 +186,12 @@ export const mapCommands = [
           ...(wasAirborne ? { wasAirborne } : {}),
           byPlayer: !isGmGrade(principal),
           distance: (a, b) => mapDistance(geometry, a, b)?.value ?? null,
-          cost: (a, b, options) => {
-            const halvedAt = speedHalvingAt(state, actorId, kit.zoneDeps(state, geometry));
-            return movementCost(state, geometry, actorId, a, b, { ...options, ...(halvedAt ? { halvedAt } : {}) });
-          },
+          // Spell areas on the way: Spirit Guardians' halved Speed, and the ground they make difficult.
+          cost: (a, b, options) =>
+            movementCost(state, geometry, actorId, a, b, {
+              ...options,
+              ...zoneMovementOptions(state, actorId, kit.zoneDeps(state, geometry))
+            }),
           calibration: geometry.calibration,
           dragging: {
             // Its riders move with it too, and their space is no obstacle.
@@ -218,7 +222,10 @@ export const mapCommands = [
                   sight.areaOf([actorId]).some((area) => insidePolygon(point, area))
               }
             : {}),
-          difficultAt: (point) => pointInRects(point, state.combat.terrain.difficult),
+          // A jump lands on painted terrain or on the ground a spell's area makes difficult (Web, Entangle).
+          difficultAt: (point) =>
+            pointInRects(point, state.combat.terrain.difficult) ||
+            zoneMovementOptions(state, actorId, kit.zoneDeps(state, geometry)).difficultAt?.(point) === true,
           moverHiddenFromPlayers: moverHiddenAtStart,
           newPromptId: kit.context.newId,
           now: Date.now,
@@ -282,16 +289,26 @@ export const mapCommands = [
         // A spell area the move enters (or that its mover carries over others) acts on whoever it meets.
         const arrived = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
         if (from !== null && arrived !== null) {
+          const zoneDeps = kit.zoneDeps(state, geometry);
+          // SRD Forbiddance: "creatures can't teleport into the area".
+          const ward =
+            mode === "teleport" ? teleportBarredAt(state, arrived, moverToken?.sizeCells ?? 1, zoneDeps) : null;
+          if (ward) {
+            const note = policeBarrier(
+              state,
+              request.override ?? null,
+              "movement.teleport",
+              `${kit.actorName(actorId)} can't teleport into ${ward}.`
+            );
+            if (note) movementWarning = movementWarning ? `${movementWarning} ${note}` : note;
+          }
           const path =
             mode === "teleport"
               ? [from, arrived]
               : (movementCost(state, geometry, actorId, from, arrived)?.path ?? [from, arrived]);
           zoneEvents.push(
-            ...zonesAfterMove(
-              state,
-              { moverId: actorId, path, teleported: mode === "teleport" },
-              kit.zoneDeps(state, geometry)
-            )
+            ...zonesAfterMove(state, { moverId: actorId, path, teleported: mode === "teleport" }, zoneDeps),
+            ...(mode === "teleport" ? [] : shellsForcedBy(state, actorId, path, zoneDeps))
           );
         }
         // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.
@@ -515,7 +532,7 @@ export const mapCommands = [
     malformed: "The spell-area command is malformed.",
     gmOnly: "Only the GM places a spell's area.",
     async run({ principal, request, execute }, kit) {
-      const { mapAssetId, geometry } = await liveMap(kit, "Start an encounter before placing a spell's area.");
+      const { mapAssetId, geometry } = await liveMap(kit, "Make a scene live before placing a spell's area.");
       if (!geometry.calibration) throw new CommandRejectedError("Calibrate this map before placing a spell's area.");
       const { commandId, zoneId, template } = request;
       await execute((state) => {
@@ -524,6 +541,8 @@ export const mapCommands = [
         if (!zone) throw new CommandRejectedError("That spell's area has already ended.");
         // The spell's own area decides the shape and the size; the drag only places and points it.
         const placed = zone.area ? templateOfArea(geometry.calibration!, template, zone.area) : template;
+        // A nearly imperceptible glyph is drawn for the GM and its caster's player alone.
+        const unseen = zoneContentOf(zone, kit.equipmentCatalog())?.trigger.hidden === true;
         addAnnotation(
           state,
           {
@@ -532,7 +551,8 @@ export const mapCommands = [
             shape: placed.shape,
             origin: placed.origin,
             target: placed.target,
-            visibility: "public",
+            visibility: unseen ? "gm-actor" : "public",
+            ...(unseen ? { visibleToActorId: zone.casterId } : {}),
             reachesPastMap: zone.area !== null,
             actor: annotationActorOf(principal),
             now: Date.now()
@@ -548,20 +568,22 @@ export const mapCommands = [
     type: "spell-zone.end",
     operationId: "endSpellZone",
     description:
-      "Ends a spell's lingering area and removes it from the map (GM-grade only): webs burned away, a guardian dismissed, or a ruling. The caster's Concentration on the spell is untouched; ending that ends the area too.",
+      "Ends a spell's lingering area and removes it from the map (GM-grade only): webs burned away, a guardian dismissed, or a ruling. The caster's Concentration on the spell is untouched; ending that ends the area too. A spell with no Concentration that is only its area (Glyph of Warding, Guardian of Faith) ends with it.",
     summary: "End a spell's lingering area (GM).",
     schema: SpellZoneEndSchema,
     malformed: "The spell-area command is malformed.",
     gmOnly: "Only the GM ends a spell's area.",
     async run({ request, execute }, kit) {
       let name = "";
+      let ended: EffectNarration[] = [];
       const { duplicate } = await execute((state) => {
         const zone = state.combat.spellZones.find((candidate) => candidate.id === request.zoneId);
         if (!zone) throw new CommandRejectedError("That spell's area has already ended.");
         name = zone.name;
-        endZone(state, zone.id);
+        ended = endZoneAndItsSpell(state, zone.id);
       });
       if (!duplicate && name) kit.context.appendLog({ kind: "encounter", text: `${name} ends.`, gmOnly: true });
+      if (!duplicate) kit.publishNarrations(ended);
     }
   }),
 

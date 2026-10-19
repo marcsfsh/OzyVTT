@@ -30,7 +30,7 @@ import {
 import { leaveShortRest } from "./short-rest-interruptions.js";
 import { releaseSwallowedBy } from "./swallow.js";
 import { endOfTurn, startOfTurn } from "./turn-boundaries.js";
-import { zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
+import { zoneHeld, zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
 import { lapseLongCasts } from "./resolution/long-casting.js";
@@ -281,6 +281,7 @@ export function startEncounter(
     return { actorId: actor.id, score: roll.total, tieBreaker, ...flags };
   });
   const sorted = ordered(state, initiative);
+  const lasting = lastingOnMap(state, input.mapAssetId);
   // Spread, never a fresh literal, so fields added to CombatState are not dropped. Fog rides the spread:
   // it is prepped before the fight and persists after it.
   state.combat = {
@@ -297,8 +298,8 @@ export function startEncounter(
       }),
       tokenGeometry
     ).map((token) => ({ ...token, position: placedPositions.get(token.actorId) ?? token.position })),
-    annotations: [],
-    spellZones: [],
+    annotations: lasting.annotations,
+    spellZones: lasting.zones,
     turn: { ...EMPTY_TURN },
     rulesMode: input.rulesMode ?? state.combat.rulesMode,
     ruleExceptions: input.ruleExceptions ?? state.combat.ruleExceptions,
@@ -418,6 +419,28 @@ export function addCombatant(
   leaveShortRest(state, new Set([actorId]), "rolled Initiative");
 }
 
+/**
+ * What a fight starting on this map keeps of the scene: the spell areas still held (a Glyph of Warding, a Fog Cloud cast
+ * before it) and the shapes they and the spells' lights and fog stand on. Every other drawing is cleared, and a fight on
+ * another map keeps nothing.
+ */
+function lastingOnMap(
+  state: GameState,
+  mapAssetId: string
+): Readonly<{ zones: GameState["combat"]["spellZones"]; annotations: GameState["combat"]["annotations"] }> {
+  if (state.combat.mapAssetId !== mapAssetId) return { zones: [], annotations: [] };
+  const zones = state.combat.spellZones
+    .filter((zone) => !zone.bursting && zoneHeld(state, zone))
+    .map((zone) => ({ ...zone, entered: [], affected: [] }));
+  const vision = state.combat.vision;
+  const kept = new Set<string>([
+    ...zones.flatMap((zone) => (zone.annotationId === null ? [] : [zone.annotationId])),
+    ...vision.lights.flatMap((light) => (light.annotationId === undefined ? [] : [light.annotationId])),
+    ...vision.areas.flatMap((area) => (area.shape.type === "template" ? [area.shape.annotationId] : []))
+  ]);
+  return { zones, annotations: state.combat.annotations.filter((annotation) => kept.has(annotation.id)) };
+}
+
 export function endEncounter(state: GameState) {
   if (!state.combat.active) throw new CommandRejectedError("There is no active encounter to end.");
   // Ending mid-review would strand the timeline pointing at a fight that no longer exists.
@@ -433,8 +456,11 @@ export function endEncounter(state: GameState) {
     turnActorId: null,
     turn: { ...EMPTY_TURN },
     underwater: false,
-    // The fight's spell areas end with it; Concentration on them is the caster's to keep or drop.
-    spellZones: [],
+    // A spell area outlasts the fight while what keeps it does (the caster's Concentration, or the effect of a longer
+    // spell, which `endEncounterEffects` has already ended if a minute or less of it was left).
+    spellZones: state.combat.spellZones
+      .filter((zone) => !zone.bursting && zoneHeld(state, zone))
+      .map((zone) => ({ ...zone, entered: [], affected: [] })),
     reactionsUsed: [],
     legendaryUsed: {},
     pendingSaves: [],

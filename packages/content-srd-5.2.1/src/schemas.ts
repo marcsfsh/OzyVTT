@@ -10,6 +10,8 @@ import { z } from "zod";
 import {
   AbilitySchema,
   ActionAreaSchema,
+  AreaTriggerSchema,
+  type AreaTrigger,
   ActionGrantSchema,
   AmmunitionKindSchema,
   BurstSchema,
@@ -77,37 +79,9 @@ const SpellDamageSchema = z
   )
   .max(4);
 
-/**
- * Where and when what a spell leaves behind acts on a creature, so the server raises the save or deals the damage:
- * a creature entering it (or the area moving onto the creature), starting or ending its turn there, or travelling in
- * it (Spike Growth's damage for every 5 feet); the start of each of its caster's turns, on the one creature in it
- * nearest its point (Faithful Hound's bite); or the spell's end, on every creature in it (Delayed Blast Fireball's
- * bead). The area is the one the cast places on the map, or within `feet` of the caster (an Emanation) or of the point
- * the spell is placed at (Flaming Sphere, a guardian). `oncePerTurn`: "A creature makes this save only once per turn"
- * (entering counts once a turn anyway); `affects` "enemies" spares the caster's allies (Guardian of Faith; spirits that
- * harm the creatures the caster chooses); `damageCap` ends it once it has dealt that much (Guardian of Faith's 60).
- */
-export const SpellZoneSchema = z
-  .object({
-    on: z
-      .array(z.enum(["enter", "start-turn", "end-turn", "travel", "caster-turn-start", "spell-end"]))
-      .min(1)
-      .max(3),
-    oncePerTurn: z.literal(true).optional(),
-    around: z.enum(["caster", "point"]).optional(),
-    feet: z.number().int().min(5).max(120).optional(),
-    affects: z.literal("enemies").optional(),
-    damageCap: z.number().int().min(1).max(1000).optional(),
-    /** The creatures it affects move at half Speed inside it (Spirit Guardians). */
-    halvesSpeed: z.literal(true).optional(),
-    /** It acts on no one while a creature it restrained is still held (Conjure Elemental: "if the spirit has no creature
-     *  Restrained"). */
-    holdsOne: z.literal(true).optional(),
-    /** Its damage grows by one die each time its caster's turn ends while it lasts (Delayed Blast Fireball). */
-    grows: z.literal(true).optional()
-  })
-  .strict();
-export type SpellZone = z.infer<typeof SpellZoneSchema>;
+/** Where and when the area a spell leaves acts (`AreaTriggerSchema`, shared with the actions of items and creatures). */
+export const SpellZoneSchema = AreaTriggerSchema;
+export type SpellZone = AreaTrigger;
 
 /** Something a spell lets its caster do after the cast, as an action of its own: Produce Flame's hurl, Spiritual
  *  Weapon's later attacks, or the save a creature makes when it enters Spirit Guardians (`activation` "other": no
@@ -137,7 +111,13 @@ export const SpellLaterActionSchema = z
     /** What its damage drains as it lands (Vampiric Touch's later touches). */
     drain: DamageDrainSchema.optional(),
     /** The area the spell leaves, whose trigger the server watches (an "other" action only). */
-    zone: SpellZoneSchema.optional()
+    zone: SpellZoneSchema.optional(),
+    /** It moves the area the spell left up to this many feet, to where its template is placed (Moonbeam's Magic
+     *  action: 60 feet; Flaming Sphere's ram: 30). Its save, if any, falls on the creatures the area moves onto. */
+    movesArea: z
+      .object({ feet: z.number().int().min(5).max(300) })
+      .strict()
+      .optional()
   })
   .strict();
 export type SpellLaterAction = z.infer<typeof SpellLaterActionSchema>;
@@ -245,7 +225,9 @@ export const SpellEffectSchema = z
     rangeDoubles: z.literal(true).optional(),
     /** No sound can be made in the area its cast places (Silence), so a creature standing there can't cast a spell
      *  with a Verbal component while the spell lasts. */
-    silencesArea: z.literal(true).optional()
+    silencesArea: z.literal(true).optional(),
+    /** Feet its area's size grows for each slot level above the spell's (Fog Cloud's radius: 20; Confusion's: 5). */
+    areaPerSlot: z.number().int().min(5).max(100).optional()
   })
   .strict();
 export type SpellEffect = z.infer<typeof SpellEffectSchema>;
@@ -530,6 +512,11 @@ export const ItemSpellCastSchema = z
     /** Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear: Beasts only). */
     targets: ActionTargetsSchema.optional().describe(
       "Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear affects Beasts only), checked on the server"
+    ),
+    /** The area the item's cast covers in place of the spell's own (Wand of Fear's 60-foot Cone, Cloak of Arachnida's
+     *  Web filling twice its area). */
+    area: ActionAreaSchema.optional().describe(
+      "The area the item's cast covers in place of the spell's own (a wand's 60-foot Cone of Fear), placed as the template"
     )
   })
   .strict()
