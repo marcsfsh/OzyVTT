@@ -36,6 +36,7 @@ import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
 import { applyMovementGrants } from "./resolution/movement-grants.js";
+import { applyTimeStop } from "./time-stop.js";
 import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
@@ -152,6 +153,7 @@ export function resolveDefinitionAction(
   markCastTurn(ctx);
   openSpellZone(ctx);
   applyMovementGrants(ctx);
+  applyTimeStop(ctx);
   applyGrant(ctx);
   applyHealing(ctx);
   applyConditionCures(ctx);

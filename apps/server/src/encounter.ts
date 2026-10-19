@@ -9,6 +9,7 @@ import type {
 import { dropStaleGrants } from "./granted-moves.js";
 import { proneInSharedSpace } from "./occupied-space.js";
 import { blinkAway } from "./off-plane.js";
+import { timeStopGoesOn } from "./time-stop.js";
 import { familyModeFor } from "./rules-families.js";
 import { abilityCheckClaims } from "./ability-checks.js";
 import { wardedConditions } from "./paladin-auras.js";
@@ -661,7 +662,9 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   while (steps < length && isDefeated(state, state.combat.initiative[(currentIndex + steps) % length].actorId))
     steps += 1;
   if (steps === length) steps = 1;
-  const wraps = currentIndex + steps >= length;
+  // Time Stop: the caster takes its turns in a row while no time passes for anyone else.
+  const stopped = timeStopGoesOn(state);
+  const wraps = !stopped && currentIndex + steps >= length;
   // The outgoing turn ends first: its "until the end of the turn" effects lapse and repeated saves open.
   const ending: EffectNarration[] = [];
   const outgoingId = state.combat.turnActorId;
@@ -683,9 +686,11 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   events?.push(...ending);
   // A new round sorts the whole order again, which settles any mid-round score change.
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
-  const nextActorId = wraps
-    ? (order.find((entry) => !isDefeated(state, entry.actorId)) ?? order[0]).actorId
-    : order[currentIndex + steps].actorId;
+  const nextActorId = stopped
+    ? outgoingId!
+    : wraps
+      ? (order.find((entry) => !isDefeated(state, entry.actorId)) ?? order[0]).actorId
+      : order[currentIndex + steps].actorId;
   state.combat = {
     ...state.combat,
     initiative: order,
@@ -693,7 +698,7 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     turnActorId: nextActorId,
     // A new turn: fresh action/bonus/reaction for the incoming actor, and its legendary pool refills (SRD). The turn
     // that just ended opens the window for legendary actions, until the incoming creature does something.
-    turn: { ...EMPTY_TURN, ...(outgoingId ? { afterActorId: outgoingId } : {}) },
+    turn: { ...EMPTY_TURN, ...(outgoingId && !stopped ? { afterActorId: outgoingId } : {}) },
     reactionsUsed: state.combat.reactionsUsed.filter((actorId) => actorId !== nextActorId),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, nextActorId)
   };

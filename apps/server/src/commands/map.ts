@@ -32,6 +32,7 @@ import { airborneAfter, altitudeOf, setAltitude } from "../altitude.js";
 import { startFall } from "../falling.js";
 import { failedTeleport } from "../granted-moves.js";
 import { landJump } from "../jumping.js";
+import { timeStopOutOfRange } from "../time-stop.js";
 import { applyMovementRules, dragAlong, dragCostsExtra, grappledBy } from "../movement-rules.js";
 import {
   creatureDistance,
@@ -227,6 +228,8 @@ export const mapCommands = [
             );
         }
         granted = outcome.granted;
+        // Time Stop ends once its caster goes more than 1,000 feet from where it cast it.
+        landing.push(...timeStopOutOfRange(state, actorId, (a, b) => mapDistance(geometry, a, b)?.value ?? null));
         // A teleport into a filled space fails: back where it was, hurt (Dimension Door).
         if (outcome.teleportFails && from !== null) {
           moveEncounterToken(state, actorId, from, geometry);

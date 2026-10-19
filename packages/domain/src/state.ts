@@ -1016,6 +1016,17 @@ export const CombatStateSchema = z
     activeSceneId: z.uuid().nullable().default(null),
     /** Falls waiting on the reactions they opened, on the live table only. GM-only (see PendingFallSchema). */
     pendingFalls: z.array(PendingFallSchema).max(20).default([]),
+    /** Time Stop (SRD 5.2.1): the caster takes `turnsLeft` more turns in a row, until it affects another creature or
+     *  moves more than 1,000 feet from `at`, where it cast the spell. Live table only; GM-only. */
+    timeStop: z
+      .object({
+        actorId: z.uuid(),
+        turnsLeft: z.number().int().min(0).max(5),
+        at: EncounterTokenPositionSchema.nullable()
+      })
+      .strict()
+      .nullable()
+      .default(null),
     /** Creatures gone from the fight's plane (Banishment, Blink's Ethereal turns), with the space each left and its
      *  height there, so it comes back to that space or the nearest unoccupied one (`off-plane.ts`). Live table only;
      *  GM-only, since a creature the party never saw leave would be placed by it. */

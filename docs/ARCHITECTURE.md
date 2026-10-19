@@ -313,6 +313,9 @@ of a hidden thing. When in doubt, leave it out.
   place in the initiative and the space it left in `combat.offPlane` (GM-only); it can't target or be
   targeted across the plane, and when the effect ends it returns to that space or the nearest
   unoccupied one. Blink's d6 is rolled by the server as the caster's turn ends.
+- Time Stop (`time-stop.ts`): the cast rolls 1d4 + 1 and `combat.timeStop` hands the caster that many
+  turns in a row; a resolve of its that reaches another creature, or a move more than 1,000 feet from
+  where it cast the spell, ends it.
 - Squeezing and passing walls: a footprint that fits a gap only as a creature one size smaller squeezes
   through it as through Difficult Terrain (`footprintStepPassage`), and Incorporeal Movement passes walls
   and creatures the same way.
