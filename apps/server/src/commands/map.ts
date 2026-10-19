@@ -48,6 +48,8 @@ import {
 } from "../movement-narration.js";
 import { releaseGrapplesOutOfRange, type EffectNarration } from "../effects.js";
 import { endZoneAndItsSpell, placeZone, zonesAfterAreaMove, zonesAfterMove } from "../spell-zones.js";
+import { fireFormBurns } from "../wall-passage.js";
+import { teleportOutOfCage } from "../forcecage.js";
 import { zoneContentOf } from "../spell-zone-state.js";
 import { policeBarrier, shellsForcedBy, teleportBarredAt } from "../zone-barriers.js";
 import { zoneMovementOptions } from "../zone-ground.js";
@@ -283,6 +285,20 @@ export const mapCommands = [
               landing
             );
         }
+        // A teleport out of a Forcecage takes a Charisma save first; a failure keeps the creature in and wastes it.
+        const landed = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
+        if (mode === "teleport" && from !== null && landed !== null && !outcome.teleportFails) {
+          const caged = teleportOutOfCage(state, actorId, from, landed, {
+            resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+            catalog: kit.equipmentCatalog(),
+            rollDie: (sides) => kit.context.random(sides)
+          });
+          if (caged) landing.push(...caged.events);
+          if (caged?.held) {
+            moveEncounterToken(state, actorId, from, geometry);
+            setAltitude(state, actorId, fromAltitude, wasAirborne);
+          }
+        }
         movementWarning = outcome.warning;
         movementOverridden = outcome.overridden;
         opportunityPrompts.push(...outcome.prompts);
@@ -310,6 +326,20 @@ export const mapCommands = [
             ...zonesAfterMove(state, { moverId: actorId, path, teleported: mode === "teleport" }, zoneDeps),
             ...(mode === "teleport" ? [] : shellsForcedBy(state, actorId, path, zoneDeps))
           );
+          // Fire Form burns each creature whose space the elemental's own way entered, once a turn.
+          const mover = state.actors.find((actor) => actor.id === actorId);
+          if (mover && outcome.path && mode !== "teleport" && mode !== "forced" && geometry.calibration)
+            zoneEvents.push(
+              ...fireFormBurns(state, mover, outcome.path, {
+                resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+                catalog: kit.equipmentCatalog(),
+                newId: kit.context.newId,
+                now: () => new Date().toISOString(),
+                commandId,
+                rollDie: (sides) => kit.context.random(sides),
+                squarePx: geometry.calibration.cellSizePx
+              })
+            );
         }
         // Narrate from the post-mutation state so logged distances are the snapped, authoritative ones.
         // A creature hidden from the table after the move is left out of the table's line. Setting the scene before

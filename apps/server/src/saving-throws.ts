@@ -470,6 +470,8 @@ export function applyFailureEffect(
     ...(onFail.conditionImmunities ? { conditionImmunities: [...onFail.conditionImmunities] } : {}),
     // The light it sheds while it lasts (Faerie Fire's Dim Light).
     ...(onFail.light ? { light: { ...onFail.light } } : {}),
+    // What holds it (a Net), whose destruction frees it.
+    ...(onFail.heldBy ? { heldBy: { ...onFail.heldBy, hitPoints: { ...onFail.heldBy.hitPoints } } } : {}),
     // What it does while it lasts (Bane's -1d4).
     modifiers: [...onFail.modifiers],
     // A size it changes (Enlarge/Reduce), from the size the creature had before.

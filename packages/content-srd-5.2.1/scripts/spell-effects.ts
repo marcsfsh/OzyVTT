@@ -346,6 +346,8 @@ const NO_CAST_SAVE: ReadonlySet<string> = new Set([
   "sleet-storm",
   "spirit-guardians",
   "stinking-cloud",
+  // Only a creature the wall would enclose saves, which is the GM's to see; the line itself asks no one.
+  "wall-of-stone",
   "web",
   "zone-of-truth"
 ]);
@@ -500,10 +502,10 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
     {
       name: "save",
       activation: "other",
-      when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN} Its space is Difficult Terrain.`,
+      when: `A creature that enters the wall's space or ends its turn there makes the save. ${ONCE_PER_TURN} Its space is Difficult Terrain, and the wall gives Three-Quarters Cover.`,
       save: save("dex"),
       damage: [{ formula: "6d10", type: "force" }],
-      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT }
+      zone: { ...ENTER_OR_END_ONCE, terrain: DIFFICULT, cover: "three-quarters" }
     }
   ],
   // "Until the spell ends, you can take a Magic action to call down lightning in that way again."
@@ -703,6 +705,16 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       wardsSpells: 5
     })
   ],
+  // "A 10-foot Emanation springs into existence around you and remains stationary": the creatures inside it at the cast
+  // move through it freely, "all other creatures and objects are barred from passing through it", and "spells of level
+  // 3 or lower can't be cast through it". Its light and its one-way sight are the GM's.
+  "tiny-hut": [
+    lasting(
+      "hut",
+      "Only the creatures inside the dome when it was made can pass through it, and spells of level 3 or lower cast from outside can't reach inside.",
+      { on: [], around: "caster", feet: 10, stays: true, wardsSpells: 3, bars: { way: "both", insiders: true } }
+    )
+  ],
   // Explosive Rune: a creature that sets the glyph off (stepping on it) makes it erupt in a "20-foot-radius Sphere
   // centered on the glyph", and "once a glyph is triggered, this spell ends". The glyph is nearly imperceptible.
   "glyph-of-warding": [
@@ -831,6 +843,16 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [],
       area: { shape: "cylinder", sizeFeet: 5, widthFeet: null },
       movesArea: { feet: 60 }
+    }
+  ],
+  // "As a Magic action on your later turns, you can control the hand thus again": it opens or closes an unlocked door.
+  "mage-hand": [
+    {
+      name: "control",
+      activation: "action",
+      when: "As a Magic action on your later turns, you control the hand again, opening or closing an unlocked door within 30 feet.",
+      damage: [],
+      laterTurnsOnly: true
     }
   ],
   // A creature of a chosen type "can't willingly enter the Cylinder by nonmagical means". Every type the spell names is
@@ -984,6 +1006,15 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       damage: [{ formula: "7d8", type: "slashing" }],
       zone: { ...ENTER_OR_END_ONCE, terrain: { cost: 4, kind: "plants" } }
     }
+  ],
+  // "Arrows, bolts, and other ordinary projectiles launched at targets behind the wall are deflected upward and miss
+  // automatically"; "Small or smaller flying creatures or objects can't pass through the wall."
+  "wind-wall": [
+    lasting(
+      "wall",
+      "Arrows, bolts and other ordinary projectiles shot or thrown across the wall miss, and Small or smaller flying creatures can't pass through it.",
+      { on: [], deflects: true, bars: { way: "both", sizes: ["tiny", "small"], flying: true } }
+    )
   ],
   web: [
     {
@@ -1976,6 +2007,9 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
       { type: "roll-mode", roll: "check", mode: "disadvantage" }
     ]
   },
+  // "A shimmering sphere encloses a Large or smaller creature or object": nothing passes its wall, in or out, and
+  // Disintegrate destroys it (`enclosures.ts`). Rolling the sphere along is the GM's.
+  "resilient-sphere": { name: "Resilient Sphere", tags: ["enclosed"], modifiers: [] },
   // "Become cursed for the duration" with the curse the caster picks, which Remove Curse ends: Disadvantage on one
   // ability's checks and saves, Disadvantage on attack rolls against the caster, the Wisdom save each turn (the GM's to
   // ask), or an extra 1d8 Necrotic when the caster's attack hits it.
@@ -2370,14 +2404,22 @@ const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   // The hound and the 5 feet it bites in.
   "faithful-hound": { shape: "sphere", sizeFeet: 5, widthFeet: null },
   "flaming-sphere": { shape: "sphere", sizeFeet: 5, widthFeet: null },
+  // The cage, "up to 20 feet on a side".
+  forcecage: { shape: "cube", sizeFeet: 20, widthFeet: null },
   "guardian-of-faith": { shape: "sphere", sizeFeet: 10, widthFeet: null },
+  // "Up to 90 feet long, 30 feet high, and 1 inch thick"; the globe is the GM's to draw.
+  "prismatic-wall": { shape: "line", sizeFeet: 90, widthFeet: 5 },
   // "Spreading to a radius of 300 feet": the creatures under the cloud.
   "storm-of-vengeance": { shape: "cylinder", sizeFeet: 300, widthFeet: null },
   // "Up to 300 feet long, 300 feet high, and 50 feet thick."
   tsunami: { shape: "line", sizeFeet: 300, widthFeet: 50 },
   "wall-of-fire": { shape: "line", sizeFeet: 60, widthFeet: 5 },
+  // "A flat surface made up of ten 10-foot-by-10-foot panels" in a row; the dome and the globe are the GM's to draw.
+  "wall-of-force": { shape: "line", sizeFeet: 100, widthFeet: 5 },
   // Ten 10-foot panels in a row; the text's "radius of up to 10 feet" names the dome, which the GM draws.
   "wall-of-ice": { shape: "line", sizeFeet: 100, widthFeet: 5 },
+  // "Ten 10-foot-by-10-foot panels", in a row.
+  "wall-of-stone": { shape: "line", sizeFeet: 100, widthFeet: 5 },
   "wall-of-thorns": { shape: "line", sizeFeet: 60, widthFeet: 5 },
   // "Up to 50 feet long, 15 feet high, and 1 foot thick."
   "wind-wall": { shape: "line", sizeFeet: 50, widthFeet: 5 }

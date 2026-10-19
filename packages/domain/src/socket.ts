@@ -45,6 +45,8 @@ import type {
   SceneCreateResult,
   StabilizeResult,
   LightAddResult,
+  DoorUseResult,
+  ObjectAttackResult,
   VisionPreviewResult,
   ScenePreviewResult,
   WallAddResult
@@ -188,6 +190,11 @@ import type {
   TurnReactionSchema,
   TurnUseSchema,
   DoorSetOpenSchema,
+  DoorSetStateSchema,
+  DoorUseSchema,
+  ObjectAttackSchema,
+  ObjectDamageSchema,
+  ObjectSetSchema,
   LightAddSchema,
   LightMoveSchema,
   LightRemoveSchema,
@@ -962,6 +969,23 @@ export interface ClientToServerEvents {
   "door:set-open": (
     payload: CommandPayload<typeof DoorSetOpenSchema>,
     acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "door:set-state": (
+    payload: CommandPayload<typeof DoorSetStateSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "door:use": (payload: CommandPayload<typeof DoorUseSchema>, acknowledgement: (result: DoorUseResult) => void) => void;
+  "object:set": (
+    payload: CommandPayload<typeof ObjectSetSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "object:damage": (
+    payload: CommandPayload<typeof ObjectDamageSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "object:attack": (
+    payload: CommandPayload<typeof ObjectAttackSchema>,
+    acknowledgement: (result: ObjectAttackResult) => void
   ) => void;
   "light:add": (
     payload: CommandPayload<typeof LightAddSchema>,

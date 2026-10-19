@@ -65,11 +65,14 @@ export type PlayerEffect = Omit<
   | "light"
   | "findDc"
   | "detects"
+  | "heldBy"
   | "form"
   | "sizeChange"
   | "ownSize"
 > & {
   yours?: true;
+  /** What holds the creature (a Net), by name: the object any creature can attack to free it. */
+  heldBy?: Readonly<{ name: string }>;
   /** The form its bearer has taken, by name alone (the effect's name says it too). */
   form?: Readonly<{ name: string }>;
 };

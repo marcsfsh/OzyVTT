@@ -284,6 +284,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   ongoingDamage: "never",
   currentTurn: "player",
   magical: "never",
+  // What holds the creature a failure restrains (a Net's AC and Hit Points) reaches players by name on the effect.
+  heldBy: "never",
   // The DC of the action that ends it is the caster's number; the option it carries shows in its name.
   endAction: "never",
   optionId: "never",
@@ -579,6 +581,9 @@ function playerEffect(
     light: _light,
     findDc: _findDc,
     detects: _detects,
+    // What holds the creature reaches players by name, so anyone can attack it; its Armor Class and the Hit Points
+    // it has left are the GM's.
+    heldBy,
     // A form's stat block, the definition it replaced and its terms are the GM's; its name reaches the table, as the
     // effect's own name says it. What size the bearer has is on the actor.
     form,
@@ -586,7 +591,11 @@ function playerEffect(
     ownSize: _ownSize,
     ...rest
   } = effect;
-  const visible = { ...rest, ...(form ? { form: { name: form.name } } : {}) };
+  const visible = {
+    ...rest,
+    ...(heldBy ? { heldBy: { name: heldBy.name } } : {}),
+    ...(form ? { form: { name: form.name } } : {})
+  };
   const mine = sourceActorId !== null && yourActorIds.has(sourceActorId);
   // A readied spell's Metamagic picks are the engine's to apply at its release.
   const held = readiedSpell ? (({ shaping: _shaping, ...kept }) => kept)(readiedSpell) : undefined;

@@ -637,7 +637,9 @@ describe("a save with no charge behind it, because the SRD prints no limit", () 
       successDamage: "none",
       failureConditions: ["restrained"],
       // "a DC 15 Strength (Athletics) or Dexterity (Acrobatics) check" escapes it.
-      escapeDc: 15
+      escapeDc: 15,
+      // "The rope has AC 20 and 20 Hit Points": breaking it frees the target.
+      heldBy: { name: "Rope", armorClass: 20, hitPoints: 20 }
     });
     expect(action.uses).toBeUndefined(); // unlimited is the printed item
     expect(action.damage).toEqual([]);
@@ -750,9 +752,11 @@ describe("the absences that were measured and must stay absent", () => {
     }
   });
 
-  it("the Bead of Force and the Horn of Blasting carry no action", () => {
-    // The bead is destroyed on use, which no `per` value can say.
-    expect(view.equipmentRecord("bead-of-force")!.actions).toEqual([]);
+  it("the Bead of Force is used up as it is thrown, and the Horn of Blasting carries no action", () => {
+    // Each bead is one of a stack, taken off as it is thrown.
+    const bead = view.equipmentRecord("bead-of-force")!;
+    expect(bead.consumedOnUse).toBe(true);
+    expect(bead.actions.map((action) => action.id)).toEqual(["throw"]);
     // The horn is absent for its 20% explosion chance.
     const horn = view.equipmentRecord("horn-of-blasting")!;
     expect(horn.description).toContain("20 percent chance of causing the horn to explode");

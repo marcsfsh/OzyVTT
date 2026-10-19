@@ -657,6 +657,27 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   })),
   {
+    at: "actions[].save.heldBy.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the object that holds a creature a failure restrains (a Net, a giant spider's web) with its Armor Class and Hit Points - read from the stat block's text or authored in the gear and item overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "save.heldBy.**",
+    types: ["spell"],
+    reason:
+      "the object that holds a creature a spell's failure restrains, read from the spell's text as the catalog is built; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "walls.**",
+    types: ["spell"],
+    reason:
+      "the walls a spell raises, cuts or destroys and what it does to a door (Wall of Force, Knock) - a reviewed table in the content build; the spell form has no control for them",
+    status: "gap"
+  },
+  {
     at: "actions[].raisesCorpse.**",
     types: ACTION_CARRIERS,
     reason:

@@ -1498,6 +1498,9 @@
    "damage": [],
    "healing": null
   },
+  "walls": {
+   "door": "arcane-lock"
+  },
   "classes": [
    "wizard"
   ],
@@ -2952,7 +2955,7 @@
     {
      "name": "save",
      "activation": "other",
-     "when": "A creature that enters the wall's space or ends its turn there makes the save. A creature makes this save only once per turn. Its space is Difficult Terrain.",
+     "when": "A creature that enters the wall's space or ends its turn there makes the save. A creature makes this save only once per turn. Its space is Difficult Terrain, and the wall gives Three-Quarters Cover.",
      "save": {
       "ability": "dex",
       "successDamage": "half",
@@ -2972,7 +2975,8 @@
       "oncePerTurn": true,
       "terrain": {
        "cost": 2
-      }
+      },
+      "cover": "three-quarters"
      }
     }
    ],
@@ -7956,6 +7960,9 @@
     }
    }
   },
+  "walls": {
+   "disintegrates": true
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -9405,6 +9412,9 @@
    "attacks": 0,
    "damage": [],
    "healing": null
+  },
+  "walls": {
+   "door": "close"
   },
   "classes": [
    "druid",
@@ -12440,12 +12450,23 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "cube",
+   "sizeFeet": 20,
+   "widthFeet": null
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
    "noCastSave": true,
    "healing": null
+  },
+  "walls": {
+   "raises": {
+    "kind": "bars",
+    "pushes": true,
+    "force": true
+   }
   },
   "classes": [
    "bard",
@@ -17549,6 +17570,9 @@
    "damage": [],
    "healing": null
   },
+  "walls": {
+   "door": "knock"
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -18279,6 +18303,15 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "control",
+     "activation": "action",
+     "when": "As a Magic action on your later turns, you control the hand again, opening or closing an unlocked door within 30 feet.",
+     "damage": [],
+     "laterTurnsOnly": true
+    }
+   ],
    "healing": null,
    "summons": {
     "creatures": [
@@ -18297,6 +18330,9 @@
     "onlyOne": true,
     "intangible": true
    }
+  },
+  "walls": {
+   "door": "open-or-close"
   },
   "classes": [
    "bard",
@@ -20568,6 +20604,12 @@
    "damage": [],
    "healing": null
   },
+  "walls": {
+   "cuts": {
+    "feet": 5,
+    "lasting": false
+   }
+  },
   "classes": [
    "wizard"
   ],
@@ -21727,7 +21769,11 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "line",
+   "sizeFeet": 90,
+   "widthFeet": 5
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
@@ -21739,6 +21785,9 @@
     "on": "area",
     "brightFeet": 100,
     "dimFeet": 100
+   },
+   "area": {
+    "kind": "heavily-obscured"
    }
   },
   "classes": [
@@ -23053,7 +23102,14 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Resilient Sphere",
+    "tags": [
+     "enclosed"
+    ],
+    "modifiers": []
+   }
   },
   "classes": [
    "wizard"
@@ -26442,6 +26498,13 @@
    "damage": [],
    "healing": null
   },
+  "walls": {
+   "door": "seal",
+   "cuts": {
+    "feet": 5,
+    "lasting": true
+   }
+  },
   "classes": [
    "cleric",
    "druid",
@@ -27337,6 +27400,9 @@
     ]
    }
   },
+  "walls": {
+   "door": "open-or-close"
+  },
   "classes": [
    "cleric"
   ],
@@ -27552,6 +27618,25 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "hut",
+     "activation": "other",
+     "when": "Only the creatures inside the dome when it was made can pass through it, and spells of level 3 or lower cast from outside can't reach inside.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "around": "caster",
+      "feet": 10,
+      "stays": true,
+      "wardsSpells": 3,
+      "bars": {
+       "way": "both",
+       "insiders": true
+      }
+     }
+    }
+   ],
    "healing": null
   },
   "classes": [
@@ -28524,6 +28609,11 @@
    ],
    "healing": null
   },
+  "sight": {
+   "area": {
+    "kind": "heavily-obscured"
+   }
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -28597,11 +28687,22 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "line",
+   "sizeFeet": 100,
+   "widthFeet": 5
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
    "healing": null
+  },
+  "walls": {
+   "raises": {
+    "kind": "window",
+    "pushes": true,
+    "force": true
+   }
   },
   "classes": [
    "wizard"
@@ -28665,6 +28766,24 @@
     }
    ],
    "healing": null
+  },
+  "walls": {
+   "raises": {
+    "kind": "window",
+    "panelFeet": 10,
+    "panel": {
+     "name": "Ice section",
+     "armorClass": 12,
+     "hitPoints": 30,
+     "immunities": [
+      "cold"
+     ],
+     "vulnerabilities": [
+      "fire"
+     ]
+    },
+    "pushes": true
+   }
   },
   "classes": [
    "wizard"
@@ -28731,11 +28850,29 @@
    "count": 1
   },
   "shape": null,
-  "area": null,
+  "area": {
+   "shape": "line",
+   "sizeFeet": 100,
+   "widthFeet": 5
+  },
   "effect": {
    "attacks": 0,
    "damage": [],
+   "noCastSave": true,
    "healing": null
+  },
+  "walls": {
+   "raises": {
+    "kind": "wall",
+    "panelFeet": 10,
+    "panel": {
+     "name": "Stone panel",
+     "armorClass": 15,
+     "hitPoints": 180
+    },
+    "pushes": true,
+    "permanentAfterFull": true
+   }
   },
   "classes": [
    "druid",
@@ -28829,6 +28966,11 @@
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "area": {
+    "kind": "heavily-obscured"
+   }
   },
   "classes": [
    "druid"
@@ -29385,6 +29527,26 @@
     {
      "formula": "4d8",
      "type": "bludgeoning"
+    }
+   ],
+   "laterActions": [
+    {
+     "name": "wall",
+     "activation": "other",
+     "when": "Arrows, bolts and other ordinary projectiles shot or thrown across the wall miss, and Small or smaller flying creatures can't pass through it.",
+     "damage": [],
+     "zone": {
+      "on": [],
+      "deflects": true,
+      "bars": {
+       "way": "both",
+       "sizes": [
+        "tiny",
+        "small"
+       ],
+       "flying": true
+      }
+     }
     }
    ],
    "healing": null

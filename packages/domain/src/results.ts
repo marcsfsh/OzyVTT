@@ -876,6 +876,12 @@ export const ActorMovementReplySchema = z.strictObject({
     .optional(),
   /** It passes through walls and creatures as through Difficult Terrain (a ghost's Incorporeal Movement). */
   throughWalls: z.boolean().optional(),
+  /** How narrow an opening it passes with no extra movement: any gap (`point`: Amorphous, "as narrow as 1 inch"), or
+   *  one a Tiny creature fits (`tiny`: a swarm). */
+  opening: z.enum(["point", "tiny"]).optional(),
+  /** Burrowing, it goes through walls: freely through earth and stone (`free`: Earth Glide), or at half its Burrow
+   *  Speed (`half`: Tunneler). */
+  burrowsThroughWalls: z.enum(["free", "half"]).optional(),
   /** Difficult Terrain costs it nothing extra (Freedom of Movement). */
   ignoresDifficultTerrain: z.boolean().optional(),
   /** A teleport granted it for this turn (Misty Step): up to `feet` to an unoccupied space it can see. */
@@ -937,6 +943,16 @@ export type ScenePreviewReply = Omit<Wire<z.infer<typeof ScenePreviewReplySchema
 export type ScenePreviewResult = { ok: boolean; message?: string } & Partial<ScenePreviewReply>;
 export type WallAddResult = MutationResult & { wallIds?: readonly string[] };
 export type LightAddResult = MutationResult & { lightId?: string };
+/** What working on a door came to: the line the table reads, and whether the door came open. */
+export type DoorUseResult = MutationResult & { text?: string; opened?: boolean };
+/** An attack on an object: hit or miss, and whether it broke. A player is told neither the object's Armor Class nor
+ *  the Hit Points it has left. */
+export type ObjectAttackResult = MutationResult & {
+  outcome?: "hit" | "crit" | "miss";
+  total?: number;
+  damage?: number;
+  destroyed?: boolean;
+};
 
 /** What `character:draft` answers: the caller's parked build and when it was last saved, or null for none. */
 export const CharacterDraftReplySchema = z.strictObject({

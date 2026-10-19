@@ -111,6 +111,14 @@ export type ResolveInput = Readonly<{
   owedPaid?: boolean;
   /** The spell area a cast that ends spells is aimed at (Dispel Magic on a Spirit Guardians); the GM's to name. */
   zoneId?: string;
+  /** The door or wall on the live map a cast is aimed at (Knock, Arcane Lock, Passwall). */
+  wallId?: string;
+  /** The template the cast placed, as the map will draw it, for the walls it raises (Wall of Force). */
+  placedArea?: Readonly<{
+    shape: "circle" | "cone" | "line" | "square";
+    origin: Readonly<{ x: number; y: number }>;
+    target: Readonly<{ x: number; y: number }>;
+  }>;
   /** The caster stands where no sound can be made (Silence's sphere), measured on the map by the server. */
   silenced?: boolean;
   /** A parked attack finishing: the declared rider (Brutal Strike) its roll forwent Advantage for, whose hit it may
@@ -157,6 +165,11 @@ export type ResolveDependencies = Readonly<{
   /** Brings an action's creatures onto the map (`bringSummons`), built by the operation layer, which has the grid and
    *  mints ids. Absent, a summon is left for the GM to place. */
   summon?: (request: SummonRequest) => SummonOutcome;
+  /** The cover the spell walls between two combatants give the second from the first (Blade Barrier), measured on the
+   *  map by the operation layer. */
+  zoneCover?: (fromActorId: string, targetId: string) => "half" | "three-quarters" | "total" | null;
+  /** The wall that deflects an ordinary projectile from the first combatant at the second (Wind Wall), or null. */
+  deflectedBy?: (fromActorId: string, targetId: string) => string | null;
 }>;
 
 type RollBase = Pick<

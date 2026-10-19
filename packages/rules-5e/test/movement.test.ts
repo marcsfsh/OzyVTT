@@ -7,6 +7,7 @@ import {
   movementPath,
   pointInRects,
   segmentsMeet,
+  slipsThroughStep,
   spacePassage,
   wallCrossing
 } from "../src/movement.js";
@@ -295,5 +296,35 @@ describe("walls in the way of a move", () => {
     expect(segmentsMeet(p(0, 0), p(1, 1), p(1, 1), p(3, 0))).toBe(true);
     expect(segmentsMeet(p(0, 0), p(2, 0), p(1, 0), p(3, 0))).toBe(true);
     expect(segmentsMeet(p(0, 0), p(1, 0), p(0, 1), p(1, 1))).toBe(false);
+  });
+});
+
+describe("slipping through narrow gaps", () => {
+  // A wall along x = 2 with a gap from row 0.4 to row 0.6, a foot wide on 5-foot squares.
+  const crosses = wallCrossing([
+    { a: { column: 2, row: -10 }, b: { column: 2, row: 0.4 } },
+    { a: { column: 2, row: 0.6 }, b: { column: 2, row: 10 } }
+  ]);
+  const step = (sizeCells: number, gap: "point" | "tiny") =>
+    slipsThroughStep({ column: 0, row: 0 }, { column: 1, row: 0 }, sizeCells, crosses, gap);
+
+  it("lets a body that passes 1 inch flow through a 1-foot gap, whatever its size", () => {
+    expect(step(1, "point")).toBe(true);
+    expect(step(2, "point")).toBe(true);
+  });
+
+  it("asks half a square of a swarm", () => {
+    expect(step(2, "tiny")).toBe(false);
+    const wide = wallCrossing([
+      { a: { column: 2, row: -10 }, b: { column: 2, row: 0.2 } },
+      { a: { column: 2, row: 0.8 }, b: { column: 2, row: 10 } }
+    ]);
+    expect(slipsThroughStep({ column: 0, row: 0 }, { column: 1, row: 0 }, 2, wide, "tiny")).toBe(true);
+  });
+
+  it("stops at a wall with no gap", () => {
+    const solid = wallCrossing([{ a: { column: 2, row: -10 }, b: { column: 2, row: 10 } }]);
+    expect(slipsThroughStep({ column: 0, row: 0 }, { column: 1, row: 0 }, 2, solid, "point")).toBe(false);
+    expect(slipsThroughStep({ column: 0, row: 0 }, { column: 1, row: 1 }, 2, solid, "point")).toBe(false);
   });
 });

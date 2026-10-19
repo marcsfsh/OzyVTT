@@ -753,6 +753,34 @@
 .vision-layer.erasing .vision-hit {
   cursor: crosshair;
 }
+/* While an action is aimed, a wall takes a tap as its target: a band narrower than a handle's ring, so a creature
+   standing beside the wall still takes its own tap. */
+.vision-aim-hit {
+  stroke: transparent;
+  stroke-width: 16px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+  cursor: crosshair;
+}
+/* What only the GM learns of a door and a wall: a square on the handle of a door held shut, a violet ring on a secret
+   door, and the hit points of a wall or door that is an object. */
+.vision-door-lock {
+  fill: var(--violet-hi);
+  pointer-events: none;
+}
+.vision-wall-door.secret .vision-door-ring {
+  stroke: var(--violet-hi);
+  stroke-dasharray: 3 2;
+}
+.vision-object-hp {
+  fill: var(--violet-hi);
+  font-family: var(--font-numeric);
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--void);
+  stroke-width: 3px;
+  pointer-events: none;
+}
 .vision-light-dim,
 .vision-light-bright {
   fill: var(--violet);

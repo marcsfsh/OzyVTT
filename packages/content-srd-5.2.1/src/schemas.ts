@@ -26,6 +26,7 @@ import {
   DispelSchema,
   HealingFormulaSchema,
   ItemSlotSchema,
+  ObjectPrintSchema,
   OnHitRiderSchema,
   SaveFailureEffectSchema,
   SaveOutcomeFields,
@@ -83,6 +84,43 @@ const SpellDamageSchema = z
 /** Where and when the area a spell leaves acts (`AreaTriggerSchema`, shared with the actions of items and creatures). */
 export const SpellZoneSchema = AreaTriggerSchema;
 export type SpellZone = AreaTrigger;
+
+/**
+ * What a spell does to the map's walls and doors (SRD 5.2.1 Wall of Force, Wall of Stone, Knock, Passwall), which the
+ * server applies on the live map (`apps/server/src/spell-walls.ts`). `raises`: the walls its placed area raises while
+ * it lasts: along a Line's far side, round a circle's edge or a Cube's sides, as `wall` (sight, light and movement:
+ * Wall of Stone), `window` (movement, and the lines an attack or an area needs: Wall of Force's Invisible force) or
+ * `bars` (movement alone: Forcecage's cage). `door`: what its cast does to the door it is aimed at. `cuts`: the gap it
+ * opens in the wall it is aimed at, for its duration (Passwall) or for good (Stone Shape). `disintegrates`: it destroys
+ * the object or creation of force it is aimed at (Disintegrate).
+ */
+export const SpellWallsSchema = z
+  .object({
+    raises: z
+      .object({
+        kind: z.enum(["wall", "window", "bars"]),
+        /** Each panel's length in feet, each its own object (Wall of Ice's 10-foot sections). */
+        panelFeet: z.number().int().min(5).max(100).optional(),
+        /** Each panel's statistics as an object; absent, nothing but what names it (Disintegrate) breaks it. */
+        panel: ObjectPrintSchema.optional(),
+        /** A creature whose space it cuts is pushed to one side. */
+        pushes: z.literal(true).optional(),
+        /** It stays for good once its caster's Concentration lasts the spell's full duration (Wall of Stone). */
+        permanentAfterFull: z.literal(true).optional(),
+        /** A creation of magical force, which Disintegrate destroys whole (Wall of Force). */
+        force: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    door: z.enum(["knock", "arcane-lock", "open-or-close", "close", "seal"]).optional(),
+    cuts: z
+      .object({ feet: z.number().int().min(1).max(20), lasting: z.boolean() })
+      .strict()
+      .optional(),
+    disintegrates: z.literal(true).optional()
+  })
+  .strict();
+export type SpellWalls = z.infer<typeof SpellWallsSchema>;
 
 /** Something a spell lets its caster do after the cast, as an action of its own: Produce Flame's hurl, Spiritual
  *  Weapon's later attacks, or the save a creature makes when it enters Spirit Guardians (`activation` "other": no
@@ -415,6 +453,8 @@ export const SpellReferenceSchema = z
     /** What the spell does to light and sight while it lasts (Light, Darkness, Fog Cloud, Daylight), which dynamic
      *  vision reads. */
     sight: SightEffectSchema.optional(),
+    /** What the spell does to the map's walls and doors (Wall of Force, Knock, Passwall). */
+    walls: SpellWallsSchema.optional(),
     classes: z
       .array(z.string())
       .describe(

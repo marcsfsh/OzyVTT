@@ -1957,7 +1957,35 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `bead-of-force` - destroyed on use.
+  // Thrown up to 60 feet, it bursts in a 10-foot-radius Sphere: a DC 15 Dexterity save or 5d4 Force damage, and a
+  // creature that fails is shut in a sphere of force for 1 minute that no attack or effect passes (`enclosures.ts`).
+  // Pushing out the creatures that saved, and rolling the sphere along, are the GM's.
+  "bead-of-force": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "throw",
+        name: "Throw Bead of Force",
+        activation: "action",
+        description:
+          "Throw the bead up to 60 feet. It explodes in a 10-foot-radius Sphere: each creature in it makes a DC 15 Dexterity saving throw or takes 5d4 Force damage. A sphere of transparent force then encloses the area for 1 minute, trapping each creature that failed and is completely inside. No attack or other effect can pass through its wall.",
+        save: {
+          ability: "dex",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: [],
+          failureEffect: {
+            name: "Bead of Force",
+            tags: ["enclosed"],
+            duration: { type: "rounds", rounds: 10 },
+            modifiers: []
+          }
+        },
+        damage: [{ formula: "5d4", type: "force" }],
+        area: { shape: "sphere", sizeFeet: 10, widthFeet: null }
+      }
+    ]
+  },
   // `bead-of-nourishment` - no hunger model.
 
   /**
@@ -2667,7 +2695,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Command the other end of the rope to dart forward and entangle one creature you can see within 20 feet of yourself. The target must succeed on a DC 15 Dexterity saving throw or have the Restrained condition. You can release the target by letting go of your end of the rope or by using a Bonus Action to repeat the command.",
-        save: { ability: "dex", dc: 15, successDamage: "none", failureConditions: ["restrained"], escapeDc: 15 },
+        save: {
+          ability: "dex",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["restrained"],
+          escapeDc: 15,
+          // "The rope has AC 20 and 20 Hit Points": attacking it to 0 frees the target.
+          heldBy: { name: "Rope", armorClass: 20, hitPoints: 20 }
+        },
         targets: { count: 1, rangeFeet: 20, seen: true }
       }
     ]

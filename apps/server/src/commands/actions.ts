@@ -35,6 +35,8 @@ import { castSlotLevel, untrainedArmorCast } from "../resolution/economy.js";
 import { areaAtLevel } from "../spell-zone-state.js";
 import { zoneRowOf } from "../spell-zones.js";
 import { spellWardedTargets } from "../zone-barriers.js";
+import { deflectingWall, zoneCover } from "../zone-walls.js";
+import { enclosedFrom } from "../enclosures.js";
 import { areaMoveOf, moveArea, planAreaMove, type AreaMove } from "../zone-moves.js";
 import { withChosenDamageType } from "../resolution/validate.js";
 import { useCostOf, withChosenCost } from "../use-cost.js";
@@ -297,6 +299,17 @@ export const actionCommands = [
             (entry) => `${entry.ward} keeps ${spellCast.name} from affecting ${kit.actorName(entry.actorId)}.`
           );
         }
+        // A sphere of force lets no area in or out (Resilient Sphere); a single target across one is refused later.
+        if (template && resolvedTargetIds.length > 0) {
+          const enclosed = enclosedFrom(draft, actorId, resolvedTargetIds);
+          resolvedTargetIds = resolvedTargetIds.filter((id) => !enclosed.some((entry) => entry.actorId === id));
+          wardNotes = [
+            ...wardNotes,
+            ...enclosed.map(
+              (entry) => `${entry.sphere} keeps ${action.name} from affecting ${kit.actorName(entry.actorId)}.`
+            )
+          ];
+        }
         // Footprint-aware (SRD Creature Size): Medium adjacent to Large is 5 ft, measured edge to edge.
         const measured = (actorIdA: string, actorIdB: string): number | null =>
           geometry ? (tokenCreatureDistance(draft, geometry, actorIdA, actorIdB)?.value ?? null) : null;
@@ -385,6 +398,15 @@ export const actionCommands = [
             ...(request.gear !== undefined ? { gear: request.gear } : {}),
             ...(request.option !== undefined ? { option: request.option } : {}),
             ...(template ? { areaPlaced: true } : {}),
+            // The template as the map draws it, for the walls a cast raises on it (Wall of Force).
+            ...(placed && geometry?.calibration
+              ? {
+                  placedArea: (({ origin, target }) => ({ shape: placed.shape, origin, target }))(
+                    shapeGeometry(geometry.calibration, placed.shape, placed.origin, placed.target)
+                  )
+                }
+              : {}),
+            ...(request.wallId !== undefined ? { wallId: request.wallId } : {}),
             ...(request.ready === true ? { ready: true } : {}),
             ...(request.moveFirst === true ? { moveFirst: true } : {}),
             // The rest of an action whose move was taken first was paid for then.
@@ -414,7 +436,16 @@ export const actionCommands = [
                 draft,
                 summonRequest,
                 kit.summonDeps(draft, draft.combat.mapAssetId === mapAssetId ? geometry : null)
-              )
+              ),
+            // The spell walls between two creatures that cover one or turn a shot (Blade Barrier, Wind Wall).
+            ...(geometry?.calibration
+              ? {
+                  zoneCover: (fromId: string, targetId: string) =>
+                    zoneCover(draft, fromId, targetId, kit.zoneDeps(draft, geometry)),
+                  deflectedBy: (fromId: string, targetId: string) =>
+                    deflectingWall(draft, fromId, targetId, kit.zoneDeps(draft, geometry))
+                }
+              : {})
           }
         );
         // A committed use counts toward the sheet's most-used options; a preview counts with its confirm.

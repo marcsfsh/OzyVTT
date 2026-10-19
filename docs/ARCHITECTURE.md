@@ -353,7 +353,23 @@ of a hidden thing. When in doubt, leave it out.
   where it cast the spell, ends it.
 - Squeezing and passing walls: a footprint that fits a gap only as a creature one size smaller squeezes
   through it as through Difficult Terrain (`footprintStepPassage`), and Incorporeal Movement passes walls
-  and creatures the same way.
+  and creatures the same way. A stat block's traits widen that (`wall-passage.ts`): Amorphous, Compression
+  and the elementals' forms slip through a gap an inch wide and a swarm through one a Tiny creature fits, at
+  no extra cost (`slipsThroughStep`); Earth Glide burrows through walls freely and Tunneler at double cost.
+  A wall a spell raised stops every one of them. The `actor:movement` reply carries the opening and the
+  burrowing, so the drag preview charges the same path.
+- Doors and objects (ADR-0023's second amendment): a door may be held shut (`VisionWall.door`: a lock with
+  its key holders, stuck, barred, jammed with a spike, sealed by Stone Shape, an Arcane Lock), and
+  `door.set-open` refuses a player one held shut against their character. `door.use` picks, forces, pries,
+  jams or seals a door beside the acting creature, the server rolling the check (`doors.ts`); `door.set-state`
+  is the GM's. A wall or door may be an object with AC and Hit Points (`VisionWall.object`), as is what holds a
+  creature (`EffectInstance.heldBy`: a Net, a web, a rope). `object.attack` rolls an attack against one
+  (`object-strikes.ts`), `object.damage` is the GM's, and at 0 Hit Points a wall or door is gone and a held
+  creature is freed (`objects.ts`). A spell's `walls` raise walls on its placed template, which go with what
+  keeps the spell (`spell-walls.ts`, `pruneEndedWalls`), or act on the door or wall a cast's `wallId` names
+  (`resolution/cast-walls.ts`). Players get no door state and no object numbers: a secret door goes as a wall,
+  and a wall with a gap cut in it as the parts that stand (`vision/audience.ts`). On the map a door's handle
+  opens its menu (`DoorMenu.tsx`), and while an action is aimed a tap on a wall or door makes it the target.
 - Legendary actions are taken right after another creature's turn (`legendary.after-a-turn`): a turn
   change records the creature whose turn ended (`turn.afterActorId`), and the window stays open, one
   action a legendary creature, until the creature whose turn it is does something.
@@ -386,7 +402,12 @@ A zone may act only on the creature types it names (Forbiddance), tell the GM wh
 its spell the first time it acts and burst over its area (Glyph of Warding, drawn for the GM and its
 caster alone), or raise a barrier at its edge (`zone-barriers.ts`): a step across it closes the path
 for the creatures it holds back (Antilife Shell, Magic Circle), a melee attack without a Reach weapon
-can't reach through Antilife Shell, and no creature teleports into Forbiddance. What an area gives the
+can't reach through Antilife Shell, no creature teleports into Forbiddance, and only the creatures inside
+Tiny Hut at its cast pass its dome. A spell's area can cover the creatures behind it or turn shots across it
+(`zone-walls.ts`): Blade Barrier gives Three-Quarters Cover, and an arrow, a bolt or a thrown weapon across
+Wind Wall misses. A sphere of force around one creature (Resilient Sphere, Bead of Force) lets no attack,
+spell or area across it either way, and Disintegrate aimed at it breaks it (`enclosures.ts`). A teleport out
+of a Forcecage takes its Charisma save first (`forcecage.ts`). What an area gives the
 creatures in it (Holy Aura's Advantage on saves, Pass without Trace's +10 to Stealth, Silence's Deafened)
 is an effect each one holds while it stands inside (`zone-auras.ts`): the pipeline settles who holds it
 after every command, as its own write when anything changed. A later action that moves a spell's area

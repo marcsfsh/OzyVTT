@@ -59,6 +59,8 @@ describe("what one cast of an SRD spell does", () => {
       "conjure-fey",
       "heat-metal",
       "hex",
+      // "As a Magic action on your later turns, you can control the hand thus again."
+      "mage-hand",
       "moonbeam",
       "spiritual-weapon"
     ]);

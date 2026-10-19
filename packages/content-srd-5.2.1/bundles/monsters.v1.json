@@ -17776,7 +17776,12 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "heldBy": {
+      "name": "Rope",
+      "armorClass": 20,
+      "hitPoints": 90
+     }
     },
     "damage": [
      {
@@ -17981,7 +17986,18 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "heldBy": {
+      "name": "Web",
+      "armorClass": 10,
+      "hitPoints": 5,
+      "immunities": [
+       "bludgeoning"
+      ],
+      "vulnerabilities": [
+       "fire"
+      ]
+     }
     },
     "damage": [],
     "targets": {
@@ -22387,7 +22403,15 @@
      "successDamage": "none",
      "failureConditions": [
       "restrained"
-     ]
+     ],
+     "heldBy": {
+      "name": "Web",
+      "armorClass": 10,
+      "hitPoints": 5,
+      "vulnerabilities": [
+       "fire"
+      ]
+     }
     },
     "damage": [],
     "targets": {

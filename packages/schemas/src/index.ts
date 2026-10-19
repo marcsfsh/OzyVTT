@@ -139,6 +139,39 @@ export const DamageTypeSchema = z.enum([
 ]);
 export type DamageType = z.infer<typeof DamageTypeSchema>;
 
+/**
+ * An object's statistics as the SRD prints them (Rules Glossary: Breaking Objects, Damage Threshold): its Armor Class,
+ * its Hit Points, a damage threshold if it has one, and the damage types it resists, ignores or takes double from.
+ * Every object also has Immunity to Poison and Psychic damage and fails every saving throw, so those aren't listed. A
+ * Net is `{ name: "Net", armorClass: 10, hitPoints: 5, immunities: ["bludgeoning"] }`.
+ */
+export const ObjectPrintSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    armorClass: z.number().int().min(1).max(40),
+    hitPoints: z.number().int().min(1).max(100000),
+    /** Damage from one attack or effect below this deals none; at or above it the whole of it lands. */
+    damageThreshold: z.number().int().min(1).max(1000).optional(),
+    immunities: z.array(DamageTypeSchema).max(13).optional(),
+    resistances: z.array(DamageTypeSchema).max(13).optional(),
+    vulnerabilities: z.array(DamageTypeSchema).max(13).optional(),
+    /** Immune to all damage (Wall of Force): only a rule that names it ends it (Disintegrate). */
+    immuneToAll: z.literal(true).optional()
+  })
+  .strict();
+export type ObjectPrint = z.infer<typeof ObjectPrintSchema>;
+
+/** An object in play (a door, a wall's panel, the Net holding a creature) and the Hit Points it has left. */
+export const ObjectStatsSchema = ObjectPrintSchema.extend({
+  hitPoints: z
+    .object({
+      current: z.number().int().min(0).max(100000),
+      maximum: z.number().int().min(1).max(100000)
+    })
+    .strict()
+}).strict();
+export type ObjectStats = z.infer<typeof ObjectStatsSchema>;
+
 /** The ways a caster shapes one casting as it casts: the Sorcerer's Metamagic options chosen with the cast (SRD 5.2.1
  *  Metamagic Options; Seeking Spell answers a missed roll instead) and the Evoker's Sculpt Spells. */
 export const CastShapingIdSchema = z.enum([
@@ -1779,6 +1812,9 @@ export const EffectInstanceSchema = z
     findDc: z.number().int().min(1).max(60).optional(),
     /** The creatures it lets its bearer sense (Divine Sense), shown to the bearer's player alone. */
     detects: DetectsSchema.optional(),
+    /** What holds the bearer (a Net, a giant spider's web): an object any creature can attack, whose destruction ends
+     *  this effect. */
+    heldBy: ObjectStatsSchema.optional(),
     /** The form its bearer has taken while it lasts (Wild Shape, Polymorph, a werewolf's wolf). */
     form: FormSchema.optional(),
     /** The bearer's size while it lasts (Enlarge/Reduce, Large Form). */
@@ -2998,7 +3034,12 @@ export const SaveOutcomeFields = {
   breaksConcentration: z
     .literal(true)
     .optional()
-    .describe("A failure also ends the Concentration the creature holds (Earthquake, Sleet Storm)")
+    .describe("A failure also ends the Concentration the creature holds (Earthquake, Sleet Storm)"),
+  /** What holds the creature a failure restrains (a Net: AC 10, 5 Hit Points), which can be attacked; destroying it
+   *  ends the failure's conditions. */
+  heldBy: ObjectPrintSchema.optional().describe(
+    "What holds the creature a failure restrains (a Net: AC 10, 5 Hit Points, Immunity to Bludgeoning damage), which can be attacked and damaged; destroying it ends the failure's conditions"
+  )
 };
 
 /** An area of effect the GM places as a map template ("60-foot Cone"). `widthFeet` is a line's width, null otherwise. */
@@ -3695,16 +3736,27 @@ export const AreaTriggerSchema = z
     hidden: z.literal(true).optional(),
     /** A barrier at its edge: the creatures it holds back can't move across it, into it (`way` "in": Magic Circle) or
      *  either way ("both": Antilife Shell), and with `reach` can't reach through it with a melee attack that isn't
-     *  made with a Reach weapon. `types` it holds back, or every type `except` these; every creature when neither. */
+     *  made with a Reach weapon. `types` it holds back, or every type `except` these; every creature when neither.
+     *  `sizes` and `flying` narrow it to creatures of those sizes, and to those in the air (Wind Wall: "Small or
+     *  smaller flying creatures"); with `insiders`, the creatures inside it when it was made pass freely (Tiny Hut). */
     bars: z
       .object({
         way: z.enum(["in", "both"]),
         types: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
         except: z.array(CreatureTypeIdSchema).min(1).max(14).optional(),
-        reach: z.literal(true).optional()
+        reach: z.literal(true).optional(),
+        sizes: z.array(SizeSchema).min(1).max(5).optional(),
+        flying: z.literal(true).optional(),
+        insiders: z.literal(true).optional()
       })
       .strict()
       .optional(),
+    /** The cover it gives a creature behind it, from a creature on its other side (Blade Barrier's Three-Quarters
+     *  Cover). */
+    cover: z.enum(["half", "three-quarters"]).optional(),
+    /** Ordinary projectiles launched across it at a creature on its other side miss (Wind Wall's arrows and bolts);
+     *  hurled boulders and spells go through. */
+    deflects: z.literal(true).optional(),
     /** No creature can teleport into it (Forbiddance). */
     noTeleport: z.literal(true).optional(),
     /** What a creature it affects holds while it stands inside (Holy Aura's Advantage on saving throws, Pass without
