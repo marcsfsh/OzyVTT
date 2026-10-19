@@ -363,6 +363,16 @@ describe("Wild Companion: the level-2 Find Familiar", () => {
     // The negative control: a level-1 Druid does not have Wild Companion, so it does not have this.
     expect(spellOf(build(druid(1, [primalOrder("warden")])), "find-familiar")).toBeUndefined();
   });
+
+  it("casts it as a Magic action, with a slot or Wild Shape, for a Fey familiar that leaves at a Long Rest", () => {
+    const two = build(druid(2, [primalOrder("warden")]));
+    const free = two.actions.find((action) => action.spellId === "find-familiar" && action.uses?.pool === "wild-shape");
+    const slot = two.actions.find((action) => action.spellId === "find-familiar" && action.spellSlot);
+    for (const cast of [free, slot]) {
+      expect(cast).toMatchObject({ activation: "action", castsAtOnce: true });
+      expect(cast?.summons).toMatchObject({ creatureTypes: ["fey"], lasts: { type: "until-long-rest" } });
+    }
+  });
 });
 
 describe("Land's Aid - a Circle of the Land action spending the CLASS's Wild Shape pool", () => {

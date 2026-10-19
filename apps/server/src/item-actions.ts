@@ -167,7 +167,9 @@ export function itemAction(
     ...(declared.onHit ? { onHit: structuredClone(declared.onHit) } : {}),
     // A roll it answers (a Ring of Evasion's Evade) and the trigger it is offered on (a Reaction's).
     ...(declared.answer ? { answer: structuredClone(declared.answer) } : {}),
-    ...(reaction ? { reaction: { ...reaction } } : {})
+    ...(reaction ? { reaction: { ...reaction } } : {}),
+    // The creatures it brings (a Horn of Valhalla's Berserkers).
+    ...(declared.summons ? { summons: structuredClone(declared.summons) } : {})
   };
 }
 
@@ -334,6 +336,7 @@ export function spellCastMechanics(
       | "endsOneCondition"
       | "dispel"
       | "endsCurses"
+      | "summons"
       | "shapeShift"
       | "effectOptions"
     >
@@ -410,6 +413,15 @@ export function spellCastMechanics(
     // The spells it ends on its target (Dispel Magic), and the curses (Remove Curse).
     ...(effect.dispel ? { dispel: { ...effect.dispel } } : {}),
     ...(effect.endsCurses ? { endsCurses: true as const } : {}),
+    // The creatures it brings, with the caster's numbers a spell-printed stat block reads (Summon Dragon's Rend).
+    ...(effect.summons
+      ? {
+          summons: {
+            ...structuredClone(effect.summons),
+            numbers: { attackBonus: numbers.attackBonus, saveDc: numbers.saveDc, modifier: numbers.modifier }
+          }
+        }
+      : {}),
     // The form it shape-shifts a creature into (Polymorph), and the effects it picks one of (Enlarge or Reduce).
     ...(effect.shapeShift ? { shapeShift: structuredClone(effect.shapeShift) } : {}),
     ...(effect.effectOptions ? { effectOptions: structuredClone(effect.effectOptions) } : {})

@@ -412,6 +412,19 @@ export function addActorFromDefinition(
   instantiate(state, definition, id, visibility, "monster", definition.source.externalId, catalog);
 }
 
+/** A summoned creature's actor (`summons.ts`): a creature from `definition`, a bundled stat block by its id or the
+ *  scaled copy the summon stored under `definitionId`. */
+export function addSummonedActor(
+  state: GameState,
+  definition: ActorDefinition,
+  id: string,
+  visibility: "public" | "gm-only",
+  definitionId: string,
+  catalog?: EquipmentCatalog
+) {
+  instantiate(state, definition, id, visibility, "monster", definitionId, catalog);
+}
+
 /** Imports a canonical ActorDefinition and instantiates a live actor; characters become claimable. */
 export function importActorDefinition(
   state: GameState,

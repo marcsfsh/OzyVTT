@@ -154,7 +154,14 @@
      "successDamage": "none",
      "failureConditions": [
       "charmed"
-     ]
+     ],
+     "failureEffect": {
+      "name": "Dominated by the Aboleth",
+      "tags": [
+       "commanded"
+      ],
+      "modifiers": []
+     }
     },
     "damage": [],
     "targets": {
@@ -44769,6 +44776,33 @@
     "uses": {
      "limit": 1,
      "per": "long-rest"
+    },
+    "summons": {
+     "creatures": [
+      {
+       "monsterId": "treant",
+       "count": 2,
+       "except": {
+        "name": "Animated Tree",
+        "abilityScores": {
+         "int": 1,
+         "cha": 1
+        },
+        "withoutActions": [
+         "animate-trees"
+        ]
+       }
+      }
+     ],
+     "rangeFeet": 60,
+     "turn": "after-user",
+     "allegiance": "user",
+     "lasts": {
+      "type": "minutes",
+      "minutes": 1440
+     },
+     "endsOnUserDeath": true,
+     "leashFeet": 120
     }
    }
   ],

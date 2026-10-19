@@ -91,6 +91,9 @@ describe("rule families", () => {
       ["attack.two-handed", "economy"],
       // Casting in untrained armor: what the character can do at all, like the hands rule.
       ["spell.untrained-armor", "economy"],
+      // A familiar that can't attack, and a command beyond its reach, are what summoning costs a creature.
+      ["summon.cant-attack", "economy"],
+      ["summon.command", "economy"],
       // A scroll whose spell the reader's lists lack: what the character can do at all.
       ["spell.scroll-unreadable", "economy"],
       // A later-turn spell action on the turn of its cast: what this turn has done.

@@ -175,6 +175,10 @@ import type {
   TokenSetAltitudeSchema,
   ActorFallSchema,
   ActorMountSchema,
+  SummonCommandSchema,
+  SummonDismissSchema,
+  SummonLookSchema,
+  SummonRecallSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
   TurnUseSchema,
@@ -815,6 +819,26 @@ export interface ClientToServerEvents {
   /** A creature climbs onto a mount or off the one it rides. */
   "actor:mount": (
     payload: CommandPayload<typeof ActorMountSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** A creature commands the creatures it summoned. */
+  "summon:command": (
+    payload: CommandPayload<typeof SummonCommandSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** A summoned creature's commander dismisses it, for good or into its pocket dimension. */
+  "summon:dismiss": (
+    payload: CommandPayload<typeof SummonDismissSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** A familiar comes back from its pocket dimension. */
+  "summon:recall": (
+    payload: CommandPayload<typeof SummonRecallSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** A commander sees through a summoned creature's eyes. */
+  "summon:look": (
+    payload: CommandPayload<typeof SummonLookSchema>,
     acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
   ) => void;
   /** GM sets how high a creature is, free of movement. */

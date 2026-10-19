@@ -478,7 +478,7 @@ describe("the one printed to-hit among carried items that the vocabulary can say
   });
 });
 
-describe("the charge-alone items, whose counter is the whole of what they enforce", () => {
+describe("the charged items with no roll of their own, whose counter they enforce", () => {
   it("rations the four elemental summons at one a day and the three-charge items at three", () => {
     const definition = definitionOf();
     for (const [id, name, actionId, limit, label] of [
@@ -510,7 +510,7 @@ describe("the charge-alone items, whose counter is the whole of what they enforc
         1,
         "Summon Earth Elemental"
       ],
-      ["bag-of-tricks", "Bag of Tricks", "item-bag-of-tricks-pull", 3, "Pull a Fuzzy Object"],
+      ["bag-of-tricks", "Bag of Tricks", "item-bag-of-tricks-pull-gray", 3, "Pull a Fuzzy Object (Gray bag)"],
       ["gem-of-seeing", "Gem of Seeing", "item-gem-of-seeing-peer", 3, "Peer Through the Gem"],
       ["pipes-of-the-sewers", "Pipes of the Sewers", "item-pipes-of-the-sewers-call", 3, "Call a Swarm of Rats"]
     ] as const) {
@@ -518,7 +518,7 @@ describe("the charge-alone items, whose counter is the whole of what they enforc
       const actor = state.actors[0];
       const action = effectiveActions(definition, actor, catalog).find((entry) => entry.id === actionId)!;
       expect(action.uses).toEqual({ limit, per: "long-rest", pool: `${id}-charges` });
-      // The charge is all these enforce.
+      // No roll of their own: the charge, and the creature the summoning ones bring (`summon-items.test.ts`).
       expect(action.damage).toEqual([]);
       expect(action.attack).toBeUndefined();
       expect(action.save).toBeUndefined();

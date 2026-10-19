@@ -9,6 +9,7 @@ import { DamageTypeSchema, type ActionArea, type DamageType, type GrantOption, t
 import { areaOfProse } from "../src/action-prose.js";
 import type { SpellEffect, SpellLaterAction, SpellReference } from "../src/schemas.js";
 import { healingOfText, spellAttackRangeOf, type SpellRange } from "../src/spell-effect.js";
+import { spellSummonFieldsFor, SPELL_SUMMON_REVIEWED_IDS } from "./spell-summons.js";
 
 /** Spells whose printed damage is not dealt by the cast to its targets, and why. They cast with no damage and the
  *  GM applies the rest from the text, or a later action does (`LATER_ACTIONS`). */
@@ -449,6 +450,31 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
         revives: 1
       }
     )
+  ],
+  // "When you cast the spell and as a Bonus Action on your later turns, you can move the hand up to 60 feet and then
+  // cause one of the following effects": each reaches from the hand (`spell-summons.ts`). Forceful Hand's push and
+  // Interposing Hand's cover are the table's.
+  "arcane-hand": [
+    {
+      name: "clenched fist",
+      activation: "bonus-action",
+      when: "The hand moves up to 60 feet and strikes a target within 5 feet of it with a melee spell attack.",
+      attackRange: melee(125),
+      damage: [{ formula: "5d8", type: "force" }]
+    },
+    {
+      name: "grasping hand",
+      activation: "bonus-action",
+      when: "The hand moves up to 60 feet and grapples a Huge or smaller creature within 5 feet of it that fails a Dexterity save.",
+      save: { ability: "dex", successDamage: "none", failureConditions: ["grappled"] },
+      damage: []
+    },
+    {
+      name: "crush",
+      activation: "bonus-action",
+      when: "While the hand grapples a creature, a Bonus Action crushes it.",
+      damage: [{ formula: "4d6", type: "bludgeoning", addsModifier: true }]
+    }
   ],
   "arcane-sword": [
     {
@@ -2387,7 +2413,9 @@ export function spellEffectFor(
     ...(shapeShift ? { shapeShift: structuredClone(shapeShift) } : {}),
     ...(effectOptions ? { effectOptions: structuredClone(effectOptions) } : {}),
     ...(UNWILLING_ONLY.has(id) ? { unwillingOnly: true as const } : {}),
-    ...(AREA_PER_SLOT[id] !== undefined ? { areaPerSlot: AREA_PER_SLOT[id] } : {})
+    ...(AREA_PER_SLOT[id] !== undefined ? { areaPerSlot: AREA_PER_SLOT[id] } : {}),
+    // The creatures it brings and the commands it gives (`spell-summons.ts`).
+    ...spellSummonFieldsFor(id)
   };
 }
 
@@ -2481,5 +2509,6 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...SILENCES_AREA,
   ...PICKS_IN_AREA,
   ...Object.keys(CHAIN_FEET),
-  ...Object.keys(AREA_PER_SLOT)
+  ...Object.keys(AREA_PER_SLOT),
+  ...SPELL_SUMMON_REVIEWED_IDS
 ];

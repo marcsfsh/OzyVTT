@@ -152,8 +152,32 @@ export const warlock: ClassMechanicsModule = {
             }
           ]
         },
-        /** "You learn Find Familiar and can cast it ... without a slot." */
-        "pact-of-the-chain": { grants: { spells: [{ id: "find-familiar", level: 1, withoutSlot: "at-will" }] } },
+        /** "You learn the Find Familiar spell and can cast it as a Magic action without expending a spell slot", and its
+         *  familiar may take a special form: Imp, Pseudodragon, Quasit, Skeleton, Sphinx of Wonder, Sprite or Venomous
+         *  Snake. Forgoing an attack so the familiar attacks with its Reaction is the table's. */
+        "pact-of-the-chain": {
+          grants: {
+            spells: [
+              {
+                id: "find-familiar",
+                level: 1,
+                withoutSlot: "at-will",
+                asMagicAction: "without-slot",
+                summon: {
+                  moreCreatures: [
+                    { monsterId: "imp" },
+                    { monsterId: "pseudodragon" },
+                    { monsterId: "quasit" },
+                    { monsterId: "skeleton" },
+                    { monsterId: "sphinx-of-wonder" },
+                    { monsterId: "sprite" },
+                    { monsterId: "venomous-snake" }
+                  ]
+                }
+              }
+            ]
+          }
+        },
         /**
          * The three cantrips only. The two level-1 Ritual spells from any class list are not expressible
          * (no all-classes list, no Ritual filter).

@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 150 commands · 326 HTTP paths
+- 14 GameState fields · 154 commands · 330 HTTP paths
 
 ## GameState shape
 
@@ -35,7 +35,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 one table entry under `apps/server/src/commands/`. Both transports register from that table, and
 the OpenAPI document generates the command's operation from it. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `item`, `light`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `item`, `light`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `summon`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
 
 | Command | Scope |
 | --- | --- |
@@ -168,6 +168,10 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `sound.stop` | `scene:write` |
 | `spell-zone.end` | `combat:write` |
 | `spell-zone.place` | `combat:write` |
+| `summon.command` | `combat:write` |
+| `summon.dismiss` | `combat:write` |
+| `summon.look` | `combat:write` |
+| `summon.recall` | `combat:write` |
 | `table.set-party-visibility` | `combat:write` |
 | `table.set-staging-defaults` | `combat:write` |
 | `terrain.paint` | `scene:write` |
@@ -343,6 +347,10 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/spellbook`
 - `POST /api/v1/game/actors/{actorId}/spend-hit-dice`
 - `POST /api/v1/game/actors/{actorId}/stabilize`
+- `POST /api/v1/game/actors/{actorId}/summon/dismiss`
+- `POST /api/v1/game/actors/{actorId}/summon/look`
+- `POST /api/v1/game/actors/{actorId}/summon/recall`
+- `POST /api/v1/game/actors/{actorId}/summons/command`
 - `POST /api/v1/game/actors/{actorId}/swap-spell`
 - `POST /api/v1/game/actors/{actorId}/temp-hp`
 - `POST /api/v1/game/actors/{actorId}/token-image`

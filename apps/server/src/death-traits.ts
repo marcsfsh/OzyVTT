@@ -13,7 +13,7 @@ import {
   type EffectNarration
 } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
-import { raiseCreature } from "./risen.js";
+import { raiseCreature } from "./summons.js";
 import { traitMechanicsOf, traitOf } from "./statblock-traits.js";
 import { escapeIntoForm } from "./transform/at-zero.js";
 import { sightRules } from "./vision/rules.js";
@@ -269,7 +269,7 @@ function severLimb(
 
 function raiseLimb(state: GameState, troll: Actor, limbs: Limbs, deps: TraitDeps & { newId: () => string }) {
   try {
-    return raiseCreature(state, { monsterId: limbs.limbMonsterId, maker: troll, at: troll, after: troll.id }, deps)
+    return raiseCreature(state, { monsterId: limbs.limbMonsterId, maker: troll, at: troll, source: limbs.name }, deps)
       ?.name;
   } catch {
     // A full roster leaves the limb to the GM.

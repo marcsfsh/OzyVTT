@@ -1,4 +1,5 @@
 import type { CombatState, GameState, PlayerVision, PlayerVisionWall, VisionPolygon, VisionRect } from "@vtt/domain";
+import { commandedBySession } from "../authorization.js";
 import { revealedRegion } from "../fog.js";
 import { intersect, type Rect } from "../rect-region.js";
 import { flatPolygon, type Point, type Polygon } from "./geometry.js";
@@ -106,10 +107,40 @@ const placed = (state: GameState, actorId: string) =>
   state.combat.tokens.some((token) => token.actorId === actorId && token.position !== null);
 const inPlay = (actor: Actor) => actor.visibility === "public" && !actor.archived;
 
-/** A player's own characters on the live map. */
+/** On a commander, while it sees through a creature it commands (a familiar's eyes, after a Bonus Action): the effect's
+ *  source is that creature. */
+export const SHARED_SIGHT_TAG = "shared-sight";
+
+/** Whether a commanded creature's commander sees what it sees now: always (an Arcane Eye), or while the commander holds
+ *  a shared sight of it (a familiar). */
+function sharesSight(state: GameState, actor: Actor): boolean {
+  if (actor.summon?.sight === "always") return true;
+  if (actor.summon?.sight !== "bonus-action") return false;
+  const commander = state.actors.find((candidate) => candidate.id === actor.control?.by);
+  return (
+    commander?.effects.some((effect) => effect.tags.includes(SHARED_SIGHT_TAG) && effect.sourceActorId === actor.id) ??
+    false
+  );
+}
+
+/** A player's own characters on the live map, and the creatures they command whose sight they share (an Arcane Eye,
+ *  or a familiar while its commander looks through its eyes). */
 export function playerViewerIds(state: GameState, sessionId: string): string[] {
   return state.actors
-    .filter((actor) => actor.ownerSessionId === sessionId && inPlay(actor) && placed(state, actor.id))
+    .filter(
+      (actor) =>
+        inPlay(actor) &&
+        placed(state, actor.id) &&
+        (actor.ownerSessionId === sessionId ||
+          (commandedBySession(state, actor, sessionId) && sharesSight(state, actor)))
+    )
+    .map((actor) => actor.id);
+}
+
+/** The creatures a player's characters command (`Actor.control`): theirs to act for, so never hidden from them. */
+export function playerCommandedIds(state: GameState, sessionId: string): string[] {
+  return state.actors
+    .filter((actor) => inPlay(actor) && commandedBySession(state, actor, sessionId))
     .map((actor) => actor.id);
 }
 
@@ -133,20 +164,28 @@ function cached<T>(cache: WeakMap<GameState, Map<string, T>>, state: GameState, 
   return value;
 }
 
-/** What an audience seeing through `viewerIds` may know of the creatures on the live and prepared scenes. */
-export function audienceSight(state: GameState, viewerIds: readonly string[], content: SightContent): AudienceSight {
+/** What an audience seeing through `viewerIds` may know of the creatures on the live and prepared scenes. `knownIds`
+ *  are creatures it always knows of beside its viewers, as it does its own characters (those it commands). */
+export function audienceSight(
+  state: GameState,
+  viewerIds: readonly string[],
+  content: SightContent,
+  knownIds: readonly string[] = []
+): AudienceSight {
   const sight = sceneSight(state, content);
   const compute = () => {
     const hidden = stagedUnseen(state);
+    const known = new Set(knownIds);
     // Its own characters are never lost to it under the fog.
     const fogged = fogCovered(state.combat);
-    for (const viewerId of viewerIds) fogged.delete(viewerId);
+    for (const viewerId of [...viewerIds, ...known]) fogged.delete(viewerId);
     const kinds = new Map(state.actors.map((actor) => [actor.id, actor.kind]));
-    const unknown = (actorId: string) => kinds.get(actorId) !== "player-character";
+    const unknown = (actorId: string) => kinds.get(actorId) !== "player-character" && !known.has(actorId);
     for (const actorId of fogged) if (unknown(actorId)) hidden.add(actorId);
     for (const actorId of unplacedUnderFog(state.combat)) if (unknown(actorId)) hidden.add(actorId);
+    for (const actorId of known) hidden.delete(actorId);
     if (!sight.enabled) return hidden.size === 0 && fogged.size === 0 ? OFF : { ...OFF, hidden, fogged, viewerIds };
-    const perceived = sight.perceivedBy(viewerIds);
+    const perceived = new Set([...sight.perceivedBy(viewerIds), ...known]);
     const combatants = new Set([
       ...state.combat.initiative.map((entry) => entry.actorId),
       ...state.combat.tokens.map((token) => token.actorId)
@@ -156,17 +195,15 @@ export function audienceSight(state: GameState, viewerIds: readonly string[], co
   };
   // Cached only beside the sight it came from, so an answer built from partial content never outlives its caller.
   return sightIsCached(state, sight)
-    ? cached(audienceCache, state, `${sight.enabled}|${viewerIds.join(",")}`, compute)
+    ? cached(audienceCache, state, `${sight.enabled}|${viewerIds.join(",")}|${knownIds.join(",")}`, compute)
     : compute();
 }
 
-/** A player's audience: their own characters' eyes. Without a session (a spectator), the party's. */
+/** A player's audience: their own characters' eyes, and the creatures they command, which they always know of.
+ *  Without a session (a spectator), the party's. */
 export function playerSight(state: GameState, sessionId: string | undefined, content: SightContent): AudienceSight {
-  return audienceSight(
-    state,
-    sessionId === undefined ? partyViewerIds(state) : playerViewerIds(state, sessionId),
-    content
-  );
+  if (sessionId === undefined) return audienceSight(state, partyViewerIds(state), content);
+  return audienceSight(state, playerViewerIds(state, sessionId), content, playerCommandedIds(state, sessionId));
 }
 
 export function partySight(state: GameState, content: SightContent): AudienceSight {

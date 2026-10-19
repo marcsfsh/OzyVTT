@@ -189,8 +189,8 @@ describe("Finger of Death", () => {
       x: 225,
       y: 125
     });
-    // A friendly copy of the stat block puts it on the party's side.
-    expect(resolveDefinition(zombie.definitionId!)?.token.disposition).toBe("friendly");
+    // It follows the caster's orders, on the party's side.
+    expect(zombie.control).toEqual({ by: HERO, side: "party" });
   });
 
   it("leaves a creature of another type dead where it fell", () => {
@@ -416,15 +416,8 @@ describe("a wraith's Create Specter", () => {
           kind: "monster",
           hp: { current: 22, maximum: 22 },
           definitionId: "specter",
-          effects: [
-            makeEffect({
-              id: `raised-${index}`,
-              name: "Under Wraith's control",
-              tags: ["raised"],
-              sourceActorId: MONSTER,
-              duration: { type: "manual" }
-            })
-          ]
+          summon: { by: MONSTER, actionId: "raised", name: "Create Specter" },
+          control: { by: MONSTER, side: "foes" }
         })
       );
     expect(() => crowded.raise()).toThrowError(/Wraith already controls 7 raised by Create Specter/);
