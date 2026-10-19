@@ -9,6 +9,7 @@ import {
   type EquipmentCatalog,
   type EquipmentDerivation
 } from "./equipment-derivation.js";
+import { spellbookRituals } from "./ritual-adept.js";
 
 /** The action list every actor-scoped consumer must read in place of `definition.actions`: item-derived
  *  actions plus standing riders (items, feats, features, live effects) folded into the numbers the resolver
@@ -24,8 +25,11 @@ export function effectiveActions(
   const taken = declared.map((action) =>
     withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition)
   );
+  // A Wizard's Ritual Adept casts a ritual from its book that the sheet doesn't list.
+  const rituals = spellbookRituals(definition, actor, catalog);
   // The definition's own list when nothing changed, so a caller holding it sees the same array.
-  const base = taken.every((action, index) => action === declared[index]) ? declared : taken;
+  const unchanged = taken.every((action, index) => action === declared[index]);
+  const base = unchanged && rituals.length === 0 ? declared : [...taken, ...rituals];
   if (!actor) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
   if (derivation.carriers.length === 0 && derivation.actions.length === 0) return base;

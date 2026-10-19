@@ -33,6 +33,7 @@ import {
   type RuleId
 } from "../rules-families.js";
 import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
+import { carriesSpellbook, hasClassFeature } from "../ritual-adept.js";
 import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
 import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
@@ -1134,18 +1135,26 @@ function checkSpellSlot({ state, attacker, action, slotLevel, violations }: Eval
  *  null. Cantrips, always-prepared spells, anything not on the sheet's list (an item's cast) and a sheet that keeps
  *  no prepared list (an import with no prepared cap) need nothing. */
 export function unpreparedSpell(
-  actor: Pick<LiveActor, "name" | "preparedSpellIds">,
+  actor: Pick<LiveActor, "name" | "preparedSpellIds"> & Partial<Pick<LiveActor, "inventory">>,
   action: Pick<DefinitionAction, "id" | "spellSlot" | "spellId">,
   definition: ActorDefinition | undefined
 ): string | null {
   if (action.spellId === undefined) return null;
   // A slot cast, or a Ritual ("To cast a spell as a Ritual, a spellcaster must have it prepared").
-  if (!action.spellSlot && action.id !== ritualSpellActionId(action.spellId)) return null;
+  const ritual = action.id === ritualSpellActionId(action.spellId);
+  if (!action.spellSlot && !ritual) return null;
   const spell = definition?.spellcasting?.spells.find((entry) => entry.id === action.spellId);
   if (!spell || spell.level === 0 || spell.alwaysPrepared || actor.preparedSpellIds.includes(spell.id)) return null;
   const classes = definition!.spellcasting!.classes ?? [];
   const casting = classes.length === 1 ? classes[0] : classes.find((entry) => entry.classId === spell.classId);
   if (casting?.prepared === undefined) return null;
+  // The Wizard's Ritual Adept: "You can cast any spell as a Ritual if that spell has the Ritual tag and the spell is
+  // in your spellbook. You needn't have the spell prepared, but you must read from the book to cast a spell in this
+  // way." A Wizard's spells on the sheet are its spellbook.
+  if (ritual && casting.classId === "wizard" && hasClassFeature(definition, "ritual-adept", "wizard"))
+    return carriesSpellbook({ inventory: actor.inventory ?? [] })
+      ? null
+      : `${actor.name} hasn't prepared ${spell.name}, and casting it as a Ritual unprepared needs the spellbook to read from.`;
   return `${actor.name} hasn't prepared ${spell.name}.`;
 }
 
