@@ -153,7 +153,7 @@ export const actionCommands = [
         const listed = statBlockAction ?? builtinActionFor(definition, actionId, attacker);
         if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
         // An action whose user picks its cost (Lay on Hands) resolves at the amount picked.
-        const action = withChosenCost(listed, request.spend);
+        const action = withChosenCost(listed, request.spend, request.conditionIds);
         // The GM may impose any condition; a player picks only among the ones the action lets its caster choose
         // (Blindness/Deafness), read from the spell too for a sheet built before the action carried them.
         const offered = conditionChoicesOf(
@@ -435,6 +435,8 @@ export const actionCommands = [
             ...(request.ability !== undefined ? { ability: request.ability } : {}),
             ...(request.optionId !== undefined ? { optionId: request.optionId } : {}),
             ...(request.targetOptions !== undefined ? { targetOptions: request.targetOptions } : {}),
+            ...(request.conditionIds !== undefined ? { conditionIds: request.conditionIds } : {}),
+            ...(request.healingShares !== undefined ? { healingShares: request.healingShares } : {}),
             ...(request.itemId !== undefined ? { itemId: request.itemId } : {}),
             ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
             ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),

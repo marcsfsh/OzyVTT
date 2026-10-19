@@ -73,6 +73,11 @@ export type ResolveInput = Readonly<{
   skill?: string | null;
   /** The ability a cast chooses (Hex). */
   ability?: "str" | "dex" | "con" | "int" | "wis" | "cha" | null;
+  /** The conditions an action with `conditionPicks` also ends on its target (Restoring Touch); their points were added
+   *  to the action's chosen cost. */
+  conditionIds?: readonly string[];
+  /** What each target regains from a heal its user divides (Preserve Life), checked against the pool and each cap. */
+  healingShares?: Readonly<Record<string, number>>;
   /** The option picked for an action that offers several (`grants.options`, `failureEffect.options`); absent, the
    *  first. */
   optionId?: string | null;

@@ -9,11 +9,14 @@ import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { potentRangeFeet } from "../class-features.js";
 import type { RuleId } from "../rules-families.js";
 import { sightRules } from "../vision/rules.js";
-import type { DefinitionAction, LiveActor } from "./context.js";
+import { areAllies } from "../creature-sides.js";
+import { sizeAtMost, type DefinitionAction, type LiveActor } from "./context.js";
+import { spellWardOf } from "./spell-wards.js";
 
 type Violation = Readonly<{ rule: RuleId; message: string }>;
 
 const rounded = (feet: number) => Math.round(feet * 10) / 10;
+const titled = (word: string) => `${word[0]!.toUpperCase()}${word.slice(1)}`;
 
 /** A spell's range in feet as a cast measures it: Touch is 5 feet, and a cantrip's range that doubles with its tiers
  *  (Spare the Dying) is doubled at character levels 5, 11 and 17. Null for Self, Sight and the ranges a map can't
@@ -84,6 +87,29 @@ export function spellTargetViolations(
   if (!picked) return violations;
 
   // "Choose a Humanoid": a creature of another type is still a target, which the spell doesn't affect (`type-gates.ts`).
+  const content = { resolveDefinition: input.resolveDefinition, catalog: input.catalog };
+  for (const targetId of unique) {
+    const target = state.actors.find((candidate) => candidate.id === targetId);
+    if (!target) continue;
+    // "A Tiny Beast" (Animal Messenger): a creature's size shows on the map.
+    if (effect?.targetMaxSize && !sizeAtMost(target.size, effect.targetMaxSize))
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${target.name} is too large for ${spell.name}, which targets a ${titled(effect.targetMaxSize)} creature or smaller.`
+      });
+    // "An object that isn't being worn or carried by someone else", "a willing creature": the caster or its side.
+    if (effect?.willingTargets && target.id !== attacker.id && !areAllies(attacker, target, input.resolveDefinition))
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${spell.name} targets ${attacker.name} or a willing creature, and ${target.name} isn't willing.`
+      });
+    // "The target can't be targeted by any Divination spell" (Nondetection).
+    if (spellWardOf(state, target, spell, attacker.id, content) !== null)
+      violations.push({
+        rule: "target.not-allowed",
+        message: `A ward keeps ${spell.name} from targeting ${target.name}.`
+      });
+  }
   // "A creature that you can see": the map answers with its vision on, and the conditions and the senses by distance
   // with it off (a Blinded caster, an Invisible target).
   if (effect?.seenTargets) {

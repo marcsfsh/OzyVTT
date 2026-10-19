@@ -111,7 +111,7 @@ function versusOf(actor: Actor, other: Actor, deps: CheckRollDependencies): Chec
   const definition = other.definitionId ? deps.resolveDefinition(other.definitionId) : undefined;
   return {
     actor: other,
-    humanoid: creatureTypeOf(other, definition) === "humanoid",
+    humanoid: creatureTypeOf(other, definition, "true") === "humanoid",
     feet: deps.distanceFeet?.(actor.id, other.id) ?? null
   };
 }

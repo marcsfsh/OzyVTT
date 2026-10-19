@@ -231,10 +231,14 @@ export function openResolve(
   const warnings: string[] = [];
   // A creature of a type the action can't affect is a target that nothing happens to, picked or caught in an area.
   const gated = typeGated({
+    state,
+    casterId: combatants.attacker.id,
     action: reaching,
     spell,
     targets: combatants.targets,
+    areaPlaced: input.areaPlaced === true,
     resolveDefinition: deps.resolveDefinition,
+    catalog: deps.catalog,
     hidden: hiddenFromInitiator
   });
   warnings.push(...gated.warnings);

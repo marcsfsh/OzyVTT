@@ -7,10 +7,11 @@ import { areAllies, areEnemies } from "../creature-sides.js";
 import { endEffect } from "../effects.js";
 import { hiddenFrom } from "../vision/audience.js";
 import { sightRules } from "../vision/rules.js";
-import type { EquipmentCatalog } from "../equipment-derivation.js";
+import { deriveEquipment, type EquipmentCatalog } from "../equipment-derivation.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { enteredOnMoveOf } from "../granted-moves.js";
+import { specialSpeedsOf } from "../speed.js";
 import type { RuleId } from "../rules-families.js";
 import { endedEffect, sizeAtMost, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
 
@@ -69,16 +70,21 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
   const rules = action.targets;
   if (!rules) return violations;
   // "A creature you can see": the map with its vision on, else the conditions and the senses by distance.
-  const sight = rules.seen
-    ? sightRules(
-        state,
-        {
-          ...(resolveDefinition ? { definition: resolveDefinition } : {}),
-          ...(check.catalog ? { catalog: check.catalog } : {})
-        },
-        distanceFeet
-      )
-    : null;
+  const sight =
+    rules.seen || rules.perceivesUser
+      ? sightRules(
+          state,
+          {
+            ...(resolveDefinition ? { definition: resolveDefinition } : {}),
+            ...(check.catalog ? { catalog: check.catalog } : {})
+          },
+          distanceFeet
+        )
+      : null;
+  // It hears the user unless it is Deafened or the user stands where no sound can be made (Silence).
+  const perceives = (target: LiveActor, user: LiveActor) =>
+    sight?.canSee(target.id, user.id) === true ||
+    (!target.conditions.some((condition) => condition.id === "deafened") && !silenced(user, check.catalog));
   // Taken move first, it reaches only the creatures its move entered; taken where it stands, the GM picks them.
   const entered = rules.entered ? enteredOnMoveOf(attacker, action.id) : null;
   for (const target of targets) {
@@ -149,12 +155,37 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
         rule: "target.not-allowed",
         message: `${action.name} targets a creature at 0 Hit Points, and ${name} isn't.`
       });
+    // "Choose Bloodied creatures" (Preserve Life): at half its Hit Points or fewer, which its health band shows.
+    if (rules.bloodied && !bloodied(target))
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} targets a Bloodied creature, and ${name} isn't.`
+      });
+    // "A Beast that has a Swim Speed" (Trident of Fish Command).
+    if (rules.speeds) {
+      const speeds = specialSpeedsOf(
+        target,
+        targetDefinition,
+        deriveEquipment(target, targetDefinition, check.catalog)
+      );
+      if (!rules.speeds.some((mode) => (speeds[mode] ?? 0) > 0))
+        violations.push({
+          rule: "target.not-allowed",
+          message: `${action.name} targets a creature with a ${rules.speeds.map((mode) => `${mode[0]!.toUpperCase()}${mode.slice(1)}`).join(" or ")} Speed, and ${name} has none.`
+        });
+    }
+    // "Another creature ... who can see or hear you" (Bardic Inspiration).
+    if (rules.perceivesUser && !self && !perceives(target, attacker))
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} needs a creature that can see or hear ${attacker.name}, and ${name} can do neither.`
+      });
     if (rules.markedBy && !markedBy(target, attacker, rules.markedBy))
       violations.push({
         rule: "target.not-allowed",
         message: `${action.name} targets the creature ${attacker.name} marked with it, and ${name} isn't marked.`
       });
-    if (sight && !self && !sight.canSee(attacker.id, target.id))
+    if (rules.seen && sight && !self && !sight.canSee(attacker.id, target.id))
       violations.push({
         rule: "target.not-allowed",
         message: `${action.name} targets a creature ${attacker.name} can see.`
@@ -188,6 +219,15 @@ const heldName = (actionId: string) =>
     .split("-")
     .map((word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`)
     .join(" ");
+
+/** SRD Bloodied: "while it has half its Hit Points or fewer remaining". */
+const bloodied = (target: LiveActor) => target.hp.current <= target.hp.maximum / 2;
+
+/** The creature stands inside a spell's area where no sound can be made: it holds that spell's aura (Silence). */
+const silenced = (actor: LiveActor, catalog: EquipmentCatalog | undefined) =>
+  actor.effects.some(
+    (effect) => effect.spell !== undefined && catalog?.spellRecord?.(effect.spell.id)?.effect?.silencesArea === true
+  );
 
 const grappledBy = (target: LiveActor, source: LiveActor) =>
   target.effects.some((effect) => effect.sourceActorId === source.id && effect.linkedConditionIds.includes("grappled"));

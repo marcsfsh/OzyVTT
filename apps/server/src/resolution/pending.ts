@@ -23,7 +23,7 @@ import { spellOf, spellSaveDuration } from "./concentration.js";
 import { endedByAt, repeatSaveOf } from "../save-stages.js";
 import { areEnemies } from "../creature-sides.js";
 import { AURA_IMMUNE_TAG, traitActionId } from "../statblock-traits.js";
-import { creatureTypeOf } from "../statblock-facts.js";
+import { creatureTypeOf, statblockFacts } from "../statblock-facts.js";
 import { openDamageWindow, type DamageWindowDeps } from "../damage-window.js";
 import { answerKeyOf, answersFromOthers, askAnswer } from "../roll-answers.js";
 import { heightenedTarget, shieldedFromSave } from "./metamagic.js";
@@ -813,6 +813,20 @@ function autoSuccessOf(ctx: ResolveContext, target: ResolveContext["targets"][nu
       target.conditionImmunities.includes("exhaustion"))
   )
     return "doesn't sleep";
+  // SRD Truesight: "Visual illusions appear transparent to you, and you automatically succeed on saving throws against
+  // them." The illusion is where the creature is (a pattern around it, a phantasm in its mind), so any range reaches.
+  if (rule.truesight) {
+    const content = {
+      ...(ctx.deps.resolveDefinition ? { definition: ctx.deps.resolveDefinition } : {}),
+      ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {})
+    };
+    if ((sightRules(ctx.state, content).sensesOf(target.id)?.truesight ?? 0) > 0) return "Truesight";
+  }
+  // "If the target's Challenge Rating isn't 0, it automatically succeeds" (Animal Messenger). The reason names no exact
+  // rating, which is the GM's.
+  const rating = definition ? statblockFacts(definition).challengeRating : null;
+  if (rule.challengeRatingAbove !== undefined && rating !== null && rating > rule.challengeRatingAbove)
+    return `Challenge Rating above ${rule.challengeRatingAbove}`;
   return "";
 }
 

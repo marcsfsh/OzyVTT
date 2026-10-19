@@ -692,7 +692,10 @@
   "save": {
    "ability": "cha",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "autoSuccess": {
+    "challengeRatingAbove": 0
+   }
   },
   "target": {
    "type": "creature",
@@ -710,7 +713,8 @@
    "seenTargets": true,
    "targetTypes": [
     "beast"
-   ]
+   ],
+   "targetMaxSize": "tiny"
   },
   "classes": [
    "bard",
@@ -1652,7 +1656,136 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Arcanist's Magic Aura",
+    "tags": [
+     "arcanists-magic-aura"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    },
+    "options": [
+     {
+      "id": "aberration",
+      "name": "Mask: Aberration",
+      "tags": [
+       "masked-as-aberration"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "beast",
+      "name": "Mask: Beast",
+      "tags": [
+       "masked-as-beast"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "celestial",
+      "name": "Mask: Celestial",
+      "tags": [
+       "masked-as-celestial"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "construct",
+      "name": "Mask: Construct",
+      "tags": [
+       "masked-as-construct"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "dragon",
+      "name": "Mask: Dragon",
+      "tags": [
+       "masked-as-dragon"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "elemental",
+      "name": "Mask: Elemental",
+      "tags": [
+       "masked-as-elemental"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "fey",
+      "name": "Mask: Fey",
+      "tags": [
+       "masked-as-fey"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "fiend",
+      "name": "Mask: Fiend",
+      "tags": [
+       "masked-as-fiend"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "giant",
+      "name": "Mask: Giant",
+      "tags": [
+       "masked-as-giant"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "humanoid",
+      "name": "Mask: Humanoid",
+      "tags": [
+       "masked-as-humanoid"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "monstrosity",
+      "name": "Mask: Monstrosity",
+      "tags": [
+       "masked-as-monstrosity"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "ooze",
+      "name": "Mask: Ooze",
+      "tags": [
+       "masked-as-ooze"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "plant",
+      "name": "Mask: Plant",
+      "tags": [
+       "masked-as-plant"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "undead",
+      "name": "Mask: Undead",
+      "tags": [
+       "masked-as-undead"
+      ],
+      "modifiers": []
+     }
+    ]
+   },
+   "willingTargets": true
   },
   "classes": [
    "wizard"
@@ -1921,11 +2054,48 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "ability-score-minimum",
+      "ability": "int",
+      "score": 10
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Awakened",
+    "tags": [
+     "awakened"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   },
    "targetTypes": [
     "beast",
     "plant"
-   ]
+   ],
+   "inflicts": {
+    "conditions": [
+     "charmed"
+    ],
+    "duration": {
+     "type": "minutes",
+     "minutes": 43200
+    },
+    "endsOnSourceSideDamage": true
+   },
+   "targetAbilityMax": {
+    "ability": "int",
+    "score": 3
+   }
   },
   "classes": [
    "bard",
@@ -6455,7 +6625,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "willingTargets": true
   },
   "sight": {
    "light": {
@@ -16370,7 +16544,10 @@
     "incapacitated"
    ],
    "endsOnDamage": true,
-   "speedZero": true
+   "speedZero": true,
+   "autoSuccess": {
+    "truesight": true
+   }
   },
   "target": {
    "type": "creature",
@@ -17806,7 +17983,8 @@
     ],
     "modifiers": []
    },
-   "seenTargets": true
+   "seenTargets": true,
+   "unwillingOnly": true
   },
   "classes": [
    "sorcerer",
@@ -17853,7 +18031,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 1
+   },
+   "healing": null,
+   "willingTargets": true
   },
   "sight": {
    "light": {
@@ -19740,6 +19922,12 @@
       "damageTypes": [
        "psychic"
       ]
+     },
+     {
+      "type": "spell-ward",
+      "schools": [
+       "divination"
+      ]
      }
     ],
     "onEnd": [],
@@ -20517,7 +20705,29 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "spell-ward",
+      "schools": [
+       "divination"
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Nondetection",
+    "tags": [
+     "nondetection"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   },
+   "willingTargets": true
   },
   "classes": [
    "bard",
@@ -20705,6 +20915,9 @@
      "ability": "int",
      "skill": "investigation"
     }
+   },
+   "autoSuccess": {
+    "truesight": true
    }
   },
   "target": {
@@ -20778,7 +20991,10 @@
    "successDamage": "half",
    "failureConditions": [],
    "repeatSave": true,
-   "repeatDamageAgain": true
+   "repeatDamageAgain": true,
+   "autoSuccess": {
+    "truesight": true
+   }
   },
   "target": {
    "type": "creature",
@@ -24340,7 +24556,8 @@
    "attacks": 0,
    "damage": [],
    "healing": null,
-   "seenTargets": true
+   "seenTargets": true,
+   "unwillingOnly": true
   },
   "classes": [
    "bard",

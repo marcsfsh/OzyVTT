@@ -166,7 +166,8 @@ export const rogue: ClassMechanicsModule = {
           description:
             "When an attacker you can see hits you with an attack roll, you can take a Reaction to halve the attack's damage against you (round down).",
           damage: [],
-          reaction: { trigger: "hit-by-attack", response: "half-damage" }
+          // "When an attacker that you can see hits you."
+          reaction: { trigger: "hit-by-attack", response: "half-damage", seenAttacker: true }
         }
       ]
     },

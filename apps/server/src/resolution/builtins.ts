@@ -345,7 +345,7 @@ function influence(ctx: ResolveContext): void {
   const monsterDefinition = monster?.definitionId ? ctx.deps.resolveDefinition?.(monster.definitionId) : undefined;
   const dc = monsterDefinition ? Math.max(15, monsterDefinition.abilityScores.int) : null;
   const subject = chosenSubject(ctx, "cha");
-  const type = monster ? creatureTypeOf(monster, monsterDefinition) : null;
+  const type = monster ? creatureTypeOf(monster, monsterDefinition, "true") : null;
   if (subject.skill === "animal-handling" && type !== null && type !== "beast" && type !== "monstrosity")
     throw new CommandRejectedError(
       `Animal Handling influences a Beast or Monstrosity, and ${monster!.name} is ${/^[aeiou]/.test(type) ? "an" : "a"} ${titleCase(type)}.`
