@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 14 GameState fields · 155 commands · 331 HTTP paths
+- 14 GameState fields · 164 commands · 340 HTTP paths
 
 ## GameState shape
 
@@ -35,7 +35,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 one table entry under `apps/server/src/commands/`. Both transports register from that table, and
 the OpenAPI document generates the command's operation from it. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `item`, `light`, `object`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `fog`, `initiative`, `item`, `light`, `object`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `scene`, `sound`, `spell-zone`, `summon`, `survival`, `table`, `terrain`, `time`, `token`, `turn`, `vision`, `wall`.
 
 | Command | Scope |
 | --- | --- |
@@ -48,8 +48,10 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `actor.fall` | `combat:write` |
 | `actor.give-heroic-inspiration` | `actor:write` |
 | `actor.heal` | `actor:write` |
+| `actor.hold-breath` | `actor:write` |
 | `actor.import-definition` | `actor:write` |
 | `actor.mount` | `combat:write` |
+| `actor.nourish` | `actor:write` |
 | `actor.rechoose` | `actor:write` |
 | `actor.remove` | `actor:write` |
 | `actor.remove-samples` | `actor:write` |
@@ -58,6 +60,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `actor.revive` | `actor:write` |
 | `actor.set-archived` | `actor:write` |
 | `actor.set-armor-class` | `actor:write` |
+| `actor.set-attitude` | `actor:write` |
 | `actor.set-condition` | `actor:write` |
 | `actor.set-health-display` | `actor:write` |
 | `actor.set-heroic-inspiration` | `actor:write` |
@@ -129,6 +132,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `fog.reset` | `scene:write` |
 | `fog.set-enabled` | `scene:write` |
 | `initiative.next` | `combat:write` |
+| `initiative.order-tie` | `combat:write` |
 | `initiative.previous` | `combat:write` |
 | `initiative.roll-remaining` | `combat:write` |
 | `initiative.roll-self` | `combat:write` |
@@ -173,6 +177,11 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `check`, `d
 | `sound.stop` | `scene:write` |
 | `spell-zone.end` | `combat:write` |
 | `spell-zone.place` | `combat:write` |
+| `summon.command` | `combat:write` |
+| `summon.dismiss` | `combat:write` |
+| `summon.look` | `combat:write` |
+| `summon.recall` | `combat:write` |
+| `survival.set-tracking` | `combat:write` |
 | `table.set-party-visibility` | `combat:write` |
 | `table.set-staging-defaults` | `combat:write` |
 | `terrain.paint` | `scene:write` |
@@ -304,7 +313,9 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `DELETE /api/v1/game/actors/{actorId}`
 - `POST /api/v1/game/actors/{actorId}/archived`
 - `POST /api/v1/game/actors/{actorId}/armor-class`
+- `POST /api/v1/game/actors/{actorId}/attitude`
 - `GET /api/v1/game/actors/{actorId}/available-actions`
+- `POST /api/v1/game/actors/{actorId}/breath`
 - `POST /api/v1/game/actors/{actorId}/check`
 - `POST /api/v1/game/actors/{actorId}/check/answer`
 - `POST /api/v1/game/actors/{actorId}/check/reroll`
@@ -335,6 +346,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/mount`
 - `GET /api/v1/game/actors/{actorId}/movement`
 - `GET /api/v1/game/actors/{actorId}/next-level`
+- `POST /api/v1/game/actors/{actorId}/nourish`
 - `POST /api/v1/game/actors/{actorId}/prepared-spell`
 - `POST /api/v1/game/actors/{actorId}/proficiencies`
 - `POST /api/v1/game/actors/{actorId}/rebuild`
@@ -348,6 +360,10 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/spellbook`
 - `POST /api/v1/game/actors/{actorId}/spend-hit-dice`
 - `POST /api/v1/game/actors/{actorId}/stabilize`
+- `POST /api/v1/game/actors/{actorId}/summon/dismiss`
+- `POST /api/v1/game/actors/{actorId}/summon/look`
+- `POST /api/v1/game/actors/{actorId}/summon/recall`
+- `POST /api/v1/game/actors/{actorId}/summons/command`
 - `POST /api/v1/game/actors/{actorId}/swap-spell`
 - `POST /api/v1/game/actors/{actorId}/temp-hp`
 - `POST /api/v1/game/actors/{actorId}/token-image`
@@ -395,6 +411,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/fog/paint`
 - `POST /api/v1/game/fog/reset`
 - `POST /api/v1/game/initiative/next`
+- `POST /api/v1/game/initiative/order-tie`
 - `POST /api/v1/game/initiative/previous`
 - `POST /api/v1/game/initiative/roll-remaining`
 - `POST /api/v1/game/initiative/roll-self`
@@ -439,6 +456,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/sound/stop`
 - `POST /api/v1/game/spell-zones/{zoneId}/end`
 - `POST /api/v1/game/spell-zones/{zoneId}/place`
+- `POST /api/v1/game/survival`
 - `POST /api/v1/game/table/party-visibility`
 - `POST /api/v1/game/table/staging-defaults`
 - `POST /api/v1/game/terrain/paint`

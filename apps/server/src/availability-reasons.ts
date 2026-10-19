@@ -8,6 +8,7 @@ import type { DefinitionAction, LiveActor } from "./resolution/context.js";
 import { hitRiderOf } from "./resolution/hit-riders.js";
 import { markMoveOf } from "./resolution/marks.js";
 import { familyOf, type RuleId } from "./rules-families.js";
+import { END_EFFECT_ACTION_ID, NO_ENDING_OPTION } from "./ending-actions.js";
 import { readyIn } from "./clock-pools.js";
 
 /**
@@ -89,6 +90,7 @@ function requiresReason({ attacker, action, spell }: ReasonFacts): string {
     return `Only while ${conditionLabel(action.requiresEffectTag)}.`;
   if (spell && markMoveOf(spell, action.id)) return `You aren't concentrating on ${spell.name}.`;
   if (spell && laterRowOf(spell, action.id)) return `Cast ${spell.name} first.`;
+  if (action.id === END_EFFECT_ACTION_ID) return NO_ENDING_OPTION;
   return "It needs an effect you don't have now.";
 }
 
@@ -127,6 +129,8 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "condition.down": () => "You can't act at 0 Hit Points.",
   "condition.imposed": () => "It ends by its own rules or the GM's say.",
   "condition.raging": () => "You can't cast spells while raging.",
+  "summon.cant-attack": () => "This creature can't attack.",
+  "summon.command": () => "Your command doesn't reach that far.",
   "condition.no-reactions": () => "You can't take Reactions now.",
   "condition.no-spells": () => "You can't cast spells now.",
   "condition.cant-attack": () => "You can't attack now.",

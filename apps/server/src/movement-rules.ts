@@ -358,10 +358,14 @@ const sharesSpace = (state: GameState, actorId: string, input: MovementRulesInpu
   return (swarmOnly ? ["Swarm"] : SHARES_SPACE).some((name) => holdsFeature(definition, name, name));
 };
 
+/** A spell's force that neither blocks a space nor is blocked (Spiritual Weapon's force, an Arcane Eye). */
+const intangible = (state: GameState, actorId: string): boolean =>
+  state.actors.find((actor) => actor.id === actorId)?.summon?.intangible === true;
+
 /** SRD: "You can't willingly end a move in a space occupied by another creature." Hidden creatures don't count, so
  *  the refusal can't give one away; neither do the creatures the mover drags. */
 function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Point, everyone = false): boolean {
-  if (!input.calibration) return false;
+  if (!input.calibration || intangible(state, input.actorId)) return false;
   const moverActor = state.actors.find((actor) => actor.id === input.actorId);
   // Air Form and Water Form as the stalker and the water elemental print them: "can enter an enemy's space and stop
   // there", so only an enemy's space is one it may end in.
@@ -377,7 +381,7 @@ function endsInOccupiedSpace(state: GameState, input: MovementRulesInput, to: Po
     if (ridesWith(state, input.actorId, token.actorId)) return false;
     // A creature above or below the mover's space at the end isn't in it (a flier over a goblin).
     if (moverToken && !sharesHeight(moverToken, token, feetPerCell, input.toAltitudeFeet ?? 0)) return false;
-    if (sharesSpace(state, token.actorId, input, true)) return false;
+    if (sharesSpace(state, token.actorId, input, true) || intangible(state, token.actorId)) return false;
     const occupant = state.actors.find((actor) => actor.id === token.actorId);
     if (enemiesOnly && moverActor && occupant && areEnemies(moverActor, occupant, input.resolveDefinition))
       return false;

@@ -158,6 +158,8 @@ describe("SRD monster save damage is what the failure deals at once", () => {
           const first = failure.split(/(?<=\.)\s/)[0] ?? "";
           if (/^If the (?:target|creature) has \d+ Hit Points/.test(first) || action.reminder?.startsWith("Roar runs"))
             return [];
+          // A type each use picks (a half-dragon's breath, of its Draconic Origin's type) is printed with no type.
+          if (action.damageTypes !== undefined) return [];
           const want = [...first.matchAll(/\d+ \((\d+d\d+(?:\s*[+-]\s*\d+)?)\) ([A-Za-z]+) damage/g)].map(
             ([, dice, type]) => `${normal(dice)} ${type.toLowerCase()}`
           );

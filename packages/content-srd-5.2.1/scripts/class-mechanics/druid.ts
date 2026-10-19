@@ -154,10 +154,22 @@ export const druid: ClassMechanicsModule = {
       ]
     },
 
-    // Find Familiar always prepared, and cast with a slot or a use of Wild Shape (the shared pool).
+    // Find Familiar always prepared, and cast "as a Magic action" with a slot or a use of Wild Shape (the shared
+    // pool): "the familiar is Fey and disappears when you finish a Long Rest".
     "wild-companion": {
       uses: { scaling: { type: "class-resource", id: "wild-shape" }, per: "long-rest", pool: "wild-shape" },
-      grants: { spells: [{ id: "find-familiar", level: 1, alwaysPrepared: true, withoutSlot: "free" }] }
+      grants: {
+        spells: [
+          {
+            id: "find-familiar",
+            level: 1,
+            alwaysPrepared: true,
+            withoutSlot: "free",
+            asMagicAction: "every-casting",
+            summon: { creatureTypes: ["fey"], untilLongRest: true }
+          }
+        ]
+      }
     },
 
     /**

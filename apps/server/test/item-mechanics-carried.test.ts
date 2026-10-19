@@ -10,7 +10,7 @@ import { effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { setInventoryItem } from "../src/inventory.js";
 import { answerSave, createPendingSaves, saveTotalFor } from "../src/saving-throws.js";
-import { startEncounter } from "../src/encounter.js";
+import { initiativeRollFor, startEncounter } from "../src/encounter.js";
 import { builtinAction } from "../src/builtin-actions.js";
 import { looseRollPlan, spendLooseUses } from "../src/tap-routing.js";
 
@@ -377,6 +377,36 @@ describe("the Stone of Good Luck: both halves reach the roll", () => {
     );
     expect(hide.check!.total).toBe(13); // d20 10 + Dex 2 + the stone's 1
   });
+
+  it("reaches Initiative, a Dexterity check, on the roll and on the sheet", () => {
+    const definition = definitionOf();
+    const content = { resolveDefinition: () => definition, catalog };
+    const bare = stateWith([]);
+    const lucky = stateWith([carried("stone-of-good-luck-luckstone", "Stone of Good Luck")]);
+    expect(initiativeRollFor(bare, IDS.hero, false, content).checkBonus).toBe(0);
+    expect(initiativeRollFor(lucky, IDS.hero, false, content).checkBonus).toBe(1);
+    const sheetOf = (state: GameState) =>
+      deriveActorSheet(
+        state.actors[0],
+        definition,
+        deriveEquipment(state.actors[0], definition, catalog),
+        skillCatalog
+      );
+    expect(sheetOf(lucky).initiative).toBe(sheetOf(bare).initiative + 1);
+    // The roll adds it: d20 10, the stored Dexterity +2, the stone's +1.
+    startEncounter(
+      lucky,
+      { mapAssetId: IDS.map, entries: [{ actorId: IDS.hero }, { actorId: IDS.foe, score: 1 }] },
+      () => 10,
+      GEOMETRY,
+      () => definition,
+      0,
+      catalog
+    );
+    expect(lucky.combat.initiative.find((entry) => entry.actorId === IDS.hero)?.score).toBe(
+      10 + (lucky.actors[0].initiative ?? 0) + 1
+    );
+  });
 });
 
 describe("what the carried items' buttons do outside an encounter", () => {
@@ -458,7 +488,7 @@ describe("the one printed to-hit among carried items that the vocabulary can say
   });
 });
 
-describe("the charge-alone items, whose counter is the whole of what they enforce", () => {
+describe("the charged items with no roll of their own, whose counter they enforce", () => {
   it("rations the four elemental summons at one a day and the three-charge items at three", () => {
     const definition = definitionOf();
     for (const [id, name, actionId, limit, label] of [
@@ -490,7 +520,7 @@ describe("the charge-alone items, whose counter is the whole of what they enforc
         1,
         "Summon Earth Elemental"
       ],
-      ["bag-of-tricks", "Bag of Tricks", "item-bag-of-tricks-pull", 3, "Pull a Fuzzy Object"],
+      ["bag-of-tricks", "Bag of Tricks", "item-bag-of-tricks-pull-gray", 3, "Pull a Fuzzy Object (Gray bag)"],
       ["gem-of-seeing", "Gem of Seeing", "item-gem-of-seeing-peer", 3, "Peer Through the Gem"],
       ["pipes-of-the-sewers", "Pipes of the Sewers", "item-pipes-of-the-sewers-call", 3, "Call a Swarm of Rats"]
     ] as const) {
@@ -498,7 +528,7 @@ describe("the charge-alone items, whose counter is the whole of what they enforc
       const actor = state.actors[0];
       const action = effectiveActions(definition, actor, catalog).find((entry) => entry.id === actionId)!;
       expect(action.uses).toEqual({ limit, per: "long-rest", pool: `${id}-charges` });
-      // The charge is all these enforce.
+      // No roll of their own: the charge, and the creature the summoning ones bring (`summon-items.test.ts`).
       expect(action.damage).toEqual([]);
       expect(action.attack).toBeUndefined();
       expect(action.save).toBeUndefined();

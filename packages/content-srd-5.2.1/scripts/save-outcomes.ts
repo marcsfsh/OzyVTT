@@ -8,6 +8,7 @@ import {
   DamageTypeSchema,
   SaveConditionSchema,
   type DamageType,
+  type EndedBy,
   type ForcedPush,
   type ObjectPrint,
   type OngoingDamage,
@@ -31,6 +32,25 @@ export type SaveOutcome = {
   ignoresCover?: true;
   failurePush?: ForcedPush;
   advantageAtSize?: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
+  repeatOnce?: true;
+  repeatAtTurnStart?: true;
+  repeatOnDamage?: { advantage?: true; notFromSource?: true };
+  repeatByAction?: true;
+  repeatFailureDamage?: { formula: string; type: DamageType }[];
+  repeatTally?: number;
+  secondFailure?: SecondFailure;
+  failureExhaustion?: number;
+  advantageIfFighting?: true;
+  immuneOnSuccess?: true;
+  endsWhenSourceDies?: true;
+  endedBy?: EndedBy;
+  onlyCreatureTypes?: string[];
+  sparesAffected?: true;
+  failureKills?: { sourceRegains?: string };
+  repeatDamageAgain?: true;
+  repeatUnseenSource?: true;
+  endsOutOfSight?: true;
+  autoSuccess?: { creatureTypes?: string[]; sleepless?: true };
   failureEndsForm?: true;
   breaksConcentration?: true;
   heldBy?: ObjectPrint;
@@ -86,6 +106,16 @@ export function heldByOf(clause: string): ObjectPrint | undefined {
     ...(vulnerabilities.length > 0 ? { vulnerabilities } : {})
   };
 }
+
+/** What a failed repeat leaves in place of the first failure ("Second Failure"). */
+export type SecondFailure = {
+  name?: string;
+  conditions: SaveCondition[];
+  duration?: SaveFailureDuration;
+  endsOnDamage?: true;
+  repeatSave?: true;
+  endedBy?: EndedBy;
+};
 
 /** The push a failure clause prints: "is pushed 10 feet away from you", "pushed up to 30 feet straight away from the
  *  dragon". */
@@ -225,6 +255,9 @@ export function hitPointLossOf(description: string): Readonly<{
     modifiers: [];
   };
   ongoingDamage: OngoingDamage;
+  endedBy?: EndedBy;
+  /** "If the target ... doesn't already have an infernal wound": one wound at a time. */
+  oneAtATime?: true;
   reminder: string | null;
 }> | null {
   const loss = /\bloses \d+ \((\d+d\d+(?: [+-] \d+)?)\) Hit Points at the start of each of its turns\b/.exec(
@@ -248,9 +281,17 @@ export function hitPointLossOf(description: string): Readonly<{
       modifiers: []
     },
     ongoingDamage: { damage: [{ formula: loss[1]! }], at: "bearer-turn-start", hitPointLoss: true },
-    reminder: stanch
-      ? `The ${name.toLowerCase()} also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC ${stanch[1]} Wisdom (Medicine) check: end it by hand.`
-      : null
+    ...(stanch
+      ? {
+          endedBy: {
+            name: "Stanch the wound",
+            by: "either" as const,
+            check: { ability: "wis" as const, skill: "medicine", dc: Number.parseInt(stanch[1]!, 10) }
+          }
+        }
+      : {}),
+    ...(/\bdoesn[\u2019']t already have an? [a-z]+ wound\b/.test(description) ? { oneAtATime: true as const } : {}),
+    reminder: null
   };
 }
 
@@ -299,20 +340,155 @@ function failureLifetime(clause: string, named: NamedConditions): Omit<SaveOutco
 export function statBlockSaveOutcome(description: string): SaveOutcome {
   const start = description.search(/\b(?:First Failure|Failure:)/);
   const tail = start === -1 ? "" : description.slice(start);
-  const end = tail.search(
-    /\b(?:Failure or Success:|Success:|Second Failure|Subsequent Failures:|Failure by \d+ or More)|\s-\s(?:Second|Third) /
-  );
+  const end = tail.search(STAT_BLOCK_LABEL);
   const failure = end === -1 ? tail : tail.slice(0, end);
   const success = /(?<!or )\bSuccess:\s*Half damage\b/.test(description);
   const lifetime = failureLifetime(failure, namedConditions(failure));
   const reach =
     lifetime.escapeDc !== undefined ? description.slice(0, Math.max(0, start)).match(/\bwithin (\d+) feet\b/) : null;
   const heldBy = lifetime.failureConditions.includes("restrained") ? heldByOf(failure) : undefined;
+  const second = secondFailureOf(description);
+  // "Until the end of its next turn, at which point it repeats the save", "repeats the save at the end of its next turn".
+  const once =
+    second !== undefined ||
+    /\brepeats the save at the end of its next turn\b|\b(?:at which point|when) it repeats the save\b/.test(failure);
+  const exhaustion = /\bgains (\d) Exhaustion levels?\b/.exec(failure);
+  // "The target dies, and the wisp regains 10 (3d6) Hit Points."
+  const dies =
+    /^Failure: The target dies(?:, and the [a-z' -]+ regains \d+ \((\d+d\d+(?: [+-] \d+)?)\) Hit Points)?/.exec(
+      failure
+    );
+  // "If the target is a Humanoid, it is subjected to the following effect."
+  const only = /\bIf the target is an? ([A-Z][a-z]+), it is subjected to the following effect\b/.exec(description);
+  const onDamage = /\bwhenever it takes damage from a source other than\b/.test(description)
+    ? { notFromSource: true as const }
+    : /\brepeats the save whenever it takes damage\b/.test(description)
+      ? {}
+      : undefined;
   return {
     successDamage: success ? "half" : "none",
     ...lifetime,
     ...(reach ? { rangeFeet: Number.parseInt(reach[1]!, 10) } : {}),
-    ...(heldBy ? { heldBy } : {})
+    ...(heldBy ? { heldBy } : {}),
+    ...(once && lifetime.repeatSave !== true ? { repeatOnce: true as const } : {}),
+    ...(second ? { secondFailure: second } : {}),
+    ...(exhaustion ? { failureExhaustion: Number.parseInt(exhaustion[1]!, 10) } : {}),
+    ...(onDamage ? { repeatOnDamage: onDamage } : {}),
+    // "Success: The target is immune to this cloaker's Moan for the next 24 hours."
+    ...(/(?<!or )\bSuccess:\s*The target is immune to this\b/.test(description)
+      ? { immuneOnSuccess: true as const }
+      : {}),
+    ...(dies ? { failureKills: dies[1] ? { sourceRegains: dies[1] } : {} } : {}),
+    ...(only && only[1] !== "Creature" ? { onlyCreatureTypes: [only[1]!.toLowerCase()] } : {}),
+    // "Each creature that isn't currently affected by this breath".
+    ...(/\bthat isn[\u2019']t currently affected by this\b/.test(description) ? { sparesAffected: true as const } : {}),
+    // "Or until it ends its turn with the nalfeshnee out of line of sight".
+    ...(/\buntil it ends its turn with the [a-z' -]+ out of line of sight\b/.test(failure)
+      ? { endsOutOfSight: true as const }
+      : {}),
+    ...(WAKE.test(failure) && !second ? { endedBy: { ...WAKE_ACTION } } : {}),
+    // "Until the aboleth dies".
+    ...(/\buntil the [a-z' -]+? dies\b/.test(failure) && lifetime.failureConditions.length > 0
+      ? { endsWhenSourceDies: true as const }
+      : {})
+  };
+}
+
+/** The roll-mode riders "Disadvantage on Strength-based D20 Tests" makes: attack rolls, saving throws and ability checks
+ *  that use Strength. */
+const STRENGTH_TESTS = [
+  ["attack", "on-attack-roll"],
+  ["save", "on-saving-throw"],
+  ["check", "on-ability-check"]
+].map(([roll, moment]) => ({
+  type: "roll-mode" as const,
+  roll: roll as "attack" | "save" | "check",
+  mode: "disadvantage" as const,
+  when: [
+    { type: moment as "on-attack-roll" | "on-saving-throw" | "on-ability-check" },
+    { type: "ability-is" as const, abilities: ["str" as const] }
+  ]
+}));
+
+/** What a failure leaves besides conditions, as one effect named for its action. */
+export type FailureRestrictions = Readonly<{
+  failureEffect: { name: string; tags: string[]; modifiers: typeof STRENGTH_TESTS };
+  failureDuration?: SaveFailureDuration;
+  repeatSave?: true;
+  /** What the engine leaves to the GM. */
+  reminder?: string;
+}>;
+
+/**
+ * A stat-block failure that names no condition but restricts the target, as one effect named for the action: a
+ * copper dragon's Slowing Breath ("can't take Reactions; its Speed is halved; and it can take either an action or a
+ * Bonus Action on its turn, not both. This effect lasts until the end of its next turn") and a gold dragon's Weakening
+ * Breath ("Disadvantage on Strength-based D20 Test ... It repeats the save at the end of each of its turns ... After 1
+ * minute, it succeeds automatically"). The damage penalty Weakening Breath adds is said in `reminder`. Null when the
+ * clause prints none of these.
+ */
+export function failureRestrictionsOf(description: string, name: string): FailureRestrictions | null {
+  const start = description.search(/\b(?:First Failure|Failure:)/);
+  if (start === -1) return null;
+  const tail = description.slice(start);
+  const end = tail.search(STAT_BLOCK_LABEL);
+  const clause = end === -1 ? tail : tail.slice(0, end);
+  if (namedConditions(clause).conditions.length > 0) return null;
+  const tags = [
+    ...(/\bcan[\u2019']t take Reactions\b/.test(clause) ? ["no-reactions"] : []),
+    ...(/\bits Speed is halved\b/.test(clause) ? ["speed-halved"] : []),
+    ...(/\bcan take either an action or a Bonus Action on its turn, not both\b/.test(clause) ? ["action-or-bonus"] : [])
+  ];
+  const modifiers = /\bDisadvantage on Strength-based D20 Tests?\b/.test(clause) ? STRENGTH_TESTS : [];
+  if (tags.length === 0 && modifiers.length === 0) return null;
+  const duration = /\bThis effect lasts until the end of its next turn\b/.test(clause)
+    ? ({ type: "until-bearer-turn-end" } as const)
+    : failureDurationOf(clause);
+  const penalty = /\bsubtracts \d+ \((\d+d\d+)\) from its damage rolls\b/.exec(clause);
+  return {
+    failureEffect: { name, tags, modifiers },
+    ...(duration ? { failureDuration: duration } : {}),
+    ...(repeatsEachTurn(clause) || /\bIt repeats the save at the end of each of its turns\b/.test(clause)
+      ? { repeatSave: true as const }
+      : {}),
+    ...(penalty
+      ? {
+          reminder: `While ${name} lasts, the target subtracts ${penalty[1]} from its damage rolls. Take it off by hand.`
+        }
+      : {})
+  };
+}
+
+/** "Or a creature within 5 feet of it takes an action to wake it", "someone within 5 feet of it takes an action to shake
+ *  it out of the spell's effect". */
+const WAKE =
+  /\b(?:a creature|someone) within 5 feet of it takes an action to (?:wake it|shake it out of the spell[\u2019']s effect)\b/;
+const WAKE_ACTION: EndedBy = { name: "Wake", by: "others" };
+
+/** Where one stat-block save clause ends: the next printed label. */
+const STAT_BLOCK_LABEL =
+  /\b(?:Failure or Success:|Success:|Second Failure|Subsequent Failures:|Failure by \d+ or More)|\s-\s(?:Second|Third) /;
+
+/**
+ * "Second Failure The target has the Petrified condition, instead of the Restrained condition, for 24 hours": what a
+ * failed repeat leaves in place of the first failure (a basilisk's gaze, a brass dragon's Sleep Breath). Undefined when
+ * the stat block prints no second failure.
+ */
+export function secondFailureOf(description: string): SecondFailure | undefined {
+  const start = description.search(/\bSecond Failure\b/);
+  if (start === -1) return undefined;
+  const tail = description.slice(start + "Second Failure".length);
+  const end = tail.search(STAT_BLOCK_LABEL);
+  const clause = end === -1 ? tail : tail.slice(0, end);
+  const conditions = namedConditions(clause).conditions;
+  if (conditions.length === 0) return undefined;
+  const duration = failureDurationOf(clause);
+  return {
+    conditions,
+    ...(duration ? { duration } : {}),
+    ...(ENDS_ON_DAMAGE.test(clause) ? { endsOnDamage: true as const } : {}),
+    ...(repeatsEachTurn(clause) ? { repeatSave: true as const } : {}),
+    ...(WAKE.test(clause) ? { endedBy: { ...WAKE_ACTION } } : {})
   };
 }
 
@@ -340,10 +516,27 @@ function spellSaveOutcome(description: string): SaveOutcome {
   const duration = failureDurationOf(failureSentences);
   const lifetime = failureLifetime(after, named);
   const { failureDuration: _later, ...rest } = lifetime;
+  // "Whenever the target takes damage, it repeats the save"; "each time it takes damage ... Advantage on the save if the
+  // save is triggered by damage" (Hideous Laughter).
+  const onDamage =
+    /\bWhenever the target takes damage, it repeats the save\b|\beach time it takes damage, it makes another [A-Z][a-z]+ saving throw\b/.test(
+      description
+    );
   return {
     successDamage: half ? "half" : "none",
     ...rest,
-    ...(duration && named.conditions.length > 0 ? { failureDuration: duration } : {})
+    ...(duration && named.conditions.length > 0 ? { failureDuration: duration } : {}),
+    ...(onDamage
+      ? {
+          repeatOnDamage: /\bAdvantage on the save if the save is triggered by damage\b/.test(description)
+            ? { advantage: true as const }
+            : {}
+        }
+      : {}),
+    // "It does so with Advantage if you or your allies are fighting it."
+    ...(/\bAdvantage(?: on the save)? if you or your allies are fighting it\b/.test(description)
+      ? { advantageIfFighting: true as const }
+      : {})
   };
 }
 
@@ -358,17 +551,53 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   // No save at the cast: 150 HP or fewer is Stunned outright, then a Constitution save at the end of each of its
   // turns ends it. (A tougher target's Speed 0 until your next turn is left to the GM.)
   "power-word-stun": { failureConditions: ["stunned"], repeatSave: true, failsAtHitPoints: 150 },
-  // Three successes or three failures: the GM keeps count.
-  "flesh-to-stone": { repeatSave: undefined },
-  contagion: { repeatSave: undefined },
+  // "If it successfully saves against this spell three times, the spell ends. If it fails its saves three times, it is
+  // turned to stone and has the Petrified condition for the duration." Constructs automatically succeed.
+  "flesh-to-stone": {
+    repeatSave: undefined,
+    repeatTally: 3,
+    secondFailure: { conditions: ["petrified"] },
+    autoSuccess: { creatureTypes: ["construct"] }
+  },
+  // "Until it gets three successes or failures": three successes end it, three failures keep it Poisoned for 7 days.
+  contagion: {
+    repeatSave: undefined,
+    repeatTally: 3,
+    secondFailure: { conditions: ["poisoned"], duration: { type: "minutes", minutes: 10080 } }
+  },
+  // "At which point it must repeat the save. If the target fails the second save, the target has the Unconscious
+  // condition for the duration"; elves and creatures immune to Exhaustion succeed outright.
+  // "Or someone within 5 feet of it takes an action to shake it out of the spell's effect", at either stage: the Shake
+  // Awake action, which reads the failure's wakeable tag.
+  sleep: {
+    repeatOnce: true,
+    secondFailure: { conditions: ["unconscious"], endsOnDamage: true },
+    autoSuccess: { sleepless: true }
+  },
+  // "The target can take a Study action to examine the phantasm with an Intelligence (Investigation) check against your
+  // spell save DC. If the check succeeds, ... the spell ends."
+  "phantasmal-force": {
+    endedBy: { name: "Study the illusion", by: "bearer", check: { ability: "int", skill: "investigation" } }
+  },
+  // "A Frightened target makes a Wisdom saving throw at the end of each of its turns. On a failed save, it takes 5d10
+  // Psychic damage."
+  weird: { repeatFailureDamage: [{ formula: "5d10", type: "psychic" }] },
+  // "Must use all its movement to dance in place", and "can take an action to collect itself and repeat the save".
+  "irresistible-dance": { speedZero: true },
+  // "The target repeats the save at the end of each of its turns, ending the spell on a success." The text names no
+  // condition for the reader to hang it on.
+  "ray-of-enfeeblement": { repeatSave: true },
+  // "If the creature ends its turn in a space where it doesn't have line of sight to you, the creature makes a Wisdom
+  // saving throw. On a successful save, the spell ends on that creature."
+  fear: { repeatUnseenSource: true },
   // "The target gains no benefit from Half Cover or Three-Quarters Cover for this save."
   "sacred-flame": { ignoresCover: true },
   // "An affected target repeats the save at the end of each of its turns, ending the spell on itself on a success."
   // The spell names no condition, so the reader leaves the repeat out.
   slow: { repeatSave: true },
-  // "The target repeats the save at the end of each of its turns, ending the spell on a success." No condition names
-  // it for the reader.
-  "ray-of-enfeeblement": { repeatSave: true },
+  // "At the end of each of its turns, an affected target repeats the save, ending the spell on itself on a success",
+  // with no condition named for the reader to hang it on.
+  confusion: { repeatSave: true },
   // "Another 5d4 Acid damage at the end of its next turn", with no condition for the reader to hang it on.
   "vitriolic-sphere": {
     ongoingDamage: { damage: [{ formula: "5d4", type: "acid" }], at: "bearer-turn-end" }
@@ -380,9 +609,10 @@ const SPELL_SAVE_OVERRIDES: Readonly<Record<string, Partial<SaveOutcome>>> = {
   // "Make a DC 15 Intelligence saving throw" yourself: "you take 6d6 Psychic damage and have the Incapacitated condition
   // until you finish a Long Rest" (`spell-effects.ts` makes it the caster's own save).
   "contact-other-plane": { failureDuration: { type: "until-rest", rest: "long" } },
-  // "For the duration, the target makes a Wisdom saving throw at the end of each of its turns ... On a successful save,
-  // the spell ends." The failure leaves no condition for the reader to hang it on.
-  "phantasmal-killer": { repeatSave: true },
+  // "For the duration, the target makes a Wisdom saving throw at the end of each of its turns. On a failed save, it takes
+  // the Psychic damage again. On a successful save, the spell ends." The failure leaves no condition for the reader to
+  // hang it on.
+  "phantasmal-killer": { repeatSave: true, repeatDamageAgain: true },
   // "While Restrained, the target takes 1d6 Piercing damage at the start of each of its turns", and "A Large or larger
   // creature has Advantage on this save".
   "ensnaring-strike": {

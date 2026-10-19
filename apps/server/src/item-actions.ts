@@ -167,7 +167,9 @@ export function itemAction(
     ...(declared.onHit ? { onHit: structuredClone(declared.onHit) } : {}),
     // A roll it answers (a Ring of Evasion's Evade) and the trigger it is offered on (a Reaction's).
     ...(declared.answer ? { answer: structuredClone(declared.answer) } : {}),
-    ...(reaction ? { reaction: { ...reaction } } : {})
+    ...(reaction ? { reaction: { ...reaction } } : {}),
+    // The creatures it brings (a Horn of Valhalla's Berserkers).
+    ...(declared.summons ? { summons: structuredClone(declared.summons) } : {})
   };
 }
 
@@ -297,8 +299,14 @@ export function castAreaOf(spell: SpellReference, mechanics: Pick<ActorAction, "
 }
 
 /** A cast's grant, its "spellcasting ability modifier" fixed at the caster's for this spell. */
-function castGrant(grant: NonNullable<ActorAction["grants"]>, modifier: number): NonNullable<ActorAction["grants"]> {
+function castGrant(
+  grant: NonNullable<ActorAction["grants"]>,
+  modifier: number,
+  saveDc: number
+): NonNullable<ActorAction["grants"]> {
   const copy = structuredClone(grant);
+  // A ward's save is against the caster's spell save DC (Sanctuary).
+  if (copy.ward && copy.ward.dc === undefined) copy.ward = { ...copy.ward, dc: saveDc };
   if (copy.temporaryHitPointsEachTurn !== "spellcasting-modifier") return copy;
   const { temporaryHitPointsEachTurn: _each, ...rest } = copy;
   return modifier >= 1 ? { ...rest, temporaryHitPointsEachTurn: Math.min(100, modifier) } : rest;
@@ -330,6 +338,7 @@ export function spellCastMechanics(
       | "endsOneCondition"
       | "dispel"
       | "endsCurses"
+      | "summons"
       | "shapeShift"
       | "effectOptions"
     >
@@ -384,7 +393,7 @@ export function spellCastMechanics(
         : {}),
     // What the cast leaves on its targets (Bless, Hunter's Mark), sourced by the caster; Heroism's Temporary Hit Points
     // are the caster's modifier for this spell.
-    ...(effect.grant ? { grants: castGrant(effect.grant, numbers.modifier) } : {}),
+    ...(effect.grant ? { grants: castGrant(effect.grant, numbers.modifier, numbers.saveDc) } : {}),
     ...(effect.healing
       ? {
           healing: {
@@ -406,6 +415,15 @@ export function spellCastMechanics(
     // The spells it ends on its target (Dispel Magic), and the curses (Remove Curse).
     ...(effect.dispel ? { dispel: { ...effect.dispel } } : {}),
     ...(effect.endsCurses ? { endsCurses: true as const } : {}),
+    // The creatures it brings, with the caster's numbers a spell-printed stat block reads (Summon Dragon's Rend).
+    ...(effect.summons
+      ? {
+          summons: {
+            ...structuredClone(effect.summons),
+            numbers: { attackBonus: numbers.attackBonus, saveDc: numbers.saveDc, modifier: numbers.modifier }
+          }
+        }
+      : {}),
     // The form it shape-shifts a creature into (Polymorph), and the effects it picks one of (Enlarge or Reduce).
     ...(effect.shapeShift ? { shapeShift: structuredClone(effect.shapeShift) } : {}),
     ...(effect.effectOptions ? { effectOptions: structuredClone(effect.effectOptions) } : {})
@@ -605,7 +623,21 @@ export function conditionChoicesOf(
 
 /** Save outcome fields the build has added since a sheet was made, which its cast copied without: the conditions a
  *  caster picks from (Blindness/Deafness). */
-const NEWER_SAVE_FIELDS = ["conditionChoices"] as const;
+const NEWER_SAVE_FIELDS = [
+  "conditionChoices",
+  "repeatSave",
+  "repeatOnce",
+  "repeatOnDamage",
+  "repeatByAction",
+  "repeatUnseenSource",
+  "repeatFailureDamage",
+  "repeatDamageAgain",
+  "repeatTally",
+  "secondFailure",
+  "speedZero",
+  "advantageIfFighting",
+  "autoSuccess"
+] as const;
 
 function newerSaveFields(
   save: NonNullable<ActorAction["save"]>,

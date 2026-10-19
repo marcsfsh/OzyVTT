@@ -291,4 +291,20 @@ describe("outside a fight", () => {
     // Not burning any more, there is nothing to put out.
     expect((await use("extinguish-fire")).status).toBe(409);
   });
+
+  it("Perfume applied before a talk lasts its hour and uses up the vial", async () => {
+    const table = tableOf({ [IDS.fighter]: fighterInput() }, false);
+    write(table, IDS.fighter, catalogRow("perfume", { equipped: false }));
+    const { server, gmToken, post, close } = await serve(table);
+    cleanups.push(close);
+    const used = await post(GAME_PATHS.actionUse, gmToken, {
+      commandId: randomUUID(),
+      actorId: IDS.fighter,
+      actionId: "item-perfume-apply"
+    });
+    expect(used.status).toBe(200);
+    const after = server.store.snapshot.actors.find((actor) => actor.id === IDS.fighter)!;
+    expect(after.effects).toMatchObject([{ name: "Perfume", tags: ["perfume"], duration: { remaining: 60 } }]);
+    expect(after.inventory.some((row) => row.id === "perfume")).toBe(false);
+  });
 });

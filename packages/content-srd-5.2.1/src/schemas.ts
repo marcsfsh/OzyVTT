@@ -30,7 +30,8 @@ import {
   OnHitRiderSchema,
   SaveFailureEffectSchema,
   SaveOutcomeFields,
-  SightEffectSchema
+  SightEffectSchema,
+  SummonSchema
 } from "@vtt/schemas";
 import {
   BackgroundReferenceSchema,
@@ -252,12 +253,15 @@ export const SpellEffectSchema = z
     grant: ActionGrantSchema.optional(),
     /** What a failed save against the cast leaves on the creature (Bane's -1d4, Faerie Fire's outline). */
     failureEffect: SaveFailureEffectSchema.optional(),
-    /** What a successful save leaves instead (Ray of Enfeeblement's Disadvantage on the next attack roll). */
+    /** What a successful save leaves on the creature instead (Flesh to Stone's Speed 0 until the start of the caster's
+     *  next turn, Ray of Enfeeblement's Disadvantage on the next attack roll). */
     successEffect: SaveFailureEffectSchema.optional(),
     /** A reaction spell's trigger and response (Shield, Hellish Rebuke), so the table offers it as a prompt. */
     reaction: ActionReactionSchema.optional(),
     /** The teleport the cast gives its caster (Misty Step's 30 feet), taken on the map at once with no GM ask. */
     teleport: ActionTeleportSchema.optional(),
+    /** The creatures the cast brings onto the map (Summon Dragon's spirit, Animate Dead's undead), see `SummonSchema`. */
+    summons: SummonSchema.optional(),
     /** The caster makes the spell's save itself, at this DC whatever its own (Contact Other Plane's DC 15). */
     selfSave: z
       .object({ dc: z.number().int().min(1).max(40) })

@@ -16,6 +16,7 @@ import {
   NO_BONUS_ACTIONS_TAG,
   NO_REACTIONS_TAG,
   SLOWED_TAG,
+  ACTION_OR_BONUS_TAG,
   NO_SPELLS_TAG,
   RAGING_TAG,
   READIED_TAG,
@@ -42,6 +43,7 @@ import { carriesSpellbook, hasClassFeature } from "../ritual-adept.js";
 import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
 import { notEnoughUses, useCostOf } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
+import { END_EFFECT_ACTION_ID, hasEndingOption, NO_ENDING_OPTION } from "../ending-actions.js";
 import { castMarks, markMoveOf } from "./marks.js";
 import { actionTargetViolations } from "./action-targets.js";
 import { hitRiderOf } from "./hit-riders.js";
@@ -192,6 +194,7 @@ export function evaluateActionEconomy(
     notes: []
   };
   checkAbleToAct(evaluation);
+  checkCommandedLimits(evaluation);
   // What the creature's form keeps it from doing (no spells in Wild Shape, a werewolf's Bite only in wolf form).
   evaluation.violations.push(
     ...formViolations(
@@ -524,7 +527,7 @@ function shownEffectName(
 /** Incapacitation and 0 HP forbid every action, Bonus Action and Reaction (SRD 2024 "Incapacitated"), legendary
  *  actions and feature activations included; a required effect (Frenzy needs Rage) must be active, and a raging
  *  Barbarian can't cast spells. */
-function checkAbleToAct({ state, attacker, action, resolveDefinition, violations }: Evaluation): void {
+function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition, violations }: Evaluation): void {
   if (action.activation !== "other" || !(ANSWERS_A_ROLL.has(action.id) || action.answer !== undefined)) {
     const incapacitating = incapacitatingCondition(attacker);
     if (incapacitating !== null)
@@ -605,6 +608,16 @@ function checkAbleToAct({ state, attacker, action, resolveDefinition, violations
       message: `${action.name} requires an active ${conditionLabel(action.requiresEffectTag)} effect.`
     });
   }
+  // End an Effect needs an effect an action ends, on the creature named or anywhere before one is.
+  if (action.id === END_EFFECT_ACTION_ID && !hasEndingOption(state, attacker, targetIds))
+    violations.push({ rule: "feature.requires-effect", message: NO_ENDING_OPTION });
+}
+
+/** What a commanded creature can't do (SRD 5.2.1 Find Familiar: "A familiar can't attack, but it can take other
+ *  actions as normal"). */
+function checkCommandedLimits({ attacker, action, violations }: Evaluation): void {
+  if (attacker.control?.noAttacks && (action.attack !== undefined || action.multiattack !== undefined))
+    violations.push({ rule: "summon.cant-attack", message: `${attacker.name} can't attack.` });
 }
 
 /** An extra attack (SRD Light, Cleave) is owed only once the swing that opens it has happened this turn: an attack
@@ -1020,8 +1033,11 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
     }
   }
   checkDazed(evaluation);
-  // SRD Slow: "On its turns, it can take either an action or a Bonus Action, not both."
-  const slowed = onOwnTurn ? attacker.effects.find((effect) => effect.tags.includes(SLOWED_TAG)) : undefined;
+  // SRD Slow: "On its turns, it can take either an action or a Bonus Action, not both." A copper dragon's Slowing
+  // Breath says the same.
+  const slowed = onOwnTurn
+    ? attacker.effects.find((effect) => effect.tags.includes(SLOWED_TAG) || effect.tags.includes(ACTION_OR_BONUS_TAG))
+    : undefined;
   if (slowed && action.activation === "bonus-action" && state.combat.turn.actionUsed)
     violations.push({
       rule: "economy.bonus-action-used",
@@ -1504,8 +1520,15 @@ function checkTargeting(
       resolveDefinition: evaluation.resolveDefinition,
       ...(distanceFeet ? { distanceFeet } : {})
     }) !== null;
-  if (!charmWarded && (action.attack !== undefined || action.save !== undefined || action.damage.length > 0)) {
-    // Only while the creature is Charmed: an effect that holds it off (Calm Emotions) lifts the bar too.
+  // "You can't attack the charmer or target the charmer with damaging abilities or magical effects": a spell, from a
+  // sheet or an item, is magical whether it harms or helps.
+  const magical = action.spellId !== undefined;
+  if (
+    !charmWarded &&
+    (action.attack !== undefined || action.save !== undefined || action.damage.length > 0 || magical)
+  ) {
+    // Only while the creature is Charmed: a hand cleared it, or an effect holds it off (Calm Emotions), and the bar
+    // lifts.
     const charmed = attacker.conditions.some((condition) => condition.id === "charmed");
     const charmers = attacker.effects.filter(
       (effect) => charmed && effect.linkedConditionIds.includes("charmed") && effect.sourceActorId !== null
@@ -1516,7 +1539,7 @@ function checkTargeting(
         const target = state.actors.find((candidate) => candidate.id === targetId);
         violations.push({
           rule: "condition.charmed-charmer",
-          message: `${attacker.name} is Charmed by ${target?.name ?? charmer.sourceName ?? "its charmer"} and can't target them with harmful effects.`
+          message: `${attacker.name} is Charmed by ${target?.name ?? charmer.sourceName ?? "its charmer"} and can't target them with harmful or magical effects.`
         });
       }
     }

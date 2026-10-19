@@ -12,12 +12,13 @@ import { blinkAway } from "./off-plane.js";
 import { timeStopGoesOn } from "./time-stop.js";
 import { familyModeFor } from "./rules-families.js";
 import { abilityCheckClaims } from "./ability-checks.js";
+import { requireActorAccess, type Initiator } from "./authorization.js";
 import { holdsFeature } from "./class-features.js";
 import { wardedConditions } from "./paladin-auras.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { CommandRejectedError } from "./game-store.js";
 import { aggregateRollMode } from "@vtt/rules-5e";
-import { deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
+import { checkRiderBonus, deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
 import { effectiveActions } from "./effective-actions.js";
 import {
   endConcentrationSustainedBy,
@@ -34,6 +35,7 @@ import { zoneHeld, zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spe
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
 import { lapseLongCasts } from "./resolution/long-casting.js";
+import { summonTurnEnd, summonTurnStart, takesNoTurns } from "./summon-turns.js";
 import { checkSightFor } from "./vision/rules.js";
 
 type StartEncounterInput = Readonly<{
@@ -104,9 +106,9 @@ export function initiativeRollFor(
   actorId: string,
   surprised: boolean,
   deps: InitiativeRollDeps = {}
-): { mode: RollMode; penalty: number; reasons: string[] } {
+): { mode: RollMode; penalty: number; checkBonus: number; reasons: string[] } {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  if (!actor) return { mode: "normal", penalty: 0, reasons: [] };
+  if (!actor) return { mode: "normal", penalty: 0, checkBonus: 0, reasons: [] };
   const definition = actor.definitionId ? deps.resolveDefinition?.(actor.definitionId) : undefined;
   const derivation = deriveEquipment(actor, definition, deps.catalog);
   const claims = rollModeClaims(derivation, ["initiative"], "on-initiative-roll");
@@ -132,9 +134,11 @@ export function initiativeRollFor(
   const incapacitated = incapacitatingCondition(actor);
   if (incapacitated) claims.disadvantage.push({ source: "incapacitated", label: conditionLabel(incapacitated) });
   const penalty = exhaustionPenalty(actor);
+  // A bonus to ability checks reaches a Dexterity check (a Stone of Good Luck's +1), which Initiative is.
+  const checkBonus = checkRiderBonus(derivation, { ability: "dex" });
   const reasons = [...claims.advantage, ...claims.disadvantage].map((claim) => claim.label);
   if (penalty !== 0) reasons.push(`Exhaustion ${penalty}`);
-  return { mode: aggregateRollMode(claims.advantage, claims.disadvantage).mode, penalty, reasons };
+  return { mode: aggregateRollMode(claims.advantage, claims.disadvantage).mode, penalty, checkBonus, reasons };
 }
 
 /** The roll mode alone, from riders and conditions, for a combatant who isn't surprised. */
@@ -177,9 +181,9 @@ function rollInitiative(
   natural?: number
 ): { natural: number; modifier: number; total: number; mode: RollMode } {
   const actor = state.actors.find((candidate) => candidate.id === actorId);
-  const { mode, penalty } = initiativeRollFor(state, actorId, surprised, deps);
+  const { mode, penalty, checkBonus } = initiativeRollFor(state, actorId, surprised, deps);
   const die = natural ?? rollUnderMode(rollD20, mode);
-  const modifier = (actor?.initiative ?? 0) + penalty;
+  const modifier = (actor?.initiative ?? 0) + checkBonus + penalty;
   const total = die + modifier;
   if (!validScore(total)) throw new CommandRejectedError("Initiative scores must be whole numbers from -1000 to 1000.");
   return { natural: die, modifier, total, mode };
@@ -187,13 +191,35 @@ function rollInitiative(
 
 function ordered(state: GameState, entries: readonly InitiativeEntry[]) {
   const names = new Map(state.actors.map((actor) => [actor.id, actor.name]));
-  return [...entries].sort(
-    (left, right) =>
-      right.score - left.score ||
-      right.tieBreaker - left.tieBreaker ||
-      (names.get(left.actorId) ?? "").localeCompare(names.get(right.actorId) ?? "") ||
-      left.actorId.localeCompare(right.actorId)
+  return followersAfterLeaders(
+    [...entries].sort(
+      (left, right) =>
+        right.score - left.score ||
+        right.tieBreaker - left.tieBreaker ||
+        (names.get(left.actorId) ?? "").localeCompare(names.get(right.actorId) ?? "") ||
+        left.actorId.localeCompare(right.actorId)
+    )
   );
+}
+
+/** An order with each entry that `follows` another moved to right after it and the others that follow it, keeping
+ *  every other entry where it was (a summoned creature "takes its turn immediately after yours"). One whose leader is
+ *  gone keeps its place. */
+function followersAfterLeaders(entries: readonly InitiativeEntry[]): InitiativeEntry[] {
+  const present = new Set(entries.map((entry) => entry.actorId));
+  const follows = (entry: InitiativeEntry) => entry.follows !== undefined && present.has(entry.follows);
+  if (!entries.some(follows)) return [...entries];
+  const placed = new Set<string>();
+  const result: InitiativeEntry[] = [];
+  const place = (entry: InitiativeEntry) => {
+    if (placed.has(entry.actorId)) return;
+    placed.add(entry.actorId);
+    result.push(entry);
+    for (const follower of entries) if (follower.follows === entry.actorId && follows(follower)) place(follower);
+  };
+  for (const entry of entries) if (!follows(entry)) place(entry);
+  for (const entry of entries) place(entry);
+  return result;
 }
 
 /**
@@ -207,7 +233,8 @@ function reorderMidRound(state: GameState, entries: readonly InitiativeEntry[]) 
   const current = initiative.findIndex((entry) => entry.actorId === turnActorId);
   if (!active || gathering || current < 0) return ordered(state, entries);
   const acted = new Set(initiative.slice(0, current).map((entry) => entry.actorId));
-  return [
+  // One that joins right after a creature whose turn has passed waits for that creature's next turn.
+  return followersAfterLeaders([
     ...ordered(
       state,
       entries.filter((entry) => acted.has(entry.actorId))
@@ -217,7 +244,33 @@ function reorderMidRound(state: GameState, entries: readonly InitiativeEntry[]) 
       state,
       entries.filter((entry) => !acted.has(entry.actorId) && entry.actorId !== turnActorId)
     )
-  ];
+  ]);
+}
+
+/** A creature joins the order mid-fight or while it is staged (a summoned creature), in its place by count and after
+ *  the creature it `follows`, as the order would put it now. */
+export function joinInitiative(state: GameState, entry: InitiativeEntry) {
+  if (state.combat.initiative.some((existing) => existing.actorId === entry.actorId))
+    throw new CommandRejectedError("That combatant is already in the encounter.");
+  if (state.combat.initiative.length >= 200)
+    throw new CommandRejectedError("This encounter already has 200 combatants.");
+  state.combat = {
+    ...state.combat,
+    initiative: reorderMidRound(state, [...state.combat.initiative, entry])
+  };
+}
+
+/** A creature's initiative roll by the rules (`initiativeRollFor`), for one that joins rolling its own. */
+export function rollJoiningInitiative(
+  state: GameState,
+  actorId: string,
+  rollD20: () => number,
+  deps: InitiativeRollDeps = {},
+  onRoll?: InitiativeRollSink
+): number {
+  const roll = rollInitiative(state, actorId, false, rollD20, deps);
+  onRoll?.({ actorId, ...roll });
+  return roll.total;
 }
 
 export function startEncounter(
@@ -496,6 +549,30 @@ export function setInitiativeScore(state: GameState, actorId: string, score: num
   settleGatherIfComplete(state);
 }
 
+/**
+ * SRD Initiative: "If a tie occurs, the GM decides the order among tied monsters, and the players decide the order among
+ * tied characters." A character's player (or the GM) puts it directly ahead of another character tied on its score, before
+ * either has taken a turn in this fight.
+ */
+export function orderTiedCharacters(state: GameState, scope: Initiator, actorId: string, beforeActorId: string) {
+  if (!state.combat.active) throw new CommandRejectedError("Start an encounter before ordering Initiative.");
+  requireActorAccess(scope, state, actorId, "edit", "You can only move your own character in the turn order.");
+  if (actorId === beforeActorId) throw new CommandRejectedError("Pick another character tied with yours.");
+  const own = state.combat.initiative.find((entry) => entry.actorId === actorId);
+  const other = state.combat.initiative.find((entry) => entry.actorId === beforeActorId);
+  const kindOf = (id: string) => state.actors.find((actor) => actor.id === id)?.kind;
+  if (!own || !other || kindOf(actorId) !== "player-character" || kindOf(beforeActorId) !== "player-character")
+    throw new CommandRejectedError("Both must be characters in this fight.");
+  if (own.score !== other.score)
+    throw new CommandRejectedError("Only characters tied on the same score are ordered so.");
+  const current = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
+  const acted = (id: string) =>
+    state.combat.round > 1 || state.combat.initiative.findIndex((entry) => entry.actorId === id) < current;
+  if (acted(actorId) || acted(beforeActorId))
+    throw new CommandRejectedError("Ties are settled before either character takes a turn in this fight.");
+  setInitiativeScore(state, actorId, own.score, Math.min(1000, other.tieBreaker + 1));
+}
+
 /** SRD Alert, Initiative Swap: right after initiative is rolled, two combatants trade scores. Not while either
  *  is Incapacitated, and only before the first of them has taken a turn in this fight. */
 export function swapInitiative(state: GameState, actorId: string, withActorId: string) {
@@ -705,9 +782,10 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   if (currentIndex < 0) throw new CommandRejectedError("The current turn is not in Initiative.");
   // A defeated creature takes no more turns: the order passes over it to the next one still in the fight.
   const length = state.combat.initiative.length;
+  // So does a summoned thing with no turns of its own (Spiritual Weapon's force).
+  const passedOver = (actorId: string) => isDefeated(state, actorId) || takesNoTurns(state, actorId);
   let steps = 1;
-  while (steps < length && isDefeated(state, state.combat.initiative[(currentIndex + steps) % length].actorId))
-    steps += 1;
+  while (steps < length && passedOver(state.combat.initiative[(currentIndex + steps) % length].actorId)) steps += 1;
   if (steps === length) steps = 1;
   // Time Stop: the caster takes its turns in a row while no time passes for anyone else.
   const stopped = timeStopGoesOn(state);
@@ -731,6 +809,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   );
   // A spell cast over several turns lapses on a turn that went without its action.
   lapseLongCasts(state, outgoingId, ending);
+  // A summoned creature that did nothing its summoner asked takes the Dodge action, and its orders are used up.
+  summonTurnEnd(state, outgoingId, ending);
   // A spell area the creature ends its turn in acts on it (Moonbeam, Spirit Guardians).
   const zones = zoneDepsOf(deps);
   if (zones) ending.push(...zonesAtTurnEnd(state, outgoingId, zones));
@@ -740,7 +820,7 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   const nextActorId = stopped
     ? outgoingId!
     : wraps
-      ? (order.find((entry) => !isDefeated(state, entry.actorId)) ?? order[0]).actorId
+      ? (order.find((entry) => !passedOver(entry.actorId)) ?? order[0]).actorId
       : order[currentIndex + steps].actorId;
   state.combat = {
     ...state.combat,
@@ -761,6 +841,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
   events?.push(...expiry);
+  // A summoned creature its summoner didn't command with a Bonus Action takes the Dodge action (Animate Dead).
+  summonTurnStart(state, nextActorId, events);
   if (!deps) return;
   // Then what lands at the start of its turn: a swallow's acid, Searing Smite's fire.
   const starting: EffectNarration[] = [];

@@ -27,6 +27,7 @@ import { tokenCreatureDistance } from "../movement-narration.js";
 import { withoutSourceName } from "../hidden-source.js";
 import { describeRoll, recordRoll, rollFeedIsGmOnly, rollsForCommand } from "../roll-history.js";
 import type { ZoneDeps } from "../spell-zones.js";
+import type { SummonDeps } from "../summons.js";
 import type { TokenMapGeometry } from "../token-placement.js";
 import { hiddenFrom, playerSight } from "../vision/audience.js";
 import { sceneSight } from "../vision/sight.js";
@@ -266,6 +267,27 @@ export function createKit(context: CommandContext) {
       rollDie: (sides) => context.random(sides),
       newId: context.newId,
       now: () => new Date().toISOString()
+    }),
+
+    /** What bringing a summon's creatures reads in `state` (`summons.ts`): the live map, stat blocks, the server's dice
+     *  and ids, and the bestiary by creature type for "another Beast that has a Challenge Rating of 0". A spell-printed
+     *  stat block (one that scales) is never such a pick. */
+    summonDeps: (state: GameState, geometry: TokenMapGeometry | null): SummonDeps => ({
+      geometry,
+      newId: context.newId,
+      rollDie: (sides) => context.random(sides),
+      resolveDefinition: (definitionId) => resolveDefinitionIn(state, definitionId),
+      catalog: equipmentCatalogOf(playCatalog()),
+      monstersOfType: (creatureType, maxChallenge) =>
+        playCatalog()
+          .monsterSummaries()
+          .filter(
+            (summary) =>
+              summary.type.toLowerCase() === creatureType &&
+              summary.challengeRating <= maxChallenge &&
+              contentLibrary.monsterForInstance(summary.id)?.summonScaling === undefined
+          )
+          .map((summary) => summary.id)
     }),
 
     /** What a fall reads in `state` (`falling.ts`): stat blocks and items, the server's dice, where creatures stand

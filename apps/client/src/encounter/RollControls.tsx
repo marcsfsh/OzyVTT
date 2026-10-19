@@ -244,6 +244,7 @@ export function RollControls({
   onInvalidFace,
   summary,
   extraActions,
+  beforeRoll,
   answers,
   answered,
   onAnswer,
@@ -284,6 +285,8 @@ export function RollControls({
   summary?: ReactNode;
   /** Extra rolled-phase buttons after Confirm (e.g. Legendary Resistance). */
   extraActions?: ReactNode;
+  /** Extra buttons before anything is rolled (choosing to fail a save). */
+  beforeRoll?: ReactNode;
   /** The answers the shown roll may still take, and the ones it took. */
   answers?: readonly RollAnswerOffer[];
   answered?: readonly RollAnswered[];
@@ -342,6 +345,7 @@ export function RollControls({
         {rollLabel}
       </button>
       {mayType && <FaceEntry label={faceLabel} busy={busy} onFace={onTyped} onInvalid={onInvalidFace} />}
+      {beforeRoll}
       {onDismiss && (
         <button
           type="button"

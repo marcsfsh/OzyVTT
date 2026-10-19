@@ -1261,6 +1261,126 @@ export const OngoingDamageSchema = z
   .strict();
 export type OngoingDamage = z.infer<typeof OngoingDamageSchema>;
 
+/** Damage a failed repeat save deals ("Each time the target fails this save, it takes 5d10 Psychic damage"). */
+const RepeatFailureDamageSchema = z
+  .array(z.object({ formula: DiceFormulaSchema, type: DamageTypeSchema }).strict())
+  .min(1)
+  .max(2);
+
+/**
+ * An action that ends an effect, and who may take it: the bearer, other creatures within 5 feet of the bearer (`near`
+ * "bearer", the default) or of the effect's source (`near` "source": pulling a creature out of a gelatinous cube), or
+ * either. With `check`, the action is an ability check that must succeed, against `dc` or the save's own DC; without,
+ * the action alone ends it ("a creature within 5 feet of it takes an action to wake it"). `takerDamage` is what the
+ * creature that succeeds takes (the cube's acid).
+ */
+export const EndedBySchema = z
+  .object({
+    name: z.string().min(1).max(60),
+    by: z.enum(["bearer", "others", "either"]),
+    near: z.enum(["bearer", "source"]).optional(),
+    /** How near another creature must be, in feet; 5 when absent. */
+    withinFeet: z.number().int().min(5).max(300).optional(),
+    check: z
+      .object({
+        ability: AbilitySchema,
+        skill: RiderSlugSchema.optional(),
+        dc: z.number().int().min(1).max(40).optional()
+      })
+      .strict()
+      .optional(),
+    takerDamage: RepeatFailureDamageSchema.optional()
+  })
+  .strict()
+  .describe(
+    "An action that ends the effect: who may take it (the bearer, others within 5 feet of the bearer or the source, or either), the ability check it needs if any, and the damage the one who succeeds takes"
+  );
+export type EndedBy = z.infer<typeof EndedBySchema>;
+
+/**
+ * What an effect does as its bearer rests or as days pass (a mummy's curse, an otyugh's poison):
+ * - `at`: as the bearer finishes a Long Rest (`long-rest`), or as each 24 hours of game time pass (`day`).
+ * - `save`: the save it makes then, a success ending the effect.
+ * - `maximumLoss`: what the bearer's Hit Point maximum loses then (on a failed save, or each time when there is no
+ *   save), held until the effect ends.
+ * - `noBenefit`: the rests that give the bearer nothing ("gains no benefit from finishing a Short or Long Rest").
+ * - `holdsMaximum`: "its Hit Point maximum doesn't return to normal when finishing a Long Rest".
+ */
+export const RestTriggerSchema = z
+  .object({
+    at: z.enum(["long-rest", "day"]).optional(),
+    save: z
+      .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional(),
+    maximumLoss: DiceFormulaSchema.optional(),
+    noBenefit: z.enum(["short", "long", "both"]).optional(),
+    holdsMaximum: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "What the effect does as its bearer finishes a Long Rest or as each day passes: a save that ends it, a Hit Point maximum loss, the rests that give no benefit, and a maximum a Long Rest doesn't restore"
+  );
+export type RestTrigger = z.infer<typeof RestTriggerSchema>;
+
+/** What an effect turns into when its repeat save fails ("Second Failure: The target has the Petrified condition
+ *  instead"): its name and conditions, how long they last (absent: until ended, or with the caster's Concentration),
+ *  whether damage ends them, and whether the target keeps repeating the save at the end of each of its turns. */
+export const EffectStageSchema = z
+  .object({
+    name: z.string().min(1).max(120),
+    linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),
+    duration: SaveFailureDurationSchema.optional(),
+    endsOnDamage: z.literal(true).optional(),
+    repeats: z.literal(true).optional(),
+    endedBy: EndedBySchema.optional()
+  })
+  .strict();
+export type EffectStage = z.infer<typeof EffectStageSchema>;
+
+/**
+ * The save an effect's bearer repeats to end it (Hold Person), and when:
+ * - `timing`: at the end of each of its turns (absent), at the start of each (`turn-start`, Conjure Elemental's
+ *   restraint), or only when something else opens it (`none`: Dominate Person's damage).
+ * - `once`: only at the end of its next turn (a basilisk's gaze); `skipsCurrentTurn` marks one that began during that
+ *   creature's own turn, so the end of that turn doesn't count.
+ * - `onDamage`: each time the bearer takes damage too, with Advantage (`advantage`, Hideous Laughter), or only damage
+ *   from another source than the effect's (`notFromSource`, a harpy's Luring Song).
+ * - `byAction`: the bearer may take an action to repeat it (Irresistible Dance).
+ * - `unseenSource`: at its turn's end only when it can't see the effect's source (Fear).
+ * - `failureDamage`: what a failure deals (Weird's 5d10 Psychic).
+ * - `tally`: successes and failures counted apart until one reaches `needed` (Flesh to Stone's three).
+ * - `next`: what a failure (the last counted one, with a tally) turns the effect into.
+ */
+export const RepeatSaveSchema = z
+  .object({
+    ability: AbilitySchema,
+    dc: z.number().int().min(1).max(40),
+    timing: z.enum(["turn-start", "none"]).optional(),
+    once: z.literal(true).optional(),
+    skipsCurrentTurn: z.literal(true).optional(),
+    onDamage: z
+      .object({ advantage: z.literal(true).optional(), notFromSource: z.literal(true).optional() })
+      .strict()
+      .optional(),
+    byAction: z.literal(true).optional(),
+    /** Only when the bearer ends its turn where it can't see the effect's source (Fear). */
+    unseenSource: z.literal(true).optional(),
+    failureDamage: RepeatFailureDamageSchema.optional(),
+    tally: z
+      .object({
+        needed: z.number().int().min(2).max(5),
+        successes: z.number().int().min(0).max(5).default(0),
+        failures: z.number().int().min(0).max(5).default(0)
+      })
+      .strict()
+      .optional(),
+    next: EffectStageSchema.optional(),
+    /** What gives each repeat Disadvantage, as the roll names it (Heightened Spell). */
+    disadvantageFrom: z.string().min(1).max(60).optional()
+  })
+  .strict();
+export type RepeatSave = z.infer<typeof RepeatSaveSchema>;
 /** Conditions a creature of these types can't give the bearer (Protection from Evil and Good). */
 export const ConditionWardSchema = z
   .object({
@@ -1538,16 +1658,9 @@ export const EffectInstanceSchema = z
     escapeDc: z.number().int().min(1).max(40).nullable().default(null),
     onEnd: z.array(EffectOnEndSchema).max(2).default([]),
     /** "Repeats the save at the end of each of its turns": the bearer owes this save as each of its turns ends, and
-     * a success ends the effect (Hold Person, a ghast's claws). `disadvantageFrom` names what gives each repeat
-     * Disadvantage (Heightened Spell). */
-    repeatSave: z
-      .object({
-        ability: AbilitySchema,
-        dc: z.number().int().min(1).max(40),
-        disadvantageFrom: z.string().min(1).max(60).optional()
-      })
-      .strict()
-      .optional(),
+     * a success ends the effect (Hold Person, a ghast's claws). When and how often, what a failure does, and what
+     * gives each repeat Disadvantage (Heightened Spell), are `RepeatSaveSchema`'s. */
+    repeatSave: RepeatSaveSchema.optional(),
     /** Ends early when the bearer takes any damage (Sleep, Turn Undead, Hypnotic Pattern, a knocked-out creature). */
     endsOnDamage: z.boolean().optional(),
     /** Ends early when its source or one of the source's allies deals damage to the bearer (Charm Person). */
@@ -1601,6 +1714,30 @@ export const EffectInstanceSchema = z
     magical: z.literal(true).optional(),
     /** It ends when a spell restores the bearer's hit points (an infernal wound). */
     endsOnSpellHealing: z.literal(true).optional(),
+    /** It ends when the bearer ends its turn where it can't see the effect's source (Horror Nimbus). */
+    endsOutOfSight: z.literal(true).optional(),
+    /** A creature that targets the bearer with an attack roll or a damaging spell first makes this save (Sanctuary). */
+    ward: z
+      .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional(),
+    /** SRD Suffocation: the rounds of breath the bearer has left (each of its turns' ends spends one), then the
+     *  Exhaustion levels suffocating gave it (one at the end of each of its turns), which go when it breathes again
+     *  and this ends. */
+    breath: z
+      .object({
+        roundsLeft: z.number().int().min(0).max(100_000),
+        exhaustionGained: z.number().int().min(0).max(6).default(0)
+      })
+      .strict()
+      .optional(),
+    /** An action that ends it: waking a sleeper, stanching a wound, studying an illusion, detaching a stirge. */
+    endedBy: EndedBySchema.optional(),
+    /** What it does as its bearer rests or days pass (a mummy's curse); `dayMark` is the game-clock minute its next 24
+     *  hours count from. */
+    atRest: RestTriggerSchema.extend({ dayMark: z.number().int().min(0).optional() })
+      .strict()
+      .optional(),
     /** On a caster's Concentration: the spell is nothing but what it leaves on creatures (Hold Person's paralysis,
      *  Bless's d4), so it ends once no living creature keeps any of it. */
     endsWhenUnaffected: z.literal(true).optional(),
@@ -1847,6 +1984,9 @@ export const InventoryItemSchema = z
     /** Ammunition pieces left in a row sold in bundles ("Arrows (20)"), when some are spent; absent = every bundle
      *  full. The server keeps it: shots spend it and a quantity change moves it by whole bundles. */
     ammunitionLeft: z.number().int().min(0).max(1_000_000).optional(),
+    /** A Waterskin row's water left, in pints; absent means every skin in the row is full (4 pints each). Drinking
+     *  as a day ends lowers it, and drinking one's fill at a source fills the skins again. The server keeps it. */
+    waterPints: z.number().int().min(0).max(100_000).optional(),
     /** Pieces fired from this row in the running fight that can be picked up after it (half come back). The
      *  server keeps it. */
     ammunitionFired: z.number().int().min(0).max(10_000).optional(),
@@ -1982,6 +2122,96 @@ export const MAX_FAVOURITE_OPTIONS = 8;
 export const MAX_COUNTED_OPTIONS = 32;
 export const MAX_OPTION_USE_COUNT = 100_000;
 
+/**
+ * A creature something brought onto the map (SRD 5.2.1 summoned creatures), and what keeps it there. The engine takes
+ * it off the map and the roster when that ends (`summons.ts`). GM knowledge: a player is told only that it commands it.
+ */
+/** Where a spell's attacks reach from when it brings a force to the map that strikes for it (Spiritual Weapon): a
+ *  creature within `reachFeet` of the force, which each later attack first moves up to `moveFeet`, or teleports that
+ *  far (Conjure Fey's spirit). */
+export const StrikesFromSchema = z
+  .object({
+    reachFeet: z.number().int().min(5).max(30),
+    moveFeet: z.number().int().min(5).max(120),
+    teleports: z.literal(true).optional()
+  })
+  .strict();
+export type StrikesFrom = z.infer<typeof StrikesFromSchema>;
+
+export const SummonedSchema = z
+  .object({
+    /** The creature that brought it. */
+    by: z.uuid(),
+    /** What brought it: the action's id and name, and the spell and the level it was cast at. */
+    actionId: z.string().min(1).max(120),
+    name: z.string().min(1).max(120),
+    spell: z
+      .object({
+        id: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80),
+        level: z.number().int().min(0).max(9)
+      })
+      .strict()
+      .optional(),
+    /** The effect whose end ends it: its user's Concentration on the spell, or the spell's own effect on its user.
+     *  Absent: it stays until it drops to 0 Hit Points or is dismissed (a familiar). */
+    keptBy: z.string().min(1).max(120).optional(),
+    /** It is gone when it takes any damage (Phantom Steed), when its user dies (Find Steed), or when it is farther
+     *  than `leashFeet` from its user (Unseen Servant). */
+    endsOnDamage: z.literal(true).optional(),
+    endsOnUserDeath: z.literal(true).optional(),
+    leashFeet: z.number().int().min(5).max(5280).optional(),
+    /** It takes no turns, can't be harmed and doesn't block a space (Arcane Eye, Spiritual Weapon's force). */
+    intangible: z.literal(true).optional(),
+    /** It takes no turns of its own; its user moves it (Spiritual Weapon's force, Arcane Hand), this far with each
+     *  command, or twice its user's Speed. */
+    noTurns: z.literal(true).optional(),
+    commandMove: z.union([z.number().int().min(5).max(500), z.literal("twice-user-speed")]).optional(),
+    /** Its commander's player sees what it sees: always (Arcane Eye), or after a Bonus Action (a familiar). */
+    sight: z.enum(["always", "bonus-action"]).optional(),
+    /** How its user dismisses it (a Bonus Action for an elemental from a bowl, a Magic action for a familiar). */
+    dismiss: z.enum(["bonus-action", "action"]).optional(),
+    /** Its user's touch spells can be delivered through it within this many feet (a familiar: 100). */
+    deliversTouch: z.number().int().min(5).max(1000).optional(),
+    /** Its spell's attacks reach from it (Spiritual Weapon's force); see `StrikesFromSchema`. */
+    strikesFrom: StrikesFromSchema.optional(),
+    /** The cast whose Concentration ends when it is gone (Arcane Hand at 0 Hit Points, Project Image's copy when it
+     *  takes damage). */
+    endsSpell: z.string().min(1).max(120).optional()
+  })
+  .strict();
+export type Summoned = z.infer<typeof SummonedSchema>;
+
+/**
+ * Who commands a creature, and the side it fights on while that lasts: its summoner, or a creature that dominates it
+ * (Dominate Person, an aboleth's Dominate Mind). The commander's player acts for it (`authorization.ts`). GM knowledge:
+ * a player is told only that it commands it.
+ */
+export const CreatureControlSchema = z
+  .object({
+    /** The creature that commands it. */
+    by: z.uuid(),
+    /** The side it fights on: its commander's when the command began. */
+    side: z.enum(["party", "foes"]),
+    /** The effect whose end ends the command (the Charmed that Dominate Person imposed, Animate Dead's 24 hours).
+     *  Absent: it lasts as long as the creature is summoned. */
+    keptBy: z.string().min(1).max(120).optional(),
+    /** Commanding it takes its commander's Bonus Action (Animate Dead) or a Magic action (Mage Hand), and `commanded`
+     *  says its commander has commanded it since its last turn. */
+    commandedWith: z.enum(["bonus-action", "action"]).optional(),
+    commanded: z.literal(true).optional(),
+    /** Uncommanded, it takes the Dodge action (see `SummonSchema.dodgesUncommanded`). */
+    dodgesUncommanded: z.literal(true).optional(),
+    /** It can't attack, but takes other actions (a familiar). */
+    noAttacks: z.literal(true).optional(),
+    /** Its commander commands it only within this many feet (Animate Dead: 60), with the Bonus Action that does. */
+    commandFeet: z.number().int().min(5).max(5280).optional()
+  })
+  .strict();
+export type CreatureControl = z.infer<typeof CreatureControlSchema>;
+
 export const ActorSchema = z.object({
   id: z.uuid(),
   name: z.string().min(1).max(120),
@@ -2074,6 +2304,22 @@ export const ActorSchema = z.object({
     .default({}),
   /** Conditions this actor is immune to (seeded from its definition). GM knowledge, stripped from player projections. */
   conditionImmunities: z.array(ConditionIdSchema).max(20).default([]),
+  /** SRD Influence: a monster's or NPC's attitude toward the party, Indifferent when absent. The GM sets it; an
+   *  Influence check against it has Advantage when Friendly and Disadvantage when Hostile. GM-only in projections. */
+  attitude: z.enum(["friendly", "indifferent", "hostile"]).optional(),
+  /** SRD Malnutrition and Dehydration, while the table tracks food and water (`rest.survival`): what the creature ate
+   *  and drank this game day, the days in a row it ate nothing, and the Exhaustion levels hunger and thirst gave it,
+   *  which no rest removes until it eats or drinks its full need for a day. The server keeps it. Owner and GM only. */
+  nourishment: z
+    .object({
+      foodPounds: z.number().min(0).max(1000).default(0),
+      waterPints: z.number().int().min(0).max(10_000).default(0),
+      daysUnfed: z.number().int().min(0).max(10_000).default(0),
+      hungerLevels: z.number().int().min(0).max(6).default(0),
+      thirstLevels: z.number().int().min(0).max(6).default(0)
+    })
+    .strict()
+    .optional(),
   /** Walking speed in feet (seeded from the definition, GM-editable). Absent = unknown, so movement rules skip. */
   speedFeet: z.number().int().min(0).max(500).optional(),
   /** Legendary actions per round and Legendary Resistance per day (SRD 2024). GM knowledge, stripped from player projections. */
@@ -2098,6 +2344,11 @@ export const ActorSchema = z.object({
   firstClaimedAt: z.number().int().nonnegative().optional(),
   /** One of the sample party a fresh table starts with. The roster labels it and can remove the set. GM-only. */
   sample: z.literal(true).optional(),
+  /** What brought this creature onto the map and keeps it there (see SummonedSchema). GM-only. */
+  summon: SummonedSchema.optional(),
+  /** Who commands this creature and on which side it fights (see CreatureControlSchema). GM-only; the commander's
+   *  player is told it commands it. */
+  control: CreatureControlSchema.optional(),
   /** Live spell-slot pools by level, restored by rests; null = not a modeled spellcaster. Owner-only in projections. */
   spellSlots: z.array(SpellSlotSchema).max(9).nullable().default(null),
   /** Warlock Pact Magic pool (one level, uniform slots); null = none. Owner-only in projections. */
@@ -2418,6 +2669,12 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   onlyOne: z.literal(true).optional(),
   /** Only another creature may receive it ("inspire another creature"). */
   notSelf: z.literal(true).optional(),
+  /** A creature that targets the recipient with an attack roll or a damaging spell first makes this save, against the
+   *  caster's spell save DC when the grant prints none (Sanctuary); a failure turns it away from the recipient. */
+  ward: z
+    .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40).optional() })
+    .strict()
+    .optional(),
   /** The recipient's size while it lasts (Large Form: Large), where there is room for it. */
   sizeChange: SizeChangeSchema.optional(),
   /** It lasts this many hours, rolled as it lands (Potion of Diminution: 1d4), in place of `duration`. */
@@ -2626,6 +2883,126 @@ export const SaveOutcomeFields = {
   /** A creature this size or larger has Advantage on the save (Ensnaring Strike: "A Large or larger creature has
    *  Advantage on this save"). */
   advantageAtSize: SizeSchema.optional(),
+  /** "Repeats the save at the end of its next turn", once (a basilisk's gaze, Sleep): the failure holds until then, a
+   *  success ends it, and a failure brings `secondFailure`. */
+  repeatOnce: z
+    .literal(true)
+    .optional()
+    .describe(
+      "The target repeats the save once, at the end of its next turn: a success ends the failure, a failure brings the second failure"
+    ),
+  /** The repeat comes at the start of each of the target's turns (Conjure Elemental's restraint). */
+  repeatAtTurnStart: z
+    .literal(true)
+    .optional()
+    .describe("The target repeats the save at the start of each of its turns, not the end"),
+  /** The target also repeats the save each time it takes damage (Dominate Person), with Advantage (Hideous Laughter),
+   *  or only for damage from another source (a harpy's Luring Song). */
+  repeatOnDamage: z
+    .object({ advantage: z.literal(true).optional(), notFromSource: z.literal(true).optional() })
+    .strict()
+    .optional()
+    .describe(
+      "The target repeats the save each time it takes damage: with Advantage (advantage), or only for damage from another source (notFromSource)"
+    ),
+  /** The target can take an action to repeat the save (Irresistible Dance: "collect itself"). */
+  repeatByAction: z.literal(true).optional().describe("The target can take an action on its turn to repeat the save"),
+  /** Damage each failed repeat deals (Weird: "it takes 5d10 Psychic damage"). */
+  repeatFailureDamage: RepeatFailureDamageSchema.optional().describe(
+    "Damage each failed repeat save deals, rolled by the engine"
+  ),
+  /** Successes and failures counted apart until one reaches this many (Flesh to Stone's three): that many successes
+   *  end it, that many failures bring `secondFailure`. */
+  repeatTally: z
+    .number()
+    .int()
+    .min(2)
+    .max(5)
+    .optional()
+    .describe(
+      "Repeated saves counted apart until this many successes (ending it) or failures (bringing the second failure)"
+    ),
+  /** What a failed repeat (the last counted one, with a tally) leaves in place of the failure: "Second Failure: The
+   *  target has the Unconscious condition for 10 minutes". */
+  secondFailure: z
+    .object({
+      name: z.string().min(1).max(120).optional(),
+      conditions: z.array(SaveConditionSchema).max(4).default([]),
+      duration: SaveFailureDurationSchema.optional(),
+      endsOnDamage: z.literal(true).optional(),
+      repeatSave: z.literal(true).optional(),
+      endedBy: EndedBySchema.optional()
+    })
+    .strict()
+    .optional()
+    .describe(
+      "What a failed repeat save leaves in place of the first failure: its conditions, how long they last, whether damage ends them and whether the save repeats each turn"
+    ),
+  /** An action that ends the failure's effect ("a creature within 5 feet of it takes an action to wake it", "stanch the
+   *  wound ... DC 12 Wisdom (Medicine) check"). */
+  endedBy: EndedBySchema.optional(),
+  /** What the failure's effect does as its bearer rests or days pass (a death dog's poison). */
+  atRest: RestTriggerSchema.optional(),
+  /** A failed repeat deals the cast's damage again (Phantasmal Killer: "it takes the Psychic damage again"). */
+  repeatDamageAgain: z
+    .literal(true)
+    .optional()
+    .describe("Each failed repeat save deals the first failure's damage again"),
+  /** The target repeats the save only when it ends its turn out of the source's line of sight (Fear). */
+  repeatUnseenSource: z
+    .literal(true)
+    .optional()
+    .describe("The target repeats the save only when it ends its turn where it can't see the source"),
+  /** The failure ends when the target ends its turn out of the source's line of sight (Horror Nimbus). */
+  endsOutOfSight: z
+    .literal(true)
+    .optional()
+    .describe("The failure ends when the target ends its turn where it can't see the source"),
+  /** Creatures that succeed without rolling: of these types (Flesh to Stone's Constructs), or that don't sleep (Sleep:
+   *  "Creatures that don't sleep, such as elves, or that have Immunity to the Exhaustion condition"). */
+  autoSuccess: z
+    .object({
+      creatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
+      sleepless: z.literal(true).optional()
+    })
+    .strict()
+    .optional()
+    .describe("Creatures that succeed without rolling: of these creature types, or that don't sleep"),
+  /** Exhaustion levels a failure adds (Weight of Years: "The target gains 1 Exhaustion level"). */
+  failureExhaustion: z.number().int().min(1).max(6).optional().describe("Exhaustion levels a failed save adds"),
+  /** In a fight, the target has Advantage when the source or its allies are fighting it (Charm Person). */
+  advantageIfFighting: z
+    .literal(true)
+    .optional()
+    .describe("In a fight, the target has Advantage on the save when the source's side is fighting it"),
+  /** "Success: The target is immune to this ghast's Stench for 24 hours" (held for the rest of the fight). */
+  immuneOnSuccess: z
+    .literal(true)
+    .optional()
+    .describe("A success makes the target immune to this action of its source, held for the rest of the fight"),
+  /** The failure's conditions end when the source dies ("until the aboleth dies"). */
+  endsWhenSourceDies: z
+    .literal(true)
+    .optional()
+    .describe("The failure's conditions end when the source dies or is defeated"),
+  /** Only creatures of these types make the save ("If the target is a Humanoid, it is subjected to the following
+   *  effect"); any other is spared it. */
+  onlyCreatureTypes: z
+    .array(RiderSlugSchema)
+    .min(1)
+    .max(6)
+    .optional()
+    .describe("Only creatures of these types make the save; any other is spared it"),
+  /** A creature that still bears this action's failure is left out ("each creature that isn't currently affected by
+   *  this breath"). */
+  sparesAffected: z.literal(true).optional().describe("A creature still under this action's failure makes no new save"),
+  /** A failure kills the target outright, and the source may regain hit points from it (a will-o'-wisp's Consume
+   *  Life: "The target dies, and the wisp regains 10 (3d6) Hit Points"). */
+  failureKills: z
+    .object({ sourceRegains: DiceFormulaSchema.optional() })
+    .strict()
+    .optional()
+    .describe("A failure kills the target outright; the source regains the rolled hit points, if any"),
   /** A failure returns a shape-shifted creature to its true form, and it can't shape-shift while the spell lasts
    *  (Moonbeam). */
   failureEndsForm: z
@@ -2850,7 +3227,7 @@ export const SaveFailureEffectSchema = z
       .strict()
       .optional(),
     /** The bearer can't move from its space while it lasts (Irresistible Dance: "must use all its movement to dance in
-     *  place"). */
+     *  place"; Flesh to Stone's success: "its Speed is 0 until the start of your next turn"). */
     speedZero: z.literal(true).optional(),
     /** The light the creature sheds while it lasts (Faerie Fire: "Each creature ... sheds Dim Light"). */
     light: CarriedLightSchema.optional(),
@@ -2994,6 +3371,13 @@ export const OnHitRiderSchema = z
     spendsEffectTag: EffectTagSchema.optional(),
     /** What the engine leaves to the GM, said with the hit: a curse that acts at rests, a creature killed outright. */
     reminder: z.string().min(1).max(400).optional(),
+    /** An action that ends the effect ("The target or a creature within 5 feet of it can detach the stirge as an
+     *  action"). */
+    endedBy: EndedBySchema.optional(),
+    /** What the effect does as its bearer rests or days pass (a mummy's curse, an otyugh's poison). */
+    atRest: RestTriggerSchema.optional(),
+    /** It ends when the attacker dies ("cursed for 24 hours or until the incubus dies"). */
+    endsWhenSourceDies: z.literal(true).optional(),
     /** The hit can kill outright (Nine Lives Stealer, Mace of Disruption, Mace of Smiting, Vorpal Sword): only against a
      *  target with fewer than `hitPointsUnder` Hit Points as it is hit, or `afterHitAtOrBelow` or fewer once the hit's
      *  damage lands, and never against `exceptCreatureTypes`. With the rider's `save` a failure kills and a success
@@ -3435,6 +3819,199 @@ export const ActionTeleportSchema = z
   .strict();
 export type ActionTeleport = z.infer<typeof ActionTeleportSchema>;
 
+/** One stat block a summon can bring onto the map, and how many of it come. */
+export const SummonCreatureSchema = z
+  .object({
+    /** The stat block, by its monster id: a bundled one, or one this table made. */
+    monsterId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(200),
+    /** How many of it come at once (a silver Horn of Valhalla's two Berserkers). */
+    count: z.number().int().min(1).max(20).default(1),
+    /** How many more come for each spell slot level above `minLevel`, or above the spell's own (Animate Dead: 2). */
+    perSlot: z.number().int().min(1).max(4).optional(),
+    /** It is offered only from this spell slot level up (Create Undead's Ghasts from a level 8 slot). */
+    minLevel: z.number().int().min(1).max(9).optional(),
+    /** The faces of the summon's `die` that bring it (a gray Bag of Tricks' 1 brings a Weasel). */
+    faces: z
+      .object({ from: z.number().int().min(1).max(100), to: z.number().int().min(1).max(100) })
+      .strict()
+      .optional(),
+    /** The form of a scaled stat block it takes (Giant Insect's spider), from the stat block's `summonScaling.forms`. */
+    form: RiderSlugSchema.optional(),
+    /** How much of an `upToModifier` budget one counts for (Animate Objects: a Large object counts as two). */
+    share: z.number().int().min(1).max(4).optional(),
+    /** Who commands it when the summon's die brings this row, in place of the summon's own (an Efreeti Bottle's 1:
+     *  "The efreeti attacks you"), and how many rounds it stays then ("After fighting for 5 rounds, the efreeti
+     *  disappears"). */
+    allegiance: z.enum(["user", "none", "hostile"]).optional(),
+    rounds: z.number().int().min(1).max(100).optional(),
+    /** How it differs from its stat block ("uses the Riding Horse stat block, except it has a Speed of 100 feet"; a
+     *  treant's trees have Intelligence and Charisma scores of 1 and lack Animate Trees). */
+    except: z
+      .object({
+        name: z.string().min(1).max(120).optional(),
+        speedFeet: z.number().int().min(0).max(500).optional(),
+        abilityScores: z
+          .object({
+            str: z.number().int().min(1).max(30).optional(),
+            dex: z.number().int().min(1).max(30).optional(),
+            con: z.number().int().min(1).max(30).optional(),
+            int: z.number().int().min(1).max(30).optional(),
+            wis: z.number().int().min(1).max(30).optional(),
+            cha: z.number().int().min(1).max(30).optional()
+          })
+          .strict()
+          .optional(),
+        withoutActions: z
+          .array(z.string().regex(/^[a-z0-9-]+$/))
+          .min(1)
+          .max(6)
+          .optional(),
+        /** Conditions it is immune to beside its stat block's (a Horn of Valhalla's spirits: Charmed and Frightened). */
+        conditionImmunities: z.array(ConditionIdSchema).min(1).max(6).optional()
+      })
+      .strict()
+      .optional()
+  })
+  .strict();
+export type SummonCreature = z.infer<typeof SummonCreatureSchema>;
+
+/**
+ * The creatures an action brings onto the map (SRD 5.2.1 summoned creatures: Summon Dragon, Animate Dead, a Bowl of
+ * Commanding Water Elementals). Each comes from a stat block, scaled by the cast's level when its stat block says how
+ * (`summonScaling`), in an unoccupied space within `rangeFeet` of its user, and stands on its user's side under its
+ * user's command unless `allegiance` says otherwise. It leaves the map when its time is up, at 0 Hit Points, or when
+ * its user dismisses it.
+ */
+export const SummonSchema = z
+  .object({
+    /** The stat blocks it may bring. With several, its user picks (Find Familiar's forms), or the server rolls `die`. */
+    creatures: z.array(SummonCreatureSchema).min(1).max(24),
+    /** The die the server rolls to pick one of `creatures` by its `faces` (a Bag of Tricks' d8). */
+    die: z.number().int().min(2).max(100).optional(),
+    /** Its user picks any stat block of this creature type up to this Challenge Rating as well ("or another Beast that
+     *  has a Challenge Rating of 0"). */
+    orAny: z
+      .object({ creatureType: RiderSlugSchema, maxChallenge: z.number().min(0).max(30) })
+      .strict()
+      .optional(),
+    /** Up to its user's spellcasting ability modifier come, each counting its `share` (Animate Objects). */
+    upToModifier: z.literal(true).optional(),
+    /** How far from its user it may appear; absent, beside its user. */
+    rangeFeet: z.number().int().min(5).max(1000).optional(),
+    /** It rises from a dead creature its user targets, in that creature's space, one for each corpse (Animate Dead). */
+    fromCorpse: z
+      .object({
+        creatureTypes: z.array(RiderSlugSchema).min(1).max(4).optional(),
+        maxSize: SizeSchema.optional(),
+        /** The creature died no more than this many rounds ago (a wraith's Create Specter: 1 minute). */
+        withinRounds: z.number().int().min(1).max(100).optional()
+      })
+      .strict()
+      .optional(),
+    /** When it acts: right after its user's turn on the same Initiative count, on its own Initiative roll, or never (a
+     *  spell's floating force, which only marks where the spell acts from). */
+    turn: z.enum(["after-user", "own", "none"]).default("after-user"),
+    /** Commanding it takes its user's Bonus Action (Animate Dead, Arcane Eye) or a Magic action (Mage Hand). Absent: it
+     *  obeys with no action from its user. */
+    commandedWith: z.enum(["bonus-action", "action"]).optional(),
+    /** Its user commands it only within this many feet (Animate Dead: 60, Animate Objects: 500). */
+    commandFeet: z.number().int().min(5).max(5280).optional(),
+    /** How far a command moves one with no turns of its own (an Unseen Servant's 15 feet, an Arcane Eye's 30), or twice
+     *  its user's Speed (Mislead's double). */
+    commandMove: z.union([z.number().int().min(5).max(500), z.literal("twice-user-speed")]).optional(),
+    /** Cast on creatures this spell made, it renews its command over up to this many of them (`perSlot` more for each
+     *  slot level above the spell's) instead of making new ones (Animate Dead: four). */
+    reasserts: z
+      .object({ count: z.number().int().min(1).max(20), perSlot: z.number().int().min(1).max(4).optional() })
+      .strict()
+      .optional(),
+    /** One its user doesn't command takes the Dodge action: one commanded with a Bonus Action that wasn't commanded
+     *  since its last turn, or one that used no action on its turn ("If you don't issue any, it takes the Dodge
+     *  action"). */
+    dodgesUncommanded: z.literal(true).optional(),
+    /** How long it stays: while its spell lasts (its Concentration or its own duration), for these minutes, until its
+     *  user's next Long Rest, or until it drops to 0 Hit Points or is dismissed. Absent: its spell's time, or untimed
+     *  for an action that casts none. */
+    lasts: z
+      .discriminatedUnion("type", [
+        z.object({ type: z.literal("spell") }).strict(),
+        z
+          .object({
+            type: z.literal("minutes"),
+            minutes: z.number().int().min(1).max(MAX_EFFECT_MINUTES),
+            /** Its user must keep Concentration for it (a Ring of Djinni Summoning: "for as long as you maintain
+             *  Concentration, up to 1 hour"). */
+            concentration: z.literal(true).optional()
+          })
+          .strict(),
+        z.object({ type: z.literal("until-long-rest") }).strict(),
+        z.object({ type: z.literal("untimed") }).strict()
+      ])
+      .optional(),
+    /** When its time is up it stays on the map and stops obeying (Animate Dead's 24 hours of control). */
+    freedAtEnd: z.literal(true).optional(),
+    /** It is gone early when it takes any damage (Phantom Steed), when its user dies (Find Steed), or when it is
+     *  farther than `leashFeet` from its user (Unseen Servant). */
+    endsOnDamage: z.literal(true).optional(),
+    endsOnUserDeath: z.literal(true).optional(),
+    leashFeet: z.number().int().min(5).max(5280).optional(),
+    /** Who commands it: its user, no one (a Wand of Wonder's Rhinoceros), or no one and it turns on its user (a Horn of
+     *  Valhalla blown without the training it asks). */
+    allegiance: z.enum(["user", "none", "hostile"]).default("user"),
+    /** It obeys its user only when its user has this training, and attacks its user otherwise (a Horn of Valhalla's
+     *  Berserkers: "Proficiency with all Martial weapons", "Training with all Medium armor"). */
+    obeysWith: z
+      .object({ weapons: ProficiencyIdSchema.optional(), armor: ProficiencyIdSchema.optional() })
+      .strict()
+      .optional(),
+    /** It can't attack, but takes other actions as normal (a familiar). */
+    noAttacks: z.literal(true).optional(),
+    /** Its user can have only one from this source; a new one replaces the old (Find Steed, Find Familiar). */
+    onlyOne: z.literal(true).optional(),
+    /** The creature type its user picks for it, in place of its stat block's (a familiar is a Celestial, Fey or Fiend;
+     *  a Druid's Wild Companion is Fey). */
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
+    /** Its user may cast it without Concentration, and it then lasts 1 minute (a Draconic Sorcerer's Dragon Companion). */
+    concentrationOptional: z.literal(true).optional(),
+    /** It can't be harmed or blocked and has no turns of its own (Arcane Eye, Faithful Hound, Mislead's double). */
+    intangible: z.literal(true).optional(),
+    /** Its user's player sees what it sees: always (Arcane Eye), or after a Bonus Action until the start of its user's
+     *  next turn (a familiar). */
+    sight: z.enum(["always", "bonus-action"]).optional(),
+    /** How its user dismisses it, which ends it: a Bonus Action (an elemental from a bowl) or a Magic action (a
+     *  familiar). Absent: only its time, its Hit Points or the GM end it. */
+    dismiss: z.enum(["bonus-action", "action"]).optional(),
+    /** Its user gains Resistance, until it is gone, to one damage type its stat block resists, picked at the summon
+     *  (a Draconic Spirit's Shared Resistances). */
+    sharedResistance: z.literal(true).optional(),
+    /** Its user's spells with a range of touch can be delivered through it, with its Reaction, while it is within this
+     *  many feet of its user (a familiar: 100). */
+    deliversTouch: z.number().int().min(5).max(1000).optional(),
+    /** The spell's attacks reach from it, not from its user (Spiritual Weapon's force, Arcane Sword, Conjure Fey's
+     *  spirit); see `StrikesFromSchema`. */
+    strikesFrom: StrikesFromSchema.optional(),
+    /** When it is gone before its time (0 Hit Points, damage), its spell ends too (Arcane Hand, Project Image). */
+    endsSpell: z.literal(true).optional(),
+    /** Its user's spell attack bonus, spell save DC and spellcasting ability modifier, which a scaled stat block reads
+     *  (`summonScaling`). The engine fills them when it makes a cast action. */
+    numbers: z
+      .object({
+        attackBonus: z.number().int().min(-10).max(30),
+        saveDc: z.number().int().min(1).max(40),
+        modifier: z.number().int().min(-5).max(10)
+      })
+      .strict()
+      .optional()
+  })
+  .strict()
+  .describe(
+    "The creatures an action brings onto the map: each from a stat block (scaled by the cast's level when the stat block says how), in an unoccupied space within `rangeFeet` of its user, on its user's side and under its user's command unless `allegiance` says otherwise; it leaves when its time is up, at 0 Hit Points, or when dismissed."
+  );
+export type Summon = z.infer<typeof SummonSchema>;
+
 /** Mechanics fields are optional (ADR-0020): absent means prose only. Descriptions stay the display source of truth. */
 export const ActionSchema = z
   .object({
@@ -3702,6 +4279,11 @@ export const ActionSchema = z
     /** A teleport the action grants ("teleports up to 60 feet to an unoccupied space it can see"), see
      *  `ActionTeleportSchema`. */
     teleport: ActionTeleportSchema.optional(),
+    /** The creatures it brings onto the map (Summon Dragon, a Bowl of Commanding Water Elementals), see `SummonSchema`. */
+    summons: SummonSchema.optional(),
+    /** Its spell is cast with this action alone, whatever the spell's casting time (Pact of the Chain: "cast it as a
+     *  Magic action without expending a spell slot"). */
+    castsAtOnce: z.literal(true).optional(),
     /** A jump the action allows this turn ("jumps up to 30 feet by spending 10 feet of movement"). */
     leap: z
       .object({ feet: z.number().int().min(5).max(120), costFeet: z.number().int().min(0).max(60) })
@@ -4074,8 +4656,8 @@ const TraitSaveSchema = z
     ability: AbilitySchema,
     dc: z.number().int().min(1).max(40),
     ...SaveOutcomeFields,
-    /** "Success: The target is immune to this ghast's Stench for 24 hours" (held for the rest of the fight). */
-    immuneOnSuccess: z.literal(true).optional()
+    /** What a failure leaves beyond conditions (an aboleth's Mucus Cloud curse). */
+    failureEffect: SaveFailureEffectSchema.optional()
   })
   .strict();
 
@@ -4129,11 +4711,15 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       notWhileIncapacitated: z.literal(true).optional(),
       /** Only a creature that can see the bearer is affected ("and can see the hag's true form"). */
       seenOnly: z.literal(true).optional(),
+      /** It acts only while the fight is underwater (an aboleth's Mucus Cloud). */
+      underwaterOnly: z.literal(true).optional(),
       damage: TraitDamageSchema.optional(),
       save: TraitSaveSchema.optional(),
       /** The fire it sets (a fire elemental's Emanation): "start burning" (SRD Burning). */
       hazard: z.literal("burning").optional(),
-      /** What a failed save does that the engine leaves to the GM (a gibbering mouther's d8 table). */
+      /** A failed save rolls on a table the server reads for the creature's turn (a gibbering mouther's d8). */
+      failureTable: z.literal("gibbering").optional(),
+      /** What a failed save does that the engine leaves to the GM. */
       reminder: z.string().min(1).max(600).optional()
     })
     .strict(),
@@ -4180,7 +4766,13 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
       kind: z.literal("berserk"),
       name: TraitNameSchema,
       /** The d6 face, or higher, that sends it berserk. */
-      on: z.number().int().min(1).max(6)
+      on: z.number().int().min(1).max(6),
+      /** Another creature within `withinFeet` calms it with an action and a Charisma (Persuasion) check against `dc`
+       *  (the flesh golem's creator). */
+      calm: z
+        .object({ dc: z.number().int().min(1).max(40), withinFeet: z.number().int().min(5).max(300) })
+        .strict()
+        .optional()
     })
     .strict(),
   /** "The stalker has the Invisible condition": the creature joins the roster with it. */
@@ -4233,6 +4825,101 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
     .strict()
 ]);
 export type TraitMechanic = z.infer<typeof TraitMechanicSchema>;
+
+const ActionIdSchema = z.string().regex(/^[a-z0-9-]+$/);
+
+/** One form a scaled stat block can take, picked at the summon (Giant Insect's spider, an Otherworldly Steed's Fey). */
+export const SummonFormSchema = z
+  .object({
+    id: RiderSlugSchema,
+    name: z.string().min(1).max(60),
+    /** The stat block's `formActions` this form keeps (the spider's Web Bolt). */
+    actions: z.array(ActionIdSchema).max(6).optional(),
+    /** Its creature type, in place of the stat block's (an Otherworldly Steed is a Celestial, Fey or Fiend). */
+    creatureType: RiderSlugSchema.optional(),
+    /** The damage type of its attacks, in place of the printed one (a Fey steed's Psychic Slam). */
+    damageType: DamageTypeSchema.optional(),
+    /** Its size and Hit Points, in place of the printed ones (a Huge Animated Object's 40). */
+    size: SizeSchema.optional(),
+    hitPoints: z.number().int().min(1).max(1000).optional(),
+    /** An attack's damage in this form (a Huge Animated Object's Slam: 2d12 + 3 and its summoner's spellcasting
+     *  modifier). */
+    damage: z
+      .array(
+        z
+          .object({ actionId: ActionIdSchema, formula: DamageFormulaSchema, addsModifier: z.literal(true).optional() })
+          .strict()
+      )
+      .max(4)
+      .optional(),
+    /** Special speeds this form has (the wasp's Fly 40). */
+    speeds: z
+      .object({
+        fly: z.number().int().min(5).max(500).optional(),
+        climb: z.number().int().min(5).max(500).optional(),
+        swim: z.number().int().min(5).max(500).optional()
+      })
+      .strict()
+      .optional()
+  })
+  .strict();
+export type SummonForm = z.infer<typeof SummonFormSchema>;
+
+/**
+ * How a stat block a spell prints scales with the spell and its caster (SRD 5.2.1 Summon Dragon's Draconic Spirit,
+ * Giant Insect, Find Steed's Otherworldly Steed, Animate Objects' Animated Object): its printed numbers are for
+ * `baseLevel`. Its attacks roll with its summoner's spell attack modifier, its saves use its summoner's spell save DC,
+ * and its Proficiency Bonus is its summoner's.
+ */
+export const SummonScalingSchema = z
+  .object({
+    baseLevel: z.number().int().min(1).max(9),
+    /** What its Armor Class and Hit Points gain for each spell level above `baseLevel` ("14 + the spell's level"). */
+    armorClassPerLevel: z.number().int().min(0).max(5).optional(),
+    hitPointsPerLevel: z.number().int().min(0).max(100).optional(),
+    /** Actions whose first damage roll, or healing, gains for each spell level above `baseLevel`: a flat `plus` ("1d6 +
+     *  4 + the spell's level") or `dice` of the roll's own die (an Animated Object's Slam: 1d4 more). */
+    perLevel: z
+      .array(
+        z
+          .object({
+            actionId: ActionIdSchema,
+            plus: z.number().int().min(1).max(10).optional(),
+            dice: z.number().int().min(1).max(4).optional()
+          })
+          .strict()
+      )
+      .max(6)
+      .optional(),
+    /** Multiattack parts that make half the spell's level of attacks, rounded down (a Draconic Spirit's Rends). */
+    halfLevelAttacks: z.array(ActionIdSchema).max(3).optional(),
+    /** Special speeds it has only from a spell level up (an Otherworldly Steed flies at 60 feet from level 4). */
+    speedsFrom: z
+      .array(
+        z
+          .object({
+            level: z.number().int().min(1).max(9),
+            mode: z.enum(["fly", "climb", "swim"]),
+            feet: z.number().int().min(5).max(500)
+          })
+          .strict()
+      )
+      .max(3)
+      .optional(),
+    /** Actions only some forms have; each form keeps the ones it names. */
+    formActions: z.array(ActionIdSchema).max(8).optional(),
+    forms: z.array(SummonFormSchema).min(2).max(6).optional(),
+    /** Actions whose damage type its summoner picks at the summon among the types the stat block resists (a Draconic
+     *  Spirit's Breath Weapon). */
+    chosenDamageType: z.array(ActionIdSchema).max(3).optional(),
+    /** Its Hit Points equal its summoner's Hit Point maximum (Arcane Hand). */
+    hitPointsOfSummoner: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "How a stat block a spell prints scales with the spell's level and its summoner: its numbers are for `baseLevel`, its attacks roll with its summoner's spell attack modifier and its saves use its summoner's spell save DC."
+  );
+export type SummonScaling = z.infer<typeof SummonScalingSchema>;
 
 export const ActorDefinitionSchema = z
   .object({
@@ -4307,6 +4994,8 @@ export const ActorDefinitionSchema = z
       ),
     /** What its traits do that the engine runs (Regeneration, auras, Death Burst), read from their text. */
     traitMechanics: z.array(TraitMechanicSchema).max(12).optional(),
+    /** A stat block a spell prints, which scales with the spell's level and its summoner (see SummonScalingSchema). */
+    summonScaling: SummonScalingSchema.optional(),
     /** Character identity (class/level/race/background/feats); character definitions only. */
     character: CharacterIdentitySchema.optional().describe(
       "The character half of an ActorDefinition (class/level/species/background/feats and the choice-provenance ledger). A monster leaves it absent: the character builder writes it, never a homebrew author"

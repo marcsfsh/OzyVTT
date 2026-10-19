@@ -1333,14 +1333,17 @@ describe("public game API over /api/v1", () => {
     for (const id of ["dodge", "dash", "disengage", "help", "hide", "ready", "unarmed-grapple", "escape-grapple"]) {
       expect(rows.find((row) => row.id === id)?.builtin).toBe(true);
     }
-    // No encounter running: nothing is spent, so everything reports available with no violations, but an action
-    // that needs an effect the crocodile doesn't have: putting out a fire needs it to be burning.
-    const putOut = rows.find((row) => row.id === "extinguish-fire");
-    expect(putOut?.available).toBe(false);
-    expect(putOut?.violations.map((violation) => violation.rule)).toEqual(["feature.requires-effect"]);
-    expect(rows.filter((row) => row !== putOut).every((row) => row.available && row.violations.length === 0)).toBe(
-      true
-    );
+    // No encounter running: nothing is spent, so everything reports available with no violations, but the actions
+    // that need an effect nobody has: putting out a fire needs the crocodile to be burning, and End an Effect needs an
+    // effect an action ends.
+    const needsEffect = rows.filter((row) => row.id === "extinguish-fire" || row.id === "end-an-effect");
+    expect(needsEffect.map((row) => [row.available, row.violations.map((violation) => violation.rule)])).toEqual([
+      [false, ["feature.requires-effect"]],
+      [false, ["feature.requires-effect"]]
+    ]);
+    expect(
+      rows.filter((row) => !needsEffect.includes(row)).every((row) => row.available && row.violations.length === 0)
+    ).toBe(true);
   });
 });
 

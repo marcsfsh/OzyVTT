@@ -743,7 +743,8 @@ describe("Warlock invocations: the eleven free castings are handed over (audit r
     resolveDefinitionAction(
       built.state,
       actionOf(built, "spell-water-breathing-free"),
-      { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000040" },
+      // Water Breathing is for the willing creatures it names; the Warlock names itself.
+      { actorId: IDS.hero, targetIds: [IDS.hero], commandId: "50000000-0000-4000-8000-000000000040" },
       deps(built, [])
     );
     expect(built.hero.actionUses["gift-of-the-depths"]).toBe(1);
@@ -751,7 +752,7 @@ describe("Warlock invocations: the eleven free castings are handed over (audit r
       resolveDefinitionAction(
         built.state,
         actionOf(built, "spell-water-breathing-free"),
-        { actorId: IDS.hero, targetIds: [], commandId: "50000000-0000-4000-8000-000000000041" },
+        { actorId: IDS.hero, targetIds: [IDS.hero], commandId: "50000000-0000-4000-8000-000000000041" },
         deps(built, [])
       )
     ).toThrow();
@@ -908,6 +909,19 @@ describe("Warlock invocations: the ones that ask a question of their own (audit 
       prepared: true
     });
     expect(spellOf(withoutInvocation(), "find-familiar")).toBeUndefined();
+  });
+
+  it("Pact of the Chain casts Find Familiar as a Magic action and offers the special forms", () => {
+    const built = withInvocation("pact-of-the-chain");
+    const free = built.actions.find((action) => action.id === "spell-find-familiar-free")!;
+    expect(free).toMatchObject({ activation: "action", castsAtOnce: true });
+    // With a slot it is the spell as printed: an hour's casting.
+    expect(built.actions.find((action) => action.id === "spell-find-familiar")?.castsAtOnce).toBeUndefined();
+    const forms = free.summons!.creatures.map((row) => row.monsterId);
+    for (const id of ["imp", "pseudodragon", "quasit", "skeleton", "sphinx-of-wonder", "sprite", "venomous-snake"])
+      expect(forms).toContain(id);
+    // The spell's own forms stay on offer.
+    expect(forms).toContain("owl");
   });
 });
 
@@ -1331,6 +1345,8 @@ describe("Draconic Sorcery: Dragon Wings and Dragon Companion carry their daily 
       alwaysPrepared: true
     });
     expect(actionOf(built, "spell-summon-dragon-free").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    // "You can modify it so that it doesn't require Concentration", on every casting of the spell.
+    expect(actionOf(built, "spell-summon-dragon-free").summons?.concentrationOptional).toBe(true);
     // A level-17 Sorcerer has the spell from the level-9 Draconic Spells row, but not the free casting.
     const seventeen = sorcerer(17);
     expect(spellOf(seventeen, "summon-dragon")).toMatchObject({ alwaysPrepared: true });

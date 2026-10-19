@@ -237,7 +237,11 @@ export function EncounterMap({
     if (readOnly) return false;
     if (role === "gm") return true;
     const actor = actorsById.get(actorId);
-    return actor !== undefined && "claimStatus" in actor && actor.claimStatus === "mine";
+    // A player moves their own character and the creatures it commands; the server checks each move.
+    return (
+      actor !== undefined &&
+      (("claimStatus" in actor && actor.claimStatus === "mine") || ("commanded" in actor && actor.commanded === true))
+    );
   };
   const canMoveShape = (annotation: AnyAnnotation) =>
     role === "gm" || isMine(annotation, role) || annotation.movableByOthers;
@@ -261,8 +265,14 @@ export function EncounterMap({
   useTokenFocusRequests((actorId) => {
     if (!moveSceneId) focusOn(actorId);
   });
+  const commandsAttacker = (attackerId: string) => {
+    const attacker = actorsById.get(attackerId);
+    return attacker !== undefined && "commanded" in attacker && attacker.commanded === true;
+  };
   const activeTargeting =
-    targetingSession && !moveSceneId && (role === "gm" || targetingSession.attackerId === ownActorId)
+    targetingSession &&
+    !moveSceneId &&
+    (role === "gm" || targetingSession.attackerId === ownActorId || commandsAttacker(targetingSession.attackerId))
       ? targetingSession
       : null;
   // The camera follows the play: who is choosing targets and whom, a reaction and what it answers, whose turn it

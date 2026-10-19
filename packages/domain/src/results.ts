@@ -231,6 +231,8 @@ export type ActionResolution = Readonly<{
   /** No attack roll and no save, but damage: what each target is owed, applied or proposed like a hit. A darts action
    *  (Magic Missile) owes each creature only what its own darts dealt. */
   damageTargets?: readonly DamageTarget[];
+  /** The creatures this action brought onto the map (Summon Dragon's spirit), which appear on it for the table. */
+  summoned?: ReadonlyArray<Readonly<{ actorId: string; name: string }>>;
 }>;
 /** A strict-mode rules rejection: what rule blocked the command and whether an override may bypass it. */
 export type RulesBlocked = Readonly<{ rule: string; message: string; overridable: boolean }>;
@@ -293,6 +295,8 @@ export type CheckRollOutcome = Readonly<{
   rollMode?: ActionRollMode;
   /** Reliable Talent counted a d20 of 9 or lower as 10. */
   reliableTalent?: true;
+  /** Why it failed whatever it rolled (a Blinded roller's check that needs sight). */
+  autoFailed?: string;
   /** The d20 was typed from a physical die. */
   typed?: true;
   /** What answered the check, already in its numbers. */

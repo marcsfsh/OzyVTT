@@ -2,6 +2,7 @@ import {
   actionChoicesOf,
   owedDamageParts,
   owedDamageTotal,
+  summonChoicesOf,
   type ActionAvailability,
   type ActionResolution,
   type GameState
@@ -52,6 +53,7 @@ import { formsOffer } from "./transform/offer.js";
 import { applyMovementGrants } from "./resolution/movement-grants.js";
 import { applyTimeStop } from "./time-stop.js";
 import { applySpellEndings } from "./resolution/dispel.js";
+import { applySummons } from "./resolution/summon.js";
 import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
@@ -95,6 +97,9 @@ import { checkKnockOut, knockOutOffered, knocksOut } from "./resolution/knock-ou
 import { healLimit } from "./loose-healing.js";
 import { passiveOf, unavailableReason } from "./availability-reasons.js";
 import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-casting.js";
+import { layOutProvisions } from "./resolution/provisions.js";
+import { turnedAwayByWard } from "./resolution/ward.js";
+import { orbLeap } from "./resolution/orb-leap.js";
 import { shapedAction, shapedOutcome, shapingInForce, shapingOffers, withShapedSpell } from "./resolution/metamagic.js";
 
 export type { ResolveDependencies, ResolveInput };
@@ -131,6 +136,9 @@ export function resolveDefinitionAction(
   // A form the action can't give is refused before anything is spent.
   checkShapeShift(ctx);
   ctx.builtin?.apply?.(ctx);
+  // A warded target (Sanctuary) asks its save as the attack or spell is made; a failure spends nothing and stops here.
+  if (input.commit !== false && input.economyPaid !== true && turnedAwayByWard(ctx))
+    return { ...resolutionOf(ctx), save: null };
   if (longCast && longCast.phase !== "finish") {
     stepLongCast(ctx, longCast);
     releaseHideAndReady(ctx);
@@ -246,7 +254,10 @@ export function resolveDefinitionAction(
   applyMovementGrants(ctx);
   applyTimeStop(ctx);
   applyGrant(ctx);
+  applySummons(ctx);
   applyShapeShift(ctx);
+  layOutProvisions(ctx);
+  orbLeap(ctx);
   placeCastSight(ctx);
   applyCastWalls(ctx);
   refuseThePrayedFor(ctx);
@@ -370,6 +381,7 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
     ...(ctx.healing ? { healing: ctx.healing } : {}),
     ...(ctx.opens ? { opens: ctx.opens } : {}),
     ...(damageTargets ? { damageTargets } : {}),
+    ...(ctx.summoned && ctx.summoned.length > 0 ? { summoned: ctx.summoned } : {}),
     ...(knocksOut(ctx) ? { knockOut: "chosen" as const } : {})
   };
 }
@@ -485,6 +497,8 @@ export function actionAvailability(
       ...(conditionChoicesOf(action, spell).length > 0
         ? { conditionChoices: [...conditionChoicesOf(action, spell)] as SaveCondition[] }
         : {}),
+      // The creature a summon brings and its creature type, picked as it is used (Find Familiar's forms).
+      ...(summonChoicesOf(action.summons) ? { summonChoices: summonChoicesOf(action.summons)! } : {}),
       // An option, one for each target, or the weapon a grant binds to (Fire Shield, Bestow Curse, Magic Weapon).
       ...(actionChoicesOf(action) ? { choices: structuredClone(actionChoicesOf(action)!) } : {}),
       // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.

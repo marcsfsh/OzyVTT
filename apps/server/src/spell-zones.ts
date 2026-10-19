@@ -395,12 +395,25 @@ function zoneAction(zone: SpellZone, content: ZoneContent): ActorAction | undefi
       ...(save ? { save: { ...structuredClone(save), dc: zone.dc } } : {})
     };
   } else return undefined;
+  const chosen = zone.damageType;
   return {
     ...action,
     damage: action.damage.map((part, index) => ({
       formula: index === 0 && (zone.grown ?? 0) > 0 ? withMoreDice(part.formula, zone.grown ?? 0) : part.formula,
-      type: zone.damageType ?? part.type
-    }))
+      type: chosen ?? part.type
+    })),
+    // A failed repeat's damage is the chosen element's too (Conjure Elemental's 4d8 "of the spirit's type").
+    ...(action.save?.repeatFailureDamage && chosen
+      ? {
+          save: {
+            ...action.save,
+            repeatFailureDamage: action.save.repeatFailureDamage.map((part) => ({
+              ...part,
+              type: chosen as typeof part.type
+            }))
+          }
+        }
+      : {})
   };
 }
 

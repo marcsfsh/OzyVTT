@@ -126,8 +126,8 @@ function obscurementFor(fog: Obscurement, light: LightAt, senses: Senses | null,
   return OBSCUREMENT_ORDER[Math.max(OBSCUREMENT_ORDER.indexOf(seen), OBSCUREMENT_ORDER.indexOf(fog))]!;
 }
 
-/** The creature a Frightened creature fears, read from the effect that gave it the condition; null when the GM set it
- *  by hand or no effect names its source. */
+/** The creatures a Frightened creature fears, read from the effects that gave it the condition (the GM's hand-set
+ *  condition names one when the GM picks it); empty when no effect names a source. */
 export function fearSources(actor: Actor): string[] {
   return actor.effects
     .filter((effect) => effect.linkedConditionIds.includes("frightened") && effect.sourceActorId !== null)
@@ -137,7 +137,7 @@ export function fearSources(actor: Actor): string[] {
 /**
  * SRD Frightened: "Disadvantage on ability checks and attack rolls while the source of fear is within line of sight."
  * With dynamic vision on and a source the effect names, only while a line of sight joins them; otherwise (vision off,
- * a source set by hand, a token off the map) whenever the condition is on.
+ * a condition set by hand with no source, a token off the map) whenever the condition is on.
  */
 export function frightenedApplies(actor: Actor, rules: SightRules): boolean {
   if (!has(actor, "frightened")) return false;

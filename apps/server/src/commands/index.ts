@@ -19,6 +19,7 @@ import { rulingCommands } from "./rulings.js";
 import { saveCommands } from "./saves.js";
 import { sceneCommands } from "./scenes.js";
 import { soundCommands } from "./sound.js";
+import { summonCommands } from "./summons.js";
 import { tableSettingCommands } from "./table-settings.js";
 import { objectCommands } from "./objects.js";
 import { visionCommands } from "./vision.js";
@@ -46,6 +47,7 @@ export const gameCommands: readonly AnyCommand[] = [
   ...tableSettingCommands,
   ...sceneCommands,
   ...mapCommands,
+  ...summonCommands,
   ...soundCommands,
   ...visionCommands,
   ...objectCommands

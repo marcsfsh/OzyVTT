@@ -890,7 +890,46 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "zombie",
+      "count": 1,
+      "perSlot": 2
+     },
+     {
+      "monsterId": "skeleton",
+      "count": 1,
+      "perSlot": 2
+     }
+    ],
+    "rangeFeet": 10,
+    "fromCorpse": {
+     "creatureTypes": [
+      "humanoid"
+     ],
+     "maxSize": "medium"
+    },
+    "turn": "own",
+    "commandedWith": "bonus-action",
+    "commandFeet": 60,
+    "reasserts": {
+     "count": 4,
+     "perSlot": 2
+    },
+    "dodgesUncommanded": true,
+    "lasts": {
+     "type": "minutes",
+     "minutes": 1440
+    },
+    "freedAtEnd": true,
+    "allegiance": "user"
+   },
+   "targets": {
+    "count": 4,
+    "perSlot": 2
+   }
   },
   "classes": [
    "cleric",
@@ -974,7 +1013,36 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "animated-object",
+      "count": 1,
+      "form": "medium",
+      "share": 1
+     },
+     {
+      "monsterId": "animated-object",
+      "count": 1,
+      "form": "large",
+      "share": 2
+     },
+     {
+      "monsterId": "animated-object",
+      "count": 1,
+      "form": "huge",
+      "share": 3
+     }
+    ],
+    "upToModifier": true,
+    "rangeFeet": 120,
+    "turn": "after-user",
+    "commandedWith": "bonus-action",
+    "commandFeet": 500,
+    "dodgesUncommanded": true,
+    "allegiance": "user"
+   }
   },
   "classes": [
    "bard",
@@ -1225,7 +1293,23 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "arcane-eye",
+      "count": 1
+     }
+    ],
+    "rangeFeet": 30,
+    "turn": "none",
+    "commandedWith": "bonus-action",
+    "commandMove": 30,
+    "allegiance": "user",
+    "noAttacks": true,
+    "intangible": true,
+    "sight": "always"
+   }
   },
   "classes": [
    "wizard"
@@ -1271,7 +1355,66 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "laterActions": [
+    {
+     "name": "clenched fist",
+     "activation": "bonus-action",
+     "when": "The hand moves up to 60 feet and strikes a target within 5 feet of it with a melee spell attack.",
+     "attackRange": {
+      "kind": "melee",
+      "feet": 125
+     },
+     "damage": [
+      {
+       "formula": "5d8",
+       "type": "force"
+      }
+     ]
+    },
+    {
+     "name": "grasping hand",
+     "activation": "bonus-action",
+     "when": "The hand moves up to 60 feet and grapples a Huge or smaller creature within 5 feet of it that fails a Dexterity save.",
+     "save": {
+      "ability": "dex",
+      "successDamage": "none",
+      "failureConditions": [
+       "grappled"
+      ]
+     },
+     "damage": []
+    },
+    {
+     "name": "crush",
+     "activation": "bonus-action",
+     "when": "While the hand grapples a creature, a Bonus Action crushes it.",
+     "damage": [
+      {
+       "formula": "4d6",
+       "type": "bludgeoning",
+       "addsModifier": true
+      }
+     ]
+    }
+   ],
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "arcane-hand",
+      "count": 1
+     }
+    ],
+    "rangeFeet": 120,
+    "turn": "none",
+    "allegiance": "user",
+    "noAttacks": true,
+    "strikesFrom": {
+     "reachFeet": 5,
+     "moveFeet": 60
+    },
+    "endsSpell": true
+   }
   },
   "classes": [
    "sorcerer",
@@ -1443,7 +1586,23 @@
      ]
     }
    ],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "arcane-sword",
+      "count": 1
+     }
+    ],
+    "rangeFeet": 90,
+    "turn": "none",
+    "allegiance": "user",
+    "intangible": true,
+    "strikesFrom": {
+     "reachFeet": 5,
+     "moveFeet": 30
+    }
+   }
   },
   "classes": [
    "bard",
@@ -3753,7 +3912,8 @@
    "failureConditions": [
     "charmed"
    ],
-   "endsOnSourceSideDamage": true
+   "endsOnSourceSideDamage": true,
+   "advantageIfFighting": true
   },
   "target": {
    "type": "creature",
@@ -3846,7 +4006,8 @@
    "failureConditions": [
     "charmed"
    ],
-   "endsOnSourceSideDamage": true
+   "endsOnSourceSideDamage": true,
+   "advantageIfFighting": true
   },
   "target": {
    "type": "creature",
@@ -5031,7 +5192,8 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "repeatSave": true
   },
   "target": {
    "type": "creature",
@@ -5051,6 +5213,15 @@
    "attacks": 0,
    "damage": [],
    "healing": null,
+   "failureEffect": {
+    "name": "Confusion",
+    "tags": [
+     "confused",
+     "no-bonus-actions",
+     "no-reactions"
+    ],
+    "modifiers": []
+   },
    "areaPerSlot": 5
   },
   "classes": [
@@ -5354,6 +5525,13 @@
       "successDamage": "none",
       "failureConditions": [
        "restrained"
+      ],
+      "repeatAtTurnStart": true,
+      "repeatFailureDamage": [
+       {
+        "formula": "4d8",
+        "type": "lightning"
+       }
       ]
      },
      "damage": [
@@ -5501,7 +5679,24 @@
      ]
     }
    ],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "fey-spirit",
+      "count": 1
+     }
+    ],
+    "rangeFeet": 60,
+    "turn": "none",
+    "allegiance": "user",
+    "intangible": true,
+    "strikesFrom": {
+     "reachFeet": 5,
+     "moveFeet": 30,
+     "teleports": true
+    }
+   }
   },
   "classes": [
    "druid"
@@ -5969,7 +6164,17 @@
    "successDamage": "none",
    "failureConditions": [
     "poisoned"
-   ]
+   ],
+   "repeatTally": 3,
+   "secondFailure": {
+    "conditions": [
+     "poisoned"
+    ],
+    "duration": {
+     "type": "minutes",
+     "minutes": 10080
+    }
+   }
   },
   "target": {
    "type": "creature",
@@ -6620,7 +6825,58 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "ghoul",
+      "count": 3,
+      "perSlot": 1
+     },
+     {
+      "monsterId": "ghast",
+      "count": 2,
+      "perSlot": 1,
+      "minLevel": 8
+     },
+     {
+      "monsterId": "wight",
+      "count": 2,
+      "perSlot": 1,
+      "minLevel": 8
+     },
+     {
+      "monsterId": "mummy",
+      "count": 2,
+      "minLevel": 9
+     }
+    ],
+    "rangeFeet": 10,
+    "fromCorpse": {
+     "creatureTypes": [
+      "humanoid"
+     ],
+     "maxSize": "medium"
+    },
+    "turn": "own",
+    "commandedWith": "bonus-action",
+    "commandFeet": 120,
+    "reasserts": {
+     "count": 3,
+     "perSlot": 1
+    },
+    "dodgesUncommanded": true,
+    "lasts": {
+     "type": "minutes",
+     "minutes": 1440
+    },
+    "freedAtEnd": true,
+    "allegiance": "user"
+   },
+   "targets": {
+    "count": 3,
+    "perSlot": 1
+   }
   },
   "classes": [
    "cleric",
@@ -8425,7 +8681,9 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "repeatOnDamage": {},
+   "advantageIfFighting": true
   },
   "target": {
    "type": "creature",
@@ -8443,7 +8701,14 @@
    "seenTargets": true,
    "targetTypes": [
     "beast"
-   ]
+   ],
+   "failureEffect": {
+    "name": "Dominate Beast",
+    "tags": [
+     "commanded"
+    ],
+    "modifiers": []
+   }
   },
   "classes": [
    "druid",
@@ -8524,7 +8789,9 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "repeatOnDamage": {},
+   "advantageIfFighting": true
   },
   "target": {
    "type": "creature",
@@ -8539,7 +8806,14 @@
     "count": 1
    },
    "healing": null,
-   "seenTargets": true
+   "seenTargets": true,
+   "failureEffect": {
+    "name": "Dominate Monster",
+    "tags": [
+     "commanded"
+    ],
+    "modifiers": []
+   }
   },
   "classes": [
    "bard",
@@ -8607,7 +8881,9 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "repeatOnDamage": {},
+   "advantageIfFighting": true
   },
   "target": {
    "type": "creature",
@@ -8625,7 +8901,14 @@
    "seenTargets": true,
    "targetTypes": [
     "humanoid"
-   ]
+   ],
+   "failureEffect": {
+    "name": "Dominate Person",
+    "tags": [
+     "commanded"
+    ],
+    "modifiers": []
+   }
   },
   "classes": [
    "bard",
@@ -10425,7 +10708,8 @@
    "successDamage": "none",
    "failureConditions": [
     "frightened"
-   ]
+   ],
+   "repeatUnseenSource": true
   },
   "target": {
    "type": "creature",
@@ -10444,7 +10728,14 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Fear",
+    "tags": [
+     "drops-held"
+    ],
+    "modifiers": []
+   }
   },
   "classes": [
    "bard",
@@ -10574,7 +10865,75 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "bat",
+      "count": 1
+     },
+     {
+      "monsterId": "cat",
+      "count": 1
+     },
+     {
+      "monsterId": "frog",
+      "count": 1
+     },
+     {
+      "monsterId": "hawk",
+      "count": 1
+     },
+     {
+      "monsterId": "lizard",
+      "count": 1
+     },
+     {
+      "monsterId": "octopus",
+      "count": 1
+     },
+     {
+      "monsterId": "owl",
+      "count": 1
+     },
+     {
+      "monsterId": "rat",
+      "count": 1
+     },
+     {
+      "monsterId": "raven",
+      "count": 1
+     },
+     {
+      "monsterId": "spider",
+      "count": 1
+     },
+     {
+      "monsterId": "weasel",
+      "count": 1
+     }
+    ],
+    "orAny": {
+     "creatureType": "beast",
+     "maxChallenge": 0
+    },
+    "rangeFeet": 10,
+    "turn": "own",
+    "lasts": {
+     "type": "untimed"
+    },
+    "allegiance": "user",
+    "noAttacks": true,
+    "onlyOne": true,
+    "creatureTypes": [
+     "celestial",
+     "fey",
+     "fiend"
+    ],
+    "sight": "bonus-action",
+    "dismiss": "action",
+    "deliversTouch": 100
+   }
   },
   "classes": [
    "wizard"
@@ -10620,7 +10979,34 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "otherworldly-steed",
+      "count": 1,
+      "form": "celestial"
+     },
+     {
+      "monsterId": "otherworldly-steed",
+      "count": 1,
+      "form": "fey"
+     },
+     {
+      "monsterId": "otherworldly-steed",
+      "count": 1,
+      "form": "fiend"
+     }
+    ],
+    "rangeFeet": 30,
+    "turn": "after-user",
+    "lasts": {
+     "type": "untimed"
+    },
+    "endsOnUserDeath": true,
+    "allegiance": "user",
+    "onlyOne": true
+   }
   },
   "classes": [
    "paladin"
@@ -11607,7 +11993,18 @@
    "successDamage": "none",
    "failureConditions": [
     "restrained"
-   ]
+   ],
+   "repeatTally": 3,
+   "secondFailure": {
+    "conditions": [
+     "petrified"
+    ]
+   },
+   "autoSuccess": {
+    "creatureTypes": [
+     "construct"
+    ]
+   }
   },
   "target": {
    "type": "creature",
@@ -11622,6 +12019,15 @@
     "count": 1
    },
    "healing": null,
+   "successEffect": {
+    "name": "Flesh to Stone",
+    "tags": [],
+    "speedZero": true,
+    "duration": {
+     "type": "until-source-next-turn"
+    },
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -12819,7 +13225,30 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "giant-insect",
+      "count": 1,
+      "form": "centipede"
+     },
+     {
+      "monsterId": "giant-insect",
+      "count": 1,
+      "form": "spider"
+     },
+     {
+      "monsterId": "giant-insect",
+      "count": 1,
+      "form": "wasp"
+     }
+    ],
+    "rangeFeet": 60,
+    "turn": "after-user",
+    "dodgesUncommanded": true,
+    "allegiance": "user"
+   }
   },
   "classes": [
    "druid"
@@ -15330,7 +15759,10 @@
     "prone",
     "incapacitated"
    ],
-   "repeatSave": true
+   "repeatSave": true,
+   "repeatOnDamage": {
+    "advantage": true
+   }
   },
   "target": {
    "type": "creature",
@@ -16891,7 +17323,8 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "speedZero": true
   },
   "target": {
    "type": "creature",
@@ -17879,7 +18312,24 @@
      "laterTurnsOnly": true
     }
    ],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "mage-hand",
+      "count": 1
+     }
+    ],
+    "rangeFeet": 30,
+    "turn": "none",
+    "commandedWith": "action",
+    "commandMove": 30,
+    "leashFeet": 30,
+    "allegiance": "user",
+    "noAttacks": true,
+    "onlyOne": true,
+    "intangible": true
+   }
   },
   "walls": {
    "door": "open-or-close"
@@ -19603,6 +20053,21 @@
     "conditions": [
      "invisible"
     ]
+   },
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "illusory-double",
+      "count": 1
+     }
+    ],
+    "turn": "none",
+    "commandedWith": "action",
+    "commandMove": "twice-user-speed",
+    "allegiance": "user",
+    "noAttacks": true,
+    "intangible": true,
+    "sight": "always"
    }
   },
   "classes": [
@@ -20184,7 +20649,15 @@
   "save": {
    "ability": "int",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "endedBy": {
+    "name": "Study the illusion",
+    "by": "bearer",
+    "check": {
+     "ability": "int",
+     "skill": "investigation"
+    }
+   }
   },
   "target": {
    "type": "creature",
@@ -20207,6 +20680,11 @@
     "count": 1
    },
    "healing": null,
+   "failureEffect": {
+    "name": "Phantasmal Force",
+    "tags": [],
+    "modifiers": []
+   },
    "seenTargets": true
   },
   "classes": [
@@ -20251,7 +20729,8 @@
    "ability": "wis",
    "successDamage": "half",
    "failureConditions": [],
-   "repeatSave": true
+   "repeatSave": true,
+   "repeatDamageAgain": true
   },
   "target": {
    "type": "creature",
@@ -20367,7 +20846,23 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "riding-horse",
+      "count": 1,
+      "except": {
+       "name": "Phantom Steed",
+       "speedFeet": 100
+      }
+     }
+    ],
+    "rangeFeet": 30,
+    "turn": "after-user",
+    "endsOnDamage": true,
+    "allegiance": "user"
+   }
   },
   "classes": [
    "wizard"
@@ -20496,7 +20991,20 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "failureEffect": {
+    "name": "Bound by Planar Binding",
+    "tags": [
+     "commanded"
+    ],
+    "modifiers": []
+   },
+   "targetTypes": [
+    "celestial",
+    "elemental",
+    "fey",
+    "fiend"
+   ]
   },
   "classes": [
    "bard",
@@ -21570,7 +22078,24 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "illusory-copy",
+      "count": 1
+     }
+    ],
+    "rangeFeet": 1000,
+    "turn": "none",
+    "commandedWith": "action",
+    "commandMove": 60,
+    "endsOnDamage": true,
+    "allegiance": "user",
+    "noAttacks": true,
+    "sight": "always",
+    "endsSpell": true
+   }
   },
   "classes": [
    "bard",
@@ -23287,7 +23812,26 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Sanctuary",
+    "tags": [
+     "sanctuary",
+     "until-it-acts"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "ward": {
+     "ability": "wis"
+    }
+   }
   },
   "classes": [
    "cleric"
@@ -24737,6 +25281,16 @@
    "endsOnDamage": true,
    "failureDuration": {
     "type": "until-bearer-turn-end"
+   },
+   "repeatOnce": true,
+   "secondFailure": {
+    "conditions": [
+     "unconscious"
+    ],
+    "endsOnDamage": true
+   },
+   "autoSuccess": {
+    "sleepless": true
    }
   },
   "target": {
@@ -25650,7 +26204,23 @@
      ]
     }
    ],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "spiritual-weapon",
+      "count": 1
+     }
+    ],
+    "rangeFeet": 60,
+    "turn": "none",
+    "allegiance": "user",
+    "intangible": true,
+    "strikesFrom": {
+     "reachFeet": 5,
+     "moveFeet": 20
+    }
+   }
   },
   "classes": [
    "cleric"
@@ -26202,7 +26772,20 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "draconic-spirit",
+      "count": 1
+     }
+    ],
+    "rangeFeet": 60,
+    "turn": "after-user",
+    "dodgesUncommanded": true,
+    "allegiance": "user",
+    "sharedResistance": true
+   }
   },
   "classes": [
    "wizard"
@@ -27594,7 +28177,22 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "unseen-servant",
+      "count": 1
+     }
+    ],
+    "rangeFeet": 60,
+    "turn": "none",
+    "commandedWith": "bonus-action",
+    "commandMove": 15,
+    "leashFeet": 60,
+    "allegiance": "user",
+    "noAttacks": true
+   }
   },
   "classes": [
    "bard",
@@ -28544,7 +29142,21 @@
    "targets": {
     "count": 10
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Water Breathing",
+    "tags": [
+     "water-breathing"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "druid",
@@ -28737,7 +29349,13 @@
    "failureConditions": [
     "frightened"
    ],
-   "repeatSave": true
+   "repeatSave": true,
+   "repeatFailureDamage": [
+    {
+     "formula": "5d10",
+     "type": "psychic"
+    }
+   ]
   },
   "target": {
    "type": "creature",

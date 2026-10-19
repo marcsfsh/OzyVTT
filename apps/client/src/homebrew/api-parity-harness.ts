@@ -448,7 +448,27 @@ const SAVE_LIFETIME_KEYS = [
   "failureHazard",
   "failurePush.**",
   "advantageAtSize",
-  "escapeAthletics"
+  "escapeAthletics",
+  "repeatOnce",
+  "repeatAtTurnStart",
+  "repeatOnDamage.**",
+  "repeatByAction",
+  "repeatFailureDamage[].**",
+  "repeatTally",
+  "secondFailure.**",
+  "failureExhaustion",
+  "advantageIfFighting",
+  "immuneOnSuccess",
+  "endsWhenSourceDies",
+  "onlyCreatureTypes",
+  "sparesAffected",
+  "failureKills.**",
+  "repeatDamageAgain",
+  "repeatUnseenSource",
+  "endsOutOfSight",
+  "autoSuccess.**",
+  "endedBy.**",
+  "atRest.**"
 ] as const;
 
 /** The save-block keys that make a failure act by the target's Hit Points or send it home (`SaveOutcomeFields`). */
@@ -524,6 +544,27 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ACTION_CARRIERS,
     reason:
       "the area an action leaves on the map to act later (spread Caltrops, a set Hunting Trap) - authored in the catalog; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].summons.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the creatures an action brings onto the map and how they are commanded (a Horn of Valhalla's Berserkers, a treant's trees) - authored in the catalog; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].castsAtOnce",
+    types: ACTION_CARRIERS,
+    reason:
+      "a cast a feature makes a Magic action whatever the spell's casting time (Pact of the Chain's Find Familiar) - set by the builder from the feature's grant",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "summonScaling.**",
+    types: ["monster"],
+    reason:
+      "how a stat block a spell prints scales with the spell's level and its summoner (a Draconic Spirit) - authored with the spell-printed stat blocks; no editor control yet",
     status: "gap"
   },
   {

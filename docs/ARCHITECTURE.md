@@ -146,7 +146,12 @@ audience. There are five:
   player's dice log. An unclaimed character carries its species and class line for the claim
   picker, since any player could claim it and read its sheet. The options a player pins to the
   sheet's turn card and how often each option resolved (`favouriteOptionIds`, `optionUseCounts`)
-  reach the owner and the GM only, whatever the party tier.
+  reach the owner and the GM only, whatever the party tier. A creature a player's character commands
+  (`Actor.control`) reaches that player with its stat block, exact Hit Points and the orders it takes
+  (`commanded`, `orders`); who summoned it and what keeps it stay the GM's. That player acts for it, and
+  sees through it when it lends its sight (`playerViewerIds`).
+  A creature's `attitude`, which the GM sets for Influence, never reaches a player; a character's food and water
+  for the day (`nourishment`) goes wherever its sheet resources go.
 - **Table viewer** (`viewer-presentation.ts`, `viewer-encounter.ts`): the public screen in a
   room that may hold non-players. It follows the live scene, before and during its fight, unless
   the GM paused it. Only public actors with a position become tokens; annotations
@@ -428,6 +433,9 @@ dispelled with no Concentration. An effect can also last until its bearer's next
 (`until-rest`), which that rest ends. A creature's own Long Rest (the GM approving a request) ends what
 would run out in its 8 hours and leaves longer effects for the GM to pass those hours, so they count
 once. The clock also runs a Stable creature's 1d4 hours to 1 Hit Point and a knocked-out creature's hour.
+While the GM tracks food and water (`rest.survival`), each midnight it crosses ends a day for every
+character, which eats and drinks what it carries and meets the hunger and thirst rules (`survival.ts`).
+A creature out of air counts its held breath down on the clock as it does at its turns' ends (`breath.ts`).
 
 Death is a record on the creature (`Actor.death`, `death.ts`). After every command the server stamps when a
 creature died: the fight's round while its fight runs, then the game clock. A rule that kills also says what killed
@@ -436,11 +444,26 @@ data on the spell (`effect.revives`: its time limit, no Undead, a new body, the 
 checked before anything is spent and applied as the cast resolves (`resolution/revival.ts`). Time under Gentle
 Repose doesn't count against the limit, and Raise Dead's ordeal is a penalty to D20 Tests that eases with each Long
 Rest. What kills outright is data too: damage that kills at 0 (`drain.killsAtZero`), a corpse that rises
-(`drain.slainRise`, `risen.ts`), a hit that kills (`onHit.kills`, `resolution/kill.ts`), a cast that kills by Hit
+(`drain.slainRise`, `risen.ts`, raised by `raiseCreature` in `summons.ts`), a hit that kills (`onHit.kills`, `resolution/kill.ts`), a cast that kills by Hit
 Points (`killsAtHitPoints`) and a save whose failure acts by the target's Hit Points (`failureByHitPoints`,
 `fatal-saves.ts`). All of them die through `killOutright` in `hit-points.ts`: a character makes no death saves, and
 Death Ward turns aside a death that deals no damage. Stat block traits that cheat death (Misty Escape, the
 Restoration traits, Multiple Heads, Loathsome Limbs) run from `death-traits.ts` as damage lands and as turns end.
+
+A creature an action brings onto the map is data on the action (`summons`: its stat blocks, how many at each slot
+level, where it appears, when it acts, how it is commanded and what ends it), run by `summons.ts` for spells, items
+and stat blocks alike. Each comes from a bundled stat block or one a spell prints (`summons.v1.json`), scaled to the
+cast's level and its caster's numbers where the stat block says how (`summonScaling`, `summon-stat-blocks.ts`) and
+stored on the table. The creature records who brought it and what keeps it (`Actor.summon`), and who commands it and
+on which side (`Actor.control`); `sideOf` reads the command first. It joins the turn order right after its user
+(`InitiativeEntry.follows`) or on its own roll. A failed save whose effect carries the `commanded` tag (Dominate
+Person, Planar Binding, an aboleth's Dominate Mind) puts its target under command the same way, and a creature a rule
+raises (`raiseCreature`) is made the same way too. After every command the pipeline settles them: a creature whose
+time, Concentration or Hit Points ran out, whose user died or that strayed too far leaves the roster, and a command
+whose effect ended lapses. A commander's orders (a Bonus Action command, a dismissal, a familiar's eyes and pocket
+dimension) are `summon.*` commands in `summon-orders.ts`; an uncommanded creature that dodges does so as its turn
+starts (`summon-turns.ts`). A spell's force that strikes for its caster (Spiritual Weapon, Arcane Sword, Arcane Hand)
+is a summoned token its attacks reach from, moved before each later one (`summon-strikes.ts`).
 
 Each effect a spell leaves records the spell and the level it was cast at (`spell`), so a spell can be
 ended as a whole: Dispel Magic and Remove Curse resolve in `resolution/dispel.ts`, which ends the

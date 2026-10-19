@@ -1,12 +1,20 @@
 import { d20FacesFor } from "@vtt/rules-5e";
 import { wardedConditions } from "../paladin-auras.js";
 import type { ActorDefinition } from "@vtt/schemas";
-import { checkPlan, totalCheck, type CheckSubject } from "../ability-checks.js";
+import { checkPlan, totalCheck, type CheckSubject, type CheckVersus } from "../ability-checks.js";
+import { creatureTypeOf } from "../statblock-facts.js";
+import { areEnemies } from "../creature-sides.js";
+import { effectiveSkillTier } from "../equipment-derivation.js";
+import { endUsedHelp, useHelp } from "../help-assist.js";
 import { checkSightFor, couldSpot } from "../vision/rules.js";
 import { builtinBaseId, END_EFFECT_ID } from "../builtin-actions.js";
 import { addEffect, endEffect, ESCAPE_ATHLETICS_TAG, makeEffect, WAKEABLE_TAG } from "../effects.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { putOutFire } from "../hazards.js";
+import { endingOptions } from "../ending-actions.js";
+import { openEndingSave } from "../save-stages.js";
+import { applyDamageDetailed } from "../hit-points.js";
+import { rollPlain } from "./hit-rider-outcomes.js";
 import { CommandRejectedError } from "../game-store.js";
 import { createPendingSaves, saveModifierFor, shownRollMode } from "../saving-throws.js";
 import {
@@ -53,8 +61,11 @@ export function rollCheck(
   subject: CheckSubject,
   dc: number | null,
   label?: string,
-  stakes: readonly string[] = []
+  stakes: readonly string[] = [],
+  versus?: CheckVersus
 ): boolean | null {
+  // A Help an earlier check used ends before this one is planned.
+  const helpEnded = endUsedHelp(ctx.state, ctx.attacker);
   const warded = ctx.deps.resolveDefinition
     ? wardedConditions(ctx.state, ctx.attacker, {
         resolveDefinition: ctx.deps.resolveDefinition,
@@ -65,6 +76,7 @@ export function rollCheck(
   const plan = checkPlan(ctx.attacker, ctx.deps.definition, ctx.derivation, subject, {
     ...(warded.length > 0 ? { warded } : {}),
     ...(stakes.length > 0 ? { stakes } : {}),
+    ...(versus ? { versus } : {}),
     // Frightened's line of sight and the light the roller stands in (Sunlight Sensitivity).
     sight: checkSightFor(
       ctx.state,
@@ -82,6 +94,9 @@ export function rollCheck(
   ctx.rollMode = shownRollMode(plan.rollMode, forced);
   const roll = totalCheck(plan, d20FacesFor(mode, [], ctx.deps.random), mode, ctx.deps.random);
   recordRoll(ctx, roll.resolution, "check", undefined, { total: roll.total });
+  // An ally's Help with this skill is used by this check.
+  for (const event of [...helpEnded, ...useHelp(ctx.state, ctx.attacker, subject, true)])
+    ctx.tableNarration.push(tableLineOf(ctx, event));
   const success = plan.autoFails !== undefined ? false : dc === null ? null : roll.total >= dc;
   if (plan.autoFails !== undefined) ctx.warnings.push(plan.autoFails);
   ctx.check = { skill: label ?? plan.label, total: roll.total, naturalRoll: roll.natural, dc, success };
@@ -95,8 +110,66 @@ export const BUILTIN_CHECK_SKILLS: Readonly<Record<string, Readonly<Record<strin
   // The usual skill first: it is the one a picker offers before the roller chooses.
   search: { perception: "wis", insight: "wis", medicine: "wis", survival: "wis" },
   study: { investigation: "int", arcana: "int", history: "int", nature: "int", religion: "int" },
-  influence: { persuasion: "cha", deception: "cha", intimidation: "cha", performance: "cha", "animal-handling": "wis" }
+  influence: { persuasion: "cha", deception: "cha", intimidation: "cha", performance: "cha", "animal-handling": "wis" },
+  // Help with a Check offers every skill; the handler takes only one the helper is proficient in.
+  "help-check": {
+    athletics: "str",
+    acrobatics: "dex",
+    "sleight-of-hand": "dex",
+    stealth: "dex",
+    arcana: "int",
+    history: "int",
+    investigation: "int",
+    nature: "int",
+    religion: "int",
+    "animal-handling": "wis",
+    insight: "wis",
+    medicine: "wis",
+    perception: "wis",
+    survival: "wis",
+    deception: "cha",
+    intimidation: "cha",
+    performance: "cha",
+    persuasion: "cha"
+  }
 };
+
+/** A skill id as the table reads it ("sleight-of-hand" is "Sleight of Hand"). */
+const skillWords = (id: string) =>
+  id
+    .split("-")
+    .map((word, index) => (index > 0 && word === "of" ? word : `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`))
+    .join(" ");
+
+/** SRD Help, Assist an Ability Check: one of the helper's skill proficiencies, for an ally. The ally's effect carries
+ *  Advantage on checks with that skill, which its next such check uses up (`help-assist.ts`). */
+function helpWithCheck(ctx: ResolveContext): DefinitionAction {
+  const { attacker, action, deps } = ctx;
+  const skill = ctx.input.skill ?? undefined;
+  if (skill === undefined || BUILTIN_CHECK_SKILLS["help-check"]![skill] === undefined)
+    throw new CommandRejectedError("Help with a Check names the skill you help with.");
+  if (effectiveSkillTier(deps.definition, ctx.derivation, skill) === "none")
+    throw new CommandRejectedError(`${attacker.name} isn't proficient in ${skillWords(skill)}, so can't help with it.`);
+  const ally = ctx.targets[0];
+  if (!ally || ally.id === attacker.id)
+    throw new CommandRejectedError("Help with a Check helps an ally, not yourself.");
+  if (areEnemies(attacker, ally, deps.resolveDefinition))
+    throw new CommandRejectedError(`${ally.name} isn't ${attacker.name}'s ally.`);
+  return {
+    ...action,
+    grants: {
+      ...action.grants!,
+      modifiers: [
+        {
+          type: "roll-mode",
+          roll: "check",
+          mode: "advantage",
+          when: [{ type: "on-ability-check" }, { type: "skill-is", skills: [skill] }]
+        }
+      ]
+    }
+  };
+}
 
 /** The skills a builtin check action lets its roller pick, the usual one first: Search, Study and Influence's, and
  *  Escape a Grapple's two. Empty for any other action. */
@@ -156,13 +229,30 @@ function findHidden(ctx: ResolveContext): void {
 }
 
 /** SRD Influence: "a default DC equal to 15 or the monster's Intelligence score, whichever is higher", so a monster
- *  picked as the target sets it; with none, the GM does. Attitude (Friendly, Hostile) stays the GM's call. */
+ *  picked as the target sets it; with none, the GM does. Its attitude gives Advantage when Friendly and Disadvantage
+ *  when Hostile, and its charmer has Advantage (`socialClaims`). Animal Handling is for "gently coaxing a Beast or
+ *  Monstrosity". */
 function influence(ctx: ResolveContext): void {
   const monster = ctx.targets[0];
   const monsterDefinition = monster?.definitionId ? ctx.deps.resolveDefinition?.(monster.definitionId) : undefined;
   const dc = monsterDefinition ? Math.max(15, monsterDefinition.abilityScores.int) : null;
-  rollCheck(ctx, chosenSubject(ctx, "cha"), dc);
+  const subject = chosenSubject(ctx, "cha");
+  const type = monster ? creatureTypeOf(monster, monsterDefinition) : null;
+  if (subject.skill === "animal-handling" && type !== null && type !== "beast" && type !== "monstrosity")
+    throw new CommandRejectedError(
+      `Animal Handling influences a Beast or Monstrosity, and ${monster!.name} is ${/^[aeiou]/.test(type) ? "an" : "a"} ${titleCase(type)}.`
+    );
+  const versus: CheckVersus | undefined = monster
+    ? {
+        actor: monster,
+        humanoid: type === "humanoid",
+        feet: ctx.deps.distanceFeet?.(ctx.attacker.id, monster.id) ?? null
+      }
+    : undefined;
+  rollCheck(ctx, subject, dc, undefined, [], versus);
 }
+
+const titleCase = (word: string) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`;
 
 /** SRD Hide: a DC 15 Dexterity (Stealth) check. On a success, Invisible while hidden; attacking ends it
  *  (`releaseHideAndReady`). The total is the DC to find the creature, so the effect names it. */
@@ -220,6 +310,73 @@ function escapeGrapple(ctx: ResolveContext): void {
   if (rollCheck(ctx, subject, escapable.escapeDc, undefined, escapable.linkedConditionIds)) {
     endEffect(state, attacker.id, escapable.id);
     ctx.effectsEnded.push(endedEffect(attacker, escapable));
+  }
+}
+
+/**
+ * End an Effect: the action an effect's text prints to end it, on the one creature targeted (the user itself when none
+ * is). Repeating a save by action opens that save (a success ends it, as any repeat does); a check must succeed, and
+ * the creature that succeeds takes what the text deals it (a gelatinous cube's acid); an action alone ends it (waking a
+ * sleeper).
+ */
+function endAnEffect(ctx: ResolveContext): void {
+  const { state, attacker, input, deps } = ctx;
+  const bearer = ctx.targets[0] ?? attacker;
+  const options = endingOptions(attacker, bearer, deps.distanceFeet);
+  const chosen = input.effectId ? options.find((option) => option.effect.id === input.effectId) : options[0];
+  if (!chosen)
+    throw new CommandRejectedError(
+      bearer.id === attacker.id
+        ? `${attacker.name} has no effect it can end with an action.`
+        : `${bearer.name} has no effect ${attacker.name} can end from where it stands.`
+    );
+  const { effect } = chosen;
+  if (chosen.kind === "repeat") {
+    const line = openEndingSave(state, bearer, effect, effect.repeatSave!, "repeats", {
+      newId: deps.newRollId,
+      now: deps.now,
+      rollDie: deps.random
+    });
+    ctx.tableNarration.push(tableLineOf(ctx, line));
+    return;
+  }
+  const ended = effect.endedBy!;
+  if (ended.check) {
+    const subject: CheckSubject = {
+      ability: ended.check.ability,
+      ...(ended.check.skill !== undefined ? { skill: ended.check.skill } : {})
+    };
+    if (rollCheck(ctx, subject, ended.check.dc ?? null, `${ended.name}: check`) !== true) return;
+  }
+  endEffect(state, bearer.id, effect.id);
+  ctx.effectsEnded.push(endedEffect(bearer, effect));
+  ctx.tableNarration.push({
+    kind: "effect",
+    text: `${attacker.name} ends ${effect.name} on ${bearer.name} (${ended.name}).`,
+    actorIds: [attacker.id, bearer.id]
+  });
+  // "The puller takes 10 (3d6) Acid damage."
+  for (const part of ended.takerDamage ?? []) {
+    const rolled = rollPlain(ctx, part.formula, part.type, ended.name);
+    const { application, events } = applyDamageDetailed(
+      state,
+      attacker.id,
+      { amount: rolled.amount, parts: [rolled], sourceName: effect.sourceName ?? effect.name },
+      { role: "gm" },
+      {
+        resolveDefinition: deps.resolveDefinition ?? (() => undefined),
+        newId: deps.newRollId,
+        now: deps.now,
+        rollDie: deps.random,
+        ...(deps.catalog ? { catalog: deps.catalog } : {})
+      }
+    );
+    ctx.tableNarration.push({
+      kind: "effect",
+      text: `${attacker.name} takes ${application.totalApplied} ${part.type[0]!.toUpperCase()}${part.type.slice(1)} damage (${ended.name}).`,
+      actorIds: [attacker.id]
+    });
+    for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
   }
 }
 
@@ -363,6 +520,7 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   study: { check: searchOrStudy("int") },
   "escape-grapple": { check: escapeGrapple },
   "extinguish-fire": { apply: rollOnTheGround },
+  "end-an-effect": { check: endAnEffect },
   [END_EFFECT_ID]: { check: endOwnEffect },
   "shake-awake": { apply: shakeAwake },
 
@@ -405,7 +563,12 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   /** The free-text trigger travels in the Readied effect's name so the table sees it. */
   ready: { grantName: ({ input }) => (input.note ? `Readied: ${input.note.slice(0, 100)}` : null) },
   /** The distracted enemy carries the effect, named for the helper whose allies it favours. */
-  help: { grantName: ({ attacker }) => `Distracted by ${attacker.name}`, distractsAnEnemy: true }
+  help: { grantName: ({ attacker }) => `Distracted by ${attacker.name}`, distractsAnEnemy: true },
+  /** The helped ally carries the effect, named for the helper and the skill. */
+  "help-check": {
+    prepare: helpWithCheck,
+    grantName: ({ attacker, input }) => `Helped by ${attacker.name} (${skillWords(input.skill ?? "")})`
+  }
 };
 
 /** The special cases for a builtin action id, or undefined when it has none. A Bonus Action form ("hide-bonus") has

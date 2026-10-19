@@ -104,6 +104,7 @@ export function TurnCard({
   myTurn,
   round,
   acting,
+  title,
   busy,
   unavailable,
   header,
@@ -117,6 +118,8 @@ export function TurnCard({
   round: number | null;
   /** Who acts now, off the character's turn. */
   acting: string | null;
+  /** Whose turn it is when it isn't the character's own (a creature its character commands). */
+  title?: string;
   busy: boolean;
   unavailable?: string;
   /** The turn's resources, on the sheet's own page; the table keeps them in its bar. */
@@ -144,9 +147,9 @@ export function TurnCard({
     onSetPins(next);
   };
   return (
-    <section ref={cardRef} className="cs-turn" aria-label={myTurn ? "Your turn" : "The turn"}>
+    <section ref={cardRef} className="cs-turn" aria-label={title ?? (myTurn ? "Your turn" : "The turn")}>
       <div className="cs-turn-head">
-        <h2 className="cs-turn-title">{myTurn ? "Your turn" : `${acting ?? "Someone else"} is acting`}</h2>
+        <h2 className="cs-turn-title">{title ?? (myTurn ? "Your turn" : `${acting ?? "Someone else"} is acting`)}</h2>
         {round !== null && <span className="cs-turn-round">Round {round}</span>}
       </div>
       {!myTurn && <p className="cs-sub">Your Reaction stays ready. Everything else waits for your turn.</p>}

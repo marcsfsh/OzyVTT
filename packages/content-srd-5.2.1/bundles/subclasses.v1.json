@@ -1153,7 +1153,10 @@
       {
        "id": "summon-dragon",
        "level": 5,
-       "withoutSlot": "free"
+       "withoutSlot": "free",
+       "summon": {
+        "concentrationOptional": true
+       }
       }
      ]
     },

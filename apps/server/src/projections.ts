@@ -1,5 +1,6 @@
 import type {
   Annotation,
+  CommandedOrders,
   GameState,
   GmView,
   PendingReaction,
@@ -18,10 +19,13 @@ import type {
   PresenceStatus,
   RollRecord
 } from "@vtt/domain";
+import { commandedBySession } from "./authorization.js";
+import type { RepeatSave } from "@vtt/schemas";
 import { actionPools } from "./effective-actions.js";
 import { HASTED_TAG } from "./effects.js";
 import { healthBandOf } from "./hit-points.js";
 import { HIDDEN_SOURCE, withoutSourceName } from "./hidden-source.js";
+import { OFF_PLANE_TAG } from "./off-plane.js";
 import { visibleTerrain } from "./terrain.js";
 import { exploredRectsOf, playerSight, tokenShown, visionOf, type AudienceSight } from "./vision/audience.js";
 import { sensedBy } from "./vision/detect.js";
@@ -227,6 +231,10 @@ const PENDING_SAVE_FIELDS = {
   failurePush: "never",
   // The save's own roll mode is read when it is answered.
   advantageAtSize: "never",
+  advantageFrom: "never",
+  // What a failure does beyond conditions is narrated when it lands, and an automatic success when it is answered.
+  failureKills: "never",
+  autoSucceeds: "never",
   disadvantageFrom: "never",
   // A failure's return to a creature's true form is narrated when it lands.
   endsForm: "never",
@@ -249,7 +257,8 @@ const ON_FAIL_EFFECT_FIELDS = {
   escapeDc: "player",
   modifiers: "player",
   duration: "player",
-  // Its ability and DC; what gives the repeats Disadvantage (Heightened Spell) is read when each is answered.
+  // What a second failure brings, a failed repeat's damage dice and what gives the repeats Disadvantage (Heightened
+  // Spell) stay with the GM (`playerRepeatSave`): each is read when the save is answered.
   repeatSave: "derived",
   endsOnDamage: "player",
   endsOnSourceSideDamage: "player",
@@ -257,6 +266,11 @@ const ON_FAIL_EFFECT_FIELDS = {
   endsWhenSourceDefeated: "player",
   rangeFeet: "player",
   endsOnSpellHealing: "player",
+  endsOutOfSight: "player",
+  // Who may end it and the check it takes are the printed text's, read by the one who owes the save.
+  endedBy: "player",
+  // What a rest or a day does to its bearer is the stat block's text; its effect lands when it happens.
+  atRest: "never",
   armorClassBonus: "player",
   // The light a failure sheds is the spell's own text (Faerie Fire's Dim Light).
   light: "player",
@@ -345,9 +359,24 @@ function withSensed(vision: PlayerVision, sensed: readonly PlayerSensedCreature[
   return { ...vision, sensed: sensed.map((creature) => ({ ...creature })) };
 }
 
+/** The orders a commanded creature's commander may give it, read off how it was summoned and commanded. */
+function ordersFor(source: Actor): { orders?: CommandedOrders } {
+  const orders: CommandedOrders = {
+    ...(source.control?.commandedWith ? { command: source.control.commandedWith } : {}),
+    ...(source.summon?.dismiss ? { dismiss: source.summon.dismiss } : {}),
+    ...(source.summon?.sight === "bonus-action" ? { look: true as const } : {}),
+    ...(source.effects.some((effect) => effect.tags.includes(OFF_PLANE_TAG)) ? { away: true as const } : {})
+  };
+  return Object.keys(orders).length > 0 ? { orders } : {};
+}
+
+/** A creature this player acts for: their own character, or one their character commands (a summon, a dominated
+ *  creature), whose saves, reactions and asks are theirs to answer. */
 function ownedBy(state: GameState, actorId: string, playerSessionId: string | undefined): boolean {
-  const owner = state.actors.find((actor) => actor.id === actorId)?.ownerSessionId ?? null;
-  return owner !== null && owner === playerSessionId;
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return false;
+  const owner = actor.ownerSessionId;
+  return (owner !== null && owner === playerSessionId) || commandedBySession(state, actor, playerSessionId);
 }
 
 /** The combat a player sees. A creature none of their characters perceive (dynamic vision) or that stands wholly under
@@ -466,9 +495,7 @@ export function projectPlayerCombat(
             ? {
                 onFailEffect: {
                   ...copyPlayerFields(onFail, ON_FAIL_EFFECT_FIELDS),
-                  ...(onFail.repeatSave
-                    ? { repeatSave: { ability: onFail.repeatSave.ability, dc: onFail.repeatSave.dc } }
-                    : {}),
+                  ...(onFail.repeatSave ? { repeatSave: playerRepeatSave(onFail.repeatSave) } : {}),
                   name: onFailHidden ? withoutSourceName(onFail.name, onFail.sourceName) : onFail.name,
                   sourceName: onFailHidden ? HIDDEN_SOURCE : onFail.sourceName,
                   sourceActorId: null
@@ -548,6 +575,8 @@ function playerEffect(
     unarmedStrike: _unarmedStrike,
     // What a hit on the bearer costs its attacker names a save's DC; the server applies it.
     struck: _struck,
+    // What a rest or a day does to its bearer names dice and a DC; it lands when it happens.
+    atRest: _atRest,
     // The light it sheds reaches players only as the lit ground in their own sight, which the server draws.
     light: _light,
     findDc: _findDc,
@@ -560,12 +589,10 @@ function playerEffect(
     form,
     sizeChange: _sizeChange,
     ownSize: _ownSize,
-    // Its ability and DC; what gives the repeats Disadvantage (Heightened Spell) is read when each is answered.
-    repeatSave,
     ...rest
   } = effect;
   const visible = {
-    ...(repeatSave ? { ...rest, repeatSave: { ability: repeatSave.ability, dc: repeatSave.dc } } : rest),
+    ...rest,
     ...(heldBy ? { heldBy: { name: heldBy.name } } : {}),
     ...(form ? { form: { name: form.name } } : {})
   };
@@ -573,8 +600,21 @@ function playerEffect(
   // A readied spell's Metamagic picks are the engine's to apply at its release.
   const held = readiedSpell ? (({ shaping: _shaping, ...kept }) => kept)(readiedSpell) : undefined;
   const yours = mine ? { yours: true as const, ...(held ? { readiedSpell: held } : {}) } : {};
-  if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...yours };
-  return { ...visible, name: withoutSourceName(visible.name, effect.sourceName), sourceName: HIDDEN_SOURCE };
+  const repeat = visible.repeatSave ? { repeatSave: playerRepeatSave(visible.repeatSave) } : {};
+  if (!isHiddenSource(sourceActorId, publicActorIds)) return { ...visible, ...repeat, ...yours };
+  return {
+    ...visible,
+    ...repeat,
+    name: withoutSourceName(visible.name, effect.sourceName),
+    sourceName: HIDDEN_SOURCE
+  };
+}
+
+/** A repeat save as a player reads it: the save, when it comes and the count so far. What a failed one turns the effect
+ *  into, the dice it deals and what gives it Disadvantage stay with the GM. */
+function playerRepeatSave(repeat: RepeatSave): RepeatSave {
+  const { next: _next, failureDamage: _failureDamage, disadvantageFrom: _disadvantageFrom, ...shown } = repeat;
+  return structuredClone(shown);
 }
 
 /** The GM's calls for a roll as one player sees them: only the calls naming their own characters, only those
@@ -669,6 +709,7 @@ const PLAYER_ACTOR_FIELDS = {
   experiencePoints: "derived",
   choiceOverrides: "derived",
   hitDice: "derived",
+  nourishment: "derived",
   lastLongRestAt: "never",
   spellSlots: "derived",
   pactSlots: "derived",
@@ -681,12 +722,17 @@ const PLAYER_ACTOR_FIELDS = {
   currency: "derived",
   notes: "never",
   conditionImmunities: "never",
+  // A creature's attitude is the GM's: players learn it from how the GM has them roll.
+  attitude: "never",
   legendary: "never",
   lastUsedAt: "never",
   firstClaimedAt: "never",
   sample: "never",
   archived: "never",
   sheetPreview: "never",
+  // Who summoned a creature and what keeps it is the GM's; its commander's player is told only that it commands it.
+  summon: "never",
+  control: "derived",
   // The owner's own turn-card pins and use counts: never another player's, whatever the party tier.
   favouriteOptionIds: "derived",
   optionUseCounts: "derived"
@@ -774,6 +820,12 @@ export function projectPlayerView(
       .filter((actor) => playerSessionId !== undefined && actor.ownerSessionId === playerSessionId)
       .map((actor) => actor.id)
   );
+  // The creatures their characters command (a summoned spirit, a dominated ogre): theirs to act for, so they get its
+  // stat block, exact Hit Points and uses, and the effects it holds on others are theirs to end.
+  const commandedIds = new Set(
+    state.actors.filter((actor) => commandedBySession(state, actor, playerSessionId)).map((actor) => actor.id)
+  );
+  const actsFor = new Set([...yourActorIds, ...commandedIds]);
   return {
     revision: state.revision,
     // The tier actually applied, so the client can tell "no sheet" from "sheet withheld".
@@ -810,6 +862,7 @@ export function projectPlayerView(
           experiencePoints,
           choiceOverrides,
           hitDice,
+          nourishment,
           spellSlots,
           pactSlots,
           preparedSpellIds,
@@ -845,10 +898,36 @@ export function projectPlayerView(
             : undefined;
         const classLine = (theirs && cardVisible) || available ? classLineOf(storedSheet) : null;
         const species = available ? (storedSheet?.character?.race?.name ?? null) : null;
+        const commanded = commandedIds.has(source.id);
+        // The stat block of a creature this player commands: a bundled one, or the scaled copy a summon stored.
+        const commandedSheet =
+          commanded && source.definitionId
+            ? (state.definitions.find((entry) => entry.id === source.definitionId)?.definition ??
+              content.definition?.(source.definitionId))
+            : undefined;
+        if (commanded)
+          return {
+            ...pickFields(source, PARTY_FIELDS),
+            hp: {
+              kind: "exact" as const,
+              current: source.hp.current,
+              maximum: source.hp.maximum,
+              temporary: source.hp.temporary
+            },
+            effects: source.effects.map((effect) => playerEffect(effect, publicActorIds, actsFor)),
+            // A commanded creature is never a player character, so no one claims it.
+            claimStatus: "available" as const,
+            presence: null,
+            commanded: true as const,
+            ...ordersFor(source),
+            ...(commandedSheet ? { definition: commandedSheet, pools: actionPools(commandedSheet.actions) } : {}),
+            actionUses: { ...actionUses },
+            ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})
+          };
         return {
           ...pickFields(source, source.kind === "player-character" ? PARTY_FIELDS : TABLE_FIELDS),
           hp: playerHp(source),
-          effects: source.effects.map((effect) => playerEffect(effect, publicActorIds, yourActorIds)),
+          effects: source.effects.map((effect) => playerEffect(effect, publicActorIds, actsFor)),
           claimStatus:
             ownerSessionId === null ? ("available" as const) : mine ? ("mine" as const) : ("claimed" as const),
           presence: ownerSessionId === null ? null : presenceFor(ownerSessionId),
@@ -882,6 +961,8 @@ export function projectPlayerView(
           ...(resourcesVisible && hitDice
             ? { hitDice: { ...hitDice, entries: hitDice.entries.map((entry) => ({ ...entry })) } }
             : {}),
+          // Today's food and water is a sheet resource, gated like the Hit Point Dice.
+          ...(resourcesVisible && nourishment ? { nourishment: { ...nourishment } } : {}),
           // Sheet resources reach the owner always and another player only at the top tier.
           ...(resourcesVisible
             ? {

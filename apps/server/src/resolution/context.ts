@@ -22,6 +22,7 @@ import type { EffectNarration } from "../effects.js";
 import { withoutSourceName } from "../hidden-source.js";
 import { hiddenFrom } from "../vision/audience.js";
 import type { MasterySwing } from "../weapon-mastery.js";
+import type { SummonChoice, SummonOutcome, SummonRequest } from "../summons.js";
 import type { BuiltinHandler } from "./builtins.js";
 import type { EconomyPlan } from "./economy.js";
 
@@ -127,6 +128,9 @@ export type ResolveInput = Readonly<{
   knockOut?: boolean;
   /** How the caster shapes this spell's cast (Metamagic, Sculpt Spells), checked and applied by `metamagic.ts`. */
   shaping?: readonly CastShaping[];
+  /** What the user picked for an action that brings creatures (`summons.ts`): which stat blocks, a form, a creature
+   *  type, damage types, and where they appear. */
+  summon?: SummonChoice;
   /** The form a shape-shift takes (a known form, a Beast, a printed form's id, or `true`), and one per target where
    *  each takes its own (`shape-shift.ts`). */
   form?: string;
@@ -158,6 +162,9 @@ export type ResolveDependencies = Readonly<{
   pushToken?: (
     input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number; toward?: boolean }>
   ) => Readonly<{ value: number; unit: string }> | null;
+  /** Brings an action's creatures onto the map (`bringSummons`), built by the operation layer, which has the grid and
+   *  mints ids. Absent, a summon is left for the GM to place. */
+  summon?: (request: SummonRequest) => SummonOutcome;
   /** The cover the spell walls between two combatants give the second from the first (Blade Barrier), measured on the
    *  map by the operation layer. */
   zoneCover?: (fromActorId: string, targetId: string) => "half" | "three-quarters" | "total" | null;
@@ -304,6 +311,8 @@ export type ResolveContext = {
   keepsHidden: boolean;
   /** The live effects whose damage riders this hit rolled, so a coat of poison is spent (`spendDamageUses`). */
   readonly damageEffectIds: string[];
+  /** The creatures this resolve brought onto the map (`resolution/summon.ts`). */
+  summoned?: ReadonlyArray<Readonly<{ actorId: string; name: string }>>;
 };
 
 /** Records one rolled formula in the shared history, attributed like every roll of this resolve; `label` names a die

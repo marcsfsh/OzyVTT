@@ -913,6 +913,16 @@ button.cs-lastroll-open {
 .cs-ac-edit .nh-input {
   width: 4.5rem;
 }
+/* Today's food and water: a line, then the ways to eat and drink, wrapping on a phone. */
+.cs-food-line {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.cs-food-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
 .cs-hd {
   display: flex;
   flex-wrap: wrap;

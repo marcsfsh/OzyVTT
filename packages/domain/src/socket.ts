@@ -133,6 +133,7 @@ import type {
   InitiativeRollSelfSchema,
   InitiativeScoreSchema,
   InitiativeSwapSchema,
+  InitiativeOrderTieSchema,
   ReactionAnswerSchema,
   ReactionDismissSchema,
   ReplayLaunchSchema,
@@ -156,6 +157,7 @@ import type {
   SceneReorderSchema,
   SceneSetCombatantsSchema,
   SetActorArchivedSchema,
+  SetActorAttitudeSchema,
   SetActorHealthDisplaySchema,
   SetActorSheetPreviewSchema,
   SetActorSizeSchema,
@@ -172,11 +174,18 @@ import type {
   TableSetStagingDefaultsSchema,
   TempHpSchema,
   TimePassSchema,
+  SurvivalSetTrackingSchema,
+  ActorNourishSchema,
+  ActorHoldBreathSchema,
   TimeSetDawnSchema,
   TokenMoveSchema,
   TokenSetAltitudeSchema,
   ActorFallSchema,
   ActorMountSchema,
+  SummonCommandSchema,
+  SummonDismissSchema,
+  SummonLookSchema,
+  SummonRecallSchema,
   TurnLegendarySchema,
   TurnReactionSchema,
   TurnUseSchema,
@@ -585,6 +594,10 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof SetActorHealthDisplaySchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "actor:set-attitude": (
+    payload: CommandPayload<typeof SetActorAttitudeSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "encounter:set-environment": (
     payload: CommandPayload<typeof SetEnvironmentSchema>,
     acknowledgement: (result: MutationResult) => void
@@ -650,6 +663,18 @@ export interface ClientToServerEvents {
   /** GM-only: move game time forward. */
   "time:pass": (
     payload: CommandPayload<typeof TimePassSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "survival:set-tracking": (
+    payload: CommandPayload<typeof SurvivalSetTrackingSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "actor:nourish": (
+    payload: CommandPayload<typeof ActorNourishSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "actor:hold-breath": (
+    payload: CommandPayload<typeof ActorHoldBreathSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM-only: set the hour dawn comes, or let a Long Rest stand in for it. */
@@ -790,6 +815,10 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof InitiativeSwapSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
+  "initiative:order-tie": (
+    payload: CommandPayload<typeof InitiativeOrderTieSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "initiative:roll-self": (
     payload: CommandPayload<typeof InitiativeRollSelfSchema>,
     acknowledgement: (result: MutationResult) => void
@@ -822,6 +851,26 @@ export interface ClientToServerEvents {
   /** A creature climbs onto a mount or off the one it rides. */
   "actor:mount": (
     payload: CommandPayload<typeof ActorMountSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** A creature commands the creatures it summoned. */
+  "summon:command": (
+    payload: CommandPayload<typeof SummonCommandSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** A summoned creature's commander dismisses it, for good or into its pocket dimension. */
+  "summon:dismiss": (
+    payload: CommandPayload<typeof SummonDismissSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** A familiar comes back from its pocket dimension. */
+  "summon:recall": (
+    payload: CommandPayload<typeof SummonRecallSchema>,
+    acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
+  ) => void;
+  /** A commander sees through a summoned creature's eyes. */
+  "summon:look": (
+    payload: CommandPayload<typeof SummonLookSchema>,
     acknowledgement: (result: MutationResult & { blocked?: RulesBlocked }) => void
   ) => void;
   /** GM sets how high a creature is, free of movement. */

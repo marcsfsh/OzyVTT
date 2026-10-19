@@ -136,6 +136,16 @@ export const InitiativeSwapSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** SRD Initiative: "the players decide the order among tied characters". A player puts their own character
+ *  directly ahead of another character tied on the same score. */
+export const InitiativeOrderTieSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    beforeActorId: z.uuid(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const AddCombatantSchema = z
   .object({
     commandId: z.uuid(),
@@ -313,6 +323,9 @@ export const SetConditionSchema = z
       .max(60),
     active: z.boolean(),
     level: z.number().int().min(1).max(6).optional(),
+    /** GM only, for Charmed or Frightened: the charmer or the source of fear, which the rules then read (a charmed
+     *  creature can't harm its charmer; a frightened one can't move closer to its source). */
+    sourceActorId: z.uuid().optional(),
     /** Bypass a rules rejection (standing from Prone costs half Speed, on your own turn; a condition someone else
      *  imposed is theirs to end); audited. */ override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -370,6 +383,36 @@ const CastShapingListSchema = z
   .refine((list) => new Set(list.map((entry) => entry.id)).size === list.length, {
     error: "Choose each way to shape the spell at most once."
   });
+const SummonSlugSchema = z
+  .string()
+  .regex(/^[a-z0-9-]+$/)
+  .max(200);
+/** What the user picks for a summon: the stat blocks and how many of each (Animate Objects may mix sizes), a form of a
+ *  scaled stat block, the creature type a familiar takes, the damage type of a Draconic Spirit's breath and the
+ *  Resistance it shares, and where the creatures appear. */
+export const SummonPickSchema = z
+  .object({
+    picks: z
+      .array(
+        z
+          .object({
+            monsterId: SummonSlugSchema,
+            form: SummonSlugSchema.optional(),
+            count: z.number().int().min(1).max(20).optional()
+          })
+          .strict()
+      )
+      .min(1)
+      .max(6)
+      .optional(),
+    creatureType: SummonSlugSchema.optional(),
+    damageType: DamageTypeSchema.optional(),
+    resistance: DamageTypeSchema.optional(),
+    at: AnnotationPointSchema.optional(),
+    /** Cast without Concentration, for 1 minute, where the caster may (a Draconic Sorcerer's Dragon Companion). */
+    withoutConcentration: z.boolean().optional()
+  })
+  .strict();
 /** A form a shape-shift takes: a bestiary id, a printed form's id, or `true` for the user's true form. */
 const FormChoiceSchema = z
   .string()
@@ -505,6 +548,13 @@ export const ActionResolveSchema = z
      *  caster taking Necrotic damage for each use after the first before a Long Rest. Refused for anything else. */
     overchannel: z.boolean().optional(),
     shaping: CastShapingListSchema.optional(),
+    /** What the user picks for an action that brings creatures onto the map (Find Familiar's form, Giant Insect's
+     *  spider, Summon Dragon's breath and the Resistance it shares), and the point they appear at, within the action's
+     *  range. The server checks each pick against what the action offers at the cast's level. */
+    summon: SummonPickSchema.optional(),
+    /** A familiar delivers this spell with a range of touch (SRD 5.2.1 Find Familiar): the touch is measured from the
+     *  familiar, which must be within 100 feet of its caster and takes its Reaction. */
+    deliveredBy: z.uuid().optional(),
     /** The form a shape-shift takes (Wild Shape's known form, Polymorph's Beast, a werewolf's wolf): a bestiary id, a
      *  printed form's id, or `true` for the true form. Refused when it isn't one the action allows. */
     form: FormChoiceSchema.optional(),
@@ -540,8 +590,8 @@ export const SaveAnswerSchema = z
     commandId: z.uuid(),
     saveId: z.uuid(),
     /** "roll": the server throws the d20 (or takes `face`) and adds the save's modifier. "manual": GM only, `total` is
-     *  the final total as the GM rules it. */
-    method: z.enum(["roll", "manual"]),
+     *  the final total as the GM rules it. "fail": the creature chooses to fail without rolling (SRD Saving Throw). */
+    method: z.enum(["roll", "manual", "fail"]),
     /** GM only, with `method: "manual"`: the final total, used as given. */
     total: z.number().int().min(-20).max(60).optional(),
     /** A typed d20 for `method: "roll"`: the face a physical die shows (the one that counts). A player may type one only
@@ -815,9 +865,13 @@ export const CheckRollSchema = z
     face: z.number().int().min(1).max(20).optional(),
     /** The GM's choice of roll mode. Ignored from a player. */
     rollMode: z.enum(["advantage", "disadvantage", "normal"]).optional(),
-    /** The creature a Wisdom (Perception or Survival) check is made to find: the roller's Hunter's Mark on it gives
-     *  Advantage. */
+    /** The creature the check is about: one a Wisdom (Perception or Survival) check is made to find (the roller's
+     *  Hunter's Mark on it gives Advantage), or one a Charisma check interacts with (its charmer, its attitude and
+     *  Perfume give Advantage or Disadvantage). */
     findActorId: z.uuid().optional(),
+    /** What the check relies on, when the GM says: a Blinded roller fails one that needs sight, a Deafened one one
+     *  that needs hearing. */
+    sense: z.enum(["sight", "hearing"]).optional(),
     /** The situations the roller says the check fits, from the sheet's list (a Book's topic, prying with a Crowbar). */
     situations: z.array(z.string().trim().min(3).max(80)).max(6).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
@@ -862,6 +916,9 @@ export const RollCallStartSchema = z
     /** A check the players roll blind: they see neither its result nor its DC. A save is never blind: its outcome
      *  lands on the character. */
     blind: z.boolean().optional(),
+    /** What a check relies on: a Blinded character fails one that needs sight, a Deafened one one that needs
+     *  hearing. */
+    sense: z.enum(["sight", "hearing"]).optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict()
@@ -871,9 +928,12 @@ export const RollCallStartSchema = z
   .refine((payload) => payload.kind === "check" || payload.blind !== true, {
     error: "A saving throw can't be rolled blind: its outcome lands on the character."
   })
-  .refine((payload) => payload.kind === "check" || (payload.skill === undefined && payload.tool === undefined), {
-    error: "A saving throw takes no skill or tool."
-  })
+  .refine(
+    (payload) =>
+      payload.kind === "check" ||
+      (payload.skill === undefined && payload.tool === undefined && payload.sense === undefined),
+    { error: "A saving throw takes no skill, tool or sense." }
+  )
   .refine((payload) => new Set(payload.actorIds).size === payload.actorIds.length, {
     error: "Name each character once."
   });
@@ -999,6 +1059,15 @@ export const SetHealthDisplaySchema = z
     commandId: z.uuid(),
     style: z.enum(["band", "bar", "ring", "aura"]),
     audience: z.enum(["gm", "all"]),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** SRD Influence: a monster's or NPC's attitude toward the party (GM). Indifferent is the default. */
+export const SetActorAttitudeSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    attitude: z.enum(["friendly", "indifferent", "hostile"]),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -1439,6 +1508,34 @@ export const RestFinishSchema = z
   })
   .strict();
 /** The GM moves game time forward, which the 16-hour rule between Long Rests reads. */
+/** The GM starts or stops tracking food and water (SRD Malnutrition, Dehydration). */
+export const SurvivalSetTrackingSchema = z
+  .object({
+    commandId: z.uuid(),
+    enabled: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A character eats or drinks: a meal, a ration or a Goodberry; its fill at a source, or from its Waterskins. */
+export const ActorNourishSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    food: z.enum(["meal", "ration", "goodberry"]).optional(),
+    water: z.enum(["fill", "waterskin"]).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict()
+  .refine((request) => request.food !== undefined || request.water !== undefined, "Say what it eats or drinks.");
+/** The GM starts or ends a creature's held breath (SRD Suffocation). */
+export const ActorHoldBreathSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    holding: z.boolean(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 export const TimePassSchema = z
   .object({
     commandId: z.uuid(),
@@ -1881,6 +1978,46 @@ export const ActorMountSchema = z
     actorId: z.uuid(),
     mountId: z.uuid().nullable(),
     /** GM-grade bypass of a movement-rule rejection (the half Speed it costs, a mount too small or too far). */
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A creature commands the creatures it summoned (SRD 5.2.1 Animate Dead: "you can take a Bonus Action to mentally
+ *  command any creature you made with this spell"): those named, or every one the command reaches. */
+export const SummonCommandSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    creatureIds: z.array(z.uuid()).min(1).max(20).optional(),
+    /** GM-grade bypass of an economy rule (the action or Bonus Action it costs, its turn, its range). */
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A summoned creature's commander dismisses it: for good, or a familiar for now into its pocket dimension. */
+export const SummonDismissSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    temporary: z.boolean().optional(),
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A familiar dismissed for now comes back to an unoccupied space within 30 feet of its commander. */
+export const SummonRecallSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A commander sees through a summoned creature's eyes until the start of its next turn (a familiar). */
+export const SummonLookSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })

@@ -89,8 +89,20 @@ export const rollCommands = [
     schema: CheckRollSchema,
     malformed: "The check is malformed.",
     async run({ principal, request, execute }, kit) {
-      const { commandId, actorId, ability, skill, tool, dc, visibility, face, rollMode, findActorId, situations } =
-        request;
+      const {
+        commandId,
+        actorId,
+        ability,
+        skill,
+        tool,
+        dc,
+        visibility,
+        face,
+        rollMode,
+        findActorId,
+        sense,
+        situations
+      } = request;
       const initiator = initiatorOf(principal);
       let result: CheckResult | undefined;
       const geometry = await kit.liveGeometry();
@@ -101,7 +113,12 @@ export const rollCommands = [
           {
             commandId,
             actorId,
-            subject: { ability, ...(skill !== undefined ? { skill } : {}), ...(tool !== undefined ? { tool } : {}) },
+            subject: {
+              ability,
+              ...(skill !== undefined ? { skill } : {}),
+              ...(tool !== undefined ? { tool } : {}),
+              ...(sense !== undefined ? { sense } : {})
+            },
             dc: dc ?? null,
             visibility,
             ...(face !== undefined ? { face } : {}),
@@ -197,8 +214,13 @@ export const rollCommands = [
     issueMessage: true,
     gmOnly: "Only the GM can call for a roll.",
     async run({ request, execute }, kit) {
-      const { commandId, kind, ability, skill, tool, dc, actorIds, blind } = request;
-      const subject = { ability, ...(skill !== undefined ? { skill } : {}), ...(tool !== undefined ? { tool } : {}) };
+      const { commandId, kind, ability, skill, tool, dc, actorIds, blind, sense } = request;
+      const subject = {
+        ability,
+        ...(skill !== undefined ? { skill } : {}),
+        ...(tool !== undefined ? { tool } : {}),
+        ...(sense !== undefined ? { sense } : {})
+      };
       const committed = await execute((draft) => {
         startRollCall(
           draft,
