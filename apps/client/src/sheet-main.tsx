@@ -8,6 +8,7 @@ import "./styles.css";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { CharacterSheet } from "./sheet/CharacterSheet";
 import { joinTable, storedPlayerToken } from "./lib/session";
+import { installZoomGuard } from "./lib/zoom-guard";
 import { socket } from "./socket";
 import "./encounter/encounter-panel.css";
 
@@ -71,6 +72,8 @@ function Message({ children }: Readonly<{ children: ReactNode }>) {
     </div>
   );
 }
+
+installZoomGuard();
 
 createRoot(document.getElementById("sheet-root")!).render(
   <StrictMode>
