@@ -11,7 +11,6 @@ import {
   isLongCastingTime,
   laterRowOf,
   laterSpellActionId,
-  ritualSpellActionId,
   upcastAction,
   withSpellAttackReach,
   withSpellEffects
@@ -292,7 +291,12 @@ export function openResolve(
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
   if (!input.economyPaid)
     warnings.push(
-      ...laterActionReminders(spell, action, scrollOfAction(action, attacker.inventory, deps.catalog) !== null)
+      ...laterActionReminders(
+        spell,
+        action,
+        scrollOfAction(action, attacker.inventory, deps.catalog) !== null,
+        state.combat.active
+      )
     );
   return ctx;
 }
@@ -327,26 +331,23 @@ export function withChosenDamageType(action: DefinitionAction, chosen: string | 
 }
 
 /** The GM's reminder on casting a spell that does more later (SRD text): what the caster may do on later turns, and
- *  what the GM spots for an area the server doesn't watch (an area with a zone it does). A scroll read for a long
- *  casting time spends no slot, and "if the casting is interrupted, the scroll isn't lost". */
+ *  what the GM spots for an area the server doesn't watch (an area with a zone it does). A creature's own long cast
+ *  runs over its turns (`long-casting.ts`); an item's in a fight is the GM's to time, and a scroll read for a long
+ *  casting time "isn't lost" if the casting is interrupted. */
 function laterActionReminders(
   spell: SpellReference | undefined,
   action: DefinitionAction,
-  fromScroll: boolean
+  fromScroll: boolean,
+  inFight: boolean
 ): string[] {
   const later = spell?.effect?.laterActions ?? [];
   if (!spell || later.some((row) => laterSpellActionId(spell.id, row.name) === action.id)) return [];
   return [
-    // SRD Rituals: 10 minutes longer than the spell's casting time, and no slot.
-    ...(action.id === ritualSpellActionId(spell.id)
+    ...(inFight && isItemActionId(action.id) && isLongCastingTime(spell.castingTime)
       ? [
-          `${spell.name} as a Ritual takes 10 minutes longer than its ${spell.castingTime}. The caster takes the Magic action on each turn and keeps Concentration, and no slot is spent.`
+          `${spell.name} takes ${spell.castingTime} to cast. Until then, the caster takes the Magic action on each turn and keeps Concentration. If that breaks, the spell fails and ${fromScroll ? "the scroll isn't lost, so give it back on the sheet" : "its charges aren't spent, so restore them on the sheet"}.`
         ]
-      : isLongCastingTime(spell.castingTime)
-        ? [
-            `${spell.name} takes ${spell.castingTime} to cast. Until then, the caster takes the Magic action on each turn and keeps Concentration. If that breaks, the spell fails and ${fromScroll ? "the scroll isn't lost, so give it back on the sheet" : "its slot isn't spent, so restore it on the sheet"}.`
-          ]
-        : []),
+      : []),
     ...later
       .filter((row) => row.zone === undefined)
       .map((row) => `${spell.name}: ${row.when} Use "${spell.name}: ${row.name}" for it.`)

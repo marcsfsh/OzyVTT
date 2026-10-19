@@ -65,6 +65,7 @@ import { openResolve } from "./resolution/validate.js";
 import { holdReadiedSpell } from "./resolution/ready.js";
 import { healLimit } from "./loose-healing.js";
 import { passiveOf, unavailableReason } from "./availability-reasons.js";
+import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-casting.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -81,9 +82,24 @@ export function resolveDefinitionAction(
   input: ResolveInput,
   deps: ResolveDependencies
 ): ActionResolution {
-  const ctx = openResolve(state, action, input, deps);
+  // A spell of a minute or more cast in a fight takes the action on each of its caster's turns, and resolves on the
+  // last with the targets and slot picked on the first.
+  const longCast = longCastStepOf(
+    state,
+    action,
+    input,
+    action.spellId ? deps.catalog?.spellRecord?.(action.spellId) : undefined
+  );
+  const ctx = openResolve(state, action, longCast?.input ?? input, deps);
   ctx.builtin?.check?.(ctx);
   ctx.builtin?.apply?.(ctx);
+  if (longCast && longCast.phase !== "finish") {
+    stepLongCast(ctx, longCast);
+    releaseHideAndReady(ctx);
+    spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  if (longCast) finishLongCast(ctx);
   // A readied spell is cast now and held: its slot and the action are spent, and nothing else happens yet.
   if (input.ready === true) {
     holdReadiedSpell(ctx);

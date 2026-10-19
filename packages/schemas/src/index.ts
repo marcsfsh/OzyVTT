@@ -915,7 +915,21 @@ export const EffectInstanceSchema = z
     /** It comes from a spell or a magic item, so a save repeated against it is one Magic Resistance helps with. */
     magical: z.literal(true).optional(),
     /** It ends when a spell restores the bearer's hit points (an infernal wound). */
-    endsOnSpellHealing: z.literal(true).optional()
+    endsOnSpellHealing: z.literal(true).optional(),
+    /** A spell its bearer is casting over a minute or more in a fight (SRD Longer Casting Times): the cast it finishes,
+     *  with the targets and slot level picked when it began, the turns' actions it still needs, and the round of the
+     *  last one, so a turn without one lets it lapse. */
+    longCast: z
+      .object({
+        actionId: z.string().min(1).max(120),
+        targetIds: z.array(z.uuid()).max(40),
+        slotLevel: z.number().int().min(1).max(9).nullable(),
+        areaPlaced: z.boolean().default(false),
+        turnsLeft: z.number().int().min(0).max(15000),
+        lastRound: z.number().int().positive()
+      })
+      .strict()
+      .optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;

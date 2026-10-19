@@ -36,6 +36,8 @@ import { useCostOf, withChosenCost } from "../use-cost.js";
 import { applyLooseHealing, looseHealTargets, partyMember } from "../loose-healing.js";
 import { countOptionUse } from "../option-uses.js";
 import { castLine, castSpellOf } from "../cast-narration.js";
+import { castingMinutesOf } from "../resolution/long-casting.js";
+import { passTime } from "../rests.js";
 import { standsInSilence } from "../silence.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { defineCommand } from "./pipeline.js";
@@ -111,6 +113,8 @@ export const actionCommands = [
       // The spell this resolve casts and whom at, for the table's "casts" line.
       let cast = null as Readonly<{ name: string; targetIds: readonly string[] }> | null;
       let restBroken: EffectNarration[] = [];
+      let castingOnward = false;
+      let clock = { fromHours: 0, toHours: 0 };
       const { state, duplicate } = await execute((draft) => {
         // Access first (the action kind is for the per-table policy hook, ADR-0021): a missing creature and someone
         // else's get one answer, so a player can't probe which ids exist.
@@ -274,6 +278,15 @@ export const actionCommands = [
         if (!resolution.preview) countOptionUse(draft, actorId, actionId);
         const spell = castSpellOf(action, kit.equipmentCatalog().spellRecord);
         cast = spell ? { name: spell.name, targetIds: resolvedTargetIds } : null;
+        // A casting under way on later turns, and outside a fight the hours a long one takes (SRD Longer Casting
+        // Times): the cast completes at once and the game clock moves by its whole hours.
+        castingOnward = attacker.effects.some((effect) => effect.longCast?.actionId === action.id);
+        const hours = spell && !draft.combat.active ? Math.floor(castingMinutesOf(spell, action.id) / 60) : 0;
+        clock = { fromHours: draft.rest.clockHours, toHours: draft.rest.clockHours };
+        if (!resolution.preview && hours > 0) {
+          passTime(draft, hours);
+          clock = { ...clock, toHours: draft.rest.clockHours };
+        }
         // Casting a spell other than a cantrip stops a Short Rest, as it does on the loose route.
         restBroken =
           spell && spell.level > 0 && !draft.combat.active
@@ -333,7 +346,18 @@ export const actionCommands = [
               kit.hiddenFromTable(state)
             )
           : { text: `${kit.actorName(actorId)} used ${resolution.actionName}.`, actorIds: [actorId] };
-        kit.context.broadcastTableEvent({ kind: "action", text: told.text, actorIds: told.actorIds, gmOnly: hidden });
+        // A casting still under way says so in its own line; the cast is told when it completes.
+        if (!castingOnward)
+          kit.context.broadcastTableEvent({ kind: "action", text: told.text, actorIds: told.actorIds, gmOnly: hidden });
+        if (clock.toHours > clock.fromHours) {
+          kit.context.onTimePassed?.(clock);
+          const hours = clock.toHours - clock.fromHours;
+          kit.context.appendLog({
+            kind: "encounter",
+            text: `${hours} ${hours === 1 ? "hour passes" : "hours pass"} while ${kit.actorName(actorId)} casts ${cast?.name ?? resolution.actionName}.`,
+            gmOnly: hidden
+          });
+        }
         // Rules-engine narration (ADR-0020): overrides are audited, warnings reach the GM, applied effects reach the table.
         if (resolution.overridden)
           kit.context.appendLog({
@@ -445,7 +469,7 @@ export const actionCommands = [
           commandId,
           actorId,
           actionId,
-          targetIds: named,
+          ...(named.length > 0 ? { targetIds: named } : {}),
           ...(rollMode ? { rollMode } : {}),
           ...(override ? { override } : {}),
           ...(slotLevel === undefined ? {} : { slotLevel }),

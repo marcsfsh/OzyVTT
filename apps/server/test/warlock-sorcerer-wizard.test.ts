@@ -348,6 +348,8 @@ describe("Warlock: Contact Patron hands over the spell and the free casting (aud
   it("gives it a once-per-Long-Rest counter the engine really spends", () => {
     const built = table(level9());
     expect(actionOf(built, "spell-contact-other-plane-free").uses).toMatchObject({ limit: 1, per: "long-rest" });
+    // Its minute of casting completes at once outside a fight, and the use goes with it.
+    endEncounter(built.state);
     resolveDefinitionAction(
       built.state,
       actionOf(built, "spell-contact-other-plane-free"),
