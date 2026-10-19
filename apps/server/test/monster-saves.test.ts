@@ -368,7 +368,7 @@ describe("a failure with no condition", () => {
     );
     use(built, "consume-life");
     answer(built, 3, [4, 4, 4]);
-    expect(hero(built).deathSaves.failures).toBe(0);
+    expect(hero(built).deathSaves).toEqual({ successes: 1, failures: 0, stable: false });
     expect(hero(built).death).toBeUndefined();
     expect(hero(built).effects.some((effect) => effect.tags.includes(DEATH_WARD_TAG))).toBe(false);
   });
