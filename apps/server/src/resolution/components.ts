@@ -121,11 +121,11 @@ function boundHands(attacker: LiveActor): Readonly<{ free: boolean; shield: bool
 }
 
 /** How many of a material the cast needs. */
-const neededOf = (material: SpellMaterial, targetCount: number) =>
+export const neededOf = (material: SpellMaterial, targetCount: number) =>
   (material.count ?? 1) * (material.perTarget ? Math.max(1, targetCount) : 1);
 
 /** The carried rows that are this material, by gear id or by a word of its name. */
-function materialRows(inventory: readonly InventoryItem[], material: SpellMaterial): InventoryItem[] {
+export function materialRows(inventory: readonly InventoryItem[], material: SpellMaterial): InventoryItem[] {
   return inventory.filter((row) => {
     if (!carried(row)) return false;
     const id = catalogIdOf(row);
@@ -136,7 +136,7 @@ function materialRows(inventory: readonly InventoryItem[], material: SpellMateri
 }
 
 /** "a diamond worth 300+ GP", "4 ivory strips worth 50+ GP each". */
-function materialWords(material: SpellMaterial, needed: number): string {
+export function materialWords(material: SpellMaterial, needed: number): string {
   const worth = material.costGp !== null ? ` worth ${material.costGp}+ GP${needed > 1 ? " each" : ""}` : "";
   return `${needed > 1 ? `${needed} ` : ""}${material.name}${worth}`;
 }

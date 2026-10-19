@@ -2,10 +2,12 @@ import { useState } from "react";
 import { gameTimeSpanLabel, isDead, longRestWait, rosterActors, type GmActor, type GmView } from "@vtt/domain";
 import { Badge, Button, Field, Modal, SegmentedControl, Select, Stepper, Switch, useToast } from "@vtt/ui";
 import { pathForSection } from "../codex/routes";
+import { CraftingProjects } from "../crafting/CraftingProjects";
 import { command } from "../lib/command";
 import { navigate } from "../router";
 import { NEEDS } from "../sheet/FoodAndWater";
 import { gameDate, useGmCalendar } from "./game-date";
+import { LongRestUnderWay } from "./LongRestUnderWay";
 import "./rest.css";
 
 const NO_REST = {
@@ -14,6 +16,7 @@ const NO_REST = {
   requests: [] as readonly string[],
   dawnHour: null as number | null,
   shortRest: null,
+  longRest: null,
   survival: false
 };
 
@@ -51,7 +54,8 @@ function restNote(state: GmView, actor: GmActor): string | null {
 
 /**
  * The GM's rests: game time and passing it, players' Long Rest requests, and resting the party together. A Short
- * Rest stays open while each player spends Hit Dice on their own device, until the GM finishes it. The clock reads
+ * Rest stays open while each player spends Hit Dice on their own device, and a Long Rest while its 8 hours can be
+ * interrupted, until the GM finishes it. Downtime passed here works the party's crafting projects. The clock reads
  * the Codex calendar's date with the game's hour, the one clock both share.
  */
 export function PartyRest({ state, token }: Readonly<{ state: GmView; token: string | null }>) {
@@ -60,6 +64,8 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
   const [hours, setHours] = useState(8);
   // Passing time on the road (SRD Travel Pace): the server logs how far the party went.
   const [pace, setPace] = useState<"stay" | "slow" | "normal" | "fast">("stay");
+  // Downtime (SRD 5.2.1 Crafting): crafters work their projects through the time passed.
+  const [downtime, setDowntime] = useState(false);
   const [minuteStep, setMinuteStep] = useState(0);
   const [unpicked, setUnpicked] = useState<ReadonlySet<string>>(new Set());
   const { toast } = useToast();
@@ -69,6 +75,9 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
   const byId = (actorId: string) => state.actors.find((actor) => actor.id === actorId);
   const requests = rest.requests.map(byId).filter((actor): actor is GmActor => actor !== undefined);
   const shortRest = rest.shortRest;
+  // A player-shaped first state carries its own cut of the Long Rest, with no members.
+  const longRest = rest.longRest && "members" in rest.longRest ? rest.longRest : null;
+  const projects = state.crafting?.projects ?? [];
   const picked = party.filter((actor) => !unpicked.has(actor.id));
   const calendar = useGmCalendar(token, open);
   const clock = gameDate(calendar.data, rest.clockHours, rest.clockMinutes);
@@ -103,11 +112,19 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
   const startRest = (kind: "short" | "long") =>
     send(
       () => command("rest:party", { kind, actorIds: picked.map((actor) => actor.id) }),
-      kind === "long"
-        ? "The party finished a Long Rest. 8 hours passed."
-        : "The Short Rest is open on each player's device.",
-      kind === "long"
+      kind === "long" ? "The Long Rest is under way." : "The Short Rest is open on each player's device."
     );
+  const finishRest = (kind: "short" | "long", apply: boolean) =>
+    send(
+      () => command("rest:finish", { apply, kind }),
+      !apply
+        ? `The ${kind === "long" ? "Long" : "Short"} Rest was called off.`
+        : kind === "long"
+          ? "The Long Rest is over."
+          : "The Short Rest is over. An hour passed.",
+      true
+    );
+  const openRest = shortRest ? "short" : longRest ? "long" : null;
   const unclaimed = shortRest?.actorIds.some((actorId) => !byId(actorId)?.ownerSessionId) ?? false;
   /** A meal for everyone, or everyone's fill at a source: one command per living character. */
   const feedAll = async (choice: Readonly<{ food?: "meal"; water?: "fill" }>, success: string) => {
@@ -121,7 +138,7 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
     toast(failure ?? success, { tone: failure ? "error" : "success" });
   };
 
-  const label = shortRest ? "Short Rest open" : "Rest";
+  const label = shortRest ? "Short Rest open" : longRest ? "Long Rest open" : "Rest";
   return (
     <>
       <Button className="party-rest-open" onClick={openDialog} aria-haspopup="dialog">
@@ -138,29 +155,13 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
         title="Rest"
         size="md"
         footer={
-          shortRest ? (
+          openRest ? (
             <>
-              <Button
-                variant="ghost"
-                disabled={busy}
-                onClick={() =>
-                  void send(() => command("rest:finish", { apply: false }), "The Short Rest was called off.", true)
-                }
-              >
+              <Button variant="ghost" disabled={busy} onClick={() => void finishRest(openRest, false)}>
                 Call off
               </Button>
-              <Button
-                variant="primary"
-                disabled={busy}
-                onClick={() =>
-                  void send(
-                    () => command("rest:finish", { apply: true }),
-                    "The Short Rest is over. An hour passed.",
-                    true
-                  )
-                }
-              >
-                Finish Short Rest
+              <Button variant="primary" disabled={busy} onClick={() => void finishRest(openRest, true)}>
+                {openRest === "long" ? "Finish Long Rest" : "Finish Short Rest"}
               </Button>
             </>
           ) : (
@@ -235,7 +236,13 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
                 disabled={busy || span === null}
                 onClick={() =>
                   void send(
-                    () => command("time:pass", { hours, minutes, ...(pace !== "stay" ? { pace } : {}) }),
+                    () =>
+                      command("time:pass", {
+                        hours,
+                        minutes,
+                        ...(pace !== "stay" ? { pace } : {}),
+                        ...(downtime && pace === "stay" ? { downtime: true } : {})
+                      }),
                     `${span} passed.`
                   )
                 }
@@ -243,10 +250,19 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
                 {span ? `${pace === "stay" ? "Pass" : "Travel"} ${span}` : "Pass time"}
               </Button>
             </div>
+            {pace === "stay" && (
+              <Switch
+                checked={downtime}
+                disabled={busy}
+                label="Downtime: crafters work on their projects"
+                onChange={setDowntime}
+              />
+            )}
             <p className="party-rest-hint">
               Time that passes here moves the Codex calendar too, and counts down spells and effects: a minute is 10
               rounds. A fight&apos;s rounds don&apos;t move the clock. A Long Rest can start 16 hours after a
-              character&apos;s last one ends.
+              character&apos;s last one ends. While the party travels, each character&apos;s checks read the pace until
+              time passes without one.
             </p>
             <Field label="Dawn" htmlFor="party-rest-dawn">
               <Select
@@ -356,7 +372,9 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
             </section>
           )}
 
-          {shortRest ? (
+          {longRest ? (
+            <LongRestUnderWay state={state} rest={longRest} busy={busy} send={send} />
+          ) : shortRest ? (
             <section className="party-rest-section" aria-label="Short Rest under way">
               <span className="party-rest-heading">Short Rest under way</span>
               <ul className="party-rest-list">
@@ -412,10 +430,13 @@ export function PartyRest({ state, token }: Readonly<{ state: GmView; token: str
                 </ul>
               )}
               <p className="party-rest-hint">
-                A Long Rest happens at once and passes 8 hours. A Short Rest opens on each player&apos;s device.
+                A Short Rest opens on each player&apos;s device. A Long Rest stays open for its 8 hours, so a fight or
+                damage can interrupt it, until you finish it.
               </p>
             </section>
           )}
+
+          {(projects.length > 0 || downtime) && <CraftingProjects state={state} busy={busy} send={send} />}
         </div>
       </Modal>
     </>

@@ -7,7 +7,7 @@ import { RandomCharacterModal } from "../builder/RandomCharacter";
 import { CLAIM_WORD, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
 import { command } from "../lib/command";
 import { aidGiverOf, isKnockedOut, StabilizeControl } from "../encounter/StabilizeControl";
-import { ShortRestPrompt } from "../rest/ShortRestPrompt";
+import { RestPrompt } from "../rest/RestPrompt";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import "./my-character.css";
 
@@ -291,7 +291,7 @@ export function MyCharacter({
           state={state}
           presentation="page"
           token={token}
-          top={<ShortRestPrompt state={state} />}
+          top={<RestPrompt state={state} />}
           {...(builderOpen ? { onLevel: () => onLevel(mine.id) } : {})}
           doors={{
             ...(tier !== "off" ? { party: () => setPartyOpen(true) } : {}),

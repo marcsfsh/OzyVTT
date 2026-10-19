@@ -17,6 +17,8 @@ const derivedWith = (defences: ActorDerivedSheet["defences"]) =>
     abilities: [],
     skills: [],
     tools: [],
+    gearUses: [],
+    fastHands: false,
     passivePerception: 11,
     speedFeet: 30,
     defences,

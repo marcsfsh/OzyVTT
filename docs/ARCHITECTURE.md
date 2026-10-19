@@ -382,7 +382,8 @@ of a hidden thing. When in doubt, leave it out.
 - Doors and objects (ADR-0023's second amendment): a door may be held shut (`VisionWall.door`: a lock with
   its key holders, stuck, barred, jammed with a spike, sealed by Stone Shape, an Arcane Lock), and
   `door.set-open` refuses a player one held shut against their character. `door.use` picks, forces, pries,
-  jams or seals a door beside the acting creature, the server rolling the check (`doors.ts`); `door.set-state`
+  jams or seals a door beside the acting creature, the server rolling the check and spending the Utilize action in a
+  fight (`doors.ts`, `utilize.ts`); `door.set-state`
   is the GM's. A wall or door may be an object with AC and Hit Points (`VisionWall.object`), as is what holds a
   creature (`EffectInstance.heldBy`: a Net, a web, a rope). `object.attack` rolls an attack against one
   (`object-strikes.ts`), `object.damage` is the GM's, and at 0 Hit Points a wall or door is gone and a held
@@ -460,8 +461,8 @@ a zone that carries the action's own save and damage (`SpellZone.rule`), which s
 or it goes off once.
 
 Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
-(`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long
-Rest moves it 8 hours and finishing the party's Short Rest moves it an hour, and `passGameTime`
+(`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), finishing the party's
+Long Rest moves it to the rest's end and finishing the party's Short Rest moves it an hour, and `passGameTime`
 (`game-time.ts`) counts every creature's effects down by it, 10 rounds to the minute. A fight's rounds
 don't move the clock. When a fight ends, what has a minute (10 rounds) or less left ends with it, and
 anything longer carries on in game time; a parked fight's combatants and a replay's copies wait outside
@@ -472,7 +473,8 @@ dispelled with no Concentration. An effect can also last until its bearer's next
 would run out in its 8 hours and leaves longer effects for the GM to pass those hours, so they count
 once. The clock also runs a Stable creature's 1d4 hours to 1 Hit Point and a knocked-out creature's hour.
 While the GM tracks food and water (`rest.survival`), each midnight it crosses ends a day for every
-character, which eats and drinks what it carries and meets the hunger and thirst rules (`survival.ts`).
+character, which eats and drinks what it carries (Rations, then a Bead of Nourishment) and meets the hunger and
+thirst rules (`survival.ts`).
 A creature out of air counts its held breath down on the clock as it does at its turns' ends (`breath.ts`).
 
 Death is a record on the creature (`Actor.death`, `death.ts`). After every command the server stamps when a
@@ -611,8 +613,23 @@ body armor, which takes minutes, and a Shield takes the Utilize action on their 
 Unconscious creature, or one a failed Fear save makes drop them, keeps its held rows carried but out of its hands
 (`dropHeldItems` in `effects.ts`), and what one gave its Armor Class (a Staff of Power's +2) goes with it. `carrying.ts`
 weighs what a character carries, coins included, against its Strength times its size's figure (a
-`carrying-capacity-larger` rider counts it one size up), and `speed.ts` holds its Speed to 5 feet beyond that. The
-sheet offers each tool's Utilize uses as checks at the DCs its record prints (`toolUses` in `ability-checks.ts`).
+`carrying-capacity-larger` rider counts it one size up), and `speed.ts` holds its Speed to 5 feet beyond that.
+
+The Utilize action is one module (`utilize.ts`): in a fight it spends the action on the user's own turn, or a Thief's
+Bonus Action with Fast Hands, and outside one nothing. A Shield, a door, and each tool's and gear's Utilize uses take
+it. The sheet offers the uses (a tool's from `toolUses` in `ability-checks.ts`, gear's from its record's `utilize`,
+a Grappling Hook's DC 13 Acrobatics), and `check.roll` with `use`, or with a tool and a DC, rolls one through
+`rollUtilizeCheck` (`tool-uses.ts`), which needs the item in the pack. That is also the call for a rule that rolls a
+tool check of its own. A Cobbler's success lands its rider when the held check settles (`settleUseOutcome`). A
+Thief's Fast Hands also takes a magic item's Magic action as a Bonus Action (`fast-hands.ts`).
+
+Crafting (SRD 5.2.1) is downtime work kept on the game state (`GameState.crafting`, `crafting.ts`). A character
+starts a project with a tool it is proficient with and carries: an item its tool's Craft line names, a Potion of
+Healing, a Spell Scroll of a prepared spell or a magic item, and pays the raw materials from its purse at the start.
+`time.pass` with `downtime` works each project up to 8 hours a game day, its helpers' hours added, and the GM can log
+days by hand (`crafting.work`). A finished item joins the crafter's pack; a scribed scroll keeps the scribe's save DC
+and attack bonus (`InventoryItem.scribed`). Players see their own characters' projects and the visible party's, with
+the price only on their own (`playerCrafting`).
 
 Every spell a sheet or stat block knows is a cast action (`character-build.ts`, `monster-spells.ts`), so even
 one with nothing to roll (Light) spends its casting time and slot, holds its Concentration, places its area and is
@@ -637,7 +654,10 @@ resource back is its own checked command. `conversions.ts` is one table of the f
 into another or recover one (Font of Magic both ways, Arcane and Natural Recovery, Magical Cunning, restoring a
 use with a slot or points, Pearl of Power), each with its timing, its check and its pick, offered by
 `actor:available-actions` and taken with `actor.convert`. Hit Point Dice are spent only during a Short Rest, a
-player's own or the party's (`rests.ts`). A finished rest opens a step on the actor (`restStep`) where its
+player's own or the party's (`rests.ts`), or by a member whose interrupted Long Rest gave it a Short Rest's benefits.
+The party's Long Rest is a span (`long-rest.ts`): it opens at the clock's time and lasts until the GM finishes it.
+Rolling Initiative, damage, a spell above a cantrip and the GM's interrupt for exertion stop a member's rest
+(`rest-interruptions.ts`), and resuming adds an hour. A finished rest opens a step on the actor (`restStep`) where its
 recoveries and re-choices are made until its player taps Done; a re-choice the build reads (a Weapon Mastery pick,
 a Wizard's cantrip, a Hunter's option) is written to the ledger and the sheet rebuilt (`ledger-rechoice.ts`), a
 pick of several one held answer at a time, and a feature's picks of different kinds each under its own offer (Pact of
@@ -833,7 +853,8 @@ The table has one clock (ADR-0029): the Codex calendar keeps the day and the gam
 of day (`rest.clockHours`, which the 16-hour rule between Long Rests reads, and `rest.clockMinutes`). A party rest or Pass time that
 crosses midnight moves the GM's date by the days crossed (`onTimePassed` in the command context, then
 `codexStore.advanceCampaignDate`), and the players' date with it when the two were the same day. Pass time
-with a travel pace (SRD Travel Pace) logs how far the party went and what the pace does to its checks.
+with a travel pace (SRD Travel Pace) logs how far the party went, and each traveller holds the pace as an effect its
+checks read until time passes without one, it rests or it rolls Initiative (`travel.ts`).
 
 ## Public HTTP API
 

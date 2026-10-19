@@ -544,6 +544,8 @@ export const WeaponReferenceSchema = z.object({
   /** What an Ammunition weapon fires (`Ammunition (Range 150/600; Arrow)`); absent on other weapons. */
   ammunition: AmmunitionKindSchema.optional(),
   improvised: z.boolean(),
+  /** The Weapons table's price in gold pieces, which crafting reads. Absent = not recorded. */
+  costGp: z.number().nonnegative().max(1_000_000).optional(),
   damage: z.object({ dice: z.string().min(1).max(20), type: z.string().min(1).max(40) }),
   rangeFeet: z.number().int().positive().nullable(),
   longRangeFeet: z.number().int().positive().nullable(),
@@ -581,6 +583,8 @@ export const ArmorReferenceSchema = z.object({
   acBase: z.number().int().min(2).max(25),
   /** The Armor table's band. Used to resolve magic-item eligibility ("Any Medium or Heavy"). */
   category: z.enum(["light", "medium", "heavy", "shield"]).optional(),
+  /** The Armor table's price in gold pieces, which crafting reads. Absent = not recorded. */
+  costGp: z.number().nonnegative().max(1_000_000).optional(),
   addDexModifier: z.boolean(),
   dexModifierCap: z.number().int().nullable(),
   stealthDisadvantage: z.boolean(),
@@ -1131,6 +1135,26 @@ export const EquipmentReferenceSchema = z
       .optional()
       .describe(
         "What the item holds, which it is unpacked into wherever a character comes by it (its starting equipment, or adding it to the sheet): each record id and how many (an Explorer's Pack's 10 Torches)"
+      ),
+    /** What the item does when its carrier takes the Utilize action, with the check it takes ("As a Utilize action,
+     *  you can throw the Grappling Hook ... DC 13 Dexterity (Acrobatics) check"). A tool's own Utilize line is read
+     *  from its description. */
+    utilize: z
+      .array(
+        z
+          .object({
+            label: z.string().min(1).max(80),
+            ability: AbilityShortSchema,
+            skill: ContentIdSchema.optional(),
+            dc: z.number().int().min(1).max(40)
+          })
+          .strict()
+      )
+      .min(1)
+      .max(4)
+      .optional()
+      .describe(
+        "What the item does when its carrier takes the Utilize action, each with the check it takes and its DC (a Grappling Hook's catch: DC 13 Dexterity (Acrobatics)). The sheet offers each one while the item is carried; in a fight it takes the Utilize action. A tool's own Utilize line is read from its description"
       ),
     /** "You can make one attack with it as a Bonus Action on each of your turns" (Scimitar of Speed). */
     bonusActionAttack: z

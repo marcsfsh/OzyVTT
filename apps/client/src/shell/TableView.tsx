@@ -17,7 +17,7 @@ import { EncounterMap } from "../scene/EncounterMap";
 import { navigate, pathForGmTab } from "../router";
 import { SCENES_PATHS } from "../scenes/routes";
 import { PartyRest } from "../rest/PartyRest";
-import { ShortRestPrompt } from "../rest/ShortRestPrompt";
+import { RestPrompt } from "../rest/RestPrompt";
 import { needsItems } from "../table/needs";
 import { NeedsYou } from "../table/NeedsYou";
 import { PaneDivider, useMomentShare } from "../table/PaneDivider";
@@ -184,7 +184,7 @@ export function TableView(props: TableViewProps) {
           top: (
             <>
               {/* The party's Short Rest on this player's own device: their Hit Dice to spend, and Done. */}
-              <ShortRestPrompt state={props.state} />
+              <RestPrompt state={props.state} />
               <PromptSlot state={props.state} />
             </>
           ),

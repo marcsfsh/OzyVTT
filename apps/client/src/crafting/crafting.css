@@ -1,0 +1,41 @@
+/* Crafting projects, in the GM's rest panel and on the sheet's Gear tab. Rows wrap to one column on a phone and keep
+   the 44px touch floor through the shared buttons and selects. */
+
+.craft-projects {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.craft-project {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.craft-project-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.craft-project-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.craft-project-actions > .nh-select {
+  flex: 1 1 9rem;
+  min-width: 0;
+}
+.craft-start {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}

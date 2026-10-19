@@ -5,9 +5,9 @@ import { checkPlan, type CheckNames, type CheckPlan } from "./ability-checks.js"
 import { GameAccessDeniedError, requireActorAccess, type Initiator } from "./authorization.js";
 import { rollSettledCheck } from "./check-rolls.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
-import { CommandRejectedError, RulesBlockedError } from "./game-store.js";
+import { CommandRejectedError } from "./game-store.js";
 import { clockMinutesOf } from "./game-time.js";
-import { effectiveModeFor, overrideCovers } from "./rules-families.js";
+import { carriedRow as carried, requireFastHands, spendUtilize } from "./utilize.js";
 import { doorWithinReach } from "./vision/edit.js";
 
 /**
@@ -112,31 +112,6 @@ export function setDoorState(state: GameState, wallId: string, door: DoorState |
   });
 }
 
-/** Spends the creature's Action when it is its turn in a fight (the Utilize action); a player may not do this off its
- *  turn, and strict rules refuse a second Action. */
-function spendAction(state: GameState, actor: Actor, initiator: Initiator, what: string): void {
-  const combat = state.combat;
-  if (!combat.active || !combat.initiative.some((entry) => entry.actorId === actor.id)) return;
-  if (combat.turnActorId !== actor.id) {
-    if (initiator.role === "player") throw new GameAccessDeniedError(`${what} on ${actor.name}'s turn.`);
-    return;
-  }
-  if (combat.turn.actionUsed) {
-    const rule = "economy.action-used" as const;
-    if (
-      initiator.role === "player" &&
-      effectiveModeFor(combat, rule) === "strict" &&
-      !overrideCovers(combat.turn, rule)
-    )
-      throw new RulesBlockedError(rule, `${actor.name} has already used an Action this turn.`);
-    return;
-  }
-  state.combat = { ...combat, turn: { ...combat.turn, actionUsed: true } };
-}
-
-const carried = (actor: Actor, id: string) =>
-  actor.inventory.find((row) => row.quantity > 0 && catalogIdOf(row) === id);
-
 export type DoorUse = "pick" | "force" | "jam" | "pry" | "seal";
 
 export type DoorUseDeps = Readonly<{
@@ -168,7 +143,15 @@ export type DoorUseResult = Readonly<{
  */
 export function useDoor(
   state: GameState,
-  input: Readonly<{ wallId: string; actorId: string; how: DoorUse; helperId?: string; visibility: RollVisibility }>,
+  input: Readonly<{
+    wallId: string;
+    actorId: string;
+    how: DoorUse;
+    helperId?: string;
+    visibility: RollVisibility;
+    /** A Thief's Fast Hands: the use takes the Bonus Action. */
+    bonusAction?: boolean;
+  }>,
   initiator: Initiator,
   deps: DoorUseDeps
 ): DoorUseResult {
@@ -181,15 +164,23 @@ export function useDoor(
     throw new GameAccessDeniedError("Move your character next to the door to work on it.");
   if (!doorWithinReach(state, wall.id, [actor.id]))
     throw new GameAccessDeniedError("Move your character next to the door to work on it.");
-  if (input.how === "jam") return jamDoor(state, wall, actor, initiator);
   const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;
-  if (input.how === "seal") return sealDoor(state, wall, actor, definition, input.visibility, initiator, deps);
+  // Each use is the Utilize action in a fight, or with Fast Hands a Bonus Action.
+  if (input.bonusAction) requireFastHands(actor, definition);
+  const spend: Spend = (what) => {
+    spendUtilize(state, actor, initiator, what, { bonusAction: input.bonusAction === true, definition });
+  };
+  if (input.how === "jam") return jamDoor(state, wall, actor, spend);
+  if (input.how === "seal") return sealDoor(state, wall, actor, definition, input.visibility, initiator, deps, spend);
   if (wall.open === true) throw new CommandRejectedError("The door is already open.");
-  if (input.how === "pry") return pryDoor(state, wall, actor, definition, input.visibility, initiator, deps);
+  if (input.how === "pry") return pryDoor(state, wall, actor, definition, input.visibility, initiator, deps, spend);
   return input.how === "pick"
-    ? pickLock(state, wall, actor, definition, input.visibility, initiator, deps)
-    : forceDoor(state, wall, actor, definition, input, initiator, deps);
+    ? pickLock(state, wall, actor, definition, input.visibility, initiator, deps, spend)
+    : forceDoor(state, wall, actor, definition, input, initiator, deps, spend);
 }
+
+/** Spends one use of the door in a fight, named for its refusal. */
+type Spend = (what: string) => void;
 
 function rollFor(
   state: GameState,
@@ -224,7 +215,8 @@ function pickLock(
   definition: ActorDefinition | undefined,
   visibility: RollVisibility,
   initiator: Initiator,
-  deps: DoorUseDeps
+  deps: DoorUseDeps,
+  spend: Spend
 ): DoorUseResult {
   const tools = carried(actor, THIEVES_TOOLS);
   if (!tools) throw new CommandRejectedError(`${actor.name} needs Thieves' Tools to pick a lock.`);
@@ -234,7 +226,7 @@ function pickLock(
   if (!lock && door && arcaneLockBars(state, door, actor.id))
     throw new CommandRejectedError("The lock doesn't yield to Thieves' Tools.");
   if (!lock) throw new CommandRejectedError("There is no lock to pick on this door.");
-  spendAction(state, actor, initiator, "Pick the lock");
+  spend("Pick the lock");
   const plan = checkPlan(
     actor,
     definition,
@@ -256,7 +248,8 @@ function forceDoor(
   definition: ActorDefinition | undefined,
   input: Readonly<{ helperId?: string; visibility: RollVisibility }>,
   initiator: Initiator,
-  deps: DoorUseDeps
+  deps: DoorUseDeps,
+  spend: Spend
 ): DoorUseResult {
   const door = wall.door;
   if (door?.fastenings.some((fastening) => fastening.kind === "sealed"))
@@ -276,7 +269,7 @@ function forceDoor(
     throw new CommandRejectedError("Only another character can help, and only with a Portable Ram.");
   if (helper && !doorWithinReach(state, wall.id, [helper.id]))
     throw new CommandRejectedError(`${helper.name} must be next to the door to help with the ram.`);
-  spendAction(state, actor, initiator, "Force the door");
+  spend("Force the door");
   const base = checkPlan(
     actor,
     definition,
@@ -334,7 +327,8 @@ function pryDoor(
   definition: ActorDefinition | undefined,
   visibility: RollVisibility,
   initiator: Initiator,
-  deps: DoorUseDeps
+  deps: DoorUseDeps,
+  spend: Spend
 ): DoorUseResult {
   const tools = carried(actor, CARPENTERS_TOOLS) ?? carried(actor, SMITHS_TOOLS);
   if (!tools) throw new CommandRejectedError(`${actor.name} needs Carpenter's or Smith's Tools to pry a door open.`);
@@ -343,7 +337,7 @@ function pryDoor(
     throw new CommandRejectedError("The door is sealed shut. Break it down or shape the stone again.");
   if (door && arcaneLockBars(state, door, actor.id))
     throw new CommandRejectedError("The door won't move: magic holds it shut. Break it down or dispel the magic.");
-  spendAction(state, actor, initiator, "Pry the door open");
+  spend("Pry the door open");
   const roll = toolCheck(state, actor, definition, catalogIdOf(tools), "Pry a door open", visibility, initiator, deps);
   if (roll.total < TOOL_DOOR_DC)
     return { text: `${actor.name} fails to pry the door open.`, opened: false, total: roll.total };
@@ -360,12 +354,13 @@ function sealDoor(
   definition: ActorDefinition | undefined,
   visibility: RollVisibility,
   initiator: Initiator,
-  deps: DoorUseDeps
+  deps: DoorUseDeps,
+  spend: Spend
 ): DoorUseResult {
   if (wall.open === true) throw new CommandRejectedError("Close the door before sealing it.");
   if (!carried(actor, CARPENTERS_TOOLS))
     throw new CommandRejectedError(`${actor.name} needs Carpenter's Tools to seal a door.`);
-  spendAction(state, actor, initiator, "Seal the door");
+  spend("Seal the door");
   const roll = toolCheck(state, actor, definition, CARPENTERS_TOOLS, "Seal a door", visibility, initiator, deps);
   if (roll.total < TOOL_DOOR_DC)
     return { text: `${actor.name} fails to seal the door.`, opened: false, total: roll.total };
@@ -381,11 +376,11 @@ function sealDoor(
 
 /** SRD Spikes, Iron: "As a Utilize action, you can use a blunt object ... to hammer a spike into wood ... to jam a door
  *  shut." The door must be closed; one spike of the bundle is used. */
-function jamDoor(state: GameState, wall: VisionWall, actor: Actor, initiator: Initiator): DoorUseResult {
+function jamDoor(state: GameState, wall: VisionWall, actor: Actor, spend: Spend): DoorUseResult {
   if (wall.open === true) throw new CommandRejectedError("Close the door before jamming it.");
   const spikes = carried(actor, IRON_SPIKES);
   if (!spikes) throw new CommandRejectedError(`${actor.name} needs Iron Spikes to jam a door.`);
-  spendAction(state, actor, initiator, "Jam the door");
+  spend("Jam the door");
   useOneSpike(actor, spikes);
   writeDoor(state, wall.id, (current) => ({
     ...current,

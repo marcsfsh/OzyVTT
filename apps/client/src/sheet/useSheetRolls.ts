@@ -3,7 +3,7 @@ import type { AbilityId, ActorDerivedSheet, CheckRollOutcome, CheckSubject, Roll
 import { parseDiceFormula } from "@vtt/rules-5e";
 import { usePrompt } from "../components/feedback";
 import { useRollPreference } from "../dice/roll-preference";
-import { command } from "../lib/command";
+import { command, type Reply } from "../lib/command";
 import { modeWords } from "../encounter/roll-mode-notes";
 import { withArticle } from "@vtt/domain";
 import { noteSheetRolls } from "./sheet-roll-ids";
@@ -99,7 +99,14 @@ export function useSheetRolls(
     return face;
   };
 
-  const rollCheck = async (subject: CheckSubject, label: string, findActorId?: string, dc?: number) => {
+  const rollCheck = async (
+    subject: CheckSubject,
+    label: string,
+    findActorId?: string,
+    dc?: number,
+    /** A Thief's Fast Hands makes a Sleight of Hand check as a Bonus Action. */
+    options: Readonly<{ bonusAction?: boolean }> = {}
+  ) => {
     const face = rollMode === "manual" ? await typedFace(`Roll ${label}`) : undefined;
     if (face === null) return;
     const fitting = declared.filter((situation) => situationFits(situation, subject)).map((entry) => entry.situation);
@@ -113,8 +120,14 @@ export function useSheetRolls(
       ...(face !== undefined ? { face } : {}),
       ...(findActorId ? { findActorId } : {}),
       ...(dc !== undefined ? { dc } : {}),
-      ...(fitting.length > 0 ? { situations: fitting } : {})
+      ...(fitting.length > 0 ? { situations: fitting } : {}),
+      ...(options.bonusAction ? { bonusAction: true } : {})
     });
+    settleCheck(result, label, fitting);
+  };
+
+  /** What a check's reply leaves on the sheet: the situations it used, the line, or the refusal. */
+  const settleCheck = (result: Reply<"check:roll">, label: string, fitting: readonly string[]) => {
     setRolling(false);
     if (result.ok && fitting.length > 0)
       setDeclared((held) => held.filter((entry) => !fitting.includes(entry.situation)));
@@ -123,6 +136,35 @@ export function useSheetRolls(
     if (!result.ok) onFeedback(result.message ?? "The check was refused.");
     else if (result.hiddenFromRoller) onFeedback(`${label}: rolled for the GM's eyes only.`);
     else if (result.check) (result.check.success !== null ? onFeedback : said)(checkLine(result.check));
+  };
+
+  /** A tool's or gear's printed Utilize use: the server takes its check, its DC and what it costs in a fight. */
+  const rollUse = async (
+    use: Readonly<{
+      tool?: string;
+      item?: string;
+      index: number;
+      ability: AbilityId;
+      label: string;
+      bonusAction?: boolean;
+      forActorId?: string;
+    }>
+  ) => {
+    const face = rollMode === "manual" ? await typedFace(`Roll ${use.label}`) : undefined;
+    if (face === null) return;
+    setRolling(true);
+    const result = await command("check:roll", {
+      actorId,
+      ability: use.ability,
+      ...(use.tool !== undefined ? { tool: use.tool } : {}),
+      ...(use.item !== undefined ? { item: use.item } : {}),
+      use: use.index,
+      visibility,
+      ...(face !== undefined ? { face } : {}),
+      ...(use.bonusAction ? { bonusAction: true } : {}),
+      ...(use.forActorId !== undefined ? { forActorId: use.forActorId } : {})
+    });
+    settleCheck(result, use.label, []);
   };
 
   /** Rerolls the check this sheet rolled last: Heroic Inspiration for a player, free for the GM. A typed check is
@@ -235,6 +277,7 @@ export function useSheetRolls(
     declared,
     toggleSituation,
     rollCheck,
+    rollUse,
     rerollCheck,
     answerCheck,
     rollSave,

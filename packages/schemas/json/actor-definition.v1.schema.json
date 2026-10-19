@@ -11524,6 +11524,32 @@
           "maxLength": 80,
           "pattern": "^[a-z0-9-]+$"
         },
+        "scribed": {
+          "type": "object",
+          "properties": {
+            "saveDc": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 40
+            },
+            "attackBonus": {
+              "type": "integer",
+              "minimum": -5,
+              "maximum": 30
+            },
+            "casterLevel": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            }
+          },
+          "required": [
+            "saveDc",
+            "attackBonus",
+            "casterLevel"
+          ],
+          "additionalProperties": false
+        },
         "ammunitionLeft": {
           "type": "integer",
           "minimum": 0,

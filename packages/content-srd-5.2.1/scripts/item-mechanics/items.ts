@@ -2800,7 +2800,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       }
     ]
   },
-  // `bead-of-nourishment` - no hunger model.
+  // `bead-of-nourishment` needs no overlay: survival.ts eats a carried bead as a day of Rations.
 
   /**
    * The four elemental-commanding items (`bowl-of-commanding-water-elementals`,

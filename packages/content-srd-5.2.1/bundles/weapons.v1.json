@@ -6,6 +6,7 @@
   "melee": true,
   "versatileDice": "1d10",
   "improvised": false,
+  "costGp": 10,
   "mastery": "topple",
   "properties": [
    "versatile"
@@ -24,6 +25,7 @@
   "melee": false,
   "ammunition": "needle",
   "improvised": false,
+  "costGp": 10,
   "mastery": "vex",
   "properties": [
    "ammunition",
@@ -42,6 +44,7 @@
   "category": "simple",
   "melee": true,
   "improvised": false,
+  "costGp": 0.1,
   "mastery": "slow",
   "properties": [
    "light"
@@ -59,6 +62,7 @@
   "category": "simple",
   "melee": true,
   "improvised": false,
+  "costGp": 2,
   "mastery": "nick",
   "properties": [
    "finesse",
@@ -78,6 +82,7 @@
   "category": "simple",
   "melee": false,
   "improvised": false,
+  "costGp": 0.05,
   "mastery": "vex",
   "properties": [
    "finesse",
@@ -96,6 +101,7 @@
   "category": "martial",
   "melee": true,
   "improvised": false,
+  "costGp": 10,
   "mastery": "sap",
   "properties": [],
   "damage": {
@@ -111,6 +117,7 @@
   "category": "martial",
   "melee": true,
   "improvised": false,
+  "costGp": 20,
   "mastery": "graze",
   "properties": [
    "heavy",
@@ -130,6 +137,7 @@
   "category": "martial",
   "melee": true,
   "improvised": false,
+  "costGp": 30,
   "mastery": "cleave",
   "properties": [
    "heavy",
@@ -148,6 +156,7 @@
   "category": "simple",
   "melee": true,
   "improvised": false,
+  "costGp": 0.2,
   "mastery": "push",
   "properties": [
    "two-handed"
@@ -165,6 +174,7 @@
   "category": "martial",
   "melee": true,
   "improvised": false,
+  "costGp": 50,
   "mastery": "graze",
   "properties": [
    "heavy",
@@ -183,6 +193,7 @@
   "category": "martial",
   "melee": true,
   "improvised": false,
+  "costGp": 20,
   "mastery": "cleave",
   "properties": [
    "heavy",
@@ -203,6 +214,7 @@
   "melee": false,
   "ammunition": "bolt",
   "improvised": false,
+  "costGp": 75,
   "mastery": "vex",
   "properties": [
    "ammunition",
@@ -222,6 +234,7 @@
   "category": "simple",
   "melee": true,
   "improvised": false,
+  "costGp": 5,
   "mastery": "vex",
   "properties": [
    "light",
@@ -241,6 +254,7 @@
   "melee": false,
   "ammunition": "bolt",
   "improvised": false,
+  "costGp": 50,
   "mastery": "push",
   "properties": [
    "ammunition",
@@ -261,6 +275,7 @@
   "category": "simple",
   "melee": true,
   "improvised": false,
+  "costGp": 0.5,
   "mastery": "slow",
   "properties": [
    "thrown"
@@ -278,6 +293,7 @@
   "category": "martial",
   "melee": true,
   "improvised": false,
+  "costGp": 10,
   "mastery": "topple",
   "properties": [
    "heavy",
@@ -298,6 +314,7 @@
   "melee": false,
   "ammunition": "bolt",
   "improvised": false,
+  "costGp": 25,
   "mastery": "slow",
   "properties": [
    "ammunition",
@@ -317,6 +334,7 @@
   "category": "simple",
   "melee": true,
   "improvised": false,
+  "costGp": 2,
   "mastery": "nick",
   "properties": [
    "light",
@@ -336,6 +354,7 @@
   "melee": false,
   "ammunition": "arrow",
   "improvised": false,
+  "costGp": 50,
   "mastery": "slow",
   "properties": [
    "ammunition",
@@ -356,6 +375,7 @@
   "melee": true,
   "versatileDice": "1d10",
   "improvised": false,
+  "costGp": 15,
   "mastery": "sap",
   "properties": [
    "versatile"
@@ -373,6 +393,7 @@
   "category": "simple",
   "melee": true,
   "improvised": false,
+  "costGp": 5,
   "mastery": "sap",
   "properties": [],
   "damage": {
@@ -388,6 +409,7 @@
   "category": "martial",
   "melee": true,
   "improvised": false,
+  "costGp": 10,
   "mastery": "topple",
   "properties": [
    "heavy",
@@ -406,6 +428,7 @@
   "category": "martial",
   "melee": true,
   "improvised": false,
+  "costGp": 15,
   "mastery": "sap",
   "properties": [],
   "damage": {
@@ -422,6 +445,7 @@
   "melee": false,
   "ammunition": "firearm-bullet",
   "improvised": false,
+  "costGp": 500,
   "mastery": "slow",
   "properties": [
    "ammunition",
@@ -441,6 +465,7 @@
   "category": "martial",
   "melee": true,
   "improvised": false,
+  "costGp": 5,
   "mastery": "push",
   "properties": [
    "heavy",
@@ -461,6 +486,7 @@
   "melee": false,
   "ammunition": "firearm-bullet",
   "improvised": false,
+  "costGp": 250,
   "mastery": "vex",
   "properties": [
    "ammunition",
@@ -480,6 +506,7 @@
   "melee": true,
   "versatileDice": "1d8",
   "improvised": false,
+  "costGp": 0.2,
   "mastery": "topple",
   "properties": [
    "versatile"
@@ -497,6 +524,7 @@
   "category": "martial",
   "melee": true,
   "improvised": false,
+  "costGp": 25,
   "mastery": "vex",
   "properties": [
    "finesse"
@@ -514,6 +542,7 @@
   "category": "martial",
   "melee": true,
   "improvised": false,
+  "costGp": 25,
   "mastery": "nick",
   "properties": [
    "finesse",
@@ -533,6 +562,7 @@
   "melee": false,
   "ammunition": "arrow",
   "improvised": false,
+  "costGp": 25,
   "mastery": "vex",
   "properties": [
    "ammunition",
@@ -551,6 +581,7 @@
   "category": "martial",
   "melee": true,
   "improvised": false,
+  "costGp": 10,
   "mastery": "vex",
   "properties": [
    "finesse",
@@ -569,6 +600,7 @@
   "category": "simple",
   "melee": true,
   "improvised": false,
+  "costGp": 1,
   "mastery": "nick",
   "properties": [
    "light"
@@ -587,6 +619,7 @@
   "melee": false,
   "ammunition": "sling-bullet",
   "improvised": false,
+  "costGp": 0.1,
   "mastery": "slow",
   "properties": [
    "ammunition"
@@ -605,6 +638,7 @@
   "melee": true,
   "versatileDice": "1d8",
   "improvised": false,
+  "costGp": 1,
   "mastery": "sap",
   "properties": [
    "thrown",
@@ -624,6 +658,7 @@
   "melee": true,
   "versatileDice": "1d10",
   "improvised": false,
+  "costGp": 5,
   "mastery": "topple",
   "properties": [
    "thrown",
@@ -643,6 +678,7 @@
   "melee": true,
   "versatileDice": "1d10",
   "improvised": false,
+  "costGp": 5,
   "mastery": "sap",
   "properties": [
    "versatile"
@@ -661,6 +697,7 @@
   "melee": true,
   "versatileDice": "1d10",
   "improvised": false,
+  "costGp": 15,
   "mastery": "push",
   "properties": [
    "versatile"
@@ -678,6 +715,7 @@
   "category": "martial",
   "melee": true,
   "improvised": false,
+  "costGp": 2,
   "mastery": "slow",
   "properties": [
    "finesse",
