@@ -430,7 +430,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   unconscious: condition("unconscious"),
   "unoccupied-space": enforced("movement-rules.ts ends a move only in a space no other creature fills."),
   utilize: guided(
-    "utilize.ts spends the action in a fight, on the user's own turn, and nothing outside one. A Shield donned or doffed (held-items.ts), a door worked on (doors.ts) and a tool's or gear's Utilize use from the sheet (tool-uses.ts) take it, and a use needs the item in the pack. What the object does is the GM's."
+    "In a fight the Utilize action takes the user's action on its own turn, and outside one it takes nothing. A Shield donned or doffed (held-items.ts), a door worked on (doors.ts) and a tool's or gear's Utilize use from the sheet (tool-uses.ts) take it, and a use needs the item in the pack. What the object does is the GM's."
   ),
   vulnerability: enforced("hit-points.ts doubles damage of a type the creature is vulnerable to, once per instance."),
   weapon: reference("A definition. Each weapon's own row under Weapons says what the app does with it."),
@@ -449,7 +449,7 @@ const breath = enforced(
 );
 /** What every tool's Utilize uses do on the sheet. */
 const TOOL_USES =
-  "The sheet rolls its check with the ability it names and offers its Utilize uses at their printed DCs (utilize.ts); a use rolled in a fight takes the Utilize action and needs the tool in the pack (tool-uses.ts).";
+  "The sheet rolls its check with the ability it names and offers its Utilize uses at their printed DCs; a use rolled in a fight takes the Utilize action and needs the tool in the pack (tool-uses.ts).";
 /** A tool with a Craft line: its uses, and crafting.ts making what the line lists. */
 const toolCraft = guided(
   `${TOOL_USES} crafting.ts makes what its Craft line lists in downtime, for half the price in raw materials and a day of 8 hours per 10 GP, helpers with the proficiency dividing the days. What a check finds is the GM's.`
