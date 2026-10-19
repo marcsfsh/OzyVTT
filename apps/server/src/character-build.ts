@@ -41,6 +41,7 @@ import {
   spellSlotsOf,
   surveyForBuild,
   type BuildClass,
+  type ChoiceOffer,
   type CharacterFeatureOrigin
 } from "./character-offers.js";
 import type { ContentView } from "./content-library.js";
@@ -974,12 +975,36 @@ export function storedHitPointRolls(choices: readonly CharacterChoice[], level: 
   return rolls;
 }
 
+/** The ledger rows a pick with a default answer takes when the ledger holds none (the High Elf's Prestidigitation). */
+function defaultedRows(offers: readonly ChoiceOffer[]): CharacterChoice[] {
+  return offers.flatMap((offer) =>
+    offer.defaultId !== null && offer.taken.length === 0 && offer.options.has(offer.defaultId)
+      ? [
+          {
+            level: offer.levels[0] ?? 1,
+            ...(offer.classId ? { classId: offer.classId } : {}),
+            kind: offer.kind,
+            id: offer.defaultId,
+            ...(offer.featureId ? { payload: { featureId: offer.featureId } } : {})
+          }
+        ]
+      : []
+  );
+}
+
 export function buildCharacterDefinition(
-  input: CharacterCreateRequestInput,
+  requested: CharacterCreateRequestInput,
   library: ContentView,
   policy: BuilderPolicy
 ): ActorDefinition {
-  const survey = surveyForBuild(input, library, policy);
+  let input = requested;
+  let survey = surveyForBuild(input, library, policy);
+  // A pick the ledger doesn't answer takes its default, which the stored ledger then records.
+  const defaults = defaultedRows(survey.offers);
+  if (defaults.length > 0) {
+    input = { ...input, choices: [...input.choices, ...defaults] };
+    survey = surveyForBuild(input, library, policy);
+  }
   const {
     offers,
     classes,

@@ -93,6 +93,23 @@ export function builderOffers(request: BuilderOffersRequest, library: ContentVie
     offers = next;
     if (settled) break;
   }
+  // A pick with a default starts on it, so the High Elf's card shows Prestidigitation chosen.
+  const defaults = defaultAnswers(
+    surveyDraft(
+      {
+        ...identity,
+        ...subclassesOf(offers, picks, request.classId),
+        choices: rowsOf(offers, pruned(picks, offers), increases)
+      },
+      library
+    )
+  );
+  for (const [key, id] of defaults)
+    if (
+      !(picks[key]?.length ?? 0) &&
+      offers.some((offer) => offer.key === key && offer.options.some((option) => option.id === id))
+    )
+      picks = { ...picks, [key]: [id] };
   picks = pruned(picks, offers);
   const keys = new Set(offers.map((offer) => offer.key));
   increases = Object.fromEntries(Object.entries(increases).filter(([key]) => keys.has(key)));
@@ -152,6 +169,13 @@ export const subclassesInLedger = (rows: readonly CharacterChoice[], startingCla
     rows.filter((row) => row.kind === "subclass").map((row) => ({ classId: row.classId ?? null, id: row.id })),
     startingClassId
   );
+
+/** The answer each pick with a default starts on, by its card's key. */
+function defaultAnswers(survey: DraftSurvey): Map<string, string> {
+  return new Map(
+    survey.offers.flatMap((offer) => (offer.defaultId !== null ? [[offer.key, offer.defaultId] as const] : []))
+  );
+}
 
 /** Each offer's answers that it still takes: a listed option (or the ASI shorthand), within capacity. */
 function pruned(picks: Picks, offers: readonly BuilderOffer[]): Record<string, readonly string[]> {

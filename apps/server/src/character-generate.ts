@@ -390,6 +390,9 @@ function answerOffer(
     // Cast with the best of the abilities offered.
     const best = Math.max(...legal.map((id) => scores[id as Ability] ?? 0));
     preferred = legal.filter((id) => (scores[id as Ability] ?? 0) === best);
+  } else if (offer.defaultId !== null && legal.includes(offer.defaultId)) {
+    // A pick with a default starts on it ("You know the Prestidigitation cantrip").
+    preferred = [offer.defaultId];
   } else if (offer.fromSpellbook) {
     // Spell Mastery and Signature Spells pick "spells in your spellbook": the class's own spell picks, filled first.
     const book = new Set(

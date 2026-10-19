@@ -2043,6 +2043,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:signature-spells": enforced(
     "Two level 3 spells from the spellbook (spellbook.ts checks the pick as a build or a level up makes it) are always prepared, and each is cast once at level 3 with no slot, back on a Short or Long Rest, on its own counter (character-build.ts)."
   ),
+  "feature:high-elf-cantrip": enforced(
+    "The High Elf knows Prestidigitation, a pick the build fills when the ledger names none (character-build.ts), or the Wizard cantrip it swapped in during the step a Long Rest opens (ledger-rechoice.ts)."
+  ),
   "feature:evocation-savant": enforced(
     "Two Evocation spells of level 2 or lower go into the spellbook at Wizard 3 (character-build.ts), and one more Evocation spell goes in free each time a new level of spell slots opens, beside the two a Wizard level gives (spell-choices.ts)."
   ),

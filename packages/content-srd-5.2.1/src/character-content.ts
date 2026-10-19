@@ -596,6 +596,10 @@ const featureChoiceBase = {
     .describe(
       'Floor on a spell pick\'s level, the sibling of maxSpellLevel. Mystic Arcanum reads "one level 6 Warlock spell"; both bounds at 6 make the pick exact'
     ),
+  /** The answer the build takes when the ledger holds none (the High Elf's Prestidigitation, swapped later). */
+  default: ContentIdSchema.optional().describe(
+    "The answer the build takes when the ledger holds none (a High Elf knows Prestidigitation until a Long Rest swaps it), so a sheet made before the pick existed still builds and the builder starts on it"
+  ),
   /** Only spells cast with this casting time (Spell Mastery: "spells ... that have a casting time of an action"). */
   castingTime: z
     .enum(["action", "bonus-action", "reaction"])

@@ -222,6 +222,8 @@ export type ChoiceOffer = {
   maximum: number | null;
   /** Its picks must be in the character's spellbook (Spell Mastery), which the commands that make them check. */
   fromSpellbook: boolean;
+  /** The answer the build takes when the ledger holds none (the High Elf's Prestidigitation). */
+  defaultId: string | null;
   label: string;
   /** The character level(s) this offer's picks belong to, one per grant (`[4, 8, 12, 16]` for an ASI).
    *  Not used for validation; writers record it so `level-ledger.ts` can prefill level-up. */
@@ -262,6 +264,7 @@ function offerOf(
     minSpellLevel: null,
     maximum: null,
     fromSpellbook: false,
+    defaultId: null,
     repeatable: false,
     levels: [1],
     classId: null,
@@ -1112,6 +1115,7 @@ function placeChoices(
         minSpellLevel: choice.minSpellLevel ?? null,
         maximum: choice.maximum ?? null,
         fromSpellbook: choice.fromSpellbook === true,
+        defaultId: choice.default ?? null,
         // The ability pick shares its record with the lineage or the feat's spells, so it names itself.
         label:
           choice.kind === SPELLCASTING_ABILITY_KIND
