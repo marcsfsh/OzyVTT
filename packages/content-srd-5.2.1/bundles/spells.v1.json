@@ -10321,6 +10321,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
    "grant": {
     "modifiers": [],
@@ -10329,13 +10332,16 @@
     "concentration": false,
     "name": "Etherealness",
     "tags": [
-     "off-plane"
+     "ethereal",
+     "ethereal-shunt"
     ],
-    "target": "self",
+    "target": "self-and-targets",
     "duration": {
      "type": "manual"
     }
-   }
+   },
+   "willingTargets": true,
+   "companionFeet": 10
   },
   "classes": [
    "bard",

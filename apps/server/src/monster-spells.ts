@@ -85,9 +85,14 @@ function castOf(
     bearersDc: false,
     modifier: abilityModifier(definition.abilityScores[casts.ability])
   });
+  const grants =
+    mechanics.grants && casts.grantTags
+      ? { grants: { ...mechanics.grants, tags: [...new Set([...mechanics.grants.tags, ...casts.grantTags])] } }
+      : {};
   const cast: ActorAction = {
     ...action,
     ...mechanics,
+    ...grants,
     spellId: spell.id,
     ...castAreaOf(spell, mechanics),
     // A reaction spell's trigger rides a reaction's cast (Protective Magic's Counterspell), so the table offers it.

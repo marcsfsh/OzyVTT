@@ -778,6 +778,7 @@ export const actionCommands = [
       const aimed =
         listed.grants?.target === "target" ||
         listed.grants?.target === "targets" ||
+        listed.grants?.target === "self-and-targets" ||
         (listed.healing !== undefined && listed.healing.self !== true) ||
         listed.endsConditions !== undefined;
       const named = targetIds && targetIds.length > 0 ? targetIds : !rollsOnTargets && aimed ? [actorId] : [];

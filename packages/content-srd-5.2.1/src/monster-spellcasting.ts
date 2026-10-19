@@ -173,6 +173,10 @@ export function withSpellcasting(
       castsSpells: {
         ...numbers,
         ...(self ? { self: true as const } : {}),
+        // A ghost's Etherealness: "The ghost is visible on the Material Plane while on the Border Ethereal".
+        ...(self && /\bvisible on the Material Plane while on the Border Ethereal\b/.test(body)
+          ? { grantTags: ["seen-across-planes"] }
+          : {}),
         spells: spells.map(({ name, atLevel, spellId }) => ({
           id: self ? action.id : entryId(action.id, spellId, atLevel),
           spellId,

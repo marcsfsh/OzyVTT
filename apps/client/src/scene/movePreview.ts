@@ -19,6 +19,9 @@ type Point = Readonly<{ x: number; y: number }>;
 type Rect = Readonly<{ x: number; y: number; width: number; height: number }>;
 type MapActor = GmActor | PlayerActor;
 
+/** On the Border Ethereal (an effect tagged `ethereal`): it and the world it overlaps pass through each other. */
+const ethereal = (actor: MapActor) => actor.effects.some((effect) => effect.tags.includes("ethereal"));
+
 /** A wall, closed door or window that bars a move, in image pixels. */
 export type MoveWall = Readonly<{ a: Point; b: Point }>;
 
@@ -142,6 +145,7 @@ export function previewMove(
     if (token.actorId === moverId || !token.position || input.carried?.includes(token.actorId)) continue;
     const occupant = actorsById.get(token.actorId);
     if (!mover || !occupant || occupant.visibility === "gm-only") continue;
+    if (ethereal(mover) !== ethereal(occupant)) continue;
     const occupantLow = token.altitudeFeet ?? 0;
     if (!spansOverlap(lowFeet, highFeet, occupantLow, occupantLow + spaceHeightCells(token.sizeCells) * feetPerCell))
       continue;

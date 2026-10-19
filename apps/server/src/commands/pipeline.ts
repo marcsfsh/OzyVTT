@@ -227,7 +227,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
               commandId: id
             })
           : [];
-      const planes = sameMap ? settlePlanes(draft, geometry) : [];
+      const planes = sameMap ? settlePlanes(draft, geometry, deps) : [];
       events = [...held, ...pursued, ...compelledMoves(draft, deps), ...planes, ...settleFallsIn(draft, deps)];
     });
     if (result.duplicate) return;

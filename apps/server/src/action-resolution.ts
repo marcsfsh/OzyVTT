@@ -704,7 +704,13 @@ function tapTargeting(
   // A shape-shift on its user (Wild Shape, a werewolf's Shape-Shift), and leaving a form, aim at no one.
   if (action.endsForm || (action.shapeShift && !action.shapeShift.onTargets && !action.save)) return "none";
   if (action.attack || action.grants?.target === "target" || action.targets?.count === 1) return "single";
-  if (action.save || action.damage.length > 0 || action.grants?.target === "targets") return "multi";
+  if (
+    action.save ||
+    action.damage.length > 0 ||
+    action.grants?.target === "targets" ||
+    action.grants?.target === "self-and-targets"
+  )
+    return "multi";
   if (action.healing) return action.healing.self ? "none" : action.healing.divided ? "multi" : "single";
   // A touch that ends a condition picks who it touches (Lesser Restoration).
   if (action.endsConditions) return "single";

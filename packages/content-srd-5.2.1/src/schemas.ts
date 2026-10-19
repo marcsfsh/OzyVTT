@@ -337,6 +337,9 @@ export const SpellEffectSchema = z
     /** Its target is the caster or a willing creature, which the server takes to be one on the caster's side (Light:
      *  "an object that isn't being worn or carried by someone else"; Nondetection: "a willing creature"). */
     willingTargets: z.literal(true).optional(),
+    /** A spell of Self range whose other targets stand within this many feet of the caster as it casts (Etherealness from
+     *  a higher slot: "The creatures must be within 10 feet of you"). */
+    companionFeet: z.number().int().min(5).max(60).optional(),
     /** Feet its area's size grows for each slot level above the spell's (Fog Cloud's radius: 20; Confusion's: 5). */
     areaPerSlot: z.number().int().min(5).max(100).optional()
   })

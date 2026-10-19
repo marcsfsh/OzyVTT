@@ -13,7 +13,9 @@ import {
   markPolygons,
   type ExploredGrid
 } from "./explored.js";
-import type { SightContent } from "./senses.js";
+import { sensesOf, type SightContent } from "./senses.js";
+import { isEthereal, needsEtherealSight, seesIntoEthereal } from "../ethereal.js";
+import { distance } from "./geometry.js";
 import { derivedUuid } from "./cast-sight.js";
 import { sceneSight, sightIsCached, wallPieces } from "./sight.js";
 
@@ -104,6 +106,31 @@ function stagedUnseen(state: GameState): Set<string> {
   return staged;
 }
 
+/** With dynamic vision off, the creatures on the Border Ethereal that none of `viewerIds` sees into that plane to
+ *  perceive: Truesight or See Invisibility by the distance between the tokens, or a viewer there itself. Dynamic vision
+ *  answers the same question from the map. */
+function etherealUnseen(state: GameState, viewerIds: readonly string[], content: SightContent): string[] {
+  const ethereal = state.actors.filter((actor) => isEthereal(actor));
+  if (ethereal.length === 0) return [];
+  const pixelsPerFoot = state.combat.vision?.measure?.pixelsPerFoot;
+  const at = (actorId: string) => state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
+  const viewers = viewerIds.flatMap((viewerId) => {
+    const viewer = state.actors.find((actor) => actor.id === viewerId);
+    return viewer ? [viewer] : [];
+  });
+  return ethereal
+    .filter((target) => {
+      const where = at(target.id);
+      return !viewers.some((viewer) => {
+        if (viewer.id === target.id || !needsEtherealSight(viewer, target)) return true;
+        const from = at(viewer.id);
+        const feet = pixelsPerFoot && from && where ? distance(from, where) / pixelsPerFoot : null;
+        return seesIntoEthereal(sensesOf(state, viewer, content), feet);
+      });
+    })
+    .map((actor) => actor.id);
+}
+
 const placed = (state: GameState, actorId: string) =>
   state.combat.tokens.some((token) => token.actorId === actorId && token.position !== null);
 const inPlay = (actor: Actor) => actor.visibility === "public" && !actor.archived;
@@ -184,6 +211,8 @@ export function audienceSight(
     const unknown = (actorId: string) => kinds.get(actorId) !== "player-character" && !known.has(actorId);
     for (const actorId of fogged) if (unknown(actorId)) hidden.add(actorId);
     for (const actorId of unplacedUnderFog(state.combat)) if (unknown(actorId)) hidden.add(actorId);
+    if (!sight.enabled)
+      for (const actorId of etherealUnseen(state, viewerIds, content)) if (unknown(actorId)) hidden.add(actorId);
     for (const actorId of known) hidden.delete(actorId);
     if (!sight.enabled) return hidden.size === 0 && fogged.size === 0 ? OFF : { ...OFF, hidden, fogged, viewerIds };
     const perceived = new Set([...sight.perceivedBy(viewerIds), ...known]);

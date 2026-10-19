@@ -2732,7 +2732,9 @@ export type GrantOption = z.infer<typeof GrantOptionSchema>;
 /** An action's grant: the effect shape, which may also go to every creature the action targets (Bless), land only
  *  when its attack hits (Guiding Bolt's light), and add to AC while it lasts (Shield of Faith). */
 export const ActionGrantSchema = EffectGrantSchema.extend({
-  target: z.enum(["self", "target", "targets"]).default("self"),
+  /** Who receives it: its user, the action's one target, each creature it targets, or its user and each creature it
+   *  targets beside (Etherealness from a higher slot: "up to three willing creatures (including yourself)"). */
+  target: z.enum(["self", "target", "targets", "self-and-targets"]).default("self"),
   /** Taken again while what it gave lasts, it ends that instead (a phase spider's Ethereal Jaunt: "from the Material
    *  Plane to the Ethereal Plane or vice versa"). */
   toggles: z.literal(true).optional(),
@@ -3983,6 +3985,9 @@ export const CastsSpellsSchema = z
     saveDc: z.number().int().min(1).max(40),
     attackBonus: z.number().int().min(-10).max(30),
     self: z.literal(true).optional(),
+    /** Tags its one cast adds to the effect the spell leaves on it (a ghost's Etherealness: `seen-across-planes`, as
+     *  "the ghost is visible on the Material Plane while on the Border Ethereal"). */
+    grantTags: z.array(EffectTagSchema).min(1).max(2).optional(),
     /** The components its casts go without ("requiring no Material components"; "no spell components" is all three). */
     waives: z
       .array(z.enum(["verbal", "somatic", "material"]))

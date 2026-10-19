@@ -19,6 +19,7 @@ import { sizeAtMost } from "./resolution/context.js";
 import { isNimble, opensItsSpace } from "./space-sharing.js";
 import { HIDDEN_SOURCE } from "./hidden-source.js";
 import { ridesWith } from "./mounts.js";
+import { isEthereal, onOtherPlanes } from "./ethereal.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
 import { burrowsThroughWalls, openingPassage, stopsOnlyInEnemySpace } from "./wall-passage.js";
@@ -227,6 +228,7 @@ export function movementStatus(
     ...(incorporeal(definition) ? { throughWalls: true } : {}),
     ...(openingPassage(definition) ? { opening: openingPassage(definition)! } : {}),
     ...(burrowsThroughWalls(definition) ? { burrowsThroughWalls: burrowsThroughWalls(definition)! } : {}),
+    ...(actor && isEthereal(actor) ? { ethereal: true } : {}),
     ...(actor && freeOfDifficultTerrain(actor) ? { ignoresDifficultTerrain: true } : {})
   };
 }
@@ -411,6 +413,7 @@ function endsInOccupiedSpace(
     if (moverToken && !sharesHeight(moverToken, token, feetPerCell, input.toAltitudeFeet ?? 0)) return false;
     if (sharesSpace(state, token.actorId, input, true) || intangible(state, token.actorId)) return false;
     const occupant = state.actors.find((actor) => actor.id === token.actorId);
+    if (occupant && moverActor && onOtherPlanes(occupant, moverActor)) return false;
     if (engulfing !== undefined && sizeAtMost(occupant?.size, engulfing)) return false;
     if (enemiesOnly && moverActor && occupant && areEnemies(moverActor, occupant, input.resolveDefinition))
       return false;
@@ -520,8 +523,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     );
   // Height changes by flying, climbing, jumping or teleporting; a creature in the air moves by flying.
   const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
+  // Etherealness: "you can move in any direction".
   const heightBar =
-    counted || input.byPlayer || grant
+    (counted || input.byPlayer || grant) && !isEthereal(mover)
       ? heightRefusal(mover.name, mode, fromAltitude, toAltitude, input.wasAirborne ?? moverToken?.airborne)
       : null;
   if (heightBar) police(state, input, "movement.altitude", heightBar, outcome);
@@ -617,7 +621,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     );
     charge = straight();
   }
-  const moved = charge?.feet ?? null;
+  // "If you move up or down, every foot of movement costs an extra foot" on the Border Ethereal.
+  const climbFeet = isEthereal(mover) ? Math.abs(toAltitude - fromAltitude) : 0;
+  const moved = charge ? charge.feet + climbFeet : null;
   const difficultFeet = charge?.difficultFeet ?? 0;
   if (moved !== null && budget !== null && moved > 0.05) {
     // A readied move is its own: up to its Speed, whatever the creature whose turn it is has moved.
@@ -810,7 +816,9 @@ function costOptions(
       ...(incorporeal(moverDefinition) || (travel === "burrow" && burrowsThroughWalls(moverDefinition) === "half")
         ? { throughWalls: true }
         : {}),
-      ...(travel === "burrow" && burrowsThroughWalls(moverDefinition) === "free" ? { throughWallsFree: true } : {}),
+      ...((travel === "burrow" && burrowsThroughWalls(moverDefinition) === "free") || isEthereal(mover)
+        ? { throughWallsFree: true }
+        : {}),
       // Amorphous, Compression and the elementals' forms slip through any gap; a swarm through one a Tiny creature fits.
       ...(openingPassage(moverDefinition) ? { opening: openingPassage(moverDefinition)! } : {}),
       ...(freeOfDifficultTerrain(mover) ? { ignoresDifficult: true } : {}),
@@ -959,6 +967,7 @@ function openOpportunityAttacks(
     const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (
       !enemy ||
+      onOtherPlanes(mover, enemy) ||
       !areEnemies(mover, enemy, input.resolveDefinition) ||
       state.combat.reactionsUsed.includes(enemy.id) ||
       isIncapacitated(enemy) ||

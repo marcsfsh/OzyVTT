@@ -4,6 +4,7 @@ import { crossesSpace, mapCover } from "../cover.js";
 import { distance } from "./geometry.js";
 import { definitionOf, sensesOf, type Senses, type SightContent } from "./senses.js";
 import { sceneSight, type LightAt, type Obscurement } from "./sight.js";
+import { needsEtherealSight, seesIntoEthereal } from "../ethereal.js";
 
 /**
  * The questions the rules ask of sight (SRD 5.2.1): "a creature you can see", "while the source of fear is within line
@@ -79,6 +80,9 @@ export function sightRules(
     const senses = sensesFor(viewerId);
     const feet = measure(viewerId, targetId);
     const reaches = (range: number) => range > 0 && feet !== null && feet <= range + RANGE_SLACK_FEET;
+    // A creature on the Border Ethereal is seen only by a sense that sees into that plane.
+    if (needsEtherealSight(viewer, target))
+      return !has(viewer, "blinded") && senses !== null && seesIntoEthereal(senses, feet);
     const blindsight = senses !== null && reaches(senses.blindsight);
     if (has(viewer, "blinded")) return blindsight;
     if (has(target, "invisible") && !outlined(target))

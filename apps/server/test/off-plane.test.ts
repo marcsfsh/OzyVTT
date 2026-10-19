@@ -8,7 +8,7 @@ import { applyFailureEffect } from "../src/saving-throws.js";
 import type { TokenMapGeometry } from "../src/token-placement.js";
 import { cell } from "./movement-fixtures.js";
 
-// SRD 5.2.1 leaving the plane (Banishment, Etherealness, Blink, Maze, Hurl Through Hell): the creature leaves the map, keeps its place in
+// SRD 5.2.1 leaving the plane (Banishment, Maze, Hurl Through Hell, and Blink's Border Ethereal): the creature leaves the map, keeps its place in
 // the initiative, can't be targeted from the plane nor target anyone on it, and returns to the space it left or the
 // nearest unoccupied one.
 
@@ -163,11 +163,12 @@ describe("a creature off the plane", () => {
       "Ethereal (Blink)"
     );
     settlePlanes(state, GRID);
-    expect(token(state, MAGE).position).toBeNull();
+    expect(state.combat.offPlane).toEqual([{ actorId: MAGE, position: cell(0, 0), ethereal: true, returnFeet: 10 }]);
     nextInitiativeTurn(state, [], { resolveDefinition: () => undefined, rollDie: () => 5, newId: () => "e3" });
     nextInitiativeTurn(state, [], { resolveDefinition: () => undefined, rollDie: () => 5, newId: () => "e4" });
     expect(state.combat.turnActorId).toBe(MAGE);
     settlePlanes(state, GRID);
     expect(token(state, MAGE).position).toEqual(cell(0, 0));
+    expect(state.combat.offPlane).toEqual([]);
   });
 });

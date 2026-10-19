@@ -567,17 +567,19 @@ describe("leaving the plane and coming back", () => {
   it("sends a phase spider to the Ethereal Plane, and back with the next Ethereal Jaunt", () => {
     const built = table("phase-spider");
     use(built, "ethereal-jaunt", IDS.monster);
-    expect(actor(built, IDS.monster).effects).toMatchObject([{ name: "Ethereal", tags: ["off-plane"] }]);
+    expect(actor(built, IDS.monster).effects).toMatchObject([{ name: "Ethereal", tags: ["ethereal"] }]);
     fresh(built);
     use(built, "ethereal-jaunt", IDS.monster);
     expect(actor(built, IDS.monster).effects).toEqual([]);
   });
 
-  it("takes a nightmare and the creatures beside it to the Ethereal Plane together", () => {
+  it("takes a nightmare and the willing creatures beside it to the Ethereal Plane together", () => {
     const built = table("nightmare");
-    use(built, "ethereal-stride", IDS.monster, [], { targetIds: [IDS.monster, IDS.hero] });
-    for (const id of [IDS.monster, IDS.hero])
-      expect(actor(built, id).effects.map((effect) => effect.tags)).toEqual([["off-plane"]]);
+    // The ally's side is read from its kind.
+    delete actor(built, IDS.ally).definitionId;
+    use(built, "ethereal-stride", IDS.monster, [], { targetIds: [IDS.ally] });
+    for (const id of [IDS.monster, IDS.ally])
+      expect(actor(built, id).effects.map((effect) => effect.tags)).toEqual([["ethereal"]]);
   });
 });
 

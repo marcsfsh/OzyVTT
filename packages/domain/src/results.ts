@@ -990,6 +990,9 @@ export const ActorMovementReplySchema = z.strictObject({
   burrowsThroughWalls: z.enum(["free", "half"]).optional(),
   /** Difficult Terrain costs it nothing extra (Freedom of Movement). */
   ignoresDifficultTerrain: z.boolean().optional(),
+  /** It is on the Border Ethereal: the walls and creatures of the world it left are no obstacle, and it may rise or
+   *  descend, each foot up or down costing an extra foot (Etherealness). */
+  ethereal: z.boolean().optional(),
   /** A teleport granted it for this turn (Misty Step): up to `feet` to an unoccupied space it can see. */
   teleport: z.strictObject({ name: z.string(), feet: z.number().min(0) }).optional(),
   /** It may end a move in another creature's space (Air Form, a swarm), so no creature bars its way; a creature's

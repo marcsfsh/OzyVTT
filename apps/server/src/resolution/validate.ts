@@ -1,5 +1,5 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
-import { isOffPlane } from "../off-plane.js";
+import { onOtherPlanes, planeOf } from "../ethereal.js";
 import type { GameState } from "@vtt/domain";
 import { checkChoices } from "./grant-extras.js";
 import { effectiveActions } from "../effective-actions.js";
@@ -78,8 +78,9 @@ function combatantsOf(
   const attacker = state.actors.find((item) => item.id === input.actorId);
   if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
   if (!inFight(input.actorId)) throw new CommandRejectedError("That combatant is not in this encounter.");
-  // A creature off the plane affects and is affected only by what is there with it (Banishment, Blink).
-  const awayFrom = (target: LiveActor) => isOffPlane(attacker) !== isOffPlane(target);
+  // A creature off the plane, or on the Border Ethereal, affects and is affected only by what is there with it
+  // (Banishment, Etherealness, Blink).
+  const awayFrom = (target: LiveActor) => onOtherPlanes(attacker, target);
   // A target named twice is one target (a second dart is the only reason to name it again).
   const targets = [...new Set(input.targetIds)].map((targetId) => {
     const target = state.actors.find((item) => item.id === targetId);
@@ -93,7 +94,7 @@ function combatantsOf(
     const name = hidden(target.id) ? "that creature" : target.name;
     if (awayFrom(target))
       throw new CommandRejectedError(
-        isOffPlane(attacker)
+        planeOf(attacker) !== "material"
           ? `${attacker.name} is off this plane and can't reach ${name}.`
           : `${name[0]!.toUpperCase()}${name.slice(1)} is gone from this plane for now and can't be targeted.`
       );

@@ -92,7 +92,13 @@ export function applyGrant(ctx: ResolveContext): void {
   if (moveMark(ctx)) return;
   if (grant.onHit && (attack === null || (attack.outcome !== "hit" && attack.outcome !== "crit"))) return;
   const recipients =
-    grant.target === "targets" ? targets : grant.target === "target" ? targets.slice(0, 1) : [attacker];
+    grant.target === "targets"
+      ? targets
+      : grant.target === "target"
+        ? targets.slice(0, 1)
+        : grant.target === "self-and-targets"
+          ? [attacker, ...targets.filter((target) => target.id !== attacker.id)]
+          : [attacker];
   if (grant.toggles && endToggled(ctx, recipients)) return;
   for (const recipient of recipients) grantTo(ctx, recipient);
 }
@@ -253,7 +259,10 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
     state,
     recipient.id,
     makeEffect({
-      id: grant.target === "targets" ? `${input.commandId}:grant:${recipient.id}` : `${input.commandId}:grant`,
+      id:
+        grant.target === "targets" || grant.target === "self-and-targets"
+          ? `${input.commandId}:grant:${recipient.id}`
+          : `${input.commandId}:grant`,
       name: withOptionName(baseName, option),
       tags: [...new Set([...(rage ? rage.tags : grant.tags), ...parts.tags])].slice(0, 8),
       sourceActorId: attacker.id,

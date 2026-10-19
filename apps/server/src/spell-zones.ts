@@ -20,6 +20,7 @@ import type { TokenMapGeometry } from "./token-placement.js";
 import { withArticle } from "@vtt/domain";
 import { altitudeOf, heightSpan } from "./altitude.js";
 import { spellWardOf } from "./resolution/spell-wards.js";
+import { planeOf } from "./ethereal.js";
 
 type Actor = GameState["actors"][number];
 type Point = Readonly<{ x: number; y: number }>;
@@ -103,7 +104,8 @@ function creaturesOnMap(state: GameState): Actor[] {
     : state.combat.tokens.filter((token) => token.position !== null).map((token) => token.actorId);
   return ids.flatMap((id) => {
     const creature = state.actors.find((actor) => actor.id === id);
-    return creature && tokenOf(state, id) ? [creature] : [];
+    // A spell's area is on the plane it was cast on; a creature on the Border Ethereal is out of its reach.
+    return creature && tokenOf(state, id) && planeOf(creature) === "material" ? [creature] : [];
   });
 }
 

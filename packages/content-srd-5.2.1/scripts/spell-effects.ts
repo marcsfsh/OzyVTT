@@ -132,6 +132,8 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   awaken: { count: 1 },
   bane: { count: 3, perSlot: 1 },
   banishment: { count: 1, perSlot: 1 },
+  // "Up to three willing creatures (including yourself) for each spell slot level above 7": the caster alone at 7.
+  etherealness: { count: 1 },
   barkskin: { count: 1 },
   befuddlement: { count: 1 },
   "bestow-curse": { count: 1 },
@@ -1115,6 +1117,9 @@ const CHAIN_FEET: Readonly<Record<string, number>> = { "chain-lightning": 30 };
  *  20 feet, Confusion's by 5, Create or Destroy Water's Cube by 5). */
 const AREA_PER_SLOT: Readonly<Record<string, number>> = { "fog-cloud": 20, confusion: 5, "create-or-destroy-water": 5 };
 
+/** A Self spell's other creatures stand this near its caster ("The creatures must be within 10 feet of you"). */
+const COMPANION_FEET: Readonly<Record<string, number>> = { etherealness: 10 };
+
 /** What a cast's hit lands on its target besides its damage (SRD 5.2.1 text). */
 const CAST_ON_HIT: Readonly<Record<string, readonly OnHitRider[]>> = {
   "ray-of-sickness": [{ conditions: [{ id: "poisoned" }], duration: { type: "until-source-turn-end" } }],
@@ -1603,12 +1608,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: rounds(10),
     modifiers: [{ type: "movement", rule: "leap", feet: 30, costFeet: 10 }]
   }),
-  // "You step into the border regions of the Ethereal Plane": off the map, unseen and untouchable from this plane,
-  // until the caster ends it (8 hours); it returns to the space it left or the nearest unoccupied one.
+  // "You step into the border regions of the Ethereal Plane": its token stays on the map, unseen and untouchable from
+  // this plane, moving through it in any direction, until the caster ends it (8 hours); "if you appear in an occupied
+  // space, you are shunted to the nearest unoccupied space and take Force damage equal to twice the number of feet you
+  // are moved" (`ethereal.ts`, `off-plane.ts`). From a higher slot, willing creatures within 10 feet go too.
   etherealness: spellGrant({
     name: "Etherealness",
-    tags: ["off-plane"],
-    target: "self",
+    tags: ["ethereal", "ethereal-shunt"],
+    target: "self-and-targets",
     duration: { type: "manual" }
   }),
   // "You banish a creature ... into a labyrinthine demiplane": off the map while the caster concentrates. "The target
@@ -2454,6 +2461,7 @@ const TARGET_ABILITY_MAX: Readonly<Record<string, NonNullable<SpellEffect["targe
  *  or carried by someone else" (the caster's own, or one a willing creature hands over), Nondetection's and
  *  Arcanist's Magic Aura's "willing creature". */
 const WILLING_TARGETS: ReadonlySet<string> = new Set([
+  "etherealness",
   "light",
   "continual-flame",
   "nondetection",
@@ -2595,6 +2603,7 @@ export function spellEffectFor(
     ...(TARGET_ABILITY_MAX[id] ? { targetAbilityMax: { ...TARGET_ABILITY_MAX[id] } } : {}),
     ...(WILLING_TARGETS.has(id) ? { willingTargets: true as const } : {}),
     ...(AREA_PER_SLOT[id] !== undefined ? { areaPerSlot: AREA_PER_SLOT[id] } : {}),
+    ...(COMPANION_FEET[id] !== undefined ? { companionFeet: COMPANION_FEET[id] } : {}),
     // The creatures it brings and the commands it gives (`spell-summons.ts`).
     ...spellSummonFieldsFor(id)
   };

@@ -20221,6 +20221,9 @@
       "material"
      ],
      "self": true,
+     "grantTags": [
+      "seen-across-planes"
+     ],
      "spells": [
       {
        "id": "etherealness",
@@ -34720,15 +34723,16 @@
     "description": "The nightmare and up to three willing creatures within 5 feet of it teleport to the Ethereal Plane from the Material Plane or vice versa.",
     "damage": [],
     "targets": {
-     "count": 4,
-     "rangeFeet": 5
+     "count": 3,
+     "rangeFeet": 5,
+     "who": "allies"
     },
     "grants": {
      "name": "Ethereal",
      "tags": [
-      "off-plane"
+      "ethereal"
      ],
-     "target": "targets",
+     "target": "self-and-targets",
      "toggles": true,
      "duration": {
       "type": "manual"
@@ -36297,7 +36301,7 @@
     "grants": {
      "name": "Ethereal",
      "tags": [
-      "off-plane"
+      "ethereal"
      ],
      "target": "self",
      "toggles": true,

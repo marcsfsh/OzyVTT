@@ -6,6 +6,7 @@ import { movementCost } from "../../../server/src/terrain";
 import type { TokenMapGeometry } from "../../../server/src/token-placement";
 import { spaceSharingFor } from "../../../server/src/space-sharing";
 import { addAnnotation } from "../../../server/src/annotations";
+import { makeEffect } from "../../../server/src/effects";
 import { zoneMovementOptions } from "../../../server/src/zone-ground";
 import { areaGroundFor } from "../../../server/src/zone-preview";
 import { moveLabel, movementWallsOf, previewMove } from "./movePreview";
@@ -306,6 +307,29 @@ describe("the drag preview squeezes and passes walls as the server does", () => 
     const charged = movementCost(state, GRID, OGRE, { x: 50, y: 300 }, { x: 300, y: 300 }, { throughWalls: true });
     expect(charged?.blocked).toBeUndefined();
     expect(ogrePreview(state, { throughWalls: true })?.feet).toBe(charged?.feet);
+  });
+
+  it("takes a creature on the Border Ethereal through a wall and the ogre beyond it at no extra cost", () => {
+    const state = table([], { [HERO]: cell(0, 5), [OGRE]: { x: 250, y: 300 } }, [
+      wall({ x: 150, y: 0 }, { x: 150, y: 1000 })
+    ]);
+    const hero = state.actors.find((actor) => actor.id === HERO)!;
+    hero.effects = [makeEffect({ id: "e1", name: "Etherealness", tags: ["ethereal"], duration: { type: "manual" } })];
+    const charged = movementCost(state, GRID, HERO, cell(0, 5), cell(6, 5), { throughWallsFree: true });
+    expect(charged).toMatchObject({ feet: 30, difficultFeet: 0 });
+    const previewed = previewMove({
+      walls: movementWallsOf(state.combat.vision.walls),
+      calibration: CALIBRATION,
+      size: { width: GRID.width, height: GRID.height },
+      terrain: state.combat.terrain.difficult,
+      tokens: state.combat.tokens,
+      actorsById: new Map(state.actors.map((actor) => [actor.id, actor as GmActor])),
+      moverId: HERO,
+      from: cell(0, 5),
+      to: cell(6, 5),
+      throughWallsFree: true
+    });
+    expect(previewed?.feet).toBe(charged?.feet);
   });
 });
 
