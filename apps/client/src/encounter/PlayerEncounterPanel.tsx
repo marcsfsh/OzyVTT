@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type MutationResult, type PlayerView } from "@vtt/domain";
-import { SunMark } from "@vtt/ui";
+import { Button, SunMark } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useMovementBudget } from "../scene/useMovementBudget";
 import { MyPendingAsks } from "./RuleAsk";
@@ -422,6 +422,47 @@ export function PlayerEncounterPanel({
             >
               {/* The row shared with the shared-screen viewer, so the two lists never drift. */}
               <InitiativeRow entry={entry} self={isMe} />
+              {/* SRD Initiative: the players decide the order among tied characters, before either has acted. */}
+              {isMe && combat.round === 1 && (
+                <OwnFeedback
+                  className="initiative-tie-row"
+                  empty={
+                    !combat.initiative.some(
+                      (other) =>
+                        other.actorId !== entry.actorId &&
+                        other.score === entry.score &&
+                        state.actors.find((actor) => actor.id === other.actorId)?.kind === "player-character"
+                    )
+                  }
+                >
+                  {(onFeedback) =>
+                    combat.initiative
+                      .filter(
+                        (other) =>
+                          other.actorId !== entry.actorId &&
+                          other.score === entry.score &&
+                          state.actors.find((actor) => actor.id === other.actorId)?.kind === "player-character"
+                      )
+                      .map((other) => (
+                        <Button
+                          key={other.actorId}
+                          size="sm"
+                          variant="secondary"
+                          onClick={() =>
+                            void command("initiative:order-tie", {
+                              actorId: entry.actorId,
+                              beforeActorId: other.actorId
+                            }).then((result) =>
+                              onFeedback(result.ok ? `You go before ${other.name}.` : (result.message ?? "Refused."))
+                            )
+                          }
+                        >
+                          Go before {other.name}
+                        </Button>
+                      ))
+                  }
+                </OwnFeedback>
+              )}
               {/* What this player's character holds on someone else (a grapple, a Concentration spell's hold):
                 theirs to let go of from that creature's row. */}
               {!isMe && rowActor && (

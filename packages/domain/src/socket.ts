@@ -128,6 +128,7 @@ import type {
   InitiativeRollSelfSchema,
   InitiativeScoreSchema,
   InitiativeSwapSchema,
+  InitiativeOrderTieSchema,
   ReactionAnswerSchema,
   ReactionDismissSchema,
   ReplayLaunchSchema,
@@ -779,6 +780,10 @@ export interface ClientToServerEvents {
   ) => void;
   "initiative:swap": (
     payload: CommandPayload<typeof InitiativeSwapSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "initiative:order-tie": (
+    payload: CommandPayload<typeof InitiativeOrderTieSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "initiative:roll-self": (

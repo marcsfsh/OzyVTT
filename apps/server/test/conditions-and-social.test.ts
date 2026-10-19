@@ -6,7 +6,7 @@ import { resolveDefinitionAction, type ResolveDependencies } from "../src/action
 import { setCondition } from "../src/actor-conditions.js";
 import { builtinAction } from "../src/builtin-actions.js";
 import { rollAbilityCheck } from "../src/check-rolls.js";
-import { startEncounter } from "../src/encounter.js";
+import { orderTiedCharacters, startEncounter } from "../src/encounter.js";
 import { applyDamageDetailed } from "../src/hit-points.js";
 import { CommandRejectedError, RulesBlockedError } from "../src/game-store.js";
 import { projectPlayerView } from "../src/projections.js";
@@ -376,5 +376,27 @@ describe("Help with a Check", () => {
     expect(() => takeBuiltin(built, IDS.cleric, "help-check", [IDS.bandit], [], "athletics")).toThrow(
       /isn't Cleric's ally/
     );
+  });
+});
+
+describe("ties on initiative", () => {
+  it("lets a player put their character before another tied character, before either has acted", () => {
+    const built = table();
+    built.state.combat = {
+      ...built.state.combat,
+      initiative: [
+        { actorId: IDS.bandit, score: 20, tieBreaker: 0 },
+        { actorId: IDS.fighter, score: 12, tieBreaker: 1 },
+        { actorId: IDS.cleric, score: 12, tieBreaker: 0 }
+      ],
+      turnActorId: IDS.bandit
+    };
+    orderTiedCharacters(built.state, { role: "player", sessionId: IDS.clericSession }, IDS.cleric, IDS.fighter);
+    expect(built.state.combat.initiative.map((entry) => entry.actorId)).toEqual([IDS.bandit, IDS.cleric, IDS.fighter]);
+    // A player moves only their own character, and only among tied characters.
+    expect(() =>
+      orderTiedCharacters(built.state, { role: "player", sessionId: IDS.clericSession }, IDS.fighter, IDS.cleric)
+    ).toThrow();
+    expect(() => orderTiedCharacters(built.state, GM, IDS.cleric, IDS.bandit)).toThrow(/Both must be characters/);
   });
 });

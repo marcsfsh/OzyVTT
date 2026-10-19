@@ -7,6 +7,7 @@ import type {
   RuleMode
 } from "@vtt/domain";
 import { abilityCheckClaims } from "./ability-checks.js";
+import { requireActorAccess, type Initiator } from "./authorization.js";
 import { holdsFeature } from "./class-features.js";
 import { wardedConditions } from "./paladin-auras.js";
 import { assertNotArchived } from "./actor-roster.js";
@@ -459,6 +460,30 @@ export function setInitiativeScore(state: GameState, actorId: string, score: num
     pendingInitiative: state.combat.pendingInitiative.filter((id) => id !== actorId)
   };
   settleGatherIfComplete(state);
+}
+
+/**
+ * SRD Initiative: "If a tie occurs, the GM decides the order among tied monsters, and the players decide the order among
+ * tied characters." A character's player (or the GM) puts it just before another character tied on its score, before
+ * either has taken a turn in this fight.
+ */
+export function orderTiedCharacters(state: GameState, scope: Initiator, actorId: string, beforeActorId: string) {
+  if (!state.combat.active) throw new CommandRejectedError("Start an encounter before ordering Initiative.");
+  requireActorAccess(scope, state, actorId, "edit", "You can only move your own character in the turn order.");
+  if (actorId === beforeActorId) throw new CommandRejectedError("Pick another character tied with yours.");
+  const own = state.combat.initiative.find((entry) => entry.actorId === actorId);
+  const other = state.combat.initiative.find((entry) => entry.actorId === beforeActorId);
+  const kindOf = (id: string) => state.actors.find((actor) => actor.id === id)?.kind;
+  if (!own || !other || kindOf(actorId) !== "player-character" || kindOf(beforeActorId) !== "player-character")
+    throw new CommandRejectedError("Both must be characters in this fight.");
+  if (own.score !== other.score)
+    throw new CommandRejectedError("Only characters tied on the same score are ordered so.");
+  const current = state.combat.initiative.findIndex((entry) => entry.actorId === state.combat.turnActorId);
+  const acted = (id: string) =>
+    state.combat.round > 1 || state.combat.initiative.findIndex((entry) => entry.actorId === id) < current;
+  if (acted(actorId) || acted(beforeActorId))
+    throw new CommandRejectedError("Ties are settled before either character takes a turn in this fight.");
+  setInitiativeScore(state, actorId, own.score, Math.min(1000, other.tieBreaker + 1));
 }
 
 /** SRD Alert, Initiative Swap: right after initiative is rolled, two combatants trade scores. Not while either
