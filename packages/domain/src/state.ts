@@ -1016,6 +1016,23 @@ export const CombatStateSchema = z
     activeSceneId: z.uuid().nullable().default(null),
     /** Falls waiting on the reactions they opened, on the live table only. GM-only (see PendingFallSchema). */
     pendingFalls: z.array(PendingFallSchema).max(20).default([]),
+    /** A move stopped at the edge of the reach it leaves while the Opportunity Attacks it provoked are answered
+     *  (`held-moves.ts`): where it waits, where it was going, the prompts it waits on, the movement the rest of the way
+     *  cost, and the creatures it drags. Live table only; GM-only. */
+    heldMove: z
+      .object({
+        actorId: z.uuid(),
+        at: EncounterTokenPositionSchema,
+        to: EncounterTokenPositionSchema,
+        toAltitudeFeet: z.number().int().min(1).max(10000).optional(),
+        airborne: z.enum(["fly", "levitate"]).optional(),
+        promptIds: z.array(z.uuid()).max(20),
+        refundFeet: z.number().min(0).max(100000),
+        dragged: z.array(z.uuid()).max(20)
+      })
+      .strict()
+      .nullable()
+      .default(null),
     /** Time Stop (SRD 5.2.1): the caster takes `turnsLeft` more turns in a row, until it affects another creature or
      *  moves more than 1,000 feet from `at`, where it cast the spell. Live table only; GM-only. */
     timeStop: z

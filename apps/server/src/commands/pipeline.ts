@@ -8,6 +8,7 @@ import type { EffectNarration } from "../effects.js";
 import { needsSettling, settleFalls as settleFallsIn } from "../falling.js";
 import { compelledMoves, fleesNow } from "../granted-moves.js";
 import { needsPlaneSettling, settlePlanes } from "../off-plane.js";
+import { heldMoveReady, settleHeldMove } from "../held-moves.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
@@ -185,6 +186,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     if (
       !fleesNow(state) &&
       !needsPlaneSettling(state) &&
+      !heldMoveReady(state) &&
       !needsSettling(state, { ...lookup, catalog: kit.equipmentCatalog() })
     )
       return;
@@ -195,8 +197,10 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     let events: EffectNarration[] = [];
     const result = await context.store.execute({ id, type: "positions.settle", principal: "table" }, (draft) => {
       const deps = kit.fallDeps(draft, distance, id);
-      const planes = geometry && draft.combat.mapAssetId === mapAssetId ? settlePlanes(draft, geometry) : [];
-      events = [...compelledMoves(draft, deps), ...planes, ...settleFallsIn(draft, deps)];
+      const sameMap = geometry !== null && draft.combat.mapAssetId === mapAssetId;
+      const held = sameMap ? settleHeldMove(draft, geometry) : [];
+      const planes = sameMap ? settlePlanes(draft, geometry) : [];
+      events = [...held, ...compelledMoves(draft, deps), ...planes, ...settleFallsIn(draft, deps)];
     });
     if (result.duplicate) return;
     await context.publishGameState(result.state);

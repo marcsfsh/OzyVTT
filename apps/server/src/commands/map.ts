@@ -31,6 +31,7 @@ import { CommandRejectedError } from "../game-store.js";
 import { airborneAfter, altitudeOf, setAltitude } from "../altitude.js";
 import { startFall } from "../falling.js";
 import { failedTeleport } from "../granted-moves.js";
+import { holdMove } from "../held-moves.js";
 import { landJump } from "../jumping.js";
 import { timeStopOutOfRange } from "../time-stop.js";
 import { applyMovementRules, dragAlong, dragCostsExtra, grappledBy } from "../movement-rules.js";
@@ -126,6 +127,8 @@ export const mapCommands = [
         // Before a fight the GM sets the scene; players move their own tokens once it starts.
         if (!state.combat.active && !isGmGrade(principal))
           throw new CommandRejectedError("Your GM places the tokens before the fight starts.");
+        // A mover waiting on its Opportunity Attacks that moves again gives up the rest of the held move.
+        if (state.combat.heldMove?.actorId === actorId) state.combat = { ...state.combat, heldMove: null };
         const startToken = state.combat.tokens.find((token) => token.actorId === actorId);
         const from = startToken?.position ?? null;
         const fromAltitude = altitudeOf(startToken);
@@ -228,6 +231,22 @@ export const mapCommands = [
             );
         }
         granted = outcome.granted;
+        // A move that provokes waits at the edge of reach while the attacks are answered.
+        const destination = state.combat.tokens.find((token) => token.actorId === actorId)?.position;
+        if (outcome.heldAt && destination)
+          holdMove(state, geometry, {
+            actorId,
+            at: outcome.heldAt.position,
+            altitudeFeet: outcome.heldAt.altitudeFeet,
+            to: destination,
+            toAltitudeFeet: toAltitude,
+            ...(airborneAfter(mode, toAltitude, wasAirborne)
+              ? { airborne: airborneAfter(mode, toAltitude, wasAirborne)! }
+              : {}),
+            promptIds: outcome.heldAt.promptIds,
+            refundFeet: outcome.heldAt.refundFeet,
+            dragged
+          });
         // Time Stop ends once its caster goes more than 1,000 feet from where it cast it.
         landing.push(...timeStopOutOfRange(state, actorId, (a, b) => mapDistance(geometry, a, b)?.value ?? null));
         // A teleport into a filled space fails: back where it was, hurt (Dimension Door).
@@ -252,7 +271,7 @@ export const mapCommands = [
         movementOverridden = outcome.overridden;
         opportunityPrompts.push(...outcome.prompts);
         // A spell area the move enters (or that its mover carries over others) acts on whoever it meets.
-        const arrived = moverToken?.position ?? null;
+        const arrived = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
         if (from !== null && arrived !== null) {
           const path =
             mode === "teleport"
@@ -284,7 +303,7 @@ export const mapCommands = [
               ...(granted ? { granted } : {})
             })
           : null;
-        const to = moverToken?.position ?? null;
+        const to = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
         if (from !== null && to !== null)
           for (const heldId of dragAlong(state, dragged, from, to, geometry)) {
             draggedNames.push(hiddenAfter(heldId) ? HIDDEN_SOURCE : kit.actorName(heldId));

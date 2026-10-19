@@ -263,7 +263,10 @@ of a hidden thing. When in doubt, leave it out.
   dragging a grappled creature, add a foot per foot (`movementPath` and `spacePassage` in
   `@vtt/rules-5e`). How a token travels (walking, a special speed, jumping, teleporting, moved by force)
   rides on `token.move`, each speed with its own budget (`speed.ts`), and opportunity attacks are
-  read along the whole path (`movement-rules.ts`). The map's drag preview runs the same function,
+  read along the whole path (`movement-rules.ts`). A move that provokes waits at the last point of its
+  way still in reach (`combat.heldMove`) until its prompts are answered; the settle step then finishes
+  it, or leaves a mover the attack dropped, Grappled or knocked Prone where it stood and gives back the
+  rest of its movement (`held-moves.ts`). The map's drag preview runs the same function,
   and a mirror test checks the two agree. Players and the table screen get only the terrain the
   fog reveals, and with vision on only what the party has seen.
 - Height (`altitude.ts`, `@vtt/rules-5e` `altitude.ts`): a token's `altitudeFeet` is how far its lowest

@@ -108,6 +108,9 @@ export type MovementRulesOutcome = Readonly<{
   landsOnDifficult?: true;
   /** The teleport arrived in a filled space and fails with this Force damage (`failedTeleport`). */
   teleportFails?: string;
+  /** The mover waits here, at the edge of the reach it leaves, while the Opportunity Attacks it provoked are answered
+   *  (`held-moves.ts`); `refundFeet` is what the rest of the way cost, given back if it never goes on. */
+  heldAt?: Readonly<{ position: Point; altitudeFeet: number; promptIds: readonly string[]; refundFeet: number }>;
 }>;
 
 /**
@@ -128,7 +131,8 @@ export type MovementRulesOutcome = Readonly<{
  * GM's own off-turn moves with no grant are repositioning and spend nothing.
  *
  * Opportunity attacks: leaving an enemy's melee reach anywhere along the path opens a leaves-reach prompt answered as
- * a real melee attack; the move completes first (arrival-timing approximation). Disengage suppresses; a hidden mover
+ * a real melee attack, and the mover waits at the last point of its way still in reach while the prompts are open
+ * (`heldAt`, `held-moves.ts`). Disengage suppresses; a hidden mover
  * prompts no one (a player must not learn a hidden token's retreat), and neither does a mover the enemy can't see
  * (Invisible, or the enemy Blinded) unless its Blindsight or Truesight reaches. Sides are `areEnemies`', as attacks'.
  */
@@ -373,6 +377,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   let granted: string | undefined;
   let landsOnDifficult = false;
   let failDamage: string | undefined;
+  let heldAt: MovementRulesOutcome["heldAt"];
   const done = (crawled = false): MovementRulesOutcome => ({
     warning: outcome.warnings.length > 0 ? outcome.warnings.join(" ") : null,
     overridden: outcome.overridden,
@@ -381,7 +386,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     ...(readied ? { readied: true as const } : {}),
     ...(granted ? { granted } : {}),
     ...(landsOnDifficult ? { landsOnDifficult: true as const } : {}),
-    ...(failDamage ? { teleportFails: failDamage } : {})
+    ...(failDamage ? { teleportFails: failDamage } : {}),
+    ...(heldAt ? { heldAt } : {})
   });
   // Forced movement is the GM's (the command refuses a player's), and spends nothing.
   if (!mover || from === null || to === null || mode === "forced") return done();
@@ -476,7 +482,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     }
     granted = grant.name;
     landsOnDifficult = grant.jump === true && input.difficultAt?.(to) === true;
-    if (grant.provokes) openOpportunityAttacks(state, input, mover, grant.path, prompts);
+    const held = grant.provokes ? openOpportunityAttacks(state, input, mover, grant.path, prompts) : null;
+    if (held) heldAt = { position: held.at, altitudeFeet: held.altitudeFeet, promptIds: held.promptIds, refundFeet: 0 };
     return done(mover.conditions.some((condition) => condition.id === "prone"));
   }
   if (!counted) return done();
@@ -544,7 +551,22 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   // The readied move spends the Reaction and uses up the ready, and a spell it held with it.
   if (readied) spendReadied(state, mover.id);
   const path = charge?.path && charge.path.length > 1 ? charge.path : [from, to];
-  openOpportunityAttacks(state, input, mover, path, prompts);
+  const held = openOpportunityAttacks(state, input, mover, path, prompts);
+  if (held) {
+    // What the rest of the way cost, for a mover the attack stops: its own movement, not a readied move's.
+    const rest = readied
+      ? null
+      : (input.cost
+          ? input.cost(held.at, to, costOptions(state, input, mover, travel, held.altitudeFeet, toAltitude).options)
+          : straight()
+        )?.feet;
+    heldAt = {
+      position: held.at,
+      altitudeFeet: held.altitudeFeet,
+      promptIds: held.promptIds,
+      refundFeet: rest !== null && rest !== undefined && moved !== null ? Math.min(rest, moved) : 0
+    };
+  }
   return done(crawling);
 }
 
@@ -796,13 +818,14 @@ function openOpportunityAttacks(
   mover: GameState["actors"][number],
   path: readonly Point[],
   prompts: Array<{ actorId: string; name: string }>
-): void {
+): Hold | null {
   const { actorId } = input;
-  if (mover.visibility === "gm-only" || mover.effects.some((effect) => effect.tags.includes("disengaged"))) return;
+  let hold: Hold | null = null;
+  if (mover.visibility === "gm-only" || mover.effects.some((effect) => effect.tags.includes("disengaged"))) return null;
   // "The rat doesn't provoke Opportunity Attacks when it moves out of an enemy's reach"; Flyby, when it flies out.
   const moverDefinition = mover.definitionId ? input.resolveDefinition(mover.definitionId) : undefined;
-  if (holdsFeature(moverDefinition, "agile", "Agile")) return;
-  if ((input.mode ?? "walk") === "fly" && holdsFeature(moverDefinition, "flyby", "Flyby")) return;
+  if (holdsFeature(moverDefinition, "agile", "Agile")) return null;
+  if ((input.mode ?? "walk") === "fly" && holdsFeature(moverDefinition, "flyby", "Flyby")) return null;
   for (const entry of state.combat.initiative) {
     if (entry.actorId === actorId || state.combat.pendingReactions.length >= 20) continue;
     const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
@@ -839,6 +862,7 @@ function openOpportunityAttacks(
     );
     // Tolerance both ways: "was in reach" forgives noise at exactly reach, and "now out" needs a real step past it.
     let left: number | null = null;
+    let leftIndex = 0;
     for (let index = 1; index < path.length && left === null; index++) {
       const wasIn = measure({ actorId: enemy.id, position: enemyPosition }, path[index - 1]!, heights[index - 1]);
       const nowOut = measure({ actorId: enemy.id, position: enemyPosition }, path[index]!, heights[index]);
@@ -847,8 +871,10 @@ function openOpportunityAttacks(
         nowOut !== null &&
         wasIn <= reach + DISTANCE_TOLERANCE_FEET &&
         nowOut > reach + DISTANCE_TOLERANCE_FEET
-      )
+      ) {
         left = wasIn;
+        leftIndex = index - 1;
+      }
     }
     if (left === null) continue;
     if (input.seenBy ? !input.seenBy(enemy.id) : !seesMover(enemy, enemyDefinition, mover, left)) continue;
@@ -859,12 +885,18 @@ function openOpportunityAttacks(
       )
     )
       continue;
+    const promptId = input.newPromptId();
+    // "The attack occurs right before the creature leaves your reach": the mover waits at the last point of the way
+    // still in reach, the first such point of all the reaches it leaves.
+    if (hold === null || leftIndex < hold.index)
+      hold = { index: leftIndex, at: path[leftIndex]!, altitudeFeet: heights[leftIndex] ?? 0, promptIds: [] };
+    hold.promptIds.push(promptId);
     state.combat = {
       ...state.combat,
       pendingReactions: [
         ...state.combat.pendingReactions,
         {
-          id: input.newPromptId(),
+          id: promptId,
           kind: "leaves-reach" as const,
           actorId: enemy.id,
           actionId: "opportunity-attack",
@@ -886,4 +918,8 @@ function openOpportunityAttacks(
     };
     prompts.push({ actorId: enemy.id, name: enemy.name });
   }
+  return hold;
 }
+
+/** Where a mover waits while the Opportunity Attacks it provoked are answered, and the prompts it waits on. */
+type Hold = { index: number; at: Point; altitudeFeet: number; promptIds: string[] };
