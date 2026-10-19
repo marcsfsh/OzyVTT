@@ -45,43 +45,46 @@
       "$ref": "#/$defs/__schema16"
     },
     "token": {
-      "$ref": "#/$defs/__schema573"
+      "$ref": "#/$defs/__schema609"
     },
     "extensions": {
-      "$ref": "#/$defs/__schema575"
+      "$ref": "#/$defs/__schema611"
     },
     "damageResistances": {
-      "$ref": "#/$defs/__schema577"
+      "$ref": "#/$defs/__schema613"
     },
     "damageImmunities": {
-      "$ref": "#/$defs/__schema579"
+      "$ref": "#/$defs/__schema615"
     },
     "damageVulnerabilities": {
-      "$ref": "#/$defs/__schema580"
+      "$ref": "#/$defs/__schema616"
     },
     "conditionImmunities": {
-      "$ref": "#/$defs/__schema581"
+      "$ref": "#/$defs/__schema617"
     },
     "legendary": {
-      "$ref": "#/$defs/__schema583"
+      "$ref": "#/$defs/__schema619"
     },
     "traitMechanics": {
-      "$ref": "#/$defs/__schema585"
+      "$ref": "#/$defs/__schema621"
+    },
+    "summonScaling": {
+      "$ref": "#/$defs/__schema628"
     },
     "character": {
-      "$ref": "#/$defs/__schema592"
+      "$ref": "#/$defs/__schema644"
     },
     "proficiencies": {
-      "$ref": "#/$defs/__schema598"
+      "$ref": "#/$defs/__schema650"
     },
     "spellcasting": {
-      "$ref": "#/$defs/__schema603"
+      "$ref": "#/$defs/__schema654"
     },
     "startingInventory": {
-      "$ref": "#/$defs/__schema614"
+      "$ref": "#/$defs/__schema665"
     },
     "startingCurrency": {
-      "$ref": "#/$defs/__schema618"
+      "$ref": "#/$defs/__schema669"
     }
   },
   "required": [
@@ -384,35 +387,41 @@
         "teleport": {
           "$ref": "#/$defs/__schema504"
         },
-        "leap": {
+        "summons": {
           "$ref": "#/$defs/__schema505"
         },
+        "castsAtOnce": {
+          "$ref": "#/$defs/__schema540"
+        },
+        "leap": {
+          "$ref": "#/$defs/__schema541"
+        },
         "sight": {
-          "$ref": "#/$defs/__schema506"
+          "$ref": "#/$defs/__schema542"
         },
         "castsSpells": {
-          "$ref": "#/$defs/__schema514"
+          "$ref": "#/$defs/__schema550"
         },
         "conditionalDamage": {
-          "$ref": "#/$defs/__schema517"
+          "$ref": "#/$defs/__schema553"
         },
         "reminder": {
-          "$ref": "#/$defs/__schema521"
+          "$ref": "#/$defs/__schema557"
         },
         "untrackedMultiattack": {
-          "$ref": "#/$defs/__schema523"
+          "$ref": "#/$defs/__schema559"
         },
         "shapeShift": {
-          "$ref": "#/$defs/__schema524"
+          "$ref": "#/$defs/__schema560"
         },
         "endsForm": {
-          "$ref": "#/$defs/__schema566"
+          "$ref": "#/$defs/__schema602"
         },
         "formOnly": {
-          "$ref": "#/$defs/__schema568"
+          "$ref": "#/$defs/__schema604"
         },
         "effectOptions": {
-          "$ref": "#/$defs/__schema570"
+          "$ref": "#/$defs/__schema606"
         }
       },
       "required": [
@@ -6866,6 +6875,585 @@
     "__schema505": {
       "type": "object",
       "properties": {
+        "creatures": {
+          "$ref": "#/$defs/__schema506"
+        },
+        "die": {
+          "$ref": "#/$defs/__schema509"
+        },
+        "orAny": {
+          "$ref": "#/$defs/__schema510"
+        },
+        "upToModifier": {
+          "$ref": "#/$defs/__schema511"
+        },
+        "rangeFeet": {
+          "$ref": "#/$defs/__schema512"
+        },
+        "fromCorpse": {
+          "$ref": "#/$defs/__schema513"
+        },
+        "turn": {
+          "$ref": "#/$defs/__schema514"
+        },
+        "commandedWith": {
+          "$ref": "#/$defs/__schema515"
+        },
+        "commandFeet": {
+          "$ref": "#/$defs/__schema516"
+        },
+        "commandMove": {
+          "$ref": "#/$defs/__schema517"
+        },
+        "reasserts": {
+          "$ref": "#/$defs/__schema518"
+        },
+        "dodgesUncommanded": {
+          "$ref": "#/$defs/__schema519"
+        },
+        "lasts": {
+          "$ref": "#/$defs/__schema520"
+        },
+        "freedAtEnd": {
+          "$ref": "#/$defs/__schema521"
+        },
+        "endsOnDamage": {
+          "$ref": "#/$defs/__schema522"
+        },
+        "endsOnUserDeath": {
+          "$ref": "#/$defs/__schema523"
+        },
+        "leashFeet": {
+          "$ref": "#/$defs/__schema524"
+        },
+        "allegiance": {
+          "$ref": "#/$defs/__schema525"
+        },
+        "obeysWith": {
+          "$ref": "#/$defs/__schema526"
+        },
+        "noAttacks": {
+          "$ref": "#/$defs/__schema528"
+        },
+        "onlyOne": {
+          "$ref": "#/$defs/__schema529"
+        },
+        "creatureTypes": {
+          "$ref": "#/$defs/__schema530"
+        },
+        "concentrationOptional": {
+          "$ref": "#/$defs/__schema531"
+        },
+        "intangible": {
+          "$ref": "#/$defs/__schema532"
+        },
+        "sight": {
+          "$ref": "#/$defs/__schema533"
+        },
+        "dismiss": {
+          "$ref": "#/$defs/__schema534"
+        },
+        "sharedResistance": {
+          "$ref": "#/$defs/__schema535"
+        },
+        "deliversTouch": {
+          "$ref": "#/$defs/__schema536"
+        },
+        "strikesFrom": {
+          "$ref": "#/$defs/__schema537"
+        },
+        "endsSpell": {
+          "$ref": "#/$defs/__schema538"
+        },
+        "numbers": {
+          "$ref": "#/$defs/__schema539"
+        }
+      },
+      "required": [
+        "creatures"
+      ],
+      "additionalProperties": false,
+      "description": "The creatures an action brings onto the map: each from a stat block (scaled by the cast's level when the stat block says how), in an unoccupied space within `rangeFeet` of its user, on its user's side and under its user's command unless `allegiance` says otherwise; it leaves when its time is up, at 0 Hit Points, or when dismissed."
+    },
+    "__schema506": {
+      "minItems": 1,
+      "maxItems": 24,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema507"
+      }
+    },
+    "__schema507": {
+      "type": "object",
+      "properties": {
+        "monsterId": {
+          "type": "string",
+          "maxLength": 200,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "count": {
+          "default": 1,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "perSlot": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "minLevel": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9
+        },
+        "faces": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "to": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        },
+        "form": {
+          "$ref": "#/$defs/__schema77"
+        },
+        "share": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "allegiance": {
+          "type": "string",
+          "enum": [
+            "user",
+            "none",
+            "hostile"
+          ]
+        },
+        "rounds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "except": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "speedFeet": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 500
+            },
+            "abilityScores": {
+              "type": "object",
+              "properties": {
+                "str": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 30
+                },
+                "dex": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 30
+                },
+                "con": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 30
+                },
+                "int": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 30
+                },
+                "wis": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 30
+                },
+                "cha": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 30
+                }
+              },
+              "additionalProperties": false
+            },
+            "withoutActions": {
+              "minItems": 1,
+              "maxItems": 6,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema508"
+              }
+            },
+            "conditionImmunities": {
+              "minItems": 1,
+              "maxItems": 6,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema348"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "monsterId"
+      ],
+      "additionalProperties": false
+    },
+    "__schema508": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "__schema509": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 100
+    },
+    "__schema510": {
+      "type": "object",
+      "properties": {
+        "creatureType": {
+          "$ref": "#/$defs/__schema77"
+        },
+        "maxChallenge": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 30
+        }
+      },
+      "required": [
+        "creatureType",
+        "maxChallenge"
+      ],
+      "additionalProperties": false
+    },
+    "__schema511": {
+      "type": "boolean",
+      "const": true
+    },
+    "__schema512": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 1000
+    },
+    "__schema513": {
+      "type": "object",
+      "properties": {
+        "creatureTypes": {
+          "minItems": 1,
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema77"
+          }
+        },
+        "maxSize": {
+          "$ref": "#/$defs/__schema68"
+        },
+        "withinRounds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "additionalProperties": false
+    },
+    "__schema514": {
+      "default": "after-user",
+      "type": "string",
+      "enum": [
+        "after-user",
+        "own",
+        "none"
+      ]
+    },
+    "__schema515": {
+      "type": "string",
+      "enum": [
+        "bonus-action",
+        "action"
+      ]
+    },
+    "__schema516": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 5280
+    },
+    "__schema517": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 500
+        },
+        {
+          "type": "string",
+          "const": "twice-user-speed"
+        }
+      ]
+    },
+    "__schema518": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "perSlot": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        }
+      },
+      "required": [
+        "count"
+      ],
+      "additionalProperties": false
+    },
+    "__schema519": {
+      "type": "boolean",
+      "const": true
+    },
+    "__schema520": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "spell"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "minutes"
+            },
+            "minutes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 527040
+            },
+            "concentration": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "type",
+            "minutes"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "until-long-rest"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "untimed"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "__schema521": {
+      "type": "boolean",
+      "const": true
+    },
+    "__schema522": {
+      "type": "boolean",
+      "const": true
+    },
+    "__schema523": {
+      "type": "boolean",
+      "const": true
+    },
+    "__schema524": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 5280
+    },
+    "__schema525": {
+      "default": "user",
+      "type": "string",
+      "enum": [
+        "user",
+        "none",
+        "hostile"
+      ]
+    },
+    "__schema526": {
+      "type": "object",
+      "properties": {
+        "weapons": {
+          "$ref": "#/$defs/__schema527"
+        },
+        "armor": {
+          "$ref": "#/$defs/__schema527"
+        }
+      },
+      "additionalProperties": false
+    },
+    "__schema527": {
+      "type": "string",
+      "maxLength": 60,
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "__schema528": {
+      "type": "boolean",
+      "const": true
+    },
+    "__schema529": {
+      "type": "boolean",
+      "const": true
+    },
+    "__schema530": {
+      "minItems": 1,
+      "maxItems": 6,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema77"
+      }
+    },
+    "__schema531": {
+      "type": "boolean",
+      "const": true
+    },
+    "__schema532": {
+      "type": "boolean",
+      "const": true
+    },
+    "__schema533": {
+      "type": "string",
+      "enum": [
+        "always",
+        "bonus-action"
+      ]
+    },
+    "__schema534": {
+      "type": "string",
+      "enum": [
+        "bonus-action",
+        "action"
+      ]
+    },
+    "__schema535": {
+      "type": "boolean",
+      "const": true
+    },
+    "__schema536": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 1000
+    },
+    "__schema537": {
+      "type": "object",
+      "properties": {
+        "reachFeet": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 30
+        },
+        "moveFeet": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 120
+        },
+        "teleports": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "reachFeet",
+        "moveFeet"
+      ],
+      "additionalProperties": false
+    },
+    "__schema538": {
+      "type": "boolean",
+      "const": true
+    },
+    "__schema539": {
+      "type": "object",
+      "properties": {
+        "attackBonus": {
+          "type": "integer",
+          "minimum": -10,
+          "maximum": 30
+        },
+        "saveDc": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 40
+        },
+        "modifier": {
+          "type": "integer",
+          "minimum": -5,
+          "maximum": 10
+        }
+      },
+      "required": [
+        "attackBonus",
+        "saveDc",
+        "modifier"
+      ],
+      "additionalProperties": false
+    },
+    "__schema540": {
+      "type": "boolean",
+      "const": true
+    },
+    "__schema541": {
+      "type": "object",
+      "properties": {
         "feet": {
           "type": "integer",
           "minimum": 5,
@@ -6883,35 +7471,35 @@
       ],
       "additionalProperties": false
     },
-    "__schema506": {
+    "__schema542": {
       "type": "object",
       "properties": {
         "light": {
-          "$ref": "#/$defs/__schema507"
+          "$ref": "#/$defs/__schema543"
         },
         "area": {
-          "$ref": "#/$defs/__schema508"
+          "$ref": "#/$defs/__schema544"
         },
         "dispels": {
-          "$ref": "#/$defs/__schema509"
+          "$ref": "#/$defs/__schema545"
         },
         "rounds": {
-          "$ref": "#/$defs/__schema510"
+          "$ref": "#/$defs/__schema546"
         },
         "toggles": {
-          "$ref": "#/$defs/__schema511"
+          "$ref": "#/$defs/__schema547"
         },
         "inDimLightOrDarkness": {
-          "$ref": "#/$defs/__schema512"
+          "$ref": "#/$defs/__schema548"
         },
         "seenBy": {
-          "$ref": "#/$defs/__schema513"
+          "$ref": "#/$defs/__schema549"
         }
       },
       "additionalProperties": false,
       "description": "What it does to light and sight while it lasts: a light it makes (on its user, its targets, its area or set down), an area of obscurement or magical Darkness, the spell light or Darkness it dispels, and whether it works only in Dim Light or Darkness."
     },
-    "__schema507": {
+    "__schema543": {
       "type": "object",
       "properties": {
         "on": {
@@ -6950,7 +7538,7 @@
       ],
       "additionalProperties": false
     },
-    "__schema508": {
+    "__schema544": {
       "type": "object",
       "properties": {
         "kind": {
@@ -6976,7 +7564,7 @@
       ],
       "additionalProperties": false
     },
-    "__schema509": {
+    "__schema545": {
       "type": "object",
       "properties": {
         "kind": {
@@ -6998,27 +7586,27 @@
       ],
       "additionalProperties": false
     },
-    "__schema510": {
+    "__schema546": {
       "type": "integer",
       "minimum": 1,
       "maximum": 100
     },
-    "__schema511": {
+    "__schema547": {
       "type": "boolean",
       "const": true
     },
-    "__schema512": {
+    "__schema548": {
       "type": "boolean",
       "const": true
     },
-    "__schema513": {
+    "__schema549": {
       "type": "string",
       "enum": [
         "user",
         "area"
       ]
     },
-    "__schema514": {
+    "__schema550": {
       "type": "object",
       "properties": {
         "ability": {
@@ -7043,7 +7631,7 @@
           "maxItems": 3,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema515"
+            "$ref": "#/$defs/__schema551"
           }
         },
         "spells": {
@@ -7051,7 +7639,7 @@
           "maxItems": 24,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema516"
+            "$ref": "#/$defs/__schema552"
           }
         }
       },
@@ -7063,7 +7651,7 @@
       ],
       "additionalProperties": false
     },
-    "__schema515": {
+    "__schema551": {
       "type": "string",
       "enum": [
         "verbal",
@@ -7071,7 +7659,7 @@
         "material"
       ]
     },
-    "__schema516": {
+    "__schema552": {
       "type": "object",
       "properties": {
         "id": {
@@ -7106,18 +7694,18 @@
       ],
       "additionalProperties": false
     },
-    "__schema517": {
+    "__schema553": {
       "description": "Damage a hit adds or swaps in under a printed condition: `advantage` (the attack roll had Advantage), `self-bloodied`, `target-bloodied`, `target-grappled-by-self`, applied by the engine; and `charge` (moved N feet straight toward the target first), which the engine cannot see, offered on the hit's preview for the attacker to confirm. `instead` replaces the first damage part; `plus` adds to the hit",
-      "$ref": "#/$defs/__schema518"
+      "$ref": "#/$defs/__schema554"
     },
-    "__schema518": {
+    "__schema554": {
       "maxItems": 3,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema519"
+        "$ref": "#/$defs/__schema555"
       }
     },
-    "__schema519": {
+    "__schema555": {
       "type": "object",
       "properties": {
         "when": {
@@ -7142,7 +7730,7 @@
           "maxItems": 2,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema520"
+            "$ref": "#/$defs/__schema556"
           }
         },
         "feet": {
@@ -7168,7 +7756,7 @@
       ],
       "additionalProperties": false
     },
-    "__schema520": {
+    "__schema556": {
       "type": "object",
       "properties": {
         "formula": {
@@ -7186,90 +7774,90 @@
       ],
       "additionalProperties": false
     },
-    "__schema521": {
+    "__schema557": {
       "description": "What the engine leaves to the GM, shown on the GM's result when the action resolves: damage on later turns, or a branch it cannot choose (a failure that turns on the target's Hit Points)",
-      "$ref": "#/$defs/__schema522"
+      "$ref": "#/$defs/__schema558"
     },
-    "__schema522": {
+    "__schema558": {
       "type": "string",
       "minLength": 1,
       "maxLength": 600
     },
-    "__schema523": {
+    "__schema559": {
       "type": "boolean",
       "const": true
     },
-    "__schema524": {
+    "__schema560": {
       "type": "object",
       "properties": {
         "from": {
-          "$ref": "#/$defs/__schema525"
-        },
-        "onTargets": {
-          "$ref": "#/$defs/__schema526"
-        },
-        "creatureTypes": {
-          "$ref": "#/$defs/__schema527"
-        },
-        "notCreatureTypes": {
-          "$ref": "#/$defs/__schema528"
-        },
-        "maxChallenge": {
-          "$ref": "#/$defs/__schema529"
-        },
-        "challengeOf": {
-          "$ref": "#/$defs/__schema530"
-        },
-        "maxSize": {
-          "$ref": "#/$defs/__schema531"
-        },
-        "noFly": {
-          "$ref": "#/$defs/__schema532"
-        },
-        "printed": {
-          "$ref": "#/$defs/__schema533"
-        },
-        "keeps": {
-          "$ref": "#/$defs/__schema551"
-        },
-        "noSpells": {
-          "$ref": "#/$defs/__schema553"
-        },
-        "noSpeech": {
-          "$ref": "#/$defs/__schema554"
-        },
-        "gear": {
-          "$ref": "#/$defs/__schema555"
-        },
-        "temporaryHitPoints": {
-          "$ref": "#/$defs/__schema556"
-        },
-        "endsWithoutTemporaryHitPoints": {
-          "$ref": "#/$defs/__schema557"
-        },
-        "endsOnIncapacitated": {
-          "$ref": "#/$defs/__schema558"
-        },
-        "endsAtZeroHitPoints": {
-          "$ref": "#/$defs/__schema559"
-        },
-        "leaveAs": {
-          "$ref": "#/$defs/__schema560"
-        },
-        "revertRounds": {
           "$ref": "#/$defs/__schema561"
         },
-        "durationMinutes": {
+        "onTargets": {
           "$ref": "#/$defs/__schema562"
         },
-        "hoursPerTwoLevelsOf": {
+        "creatureTypes": {
           "$ref": "#/$defs/__schema563"
         },
-        "notInSunlight": {
+        "notCreatureTypes": {
           "$ref": "#/$defs/__schema564"
         },
-        "escapesAtZero": {
+        "maxChallenge": {
           "$ref": "#/$defs/__schema565"
+        },
+        "challengeOf": {
+          "$ref": "#/$defs/__schema566"
+        },
+        "maxSize": {
+          "$ref": "#/$defs/__schema567"
+        },
+        "noFly": {
+          "$ref": "#/$defs/__schema568"
+        },
+        "printed": {
+          "$ref": "#/$defs/__schema569"
+        },
+        "keeps": {
+          "$ref": "#/$defs/__schema587"
+        },
+        "noSpells": {
+          "$ref": "#/$defs/__schema589"
+        },
+        "noSpeech": {
+          "$ref": "#/$defs/__schema590"
+        },
+        "gear": {
+          "$ref": "#/$defs/__schema591"
+        },
+        "temporaryHitPoints": {
+          "$ref": "#/$defs/__schema592"
+        },
+        "endsWithoutTemporaryHitPoints": {
+          "$ref": "#/$defs/__schema593"
+        },
+        "endsOnIncapacitated": {
+          "$ref": "#/$defs/__schema594"
+        },
+        "endsAtZeroHitPoints": {
+          "$ref": "#/$defs/__schema595"
+        },
+        "leaveAs": {
+          "$ref": "#/$defs/__schema596"
+        },
+        "revertRounds": {
+          "$ref": "#/$defs/__schema597"
+        },
+        "durationMinutes": {
+          "$ref": "#/$defs/__schema598"
+        },
+        "hoursPerTwoLevelsOf": {
+          "$ref": "#/$defs/__schema599"
+        },
+        "notInSunlight": {
+          "$ref": "#/$defs/__schema600"
+        },
+        "escapesAtZero": {
+          "$ref": "#/$defs/__schema601"
         }
       },
       "required": [
@@ -7278,7 +7866,7 @@
       "additionalProperties": false,
       "description": "Shape-shifts a creature: forms from the user's known forms, the bestiary under limits, or the stat block's printed forms; what the creature keeps; and how the form ends."
     },
-    "__schema525": {
+    "__schema561": {
       "type": "string",
       "enum": [
         "known",
@@ -7286,11 +7874,11 @@
         "printed"
       ]
     },
-    "__schema526": {
+    "__schema562": {
       "type": "boolean",
       "const": true
     },
-    "__schema527": {
+    "__schema563": {
       "minItems": 1,
       "maxItems": 14,
       "type": "array",
@@ -7298,7 +7886,7 @@
         "$ref": "#/$defs/__schema77"
       }
     },
-    "__schema528": {
+    "__schema564": {
       "minItems": 1,
       "maxItems": 14,
       "type": "array",
@@ -7306,68 +7894,68 @@
         "$ref": "#/$defs/__schema77"
       }
     },
-    "__schema529": {
+    "__schema565": {
       "type": "number",
       "minimum": 0,
       "maximum": 30
     },
-    "__schema530": {
+    "__schema566": {
       "type": "string",
       "enum": [
         "target",
         "user"
       ]
     },
-    "__schema531": {
+    "__schema567": {
       "$ref": "#/$defs/__schema68"
     },
-    "__schema532": {
+    "__schema568": {
       "type": "boolean",
       "const": true
     },
-    "__schema533": {
+    "__schema569": {
       "minItems": 1,
       "maxItems": 4,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema534"
+        "$ref": "#/$defs/__schema570"
       }
     },
-    "__schema534": {
+    "__schema570": {
       "type": "object",
       "properties": {
         "id": {
           "$ref": "#/$defs/__schema77"
         },
         "name": {
-          "$ref": "#/$defs/__schema535"
+          "$ref": "#/$defs/__schema571"
         },
         "size": {
-          "$ref": "#/$defs/__schema536"
+          "$ref": "#/$defs/__schema572"
         },
         "speeds": {
-          "$ref": "#/$defs/__schema537"
+          "$ref": "#/$defs/__schema573"
         },
         "noActions": {
-          "$ref": "#/$defs/__schema544"
+          "$ref": "#/$defs/__schema580"
         },
         "allowsActions": {
-          "$ref": "#/$defs/__schema545"
+          "$ref": "#/$defs/__schema581"
         },
         "noAttacks": {
-          "$ref": "#/$defs/__schema546"
+          "$ref": "#/$defs/__schema582"
         },
         "noSpeech": {
-          "$ref": "#/$defs/__schema547"
+          "$ref": "#/$defs/__schema583"
         },
         "sharesSpaces": {
-          "$ref": "#/$defs/__schema548"
+          "$ref": "#/$defs/__schema584"
         },
         "conditionImmunities": {
-          "$ref": "#/$defs/__schema549"
+          "$ref": "#/$defs/__schema585"
         },
         "modifiers": {
-          "$ref": "#/$defs/__schema550"
+          "$ref": "#/$defs/__schema586"
         }
       },
       "required": [
@@ -7377,34 +7965,34 @@
       "additionalProperties": false,
       "description": "One of a stat block's printed forms: its size and speeds, and what it can't do (take actions, speak). The creature's other statistics stay its own."
     },
-    "__schema535": {
+    "__schema571": {
       "type": "string",
       "minLength": 1,
       "maxLength": 60
     },
-    "__schema536": {
+    "__schema572": {
       "$ref": "#/$defs/__schema68"
     },
-    "__schema537": {
+    "__schema573": {
       "type": "object",
       "properties": {
         "walk": {
-          "$ref": "#/$defs/__schema538"
+          "$ref": "#/$defs/__schema574"
         },
         "fly": {
-          "$ref": "#/$defs/__schema539"
+          "$ref": "#/$defs/__schema575"
         },
         "swim": {
-          "$ref": "#/$defs/__schema540"
+          "$ref": "#/$defs/__schema576"
         },
         "climb": {
-          "$ref": "#/$defs/__schema541"
+          "$ref": "#/$defs/__schema577"
         },
         "burrow": {
-          "$ref": "#/$defs/__schema542"
+          "$ref": "#/$defs/__schema578"
         },
         "hover": {
-          "$ref": "#/$defs/__schema543"
+          "$ref": "#/$defs/__schema579"
         }
       },
       "required": [
@@ -7413,40 +8001,40 @@
       "additionalProperties": false,
       "description": "The speeds a form moves with, in place of the creature's own: Speed (`walk`) and any special speeds."
     },
-    "__schema538": {
+    "__schema574": {
       "type": "integer",
       "minimum": 0,
       "maximum": 500
     },
-    "__schema539": {
+    "__schema575": {
       "type": "integer",
       "minimum": 1,
       "maximum": 500
     },
-    "__schema540": {
+    "__schema576": {
       "type": "integer",
       "minimum": 1,
       "maximum": 500
     },
-    "__schema541": {
+    "__schema577": {
       "type": "integer",
       "minimum": 1,
       "maximum": 500
     },
-    "__schema542": {
+    "__schema578": {
       "type": "integer",
       "minimum": 1,
       "maximum": 500
     },
-    "__schema543": {
+    "__schema579": {
       "type": "boolean",
       "const": true
     },
-    "__schema544": {
+    "__schema580": {
       "type": "boolean",
       "const": true
     },
-    "__schema545": {
+    "__schema581": {
       "minItems": 1,
       "maxItems": 4,
       "type": "array",
@@ -7454,19 +8042,19 @@
         "$ref": "#/$defs/__schema77"
       }
     },
-    "__schema546": {
+    "__schema582": {
       "type": "boolean",
       "const": true
     },
-    "__schema547": {
+    "__schema583": {
       "type": "boolean",
       "const": true
     },
-    "__schema548": {
+    "__schema584": {
       "type": "boolean",
       "const": true
     },
-    "__schema549": {
+    "__schema585": {
       "minItems": 1,
       "maxItems": 6,
       "type": "array",
@@ -7474,19 +8062,19 @@
         "$ref": "#/$defs/__schema348"
       }
     },
-    "__schema550": {
+    "__schema586": {
       "default": [],
       "$ref": "#/$defs/__schema82"
     },
-    "__schema551": {
+    "__schema587": {
       "default": [],
       "maxItems": 5,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema552"
+        "$ref": "#/$defs/__schema588"
       }
     },
-    "__schema552": {
+    "__schema588": {
       "type": "string",
       "enum": [
         "mental",
@@ -7496,15 +8084,15 @@
         "type"
       ]
     },
-    "__schema553": {
+    "__schema589": {
       "type": "boolean",
       "const": true
     },
-    "__schema554": {
+    "__schema590": {
       "type": "boolean",
       "const": true
     },
-    "__schema555": {
+    "__schema591": {
       "default": "worn",
       "type": "string",
       "enum": [
@@ -7513,50 +8101,50 @@
         "choice"
       ]
     },
-    "__schema556": {
+    "__schema592": {
       "type": "string",
       "enum": [
         "each-form",
         "first-form"
       ]
     },
-    "__schema557": {
+    "__schema593": {
       "type": "boolean",
       "const": true
     },
-    "__schema558": {
+    "__schema594": {
       "type": "boolean",
       "const": true
     },
-    "__schema559": {
+    "__schema595": {
       "type": "boolean",
       "const": true
     },
-    "__schema560": {
+    "__schema596": {
       "type": "string",
       "enum": [
         "bonus-action",
         "action"
       ]
     },
-    "__schema561": {
+    "__schema597": {
       "type": "integer",
       "minimum": 1,
       "maximum": 100
     },
-    "__schema562": {
+    "__schema598": {
       "type": "integer",
       "minimum": 1,
       "maximum": 1440
     },
-    "__schema563": {
+    "__schema599": {
       "$ref": "#/$defs/__schema77"
     },
-    "__schema564": {
+    "__schema600": {
       "type": "boolean",
       "const": true
     },
-    "__schema565": {
+    "__schema601": {
       "type": "object",
       "properties": {
         "form": {
@@ -7574,19 +8162,19 @@
       ],
       "additionalProperties": false
     },
-    "__schema566": {
+    "__schema602": {
       "description": "It ends its user's form, which returns to its true form (leaving Wild Shape early)",
-      "$ref": "#/$defs/__schema567"
+      "$ref": "#/$defs/__schema603"
     },
-    "__schema567": {
+    "__schema603": {
       "type": "boolean",
       "const": true
     },
-    "__schema568": {
+    "__schema604": {
       "description": "It works only in these of its user's printed forms, `true` naming its true form (\"Bite (Wolf or Hybrid Form Only)\")",
-      "$ref": "#/$defs/__schema569"
+      "$ref": "#/$defs/__schema605"
     },
-    "__schema569": {
+    "__schema605": {
       "minItems": 1,
       "maxItems": 4,
       "type": "array",
@@ -7594,19 +8182,19 @@
         "$ref": "#/$defs/__schema77"
       }
     },
-    "__schema570": {
+    "__schema606": {
       "description": "Effects a use picks one of (Enlarge or Reduce), the picked one landing as a failed save's effect",
-      "$ref": "#/$defs/__schema571"
+      "$ref": "#/$defs/__schema607"
     },
-    "__schema571": {
+    "__schema607": {
       "minItems": 2,
       "maxItems": 4,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema572"
+        "$ref": "#/$defs/__schema608"
       }
     },
-    "__schema572": {
+    "__schema608": {
       "type": "object",
       "properties": {
         "id": {
@@ -7628,7 +8216,7 @@
       ],
       "additionalProperties": false
     },
-    "__schema573": {
+    "__schema609": {
       "description": "The battlemap piece: disposition and grid footprint. Nothing to do with credentials",
       "default": {
         "disposition": "neutral",
@@ -7637,9 +8225,9 @@
           "height": 1
         }
       },
-      "$ref": "#/$defs/__schema574"
+      "$ref": "#/$defs/__schema610"
     },
-    "__schema574": {
+    "__schema610": {
       "type": "object",
       "properties": {
         "disposition": {
@@ -7678,60 +8266,60 @@
       },
       "additionalProperties": false
     },
-    "__schema575": {
+    "__schema611": {
       "default": {},
       "description": "Free-form passthrough an importer may carry. One bag is read: publishing needs `extensions[\"open5e.srd-2024\"]` to hold a numeric `challengeRating` (0.125 for CR 1/8) and a non-empty `type` (\"dragon\"), because the bestiary lists, sorts and searches by them. Example: `{\"open5e.srd-2024\": {\"challengeRating\": 5, \"type\": \"giant\"}}`. Everything else is carried and never read",
-      "$ref": "#/$defs/__schema576"
+      "$ref": "#/$defs/__schema612"
     },
-    "__schema576": {
+    "__schema612": {
       "type": "object",
       "propertyNames": {
         "type": "string"
       },
       "additionalProperties": {}
     },
-    "__schema577": {
+    "__schema613": {
       "maxItems": 20,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema578"
+        "$ref": "#/$defs/__schema614"
       }
     },
-    "__schema578": {
+    "__schema614": {
       "type": "string",
       "minLength": 1,
       "maxLength": 40
     },
-    "__schema579": {
+    "__schema615": {
       "maxItems": 20,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema578"
+        "$ref": "#/$defs/__schema614"
       }
     },
-    "__schema580": {
+    "__schema616": {
       "maxItems": 20,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema578"
+        "$ref": "#/$defs/__schema614"
       }
     },
-    "__schema581": {
+    "__schema617": {
       "description": "Reference-level for now: displayed, and actor.set-condition does not enforce it yet",
-      "$ref": "#/$defs/__schema582"
+      "$ref": "#/$defs/__schema618"
     },
-    "__schema582": {
+    "__schema618": {
       "maxItems": 20,
       "type": "array",
       "items": {
         "$ref": "#/$defs/__schema348"
       }
     },
-    "__schema583": {
+    "__schema619": {
       "description": "SRD 2024 legendary resources: actions spent on other creatures' turns, and Legendary Resistance uses that re-arm on a Long Rest",
-      "$ref": "#/$defs/__schema584"
+      "$ref": "#/$defs/__schema620"
     },
-    "__schema584": {
+    "__schema620": {
       "type": "object",
       "properties": {
         "actionsPerRound": {
@@ -7747,14 +8335,14 @@
       },
       "additionalProperties": false
     },
-    "__schema585": {
+    "__schema621": {
       "maxItems": 12,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema586"
+        "$ref": "#/$defs/__schema622"
       }
     },
-    "__schema586": {
+    "__schema622": {
       "oneOf": [
         {
           "type": "object",
@@ -7764,7 +8352,7 @@
               "const": "regeneration"
             },
             "name": {
-              "$ref": "#/$defs/__schema587"
+              "$ref": "#/$defs/__schema623"
             },
             "hitPoints": {
               "type": "integer",
@@ -7802,7 +8390,7 @@
               "const": "undead-fortitude"
             },
             "name": {
-              "$ref": "#/$defs/__schema587"
+              "$ref": "#/$defs/__schema623"
             },
             "ability": {
               "$ref": "#/$defs/__schema27"
@@ -7841,7 +8429,7 @@
               "const": "aura"
             },
             "name": {
-              "$ref": "#/$defs/__schema587"
+              "$ref": "#/$defs/__schema623"
             },
             "trigger": {
               "type": "string",
@@ -7882,10 +8470,10 @@
               "const": true
             },
             "damage": {
-              "$ref": "#/$defs/__schema588"
+              "$ref": "#/$defs/__schema624"
             },
             "save": {
-              "$ref": "#/$defs/__schema590"
+              "$ref": "#/$defs/__schema626"
             },
             "hazard": {
               "type": "string",
@@ -7914,7 +8502,7 @@
               "const": "death-burst"
             },
             "name": {
-              "$ref": "#/$defs/__schema587"
+              "$ref": "#/$defs/__schema623"
             },
             "rangeFeet": {
               "type": "integer",
@@ -7922,10 +8510,10 @@
               "maximum": 120
             },
             "save": {
-              "$ref": "#/$defs/__schema590"
+              "$ref": "#/$defs/__schema626"
             },
             "damage": {
-              "$ref": "#/$defs/__schema588"
+              "$ref": "#/$defs/__schema624"
             }
           },
           "required": [
@@ -7945,10 +8533,10 @@
               "const": "melee-hit-damage"
             },
             "name": {
-              "$ref": "#/$defs/__schema587"
+              "$ref": "#/$defs/__schema623"
             },
             "damage": {
-              "$ref": "#/$defs/__schema588"
+              "$ref": "#/$defs/__schema624"
             }
           },
           "required": [
@@ -7966,7 +8554,7 @@
               "const": "light"
             },
             "name": {
-              "$ref": "#/$defs/__schema587"
+              "$ref": "#/$defs/__schema623"
             },
             "brightFeet": {
               "type": "integer",
@@ -7995,7 +8583,7 @@
               "const": "light-sensitivity"
             },
             "name": {
-              "$ref": "#/$defs/__schema587"
+              "$ref": "#/$defs/__schema623"
             },
             "light": {
               "type": "string",
@@ -8009,7 +8597,7 @@
               "maxItems": 3,
               "type": "array",
               "items": {
-                "$ref": "#/$defs/__schema591"
+                "$ref": "#/$defs/__schema627"
               }
             },
             "damageAtTurnStart": {
@@ -8047,7 +8635,7 @@
               "const": "berserk"
             },
             "name": {
-              "$ref": "#/$defs/__schema587"
+              "$ref": "#/$defs/__schema623"
             },
             "on": {
               "type": "integer",
@@ -8070,7 +8658,7 @@
               "const": "invisible"
             },
             "name": {
-              "$ref": "#/$defs/__schema587"
+              "$ref": "#/$defs/__schema623"
             }
           },
           "required": [
@@ -8087,7 +8675,7 @@
               "const": "misty-escape"
             },
             "name": {
-              "$ref": "#/$defs/__schema587"
+              "$ref": "#/$defs/__schema623"
             }
           },
           "required": [
@@ -8104,7 +8692,7 @@
               "const": "restoration"
             },
             "name": {
-              "$ref": "#/$defs/__schema587"
+              "$ref": "#/$defs/__schema623"
             },
             "bodyGoes": {
               "type": "boolean",
@@ -8125,7 +8713,7 @@
               "const": "multiple-heads"
             },
             "name": {
-              "$ref": "#/$defs/__schema587"
+              "$ref": "#/$defs/__schema623"
             },
             "heads": {
               "type": "integer",
@@ -8177,7 +8765,7 @@
               "const": "severed-limbs"
             },
             "name": {
-              "$ref": "#/$defs/__schema587"
+              "$ref": "#/$defs/__schema623"
             },
             "uses": {
               "type": "integer",
@@ -8206,20 +8794,20 @@
         }
       ]
     },
-    "__schema587": {
+    "__schema623": {
       "type": "string",
       "minLength": 1,
       "maxLength": 120
     },
-    "__schema588": {
+    "__schema624": {
       "minItems": 1,
       "maxItems": 2,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema589"
+        "$ref": "#/$defs/__schema625"
       }
     },
-    "__schema589": {
+    "__schema625": {
       "type": "object",
       "properties": {
         "formula": {
@@ -8235,7 +8823,7 @@
       ],
       "additionalProperties": false
     },
-    "__schema590": {
+    "__schema626": {
       "type": "object",
       "properties": {
         "ability": {
@@ -8320,7 +8908,7 @@
       ],
       "additionalProperties": false
     },
-    "__schema591": {
+    "__schema627": {
       "type": "string",
       "enum": [
         "attack",
@@ -8328,11 +8916,255 @@
         "save"
       ]
     },
-    "__schema592": {
-      "description": "The character half of an ActorDefinition (class/level/species/background/feats and the choice-provenance ledger). A monster leaves it absent: the character builder writes it, never a homebrew author",
-      "$ref": "#/$defs/__schema593"
+    "__schema628": {
+      "type": "object",
+      "properties": {
+        "baseLevel": {
+          "$ref": "#/$defs/__schema629"
+        },
+        "armorClassPerLevel": {
+          "$ref": "#/$defs/__schema630"
+        },
+        "hitPointsPerLevel": {
+          "$ref": "#/$defs/__schema631"
+        },
+        "perLevel": {
+          "$ref": "#/$defs/__schema632"
+        },
+        "halfLevelAttacks": {
+          "$ref": "#/$defs/__schema635"
+        },
+        "speedsFrom": {
+          "$ref": "#/$defs/__schema636"
+        },
+        "formActions": {
+          "$ref": "#/$defs/__schema638"
+        },
+        "forms": {
+          "$ref": "#/$defs/__schema639"
+        },
+        "chosenDamageType": {
+          "$ref": "#/$defs/__schema642"
+        },
+        "hitPointsOfSummoner": {
+          "$ref": "#/$defs/__schema643"
+        }
+      },
+      "required": [
+        "baseLevel"
+      ],
+      "additionalProperties": false,
+      "description": "How a stat block a spell prints scales with the spell's level and its summoner: its numbers are for `baseLevel`, its attacks roll with its summoner's spell attack modifier and its saves use its summoner's spell save DC."
     },
-    "__schema593": {
+    "__schema629": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9
+    },
+    "__schema630": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "__schema631": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "__schema632": {
+      "maxItems": 6,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema633"
+      }
+    },
+    "__schema633": {
+      "type": "object",
+      "properties": {
+        "actionId": {
+          "$ref": "#/$defs/__schema634"
+        },
+        "plus": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "dice": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        }
+      },
+      "required": [
+        "actionId"
+      ],
+      "additionalProperties": false
+    },
+    "__schema634": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "__schema635": {
+      "maxItems": 3,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema634"
+      }
+    },
+    "__schema636": {
+      "maxItems": 3,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema637"
+      }
+    },
+    "__schema637": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "fly",
+            "climb",
+            "swim"
+          ]
+        },
+        "feet": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 500
+        }
+      },
+      "required": [
+        "level",
+        "mode",
+        "feet"
+      ],
+      "additionalProperties": false
+    },
+    "__schema638": {
+      "maxItems": 8,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema634"
+      }
+    },
+    "__schema639": {
+      "minItems": 2,
+      "maxItems": 6,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema640"
+      }
+    },
+    "__schema640": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/__schema77"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "actions": {
+          "maxItems": 6,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema634"
+          }
+        },
+        "creatureType": {
+          "$ref": "#/$defs/__schema77"
+        },
+        "damageType": {
+          "$ref": "#/$defs/__schema63"
+        },
+        "size": {
+          "$ref": "#/$defs/__schema68"
+        },
+        "hitPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "damage": {
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema641"
+          }
+        },
+        "speeds": {
+          "type": "object",
+          "properties": {
+            "fly": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 500
+            },
+            "climb": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 500
+            },
+            "swim": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 500
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "__schema641": {
+      "type": "object",
+      "properties": {
+        "actionId": {
+          "$ref": "#/$defs/__schema634"
+        },
+        "formula": {
+          "$ref": "#/$defs/__schema344"
+        },
+        "addsModifier": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "actionId",
+        "formula"
+      ],
+      "additionalProperties": false
+    },
+    "__schema642": {
+      "maxItems": 3,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema634"
+      }
+    },
+    "__schema643": {
+      "type": "boolean",
+      "const": true
+    },
+    "__schema644": {
+      "description": "The character half of an ActorDefinition (class/level/species/background/feats and the choice-provenance ledger). A monster leaves it absent: the character builder writes it, never a homebrew author",
+      "$ref": "#/$defs/__schema645"
+    },
+    "__schema645": {
       "type": "object",
       "properties": {
         "classes": {
@@ -8340,7 +9172,7 @@
           "maxItems": 4,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema594"
+            "$ref": "#/$defs/__schema646"
           }
         },
         "race": {
@@ -8408,7 +9240,7 @@
           "maxItems": 40,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema595"
+            "$ref": "#/$defs/__schema647"
           }
         },
         "martialArts": {
@@ -8428,20 +9260,20 @@
           "maxItems": 80,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema596"
+            "$ref": "#/$defs/__schema648"
           }
         },
         "choices": {
           "maxItems": 200,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema597"
+            "$ref": "#/$defs/__schema649"
           }
         }
       },
       "additionalProperties": false
     },
-    "__schema594": {
+    "__schema646": {
       "type": "object",
       "properties": {
         "id": {
@@ -8497,7 +9329,7 @@
       ],
       "additionalProperties": false
     },
-    "__schema595": {
+    "__schema647": {
       "type": "object",
       "properties": {
         "id": {
@@ -8521,7 +9353,7 @@
       ],
       "additionalProperties": false
     },
-    "__schema596": {
+    "__schema648": {
       "type": "object",
       "properties": {
         "id": {
@@ -8553,7 +9385,7 @@
       ],
       "additionalProperties": false
     },
-    "__schema597": {
+    "__schema649": {
       "type": "object",
       "properties": {
         "level": {
@@ -8591,11 +9423,11 @@
       ],
       "additionalProperties": false
     },
-    "__schema598": {
+    "__schema650": {
       "description": "Save/skill proficiency selections; the character half, see `character`",
-      "$ref": "#/$defs/__schema599"
+      "$ref": "#/$defs/__schema651"
     },
-    "__schema599": {
+    "__schema651": {
       "type": "object",
       "properties": {
         "saves": {
@@ -8611,7 +9443,7 @@
           "maxItems": 40,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema600"
+            "$ref": "#/$defs/__schema652"
           }
         },
         "saveOverrides": {
@@ -8628,7 +9460,7 @@
         "skillOverrides": {
           "type": "object",
           "propertyNames": {
-            "$ref": "#/$defs/__schema601"
+            "$ref": "#/$defs/__schema653"
           },
           "additionalProperties": {
             "type": "integer",
@@ -8640,38 +9472,38 @@
           "maxItems": 20,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema602"
+            "$ref": "#/$defs/__schema527"
           }
         },
         "weapons": {
           "maxItems": 60,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema602"
+            "$ref": "#/$defs/__schema527"
           }
         },
         "tools": {
           "maxItems": 40,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema602"
+            "$ref": "#/$defs/__schema527"
           }
         },
         "languages": {
           "maxItems": 30,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema602"
+            "$ref": "#/$defs/__schema527"
           }
         }
       },
       "additionalProperties": false
     },
-    "__schema600": {
+    "__schema652": {
       "type": "object",
       "properties": {
         "id": {
-          "$ref": "#/$defs/__schema601"
+          "$ref": "#/$defs/__schema653"
         },
         "proficiency": {
           "type": "string",
@@ -8687,43 +9519,38 @@
       ],
       "additionalProperties": false
     },
-    "__schema601": {
+    "__schema653": {
       "type": "string",
       "maxLength": 60,
       "pattern": "^[a-z0-9-]+$"
     },
-    "__schema602": {
-      "type": "string",
-      "maxLength": 60,
-      "pattern": "^[a-z0-9-]+$"
-    },
-    "__schema603": {
+    "__schema654": {
       "description": "A spellcasting creature's ability, slot maxima, and known/prepared list; the character half, see `character`",
-      "$ref": "#/$defs/__schema604"
+      "$ref": "#/$defs/__schema655"
     },
-    "__schema604": {
+    "__schema655": {
       "type": "object",
       "properties": {
         "ability": {
           "$ref": "#/$defs/__schema27"
         },
         "saveDc": {
-          "$ref": "#/$defs/__schema605"
+          "$ref": "#/$defs/__schema656"
         },
         "attackBonus": {
-          "$ref": "#/$defs/__schema606"
+          "$ref": "#/$defs/__schema657"
         },
         "slots": {
-          "$ref": "#/$defs/__schema607"
+          "$ref": "#/$defs/__schema658"
         },
         "pact": {
-          "$ref": "#/$defs/__schema609"
+          "$ref": "#/$defs/__schema660"
         },
         "classes": {
-          "$ref": "#/$defs/__schema610"
+          "$ref": "#/$defs/__schema661"
         },
         "spells": {
-          "$ref": "#/$defs/__schema612"
+          "$ref": "#/$defs/__schema663"
         }
       },
       "required": [
@@ -8731,25 +9558,25 @@
       ],
       "additionalProperties": false
     },
-    "__schema605": {
+    "__schema656": {
       "type": "integer",
       "minimum": 1,
       "maximum": 40
     },
-    "__schema606": {
+    "__schema657": {
       "type": "integer",
       "minimum": -5,
       "maximum": 30
     },
-    "__schema607": {
+    "__schema658": {
       "default": [],
       "maxItems": 9,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema608"
+        "$ref": "#/$defs/__schema659"
       }
     },
-    "__schema608": {
+    "__schema659": {
       "type": "object",
       "properties": {
         "level": {
@@ -8769,7 +9596,7 @@
       ],
       "additionalProperties": false
     },
-    "__schema609": {
+    "__schema660": {
       "type": "object",
       "properties": {
         "level": {
@@ -8789,14 +9616,14 @@
       ],
       "additionalProperties": false
     },
-    "__schema610": {
+    "__schema661": {
       "maxItems": 4,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema611"
+        "$ref": "#/$defs/__schema662"
       }
     },
-    "__schema611": {
+    "__schema662": {
       "type": "object",
       "properties": {
         "classId": {
@@ -8821,7 +9648,7 @@
           "maxItems": 9,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema608"
+            "$ref": "#/$defs/__schema659"
           }
         },
         "prepared": {
@@ -8836,15 +9663,15 @@
       ],
       "additionalProperties": false
     },
-    "__schema612": {
+    "__schema663": {
       "default": [],
       "maxItems": 400,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema613"
+        "$ref": "#/$defs/__schema664"
       }
     },
-    "__schema613": {
+    "__schema664": {
       "type": "object",
       "properties": {
         "id": {
@@ -8897,18 +9724,18 @@
       ],
       "additionalProperties": false
     },
-    "__schema614": {
+    "__schema665": {
       "description": "Immutable starting loadout; the character half, see `character`",
-      "$ref": "#/$defs/__schema615"
+      "$ref": "#/$defs/__schema666"
     },
-    "__schema615": {
+    "__schema666": {
       "maxItems": 200,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema616"
+        "$ref": "#/$defs/__schema667"
       }
     },
-    "__schema616": {
+    "__schema667": {
       "type": "object",
       "properties": {
         "id": {
@@ -9015,7 +9842,7 @@
               "maxItems": 12,
               "type": "array",
               "items": {
-                "$ref": "#/$defs/__schema617"
+                "$ref": "#/$defs/__schema668"
               }
             }
           },
@@ -9163,16 +9990,16 @@
       ],
       "additionalProperties": false
     },
-    "__schema617": {
+    "__schema668": {
       "type": "string",
       "maxLength": 40,
       "pattern": "^[a-z0-9-]+$"
     },
-    "__schema618": {
+    "__schema669": {
       "description": "Immutable starting coins; the character half, see `character`",
-      "$ref": "#/$defs/__schema619"
+      "$ref": "#/$defs/__schema670"
     },
-    "__schema619": {
+    "__schema670": {
       "type": "object",
       "properties": {
         "cp": {

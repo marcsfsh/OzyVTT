@@ -68,6 +68,12 @@ export function loadMonsterDefinitions(): readonly ActorDefinition[] {
   return loadBundle("monsters.v1.json", z.array(ActorDefinitionSchema));
 }
 
+/** The stat blocks SRD 5.2.1 prints inside its summoning spells (Draconic Spirit, Giant Insect, Otherworldly Steed,
+ *  Animated Object, Unseen Servant): no Challenge Rating, so apart from the bestiary, and scaled when summoned. */
+export function loadSummonStatBlocks(): readonly ActorDefinition[] {
+  return loadBundle("summons.v1.json", z.array(ActorDefinitionSchema));
+}
+
 /** The 15 SRD 5.2.1 conditions as reference text (Blinded, Charmed, ... Unconscious). */
 export function loadConditions(): readonly ConditionReference[] {
   return loadBundle("conditions.v1.json", z.array(ConditionReferenceSchema));

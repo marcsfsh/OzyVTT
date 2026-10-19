@@ -24,6 +24,8 @@ import {
   setShapeForm,
   setShapeGear,
   setShapingCreatures,
+  setSummonPick,
+  setSummonType,
   setTargetDarts,
   setTargetingSpend,
   SHAPING_CREATURE_PICKS,
@@ -93,7 +95,13 @@ export function ActionTargetPicker({
   const assigned = darts ? Object.values(darts.counts).reduce((sum, count) => sum + count, 0) : 0;
   // The level or "Cantrip" the list shows in brackets is noise once the action is chosen.
   const name = plainActionName(picking.action.name);
-  const verb = rollsNothing(picking.action) ? "Use" : "Roll";
+  // A summon that rolls nothing (Find Familiar) asks for its creature and is used, not rolled.
+  const summoning =
+    picking.action.summonChoices !== undefined &&
+    picking.action.attackBonus === null &&
+    picking.action.saveAbility === null &&
+    picking.action.damage.length === 0;
+  const verb = rollsNothing(picking.action) || summoning ? "Use" : "Roll";
   const where = onMap ? " on the map or in the list" : "";
   return (
     <div className="action-targeting" role="group" aria-label={`Targets for ${name}`} ref={groupRef}>
@@ -102,7 +110,9 @@ export function ActionTargetPicker({
           <strong>{name}</strong> ·{" "}
           {picking.action.checkSkills?.length
             ? "choose the skill, then Roll."
-            : `no target to choose.${verb === "Roll" ? " Roll to use it." : ""}`}
+            : summoning
+              ? `choose its ${picking.action.summonChoices?.forms ? "form" : "type"}, then Use.`
+              : `no target to choose.${verb === "Roll" ? " Roll to use it." : ""}`}
         </p>
       ) : picking.mode === "template" ? (
         <>
@@ -248,6 +258,43 @@ export function ActionTargetPicker({
             : targets.filter((target) => picking.selected.includes(target.id))
         }
       />
+      {picking.action.summonChoices?.forms && (
+        <label className="action-damage-type">
+          <span>Form</span>
+          <Select
+            value={String(
+              Math.max(
+                0,
+                picking.action.summonChoices.forms.findIndex(
+                  (row) => row.monsterId === picking.summonPick?.monsterId && row.form === picking.summonPick?.form
+                )
+              )
+            )}
+            onChange={(event) => setSummonPick(Number(event.target.value))}
+          >
+            {picking.action.summonChoices.forms.map((row, index) => (
+              <option key={`${row.monsterId}:${row.form ?? ""}`} value={index}>
+                {row.label}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
+      {picking.action.summonChoices?.creatureTypes && (
+        <label className="action-damage-type">
+          <span>Type</span>
+          <Select
+            value={picking.summonType ?? picking.action.summonChoices.creatureTypes[0]}
+            onChange={(event) => setSummonType(event.target.value)}
+          >
+            {picking.action.summonChoices.creatureTypes.map((type) => (
+              <option key={type} value={type}>
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </option>
+            ))}
+          </Select>
+        </label>
+      )}
       {picking.action.conditionChoices && picking.action.conditionChoices.length > 1 && (
         <label className="action-damage-type">
           <span>{picking.action.saveAbility ? "Condition on a failed save" : "Condition to end"}</span>

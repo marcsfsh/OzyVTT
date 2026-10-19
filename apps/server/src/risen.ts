@@ -1,111 +1,15 @@
 import { isDead, type GameState } from "@vtt/domain";
 import type { ActorDefinition, DamageDrain } from "@vtt/schemas";
-import { addActorFromDefinition, importActorDefinition } from "./actor-roster.js";
-import { sideOf } from "./creature-sides.js";
 import { addEffect, endEffect, makeEffect, type EffectNarration } from "./effects.js";
 import { removeCombatant } from "./encounter.js";
-import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { creatureTypeOf } from "./statblock-facts.js";
+import { raiseCreature, type RaiseDeps } from "./summons.js";
 
 /**
- * A creature a rule brings into the fight from a stat block (SRD Finger of Death's Zombie, a wraith's Specter, a
- * troll's severed limb): it joins the roster on its maker's side, stands in `at`'s space, and takes its turn right
- * after `after`'s. A maker on the party's side makes a friendly copy of the stat block, since a monster otherwise
- * fights against the party. The GM runs it.
+ * Creatures that rise from the dead at a rule's word (SRD Finger of Death: "A Humanoid killed by this spell rises at
+ * the start of your next turn as a Zombie"): the corpse is marked as it dies, and its killer's next turn raises it on
+ * the killer's side through `raiseCreature` (`summons.ts`), the one way a creature joins a side under another's orders.
  */
-
-export type RaiseDeps = Readonly<{
-  resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
-  catalog?: EquipmentCatalog;
-  newId: () => string;
-}>;
-
-export function raiseCreature(
-  state: GameState,
-  input: Readonly<{
-    monsterId: string;
-    /** The creature whose side it fights on. */
-    maker: GameState["actors"][number];
-    /** Where it appears: this creature's token's space. */
-    at: GameState["actors"][number];
-    /** It acts right after this creature's turn. */
-    after: string;
-    visibility?: "public" | "gm-only";
-  }>,
-  deps: RaiseDeps
-): Readonly<{ actorId: string; name: string }> | null {
-  const printed = deps.resolveDefinition(input.monsterId);
-  if (!printed || printed.schemaId !== "vtt.actor-monster") return null;
-  const id = deps.newId();
-  const visibility = input.visibility ?? input.maker.visibility;
-  const party = sideOf(input.maker, deps.resolveDefinition) === "party";
-  if (party)
-    importActorDefinition(
-      state,
-      { ...printed, token: { ...printed.token, disposition: "friendly" } },
-      id,
-      visibility,
-      deps.catalog
-    );
-  else addActorFromDefinition(state, printed, id, visibility, deps.catalog);
-  const actor = state.actors.find((candidate) => candidate.id === id)!;
-  if (state.combat.active) {
-    const reference = state.combat.tokens.find((token) => token.actorId === input.at.id);
-    const index = state.combat.initiative.findIndex((entry) => entry.actorId === input.after);
-    const before = index >= 0 ? state.combat.initiative[index]! : null;
-    const entry = {
-      actorId: id,
-      score: before?.score ?? 0,
-      tieBreaker: Math.max(-1000, (before?.tieBreaker ?? 0) - 1)
-    };
-    const initiative = [...state.combat.initiative];
-    initiative.splice(index >= 0 ? index + 1 : initiative.length, 0, entry);
-    state.combat = {
-      ...state.combat,
-      initiative,
-      tokens: [
-        ...state.combat.tokens,
-        {
-          actorId: id,
-          position: reference?.position ? { ...reference.position } : null,
-          sizePx: reference ? (reference.sizePx / reference.sizeCells) * (actor.sizeCells ?? 1) : 48,
-          gridSizePx: reference?.gridSizePx ?? null,
-          gridRotationRadians: reference?.gridRotationRadians ?? null,
-          sizeCells: actor.sizeCells ?? 1
-        }
-      ]
-    };
-  }
-  // Whose orders it follows, which counts it among what its maker controls.
-  addEffect(
-    state,
-    id,
-    makeEffect({
-      id: `${id}:${RAISED_TAG}`,
-      name: `Under ${input.maker.name}'s control`.slice(0, 120),
-      tags: [RAISED_TAG],
-      sourceActorId: input.maker.id,
-      sourceName: input.maker.name,
-      startedRound: state.combat.round,
-      duration: { type: "manual" }
-    })
-  );
-  return { actorId: id, name: actor.name };
-}
-
-/** The tag on a creature a rule raised, its maker its source. */
-export const RAISED_TAG = "raised";
-
-/** How many living creatures raised as `monsterId` follow `makerId`'s orders. */
-export function raisedBy(state: GameState, makerId: string, monsterId: string): number {
-  return state.actors.filter(
-    (actor) =>
-      !isDead(actor) &&
-      actor.effects.some((effect) => effect.tags.includes(RAISED_TAG) && effect.sourceActorId === makerId) &&
-      (actor.definitionId === monsterId ||
-        state.definitions.find((entry) => entry.id === actor.definitionId)?.definition.source.externalId === monsterId)
-  ).length;
-}
 
 /** The tag on a corpse that rises as the monster it names at the start of its killer's next turn. */
 const RISING_PREFIX = "rises-as-";
@@ -165,7 +69,7 @@ export function riseAtTurnStart(state: GameState, actorId: string, deps: RaiseDe
     const monsterId = mark.tags.find((tag) => tag.startsWith(RISING_PREFIX))!.slice(RISING_PREFIX.length);
     let raised: ReturnType<typeof raiseCreature>;
     try {
-      raised = raiseCreature(state, { monsterId, maker, at: corpse, after: maker.id }, deps);
+      raised = raiseCreature(state, { monsterId, maker, at: corpse, source: "Rises from the dead" }, deps);
     } catch {
       // A full roster leaves it to the GM.
       raised = null;

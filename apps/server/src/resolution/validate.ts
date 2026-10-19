@@ -143,6 +143,8 @@ function combatantsOf(
     input.builtin === true ||
     // A light or a cloud is something done, with no creature under it (a magmin's flames, a darkmantle's aura).
     action.sight !== undefined ||
+    // So is bringing creatures onto the map (a Horn of Valhalla's Berserkers).
+    action.summons !== undefined ||
     // Taking a form, or leaving it, is the user's own (Wild Shape, a werewolf's Shape-Shift).
     (shapeShifts && action.shapeShift?.onTargets !== true && action.save === undefined);
   // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone.
@@ -166,6 +168,7 @@ function combatantsOf(
     action.move === undefined &&
     action.leap === undefined &&
     action.teleport === undefined &&
+    action.summons === undefined &&
     action.raisesCorpse === undefined &&
     input.builtin !== true
   )

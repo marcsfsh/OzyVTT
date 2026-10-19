@@ -52,6 +52,7 @@ import { traitMechanicsOf } from "./trait-mechanics.js";
 import { deathTraitMechanicsOf, monsterDeathFor } from "./death-traits.js";
 import { withSpellcasting } from "./monster-spells.js";
 import { formOnlyOf, lycanthropeCurseOf, shapeShiftOf } from "./monster-forms.js";
+import { SUMMON_STAT_BLOCKS } from "./summon-stat-blocks.js";
 
 const sourceDir = sourcePath("open5e-srd-2024");
 
@@ -577,11 +578,40 @@ const PROTECTIVE_MAGIC: Pick<ActorAction, "reaction"> = {
  *   creature within 5 feet damages it.
  * - deflect-missile: "hit by a ranged attack roll and takes Bludgeoning, Piercing, or Slashing damage from it ...
  *   reduces the damage it takes from the attack by 11 (1d10 + 6)"; the redirect after reducing it to 0 stays prose.
+ * - animate-trees: "animates up to two trees it can see within 60 feet of itself. Each tree uses the Treant stat
+ *   block, except it has Intelligence and Charisma scores of 1, it can't speak, and it lacks this action ... The tree
+ *   takes its turn immediately after the treant on the same Initiative count, and it obeys the treant. A tree remains
+ *   animate for 1 day or until it dies, the treant dies, or it is more than 120 feet from the treant." Which trees stand
+ *   where is the GM's: the two come where the GM points.
  */
+/** A failed save that puts the target under the creature's command while its condition lasts (an aboleth's Dominate
+ *  Mind: "the target acts as an ally to the aboleth and is under its control"): the `commanded` tag the server's
+ *  summons settle reads. Keyed like `ACTION_ENRICHMENTS`. */
+const COMMANDING_SAVES: Readonly<Record<string, { name: string; tags: string[]; modifiers: [] }>> = {
+  "aboleth/dominate-mind": { name: "Dominated by the Aboleth", tags: ["commanded"], modifiers: [] }
+};
+
 const ACTION_ENRICHMENTS: Record<
   string,
-  Partial<Pick<ActorAction, "targetRules" | "reaction" | "answer" | "sight" | "grants">>
+  Partial<Pick<ActorAction, "targetRules" | "reaction" | "answer" | "sight" | "grants" | "summons">>
 > = {
+  "treant/animate-trees": {
+    summons: {
+      creatures: [
+        {
+          monsterId: "treant",
+          count: 2,
+          except: { name: "Animated Tree", abilityScores: { int: 1, cha: 1 }, withoutActions: ["animate-trees"] }
+        }
+      ],
+      rangeFeet: 60,
+      turn: "after-user",
+      allegiance: "user",
+      lasts: { type: "minutes", minutes: 1440 },
+      endsOnUserDeath: true,
+      leashFeet: 120
+    }
+  },
   "archmage/protective-magic": PROTECTIVE_MAGIC,
   "lich/protective-magic": PROTECTIVE_MAGIC,
   "mage/protective-magic": PROTECTIVE_MAGIC,
@@ -1166,6 +1196,9 @@ const monsters: ActorDefinition[] = creatures
                 ...(loss ? { failureEffect: loss.failureEffect, ongoingDamage: loss.ongoingDamage } : {}),
                 ...(poisonStopsHealing
                   ? { failureEffect: { name: "Poisoned", tags: ["no-healing"], modifiers: [] } }
+                  : {}),
+                ...(COMMANDING_SAVES[`${slug}/${actionId}`]
+                  ? { failureEffect: structuredClone(COMMANDING_SAVES[`${slug}/${actionId}`]!) }
                   : {}),
                 ...(fatal.failureByHitPoints ? { failureByHitPoints: fatal.failureByHitPoints } : {})
               }
@@ -1753,6 +1786,7 @@ const validateBundle = (label: string, schema: z.ZodType, value: unknown) => {
     process.exit(1);
   }
 };
+validateBundle("summoned stat blocks", z.array(ActorDefinitionSchema), SUMMON_STAT_BLOCKS);
 validateBundle("conditions", z.array(ConditionReferenceSchema), conditionRecords);
 validateBundle("spells", z.array(SpellReferenceSchema), spellRecords);
 validateBundle("weapons", z.array(WeaponReferenceSchema), weaponRecords);
@@ -1765,6 +1799,9 @@ validateBundle("attribution", ContentAttributionSchema, attribution);
 
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "monsters.v1.json"), `${JSON.stringify(monsters, null, 1)}\n`);
+// The stat blocks SRD 5.2.1 prints inside its summoning spells, which the source leaves out: kept apart from the
+// bestiary, since they have no Challenge Rating and come onto the map only through their spells.
+writeFileSync(join(outDir, "summons.v1.json"), `${JSON.stringify(SUMMON_STAT_BLOCKS, null, 1)}\n`);
 writeFileSync(join(outDir, "conditions.v1.json"), `${JSON.stringify(conditionRecords, null, 1)}\n`);
 writeFileSync(join(outDir, "spells.v1.json"), `${JSON.stringify(spellRecords, null, 1)}\n`);
 writeFileSync(join(outDir, "weapons.v1.json"), `${JSON.stringify(weaponRecords, null, 1)}\n`);

@@ -79,6 +79,8 @@ export * from "./views.js";
 export * from "./results.js";
 /** The content catalogs' wire rows. */
 export * from "./content.js";
+/** What a summoning action's user picks: the creature and its creature type. */
+export * from "./summon-choices.js";
 /** The Socket.IO contract both ends are typed against. */
 export * from "./socket.js";
 /** The table's music and ambient sound board (ADR-0024). */

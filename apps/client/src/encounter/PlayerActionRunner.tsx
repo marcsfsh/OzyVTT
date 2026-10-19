@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { actionChoicesOf, choosesAbility, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
+import {
+  actionChoicesOf,
+  choosesAbility,
+  summonChoicesOf,
+  type ActorDefinition,
+  type ContentActionSummary
+} from "@vtt/domain";
 import type { CastShaping } from "@vtt/schemas";
 import { command, read } from "../lib/command";
 import { ActionList } from "../sheet/ActionList";
@@ -67,6 +73,12 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     // A cure that ends one condition of several asks which (Lesser Restoration).
     ...(action.endsOneCondition && action.endsConditions ? { conditionChoices: [...action.endsConditions] } : {}),
     ...(choosesAbility(action) ? { choosesAbility: true } : {}),
+    // A summon whose user picks the creature or its type (Find Familiar) asks before it resolves.
+    ...(summonChoicesOf(action.summons) ? { summonChoices: summonChoicesOf(action.summons)! } : {}),
+    // Bringing a creature aims at no one, unless it rises from a corpse or the cast also strikes (Spiritual Weapon).
+    ...(action.summons && !action.summons.fromCorpse && !action.attack && !action.save && action.damage.length === 0
+      ? { targeting: "none" as const }
+      : {}),
     // What it asks for as it resolves; a self grant that asks is aimed at no one, so the pick comes before the tap.
     ...(actionChoicesOf(action) ? { choices: actionChoicesOf(action)! } : {}),
     ...(actionChoicesOf(action) && action.grants?.target === "self" ? { targeting: "none" as const } : {}),
@@ -158,7 +170,9 @@ export function PlayerActionRunner({
   castPlace = { kind: "inline" },
   look = "list",
   round = null,
-  acting = null
+  acting = null,
+  turnTitle,
+  pinnable = true
 }: Readonly<{
   actorId: string;
   definition: ActorDefinition;
@@ -193,6 +207,10 @@ export function PlayerActionRunner({
   /** The fight's round, and who acts off this character's turn, for the turn card's heading. */
   round?: number | null;
   acting?: string | null;
+  /** The turn card's heading when the turn isn't the character's own (a creature its character commands). */
+  turnTitle?: string;
+  /** Whether the player may pin favourites on this card: only on their own character. */
+  pinnable?: boolean;
 }>) {
   const [feedback, setFeedback] = useState("");
   const onFeedback = setFeedback;
@@ -242,6 +260,8 @@ export function PlayerActionRunner({
   // A self heal (Second Wind) is a direct tap; a heal for others picks its targets first. An item's action carries the
   // server's word on it (a scroll of Detect Magic is a tap, a potion picks its drinker).
   const isTargetlessOwn = (action: ContentActionSummary) => {
+    // A summon with a creature to pick asks for it first.
+    if (action.summonChoices) return false;
     // A pick comes first (Fire Shield's warm or chill, the weapon Magic Weapon is cast on).
     if (action.choices) return false;
     if (action.targeting === "none") return true;
@@ -411,12 +431,13 @@ export function PlayerActionRunner({
               myTurn={myTurn}
               round={round}
               acting={acting}
+              {...(turnTitle ? { title: turnTitle } : {})}
               busy={busy}
               {...(unavailable ? { unavailable } : {})}
               header={header}
               pins={pinsOf(actor)}
               counts={optionCountsOf(actor)}
-              {...(actor ? { onSetPins: setPins } : {})}
+              {...(actor && pinnable ? { onSetPins: setPins } : {})}
               onUse={pickOption}
             />
           ) : (

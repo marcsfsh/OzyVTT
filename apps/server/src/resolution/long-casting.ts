@@ -56,6 +56,8 @@ export function longCastStepOf(
   spell: SpellReference | undefined
 ): LongCastStep | null {
   if (!state.combat.active || !spell || action.spellId === undefined || isItemActionId(action.id)) return null;
+  // A feature that casts it as a Magic action (Pact of the Chain's Find Familiar) takes that action alone.
+  if (action.castsAtOnce) return null;
   if (input.economyPaid === true || input.ready === true || input.commit === false) return null;
   if (laterRowOf(spell, action.id) !== undefined) return null;
   const minutes = castingMinutesOf(spell, action.id);

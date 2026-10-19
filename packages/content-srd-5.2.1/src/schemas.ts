@@ -29,7 +29,8 @@ import {
   OnHitRiderSchema,
   SaveFailureEffectSchema,
   SaveOutcomeFields,
-  SightEffectSchema
+  SightEffectSchema,
+  SummonSchema
 } from "@vtt/schemas";
 import {
   BackgroundReferenceSchema,
@@ -220,6 +221,8 @@ export const SpellEffectSchema = z
     reaction: ActionReactionSchema.optional(),
     /** The teleport the cast gives its caster (Misty Step's 30 feet), taken on the map at once with no GM ask. */
     teleport: ActionTeleportSchema.optional(),
+    /** The creatures the cast brings onto the map (Summon Dragon's spirit, Animate Dead's undead), see `SummonSchema`. */
+    summons: SummonSchema.optional(),
     /** The caster makes the spell's save itself, at this DC whatever its own (Contact Other Plane's DC 15). */
     selfSave: z
       .object({ dc: z.number().int().min(1).max(40) })

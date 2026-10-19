@@ -15,20 +15,59 @@ export type InitiateVerdict = { ok: true } | { ok: false; message: string };
 const NOT_YOURS = "You can only act on your own character.";
 
 /** The single decision for "may this principal initiate this kind of action on this actor?". The GM
- *  (and integrations) may act on anyone; a player only on their claimed player-character. A future
- *  per-table policy would be read here and nowhere else. */
+ *  (and integrations) may act on anyone; a player on their claimed player-character, and in play on a creature that
+ *  character commands. A future per-table policy would be read here and nowhere else. */
 export function canInitiateForActor(
   initiator: Initiator,
   state: GameState,
   actorId: string,
-  _kind: InitiateKind
+  kind: InitiateKind
 ): InitiateVerdict {
   if (initiator.role === "gm") return { ok: true };
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   // A missing actor and someone else's get the same answer, so a player cannot probe which ids exist.
-  if (!actor || actor.kind !== "player-character" || actor.ownerSessionId !== initiator.sessionId)
-    return { ok: false, message: NOT_YOURS };
-  return { ok: true };
+  if (!actor) return { ok: false, message: NOT_YOURS };
+  const commander = commanderOf(state, actor);
+  const ownsCommander = commander !== undefined && !commander.archived && ownedBy(commander, initiator.sessionId);
+  if (ownedBy(actor, initiator.sessionId)) {
+    // A character under another creature's command (an aboleth's Dominate Mind) acts as that creature decides. Its
+    // player still rolls its checks and saves and keeps its sheet.
+    if (commander && !ownsCommander && COMMANDED_KINDS.has(kind))
+      return { ok: false, message: `${actor.name} is under ${commander.name}'s command.` };
+    return { ok: true };
+  }
+  // A creature the player's own character commands (a summoned spirit, a dominated ogre): that player acts for it in
+  // play. Edits to its sheet stay with the GM.
+  if (ownsCommander && actor.kind !== "player-character" && kind !== "edit" && kind !== "inventory")
+    return { ok: true };
+  return { ok: false, message: NOT_YOURS };
+}
+
+/** What a commanded creature's commander decides for it: what it does, where it moves and when its turn ends. */
+const COMMANDED_KINDS: ReadonlySet<InitiateKind> = new Set(["attack", "move", "track"]);
+
+const ownedBy = (actor: GameState["actors"][number], sessionId: string) =>
+  actor.kind === "player-character" && actor.ownerSessionId === sessionId;
+
+/** The creature that commands this one, while it is on the roster (see `Actor.control`). */
+export function commanderOf(
+  state: GameState,
+  actor: Pick<GameState["actors"][number], "control">
+): GameState["actors"][number] | undefined {
+  const commanderId = actor.control?.by;
+  return commanderId ? state.actors.find((candidate) => candidate.id === commanderId) : undefined;
+}
+
+/** Whether this player session's own character commands the creature (a summon, a dominated creature), so the player
+ *  acts for it and is sent its stat block. A player character is never another player's to command. */
+export function commandedBySession(
+  state: GameState,
+  actor: Pick<GameState["actors"][number], "control" | "kind">,
+  sessionId: string | undefined
+): boolean {
+  if (sessionId === undefined || actor.kind === "player-character") return false;
+  const commander = commanderOf(state, actor);
+  return commander !== undefined && !commander.archived && ownedBy(commander, sessionId);
 }
 
 /** `canInitiateForActor` as a guard that throws a denial. `denial`

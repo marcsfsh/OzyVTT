@@ -10,6 +10,9 @@ import { compelledMoves, fleesNow } from "../granted-moves.js";
 import { needsPlaneSettling, settlePlanes } from "../off-plane.js";
 import { heldMoveReady, settleHeldMove } from "../held-moves.js";
 import { burstEndedZones } from "../spell-zones.js";
+import { planNextTurn } from "../combat-history.js";
+import { nextInitiativeTurn } from "../encounter.js";
+import { holdsSummons, needsSummonSettling, settleSummons, summonHoldingTurnLeaves } from "../summons.js";
 import { holdsAuras, settleZoneAuras, zoneAuraChanges } from "../zone-auras.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
@@ -211,6 +214,49 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
   }
 
   /**
+   * Summoned creatures whose time is up, that dropped to 0 Hit Points, whose summoner died or that strayed too far leave
+   * the map and the roster, and a creature whose command lapsed stops obeying (`summons.ts`), as their own write. One
+   * that holds the turn ends it first, as its End Turn would, so the turn passes on through the turn's own steps.
+   */
+  async function settleSummoned() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null || !holdsSummons(before)) return;
+    const geometry = await kit.liveGeometry();
+    const distance = await kit.creatureDistance();
+    const leash = (state: GameState) => (a: string, b: string) => distance(state, a, b);
+    if (!needsSummonSettling(before, leash(before))) return;
+    if (summonHoldingTurnLeaves(before, leash(before))) {
+      const turnEvents: EffectNarration[] = [];
+      const passed = await context.store.executeTimeline(
+        { id: context.newId(), type: "turn.end", principal: "table" },
+        (draft, timeline) => {
+          planNextTurn(draft, timeline, false, (advancing) =>
+            nextInitiativeTurn(advancing, turnEvents, kit.turnAdvanceDeps(advancing, geometry, distance))
+          );
+        }
+      );
+      if (!passed.duplicate) {
+        await context.publishGameState(passed.state);
+        kit.context.logTurnBegin(passed.state);
+        kit.publishNarrations(turnEvents);
+      }
+    }
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute(
+      { id: context.newId(), type: "summons.settle", principal: "table" },
+      (draft) => {
+        events = settleSummons(draft, {
+          distanceFeet: leash(draft),
+          resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId)
+        });
+      }
+    );
+    if (result.duplicate) return;
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
+  /**
    * A spell area that acts as its spell ends (Delayed Blast Fireball's bead) is left bursting by whatever ended the
    * spell; the table then raises its saves with the server's dice and the live map, as its own write.
    */
@@ -290,6 +336,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
       await settleBurstingZones();
       await settleZoneAurasAfter();
       await settleDownedReactions();
+      await settleSummoned();
       await settleFalls();
     }
     return reply;

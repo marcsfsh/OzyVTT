@@ -368,6 +368,36 @@ const CastShapingListSchema = z
   .refine((list) => new Set(list.map((entry) => entry.id)).size === list.length, {
     error: "Choose each way to shape the spell at most once."
   });
+const SummonSlugSchema = z
+  .string()
+  .regex(/^[a-z0-9-]+$/)
+  .max(200);
+/** What the user picks for a summon: the stat blocks and how many of each (Animate Objects may mix sizes), a form of a
+ *  scaled stat block, the creature type a familiar takes, the damage type of a Draconic Spirit's breath and the
+ *  Resistance it shares, and where the creatures appear. */
+export const SummonPickSchema = z
+  .object({
+    picks: z
+      .array(
+        z
+          .object({
+            monsterId: SummonSlugSchema,
+            form: SummonSlugSchema.optional(),
+            count: z.number().int().min(1).max(20).optional()
+          })
+          .strict()
+      )
+      .min(1)
+      .max(6)
+      .optional(),
+    creatureType: SummonSlugSchema.optional(),
+    damageType: DamageTypeSchema.optional(),
+    resistance: DamageTypeSchema.optional(),
+    at: AnnotationPointSchema.optional(),
+    /** Cast without Concentration, for 1 minute, where the caster may (a Draconic Sorcerer's Dragon Companion). */
+    withoutConcentration: z.boolean().optional()
+  })
+  .strict();
 /** A form a shape-shift takes: a bestiary id, a printed form's id, or `true` for the user's true form. */
 const FormChoiceSchema = z
   .string()
@@ -501,6 +531,13 @@ export const ActionResolveSchema = z
      *  caster taking Necrotic damage for each use after the first before a Long Rest. Refused for anything else. */
     overchannel: z.boolean().optional(),
     shaping: CastShapingListSchema.optional(),
+    /** What the user picks for an action that brings creatures onto the map (Find Familiar's form, Giant Insect's
+     *  spider, Summon Dragon's breath and the Resistance it shares), and the point they appear at, within the action's
+     *  range. The server checks each pick against what the action offers at the cast's level. */
+    summon: SummonPickSchema.optional(),
+    /** A familiar delivers this spell with a range of touch (SRD 5.2.1 Find Familiar): the touch is measured from the
+     *  familiar, which must be within 100 feet of its caster and takes its Reaction. */
+    deliveredBy: z.uuid().optional(),
     /** The form a shape-shift takes (Wild Shape's known form, Polymorph's Beast, a werewolf's wolf): a bestiary id, a
      *  printed form's id, or `true` for the true form. Refused when it isn't one the action allows. */
     form: FormChoiceSchema.optional(),
@@ -1813,6 +1850,46 @@ export const ActorMountSchema = z
     actorId: z.uuid(),
     mountId: z.uuid().nullable(),
     /** GM-grade bypass of a movement-rule rejection (the half Speed it costs, a mount too small or too far). */
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A creature commands the creatures it summoned (SRD 5.2.1 Animate Dead: "you can take a Bonus Action to mentally
+ *  command any creature you made with this spell"): those named, or every one the command reaches. */
+export const SummonCommandSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    creatureIds: z.array(z.uuid()).min(1).max(20).optional(),
+    /** GM-grade bypass of an economy rule (the action or Bonus Action it costs, its turn, its range). */
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A summoned creature's commander dismisses it: for good, or a familiar for now into its pocket dimension. */
+export const SummonDismissSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    temporary: z.boolean().optional(),
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A familiar dismissed for now comes back to an unoccupied space within 30 feet of its commander. */
+export const SummonRecallSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    override: RulesOverrideSchema.optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** A commander sees through a summoned creature's eyes until the start of its next turn (a familiar). */
+export const SummonLookSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
     override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })

@@ -527,6 +527,27 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].summons.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the creatures an action brings onto the map and how they are commanded (a Horn of Valhalla's Berserkers, a treant's trees) - authored in the catalog; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].castsAtOnce",
+    types: ACTION_CARRIERS,
+    reason:
+      "a cast a feature makes a Magic action whatever the spell's casting time (Pact of the Chain's Find Familiar) - set by the builder from the feature's grant",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "summonScaling.**",
+    types: ["monster"],
+    reason:
+      "how a stat block a spell prints scales with the spell's level and its summoner (a Draconic Spirit) - authored with the spell-printed stat blocks; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].drain.**",
     types: ACTION_CARRIERS,
     reason:

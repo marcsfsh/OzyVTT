@@ -10,7 +10,7 @@ import { endCursesOn } from "../spell-endings.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { spellOf } from "./concentration.js";
 import { tableLineOf, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
-import { raiseCreature, raisedBy } from "../risen.js";
+import { raiseCreature, raisedBy } from "../summons.js";
 import { removeCombatant } from "../encounter.js";
 
 /**
@@ -278,7 +278,7 @@ export function raiseOnAction(ctx: ResolveContext): void {
     try {
       raised = raiseCreature(
         ctx.state,
-        { monsterId: raises.monsterId, maker: ctx.attacker, at: corpse, after: ctx.attacker.id },
+        { monsterId: raises.monsterId, maker: ctx.attacker, at: corpse, source: ctx.action.name },
         {
           resolveDefinition: ctx.deps.resolveDefinition,
           newId: () => crypto.randomUUID(),
