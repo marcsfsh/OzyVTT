@@ -343,6 +343,7 @@ export function spellCastMechanics(
       | "effectOptions"
       | "inflicts"
       | "explodingDice"
+      | "teleportOutcome"
     >
   > {
   // No cast model: the save still applies, and the rest is the GM's.
@@ -359,6 +360,8 @@ export function spellCastMechanics(
     ...(effect.darts ? { darts: effect.darts } : {}),
     // Sorcerous Burst: up to the spellcasting ability modifier in extra d8s.
     ...(effect.explodingDice ? { explodingDice: { most: Math.max(0, Math.min(10, numbers.modifier)) } } : {}),
+    // Teleport: the destination's familiarity, picked on the cast, and the outcome the server rolls.
+    ...(effect.teleportOutcome ? { teleportOutcome: true as const } : {}),
     // The type the caster picks: of the damage (Chromatic Orb), of the Resistance it grants (Protection from Energy), or
     // of the area it leaves (Conjure Elemental's element).
     ...(effect.damageTypes &&

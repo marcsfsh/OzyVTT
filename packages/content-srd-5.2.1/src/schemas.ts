@@ -265,6 +265,9 @@ export const SpellEffectSchema = z
      *  ability modifier in dice for the cast (Sorcerous Burst: "If you roll an 8 on a d8 for this spell, you can roll
      *  another d8"). */
     explodingDice: z.literal(true).optional(),
+    /** The caster picks how familiar the destination is and the d100 is rolled on the Teleportation Outcome table
+     *  (Teleport). */
+    teleportOutcome: z.literal(true).optional(),
     /** The spell's save is not made when it is cast but later (Spirit Guardians, Web) or never by its target
      *  (Haste, Sanctuary): the cast prompts none. `laterActions` carries one the engine can roll. */
     noCastSave: z.literal(true).optional(),

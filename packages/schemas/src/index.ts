@@ -4487,6 +4487,12 @@ export const ActionSchema = z
       .strict()
       .optional()
       .describe("Each damage die that rolls its highest face adds another, up to this many in all"),
+    /** Teleport: the caster picks the destination's familiarity as it casts (`optionId`), and the server rolls the
+     *  d100 on the Teleportation Outcome table. */
+    teleportOutcome: z
+      .literal(true)
+      .optional()
+      .describe("The cast picks a destination's familiarity and rolls on the Teleportation Outcome table"),
     /** Hit points each target regains, rolled once and applied when the action resolves (Cure Wounds). */
     healing: z
       .object({

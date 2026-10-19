@@ -1,3 +1,4 @@
+import { TELEPORT_FAMILIARITY } from "@vtt/domain";
 import { abilityModifier, isMeleeWeapon } from "@vtt/rules-5e";
 import {
   catalogIdOf,
@@ -46,12 +47,12 @@ export function checkChoices(
   catalog: EquipmentCatalog | undefined,
   definition: ActorDefinition | undefined
 ): void {
-  const offered = optionsOf(action);
+  const offered = optionsOf(action)?.options ?? (action.teleportOutcome ? TELEPORT_FAMILIARITY : undefined);
   const picks = [input.optionId, ...Object.values(input.targetOptions ?? {})].filter(
     (pick): pick is string => typeof pick === "string"
   );
   for (const pick of picks)
-    if (!offered?.options.some((option) => option.id === pick))
+    if (!offered?.some((option) => option.id === pick))
       throw new CommandRejectedError(`${action.name} doesn't offer that choice.`);
   if (Object.keys(input.targetOptions ?? {}).some((id) => !input.targetIds.includes(id)))
     throw new CommandRejectedError("Each choice must be for one of the action's targets.");

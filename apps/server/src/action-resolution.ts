@@ -107,6 +107,7 @@ import { finishLongCast, longCastStepOf, stepLongCast } from "./resolution/long-
 import { layOutProvisions } from "./resolution/provisions.js";
 import { turnedAwayByWard } from "./resolution/ward.js";
 import { orbLeap } from "./resolution/orb-leap.js";
+import { teleportOutcome } from "./resolution/teleport-outcome.js";
 import { openStrike, spendStrike } from "./resolution/true-strike.js";
 import {
   shapedAction,
@@ -348,6 +349,7 @@ export function resolveDefinitionAction(
   reviveOnCast(ctx);
   raiseOnAction(ctx);
   killOnCast(ctx);
+  teleportOutcome(ctx);
 
   parkReaction(ctx);
   ctx.builtin?.forcedSave?.(ctx);

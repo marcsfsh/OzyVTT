@@ -892,7 +892,17 @@ export type ActionChoices = Readonly<{
   optionsPerTarget?: true;
   bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true }>;
 }>;
+/** Teleport's familiarity picks, the rows of its Teleportation Outcome table. */
+export const TELEPORT_FAMILIARITY: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
+  { id: "permanent-circle", name: "Permanent circle" },
+  { id: "linked-object", name: "Linked object" },
+  { id: "very-familiar", name: "Very familiar" },
+  { id: "seen-casually", name: "Seen casually" },
+  { id: "viewed-once", name: "Viewed once or described" },
+  { id: "false-destination", name: "False destination" }
+];
 type ChoosingAction = Readonly<{
+  teleportOutcome?: true;
   grants?: Readonly<{
     options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
     optionsPerTarget?: true;
@@ -907,12 +917,18 @@ type ChoosingAction = Readonly<{
 }>;
 /** What an action asks its user to choose as it resolves, or null when it asks nothing. */
 export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
-  const chooser = action.grants?.options ? action.grants : action.save?.failureEffect;
+  const chooser = action.grants?.options
+    ? action.grants
+    : action.teleportOutcome
+      ? { options: TELEPORT_FAMILIARITY }
+      : action.save?.failureEffect;
   const binds = action.grants?.bindsWeapon;
   if (!chooser?.options && !binds) return null;
   return {
     ...(chooser?.options ? { options: chooser.options.map((option) => ({ id: option.id, name: option.name })) } : {}),
-    ...(chooser?.optionsPerTarget ? { optionsPerTarget: true as const } : {}),
+    ...(chooser && "optionsPerTarget" in chooser && chooser.optionsPerTarget
+      ? { optionsPerTarget: true as const }
+      : {}),
     ...(binds
       ? {
           bindsWeapon: {
