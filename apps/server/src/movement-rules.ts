@@ -7,19 +7,15 @@ import { holdsFeature } from "./class-features.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
 import { effectiveActions } from "./effective-actions.js";
-import {
-  NO_OPPORTUNITY_ATTACKS_TAG,
-  NO_REACTIONS_TAG,
-  ONE_THING_A_TURN_TAG,
-  READIED_TAG,
-  releaseReadied
-} from "./effects.js";
+import { NO_OPPORTUNITY_ATTACKS_TAG, NO_REACTIONS_TAG, READIED_TAG, releaseReadied } from "./effects.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
 import { travelBudgetFeet, travelCostsExtra, type TravelMode } from "./speed.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
+import { DAZED_TAG } from "./resolution/economy.js";
 import type { MovementCost, MovementCostOptions } from "./terrain.js";
 import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
+import { frightenedApproach } from "./vision/rules.js";
 import {
   effectiveModeFor,
   familyModeFor,
@@ -350,9 +346,20 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     police(state, input, "movement.teleport", `${mover.name} can teleport only with the GM's go-ahead.`, outcome);
   if ((counted || input.byPlayer) && endsInOccupiedSpace(state, input, to))
     police(state, input, "movement.occupied", `${mover.name} can't end its move in another creature's space.`, outcome);
+  // SRD Frightened: "You can't willingly move closer to the source of fear."
+  const feared = counted || input.byPlayer ? frightenedApproach(state, actorId, from, to) : null;
+  if (feared !== null)
+    police(
+      state,
+      input,
+      "movement.toward-fear",
+      `${mover.name} is Frightened and can't willingly move closer to ${feared}.`,
+      outcome
+    );
   if (mode === "teleport" || !counted) return done();
-  // SRD Abjure Foes: a creature limited to one of moving, an action or a Bonus Action that took either can't move.
-  const limited = mover.effects.find((effect) => effect.tags.includes(ONE_THING_A_TURN_TAG));
+  // SRD Abjure Foes, a Rogue's Daze: a creature limited to one of moving, an action or a Bonus Action that took
+  // either can't move (resolution/economy.ts refuses the rest).
+  const limited = mover.effects.find((effect) => effect.tags.includes(DAZED_TAG));
   if (
     limited &&
     !readied &&

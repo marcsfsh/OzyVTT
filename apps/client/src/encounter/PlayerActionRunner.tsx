@@ -28,7 +28,7 @@ import {
   useTargetingBusy,
   useTargetingResult
 } from "./targeting";
-import { foesFirst, type TargetRow } from "../table/targetRows";
+import { foesFirst, pickableTargets, type TargetRow } from "../table/targetRows";
 import { revealInRegion } from "../lib/reveal";
 import "./action-runner.css";
 
@@ -134,6 +134,7 @@ export function PlayerActionRunner({
   insideNow,
   actor = null,
   myTurn = true,
+  offTurn = false,
   header,
   pickOnly,
   castPlace = { kind: "inline" },
@@ -161,6 +162,8 @@ export function PlayerActionRunner({
   actor?: SheetActor | null;
   /** The character acts now; off its turn the list stays in view and only reactions are live. */
   myTurn?: boolean;
+  /** It acts off its own turn (a readied spell or action), so a result it gets stays until its player closes it. */
+  offTurn?: boolean;
   /** What sits above the list (the economy on the sheet's own Play tab). */
   header?: ReactNode;
   /** Only the aim and its result, for a use started from another tab of the sheet; Done closes it. */
@@ -248,12 +251,20 @@ export function PlayerActionRunner({
     },
     []
   );
-  // The turn moved on: what was being aimed on it goes, as when the runner was mounted only for the turn.
+  // The turn moved on: what was being aimed on it goes, as when the runner was mounted only for the turn. A result got
+  // off the turn (a readied spell released, which ends the Ready) stays until its player closes it.
   const wasMyTurn = useRef(myTurn);
+  const resultOffTurn = useRef(false);
+  const offTurnNow = useRef(offTurn);
+  offTurnNow.current = offTurn;
+  // Whether the result in view arrived off the turn, read when it arrives.
+  useEffect(() => {
+    resultOffTurn.current = result !== null && offTurnNow.current;
+  }, [result]);
   useEffect(() => {
     if (wasMyTurn.current && !myTurn) {
       clearTargeting();
-      setTargetingResult(null);
+      if (!resultOffTurn.current) setTargetingResult(null);
     }
     wasMyTurn.current = myTurn;
   }, [myTurn]);
@@ -435,26 +446,30 @@ export function PlayerActionRunner({
       {picking && !result?.preview && (
         <ActionTargetPicker
           picking={picking}
-          targets={foesFirst(
-            targets
-              // A heal may be for the healer too (a potion the healer drinks), and so may a touch that cures or
-              // protects with no attack, save or damage (Lesser Restoration, Enhance Ability on the caster).
-              .filter(
-                (target) =>
-                  target.actorId !== actorId ||
-                  picking.action.healing != null ||
-                  healingOf(picking.action) !== undefined ||
-                  (picking.action.builtin !== true &&
-                    picking.action.attackBonus === null &&
-                    picking.action.saveAbility === null &&
-                    picking.action.damage.length === 0)
-              )
-              .map(
-                (target): Pick<TargetRow, "id" | "label"> & Partial<TargetRow> =>
-                  targetRows?.get(target.actorId) ?? { id: target.actorId, label: target.name }
-              ),
-            "player-character",
-            picking.action.healing != null || healingOf(picking.action) !== undefined
+          targets={pickableTargets(
+            foesFirst(
+              targets
+                // A heal may be for the healer too (a potion the healer drinks), and so may a touch that cures or
+                // protects with no attack, save or damage (Lesser Restoration, Enhance Ability on the caster).
+                .filter(
+                  (target) =>
+                    target.actorId !== actorId ||
+                    picking.action.healing != null ||
+                    healingOf(picking.action) !== undefined ||
+                    (picking.action.builtin !== true &&
+                      picking.action.attackBonus === null &&
+                      picking.action.saveAbility === null &&
+                      picking.action.damage.length === 0)
+                )
+                .map(
+                  (target): Pick<TargetRow, "id" | "label"> & Partial<TargetRow> =>
+                    targetRows?.get(target.actorId) ?? { id: target.actorId, label: target.name }
+                ),
+              "player-character",
+              picking.action.healing != null || healingOf(picking.action) !== undefined
+            ),
+            picking.action,
+            picking.action.spellId !== undefined ? spellIndex.get(picking.action.spellId) : undefined
           )}
           onMap
           {...(insideNow ? { insideNow } : {})}
@@ -488,6 +503,7 @@ export function PlayerActionRunner({
               onFeedback={onFeedback}
               push={result.push}
               {...(result.hitOffers ? { hitOffers: result.hitOffers } : {})}
+              knockOutOffered={result.knockOut === "offered"}
               resolve={(options) => resolveTargeting(revision, onOutcome, options)}
             />
           )}
@@ -496,16 +512,22 @@ export function PlayerActionRunner({
               Each target makes a DC {result.save.dc} {result.save.ability.toUpperCase()} save. The GM answers these.
             </p>
           )}
-          {result.waitingOnReaction && result.attack && (
-            <p className="action-save-note">
-              Waiting on {result.attack.targetName}'s{" "}
-              <strong>
-                {result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId)
-                  ?.actionName ?? "reaction"}
-              </strong>
-              . It may turn the hit into a miss, and the attack finishes when it is answered.
-            </p>
-          )}
+          {result.waitingOnReaction &&
+            result.attack &&
+            (() => {
+              const prompt = result.reactionPrompts?.find((candidate) => candidate.actorId === result.attack!.targetId);
+              // Another creature's answer to the roll (Cutting Words) is not named: it may be one the player can't see.
+              return prompt ? (
+                <p className="action-save-note">
+                  Waiting on {result.attack.targetName}'s <strong>{prompt.actionName}</strong>. It may turn the hit into
+                  a miss, and the attack finishes when it is answered.
+                </p>
+              ) : (
+                <p className="action-save-note">
+                  Waiting on an answer to the attack roll. The attack finishes when it is answered.
+                </p>
+              );
+            })()}
           {result.damage.length > 0 &&
             !result.preview &&
             (() => {
@@ -527,13 +549,17 @@ export function PlayerActionRunner({
             result.damageTotal > 0 &&
             (() => {
               const reactionPrompt = result.reactionPrompts?.find(
-                (candidate) => candidate.actorId === result.attack!.targetId
+                (candidate) => candidate.holdsDamage || candidate.actorId === result.attack!.targetId
               );
               if (reactionPrompt)
-                return (
+                return reactionPrompt.actorId === result.attack!.targetId ? (
                   <p className="action-save-note">
                     Waiting on {result.attack!.targetName}'s <strong>{reactionPrompt.actionName}</strong>. The damage
                     lands when it is answered.
+                  </p>
+                ) : (
+                  <p className="action-save-note">
+                    Waiting on an answer to the damage roll. The damage lands when it is answered.
                   </p>
                 );
               return (

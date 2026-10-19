@@ -251,6 +251,30 @@ export const ContentEquipmentSummarySchema = z.strictObject({
     .optional()
     .describe(
       "The spell levels one copy of a Spell Scroll can bear (0 is a cantrip), for the picker's spell step; absent on anything else"
+    ),
+  /** A manual or tome: its study raises a score for good (`character.study-item`). */
+  study: z
+    .strictObject({
+      ability: z.enum(["str", "dex", "con", "int", "wis", "cha"]),
+      amount: z.number().int(),
+      maximum: z.number().int(),
+      hours: z.number().int(),
+      days: z.number().int()
+    })
+    .optional()
+    .describe(
+      "A manual or tome: `hours` of study within `days` raise the reader's `ability` by `amount`, never above `maximum`, as its text prints it; absent on anything else"
+    ),
+  /** A light source: lit and put out on the row unless it always glows, with a hood to lower or a Cone to aim. */
+  light: z
+    .strictObject({
+      always: z.literal(true).optional(),
+      hooded: z.literal(true).optional(),
+      cone: z.literal(true).optional()
+    })
+    .optional()
+    .describe(
+      "How the item sheds light, as its own text says: lit and put out on its row (item.set-light) unless `always` (it glows while held), with a hood to lower (`hooded`) or a Cone to aim (`cone`). Absent on anything that sheds none"
     )
 });
 export type ContentEquipmentSummary = Wire<z.infer<typeof ContentEquipmentSummarySchema>>;
@@ -874,6 +898,7 @@ export type ContentActionSummary = Readonly<{
   rangeFeet: number | null;
   /** Normal range band for two-range weapons; shots beyond it (up to rangeFeet) roll at disadvantage. */ rangeNormalFeet:
     number | null;
+  /** How far its targets may be when it says so without an attack (Lay on Hands' touch is 5). */ targetRangeFeet?: number;
   saveAbility: string | null;
   saveDc: number | null;
   damage: ReadonlyArray<{ formula: string; type: string }>;

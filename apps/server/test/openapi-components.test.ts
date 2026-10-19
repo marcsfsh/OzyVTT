@@ -440,6 +440,7 @@ describe("generated OpenAPI components", () => {
       "on-attack-roll": {},
       "on-hit": {},
       "on-critical-hit": {},
+      "on-natural-20": {},
       "on-damage-roll": {},
       "on-saving-throw": {},
       "on-ability-check": {},
@@ -463,7 +464,10 @@ describe("generated OpenAPI components", () => {
       "versus-marked": { tags: ["hunters-mark"] },
       "versus-hurt": {},
       "versus-within": { feet: 5 },
-      "spell-class-is": { classIds: ["sorcerer"] }
+      "spell-class-is": { classIds: ["sorcerer"] },
+      "sees-other": {},
+      "seen-by-other": {},
+      "other-lacks-sense": { senses: ["blindsight", "truesight"] }
     };
 
     /** One payload per modifier. */

@@ -2,9 +2,15 @@ import { useId } from "react";
 
 type Rect = Readonly<{ x: number; y: number; width: number; height: number }>;
 
-/** Dynamic vision as the server sends it: where the audience sees now (flat `[x0, y0, x1, y1, ...]` polygons) and
- *  what the party has seen (rects). */
-export type VisionMask = Readonly<{ visible: readonly (readonly number[])[]; explored: readonly Rect[] }>;
+/** Dynamic vision as the server sends it: where the audience sees now (flat `[x0, y0, x1, y1, ...]` polygons), where
+ *  in that the light is bright (absent when it all is), what the party has seen (rects), and the creatures one of a
+ *  player's characters senses without seeing (Divine Sense). */
+export type VisionMask = Readonly<{
+  visible: readonly (readonly number[])[];
+  bright?: readonly (readonly number[])[];
+  explored: readonly Rect[];
+  sensed?: readonly Readonly<{ x: number; y: number; creatureType: string }>[];
+}>;
 
 const points = (polygon: readonly number[]) => {
   const pairs: string[] = [];
@@ -24,7 +30,8 @@ export function FogOverlay({
   height,
   fog,
   vision,
-  variant
+  variant,
+  markRadius = 18
 }: Readonly<{
   width: number;
   height: number;
@@ -41,6 +48,8 @@ export function FogOverlay({
   }>;
   vision?: VisionMask | null;
   variant: "gm" | "player";
+  /** How big a sensed creature's mark is drawn, in map pixels (about a third of a cell). */
+  markRadius?: number;
 }>) {
   const base = useId();
   // Chromium caches an SVG <mask>'s raster and does not re-evaluate it when only its children change (stale holes
@@ -89,9 +98,19 @@ export function FogOverlay({
               {vision.explored.map((rect, index) => (
                 <rect key={index} x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill="#6e6e6e" />
               ))}
-              {/* In sight now. The thin stroke closes the hairline seams between neighbouring pieces. */}
+              {/* In sight now. The thin stroke closes the hairline seams between neighbouring pieces. Where the
+                  server marks bright light, the rest of what is in sight keeps a light shade: Dim Light. */}
               {vision.visible.map((polygon, index) => (
-                <polygon key={index} points={points(polygon)} fill="black" stroke="black" strokeWidth={1.5} />
+                <polygon
+                  key={index}
+                  points={points(polygon)}
+                  fill={vision.bright ? DIM_SHADE : "black"}
+                  stroke={vision.bright ? DIM_SHADE : "black"}
+                  strokeWidth={1.5}
+                />
+              ))}
+              {vision.bright?.map((polygon, index) => (
+                <polygon key={`b${index}`} points={points(polygon)} fill="black" stroke="black" strokeWidth={1.5} />
               ))}
             </mask>
           </defs>
@@ -104,11 +123,27 @@ export function FogOverlay({
             mask={`url(#${visionMask})`}
             pointerEvents="none"
           />
+          {vision.sensed?.map((creature, index) => (
+            <g key={index} className="vision-sensed" pointerEvents="none">
+              <title>{`You sense ${article(creature.creatureType)} here`}</title>
+              <circle cx={creature.x} cy={creature.y} r={markRadius} />
+              <text x={creature.x} y={creature.y + markRadius * 1.7} textAnchor="middle" fontSize={markRadius * 0.7}>
+                {titled(creature.creatureType)}
+              </text>
+            </g>
+          ))}
         </>
       )}
     </>
   );
 }
+
+/** The mask's grey for what is in sight in Dim Light: a light shade over the map, well short of the remembered ground. */
+const DIM_SHADE = "#2a2a2a";
+
+/** "an Undead", "a Fiend": the creature type with its article. */
+const article = (type: string) => `${/^[aeiou]/.test(type) ? "an" : "a"} ${titled(type)}`;
+const titled = (type: string) => type.slice(0, 1).toUpperCase() + type.slice(1);
 
 /** A short fingerprint of the mask's geometry (see the Chromium note above). */
 function signatureOf(vision: VisionMask): string {
@@ -117,6 +152,10 @@ function signatureOf(vision: VisionMask): string {
     hash = Math.imul(hash ^ Math.round(value * 10), 0x01000193) >>> 0;
   };
   for (const polygon of vision.visible) {
+    add(polygon.length);
+    for (const value of polygon) add(value);
+  }
+  for (const polygon of vision.bright ?? []) {
     add(polygon.length);
     for (const value of polygon) add(value);
   }

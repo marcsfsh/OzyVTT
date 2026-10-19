@@ -7,6 +7,8 @@ import { potentSpellcasting, wisdomOnChecks, type ClassMechanicsModule } from ".
 
 export const cleric: ClassMechanicsModule = {
   features: {
+    // "Whenever you gain a Cleric level, you can replace one of your cantrips."
+    spellcasting: { replaces: [{ offer: "class-cantrips", when: "level-up", amount: 1 }] },
     // "You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you
     // finish a Long Rest."
     "channel-divinity": {

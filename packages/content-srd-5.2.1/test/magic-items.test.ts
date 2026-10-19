@@ -341,9 +341,24 @@ describe("the generated magic-item bundle", () => {
     const catalog = loadEquipment();
     expect(catalog.filter((item) => item.isMagic)).toHaveLength(rows.length);
     // The fold gives every row the uniform `weapon`/`armor`-present shape the other three have; only a
-    // shield carries a block of its own (see below).
+    // shield carries an armor block of its own (see below), and only what is wielded as a weapon of its own a weapon
+    // block (a staff as a Quarterstaff, the Rod of Lordly Might as a Mace, the Sun Blade as a Longsword).
     const magic = catalog.filter((item) => item.isMagic);
-    expect(magic.filter((item) => item.weapon !== null)).toEqual([]);
+    expect(
+      magic
+        .filter((item) => item.weapon !== null)
+        .map((item) => item.id)
+        .sort()
+    ).toEqual([
+      "rod-of-lordly-might",
+      "staff-of-power",
+      "staff-of-striking",
+      "staff-of-the-magi",
+      "staff-of-the-woodlands",
+      "staff-of-thunder-and-lightning",
+      "staff-of-withering",
+      "sun-blade"
+    ]);
     expect(magic.filter((item) => item.armor !== null && item.slot !== "shield")).toEqual([]);
     const wand = catalog.find((item) => item.id === "wand-of-the-war-mage-1")!;
     expect(wand).toMatchObject({

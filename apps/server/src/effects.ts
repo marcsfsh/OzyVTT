@@ -34,13 +34,10 @@ export const MAGE_ARMOR_TAG = "mage-armor";
 export const NO_ACTIONS_TAG = "no-actions";
 /** The bearer can't take Reactions while this lasts. */
 export const NO_REACTIONS_TAG = "no-reactions";
-/** The bearer can't take Bonus Actions while this lasts (Confusion). */
+/** The bearer can't take a Bonus Action while this lasts (an ice devil's Ice Spear, Confusion). */
 export const NO_BONUS_ACTIONS_TAG = "no-bonus-actions";
 /** The bearer can't make attacks while this lasts (Gaseous Form's cloud). */
 export const CANT_ATTACK_TAG = "cant-attack";
-/** On its turns the bearer can do only one of these: move, take an action, or take a Bonus Action (Abjure Foes, a
- *  Cunning Strike's Daze). */
-export const ONE_THING_A_TURN_TAG = "one-thing-a-turn";
 /** The bearer's only actions are Dash and the Magic action that ends this (Wind Walk's cloud form). */
 export const DASH_ONLY_TAG = "dash-only";
 /** The bearer can't end the Prone condition on itself while this lasts (Hideous Laughter). */

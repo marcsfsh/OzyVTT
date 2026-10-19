@@ -534,11 +534,13 @@ describe("the two entries that cast nothing and keep the rest", () => {
     expect(saveTotalFor(definition, state.actors[0], "dex", derivation)).toBe(4);
     // Both casts were removed, so the 20-charge pool has nothing drawing on it.
     expect(view.equipmentRecord("staff-of-power")!.casts).toEqual([]);
+    // What it does is swing as a magic Quarterstaff, in one hand or two.
     expect(
-      effectiveActions(definition, state.actors[0], catalog).filter((entry) =>
-        entry.id.startsWith("item-staff-of-power-")
-      )
-    ).toEqual([]);
+      effectiveActions(definition, state.actors[0], catalog)
+        .filter((entry) => entry.id.startsWith("item-staff-of-power"))
+        .map((entry) => entry.id)
+        .sort()
+    ).toEqual(["item-staff-of-power", "item-staff-of-power-two-handed"]);
   });
 
   it("leaves Staff of the Magi four at-will casts and Ring of Shooting Stars its two cantrips and its own action", () => {
@@ -557,7 +559,7 @@ describe("the two entries that cast nothing and keep the rest", () => {
     );
     expect(
       effectiveActions(definition, magi.actors[0], catalog)
-        .filter((entry) => entry.id.startsWith("item-staff-of-the-magi-"))
+        .filter((entry) => entry.id.startsWith("item-staff-of-the-magi-cast-"))
         .map((entry) => entry.id)
         .sort()
     ).toEqual([

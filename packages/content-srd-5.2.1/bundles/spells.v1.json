@@ -3156,6 +3156,13 @@
       "when": [
        {
         "type": "on-attack-roll"
+       },
+       {
+        "type": "other-lacks-sense",
+        "senses": [
+         "blindsight",
+         "truesight"
+        ]
        }
       ]
      }
@@ -4301,6 +4308,11 @@
    ],
    "healing": null
   },
+  "sight": {
+   "area": {
+    "kind": "heavily-obscured"
+   }
+  },
   "classes": [
    "sorcerer",
    "wizard"
@@ -5106,6 +5118,13 @@
    "healing": {
     "formula": "4d12",
     "addsModifier": true
+   }
+  },
+  "sight": {
+   "light": {
+    "on": "area",
+    "brightFeet": 10,
+    "dimFeet": 0
    }
   },
   "classes": [
@@ -6071,6 +6090,13 @@
    "damage": [],
    "healing": null
   },
+  "sight": {
+   "light": {
+    "on": "targets",
+    "brightFeet": 20,
+    "dimFeet": 20
+   }
+  },
   "classes": [
    "cleric",
    "druid",
@@ -6687,6 +6713,14 @@
    "damage": [],
    "healing": null
   },
+  "sight": {
+   "light": {
+    "on": "point",
+    "brightFeet": 0,
+    "dimFeet": 10,
+    "count": 4
+   }
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -6743,6 +6777,15 @@
    "damage": [],
    "healing": null
   },
+  "sight": {
+   "area": {
+    "kind": "magical-darkness"
+   },
+   "dispels": {
+    "kind": "light",
+    "upToLevel": 2
+   }
+  },
   "classes": [
    "sorcerer",
    "warlock",
@@ -6792,7 +6835,26 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "darkvision",
+      "feet": 150
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Darkvision",
+    "tags": [
+     "darkvision-spell"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "druid",
@@ -6850,6 +6912,18 @@
    "attacks": 0,
    "damage": [],
    "healing": null
+  },
+  "sight": {
+   "light": {
+    "on": "area",
+    "brightFeet": 60,
+    "dimFeet": 60,
+    "sunlight": true
+   },
+   "dispels": {
+    "kind": "darkness",
+    "upToLevel": 3
+   }
   },
   "classes": [
    "cleric",
@@ -7115,7 +7189,33 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Detect Evil and Good",
+    "tags": [
+     "detect-evil-and-good"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    },
+    "detects": {
+     "creatureTypes": [
+      "aberration",
+      "celestial",
+      "elemental",
+      "fey",
+      "fiend",
+      "undead"
+     ],
+     "feet": 30,
+     "blockedByWalls": true
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -9794,10 +9894,17 @@
       "when": [
        {
         "type": "on-attack-roll"
+       },
+       {
+        "type": "seen-by-other"
        }
       ]
      }
-    ]
+    ],
+    "light": {
+     "brightFeet": 0,
+     "dimFeet": 10
+    }
    }
   },
   "classes": [
@@ -10554,8 +10661,18 @@
     "duration": {
      "type": "manual"
     },
-    "meleeHitDamage": {
-     "formula": "2d8"
+    "struck": {
+     "withinFeet": 5,
+     "damage": [
+      {
+       "formula": "2d8",
+       "type": "fire"
+      }
+     ]
+    },
+    "light": {
+     "brightFeet": 10,
+     "dimFeet": 10
     },
     "options": [
      {
@@ -10587,6 +10704,13 @@
       "damageType": "cold"
      }
     ]
+   }
+  },
+  "sight": {
+   "light": {
+    "on": "caster",
+    "brightFeet": 10,
+    "dimFeet": 10
    }
   },
   "classes": [
@@ -10827,6 +10951,13 @@
    ],
    "healing": null
   },
+  "sight": {
+   "light": {
+    "on": "caster",
+    "brightFeet": 10,
+    "dimFeet": 10
+   }
+  },
   "classes": [
    "druid",
    "sorcerer"
@@ -11059,6 +11190,13 @@
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "light": {
+    "on": "area",
+    "brightFeet": 20,
+    "dimFeet": 20
+   }
   },
   "classes": [
    "druid",
@@ -11373,6 +11511,11 @@
    "attacks": 0,
    "damage": [],
    "healing": null
+  },
+  "sight": {
+   "area": {
+    "kind": "heavily-obscured"
+   }
   },
   "classes": [
    "druid",
@@ -13627,6 +13770,11 @@
    "damage": [],
    "healing": null
   },
+  "sight": {
+   "dispels": {
+    "kind": "fog"
+   }
+  },
   "classes": [
    "druid",
    "ranger",
@@ -15271,6 +15419,9 @@
    "damage": [],
    "healing": null
   },
+  "sight": {
+   "seenBy": "area"
+  },
   "classes": [
    "bard",
    "sorcerer",
@@ -15770,6 +15921,11 @@
    ],
    "healing": null
   },
+  "sight": {
+   "area": {
+    "kind": "heavily-obscured"
+   }
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -15970,6 +16126,11 @@
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "area": {
+    "kind": "lightly-obscured"
+   }
   },
   "classes": [
    "cleric",
@@ -16660,6 +16821,13 @@
    "attacks": 0,
    "damage": [],
    "healing": null
+  },
+  "sight": {
+   "light": {
+    "on": "targets",
+    "brightFeet": 20,
+    "dimFeet": 20
+   }
   },
   "classes": [
    "bard",
@@ -19052,6 +19220,13 @@
    ],
    "healing": null
   },
+  "sight": {
+   "light": {
+    "on": "area",
+    "brightFeet": 0,
+    "dimFeet": 5
+   }
+  },
   "classes": [
    "druid"
   ],
@@ -20393,6 +20568,13 @@
    "noCastSave": true,
    "healing": null
   },
+  "sight": {
+   "light": {
+    "on": "area",
+    "brightFeet": 100,
+    "dimFeet": 100
+   }
+  },
   "classes": [
    "bard",
    "wizard"
@@ -20535,6 +20717,13 @@
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "light": {
+    "on": "caster",
+    "brightFeet": 20,
+    "dimFeet": 20
+   }
   },
   "classes": [
    "druid"
@@ -22832,7 +23021,27 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "sense",
+      "sense": "see-invisibility",
+      "feet": 0
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "See Invisibility",
+    "tags": [
+     "see-invisibility"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -23929,6 +24138,11 @@
    ],
    "healing": null
   },
+  "sight": {
+   "area": {
+    "kind": "heavily-obscured"
+   }
+  },
   "classes": [
    "druid",
    "sorcerer",
@@ -24832,6 +25046,10 @@
     "onHit": true,
     "duration": {
      "type": "until-source-turn-end"
+    },
+    "light": {
+     "brightFeet": 0,
+     "dimFeet": 10
     }
    }
   },
@@ -24938,6 +25156,11 @@
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "area": {
+    "kind": "heavily-obscured"
+   }
   },
   "classes": [
    "bard",
@@ -25375,6 +25598,14 @@
    ],
    "healing": null
   },
+  "sight": {
+   "light": {
+    "on": "caster",
+    "brightFeet": 30,
+    "dimFeet": 30,
+    "sunlight": true
+   }
+  },
   "classes": [
    "cleric",
    "druid",
@@ -25449,6 +25680,11 @@
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "dispels": {
+    "kind": "darkness"
+   }
   },
   "classes": [
    "cleric",
@@ -26393,7 +26629,27 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "sense",
+      "sense": "truesight",
+      "feet": 120
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "True Seeing",
+    "tags": [
+     "true-seeing"
+    ],
+    "target": "target",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -27603,6 +27859,11 @@
     }
    ],
    "healing": null
+  },
+  "sight": {
+   "area": {
+    "kind": "lightly-obscured"
+   }
   },
   "classes": [
    "sorcerer",

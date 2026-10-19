@@ -149,7 +149,7 @@ export function grantExtras(
     ...(option ? { optionId: option.id } : {}),
     ...(option?.speedZero ? { speedZero: true } : {}),
     ...(grant.endsOnDamage || option?.endsOnDamage ? { endsOnDamage: true } : {}),
-    ...meleeHitDamageOf(grant, option),
+    ...struckOf(grant, option),
     ...unarmedStrikeOf(ctx, option),
     ...grantedSpellActionOf(ctx, grant, option, recipient)
   };
@@ -171,11 +171,13 @@ function unarmedStrikeOf(
   };
 }
 
-/** Fire Shield: what a creature that hits the bearer in melee takes, of the type the option picked. */
-function meleeHitDamageOf(grant: Grant, option: GrantOption | null): Partial<Pick<EffectInstance, "meleeHitDamage">> {
-  const hit = grant.meleeHitDamage;
-  const type = option?.damageType ?? hit?.type;
-  return hit && type ? { meleeHitDamage: { formula: hit.formula, type } } : {};
+/** Fire Shield: what a creature that hits the bearer in melee takes, of the type the option picked (warm: Fire,
+ *  chill: Cold). */
+function struckOf(grant: Grant, option: GrantOption | null): Partial<Pick<EffectInstance, "struck">> {
+  const struck = grant.struck;
+  const type = option?.damageType;
+  if (!struck?.damage || !type) return {};
+  return { struck: { ...structuredClone(struck), damage: struck.damage.map((part) => ({ ...part, type })) } };
 }
 
 /** Dragon's Breath: the spell's later action the recipient may take while it lasts, at the numbers it was cast with

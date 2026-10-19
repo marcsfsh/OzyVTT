@@ -3,11 +3,16 @@ import type { ClassMechanicsModule } from "./overlay.js";
 
 export const rogue: ClassMechanicsModule = {
   features: {
+    // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": made in the Level flow until a
+    // rest offers it.
+    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "level-up", amount: 2 }] },
     /**
      * Once per turn (`per: "turn"`, counted in `turnUses`). It rides a hit: the server offers it on an attack's
      * preview when the hit qualifies (Finesse or Ranged weapon; Advantage, or an ally beside the target and no
      * Disadvantage) and rolls it with the hit in the weapon's type, so the `weapon` label below is never dealt.
-     * The printed column stays display-only: "6d6" is dice to roll.
+     * The printed column stays display-only: "6d6" is dice to roll. Cunning Strike's effects ride it, each forgoing
+     * its die cost before the dice roll, at 8 + Dexterity + Proficiency Bonus: one effect from level 5 (Cunning
+     * Strike), two from level 11 (Improved Cunning Strike), and the ones Devious Strikes and Supreme Sneak add.
      */
     "sneak-attack": {
       uses: { limit: 1, per: "turn", pool: "sneak-attack" },
@@ -17,8 +22,93 @@ export const rogue: ClassMechanicsModule = {
           name: "Sneak Attack",
           activation: "other",
           description:
-            "Once per turn, deal this extra damage to one creature you hit with an attack roll, if you have Advantage on the roll (or an ally is within 5 feet of the target, that ally isn't Incapacitated, and you don't have Disadvantage) and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's. Add it when you confirm a qualifying hit.",
+            "Once per turn, deal this extra damage to one creature you hit with an attack roll, if you have Advantage on the roll (or an ally is within 5 feet of the target, that ally isn't Incapacitated, and you don't have Disadvantage) and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's. Add it when you confirm a qualifying hit, with any Cunning Strike effects, each forgoing its die cost.",
           damage: [],
+          ridesHit: {
+            rides: "finesse-or-ranged-weapon",
+            sneakAttack: true,
+            weaponType: true,
+            saveDc: { base: 8, ability: "dex", proficiencyBonus: true },
+            effectsChooseByLevel: [
+              { level: 5, choose: 1 },
+              { level: 11, choose: 2 }
+            ],
+            effects: [
+              {
+                id: "poison",
+                name: "Poison",
+                forgoesDice: 1,
+                requiresFeature: "cunning-strike",
+                requiresItem: "poisoners-kit",
+                save: {
+                  ability: "con",
+                  failureConditions: ["poisoned"],
+                  failureDuration: { type: "rounds", rounds: 10 },
+                  repeatSave: true
+                }
+              },
+              {
+                id: "trip",
+                name: "Trip",
+                forgoesDice: 1,
+                requiresFeature: "cunning-strike",
+                maxTargetSize: "large",
+                save: { ability: "dex", failureConditions: ["prone"] }
+              },
+              {
+                id: "withdraw",
+                name: "Withdraw",
+                forgoesDice: 1,
+                requiresFeature: "cunning-strike",
+                grantsHalfSpeedMove: true
+              },
+              {
+                id: "stealth-attack",
+                name: "Stealth Attack",
+                forgoesDice: 1,
+                requiresFeature: "supreme-sneak",
+                keepsHidden: true
+              },
+              {
+                id: "daze",
+                name: "Daze",
+                forgoesDice: 2,
+                requiresFeature: "devious-strikes",
+                save: {
+                  ability: "con",
+                  failureEffect: {
+                    name: "Dazed",
+                    tags: ["dazed"],
+                    duration: { type: "until-bearer-turn-end" }
+                  }
+                }
+              },
+              {
+                id: "knock-out",
+                name: "Knock Out",
+                forgoesDice: 6,
+                requiresFeature: "devious-strikes",
+                save: {
+                  ability: "con",
+                  failureConditions: ["unconscious"],
+                  failureDuration: { type: "rounds", rounds: 10 },
+                  repeatSave: true,
+                  endsOnDamage: true
+                }
+              },
+              {
+                id: "obscure",
+                name: "Obscure",
+                forgoesDice: 3,
+                requiresFeature: "devious-strikes",
+                save: {
+                  ability: "dex",
+                  failureConditions: ["blinded"],
+                  failureDuration: { type: "until-bearer-turn-end" }
+                }
+              }
+            ]
+          },
           damageByLevel: [
             { level: 1, formula: "1d6", type: "weapon" },
             { level: 3, formula: "2d6", type: "weapon" },
@@ -98,9 +188,23 @@ export const rogue: ClassMechanicsModule = {
       choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },
 
-    // The counter only; turning a failed D20 Test into a 20 is not expressible.
+    // "If you fail a D20 Test, you can turn the roll into a 20", once per Short or Long Rest.
     "stroke-of-luck": {
-      uses: { limit: 1, per: "short-rest" }
+      uses: { limit: 1, per: "short-rest" },
+      actions: [
+        {
+          id: "stroke-of-luck",
+          name: "Stroke of Luck",
+          activation: "other",
+          description: "When you fail a D20 Test, turn the d20 roll into a 20.",
+          damage: [],
+          answer: {
+            rolls: ["attack", "save", "check", "death-save"],
+            when: "failure",
+            effect: { kind: "set-d20", face: 20 }
+          }
+        }
+      ]
     }
   },
   subclasses: {

@@ -30,6 +30,7 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
   "on-attack-roll": "Making an attack roll",
   "on-hit": "An attack hits",
   "on-critical-hit": "Scoring a critical hit",
+  "on-natural-20": "Rolling a 20 to hit",
   "on-damage-roll": "Rolling damage",
   "on-saving-throw": "Making a saving throw",
   "on-ability-check": "Making an ability check",
@@ -53,12 +54,19 @@ const TRIGGER_LABELS: Readonly<Record<RiderTrigger["type"], string>> = {
   "versus-marked": "A target it marked",
   "versus-hurt": "A target missing Hit Points",
   "versus-within": "A target within a distance",
-  "spell-class-is": "A spell of one class"
+  "spell-class-is": "A spell of one class",
+  "sees-other": "You can see the other creature",
+  "seen-by-other": "The other creature can see you",
+  "other-lacks-sense": "The other creature lacks a sense"
 };
 
-/** Read only on an effect the engine puts on another creature (Hunter's Mark), never on an item or a feature, so the
- *  editor doesn't offer it. */
-const ENGINE_ONLY_TRIGGERS: ReadonlySet<string> = new Set(["by-effect-source", "versus-effect-source"]);
+/** Read only on an effect the engine puts on another creature (Hunter's Mark, Bestow Curse), or authored only by the
+ *  content (Blur's senses), so the editor doesn't offer them. */
+const ENGINE_ONLY_TRIGGERS: ReadonlySet<string> = new Set([
+  "by-effect-source",
+  "versus-effect-source",
+  "other-lacks-sense"
+]);
 
 const TRIGGER_TYPES: readonly SelectOption[] = (Object.keys(TRIGGER_LABELS) as RiderTrigger["type"][])
   .filter((type) => !ENGINE_ONLY_TRIGGERS.has(type))

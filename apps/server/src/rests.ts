@@ -18,6 +18,7 @@ import { passGameTime } from "./game-time.js";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { openPreparation } from "./spellcasting.js";
 import { healActor } from "./hit-points.js";
+import { gainHeroicInspiration } from "./heroic-inspiration.js";
 import { chargesAfterDawn } from "./item-charges.js";
 
 /** SRD Resting: a Short Rest is 1 hour and a Long Rest at least 8. */
@@ -28,7 +29,7 @@ const hoursText = (hours: number) => `${hours} ${hours === 1 ? "hour" : "hours"}
 
 /** Takes `count` dice off a multiclass pool, biggest die first (the order the roll uses). The caller has
  *  already checked the pool holds enough. */
-function spendFromPool(entries: readonly HitDiceEntry[], count: number): HitDiceEntry[] {
+export function spendFromPool(entries: readonly HitDiceEntry[], count: number): HitDiceEntry[] {
   let left = count;
   return [...entries]
     .sort((a, b) => Number(b.die.slice(1)) - Number(a.die.slice(1)))
@@ -251,7 +252,7 @@ export function applyRest(
     holdsFeature(longRestDefinition, "human-resourceful", "Resourceful") ||
     longRestDefinition?.character?.race?.id === "human"
   )
-    actor.heroicInspiration = true;
+    gainHeroicInspiration(actor);
   return events;
 }
 

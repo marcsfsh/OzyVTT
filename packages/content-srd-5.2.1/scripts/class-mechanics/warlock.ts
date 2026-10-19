@@ -1,9 +1,9 @@
 /**
  * Warlock and Fiend Patron mechanics, merged over the ETL-generated prose.
  *
- * Stays prose throughout: "whenever you gain a Warlock level, you can replace..." clauses; anything
- * scoped to "your pact weapon" (the trigger vocabulary cannot name one conjured weapon, and unscoped
- * riders would apply to every weapon); and senses, which are display-only.
+ * Stays prose throughout: "whenever you gain a Warlock level, you can replace..." clauses; the pact weapon's
+ * own riders (Charisma for its rolls, its damage types), since the trigger vocabulary cannot name one conjured
+ * weapon. Eldritch Smite and Lifedrinker ride its hits.
  */
 import { spellTableStages, type ClassMechanicsModule } from "./overlay.js";
 
@@ -33,6 +33,9 @@ export const warlock: ClassMechanicsModule = {
      * level-1 feature reads the column's growth, so no grant repeats.
      */
     "eldritch-invocations": {
+      // "Whenever you gain a Warlock level, you can replace one of your invocations with another one for which you
+      // qualify."
+      replaces: [{ offer: "feature:eldritch-invocations", when: "level-up", amount: 1 }],
       extraPicks: [
         {
           offer: "feature:eldritch-invocations",
@@ -69,6 +72,11 @@ export const warlock: ClassMechanicsModule = {
         },
         // "Advantage on Constitution saving throws that you make to maintain Concentration."
         "eldritch-mind": { modifiers: [{ type: "roll-mode", roll: "concentration", mode: "advantage" }] },
+        // ---- senses, read by dynamic vision ----------------------------------------------------------
+        // "You can see normally in Dim Light and Darkness, both magical and nonmagical, within 120 feet of yourself."
+        "devils-sight": { modifiers: [{ type: "sense", sense: "devils-sight", feet: 120 }] },
+        // "You have Truesight with a range of 30 feet."
+        "witch-sight": { modifiers: [{ type: "sense", sense: "truesight", feet: 30 }] },
         // ---- castings without a spell slot ---------------------------------------------------------
         "armor-of-shadows": { grants: { spells: [atWill("mage-armor", 1)] } },
         "ascendant-step": { grants: { spells: [atWill("levitate", 2)] } },
@@ -95,6 +103,55 @@ export const warlock: ClassMechanicsModule = {
          * filtered). Proficiency with the chosen weapon stays prose: `grants.weapons` names groups only.
          */
         "pact-of-the-blade": { choice: { kind: "weapon", choose: 1, fromCatalog: "weapons" } },
+        /**
+         * Both ride a hit with the pact weapon, once per turn: Eldritch Smite spends a Pact Magic slot for 1d8 Force
+         * plus 1d8 per slot level, and may knock a Huge or smaller target Prone; Lifedrinker adds 1d6 of the type
+         * picked and may spend a Hit Point Die to heal. The pact weapon is the kind picked for Pact of the Blade; any
+         * other weapon is one the Warlock vouches for.
+         */
+        "eldritch-smite": {
+          actions: [
+            {
+              id: "eldritch-smite",
+              name: "Eldritch Smite",
+              activation: "other",
+              description:
+                "Once per turn when you hit a creature with your pact weapon, expend a Pact Magic spell slot to deal an extra 1d8 Force damage to the target, plus another 1d8 per level of the spell slot, and you can give the target the Prone condition if it is Huge or smaller. Choose it on the hit's result.",
+              damage: [{ formula: "1d8", type: "force" }],
+              ridesHit: {
+                rides: "pact-weapon",
+                oncePerTurn: true,
+                pactSlotDie: "1d8",
+                effects: [
+                  {
+                    id: "prone",
+                    name: "Knock Prone",
+                    maxTargetSize: "huge",
+                    applies: { name: "Eldritch Smite", conditions: ["prone"] }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        lifedrinker: {
+          actions: [
+            {
+              id: "lifedrinker",
+              name: "Lifedrinker",
+              activation: "other",
+              description:
+                "Once per turn when you hit a creature with your pact weapon, deal an extra 1d6 Necrotic, Psychic or Radiant damage (your choice) to the creature, and you can expend one of your Hit Point Dice to regain Hit Points equal to its roll plus your Constitution modifier (minimum of 1). Choose it on the hit's result.",
+              damage: [{ formula: "1d6", type: "necrotic" }],
+              ridesHit: {
+                rides: "pact-weapon",
+                oncePerTurn: true,
+                damageTypes: ["necrotic", "psychic", "radiant"],
+                effects: [{ id: "hit-point-die", name: "Spend a Hit Point Die", spendsHitPointDie: true }]
+              }
+            }
+          ]
+        },
         /** "You learn Find Familiar and can cast it ... without a slot." */
         "pact-of-the-chain": { grants: { spells: [{ id: "find-familiar", level: 1, withoutSlot: "at-will" }] } },
         /**
@@ -103,13 +160,21 @@ export const warlock: ClassMechanicsModule = {
          */
         "pact-of-the-tome": { choice: { kind: "cantrip", choose: 3, fromCatalog: "warlock-spells", maxSpellLevel: 0 } }
         // Not modeled: Lessons of the First Ones (a feat pick on an option's nested choice cannot be
-        // settled by the build's pass ordering), Devil's Sight and Witch Sight (senses are display-only),
-        // the pact-weapon invocations, and Gaze of Two Minds, Gift of the Protectors and Investment of the Chain
-        // Master.
+        // settled by the build's pass ordering), the pact weapon itself with Thirsting Blade and Devouring Blade, and
+        // Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master.
       }
     },
-    /** The sheet's spellcasting grouping slug, exactly as the hand-authored Wizard tags its own. */
-    "pact-magic": { tags: ["spellcasting"] },
+    /**
+     * The sheet's spellcasting grouping slug, exactly as the hand-authored Wizard tags its own. "Whenever you gain a
+     * Warlock level, you can replace one of your cantrips" and "one spell on your list".
+     */
+    "pact-magic": {
+      tags: ["spellcasting"],
+      replaces: [
+        { offer: "class-cantrips", when: "level-up", amount: 1 },
+        { offer: "class-spells", when: "level-up", amount: 1 }
+      ]
+    },
     // The once-per-Long-Rest permission only; no rider restores spell slots.
     "magical-cunning": { uses: { limit: 1, per: "long-rest" } },
     // Contact Other Plane always prepared, plus one free casting per Long Rest.
@@ -123,19 +188,31 @@ export const warlock: ClassMechanicsModule = {
      */
     "mystic-arcanum-level-6-spell": {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 6, maxSpellLevel: 6 },
-      uses: { limit: 1, per: "long-rest" }
+      uses: { limit: 1, per: "long-rest" },
+      // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
+      // same level."
+      replaces: [{ offer: "feature:mystic-arcanum-level-6-spell", when: "level-up", amount: 1 }]
     },
     "mystic-arcanum-level-7-spell": {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 7, maxSpellLevel: 7 },
-      uses: { limit: 1, per: "long-rest" }
+      uses: { limit: 1, per: "long-rest" },
+      // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
+      // same level."
+      replaces: [{ offer: "feature:mystic-arcanum-level-7-spell", when: "level-up", amount: 1 }]
     },
     "mystic-arcanum-level-8-spell": {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 8, maxSpellLevel: 8 },
-      uses: { limit: 1, per: "long-rest" }
+      uses: { limit: 1, per: "long-rest" },
+      // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
+      // same level."
+      replaces: [{ offer: "feature:mystic-arcanum-level-8-spell", when: "level-up", amount: 1 }]
     },
     "mystic-arcanum-level-9-spell": {
       choice: { kind: "spell", choose: 1, fromCatalog: "warlock-spells", minSpellLevel: 9, maxSpellLevel: 9 },
-      uses: { limit: 1, per: "long-rest" }
+      uses: { limit: 1, per: "long-rest" },
+      // "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the
+      // same level."
+      replaces: [{ offer: "feature:mystic-arcanum-level-9-spell", when: "level-up", amount: 1 }]
     },
     "epic-boon": { choice: { kind: "feat", choose: 1, fromCatalog: "feats" } }
   },
@@ -177,9 +254,20 @@ export const warlock: ClassMechanicsModule = {
           ]
         }
       },
-      // Uses equal the Charisma modifier (minimum 1). Adding the 1d10 to a roll already made stays prose.
+      // Uses equal the Charisma modifier (minimum 1): 1d10 added to a check or a save after it is seen, once per roll.
       "dark-ones-own-luck": {
-        uses: { scaling: { type: "ability-modifier", ability: "cha", minimum: 1 }, per: "long-rest" }
+        uses: { scaling: { type: "ability-modifier", ability: "cha", minimum: 1 }, per: "long-rest" },
+        actions: [
+          {
+            id: "dark-ones-own-luck",
+            name: "Dark One's Own Luck",
+            activation: "other",
+            description:
+              "When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before any of its effects occur, no more than once per roll.",
+            damage: [],
+            answer: { rolls: ["check", "save", "death-save"], when: "any", effect: { kind: "add", amount: "1d10" } }
+          }
+        ]
       },
       /**
        * Twelve inline options, one resistance each. Re-choosing on a rest is runtime state
@@ -199,8 +287,9 @@ export const warlock: ClassMechanicsModule = {
         }
       },
       /**
-       * `activation: "other"`: the trigger is "once per turn when you hit", which the action economy has
-       * no slot for. The Fiend exemption and restoring the use with a Pact Magic slot stay prose.
+       * It rides any attack roll's hit, once per turn, and opens the Charisma save on that target: a failure deals
+       * the 8d10 Psychic unless it is a Fiend, and the target is Incapacitated and gone (`off-plane`, which no action
+       * can target) until the end of the Warlock's next turn. Restoring the use with a Pact Magic slot stays prose.
        */
       "hurl-through-hell": {
         uses: { limit: 1, per: "long-rest" },
@@ -210,15 +299,23 @@ export const warlock: ClassMechanicsModule = {
             name: "Hurl Through Hell",
             activation: "other",
             description:
-              "Once per turn when you hit a creature with an attack roll, the target must succeed on a Charisma saving throw or hurtle through the Lower Planes, taking 8d10 Psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn.",
+              "Once per turn when you hit a creature with an attack roll, the target must succeed on a Charisma saving throw or disappear and hurtle through the Lower Planes, taking 8d10 Psychic damage if it isn't a Fiend and gaining the Incapacitated condition until the end of your next turn, when it returns to the space it left or the nearest unoccupied one. Choose it on the hit's result.",
             save: {
               ability: "cha",
               dc: "spellcasting",
               successDamage: "none",
               failureConditions: ["incapacitated"],
-              failureDuration: { type: "until-source-turn-end" }
+              failureDuration: { type: "until-source-turn-end" },
+              failureEffect: { name: "Hurled Through Hell", tags: ["off-plane"] }
             },
-            damage: [{ formula: "8d10", type: "psychic" }]
+            damage: [{ formula: "8d10", type: "psychic" }],
+            ridesHit: {
+              rides: "attack-roll",
+              oncePerTurn: true,
+              sparesCreatureTypes: ["fiend"],
+              reminder:
+                "Hurl Through Hell: on a failed save the target leaves the map until the end of the Warlock's next turn, then returns to the space it left or the nearest unoccupied one."
+            }
           }
         ]
       }

@@ -565,7 +565,14 @@ describe("the charges a worn item rations", () => {
     const action = effectiveActions(definition, actor, catalog).find(
       (entry) => entry.id === "item-robe-of-scintillating-colors-dazzle"
     )!;
-    expect(action.save).toEqual({ ability: "wis", dc: 15, successDamage: "none", failureConditions: ["stunned"] });
+    expect(action.save).toEqual({
+      ability: "wis",
+      dc: 15,
+      successDamage: "none",
+      failureConditions: ["stunned"],
+      // "until the effect ends", which is the end of the wearer's next turn.
+      failureDuration: { type: "until-source-turn-end" }
+    });
     expect(action.uses).toEqual({ limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" });
 
     resolveDefinitionAction(
@@ -810,11 +817,8 @@ describe("the worn items left as prose, by name", () => {
     }
   });
 
-  it("leaves the two RESERVED items and the four ability-score refusals entirely to prose", () => {
+  it("leaves the RESERVED item and the four ability-score refusals entirely to prose", () => {
     for (const id of [
-      // The gloves need a rolled reduction ("1d10 plus your Dexterity modifier"), a free-hand gate and a
-      // Reaction cost; `on-taking-damage` + `damage-reduction` alone cannot express it.
-      "gloves-of-missile-snaring",
       "periapt-of-wound-closure", // rolled amount
       "amulet-of-health",
       "belt-of-giant-strength", // ITEM_REFUSED_MODIFIER_TYPES
@@ -881,7 +885,10 @@ describe("the worn items left as prose, by name", () => {
       ["robe-of-eyes", "Perception 'that rely on sight', on a robe whose own Drawbacks Blind you"],
       ["talisman-of-the-sphere", "Arcana to control a Sphere of Annihilation, which the engine does not hold"]
     ] as const) {
-      const advantage = view.equipmentRecord(id)!.modifiers.filter((modifier) => modifier.type === "roll-mode");
+      // A check's Advantage only: the belt's Advantage on saves against Poisoned is authored.
+      const advantage = view
+        .equipmentRecord(id)!
+        .modifiers.filter((modifier) => modifier.type === "roll-mode" && modifier.roll === "check");
       expect(advantage, `${id} must stay prose: ${why}`).toEqual([]);
     }
   });

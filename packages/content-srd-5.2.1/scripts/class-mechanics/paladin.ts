@@ -11,10 +11,11 @@ const AURA_ACTIVE = {
 
 export const paladin: ClassMechanicsModule = {
   features: {
-    /**
-     * The Fighting Style feat catalog plus the inline Blessed Warrior option (consumers union the two).
-     * Its replace-a-cantrip-on-level-up clause stays prose.
-     */
+    // "Whenever you finish a Long Rest, you can change the kinds of weapons you chose": made in the Level flow until a
+    // rest offers it.
+    "weapon-mastery": { replaces: [{ offer: "feature:weapon-mastery", when: "level-up", amount: 2 }] },
+
+    /** The Fighting Style feat catalog plus the inline Blessed Warrior option (consumers union the two). */
     "fighting-style": {
       choice: {
         kind: "fighting-style",
@@ -26,7 +27,8 @@ export const paladin: ClassMechanicsModule = {
             name: "Blessed Warrior",
             description:
               "You learn two Cleric cantrips of your choice. Charisma is your spellcasting ability for them. Whenever you gain a Paladin level, you can replace one of these cantrips with another Cleric cantrip.",
-            choice: { kind: "cantrip", choose: 2, fromCatalog: "cleric-spells", maxSpellLevel: 0 }
+            choice: { kind: "cantrip", choose: 2, fromCatalog: "cleric-spells", maxSpellLevel: 0 },
+            replaces: [{ offer: "feature:blessed-warrior", when: "level-up", amount: 1 }]
           }
         ]
       }
@@ -54,7 +56,8 @@ export const paladin: ClassMechanicsModule = {
             "As a Bonus Action, touch a creature (which could be yourself) and draw power from the pool of healing to restore a number of Hit Points to that creature, up to the maximum amount remaining in the pool.",
           damage: [],
           useCost: "chosen",
-          healing: { formula: "1", perUse: true }
+          healing: { formula: "1", perUse: true },
+          targets: { count: 1, rangeFeet: 5 }
         },
         {
           id: "lay-on-hands-cure-poison",
@@ -64,7 +67,8 @@ export const paladin: ClassMechanicsModule = {
             "As a Bonus Action, touch a creature and expend 5 Hit Points from the pool of healing to remove the Poisoned condition from it; those points don't also restore Hit Points to the creature.",
           damage: [],
           useCost: 5,
-          endsConditions: ["poisoned"]
+          endsConditions: ["poisoned"],
+          targets: { count: 1, rangeFeet: 5 }
         }
       ]
     },
@@ -90,7 +94,14 @@ export const paladin: ClassMechanicsModule = {
           activation: "bonus-action",
           description:
             "You open your awareness to detect Celestials, Fiends, and Undead. For the next 10 minutes or until you have the Incapacitated condition, you know the location of any creature of those types within 60 feet of yourself, and you know its creature type. Within the same radius, you also detect any place or object that has been consecrated or desecrated, as with the Hallow spell.",
-          damage: []
+          damage: [],
+          // Where each one stands and its type reach the Paladin's player alone, walls or not.
+          grants: {
+            name: "Divine Sense",
+            tags: ["divine-sense"],
+            duration: { type: "rounds", rounds: 100 },
+            detects: { creatureTypes: ["celestial", "fiend", "undead"], feet: 60 }
+          }
         }
       ]
     },
@@ -106,9 +117,9 @@ export const paladin: ClassMechanicsModule = {
     },
 
     /**
-     * Spends the shared Channel Divinity pool against the Paladin's own spell save DC; the Frightened lasts 1
-     * minute or until the target takes damage. The Charisma-scaled target count and the one-thing-per-turn limit
-     * stay prose.
+     * Spends the shared Channel Divinity pool against the Paladin's own spell save DC, at up to the Charisma modifier's
+     * creatures (minimum one) the Paladin can see within 60 feet; the Frightened lasts 1 minute or until the target
+     * takes damage, and leaves it only one of moving, an action or a Bonus Action on its turns (`dazed`).
      */
     "abjure-foes": {
       uses: { scaling: { type: "class-resource", id: "channel-divinity" }, per: "long-rest", pool: "channel-divinity" },
@@ -127,10 +138,9 @@ export const paladin: ClassMechanicsModule = {
             failureConditions: ["frightened"],
             failureDuration: { type: "rounds", rounds: 10 },
             endsOnDamage: true,
-            // "While Frightened in this way, a target can do only one of the following on its turns: move, take an
-            // action, or take a Bonus Action."
-            failureEffect: { name: "Abjure Foes", tags: ["one-thing-a-turn"], modifiers: [] }
-          }
+            failureEffect: { name: "Abjured", tags: ["dazed"] }
+          },
+          targets: { countAbility: "cha", rangeFeet: 60, seen: true }
         }
       ]
     },
@@ -202,7 +212,8 @@ export const paladin: ClassMechanicsModule = {
       },
 
       // A subclass spender of the class's Channel Divinity pool, bound to the Melee weapon picked: its attack rolls add
-      // the Charisma modifier (at least +1), and its hits deal Radiant or the weapon's own type. The light is P6's.
+      // the Charisma modifier (at least +1), its hits deal Radiant or the weapon's own type, and the weapon's light
+      // rides the effect on the Paladin, who holds it.
       "sacred-weapon": {
         uses: {
           scaling: { type: "class-resource", id: "channel-divinity" },
@@ -230,7 +241,8 @@ export const paladin: ClassMechanicsModule = {
                 melee: true,
                 attackBonusAbility: { ability: "cha", minimum: 1 },
                 damageTypes: ["radiant"]
-              }
+              },
+              light: { brightFeet: 20, dimFeet: 20 }
             }
           }
         ]
@@ -242,8 +254,8 @@ export const paladin: ClassMechanicsModule = {
       },
 
       // The nimbus is an effect on the Paladin for 10 minutes; the server reads it for the Radiant damage an enemy
-      // starting its turn in the aura takes and the Advantage on saves a Fiend or an Undead forces. The sunlight
-      // stays prose.
+      // starting its turn in the aura takes and the Advantage on saves a Fiend or an Undead forces. Its sunlight
+      // fills the aura's 30 feet (Aura Expansion comes at level 18, before Holy Nimbus at 20).
       "holy-nimbus": {
         uses: { limit: 1, per: "long-rest" },
         actions: [
@@ -254,7 +266,12 @@ export const paladin: ClassMechanicsModule = {
             description:
               "You imbue your Aura of Protection with holy power for 10 minutes or until you end it (no action required). You have Advantage on saving throws forced by Fiends and Undead; an enemy that starts its turn in the aura takes Radiant damage equal to your Charisma modifier plus your Proficiency Bonus; and the aura is filled with Bright Light that is sunlight. You can restore your use of this feature by expending a level 5 spell slot.",
             damage: [],
-            grants: { name: "Holy Nimbus", tags: ["holy-nimbus"], duration: { type: "rounds", rounds: 100 } }
+            grants: {
+              name: "Holy Nimbus",
+              tags: ["holy-nimbus"],
+              duration: { type: "rounds", rounds: 100 },
+              light: { brightFeet: 30, dimFeet: 0, sunlight: true }
+            }
           }
         ]
       }

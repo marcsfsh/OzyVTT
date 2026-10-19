@@ -210,12 +210,30 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Bearer only: the 30-foot ally aura and the surprise/sleep clause are not expressible.
   "weapon-of-warning": { modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }] },
 
-  // "On your person" is read as equipped. Not modeled: Luck (a reroll) and Wish (rolled charge count).
+  // "On your person" is read as equipped. Luck rerolls a failed D20 Test once per dawn (`answer`). Not modeled: Wish
+  // (a rolled charge count that never comes back).
   "luck-blade": {
     modifiers: [
       { type: "save-bonus", amount: 1 },
       { type: "attack-bonus", amount: 1 },
       { type: "damage-bonus", amount: 1 }
+    ],
+    actions: [
+      {
+        id: "luck",
+        name: "Luck",
+        activation: "other",
+        description:
+          "Reroll one failed D20 Test if you don't have the Incapacitated condition. You must use the second roll. Once used, this property can't be used again until the next dawn.",
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        answer: {
+          rolls: ["attack", "save", "check", "death-save"],
+          when: "failure",
+          notWhileIncapacitated: true,
+          effect: { kind: "reroll" }
+        }
+      }
     ]
   },
 
@@ -273,11 +291,19 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Not modeled: ignoring Slashing resistance and the natural-20 decapitation (30 damage exceeds the range).
+  // The beheading on a rolled 20 is the GM's, said with the hit. Not modeled: ignoring Resistance to Slashing damage.
   "vorpal-sword": {
     modifiers: [
       { type: "attack-bonus", amount: 3 },
       { type: "damage-bonus", amount: 3 }
+    ],
+    onHit: [
+      {
+        conditions: [],
+        naturalTwenty: true,
+        reminder:
+          "On a rolled 20 the sword cuts off one of the creature's heads, and it dies if it can't survive without it. A creature with Immunity to Slashing damage, no head or one too big for the blade takes an extra 30 Slashing damage instead, and Legendary Resistance can trade the head for that damage."
+      }
     ]
   },
 
@@ -306,25 +332,65 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Not modeled: Acrobatic Assist (gated on the item's current form), Attack Deflection, the form changes.
+  // Attack Deflection's +5 AC is offered on a hit, once per rest, and its glow ("Dim Light out to 10 feet") is lit and
+  // put out on the row. Not modeled: the form changes, which would gate it and Acrobatic Assist (prose) to the
+  // Quarterstaff form.
   "quarterstaff-of-the-acrobat": {
     modifiers: [
       { type: "attack-bonus", amount: 2 },
       { type: "damage-bonus", amount: 2 }
-    ]
+    ],
+    actions: [
+      {
+        id: "attack-deflection",
+        name: "Attack Deflection",
+        activation: "reaction",
+        description:
+          "When you are hit by an attack while holding the weapon, take a Reaction to twirl it around you and gain a +5 bonus to your Armor Class against the triggering attack, potentially causing it to miss. You can't use this property again until you finish a Short or Long Rest.",
+        damage: [],
+        uses: { limit: 1, per: "short-rest" },
+        reaction: { trigger: "hit-by-attack", response: "ac-bonus", amount: 5 }
+      }
+    ],
+    light: { brightFeet: 0, dimFeet: 10 }
   },
 
-  // The armed-then-discharged poison coating needs item state and is not modeled.
+  // The coat is a Bonus Action once per dawn, an effect on the bearer that the dagger's next hit spends on its save.
   "dagger-of-venom": {
     modifiers: [
       { type: "attack-bonus", amount: 1 },
       { type: "damage-bonus", amount: 1 }
+    ],
+    actions: [
+      {
+        id: "coat-blade",
+        name: "Coat the Blade",
+        activation: "bonus-action",
+        description:
+          "Coat the blade with poison. It remains for 1 minute or until an attack using this weapon hits a creature, which must succeed on a DC 15 Constitution saving throw or take 2d10 Poison damage and have the Poisoned condition for 1 minute.",
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        grants: { name: "Dagger of Venom: coated", tags: ["venom-coat"], duration: { type: "rounds", rounds: 10 } }
+      }
+    ],
+    onHit: [
+      {
+        conditions: [{ id: "poisoned" }],
+        duration: { type: "rounds", rounds: 10 },
+        spendsEffectTag: "venom-coat",
+        save: { ability: "con", dc: 15, failureDamage: [{ formula: "2d10", type: "poison" }] }
+      }
     ]
   },
 
-  // The extra 2d6 of the weapon's type against a Giant; the Giant's save against Prone is not modeled.
+  // The extra 2d6 of the weapon's type against a Giant, and the Giant's DC 15 Strength save against Prone.
   "giant-slayer": {
-    modifiers: [{ type: "attack-bonus", amount: 1 }, { type: "damage-bonus", amount: 1 }, versusTypes("2d6", ["giant"])]
+    modifiers: [
+      { type: "attack-bonus", amount: 1 },
+      { type: "damage-bonus", amount: 1 },
+      versusTypes("2d6", ["giant"])
+    ],
+    onHit: [{ conditions: [{ id: "prone" }], creatureTypes: ["giant"], save: { ability: "str", dc: 15 } }]
   },
 
   // "The weapon deals an extra 3d6 damage of the weapon's type if the target is a Dragon."
@@ -336,8 +402,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // +3 against a Construct, and 7 Bludgeoning more on a Critical Hit (14 against a Construct); a mace's damage is
-  // Bludgeoning, so a flat bonus carries it. Destroying a Construct at 25 Hit Points or fewer is not modeled.
+  // +3 against a Construct, and 7 Bludgeoning more on a rolled 20 (14 against a Construct), never on a crit from a wider
+  // range; a mace's damage is Bludgeoning, so a flat bonus carries it. Destroying a Construct is the GM's, said then.
   "mace-of-smiting": {
     modifiers: [
       { type: "attack-bonus", amount: 1 },
@@ -352,18 +418,30 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         amount: 2,
         when: [{ type: "on-hit" }, { type: "versus-creature-type", creatureTypes: ["construct"] }]
       },
-      { type: "damage-bonus", amount: 7, when: [{ type: "on-critical-hit" }] },
+      { type: "damage-bonus", amount: 7, when: [{ type: "on-natural-20" }] },
       {
         type: "damage-bonus",
         amount: 7,
-        when: [{ type: "on-critical-hit" }, { type: "versus-creature-type", creatureTypes: ["construct"] }]
+        when: [{ type: "on-natural-20" }, { type: "versus-creature-type", creatureTypes: ["construct"] }]
+      }
+    ],
+    onHit: [
+      {
+        conditions: [],
+        naturalTwenty: true,
+        creatureTypes: ["construct"],
+        reminder: "A Construct with 25 Hit Points or fewer after this damage is destroyed."
       }
     ]
   },
 
   // "When you hit a Fiend or an Undead with this magic weapon, that creature takes an extra 2d6 Radiant damage." The
-  // save against destruction at 25 Hit Points or fewer is not modeled.
-  "mace-of-disruption": { modifiers: [versusTypes("2d6", ["fiend", "undead"], "radiant")] },
+  // save against destruction at 25 Hit Points or fewer is not modeled. "While you hold this weapon, it sheds Bright
+  // Light in a 20-foot radius and Dim Light for an additional 20 feet."
+  "mace-of-disruption": {
+    modifiers: [versusTypes("2d6", ["fiend", "undead"], "radiant")],
+    light: { brightFeet: 20, dimFeet: 20, always: true }
+  },
 
   // "An extra 2d6 damage to any creature it hits", of the weapon's own type.
   "vicious-weapon": {
@@ -388,18 +466,48 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Authored always on: the command-word lit state is not modeled, and a drawn Flame Tongue in combat is lit.
-  "flame-tongue": { modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "fire", doubleOnCritical: true }] },
+  // Its flames are lit and put out on the row (a Bonus Action): ablaze, it deals 2d6 Fire more and sheds light.
+  "flame-tongue": {
+    modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "fire", doubleOnCritical: true }],
+    light: { brightFeet: 40, dimFeet: 40, ridersWhileLit: true }
+  },
 
-  // The "can't regain Hit Points" save is not expressible.
+  // The DC 15 Constitution save against healing, repeated at the end of each of the target's turns. Its hour outlasts
+  // any fight, so the effect lasts until the save ends it.
   "sword-of-wounding": {
-    modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "necrotic", doubleOnCritical: true }]
+    modifiers: [{ type: "extra-damage", formula: "2d6", damageType: "necrotic", doubleOnCritical: true }],
+    onHit: [
+      { conditions: [], name: "Wounded", tags: ["no-healing"], save: { ability: "con", dc: 15, repeatSave: true } }
+    ]
+  },
+
+  // An extra 14 Slashing damage (two 7s: one flat bonus stops at 10) and a level of Exhaustion on a rolled 20. Not
+  // modeled: maximized damage against an object.
+  "sword-of-sharpness": {
+    modifiers: [
+      { type: "damage-bonus", amount: 7, when: [{ type: "on-natural-20" }] },
+      { type: "damage-bonus", amount: 7, when: [{ type: "on-natural-20" }] }
+    ],
+    onHit: [{ conditions: [{ id: "exhaustion", level: 1 }], naturalTwenty: true }]
+  },
+
+  // A Longsword with Finesse that deals Radiant damage (its weapon block), +2, and 1d8 Radiant more against an Undead.
+  // "While the blade exists, it sheds Bright Light in a 15-foot radius and Dim Light for an additional 15 feet. The
+  // light is sunlight": the blade is made and put away on the row, lit or not. Not modeled: the radius its Magic action
+  // adjusts.
+  "sun-blade": {
+    modifiers: [
+      { type: "attack-bonus", amount: 2 },
+      { type: "damage-bonus", amount: 2 },
+      versusTypes("1d8", ["undead"], "radiant")
+    ],
+    light: { brightFeet: 15, dimFeet: 15, sunlight: true }
   },
 
   // Prose-only items:
   //   `javelin-of-lightning`: Lightning where the javelin deals Piercing, and a Line area.
-  //   `sun-blade`, `energy-bow`: deal Radiant/Force where the weapon's own type would go; unbound until
-  //       weapon-swing overrides exist. Energy Bow's arrow options are not expressible either.
+  //   `energy-bow`: deals Force where the bow's own type would go; unbound until weapon-swing overrides exist. Its
+  //       arrow options are not expressible either.
   //   `thunderous-greatclub` - "your Strength is 20" is `ability-score`, refused on items; areas.
   //   `adamantine-armor` - no rider suppresses an incoming critical hit.
   //   `mithral-armor` - no rider removes a base armor's stealth disadvantage or Strength requirement.
@@ -409,7 +517,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //   `mace-of-terror` - an area Frightened effect; item actions have no radius.
   //   `ammunition-of-slaying` - entirely gated on creature type.
   //   `oathbow` - everything is gated on a player-declared sworn enemy.
-  //   `sword-of-life-stealing`, `sword-of-sharpness` - crit damage of 15 and 14 exceeds the range.
+  //   `sword-of-life-stealing` - its 15 Necrotic on a rolled 20 also heals, and Constructs and Undead are spared.
 
   // ==== Wands, staffs, rods, rings and the spell scroll ===========================================
   //
@@ -418,8 +526,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   //   - "Regains 1d6 + 1 expended charges daily at dawn" is `charges.regain`, rolled on a Long Rest, and "if you
   //     expend the last charge, roll 1d20" is `charges.lastChargeRoll`. Charges count per carried copy.
   //   - Use pools are capped at 20.
-  //   - Staffs and rods have no weapon block, so "+N to attack and damage rolls made with it" would be
-  //     bearer-scoped (every weapon) or inert; it is not authored.
+  //   - A staff wielded as a Quarterstaff and the Rod of Lordly Might carry their base's weapon block
+  //     (`build-magic-items.ts`), so "+N to attack and damage rolls made with it" is scoped to them, and a hit property
+  //     is an action that rides the item's own melee hits (`ridesHit: melee-this-weapon`).
   //   - An item action's to-hit is ability-derived; a printed flat attack bonus cannot be said.
   //   - `castAction` takes a cast's damage and attack from the spell record's `damage`/`attackRoll`
   //     columns, which describe the spell's text as a whole: healing spells become Force
@@ -432,7 +541,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   /**
    * Three casts on one shared 3-charge pool at the printed DC. Speak with Animals forces no save, so it
-   * carries no `saveDc`. "Fear (affects Beasts only)" stays prose.
+   * carries no `saveDc`. "Fear (affects Beasts only)" refuses any other creature as a target.
    */
   "ring-of-animal-influence": {
     charges: { regain: "1d3" },
@@ -442,7 +551,12 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         saveDc: 13,
         uses: { limit: 3, per: "long-rest", pool: "ring-of-animal-influence-charges" }
       },
-      { spellId: "fear", saveDc: 13, uses: { limit: 3, per: "long-rest", pool: "ring-of-animal-influence-charges" } },
+      {
+        spellId: "fear",
+        saveDc: 13,
+        uses: { limit: 3, per: "long-rest", pool: "ring-of-animal-influence-charges" },
+        targets: { creatureTypes: ["beast"] }
+      },
       { spellId: "speak-with-animals", uses: { limit: 3, per: "long-rest", pool: "ring-of-animal-influence-charges" } }
     ]
   },
@@ -451,7 +565,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `ring-of-elemental-command` - `versus-creature-type` is inert; the plane is a per-copy GM choice;
   // multi-charge spells.
 
-  // Auto-succeeding a save is not expressible; the reaction and its 3-charge pool are, and the GM rules the success.
+  // "When you fail a Dexterity saving throw while wearing the ring, you can take a Reaction to expend 1 charge to
+  // succeed on that save instead": offered on the wearer's failed Dexterity save.
   "ring-of-evasion": {
     charges: { regain: "1d3" },
     actions: [
@@ -461,7 +576,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "reaction",
         description:
           "When you fail a Dexterity saving throw while wearing the ring, you can take a Reaction to expend 1 charge to succeed on that save instead.",
-        uses: { limit: 3, per: "long-rest", pool: "ring-of-evasion-charges" }
+        uses: { limit: 3, per: "long-rest", pool: "ring-of-evasion-charges" },
+        answer: { rolls: ["save"], when: "failure", abilities: ["dex"], effect: { kind: "succeed" } }
       }
     ]
   },
@@ -530,7 +646,26 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   /** "While wearing this ring, you cast Water Walk from it, targeting only yourself." Self-only is prose. */
   "ring-of-water-walking": { casts: [{ spellId: "water-walk" }] },
 
-  // `ring-of-x-ray-vision`: `sense` is display-only and standing, with no timed activation.
+  /** "You can take a Magic action to gain X-ray vision with a range of 30 feet for 1 minute": walls don't block the
+   *  wearer's sight within 30 feet. Not modeled: the Exhaustion save on a second use before a Long Rest, and the lead
+   *  that still blocks it. */
+  "ring-of-x-ray-vision": {
+    actions: [
+      {
+        id: "x-ray-vision",
+        name: "X-ray Vision",
+        activation: "action",
+        description:
+          "Gain X-ray vision with a range of 30 feet for 1 minute: solid objects within that range appear transparent and don't prevent light from passing through them.",
+        grants: {
+          name: "X-ray Vision",
+          tags: ["x-ray-vision"],
+          duration: { type: "rounds", rounds: 10 },
+          modifiers: [{ type: "sense", sense: "x-ray", feet: 30 }]
+        }
+      }
+    ]
+  },
 
   // ---- Rods ------------------------------------------------------------------------------------
 
@@ -564,12 +699,73 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Plant the haft end of the rod in the ground. Its head sheds Bright Light in a 60-foot radius and Dim Light for an additional 60 feet. While in that Bright Light, you and your allies gain a +1 bonus to Armor Class and saving throws and can sense the location of any Invisible creature that is also in the Bright Light. Ends after 10 minutes or when a creature pulls the rod from the ground.",
-        uses: { limit: 1, per: "long-rest" }
+        uses: { limit: 1, per: "long-rest" },
+        // The planted rod's light, set down where its holder stands for 10 minutes.
+        sight: { light: { on: "point", brightFeet: 60, dimFeet: 60 }, rounds: 100 }
       }
     ]
   },
 
-  // `rod-of-lordly-might` - no weapon block, and its buttons turn one record into several weapons.
+  // A +3 Mace, Drain Life and Paralyze on its melee hits, and Terrify. Not modeled: the buttons that turn it into
+  // other weapons and tools (one record, one weapon block), and Drain Life's healing, said with the hit.
+  "rod-of-lordly-might": {
+    modifiers: [
+      { type: "attack-bonus", amount: 3 },
+      { type: "damage-bonus", amount: 3 }
+    ],
+    actions: [
+      {
+        id: "drain-life",
+        name: "Drain Life",
+        activation: "other",
+        description:
+          "When you hit a creature with a melee attack using the rod, force it to make a DC 17 Constitution saving throw. On a failed save, it takes an extra 4d6 Necrotic damage, and you regain Hit Points equal to half that damage.",
+        save: { ability: "con", dc: 17, successDamage: "none", failureConditions: [] },
+        damage: [{ formula: "4d6", type: "necrotic" }],
+        uses: { limit: 1, per: "long-rest" },
+        ridesHit: {
+          rides: "melee-this-weapon",
+          reminder: "On a failed save you regain Hit Points equal to half the Necrotic damage it takes."
+        }
+      },
+      {
+        id: "paralyze",
+        name: "Paralyze",
+        activation: "other",
+        description:
+          "When you hit a creature with a melee attack using the rod, force it to make a DC 17 Constitution saving throw. On a failed save, it has the Paralyzed condition for 1 minute, repeating the save at the end of each of its turns.",
+        save: {
+          ability: "con",
+          dc: 17,
+          successDamage: "none",
+          failureConditions: ["paralyzed"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          repeatSave: true
+        },
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        ridesHit: { rides: "melee-this-weapon" }
+      },
+      {
+        id: "terrify",
+        name: "Terrify",
+        activation: "action",
+        description:
+          "Each creature you can see within 30 feet makes a DC 17 Wisdom saving throw. On a failed save, it has the Frightened condition for 1 minute, repeating the save at the end of each of its turns.",
+        save: {
+          ability: "wis",
+          dc: 17,
+          successDamage: "none",
+          failureConditions: ["frightened"],
+          failureDuration: { type: "rounds", rounds: 10 },
+          repeatSave: true
+        },
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        targets: { rangeFeet: 30, seen: true, who: "others" }
+      }
+    ]
+  },
 
   // `rod-of-resurrection` - `heal` has no healing in the spell model; Resurrection costs 5 charges.
 
@@ -582,7 +778,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         description:
           "Present the rod and command obedience from each creature of your choice that you can see within 120 feet. Each target must succeed on a DC 15 Wisdom saving throw or have the Charmed condition for 8 hours. If harmed by you or your allies, or commanded to do something contrary to its nature, a target ceases to be Charmed in this way.",
         save: { ability: "wis", dc: 15, successDamage: "none", failureConditions: ["charmed"] },
-        uses: { limit: 1, per: "long-rest" }
+        uses: { limit: 1, per: "long-rest" },
+        targets: { rangeFeet: 120, seen: true }
       }
     ]
   },
@@ -598,9 +795,27 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // ---- Staffs ----------------------------------------------------------------------------------
 
   // All three one-charge casts on one pool. No `saveDc`: the cast uses the wielder's own DC, as
-  // printed. Reflect and Resist Enchantment (save outcomes) are not expressible.
+  // printed. Resist Enchantment turns a failed save against an Enchantment spell aimed only at the holder into a
+  // success once a day. Not modeled: Reflect Enchantment (turning the spell back on its caster).
   "staff-of-charming": {
     charges: { regain: "1d8 + 2", lastChargeRoll: true },
+    actions: [
+      {
+        id: "resist-enchantment",
+        name: "Resist Enchantment",
+        activation: "other",
+        description:
+          "If you fail a saving throw against an Enchantment spell that targets only you, you can turn your failed save into a successful one. You can't use this property of the staff again until the next dawn.",
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        answer: {
+          rolls: ["save"],
+          when: "failure",
+          versus: { spellSchools: ["enchantment"], singleTarget: true },
+          effect: { kind: "succeed" }
+        }
+      }
+    ],
     casts: [
       { spellId: "charm-person", uses: { limit: 10, per: "long-rest", pool: "staff-of-charming-charges" } },
       { spellId: "command", uses: { limit: 10, per: "long-rest", pool: "staff-of-charming-charges" } },
@@ -626,21 +841,41 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // is multi-charge.
 
   /**
-   * The AC, save and spell attack bonuses. Not authored: Magic Missile and Ray of Enfeeblement (wrong cast
-   * effects), the +2 Quarterstaff (no weapon block), the multi-charge spells, and Retributive Strike (damage from
-   * live charge count).
+   * The +2 Quarterstaff and the AC, save and spell attack bonuses. Not authored: Magic Missile and Ray of
+   * Enfeeblement (wrong cast effects), the multi-charge spells, and Retributive Strike (damage from live charge count).
    */
   "staff-of-power": {
     modifiers: [
+      { type: "attack-bonus", amount: 2 },
+      { type: "damage-bonus", amount: 2 },
       { type: "armor-class", amount: 2 },
       { type: "save-bonus", amount: 2 },
       { type: "spell-attack-bonus", amount: 2 }
     ]
   },
 
-  // `staff-of-striking` - the +3 and the per-charge 1d6 both need a weapon block (and multi-charge).
+  // A +3 Quarterstaff whose melee hit can spend 1, 2 or 3 charges for 1d6 Force each: one rider per count on the one
+  // pool, of which a hit takes one.
+  "staff-of-striking": {
+    charges: { regain: "1d6 + 4", lastChargeRoll: true },
+    modifiers: [
+      { type: "attack-bonus", amount: 3 },
+      { type: "damage-bonus", amount: 3 }
+    ],
+    actions: [1, 2, 3].map((count) => ({
+      id: `striking-${count}`,
+      name: `Striking (${count} charge${count === 1 ? "" : "s"})`,
+      activation: "other" as const,
+      description: `When you hit with a melee attack using the staff, expend ${count} charge${count === 1 ? "" : "s"}: the target takes an extra ${count}d6 Force damage.`,
+      damage: [{ formula: `${count}d6`, type: "force" }],
+      uses: { limit: 10, per: "long-rest" as const, pool: "staff-of-striking-charges" },
+      ...(count > 1 ? { useCost: count } : {}),
+      ridesHit: { rides: "melee-this-weapon" as const }
+    }))
+  },
 
-  // Insect Cloud's counter; the Heavily Obscured area is a GM ruling. Giant Insect and Insect Plague are multi-charge.
+  // Insect Cloud: a Heavily Obscured Emanation round the holder, who sees through it. Giant Insect and Insect Plague are
+  // multi-charge.
   "staff-of-swarming-insects": {
     charges: { regain: "1d6 + 4", lastChargeRoll: true },
     actions: [
@@ -651,27 +886,36 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         area: { shape: "emanation", sizeFeet: 30, widthFeet: null },
         description:
           "Expend 1 charge to fill a 30-foot Emanation originating from you with a swarm of harmless flying insects. They remain for 10 minutes, making the area Heavily Obscured for creatures other than you. A strong wind disperses the swarm and ends the effect.",
-        uses: { limit: 10, per: "long-rest", pool: "staff-of-swarming-insects-charges" }
+        uses: { limit: 10, per: "long-rest", pool: "staff-of-swarming-insects-charges" },
+        sight: { area: { kind: "heavily-obscured", aroundSelfFeet: 30, sparesUser: true }, rounds: 100 }
       }
     ]
   },
 
   /**
-   * The four zero-charge casts and the +2 to spell attack rolls; 50 charges exceed the pool cap. Not authored:
-   * Protection from Evil and Good (bogus attack roll), the +2 Quarterstaff, advantage on saves against spells, the
+   * The +2 Quarterstaff, the four zero-charge casts and the +2 to spell attack rolls; 50 charges exceed the pool cap.
+   * Not authored: Protection from Evil and Good (bogus attack roll), advantage on saves against spells, the
    * multi-charge rows, Spell Absorption and Retributive Strike.
    */
   "staff-of-the-magi": {
-    modifiers: [{ type: "spell-attack-bonus", amount: 2 }],
+    modifiers: [
+      { type: "attack-bonus", amount: 2 },
+      { type: "damage-bonus", amount: 2 },
+      { type: "spell-attack-bonus", amount: 2 }
+    ],
     casts: [{ spellId: "arcane-lock" }, { spellId: "detect-magic" }, { spellId: "enlargereduce" }, { spellId: "light" }]
   },
 
   // `staff-of-the-python` - summoning a controlled creature is not expressible.
 
-  // The three one-charge properties on the 6-charge pool and the +2 to spell attack rolls. Not authored: the
-  // +2 Quarterstaff, the multi-charge spells.
+  // The +2 Quarterstaff, the three one-charge properties on the 6-charge pool and the +2 to spell attack rolls. Not
+  // authored: the multi-charge spells.
   "staff-of-the-woodlands": {
-    modifiers: [{ type: "spell-attack-bonus", amount: 2 }],
+    modifiers: [
+      { type: "attack-bonus", amount: 2 },
+      { type: "damage-bonus", amount: 2 },
+      { type: "spell-attack-bonus", amount: 2 }
+    ],
     charges: { regain: "1d6", lastChargeRoll: true },
     casts: [
       { spellId: "animal-friendship", uses: { limit: 6, per: "long-rest", pool: "staff-of-the-woodlands-charges" } },
@@ -690,11 +934,67 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   /**
-   * The two standalone properties, each with its own once-per-dawn counter. The on-hit properties and the
-   * +2 Quarterstaff need a weapon block.
+   * The +2 Quarterstaff and its five properties, each with its own once-per-dawn counter: Lightning and Thunder ride a
+   * melee hit, Thunder and Lightning does both as a Bonus Action after one, and the other two are actions.
    */
   "staff-of-thunder-and-lightning": {
+    modifiers: [
+      { type: "attack-bonus", amount: 2 },
+      { type: "damage-bonus", amount: 2 }
+    ],
     actions: [
+      {
+        id: "lightning",
+        name: "Lightning",
+        activation: "other",
+        description:
+          "When you hit with a melee attack using the staff, the target takes an extra 2d6 Lightning damage.",
+        damage: [{ formula: "2d6", type: "lightning" }],
+        uses: { limit: 1, per: "long-rest" },
+        ridesHit: { rides: "melee-this-weapon" }
+      },
+      {
+        id: "thunder",
+        name: "Thunder",
+        activation: "other",
+        description:
+          "When you hit with a melee attack using the staff, it emits a crack of thunder audible out to 300 feet. The target must succeed on a DC 17 Constitution saving throw or have the Stunned condition until the end of your next turn.",
+        save: {
+          ability: "con",
+          dc: 17,
+          successDamage: "none",
+          failureConditions: ["stunned"],
+          failureDuration: { type: "until-source-turn-end" }
+        },
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        ridesHit: { rides: "melee-this-weapon" }
+      },
+      {
+        id: "thunder-and-lightning",
+        name: "Thunder and Lightning",
+        activation: "bonus-action",
+        description:
+          "Immediately after you hit with a melee attack using the staff, take a Bonus Action to use Lightning and Thunder at once, which spends neither of their daily uses.",
+        damage: [{ formula: "2d6", type: "lightning" }],
+        uses: { limit: 1, per: "long-rest" },
+        ridesHit: {
+          rides: "melee-this-weapon",
+          saveDc: 17,
+          effectRequired: true,
+          effects: [
+            {
+              id: "thunder",
+              name: "Thunder",
+              save: {
+                ability: "con",
+                failureConditions: ["stunned"],
+                failureDuration: { type: "until-source-turn-end" }
+              }
+            }
+          ]
+        }
+      },
       {
         id: "lightning-strike",
         name: "Lightning Strike",
@@ -725,7 +1025,53 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `staff-of-withering` - the on-hit 2d10 needs a weapon block (bearer-scoped it would hit every weapon).
+  // A Quarterstaff whose hit can spend a charge for 2d10 Necrotic and a DC 15 Constitution save. The failure's hour of
+  // Disadvantage on Strength and Constitution checks and saves outlasts a fight, so it lasts until the GM ends it.
+  "staff-of-withering": {
+    charges: { regain: "1d3" },
+    actions: [
+      {
+        id: "withering",
+        name: "Withering",
+        activation: "other",
+        description:
+          "On a hit with the staff, expend 1 charge to deal an extra 2d10 Necrotic damage to the target and force it to make a DC 15 Constitution saving throw. On a failed save, the target has Disadvantage for 1 hour on any ability check or saving throw that uses Strength or Constitution.",
+        damage: [{ formula: "2d10", type: "necrotic" }],
+        uses: { limit: 3, per: "long-rest", pool: "staff-of-withering-charges" },
+        ridesHit: {
+          rides: "this-weapon",
+          saveDc: 15,
+          effectRequired: true,
+          effects: [
+            {
+              id: "withering",
+              name: "Withering",
+              save: {
+                ability: "con",
+                failureEffect: {
+                  name: "Withered",
+                  modifiers: [
+                    {
+                      type: "roll-mode",
+                      roll: "check",
+                      mode: "disadvantage",
+                      when: [{ type: "on-ability-check" }, { type: "ability-is", abilities: ["str", "con"] }]
+                    },
+                    {
+                      type: "roll-mode",
+                      roll: "save",
+                      mode: "disadvantage",
+                      when: [{ type: "on-saving-throw" }, { type: "ability-is", abilities: ["str", "con"] }]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
 
   // ---- Wands -----------------------------------------------------------------------------------
 
@@ -805,7 +1151,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           failureDuration: { type: "rounds", rounds: 10 },
           repeatSave: true
         },
-        uses: { limit: 7, per: "long-rest", pool: "wand-of-paralysis-charges" }
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-paralysis-charges" },
+        targets: { count: 1, rangeFeet: 60, seen: true }
       }
     ]
   },
@@ -878,9 +1225,22 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ---- Belt ------------------------------------------------------------------------------------
 
-  // `belt-of-dwarvenkind` - Constitution +2 (`ability-score`, refused), Dwarvish (item languages have
-  //     no reader), Persuasion advantage limited to dwarves (no target creature type), and Darkvision
-  //     and Poison resistance under a negated species gate ("if you aren't a dwarf").
+  /** "If you aren't a dwarf or duergar, you have Darkvision 60 feet, Resistance to Poison damage, and Advantage on
+   *  saving throws to avoid or end the Poisoned condition": authored for every wearer, since a dwarf's own Darkvision
+   *  (120 feet) and Dwarven Resilience already give it as much. Not modeled: Constitution +2 (`ability-score`,
+   *  refused), Dwarvish (item languages have no reader), and the Persuasion Advantage with dwarves. */
+  "belt-of-dwarvenkind": {
+    grants: { damageResistances: ["poison"] },
+    modifiers: [
+      { type: "darkvision", feet: 60 },
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "advantage",
+        when: [{ type: "on-saving-throw" }, { type: "versus-condition", conditionIds: ["poisoned"] }]
+      }
+    ]
+  },
   // `belt-of-giant-strength` - sets Strength (`ability-score`, refused).
 
   // ---- Feet ------------------------------------------------------------------------------------
@@ -944,8 +1304,30 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // `gauntlets-of-ogre-power` - sets Strength (`ability-score`, refused).
-  // `gloves-of-missile-snaring` - the reduction is rolled (1d10 + Dex), needs a free hand, and costs a
-  //     Reaction; `damage-reduction` is a flat, free, standing amount.
+
+  // Offered on a weapon's hit from range, a thrown one's included (a Thrown weapon swung in melee is no missile); the
+  // wearer's Dexterity modifier is added to the 1d10 when the action is derived. The free hand and catching the
+  // missile stay prose.
+  "gloves-of-missile-snaring": {
+    actions: [
+      {
+        id: "snare-missile",
+        name: "Snare Missile",
+        activation: "reaction",
+        description:
+          "If you're hit by an attack roll made with a Ranged or Thrown weapon while wearing these gloves, you can take a Reaction to reduce the damage by 1d10 plus your Dexterity modifier if you have a free hand. If you reduce the damage to 0, you can catch the ammunition or weapon if it is small enough for you to hold in that hand.",
+        damage: [],
+        reaction: {
+          trigger: "hit-by-attack",
+          response: "reduce-damage",
+          formula: "1d10",
+          attackKinds: ["ranged-weapon"]
+        },
+        adds: { abilityModifier: "dex" }
+      }
+    ]
+  },
+
   // `gloves-of-swimming-and-climbing` - movement speeds, and the +5 is limited to climbing or swimming
   //     within Athletics, which `skill-is` cannot narrow.
 
@@ -977,7 +1359,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `eyes-of-minute-seeing` - Darkvision, and Investigation advantage limited to within one foot.
   // `eyes-of-the-eagle` - Perception advantage "that rely on sight" and long-distance sight.
-  // `goggles-of-night` - Darkvision reaches nothing from an item.
+
+  /** "While wearing these dark lenses, you have Darkvision out to 60 feet. If you already have Darkvision, wearing the
+   *  goggles increases its range by 60 feet." */
+  "goggles-of-night": { modifiers: [{ type: "darkvision", feet: 60, extends: true }] },
 
   // An unlimited self-cast with no damage, attack or save.
   "hat-of-disguise": { casts: [{ spellId: "disguise-self" }] },
@@ -1110,11 +1495,20 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `cloak-of-the-manta-ray` - underwater breathing and Swim Speed are not modeled.
   // `mantle-of-spell-resistance` - spell-save advantage would apply to every save.
-  // `robe-of-eyes` - Perception advantage "that rely on sight", Darkvision and Truesight, and its Light/Daylight drawback.
+  /** Darkvision and Truesight out to 120 feet, which dynamic vision reads. Not modeled: Advantage on Wisdom
+   *  (Perception) checks "that rely on sight" (a check doesn't say what it relies on), and the Light or Daylight
+   *  drawback that Blinds the wearer. */
+  "robe-of-eyes": {
+    modifiers: [
+      { type: "darkvision", feet: 120 },
+      { type: "sense", sense: "truesight", feet: 120 }
+    ]
+  },
 
   /**
-   * A real DC 15 Wisdom save that Stuns on a failure. Not modeled: the light, the attack disadvantage
-   * for the duration, and the stun ending with the effect (the GM clears it).
+   * A real DC 15 Wisdom save that Stuns until the end of the wearer's next turn, at creatures within 30 feet, and the
+   * robe's light and the Disadvantage of attackers that can see the wearer until the end of its next turn. Not modeled:
+   * the save only for those in the Bright Light that see it.
    */
   "robe-of-scintillating-colors": {
     charges: { regain: "1d3" },
@@ -1125,8 +1519,30 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge to make the garment display a shifting pattern of dazzling hues until the end of your next turn. During this time, the robe sheds Bright Light in a 30-foot radius and Dim Light for an additional 30 feet, and creatures that can see you have Disadvantage on attack rolls against you. Any creature in the Bright Light that can see you when the robe's power is activated must succeed on a DC 15 Wisdom saving throw or have the Stunned condition until the effect ends.",
-        save: { ability: "wis", dc: 15, successDamage: "none", failureConditions: ["stunned"] },
-        uses: { limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" }
+        save: {
+          ability: "wis",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: ["stunned"],
+          failureDuration: { type: "until-source-turn-end" }
+        },
+        uses: { limit: 3, per: "long-rest", pool: "robe-of-scintillating-colors-charges" },
+        targets: { rangeFeet: 30 },
+        grants: {
+          name: "Scintillating Colors",
+          tags: ["scintillating-colors"],
+          duration: { type: "until-source-turn-end" },
+          light: { brightFeet: 30, dimFeet: 30 },
+          // "Creatures that can see you have Disadvantage on attack rolls against you."
+          modifiers: [
+            {
+              type: "roll-mode",
+              roll: "incoming-attack",
+              mode: "disadvantage",
+              when: [{ type: "on-attack-roll" }, { type: "seen-by-other" }]
+            }
+          ]
+        }
       }
     ]
   },
@@ -1220,7 +1636,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // `broom-of-flying` - Fly Speed is not modeled (also `carpet-of-flying`, `horseshoes-of-a-zephyr`).
 
-  // `candle-of-invocation` - advantage on all D20 Tests while within its light; no light-area gate or burn-down duration.
+  // Its light: "the candle sheds Dim Light in a 30-foot radius" for its 4 hours of burning. Not modeled: Advantage on
+  // D20 Tests and slot-free level 1 spells within that light, and the Gate it can open.
+  "candle-of-invocation": { light: { brightFeet: 0, dimFeet: 30, burnHours: 4 } },
 
   // One of the four elemental-commanding items; see the bowl.
   "censer-of-controlling-air-elementals": {
@@ -1286,7 +1704,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         description:
           "Remove the stopper and speak the command word: 30 gallons of water gush forth in a Line 30 feet long and 1 foot wide. One creature of your choice in the Line must succeed on a DC 13 Strength saving throw or take 1d4 Bludgeoning damage and have the Prone condition. Instead of a creature, you can target one object in the Line that isn't being worn or carried and that weighs no more than 200 pounds; the object is knocked over.",
         save: { ability: "str", dc: 13, successDamage: "none", failureConditions: ["prone"] },
-        damage: [{ formula: "1d4", type: "bludgeoning" }]
+        damage: [{ formula: "1d4", type: "bludgeoning" }],
+        targets: { count: 1, rangeFeet: 30 }
       }
     ]
   },
@@ -1301,13 +1720,31 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `efficient-quiver` - a container.
   // `efreeti-bottle` - a first-opening table governing later uses.
   // `elemental-gem` - single use.
-  // `eversmoking-bottle` - obscurement is not modeled.
+  /** Opened, "smoke billows out of the bottle and fills a 60-foot Emanation originating from the bottle", Heavily
+   *  Obscured, for 10 minutes. Not modeled: the cloud growing 10 feet a minute while it stays open, and a strong wind
+   *  dispersing it. */
+  "eversmoking-bottle": {
+    actions: [
+      {
+        id: "open",
+        name: "Open the Bottle",
+        activation: "action",
+        area: { shape: "emanation", sizeFeet: 60, widthFeet: null },
+        description:
+          "Remove the stopper: smoke fills a 60-foot Emanation originating from the bottle, Heavily Obscured, for 10 minutes.",
+        sight: { area: { kind: "heavily-obscured", aroundSelfFeet: 60 }, rounds: 100 }
+      }
+    ]
+  },
   // `feather-token` - six single-use tokens in one row.
   // `figurine-of-wondrous-power` - ten figurines, summons, multi-day cooldowns.
   // `folding-boat` - a vehicle.
-  // `gem-of-brightness` - 50 non-renewing charges, a 5-charge option.
+  // Its first command's light ("Bright Light in a 30-foot radius and Dim Light for an additional 30 feet"), lit and put
+  // out on the row. Not modeled: the 50 charges that never return, and the beam and flare that Blind.
+  "gem-of-brightness": { light: { brightFeet: 30, dimFeet: 30 } },
 
-  // Charge-alone. Not cast as True Seeing (that spell targets someone you touch); the Truesight is narrated.
+  // Not cast as True Seeing (that spell targets someone you touch): the charge gives its user Truesight 120 feet for
+  // 10 minutes, which dynamic vision reads.
   "gem-of-seeing": {
     charges: { regain: "1d3" },
     actions: [
@@ -1317,7 +1754,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge. For the next 10 minutes, you have Truesight out to 120 feet when you peer through the gem.",
-        uses: { limit: 3, per: "long-rest", pool: "gem-of-seeing-charges" }
+        uses: { limit: 3, per: "long-rest", pool: "gem-of-seeing-charges" },
+        grants: {
+          name: "Peering Through the Gem of Seeing",
+          tags: ["gem-of-seeing"],
+          duration: { type: "rounds", rounds: 100 },
+          modifiers: [{ type: "sense", sense: "truesight", feet: 120 }]
+        }
       }
     ]
   },
@@ -1333,9 +1776,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `ioun-stone` - fourteen stones in one row; a rider would grant all of them.
 
   /**
-   * Its to-hit is printed as Dexterity + Proficiency Bonus, which is exactly the derived form. Not
-   * modeled: Restrained on a hit (`onHit` is dropped), the DC 20 break check, and the bands being
-   * destroyed when broken.
+   * Its to-hit is printed as Dexterity + Proficiency Bonus, which is exactly the derived form. A hit Restrains a Huge or
+   * smaller creature until released, escaped with a DC 20 Strength (Athletics) check. Not modeled: the bands being
+   * destroyed when broken, the 24-hour lockout after a failed check, and the release command.
    */
   "iron-bands": {
     actions: [
@@ -1346,13 +1789,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         description:
           "Throw the sphere at a Huge or smaller creature you can see within 60 feet of yourself. As the sphere moves through the air, it opens into a tangle of metal bands. On a hit, the target has the Restrained condition until you take a Bonus Action to issue a command that releases it. Doing so or missing with the attack causes the bands to contract and become a sphere once more. A creature that can touch the bands, including the one Restrained, can take an action to make a DC 20 Strength (Athletics) check to break the iron bands. On a successful check, the item is destroyed, and the Restrained creature is freed. On a failed check, any further attempts made by that creature automatically fail until 24 hours have elapsed. Once the bands are used, they can't be used again until the next dawn.",
         attack: { ability: "dex", proficient: true, rangeFeet: 60 },
-        uses: { limit: 1, per: "long-rest", pool: "iron-bands-charges" }
+        uses: { limit: 1, per: "long-rest", pool: "iron-bands-charges" },
+        targets: { count: 1, maxSize: "huge", seen: true },
+        onHit: [{ name: "Iron Bands", conditions: [{ id: "restrained" }], escapeDc: 20, tags: ["escape-athletics"] }]
       }
     ]
   },
 
-  // No limit on attempts, as printed. Not modeled: the trapping itself and the "native to another
-  // plane" precondition (carried in the description for the GM).
+  // No limit on attempts, as printed. "Native to another plane" is read as a Celestial, an Elemental, a Fey or a
+  // Fiend. Not modeled: the trapping itself.
   "iron-flask": {
     actions: [
       {
@@ -1361,16 +1806,36 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Target a creature you can see within 60 feet of yourself. If the flask is empty and the target is native to a plane of existence other than the one you are on, the target must succeed on a DC 17 Wisdom saving throw or be trapped in the flask. Once trapped, a creature remains in the flask until released.",
-        save: { ability: "wis", dc: 17, successDamage: "none", failureConditions: [] }
+        save: { ability: "wis", dc: 17, successDamage: "none", failureConditions: [] },
+        targets: { count: 1, rangeFeet: 60, seen: true, creatureTypes: ["celestial", "elemental", "fey", "fiend"] }
       }
     ]
   },
 
-  // `lantern-of-revealing` - no rider suppresses Invisible within a light radius.
-  // `manual-of-bodily-health`, `manual-of-gainful-exercise`, `manual-of-quickness-of-action`,
-  //     `tome-of-clear-thought`, `tome-of-leadership-and-influence`, `tome-of-understanding`: a
-  //     permanent ability increase is a sheet edit, and an item rider is reversible (and `ability-score`
-  //     is refused on items).
+  /** "While lit, this hooded lantern burns for 6 hours on 1 pint of oil, shedding Bright Light in a 30-foot radius and
+   *  Dim Light for an additional 30 feet. Invisible creatures and objects are visible as long as they are in the
+   *  lantern's Bright Light. You can take a Utilize action to lower the hood, reducing the light to Dim Light in a
+   *  5-foot radius." */
+  "lantern-of-revealing": {
+    light: {
+      brightFeet: 30,
+      dimFeet: 30,
+      revealsInvisible: true,
+      hooded: { brightFeet: 0, dimFeet: 5 },
+      burnHours: 6,
+      fuel: "oil"
+    }
+  },
+  // ---- Manuals and tomes: "If you spend 48 hours over a period of 6 days or fewer studying the book's contents and
+  // practicing its guidelines, your Constitution increases by 2, to a maximum of 30. The manual then loses its magic but
+  // regains it in a century." The increase is permanent, so it goes into the reader's build (the GM marks the study
+  // done); an item rider would end when the book is put down.
+  "manual-of-bodily-health": { study: { ability: "con", amount: 2, maximum: 30, hours: 48, days: 6 } },
+  "manual-of-gainful-exercise": { study: { ability: "str", amount: 2, maximum: 30, hours: 48, days: 6 } },
+  "manual-of-quickness-of-action": { study: { ability: "dex", amount: 2, maximum: 30, hours: 48, days: 6 } },
+  "tome-of-clear-thought": { study: { ability: "int", amount: 2, maximum: 30, hours: 48, days: 6 } },
+  "tome-of-leadership-and-influence": { study: { ability: "cha", amount: 2, maximum: 30, hours: 48, days: 6 } },
+  "tome-of-understanding": { study: { ability: "wis", amount: 2, maximum: 30, hours: 48, days: 6 } },
   // `manual-of-golems` - crafting.
   // `marvelous-pigments` - GM fiat, consumed.
   // `mirror-of-life-trapping` - a passive save on anyone who sees their reflection.
@@ -1399,7 +1864,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           failureDuration: { type: "rounds", rounds: 10 },
           repeatSave: true
         },
-        uses: { limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" }
+        uses: { limit: 3, per: "long-rest", pool: "pipes-of-haunting-charges" },
+        targets: { rangeFeet: 30 }
       }
     ]
   },
@@ -1426,7 +1892,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `portable-hole` - a container.
   // `rope-of-climbing` - there is no climb check to gate its advantage on.
 
-  // Unlimited, as printed. The escape check is not modeled.
+  // Unlimited, as printed. The rope's own Armor Class and Hit Points are not modeled.
   "rope-of-entanglement": {
     actions: [
       {
@@ -1435,7 +1901,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Command the other end of the rope to dart forward and entangle one creature you can see within 20 feet of yourself. The target must succeed on a DC 15 Dexterity saving throw or have the Restrained condition. You can release the target by letting go of your end of the rope or by using a Bonus Action to repeat the command.",
-        save: { ability: "dex", dc: 15, successDamage: "none", failureConditions: ["restrained"] }
+        save: { ability: "dex", dc: 15, successDamage: "none", failureConditions: ["restrained"], escapeDc: 15 },
+        targets: { count: 1, rangeFeet: 20, seen: true }
       }
     ]
   },

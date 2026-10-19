@@ -133,16 +133,20 @@ export function ActionTargetPicker({
           <ul className="action-target-list scroll-y">
             {targets.map((target) => (
               <li key={target.id}>
-                <label className={`action-target${picking.selected.includes(target.id) ? " is-picked" : ""}`}>
+                <label
+                  className={`action-target${picking.selected.includes(target.id) ? " is-picked" : ""}${target.unavailable ? " is-unavailable" : ""}`}
+                >
                   <input
                     type={picking.mode === "single" ? "radio" : "checkbox"}
                     name={group}
                     checked={picking.selected.includes(target.id)}
+                    disabled={target.unavailable !== undefined && !picking.selected.includes(target.id)}
                     onChange={() => toggleTarget(target.id)}
                   />
                   {target.initials !== undefined && <TargetAvatar target={target as TargetRow} />}
                   <span className="action-target-name">{target.label}</span>
                   {target.detail && <span className="action-target-detail">{target.detail}</span>}
+                  {target.unavailable && <span className="action-target-reason">{target.unavailable}</span>}
                 </label>
                 {darts && picking.selected.includes(target.id) && (
                   <Stepper

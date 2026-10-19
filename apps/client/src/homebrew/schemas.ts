@@ -832,6 +832,7 @@ const MAGIC_KEYS = [
   "damageTypeChoice",
   "vulnerableToOtherChoices",
   "removesArmorDrawbacks",
+  "study",
   "casts",
   "grantsFeatIds",
   "modifiers",
@@ -840,7 +841,8 @@ const MAGIC_KEYS = [
   "actions",
   "effects",
   "tags",
-  "appliesTo"
+  "appliesTo",
+  "onHit"
 ];
 
 const EQUIPMENT_SCHEMA: HomebrewSchema = {
@@ -994,7 +996,13 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
           label: "Cursed",
           kind: "switch",
           help: "Players can't unattune, unequip or drop it. Only you can. Its magic stays hidden from them until they attune.",
-          visibleWhen: (draft) => draft.isMagic === true && getAt(draft, "attunement.required") === true
+          visibleWhen: (draft) => draft.isMagic === true && getAt(draft, "attunement.required") === true,
+          // The curse's vulnerability switch hides with it, so it goes with it, or publishing refuses a switch no one
+          // can see.
+          write: (next, draft) => {
+            const { vulnerableToOtherChoices: _curse, ...rest } = draft;
+            return next === true ? { ...draft, cursed: true } : { ...rest, cursed: false };
+          }
         },
         // The charges themselves are the `uses` on its spells and actions; these say how they come back.
         {
@@ -1033,7 +1041,10 @@ const EQUIPMENT_SCHEMA: HomebrewSchema = {
             ((getAt(draft, "grants.damageResistances") as unknown[] | undefined)?.length ?? 0) > 0,
           write: (next, draft) => {
             const { damageTypeChoice: _old, ...rest } = draft;
-            return Array.isArray(next) && next.length > 0 ? { ...rest, damageTypeChoice: next } : rest;
+            if (Array.isArray(next) && next.length > 0) return { ...rest, damageTypeChoice: next };
+            // With no choice the curse's vulnerability switch hides, so it goes too.
+            const { vulnerableToOtherChoices: _curse, ...bare } = rest;
+            return bare;
           }
         },
         // Like Armor of Vulnerability: the curse makes the bearer vulnerable to every choice it doesn't resist.

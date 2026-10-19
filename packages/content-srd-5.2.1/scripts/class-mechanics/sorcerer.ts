@@ -28,7 +28,14 @@ const AFFINITY_TYPES: ReadonlyArray<readonly [id: DamageType, name: string]> = [
 export const sorcerer: ClassMechanicsModule = {
   features: {
     // Grouping tag, as on the other casters; no consumer reads class-feature `tags` yet.
-    spellcasting: { tags: ["spellcasting"] },
+    // "Whenever you gain a Sorcerer level, you can replace one of your cantrips" and "one spell on your list".
+    spellcasting: {
+      tags: ["spellcasting"],
+      replaces: [
+        { offer: "class-cantrips", when: "level-up", amount: 1 },
+        { offer: "class-spells", when: "level-up", amount: 1 }
+      ]
+    },
     /**
      * Bonus Action, two uses per Long Rest, for 10 rounds: +1 to the save DC of the spells the sheet casts as a
      * Sorcerer (`classId`), and Advantage on their spell attack rolls (`spell-class-is`).
@@ -77,6 +84,8 @@ export const sorcerer: ClassMechanicsModule = {
      * `grantedAtLevels`.
      */
     metamagic: {
+      // "Whenever you gain a Sorcerer level, you can replace one of your Metamagic options with one you don't know."
+      replaces: [{ offer: "feature:metamagic", when: "level-up", amount: 1 }],
       options: {
         "careful-spell": ONE_SORCERY_POINT,
         "distant-spell": ONE_SORCERY_POINT,

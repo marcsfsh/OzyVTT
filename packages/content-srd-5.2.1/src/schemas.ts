@@ -15,6 +15,7 @@ import {
   BurstSchema,
   ActionReactionSchema,
   ActionSchema,
+  ActionTargetsSchema,
   ActorDefinitionSchema,
   DamageDrainSchema,
   DamageFormulaSchema,
@@ -24,7 +25,8 @@ import {
   ItemSlotSchema,
   OnHitRiderSchema,
   SaveFailureEffectSchema,
-  SaveOutcomeFields
+  SaveOutcomeFields,
+  SightEffectSchema
 } from "@vtt/schemas";
 import {
   BackgroundReferenceSchema,
@@ -372,6 +374,9 @@ export const SpellReferenceSchema = z
      *  describe the prose (Hex's later 1d6, Faerie Fire's "attack rolls against") and no single cast. A zone, a summons or a
      *  rider on later hits casts with none of these, and stays for the GM. Actions built from a spell read this. */
     effect: SpellEffectSchema.nullable().default(null),
+    /** What the spell does to light and sight while it lasts (Light, Darkness, Fog Cloud, Daylight), which dynamic
+     *  vision reads. */
+    sight: SightEffectSchema.optional(),
     classes: z
       .array(z.string())
       .describe(
@@ -517,7 +522,11 @@ export const ItemSpellCastSchema = z
     consumesSpellSlot: z
       .boolean()
       .default(false)
-      .describe("Whether casting it also spends one of the bearer's own spell slots")
+      .describe("Whether casting it also spends one of the bearer's own spell slots"),
+    /** Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear: Beasts only). */
+    targets: ActionTargetsSchema.optional().describe(
+      "Who the item's cast may affect beside what the spell allows (a Ring of Animal Influence's Fear affects Beasts only), checked on the server"
+    )
   })
   .strict()
   .describe(
@@ -614,13 +623,40 @@ const EquipmentWeaponStatsSchema = z.object({
 });
 
 /** The light a lit item sheds, as its description prints it: Bright Light out to `brightFeet` and Dim Light for
- *  `dimFeet` more (Torch: 20 and 20). Dynamic vision lights a carried one while it is equipped (ADR-0023). */
+ *  `dimFeet` more (Torch: 20 and 20). Dynamic vision lights its bearer while it is lit and equipped (ADR-0023). */
 const ItemLightSchema = z
   .object({
     brightFeet: z.number().int().min(0).max(240),
-    dimFeet: z.number().int().min(0).max(240)
+    dimFeet: z.number().int().min(0).max(240),
+    /** The light is a Cone the bearer aims (a Bullseye Lantern). */
+    cone: z.literal(true).optional(),
+    /** With its hood lowered (a Hooded Lantern): "reducing the light to Dim Light in a 5-foot radius". */
+    hooded: z
+      .object({ brightFeet: z.number().int().min(0).max(240), dimFeet: z.number().int().min(0).max(240) })
+      .strict()
+      .optional(),
+    /** Its Bright Light is sunlight (a Sun Blade). */
+    sunlight: z.literal(true).optional(),
+    /** Invisible creatures in its Bright Light are seen (a Lantern of Revealing). */
+    revealsInvisible: z.literal(true).optional(),
+    /** It sheds its light whenever it is held, with nothing to light (a Mace of Disruption). */
+    always: z.literal(true).optional(),
+    /** Its other riders apply only while it is lit (a Flame Tongue's 2d6 Fire while ablaze). */
+    ridersWhileLit: z.literal(true).optional(),
+    /** How long it burns once lit, in hours: a Torch or Candle is used up, and a Lamp or Lantern spends a flask of
+     *  `fuel` (Oil). */
+    burnHours: z.number().int().min(1).max(24).optional(),
+    fuel: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional()
   })
-  .strict();
+  .strict()
+  .describe(
+    "The light the item sheds while it is lit and equipped: Bright Light out to `brightFeet` and Dim Light for `dimFeet` more, a Cone with `cone`, less with its hood down (`hooded`), sunlight with `sunlight`, and revealing Invisible creatures in its Bright Light with `revealsInvisible`. `burnHours` is how long it burns once lit, spending a `fuel` item when it names one. With `always` it shines whenever it is held, and with `ridersWhileLit` its other riders apply only while it is lit."
+  );
+export type ItemLight = z.infer<typeof ItemLightSchema>;
 
 /**
  * The base weapons or armors a template item may bind to: the SRD's printed qualifier (`label`) and
@@ -765,6 +801,21 @@ export const EquipmentReferenceSchema = z
       .describe(
         "A Spell Scroll: each carried copy bears one spell of these levels (0 is a cantrip), stored as the row's `spellId` and checked by the server when it is added. Reading it casts the spell at its level with the Spell Scroll table's save DC and attack bonus, no spell slot and no Material components, and uses it up; a reader whose spell list lacks the spell can't read it, and one above the reader's levels needs a check first. Needs `consumedOnUse`"
       ),
+    /** A manual or tome: studied for its reading time, it raises its reader's score for good, and its magic then
+     *  sleeps. */
+    study: z
+      .object({
+        ability: AbilityShortSchema,
+        amount: z.number().int().min(1).max(4),
+        maximum: z.number().int().min(20).max(30),
+        hours: z.number().int().min(1).max(1000),
+        days: z.number().int().min(1).max(365)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A manual or tome (\"If you spend 48 hours over a period of 6 days or fewer studying the book's contents and practicing its guidelines, your Constitution increases by 2, to a maximum of 30\"): `hours` of study within `days`, after which the reader's `ability` rises by `amount`, never above `maximum`, for good. The GM marks the study done (the time is downtime the GM gives); the server records it in the reader's build, so a rebuild keeps it, and the copy's magic is spent, so no one else gains from it"
+      ),
     /** "The GM chooses the type": the types the GM may pick for this item's one granted resistance, which then
      *  replaces the printed default in `grants.damageResistances` for that carried copy. */
     damageTypeChoice: z
@@ -782,6 +833,15 @@ export const EquipmentReferenceSchema = z
       .optional()
       .describe(
         "Armor of Vulnerability's curse: while the bearer is attuned, worn or not, Vulnerability to every `damageTypeChoice` type except the one it resists. Needs `cursed` and `damageTypeChoice`"
+      ),
+    /** What a hit with this weapon does beside its damage (Giant Slayer's save against Prone, a Sword of Wounding's
+     *  stopped healing, a Sword of Sharpness's Exhaustion on a rolled 20). */
+    onHit: z
+      .array(OnHitRiderSchema)
+      .max(4)
+      .optional()
+      .describe(
+        "What a hit with this weapon does beside its damage: each rider rides every attack the item makes (both grips, its Light extra attack) and lands as the monster on-hit riders do, a save at its DC (Giant Slayer), a rolled 20 only (Sword of Sharpness), a creature type only, or the coat its own action put on (Dagger of Venom). Needs a `weapon` block or `appliesTo`"
       ),
     /** Feats granted while active, depth 1. Nothing has `grants.items`, so a grant cycle cannot be expressed. */
     grantsFeatIds: z
@@ -828,6 +888,13 @@ export const EquipmentReferenceSchema = z
         code: "custom",
         path: ["vulnerableToOtherChoices"],
         message: "Vulnerability to the other choices needs a cursed item whose resistance the GM chooses."
+      });
+    // A hit rider rides the item's own attacks, so the item has to make one.
+    if (item.onHit && !item.weapon && !item.appliesTo)
+      context.addIssue({
+        code: "custom",
+        path: ["onHit"],
+        message: "What a hit does needs a weapon to hit with: give the item weapon stats or a base weapon."
       });
     // Enforced on the item carrier only: the identical rider on a feat is valid.
     item.modifiers.forEach((modifier, index) => {

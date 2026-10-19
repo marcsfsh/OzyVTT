@@ -39,7 +39,7 @@ export function playerHitOwesDamage(resolution: ActionResolution): boolean {
     attack !== null &&
     !resolution.preview &&
     resolution.damageTotal > 0 &&
-    !(resolution.reactionPrompts ?? []).some((prompt) => prompt.actorId === attack.targetId)
+    !(resolution.reactionPrompts ?? []).some((prompt) => prompt.actorId === attack.targetId || prompt.holdsDamage)
   );
 }
 
@@ -135,7 +135,8 @@ function settleOne(
         critical: resolution.crit,
         sourceName: label,
         sourceActorId,
-        ...(drain ? { drain } : {})
+        ...(drain ? { drain } : {}),
+        ...(resolution.knockOut === "chosen" ? { nonlethal: true } : {})
       },
       { role: "gm" },
       damageDepsOf(deps)
@@ -157,6 +158,7 @@ function settleOne(
         proposedTotal: owed.total,
         critical: resolution.crit,
         ...(drain ? { drain } : {}),
+        ...(resolution.knockOut === "chosen" ? { nonlethal: true as const } : {}),
         createdAt: deps.now()
       }
     ]
@@ -189,7 +191,8 @@ export function resolvePendingDamage(
       critical: proposal.critical,
       sourceName: label,
       sourceActorId: proposal.sourceActorId,
-      ...(proposal.drain ? { drain: proposal.drain } : {})
+      ...(proposal.drain ? { drain: proposal.drain } : {}),
+      ...(proposal.nonlethal ? { nonlethal: true } : {})
     };
     const outcome = applyDamageDetailed(state, proposal.targetActorId, input, { role: "gm" }, damageDepsOf(deps));
     applied = { outcome, targetId: proposal.targetActorId, sourceActorId: proposal.sourceActorId, label };

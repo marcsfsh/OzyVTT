@@ -6,6 +6,9 @@ import type { ClassMechanicsModule } from "./overlay.js";
 
 export const wizard: ClassMechanicsModule = {
   features: {
+    // "Whenever you finish a Long Rest, you can replace one of your cantrips": made in the Level flow until a rest
+    // offers it.
+    spellcasting: { replaces: [{ offer: "class-cantrips", when: "level-up", amount: 1 }] },
     /**
      * Two free level-3 castings back on a Short Rest (a Long Rest clears every pool too). One counter,
      * so the per-spell split is not enforced; the description carries it. The spell `choice` is already

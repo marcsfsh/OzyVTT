@@ -50,6 +50,7 @@ describe("rule families", () => {
       ["movement.blocked-path", "movement"],
       // Hideous Laughter: standing up is movement the effect holds back.
       ["movement.cant-stand", "movement"],
+      ["movement.toward-fear", "movement"],
       ["economy.action-used", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
@@ -67,9 +68,8 @@ describe("rule families", () => {
       // An effect that takes away Reactions (Slow) is "you have no reaction", like Incapacitated.
       ["condition.no-reactions", "economy"],
       ["condition.no-spells", "economy"],
-      // What an effect leaves its bearer able to do on a turn (Irresistible Dance's Bonus Actions, Abjure Foes' one
-      // thing, Command's Flee): like Slow's no Reactions.
-      ["condition.no-bonus-actions", "economy"],
+      // What an effect leaves its bearer able to do on a turn (Gaseous Form's no attacks, Abjure Foes' one thing,
+      // Command's Flee): like Slow's no Reactions.
       ["condition.cant-attack", "economy"],
       ["condition.dash-only", "economy"],
       ["condition.one-thing-a-turn", "economy"],
@@ -93,6 +93,7 @@ describe("rule families", () => {
       ["spell.later-turn", "economy"],
       // Sneak Attack or a smite taken alone, with no hit to add to.
       ["attack.rides-a-hit", "economy"],
+      ["roll.answers-a-roll", "economy"],
       ["feature.no-uses-remaining", "resources"],
       ["feature.requires-effect", "resources"],
       // Action Surge with two uses, Stunning Strike: once on a turn, a spent per-turn limit.
@@ -112,12 +113,16 @@ describe("rule families", () => {
       ["cover.total", "targeting"],
       // Hiding in an enemy's sight: where the creature stands relative to the others, like cover.
       ["hide.seen", "targeting"],
+      ["hide.exposed", "targeting"],
+      ["light.too-bright", "targeting"],
       ["condition.charmed-charmer", "targeting"],
       ["target.too-many", "targeting"],
       // Whom a spell may pick: a creature of a type it targets, one the caster sees, all in one of its areas.
       ["target.wrong-type", "targeting"],
       ["target.unseen", "targeting"],
       ["target.outside-area", "targeting"],
+      // A creature the action can't affect (Turn Undead on a goblin, a flask's Holy Water on a bandit).
+      ["target.not-allowed", "targeting"],
       ["attack.cleave-same-target", "targeting"],
       ["attack.cleave-too-far", "targeting"],
       // The hit can't carry the extra: no Advantage or ally for Sneak Attack, no melee weapon for a smite.

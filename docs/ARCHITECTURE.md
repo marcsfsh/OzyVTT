@@ -222,7 +222,9 @@ check: GM-only, or hidden by sight or the fog, for the table or for one player. 
 name a hidden creature names "A hidden threat", a rule it would bend for a visible creature doesn't
 apply, and a public roll it makes is recorded GM-only. Another player's character out of
 sight keeps its actor but loses its token. An audience's own characters are always sent, and so
-is a creature with any part of its space revealed.
+is a creature with any part of its space revealed. A player's vision block also marks the creatures
+one of their own characters senses without seeing (Divine Sense, `vision/detect.ts`): where each
+stands and its creature type, never its identity, and never to the table or another player.
 
 The rule for a new field: it may reach a player or the viewer only if everything it carries is
 already public to them, and it carries no exact quantity and no identity, position or existence
@@ -248,15 +250,28 @@ of a hidden thing. When in doubt, leave it out.
   makes the scene live in a copy of the state and runs the real projections over it, and nothing
   is committed (ADR-0035).
 - Dynamic vision (ADR-0023) is per scene and off by default: walls, doors and windows as
-  image-pixel segments, placed and carried lights, and an ambient light level
-  (`vision/edit.ts`). The server builds each viewer's visibility polygon against the walls, cuts it
-  to the creature's senses and the lights (`vision/geometry.ts`, `vision/sight.ts`), and caches
-  polygons by walls, origin and radius. Senses come from stat blocks, species and features, and
-  light from equipped items (`vision/senses.ts`). After every command the server adds what the
-  party sees to the scene's explored memory (`rememberExplored`). Players and the table screen
-  get only polygons and rectangles to paint. While vision is on, walls, closed doors and windows
-  also bar movement, and sight decides an attack's unseen Advantage and Disadvantage and whether
-  Hide is allowed.
+  image-pixel segments, placed and carried lights, an ambient light level (sunlight or not), and
+  painted areas of Bright Light, Dim Light, Darkness, light or heavy obscurement and magical
+  Darkness (`vision/edit.ts`, `vision/areas.ts`). The server builds each viewer's visibility
+  polygon against the walls, cuts it to the creature's senses, the light at each point and the
+  areas (`vision/geometry.ts`, `vision/sight.ts`), and caches polygons by walls, origin and
+  radius. Senses come from stat blocks, species, features, feats, active items and live effects,
+  and light from items lit on their row, effects and a stat block's own glow (`vision/senses.ts`,
+  `item-light.ts`, which burns a light down on the game clock). A cast or an action places its
+  light, fog or magical Darkness and dispels what it overlaps; each ends with the Concentration,
+  effect or rounds that keep it (`vision/cast-sight.ts`). After every command the server adds what
+  the party sees to the scene's explored memory (`rememberExplored`). Players and the table screen
+  get only polygons and rectangles to paint: what is in sight, the bright part of it, and what
+  has been seen. While vision is on, walls, closed doors and windows also bar movement.
+- The rules read sight through `vision/rules.ts` (`sightRules`), which answers with the map while
+  vision is on and with the conditions and Blindsight, Truesight and See Invisibility by distance
+  while it is off: an attack's unseen Advantage and Disadvantage and Invisible, Cover from walls
+  and creatures between (`cover.ts`), an area that leaves out what its origin can't reach
+  (`area-targeting.ts`), Hide's hiding place, Search finding a hidden creature, Frightened's line
+  of sight and its refused approach (`movement-rules.ts`), Dodge and other riders that name who
+  sees whom (`sees-other`, `seen-by-other`, `other-lacks-sense`), Blinded and Heavily Obscured
+  checks, a save that needs its source seen (a gaze, a pattern), and the traits and features that
+  ask for sunlight, Bright Light, or Dim Light and Darkness.
 - Difficult terrain is a GM-painted set of cell-snapped rectangles per scene (`terrain.ts`).
   A move is charged along the cheapest grid path, where terrain costs double, other creatures'
   spaces cost double or bar the way, and crawling, climbing or swimming without the speed, or
@@ -264,7 +279,9 @@ of a hidden thing. When in doubt, leave it out.
   `@vtt/rules-5e`). How a token travels (walking, a special speed, teleporting, moved by force)
   rides on `token.move`, each speed with its own budget (`speed.ts`), and opportunity attacks are
   read along the whole path (`movement-rules.ts`). The map's drag preview runs the same function,
-  and a mirror test checks the two agree. Players and the table screen get only the terrain the
+  and a mirror test checks the two agree. The `actor:movement` reply tells the preview whether the
+  mover shares spaces (Air Form, a swarm) and which swarms its viewer can see (`space-sharing.ts`),
+  so it charges those spaces as the server does. Players and the table screen get only the terrain the
   fog reveals, and with vision on only what the party has seen.
 
 ## Rules engine
@@ -319,7 +336,8 @@ they grant, its own feats and features, its live effects) with one context of be
 each roll collects the standing modifiers plus those gated on its moment (`on-attack-roll`,
 `on-saving-throw`, ...), so a modifier's `when` gate means the same thing on every carrier. A
 carrier refuses what it cannot give back: an item refuses hit points and ability scores, an effect
-everything the sheet stores (AC, initiative, slots, senses). Riders name damage types and
+everything the sheet stores (AC, initiative, slots). Senses on any carrier are read live by dynamic
+vision. Riders name damage types and
 conditions from the SRD's closed sets, and the homebrew publish gate (`homebrew-validate.ts`)
 refuses a rider gated on a moment its reader never collects.
 
@@ -331,6 +349,16 @@ its `weapon` changes how the row swings, until the row leaves the pack (`bound-w
 can offer its bearer actions: a Bonus Action Dash or Disengage, an action that ends it with a save or a
 check, and another creature's spell action at the numbers it was cast with (`builtinActionsFor` in
 `builtin-actions.ts`, `granted-actions.ts`).
+
+What rides a hit is data on its action (`ridesHit`): the hits it rides, once a turn or on its user's own
+turn, the dice it gives up, its cost, the save it opens and the effects picked with it (Sneak Attack's
+Cunning Strikes, Brutal Strike, Stunning Strike, a staff's charges). The attack's preview offers it and
+the confirm checks and spends it with the hit (`resolution/hit-options.ts`); it is never tapped alone.
+What a stat block's or a magic weapon's hit leaves by itself (`onHit`: conditions, tags and modifiers on
+one effect, a pull, a save at a printed DC, only on a rolled 20 or against some creature types) lands in
+`resolution/on-hit.ts`. Who an action that isn't a spell may target (`targets`: how many, how far,
+creature types, size, sight, grappled by its user, a condition, in its space, enemies or allies) is
+checked as a spell's targets are, in `resolution/action-targets.ts`.
 
 A magic item's charges are an `actionUses` pool keyed by the carried row (`itemPool` in
 `item-actions.ts`), so two copies count separately and the count moves with the row when the GM hands
@@ -377,9 +405,16 @@ pins (`character.set-favourites`) and counts each option that resolves for it (`
 Every ability check, from a sheet chip, a builtin action or the GM's call for a roll, comes from one plan
 (`checkPlan` in `ability-checks.ts`), so the number a sheet shows is the roll the server makes. A die a
 player sees before it counts (a previewed attack, save or death save) is held on the server
-(`held-rolls.ts`, ADR-0012): a second look shows the same die, and Heroic Inspiration is a player's only
-reroll. Players type die faces, never totals, and only while the table allows typed dice. On the client every
-roll prompt shares one set of controls (`RollControls.tsx`), and the GM's calls for a roll
+(`held-rolls.ts`, ADR-0012): a second look shows the same die, and a reroll needs Heroic Inspiration or an
+answer. An answer is data on an action, a grant or an effect (`RollAnswerSchema`): what a roll may take after it
+is seen and before it counts (Bardic Inspiration's die, Indomitable's reroll, Stroke of Luck's 20).
+`roll-answers.ts` offers the roller's own answers on the preview and applies the one picked to the held roll;
+another creature's answer (Cutting Words, Countercharm, Improve Fate) is a `roll-answer` reaction prompt, asked one
+creature at a time in turn order while the attack, save, check or damage waits at its roll. A hit's damage waits in
+the same way (`damage-window.ts`): another creature's answer to the damage roll, then the target's own reaction
+(Uncanny Dodge, Deflect Attacks, Stone's Endurance), and a failed save's damage waits for a reaction to taking damage.
+Players type die faces, never totals, and only while the table allows typed dice. On the client every roll prompt
+shares one set of controls (`RollControls.tsx`, with its answer buttons), and the GM's calls for a roll
 (`GameState.rollCalls`) reach each player as a card that follows them across the app (`RollCallPrompt.tsx`).
 
 How strictly rules are enforced is table policy (`GameState.rulesPolicy`): enforce, advise or

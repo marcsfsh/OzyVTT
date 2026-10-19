@@ -56,6 +56,8 @@ export type ViewerTerrain = Readonly<{
  *  and what it has seen. Everything else on the map is dark. */
 export type ViewerVision = Readonly<{
   visible: readonly (readonly number[])[];
+  /** The part of `visible` in Bright Light; absent when all of it is. */
+  bright?: readonly (readonly number[])[];
   explored: readonly Readonly<{ x: number; y: number; width: number; height: number }>[];
 }>;
 

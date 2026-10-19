@@ -504,7 +504,15 @@ export const modifiersField = (label: string, scope: RiderScope): FieldDef => ({
       max: 240,
       unit: "ft",
       visibleWhen: hasType("darkvision"),
-      note: "Display only."
+      note: "Dynamic vision reads it; the best range counts."
+    },
+    {
+      key: "extends",
+      label: "Adds to other Darkvision",
+      kind: "switch",
+      visibleWhen: hasType("darkvision"),
+      ...trueOnly("extends"),
+      help: "The feet are added to the bearer's other Darkvision, as Goggles of Night's 60 feet are."
     },
     ...specialSpeedFields(),
     { key: "whileArmored", label: "Only while wearing armour", kind: "switch", visibleWhen: hasType("armor-class") },

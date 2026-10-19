@@ -7,8 +7,10 @@ import {
   type RiderCarrier,
   type RiderMoment
 } from "@vtt/rules-5e";
+import { holdsFeature } from "../class-features.js";
 import { endEffect } from "../effects.js";
 import { abilityModifier, endedEffect, recordRoll, type ResolveContext } from "./context.js";
+import { declaredBeforeRoll } from "./hit-riders.js";
 
 /** 2024 crit rule: double every dice term (modifiers once); `extraFirstTermDice` adds Savage Attacks dice. */
 export function criticalExpression(expression: DiceExpression, extraFirstTermDice = 0): DiceExpression {
@@ -82,6 +84,8 @@ function damageInForce(ctx: ResolveContext): ResolveContext["action"]["damage"] 
  *  its own and assigns it: dart i strikes the i-th target listed, the list wrapping round when darts remain. */
 export function rollWeaponDamage(ctx: ResolveContext): void {
   const { action, deps, damage, input } = ctx;
+  // A strike declared before its roll (Brutal Strike) rolls its dice with the hit it rides, never with its tap.
+  if (declaredBeforeRoll(action)) return;
   const parts = damageInForce(ctx);
   if (parts.length > 0 && action.missDamage === "half" && missed(ctx.attack)) {
     halfOnAMiss(ctx, parts);
@@ -103,11 +107,19 @@ export function rollWeaponDamage(ctx: ResolveContext): void {
   // Great Weapon Fighting: a die of the attack's own damage under the floor counts as the floor.
   const floor = damageDieFloor(ctx);
   const random = floor > 1 ? (sides: number) => Math.max(Math.min(floor, sides), deps.random(sides)) : deps.random;
+  const savage = savageAttack(ctx);
   parts.forEach((part, index) => {
     const expression = parseDiceFormula(part.formula);
     const extraCritDice = index === 0 ? (action.attack?.criticalBonusDice ?? 0) : 0;
-    const rolled = resolveDice(ctx.crit ? criticalExpression(expression, extraCritDice) : expression, random);
+    const rolledExpression = ctx.crit ? criticalExpression(expression, extraCritDice) : expression;
+    let rolled = resolveDice(rolledExpression, random);
     recordRoll(ctx, rolled, "damage");
+    // The weapon's own dice are rolled again and the higher roll is used: no attacker would choose the lower.
+    if (savage && index === 0) {
+      const again = resolveDice(rolledExpression, deps.random);
+      recordRoll(ctx, again, "damage", "Savage Attacker");
+      if (again.total > rolled.total) rolled = again;
+    }
     damage.push({ formula: rolled.expression.source, type: part.type, total: rolled.total });
   });
 }
@@ -123,6 +135,42 @@ function damageDieFloor(ctx: ResolveContext): number {
     for (const rider of collectRiders(derivation.carriers, { ...derivation.context, ...riderFilters, moment }))
       if (rider.modifier.type === "damage-die-minimum") floor = Math.max(floor, rider.modifier.minimum ?? 1);
   return floor;
+}
+
+/** The hit option that rolls a weapon's damage dice twice (SRD Savage Attacker). */
+export const SAVAGE_ATTACKER = "savage-attacker";
+
+/**
+ * SRD Savage Attacker: "Once per turn when you hit a target with a weapon, you can roll the weapon's damage dice twice
+ * and use either roll against the target." Whether this weapon hit may use it: its attacker holds the feat and has not
+ * used it this turn.
+ */
+export function savageAttackerReady(ctx: ResolveContext): boolean {
+  const { state, attacker, attack, deps } = ctx;
+  if (attack === null || (attack.outcome !== "hit" && attack.outcome !== "crit")) return false;
+  if (!(ctx.riderFilters.attackKinds ?? []).includes("weapon") || ctx.action.damage.length === 0) return false;
+  const definition =
+    deps.definition ?? (attacker.definitionId ? deps.resolveDefinition?.(attacker.definitionId) : undefined);
+  if (!holdsFeature(definition, SAVAGE_ATTACKER, "Savage Attacker")) return false;
+  return !state.combat.active || (state.combat.turn.turnUses[`${attacker.id}:${SAVAGE_ATTACKER}`] ?? 0) === 0;
+}
+
+/** Whether the attacker chose Savage Attacker for this hit and may use it; spends the turn's use when it does. */
+function savageAttack(ctx: ResolveContext): boolean {
+  if (!(ctx.input.hitOptions ?? []).some((choice) => choice.id === SAVAGE_ATTACKER)) return false;
+  if (!savageAttackerReady(ctx)) {
+    ctx.warnings.push(`${ctx.attacker.name} can't use Savage Attacker on this hit.`);
+    return false;
+  }
+  const { state, attacker } = ctx;
+  if (state.combat.active) {
+    const key = `${attacker.id}:${SAVAGE_ATTACKER}`;
+    state.combat = {
+      ...state.combat,
+      turn: { ...state.combat.turn, turnUses: { ...state.combat.turn.turnUses, [key]: 1 } }
+    };
+  }
+  return true;
 }
 
 const missed = (attack: ActionResolutionAttack | null) =>
@@ -174,13 +222,16 @@ function markCarriers(ctx: ResolveContext): RiderCarrier[] {
  *  put on the creature it hit): typed `extra-damage` as its own `damage[]` entry (crit-doubled unless
  *  `doubleOnCritical` is false: a Critical Hit rolls the attack's other damage dice twice too) and moment-gated flat
  *  `damage-bonus` as a bonus line. A rider with no `when` fires on every damage roll of its action;
- *  `on-hit`/`on-critical-hit` narrow it. The moments collected here are `DAMAGE_ROLL_MOMENTS`. */
+ *  `on-hit`/`on-critical-hit`/`on-natural-20` narrow it. The moments collected here are `DAMAGE_ROLL_MOMENTS`. */
 export function rollRiderDamage(ctx: ResolveContext): void {
   const { attack, crit, derivation, riderFilters, deps, damage, bonusDamage, warnings } = ctx;
-  if (!rollsDamage(attack)) return;
+  if (!rollsDamage(attack) || declaredBeforeRoll(ctx.action)) return;
   const passes: Array<RiderMoment | null> = [null, "on-damage-roll"];
   if (attack === null || attack.outcome === "hit" || attack.outcome === "crit") passes.push("on-hit");
   if (crit) passes.push("on-critical-hit");
+  // "When you roll a 20": the die itself, so a wider crit range or an auto-crit on a Paralyzed target isn't one.
+  if (attack !== null && attack.naturalRoll === 20 && (attack.outcome === "hit" || attack.outcome === "crit"))
+    passes.push("on-natural-20");
   const marks = markCarriers(ctx);
   const already = new Set<unknown>();
   for (const moment of passes) {

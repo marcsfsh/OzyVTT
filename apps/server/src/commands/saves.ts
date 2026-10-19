@@ -1,4 +1,4 @@
-import type { LooseSaveOutcome } from "@vtt/domain";
+import type { HeldRoll, LooseSaveOutcome, RollAnswered, RollAnswerOffer } from "@vtt/domain";
 import { aggregateRollMode, otherDiceOf } from "@vtt/rules-5e";
 import { GameAccessDeniedError, requireActorAccess, requireGm } from "../authorization.js";
 import { autoFailsPhysicalSaves, conditionLabel, exhaustionPenalty } from "../condition-rules.js";
@@ -17,6 +17,14 @@ import { CommandRejectedError } from "../game-store.js";
 import { heldRollFor, holdRoll, releaseHeldRoll, rollHeldTest } from "../held-rolls.js";
 import { damageAdjustmentDetail, healActor } from "../hit-points.js";
 import { recordRoll } from "../roll-history.js";
+import {
+  answeredLines,
+  answersOffered,
+  applyRollAnswer,
+  withAnswers,
+  type AnswerDeps,
+  type AnswerTarget
+} from "../roll-answers.js";
 import {
   answerSave,
   anySaveRollSources,
@@ -206,7 +214,11 @@ export const saveCommands = [
           legendaryResistance,
           rollMode,
           damageOverride,
-          { ...(face !== undefined ? { face } : {}), ...(reroll === true ? { reroll: true } : {}) }
+          {
+            ...(face !== undefined ? { face } : {}),
+            ...(reroll === true ? { reroll: true } : {}),
+            ...(request.answer ? { answer: request.answer } : {})
+          }
         );
       });
       if (duplicate) return;
@@ -257,7 +269,9 @@ export const saveCommands = [
       const distance = await kit.creatureDistance();
       let roll: ReturnType<typeof rollDeathSave> | undefined;
       let rollModeSources: ReturnType<typeof shownRollMode>;
-      let events: EffectNarration[] = [];
+      const events: EffectNarration[] = [];
+      let answered: RollAnswered[] = [];
+      let offered: RollAnswerOffer[] = [];
       const { state, duplicate } = await execute((draft) => {
         // Access first: a missing creature and someone else's get one answer.
         requireActorAccess(initiator, draft, actorId, "save", "You can only roll for your own character.");
@@ -291,23 +305,73 @@ export const saveCommands = [
         const aggregated = aggregateRollMode(sources.advantage, sources.disadvantage);
         const forced = initiator.role === "gm" ? rollMode : undefined;
         const key = `death-save:${actorId}`;
-        const test = rollHeldTest(
-          draft,
-          key,
-          actor,
-          initiator,
-          forced ?? aggregated.mode,
-          modifier,
-          saveRiderDiceTermsForAnySave(derivation),
-          { ...(naturalRoll !== undefined ? { face: naturalRoll } : {}), ...(reroll === true ? { reroll: true } : {}) },
-          kit.context.random
+        if (request.answer && (commit || reroll === true || naturalRoll !== undefined))
+          throw new CommandRejectedError("Answer the death save on a look of its own, before you confirm it.");
+        if (request.answer && !heldRollFor(draft, key))
+          throw new CommandRejectedError("Roll first: an answer meets a roll that was made.");
+        const mode = forced ?? aggregated.mode;
+        const throwDeathSave = (choice: Readonly<{ face?: number; reroll?: boolean }>) =>
+          rollHeldTest(
+            draft,
+            key,
+            actor,
+            initiator,
+            mode,
+            modifier,
+            saveRiderDiceTermsForAnySave(derivation),
+            choice,
+            kit.context.random
+          );
+        let test = throwDeathSave(
+          request.answer
+            ? {}
+            : {
+                ...(naturalRoll !== undefined ? { face: naturalRoll } : {}),
+                ...(reroll === true ? { reroll: true } : {})
+              }
         );
         rollModeSources = test.typed ? undefined : shownRollMode(aggregated, forced);
+        // What answered the death save on an earlier look counts in this one, the confirm included.
+        const answeredBefore = heldRollFor(draft, key);
+        const answerDeps: AnswerDeps = {
+          resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+          catalog: kit.equipmentCatalog(),
+          random: kit.context.random,
+          newRollId: kit.context.newId,
+          sessionId: sessionIdOf(principal),
+          role: initiator.role,
+          now: () => new Date().toISOString(),
+          commandId,
+          distanceFeet: (actorIdA, actorIdB) => distance(draft, actorIdA, actorIdB)
+        };
+        const answerTarget = (held: HeldRoll | undefined): AnswerTarget => {
+          const shown = withAnswers(held, test.natural, test.resolution.total);
+          return {
+            kind: "death-save",
+            roller: actor,
+            key,
+            natural: shown.natural,
+            total: shown.total,
+            threshold: 10,
+            mode,
+            purpose: "save",
+            label: "death save",
+            visibility: actor.visibility === "gm-only" ? "gm-only" : "public"
+          };
+        };
+        if (request.answer && answeredBefore) {
+          events.push(...applyRollAnswer(draft, answerTarget(answeredBefore), actor, request.answer, answerDeps));
+          // A reroll answer changed the held dice; this look reads them.
+          test = throwDeathSave({});
+        }
+        const answeredHeld = commit ? answeredBefore : heldRollFor(draft, key);
+        const read = withAnswers(answeredHeld, test.natural, test.resolution.total);
+        answered = answeredLines(answeredHeld);
         // The die and preview/commit logic live in the shared death-save core.
         roll = rollDeathSave(
           draft,
           actor,
-          { commit, test },
+          { commit, test: { ...test, natural: read.natural }, total: read.total },
           {
             random: kit.context.random,
             rollId,
@@ -318,7 +382,7 @@ export const saveCommands = [
           }
         );
         if (commit) releaseHeldRoll(draft, key);
-        else
+        else {
           holdRoll(draft, {
             key,
             actorId,
@@ -327,12 +391,14 @@ export const saveCommands = [
             rollId: test.fresh ? rollId : (heldRollFor(draft, key)?.rollId ?? null),
             typed: test.typed
           });
+          offered = answersOffered(draft, answerTarget(heldRollFor(draft, key)), answerDeps);
+        }
         if (commit && inFight && draft.combat.turnActorId === actorId)
           draft.combat.turn = { ...draft.combat.turn, deathSaveRolled: true };
-        if (commit && roll.outcome.regainsOneHitPoint) events = healActor(draft, actorId, 1, { role: "gm" });
+        if (commit && roll.outcome.regainsOneHitPoint) events.push(...healActor(draft, actorId, 1, { role: "gm" }));
         // Three successes: Stable, and 1 Hit Point back after 1d4 hours of game time.
         else if (commit && roll.outcome.state.stable)
-          events = startStableRecovery(draft, actor, kit.context.random, `${commandId}:stable`);
+          events.push(...startStableRecovery(draft, actor, kit.context.random, `${commandId}:stable`));
       });
       if (duplicate || !roll) return { rollId };
       kit.publishRolls(state, commandId);
@@ -367,7 +433,9 @@ export const saveCommands = [
           regainedConsciousness: outcome.regainsOneHitPoint,
           committed: commit,
           ...(roll.mode ? { rollMode: roll.mode } : {}),
-          ...(rollModeSources ? { rollModeSources } : {})
+          ...(rollModeSources ? { rollModeSources } : {}),
+          ...(answered.length > 0 ? { answered } : {}),
+          ...(offered.length > 0 ? { answers: offered } : {})
         }
       };
     }

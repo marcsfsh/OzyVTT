@@ -58,8 +58,11 @@ export type PlayerEffect = Omit<
   | "endAction"
   | "usedOnTurn"
   | "shrinksEachLongRest"
-  | "meleeHitDamage"
   | "unarmedStrike"
+  | "struck"
+  | "light"
+  | "findDc"
+  | "detects"
 > & {
   yours?: true;
 };
@@ -86,6 +89,9 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
       number
     >;
     /** Whether the character holds Heroic Inspiration. Same gate as `actionUses`. */ heroicInspiration?: boolean;
+    /** A second Heroic Inspiration your own character gained, to give to a player character who lacks one or let go.
+     *  Your own claimed character only. */ heroicInspirationToGive?: boolean;
+    /** The character's Experience Points, once the GM has awarded any. Same gate as `actionUses`. */ experiencePoints?: number;
     /** Picks re-made on a rest, keyed by offer key (Circle of the Land's land type). Same gate as `actionUses`. */ choiceOverrides?: Record<
       string,
       { id: string; per: "short-rest" | "long-rest" }
@@ -141,16 +147,23 @@ export type PlayerPendingSave = Omit<
   | "drain"
   | "failurePush"
   | "advantageAtSize"
+  | "spell"
+  | "confirmed"
 > & {
   onFailEffect?: Omit<
     NonNullable<PendingSave["onFailEffect"]>,
     "castId" | "sourceActionId" | "ongoingDamage" | "magical"
   >;
+  /** Confirmed, and waiting on another creature's answer to the roll; who may answer stays unnamed. */
+  awaitingAnswer?: true;
 };
 /** A player's own pending reaction prompts only, masked like saves; the parked attack stays with the GM, since it names
  *  the attacker's action and how it was rolled. `attackRoll` is the held attack's total, present only when that roll
  *  is in the player's own dice log; `lastsUntilNextTurn` says the reactor's reaction lasts (Shield). */
-export type PlayerPendingReaction = Omit<PendingReaction, "sourceActorId" | "parkedAttack" | "parkedCast"> & {
+export type PlayerPendingReaction = Omit<
+  PendingReaction,
+  "sourceActorId" | "parkedAttack" | "parkedCast" | "saveId" | "asked" | "drain" | "hitKinds"
+> & {
   attackRoll?: number;
   lastsUntilNextTurn?: true;
 };
@@ -169,14 +182,21 @@ export type PlayerVisionWall = Readonly<{
   open?: boolean;
 }>;
 /** Dynamic vision as one player gets it (ADR-0023): where their own characters see now, what the party has seen in
- *  this scene, and the walls in it. Everything else on the map is dark. */
+ *  this scene, and the walls in it. Everything else on the map is dark. `bright`, when present, is the part of what
+ *  they see that lies in Bright Light; the rest of it is dim, or dark seen by Darkvision. Absent, all of it is bright. */
+/** A creature one of the player's characters senses without seeing it (Divine Sense): where it stands and its
+ *  creature type, nothing else. */
+export type PlayerSensedCreature = Readonly<{ x: number; y: number; creatureType: string }>;
 export type PlayerVision =
   | Readonly<{ enabled: false }>
   | Readonly<{
       enabled: true;
       visible: readonly VisionPolygon[];
+      bright?: readonly VisionPolygon[];
       explored: readonly VisionRect[];
       walls: readonly PlayerVisionWall[];
+      /** Only in a player's own projection, never the table's. */
+      sensed?: readonly PlayerSensedCreature[];
     }>;
 export type PlayerCombatView = Readonly<{
   active: boolean;

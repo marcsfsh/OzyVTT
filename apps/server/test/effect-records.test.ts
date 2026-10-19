@@ -111,7 +111,10 @@ describe("spells that ask for a choice at the cast", () => {
   it("gives Fire Shield's chill shield Resistance to Fire and Cold back at a melee attacker", () => {
     const built = caster();
     resolve(built, spellAction("fire-shield"), { targetIds: [], optionId: "chill" });
-    expect(effectNamed(built, WREN, "Fire Shield")?.meleeHitDamage).toEqual({ formula: "2d8", type: "cold" });
+    expect(effectNamed(built, WREN, "Fire Shield")?.struck).toEqual({
+      withinFeet: 5,
+      damage: [{ formula: "2d8", type: "cold" }]
+    });
     const fire = { amount: 10, parts: [{ amount: 10, type: "fire" }] };
     expect(
       applyDamageDetailed(built.state, WREN, fire, { role: "gm" }, damageDeps(built)).application.totalApplied
