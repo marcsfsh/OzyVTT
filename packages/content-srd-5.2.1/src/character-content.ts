@@ -591,6 +591,23 @@ const featureChoiceBase = {
     .describe(
       'Floor on a spell pick\'s level, the sibling of maxSpellLevel. Mystic Arcanum reads "one level 6 Warlock spell"; both bounds at 6 make the pick exact'
     ),
+  /** Only spells cast with this casting time (Spell Mastery: "spells ... that have a casting time of an action"). */
+  castingTime: z
+    .enum(["action", "bonus-action", "reaction"])
+    .optional()
+    .describe('Only spells cast with this casting time (Spell Mastery: "a casting time of an action")'),
+  /** Only spells with the Ritual tag (Pact of the Tome's "two level 1 spells that have the Ritual tag"). */
+  ritual: z
+    .literal(true)
+    .optional()
+    .describe("Only spells with the Ritual tag (Pact of the Tome's two level 1 rituals)"),
+  /** Only spells in the character's spellbook (Spell Mastery, Signature Spells), checked as the pick is made. */
+  fromSpellbook: z
+    .literal(true)
+    .optional()
+    .describe(
+      "Only spells in the character's spellbook (Spell Mastery, Signature Spells): the server checks the pick against the book when a build or a rest's re-choice makes it"
+    ),
   /** The ceiling an ability-score pick from this choice may reach; absent = 20 (epic boons use 30). */
   maximum: z
     .number()

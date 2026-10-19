@@ -34,6 +34,7 @@ import {
   UNTYPED_DAMAGE
 } from "../hit-points.js";
 import { rechooseInLedger } from "../ledger-rechoice.js";
+import { spellbookOf } from "../spellbook.js";
 import { applyRest, hitDieSizesToSpend, spendHitDice, startOwnShortRest } from "../rests.js";
 import { restoreUses, spendUses } from "../use-pools.js";
 import { builtinActionFor } from "../builtin-actions.js";
@@ -320,7 +321,11 @@ export const actorHealthCommands = [
         const definition = actor.definitionId ? kit.resolveDefinition(actor.definitionId) : undefined;
         // Play content: legality is a question about what the sheet already has, whatever a pack's switch says.
         // Nothing GM-only is projected.
-        const choices = replaceableOffers(definition, kit.playCatalog());
+        const choices = replaceableOffers(
+          definition,
+          kit.playCatalog(),
+          definition ? spellbookOf(actor, definition, kit.playCatalog()) : undefined
+        );
         const match = choices.find((candidate) => candidate.offer === offer);
         if (!match) {
           throw new CommandRejectedError(

@@ -8,6 +8,7 @@ import type { ContentView } from "./content-library.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { CommandRejectedError } from "./game-store.js";
 import { sheetAbilityScores, sheetSourceOf } from "./sheet-abilities.js";
+import { spellbookOf } from "./spellbook.js";
 
 /**
  * A pick re-made on a rest whose answer the build itself reads. SRD Circle of the Land: "Whenever you finish a Long
@@ -119,11 +120,12 @@ function ledgerAnswerOf(definition: ActorDefinition | undefined, offer: string):
 /** The picks a character may re-make on a rest, as its sheet offers them: each option's name, and the answer in force
  *  (a rest-time override, else the ledger's). */
 export function rechoicesOf(
-  actor: Pick<Actor, "choiceOverrides">,
+  actor: Pick<Actor, "choiceOverrides" | "spellbook">,
   definition: ActorDefinition | undefined,
   library: ContentView
 ): Rechoice[] {
-  return replaceableOffers(definition, library).map((offer) => ({
+  const spellbook = definition ? spellbookOf(actor, definition, library) : undefined;
+  return replaceableOffers(definition, library, spellbook).map((offer) => ({
     offer: offer.offer,
     label: offer.label,
     per: offer.per,

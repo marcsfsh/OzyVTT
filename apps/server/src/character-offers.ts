@@ -220,6 +220,8 @@ export type ChoiceOffer = {
   minSpellLevel: number | null;
   /** The ceiling an ability-score pick from this offer may reach; null = the SRD's 20 (epic boons say 30). */
   maximum: number | null;
+  /** Its picks must be in the character's spellbook (Spell Mastery), which the commands that make them check. */
+  fromSpellbook: boolean;
   label: string;
   /** The character level(s) this offer's picks belong to, one per grant (`[4, 8, 12, 16]` for an ASI).
    *  Not used for validation; writers record it so `level-ledger.ts` can prefill level-up. */
@@ -259,6 +261,7 @@ function offerOf(
     maxSpellLevel: null,
     minSpellLevel: null,
     maximum: null,
+    fromSpellbook: false,
     repeatable: false,
     levels: [1],
     classId: null,
@@ -297,6 +300,28 @@ export function levelGatesFit(
 export function levelOfPick(offer: Pick<ChoiceOffer, "levels" | "capacity">, index: number): number {
   const perGrant = Math.max(1, Math.ceil(offer.capacity / Math.max(1, offer.levels.length)));
   return offer.levels[Math.min(offer.levels.length - 1, Math.floor(index / perGrant))] ?? 1;
+}
+
+/** The casting times a spell pick's `castingTime` names, as the spell records print them. */
+const CASTING_TIMES: Readonly<Record<string, RegExp>> = {
+  action: /^action\b/i,
+  "bonus-action": /^bonus action\b/i,
+  reaction: /^reaction\b/i
+};
+
+/** Which spells a pick's casting-time and Ritual filters let through, or null when it names neither. */
+export function spellPickFits(
+  choice: Readonly<{ castingTime?: string; ritual?: true }>,
+  catalogs: Pick<CatalogChoiceCatalogs, "spells">
+): ((id: string) => boolean) | null {
+  if (choice.castingTime === undefined && choice.ritual === undefined) return null;
+  const time = choice.castingTime !== undefined ? CASTING_TIMES[choice.castingTime] : undefined;
+  const spells = new Map(catalogs.spells.map((spell) => [spell.id, spell]));
+  return (id) => {
+    const spell = spells.get(id);
+    if (!spell) return false;
+    return (time === undefined || time.test(spell.castingTime.trim())) && (choice.ritual !== true || spell.ritual);
+  };
 }
 
 // Whether an option lies inside the offer's spell-level window (ceiling, floor or both); unknown level reads as 0.
@@ -1031,6 +1056,9 @@ function placeChoices(
         unresolvable = error.message;
       }
     }
+    // A spell pick narrowed by its casting time or the Ritual tag (Spell Mastery, Pact of the Tome's rituals).
+    const fits = spellPickFits(choice, catalogs);
+    if (fits) options = new Set([...options].filter(fits));
     /** Options gated on an earlier answer: unmet gates drop out, and if the survivors exactly fill the
      *  capacity they are adopted without pushing an offer. An option above this build's level (its class's level,
      *  for a class feature: "Level 9+ Warlock") is not offered. */
@@ -1083,6 +1111,7 @@ function placeChoices(
           (choice.kind === "spell" && site.classId !== null && highestSlotLevel > 0 ? highestSlotLevel : null),
         minSpellLevel: choice.minSpellLevel ?? null,
         maximum: choice.maximum ?? null,
+        fromSpellbook: choice.fromSpellbook === true,
         // The ability pick shares its record with the lineage or the feat's spells, so it names itself.
         label:
           choice.kind === SPELLCASTING_ABILITY_KIND

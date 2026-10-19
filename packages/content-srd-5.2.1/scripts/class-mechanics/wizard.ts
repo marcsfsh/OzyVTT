@@ -13,14 +13,33 @@ export const wizard: ClassMechanicsModule = {
     // Rest, each on its own counter (the build's `PICKED_SPELL_CASTS`).
 
     /**
-     * "Choose a level 1 and a level 2 spell": two blocks with exact level windows, cast at will with no slot (the
-     * build's `PICKED_SPELL_CASTS`). "In your spellbook" isn't checked: a sheet's ledger needn't list its spellbook.
+     * "Choose a level 1 and a level 2 spell in your spellbook that have a casting time of an action": two blocks with
+     * exact level windows, cast at will with no slot (the build's `PICKED_SPELL_CASTS`), each checked against the
+     * spellbook as it is picked. "Whenever you finish a Long Rest, you can replace one of those spells with an eligible
+     * spell of the same level from your spellbook": one swap across both in the step a Long Rest opens.
      */
     "spell-mastery": {
+      replaces: [{ offer: "feature:spell-mastery", when: "long-rest", amount: 1 }],
       choices: [
         // Both blocks need a floor: `wizard-spells` includes cantrips, and the server checks only min/max.
-        { kind: "spell", choose: 1, fromCatalog: "wizard-spells", minSpellLevel: 1, maxSpellLevel: 1 },
-        { kind: "spell", choose: 1, fromCatalog: "wizard-spells", minSpellLevel: 2, maxSpellLevel: 2 }
+        {
+          kind: "spell",
+          choose: 1,
+          fromCatalog: "wizard-spells",
+          minSpellLevel: 1,
+          maxSpellLevel: 1,
+          castingTime: "action",
+          fromSpellbook: true
+        },
+        {
+          kind: "spell",
+          choose: 1,
+          fromCatalog: "wizard-spells",
+          minSpellLevel: 2,
+          maxSpellLevel: 2,
+          castingTime: "action",
+          fromSpellbook: true
+        }
       ]
     }
     // Arcane Recovery's slots are recovered by the server's conversions, and Memorize Spell opens a one-change prepare
