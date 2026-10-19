@@ -99,10 +99,39 @@ export const warlock: ClassMechanicsModule = {
         "whispers-of-the-grave": { grants: { spells: [atWill("speak-with-dead", 3)] } },
         // ---- picks an invocation makes on top of itself --------------------------------------------
         /**
-         * `fromCatalog: "weapons"` is wider than "a Simple or Martial Melee weapon" (catalog slugs cannot be
-         * filtered). Proficiency with the chosen weapon stays prose: `grants.weapons` names groups only.
+         * The kind picked is the "Simple or Martial Melee weapon of your choice" its Bonus Action conjures; with a
+         * magic weapon picked on the use, it bonds that one instead. The bond (`bindsWeapon`, the effect tagged
+         * `pact-weapon`) lends proficiency, the Spellcasting Focus, Charisma for its rolls and the three damage types,
+         * and ends on another use or the Warlock's death, taking a conjured weapon with it.
          */
-        "pact-of-the-blade": { choice: { kind: "weapon", choose: 1, fromCatalog: "weapons" } },
+        "pact-of-the-blade": {
+          choice: { kind: "weapon", choose: 1, fromCatalog: "melee-weapons" },
+          actions: [
+            {
+              id: "pact-of-the-blade",
+              name: "Pact of the Blade",
+              activation: "bonus-action",
+              description:
+                "Conjure your pact weapon in your hand (the kind you chose), or bond with a magic weapon you carry. Until the bond ends you have proficiency with it, can use it as a Spellcasting Focus, can use your Charisma modifier for its attack and damage rolls, and can make it deal Necrotic, Psychic or Radiant damage. The bond ends when you use this Bonus Action again or die, and a conjured weapon disappears with it.",
+              damage: [],
+              grants: {
+                name: "Pact Weapon",
+                target: "self",
+                tags: ["pact-weapon", "ends-on-death"],
+                duration: { type: "manual" },
+                bindsWeapon: {
+                  melee: true,
+                  magical: true,
+                  ability: "cha",
+                  damageTypes: ["necrotic", "psychic", "radiant"],
+                  proficient: true,
+                  focus: true,
+                  conjures: { pickOf: "pact-of-the-blade" }
+                }
+              }
+            }
+          ]
+        },
         /**
          * Both ride a hit with the pact weapon, once per turn: Eldritch Smite spends a Pact Magic slot for 1d8 Force
          * plus 1d8 per slot level, and may knock a Huge or smaller target Prone; Lifedrinker adds 1d6 of the type

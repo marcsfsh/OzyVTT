@@ -13,6 +13,7 @@ import {
 import { spellClassOf } from "../class-features.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
+import { withArticle } from "@vtt/domain";
 import { spellOf } from "./concentration.js";
 import type { DefinitionAction, LiveActor, ResolveContext, ResolveInput } from "./context.js";
 
@@ -213,6 +214,51 @@ function grantedSpellActionOf(
   };
 }
 
+/**
+ * A weapon conjured in its user's hand as the binding is made, of the kind its user picked for the feature (Pact of
+ * the Blade: "conjure a pact weapon in your hand, a Simple or Martial Melee weapon of your choice"). A weapon an earlier
+ * binding of the same action conjured goes first, since the new bond ends the old one.
+ */
+function conjuredWeapon(ctx: ResolveContext, recipient: LiveActor, pickOf: string): InventoryItem {
+  const { deps, input, action } = ctx;
+  const kind = (deps.definition?.character?.choices ?? []).find(
+    (row) => row.kind === "weapon" && row.payload?.featureId === pickOf
+  )?.id;
+  const record = kind ? deps.catalog?.equipmentRecord(kind) : undefined;
+  if (!kind || !record?.weapon)
+    throw new CommandRejectedError(`${recipient.name} has no weapon picked for ${action.name} to conjure.`);
+  const earlier = recipient.effects.find(
+    (effect) => effect.sourceActionId === action.id && effect.weapon?.conjured === true && effect.itemId !== undefined
+  )?.itemId;
+  const row: InventoryItem = {
+    id: `${kind}-conjured-${input.commandId.slice(0, 8)}`,
+    recordId: kind,
+    name: `${record.name} (conjured)`,
+    quantity: 1,
+    equipped: true,
+    attuned: false,
+    category: record.category,
+    ...(record.weightLb !== null && record.weightLb !== undefined ? { weightEach: record.weightLb } : {}),
+    weapon: {
+      category: record.weapon.category,
+      damageDice: record.weapon.damageDice,
+      damageType: record.weapon.damageType,
+      rangeFeet: record.weapon.rangeFeet,
+      longRangeFeet: record.weapon.longRangeFeet,
+      ...(record.weapon.melee !== undefined ? { melee: record.weapon.melee } : {}),
+      ...(record.weapon.versatileDice ? { versatileDice: record.weapon.versatileDice } : {}),
+      ...(record.weapon.properties ? { properties: [...record.weapon.properties] } : {})
+    }
+  } as InventoryItem;
+  recipient.inventory = [...recipient.inventory.filter((entry) => entry.id !== earlier), row];
+  ctx.tableNarration.push({
+    kind: "effect",
+    text: `${recipient.name} conjures ${withArticle(record.name)} in hand.`,
+    actorIds: [recipient.id]
+  });
+  return row;
+}
+
 /** The carried row a grant binds to on its recipient, refused when it doesn't fit what the grant names. */
 function fittingRow(
   bearer: Pick<LiveActor, "name" | "inventory">,
@@ -240,6 +286,7 @@ function rowProblem(
   if (binds.weaponIds && !binds.weaponIds.some((id) => ids.includes(id)))
     return `it works only on ${binds.weaponIds.join(" or ")}`;
   if (binds.nonmagical && catalog?.equipmentRecord(catalogIdOf(row))?.isMagic === true) return "it is already magical";
+  if (binds.magical && catalog?.equipmentRecord(catalogIdOf(row))?.isMagic !== true) return "it isn't a magic weapon";
   if (binds.melee && !isMeleeWeapon(weapon.properties ?? [], weapon.rangeFeet, weapon.melee))
     return "it isn't a Melee weapon";
   return null;
@@ -266,6 +313,7 @@ export function boundWeaponOf(
   const { input, deps, warnings, action } = ctx;
   let row: InventoryItem | undefined;
   if (input.itemId != null) row = fittingRow(recipient, binds, input.itemId, deps.catalog, action.name);
+  else if (binds.conjures) row = conjuredWeapon(ctx, recipient, binds.conjures.pickOf);
   else {
     const carried = recipient.inventory.filter((entry) => entry.quantity > 0);
     row = [...carried.filter((entry) => entry.equipped), ...carried].find(
@@ -287,7 +335,10 @@ export function boundWeaponOf(
   const weapon = {
     ...(ability ? { ability } : {}),
     ...(dice ? { dice } : {}),
-    ...(binds.damageTypes ? { damageTypes: [...binds.damageTypes] } : {})
+    ...(binds.damageTypes ? { damageTypes: [...binds.damageTypes] } : {}),
+    ...(binds.proficient ? { proficient: true as const } : {}),
+    ...(binds.focus ? { focus: true as const } : {}),
+    ...(input.itemId == null && binds.conjures ? { conjured: true as const } : {})
   };
   const castLevel = ctx.plan.castLevel ?? spellOf(ctx)?.level ?? 1;
   const slotBonus = [...(binds.bonusBySlot ?? [])]

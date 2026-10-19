@@ -7,6 +7,7 @@ import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { isItemActionId, laterRowOf } from "../item-actions.js";
 import { isDivineCast } from "../divine-intervention.js";
 import type { RuleId } from "../rules-families.js";
+import { boundFocusRows } from "../pact-weapon.js";
 import { scrollOfAction } from "../scrolls.js";
 import type { DefinitionAction, LiveActor } from "./context.js";
 
@@ -187,7 +188,8 @@ export function readComponents(
   const hands = boundHands(attacker);
   const freeHand = hands.free;
   const { kinds, books } = focusKinds(definition, spell.id, catalog);
-  const focuses = focusRows(attacker.inventory, kinds, books);
+  // A weapon a binding lends as a focus serves too (a pact weapon).
+  const focuses = [...focusRows(attacker.inventory, kinds, books), ...boundFocusRows(attacker)];
   // An emblem borne on a Shield serves with no hand of its own, and the Shield's hand makes the gestures.
   const emblem = hands.shield && focuses.some((row) => equipped(row) && catalogIdOf(row) === EMBLEM_ID);
   const costly = material ? (spell.components.costly ?? []) : [];

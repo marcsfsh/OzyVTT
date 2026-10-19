@@ -15,6 +15,7 @@ import { spellClassOf } from "./class-features.js";
 import { grantedSpellActions } from "./granted-actions.js";
 import { divineInterventionCasts } from "./divine-intervention.js";
 import { withHeadCount } from "./death-traits.js";
+import { withPactWeaponAttacks } from "./pact-weapon.js";
 
 /** The action list every actor-scoped consumer must read in place of `definition.actions`: item-derived
  *  actions plus standing riders (items, feats, features, live effects) folded into the numbers the resolver
@@ -59,7 +60,9 @@ export function effectiveActions(
   if (!actor) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
   if (derivation.carriers.length === 0 && derivation.actions.length === 0) return base;
-  return [...base, ...derivation.actions].map((action) => withStandingRiders(action, derivation, actor, definition));
+  return [...base, ...derivation.actions].map((action) =>
+    withPactWeaponAttacks(withStandingRiders(action, derivation, actor, definition), actor, definition)
+  );
 }
 
 /** SRD Eldritch Spear: the cantrip picked for it reaches 30 feet farther for each Warlock level. Applied to the spell

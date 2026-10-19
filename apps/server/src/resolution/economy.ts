@@ -973,6 +973,11 @@ function openedBy(
  *  mix weapons legally; a spell's rays or beams are that spell's alone, never a swing of the Attack action. */
 function attackPool(action: DefinitionAction): Record<string, number> {
   const left = (action.attack?.count ?? 1) - 1;
+  // Attacks a weapon gives only itself (Thirsting Blade's pact weapon) are that weapon's, held in either grip.
+  if (action.attack?.countWithItself && action.spellId === undefined) {
+    const base = action.id.replace(new RegExp(`-${TWO_HANDED_SUFFIX}$`), "");
+    return { [`${base}|${base}-${TWO_HANDED_SUFFIX}`]: left };
+  }
   return action.spellId === undefined ? { attack: left } : { [action.id]: left };
 }
 

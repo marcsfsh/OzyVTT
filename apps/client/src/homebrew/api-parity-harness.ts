@@ -617,6 +617,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].attack.countWithItself",
+    types: ACTION_CARRIERS,
+    reason:
+      "a weapon's extra attacks made with itself alone (Thirsting Blade's pact weapon) - set by the server on the bonded weapon's swing",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "actions[].attack.criticalBonusDice",
     types: ACTION_CARRIERS,
     reason:

@@ -11,6 +11,7 @@ import {
   BARKSKIN_TAG,
   endConditionsImmuneTo,
   endEffect,
+  ENDS_ON_DEATH_TAG,
   RESISTS_CHOSEN_TYPE_TAG,
   makeEffect,
   PERSISTENT_RAGE_TAG,
@@ -274,7 +275,8 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
               ),
       // A spell's effect outlasts its caster's fall; only Concentration ends it early. A die given to another creature
       // (Bardic Inspiration) is its own once given.
-      endsWhenSourceDefeated: action.spellId === undefined && grant.answer === undefined,
+      endsWhenSourceDefeated:
+        action.spellId === undefined && grant.answer === undefined && !grant.tags.includes(ENDS_ON_DEATH_TAG),
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
       modifiers: [
         ...modifiers,
