@@ -1871,6 +1871,26 @@ export const GameStateSchema = z.object({
   heldRolls: z.array(HeldRollSchema).max(100).default([]),
   /** Damage rolls looked at before they count (see HeldDamageSchema). GM-only. */
   heldDamage: z.array(HeldDamageSchema).max(40).default([]),
+  /** Each character's latest spend of Hit Point Dice, which Heroic Inspiration may reroll a die of while it is the
+   *  character's latest roll: the dice, what each adds, and the Hit Points before it healed. GM-only. */
+  heldHitDice: z
+    .array(
+      z
+        .object({
+          actorId: z.uuid(),
+          rollId: z.uuid(),
+          dice: z
+            .array(z.object({ sides: z.number().int().min(2).max(20), face: z.number().int().min(1).max(20) }).strict())
+            .min(1)
+            .max(40),
+          conModifier: z.number().int().min(-5).max(10),
+          doubled: z.boolean(),
+          before: z.number().int().min(0).max(100000)
+        })
+        .strict()
+    )
+    .max(50)
+    .default([]),
   /** The GM's open calls for a roll. A player reads only their own part of each. */
   rollCalls: z.array(RollCallSchema).max(20).default([]),
   /** Game time, Long Rest requests and the party's Short Rest. Players see only their own characters' part. */

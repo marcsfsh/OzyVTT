@@ -614,6 +614,7 @@ export function CharacterSheet({
                 hitDice={hitDice}
                 constitution={constitution}
                 canSpend={role === "gm" || restOpen}
+                canReroll={role === "gm" || inspired === true}
                 onFeedback={say}
               />
             )}

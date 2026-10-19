@@ -488,6 +488,7 @@ function Vitals({
           constitution={constitution}
           boxes
           canSpend={role === "gm" || restOpen}
+          canReroll={role === "gm" || inspired === true}
           onFeedback={onFeedback}
         />
       )}
@@ -580,6 +581,7 @@ export function PlayCalm({
   onFeedback: (text: string) => void;
 }>) {
   const hitDice = "hitDice" in actor ? actor.hitDice : null;
+  const inspired = heroicInspirationOf(actor);
   const restPools = pools.filter((pool) => pool.per === "short-rest" || pool.per === "long-rest");
   const constitution = definition ? abilityModifier(definition.abilityScores.con) : null;
   return (
@@ -609,6 +611,7 @@ export function PlayCalm({
                 hitDice={hitDice}
                 constitution={constitution}
                 canSpend={role === "gm" || restOpen}
+                canReroll={role === "gm" || inspired === true}
                 onFeedback={onFeedback}
               />
             )}

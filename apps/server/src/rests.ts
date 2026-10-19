@@ -25,6 +25,7 @@ import { HIT_DICE_DOUBLED_TAG } from "./death-saves.js";
 import { easeOrdeals } from "./death.js";
 import { healActor, RELENTLESS_RAGE_KEY } from "./hit-points.js";
 import { gainHeroicInspiration } from "./heroic-inspiration.js";
+import { spendRerollRight } from "./held-rolls.js";
 import { chargesAfterDawn, neverRegained } from "./item-charges.js";
 import { afterLongRest, deniedRestLine, holdsMaximumAtRest, restDeniedBy } from "./rest-triggers.js";
 import { divineInterventionWaiting } from "./divine-intervention.js";
@@ -74,7 +75,7 @@ export function spendHitDice(
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined,
   count: number = faces.length,
   catalog?: EquipmentCatalog
-): { healed: number; events: EffectNarration[]; conModifier: number } {
+): { healed: number; events: EffectNarration[]; conModifier: number; doubled: boolean; before: number } {
   requireActorAccess(scope, state, actorId, "resource");
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
@@ -96,11 +97,58 @@ export function spendHitDice(
   // A Periapt of Wound Closure doubles what each die restores.
   const doubled =
     deriveEquipment(actor, definition, catalog).context.effectTags?.includes(HIT_DICE_DOUBLED_TAG) === true;
-  const healed = faces.reduce((sum, face) => sum + Math.max(1, face + conModifier) * (doubled ? 2 : 1), 0);
+  const healed = hitDieHealing(faces, conModifier, doubled);
+  const before = actor.hp.current;
   const events = healActor(state, actorId, healed, scope);
   // Decrement the pool die by die: a Fighter 3 / Wizard 2 spends its d10s before its d6s.
   actor.hitDice = makeHitDicePool(spendFromPool(actor.hitDice.entries, faces.length));
-  return { healed, events, conModifier };
+  return { healed, events, conModifier, doubled, before };
+}
+
+/** What a Hit Point Die restores: its roll plus the Constitution modifier, at least 1, doubled by a Periapt of Wound
+ *  Closure. */
+const hitDieHealing = (faces: readonly number[], conModifier: number, doubled: boolean) =>
+  faces.reduce((sum, face) => sum + Math.max(1, face + conModifier) * (doubled ? 2 : 1), 0);
+
+/** Holds a spend of Hit Point Dice for Heroic Inspiration's reroll, over the character's earlier one. */
+export function holdHitDice(state: GameState, held: GameState["heldHitDice"][number]): void {
+  state.heldHitDice = [...state.heldHitDice.filter((entry) => entry.actorId !== held.actorId), held].slice(-50);
+}
+
+/**
+ * Rerolls one die of a character's latest spend of Hit Point Dice (SRD Heroic Inspiration: "reroll any die immediately
+ * after rolling it"), while it is still the character's latest roll: a player spends Heroic Inspiration on the lowest
+ * die, the GM throws them all again. The healing is worked out afresh from the Hit Points before the spend.
+ */
+export function rerollHitDice(
+  state: GameState,
+  actorId: string,
+  scope: Initiator,
+  random: (sides: number) => number,
+  rollId: string
+): { healed: number; dice: ReadonlyArray<{ sides: number; face: number }>; conModifier: number } {
+  requireActorAccess(scope, state, actorId, "resource");
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  const held = state.heldHitDice.find((entry) => entry.actorId === actorId);
+  const latest = [...state.rolls].reverse().find((roll) => roll.actorId === actorId);
+  if (!held || !latest || latest.id !== held.rollId)
+    throw new CommandRejectedError(
+      `${actor.name} has no Hit Point Die to reroll: a reroll comes right after the roll.`
+    );
+  spendRerollRight(actor, scope);
+  const lowest = held.dice.reduce((low, die, index) => (die.face < held.dice[low]!.face ? index : low), 0);
+  const dice = held.dice.map((die, index) =>
+    scope.role === "gm" || index === lowest ? { ...die, face: random(die.sides) } : die
+  );
+  const healed = hitDieHealing(
+    dice.map((die) => die.face),
+    held.conModifier,
+    held.doubled
+  );
+  actor.hp = { ...actor.hp, current: Math.min(actor.hp.maximum, held.before + healed) };
+  holdHitDice(state, { ...held, rollId, dice });
+  return { healed, dice, conModifier: held.conModifier };
 }
 
 /** SRD Resting: "To start a Short Rest [or a Long Rest], you must have at least 1 Hit Point", and nothing brings

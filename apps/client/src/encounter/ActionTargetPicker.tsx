@@ -400,7 +400,9 @@ export function ActionTargetPicker({
           )}
           {onLookAtDamage && (
             <Button type="button" variant="secondary" disabled={busy || !ready} onClick={onLookAtDamage}>
-              Roll damage first
+              {picking.action.damage.length === 0 && picking.action.healing
+                ? "Roll healing first"
+                : "Roll damage first"}
             </Button>
           )}
           <button type="button" className="encounter-primary" disabled={busy || !ready} onClick={() => onRoll()}>

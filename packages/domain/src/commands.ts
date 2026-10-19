@@ -1530,6 +1530,9 @@ export const ActorSpendHitDiceSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     count: z.number().int().min(1).max(40),
+    /** Reroll one die of the character's latest spend instead, while it is still the character's latest roll (SRD
+     *  Heroic Inspiration: "reroll any die immediately after rolling it"); `count` is ignored. */
+    reroll: z.boolean().optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

@@ -174,6 +174,8 @@ export type HeldDamageLook = Readonly<{
   dice: ReadonlyArray<Readonly<{ sides: number; face: number; own: boolean }>>;
   answered: readonly RollAnswered[];
   answers: readonly DamageAnswerOffer[];
+  /** A heal's look (Cure Wounds, a potion): the Hit Points its roll restores, before what the healer's features add. */
+  healing?: number;
 }>;
 /** The damage an action with no attack roll and no save owes one target (Magic Missile, a smite resolved alone). */
 export type DamageTarget = Readonly<{
