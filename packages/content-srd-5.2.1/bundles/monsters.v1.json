@@ -157,6 +157,11 @@
      ]
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 30,
+     "seen": true
+    },
     "uses": {
      "limit": 2,
      "per": "long-rest"
@@ -282,6 +287,11 @@
       "type": "poison"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -955,6 +965,11 @@
       "type": "fire"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -1469,6 +1484,11 @@
       "type": "psychic"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 90,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -1776,6 +1796,11 @@
       "type": "force"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -3197,6 +3222,11 @@
       "type": "thunder"
      }
     ],
+    "targets": {
+     "count": 1,
+     "maxSize": "medium",
+     "inSpace": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -3424,6 +3454,11 @@
       "type": "poison"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -4111,6 +4146,11 @@
       "type": "fire"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -4643,6 +4683,11 @@
       "type": "psychic"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -4956,6 +5001,11 @@
       "type": "force"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -8242,6 +8292,21 @@
       "formula": "5d6",
       "type": "fire"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [
+       {
+        "id": "prone"
+       }
+      ],
+      "name": "Pulled",
+      "pull": {
+       "feet": 25,
+       "upTo": true
+      },
+      "maxTargetSize": "huge"
+     }
     ]
    },
    {
@@ -8261,6 +8326,18 @@
      {
       "formula": "4d10",
       "type": "lightning"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "No Reactions",
+      "tags": [
+       "no-reactions"
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
      }
     ]
    }
@@ -9107,7 +9184,10 @@
       ],
       "duration": {
        "type": "until-source-next-turn"
-      }
+      },
+      "tags": [
+       "no-healing"
+      ]
      }
     ]
    },
@@ -9285,7 +9365,12 @@
      }
     },
     "damage": [],
-    "reminder": "While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir."
+    "reminder": "While swallowed, a creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the behir.",
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "grappledBySource": true
+    }
    },
    {
     "id": "bite",
@@ -9328,7 +9413,13 @@
       "formula": "5d8 + 6",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "rangeFeet": 5,
+     "seen": true
+    }
    },
    {
     "id": "lightning-breath",
@@ -10453,7 +10544,10 @@
       ],
       "duration": {
        "type": "until-source-next-turn"
-      }
+      },
+      "tags": [
+       "no-healing"
+      ]
      }
     ]
    }
@@ -11038,7 +11132,13 @@
      "escapeDc": 13,
      "rangeFeet": 10
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "maxSize": "medium",
+     "rangeFeet": 10,
+     "seen": true
+    }
    },
    {
     "id": "javelin",
@@ -11834,7 +11934,12 @@
       "formula": "2d4 + 4",
       "type": "fire"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -12198,7 +12303,11 @@
      },
      "repeatSave": true
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "grappledBySource": true
+    }
    }
   ],
   "token": {
@@ -13094,7 +13203,13 @@
       "formula": "3d4",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "maxSize": "medium",
+     "rangeFeet": 5,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -13400,7 +13515,13 @@
       "formula": "1d6 + 5",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "maxSize": "medium",
+     "rangeFeet": 5,
+     "seen": true
+    }
    },
    {
     "id": "spellcasting",
@@ -16642,7 +16763,14 @@
       "formula": "2d10 + 6",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "conditions": [
+      "prone"
+     ],
+     "rangeFeet": 5
+    }
    },
    {
     "id": "gore",
@@ -16911,7 +17039,12 @@
       "formula": "4d6",
       "type": "force"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -17100,6 +17233,12 @@
      ]
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "rangeFeet": 30,
+     "seen": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -17250,6 +17389,25 @@
      {
       "formula": "2d8 + 5",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Next attack at Disadvantage",
+      "tags": [
+       "until-own-attack"
+      ],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "attack",
+        "mode": "disadvantage"
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
      }
     ]
    }
@@ -17535,6 +17693,25 @@
      {
       "formula": "1d8",
       "type": "fire"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Next attack at Disadvantage",
+      "tags": [
+       "until-own-attack"
+      ],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "attack",
+        "mode": "disadvantage"
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
      }
     ],
     "onHitPush": {
@@ -18038,6 +18215,21 @@
      {
       "formula": "2d6",
       "type": "cold"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Speed reduced",
+      "modifiers": [
+       {
+        "type": "speed",
+        "amount": -10
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
      }
     ]
    }
@@ -18610,6 +18802,14 @@
      ]
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "creatureTypes": [
+      "humanoid"
+     ],
+     "rangeFeet": 5,
+     "seen": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -19482,7 +19682,13 @@
       "formula": "2d8 + 4",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "rangeFeet": 10,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -21344,6 +21550,11 @@
      ]
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -22294,7 +22505,11 @@
       "formula": "3d6 + 5",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "grappledBySource": true
+    }
    },
    {
     "id": "spellcasting",
@@ -22511,7 +22726,12 @@
       "formula": "2d4 + 4",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -23415,7 +23635,14 @@
       "formula": "2d10 + 5",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "conditions": [
+      "prone"
+     ],
+     "rangeFeet": 5
+    }
    },
    {
     "id": "petrifying-breath",
@@ -24573,7 +24800,12 @@
       "formula": "7d8",
       "type": "poison"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    }
    },
    {
     "id": "spellcasting",
@@ -26196,7 +26428,12 @@
       "type": "necrotic"
      }
     ],
-    "reminder": "The infernal wound also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC 17 Wisdom (Medicine) check: end it by hand."
+    "reminder": "The infernal wound also closes when the bearer or a creature within 5 feet takes an action and succeeds on a DC 17 Wisdom (Medicine) check: end it by hand.",
+    "targets": {
+     "count": 1,
+     "rangeFeet": 10,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -26639,6 +26876,26 @@
      {
       "formula": "3d6",
       "type": "cold"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Chilled",
+      "tags": [
+       "no-bonus-actions",
+       "no-reactions",
+       "dazed"
+      ],
+      "modifiers": [
+       {
+        "type": "speed",
+        "amount": -10
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
      }
     ]
    },
@@ -27133,6 +27390,11 @@
     },
     "damage": [],
     "reminder": "On a failed save: a target with 20 Hit Points or fewer has the Unconscious condition for 1 hour (until it takes damage or is woken); any other target takes 18 (4d8) Psychic damage.",
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -27152,6 +27414,12 @@
      {
       "formula": "3d6 + 5",
       "type": "psychic"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "reminder": "The target is cursed for 24 hours or until the incubus dies. Until the curse ends, the target gains no benefit from finishing Short Rests."
      }
     ]
    },
@@ -27349,7 +27617,12 @@
       "type": "thunder"
      }
     ],
-    "reminder": "Until the grapple ends, the target can't cast spells with a Verbal component."
+    "reminder": "Until the grapple ends, the target can't cast spells with a Verbal component.",
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "inSpace": true
+    }
    }
   ],
   "token": {
@@ -28110,6 +28383,11 @@
      "dc": 23,
      "successDamage": "half",
      "failureConditions": []
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
     }
    },
    {
@@ -28205,7 +28483,12 @@
       "formula": "6d10",
       "type": "lightning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    }
    },
    {
     "id": "swallow",
@@ -28235,7 +28518,11 @@
       "type": "piercing"
      }
     ],
-    "reminder": "A swallowed creature has the Restrained condition, has Total Cover against attacks and other effects outside the kraken."
+    "reminder": "A swallowed creature has the Restrained condition, has Total Cover against attacks and other effects outside the kraken.",
+    "targets": {
+     "count": 1,
+     "grappledBySource": true
+    }
    }
   ],
   "token": {
@@ -28409,7 +28696,12 @@
       "formula": "3d8",
       "type": "psychic"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5,
+     "seen": true
+    }
    },
    {
     "id": "spellcasting",
@@ -29032,7 +29324,11 @@
       "type": "until-source-next-turn"
      }
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 15
+    }
    }
   ],
   "token": {
@@ -29739,7 +30035,14 @@
       "formula": "4d10 + 7",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "conditions": [
+      "prone"
+     ],
+     "rangeFeet": 5
+    }
    },
    {
     "id": "gore",
@@ -30037,7 +30340,13 @@
       "formula": "2d10 + 4",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "maxSize": "medium",
+     "rangeFeet": 5,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -30444,6 +30753,21 @@
       "formula": "1d4",
       "type": "cold"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Speed reduced",
+      "modifiers": [
+       {
+        "type": "speed",
+        "amount": -10
+       }
+      ],
+      "duration": {
+       "type": "until-bearer-turn-end"
+      }
+     }
     ]
    }
   ],
@@ -30600,6 +30924,17 @@
      {
       "formula": "2d6 + 4",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Pulled",
+      "pull": {
+       "feet": 15,
+       "upTo": true
+      },
+      "maxTargetSize": "large"
      }
     ]
    }
@@ -31237,6 +31572,16 @@
       "formula": "3d6",
       "type": "necrotic"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Cursed",
+      "tags": [
+       "no-healing"
+      ],
+      "reminder": "While cursed, the target can't regain Hit Points, its Hit Point maximum doesn't return to normal when finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse. A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
+     }
     ]
    },
    {
@@ -31255,7 +31600,12 @@
       "type": "until-source-turn-end"
      }
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -31368,6 +31718,11 @@
      "failureDuration": {
       "type": "until-source-turn-end"
      }
+    },
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
     }
    },
    {
@@ -31429,6 +31784,16 @@
      {
       "formula": "3d6",
       "type": "necrotic"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Cursed",
+      "tags": [
+       "no-healing"
+      ],
+      "reminder": "While cursed, the target can't regain Hit Points, it gains no benefit from finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse. A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
      }
     ]
    },
@@ -31494,7 +31859,12 @@
       "formula": "6d6 + 4",
       "type": "psychic"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 60,
+     "seen": true
+    }
    },
    {
     "id": "spellcasting",
@@ -33026,7 +33396,10 @@
       "formula": "3d8 + 3",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "grappledBySource": true
+    }
    }
   ],
   "token": {
@@ -33785,7 +34158,12 @@
       "type": "until-source-next-turn"
      }
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 30,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -33876,7 +34254,12 @@
       "type": "until-source-next-turn"
      }
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 30,
+     "seen": true
+    }
    },
    {
     "id": "multiattack",
@@ -33920,6 +34303,26 @@
      {
       "formula": "2d8 + 4",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Next attack at Advantage",
+      "self": true,
+      "tags": [
+       "until-own-attack"
+      ],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "attack",
+        "mode": "advantage"
+       }
+      ],
+      "duration": {
+       "type": "until-source-turn-end"
+      }
      }
     ]
    },
@@ -34066,6 +34469,13 @@
        }
       ],
       "at": "bearer-turn-start"
+     },
+     "failureEffect": {
+      "name": "Poisoned",
+      "tags": [
+       "no-healing"
+      ],
+      "modifiers": []
      }
     },
     "damage": [
@@ -34073,8 +34483,7 @@
       "formula": "3d6 + 8",
       "type": "piercing"
      }
-    ],
-    "reminder": "While Poisoned, the target can't regain Hit Points, and it repeats the save at the end of each of its turns, ending the effect on itself on a success."
+    ]
    },
    {
     "id": "devilish-claw",
@@ -35201,7 +35610,12 @@
       "formula": "2d4",
       "type": "poison"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -35424,7 +35838,12 @@
      }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the worm."
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions, has Total Cover against attacks and other effects outside the worm.",
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "grappledBySource": true
+    }
    },
    {
     "id": "bite",
@@ -35604,6 +36023,10 @@
      "repeatSave": true
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 20
+    },
     "uses": {
      "limit": 1,
      "per": "long-rest"
@@ -36448,7 +36871,12 @@
      }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions, it has Total Cover against attacks and other effects outside the remorhaz."
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions, it has Total Cover against attacks and other effects outside the remorhaz.",
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "grappledBySource": true
+    }
    }
   ],
   "token": {
@@ -37512,7 +37940,13 @@
       "formula": "2d6",
       "type": "fire"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "rangeFeet": 10,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -37644,7 +38078,12 @@
       "formula": "1d6 + 2",
       "type": "psychic"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 90,
+     "seen": true
+    }
    }
   ],
   "token": {
@@ -37979,6 +38418,14 @@
     },
     "damage": [],
     "reminder": "On a failed save: a target with 20 Hit Points or fewer drops to 0 Hit Points; any other target takes 13 (3d8) Psychic damage.",
+    "targets": {
+     "count": 1,
+     "conditions": [
+      "frightened"
+     ],
+     "rangeFeet": 30,
+     "seen": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -38216,6 +38663,12 @@
       "formula": "1d6 + 2",
       "type": "necrotic"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "reminder": "The target's Strength score decreases by 1d4. The target dies if this reduces that score to 0."
+     }
     ]
    },
    {
@@ -38372,6 +38825,16 @@
       "formula": "2d4",
       "type": "lightning"
      }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Pulled",
+      "pull": {
+       "feet": 5
+      },
+      "maxTargetSize": "medium"
+     }
     ]
    },
    {
@@ -38401,7 +38864,12 @@
      "rangeFeet": 5
     },
     "damage": [],
-    "reminder": "Until the grapple ends, the target has the Blinded and Restrained conditions."
+    "reminder": "Until the grapple ends, the target has the Blinded and Restrained conditions.",
+    "targets": {
+     "count": 1,
+     "maxSize": "medium",
+     "rangeFeet": 5
+    }
    }
   ],
   "token": {
@@ -39021,6 +39489,11 @@
      }
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -39140,7 +39613,12 @@
      "failureConditions": []
     },
     "damage": [],
-    "reminder": "On a failed save: a creature with 100 Hit Points or fewer dies; any other takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage."
+    "reminder": "On a failed save: a creature with 100 Hit Points or fewer dies; any other takes 24 (4d8 + 6) Piercing damage plus 36 (8d8) Radiant damage.",
+    "targets": {
+     "count": 1,
+     "rangeFeet": 600,
+     "seen": true
+    }
    },
    {
     "id": "spellcasting",
@@ -39478,6 +39956,11 @@
      "failureConditions": []
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -39759,6 +40242,11 @@
      "failureConditions": []
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 120,
+     "seen": true
+    },
     "legendary": {
      "cost": 1,
      "oncePerRound": true
@@ -40429,7 +40917,12 @@
      "successDamage": "none",
      "failureConditions": []
     },
-    "damage": []
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5,
+     "seen": true
+    }
    },
    {
     "id": "invisibility",
@@ -41544,6 +42037,10 @@
       "type": "psychic"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
     "drain": {
      "reducesMaximum": true
     }
@@ -42260,6 +42757,10 @@
      }
     },
     "damage": [],
+    "targets": {
+     "count": 1,
+     "inSpace": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -42512,7 +43013,12 @@
      }
     },
     "damage": [],
-    "reminder": "A swallowed creature has the Blinded and Restrained conditions and can't teleport, it has Total Cover against attacks and other effects outside the tarrasque."
+    "reminder": "A swallowed creature has the Blinded and Restrained conditions and can't teleport, it has Total Cover against attacks and other effects outside the tarrasque.",
+    "targets": {
+     "count": 1,
+     "maxSize": "large",
+     "grappledBySource": true
+    }
    },
    {
     "id": "bite",
@@ -45562,6 +46068,9 @@
      }
     ],
     "reminder": "Until the grapple ends, the target has the Restrained condition, is suffocating unless it can breathe water.",
+    "targets": {
+     "inSpace": true
+    },
     "uses": {
      "limit": 1,
      "per": "recharge",
@@ -46841,6 +47350,10 @@
       "type": "necrotic"
      }
     ],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5
+    },
     "drain": {
      "reducesMaximum": true
     }
@@ -47342,6 +47855,25 @@
      {
       "formula": "1d8 + 3",
       "type": "piercing"
+     }
+    ],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Next attack against it at Advantage",
+      "tags": [
+       "until-attacked"
+      ],
+      "modifiers": [
+       {
+        "type": "roll-mode",
+        "roll": "incoming-attack",
+        "mode": "advantage"
+       }
+      ],
+      "duration": {
+       "type": "until-source-next-turn"
+      }
      }
     ]
    }
