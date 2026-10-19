@@ -16,7 +16,7 @@ import { CommandRejectedError } from "./game-store.js";
 import { failureEffectFor } from "./resolution/pending.js";
 import { createPendingSaves } from "./saving-throws.js";
 import { countZoneDamage, endZone, removeZone, zoneContentOf, type ZoneContent } from "./spell-zone-state.js";
-import type { TokenMapGeometry } from "./token-placement.js";
+import { moveEncounterToken, type TokenMapGeometry } from "./token-placement.js";
 import { withArticle } from "@vtt/domain";
 import { altitudeOf, heightSpan } from "./altitude.js";
 import { bandTest, ringTest } from "./zone-shapes.js";
@@ -52,7 +52,8 @@ type Meeting =
   | "moves through"
   | "is set upon by"
   | "is caught in the blast of"
-  | "is caught in";
+  | "is caught in"
+  | "is swept up by";
 
 /** The later action whose zone this spell leaves, if any: the one its cast picked among the spell's options (Wall of
  *  Fire's ring), else the first. */
@@ -298,6 +299,7 @@ export function exposed(
     // "Each creature on the ground in the area": one in the air above it is spared.
     if (trigger.grounded && altitudeOf(tokenOf(state, creature.id)) > 0) return [];
     if (trigger.types && !trigger.types.includes(typeOf(creature, deps) ?? "")) return [];
+    if (trigger.sizes && !trigger.sizes.includes(creature.size ?? "medium")) return [];
     // A defeated creature takes no more; a dying character does (damage at 0 HP is a failed death save).
     if (creature.hp.current <= 0 && (creature.kind !== "player-character" || (creature.deathSaves?.failures ?? 0) >= 3))
       return [];
@@ -495,10 +497,12 @@ export function zoneAction(zone: SpellZone, content: ZoneContent): ActorAction |
     };
   } else return undefined;
   const chosen = zone.damageType;
+  // Dice it has gained (Delayed Blast Fireball) less those it has lost (Tsunami's 1d10 a round).
+  const extra = (zone.grown ?? 0) - (zone.faded ?? 0);
   return {
     ...action,
     damage: action.damage.map((part, index) => ({
-      formula: index === 0 && (zone.grown ?? 0) > 0 ? withMoreDice(part.formula, zone.grown ?? 0) : part.formula,
+      formula: index === 0 && extra !== 0 ? withMoreDice(part.formula, extra) : part.formula,
       type: chosen ?? part.type
     })),
     // A failed repeat's damage is the chosen element's too (Conjure Elemental's 4d8 "of the spirit's type").
@@ -516,10 +520,13 @@ export function zoneAction(zone: SpellZone, content: ZoneContent): ActorAction |
   };
 }
 
-/** "12d6" with `extra` more dice of its size: "15d6". A formula with no dice term stays as it is. */
+/** "12d6" with `extra` more dice of its size: "15d6"; fewer with a negative `extra`, and "0" once none is left. A
+ *  formula with no dice term stays as it is. */
 function withMoreDice(formula: string, extra: number): string {
   const match = /^(\d+)d(\d+)(.*)$/.exec(formula.trim());
-  return match ? `${Number(match[1]) + extra}d${match[2]}${match[3]}` : formula;
+  if (!match) return formula;
+  const count = Number(match[1]) + extra;
+  return count > 0 ? `${count}d${match[2]}${match[3]}` : "0";
 }
 
 /** Whether a creature still bears what the cast restrained it with (Conjure Elemental's spirit holds one). */
@@ -756,7 +763,15 @@ function drift(state: GameState, zone: SpellZone, feet: number, deps: ZoneDeps):
     ? state.combat.annotations.find((annotation) => annotation.id === zone.annotationId)
     : undefined;
   const caster = tokenOf(state, zone.casterId)?.position;
-  const away = area && caster ? { x: area.geometry.origin.x - caster.x, y: area.geometry.origin.y - caster.y } : null;
+  // Away from the caster through the area's middle, so a wall moves square to its caster.
+  const middle =
+    area && (area.shape === "line" || area.shape === "square")
+      ? {
+          x: (area.geometry.origin.x + area.geometry.target.x) / 2,
+          y: (area.geometry.origin.y + area.geometry.target.y) / 2
+        }
+      : area?.geometry.origin;
+  const away = middle && caster ? { x: middle.x - caster.x, y: middle.y - caster.y } : null;
   const length = away ? Math.hypot(away.x, away.y) : 0;
   if (!calibration || !area || area.shape === null || !away || length < 1)
     return [
@@ -770,6 +785,16 @@ function drift(state: GameState, zone: SpellZone, feet: number, deps: ZoneDeps):
   const pixels = (feet / calibration.distancePerCell) * calibration.cellSizePx;
   const shift = { x: (away.x / length) * pixels, y: (away.y / length) * pixels };
   const before = { origin: area.geometry.origin, target: area.geometry.target };
+  const content = zoneContentOf(zone, deps.catalog);
+  // Tsunami: "the wall, along with any creatures in it, moves 50 feet away from you".
+  const carries = content?.trigger.carries === true;
+  const insideBefore = carries && content ? insideTest(state, zone, content.trigger, content, deps.geometry) : null;
+  const carried = insideBefore
+    ? creaturesOnMap(state).filter((creature) => {
+        const token = tokenOf(state, creature.id)!;
+        return insideBefore(token.position!, token.sizeCells, altitudeOf(token));
+      })
+    : [];
   const moved = shapeGeometry(
     calibration,
     area.shape,
@@ -778,14 +803,28 @@ function drift(state: GameState, zone: SpellZone, feet: number, deps: ZoneDeps):
   );
   area.geometry = moved;
   const casterName = state.actors.find((actor) => actor.id === zone.casterId)?.name ?? "its caster";
-  return [
+  const events: EffectNarration[] = [
     {
       kind: "effect",
-      text: `${zone.name} drifts ${feet} feet away from ${casterName}.`,
+      text: `${zone.name} drifts ${feet} feet away from ${casterName}${carried.length > 0 ? `, carrying ${carried.map((creature) => creature.name).join(", ")}` : ""}.`,
       actorId: zone.casterId
-    },
-    ...zonesAfterAreaMove(state, area.id, before, deps)
+    }
   ];
+  if (!carries || !content || !deps.geometry) return [...events, ...zonesAfterAreaMove(state, area.id, before, deps)];
+  for (const creature of carried) {
+    const at = tokenOf(state, creature.id)!.position!;
+    moveEncounterToken(state, creature.id, { x: at.x + shift.x, y: at.y + shift.y }, deps.geometry);
+  }
+  zone.driftedThisTurn = true;
+  // Each creature it now holds, carried or newly caught, makes the save.
+  const holding = insideTest(state, zone, content.trigger, content, deps.geometry);
+  if (holding)
+    for (const creature of exposed(state, zone, content.trigger, deps)) {
+      const token = tokenOf(state, creature.id)!;
+      if (holding(token.position!, token.sizeCells, altitudeOf(token)))
+        act(state, zone, creature, "is swept up by", deps, events);
+    }
+  return events;
 }
 
 /** SRD Faithful Hound: "At the start of each of your turns, the hound attempts to bite one enemy within 5 feet of it."

@@ -4033,7 +4033,18 @@ export const AreaTriggerSchema = z
      *  area. */
     destroysFog: z.literal(true).optional(),
     /** It acts once over the area it is placed on, then ends (Create or Destroy Water's instant rain). */
-    instant: z.literal(true).optional()
+    instant: z.literal(true).optional(),
+    /** It acts only on creatures of these sizes (Tsunami: "Any Huge or smaller creature"). */
+    sizes: z.array(SizeSchema).min(1).max(6).optional(),
+    /** As it drifts it carries the creatures in it, and each creature it holds or moves onto then makes its save, once
+     *  a round (Tsunami: "the wall, along with any creatures in it, moves 50 feet away from you"). */
+    carries: z.literal(true).optional(),
+    /** At the end of each of its caster's turns on which it drifted, it loses this much height and one die of its
+     *  damage; the spell ends when no height is left (Tsunami's 50 feet and 1d10). */
+    fadesFeet: z.number().int().min(5).max(300).optional(),
+    /** A creature in it can't move on its turn unless it first succeeds on a Strength (Athletics) check against the
+     *  save DC, rolled as its turn starts (Tsunami: "must succeed on a Strength (Athletics) check ... to move at all"). */
+    athleticsToMove: z.literal(true).optional()
   })
   .strict();
 export type AreaTrigger = z.infer<typeof AreaTriggerSchema>;

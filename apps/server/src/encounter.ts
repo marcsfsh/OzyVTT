@@ -41,6 +41,7 @@ import { leaveShortRest } from "./short-rest-interruptions.js";
 import { releaseSwallowedBy } from "./swallow.js";
 import { endOfTurn, playStartSteps, startOfTurn } from "./turn-boundaries.js";
 import { zoneHeld, zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
+import { wavesAtTurnEnd, wavesAtTurnStart } from "./zone-waves.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
 import { lapseLongCasts } from "./resolution/long-casting.js";
@@ -877,6 +878,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // A spell area the creature ends its turn in acts on it (Moonbeam, Spirit Guardians).
   const zones = zoneDepsOf(deps);
   if (zones) ending.push(...zonesAtTurnEnd(state, outgoingId, zones));
+  // A wave that moved this turn sinks and weakens (Tsunami).
+  if (zones && outgoingId) ending.push(...wavesAtTurnEnd(state, outgoingId, zones));
   events?.push(...ending);
   // A new round sorts the whole order again, which settles any mid-round score change.
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
@@ -913,6 +916,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // Then the spell areas: each counts "once per turn" afresh, a spell's duration runs out at its caster's turn, and
   // the incoming creature starting its turn inside one (Web, Stinking Cloud) meets it.
   if (zones) starting.push(...zonesAtTurnStart(state, nextActorId, zones));
+  // A creature in a wave fights it before it can move (Tsunami).
+  if (zones) starting.push(...wavesAtTurnStart(state, nextActorId, zones));
   events?.push(...starting);
   rollRecharges(state, nextActorId, deps, events);
   refreshOwnTurnUses(state, nextActorId, deps);

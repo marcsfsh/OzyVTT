@@ -1132,6 +1132,28 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       zone: { on: ["start-turn"], endsBy: ["wind"] }
     }
   ],
+  // "At the start of each of your turns after the wall appears, the wall, along with any creatures in it, moves 50 feet
+  // away from you. Any Huge or smaller creature inside the wall or whose space the wall enters when it moves must
+  // succeed on a Strength saving throw or take 5d10 Bludgeoning damage", "At the end of the turn, the wall's height is
+  // reduced by 50 feet, and the damage the wall deals on later rounds is reduced by 1d10", and a creature in the wall
+  // "must succeed on a Strength (Athletics) check against your spell save DC to move at all".
+  tsunami: [
+    {
+      name: "wave",
+      activation: "other",
+      when: "At the start of each of your turns the wall moves 50 feet away from you with the creatures in it, and each Huge or smaller creature it holds makes the save. It then loses 50 feet of height and 1d10 of damage. A creature in it moves only after a Strength (Athletics) check.",
+      save: save("str"),
+      damage: [{ formula: "5d10", type: "bludgeoning" }],
+      zone: {
+        on: [],
+        drifts: 50,
+        carries: true,
+        sizes: ["tiny", "small", "medium", "large", "huge"],
+        fadesFeet: 50,
+        athleticsToMove: true
+      }
+    }
+  ],
   // "Until the spell ends, you can take a Magic action to create a new Line of radiance."
   sunbeam: [
     {
@@ -2582,7 +2604,7 @@ const SPELL_AREAS: Readonly<Record<string, ActionArea>> = {
   // "Spreading to a radius of 300 feet": the creatures under the cloud.
   "storm-of-vengeance": { shape: "cylinder", sizeFeet: 300, widthFeet: null },
   // "Up to 300 feet long, 300 feet high, and 50 feet thick."
-  tsunami: { shape: "line", sizeFeet: 300, widthFeet: 50 },
+  tsunami: { shape: "line", sizeFeet: 300, widthFeet: 50, heightFeet: 300 },
   "wall-of-fire": { shape: "line", sizeFeet: 60, widthFeet: 5 },
   // "A flat surface made up of ten 10-foot-by-10-foot panels" in a row; the dome and the globe are the GM's to draw.
   "wall-of-force": { shape: "line", sizeFeet: 100, widthFeet: 5 },

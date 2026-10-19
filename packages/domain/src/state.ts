@@ -1375,6 +1375,10 @@ export const SpellZoneSchema = z
     /** The carried lights (`actorId:itemId`) whose protected flame has had its chance to go out in it (Gust of
      *  Wind's 50 percent for a lantern). */
     windTried: z.array(z.string().max(240)).max(200).optional(),
+    /** Dice its damage has lost and height it has lost so far (Tsunami: 1d10 and 50 feet each turn it moved), and
+     *  whether it drifted this turn. */
+    faded: z.number().int().nonnegative().max(100).optional(),
+    driftedThisTurn: z.literal(true).optional(),
     /** It acts when its spell ends (Delayed Blast Fireball's bead), so ending it leaves it `bursting` until the server
      *  has raised the saves. */
     burstsOnEnd: z.literal(true).optional(),
