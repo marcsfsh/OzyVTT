@@ -469,7 +469,7 @@ export function setInitiativeScore(state: GameState, actorId: string, score: num
 
 /**
  * SRD Initiative: "If a tie occurs, the GM decides the order among tied monsters, and the players decide the order among
- * tied characters." A character's player (or the GM) puts it just before another character tied on its score, before
+ * tied characters." A character's player (or the GM) puts it directly ahead of another character tied on its score, before
  * either has taken a turn in this fight.
  */
 export function orderTiedCharacters(state: GameState, scope: Initiator, actorId: string, beforeActorId: string) {

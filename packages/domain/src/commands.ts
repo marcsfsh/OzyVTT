@@ -134,8 +134,8 @@ export const InitiativeSwapSchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
-/** SRD Initiative: "the players decide the order among tied characters". A player puts their own character just
- *  before another character tied on the same score. */
+/** SRD Initiative: "the players decide the order among tied characters". A player puts their own character
+ *  directly ahead of another character tied on the same score. */
 export const InitiativeOrderTieSchema = z
   .object({
     commandId: z.uuid(),

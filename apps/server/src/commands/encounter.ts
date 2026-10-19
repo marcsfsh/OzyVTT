@@ -336,7 +336,7 @@ export const encounterCommands = [
     type: "initiative.order-tie",
     operationId: "orderTiedCharacters",
     description:
-      "Puts a character just before another character tied with it on the same initiative score (SRD Initiative: the players decide the order among tied characters), before either has taken a turn in this fight. GM-grade for any character; a player session only for their own claimed character.",
+      "Puts a character directly ahead of another character tied with it on the same initiative score (SRD Initiative: the players decide the order among tied characters), before either has taken a turn in this fight. GM-grade for any character; a player session only for their own claimed character.",
     summary: "Order your character before another character tied on initiative.",
     schema: InitiativeOrderTieSchema,
     malformed: "The tie order is malformed.",
