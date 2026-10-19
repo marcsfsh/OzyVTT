@@ -206,7 +206,13 @@ describe("the sheet's inventory", () => {
     serve();
     const actor = hero({
       inventory: [
-        { id: "manual-of-bodily-health", name: "Manual of Bodily Health", quantity: 1, equipped: false, attuned: false },
+        {
+          id: "manual-of-bodily-health",
+          name: "Manual of Bodily Health",
+          quantity: 1,
+          equipped: false,
+          attuned: false
+        },
         {
           id: "tome-of-clear-thought",
           name: "Tome of Clear Thought",

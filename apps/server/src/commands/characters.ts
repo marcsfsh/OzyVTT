@@ -146,13 +146,17 @@ export const characterCommands = [
           // homebrew out of a player's build.
           const catalog = kit.catalogFor(principal);
           // A new character has studied nothing yet.
-          const { input, thrown } = settleBuilderDice(state, { ...request, choices: withStoredStudies(request.choices, []) }, {
-            gm: isGmGrade(principal),
-            sessionId: sessionIdOf(principal),
-            previous: undefined,
-            hitDieOf: hitDieIn(catalog),
-            random: (sides) => kit.context.random(sides)
-          });
+          const { input, thrown } = settleBuilderDice(
+            state,
+            { ...request, choices: withStoredStudies(request.choices, []) },
+            {
+              gm: isGmGrade(principal),
+              sessionId: sessionIdOf(principal),
+              previous: undefined,
+              hitDieOf: hitDieIn(catalog),
+              random: (sides) => kit.context.random(sides)
+            }
+          );
           const definition = buildCharacterDefinition(input, catalog, state.builderPolicy);
           importActorDefinition(state, definition, actorId, "public", kit.equipmentCatalog());
           claimForCreator(state, actorId, principal);
