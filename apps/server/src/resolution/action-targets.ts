@@ -6,7 +6,8 @@ import { conditionLabel } from "../condition-rules.js";
 import { areAllies, areEnemies } from "../creature-sides.js";
 import { endEffect } from "../effects.js";
 import { hiddenFrom } from "../vision/audience.js";
-import { sceneSight } from "../vision/sight.js";
+import { sightRules } from "../vision/rules.js";
+import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { enteredOnMoveOf } from "../granted-moves.js";
@@ -29,6 +30,8 @@ type TargetCheck = Readonly<{
   definition: ActorDefinition | undefined;
   resolveDefinition: ((definitionId: string) => ActorDefinition | undefined) | undefined;
   distanceFeet: ((actorIdA: string, actorIdB: string) => number | null) | undefined;
+  /** The item catalog, for senses an item gives (a Ring of See Invisibility). */
+  catalog?: EquipmentCatalog | undefined;
 }>;
 
 const words = (types: readonly string[]) =>
@@ -65,7 +68,17 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
     });
   const rules = action.targets;
   if (!rules) return violations;
-  const sight = rules.seen ? sceneSight(state, resolveDefinition ? { definition: resolveDefinition } : {}) : null;
+  // "A creature you can see": the map with its vision on, else the conditions and the senses by distance.
+  const sight = rules.seen
+    ? sightRules(
+        state,
+        {
+          ...(resolveDefinition ? { definition: resolveDefinition } : {}),
+          ...(check.catalog ? { catalog: check.catalog } : {})
+        },
+        distanceFeet
+      )
+    : null;
   // Taken move first, it reaches only the creatures its move entered; taken where it stands, the GM picks them.
   const entered = rules.entered ? enteredOnMoveOf(attacker, action.id) : null;
   for (const target of targets) {
@@ -83,7 +96,9 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
     if (rules.who === "allies" && !self && !areAllies(attacker, target, resolveDefinition))
       violations.push({ rule: "target.not-allowed", message: `${action.name} targets allies, and ${name} isn't one.` });
     const targetDefinition = target.definitionId ? resolveDefinition?.(target.definitionId) : undefined;
-    const type = creatureTypeOf(target, targetDefinition);
+    // A creature of a type the action doesn't affect is still a target that nothing happens to (`type-gates.ts`); an
+    // attack resolves against its one target, so its types are checked as it is aimed.
+    const type = action.attack !== undefined ? creatureTypeOf(target, targetDefinition) : null;
     if (rules.creatureTypes && type !== null && !rules.creatureTypes.includes(type))
       violations.push({
         rule: "target.not-allowed",
@@ -139,7 +154,7 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
         rule: "target.not-allowed",
         message: `${action.name} targets the creature ${attacker.name} marked with it, and ${name} isn't marked.`
       });
-    if (sight?.enabled && !self && !sight.sees(attacker.id, target.id))
+    if (sight && !self && !sight.canSee(attacker.id, target.id))
       violations.push({
         rule: "target.not-allowed",
         message: `${action.name} targets a creature ${attacker.name} can see.`

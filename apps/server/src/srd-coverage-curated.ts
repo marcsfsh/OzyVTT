@@ -23,7 +23,7 @@ const reference = (note: string): CuratedCoverage => ({ state: "reference", note
 
 export const CONDITION_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   blinded: enforced(
-    "resolution/attack.ts: its attack rolls have Disadvantage and attack rolls against it have Advantage. ability-checks.ts fails its Perception check to find a creature unless its Blindsight reaches it, and any check the GM marks as needing sight (check-rolls.ts, a call for a roll). movement-rules.ts: it makes an Opportunity Attack only against a mover in its Blindsight, and with dynamic vision on vision/sight.ts lets it see only within Blindsight."
+    "resolution/attack.ts: its attack rolls have Disadvantage and attack rolls against it have Advantage. ability-checks.ts fails its Perception check to find a creature unless its Blindsight reaches it, and any check the GM marks as needing sight (check-rolls.ts, a call for a roll). It can't target a creature a spell or action needs it to see unless its Blindsight reaches it (resolution/spell-targets.ts, action-targets.ts, vision/rules.ts). movement-rules.ts: it makes an Opportunity Attack only against a mover in its Blindsight, and with dynamic vision on vision/sight.ts lets it see only within Blindsight."
   ),
   charmed: enforced(
     "resolution/economy.ts: a Charmed creature can't attack its charmer or target it with a save, damage or a spell, whether the condition came from a spell, an action or the GM's chip naming the charmer (actor-conditions.ts). ability-checks.ts gives the charmer Advantage on Charisma checks and Animal Handling against it (Influence, or a check the GM calls naming it)."
@@ -44,7 +44,7 @@ export const CONDITION_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/economy.ts refuses its actions, Bonus Actions and Reactions. effects.ts ends its Concentration and its grapples, and encounter.ts gives it Disadvantage on Initiative."
   ),
   invisible: enforced(
-    "resolution/attack.ts: Advantage on its attack rolls and Disadvantage on attack rolls against it, unless the other creature sees it (Blindsight, Truesight or See Invisibility within range, or the map with dynamic vision on) or Faerie Fire outlines it. encounter.ts: Advantage on Initiative. movement-rules.ts: it provokes an Opportunity Attack only from a creature whose Blindsight or Truesight reaches it."
+    "resolution/attack.ts: Advantage on its attack rolls and Disadvantage on attack rolls against it, unless the other creature sees it (Blindsight, Truesight or See Invisibility within range, or the map with dynamic vision on) or Faerie Fire outlines it. A spell or action that needs a target its user sees can't pick it unless its user sees it the same way (resolution/spell-targets.ts, action-targets.ts). encounter.ts: Advantage on Initiative. movement-rules.ts: it provokes an Opportunity Attack only from a creature whose Blindsight or Truesight reaches it."
   ),
   paralyzed: enforced(
     "It counts as Incapacitated, and speed.ts sets its Speed to 0. saving-throws.ts fails its Strength and Dexterity saves. resolution/attack.ts gives attack rolls against it Advantage and makes a hit from within 5 feet a Critical Hit."
@@ -409,7 +409,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "speed.ts gives a creature with a Swim Speed its own budget for swimming, with no extra cost."
   ),
   target: enforced(
-    "resolution/spell-targets.ts holds a spell to the number of targets it names (more with a higher slot), the creature type it affects, the ones the caster can see when dynamic vision is on, its range, and for creatures of the caster's choice in an area, to those inside it."
+    "resolution/spell-targets.ts holds a spell to the number of targets it names (more with a higher slot), the ones the caster can see (vision/rules.ts, with dynamic vision on or off), its range, and for creatures of the caster's choice in an area, to those inside it; resolution/validate.ts refuses one behind Total Cover. A target of a type the spell can't affect is unaffected and the slot is spent, and its player isn't told the type (resolution/type-gates.ts)."
   ),
   telepathy: reference("Telepathy is the table's to run."),
   teleportation: enforced(
@@ -2116,6 +2116,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   ),
   "item:bead-of-force": enforced(
     "Throwing a bead uses it up: each creature in the 10-foot-radius Sphere makes the DC 15 Dexterity save or takes 5d4 Force damage, and one that fails is shut in the sphere for a minute, which no attack or effect passes (enclosures.ts). Pushing out the creatures that saved, and rolling the sphere, are the GM's."
+  ),
+  "item:holy-water": enforced(
+    "Thrown in place of an attack at a creature the thrower sees within 20 feet: on a failed Dexterity save a Fiend or an Undead takes 2d8 Radiant damage, and any other creature nothing, though the flask is used (resolution/type-gates.ts)."
   ),
   "item:net": enforced(
     "Thrown in place of an attack at a Large or smaller creature the thrower sees within 15 feet, a failed Dexterity save leaves it Restrained, escaped with a DC 10 Strength (Athletics) check. The Net is an object with AC 10 and 5 Hit Points, immune to Bludgeoning damage, and an attack that breaks it frees the creature (objects.ts)."

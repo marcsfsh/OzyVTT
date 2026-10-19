@@ -533,8 +533,12 @@ the confirm checks and spends it with the hit (`resolution/hit-options.ts`); it 
 What a stat block's or a magic weapon's hit leaves by itself (`onHit`: conditions, tags and modifiers on
 one effect, a pull, a save at a printed DC, only on a rolled 20 or against some creature types) lands in
 `resolution/on-hit.ts`. Who an action that isn't a spell may target (`targets`: how many, how far,
-creature types, size, sight, grappled by its user, a condition, in its space, enemies or allies) is
-checked as a spell's targets are, in `resolution/action-targets.ts`.
+size, sight, grappled by its user, a condition, in its space, enemies or allies) is
+checked as a spell's targets are, in `resolution/action-targets.ts`. Sight there and in a spell's targets is
+`sightRules().canSee`, so a Blinded user or an Invisible target counts with dynamic vision off too. The creature types an
+action or spell affects follow the Spells chapter's invalid target (`resolution/type-gates.ts`): a creature of another
+type is still a target, the use or slot is spent, nothing happens to it, and its player is told only that (the GM's line
+names the type).
 
 A magic item's charges are an `actionUses` pool keyed by the carried row (`itemPool` in
 `item-actions.ts`), so two copies count separately and the count moves with the row when the GM hands
@@ -590,8 +594,7 @@ one with nothing to roll (Light) spends its casting time and slot, holds its Con
 told to the table as cast (`cast-narration.ts`). Before anything is spent the economy checks the cast's components
 (`resolution/components.ts`: speech outside Silence, a free hand, a pouch, a focus the class names or a priced
 material the content build lists on the spell) and its targets (`resolution/spell-targets.ts`: the count the spell
-names, its creature type, sight with dynamic vision on, range, and for creatures of the caster's choice in an area,
-the area). A cast with components waits while a creature that sees it may answer with Counterspell
+names, sight, range, and for creatures of the caster's choice in an area, the area). A cast with components waits while a creature that sees it may answer with Counterspell
 (`resolution/counter.ts`, `counter-answers.ts`), and a reaction spell's prompt lets its caster pick the slot. A Spell
 Scroll's cast is seen (a wand's needs no components and isn't), a spell readied with the Ready action is seen as it is
 cast and not when it is let go, and a long casting as it begins. A

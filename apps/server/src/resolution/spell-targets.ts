@@ -8,19 +8,12 @@ import { laterRowOf } from "../item-actions.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { potentRangeFeet } from "../class-features.js";
 import type { RuleId } from "../rules-families.js";
-import { creatureTypeOf } from "../statblock-facts.js";
-import { sceneSight } from "../vision/sight.js";
+import { sightRules } from "../vision/rules.js";
 import type { DefinitionAction, LiveActor } from "./context.js";
 
 type Violation = Readonly<{ rule: RuleId; message: string }>;
 
 const rounded = (feet: number) => Math.round(feet * 10) / 10;
-
-/** A creature type as the text names it ("Humanoid"), with its article. */
-const typeWords = (types: readonly string[]) =>
-  types
-    .map((type) => `${/^[aeiou]/.test(type) ? "an" : "a"} ${type.charAt(0).toUpperCase()}${type.slice(1)}`)
-    .join(" or ");
 
 /** A spell's range in feet as a cast measures it: Touch is 5 feet, and a cantrip's range that doubles with its tiers
  *  (Spare the Dying) is doubled at character levels 5, 11 and 17. Null for Self, Sight and the ranges a map can't
@@ -46,8 +39,8 @@ function areaSpan(area: NonNullable<SpellReference["area"]>): Readonly<{ across:
 
 /**
  * A spell's own targeting (SRD 5.2.1 Spells, "Range" and "Targets"), for the creatures the caster picks: no more of
- * them than it targets at this slot; each of a type it can target and, where the text says "that you can see", one
- * the caster sees (when the map's vision is on); each within its range (Touch is 5 feet). A spell whose targets are
+ * them than it targets at this slot; where the text says "that you can see", one the caster sees (`sightRules`); each
+ * within its range (Touch is 5 feet). A spell whose targets are
  * picked among the creatures in its area ("up to six creatures of your choice in a 40-foot Cube", Mass Cure Wounds'
  * Sphere) takes them within its range plus the area's reach, and no two farther apart than one area can hold. A
  * template's catch is whoever it covers, and only its count is checked; an attack's range is the attack's; a later
@@ -90,34 +83,24 @@ export function spellTargetViolations(
   }
   if (!picked) return violations;
 
-  // "Choose a Humanoid": a creature of another type is no target for it. A type the stat block doesn't print is the GM's.
-  const types = effect?.targetTypes;
-  if (types && input.resolveDefinition)
-    for (const targetId of unique) {
-      const target = state.actors.find((candidate) => candidate.id === targetId);
-      if (!target) continue;
-      const definition = target.definitionId ? input.resolveDefinition(target.definitionId) : undefined;
-      const type = creatureTypeOf(target, definition);
-      if (type !== null && !types.includes(type))
-        violations.push({
-          rule: "target.wrong-type",
-          message: `${spell.name} targets ${typeWords(types)}, and ${target.name} isn't one.`
-        });
-    }
-
-  // "A creature that you can see": with the map's vision on, the caster must see it.
+  // "Choose a Humanoid": a creature of another type is still a target, which the spell doesn't affect (`type-gates.ts`).
+  // "A creature that you can see": the map answers with its vision on, and the conditions and the senses by distance
+  // with it off (a Blinded caster, an Invisible target).
   if (effect?.seenTargets) {
-    const sight = sceneSight(state, {
-      ...(input.resolveDefinition ? { definition: input.resolveDefinition } : {}),
-      ...(input.catalog ? { catalog: input.catalog } : {})
-    });
-    if (sight.enabled)
-      for (const targetId of unique)
-        if (targetId !== attacker.id && !sight.sees(attacker.id, targetId))
-          violations.push({
-            rule: "target.unseen",
-            message: `${attacker.name} can't see ${nameOf(targetId)}, and ${spell.name} needs a target ${attacker.name} can see.`
-          });
+    const sight = sightRules(
+      state,
+      {
+        ...(input.resolveDefinition ? { definition: input.resolveDefinition } : {}),
+        ...(input.catalog ? { catalog: input.catalog } : {})
+      },
+      distanceFeet
+    );
+    for (const targetId of unique)
+      if (targetId !== attacker.id && !sight.canSee(attacker.id, targetId))
+        violations.push({
+          rule: "target.unseen",
+          message: `${attacker.name} can't see ${nameOf(targetId)}, and ${spell.name} needs a target ${attacker.name} can see.`
+        });
   }
 
   if (action.attack !== undefined || !distanceFeet) return violations;

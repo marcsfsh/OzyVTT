@@ -31,7 +31,6 @@ import { areEnemies } from "../creature-sides.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { sceneSight } from "../vision/sight.js";
 import { hidingPlace, inDimLightOrDarkness } from "../vision/rules.js";
-import { creatureTypeOf } from "../statblock-facts.js";
 import { reachBarredBy } from "../zone-barriers.js";
 import { swallowCover } from "../swallow.js";
 import { enclosureBlocks } from "../enclosures.js";
@@ -46,6 +45,7 @@ import {
 } from "./context.js";
 import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
 import { actionTargetViolations } from "./action-targets.js";
+import { typeGated } from "./type-gates.js";
 
 /** The attacker and targets, refused unless the action has something structured to resolve against them. */
 function combatantsOf(
@@ -229,7 +229,16 @@ export function openResolve(
   const combatants = combatantsOf(state, reaching, input, deps.catalog, spell, hiddenFromInitiator);
   const { attacker } = combatants;
   const warnings: string[] = [];
-  const caught = input.areaPlaced ? onlyTargetTypes(combatants.targets, spell, deps, warnings) : combatants.targets;
+  // A creature of a type the action can't affect is a target that nothing happens to, picked or caught in an area.
+  const gated = typeGated({
+    action: reaching,
+    spell,
+    targets: combatants.targets,
+    resolveDefinition: deps.resolveDefinition,
+    hidden: hiddenFromInitiator
+  });
+  warnings.push(...gated.warnings);
+  const caught = gated.affected;
   // A swallowed creature has Total Cover from an area outside its swallower, and is left out of it.
   const targets =
     caught.length > 1
@@ -337,7 +346,8 @@ export function openResolve(
       targetIds: input.targetIds,
       definition: deps.definition,
       resolveDefinition: deps.resolveDefinition,
-      distanceFeet: deps.distanceFeet
+      distanceFeet: deps.distanceFeet,
+      catalog: deps.catalog
     }))
       sightBlocks.push([violation.rule, violation.message]);
   // SRD Hide: "you must be out of any enemy's line of sight". With dynamic vision on the engine knows who sees whom;
@@ -421,7 +431,7 @@ export function openResolve(
       createdAt: deps.now()
     },
     warnings,
-    tableNarration: [],
+    tableNarration: [...gated.gmLines],
     healing: null,
     rollMode: undefined,
     check: null,
@@ -447,27 +457,6 @@ export function openResolve(
   if (builtin?.prepare) ctx.action = builtin.prepare(ctx);
   if (!input.economyPaid) warnings.push(...laterActionReminders(spell, action));
   return ctx;
-}
-
-/** An area's catch, less the creatures of a type the spell doesn't affect ("Each Humanoid in a 20-foot-radius
- *  Sphere"), each named to the GM. A type the stat block doesn't print stays in. */
-function onlyTargetTypes(
-  targets: LiveActor[],
-  spell: SpellReference | undefined,
-  deps: ResolveDependencies,
-  warnings: string[]
-): LiveActor[] {
-  const types = spell?.effect?.targetTypes;
-  if (!types || !deps.resolveDefinition) return targets;
-  return targets.filter((target) => {
-    const definition = target.definitionId ? deps.resolveDefinition!(target.definitionId) : undefined;
-    const type = creatureTypeOf(target, definition);
-    if (type === null || types.includes(type)) return true;
-    warnings.push(
-      `${target.name} isn't affected by ${spell!.name}, which affects only ${types.join(" or ")} creatures.`
-    );
-    return false;
-  });
 }
 
 /** An action whose caster picks the damage type (Chromatic Orb) deals the one picked, every part of it. */
