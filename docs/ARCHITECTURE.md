@@ -326,6 +326,9 @@ new shape is drawn (`zone-moves.ts`). A cloud that drifts (Cloudkill) moves stra
 the caster's turn starts. A cast's template grows with its slot where the spell says so (Fog Cloud), an
 item's cast may place its own area (Cloak of Arachnida's doubled Web), and an Emanation that stays where
 its caster stood (Globe of Invulnerability) keeps lower spells cast from outside off the creatures in it.
+An item's action with a `zone` (spread Caltrops, a set Hunting Trap) rolls nothing as it is used: it opens
+a zone that carries the action's own save and damage (`SpellZone.rule`), which stays until the GM ends it
+or it goes off once.
 
 Durations run on two clocks. In a fight they count rounds. Outside one, the game clock
 (`rest.clockHours` and `rest.clockMinutes`) is the time: the GM passes time (`time.pass`), the party's Long
