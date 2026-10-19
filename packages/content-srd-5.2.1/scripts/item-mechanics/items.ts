@@ -186,9 +186,33 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // "Until the next dawn" is a Long Rest.
+  // "Gain the effect of the Etherealness spell. The spell ends immediately if you remove the armor or take a Magic
+  // action to repeat the command word." The Border Ethereal for up to 8 hours (`ethereal.ts`), ended by taking the
+  // armor off (a worn item's own grant) or by the action again, which spends no new use. "Until the next dawn" is a
+  // Long Rest.
   "plate-armor-of-etherealness": {
-    casts: [{ spellId: "etherealness", uses: { limit: 1, per: "long-rest" } }]
+    actions: [
+      {
+        id: "etherealness",
+        name: "Etherealness",
+        activation: "action",
+        description:
+          "Speak the command word to gain the effect of the Etherealness spell: you step into the Border Ethereal for up to 8 hours. Repeat the command word, or take the armor off, to end it.",
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        grants: {
+          name: "Etherealness",
+          tags: ["ethereal", "ethereal-shunt"],
+          target: "self",
+          toggles: true,
+          duration: { type: "minutes", minutes: 480 },
+          modifiers: [],
+          onEnd: [],
+          voidWhileIncapacitated: false,
+          concentration: false
+        }
+      }
+    ]
   },
 
   // ---- Ammunition ------------------------------------------------------------------------------
@@ -2605,13 +2629,36 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The level-5 Magic Missile stars and Astral travel are not expressible.
   // The +1 to saves, and the six stars, each a level 5 Magic Missile; 1d6 come back at dusk, which is the Long Rest
-  // here. The trip to the Astral Plane is the GM's.
+  // here. "A Magic action to enter the Astral Plane ... until you take a Magic action to return ... in the last space
+  // you occupied or, if that space is occupied, the nearest unoccupied space": off the map and back (`off-plane.ts`).
   "robe-of-stars": {
     modifiers: [{ type: "save-bonus", amount: 1 }],
     charges: { regain: "1d6" },
-    casts: [{ spellId: "magic-missile", atLevel: 5, uses: { limit: 6, per: "long-rest", pool: "robe-of-stars-stars" } }]
+    casts: [
+      { spellId: "magic-missile", atLevel: 5, uses: { limit: 6, per: "long-rest", pool: "robe-of-stars-stars" } }
+    ],
+    actions: [
+      {
+        id: "astral-plane",
+        name: "Enter the Astral Plane",
+        activation: "action",
+        description:
+          "Enter the Astral Plane with everything you wear and carry. Take this action again to return to the space you left, or the nearest unoccupied one.",
+        damage: [],
+        grants: {
+          name: "On the Astral Plane",
+          tags: ["off-plane"],
+          target: "self",
+          toggles: true,
+          duration: { type: "manual" },
+          modifiers: [],
+          onEnd: [],
+          voidWhileIncapacitated: false,
+          concentration: false
+        }
+      }
+    ]
   },
 
   // Without armor its base AC is 15 plus Dexterity, chosen like Unarmored Defense; Advantage on saves against spells and
@@ -4011,6 +4058,34 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           }
         ),
         healing: { formula: "10", temporary: true, self: true }
+      }
+    ]
+  },
+
+  // "One vial ... can cover one Medium or smaller creature ... Applying the oil takes 10 minutes. The affected creature
+  // then gains the effect of the Etherealness spell for 1 hour": the Border Ethereal (`ethereal.ts`) for the one it is
+  // applied to. The 10 minutes it takes are the GM's to pass.
+  "oil-of-etherealness": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "apply",
+        name: "Apply Oil of Etherealness",
+        activation: "action",
+        description:
+          "Spend 10 minutes covering a Medium or smaller creature within reach: it gains the effect of the Etherealness spell for 1 hour.",
+        damage: [],
+        targets: { count: 1, rangeFeet: 5, maxSize: "medium" },
+        grants: {
+          name: "Oil of Etherealness",
+          tags: ["ethereal", "ethereal-shunt"],
+          target: "target",
+          duration: { type: "minutes", minutes: 60 },
+          modifiers: [],
+          onEnd: [],
+          voidWhileIncapacitated: false,
+          concentration: false
+        }
       }
     ]
   },

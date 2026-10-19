@@ -7649,9 +7649,39 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "apply",
+    "name": "Apply Oil of Etherealness",
+    "activation": "action",
+    "description": "Spend 10 minutes covering a Medium or smaller creature within reach: it gains the effect of the Etherealness spell for 1 hour.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "rangeFeet": 5,
+     "maxSize": "medium"
+    },
+    "grants": {
+     "name": "Oil of Etherealness",
+     "tags": [
+      "ethereal",
+      "ethereal-shunt"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 60
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "target",
+     "voidWhileIncapacitated": false,
+     "concentration": false
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -8032,19 +8062,39 @@
    "restrictedTo": []
   },
   "cursed": false,
-  "casts": [
+  "casts": [],
+  "grantsFeatIds": [],
+  "tags": [],
+  "actions": [
    {
-    "spellId": "etherealness",
+    "id": "etherealness",
+    "name": "Etherealness",
+    "activation": "action",
+    "description": "Speak the command word to gain the effect of the Etherealness spell: you step into the Border Ethereal for up to 8 hours. Repeat the command word, or take the armor off, to end it.",
+    "damage": [],
+    "grants": {
+     "name": "Etherealness",
+     "tags": [
+      "ethereal",
+      "ethereal-shunt"
+     ],
+     "duration": {
+      "type": "minutes",
+      "minutes": 480
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "toggles": true
+    },
     "uses": {
      "limit": 1,
      "per": "long-rest"
-    },
-    "consumesSpellSlot": false
+    }
    }
   ],
-  "grantsFeatIds": [],
-  "tags": [],
-  "actions": [],
   "effects": [],
   "modifiers": []
  },
@@ -11308,7 +11358,30 @@
   },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "astral-plane",
+    "name": "Enter the Astral Plane",
+    "activation": "action",
+    "description": "Enter the Astral Plane with everything you wear and carry. Take this action again to return to the space you left, or the nearest unoccupied one.",
+    "damage": [],
+    "grants": {
+     "name": "On the Astral Plane",
+     "tags": [
+      "off-plane"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "self",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "toggles": true
+    }
+   }
+  ],
   "effects": [],
   "modifiers": [
    {

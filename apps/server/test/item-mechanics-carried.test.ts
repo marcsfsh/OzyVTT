@@ -732,6 +732,7 @@ describe("what no carried item can carry", () => {
     expect(consumables.length).toBeGreaterThan(0);
     expect(consumables.filter(carries).map((row) => row.id)).toEqual([
       "elixir-of-health",
+      "oil-of-etherealness",
       "potion-of-animal-friendship",
       "potion-of-climbing",
       "potion-of-diminution",
