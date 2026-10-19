@@ -16,13 +16,14 @@ import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { recordRoll, sizeAtMost, tableLineOf, type LiveActor, type ResolveContext } from "./context.js";
 import { optionFor, optionParts, withOptionName } from "./grant-extras.js";
 import { bestCover, coverBonusOf, coverFor, mapCover } from "../cover.js";
+import { areaOriginPoint } from "../area-targeting.js";
 import { smiteOfProtectionCover } from "../paladin-auras.js";
 import { damagePartsOf, potentCantrip } from "./damage.js";
 import { spellOf, spellSaveDuration } from "./concentration.js";
 import { endedByAt, repeatSaveOf } from "../save-stages.js";
 import { areEnemies } from "../creature-sides.js";
 import { AURA_IMMUNE_TAG, traitActionId } from "../statblock-traits.js";
-import { creatureTypeOf } from "../statblock-facts.js";
+import { creatureTypeOf, statblockFacts } from "../statblock-facts.js";
 import { openDamageWindow, type DamageWindowDeps } from "../damage-window.js";
 import { answerKeyOf, answersFromOthers, askAnswer } from "../roll-answers.js";
 import { heightenedTarget, shieldedFromSave } from "./metamagic.js";
@@ -684,14 +685,18 @@ export function parkActionSave(ctx: ResolveContext): void {
     );
   // Cover adds to Dexterity saving throws (SRD Cover), each target's own: the GM's choice for this resolve, else the
   // cover the GM marked it with, unless the save ignores it (Sacred Flame). Carried on the prompt.
-  // With dynamic vision on, the walls and creatures between the caster and a single target cover it too (`mapCover`).
+  // With dynamic vision on, the walls and creatures between the caster, or a placed area's point of origin, and each
+  // target cover it too (`mapCover`).
+  const origin = input.areaPlaced === true ? (input.areaOrigin ?? drawnAreaOrigin(state, input.commandId)) : null;
   const saveBonusOf = (target: (typeof targets)[number]) =>
     action.save!.ability === "dex" && !action.save!.ignoresCover
       ? coverBonusOf(
           input.cover ??
             bestCover(
               coverFor(null, target),
-              input.areaPlaced === true ? null : mapCover(state, attacker.id, target.id),
+              input.areaPlaced === true
+                ? origin && mapCover(state, attacker.id, target.id, origin)
+                : mapCover(state, attacker.id, target.id),
               input.areaPlaced === true ? null : deps.zoneCover?.(attacker.id, target.id),
               deps.resolveDefinition
                 ? smiteOfProtectionCover(state, target, {
@@ -788,6 +793,12 @@ export function parkActionSave(ctx: ResolveContext): void {
 
 /** Why a target succeeds on this save without rolling, or "" when it rolls: its creature type (Flesh to Stone's
  *  Constructs), or that it doesn't sleep (Sleep: an elf's Trance, an Immunity to Exhaustion). */
+/** The point of origin of the area a cast drew with this command's id (a cast finished after Counterspell), or null. */
+function drawnAreaOrigin(state: ResolveContext["state"], commandId: string): Readonly<{ x: number; y: number }> | null {
+  const drawn = state.combat.annotations.find((annotation) => annotation.id === commandId);
+  return drawn?.shape ? areaOriginPoint(drawn.geometry, drawn.shape) : null;
+}
+
 function autoSuccessOf(ctx: ResolveContext, target: ResolveContext["targets"][number]): string {
   const rule = ctx.action.save?.autoSuccess;
   if (!rule) return "";
@@ -802,6 +813,20 @@ function autoSuccessOf(ctx: ResolveContext, target: ResolveContext["targets"][nu
       target.conditionImmunities.includes("exhaustion"))
   )
     return "doesn't sleep";
+  // SRD Truesight: "Visual illusions appear transparent to you, and you automatically succeed on saving throws against
+  // them." The illusion is where the creature is (a pattern around it, a phantasm in its mind), so any range reaches.
+  if (rule.truesight) {
+    const content = {
+      ...(ctx.deps.resolveDefinition ? { definition: ctx.deps.resolveDefinition } : {}),
+      ...(ctx.deps.catalog ? { catalog: ctx.deps.catalog } : {})
+    };
+    if ((sightRules(ctx.state, content).sensesOf(target.id)?.truesight ?? 0) > 0) return "Truesight";
+  }
+  // "If the target's Challenge Rating isn't 0, it automatically succeeds" (Animal Messenger). The reason names no exact
+  // rating, which is the GM's.
+  const rating = definition ? statblockFacts(definition).challengeRating : null;
+  if (rule.challengeRatingAbove !== undefined && rating !== null && rating > rule.challengeRatingAbove)
+    return `Challenge Rating above ${rule.challengeRatingAbove}`;
   return "";
 }
 

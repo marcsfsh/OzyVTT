@@ -19,6 +19,7 @@ import { countZoneDamage, endZone, removeZone, zoneContentOf, type ZoneContent }
 import type { TokenMapGeometry } from "./token-placement.js";
 import { withArticle } from "@vtt/domain";
 import { altitudeOf, heightSpan } from "./altitude.js";
+import { spellWardOf } from "./resolution/spell-wards.js";
 
 type Actor = GameState["actors"][number];
 type Point = Readonly<{ x: number; y: number }>;
@@ -231,6 +232,9 @@ export function exposed(
     // "Each creature on the ground in the area": one in the air above it is spared.
     if (trigger.grounded && altitudeOf(tokenOf(state, creature.id)) > 0) return [];
     if (trigger.types && !trigger.types.includes(typeOf(creature, deps) ?? "")) return [];
+    // A spell that can't reach the creature leaves it out (a Ring of Mind Shielding in Zone of Truth).
+    const spell = zone.rule === undefined ? deps.catalog?.spellRecord?.(zone.spellId) : undefined;
+    if (spell && spellWardOf(state, creature, spell, zone.casterId, deps) !== null) return [];
     // A defeated creature takes no more; a dying character does (damage at 0 HP is a failed death save).
     if (creature.hp.current <= 0 && (creature.kind !== "player-character" || (creature.deathSaves?.failures ?? 0) >= 3))
       return [];

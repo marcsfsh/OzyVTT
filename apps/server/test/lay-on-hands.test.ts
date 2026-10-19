@@ -82,7 +82,7 @@ describe("Lay on Hands", () => {
   // SRD Restoring Touch (Paladin 14): "When you use Lay On Hands on a creature, you can also remove one or more of the
   // following conditions from the creature: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. You must
   // expend 5 Hit Points from the healing pool of Lay On Hands for each of these conditions you remove".
-  it("ends one of six more conditions for 5 points from Paladin 14, and not before", () => {
+  it("ends any of six more conditions for 5 points each, beside the healing, from Paladin 14 and not before", () => {
     const at = (level: number) =>
       buildCharacterDefinition(
         generateCharacterRequest({ classId: "paladin", level }, library, policy, seeded(5)).request,
@@ -90,9 +90,13 @@ describe("Lay on Hands", () => {
         policy
       ).actions.find((action) => action.id === "lay-on-hands-restoring-touch");
     expect(at(14)).toMatchObject({
-      useCost: 5,
-      endsOneCondition: true,
-      endsConditions: ["blinded", "charmed", "deafened", "frightened", "paralyzed", "stunned"],
+      useCost: "chosen",
+      healing: { formula: "1", perUse: true },
+      conditionPicks: {
+        conditions: ["blinded", "charmed", "deafened", "frightened", "paralyzed", "stunned"],
+        pointsEach: 5
+      },
+      targets: { count: 1, rangeFeet: 5 },
       uses: { pool: "lay-on-hands", limit: 70 }
     });
     expect(at(13)).toBeUndefined();

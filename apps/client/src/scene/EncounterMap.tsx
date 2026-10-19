@@ -562,6 +562,7 @@ export function EncounterMap({
           ignoresDifficult: draggedBudget?.ignoresDifficultTerrain === true,
           walls: moveWalls,
           ...(draggedBudget?.passesCreatures ? { passesCreatures: true } : {}),
+          ...(draggedBudget?.nimble ? { nimble: true } : {}),
           ...(draggedBudget?.swarmIds ? { swarmIds: draggedBudget.swarmIds } : {}),
           ...(draggedBudget?.areaGround ? { areaGround: draggedBudget.areaGround } : {}),
           // A drag keeps the creature at its height; the token menu changes it.

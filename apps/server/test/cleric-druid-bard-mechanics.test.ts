@@ -613,6 +613,25 @@ describe("Bardic Inspiration: the counter the class is built around", () => {
     expect(state.actors[1].effects[0]?.duration).toEqual({ type: "minutes", remaining: 60 });
   });
 
+  // "Another creature within 60 feet of yourself who can see or hear you."
+  it("refuses a creature that can neither see nor hear the Bard, and takes one that only hears", () => {
+    const definition = build(bard(1, 15));
+    const state = encounterWith(definition);
+    const inspire = actionOf(definition, "bardic-inspiration")!;
+    const give = () =>
+      resolveDefinitionAction(
+        state,
+        inspire,
+        { actorId: HERO, targetIds: [FOE], commandId: command() },
+        deps(definition)
+      );
+    state.actors[1].conditions = [{ id: "blinded" }, { id: "deafened" }] as (typeof state.actors)[1]["conditions"];
+    expect(give).toThrowError(/needs a creature that can see or hear Ysolde, and .* can do neither/);
+    state.actors[1].conditions = [{ id: "blinded" }] as (typeof state.actors)[1]["conditions"];
+    give();
+    expect(state.actors[1].effects[0]?.name).toBe("Bardic Inspiration");
+  });
+
   it("gives a d8 from level 5, and a d12 from level 15", () => {
     const dieAt = (level: number) =>
       actionOf(

@@ -63,7 +63,7 @@ describe("Treant: Animate Trees", () => {
 });
 
 describe("Planar Binding", () => {
-  it("binds a Fiend that fails its Charisma save to serve its caster, and refuses a Humanoid", async () => {
+  it("binds a Fiend that fails its Charisma save to serve its caster, and does nothing to a Humanoid", async () => {
     const IMP = "70000000-0000-4000-8000-0000000000d3";
     const state = summonTable();
     addActorFromDefinition(state, view.monster("imp")!, IMP, "public", catalog);
@@ -72,7 +72,8 @@ describe("Planar Binding", () => {
     await table.move(BANDIT, table.gmToken, { position: cell(4, 2) });
     expect((await table.post(GAME_PATHS.encounterEnd, table.gmToken)).status).toBe(200);
     const humanoid = await table.resolve({ actionId: "spell-planar-binding", targetIds: [BANDIT] });
-    expect(humanoid.status).toBe(409);
+    expect(humanoid.status, await humanoid.clone().text()).toBe(200);
+    expect(table.snapshot().combat.pendingSaves.some((pending) => pending.targetActorId === BANDIT)).toBe(false);
     const cast = await table.resolve({ actionId: "spell-planar-binding", targetIds: [IMP] });
     expect(cast.status, await cast.clone().text()).toBe(200);
     const save = table.snapshot().combat.pendingSaves.find((pending) => pending.targetActorId === IMP)!;

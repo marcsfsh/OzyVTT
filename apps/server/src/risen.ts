@@ -28,7 +28,7 @@ export function markRising(
 ): EffectNarration[] {
   const killer = killerId ? state.actors.find((candidate) => candidate.id === killerId) : undefined;
   if (!killer || !state.combat.active) return [];
-  const type = creatureTypeOf(corpse, definition);
+  const type = creatureTypeOf(corpse, definition, "true");
   if (rise.creatureTypes && (type === null || !rise.creatureTypes.includes(type))) return [];
   const monster = rise.monsterId.replace(/-/g, " ");
   addEffect(

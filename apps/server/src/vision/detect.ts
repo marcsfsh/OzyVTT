@@ -1,5 +1,6 @@
 import type { GameState, PlayerSensedCreature } from "@vtt/domain";
 import { isIncapacitated } from "../condition-rules.js";
+import { spellWardOf, typeSenseWardOf } from "../resolution/spell-wards.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { clearLine, distance } from "./geometry.js";
 import { definitionOf, type SightContent } from "./senses.js";
@@ -37,7 +38,12 @@ export function sensedBy(
     const token = tokens.get(viewerId);
     // "For the next 10 minutes or until you have the Incapacitated condition."
     if (!viewer || !token || isIncapacitated(viewer)) return [];
-    return viewer.effects.flatMap((effect) => (effect.detects ? [{ token, detects: effect.detects }] : []));
+    return viewer.effects.flatMap((effect) => {
+      if (!effect.detects) return [];
+      // A spell's detection (Detect Evil and Good) passes over a creature warded against it (Nondetection).
+      const spell = effect.spell ? content.catalog?.spellRecord?.(effect.spell.id) : undefined;
+      return [{ token, detects: effect.detects, spell, viewerId }];
+    });
   });
   if (senses.length === 0) return [];
   const walls = vision.walls.filter((wall) => wall.kind === "wall" || (wall.kind === "door" && wall.open !== true));
@@ -49,8 +55,14 @@ export function sensedBy(
     if (!token?.position) continue;
     const type = creatureTypeOf(actor, definitionOf(state, actor, content));
     if (type === null) continue;
-    const reached = senses.some(({ token: from, detects }) => {
+    const reached = senses.some(({ token: from, detects, spell, viewerId }) => {
       if (!detects.creatureTypes.includes(type)) return false;
+      const wardContent = { resolveDefinition: content.definition, catalog: content.catalog };
+      // Every such sense tells the creature's type, which a Ring of Mind Shielding keeps from any magic.
+      const warded =
+        (spell !== undefined && spellWardOf(state, actor, spell, viewerId, wardContent)) ||
+        typeSenseWardOf(actor, wardContent);
+      if (warded) return false;
       const feet = (distance(from.position!, token.position!) - reachOf(from) - reachOf(token)) / pixelsPerFoot;
       if (feet > detects.feet + 0.5) return false;
       return detects.blockedByWalls !== true || clearLine(from.position!, token.position!, segments);

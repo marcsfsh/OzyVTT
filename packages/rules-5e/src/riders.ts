@@ -183,6 +183,12 @@ export type RiderModifier = Readonly<{
   perSlotLevel?: boolean;
   /** `healing-bonus`: the bearer regains it, once its healing reaches another creature (Blessed Healer). */
   self?: boolean;
+  /** `spell-ward`: the schools and spells that can't reach the bearer, whether its own side's spells still do, and
+   *  whether magical senses that tell a creature's type miss it too. */
+  schools?: readonly string[];
+  spellIds?: readonly string[];
+  alliesAllowed?: boolean;
+  typeSenses?: boolean;
   when?: readonly RiderTrigger[];
   scope?: "bearer" | "this-item";
 }>;

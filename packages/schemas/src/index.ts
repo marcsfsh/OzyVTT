@@ -13,6 +13,9 @@ const EffectTagSchema = z
   .string()
   .regex(/^[a-z0-9-]+$/)
   .max(40);
+/** An effect tag that gives its bearer another creature type for spells and magic (Arcanist's Magic Aura's Mask):
+ *  `masked-as-undead`. */
+export const MASKED_TYPE_TAG = "masked-as-";
 /** Open identity slug, the same as the content catalog's `ContentIdSchema`. */
 const RiderSlugSchema = z
   .string()
@@ -1123,6 +1126,21 @@ export const ModifierSchema = z
       .strict()
       .describe(
         "Any Critical Hit against the bearer becomes a normal hit while it holds (Adamantine Armor), so the hit's damage dice are rolled once. Read on the target as the attack lands."
+      ),
+    /** Spells of these schools or ids can't reach the bearer (Nondetection, an Amulet of Proof against Detection and
+     *  Location, a Ring of Mind Shielding). */
+    z
+      .object({
+        type: z.literal("spell-ward"),
+        schools: z.array(RiderSlugSchema).min(1).max(8).optional(),
+        spellIds: z.array(RiderSlugSchema).min(1).max(12).optional(),
+        alliesAllowed: z.literal(true).optional(),
+        typeSenses: z.literal(true).optional(),
+        ...riderGate
+      })
+      .strict()
+      .describe(
+        "A spell of these schools (`divination`) or ids can't reach the bearer while it holds: it can't pick the bearer as a target (\"can't be targeted by any Divination spell\", Nondetection), its area and its lasting area leave the bearer out, and its detection doesn't sense it (a Ring of Mind Shielding against Zone of Truth and Detect Evil and Good). `alliesAllowed`: a spell from the bearer's own side reaches it (\"unless the wearer allows it\"). `typeSenses`: no magical sense that tells a creature's type finds the bearer, a feature's included (Divine Sense against a Ring of Mind Shielding's \"know your creature type\"). Read on the bearer as a spell is aimed or a sense reaches out."
       ),
     /** No attack roll against the bearer has Advantage (Elusive), while its gates hold. */
     z
@@ -3074,16 +3092,22 @@ export const SaveOutcomeFields = {
     .literal(true)
     .optional()
     .describe("The failure ends when the target ends its turn where it can't see the source"),
-  /** Creatures that succeed without rolling: of these types (Flesh to Stone's Constructs), or that don't sleep (Sleep:
-   *  "Creatures that don't sleep, such as elves, or that have Immunity to the Exhaustion condition"). */
+  /** Creatures that succeed without rolling: of these types (Flesh to Stone's Constructs), that don't sleep (Sleep:
+   *  "Creatures that don't sleep, such as elves, or that have Immunity to the Exhaustion condition"), that have
+   *  Truesight against a visual illusion (Hypnotic Pattern), or whose Challenge Rating is above a number (Animal
+   *  Messenger: "if the target's Challenge Rating isn't 0, it automatically succeeds"). */
   autoSuccess: z
     .object({
       creatureTypes: z.array(RiderSlugSchema).min(1).max(6).optional(),
-      sleepless: z.literal(true).optional()
+      sleepless: z.literal(true).optional(),
+      truesight: z.literal(true).optional(),
+      challengeRatingAbove: z.number().min(0).max(30).optional()
     })
     .strict()
     .optional()
-    .describe("Creatures that succeed without rolling: of these creature types, or that don't sleep"),
+    .describe(
+      "Creatures that succeed without rolling: of these creature types, that don't sleep, that have Truesight (a visual illusion), or whose Challenge Rating is above a number"
+    ),
   /** Exhaustion levels a failure adds (Weight of Years: "The target gains 1 Exhaustion level"). */
   failureExhaustion: z.number().int().min(1).max(6).optional().describe("Exhaustion levels a failed save adds"),
   /** In a fight, the target has Advantage when the source or its allies are fighting it (Charm Person). */
@@ -3246,7 +3270,7 @@ const ReactionAttackKindSchema = z.enum(["melee", "ranged", "melee-weapon", "ran
 /**
  * A reaction the engine offers as a prompt when its trigger happens (ADR-0020); only meaningful on activation
  * "reaction". The response is what answering "use" does:
- * - half-damage (Uncanny Dodge): halve the hit's damage.
+ * - half-damage (Uncanny Dodge): halve the hit's damage; `seenAttacker`, only when the reactor can see the attacker.
  * - reduce-damage (Deflect Attacks, Stone's Endurance): roll `formula` and take it off the damage, on a hit
  *   (`hit-by-attack`, limited to `damageTypes` it includes and `attackKinds` it was made as) or on any damage the
  *   reactor is about to take (`takes-damage`, from a hit or a failed save).
@@ -3262,7 +3286,13 @@ const ReactionAttackKindSchema = z.enum(["melee", "ranged", "melee-weapon", "ran
  * `rangeFeet` skips the prompt when the map shows the damaging or casting creature farther away.
  */
 export const ActionReactionSchema = z.discriminatedUnion("response", [
-  z.object({ trigger: z.literal("hit-by-attack"), response: z.literal("half-damage") }).strict(),
+  z
+    .object({
+      trigger: z.literal("hit-by-attack"),
+      response: z.literal("half-damage"),
+      seenAttacker: z.literal(true).optional()
+    })
+    .strict(),
   z
     .object({
       trigger: z.enum(["hit-by-attack", "takes-damage"]),
@@ -3738,6 +3768,17 @@ export const ActionTargetsSchema = z
     entered: z.literal(true).optional(),
     /** Only a creature whose stat block prints this type tag ("a willing demon": a Fiend (Demon)). */
     typeTag: z.string().min(1).max(40).optional(),
+    /** Only a creature with one of these special speeds (a Trident of Fish Command: "a Beast that has a Swim Speed"). */
+    speeds: z
+      .array(z.enum(["fly", "swim", "climb", "burrow"]))
+      .min(1)
+      .max(4)
+      .optional(),
+    /** Only a creature that can see or hear the user (Bardic Inspiration: "another creature ... who can see or hear
+     *  you"). */
+    perceivesUser: z.literal(true).optional(),
+    /** Only a Bloodied creature, at half its Hit Points or fewer (Preserve Life). */
+    bloodied: z.literal(true).optional(),
     /** Only a creature under this creature's effect from that action (one Restrained by an ettercap's Web Strand). */
     heldByAction: z
       .string()
@@ -3747,7 +3788,7 @@ export const ActionTargetsSchema = z
   })
   .strict()
   .describe(
-    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions, in the user's space, enemies, allies, others or only the user itself, a creature the user marked, or one at 0 Hit Points."
+    "Who an action may target, checked on the server: how many (`count`, or `countAbility`'s modifier, minimum 1), how far (`rangeFeet`, 5 for touch), creature types, size, sight, grappled by the user, conditions, in the user's space, enemies, allies, others or only the user itself, a creature the user marked, one at 0 Hit Points, a Bloodied one, one with a special speed, or one that can see or hear the user."
   );
 export type ActionTargets = z.infer<typeof ActionTargetsSchema>;
 
@@ -4362,6 +4403,16 @@ export const ActionSchema = z
     endsConditions: z.array(ConditionIdSchema).min(1).max(6).optional(),
     /** It ends one of `endsConditions`, the one its user picks (Lesser Restoration); absent, it ends each one present. */
     endsOneCondition: z.literal(true).optional(),
+    /** Conditions its user may also end on the target, any of them, each for `pointsEach` of the action's chosen pool
+     *  (Restoring Touch: "remove one or more of the following conditions ... For each condition, you must expend 5
+     *  Hit Points from the healing pool"); those points restore no Hit Points. Picked on the resolve as `conditionIds`. */
+    conditionPicks: z
+      .object({
+        conditions: z.array(ConditionIdSchema).min(1).max(8),
+        pointsEach: z.number().int().min(1).max(20)
+      })
+      .strict()
+      .optional(),
     /** It ends spells on its target (Dispel Magic): each of `automaticLevel` or lower ends, the slot it was cast with
      *  raising that level, and each higher one takes its user's spellcasting ability check against DC 10 plus the
      *  spell's level. */
@@ -4560,6 +4611,9 @@ export const ActionSchema = z
         conditions: z.array(ConditionIdSchema).min(1).max(3).optional(),
         maxTargetSize: SizeSchema.optional(),
         duration: SaveFailureDurationSchema.optional(),
+        /** The conditions end early when the user or its allies damage the creature (Awaken: "for 30 days or until you
+         *  or your allies deal damage to it"); needs a `duration`. */
+        endsOnSourceSideDamage: z.literal(true).optional(),
         breaksConcentration: z.literal(true).optional()
       })
       .strict()
