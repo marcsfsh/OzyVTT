@@ -212,7 +212,12 @@ describe("what one cast of an SRD spell does", () => {
       creatureTypes: ["fiend", "undead"],
       save: { ability: "con", conditions: ["blinded"] }
     });
-    expect(zoneOf("aura-of-life")).toMatchObject({ on: ["start-turn"], affects: "allies", revives: 1 });
+    expect(zoneOf("aura-of-life")).toMatchObject({
+      on: ["start-turn"],
+      affects: "allies",
+      revives: 1,
+      holds: { keepsMaximum: true }
+    });
     expect(zoneOf("pass-without-trace")?.holds?.modifiers).toEqual([
       {
         type: "check-bonus",
@@ -220,7 +225,10 @@ describe("what one cast of an SRD spell does", () => {
         when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["stealth"] }]
       }
     ]);
-    expect(zoneOf("silence")).toEqual({ on: [], holds: { conditions: ["deafened"] } });
+    expect(zoneOf("silence")).toEqual({
+      on: [],
+      holds: { modifiers: [{ type: "damage-immunity", damageTypes: ["thunder"] }], conditions: ["deafened"] }
+    });
   });
 
   it("marks the ground an area makes difficult, and how long the ground stays", () => {

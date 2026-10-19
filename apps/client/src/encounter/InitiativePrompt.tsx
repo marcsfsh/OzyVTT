@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Input } from "@vtt/ui";
+import { Button, Input, useToast } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useRollPreference } from "../dice/roll-preference";
 import "./prompts.css";
@@ -9,8 +9,8 @@ import "./prompts.css";
  * it"): the server throws one die again and the new score sets the order, or Keep leaves it.
  */
 export function InitiativeReroll({ actorId, onDone }: Readonly<{ actorId: string; onDone: () => void }>) {
+  const { toast } = useToast();
   const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState("");
   return (
     <div className="save-prompt initiative-prompt" role="group" aria-label="Reroll your initiative">
       <span className="save-prompt-confirm">
@@ -26,18 +26,13 @@ export function InitiativeReroll({ actorId, onDone }: Readonly<{ actorId: string
             void command("initiative:roll-self", { actorId, reroll: true }).then((result) => {
               setBusy(false);
               if (result.ok) onDone();
-              else setFeedback(result.message ?? "Initiative could not be rerolled.");
+              else toast(result.message ?? "Initiative could not be rerolled.", { tone: "error" });
             });
           }}
         >
           Reroll with Heroic Inspiration
         </button>
       </span>
-      {feedback && (
-        <p className="save-prompt-outcome" role="status">
-          {feedback}
-        </p>
-      )}
     </div>
   );
 }
