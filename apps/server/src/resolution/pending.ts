@@ -611,7 +611,7 @@ export function parkActionSave(ctx: ResolveContext): void {
   const parts = rider ? [] : damagePartsOf(ctx);
   const heightened = heightenedTarget(ctx);
   const onSuccessEffect = successEffectFor(ctx, cast);
-  // A spell's save whose outcome the engine applies nothing of (Phantasmal Force, Polymorph): the card and the GM's
+  // A spell's save whose outcome the engine applies nothing of (Resilient Sphere, Telekinesis): the card and the GM's
   // result say the GM applies it, so it never reads as if the server had.
   const fatal = fatalFailureOf(action.save);
   const gmApplies =
