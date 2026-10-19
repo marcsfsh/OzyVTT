@@ -785,7 +785,7 @@ test("a player rolls a tool's Utilize use and starts crafting from the sheet, an
   await press(sheet.getByRole("tab", { name: "Gear" }));
   const crafting = sheet.getByRole("region", { name: "Crafting" });
   await press(crafting.getByRole("button", { name: "Start a project" }));
-  const dialog = player.getByRole("dialog", { name: `${hero} crafts` });
+  const dialog = player.getByRole("dialog", { name: "Start a project" });
   const what = dialog.getByRole("combobox", { name: "What to make" });
   await expect(what.locator("option", { hasText: /^Ink \(1-ounce bottle\)/ })).toHaveCount(1);
   await what.selectOption("tool:calligraphers-supplies:ink");

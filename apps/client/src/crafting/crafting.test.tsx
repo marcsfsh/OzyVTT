@@ -98,8 +98,8 @@ describe("the sheet's crafting", () => {
     render(<SheetCrafting actor={ARIA} state={viewOf([])} busy={false} edit={edit} />);
     expect(screen.getByText(/Aria makes nothing yet/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Start a project" }));
-    const dialog = await screen.findByRole("dialog", { name: "Aria crafts" });
-    expect(await within(dialog).findByText("The purse holds 20 GP.")).toBeTruthy();
+    const dialog = await screen.findByRole("dialog", { name: "Start a project" });
+    expect(await within(dialog).findByText("Aria's purse holds 20 GP.")).toBeTruthy();
     const what = within(dialog).getByRole("combobox", { name: "What to make" });
     await user.selectOptions(what, "tool:cobblers-tools:climbers-kit");
     expect(within(dialog).getByText(/Crafting needs Cobbler's Tools in the pack/)).toBeTruthy();

@@ -229,7 +229,7 @@ function StartProject({
     <Modal
       open
       onClose={onClose}
-      title={`${actor.name} crafts`}
+      title="Start a project"
       size="md"
       footer={
         <>
@@ -254,7 +254,9 @@ function StartProject({
           </p>
         ) : (
           <>
-            <p className="cs-sub">The purse holds {coinWords(offers.purseCp)}.</p>
+            <p className="cs-sub">
+              {actor.name}&apos;s purse holds {coinWords(offers.purseCp)}.
+            </p>
             <Field label="What to make" htmlFor="craft-start-item">
               <Select id="craft-start-item" value={picked} onChange={(event) => setPicked(event.target.value)}>
                 <option value="">Choose an item</option>
