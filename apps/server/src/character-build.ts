@@ -236,6 +236,7 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "ignores-cover": "at-its-moment", // resolution/attack.ts sets the target's cover aside on the attack roll
   "base-armor-class": "standing", // actor-roster.ts storedArmorClass offers it like Unarmored Defense
   "no-critical-hits": "at-its-moment", // resolution/attack.ts turns a Critical Hit on the bearer into a hit
+  "spell-ward": "standing", // resolution/spell-wards.ts, read on the bearer as a spell is aimed at it or reaches it
   sense: "vision" // vision/senses.ts reads it live for dynamic vision, from every carrier
 };
 

@@ -1979,7 +1979,7 @@
       "id": "preserve-life",
       "name": "Channel Divinity: Preserve Life",
       "activation": "action",
-      "description": "Expend a use of Channel Divinity to divide up to five times your Cleric level in Hit Points among Bloodied creatures within 30 feet (up to half each target's Hit Point maximum). The engine splits it evenly among the creatures you pick.",
+      "description": "Expend a use of Channel Divinity to divide up to five times your Cleric level in Hit Points among Bloodied creatures within 30 feet, which can include you, as you choose. None regains past half its Hit Point maximum.",
       "damage": [],
       "healing": {
        "formula": "0",
@@ -1990,7 +1990,8 @@
        "classLevel": 5
       },
       "targets": {
-       "rangeFeet": 30
+       "rangeFeet": 30,
+       "bloodied": true
       }
      }
     ],

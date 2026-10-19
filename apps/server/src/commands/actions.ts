@@ -2,7 +2,7 @@ import type { ActionResolution, AnnotationPoint, AnnotationShapeKind, GameState,
 import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry, templateOfArea } from "../annotations.js";
-import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
+import { areaOriginatesFromCaster, areaOriginPoint, tokensInTemplate } from "../area-targeting.js";
 import { areaOriginHeight, creatureAtPoint, withinAreaHeight } from "../altitude.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { requireStartOrdered } from "../simultaneous-effects.js";
@@ -153,7 +153,7 @@ export const actionCommands = [
         const listed = statBlockAction ?? builtinActionFor(definition, actionId, attacker);
         if (!listed) throw new CommandRejectedError("That action is not on the stat block.");
         // An action whose user picks its cost (Lay on Hands) resolves at the amount picked.
-        const action = withChosenCost(listed, request.spend);
+        const action = withChosenCost(listed, request.spend, request.conditionIds);
         // The GM may impose any condition; a player picks only among the ones the action lets its caster choose
         // (Blindness/Deafness), read from the spell too for a sheet built before the action carried them.
         const offered = conditionChoicesOf(
@@ -168,6 +168,8 @@ export const actionCommands = [
               : null;
         let resolvedTargetIds: readonly string[];
         let originAtCaster = false;
+        // The area's point of origin, for the cover its Dexterity saves read.
+        let areaOrigin: Readonly<{ x: number; y: number }> | undefined;
         let areaMove: AreaMove | null = null;
         // An item's action that leaves an area to act later (spread Caltrops) catches no one as it is used.
         const leavesArea = action.zone !== undefined && action.spellId === undefined;
@@ -222,6 +224,7 @@ export const actionCommands = [
           const spell = action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined;
           const casterOutside = areaOriginatesFromCaster(action.area?.shape ?? template.shape, spell?.range.text);
           originAtCaster = casterOutside;
+          areaOrigin = areaOriginPoint(snapped, placed.shape);
           resolvedTargetIds = tokensInTemplate(
             draft,
             calibration,
@@ -432,6 +435,8 @@ export const actionCommands = [
             ...(request.ability !== undefined ? { ability: request.ability } : {}),
             ...(request.optionId !== undefined ? { optionId: request.optionId } : {}),
             ...(request.targetOptions !== undefined ? { targetOptions: request.targetOptions } : {}),
+            ...(request.conditionIds !== undefined ? { conditionIds: request.conditionIds } : {}),
+            ...(request.healingShares !== undefined ? { healingShares: request.healingShares } : {}),
             ...(request.itemId !== undefined ? { itemId: request.itemId } : {}),
             ...(request.pushFeet !== undefined ? { pushFeet: request.pushFeet } : {}),
             ...(request.slotLevel !== undefined ? { slotLevel: request.slotLevel } : {}),
@@ -452,6 +457,7 @@ export const actionCommands = [
             ...(request.gear !== undefined ? { gear: request.gear } : {}),
             ...(request.option !== undefined ? { option: request.option } : {}),
             ...(template || templates ? { areaPlaced: true } : {}),
+            ...(areaOrigin ? { areaOrigin } : {}),
             // The template as the map draws it, for the walls a cast raises on it (Wall of Force).
             ...(placed && geometry?.calibration
               ? {

@@ -305,10 +305,13 @@ describe("Animate Dead's second casting", () => {
 
 describe("Dominate Person", () => {
   it("puts a Humanoid that fails its save under the caster's command while the spell lasts", async () => {
+    // "One Humanoid": a Beast picked takes the cast, and nothing happens to it.
+    const beast = await bootSummons(cleanups, summonTable());
+    const wolf = await beast.resolve({ actionId: "spell-dominate-person", targetIds: [WOLF] });
+    expect(wolf.status, await wolf.clone().text()).toBe(200);
+    expect(beast.snapshot().combat.pendingSaves.some((pending) => pending.targetActorId === WOLF)).toBe(false);
     const table = await bootSummons(cleanups, summonTable());
     await table.move(BANDIT, table.gmToken, { position: cell(4, 2) });
-    const wolf = await table.resolve({ actionId: "spell-dominate-person", targetIds: [WOLF] });
-    expect(wolf.status).toBe(409);
     const cast = await table.resolve({ actionId: "spell-dominate-person", targetIds: [BANDIT] });
     expect(cast.status, await cast.clone().text()).toBe(200);
     const save = table.snapshot().combat.pendingSaves.find((pending) => pending.targetActorId === BANDIT)!;

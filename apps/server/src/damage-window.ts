@@ -7,6 +7,7 @@ import { halvedDamageParts, previewDamage } from "./hit-points.js";
 import { offerableReaction } from "./reaction-offers.js";
 import type { LiveActor } from "./resolution/context.js";
 import { answerKeyOf, answersFromOthers, askAnswer, type AnswerDeps } from "./roll-answers.js";
+import { sightRules } from "./vision/rules.js";
 
 /**
  * Damage about to land, held while the creatures who may act on it answer, one prompt at a time: first another
@@ -82,13 +83,17 @@ function hitAs(kind: string, hitKinds: readonly string[], types: readonly string
  *  it was made; on any damage, one that answers taking damage. */
 function ownReactionFor(state: GameState, held: HeldDamage, deps: DamageWindowDeps) {
   const types = held.parts.filter((part) => part.amount > 0).map((part) => part.type);
+  const content = { definition: deps.resolveDefinition, ...(deps.catalog ? { catalog: deps.catalog } : {}) };
+  // Uncanny Dodge: "When an attacker that you can see hits you", with the map's vision on or off.
+  const seesAttacker = () =>
+    held.source !== null && sightRules(state, content, deps.distanceFeet).canSee(held.target.id, held.source.id);
   return offerableReaction(
     state,
     held.target,
     (reaction): reaction is ActionReaction => {
       if (reaction.trigger === "takes-damage") return true;
       if (reaction.trigger !== "hit-by-attack" || !held.hit) return false;
-      if (reaction.response === "half-damage") return true;
+      if (reaction.response === "half-damage") return reaction.seenAttacker !== true || seesAttacker();
       if (reaction.response !== "reduce-damage") return false;
       if (reaction.damageTypes && !reaction.damageTypes.some((type) => types.includes(type))) return false;
       return !reaction.attackKinds || reaction.attackKinds.some((kind) => hitAs(kind, held.hitKinds, types));

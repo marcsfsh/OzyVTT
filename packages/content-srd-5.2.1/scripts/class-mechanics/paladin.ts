@@ -75,8 +75,9 @@ export const paladin: ClassMechanicsModule = {
     },
 
     /**
-     * Restoring Touch (Paladin 14): 5 points of the Lay on Hands pool end one of six more conditions. Each use ends
-     * the one its user picks, so ending two takes two uses; the printed feature ends them all in one Lay on Hands.
+     * Restoring Touch (Paladin 14): "When you use Lay on Hands on a creature, you can also remove one or more of the
+     * following conditions ... For each condition, you must expend 5 Hit Points from the healing pool." One Bonus Action
+     * that touches a creature, restores the Hit Points picked and ends each condition picked for 5 points apiece.
      */
     "restoring-touch": {
       uses: {
@@ -93,11 +94,15 @@ export const paladin: ClassMechanicsModule = {
           name: "Lay on Hands: Restoring Touch",
           activation: "bonus-action",
           description:
-            "As a Bonus Action, touch a creature and expend 5 Hit Points from the pool of healing to remove one of these conditions from it: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. Those points don't also restore Hit Points to the creature.",
+            "As a Bonus Action, touch a creature and draw on the pool of healing: restore the Hit Points you choose, and remove any of these conditions from it for 5 points of the pool each: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. The points spent on conditions don't also restore Hit Points.",
           damage: [],
-          useCost: 5,
-          endsConditions: ["blinded", "charmed", "deafened", "frightened", "paralyzed", "stunned"],
-          endsOneCondition: true
+          useCost: "chosen",
+          healing: { formula: "1", perUse: true },
+          conditionPicks: {
+            conditions: ["blinded", "charmed", "deafened", "frightened", "paralyzed", "stunned"],
+            pointsEach: 5
+          },
+          targets: { count: 1, rangeFeet: 5 }
         }
       ]
     },

@@ -244,7 +244,16 @@ export function evaluateActionEconomy(
   checkTargeting(evaluation, distanceFeet);
   // Who a non-spell action may target: its count, range and creatures (`ActionSchema.targets`).
   evaluation.violations.push(
-    ...actionTargetViolations({ state, attacker, action, targetIds, definition, resolveDefinition, distanceFeet }),
+    ...actionTargetViolations({
+      state,
+      attacker,
+      action,
+      targetIds,
+      definition,
+      resolveDefinition,
+      distanceFeet,
+      catalog
+    }),
     // How many it can hold swallowed, and what it can't do while it holds one (a giant toad's Bite).
     ...swallowViolations(state, attacker, action, siblings, targetIds),
     // What a creature attached to another can't do while it holds on (a stirge's Proboscis).

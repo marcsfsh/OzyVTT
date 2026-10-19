@@ -140,6 +140,7 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
   "ignores-cover": "at-its-moment",
   "base-armor-class": "standing",
   "no-critical-hits": "at-its-moment",
+  "spell-ward": "standing",
   sense: "vision"
 });
 

@@ -341,6 +341,7 @@ export function spellCastMechanics(
       | "summons"
       | "shapeShift"
       | "effectOptions"
+      | "inflicts"
     >
   > {
   // No cast model: the save still applies, and the rest is the GM's.
@@ -426,7 +427,9 @@ export function spellCastMechanics(
       : {}),
     // The form it shape-shifts a creature into (Polymorph), and the effects it picks one of (Enlarge or Reduce).
     ...(effect.shapeShift ? { shapeShift: structuredClone(effect.shapeShift) } : {}),
-    ...(effect.effectOptions ? { effectOptions: structuredClone(effect.effectOptions) } : {})
+    ...(effect.effectOptions ? { effectOptions: structuredClone(effect.effectOptions) } : {}),
+    // What it does to its targets with no roll (Awaken's Charmed).
+    ...(effect.inflicts ? { inflicts: structuredClone(effect.inflicts) } : {})
   };
 }
 
@@ -569,7 +572,8 @@ export function withSpellEffects(action: ActorAction, spell: SpellReference | un
           endsConditions: [...effect.endsConditions],
           ...(effect.endsOneCondition ? { endsOneCondition: true as const } : {})
         }
-      : {})
+      : {}),
+    ...(action.inflicts === undefined && effect.inflicts ? { inflicts: structuredClone(effect.inflicts) } : {})
   };
   const grants = action.grants === undefined && effect.grant ? structuredClone(effect.grant) : undefined;
   const failureEffect =

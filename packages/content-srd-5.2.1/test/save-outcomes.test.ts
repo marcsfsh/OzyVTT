@@ -178,12 +178,14 @@ describe("save outcomes in the shipped content", () => {
   });
 
   it("reads 'while X, also Y', Speed 0 and ending on damage", () => {
+    // A creature with Truesight sees through the pattern and succeeds outright.
     expect(spellSave("hypnotic-pattern")).toEqual({
       ability: "wis",
       successDamage: "none",
       failureConditions: ["charmed", "incapacitated"],
       endsOnDamage: true,
-      speedZero: true
+      speedZero: true,
+      autoSuccess: { truesight: true }
     });
     expect(monsterAction("chuul", "paralyzing-tentacles").save).toMatchObject({
       failureConditions: ["poisoned", "paralyzed"]

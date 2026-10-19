@@ -1903,7 +1903,8 @@
       "targets": {
        "count": 1,
        "rangeFeet": 60,
-       "who": "others"
+       "who": "others",
+       "perceivesUser": true
       },
       "grants": {
        "name": "Bardic Inspiration",
@@ -7543,18 +7544,28 @@
       "id": "lay-on-hands-restoring-touch",
       "name": "Lay on Hands: Restoring Touch",
       "activation": "bonus-action",
-      "description": "As a Bonus Action, touch a creature and expend 5 Hit Points from the pool of healing to remove one of these conditions from it: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. Those points don't also restore Hit Points to the creature.",
+      "description": "As a Bonus Action, touch a creature and draw on the pool of healing: restore the Hit Points you choose, and remove any of these conditions from it for 5 points of the pool each: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. The points spent on conditions don't also restore Hit Points.",
       "damage": [],
-      "useCost": 5,
-      "endsConditions": [
-       "blinded",
-       "charmed",
-       "deafened",
-       "frightened",
-       "paralyzed",
-       "stunned"
-      ],
-      "endsOneCondition": true
+      "useCost": "chosen",
+      "healing": {
+       "formula": "1",
+       "perUse": true
+      },
+      "conditionPicks": {
+       "conditions": [
+        "blinded",
+        "charmed",
+        "deafened",
+        "frightened",
+        "paralyzed",
+        "stunned"
+       ],
+       "pointsEach": 5
+      },
+      "targets": {
+       "count": 1,
+       "rangeFeet": 5
+      }
      }
     ]
    },
@@ -9312,7 +9323,8 @@
       "damage": [],
       "reaction": {
        "trigger": "hit-by-attack",
-       "response": "half-damage"
+       "response": "half-damage",
+       "seenAttacker": true
       }
      }
     ]

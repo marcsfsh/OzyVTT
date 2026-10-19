@@ -103,6 +103,8 @@ export function previewMove(
     altitude?: Readonly<{ fromFeet: number; toFeet: number }>;
     /** The mover may end a move in another creature's space, so none bars its way (the movement reply's). */
     passesCreatures?: boolean;
+    /** The mover may pass through the space of any creature larger than itself (the movement reply's). */
+    nimble?: boolean;
     /** The swarms on the map, whose spaces any creature may cross (the movement reply's). */
     swarmIds?: readonly string[];
     /** The ground the spell areas change for the mover (the movement reply's). */
@@ -147,7 +149,8 @@ export function previewMove(
       ally: isAlly(mover, occupant),
       incapacitated: occupant.conditions.some((condition) => INCAPACITATING.has(condition.id)),
       moverSize: mover.size,
-      occupantSize: occupant.size
+      occupantSize: occupant.size,
+      nimble: input.nimble === true
     });
     // A space the mover may share is still another creature's, so it costs as Difficult Terrain.
     const passage =
@@ -179,6 +182,8 @@ export function previewMove(
   }));
   const apart = (point: Point, caster: Point) => Math.hypot(point.x - caster.x, point.y - caster.y);
   const passesWalls = input.throughWalls === true || input.throughWallsFree === true;
+  // A Tiny creature fits an opening half a square wide; a bigger one squeezes through it.
+  const lane = { tiny: mover?.size === "tiny" };
   const path = movementPath({
     from,
     to,
@@ -210,14 +215,14 @@ export function previewMove(
     },
     isStepOpen: (stepFrom, stepTo) =>
       passesWalls ||
-      footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, gridWalls) !== "blocked" ||
+      footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, gridWalls, lane) !== "blocked" ||
       (input.opening !== undefined && slipsThroughStep(stepFrom, stepTo, sizeCells, crosses, input.opening)),
     // A footprint that fits only as a creature one size smaller squeezes through, as through Difficult Terrain, and
     // so does a wall an incorporeal mover passes.
     isStepSqueezed: (stepFrom, stepTo) => {
       if (input.ignoresDifficult === true || input.throughWallsFree === true) return false;
       if (input.opening && slipsThroughStep(stepFrom, stepTo, sizeCells, crosses, input.opening)) return false;
-      const passage = footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, gridWalls);
+      const passage = footprintStepPassage(stepFrom, stepTo, sizeCells, crosses, gridWalls, lane);
       return passage === "squeeze" || (input.throughWalls === true && passage === "blocked");
     },
     extraPerStep: input.extraPerStep ?? 0

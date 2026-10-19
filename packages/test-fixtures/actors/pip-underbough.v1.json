@@ -98,7 +98,8 @@
    "damage": [],
    "reaction": {
     "trigger": "hit-by-attack",
-    "response": "half-damage"
+    "response": "half-damage",
+    "seenAttacker": true
    }
   }
  ],
