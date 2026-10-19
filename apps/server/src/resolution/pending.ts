@@ -82,7 +82,9 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
     attack.outcome !== "hit" ||
     attack.targetAc === null ||
     input.economyPaid === true ||
-    !deps.resolveDefinition
+    !deps.resolveDefinition ||
+    // An attack an answer made hit hits whatever the AC (Boon of Combat Prowess).
+    ctx.answeredHit === true
   )
     return false;
   const target = targets[0];
@@ -134,9 +136,21 @@ export function parkForAcReaction(ctx: ResolveContext): boolean {
           pushFeet: input.pushFeet ?? null,
           slotLevel: ctx.plan.castLevel,
           damageType: input.damageType ?? null,
-          bonusDice: (attack.bonusDice ?? []).flatMap((entry) =>
-            entry.total === null ? [] : [{ label: entry.label, dice: entry.dice, total: entry.total }]
-          ),
+          bonusDice: [
+            ...(attack.bonusDice ?? []).flatMap((entry) =>
+              entry.total === null ? [] : [{ label: entry.label, dice: entry.dice, total: entry.total }]
+            ),
+            // What answers added to the roll (a Bardic Inspiration die), which the replay holds no die to read.
+            ...(ctx.attackAnswerBonus
+              ? [
+                  {
+                    label: ((attack.answered ?? []).map((line) => line.name).join(", ") || "Answers").slice(0, 120),
+                    dice: "",
+                    total: Math.max(-48, Math.min(48, ctx.attackAnswerBonus))
+                  }
+                ]
+              : [])
+          ],
           distanceFeet: deps.distanceFeet?.(attacker.id, target.id) ?? null,
           initiatorRole: deps.initiatorRole ?? "gm",
           initiatorSessionId: deps.initiatorSessionId ?? deps.gmSessionId,
@@ -344,6 +358,16 @@ export function parkActionSave(ctx: ResolveContext): void {
       : 0;
   const groups = new Map<number, string[]>();
   for (const target of saving) groups.set(saveBonusOf(target), [...(groups.get(saveBonusOf(target)) ?? []), target.id]);
+  // The spell the save is against, and whether it aimed at one creature alone (Staff of Charming's Resist Enchantment).
+  const spell = action.spellId !== undefined ? deps.catalog?.spellRecord?.(action.spellId) : undefined;
+  const against = spell
+    ? {
+        id: spell.id,
+        school: spell.school,
+        level: ctx.plan.castLevel ?? spell.level,
+        singleTarget: targets.length === 1 && action.area === undefined && spell.area === null
+      }
+    : undefined;
   for (const [saveBonus, targetIds] of groups)
     createPendingSaves(state, {
       sourceActorId: attacker.id,
@@ -362,6 +386,7 @@ export function parkActionSave(ctx: ResolveContext): void {
       ...(action.drain ? { drain: action.drain } : {}),
       ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
       ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),
+      ...(against ? { spell: against } : {}),
       magical: isMagicalAction(ctx),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())

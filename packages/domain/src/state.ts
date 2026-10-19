@@ -301,6 +301,23 @@ export const PendingSaveSchema = z
     failurePush: ForcedPushSchema.optional(),
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
+    /** The spell the save is against, its school and level, and whether it aimed at this creature alone, for what
+     *  answers a save against a spell (Staff of Charming's Resist Enchantment). GM bookkeeping, never projected. */
+    spell: z
+      .object({
+        id: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80),
+        school: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(40),
+        level: z.number().int().min(0).max(9),
+        singleTarget: z.boolean()
+      })
+      .strict()
+      .optional(),
     createdAt: z.number().int().nonnegative()
   })
   .strict();
@@ -323,6 +340,24 @@ export const CheckSubjectSchema = z
   })
   .strict();
 export type CheckSubject = z.infer<typeof CheckSubjectSchema>;
+
+/** One answer a held roll took (see `RollAnswerSchema`): who gave it, what it is called, and what it did to the roll.
+ *  `bonus` is added to the total (negative for Cutting Words); `face` replaced the d20 that counts (Stroke of Luck);
+ *  `succeed` and `hit` turned the outcome; `spent` is false when its use came back because the roll still failed. */
+export const HeldAnswerSchema = z
+  .object({
+    id: z.string().min(1).max(160),
+    actorId: z.uuid(),
+    name: z.string().min(1).max(120),
+    bonus: z.number().int().min(-100).max(100).default(0),
+    face: z.number().int().min(1).max(20).optional(),
+    rerolled: z.literal(true).optional(),
+    succeed: z.literal(true).optional(),
+    hit: z.literal(true).optional(),
+    spent: z.boolean().default(true)
+  })
+  .strict();
+export type HeldAnswer = z.infer<typeof HeldAnswerSchema>;
 
 /**
  * Dice thrown before they count, held so a second look at the same roll returns the same dice (ADR-0012): a previewed
@@ -349,6 +384,11 @@ export const HeldRollSchema = z
     /** The round and turn they were thrown in: a die held for one turn's attack is not reused on a later turn. */
     round: z.number().int().nonnegative(),
     turnActorId: z.uuid().nullable(),
+    /** What answered the roll so far (Bardic Inspiration's die, Indomitable's reroll), each once, read into the roll
+     *  every time it is looked at again. */
+    answers: z.array(HeldAnswerSchema).max(12).default([]),
+    /** A reroll with Advantage (Countercharm) reads the new dice that way, whatever the rules gave the first throw. */
+    readAs: z.enum(["advantage", "disadvantage", "normal"]).optional(),
     /** A check's subject and how it was made, so Heroic Inspiration can reroll it. */
     check: z
       .object({

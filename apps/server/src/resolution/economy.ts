@@ -398,7 +398,7 @@ function shownEffectName(
  *  actions and feature activations included; a required effect (Frenzy needs Rage) must be active, and a raging
  *  Barbarian can't cast spells. */
 function checkAbleToAct({ state, attacker, action, resolveDefinition, violations }: Evaluation): void {
-  if (action.activation !== "other" || !ANSWERS_A_ROLL.has(action.id)) {
+  if (action.activation !== "other" || !(ANSWERS_A_ROLL.has(action.id) || action.answer !== undefined)) {
     const incapacitating = incapacitatingCondition(attacker);
     if (incapacitating !== null)
       violations.push({
@@ -573,6 +573,12 @@ function checkTakenAlone({ action, violations }: Evaluation): void {
     violations.push({
       rule: "attack.rides-a-hit",
       message: `${action.name} adds to a hit: choose it on the attack's result before you confirm the hit.`
+    });
+  // Its cost is spent by the answer itself (`roll-answers.ts`), offered on the roll's own result.
+  if (action.answer)
+    violations.push({
+      rule: "roll.answers-a-roll",
+      message: `${action.name} answers a roll: use it on the roll's result, once the roll is shown.`
     });
 }
 

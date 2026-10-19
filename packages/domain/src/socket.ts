@@ -103,6 +103,7 @@ import type {
   CharacterSetProficienciesSchema,
   CharacterSetSlotSchema,
   CharacterSubmitImportSchema,
+  CheckAnswerSchema,
   CheckRerollSchema,
   CheckRollSchema,
   CommandIdentitySchema,
@@ -366,6 +367,11 @@ export interface ClientToServerEvents {
   /** Reroll one die of a character's latest check: Heroic Inspiration for a player, free for the GM. */
   "check:reroll": (
     payload: CommandPayload<typeof CheckRerollSchema>,
+    acknowledgement: (result: CheckRollResult) => void
+  ) => void;
+  /** Answer a character's latest check with one of its answers (Tactical Mind, a Bardic Inspiration die). */
+  "check:answer": (
+    payload: CommandPayload<typeof CheckAnswerSchema>,
     acknowledgement: (result: CheckRollResult) => void
   ) => void;
   /** GM: call for a check or a save from one or several characters. */

@@ -9,6 +9,7 @@ import { deriveEquipment, equipmentCatalogOf, rollModeClaims } from "../src/equi
 import { resolveDefinitionAction, type ResolveDependencies } from "../src/action-resolution.js";
 import { answerReaction } from "../src/reactions.js";
 import { answerSave, createPendingSaves } from "../src/saving-throws.js";
+import { answerAbilityCheck, rollAbilityCheck, type CheckRollDependencies } from "../src/check-rolls.js";
 import { setCondition } from "../src/actor-conditions.js";
 import { addEffect, endEffect, makeEffect } from "../src/effects.js";
 import { nextInitiativeTurn, startEncounter } from "../src/encounter.js";
@@ -542,14 +543,39 @@ describe("Rogue: the flat grants and the pick", () => {
     );
   });
 
-  it("spends Stroke of Luck's one use and refuses the second", () => {
-    // A feature that prints a use count and no action gets a synthesized rollable action.
+  it("turns a failed check into a 20 with Stroke of Luck once, and offers it no second time before a rest", () => {
     const built = table(rogueInput(20));
-    resolve(built, "stroke-of-luck", [], []);
-    expect(built.hero.actionUses["stroke-of-luck"]).toBe(1);
-    expect(() => resolve(built, "stroke-of-luck", [], [])).toThrowError(
-      /Stroke of Luck: no uses remaining \(1\/Short Rest\)/
+    const checkDeps = (faces: number[]): CheckRollDependencies => ({
+      random: () => faces.shift()!,
+      newId: nextCommandId,
+      sessionId: IDS.gm,
+      now: () => "2026-07-27T00:00:00.000Z",
+      resolveDefinition: (id) => resolveIn(built.state, id),
+      catalog: built.catalog
+    });
+    const stealth = (face: number) =>
+      rollAbilityCheck(
+        built.state,
+        { role: "gm" },
+        {
+          commandId: nextCommandId(),
+          actorId: IDS.hero,
+          subject: { ability: "int" },
+          dc: 30,
+          visibility: "public"
+        },
+        checkDeps([face])
+      );
+    expect(stealth(4).outcome.answers?.map((offer) => offer.id)).toContain("stroke-of-luck");
+    const turned = answerAbilityCheck(
+      built.state,
+      { role: "gm" },
+      { commandId: nextCommandId(), actorId: IDS.hero, answer: { id: "stroke-of-luck" } },
+      checkDeps([])
     );
+    expect(turned.outcome.natural).toBe(20);
+    expect(built.hero.actionUses["stroke-of-luck"]).toBe(1);
+    expect(stealth(4).outcome.answers?.map((offer) => offer.id) ?? []).not.toContain("stroke-of-luck");
   });
 
   it("gives Steady Aim's Bonus Action a real Advantage effect", () => {

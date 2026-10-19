@@ -210,12 +210,30 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Bearer only: the 30-foot ally aura and the surprise/sleep clause are not expressible.
   "weapon-of-warning": { modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }] },
 
-  // "On your person" is read as equipped. Not modeled: Luck (a reroll) and Wish (rolled charge count).
+  // "On your person" is read as equipped. Luck rerolls a failed D20 Test once per dawn (`answer`). Not modeled: Wish
+  // (a rolled charge count that never comes back).
   "luck-blade": {
     modifiers: [
       { type: "save-bonus", amount: 1 },
       { type: "attack-bonus", amount: 1 },
       { type: "damage-bonus", amount: 1 }
+    ],
+    actions: [
+      {
+        id: "luck",
+        name: "Luck",
+        activation: "other",
+        description:
+          "Reroll one failed D20 Test if you don't have the Incapacitated condition. You must use the second roll. Once used, this property can't be used again until the next dawn.",
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        answer: {
+          rolls: ["attack", "save", "check", "death-save"],
+          when: "failure",
+          notWhileIncapacitated: true,
+          effect: { kind: "reroll" }
+        }
+      }
     ]
   },
 
@@ -451,7 +469,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // `ring-of-elemental-command` - `versus-creature-type` is inert; the plane is a per-copy GM choice;
   // multi-charge spells.
 
-  // Auto-succeeding a save is not expressible; the reaction and its 3-charge pool are, and the GM rules the success.
+  // "When you fail a Dexterity saving throw while wearing the ring, you can take a Reaction to expend 1 charge to
+  // succeed on that save instead": offered on the wearer's failed Dexterity save.
   "ring-of-evasion": {
     charges: { regain: "1d3" },
     actions: [
@@ -461,7 +480,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "reaction",
         description:
           "When you fail a Dexterity saving throw while wearing the ring, you can take a Reaction to expend 1 charge to succeed on that save instead.",
-        uses: { limit: 3, per: "long-rest", pool: "ring-of-evasion-charges" }
+        uses: { limit: 3, per: "long-rest", pool: "ring-of-evasion-charges" },
+        answer: { rolls: ["save"], when: "failure", abilities: ["dex"], effect: { kind: "succeed" } }
       }
     ]
   },
@@ -598,9 +618,27 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // ---- Staffs ----------------------------------------------------------------------------------
 
   // All three one-charge casts on one pool. No `saveDc`: the cast uses the wielder's own DC, as
-  // printed. Reflect and Resist Enchantment (save outcomes) are not expressible.
+  // printed. Resist Enchantment turns a failed save against an Enchantment spell aimed only at the holder into a
+  // success once a day. Not modeled: Reflect Enchantment (turning the spell back on its caster).
   "staff-of-charming": {
     charges: { regain: "1d8 + 2", lastChargeRoll: true },
+    actions: [
+      {
+        id: "resist-enchantment",
+        name: "Resist Enchantment",
+        activation: "other",
+        description:
+          "If you fail a saving throw against an Enchantment spell that targets only you, you can turn your failed save into a successful one. You can't use this property of the staff again until the next dawn.",
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        answer: {
+          rolls: ["save"],
+          when: "failure",
+          versus: { spellSchools: ["enchantment"], singleTarget: true },
+          effect: { kind: "succeed" }
+        }
+      }
+    ],
     casts: [
       { spellId: "charm-person", uses: { limit: 10, per: "long-rest", pool: "staff-of-charming-charges" } },
       { spellId: "command", uses: { limit: 10, per: "long-rest", pool: "staff-of-charming-charges" } },

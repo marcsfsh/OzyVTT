@@ -45,6 +45,79 @@ export const HealingFormulaSchema = z
   .regex(/^(?:\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?|\d+)$/i, "Use dice such as 2d8 + 3, or a number.");
 export const AbilitySchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 export type AbilityId = z.infer<typeof AbilitySchema>;
+
+/** The rolls an answer can change: the three D20 Tests (a check includes Initiative), a death save, and a damage
+ *  roll. */
+export const RollAnswerRollSchema = z.enum(["attack", "save", "check", "death-save", "damage"]);
+export type RollAnswerRoll = z.infer<typeof RollAnswerRollSchema>;
+
+/**
+ * What an answer does to the roll it answers:
+ * - add / subtract: roll `amount` and add it to the total, or take it off (Bardic Inspiration, Cutting Words).
+ *   `keepUseOnFailure`: the use comes back when the roll still fails (Peerless Skill, Tactical Mind).
+ * - add-or-subtract: the answerer picks the sign when it answers (Boon of Fate).
+ * - reroll: throw the d20s again and use the new roll (Indomitable). `one` rerolls only the die that counts (the
+ *   halfling's Luck), `bonus` adds to the new roll, `advantage` rerolls it with Advantage (Countercharm).
+ * - set-d20: the d20 that counts becomes `face` (Stroke of Luck).
+ * - succeed: a failed save succeeds (Ring of Evasion). hit: a missed attack hits (Boon of Combat Prowess).
+ */
+export const RollAnswerEffectSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("add"),
+      amount: DamageFormulaSchema,
+      keepUseOnFailure: z.literal(true).optional()
+    })
+    .strict(),
+  z.object({ kind: z.literal("subtract"), amount: DamageFormulaSchema }).strict(),
+  z.object({ kind: z.literal("add-or-subtract"), amount: DamageFormulaSchema }).strict(),
+  z
+    .object({
+      kind: z.literal("reroll"),
+      one: z.literal(true).optional(),
+      bonus: z.number().int().min(1).max(30).optional(),
+      advantage: z.literal(true).optional()
+    })
+    .strict(),
+  z.object({ kind: z.literal("set-d20"), face: z.number().int().min(1).max(20) }).strict(),
+  z.object({ kind: z.literal("succeed") }).strict(),
+  z.object({ kind: z.literal("hit") }).strict()
+]);
+export type RollAnswerEffect = z.infer<typeof RollAnswerEffectSchema>;
+
+/**
+ * A way to change a roll after it is seen and before its outcome lands (SRD "after seeing the roll"): what rolls it
+ * answers, whose (the bearer's own, another creature's within `rangeFeet`, or either), when (after a failure, a success,
+ * either, or a d20 showing 1), what it does, and for a save what the save must be against. Its cost is the action's own:
+ * its uses and, on a Reaction, the Reaction. An effect that carries one (a Bardic Inspiration die) ends when it is used.
+ * `versus` passes when any of its lists matches: a save against an effect that imposes one of `conditions`, a spell of
+ * one of `spellSchools` (`singleTarget`: aimed at the bearer alone), or a source of one of `creatureTypes`.
+ */
+export const RollAnswerSchema = z
+  .object({
+    rolls: z.array(RollAnswerRollSchema).min(1).max(5),
+    whose: z.enum(["own", "other", "any"]).default("own"),
+    rangeFeet: z.number().int().min(5).max(1000).optional(),
+    when: z.enum(["failure", "success", "any", "natural-one"]).default("failure"),
+    /** Not while the bearer is Incapacitated (a Luck Blade's luck). */
+    notWhileIncapacitated: z.literal(true).optional(),
+    abilities: z.array(AbilitySchema).min(1).max(6).optional(),
+    versus: z
+      .object({
+        conditions: z.array(ConditionIdSchema).min(1).max(4).optional(),
+        spellSchools: z.array(RiderSlugSchema).min(1).max(8).optional(),
+        creatureTypes: z.array(RiderSlugSchema).min(1).max(8).optional(),
+        singleTarget: z.literal(true).optional()
+      })
+      .strict()
+      .optional(),
+    effect: RollAnswerEffectSchema
+  })
+  .strict()
+  .describe(
+    "A way to change a roll after it is seen and before it counts: the rolls it answers, whose roll (own, other or any, within rangeFeet), when (failure, success, any or natural-one), what it does (add, subtract, add-or-subtract, reroll, set-d20, succeed, hit), and what a save must be against. It costs the action's own uses, and its Reaction when the action is one."
+  );
+export type RollAnswer = z.infer<typeof RollAnswerSchema>;
 /** The SRD's 13 damage types. Riders name one of these, so a misspelled type is refused, and no
  * gate or defence that matches nothing is published. */
 export const DamageTypeSchema = z.enum([
@@ -915,7 +988,9 @@ export const EffectInstanceSchema = z
     /** It comes from a spell or a magic item, so a save repeated against it is one Magic Resistance helps with. */
     magical: z.literal(true).optional(),
     /** It ends when a spell restores the bearer's hit points (an infernal wound). */
-    endsOnSpellHealing: z.literal(true).optional()
+    endsOnSpellHealing: z.literal(true).optional(),
+    /** A roll its bearer may answer with it, which ends it (a Bardic Inspiration die). */
+    answer: RollAnswerSchema.optional()
   })
   .strict();
 export type EffectInstance = z.infer<typeof EffectInstanceSchema>;
@@ -1430,7 +1505,14 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   hitPointMaximumGain: z
     .object({ amount: z.number().int().min(1).max(100), perSlot: z.number().int().min(1).max(50).optional() })
     .strict()
-    .optional()
+    .optional(),
+  /** A roll the recipient may answer with it, which ends it (Bardic Inspiration: add the die to a failed D20 Test). */
+  answer: RollAnswerSchema.optional(),
+  /** The recipient may hold only one effect with these tags at a time ("A creature can have only one Bardic
+   *  Inspiration die at a time"): a grant to a creature that holds one is refused. */
+  onlyOne: z.literal(true).optional(),
+  /** Only another creature may receive it ("inspire another creature"). */
+  notSelf: z.literal(true).optional()
 }).strict();
 
 /** The most a limited-use pool can hold: Lay on Hands at Paladin 20 is 100 points. */
@@ -1952,6 +2034,8 @@ export const ActionSchema = z
       .describe(
         'Which spell this action is a casting of. Identity only (every number the action rolls is already on the action itself), so it changes no arithmetic. It exists because the `spell-id-is` rider filter needs something to match: "when you cast Eldritch Blast" cannot be said with `spell-school-is` or `spell-level-is`, which name categories. Absent = not a spell, and every `spell-id-is` gate fails closed'
       ),
+    /** A roll this action answers after it is seen (Indomitable's reroll, Cutting Words); see `RollAnswerSchema`. */
+    answer: RollAnswerSchema.optional(),
     /** Declared reaction the engine can offer as a pending prompt; see `ActionReactionSchema`. */
     reaction: ActionReactionSchema.optional().describe(
       'A declared reaction the engine offers as a pending prompt when its trigger happens: half-damage (Uncanny Dodge), ac-bonus (Parry, Shield), strike-back (Hellish Rebuke) or melee-attack (Retaliation). Only meaningful on activation "reaction"'

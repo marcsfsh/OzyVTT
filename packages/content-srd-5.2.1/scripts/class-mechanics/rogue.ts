@@ -88,9 +88,23 @@ export const rogue: ClassMechanicsModule = {
       choice: { kind: "feat", choose: 1, fromCatalog: "feats" }
     },
 
-    // The counter only; turning a failed D20 Test into a 20 is not expressible.
+    // "If you fail a D20 Test, you can turn the roll into a 20", once per Short or Long Rest.
     "stroke-of-luck": {
-      uses: { limit: 1, per: "short-rest" }
+      uses: { limit: 1, per: "short-rest" },
+      actions: [
+        {
+          id: "stroke-of-luck",
+          name: "Stroke of Luck",
+          activation: "other",
+          description: "When you fail a D20 Test, turn the d20 roll into a 20.",
+          damage: [],
+          answer: {
+            rolls: ["attack", "save", "check", "death-save"],
+            when: "failure",
+            effect: { kind: "set-d20", face: 20 }
+          }
+        }
+      ]
     }
   },
   subclasses: {

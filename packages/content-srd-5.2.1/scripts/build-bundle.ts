@@ -422,11 +422,22 @@ const PROTECTIVE_MAGIC: Pick<ActorAction, "reaction"> = {
  * "<creature slug>/<action id>"; values merge into the adapted action.
  * - giant-crocodile tail: "…can't be targeted by the crocodile's Tail" (stated on Bite).
  * - protective-magic: its Shield, offered when an attack would hit.
+ * - burst-of-ingenuity: "The sphinx or another creature within 30 feet makes an ability check or a saving throw ...
+ *   The sphinx adds 2 to the roll", an answer to the roll.
  */
-const ACTION_ENRICHMENTS: Record<string, Pick<ActorAction, "targetRules" | "reaction">> = {
+const ACTION_ENRICHMENTS: Record<string, Pick<ActorAction, "targetRules" | "reaction" | "answer">> = {
   "archmage/protective-magic": PROTECTIVE_MAGIC,
   "lich/protective-magic": PROTECTIVE_MAGIC,
-  "mage/protective-magic": PROTECTIVE_MAGIC
+  "mage/protective-magic": PROTECTIVE_MAGIC,
+  "sphinx-of-wonder/burst-of-ingenuity": {
+    answer: {
+      rolls: ["check", "save", "death-save"],
+      whose: "any",
+      rangeFeet: 30,
+      when: "any",
+      effect: { kind: "add", amount: "2" }
+    }
+  }
 };
 
 const PRINTED_NAME = "[A-Z][A-Za-z'\u2019-]*(?: [A-Z][A-Za-z'\u2019-]*)*";

@@ -241,8 +241,35 @@ function interpretAction(
   action: FeatureRecord["actions"][number],
   context: BuildContext
 ): ActorAction {
-  const { attack, save, damageByLevel, multiattackByLevel, healingByLevel, adds, grantScaling, ...carried } = action;
+  const {
+    attack,
+    save,
+    damageByLevel,
+    multiattackByLevel,
+    healingByLevel,
+    adds,
+    grantScaling,
+    answerAmountByLevel,
+    ...carried
+  } = action;
   const assembled: Record<string, unknown> = { ...carried };
+  // The die an answer rolls at this level (the Bardic Inspiration die), on the action's answer and its grant's.
+  const answerRows = (answerAmountByLevel ?? [])
+    .filter((row) => row.level <= context.level)
+    .sort((left, right) => left.level - right.level);
+  const answerAmount = answerRows[answerRows.length - 1]?.amount;
+  if (answerAmount !== undefined) {
+    const withAmount = (answer: ActorAction["answer"]): ActorAction["answer"] =>
+      answer && "amount" in answer.effect ? { ...answer, effect: { ...answer.effect, amount: answerAmount } } : answer;
+    if (action.answer) assembled.answer = withAmount(action.answer);
+    if (action.grants?.answer) assembled.grants = { ...action.grants, answer: withAmount(action.grants.answer) };
+  }
+  // "Reroll it with a bonus equal to your Fighter level": the level multiple is the reroll's bonus.
+  if (adds?.classLevel && action.answer?.effect.kind === "reroll")
+    assembled.answer = {
+      ...action.answer,
+      effect: { ...action.answer.effect, bonus: adds.classLevel * context.level }
+    };
   if (attack) {
     const ability = attack.ability === "spellcasting" ? context.spellcastingAbility : attack.ability;
     if (!ability)

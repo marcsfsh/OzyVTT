@@ -61,6 +61,8 @@ const RULE_FAMILIES = {
   "spell.later-turn": "economy",
   // Sneak Attack, a smite and the like add to a hit: they're chosen when the hit is confirmed and never taken alone.
   "attack.rides-a-hit": "economy",
+  // Indomitable, Cutting Words and the like answer a roll once it is shown, and are never taken alone.
+  "roll.answers-a-roll": "economy",
   // ...while "no legendary actions left this round" is a spent resource, like limited uses.
   "legendary.no-actions-remaining": "resources",
   // "Can't take this action again until the start of its next turn": spent for the round, like the pool.

@@ -111,9 +111,21 @@ export const monk: ClassMechanicsModule = {
         }
       ]
     },
-    /** "Your physical and mental discipline grant you proficiency in all saving throws." */
+    /** "Your physical and mental discipline grant you proficiency in all saving throws. Additionally, whenever you make a
+     *  saving throw and fail, you can expend 1 Focus Point to reroll it, and you must use the new roll." */
     "disciplined-survivor": {
-      grants: { saves: ["str", "dex", "con", "int", "wis", "cha"] }
+      grants: { saves: ["str", "dex", "con", "int", "wis", "cha"] },
+      uses: { scaling: { type: "class-resource", id: "focus-points" }, per: "short-rest", pool: "focus-points" },
+      actions: [
+        {
+          id: "disciplined-survivor",
+          name: "Disciplined Survivor",
+          activation: "other",
+          description: "When you fail a saving throw, expend 1 Focus Point to reroll it. You must use the new roll.",
+          damage: [],
+          answer: { rolls: ["save", "death-save"], when: "failure", effect: { kind: "reroll" } }
+        }
+      ]
     },
     // "At the start of your turn, you can expend 3 Focus Points"; the Incapacitated end condition stays prose.
     "superior-defense": {

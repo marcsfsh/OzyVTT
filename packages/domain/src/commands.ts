@@ -338,6 +338,15 @@ export const HitOptionChoiceSchema = z
     slotLevel: z.number().int().min(1).max(9).optional()
   })
   .strict();
+/** An answer to a roll the answerer has seen (`answers` on its preview): the answer's id, `subtract` to take an
+ *  either-way die off (Boon of Fate), and the face a physical die shows when the answer rerolls a typed d20. */
+export const RollAnswerChoiceSchema = z
+  .object({
+    id: z.string().min(1).max(160),
+    subtract: z.boolean().optional(),
+    face: z.number().int().min(1).max(20).optional()
+  })
+  .strict();
 export const ActionResolveSchema = z
   .object({
     commandId: z.uuid(),
@@ -387,6 +396,9 @@ export const ActionResolveSchema = z
     /** With `commit: false`, throw the held attack d20 again: a player spends Heroic Inspiration to reroll one die (the
      *  lowest); the GM rerolls freely. */
     reroll: z.boolean().optional(),
+    /** With `commit: false`, answer the held attack roll with one of the preview's `answers` (Peerless Skill, Stroke of
+     *  Luck), which then counts in every later look and the confirm. */
+    answer: RollAnswerChoiceSchema.optional(),
     /** The skill a check action is made with: Influence (Deception, Intimidation, Performance, Persuasion or Animal
      *  Handling), Search (Insight, Medicine, Perception or Survival) or Study (Arcana, History, Investigation, Nature or
      *  Religion). */
@@ -440,6 +452,9 @@ export const SaveAnswerSchema = z
     /** With `commit: false`, throw the held d20 again: a player spends Heroic Inspiration to reroll one die (the
      *  lowest); the GM rerolls freely. */
     reroll: z.boolean().optional(),
+    /** With `commit: false`, answer the held save with one of the preview's `answers` (Indomitable, a Bardic
+     *  Inspiration die), which then counts in every later look and the confirm. */
+    answer: RollAnswerChoiceSchema.optional(),
     /** false previews: the d20 is thrown and held, so a later preview or the confirm uses the same die. */
     commit: z.boolean().default(true),
     legendaryResistance: z.boolean().default(false),
@@ -584,6 +599,8 @@ export const DeathSaveRollSchema = z
     naturalRoll: z.number().int().min(1).max(20).optional(),
     /** With `commit: false`, throw the held d20 again: Heroic Inspiration for a player, free for the GM. */
     reroll: z.boolean().optional(),
+    /** With `commit: false`, answer the held death save with one of the preview's `answers` (the halfling's Luck). */
+    answer: RollAnswerChoiceSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
@@ -696,6 +713,17 @@ export const CheckRerollSchema = z
     actorId: z.uuid(),
     /** The face the rerolled physical die shows, for a check that was typed. */
     face: z.number().int().min(1).max(20).optional(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+
+/** Answer a character's latest check with one of its `answers` (Tactical Mind, a Bardic Inspiration die), while it is
+ *  still their latest roll. */
+export const CheckAnswerSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.uuid(),
+    answer: RollAnswerChoiceSchema,
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();

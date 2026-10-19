@@ -177,9 +177,20 @@ export const warlock: ClassMechanicsModule = {
           ]
         }
       },
-      // Uses equal the Charisma modifier (minimum 1). Adding the 1d10 to a roll already made stays prose.
+      // Uses equal the Charisma modifier (minimum 1): 1d10 added to a check or a save after it is seen, once per roll.
       "dark-ones-own-luck": {
-        uses: { scaling: { type: "ability-modifier", ability: "cha", minimum: 1 }, per: "long-rest" }
+        uses: { scaling: { type: "ability-modifier", ability: "cha", minimum: 1 }, per: "long-rest" },
+        actions: [
+          {
+            id: "dark-ones-own-luck",
+            name: "Dark One's Own Luck",
+            activation: "other",
+            description:
+              "When you make an ability check or a saving throw, add 1d10 to the roll after seeing it but before any of its effects occur, no more than once per roll.",
+            damage: [],
+            answer: { rolls: ["check", "save", "death-save"], when: "any", effect: { kind: "add", amount: "1d10" } }
+          }
+        ]
       },
       /**
        * Twelve inline options, one resistance each. Re-choosing on a rest is runtime state

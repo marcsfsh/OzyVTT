@@ -1,4 +1,13 @@
-import type { AbilityId, Actor, DamageApplication, GameState, PendingSave } from "@vtt/domain";
+import type {
+  AbilityId,
+  Actor,
+  DamageApplication,
+  GameState,
+  HeldRoll,
+  PendingSave,
+  RollAnswered,
+  RollAnswerOffer
+} from "@vtt/domain";
 import {
   abilityModifier as scoreModifier,
   aggregateRollMode,
@@ -22,7 +31,15 @@ import { withoutSameHazard } from "./hazards.js";
 import { recordRoll as recordRollInHistory, rolledTerms } from "./roll-history.js";
 import { requireGm, type Initiator } from "./authorization.js";
 import { holdsFeature } from "./class-features.js";
-import { holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
+import { heldRollFor, holdRoll, releaseHeldRoll, rollHeldTest } from "./held-rolls.js";
+import {
+  answeredLines,
+  answersOffered,
+  applyRollAnswer,
+  withAnswers,
+  type AnswerDeps,
+  type AnswerTarget
+} from "./roll-answers.js";
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
 import { applyDamageDetailed, previewDamage, adjustableActor } from "./hit-points.js";
 import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
@@ -345,6 +362,8 @@ export function createPendingSaves(
     failurePush?: ForcedPush;
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize?: PendingSave["advantageAtSize"];
+    /** The spell the save is against, for what answers a save against a spell. */
+    spell?: PendingSave["spell"];
     newSaveId: () => string;
     createdAt: number;
   }>
@@ -378,6 +397,7 @@ export function createPendingSaves(
     ...(input.drain ? { drain: { ...input.drain } } : {}),
     ...(input.failurePush ? { failurePush: { ...input.failurePush } } : {}),
     ...(input.advantageAtSize ? { advantageAtSize: input.advantageAtSize } : {}),
+    ...(input.spell ? { spell: { ...input.spell } } : {}),
     createdAt: input.createdAt
   }));
   // A re-cast against the same target replaces its older prompt.
@@ -560,8 +580,13 @@ export function shownRollMode(
   };
 }
 
-/** How a pending save is answered beyond its method: a typed d20 (`face`), or a reroll of the held die. */
-export type SaveAnswerOptions = Readonly<{ face?: number; reroll?: boolean }>;
+/** How a pending save is answered beyond its method: a typed d20 (`face`), a reroll of the held die, or an answer to
+ *  the held roll (`roll-answers.ts`). */
+export type SaveAnswerOptions = Readonly<{
+  face?: number;
+  reroll?: boolean;
+  answer?: Readonly<{ id: string; subtract?: boolean; face?: number }>;
+}>;
 
 /** Answers a pending save (a roll, a typed d20, or the GM's typed total) and auto-applies it: fail takes full damage
  *  and the condition; success takes half if the action says so. The structured-save exception to propose-then-apply
@@ -596,6 +621,12 @@ export function answerSave(
   let autoFailed: string | null = null;
   let autoSucceeded: string | null = null;
   let rollMode: AggregatedRollMode | undefined;
+  // What answered the rolled save (`roll-answers.ts`), and what may still answer it on a preview.
+  let answerSucceeds = false;
+  let answered: RollAnswered[] = [];
+  let offered: RollAnswerOffer[] = [];
+  const answerEvents: EffectNarration[] = [];
+  if (options.answer && method !== "roll") throw new CommandRejectedError("Answer a save the dice decide.");
   const targetDefinition = target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined;
   const magicResistance = pending.magical ? magicResistanceOf(targetDefinition) : null;
   if (method === "manual") {
@@ -642,20 +673,25 @@ export function answerSave(
     // A player's choice is never read: the rules count Advantage and Disadvantage, and only the GM may force a mode.
     const forced = scope.role === "gm" ? explicitRollMode : undefined;
     const mode = forced ?? aggregated.mode;
+    if (options.answer && (commit || options.reroll || options.face !== undefined))
+      throw new CommandRejectedError("Answer the save on a look of its own, before you confirm it.");
+    if (options.answer && !heldRollFor(state, heldKey))
+      throw new CommandRejectedError("Roll first: an answer meets a roll that was made.");
     // Bless's d4 rolls into the save itself, and is held with its d20s.
-    const test = rollHeldTest(
-      state,
-      heldKey,
-      target,
-      scope,
-      mode,
-      modifier,
-      saveRiderDiceTerms(derivation, pending.ability),
-      options,
-      deps.random
-    );
+    const throwSave = (choice: Pick<SaveAnswerOptions, "face" | "reroll">) =>
+      rollHeldTest(
+        state,
+        heldKey,
+        target,
+        scope,
+        mode,
+        modifier,
+        saveRiderDiceTerms(derivation, pending.ability),
+        choice,
+        deps.random
+      );
+    let test = throwSave(options.answer ? {} : options);
     rollMode = test.typed ? undefined : shownRollMode(aggregated, forced);
-    natural = test.natural;
     const rollId = deps.newRollId();
     // A second look at held dice records nothing new; the dice already sit in the history.
     if (test.fresh)
@@ -671,8 +707,9 @@ export function answerSave(
         createdAt: deps.now(),
         typed: test.typed
       });
-    if (commit) releaseHeldRoll(state, heldKey);
-    else
+    // What answered the save on an earlier look counts in this one, the confirm included.
+    const answeredBefore = heldRollFor(state, heldKey);
+    if (!commit)
       holdRoll(state, {
         key: heldKey,
         actorId: target.id,
@@ -681,10 +718,49 @@ export function answerSave(
         rollId: test.fresh ? rollId : (state.heldRolls.find((entry) => entry.key === heldKey)?.rollId ?? null),
         typed: test.typed
       });
-    total = test.resolution.total;
+    const shown = (held: HeldRoll | undefined) => withAnswers(held, test.natural, test.resolution.total);
+    const answerTarget = (held: HeldRoll | undefined): AnswerTarget => ({
+      kind: "save",
+      roller: target,
+      key: heldKey,
+      natural: shown(held).natural,
+      total: shown(held).total,
+      threshold: pending.dc,
+      mode,
+      ability: pending.ability,
+      stakes: {
+        conditions: conditionsAtStake(state, pending),
+        ...(pending.spell ? { spell: pending.spell } : {}),
+        sourceActorId: pending.sourceActorId
+      },
+      purpose: "save",
+      label: `${pending.ability.toUpperCase()} save`,
+      visibility: target.visibility === "gm-only" ? "gm-only" : "public"
+    });
+    if (options.answer) {
+      answerEvents.push(
+        ...applyRollAnswer(
+          state,
+          answerTarget(heldRollFor(state, heldKey)),
+          target,
+          options.answer,
+          answerDepsOf(deps, commandId)
+        )
+      );
+      // A reroll answer changed the held dice; this look reads them.
+      test = throwSave({});
+    }
+    const held = commit ? answeredBefore : heldRollFor(state, heldKey);
+    if (commit) releaseHeldRoll(state, heldKey);
+    const read = shown(held);
+    natural = read.natural;
+    total = read.total;
+    answerSucceeds = read.succeed;
+    answered = answeredLines(held);
+    if (!commit) offered = answersOffered(state, answerTarget(held), answerDepsOf(deps, commandId));
   }
 
-  let success = autoSucceeded !== null || (autoFailed === null && total >= pending.dc);
+  let success = autoSucceeded !== null || (autoFailed === null && total >= pending.dc) || answerSucceeds;
   // SRD Legendary Resistance: on a failed save the creature can choose to succeed. The GM commits with
   // the flag; the pool rides actionUses["legendary-resistance"] and a Long Rest re-arms it.
   let legendaryNote: string | null = null;
@@ -771,13 +847,15 @@ export function answerSave(
         ...(natural !== null ? { natural } : {}),
         ...(rollMode ? { rollMode } : {}),
         ...(weighed && weighed.parts.length > 0 ? { parts: weighed.parts } : {}),
-        ...(weighed?.flatReduction ? { flatReduction: weighed.flatReduction } : {})
+        ...(weighed?.flatReduction ? { flatReduction: weighed.flatReduction } : {}),
+        ...(answered.length > 0 ? { answered } : {}),
+        ...(offered.length > 0 ? { answers: offered } : {})
       },
-      events: []
+      events: answerEvents
     };
   }
 
-  const events: EffectNarration[] = [];
+  const events: EffectNarration[] = [...answerEvents];
   if (legendaryNote !== null) events.push({ kind: "effect", text: legendaryNote, actorId: target.id });
   if (autoFailed !== null)
     events.push({
@@ -914,9 +992,31 @@ export function answerSave(
             parts: application.parts,
             ...(application.flatReduction ? { flatReduction: application.flatReduction } : {})
           }
-        : {})
+        : {}),
+      ...(answered.length > 0 ? { answered } : {})
     },
     events
+  };
+}
+
+/** What an answer to a save needs from the save's own dependencies. */
+export function answerDepsOf(
+  deps: Pick<
+    SaveAnswerDependencies,
+    "resolveDefinition" | "catalog" | "random" | "newRollId" | "sessionId" | "role" | "now" | "distanceFeet"
+  >,
+  commandId: string
+): AnswerDeps {
+  return {
+    resolveDefinition: deps.resolveDefinition,
+    ...(deps.catalog ? { catalog: deps.catalog } : {}),
+    random: deps.random,
+    newRollId: deps.newRollId,
+    sessionId: deps.sessionId,
+    role: deps.role,
+    now: deps.now,
+    commandId,
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {})
   };
 }
 

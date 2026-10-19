@@ -55,6 +55,8 @@ export type ResolveInput = Readonly<{
   holdKey?: string;
   /** Throw the held attack d20 again: a player's Heroic Inspiration rerolls one die, the GM throws afresh. */
   reroll?: boolean;
+  /** On a preview, answer the held attack roll with one of the attacker's answers (Peerless Skill, Stroke of Luck). */
+  answer?: Readonly<{ id: string; subtract?: boolean; face?: number }>;
   /** GM only: a hand-entered attack total, used verbatim vs AC. The natural die is unknown, so a crit is declared
    * via `critical` and a natural 1 via `fumble`. */
   attackTotal?: number;
@@ -214,6 +216,9 @@ export type ResolveContext = {
   check: NonNullable<ActionResolution["check"]> | null;
   attack: ActionResolutionAttack | null;
   crit: boolean;
+  /** What answers added to the attack roll, and whether one made it hit, for a replay that holds no die. */
+  attackAnswerBonus?: number;
+  answeredHit?: boolean;
   /** The roll-specific facts riders filter on (attack kind, target size, damage types...). */
   riderFilters: Omit<Partial<RiderContext>, "moment">;
   readonly damage: Array<{ formula: string; type: string; total: number; source?: string }>;

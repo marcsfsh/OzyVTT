@@ -142,7 +142,10 @@ export function itemAction(
     ...(declared.replacesAttack ? { replacesAttack: true } : {}),
     // What drinking or applying it puts on the user (Antitoxin's Advantage, a coat of poison).
     ...(declared.grants ? { grants: structuredClone(declared.grants) } : {}),
-    ...(declared.area ? { area: { ...declared.area } } : {})
+    ...(declared.area ? { area: { ...declared.area } } : {}),
+    // A roll it answers (a Ring of Evasion's Evade) and the trigger it is offered on (a Reaction's).
+    ...(declared.answer ? { answer: structuredClone(declared.answer) } : {}),
+    ...(declared.reaction ? { reaction: { ...declared.reaction } } : {})
   };
 }
 
@@ -209,7 +212,15 @@ export function castAction(
     { roll: upcast }
   );
   // A healing area heals the creatures the caster picks (up to its count), so it is picked with no template.
-  return { ...base, ...(spell.area && !mechanics.healing ? { area: spell.area } : {}), ...mechanics };
+  return {
+    ...base,
+    ...(spell.area && !mechanics.healing ? { area: spell.area } : {}),
+    ...mechanics,
+    // A Reaction spell (Shield, Hellish Rebuke) is cast from the item as a Reaction, offered when its trigger happens.
+    ...(spell.effect?.reaction
+      ? { activation: "reaction" as const, reaction: structuredClone(spell.effect.reaction) }
+      : {})
+  };
 }
 
 /** A cast's grant, its "spellcasting ability modifier" fixed at the caster's for this spell. */

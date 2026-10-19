@@ -208,6 +208,7 @@ export const actionCommands = [
             ...(attackNatural !== undefined ? { typedFace: true } : {}),
             holdKey,
             ...(request.reroll === true ? { reroll: true } : {}),
+            ...(request.answer ? { answer: request.answer } : {}),
             attackTotal,
             critical,
             ...(fumble !== undefined ? { fumble } : {}),

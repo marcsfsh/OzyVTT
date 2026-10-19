@@ -11,7 +11,7 @@ import { ContentLibrary } from "../src/content-library.js";
 import { criticalThreshold, effectiveActions } from "../src/effective-actions.js";
 import { deriveEquipment, equipmentCatalogOf } from "../src/equipment-derivation.js";
 import { initiativeRollMode, nextInitiativeTurn, startEncounter } from "../src/encounter.js";
-import { answerSave, saveRollSources } from "../src/saving-throws.js";
+import { answerSave, createPendingSaves, saveRollSources } from "../src/saving-throws.js";
 import { checkPlan } from "../src/ability-checks.js";
 import { evaluateActionEconomy } from "../src/resolution/economy.js";
 import { UNARMED_STRIKE_ACTION_ID } from "../src/item-actions.js";
@@ -554,21 +554,34 @@ describe("Barbarian: Reckless Attack is an effect the table can see and swing un
 });
 
 describe("Boon of Combat Prowess: Peerless Aim until the start of the bearer's next turn", () => {
-  it("stays spent through the other creatures' turns and comes back with its own", () => {
+  it("turns a missed attack into a hit, stays spent through the other creatures' turns and comes back with its own", () => {
     const built = onTheTable(build(barbarianInput()));
     const turnDeps = {
       resolveDefinition: (id: string) => (id === built.hero.definitionId ? built.definition : undefined),
       catalog,
       rollDie: () => 1
     };
-    use(built, "boon-of-combat-prowess");
-    nextInitiativeTurn(built.state, [], turnDeps); // the foe's turn: a missed opportunity attack can't use it
-    expect(() => use(built, "boon-of-combat-prowess")).toThrowError(
-      /no uses remaining \(spent · back at the start of its next turn\)/
-    );
-    nextInitiativeTurn(built.state, [], turnDeps); // Ozar's own turn again
-    use(built, "boon-of-combat-prowess");
+    const look = (faces: number[], answer?: string) =>
+      resolveDefinitionAction(
+        built.state,
+        actionOf(built, "item-greataxe"),
+        {
+          actorId: IDS.hero,
+          targetIds: [IDS.foe],
+          commandId: `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
+          holdKey: `attack:${IDS.hero}`,
+          commit: false,
+          ...(answer ? { answer: { id: answer } } : {})
+        },
+        deps(built, faces)
+      );
+    expect(look([1]).attack?.answers?.map((offer) => offer.id)).toContain("boon-of-combat-prowess");
+    expect(look([], "boon-of-combat-prowess").attack?.outcome).toBe("hit");
     expect(built.hero.actionUses["boon-of-combat-prowess"]).toBe(1);
+    nextInitiativeTurn(built.state, [], turnDeps); // the foe's turn: still spent
+    expect(built.hero.actionUses["boon-of-combat-prowess"]).toBe(1);
+    nextInitiativeTurn(built.state, [], turnDeps); // Ozar's own turn again
+    expect(built.hero.actionUses["boon-of-combat-prowess"] ?? 0).toBe(0);
   });
 });
 
@@ -1651,7 +1664,45 @@ describe("Incapacitated: feature activations are refused too", () => {
     const built = onTheTable(build(fighterInput(9)));
     setCondition(built.state, IDS.hero, "stunned", true, undefined, { role: "gm" });
     expect(() => use(built, "action-surge")).toThrowError(/Stunned and can't take actions/);
-    use(built, "indomitable");
+    createPendingSaves(built.state, {
+      sourceActorId: IDS.foe,
+      sourceName: "Foe",
+      actionName: "Glare",
+      ability: "wis",
+      dc: 20,
+      targetIds: [IDS.hero],
+      proposedDamage: 0,
+      halfOnSuccess: false,
+      conditionIds: [],
+      newSaveId: () => "50000000-0000-4000-8000-999999999990",
+      createdAt: 0
+    });
+    const look = (faces: number[], answer?: string) =>
+      answerSave(
+        built.state,
+        `50000000-0000-4000-8000-99999999999${faces.length}`,
+        "50000000-0000-4000-8000-999999999990",
+        "roll",
+        undefined,
+        false,
+        { role: "gm" },
+        {
+          random: () => faces.shift()!,
+          newRollId: () => `50000000-0000-4000-8000-${String(++command).padStart(12, "0")}`,
+          sessionId: IDS.gmSession,
+          role: "gm",
+          now: () => "2026-08-07T00:00:00.000Z",
+          resolveDefinition: (id: string) => (id === built.hero.definitionId ? built.definition : undefined),
+          catalog
+        },
+        false,
+        undefined,
+        undefined,
+        answer ? { answer: { id: answer } } : {}
+      );
+    expect(look([4]).outcome.answers?.map((offer) => offer.id)).toContain("indomitable");
+    // The reroll adds the Fighter level: 12 + 9 + Wis +1.
+    expect(look([12], "indomitable").outcome.total).toBe(22);
     expect(built.hero.actionUses.indomitable).toBe(1);
   });
 

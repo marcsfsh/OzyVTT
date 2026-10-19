@@ -10,6 +10,7 @@ import { z } from "zod";
 import {
   AbilitySchema,
   ActionSchema,
+  DamageFormulaSchema,
   DiceFormulaSchema,
   HealingFormulaSchema,
   EffectGrantSchema,
@@ -225,7 +226,7 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
       ),
     /** What the built action adds to its first damage part and its healing, read off the character when it is built:
      *  a multiple of its level ("1d10 plus your Fighter level", "five times your Cleric level") and an ability
-     *  modifier ("add your Wisdom modifier"). */
+     *  modifier ("add your Wisdom modifier"). A reroll answer takes the level multiple as its bonus (Indomitable). */
     adds: z
       .object({
         classLevel: z.number().int().min(1).max(10).optional(),
@@ -251,6 +252,16 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true 
       .optional()
       .describe(
         "The granted effect's `damage-bonus` amounts become the named printed class column at the character's level (Rage Damage), and the action's text says the number"
+      ),
+    /** The die an answer to a roll rolls, growing with level (the Bardic Inspiration die: d6, a d8 at level 5, a d10 at
+     *  10, a d12 at 15). It replaces the amount of the action's `answer`, and of the answer its grant carries, at the
+     *  highest matching level. */
+    answerAmountByLevel: z
+      .array(z.object({ level: ContentLevelSchema, amount: DamageFormulaSchema }).strict())
+      .max(20)
+      .optional()
+      .describe(
+        "The die an answer to a roll rolls, growing with level (the Bardic Inspiration die). The highest matching level replaces the amount of the action's answer and of its grant's answer"
       ),
     /** A compound plan that grows with level. It replaces `multiattack` at the highest matching level (Flurry of
      *  Blows' third strike at Monk 10). */

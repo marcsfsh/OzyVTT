@@ -222,7 +222,9 @@ const PENDING_SAVE_FIELDS = {
   drain: "never",
   failurePush: "never",
   // The save's own roll mode is read when it is answered.
-  advantageAtSize: "never"
+  advantageAtSize: "never",
+  // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
+  spell: "never"
 } as const satisfies Record<keyof PendingSave, FieldAudience>;
 
 // How long what a failure imposes would last is the save's own text, read on the prompt by the one who owes it.
