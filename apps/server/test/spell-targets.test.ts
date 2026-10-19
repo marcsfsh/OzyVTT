@@ -164,9 +164,9 @@ describe("a spell's range", () => {
 describe("a save the engine applies nothing of", () => {
   it("tells the GM and the save card that the GM applies it", () => {
     const { state } = beasts();
-    const resolution = cast(state, "levitate", { targetIds: [FOE2] });
+    const resolution = cast(state, "command", { targetIds: [FOE2] });
     expect(resolution.warnings).toContain(
-      "The server applies nothing of Levitate's save. Apply what a failure or a success does from the spell's text."
+      "The server applies nothing of Command's save. Apply what a failure or a success does from the spell's text."
     );
     const pending = state.combat.pendingSaves.find((save) => save.targetActorId === FOE2)!;
     expect(pending.gmApplies).toBe(true);

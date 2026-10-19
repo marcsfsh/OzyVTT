@@ -282,6 +282,8 @@ const PENDING_REACTION_FIELDS = {
   weighed: "player",
   acBonus: "player",
   rollsAttack: "player",
+  // How far the falling creature falls: its height, which is as public as the token it answers for.
+  fallFeet: "player",
   // The reactor's own slots, which its owner already reads on the sheet; only the reactor's owner gets the prompt.
   slotLevels: "player",
   createdAt: "player",
@@ -502,6 +504,10 @@ function playerEffect(
     hitPointMaximumGain: _hitPointMaximumGain,
     temporaryHitPointsEachTurn: _temporaryHitPointsEachTurn,
     conditionImmunities: _conditionImmunities,
+    // A granted move names the turn it belongs to and the creature it must flee, which can be hidden; its own
+    // character's grant reaches a player through `actor:movement`.
+    grantedMove: _grantedMove,
+    grantedTeleport: _grantedTeleport,
     // Whether a Concentration spell ends once no creature keeps it is the engine's bookkeeping.
     endsWhenUnaffected: _endsWhenUnaffected,
     // A long casting's targets and slot are the caster's plan; its name says what is being cast.

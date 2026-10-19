@@ -203,6 +203,14 @@ export const rogue: ClassMechanicsModule = {
       "use-magic-device": {
         modifiers: [{ type: "attunement-slots", amount: 1 }]
       },
+      // "You gain a Climb Speed equal to your Speed" and "can determine your jump distance using your Dexterity
+      // rather than your Strength", which the movement rules read (`jumping.ts`).
+      "second-story-work": {
+        modifiers: [
+          { type: "special-speed", movement: "climb", equalToSpeed: true },
+          { type: "movement", rule: "jump-by-dexterity" }
+        ]
+      },
       // Adds the Bonus Action activation; the Sleight of Hand check is rolled from the skill block.
       "fast-hands": {
         actions: [

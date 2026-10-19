@@ -597,6 +597,23 @@
   fill: var(--surface-2);
   stroke: var(--line-strong);
 }
+/* How many feet up a creature is, as on the table's map. */
+.token-altitude rect {
+  fill: var(--surface-1);
+  stroke: var(--cyan);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.token-altitude text {
+  fill: var(--text);
+  font-family: var(--font-label);
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.token-altitude path {
+  fill: var(--cyan);
+}
 
 /* "Tap to turn on sound": the browser holds sound back until someone touches the screen. Bottom left, clear of the
    zoom buttons, and large enough to read from across the room. It stays quiet until something is waiting to play;

@@ -757,6 +757,23 @@ export const ActorMovementReplySchema = z.strictObject({
   crawling: z.boolean().optional(),
   /** It drags a creature it grapples that isn't Tiny or two sizes smaller, each foot costing an extra foot. */
   dragging: z.boolean().optional(),
+  /** A move an action or feature granted it for this turn, beside its own (Pounce, Tactical Shift): the feet left,
+   *  the way it travels when only one, whether it provokes Opportunity Attacks, and whether it is a jump. */
+  granted: z
+    .strictObject({
+      name: z.string(),
+      feet: z.number().min(0),
+      mode: z.enum(["walk", "fly", "swim", "climb", "burrow"]).optional(),
+      provokes: z.boolean(),
+      jump: z.boolean().optional()
+    })
+    .optional(),
+  /** It passes through walls and creatures as through Difficult Terrain (a ghost's Incorporeal Movement). */
+  throughWalls: z.boolean().optional(),
+  /** Difficult Terrain costs it nothing extra (Freedom of Movement). */
+  ignoresDifficultTerrain: z.boolean().optional(),
+  /** A teleport granted it for this turn (Misty Step): up to `feet` to an unoccupied space it can see. */
+  teleport: z.strictObject({ name: z.string(), feet: z.number().min(0) }).optional(),
   /** It may end a move in another creature's space (Air Form, a swarm), so no creature bars its way; a creature's
    *  space still costs as Difficult Terrain. */
   passesCreatures: z.boolean().optional(),

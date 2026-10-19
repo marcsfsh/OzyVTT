@@ -2,7 +2,15 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { ActorAction } from "@vtt/schemas";
-import { areaOfProse, drainOfProse, multiattackOfProse, withProseFacts } from "../src/action-prose.js";
+import {
+  areaOfProse,
+  drainOfProse,
+  leapOfProse,
+  moveOfProse,
+  multiattackOfProse,
+  teleportOfProse,
+  withProseFacts
+} from "../src/action-prose.js";
 import { loadSpells } from "../src/index.js";
 
 const action = (fields: Partial<ActorAction>): ActorAction =>
@@ -253,5 +261,59 @@ describe("the bundles carry what their prose says, so play never reads it", () =
         .filter((spell) => areaOfProse(spell.description) !== null && spell.area === null)
         .map((spell) => spell.id)
     ).toEqual([]);
+  });
+});
+
+describe("reading the moves an action makes its creature take", () => {
+  it("reads a move's share of Speed, its way of moving, and whether it provokes, goes straight or comes first", () => {
+    expect(
+      moveOfProse("Legendary Action. The dragon moves up to half its Speed, and it makes one Rend attack.")
+    ).toEqual({ speed: "half", provokes: true, first: true });
+    expect(
+      moveOfProse(
+        "If the roc has a creature Grappled, the roc flies up to half its Fly Speed without provoking Opportunity Attacks and drops that creature."
+      )
+    ).toEqual({ speed: "half", mode: "fly", provokes: false });
+    expect(moveOfProse("The sahuagin swims up to its Swim Speed straight toward an enemy it can see.")).toEqual({
+      speed: "full",
+      mode: "swim",
+      provokes: true,
+      straight: true
+    });
+    expect(
+      moveOfProse("The xorn moves up to its Speed or Burrow Speed straight toward an enemy it can sense.")
+    ).toEqual({ speed: "full", provokes: true, straight: true });
+    // The kraken's move follows its save.
+    expect(
+      moveOfProse(
+        "Constitution Saving Throw: DC 23, each creature in a 15-foot Emanation. The kraken then moves up to its Speed."
+      )
+    ).toEqual({ speed: "full", provokes: true });
+    expect(moveOfProse("The target moves up to its Speed away from you.")).toBeNull();
+  });
+
+  it("reads a teleport's range and a jump's distance and cost", () => {
+    expect(teleportOfProse("The dog teleports up to 40 feet to an unoccupied space it can see.")).toEqual({ feet: 40 });
+    expect(
+      teleportOfProse(
+        "The balor teleports itself or a willing demon within 10 feet of itself up to 60 feet to an unoccupied space the balor can see."
+      )
+    ).toEqual({ feet: 60 });
+    expect(
+      teleportOfProse(
+        "If within 5 feet of a Large or bigger tree, the dryad teleports to an unoccupied space within 5 feet of a second Large or bigger tree that is within 60 feet of the previous tree."
+      )
+    ).toEqual({ feet: 65 });
+    expect(leapOfProse("The bulette jumps up to 30 feet by spending 10 feet of movement.")).toEqual({
+      feet: 30,
+      costFeet: 10
+    });
+  });
+
+  it("fills them on the action as it enters the system", () => {
+    const filled = withProseFacts(
+      action({ description: "The dog teleports up to 40 feet to an unoccupied space it can see." })
+    );
+    expect(filled.teleport).toEqual({ feet: 40 });
   });
 });

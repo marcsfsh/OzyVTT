@@ -15,12 +15,8 @@ import { endedEffect, sizeAtMost, type DefinitionAction, type LiveActor, type Re
 /**
  * Who an action without a spell may target, checked on the server as `spellTargetViolations` checks a spell (SRD
  * "Targets"): how many, how far, and which creatures (`ActionSchema.targets`). Each refusal names the target only when
- * the user's side can see it. A creature gone from the plane (Hurl Through Hell's victim) can't be targeted by
- * anything.
+ * the user's side can see it. A creature off the plane is refused earlier, for every action and spell (`validate.ts`).
  */
-
-/** The bearer is off this plane for now (hurled through the Lower Planes): nothing here can target it. */
-export const OFF_PLANE_TAG = "off-plane";
 
 type Violation = Readonly<{ rule: RuleId; message: string }>;
 
@@ -60,12 +56,6 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
     const target = state.actors.find((candidate) => candidate.id === targetId);
     return target ? [target] : [];
   });
-  for (const target of targets)
-    if (target.effects.some((effect) => effect.tags.includes(OFF_PLANE_TAG)))
-      violations.push({
-        rule: "target.not-allowed",
-        message: `${nameOf(target)} is gone from this plane for now and can't be targeted.`
-      });
   const limit = targetCountOf(action, definition);
   if (limit !== null && unique.length > limit)
     violations.push({

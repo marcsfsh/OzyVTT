@@ -5,6 +5,7 @@ import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
 import { addEffect, effectDurationOf, endEffect, makeEffect, type EffectNarration } from "../effects.js";
 import { deriveEquipment } from "../equipment-derivation.js";
+import { grantMove } from "../granted-moves.js";
 import { createPendingSaves } from "../saving-throws.js";
 import { currentSpeedFeet } from "../speed.js";
 import { recordRoll, tableLineOf, type DefinitionAction, type LiveActor, type ResolveContext } from "./context.js";
@@ -183,29 +184,23 @@ export function forceMove(
   });
 }
 
-/** "You can then move up to half your Speed ... without provoking Opportunity Attacks": that much movement on the
- *  attacker's own turn, beside its Speed. */
-export function grantHalfSpeedMove(ctx: ResolveContext, source: string): void {
+/** "You can then move up to half your Speed ... without provoking Opportunity Attacks": a granted move on the
+ *  attacker's own turn, beside its Speed, that the movement rules charge and that provokes nothing
+ *  (`granted-moves.ts`). With `towardId` it must end nearer that creature (Forceful Blow's "straight toward the
+ *  target"). */
+export function grantHalfSpeedMove(ctx: ResolveContext, source: string, towardId?: string): void {
   const { state, attacker, deps, input } = ctx;
   const speed = currentSpeedFeet(attacker, deriveEquipment(attacker, deps.definition, deps.catalog)) ?? 0;
   const feet = Math.floor(speed / 10) * 5;
   if (feet <= 0) return;
-  const onOwnTurn = state.combat.turnActorId === attacker.id;
-  if (onOwnTurn)
-    addEffect(
-      state,
-      attacker.id,
-      makeEffect({
-        id: `${input.commandId}:${source}:move`,
-        name: `${source}: move`,
-        tags: ["half-speed-move"],
-        sourceActorId: attacker.id,
-        sourceName: attacker.name,
-        startedRound: state.combat.round,
-        duration: { type: "until-source-turn-end", skipsCurrentTurn: false },
-        movementGrantFeet: feet
-      })
-    );
+  if (state.combat.turnActorId === attacker.id)
+    grantMove(state, attacker, {
+      id: `${input.commandId}:${source}:move`,
+      name: source,
+      feet,
+      provokes: false,
+      ...(towardId ? { towardActorId: towardId } : {})
+    });
   ctx.tableNarration.push({
     kind: "movement",
     text: `${source}: ${attacker.name} can move up to ${feet} feet without provoking Opportunity Attacks.`,

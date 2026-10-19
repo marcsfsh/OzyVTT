@@ -3,6 +3,7 @@ import { rollDice } from "@vtt/rules-5e";
 import { resolveDefinitionAction } from "../action-resolution.js";
 import { addAnnotation, shapeGeometry, templateOfArea } from "../annotations.js";
 import { areaOriginatesFromCaster, tokensInTemplate } from "../area-targeting.js";
+import { areaOriginHeight, creatureAtPoint, withinAreaHeight } from "../altitude.js";
 import { GameAccessDeniedError, requireActorAccess } from "../authorization.js";
 import { withSeenTargets } from "../resolution/seen-targets.js";
 import { builtinActionFor } from "../builtin-actions.js";
@@ -12,7 +13,8 @@ import { ActionResolveSchema, ActionUseSchema, DiceRollSchema } from "@vtt/domai
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
 import { heldRollFor, requireTypedDie } from "../held-rolls.js";
 import { damageAdjustmentDetail } from "../hit-points.js";
-import { tokenCreatureDistance } from "../movement-narration.js";
+import { activeMoveGrant } from "../granted-moves.js";
+import { mapDistance, tokenCreatureDistance } from "../movement-narration.js";
 import { settlePlayerDamage, type AppliedDamage } from "../player-damage.js";
 import { recordRoll, rolledTerms } from "../roll-history.js";
 import { effectiveModeFor, overrideWaives, rulesInForce } from "../rules-families.js";
@@ -171,6 +173,24 @@ export const actionCommands = [
               (id !== actorId || !casterOutside) &&
               (!draft.combat.active || draft.combat.initiative.some((entry) => entry.actorId === id))
           );
+          // Height: an area reaches up and down only as far as its shape does (a flier above a Fireball is spared).
+          resolvedTargetIds = withinAreaHeight(
+            draft,
+            resolvedTargetIds,
+            action.area ?? { shape: placed.shape, sizeFeet: snapped.sizeFeet, widthFeet: null },
+            areaOriginHeight(
+              draft,
+              actorId,
+              casterOutside,
+              creatureAtPoint(draft, calibration, snapped.origin),
+              calibration.distancePerCell
+            ),
+            (id) => {
+              const at = draft.combat.tokens.find((token) => token.actorId === id)?.position;
+              return at ? (mapDistance(geometry!, snapped.origin, at)?.value ?? null) : null;
+            },
+            calibration.distancePerCell
+          );
           // An area catches everyone under it, seen or not. Whether it holds anyone is judged on what the caster's
           // player can see, so an empty refusal never tells them a hidden creature is there. A spell that leaves its
           // area behind (Moonbeam, Web, a wall), or does nothing to whoever is in it (Minor Illusion's image), may be
@@ -259,6 +279,11 @@ export const actionCommands = [
             ...(request.shaping && request.shaping.length > 0 ? { shaping: request.shaping } : {}),
             ...(template ? { areaPlaced: true } : {}),
             ...(request.ready === true ? { ready: true } : {}),
+            ...(request.moveFirst === true ? { moveFirst: true } : {}),
+            // The rest of an action whose move was taken first was paid for then.
+            ...(request.moveFirst !== true && activeMoveGrant(draft, attacker)?.owedActionId === action.id
+              ? { owedPaid: true }
+              : {}),
             // Spell areas are the GM's to see, so only the GM aims a cast at one.
             ...(request.zoneId !== undefined && !isPlayer ? { zoneId: request.zoneId } : {}),
             ...(action.spellId !== undefined && standsInSilence(draft, actorId, geometry, kit.equipmentCatalog())

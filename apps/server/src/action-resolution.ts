@@ -38,6 +38,8 @@ import { withoutSourceName } from "./hidden-source.js";
 import { dartDamageTargetsOf, rollRiderDamage, rollWeaponDamage, spendDamageUses } from "./resolution/damage.js";
 import { commitEconomy, evaluateActionEconomy, useLimitFor } from "./resolution/economy.js";
 import { applyGrant } from "./resolution/grant.js";
+import { applyMovementGrants } from "./resolution/movement-grants.js";
+import { applyTimeStop } from "./time-stop.js";
 import { applySpellEndings } from "./resolution/dispel.js";
 import { readScroll } from "./resolution/scroll.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
@@ -118,6 +120,12 @@ export function resolveDefinitionAction(
     commitEconomy(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
+  // The action's move taken before the rest of it: its cost is spent and the move granted, and the rest waits.
+  if (input.moveFirst === true) {
+    commitEconomy(ctx);
+    applyMovementGrants(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
   // A failed check to read a scroll spends the cast and the scroll, and nothing else happens.
   if (readScroll(ctx)) {
     commitEconomy(ctx);
@@ -188,6 +196,8 @@ export function resolveDefinitionAction(
   markSpellUp(ctx);
   markCastTurn(ctx);
   openSpellZone(ctx);
+  applyMovementGrants(ctx);
+  applyTimeStop(ctx);
   applyGrant(ctx);
   placeCastSight(ctx);
   applyHealing(ctx);
@@ -439,6 +449,9 @@ function tapTargeting(
   }
   const structured =
     action.grants !== undefined ||
+    action.move !== undefined ||
+    action.teleport !== undefined ||
+    action.leap !== undefined ||
     action.multiattack !== undefined ||
     action.uses !== undefined ||
     action.spellSlot !== undefined ||

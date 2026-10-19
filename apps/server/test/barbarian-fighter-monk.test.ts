@@ -1789,6 +1789,11 @@ describe("Incapacitated: feature activations are refused too", () => {
       legendary: { cost: 1 }
     };
     const check = () => evaluateActionEconomy(built.state, foe, tail, [IDS.hero], undefined).violations;
+    // Right after a turn ends, before the next creature acts (SRD 5.2.1 Legendary Actions).
+    built.state.combat = {
+      ...built.state.combat,
+      turn: { ...built.state.combat.turn, afterActorId: built.state.combat.turnActorId! }
+    };
     expect(check()).toEqual([]);
     setCondition(built.state, IDS.foe, "stunned", true, undefined, { role: "gm" });
     expect(check().map((violation) => violation.rule)).toEqual(["condition.incapacitated"]);
@@ -1978,6 +1983,18 @@ describe("Barbarian: Brutal Strike gives up Advantage before the roll and rides 
     // The roll spent the declaration, and the turn's use is spent too.
     expect(built.hero.effects.some((effect) => effect.tags.includes("forgoes-advantage"))).toBe(false);
     expect(() => use(built, "brutal-strike")).toThrowError(/no uses remaining/);
+  });
+
+  it("gives Forceful Blow's half Speed of movement toward the target, provoking no Opportunity Attacks", () => {
+    const built = onTheTable(build(barbarianInput(9)));
+    use(built, "reckless-attack");
+    use(built, "brutal-strike");
+    swing(built, "item-greataxe", [15, 8, 6], { hitOptions: [{ id: "brutal-strike", effects: ["forceful-blow"] }] });
+    const speed = currentSpeedFeet(built.hero, deriveEquipment(built.hero, built.definition, catalog)) ?? 0;
+    expect(built.hero.effects.find((effect) => effect.grantedMove !== undefined)).toMatchObject({
+      name: "Brutal Strike: Forceful Blow",
+      grantedMove: { feet: Math.floor(speed / 10) * 5, provokes: false, towardActorId: IDS.foe }
+    });
   });
 
   it("is refused without Reckless Attack", () => {

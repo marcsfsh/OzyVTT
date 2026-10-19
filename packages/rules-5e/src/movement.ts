@@ -125,6 +125,9 @@ export function movementPath(
     /** Whether the footprint may step from one position to the next, such as no wall being in the way
      *  (`footprintStepBlocked`). Every step is open when absent. */
     isStepOpen?: (from: GridCell, to: GridCell) => boolean;
+    /** Whether the footprint squeezes through on that step (`footprintStepPassage`), which costs as Difficult Terrain
+     *  does. No step squeezes when absent. */
+    isStepSqueezed?: (from: GridCell, to: GridCell) => boolean;
     /** Cells added to every step's cost (1 while crawling, climbing or swimming without the speed). */
     extraPerStep?: number;
     /** Whether the mover's Speed is halved at this position, its top-left cell given (Spirit Guardians' Emanation). */
@@ -205,7 +208,9 @@ export function movementPath(
       const row = node.row + stepRow;
       if (!inBox(column, row) || !footprintFits(column, row)) continue;
       if (input.isStepOpen && !input.isStepOpen({ column: node.column, row: node.row }, { column, row })) continue;
-      const difficult = enteringIsDifficult(column, row);
+      const difficult =
+        enteringIsDifficult(column, row) ||
+        input.isStepSqueezed?.({ column: node.column, row: node.row }, { column, row }) === true;
       const halved = input.isHalved?.(column, row) === true;
       const cost = node.cost + ((difficult ? 2 : 1) + extraPerStep) * (halved ? 2 : 1);
       const key = keyOf(column, row);
@@ -330,6 +335,46 @@ export function footprintStepBlocked(
       if (row + 1 < size && crosses(cell, { column: cell.column, row: cell.row + 1 })) return true;
     }
   return false;
+}
+
+/**
+ * How a footprint passes from one position to the next: `open`; `squeeze` through a narrow opening (SRD 5.2.1
+ * Difficult Terrain: "A narrow opening sized for a creature one size smaller than you"), where a footprint one cell
+ * narrower fits through somewhere inside its own and every wall in the way ends within the footprint's reach, as the
+ * jambs of a door do (a wall running clean across the footprint is no opening); or `blocked`.
+ */
+export function footprintStepPassage(
+  from: GridCell,
+  to: GridCell,
+  sizeCells: number,
+  crosses: (a: GridPoint, b: GridPoint) => boolean,
+  walls: readonly GridSegment[] = []
+): "open" | "squeeze" | "blocked" {
+  if (!footprintStepBlocked(from, to, sizeCells, crosses)) return "open";
+  const size = Math.max(1, Math.round(sizeCells));
+  if (size < 2) return "blocked";
+  const narrower = [0, 1].some((column) =>
+    [0, 1].some((row) => {
+      const shift = (cell: GridCell) => ({ column: cell.column + column, row: cell.row + row });
+      return !footprintStepBlocked(shift(from), shift(to), size - 1, crosses);
+    })
+  );
+  if (!narrower) return "blocked";
+  const low = { column: Math.min(from.column, to.column), row: Math.min(from.row, to.row) };
+  const high = { column: Math.max(from.column, to.column) + size, row: Math.max(from.row, to.row) + size };
+  // Strictly inside: a wall that only touches the footprint's edge runs clean across it.
+  const inside = (point: GridPoint) =>
+    point.column > low.column + 1e-9 &&
+    point.column < high.column - 1e-9 &&
+    point.row > low.row + 1e-9 &&
+    point.row < high.row - 1e-9;
+  const opening = walls.every(
+    (wall) =>
+      !footprintStepBlocked(from, to, size, (a, b) => segmentsMeet(a, b, wall.a, wall.b)) ||
+      inside(wall.a) ||
+      inside(wall.b)
+  );
+  return opening ? "squeeze" : "blocked";
 }
 
 /** Whether a point lies in any of the rects, edges included. */

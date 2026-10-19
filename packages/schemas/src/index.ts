@@ -640,6 +640,23 @@ export const ModifierSchema = z
         ...riderGate
       })
       .strict(),
+    /** How the bearer falls and jumps, read live by the movement rules from features, items and effects. */
+    z
+      .object({
+        type: z.literal("movement"),
+        rule: z.enum(["safe-fall", "leap", "jump-by-dexterity", "jump-multiplier"]),
+        /** `leap`: how far the jump may go. */
+        feet: z.number().int().min(5).max(120).optional(),
+        /** `leap`: the movement it spends, whatever its length. */
+        costFeet: z.number().int().min(0).max(60).optional(),
+        /** `jump-multiplier`: what the jump's distance is multiplied by. */
+        times: z.number().int().min(2).max(4).optional(),
+        ...riderGate
+      })
+      .strict()
+      .describe(
+        'How the bearer falls and jumps (SRD Falling, Jumping): "safe-fall" takes no damage from a fall (Ring of Feather Falling); "leap" jumps up to `feet` for `costFeet` of movement once on each of its turns (Jump, Boots of Striding and Springing); "jump-by-dexterity" measures jumps with Dexterity in place of Strength (Second-Story Work); "jump-multiplier" multiplies the jump\'s distance by `times` (Step of the Wind). Read live by the movement rules, so it ends with its carrier.'
+      ),
     /**
      * Flat AC. `whileArmored` (the Defense fighting style) predates `when: [{type: "while-armored"}]` and
      * stays because shipped bundles use it.
@@ -1069,6 +1086,42 @@ export const EffectInstanceSchema = z
     /** Extra movement granted for the current turn, fixed when granted (Dash), so a later Slow does not rewrite it.
      * On a `dashing` effect without it, `effectiveSpeedFeet` falls back to doubling Speed. */
     movementGrantFeet: z.number().int().min(0).max(999).optional(),
+    /** A move an action or feature grants beside the turn's own movement ("moves up to half its Speed"), on the
+     *  bearer's turn or off it: the feet left, the way it travels (any of its ways when absent), whether leaving an
+     *  enemy's reach on it provokes Opportunity Attacks, and the turn it belongs to, which ends it. `straight`: it
+     *  must end nearer an enemy (a charge). `owedActionId`: the action it came from still owes the rest of itself
+     *  (Pounce taken move first). `awayFromActorId`: it must end farther from that creature (Dissonant Whispers);
+     *  `towardActorId`: nearer it (Forceful Blow). `jump`: a leap over what lies between, which spends `costFeet` of
+     *  the turn's own movement ("jumps up to 30 feet by spending 10 feet of movement"). */
+    grantedMove: z
+      .object({
+        feet: z.number().int().min(0).max(999),
+        mode: z.enum(["walk", "fly", "swim", "climb", "burrow"]).optional(),
+        provokes: z.boolean(),
+        straight: z.literal(true).optional(),
+        jump: z.literal(true).optional(),
+        costFeet: z.number().int().min(0).max(120).optional(),
+        round: z.number().int().positive(),
+        turnActorId: z.uuid().nullable(),
+        owedActionId: z.string().min(1).max(120).optional(),
+        awayFromActorId: z.uuid().optional(),
+        towardActorId: z.uuid().optional()
+      })
+      .strict()
+      .optional(),
+    /** A teleport an action, spell or feature grants (Misty Step): up to `feet` to an unoccupied space the bearer can
+     *  see, taken during the turn it belongs to with no movement spent. `failDamage`: arriving in a filled space fails
+     *  and deals this Force damage instead (Dimension Door). */
+    grantedTeleport: z
+      .object({
+        feet: z.number().int().min(5).max(10000),
+        round: z.number().int().positive(),
+        turnActorId: z.uuid().nullable(),
+        unseen: z.literal(true).optional(),
+        failDamage: DiceFormulaSchema.optional()
+      })
+      .strict()
+      .optional(),
     /** A reaction's lasting AC bonus (Shield: +5 until the caster's next turn), added to the stored AC while the
      * effect lasts; a penalty is negative (Slow's -2). Kept apart from `modifiers`, whose `armor-class` is written onto
      * the sheet and would outlast it. */
@@ -2053,6 +2106,24 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
       rangeFeet: ReactionRangeFeet
     })
     .strict(),
+  /** Feather Fall: when the reactor or a creature it can see within `rangeFeet` falls, this action lands on the
+   *  falling creature before the fall does. */
+  z
+    .object({ trigger: z.literal("falls"), response: z.literal("cast-on-faller"), rangeFeet: ReactionRangeFeet })
+    .strict(),
+  /** Slow Fall: when the reactor itself falls, the fall's damage is reduced by `perLevel` times its level in
+   *  `classId`. */
+  z
+    .object({
+      trigger: z.literal("falls"),
+      response: z.literal("reduce-fall-damage"),
+      perLevel: z.number().int().min(1).max(10),
+      classId: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(60)
+    })
+    .strict(),
   z
     .object({
       trigger: z.literal("casts-spell"),
@@ -2416,6 +2487,34 @@ export const CastsSpellsSchema = z
   })
   .strict();
 
+/** A move an action grants beside the turn's own (SRD 5.2.1 stat blocks: "The dragon moves up to half its Speed, and
+ *  it makes one Rend attack"). `speed`: half or all of the way's Speed, measured when it is taken; `mode`: the way it
+ *  travels (any of the creature's ways when absent); `provokes: false` for "without provoking Opportunity Attacks";
+ *  `straight` for a charge "straight toward an enemy"; `first` when the text moves before the rest of the action
+ *  does, so the move can be taken before the attack. */
+export const ActionMoveSchema = z
+  .object({
+    speed: z.enum(["half", "full"]),
+    mode: z.enum(["walk", "fly", "swim", "climb", "burrow"]).optional(),
+    provokes: z.boolean().default(true),
+    straight: z.literal(true).optional(),
+    first: z.literal(true).optional()
+  })
+  .strict();
+export type ActionMove = z.infer<typeof ActionMoveSchema>;
+
+/** A teleport an action grants: up to `feet` to an unoccupied space the creature can see. `unseen`: the space need
+ *  not be seen (Dimension Door's "a place you can ... visualize, or one you can describe"). `failDamage`: a space that
+ *  turns out filled fails the teleport and deals this Force damage (Dimension Door). */
+export const ActionTeleportSchema = z
+  .object({
+    feet: z.number().int().min(5).max(10000),
+    unseen: z.literal(true).optional(),
+    failDamage: DiceFormulaSchema.optional()
+  })
+  .strict();
+export type ActionTeleport = z.infer<typeof ActionTeleportSchema>;
+
 /** Mechanics fields are optional (ADR-0020): absent means prose only. Descriptions stay the display source of truth. */
 export const ActionSchema = z
   .object({
@@ -2650,6 +2749,16 @@ export const ActionSchema = z
     /** The area it covers, for the map template. Filled from the description where the action enters the system
      *  (the content build, a homebrew save, an import), so play never reads the prose. */
     area: ActionAreaSchema.optional(),
+    /** A move the action grants ("moves up to half its Speed"), see `ActionMoveSchema`. */
+    move: ActionMoveSchema.optional(),
+    /** A teleport the action grants ("teleports up to 60 feet to an unoccupied space it can see"), see
+     *  `ActionTeleportSchema`. */
+    teleport: ActionTeleportSchema.optional(),
+    /** A jump the action allows this turn ("jumps up to 30 feet by spending 10 feet of movement"). */
+    leap: z
+      .object({ feet: z.number().int().min(5).max(120), costFeet: z.number().int().min(0).max(60) })
+      .strict()
+      .optional(),
     /** What it does to light and sight while it lasts (a darkmantle's Darkness Aura, an octopus's ink). */
     sight: SightEffectSchema.optional(),
     /** The spells it casts, each its own cast action in play (a Spellcasting list, a Misty Step); see `CastsSpellsSchema`. */
