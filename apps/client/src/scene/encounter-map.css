@@ -58,10 +58,12 @@
   }
 }
 /* Staging tray chips: neutral plate, team colour on a 1px edge and the round avatar disc, painted on a
-   backing layer behind the drag surface. */
+   backing layer behind the drag surface. The tray keeps its height in the map column (`flex: none`): squeezed by a
+   short phone pane, its chips spilled over the map options row above it. */
 .encounter-token-tray {
   position: relative;
   isolation: isolate;
+  flex: none;
   min-height: 3.6rem;
   display: flex;
   align-items: center;
