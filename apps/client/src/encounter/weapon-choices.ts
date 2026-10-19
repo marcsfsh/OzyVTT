@@ -8,7 +8,9 @@ export type CarriedRow = Readonly<{
   recordId?: string;
   baseId?: string;
   weapon?: Readonly<{ rangeFeet: number | null; melee?: boolean; properties?: readonly string[] }>;
+  armor?: unknown;
   category?: string;
+  equipped?: boolean;
 }>;
 
 /**
@@ -31,4 +33,22 @@ export function weaponChoicesOf(
       row.weapon.melee ?? (row.weapon.rangeFeet === null || (row.weapon.properties ?? []).includes("thrown"));
     return !binds.melee || melee;
   });
+}
+
+/** The target's armor and weapons an action acts on (a rust monster's Antennae): the body armor it wears and the
+ *  weapons it carries, for the pick. The server checks the pick again, refusing a magic one or one of the wrong stuff. */
+export function objectChoicesOf(
+  rows: readonly CarriedRow[],
+  object: NonNullable<ContentActionSummary["choices"]>["object"]
+): readonly CarriedRow[] {
+  if (!object) return [];
+  return rows.filter(
+    (row) =>
+      row.quantity > 0 &&
+      ((object.kinds.includes("armor") &&
+        row.armor !== undefined &&
+        row.equipped === true &&
+        row.category !== "shield") ||
+        (object.kinds.includes("weapon") && row.weapon !== undefined))
+  );
 }

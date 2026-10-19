@@ -168,6 +168,7 @@ import type {
   SetActorHealthDisplaySchema,
   SetActorSheetPreviewSchema,
   SetActorLairSchema,
+  SetActorPickSchema,
   SetActorSizeSchema,
   SetActorVisibilitySchema,
   SetConditionSchema,
@@ -493,6 +494,11 @@ export interface ClientToServerEvents {
   /** GM marks a legendary creature as fighting in its lair, with the lair's counts, or out of it. */
   "actor:set-lair": (
     payload: CommandPayload<typeof SetActorLairSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM picks what a creature's stat block leaves to the GM (a Draconic Origin's damage type, a Training skill). */
+  "actor:set-pick": (
+    payload: CommandPayload<typeof SetActorPickSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   "actor:set-speed": (

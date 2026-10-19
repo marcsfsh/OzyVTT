@@ -63,6 +63,7 @@ import { releaseItemEffects } from "./resolution/endings.js";
 import { rebindRow } from "./resolution/rebind.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
+import { mendOnCast } from "./resolution/mend.js";
 import { stabilizeOnCast } from "./resolution/stabilize.js";
 import { raiseOnAction, reviveOnCast } from "./resolution/revival.js";
 import { killOnCast } from "./resolution/kill.js";
@@ -76,7 +77,13 @@ import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } f
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { endTargetMarks } from "./resolution/action-targets.js";
-import { markMultiattackDefense, strikeBackFromEffects, strikeBackOnHit } from "./resolution/struck.js";
+import {
+  corrodeOnHit,
+  markMultiattackDefense,
+  offerReactionToHit,
+  strikeBackFromEffects,
+  strikeBackOnHit
+} from "./resolution/struck.js";
 import {
   parkActionSave,
   parkBurstSave,
@@ -321,7 +328,9 @@ export function resolveDefinitionAction(
 
   applyOnHitEffects(ctx);
   strikeBackOnHit(ctx);
+  corrodeOnHit(ctx);
   strikeBackFromEffects(ctx);
+  offerReactionToHit(ctx);
   markMultiattackDefense(ctx);
   applyMasteryForces(ctx);
   startConcentration(ctx);
@@ -346,6 +355,7 @@ export function resolveDefinitionAction(
   applyHealing(ctx);
   prayerShortRest(ctx);
   applyConditionCures(ctx);
+  mendOnCast(ctx);
   applySpellEndings(ctx);
   stabilizeOnCast(ctx);
   reviveOnCast(ctx);

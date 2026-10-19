@@ -45,7 +45,11 @@ function reactionLine(outcome: ReactionOutcome): { kind: "reaction" | "damage"; 
       return outcome.used
         ? {
             kind: "reaction",
-            text: `${outcome.actorName} used ${outcome.actionName}, and ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}${detail}.`
+            text: `${outcome.actorName} used ${outcome.actionName}, and ${outcome.proposedDamage} damage becomes ${outcome.appliedDamage}${detail}.${
+              resolution?.save
+                ? ` It turns the force on ${outcome.other?.name ?? "a creature"}: DC ${resolution.save.dc} ${resolution.save.ability.toUpperCase()} save.`
+                : ""
+            }`
           }
         : {
             kind: "damage",
@@ -99,6 +103,18 @@ function reactionLine(outcome: ReactionOutcome): { kind: "reaction" | "damage"; 
           ? `DC ${resolution.save.dc} ${resolution.save.ability.toUpperCase()} save`
           : (damage ?? "no damage");
       return { kind: "reaction", text: `${outcome.actorName} ${what} - ${result}.` };
+    }
+    case "triggered": {
+      if (!outcome.used) return null;
+      const target = outcome.other?.name;
+      const uses = resolution && resolution.actionName !== outcome.actionName ? ` (${resolution.actionName})` : "";
+      const result = verdict
+        ? `: ${verdict}${damage ? `, ${damage}` : ""}`
+        : resolution?.save
+          ? `: DC ${resolution.save.dc} ${resolution.save.ability.toUpperCase()} save`
+          : "";
+      const aimed = target && (verdict || resolution?.save) ? ` against ${target}` : "";
+      return { kind: "reaction", text: `${outcome.actorName} used ${outcome.actionName}${aimed}${uses}${result}.` };
     }
     case "attack-targeted": {
       if (!resolution) return null;
@@ -155,7 +171,7 @@ export const reactionCommands = [
     type: "reaction.answer",
     operationId: "answerReaction",
     description:
-      "Answers a pending reaction prompt; `use: true` spends the reaction, `use: false` declines it. What else happens depends on the prompt's `kind`. `hit-by-attack` (Uncanny Dodge, Deflect Attacks) and `takes-damage` (Stone's Endurance, Superior Hunter's Defense): the parked damage applies either way, halved, less a rolled amount, or met with Resistance to its type on use. `roll-answer` (Cutting Words, Countercharm, Improve Fate): use applies the answer to the other creature's roll (`subtract` takes an either-way die off), and either way the roll moves on to the next creature that may answer it, then lands. `attack-would-hit` (Parry, Shield): the attack waiting at its roll finishes either way with the same die, against AC raised by the reaction on use, and a hit's damage applies. `leaves-reach` (an opportunity attack) and `damaged-by-creature` (Hellish Rebuke, Retaliation): use strikes the creature with one melee attack with a weapon or an Unarmed Strike (another action is refused), previewable with `commit: false`, the confirm carrying the `hitOptions` its preview offered (Sneak Attack), and damage that lands applies. `casts-spell` (Counterspell): the cast waits before anything of it happens; use spends the reaction and a slot, and the caster rolls the saving throw against the reactor's spell save DC, a failure losing the spell with its slot unspent; once every prompt on the cast is answered without stopping it, the cast goes ahead and spends its slot. `slotLevel` casts a reaction spell with a higher slot, which upcasts it (Hellish Rebuke's dice). Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
+      "Answers a pending reaction prompt; `use: true` spends the reaction, `use: false` declines it. What else happens depends on the prompt's `kind`. `hit-by-attack` (Uncanny Dodge, Deflect Attacks) and `takes-damage` (Stone's Endurance, Superior Hunter's Defense): the parked damage applies either way, halved, less a rolled amount, or met with Resistance to its type on use. `roll-answer` (Cutting Words, Countercharm, Improve Fate): use applies the answer to the other creature's roll (`subtract` takes an either-way die off), and either way the roll moves on to the next creature that may answer it, then lands. `attack-would-hit` (Parry, Shield): the attack waiting at its roll finishes either way with the same die, against AC raised by the reaction on use, and a hit's damage applies. `leaves-reach` (an opportunity attack) and `damaged-by-creature` (Hellish Rebuke, Retaliation): use strikes the creature with one melee attack with a weapon or an Unarmed Strike (another action is refused), previewable with `commit: false`, the confirm carrying the `hitOptions` its preview offered (Sneak Attack), and damage that lands applies. `triggered` (a stat block's reaction to a hit, a creature's turn starting or ending or its move ending nearby, or damage it takes: Reflexive Antennae, Unnerving Gaze, Ink Cloud, Pursuit, Split, named by `cause`): use does what the reaction says, against the creature that set it off (its action's save or swing) or on the reactor (its area and move, a teleport near that creature, splitting in two). Deflect Missile's use, when the reduction takes the damage to 0, turns its save on `redirectTo`, one of the prompt's `redirectChoices`, else on the attacker. `casts-spell` (Counterspell): the cast waits before anything of it happens; use spends the reaction and a slot, and the caster rolls the saving throw against the reactor's spell save DC, a failure losing the spell with its slot unspent; once every prompt on the cast is answered without stopping it, the cast goes ahead and spends its slot. `slotLevel` casts a reaction spell with a higher slot, which upcasts it (Hellish Rebuke's dice). Player sessions may answer only their claimed character's prompts. The response carries the `outcome`.",
     summary: "Answer a pending reaction prompt: use it (spend the reaction) or decline it.",
     schema: ReactionAnswerSchema,
     malformed: "The reaction answer is malformed.",

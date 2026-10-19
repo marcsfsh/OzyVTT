@@ -60,6 +60,7 @@ describe("rule families", () => {
       // A controlled mount's action: what it may take is the economy of its turn.
       ["mount.controlled", "economy"],
       ["economy.action-used", "economy"],
+      ["action.underwater-only", "economy"],
       ["economy.bonus-action-used", "economy"],
       ["economy.reaction-used", "economy"],
       ["economy.not-your-turn", "economy"],

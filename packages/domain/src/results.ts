@@ -544,11 +544,14 @@ export const ActionAvailabilitySchema = z.strictObject({
           melee: z.literal(true).optional(),
           ammunition: z.enum(["only", "also"]).optional()
         })
+        .optional(),
+      object: z
+        .strictObject({ kinds: z.array(z.enum(["armor", "weapon"])), metal: z.literal(true).optional() })
         .optional()
     })
     .optional()
     .describe(
-      "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), and `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`; `ammunition`: only a stack of ammunition (`only`), or one as well as a weapon (`also`))"
+      "What the action asks its user to choose as it resolves: `options` (sent as the resolve's `optionId`, or `targetOptions` with one pick for each target when `optionsPerTarget`), `bindsWeapon`, the carried weapon its grant binds to (sent as `itemId`, limited to `weaponIds` and to Melee weapons when `melee`; `ammunition`: only a stack of ammunition (`only`), or one as well as a weapon (`also`)), and `object`, the target's armor or weapon it acts on (sent as `objectItemId`; absent, the target's worn armor, else its weapon in hand)"
     ),
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple), and
    *  the tools its user may help with through Help with a Check, which carry their name. */
@@ -890,6 +893,9 @@ const SpellChoicesSchema = z.strictObject({
     .strictObject({
       spellIds: z.array(z.string()),
       freeLeft: z.number().int().min(0),
+      /** Free additions a feature gives for spells of one school, beyond the levels' (Evocation Savant's one each time
+       *  a new level of spell slots opens). */
+      freeOfSchool: z.strictObject({ school: z.string(), left: z.number().int().min(0) }).nullable(),
       maxLevel: z.number().int().min(0).max(9),
       addable: z.array(z.string())
     })

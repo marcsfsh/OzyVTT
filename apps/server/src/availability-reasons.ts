@@ -168,6 +168,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "range.out-of-range": () => "Out of range.",
   "range.out-of-reach": () => "Out of reach.",
   "range.underwater": () => "Out of range underwater.",
+  "action.underwater-only": () => "Only underwater.",
   "target.grappled-by-source": () => "You aren't grappling that creature.",
   "target.too-large-to-grapple": () => "That creature is too large.",
   "target.not-an-enemy": () => "Choose an enemy.",

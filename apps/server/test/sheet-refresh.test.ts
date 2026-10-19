@@ -87,6 +87,24 @@ describe("rebuilding stored sheets when the content changes", () => {
     expect(hero.inventory).toEqual(before.inventory);
   });
 
+  it("keeps the counters a rule holds outside a pool through the rebuild", () => {
+    const state = table(builtBefore(ranger()));
+    const hero = state.actors[0]!;
+    const counters = {
+      "relentless-rage": 2,
+      overchannel: 1,
+      "torch-uses": 3,
+      "conversion-nature-magician": 1,
+      "pearl-of-power-row-1": 1,
+      "casts-since-rest-augury": 2
+    };
+    hero.actionUses = { ...hero.actionUses, ...counters };
+
+    expect(refreshBuiltSheets(state, { library, policy, catalog }).rebuilt).toEqual([RANGER]);
+
+    expect(state.actors[0]!.actionUses).toEqual({ "favored-enemy": 1, ...counters });
+  });
+
   it("only stamps a sheet the current content builds the same", () => {
     const sheet = ranger();
     const state = table({ ...sheet, source: { ...sheet.source, version: "1" } });

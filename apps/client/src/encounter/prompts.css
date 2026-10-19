@@ -208,6 +208,20 @@
 .reaction-prompt .save-prompt-label strong {
   color: var(--text);
 }
+/* Deflect Missile's pick of who the force turns on: the label wraps above the menu on a phone. */
+.reaction-redirect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+.reaction-redirect select {
+  min-height: var(--tap-min);
+  max-width: 100%;
+}
 /* The GM's forced Advantage or Disadvantage: a pair kept together when the confirm row wraps. */
 .roll-force {
   display: inline-flex;

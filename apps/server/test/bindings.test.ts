@@ -165,17 +165,15 @@ describe("a Hunting Trap's hold", () => {
     const table = twoOfThem();
     const save = catalog.equipmentRecord("hunting-trap")!.actions[0]!.save!;
     // The hold a failed save leaves (zone-commands.test.ts walks a creature into the trap).
-    table
-      .actor(IDS.wizard)
-      .effects.push(
-        makeEffect({
-          id: "trap",
-          name: "Hunting Trap",
-          duration: { type: "manual" },
-          speedZero: true,
-          endedBy: save.endedBy!
-        })
-      );
+    table.actor(IDS.wizard).effects.push(
+      makeEffect({
+        id: "trap",
+        name: "Hunting Trap",
+        duration: { type: "manual" },
+        speedZero: true,
+        endedBy: save.endedBy!
+      })
+    );
     fightOf(table, IDS.fighter);
     const before = table.actor(IDS.wizard).hp.current;
     // Athletics +7 with Advantage: a pair of 2s totals 9.
@@ -190,17 +188,15 @@ describe("a Hunting Trap's hold", () => {
   it("can't be freed by a creature out of reach", () => {
     const table = twoOfThem();
     const save = catalog.equipmentRecord("hunting-trap")!.actions[0]!.save!;
-    table
-      .actor(IDS.wizard)
-      .effects.push(
-        makeEffect({
-          id: "trap",
-          name: "Hunting Trap",
-          duration: { type: "manual" },
-          speedZero: true,
-          endedBy: save.endedBy!
-        })
-      );
+    table.actor(IDS.wizard).effects.push(
+      makeEffect({
+        id: "trap",
+        name: "Hunting Trap",
+        duration: { type: "manual" },
+        speedZero: true,
+        endedBy: save.endedBy!
+      })
+    );
     fightOf(table, IDS.fighter);
     expect(() => resolveAt(table, IDS.fighter, "end-an-effect", [12], { targetIds: [IDS.wizard] }, 15)).toThrow();
   });

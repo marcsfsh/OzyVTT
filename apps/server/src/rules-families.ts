@@ -70,6 +70,8 @@ const RULE_FAMILIES = {
   // "Legendary actions are taken right after other creatures' turns" is a timing/economy rule...
   "legendary.own-turn": "economy",
   "legendary.after-a-turn": "economy",
+  // What a creature can do only underwater (a seahorse's Bubble Dash) in a fight that isn't.
+  "action.underwater-only": "economy",
   // An extra attack (Light, Cleave) is owed only once the swing that opens it has happened this turn.
   "attack.light-needs-attack": "economy",
   "attack.cleave-needs-hit": "economy",

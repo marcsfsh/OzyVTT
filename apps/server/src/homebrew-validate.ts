@@ -340,14 +340,10 @@ function speciesIssues(entry: SpeciesReference, checks: Checks) {
         `Two lineages of ${entry.name} share one id, so only the first would ever be granted. Give ${lineage.name} its own.`
       );
     seen.add(lineage.id);
-    // Lineage traits are flattened untagged, so a choice there would be offered for every lineage.
-    lineage.traits.forEach((trait, traitIndex) => {
-      if (featurePicks(trait).length > 0)
-        checks.add(
-          ["lineages", index, "traits", traitIndex, "choice"],
-          `${trait.name} asks the player to choose from inside a lineage. Lineage traits cannot carry choices yet. Move the choice up to a species trait.`
-        );
-    });
+    // A lineage trait's pick is offered only to a character of that lineage (the High Elf's cantrip).
+    lineage.traits.forEach((trait, traitIndex) =>
+      featureIssues(trait, ["lineages", index, "traits", traitIndex], checks, 1)
+    );
   });
 
   const self: SelfCatalog = {
@@ -418,6 +414,27 @@ function monsterIssues(definition: ActorDefinition, id: string, checks: Checks) 
       ["extensions", STATBLOCK_EXTENSION, "type"],
       `${definition.name} has no creature type, so the bestiary would list it with none and a search by type would never find it. Pick its creature type.`
     );
+  // A reaction that uses another action (Reflexive Antennae, Pursuit) and a damage part of a picked type (a
+  // half-dragon's Claw) find what they name on the same stat block, or they do nothing in play.
+  const picks = new Set(
+    (definition.traitMechanics ?? []).flatMap((mechanic) => (mechanic.kind === "pick" ? [mechanic.key] : []))
+  );
+  definition.actions.forEach((action, index) => {
+    const reaction = action.reaction;
+    const uses = reaction && "usesAction" in reaction ? reaction.usesAction : undefined;
+    if (uses !== undefined && !definition.actions.some((sibling) => sibling.id === uses))
+      checks.add(
+        ["actions", index, "reaction", "usesAction"],
+        `${action.name} uses an action ${definition.name} doesn't have. Pick one of its actions.`
+      );
+    action.damage.forEach((part, partIndex) => {
+      if (part.pick !== undefined && !picks.has(part.pick))
+        checks.add(
+          ["actions", index, "damage", partIndex, "pick"],
+          `${action.name} deals the damage type of a choice ${definition.name}'s traits don't offer. Add the trait that offers it, or give the damage a type.`
+        );
+    });
+  });
 }
 
 /** A template's `appliesTo.baseIds` must resolve to items with the stats the bind copies (weapon or armor), or to

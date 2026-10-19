@@ -5,7 +5,9 @@ import type { EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { halvedDamageParts, previewDamage } from "./hit-points.js";
 import { offerableReaction } from "./reaction-offers.js";
-import type { LiveActor } from "./resolution/context.js";
+import type { DefinitionAction, LiveActor } from "./resolution/context.js";
+import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
+import { sceneSight } from "./vision/sight.js";
 import { answerKeyOf, answersFromOthers, askAnswer, type AnswerDeps } from "./roll-answers.js";
 import { sightRules } from "./vision/rules.js";
 
@@ -203,11 +205,42 @@ export function openDamageWindow(
     ...(response.kind === "half" ? {} : { damageResponse: response }),
     ...(held.drain ? { drain: held.drain } : {}),
     ...(held.hitKinds.length > 0 ? { hitKinds: [...held.hitKinds] } : {}),
+    ...redirectChoicesOf(state, held.target, offer, deps),
     asked: [...held.asked, OWN_REACTION],
     createdAt: Date.parse(deps.now())
   };
   state.combat = { ...state.combat, pendingReactions: [...state.combat.pendingReactions, prompt] };
   return { prompt, line: null };
+}
+
+/** A stone giant's Deflect Missile: the creatures it may turn the force on, if the reduction takes the damage to 0
+ *  ("one creature the giant can see within 60 feet"), nearest first. */
+function redirectChoicesOf(
+  state: GameState,
+  reactor: LiveActor,
+  offer: Readonly<{ action: DefinitionAction; reaction: ActionReaction }>,
+  deps: DamageWindowDeps
+): Partial<Pick<PendingReaction, "redirectChoices">> {
+  if (offer.reaction.response !== "reduce-damage" || offer.reaction.redirect !== true || !deps.distanceFeet) return {};
+  const reach = offer.action.targets?.rangeFeet ?? 60;
+  const sight = sceneSight(state, {
+    definition: deps.resolveDefinition,
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  });
+  const choices = state.combat.initiative
+    .map((entry) => state.actors.find((actor) => actor.id === entry.actorId))
+    .filter((actor): actor is LiveActor => actor !== undefined && actor.id !== reactor.id && actor.hp.current > 0)
+    .map((actor) => ({ actor, distance: deps.distanceFeet!(reactor.id, actor.id) }))
+    .filter(
+      ({ actor, distance }) =>
+        distance !== null &&
+        distance <= reach + DISTANCE_TOLERANCE_FEET &&
+        (!sight.enabled || sight.sees(reactor.id, actor.id))
+    )
+    .sort((left, right) => left.distance! - right.distance!)
+    .slice(0, 12)
+    .map(({ actor }) => ({ actorId: actor.id, name: actor.name }));
+  return choices.length > 0 ? { redirectChoices: choices } : {};
 }
 
 /** The damage a damage reaction leaves to land: halved, a rolled amount taken off, or kept whole while a Resistance

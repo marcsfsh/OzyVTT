@@ -8,6 +8,10 @@ import { createPendingSaves } from "../saving-throws.js";
 import { creatureTypeOf } from "../statblock-facts.js";
 import { traitOf } from "../statblock-traits.js";
 import { tableLineOf, type ResolveContext } from "./context.js";
+import { shotFrom } from "../ammunition.js";
+import { isMagicRow, penalizeRow } from "../row-penalties.js";
+import { dealsDamage } from "./on-hit.js";
+import { offerHitReaction } from "../triggered-reactions.js";
 
 /** The tag, and the option id, of a Hunter's Multiattack Defense. */
 export const MULTIATTACK_DEFENSE_TAG = "multiattack-defense";
@@ -15,7 +19,7 @@ export const MULTIATTACK_DEFENSE_TAG = "multiattack-defense";
 /**
  * What hitting the target costs the attacker, from the target's stat block: "A creature that hits the pudding with a
  * melee attack roll takes 4 (1d8) Acid damage" (a black pudding's Corrosive Form). It lands as the hit does, through
- * the attacker's defences; what it does to the weapon is the GM's.
+ * the attacker's defences; what it does to the weapon is `corrodeOnHit`'s.
  */
 export function strikeBackOnHit(ctx: ResolveContext): void {
   const { state, attack, attacker, targets, deps } = ctx;
@@ -55,6 +59,46 @@ export function strikeBackOnHit(ctx: ResolveContext): void {
     actorIds: [attacker.id, target.id]
   });
   for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
+}
+
+/**
+ * What hitting the target does to the attacker's weapon (SRD 5.2.1 Corrosive Form: "Any nonmagical weapon takes a
+ * cumulative -1 penalty to attack rolls immediately after dealing damage to the pudding and coming into contact with
+ * it. The weapon is destroyed if the penalty reaches -5"). A weapon swung or thrown touches it; a bow or a sling
+ * doesn't, and its ammunition is destroyed instead (`ammunition.ts`).
+ */
+export function corrodeOnHit(ctx: ResolveContext): void {
+  const { state, attack, attacker, targets, input, deps } = ctx;
+  if (attack === null || (attack.outcome !== "hit" && attack.outcome !== "crit") || input.commit === false) return;
+  const target = targets.find((candidate) => candidate.id === attack.targetId) ?? targets[0];
+  const definition = target?.definitionId ? deps.resolveDefinition?.(target.definitionId) : undefined;
+  if (!traitOf(definition, "corrodes-gear")?.weapons || !deps.resolveDefinition) return;
+  const row = ctx.riderItemId ? attacker.inventory.find((entry) => entry.id === ctx.riderItemId) : undefined;
+  if (!row?.weapon || isMagicRow(row, deps.catalog) || shotFrom(attacker, row.id, deps.catalog) !== null) return;
+  if (!dealsDamage(ctx)) return;
+  for (const event of penalizeRow(state, attacker.id, row.id, {
+    resolveDefinition: deps.resolveDefinition,
+    ...(deps.catalog ? { catalog: deps.catalog } : {})
+  }))
+    ctx.tableNarration.push(tableLineOf(ctx, event));
+}
+
+/** An attack roll that hit its target opens the target's reaction to being hit (a rust monster's Reflexive Antennae:
+ *  "An attack roll hits the rust monster. Response: The rust monster uses Antennae"). */
+export function offerReactionToHit(ctx: ResolveContext): void {
+  const { state, attack, attacker, targets, input, deps } = ctx;
+  if (attack === null || (attack.outcome !== "hit" && attack.outcome !== "crit") || input.commit === false) return;
+  const target = targets.find((candidate) => candidate.id === attack.targetId) ?? targets[0];
+  if (!target || !deps.resolveDefinition) return;
+  const line = offerHitReaction(state, target, attacker, {
+    newId: deps.newRollId,
+    now: deps.now,
+    resolveDefinition: deps.resolveDefinition,
+    ...(deps.catalog ? { catalog: deps.catalog } : {}),
+    ...(deps.distanceFeet ? { distanceFeet: deps.distanceFeet } : {}),
+    commandId: input.commandId
+  });
+  if (line) ctx.tableNarration.push(tableLineOf(ctx, line));
 }
 
 /**

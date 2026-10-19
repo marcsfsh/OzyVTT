@@ -51,6 +51,8 @@ import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-tra
 import { applyDamageDetailed, previewDamage, adjustableActor, healActor, killOutright } from "./hit-points.js";
 import { openDamageWindow } from "./damage-window.js";
 import { applyHitPointBand, banishOnFailure, hitPointBandOf } from "./fatal-saves.js";
+import { applyMarginCompanion, marginBandOf, withMarginBand } from "./save-margins.js";
+import { penalizeRow } from "./row-penalties.js";
 import { regurgitate, swallowLands, SWALLOWED_TAG } from "./swallow.js";
 import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
@@ -1252,9 +1254,23 @@ export function answerSave(
         `${commandId}:${saveId}:banished`
       )
     );
-  if (!success && band === null && pending.onFailEffect)
+  // "Failure by 5 or More": the band's conditions and duration stand in for the failure's, with what lasts while they do.
+  const margin = !success && band === null ? marginBandOf(pending, total) : null;
+  if (!success && band === null && pending.onFailEffect) {
+    const onFail = margin ? withMarginBand(pending.onFailEffect, margin) : pending.onFailEffect;
+    events.push(...applyFailureEffect(state, target.id, onFail, `${commandId}:${saveId}:fail`, immunities));
+    if (margin)
+      events.push(
+        ...applyMarginCompanion(state, target.id, onFail, margin, `${commandId}:${saveId}:margin`, immunities)
+      );
+  }
+  // A rust monster's Antennae: the armor or weapon the failure marks takes a cumulative -1.
+  if (!success && pending.objectPenalty)
     events.push(
-      ...applyFailureEffect(state, target.id, pending.onFailEffect, `${commandId}:${saveId}:fail`, immunities)
+      ...penalizeRow(state, target.id, pending.objectPenalty.rowId, {
+        resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
+        ...(deps.catalog ? { catalog: deps.catalog } : {})
+      })
     );
   // A gibbering mouther's d8 decides what the creature does this turn.
   if (!success && pending.onFailEffect?.tags.includes(GIBBERING_TAG))

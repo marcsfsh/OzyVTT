@@ -11,11 +11,12 @@ import type { TargetRow } from "../table/targetRows";
 import { InFooter } from "../table/footerSlot";
 import { ShapeChoices } from "./ShapeChoices";
 import { revealInRegion } from "../lib/reveal";
-import { weaponChoicesOf, type CarriedRow } from "./weapon-choices";
+import { objectChoicesOf, weaponChoicesOf, type CarriedRow } from "./weapon-choices";
 import {
   clearTargeting,
   placeAnotherTemplate,
   setBoundItem,
+  setObjectItem,
   setChoiceOption,
   setCheckSkill,
   setChosenAbility,
@@ -66,6 +67,7 @@ export function ActionTargetPicker({
   onInvalidFace,
   insideNow,
   carried = [],
+  carriedBy,
   onMoveFirst,
   onLookAtDamage
 }: Readonly<{
@@ -81,6 +83,8 @@ export function ActionTargetPicker({
   insideNow?: readonly TargetRow[];
   /** What the acting creature carries, for a grant cast on one of its weapons (Magic Weapon). */
   carried?: readonly CarriedRow[];
+  /** What another creature carries, for an action at its armor or weapon (a rust monster's Antennae). */
+  carriedBy?: (actorId: string) => readonly CarriedRow[];
   /** Take the action's own move first (Pounce), when it has one that comes before the rest. */
   onMoveFirst?: () => void;
   /** Roll the damage and look at it before it counts, for an answer to it (Empowered Spell, Heroic Inspiration). */
@@ -278,7 +282,7 @@ export function ActionTargetPicker({
           </Select>
         </label>
       )}
-      <ChoicePicks picking={picking} targets={targets} carried={carried} />
+      <ChoicePicks picking={picking} targets={targets} carried={carried} carriedBy={carriedBy} />
       <ShapeChoices
         action={picking.action}
         choice={picking}
@@ -411,16 +415,21 @@ export function ActionTargetPicker({
 function ChoicePicks({
   picking,
   targets,
-  carried
+  carried,
+  carriedBy
 }: Readonly<{
   picking: TargetingSession;
   targets: ReadonlyArray<Pick<TargetRow, "id" | "label">>;
   carried: readonly CarriedRow[];
+  carriedBy?: (actorId: string) => readonly CarriedRow[];
 }>) {
   const choices = picking.action.choices;
   if (!choices) return null;
   const options = choices.options ?? [];
   const weapons = weaponChoicesOf(carried, choices.bindsWeapon);
+  // The one target's armor and weapons, once it is picked.
+  const holder = picking.selected.length === 1 ? picking.selected[0]! : null;
+  const objects = holder && carriedBy ? objectChoicesOf(carriedBy(holder), choices.object) : [];
   const optionSelect = (key: string, label: string, value: string | undefined, onPick: (id: string) => void) => (
     <label className="action-damage-type" key={key}>
       <span>{label}</span>
@@ -472,6 +481,22 @@ function ChoicePicks({
                 : "No weapon it can be used on is carried."}
             </span>
           )}
+        </label>
+      )}
+      {choices.object && objects.length > 0 && (
+        <label className="action-damage-type">
+          <span>Object</span>
+          <Select
+            value={picking.objectItemId ?? ""}
+            onChange={(event) => setObjectItem(event.target.value === "" ? undefined : event.target.value)}
+          >
+            <option value="">Worn armor, else weapon in hand</option>
+            {objects.map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.name}
+              </option>
+            ))}
+          </Select>
         </label>
       )}
     </>

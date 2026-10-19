@@ -152,7 +152,18 @@ function resolveTheFixture(definition: ActorDefinition) {
         kind: "monster",
         visibility: "public",
         hp: { current: 40, maximum: 40 },
-        armorClass: 12
+        armorClass: 12,
+        // The SRD's printing reaches only a creature the aboleth Charms or Grapples.
+        conditions: [{ id: "charmed" }],
+        effects: [
+          {
+            id: "charmed-by-the-caster",
+            name: "Charmed",
+            sourceActorId: IDS.caster,
+            linkedConditionIds: ["charmed"],
+            duration: { type: "manual" }
+          }
+        ]
       }
     ]
   });
@@ -2238,7 +2249,7 @@ describe("a settled pick the character may re-make (`replaces`): through both pa
     expect(field.validate?.("f1", { id: "f2" }, EMPTY_CONTEXT)).toBeNull();
   });
 
-  it("2. SRD content authors the same shape: 10 picks re-made on a rest and 7 superseding features", () => {
+  it("2. SRD content authors the same shape: 13 picks re-made on a rest and 7 superseding features", () => {
     const library = new ContentLibrary().forAudience("gm");
     const clauses: Array<{ id: string; clause: Record<string, unknown> }> = [];
     const supersedes: Array<{ id: string; replaced: string }> = [];
@@ -2261,15 +2272,18 @@ describe("a settled pick the character may re-make (`replaces`): through both pa
     for (const summary of library.subclassSummaries()) walk(library.subclassRecord(summary.id));
     for (const summary of library.featSummaries()) walk(library.featRecord(summary.id));
 
-    // The rest clauses at the time of writing: Circle of the Land, Fiendish Resilience, the Hunter's two options, the
-    // Wizard's cantrips and Weapon Mastery in its five classes. The level-up clauses are the replacements a player
-    // may make when levelling (`level-up-picks.ts`).
+    // The rest clauses at the time of writing: Circle of the Land, Fiendish Resilience, the Hunter's two options, Pact
+    // of the Tome's cantrips and rituals, Spell Mastery, the Wizard's cantrips and Weapon Mastery in its five classes.
+    // The level-up clauses are the replacements a player may make when levelling (`level-up-picks.ts`).
     const onRests = clauses.filter((entry) => entry.clause.when !== "level-up");
     expect(onRests.map((entry) => entry.id).sort()).toEqual([
       "circle-of-the-land-spells",
       "defensive-tactics",
       "fiendish-resilience",
       "hunters-prey",
+      "pact-of-the-tome",
+      "pact-of-the-tome",
+      "spell-mastery",
       "spellcasting",
       ...Array<string>(5).fill("weapon-mastery")
     ]);
@@ -2762,7 +2776,7 @@ describe("the spell window and the ASI ceiling: through both paths", () => {
     expect(upsideDown.why).toContain("The lowest spell level for Borrowed Mystery's choice is above the highest");
   });
 
-  it("2. SRD content authors the same shapes: 17 ceilings, 11 floors, 7 epic boons", () => {
+  it("2. SRD content authors the same shapes: 18 ceilings, 12 floors, 7 epic boons", () => {
     const library = new ContentLibrary().forAudience("gm");
     const found: Array<{
       id: string;
@@ -2808,7 +2822,7 @@ describe("the spell window and the ASI ceiling: through both paths", () => {
     const ceilings = found.filter((entry) => entry.max !== undefined);
     const floors = found.filter((entry) => entry.min !== undefined);
     const maxima = found.filter((entry) => entry.maximum !== undefined);
-    expect(ceilings).toHaveLength(17);
+    expect(ceilings).toHaveLength(18);
     expect(floors.map((entry) => entry.id).sort()).toEqual([
       "evocation-savant",
       // Magic Initiate's "level 1 spell" is exact too.
@@ -2819,6 +2833,8 @@ describe("the spell window and the ASI ceiling: through both paths", () => {
       "mystic-arcanum-level-7-spell",
       "mystic-arcanum-level-8-spell",
       "mystic-arcanum-level-9-spell",
+      // Pact of the Tome's "two level 1 spells that have the Ritual tag".
+      "pact-of-the-tome",
       "signature-spells",
       "spell-mastery",
       "spell-mastery"
@@ -2829,8 +2845,9 @@ describe("the spell window and the ASI ceiling: through both paths", () => {
     expect(maxima).toHaveLength(7);
     expect(maxima.every((entry) => entry.maximum === WINDOW.ceiling && entry.kind === "ability-score")).toBe(true);
 
-    // Every window author draws on a spell catalog, and every ceiling author on a typed list of abilities.
-    expect(ceilings.every((entry) => /-spells(-of-[a-z]+)?$/.test(entry.fromCatalog ?? ""))).toBe(true);
+    // Every window author draws on a spell catalog (a class's list, or `spells`, every list, for Pact of the Tome), and
+    // every ceiling author on a typed list of abilities.
+    expect(ceilings.every((entry) => /(^|-)spells(-of-[a-z]+)?$/.test(entry.fromCatalog ?? ""))).toBe(true);
     expect(maxima.every((entry) => entry.fromCatalog === undefined)).toBe(true);
   });
 

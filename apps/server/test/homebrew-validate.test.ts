@@ -449,7 +449,8 @@ describe("tier 3: cross-record references, continued", () => {
     expect(validateForPublish("species", species("lineage"), contextWith()).valid).toBe(true);
   });
 
-  it("refuses a choice authored on a LINEAGE trait, which the catalog flattens with no lineage tag", () => {
+  // The build offers a lineage trait's pick only to a character of that lineage (the High Elf's cantrip).
+  it("publishes a choice authored on a lineage trait", () => {
     const validity = validateForPublish(
       "species",
       {
@@ -469,7 +470,7 @@ describe("tier 3: cross-record references, continued", () => {
       },
       contextWith()
     );
-    expect(messages(validity)).toContain("Lineage traits cannot carry choices yet");
+    expect(validity.issues.filter((issue) => issue.path[0] === "lineages")).toEqual([]);
   });
 
   it('refuses a monster with no challenge rating or creature type: the picker would show "CR 0 unknown"', () => {
@@ -526,6 +527,49 @@ describe("tier 3: cross-record references, continued", () => {
     }
     // And the guard is not simply refusing everything.
     expect(passed).toBe(1);
+  });
+
+  it("refuses a reaction that uses an action the stat block lacks, and damage of a choice no trait offers", () => {
+    const monster = (actions: readonly object[], traitMechanics: readonly object[] = []) => ({
+      id: "hb-m-4f19c8b02de7",
+      schemaId: "vtt.actor-monster",
+      schemaVersion: 1,
+      source: { name: "Homebrew", version: "1", externalId: "hb-m-4f19c8b02de7" },
+      name: "Rust Hound",
+      size: "medium",
+      abilityScores: { str: 12, dex: 12, con: 13, int: 2, wis: 13, cha: 6 },
+      proficiencyBonus: 2,
+      armorClass: 14,
+      hitPoints: { maximum: 27 },
+      speedFeet: 40,
+      actions,
+      traitMechanics,
+      extensions: { "open5e.srd-2024": { challengeRating: 1, type: "monstrosity" } }
+    });
+    const antennae = {
+      id: "reflexive-antennae",
+      name: "Reflexive Antennae",
+      activation: "reaction",
+      description: "It uses Antennae.",
+      damage: [],
+      reaction: { trigger: "hit-by-attack", response: "strike-back", rangeFeet: 5, usesAction: "antennae" }
+    };
+    const claw = {
+      id: "claw",
+      name: "Claw",
+      activation: "action",
+      description: "A claw.",
+      attack: { bonus: 4, reachFeet: 5 },
+      damage: [{ formula: "2d6", type: "fire", pick: "draconic-origin" }]
+    };
+    const refused = messages(validateForPublish("monster", monster([antennae, claw]), contextWith()));
+    expect(refused).toContain("Reflexive Antennae uses an action Rust Hound doesn't have");
+    expect(refused).toContain("Claw deals the damage type of a choice Rust Hound's traits don't offer");
+    const whole = monster(
+      [antennae, { ...antennae, id: "antennae", name: "Antennae", activation: "action", reaction: undefined }, claw],
+      [{ kind: "pick", name: "Draconic Origin", key: "draconic-origin", of: "damage-type", options: ["fire", "cold"] }]
+    );
+    expect(validateForPublish("monster", whole, contextWith()).valid).toBe(true);
   });
 
   it("refuses a monster whose content id disagrees with its record id: its live tokens would resolve to nothing", () => {

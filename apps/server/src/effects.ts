@@ -283,6 +283,8 @@ export const SMOTHERING_TAG = "smothering";
 /** Goodberry's berries: the inventory row the cast fills, and the tag on the caster's effect that keeps them. */
 export const GOODBERRY_ID = "goodberry";
 export const GOODBERRY_TAG = "goodberry";
+/** The effect ends when its bearer dies, not when it drops to 0 Hit Points (a pact weapon's bond). */
+export const ENDS_ON_DEATH_TAG = "ends-on-death";
 
 /** The Exhaustion levels hunger and thirst hold in place (SRD Malnutrition, Dehydration: "can't be removed until the
  *  creature eats [drinks] the full amount ... required for a day"). */
@@ -587,6 +589,16 @@ function endEffectInternal(
   if (effect.tags.includes(SMOTHERING_TAG))
     for (const held of actor.effects.filter((candidate) => candidate.breath !== undefined))
       endEffectInternal(state, actor, held.id, events, sweeping);
+  // A weapon conjured with a binding disappears when the binding ends (a conjured pact weapon).
+  if (
+    effect.weapon?.conjured &&
+    effect.itemId !== undefined &&
+    actor.inventory.some((row) => row.id === effect.itemId)
+  ) {
+    const gone = actor.inventory.find((row) => row.id === effect.itemId)!;
+    actor.inventory = actor.inventory.filter((row) => row.id !== effect.itemId);
+    events.push({ kind: "effect", text: `${actor.name}'s ${gone.name} disappears.`, actorId: actor.id });
+  }
   // SRD Goodberry: "Uneaten berries disappear when the spell ends."
   if (effect.tags.includes(GOODBERRY_TAG) && actor.inventory.some((row) => (row.recordId ?? row.id) === GOODBERRY_ID)) {
     actor.inventory = actor.inventory.filter((row) => (row.recordId ?? row.id) !== GOODBERRY_ID);

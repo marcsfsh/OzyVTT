@@ -11,6 +11,7 @@ import {
   BARKSKIN_TAG,
   endConditionsImmuneTo,
   endEffect,
+  ENDS_ON_DEATH_TAG,
   RESISTS_CHOSEN_TYPE_TAG,
   makeEffect,
   PERSISTENT_RAGE_TAG,
@@ -24,6 +25,7 @@ import {
 import { refreshBaseArmorClass } from "../actor-roster.js";
 import { altitudeOf } from "../altitude.js";
 import { holdsFeature } from "../class-features.js";
+import { GIFT_OF_THE_PROTECTORS_TAG, refuseFullPage } from "../book-of-shadows.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
 import { currentSpeedFeet } from "../speed.js";
@@ -139,6 +141,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
     throw new CommandRejectedError(
       `${recipient.name} already has ${grant.name ?? action.name}, and a creature can have only one at a time.`
     );
+  if (grant.tags.includes(GIFT_OF_THE_PROTECTORS_TAG)) refuseFullPage(state, attacker, recipient, deps.definition);
   // A concentration grant may end the granter's previous concentration; surfaced as a warning line.
   const replaced: EffectNarration[] = [];
   const recipientDefinition =
@@ -275,7 +278,8 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
               ),
       // A spell's effect outlasts its caster's fall; only Concentration ends it early. A die given to another creature
       // (Bardic Inspiration) is its own once given.
-      endsWhenSourceDefeated: action.spellId === undefined && grant.answer === undefined,
+      endsWhenSourceDefeated:
+        action.spellId === undefined && grant.answer === undefined && !grant.tags.includes(ENDS_ON_DEATH_TAG),
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
       modifiers: [
         ...modifiers,

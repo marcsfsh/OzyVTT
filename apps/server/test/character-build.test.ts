@@ -502,9 +502,21 @@ describe("buildCharacterDefinition: Wizard 3 (high-elf sage, Evoker)", () => {
   });
 
   it("merges overlapping starting-equipment items instead of duplicating rows", () => {
-    const quarterstaff = (definition.startingInventory ?? []).find((item) => item.id === "quarterstaff");
-    expect(quarterstaff?.quantity).toBe(2); // one from wizard-a, one from sage-a
+    const robe = (definition.startingInventory ?? []).find((item) => item.id === "robe");
+    expect(robe?.quantity).toBe(2); // one from wizard-a, one from sage-a
     expect(definition.startingCurrency?.gp).toBe(13);
+  });
+
+  // SRD Wizard starting equipment A: "2 Daggers, Arcane Focus (Quarterstaff), Robe, Spellbook, Scholar's Pack".
+  it("carries the Arcane Focus staff the Wizard's kit prints, a focus that swings as a Quarterstaff", () => {
+    const staff = (definition.startingInventory ?? []).find((item) => item.id === "arcane-focus-staff");
+    expect(staff).toMatchObject({
+      quantity: 1,
+      category: "focus",
+      weapon: { damageDice: "1d6", versatileDice: "1d8" }
+    });
+    // The only plain Quarterstaff is the Sage's.
+    expect((definition.startingInventory ?? []).find((item) => item.id === "quarterstaff")?.quantity).toBe(1);
   });
 
   // `weaponAbilityModifier` reads `finesse` from the inventory row's `properties`, so the builder must

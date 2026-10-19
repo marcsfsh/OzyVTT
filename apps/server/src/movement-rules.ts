@@ -1,7 +1,7 @@
 import { formEffectOf } from "./transform/forms.js";
 import type { ActorMovementReply, EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { MoveMode } from "@vtt/domain/commands";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, TeleportLanding } from "@vtt/schemas";
 import { footprintOrigin } from "@vtt/rules-5e";
 import { RulesBlockedError } from "./game-store.js";
 import { altitudesAlong, heightRefusal, sharesHeight } from "./altitude.js";
@@ -123,6 +123,8 @@ export type MovementRulesOutcome = Readonly<{
   landsOnDifficult?: true;
   /** The teleport arrived in a filled space and fails with this Force damage (`failedTeleport`). */
   teleportFails?: string;
+  /** What the granted teleport's arrival does near its destination (a mummy lord's Whirlwind of Sand). */
+  teleportLanding?: TeleportLanding;
   /** The mover waits here, at the edge of the reach it leaves, while the Opportunity Attacks it provoked are answered
    *  (`held-moves.ts`); `refundFeet` is what the rest of the way cost, given back if it never goes on. */
   heldAt?: Readonly<{ position: Point; altitudeFeet: number; promptIds: readonly string[]; refundFeet: number }>;
@@ -430,6 +432,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   let granted: string | undefined;
   let landsOnDifficult = false;
   let failDamage: string | undefined;
+  let landing: TeleportLanding | undefined;
   let heldAt: MovementRulesOutcome["heldAt"];
   const travelled: { path?: readonly Point[] } = {};
   const done = (crawled = false): MovementRulesOutcome => ({
@@ -441,6 +444,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     ...(granted ? { granted } : {}),
     ...(landsOnDifficult ? { landsOnDifficult: true as const } : {}),
     ...(failDamage ? { teleportFails: failDamage } : {}),
+    ...(landing ? { teleportLanding: landing } : {}),
     ...(heldAt ? { heldAt } : {}),
     ...(travelled.path ? { path: travelled.path } : {})
   });
@@ -466,6 +470,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     if (teleport && refusal === null) {
       spendTeleportGrant(mover, teleport.effectId);
       granted = teleport.name;
+      landing = teleport.landing;
       // A space filled by a creature the mover didn't know of fails the teleport that says so (Dimension Door).
       if (teleport.failDamage && endsInOccupiedSpace(state, input, to, true)) failDamage = teleport.failDamage;
       return done();
@@ -850,7 +855,7 @@ function teleportRefusal(
   state: GameState,
   input: MovementRulesInput,
   name: string,
-  teleport: Readonly<{ feet: number; unseen?: true }>,
+  teleport: Readonly<{ feet: number; unseen?: true; near?: Readonly<{ actorId: string; feet: number }> }>,
   toAltitude: number
 ): string | null {
   const { from, to } = input;
@@ -858,6 +863,17 @@ function teleportRefusal(
   const far = straightCost(input, from, to, input.fromAltitudeFeet ?? 0, toAltitude)?.feet ?? null;
   if (far !== null && far > teleport.feet + DISTANCE_TOLERANCE_FEET)
     return `${name} can teleport up to ${teleport.feet} ft, and that space is ${Math.round(far)} ft away.`;
+  // A nalfeshnee's Pursuit: "its destination space must be within 10 feet of the triggering creature".
+  const near = teleport.near;
+  const quarry = near ? state.combat.tokens.find((token) => token.actorId === near.actorId) : undefined;
+  if (near && quarry?.position) {
+    const apart =
+      input.creatureDistance?.({ actorId: near.actorId, position: quarry.position }, to, toAltitude) ??
+      input.distance(quarry.position, to);
+    const quarryName = state.actors.find((actor) => actor.id === near.actorId)?.name ?? "the creature it follows";
+    if (apart !== null && apart > near.feet + DISTANCE_TOLERANCE_FEET)
+      return `${name} must end within ${near.feet} ft of ${quarryName}, and that space is ${Math.round(apart)} ft away.`;
+  }
   if (endsInOccupiedSpace(state, input, to)) return `${name} can teleport only to an unoccupied space.`;
   if (!teleport.unseen && input.seesPoint && !input.seesPoint(to))
     return `${name} can teleport only to a space it can see.`;

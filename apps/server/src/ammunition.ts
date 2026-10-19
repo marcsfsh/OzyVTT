@@ -197,12 +197,18 @@ export function recoverAmmunition(
       let next: InventoryItem = rest;
       if (thrown) {
         next = { ...next, quantity: next.quantity + thrown };
-        lines.push({ actorId: actor.id, text: `${actor.name} picks up the ${row.name} thrown in the fight (${thrown}).` });
+        lines.push({
+          actorId: actor.id,
+          text: `${actor.name} picks up the ${row.name} thrown in the fight (${thrown}).`
+        });
       }
       const ammo = fired ? ammunitionOf(next, catalog) : null;
       const back = Math.floor((fired ?? 0) / 2);
       if (ammo && back > 0) {
-        lines.push({ actorId: actor.id, text: `${actor.name} recovers ${back} of the ${fired} pieces fired from ${row.name}.` });
+        lines.push({
+          actorId: actor.id,
+          text: `${actor.name} recovers ${back} of the ${fired} pieces fired from ${row.name}.`
+        });
         next = withPiecesLeft(next, ammo.left + back, ammo.count);
       }
       const plainBack = Math.floor((spent ?? 0) / 2);

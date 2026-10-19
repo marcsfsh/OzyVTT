@@ -146,9 +146,9 @@ describe("taking a combatant out of the fight", () => {
     expect(state.combat.turn.movementUsedFeet).toBe(20);
     expect(actor(state, HERO).effects).toEqual([]);
     // Standing costs half of Speed 30, more than the 10 feet left.
-    expect(() =>
-      setCondition(state, HERO, "prone", false, undefined, { role: "gm" })
-    ).toThrow(/Standing up costs 15 ft/);
+    expect(() => setCondition(state, HERO, "prone", false, undefined, { role: "gm" })).toThrow(
+      /Standing up costs 15 ft/
+    );
   });
 
   it("ends a grapple it held, and refuses the last combatant or one whose turn it is", () => {

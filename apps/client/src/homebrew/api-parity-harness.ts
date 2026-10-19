@@ -474,6 +474,8 @@ const SAVE_LIFETIME_KEYS = [
 
 /** The save-block keys that make a failure act by the target's Hit Points or send it home (`SaveOutcomeFields`). */
 const DEATH_SAVE_KEYS = ["failureByHitPoints[].**", "failureBanishes"] as const;
+/** The save-block keys for a failure by a margin and the creatures a failure spares (`SaveOutcomeFields`). */
+const MARGIN_SAVE_KEYS = ["failureByMargin.**", "sparesCreatureTypes", "sparesSpecies"] as const;
 
 /** The exemption table. First match wins, so specific rows sit above general ones. */
 export const EXEMPTIONS: readonly ExemptionRow[] = [
@@ -569,6 +571,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: system-synthesised"
   },
   {
+    at: "actions[].waives",
+    types: ACTION_CARRIERS,
+    reason:
+      "the spell components a feature's cast goes without (Wild Companion's Find Familiar) - set by the builder from the feature's grant",
+    status: "permanent: system-synthesised"
+  },
+  {
     at: "summonScaling.**",
     types: ["monster"],
     reason:
@@ -615,6 +624,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     reason:
       "attack keys the action rows do not enumerate: surfaced when the bare-group false credit was removed (this batch's adversarial review)",
     status: "gap"
+  },
+  {
+    at: "actions[].attack.countWithItself",
+    types: ACTION_CARRIERS,
+    reason:
+      "a weapon's extra attacks made with itself alone (Thirsting Blade's pact weapon) - set by the server on the bonded weapon's swing",
+    status: "permanent: system-synthesised"
   },
   {
     at: "actions[].attack.criticalBonusDice",
@@ -664,6 +680,62 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
       "what a failed save does by the target's Hit Points and the creature types it sends home (Divine Word) - authored in the content scripts",
     status: "gap"
   })),
+  ...MARGIN_SAVE_KEYS.map((key): ExemptionRow => ({
+    at: `actions[].save.${key}`,
+    types: ACTION_CARRIERS,
+    reason:
+      "what a failure by 5 or more does instead (a homunculus's Bite) and the creatures a failure spares by type or species (a ghoul's Claw: an Undead or an elf) - read from the stat block's text; no editor control yet",
+    status: "gap"
+  })),
+  ...MARGIN_SAVE_KEYS.map((key): ExemptionRow => ({
+    at: `save.${key}`,
+    types: ["spell"],
+    reason:
+      "what a failure by a margin does and the creatures a failure spares, read from the spell's description as the catalog is built",
+    status: "gap"
+  })),
+  {
+    at: "actions[].underwaterOnly",
+    types: ACTION_CARRIERS,
+    reason:
+      "an action usable only in an underwater fight (a seahorse's Bubble Dash), read from the action's description as the catalog is built",
+    status: "permanent: system-synthesised"
+  },
+  {
+    at: "actions[].object.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the target's armor or weapon a failed save corrodes (a rust monster's Antennae), authored in the stat-block enrichments; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].checkFirst.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the check its user makes before the action lands (binding with a Chain or Manacles) - authored in the gear and item overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsItemEffects",
+    types: ACTION_CARRIERS,
+    reason:
+      "a command that releases what the item's other actions hold (Iron Bands, a Rope of Entanglement) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].rebindsRow.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "remaking a carried weapon or stack of ammunition as a magic one (Oil of Sharpness) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].damage[].pick",
+    types: ACTION_CARRIERS,
+    reason:
+      "a damage part whose type is the one picked for the creature (a half-dragon's Claw and its Draconic Origin), read from the stat block's text; no editor control yet",
+    status: "gap"
+  },
   {
     at: "actions[].save.heldBy.**",
     types: ACTION_CARRIERS,
@@ -1297,6 +1369,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "freeCastOf.**",
+    types: "*",
+    reason:
+      "a free casting a feature gives the spells other features grant (Natural Recovery's Circle Spell): no control at feature scope yet",
+    status: "gap"
+  },
+  {
     at: "extraSpellLists",
     types: "*",
     reason:
@@ -1361,6 +1440,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "permanent: zero SRD authors"
   },
   {
+    at: "startingEquipment[].items[].pickFrom",
+    types: ["class", "background"],
+    reason:
+      "the items a kit entry lets its taker pick (the Bard's instrument of choice): the kit editor writes items without a pick list yet",
+    status: "gap"
+  },
+  {
     at: "multiclassProficiencies.**",
     types: ["class"],
     reason:
@@ -1413,6 +1499,20 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ["equipment"],
     reason:
       "what a magic weapon changes about its bound base (a Dwarven Thrower's Thrown 20/60, an Energy Bow's Force) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^container.**",
+    types: ["equipment"],
+    reason:
+      "what the item holds as a container (a Backpack's 30 pounds, a Handy Haversack's pouches) - authored in the gear and item overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^attunementHeldBy",
+    types: ["equipment"],
+    reason:
+      "the effect that keeps its bearer attuned (a Dragon Orb's charm) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {

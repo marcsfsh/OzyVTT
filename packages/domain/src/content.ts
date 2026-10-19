@@ -908,12 +908,14 @@ export const choosesAbility = (action: Readonly<{ grants?: Readonly<{ tags: read
   action.grants?.tags.includes(CHOSEN_ABILITY_TAG) === true ||
   action.grants?.tags.includes(ENHANCED_ABILITY_TAG) === true;
 /** The choices an action asks for as it resolves: an option of its grant or failed save (Fire Shield's warm or
- *  chill, Bestow Curse's curse), one for each target where the text says so, and the carried weapon its grant binds to
- *  (Magic Weapon). Sent as `action.resolve`'s `optionId`, `targetOptions` and `itemId`. */
+ *  chill, Bestow Curse's curse), one for each target where the text says so, the carried weapon its grant binds to
+ *  (Magic Weapon), and the armor or weapon of its target it acts on (a rust monster's Antennae). Sent as
+ *  `action.resolve`'s `optionId`, `targetOptions`, `itemId` and `objectItemId`. */
 export type ActionChoices = Readonly<{
   options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
   optionsPerTarget?: true;
   bindsWeapon?: Readonly<{ weaponIds?: readonly string[]; melee?: true; ammunition?: "only" | "also" }>;
+  object?: Readonly<{ kinds: ReadonlyArray<"armor" | "weapon">; metal?: true }>;
 }>;
 type ChoosingAction = Readonly<{
   grants?: Readonly<{
@@ -929,6 +931,7 @@ type ChoosingAction = Readonly<{
       optionsPerTarget?: true;
     }>;
   }>;
+  object?: Readonly<{ kinds: ReadonlyArray<"armor" | "weapon">; metal?: true }>;
 }>;
 /** What an action asks its user to choose as it resolves, or null when it asks nothing. */
 export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
@@ -944,11 +947,13 @@ export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
     : action.rebindsRow !== undefined
       ? { melee: true, ammunition: "also" }
       : undefined;
-  if (!chooser?.options && !binds) return null;
+  const object = action.object;
+  if (!chooser?.options && !binds && !object) return null;
   return {
     ...(chooser?.options ? { options: chooser.options.map((option) => ({ id: option.id, name: option.name })) } : {}),
     ...(chooser?.optionsPerTarget ? { optionsPerTarget: true as const } : {}),
-    ...(binds ? { bindsWeapon: binds } : {})
+    ...(binds ? { bindsWeapon: binds } : {}),
+    ...(object ? { object: { kinds: [...object.kinds], ...(object.metal ? { metal: true as const } : {}) } } : {})
   };
 }
 /** A definition action flattened for the GM's action runner. Structured fields only where the content has them; the ADR-0020 mechanics fields power availability hints (the server stays the authority). */

@@ -524,8 +524,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Celestial Restoration": revives,
   Compression: squeezes,
   "Confer Fire Resistance": reference("Granting its rider Resistance is the GM's to apply."),
-  "Corrosive Form": guided(
-    "resolution/struck.ts deals the black pudding's 1d8 Acid damage to a creature that hits it with a melee attack. The gray ooze's printing deals none, and the damage to weapons and ammunition is the GM's."
+  "Corrosive Form": enforced(
+    "resolution/struck.ts deals the black pudding's 1d8 Acid damage to a creature that hits it with a melee attack (the gray ooze's printing deals none), and gives a nonmagical weapon that damages it a cumulative -1 to attack rolls, destroyed at -5 (row-penalties.ts; Mending removes it, resolution/mend.ts). Nonmagical ammunition that hits and damages it is destroyed, so none of it is found after the fight (resolution/ammunition.ts). Eating through wood or metal is the GM's."
   ),
   "Death Burst": enforced(
     "statblock-traits.ts opens the save for each creature in the Emanation when it dies, with the damage rolled once."
@@ -536,7 +536,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Demonic Restoration": revives,
   "Diabolical Restoration": revives,
   "Divine Awareness": senses,
-  "Draconic Origin": reference("The GM picks the damage type and edits the stat block to match."),
+  "Draconic Origin": enforced(
+    "The GM picks the damage type once for each half-dragon from its row tools (statblock-picks.ts, PickControl). Its Dragon's Breath and its Claw's 2d6 deal that type every time, and an unpicked one asks for the pick first."
+  ),
   "Earth Glide": enforced(
     "A burrowing move passes it through the map's walls at no extra cost (terrain.ts, wall-passage.ts), and a wall a spell raised still stops it. Leaving no trace is the GM's."
   ),
@@ -661,7 +663,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "movement-rules.ts and terrain.ts let the swarm and other creatures share a space, and let it through any gap in the walls a Tiny creature fits at no extra cost (wall-passage.ts). The map's drag preview (movePreview.ts) charges the same path. Healing a swarm restores nothing (resolution/heal.ts)."
   ),
   "Telepathic Bond": senses,
-  Training: reference("The GM picks the skill and applies its Advantage."),
+  Training: enforced(
+    "The GM picks the skill for each creature from its row tools (statblock-picks.ts). ability-checks.ts adds its Proficiency Bonus to checks with that skill and rolls them with Advantage."
+  ),
   Transparent: reference("Noticing the cube is the GM's call, with the DC the trait prints."),
   "Treasure Sense": senses,
   "Troll Spawn": reference("What becomes of a severed limb is the GM's to run."),
@@ -767,11 +771,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:unseen-servant": enforced(
     "The Invisible servant appears within 60 feet with AC 10, 1 Hit Point and Strength 2 and can't attack (summons.ts). A Bonus Action sends it 15 feet (summon-orders.ts), and it ends more than 60 feet from the caster. Its tasks are the GM's."
   ),
-  "feature:wild-companion": guided(
-    "Find Familiar is always prepared and cast as a Magic action with a slot or a use of Wild Shape; the familiar is Fey and leaves when the Druid finishes a Long Rest (character-build.ts, summons.ts). Going without the Material component is the GM's."
+  "feature:wild-companion": enforced(
+    "Find Familiar is always prepared and cast as a Magic action with a slot or a use of Wild Shape, with no Material component (resolution/components.ts reads the cast's waiver); the familiar is Fey and leaves when the Druid finishes a Long Rest (character-build.ts, summons.ts)."
   ),
-  "feature:dragon-companion": guided(
-    "Summon Dragon is cast free once a Long Rest, and any casting may go without Concentration, lasting 1 minute then (character-build.ts, summons.ts). Going without the Material component is the GM's."
+  "feature:dragon-companion": enforced(
+    "Summon Dragon is cast with no Material component (resolution/components.ts reads the cast's waiver), free once a Long Rest, and any casting may go without Concentration, lasting 1 minute then (character-build.ts, summons.ts)."
   ),
   "item:bag-of-tricks": enforced(
     "The GM says which bag a found one is (item-records.ts); its pull rolls the d8 on that bag's table, and the creature appears within 20 feet acting right after its user until the next Long Rest or 0 Hit Points (summons.ts). A Bonus Action commands it (summon-orders.ts)."
@@ -924,8 +928,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Gibbering Mouther/bite": enforced(
     "The hit's damage, and Prone on a Medium or smaller target, are applied. A creature it drops to 0 Hit Points dies outright with nothing left of its body (hit-points.ts)."
   ),
-  "action:Mummy Lord/whirlwind-of-sand": guided(
-    "The Reaction gives a 60-foot teleport (granted-moves.ts). The +2 AC against the triggering attack and the creatures it blinds are the GM's."
+  "action:Mummy Lord/whirlwind-of-sand": enforced(
+    "resolution/pending.ts offers it on every hit, and one answer raises the mummy's AC by 2 against that attack, which may then miss, and grants its 60-foot teleport (reactions.ts, granted-moves.ts). Landing Blinds each enemy the mummy sees within 5 feet of its destination until the end of the mummy's next turn (granted-moves.ts); its allies are left out as the creatures it wouldn't choose."
   ),
   "action:Balor/teleport": enforced(
     "A 60-foot teleport is granted to the balor, or to the one demon within 10 feet it names instead (resolution/movement-grants.ts, resolution/action-targets.ts). Whether that demon is willing is its player's or the GM's."
@@ -1234,11 +1238,106 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:superior-hunters-defense": enforced(
     "damage-window.ts offers it when the Ranger is about to take damage from a hit or a failed save. Using it gives Resistance to the damage's largest type, that damage included, until the end of the current turn."
   ),
-  "action:Stone Giant/deflect-missile": guided(
-    "A ranged hit with Bludgeoning, Piercing or Slashing damage opens the giant's reaction prompt (damage-window.ts), and using it takes 1d10 + 6 off the damage, recharging on a 5 or 6. Redirecting the force at another creature when the damage reaches 0 is the GM's."
+  "action:Stone Giant/deflect-missile": enforced(
+    "A ranged hit with Bludgeoning, Piercing or Slashing damage opens the giant's reaction prompt (damage-window.ts), and using it takes 1d10 + 6 off the damage, recharging on a 5 or 6. When nothing is left, the same answer turns its DC 17 Dexterity save, 11 (1d10 + 6) Force damage on a failure, on the creature the GM picks among those the giant sees within 60 feet, the attacker unless another is picked (reactions.ts)."
   ),
-  "action:Rust Monster/reflexive-antennae": guided(
-    "damage-reactions.ts offers it when a creature within 5 feet damages the rust monster, and using it resolves Antennae against that creature, opening its Dexterity save. It is offered on any damage, not only a hit's, so the GM declines it for a spell."
+  "action:Rust Monster/reflexive-antennae": enforced(
+    "triggered-reactions.ts offers it when an attack roll from a creature within 5 feet hits the rust monster, and using it resolves Antennae against that creature (reactions.ts)."
+  ),
+  // Stat-block actions whose printed riders, target rules and drop-to-0 clauses the readers carry (build-bundle.ts,
+  // save-outcomes.ts), each a row the data pass would read as plain damage.
+  "action:Half-Dragon/claw": enforced(
+    "The hit's Slashing damage and 2d6 of the type picked for its Draconic Origin are applied (statblock-picks.ts); a half-dragon with no pick yet asks the GM for one first."
+  ),
+  "action:Giant Ape/boulder-toss": enforced(
+    "The save's Bludgeoning damage is applied, half on a success, and a failure knocks a Large or smaller creature Prone (resolution/pending.ts); a bigger one takes the damage alone."
+  ),
+  "action:Gladiator/shield-bash": enforced(
+    "The save's Bludgeoning damage is applied, and a failure knocks a Medium or smaller creature Prone (resolution/pending.ts); a bigger one takes the damage alone."
+  ),
+  "action:Ghoul/claw": enforced(
+    "The hit's Slashing damage is applied, and its Constitution save opens only on a creature that is neither an Undead nor an elf (resolution/pending.ts), a failure leaving it Paralyzed until the end of its next turn."
+  ),
+  "action:Steam Mephit/steam-breath": guided(
+    "The save's Fire damage is applied, half on a success, and a failure takes 10 feet off the target's Speed until the end of the mephit's next turn (saving-throws.ts). Underwater, hit-points.ts still gives the Fire damage Resistance, which the breath ignores; the GM gives that half back."
+  ),
+  "action:Adult Brass Dragon/scorching-sands": enforced(
+    "The save's Fire damage is applied, and a failure halves the target's Speed until the end of its next turn (saving-throws.ts). The dragon takes it once until its next turn starts (resolution/economy.ts)."
+  ),
+  "action:Adult Black Dragon/cloud-of-insects": enforced(
+    "The save's Poison damage is applied, and a failure gives the target Disadvantage on saves to keep Concentration until the end of its next turn (saving-throws.ts). The dragon takes it once until its next turn starts (resolution/economy.ts)."
+  ),
+  "action:Dretch/fetid-cloud-1-day": enforced(
+    "Each creature in the Emanation saves, and a failure leaves it Poisoned until the end of its next turn, taking an action or a Bonus Action on its turn and no Reactions while it lasts (saving-throws.ts, resolution/economy.ts)."
+  ),
+  "action:Swarm of Ravens/cacophony": enforced(
+    "A failure leaves the target Deafened until the start of the swarm's next turn, with Disadvantage on ability checks and attack rolls while it lasts (saving-throws.ts)."
+  ),
+  "action:Ghost/horrific-visage": enforced(
+    "The Cone's save reaches only a creature that sees the ghost and isn't an Undead (resolution/pending.ts, resolution/type-gates.ts). A failure deals the Psychic damage and Frightens it until the start of the ghost's next turn, and a success makes it immune for the fight."
+  ),
+  "action:Lich/disrupt-life": enforced(
+    "The Emanation's save leaves out every Undead (resolution/type-gates.ts), and the Necrotic damage lands, half on a success. The lich takes it once until its next turn starts (resolution/economy.ts)."
+  ),
+  "action:Planetar/holy-burst": enforced(
+    "The Sphere's save reaches only the planetar's enemies (commands/actions.ts), and the Radiant damage lands, half on a success."
+  ),
+  "action:Rakshasa/baleful-command": enforced(
+    "The Emanation's save reaches only the rakshasa's enemies (commands/actions.ts). A failure deals the Psychic damage and leaves the target Frightened and Incapacitated until the start of the rakshasa's next turn."
+  ),
+  "action:Sphinx of Lore/mind-rending-roar": enforced(
+    "The Emanation's save reaches only the sphinx's enemies (commands/actions.ts). A failure deals the Psychic damage and Incapacitates the target until the start of the sphinx's next turn."
+  ),
+  "action:Aboleth/consume-memories": enforced(
+    "It targets one creature within 30 feet that is Charmed or Grappled by the aboleth (resolution/action-targets.ts), and the Psychic damage lands, half on a success. Gaining a Humanoid's memories is the story's."
+  ),
+  "action:Doppelganger/unsettling-visage": enforced(
+    "The Emanation's save reaches only a creature that sees the doppelganger (resolution/pending.ts). A failure Frightens it, repeating the save at the end of each of its turns, and it succeeds on its own after 1 minute."
+  ),
+  "action:Kraken/toxic-ink": enforced(
+    "resolution/economy.ts refuses it in a fight the GM hasn't marked as underwater. A failure leaves each creature in the Emanation Blinded and Poisoned until the end of the kraken's next turn, and the kraken gets its move (granted-moves.ts)."
+  ),
+  "action:Seahorse/bubble-dash": enforced(
+    "resolution/economy.ts refuses it in a fight the GM hasn't marked as underwater; underwater it grants a swim of its Swim Speed that provokes no Opportunity Attacks (granted-moves.ts)."
+  ),
+  "action:Giant Seahorse/bubble-dash": enforced(
+    "resolution/economy.ts refuses it in a fight the GM hasn't marked as underwater; underwater it grants a swim of half its Swim Speed that provokes no Opportunity Attacks (granted-moves.ts)."
+  ),
+  "action:Homunculus/bite": enforced(
+    "The hit's damage is applied and its Constitution save opens. A failure leaves the target Poisoned until the end of the homunculus's next turn; a failure by 5 or more Poisons it for 1 minute, and Unconscious with it until it takes damage (save-margins.ts)."
+  ),
+  "action:Pseudodragon/sting": enforced(
+    "A failure deals the Poison damage and Poisons the target for 1 hour. A failure by 5 or more also leaves it Unconscious while Poisoned, until it takes damage or a creature within 5 feet takes an action to wake it (save-margins.ts)."
+  ),
+  "action:Chain Devil/unnerving-gaze": enforced(
+    "triggered-reactions.ts offers it when a creature that sees the devil, and that the devil sees, starts its turn within 30 feet of it; creatures of the devil's own side open no prompt. Using it opens the DC 15 Wisdom save: a failure Frightens the creature until that turn ends, and a success makes it immune to this devil's gaze for the fight (saving-throws.ts)."
+  ),
+  "action:Nalfeshnee/nalfeshnee-pursuit": enforced(
+    "triggered-reactions.ts offers it when a creature the nalfeshnee sees ends a move within 120 feet of it (commands/map.ts, or a held move once it goes on). Using it grants its Teleport, which a destination within 10 feet of that creature takes (granted-moves.ts, movement-rules.ts); one farther is the GM's own move."
+  ),
+  "action:Black Pudding/black-pudding-split": enforced(
+    "triggered-reactions.ts offers it when the pudding, Large or Medium with 10 or more Hit Points, becomes Bloodied or is dealt Lightning or Slashing damage. Using it puts two puddings of its stat block in its place, each one size smaller with half its Hit Points (round down) as current and maximum, on its Initiative count (split.ts)."
+  ),
+  "action:Ochre Jelly/split": enforced(
+    "triggered-reactions.ts offers it when the jelly, Large or Medium with 10 or more Hit Points, becomes Bloodied or is dealt Lightning or Slashing damage. Using it puts two jellies of its stat block in its place, each one size smaller with half its Hit Points (round down) as current and maximum, on its Initiative count (split.ts)."
+  ),
+  "action:Black Pudding/dissolving-pseudopod": enforced(
+    "The attack and its 4d6 + 3 Acid damage are applied, and a hit gives the nonmagical body armor the target wears a cumulative -1 to the AC it offers, destroying it at AC 10 (resolution/on-hit.ts, row-penalties.ts). Mending removes the penalty (resolution/mend.ts)."
+  ),
+  "action:Gray Ooze/pseudopod": enforced(
+    "The attack and its 2d8 + 1 Acid damage are applied, and a hit gives the nonmagical body armor the target wears a cumulative -1 to the AC it offers, destroying it at AC 10 (resolution/on-hit.ts, row-penalties.ts). Mending removes the penalty (resolution/mend.ts)."
+  ),
+  "action:Rust Monster/antennae": enforced(
+    "The Dexterity save is rolled against the creature (saving-throws.ts). A failure gives the nonmagical metal armor or weapon the GM names, else its worn armor or its weapon in hand, a cumulative -1 to the AC it offers or to its attack rolls, armor destroyed at AC 10 and a weapon at -5 (row-penalties.ts). A magic item is refused, and Mending removes the penalty (resolution/mend.ts)."
+  ),
+  "action:Shadow/draining-swipe": guided(
+    "The hit's Necrotic damage is applied, and the target's Strength drops by 1d4, cumulatively until ended, read by every rule (resolution/score-drain.ts, live-abilities.ts); a target taken to 0 Strength dies. A Shadow rising from a Humanoid it slays 1d4 hours later is the GM's."
+  ),
+  "action:Phase Spider/bite": enforced(
+    "The attack and its 1d10 + 3 Piercing plus 2d8 Poison damage are applied. A target the damage drops to 0 Hit Points is Stable instead of dying, Poisoned and Paralyzed for 1 hour, and regains 1 Hit Point after 1d4 hours unless healed first (stable-at-zero.ts)."
+  ),
+  "action:Vampire Familiar/umbral-dagger": enforced(
+    "The attack and its 1d4 + 3 Piercing plus 3d4 Necrotic damage are applied. A target the attack drops to 0 Hit Points is Stable instead of dying, Poisoned and Paralyzed for 1 hour, and regains 1 Hit Point after 1d4 hours unless healed first (stable-at-zero.ts)."
   ),
   "action:Sphinx of Wonder/burst-of-ingenuity": enforced(
     "roll-answers.ts offers it on the sphinx's own check or save and asks it by a prompt about another creature's within 30 feet. Using it adds 2 to the roll, twice a day."
@@ -1250,13 +1349,13 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Protector's training and Thaumaturge's extra cantrip are applied, and Thaumaturge adds the Wisdom modifier, at least +1, to Arcana and Religion checks (ability-checks.ts)."
   ),
   "feature:eldritch-invocations": guided(
-    "Agonizing Blast's damage, Eldritch Spear's range on a spell attack, Repelling Blast's push (resolution/masteries.ts), Eldritch Mind's Advantage and the free casts are applied, and level-up-picks.ts lets a level up replace one invocation. Eldritch Smite's Pact Magic slot dice and Prone, and Lifedrinker's damage and Hit Point Die, ride a pact weapon's hit (resolution/hit-options.ts). Devil's Sight and Witch Sight are senses dynamic vision reads (vision/senses.ts), and One with Shadows' Invisibility is refused in Bright Light (resolution/validate.ts). Pact of the Chain casts Find Familiar as a Magic action and adds its special forms (character-build.ts, summons.ts); forgoing an attack so the familiar attacks with its Reaction is the GM's. Lessons of the First Ones, Gaze of Two Minds, Gift of the Protectors and Investment of the Chain Master are the GM's."
+    "Agonizing Blast adds Charisma to the damage of the cantrip picked for it (effective-actions.ts), Eldritch Spear its range and Repelling Blast its push (resolution/masteries.ts), each repeatable on another cantrip. Eldritch Mind's Advantage and the free casts are applied, an \"on yourself\" cast targets only the Warlock and Fiendish Vigor's die is at its highest; level-up-picks.ts lets a level up replace one invocation. Pact of the Blade's Bonus Action conjures or bonds the weapon picked, with proficiency, Charisma, the three damage types and its use as a focus, and Thirsting and Devouring Blade add attacks with it (pact-weapon.ts); Eldritch Smite and Lifedrinker ride its hits (resolution/hit-options.ts). Pact of the Tome's book holds three cantrips and two Rituals from any list, prepared and a Spellcasting Focus while it is carried, conjured anew with its picks re-made at the end of a rest; Gift of the Protectors' page holds the names written on it and drops one to 1 Hit Point once a Long Rest (book-of-shadows.ts). Gift of the Depths gives its Swim Speed and water breathing, Lessons of the First Ones its Origin feat, Devil's Sight and Witch Sight are senses dynamic vision reads, and One with Shadows' Invisibility is refused in Bright Light (resolution/validate.ts). Pact of the Chain casts Find Familiar as a Magic action with its special forms (summons.ts). Forgoing an attack for the familiar's, Investment of the Chain Master and Gaze of Two Minds are the GM's."
   ),
   "feature:elemental-fury": enforced(
     "Primal Strike's extra damage, of the type the Druid picks, rides a weapon attack or a Beast form's attack in Wild Shape once a turn (resolution/hit-riders.ts). Potent Spellcasting adds the Druid's Wisdom modifier to the damage of Poison Spray, Produce Flame and Starry Wisp."
   ),
   "feature:wild-shape": enforced(
-    "The Druid picks its known forms on the sheet, as many as its level allows and within its Challenge Rating and Fly Speed limits, and replaces one after a Long Rest (transform/known-forms.ts). The Bonus Action takes one for hours equal to half its Druid level: the Beast's statistics with the Druid's Hit Points, mind, features and proficiencies, Temporary Hit Points equal to its Druid level, no spells, Concentration kept and gear melded or worn as it picks (transform/compose.ts). It ends as a Bonus Action, on another use, on the Incapacitated condition or at 0 Hit Points (transform/rules.ts)."
+    "The Druid picks its known forms on the sheet, as many as its level allows and within its Challenge Rating and Fly Speed limits, and replaces one after a Long Rest (transform/known-forms.ts). The Bonus Action takes one for hours equal to half its Druid level: the Beast's statistics with the Druid's Hit Points, mind, type, class features (their defences included), feats and proficiencies (the higher printed modifiers used), Temporary Hit Points equal to its Druid level, no spells, Concentration kept and gear melded or worn as it picks (transform/compose.ts). It ends as a Bonus Action, on another use, on the Incapacitated condition or at 0 Hit Points (transform/rules.ts)."
   ),
   "feature:beast-spells": enforced(
     "transform/rules.ts lets a Druid 18 cast spells in a Wild Shape form, except one whose Material component has a cost or is consumed."
@@ -1325,7 +1424,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The ability score increase is applied, and roll-answers.ts offers Peerless Aim on a missed attack roll: the attack hits, and the boon waits for the start of the creature's next turn."
   ),
   "feature:boon-of-dimensional-travel": enforced(
-    "The ability score increase is applied, and after the Attack or Magic action resolution/movement-grants.ts gives a 30-foot teleport for the turn, which movement-rules.ts takes at once to an unoccupied space the creature can see."
+    "The ability score increase is applied, and once each Attack or Magic action is taken (after its last attack or ray) resolution/movement-grants.ts gives a 30-foot teleport for the turn, which movement-rules.ts takes at once to an unoccupied space the creature can see."
   ),
   "feature:tactical-shift": enforced(
     "Second Wind gives the Fighter a move of half its Speed for the turn that provokes no Opportunity Attacks (resolution/movement-grants.ts), charged to its own grant (movement-rules.ts)."
@@ -1925,11 +2024,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:web": enforced(
     "spell-zones.ts asks for the Dexterity save the first time a creature enters the webs on a turn or starts its turn there, and a failure leaves it Restrained, escaped with a Strength (Athletics) check against the spell save DC. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). zone-ground.ts makes the webs Difficult Terrain, and they are Lightly Obscured for dynamic vision (vision/cast-sight.ts). Burning the webs away is the GM's, who ends the area."
   ),
-  "action:Octopus/ink-cloud": guided(
-    "The Reaction fills its 5-foot Cube with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). Offering it when a creature ends its turn beside the octopus underwater is the GM's."
+  "action:Octopus/ink-cloud": enforced(
+    "triggered-reactions.ts offers it in an underwater fight when a creature ends its turn within 5 feet of the octopus. Using it fills a 5-foot Cube around the octopus with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). A strong current dispersing the ink is the GM's."
   ),
-  "action:Giant Octopus/ink-cloud": guided(
-    "The Reaction fills its 10-foot Cube with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). Offering it when the octopus takes damage underwater is the GM's."
+  "action:Giant Octopus/ink-cloud": enforced(
+    "triggered-reactions.ts offers it when the octopus takes damage in an underwater fight. Using it fills a 10-foot Cube around the octopus with ink, Heavily Obscured for 1 minute (vision/cast-sight.ts), and gives a swim of its Swim Speed (granted-moves.ts). A strong current dispersing the ink is the GM's."
   ),
   "spell:sorcerous-burst": guided(
     "The attack and the chosen damage type are applied. Rolling another d8 on each 8 is the GM's."
@@ -2041,7 +2140,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "When the Druid rolls Initiative with no use of Wild Shape left, initiative-hooks.ts restores one. conversions.ts turns uses of Wild Shape into one spell slot, two levels a use, once per Long Rest (Nature Magician). Its slow aging is narrative."
   ),
   "feature:natural-recovery": enforced(
-    "In the step a Short Rest opens, conversions.ts recovers slots of combined level up to half the Druid level, none of level 6 or higher, once per Long Rest."
+    "One level 1+ spell the Druid has prepared from its Circle Spells is cast with no slot, once per Long Rest: each land spell's free casting spends the one counter (character-build.ts). In the step a Short Rest opens, conversions.ts recovers spent slots of combined level up to half the Druid level (round up), none of level 6 or higher, once per Long Rest."
   ),
   "feature:arcane-recovery": enforced(
     "In the step a Short Rest opens, conversions.ts recovers slots of combined level up to half the Wizard level, none of level 6 or higher, once per Long Rest."
@@ -2098,11 +2197,17 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:overchannel": enforced(
     "The cast offers Overchannel beside Metamagic (resolution/metamagic.ts): it deals a Wizard spell's maximum damage with a level 1 to 5 slot, and from the second use before a Long Rest the Evoker takes 2d12 Necrotic a slot level, 1d12 more each time, past its defences (resolution/overchannel.ts)."
   ),
-  "feature:signature-spells": guided(
-    "Both spells are always prepared, and each is cast once at level 3 with no slot, back on a Short or Long Rest, on its own counter (character-build.ts). That they come from the spellbook is the player's to keep."
+  "feature:signature-spells": enforced(
+    "Two level 3 spells from the spellbook (spellbook.ts checks the pick as a build or a level up makes it) are always prepared, and each is cast once at level 3 with no slot, back on a Short or Long Rest, on its own counter (character-build.ts)."
   ),
-  "feature:spell-mastery": guided(
-    "The level 1 and level 2 picks are always prepared and cast at will at their own level with no slot (character-build.ts). That they come from the spellbook with a casting time of an action, and swapping one after a Long Rest, are the GM's."
+  "feature:high-elf-cantrip": enforced(
+    "The High Elf knows Prestidigitation, a pick the build fills when the ledger names none (character-build.ts), or the Wizard cantrip it swapped in during the step a Long Rest opens (ledger-rechoice.ts)."
+  ),
+  "feature:evocation-savant": enforced(
+    "Two Evocation spells of level 2 or lower go into the spellbook at Wizard 3 (character-build.ts), and one more Evocation spell goes in free each time a new level of spell slots opens, beside the two a Wizard level gives (spell-choices.ts)."
+  ),
+  "feature:spell-mastery": enforced(
+    "The level 1 and level 2 picks, spells from the spellbook with a casting time of an action (character-offers.ts filters the casting time, spellbook.ts checks the book), are always prepared and cast at will at their own level with no slot (character-build.ts); one is swapped for another of the same level from the book in the step a Long Rest opens (ledger-rechoice.ts)."
   ),
   "spell:mirror-image": enforced(
     "The caster has three duplicates for a minute. Each hit on it rolls a d6 a duplicate, and on a 3 or higher the hit lands on a duplicate, which is destroyed, ending the spell with the last; an attacker Blinded or with Blindsight or Truesight is unaffected (resolution/mirror-image.ts)."

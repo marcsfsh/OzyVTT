@@ -698,9 +698,9 @@ export function SpellsTab({
         <section className="cs-group" role="group" aria-label="Spellbook">
           <span className="cs-eyebrow">Spellbook</span>
           <div className="cs-chiprow">
-            {book.freeLeft > 0 && (
+            {book.freeLeft + (book.freeOfSchool?.left ?? 0) > 0 && (
               <Button size="sm" variant="secondary" disabled={busy} onClick={() => setPanel("add")}>
-                Add from your levels ({book.freeLeft})
+                Add from your levels ({book.freeLeft + (book.freeOfSchool?.left ?? 0)})
               </Button>
             )}
             <Button size="sm" variant="secondary" disabled={busy} onClick={() => setPanel("copy")}>
