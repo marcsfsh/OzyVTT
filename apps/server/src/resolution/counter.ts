@@ -1,6 +1,7 @@
 import type { ActionReaction } from "@vtt/schemas";
 import { areAllies } from "../creature-sides.js";
 import { isItemActionId, laterRowOf } from "../item-actions.js";
+import { isDivineCast } from "../divine-intervention.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { offerableReaction, slotChoiceOf } from "../reaction-offers.js";
 import { scrollOfAction } from "../scrolls.js";
@@ -29,6 +30,8 @@ function castWithComponents(ctx: ResolveContext): boolean {
         : []
     )
   );
+  // Divine Intervention casts with no Material components.
+  if (isDivineCast(ctx.action.id)) waived.add("material");
   // A Subtle Spell is cast with no components but a consumed or priced material, which can still be seen.
   const subtle = shapingOf(ctx.input.shaping, "subtle-spell") !== undefined;
   return (["verbal", "somatic", "material"] as const).some(

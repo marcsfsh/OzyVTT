@@ -78,6 +78,7 @@ import {
   parkReaction
 } from "./resolution/pending.js";
 import { parkForRedirect } from "./resolution/redirect.js";
+import { afterDivineWish } from "./divine-intervention.js";
 import {
   markCastTurn,
   markSpellUp,
@@ -318,6 +319,7 @@ export function resolveDefinitionAction(
 
   commitEconomy(ctx);
   recallSpellSlot(ctx);
+  afterDivineWish(ctx);
   rollForAnAnswer(ctx);
   overchannelBacklash(ctx);
   spendHitOptions(ctx);

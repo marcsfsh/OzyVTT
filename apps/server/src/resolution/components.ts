@@ -4,6 +4,7 @@ import { catalogIdOf, type ActorDefinition, type Currency, type InventoryItem } 
 import { CANT_SPEAK_TAG, HANDS_BOUND_TAG } from "../effects.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { isItemActionId, laterRowOf } from "../item-actions.js";
+import { isDivineCast } from "../divine-intervention.js";
 import type { RuleId } from "../rules-families.js";
 import { scrollOfAction } from "../scrolls.js";
 import type { DefinitionAction, LiveActor } from "./context.js";
@@ -51,6 +52,8 @@ const equipped = (row: InventoryItem) => row.equipped && carried(row);
 
 /** The components a stat block's Spellcasting says this cast goes without. */
 function waivedBy(definition: ActorDefinition | undefined, action: DefinitionAction): ReadonlySet<Component> {
+  // Divine Intervention: "without expending a spell slot or needing Material components".
+  if (isDivineCast(action.id)) return new Set(["material"]);
   for (const parent of definition?.actions ?? []) {
     const casts = parent.castsSpells;
     if (!casts?.waives) continue;

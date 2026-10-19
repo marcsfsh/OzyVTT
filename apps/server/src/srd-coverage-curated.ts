@@ -933,6 +933,12 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "feature:spellcasting": enforced(
     "character-build.ts gives the class its slots, cantrips and prepared spells, and each spell is a cast action at the class's spell save DC and attack bonus. resolution/economy.ts spends the slot, and rests.ts restores slots on a Long Rest. level-up-picks.ts lets a player's level up replace only the cantrips and spells the class's level allows."
   ),
+  "feature:divine-intervention": enforced(
+    "divine-intervention.ts gives the Cleric a cast of every Cleric spell of level 5 or lower that isn't cast with a Reaction, at the Cleric's numbers, and the sheet lists them under the feature's row to pick. The cast goes through the cast pipeline at once, whatever its casting time, with no spell slot and no Material components, and spends the feature's one use until a Long Rest."
+  ),
+  "feature:greater-divine-intervention": enforced(
+    "Wish joins Divine Intervention's casts (divine-intervention.ts). Cast that way, the server rolls 2d4 and Divine Intervention stays spent through that many Long Rests (rests.ts). What the Wish does is as the spell's own row says."
+  ),
   "feature:pact-magic": enforced(
     "character-build.ts gives the Warlock its Pact Magic slots at the level its table prints, and resolution/economy.ts spends them. rests.ts restores them on a Short or Long Rest."
   ),

@@ -27,6 +27,7 @@ import { healActor, RELENTLESS_RAGE_KEY } from "./hit-points.js";
 import { gainHeroicInspiration } from "./heroic-inspiration.js";
 import { chargesAfterDawn, neverRegained } from "./item-charges.js";
 import { afterLongRest, deniedRestLine, holdsMaximumAtRest, restDeniedBy } from "./rest-triggers.js";
+import { divineInterventionWaiting } from "./divine-intervention.js";
 
 /** SRD Resting: a Short Rest is 1 hour and a Long Rest at least 8. */
 export const SHORT_REST_HOURS = 1;
@@ -272,7 +273,7 @@ export function applyRest(
   const longRestDefinition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   // A pool spent for a time waits on the clock, not the rest (a Horn of Valhalla's 7 days); with a dawn hour, what
   // an item regains at dawn waits for the clock's dawn too.
-  const waiting: Record<string, number> = timedSpent(actor);
+  const waiting: Record<string, number> = { ...timedSpent(actor), ...divineInterventionWaiting(actor) };
   if (state.rest.dawnHour !== null)
     for (const key of dawnPoolKeys(actor, longRestDefinition, catalog))
       if ((actor.actionUses[key] ?? 0) > 0) waiting[key] = actor.actionUses[key]!;

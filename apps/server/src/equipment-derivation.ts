@@ -1,5 +1,5 @@
 import { gearMerged } from "./transform/forms.js";
-import type { Actor, ContentMonsterSummary } from "@vtt/domain";
+import type { Actor, ContentMonsterSummary, ContentSpellSummary } from "@vtt/domain";
 import type {
   ClassReference,
   EquipmentReference,
@@ -90,6 +90,8 @@ export type EquipmentCatalog = Readonly<{
   /** The bestiary's rows and stat blocks, for the forms a shape-shift may take (Wild Shape, Polymorph). */
   monsterSummaries?: () => readonly ContentMonsterSummary[];
   monster?: (id: string) => ActorDefinition | undefined;
+  /** Every spell's row, for a feature that casts any spell of a list (Divine Intervention). */
+  spellSummaries?: () => readonly ContentSpellSummary[];
 }>;
 
 /** Narrows a content view to the hooks the derivation reads. */
@@ -102,7 +104,8 @@ export function equipmentCatalogOf(view: EquipmentCatalog): EquipmentCatalog {
     ...(view.classRecord ? { classRecord: view.classRecord } : {}),
     ...(view.subclassRecord ? { subclassRecord: view.subclassRecord } : {}),
     ...(view.monsterSummaries ? { monsterSummaries: view.monsterSummaries } : {}),
-    ...(view.monster ? { monster: view.monster } : {})
+    ...(view.monster ? { monster: view.monster } : {}),
+    ...(view.spellSummaries ? { spellSummaries: view.spellSummaries } : {})
   };
 }
 

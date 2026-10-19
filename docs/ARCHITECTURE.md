@@ -539,7 +539,9 @@ the area). A cast with components waits while a creature that sees it may answer
 Scroll's cast is seen (a wand's needs no components and isn't), a spell readied with the Ready action is seen as it is
 cast and not when it is let go, and a long casting as it begins. A
 creature's own spell of a minute or more takes the action on each of its turns in a fight and resolves on the last
-(`resolution/long-casting.ts`). Outside a fight a creature's own cast resolves through the same path with no turn to
+(`resolution/long-casting.ts`). A Cleric's Divine Intervention casts any Cleric spell of level 5 or lower (Wish with
+Greater Divine Intervention) as an action of its own, minted in the effective list (`divine-intervention.ts`) and
+picked under the feature's row on the sheet: cast at once, with no slot and no Material components. Outside a fight a creature's own cast resolves through the same path with no turn to
 spend, and a long one moves the game clock by its whole hours; an item's cast there stays on the loose route.
 
 A player only spends spell slots (`character.set-slot` refuses a raise from a player); everything that gives a
