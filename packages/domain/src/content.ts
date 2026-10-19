@@ -9,6 +9,7 @@ import {
 } from "@vtt/schemas";
 import type { Wire } from "./wire.js";
 import type { CastShapingOffers } from "./results.js";
+import type { SummonChoices } from "./summon-choices.js";
 
 /** An open identity slug; ids are never closed enums, so homebrew stays additive. */
 const slug = (max = 80) =>
@@ -895,6 +896,8 @@ export type ContentActionSummary = Readonly<{
   /** Damage types the caster picks from (Chromatic Orb); see `ActorAction.damageTypes`. */ damageTypes?: readonly DamageType[];
   /** The conditions the caster picks one of for a failed save (Blindness/Deafness); `action.resolve`'s
    *  `conditionId`. */ conditionChoices?: readonly string[];
+  /** The creature and creature type its user picks when it summons (Find Familiar's forms); `action.resolve`'s
+   *  `summon`. */ summonChoices?: SummonChoices;
   /** The skills a check action is made with, for the roller to pick (Search, Study, Influence, Escape a Grapple);
    *  `action.resolve`'s `skill`. */ checkSkills?: ReadonlyArray<
     Readonly<{ id: string; ability: z.infer<typeof AbilitySchema> }>

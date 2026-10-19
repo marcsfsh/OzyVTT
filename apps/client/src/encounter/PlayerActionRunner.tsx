@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { choosesAbility, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
+import { choosesAbility, summonChoicesOf, type ActorDefinition, type ContentActionSummary } from "@vtt/domain";
 import type { CastShaping } from "@vtt/schemas";
 import { command, read } from "../lib/command";
 import { ActionList } from "../sheet/ActionList";
@@ -67,6 +67,12 @@ export function summaryOfOwnAction(action: ActorDefinition["actions"][number]): 
     // A cure that ends one condition of several asks which (Lesser Restoration).
     ...(action.endsOneCondition && action.endsConditions ? { conditionChoices: [...action.endsConditions] } : {}),
     ...(choosesAbility(action) ? { choosesAbility: true } : {}),
+    // A summon whose user picks the creature or its type (Find Familiar) asks before it resolves.
+    ...(summonChoicesOf(action.summons) ? { summonChoices: summonChoicesOf(action.summons)! } : {}),
+    // Bringing a creature aims at no one, unless it rises from a corpse or the cast also strikes (Spiritual Weapon).
+    ...(action.summons && !action.summons.fromCorpse && !action.attack && !action.save && action.damage.length === 0
+      ? { targeting: "none" as const }
+      : {}),
     // A heal for others picks its targets: one (Divine Spark's healing), or several for a divided pool.
     ...(action.healing && !action.healing.self
       ? { targeting: action.healing.divided ? ("multi" as const) : ("single" as const) }
@@ -222,6 +228,8 @@ export function PlayerActionRunner({
   // A self heal (Second Wind) is a direct tap; a heal for others picks its targets first. An item's action carries the
   // server's word on it (a scroll of Detect Magic is a tap, a potion picks its drinker).
   const isTargetlessOwn = (action: ContentActionSummary) => {
+    // A summon with a creature to pick asks for it first.
+    if (action.summonChoices) return false;
     if (action.targeting === "none") return true;
     // A touch that ends a condition picks who it touches.
     if (action.targeting === "single" || action.targeting === "multi") return false;

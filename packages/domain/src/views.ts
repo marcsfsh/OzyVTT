@@ -63,6 +63,19 @@ export type PlayerActorTableField =
   "id" | "name" | "kind" | "visibility" | "size" | "sizeCells" | "tokenAssetId" | "conditions" | "deathSaves";
 /** Actor fields players receive only on player characters; a monster's stats are GM knowledge. */
 export type PlayerActorPartyField = "armorClass" | "armorClassOverride" | "initiative" | "speedFeet" | "definitionId";
+/** What a player may order a creature their character commands to do (`summon:*`), and the action each takes. */
+export type CommandedOrders = Readonly<{
+  /** Commanding it takes the commander's Bonus Action or a Magic action (`summon:command`). */
+  command?: "bonus-action" | "action";
+  /** The commander dismisses it with this (`summon:dismiss`). */
+  dismiss?: "bonus-action" | "action";
+  /** The commander may look through its eyes with a Bonus Action (`summon:look`) and send it to its pocket
+   *  dimension. */
+  look?: true;
+  /** It waits in its pocket dimension until called back with a Magic action (`summon:recall`). */
+  away?: true;
+}>;
+
 export type PlayerActor = Pick<Actor, PlayerActorTableField> &
   Partial<Pick<Actor, PlayerActorPartyField>> & {
     replaySceneId?: string;
@@ -72,6 +85,7 @@ export type PlayerActor = Pick<Actor, PlayerActorTableField> &
     presence: PresenceStatus | null;
     /** A creature your own character commands (a summoned spirit, a dominated ogre): you act for it, and get its stat
      *  block (`definition`), exact `hp`, `actionUses` and `pools`. Never on another player's. */ commanded?: true;
+    /** On a creature you command: the orders you may give it and what each costs your character. */ orders?: CommandedOrders;
     /** "Fighter 5 / Rogue 2", derived server-side; on another player's claimed character (the party tier decides),
      *  and on an unclaimed character for the claim picker. */ classLine?: string;
     /** "Dwarf", for the claim picker; only on an unclaimed character, which any player could claim and read in full. */ species?: string;

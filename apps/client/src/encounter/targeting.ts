@@ -48,6 +48,9 @@ export type TargetingSession = Readonly<{
   placeZoneId?: string;
   /** How the caster shapes the cast (Metamagic, Sculpt Spells), with the creatures each pick names once chosen. */
   shaping?: readonly CastShaping[];
+  /** The creature a summon brings, and its creature type, where its user picks (Find Familiar's form). */
+  summonPick?: Readonly<{ monsterId: string; form?: string }>;
+  summonType?: string;
 }>;
 
 let session: TargetingSession | null = null;
@@ -199,6 +202,19 @@ export function setDamageType(damageType: string) {
   session = { ...session, damageType: picked };
   emit();
 }
+/** Picks the creature a summon brings, by its place in the action's choices. */
+export function setSummonPick(index: number) {
+  const picked = session?.action.summonChoices?.forms?.[index];
+  if (!session || !picked) return;
+  session = { ...session, summonPick: { monsterId: picked.monsterId, ...(picked.form ? { form: picked.form } : {}) } };
+  emit();
+}
+/** Picks the creature type a summon takes (a familiar's Celestial, Fey or Fiend). */
+export function setSummonType(creatureType: string) {
+  if (!session?.action.summonChoices?.creatureTypes?.includes(creatureType)) return;
+  session = { ...session, summonType: creatureType };
+  emit();
+}
 /** Picks the condition a failed save imposes, for an action whose caster chooses one (Blindness/Deafness). */
 export function setConditionChoice(conditionId: string) {
   if (!session?.action.conditionChoices?.includes(conditionId)) return;
@@ -343,7 +359,9 @@ export function resolveTargeting(
     skill,
     ability,
     conditionId,
-    shaping
+    shaping,
+    summonPick,
+    summonType
   } = session;
   if (session.placeZoneId !== undefined) {
     if (!template?.placed) return;
@@ -383,6 +401,14 @@ export function resolveTargeting(
     ...(ability !== undefined ? { ability } : {}),
     ...(conditionId !== undefined ? { conditionId } : {}),
     ...(shaping && shaping.length > 0 ? { shaping: shaping.map((entry) => ({ ...entry })) } : {}),
+    ...(summonPick || summonType
+      ? {
+          summon: {
+            ...(summonPick ? { picks: [{ ...summonPick }] } : {}),
+            ...(summonType ? { creatureType: summonType } : {})
+          }
+        }
+      : {}),
     commit,
     ...(revision !== undefined ? { expectedRevision: revision } : {})
   };

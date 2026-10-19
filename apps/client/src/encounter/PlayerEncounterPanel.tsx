@@ -12,6 +12,7 @@ import { EffectChips } from "./EffectChips";
 import { DyingTracker } from "./DyingTracker";
 import { aidGiverOf, isKnockedOut, StabilizeControl } from "./StabilizeControl";
 import { PlayerActionRunner } from "./PlayerActionRunner";
+import { CommandedCreatures, commandedOf } from "./CommandedCreatures";
 import { UnconsciousNote } from "../sheet/PlayFight";
 import { isDying, owesDeathSave } from "../table/playerPrompts";
 import { hasPlayerPrompt } from "../table/PromptSlot";
@@ -220,6 +221,15 @@ export function PlayerEncounterPanel({
   const { combat } = state;
   const myId = state.actors.find((actor) => "claimStatus" in actor && actor.claimStatus === "mine")?.id ?? null;
   const myActor = state.actors.find((actor) => actor.id === myId) ?? null;
+  // The creatures the character commands; on one's own turn, the player acts for it.
+  const commanded = commandedOf(state);
+  const actingFor = combat.active
+    ? (commanded.find((actor) => actor.id === combat.turnActorId && actor.definition) ?? null)
+    : null;
+  const creatureList =
+    myActor && commanded.length > 0 ? (
+      <CommandedCreatures creatures={commanded} commanderId={myActor.id} commanderName={myActor.name} />
+    ) : null;
   // Bring the active combatant's row into view when the turn advances.
   const activeRowRef = useRef<HTMLLIElement | null>(null);
   useEffect(() => {
@@ -290,7 +300,16 @@ export function PlayerEncounterPanel({
           {...(state.builderPolicy?.playerBuilder === "open"
             ? { onLevel: () => navigate(`/characters/${myActor.id}/level`) }
             : {})}
-          end={slots?.sheetFooter}
+          end={
+            creatureList ? (
+              <>
+                {creatureList}
+                {slots?.sheetFooter}
+              </>
+            ) : (
+              slots?.sheetFooter
+            )
+          }
           onClose={() => setTab(inCombat ? "turn" : "me")}
         />
       </>
@@ -303,30 +322,55 @@ export function PlayerEncounterPanel({
 
   const acting = combat.initiative.find((entry) => entry.active)?.name ?? null;
   const dying = myActor !== null && isDying(myActor);
-  const runner =
-    inFight && myId !== null && myActor?.definition && !dying ? (
-      <PlayerActionRunner
-        actorId={myId}
-        definition={myActor.definition}
-        revision={state.revision}
-        inspired={myActor.heroicInspiration === true}
-        playerDamageMode={combat.playerDamageMode}
-        targets={targets}
-        actor={myActor}
-        myTurn={myTurn}
-        look={phone ? "card" : "list"}
-        round={combat.round}
-        acting={acting}
-        targetRows={targetHints.rows}
-        {...(targetHints.insideNow ? { insideNow: targetHints.insideNow } : {})}
-      />
-    ) : null;
+  const runner = actingFor?.definition ? (
+    <PlayerActionRunner
+      actorId={actingFor.id}
+      definition={actingFor.definition}
+      revision={state.revision}
+      playerDamageMode={combat.playerDamageMode}
+      targets={targets}
+      actor={actingFor}
+      myTurn
+      look={phone ? "card" : "list"}
+      round={combat.round}
+      acting={acting}
+    />
+  ) : inFight && myId !== null && myActor?.definition && !dying ? (
+    <PlayerActionRunner
+      actorId={myId}
+      definition={myActor.definition}
+      revision={state.revision}
+      inspired={myActor.heroicInspiration === true}
+      playerDamageMode={combat.playerDamageMode}
+      targets={targets}
+      actor={myActor}
+      myTurn={myTurn}
+      look={phone ? "card" : "list"}
+      round={combat.round}
+      acting={acting}
+      targetRows={targetHints.rows}
+      {...(targetHints.insideNow ? { insideNow: targetHints.insideNow } : {})}
+    />
+  ) : null;
   const turnBody = (
-    <section className="player-turn" aria-label={myTurn ? "Your turn" : "The turn"}>
+    <section
+      className="player-turn"
+      aria-label={myTurn ? "Your turn" : actingFor ? `${actingFor.name}'s turn` : "The turn"}
+    >
       {/* On a phone the turn card carries its own heading; a laptop's list sits under this one. */}
-      {(!phone || !runner) && (
+      {(!phone || !runner || actingFor) && (
         <div className="player-turn-head">
-          {myTurn ? (
+          {actingFor ? (
+            <>
+              <h2 className="player-turn-title">
+                <SunMark size="sm" />
+                {actingFor.name}&apos;s turn
+              </h2>
+              <p className="encounter-quiet-note">
+                {myActor ? `${myActor.name} commands it: you act for it.` : "You act for it."}
+              </p>
+            </>
+          ) : myTurn ? (
             <h2 className="player-turn-title">
               <SunMark size="sm" />
               Your turn
@@ -347,6 +391,7 @@ export function PlayerEncounterPanel({
       {/* The death save waits in the prompt slot above the tabs; this tab says what Unconscious leaves. */}
       {inFight && dying && myActor && <UnconsciousNote name={myActor.name} />}
       {runner}
+      {creatureList}
       {myActor && inFight && (
         <OwnFeedback className="own-effect-row" empty={myActor.effects.length === 0}>
           {(onFeedback) => (
@@ -474,25 +519,38 @@ export function PlayerEncounterPanel({
   // The footer keeps the turn under the thumb: the economy and End turn on this player's turn, and their reaction
   // and HP while someone else acts.
   const ownHp = myActor && myActor.hp.kind === "exact" ? myActor.hp : null;
-  const footer =
-    fighting && inFight && myId !== null ? (
-      <div className="table-panel-foot-row player-foot">
-        <PlayerTurnEconomy
-          combat={combat}
-          myId={myId}
-          myTurn={myTurn}
-          mySpeedFeet={myActor?.speedFeet}
-          revision={state.revision}
-          quiet={rollPending}
-          unconscious={myActor !== null && isDying(myActor)}
-          /* The character's hit points, in view on every tab. */
-          {...(ownHp
-            ? { hp: `HP ${ownHp.current}/${ownHp.maximum}${ownHp.temporary > 0 ? ` +${ownHp.temporary}` : ""}` }
-            : {})}
-          {...(myActor && owesDeathSave(state, myActor) ? { endWaits: "Roll your death save first." } : {})}
-        />
-      </div>
-    ) : null;
+  const creatureHp = actingFor && actingFor.hp.kind === "exact" ? actingFor.hp : null;
+  const footer = actingFor ? (
+    // The creature's turn: its economy and End turn, which its commander's player runs.
+    <div className="table-panel-foot-row player-foot">
+      <PlayerTurnEconomy
+        combat={combat}
+        myId={actingFor.id}
+        myTurn
+        mySpeedFeet={actingFor.speedFeet}
+        revision={state.revision}
+        quiet={rollPending}
+        {...(creatureHp ? { hp: `HP ${creatureHp.current}/${creatureHp.maximum}` } : {})}
+      />
+    </div>
+  ) : fighting && inFight && myId !== null ? (
+    <div className="table-panel-foot-row player-foot">
+      <PlayerTurnEconomy
+        combat={combat}
+        myId={myId}
+        myTurn={myTurn}
+        mySpeedFeet={myActor?.speedFeet}
+        revision={state.revision}
+        quiet={rollPending}
+        unconscious={myActor !== null && isDying(myActor)}
+        /* The character's hit points, in view on every tab. */
+        {...(ownHp
+          ? { hp: `HP ${ownHp.current}/${ownHp.maximum}${ownHp.temporary > 0 ? ` +${ownHp.temporary}` : ""}` }
+          : {})}
+        {...(myActor && owesDeathSave(state, myActor) ? { endWaits: "Roll your death save first." } : {})}
+      />
+    </div>
+  ) : null;
 
   return (
     <TablePanel

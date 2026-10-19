@@ -1,5 +1,6 @@
 import type {
   Annotation,
+  CommandedOrders,
   GameState,
   GmView,
   PendingReaction,
@@ -23,6 +24,7 @@ import { actionPools } from "./effective-actions.js";
 import { HASTED_TAG } from "./effects.js";
 import { healthBandOf } from "./hit-points.js";
 import { HIDDEN_SOURCE, withoutSourceName } from "./hidden-source.js";
+import { OFF_PLANE_TAG } from "./off-plane.js";
 import { visibleTerrain } from "./terrain.js";
 import { exploredRectsOf, playerSight, tokenShown, visionOf, type AudienceSight } from "./vision/audience.js";
 import { sensedBy } from "./vision/detect.js";
@@ -327,6 +329,17 @@ function isHiddenSource(sourceActorId: string | null, publicActorIds: ReadonlySe
 function withSensed(vision: PlayerVision, sensed: readonly PlayerSensedCreature[]): PlayerVision {
   if (!vision.enabled || sensed.length === 0) return vision;
   return { ...vision, sensed: sensed.map((creature) => ({ ...creature })) };
+}
+
+/** The orders a commanded creature's commander may give it, read off how it was summoned and commanded. */
+function ordersFor(source: Actor): { orders?: CommandedOrders } {
+  const orders: CommandedOrders = {
+    ...(source.control?.commandedWith ? { command: source.control.commandedWith } : {}),
+    ...(source.summon?.dismiss ? { dismiss: source.summon.dismiss } : {}),
+    ...(source.summon?.sight === "bonus-action" ? { look: true as const } : {}),
+    ...(source.effects.some((effect) => effect.tags.includes(OFF_PLANE_TAG)) ? { away: true as const } : {})
+  };
+  return Object.keys(orders).length > 0 ? { orders } : {};
 }
 
 /** A creature this player acts for: their own character, or one their character commands (a summon, a dominated
@@ -824,6 +837,7 @@ export function projectPlayerView(
             claimStatus: "available" as const,
             presence: null,
             commanded: true as const,
+            ...ordersFor(source),
             ...(commandedSheet ? { definition: commandedSheet, pools: actionPools(commandedSheet.actions) } : {}),
             actionUses: { ...actionUses },
             ...(sharedDisplayStyle ? { healthDisplay: { style: sharedDisplayStyle } } : {})

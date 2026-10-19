@@ -62,6 +62,31 @@ describe("Treant: Animate Trees", () => {
   });
 });
 
+describe("Planar Binding", () => {
+  it("binds a Fiend that fails its Charisma save to serve its caster, and refuses a Humanoid", async () => {
+    const IMP = "70000000-0000-4000-8000-0000000000d3";
+    const state = summonTable();
+    addActorFromDefinition(state, view.monster("imp")!, IMP, "public", catalog);
+    const table = await bootSummons(cleanups, state);
+    await table.move(IMP, table.gmToken, { position: cell(4, 4) });
+    await table.move(BANDIT, table.gmToken, { position: cell(4, 2) });
+    expect((await table.post(GAME_PATHS.encounterEnd, table.gmToken)).status).toBe(200);
+    const humanoid = await table.resolve({ actionId: "spell-planar-binding", targetIds: [BANDIT] });
+    expect(humanoid.status).toBe(409);
+    const cast = await table.resolve({ actionId: "spell-planar-binding", targetIds: [IMP] });
+    expect(cast.status, await cast.clone().text()).toBe(200);
+    const save = table.snapshot().combat.pendingSaves.find((pending) => pending.targetActorId === IMP)!;
+    const failed = await table.post(GAME_PATHS.saveAnswer.replace("{saveId}", save.id), table.gmToken, {
+      saveId: save.id,
+      method: "manual",
+      total: 1,
+      commit: true
+    });
+    expect(failed.status, await failed.clone().text()).toBe(200);
+    expect(table.actor(IMP)!.control).toMatchObject({ by: CASTER, side: "party" });
+  });
+});
+
 describe("Aboleth: Dominate Mind", () => {
   it("puts a creature that fails its save under the aboleth's command, on the aboleth's side", async () => {
     const table = await withMonster("aboleth", ABOLETH);

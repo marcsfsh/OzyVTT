@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { GAME_PATHS } from "@vtt/api-contract";
 import type { ActorAction } from "@vtt/schemas";
+import { projectPlayerView } from "../src/projections.js";
 import { cell } from "./movement-fixtures.js";
 import { BANDIT, bootSummons, CASTER, castActionOf, CORPSE, CORPSE_TWO, summonTable, WOLF } from "./summon-fixtures.js";
 
@@ -77,6 +78,18 @@ describe("Find Familiar", () => {
     });
     expect(away.status, await away.clone().text()).toBe(200);
     expect(table.snapshot().combat.tokens.find((token) => token.actorId === table.owl.id)!.position).toBeNull();
+    // Its commander's player is told the orders it takes, and that it waits away; another player is told nothing.
+    const player = table.server.auth.issuePlayerSession();
+    expect((await table.post(GAME_PATHS.claims, player, { actorId: CASTER })).status).toBe(200);
+    const viewOf = (token: string) =>
+      projectPlayerView(table.snapshot(), table.server.auth.verifyPlayer(token)!.sessionId, () => null, Date.now());
+    expect(viewOf(player).actors.find((actor) => actor.id === table.owl.id)?.orders).toEqual({
+      dismiss: "action",
+      look: true,
+      away: true
+    });
+    const stranger = table.server.auth.issuePlayerSession();
+    expect(viewOf(stranger).actors.find((actor) => actor.id === table.owl.id)?.orders).toBeUndefined();
     const back = await table.post(pathFor(GAME_PATHS.summonRecall, table.owl.id), table.gmToken, {
       actorId: table.owl.id
     });

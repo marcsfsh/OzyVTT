@@ -1,6 +1,7 @@
 import {
   owedDamageParts,
   owedDamageTotal,
+  summonChoicesOf,
   type ActionAvailability,
   type ActionResolution,
   type GameState
@@ -439,6 +440,8 @@ export function actionAvailability(
       ...(conditionChoicesOf(action, spell).length > 0
         ? { conditionChoices: [...conditionChoicesOf(action, spell)] as SaveCondition[] }
         : {}),
+      // The creature a summon brings and its creature type, picked as it is used (Find Familiar's forms).
+      ...(summonChoicesOf(action.summons) ? { summonChoices: summonChoicesOf(action.summons)! } : {}),
       // Search, Study, Influence and Escape a Grapple are made with a skill the roller picks.
       ...(builtin && builtinCheckSkills(action.id).length > 0 ? { checkSkills: builtinCheckSkills(action.id) } : {})
     };
