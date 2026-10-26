@@ -122,6 +122,57 @@ describe("what a player's level up may change", () => {
   });
 });
 
+// SRD 5.2.1 Mystic Arcanum: "Whenever you gain a Warlock level, you can replace one of your arcanum spells with another
+// Warlock spell of the same level": one replacement a level, across all four arcana.
+describe("a Warlock's level up and its arcana", () => {
+  function warlock() {
+    const { request: eighteen } = generateCharacterRequest(
+      { classId: "warlock", level: 18 },
+      library,
+      policy,
+      seeded(7)
+    );
+    // Warlock 18 gains a tenth invocation, which the Warlock 17 doesn't have yet, with any pick of its own.
+    const tenth = eighteen.choices.filter((row) => row.kind === "eldritch-invocation").at(-1)!;
+    const seventeen: CharacterCreateRequestInput = {
+      ...eighteen,
+      level: 17,
+      choices: eighteen.choices.filter(
+        (row) => row.level <= 17 && row !== tenth && row.payload?.featureId !== tenth.id
+      ),
+      hp: eighteen.hp.mode === "entries" ? { mode: "entries", entries: eighteen.hp.entries!.slice(0, 16) } : eighteen.hp
+    };
+    return { eighteen, sheet: buildCharacterDefinition(seventeen, library, policy) };
+  }
+  /** The level up with the arcanum of each level named swapped for another Warlock spell of that level. */
+  function swappingArcana(eighteen: CharacterCreateRequestInput, levels: readonly number[]) {
+    const taken = new Set(eighteen.choices.map((row) => row.id));
+    return {
+      ...eighteen,
+      choices: eighteen.choices.map((row) => {
+        const level = levels.find((at) => row.payload?.featureId === `mystic-arcanum-level-${at}-spell`);
+        if (level === undefined) return row;
+        const other = library
+          .spellSummaries()
+          .find((spell) => spell.level === level && spell.classes.includes("warlock") && !taken.has(spell.id))!;
+        return { ...row, id: other.id };
+      })
+    };
+  }
+
+  it("replaces one arcanum spell", () => {
+    const { eighteen, sheet } = warlock();
+    expect(() => check(sheet, swappingArcana(eighteen, [6]))).not.toThrow();
+  });
+
+  it("refuses a second arcanum spell replaced at the same level up", () => {
+    const { eighteen, sheet } = warlock();
+    expect(() => check(sheet, swappingArcana(eighteen, [6, 7]))).toThrowError(
+      /may replace 1 of Mystic Arcanum.*and the rebuild replaces 2/
+    );
+  });
+});
+
 describe("the rebuild command", () => {
   const cleanups: Array<() => Promise<void>> = [];
   afterEach(async () => {

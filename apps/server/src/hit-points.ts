@@ -55,19 +55,23 @@ import {
 } from "./effects.js";
 import { returnToLife, stampDeath } from "./death.js";
 import { markRising } from "./risen.js";
+import { dropStable } from "./stable-at-zero.js";
 import { mistyEscape, regainedHitPoints, restorationAtDeath, tallyTurnDamage } from "./death-traits.js";
 import { holdsFeature } from "./class-features.js";
+import { giftOfTheProtectors } from "./book-of-shadows.js";
 import { rollSaveAtOnce } from "./saving-throws.js";
 import { offerDamageReaction } from "./damage-reactions.js";
+import { offerDamagedReaction } from "./triggered-reactions.js";
 import { releaseSwallowedBy, tallyDamageFromInside } from "./swallow.js";
 import { markBloodiedHit } from "./bloodied-hits.js";
 import { damageTypeTraits } from "./damage-traits.js";
 import { openRepeatSavesOnDamage } from "./save-stages.js";
 import { berserkerCurse } from "./berserker-axe.js";
-import { leaveShortRest } from "./short-rest-interruptions.js";
+import { interruptRests } from "./rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { oilIgnition, OILED_TAG } from "./hazards.js";
+import { noteFire } from "./zone-fire-note.js";
 import { sightRules } from "./vision/rules.js";
 import {
   deathBurst,
@@ -803,6 +807,8 @@ export function applyDamageDetailed(
   if (totalAdjusted > 0) events.push(...stopRegeneration(state, actor, definition, parts));
   // What a damage type does to the stat block it lands on (Acid Absorption, Aversion to Fire, Freeze).
   events.push(...damageTypeTraits(state, actor, definition, parts));
+  // Fire on a creature standing in webs sets them burning (Web), settled with the map after the command.
+  noteFire(state, actor.id, input.parts ?? parts);
   if (!isPlayerCharacter && !knockedOut && !wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deps)
     undeadFortitude(
       state,
@@ -822,7 +828,7 @@ export function applyDamageDetailed(
           ? { actorId: input.sourceActorId, ...(deps ? { resolveDefinition: deps.resolveDefinition } : {}) }
           : undefined
       ),
-      ...leaveShortRest(state, new Set([actor.id]), "took damage")
+      ...interruptRests(state, new Set([actor.id]), "took damage", deps ?? {})
     );
 
   // "Whenever the target takes damage, it repeats the save" (Dominate Person, Hideous Laughter).
@@ -885,6 +891,21 @@ export function applyDamageDetailed(
     });
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && deathWard(state, actor, events)) {
     // Death Ward held the creature at 1 Hit Point: nothing falls.
+  } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && input.drain?.stableAtZero) {
+    // "The target becomes Stable" (a phase spider's Bite): no dying, no defeat, and the poison's conditions.
+    events.push(
+      ...dropStable(
+        state,
+        actor,
+        input.drain.stableAtZero,
+        {
+          actorId: input.sourceActorId ?? null,
+          name: input.sourceName ?? null,
+          commandId: deps?.commandId ?? deps?.newId?.() ?? `${actor.id}:${hpBefore}`
+        },
+        { ...(deps ?? {}), state }
+      )
+    );
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0 && input.drain?.killsAtZero) {
     // "The target dies if it is reduced to 0 Hit Points by this attack": no death saves, no trait to hold it up.
     const kill = input.drain.killsAtZero;
@@ -903,6 +924,13 @@ export function applyDamageDetailed(
       relentlessEndurance(actor, definition, damageToHp - hpBefore, events))
   ) {
     // Up at 1 Hit Point: nothing falls.
+  } else if (
+    !wasAtZero &&
+    actor.hp.current === 0 &&
+    damageToHp > 0 &&
+    giftOfTheProtectors(state, actor, damageToHp - hpBefore, events)
+  ) {
+    // A name on a Warlock's page: up at 1 Hit Point.
   } else if (
     !wasAtZero &&
     actor.hp.current === 0 &&
@@ -1014,6 +1042,21 @@ export function applyDamageDetailed(
   // Damage from a creature can open the target's strike-back reaction (Hellish Rebuke). Skipped without an id-minter.
   if (totalAdjusted > 0 && input.sourceActorId && deps) {
     const offered = offerDamageReaction(state, actor, input.sourceActorId, deps);
+    if (offered) events.push(offered);
+  }
+  // Damage can open the creature's own reaction to taking it (a giant octopus's Ink Cloud, a black pudding's Split).
+  if (totalRequested > 0 && deps?.newId) {
+    const offered = offerDamagedReaction(
+      state,
+      actor,
+      {
+        types: parts.filter((part) => part.amount > 0).map((part) => part.type.trim().toLowerCase()),
+        applied: totalAdjusted,
+        hpBefore,
+        sourceActorId: input.sourceActorId ?? null
+      },
+      { ...deps, newId: deps.newId }
+    );
     if (offered) events.push(offered);
   }
 

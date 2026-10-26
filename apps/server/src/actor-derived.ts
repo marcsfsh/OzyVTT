@@ -4,19 +4,14 @@ import type {
   ActorDerivedSheet,
   ContentSkillSummary,
   DerivedAbilityRow,
+  DerivedGearUses,
   DerivedSkillRow,
   DerivedToolRow
 } from "@vtt/domain";
 import { aggregateRollMode, collectRiders, sumRiders } from "@vtt/rules-5e";
-import type { ActorDefinition } from "@vtt/schemas";
-import {
-  checkPlan,
-  passivePerception,
-  toolAbility,
-  toolProficiencies,
-  toolUses,
-  type CheckNames
-} from "./ability-checks.js";
+import { catalogIdOf, type ActorDefinition } from "@vtt/schemas";
+import { checkPlan, passivePerception, toolAbility, toolProficiencies, type CheckNames } from "./ability-checks.js";
+import { holdsFastHands, utilizeUses, type UtilizeUse } from "./utilize.js";
 import { checkSituations } from "./check-situations.js";
 import {
   checkRiderBonus,
@@ -102,8 +97,14 @@ export function deriveActorSheet(
     };
   });
 
-  // Tools the SRD gives an ability ("Ability: Dexterity"); a proficiency the catalog can't name has no check to roll.
-  const tools = toolProficiencies(definition, derivation).flatMap((id): DerivedToolRow[] => {
+  // Tools the SRD gives an ability ("Ability: Dexterity") that the character is proficient with or carries; a
+  // proficiency the catalog can't name has no check to roll. Every use needs the tool carried.
+  const proficientTools = toolProficiencies(definition, derivation);
+  const carriedIds = actor.inventory.filter((row) => row.quantity > 0).map((row) => catalogIdOf(row));
+  const toolIds = [
+    ...new Set([...proficientTools, ...carriedIds.filter((id) => catalog?.equipmentRecord?.(id)?.category === "tool")])
+  ];
+  const tools = toolIds.flatMap((id): DerivedToolRow[] => {
     const record = catalog?.equipmentRecord?.(id);
     const ability = toolAbility(record?.description);
     if (!record || !ability) return [];
@@ -116,7 +117,30 @@ export function deriveActorSheet(
         bonus: plan.modifier,
         mode: plan.rollMode,
         reliableTalent: plan.reliableTalent,
-        uses: toolUses(record.description).map((use) => ({ ...use }))
+        proficient: proficientTools.includes(id),
+        carried: carriedIds.includes(id),
+        uses: utilizeUses(record).map(derivedUse)
+      }
+    ];
+  });
+  // Carried gear that prints a Utilize check (a Grappling Hook), each use with the bonus its check would roll.
+  const gearUses = [...new Set(carriedIds)].flatMap((id): DerivedGearUses[] => {
+    const record = catalog?.equipmentRecord?.(id);
+    if (!record || record.category === "tool" || !record.utilize) return [];
+    return [
+      {
+        id,
+        name: record.name,
+        uses: utilizeUses(record).map((use) => {
+          const plan = checkPlan(
+            actor,
+            definition,
+            derivation,
+            { ability: use.ability, ...(use.skill !== undefined ? { skill: use.skill } : {}) },
+            { names }
+          );
+          return { ...derivedUse(use), ability: use.ability, bonus: plan.modifier, mode: plan.rollMode };
+        })
       }
     ];
   });
@@ -137,6 +161,8 @@ export function deriveActorSheet(
     abilities,
     skills: derivedSkills,
     tools,
+    gearUses,
+    fastHands: holdsFastHands(definition),
     passivePerception: passivePerception(
       checkPlan(actor, definition, derivation, { ability: "wis", skill: "perception" }, { names })
     ),
@@ -175,4 +201,14 @@ function skillTier(
   const printed = (definition?.extensions["open5e.srd-2024"] as { skills?: Record<string, unknown> } | undefined)
     ?.skills?.[skillId];
   return definition?.proficiencies === undefined && typeof printed === "number" ? "proficient" : "none";
+}
+
+/** A printed Utilize use as the sheet offers it. */
+function derivedUse(use: UtilizeUse): DerivedToolRow["uses"][number] {
+  return {
+    label: use.label,
+    dc: use.dc,
+    ...(use.skill !== undefined ? { skill: use.skill } : {}),
+    ...(use.onSuccess !== undefined ? { forAnother: true as const } : {})
+  };
 }

@@ -49,9 +49,12 @@ import {
   type AnswerTarget
 } from "./roll-answers.js";
 import { AURA_IMMUNE_TAG, auraOfAuthority, traitActionId } from "./statblock-traits.js";
+import { settleTouchedZone } from "./zone-touch.js";
 import { applyDamageDetailed, previewDamage, adjustableActor, healActor, killOutright } from "./hit-points.js";
 import { openDamageWindow } from "./damage-window.js";
 import { applyHitPointBand, banishOnFailure, hitPointBandOf } from "./fatal-saves.js";
+import { applyMarginCompanion, marginBandOf, withMarginBand } from "./save-margins.js";
+import { penalizeRow } from "./row-penalties.js";
 import { regurgitate, swallowLands, SWALLOWED_TAG } from "./swallow.js";
 import { holyWardClaim, inPaladinAura, tableHiddenCheck, type AuraContext } from "./paladin-auras.js";
 import { setCondition } from "./actor-conditions.js";
@@ -70,6 +73,7 @@ import {
   endIdleConcentration,
   makeEffect,
   sourceOf,
+  spellWords,
   type ConditionImmunitySource,
   type EffectNarration
 } from "./effects.js";
@@ -92,6 +96,8 @@ import { suppressConditions } from "./suppressed-conditions.js";
 import { sizeAtMost, sizeRank } from "./resolution/context.js";
 import { lightSensitivities, sightRules } from "./vision/rules.js";
 import { legendaryResistancesPerDay } from "./lair.js";
+import { unseat } from "./mounts.js";
+import { spendKillCharge } from "./item-charges.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -108,6 +114,9 @@ export type SaveAnswerDependencies = Readonly<{
   pushToken?: (
     input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>
   ) => Readonly<{ value: number; unit: string }> | null;
+  /** Sets a creature's token down in the nearest unoccupied space beside another's (a rider thrown from its mount);
+   *  false when the map can't. */
+  placeBeside?: (actorId: string, besideId: string) => boolean;
 }>;
 export type SaveOutcome = Readonly<{
   success: boolean;
@@ -165,6 +174,8 @@ export function saveRollSources(
       // A save against a spell or another magical effect (Spellguard Shield), and against a spell, with its school and
       // level (Mantle of Spell Resistance).
       ...(against.magical ? { magicalSource: true } : {}),
+      // A save against a breath weapon (Dragon Scale Mail's Advantage).
+      ...(against.breathWeapon ? { breathWeaponSource: true } : {}),
       ...(against.spell
         ? {
             spellSource: true,
@@ -178,16 +189,34 @@ export function saveRollSources(
   );
 }
 
-/** What a save is against, for a rider that reads it: magic, and the spell. */
+/** What a save is against, for a rider that reads it: magic, the spell, and a breath weapon. */
 export type SaveSource = Readonly<{
   magical?: boolean;
   spell?: Readonly<{ id: string; school: string; level: number }>;
+  breathWeapon?: boolean;
 }>;
 
+/** The active item whose success against this spell leaves it no effect on its bearer (a Ring of Spell Turning: "If
+ *  you succeed on the save for a spell of level 7 or lower, the spell has no effect on you"), by name. */
+function spellTurnedBy(target: Actor, pending: PendingSave, catalog: EquipmentCatalog | undefined): string | null {
+  const level = pending.spell?.level;
+  if (level === undefined || !catalog) return null;
+  for (const row of target.inventory) {
+    const record = rowRecord(catalog, row);
+    const turning = record?.savesNegateSpells;
+    if (turning && level <= turning.maxLevel && itemIsActive(row, record)) return record!.name;
+  }
+  return null;
+}
+
+/** What a breath weapon as the SRD's stat blocks name it: a Dragon's "Fire Breath", a dragonborn's "Breath Weapon". */
+export const isBreathWeapon = (actionName: string): boolean => /\bbreath(?: weapon)?\b/i.test(actionName);
+
 /** What a pending save is against: a spell is magic too. */
-export const saveSourceOf = (pending: Pick<PendingSave, "magical" | "spell">): SaveSource => ({
+export const saveSourceOf = (pending: Pick<PendingSave, "magical" | "spell" | "actionName">): SaveSource => ({
   ...(pending.magical === true || pending.spell !== undefined ? { magical: true } : {}),
-  ...(pending.spell ? { spell: pending.spell } : {})
+  ...(pending.spell ? { spell: pending.spell } : {}),
+  ...(isBreathWeapon(pending.actionName) ? { breathWeapon: true } : {})
 });
 
 /**
@@ -1063,12 +1092,14 @@ export function answerSave(
     !isIncapacitated(target) &&
     hasEvasion(target.definitionId ? deps.resolveDefinition(target.definitionId) : undefined);
   const halved = success !== evasion;
+  // A Ring of Spell Turning: a success against a spell of its level or lower leaves the spell no effect at all.
+  const turnedBy = success ? spellTurnedBy(target, pending, deps.catalog) : null;
   // A failure that acts by the target's Hit Points (Divine Word, Slaying Bow) does its band's outcome instead.
   const band = success ? null : hitPointBandOf(pending, target);
   const outcomeParts = band
     ? []
     : parts && parts.length > 0
-      ? success && (!pending.halfOnSuccess || evasion)
+      ? success && (!pending.halfOnSuccess || evasion || turnedBy !== null)
         ? []
         : halved
           ? halveDamageParts(parts)
@@ -1077,7 +1108,7 @@ export function answerSave(
   const outcomeDamage =
     outcomeParts !== null
       ? outcomeParts.reduce((sum, part) => sum + part.amount, 0)
-      : success && (!pending.halfOnSuccess || evasion)
+      : success && (!pending.halfOnSuccess || evasion || turnedBy !== null)
         ? 0
         : halved
           ? Math.floor(proposedTotal / 2)
@@ -1251,6 +1282,12 @@ export function answerSave(
         `${commandId}:${saveId}:band`
       )
     );
+  // A slaying that spends its weapon's charge (Nine Lives Stealer) spends it now.
+  const killer =
+    band?.dies && pending.spendsOnKill
+      ? state.actors.find((actor) => actor.id === pending.spendsOnKill!.actorId)
+      : undefined;
+  if (killer) spendKillCharge(killer, pending.spendsOnKill!.key);
   if (!success && pending.failureBanishes)
     events.push(
       ...banishOnFailure(
@@ -1261,15 +1298,36 @@ export function answerSave(
         `${commandId}:${saveId}:banished`
       )
     );
-  if (!success && band === null && pending.onFailEffect)
+  // "Failure by 5 or More": the band's conditions and duration stand in for the failure's, with what lasts while they do.
+  const margin = !success && band === null ? marginBandOf(pending, total) : null;
+  if (!success && band === null && pending.onFailEffect) {
+    const onFail = margin ? withMarginBand(pending.onFailEffect, margin) : pending.onFailEffect;
+    events.push(...applyFailureEffect(state, target.id, onFail, `${commandId}:${saveId}:fail`, immunities));
+    if (margin)
+      events.push(
+        ...applyMarginCompanion(state, target.id, onFail, margin, `${commandId}:${saveId}:margin`, immunities)
+      );
+  }
+  // A rust monster's Antennae: the armor or weapon the failure marks takes a cumulative -1.
+  if (!success && pending.objectPenalty)
     events.push(
-      ...applyFailureEffect(state, target.id, pending.onFailEffect, `${commandId}:${saveId}:fail`, immunities)
+      ...penalizeRow(state, target.id, pending.objectPenalty.rowId, {
+        resolveDefinition: (definitionId) => deps.resolveDefinition(definitionId),
+        ...(deps.catalog ? { catalog: deps.catalog } : {})
+      })
     );
   // A gibbering mouther's d8 decides what the creature does this turn.
   if (!success && pending.onFailEffect?.tags.includes(GIBBERING_TAG))
     events.push(...gibberingTurn(target, deps.random));
-  // What a success leaves instead (Heat Metal's Disadvantage on a creature that keeps hold of the object).
-  if (success && pending.onSuccessEffect)
+  // A Ring of Spell Turning's success leaves the spell nothing; otherwise what a success leaves instead (Heat Metal's
+  // Disadvantage on a creature that keeps hold of the object).
+  if (turnedBy !== null)
+    events.push({
+      kind: "effect",
+      text: `${turnedBy} leaves ${spellWords(pending.spell!.id)} no effect on ${target.name}.`,
+      actorId: target.id
+    });
+  if (success && turnedBy === null && pending.onSuccessEffect)
     events.push(
       ...applyFailureEffect(state, target.id, pending.onSuccessEffect, `${commandId}:${saveId}:success`, immunities)
     );
@@ -1283,6 +1341,10 @@ export function answerSave(
       ...(pending.sourceActorId ? { source: { actorId: pending.sourceActorId, name: pending.sourceName } } : {})
     });
   if (!success && pending.failurePush) events.push(...pushOnFailure(state, target, pending, deps));
+  // SRD Mounted Combat: a rider that fails to stay on falls off, Prone beside its mount.
+  if (!success && pending.unseats) events.push(...unseat(state, target.id, pending.unseats, deps.placeBeside));
+  // Delayed Blast Fireball's bead: fumbled, it goes off where it is; caught, it goes off where it is thrown.
+  if (pending.touchedZone) events.push(...settleTouchedZone(state, pending.touchedZone, target, success));
   // "The target dies, and the wisp regains 10 (3d6) Hit Points."
   if (!success && pending.failureKills) events.push(...killOnFailure(state, target, pending, deps));
   // A swallower that fails to hold on lets out what it swallowed.

@@ -3,7 +3,7 @@ import { isOffPlane } from "../off-plane.js";
 import type { GameState } from "@vtt/domain";
 import { checkChoices } from "./grant-extras.js";
 import { effectiveActions } from "../effective-actions.js";
-import { withShotAmmunitionOnly } from "../ammunition.js";
+import { withShotAmmunitionOnly, withShotHitRiders } from "../ammunition.js";
 import { consumableRowFor } from "../consumables.js";
 import { deriveEquipment, sourceItemOf } from "../equipment-derivation.js";
 import { CommandRejectedError, RulesBlockedError } from "../game-store.js";
@@ -48,6 +48,7 @@ import {
 } from "./context.js";
 import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
 import { actionTargetViolations } from "./action-targets.js";
+import { withPickedDamageTypes } from "../statblock-picks.js";
 import { typeGated } from "./type-gates.js";
 
 /** The attacker and targets, refused unless the action has something structured to resolve against them. */
@@ -68,7 +69,7 @@ function combatantsOf(
   const outsideFight = !state.combat.active;
   // A shape-shift is something a creature does outside a fight too (Wild Shape to scout, a werewolf's change).
   const shapeShifts = action.shapeShift !== undefined || action.endsForm === true;
-  const itemGrant = isItemActionId(action.id) && action.grants !== undefined;
+  const itemGrant = isItemActionId(action.id) && (action.grants !== undefined || action.rebindsRow !== undefined);
   // So is helping an ally with a check (picking a lock, calming a horse), which needs no turn.
   const helps = action.id === "help-check";
   // And what a lasting spell does by its caster's hand away from a fight (Dream's message to a sleeper, Geas's harm
@@ -166,6 +167,9 @@ function combatantsOf(
     (spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined)) ||
     // So is bringing creatures onto the map (a Horn of Valhalla's Berserkers).
     action.summons !== undefined ||
+    // An item's command releases whoever it holds (Iron Bands), and an oil remakes a carried row.
+    action.endsItemEffects === true ||
+    action.rebindsRow !== undefined ||
     // Taking a form, or leaving it, is the user's own (Wild Shape, a werewolf's Shape-Shift).
     (shapeShifts && action.shapeShift?.onTargets !== true && action.save === undefined);
   // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone, and so is a swallow.
@@ -198,6 +202,8 @@ function combatantsOf(
     action.swallow?.conditions === undefined &&
     action.pull === undefined &&
     action.inflicts === undefined &&
+    action.endsItemEffects !== true &&
+    action.rebindsRow === undefined &&
     input.builtin !== true &&
     !(spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined))
   )
@@ -273,7 +279,12 @@ export function openResolve(
     castLevel !== null && castLevel !== undefined && spell && reaching.spellSlot && castLevel > reaching.spellSlot.level
       ? upcastAction(reaching, spell, castLevel)
       : reaching;
-  const chosen = withChosenDamageType(upcast, input.damageType ?? null);
+  // A part of the creature's picked type (a half-dragon's Draconic Origin) deals that type.
+  const chosen = withPickedDamageTypes(
+    withChosenDamageType(upcast, input.damageType ?? null),
+    attacker,
+    deps.definition
+  );
   // The cast's own free use of a later action costs nothing more (Arcane Hand's first effect).
   const withCast = spell !== undefined && takenWithCast(state, attacker.id, spell, chosen.id);
   // Levitating itself, the caster rises or sinks as part of its move (Levitate: "If you are the target, you can move
@@ -457,7 +468,8 @@ export function openResolve(
   const builtin = input.builtin ? builtinHandlerFor(action.id) : undefined;
   const ctx: ResolveContext = {
     state,
-    action,
+    // A shot carries what a hit with the piece it draws does (Ammunition of Slaying).
+    action: withShotHitRiders(action, attacker, riderItemId, deps.catalog),
     input,
     deps,
     hiddenFromTable,

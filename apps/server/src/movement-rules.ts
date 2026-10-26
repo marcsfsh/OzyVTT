@@ -2,7 +2,7 @@ import { reactionSpent } from "./commanded-reactions.js";
 import { formEffectOf } from "./transform/forms.js";
 import type { ActorMovementReply, EncounterTokenPosition, GameState } from "@vtt/domain";
 import type { MoveMode } from "@vtt/domain/commands";
-import type { ActorDefinition } from "@vtt/schemas";
+import type { ActorDefinition, TeleportLanding } from "@vtt/schemas";
 import { footprintOrigin } from "@vtt/rules-5e";
 import { RulesBlockedError } from "./game-store.js";
 import { altitudesAlong, heightRefusal, sharesHeight } from "./altitude.js";
@@ -31,7 +31,7 @@ import {
   READIED_TAG,
   releaseReadied
 } from "./effects.js";
-import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
+import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
 import { jumpLimits, leapRider } from "./jumping.js";
 import { travelBudgetFeet, travelCostsExtra, type TravelMode } from "./speed.js";
@@ -124,6 +124,8 @@ export type MovementRulesOutcome = Readonly<{
   landsOnDifficult?: true;
   /** The teleport arrived in a filled space and fails with this Force damage (`failedTeleport`). */
   teleportFails?: string;
+  /** What the granted teleport's arrival does near its destination (a mummy lord's Whirlwind of Sand). */
+  teleportLanding?: TeleportLanding;
   /** The mover waits here, at the edge of the reach it leaves, while the Opportunity Attacks it provoked are answered
    *  (`held-moves.ts`); `refundFeet` is what the rest of the way cost, given back if it never goes on. */
   heldAt?: Readonly<{ position: Point; altitudeFeet: number; promptIds: readonly string[]; refundFeet: number }>;
@@ -226,7 +228,7 @@ export function movementStatus(
     ...(incorporeal(definition) ? { throughWalls: true } : {}),
     ...(openingPassage(definition) ? { opening: openingPassage(definition)! } : {}),
     ...(burrowsThroughWalls(definition) ? { burrowsThroughWalls: burrowsThroughWalls(definition)! } : {}),
-    ...(actor && freeOfDifficultTerrain(actor) ? { ignoresDifficultTerrain: true } : {})
+    ...(actor && freeOfDifficultTerrain(actor, derivation ?? undefined) ? { ignoresDifficultTerrain: true } : {})
   };
 }
 
@@ -431,6 +433,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   let granted: string | undefined;
   let landsOnDifficult = false;
   let failDamage: string | undefined;
+  let landing: TeleportLanding | undefined;
   let heldAt: MovementRulesOutcome["heldAt"];
   const travelled: { path?: readonly Point[] } = {};
   const done = (crawled = false): MovementRulesOutcome => ({
@@ -442,6 +445,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     ...(granted ? { granted } : {}),
     ...(landsOnDifficult ? { landsOnDifficult: true as const } : {}),
     ...(failDamage ? { teleportFails: failDamage } : {}),
+    ...(landing ? { teleportLanding: landing } : {}),
     ...(heldAt ? { heldAt } : {}),
     ...(travelled.path ? { path: travelled.path } : {})
   });
@@ -467,6 +471,7 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     if (teleport && refusal === null) {
       spendTeleportGrant(mover, teleport.effectId);
       granted = teleport.name;
+      landing = teleport.landing;
       // A space filled by a creature the mover didn't know of fails the teleport that says so (Dimension Door).
       if (teleport.failDamage && endsInOccupiedSpace(state, input, to, true)) failDamage = teleport.failDamage;
       return done();
@@ -514,6 +519,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       `${mover.name} is Frightened and can't willingly move closer to ${feared}.`,
       outcome
     );
+  // SRD Climber's Kit: "you can't move more than 25 feet from there without undoing the anchor".
+  const tether = (counted || input.byPlayer || grant) && strainsAnchor(input, mover, to);
+  if (tether) police(state, input, "movement.tether", tether, outcome);
   // Height changes by flying, climbing, jumping or teleporting; a creature in the air moves by flying.
   const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
   const heightBar =
@@ -760,6 +768,18 @@ function approachesFear(
   return null;
 }
 
+/** Why a move takes an anchored creature too far from its anchor, or null. Height counts as distance does. */
+function strainsAnchor(input: MovementRulesInput, mover: GameState["actors"][number], to: Point): string | null {
+  const anchored = mover.effects.find((effect) => effect.anchor !== undefined);
+  const anchor = anchored?.anchor;
+  if (!anchor) return null;
+  const across = input.distance({ x: anchor.x, y: anchor.y }, to);
+  if (across === null) return null;
+  const up = Math.abs((input.toAltitudeFeet ?? input.fromAltitudeFeet ?? 0) - anchor.altitudeFeet);
+  if (Math.max(across, up) <= anchor.feet + DISTANCE_TOLERANCE_FEET) return null;
+  return `${mover.name} is anchored (${anchored.name}) and can't move more than ${anchor.feet} feet from the anchor. Undo the anchor first.`;
+}
+
 /** A readied move spends the creature's Reaction and uses up the ready, and a spell it held with it. */
 function spendReadied(state: GameState, moverId: string): void {
   state.combat = { ...state.combat, reactionsUsed: [...new Set([...state.combat.reactionsUsed, moverId])] };
@@ -773,9 +793,14 @@ const moverDefinitionOf = (mover: GameState["actors"][number], input: Pick<Movem
 const incorporeal = (definition: ActorDefinition | undefined) =>
   holdsFeature(definition, "incorporeal-movement", "Incorporeal Movement");
 
-/** Freedom of Movement: "The target's movement is unaffected by Difficult Terrain." */
-const freeOfDifficultTerrain = (mover: GameState["actors"][number]) =>
-  mover.effects.some((effect) => effect.tags.includes("freedom-of-movement"));
+/** The tags that free a mover from Difficult Terrain: Freedom of Movement's ("The target's movement is unaffected by
+ *  Difficult Terrain", a Ring of Free Action's too) and a creature that otherwise ignores it (Horseshoes of a Zephyr). */
+const DIFFICULT_TERRAIN_FREE_TAGS: readonly string[] = ["freedom-of-movement", "ignores-difficult-terrain"];
+
+/** Whether a live effect or a worn item's own effect frees the mover from Difficult Terrain. */
+const freeOfDifficultTerrain = (mover: GameState["actors"][number], derivation: EquipmentDerivation | undefined) =>
+  mover.effects.some((effect) => effect.tags.some((tag) => DIFFICULT_TERRAIN_FREE_TAGS.includes(tag))) ||
+  (derivation?.context.effectTags ?? []).some((tag) => DIFFICULT_TERRAIN_FREE_TAGS.includes(tag));
 
 /** What each foot of a move costs beside itself, and the options the path's cost is measured with. */
 function costOptions(
@@ -809,7 +834,7 @@ function costOptions(
       ...(travel === "burrow" && burrowsThroughWalls(moverDefinition) === "free" ? { throughWallsFree: true } : {}),
       // Amorphous, Compression and the elementals' forms slip through any gap; a swarm through one a Tiny creature fits.
       ...(openingPassage(moverDefinition) ? { opening: openingPassage(moverDefinition)! } : {}),
-      ...(freeOfDifficultTerrain(mover) ? { ignoresDifficult: true } : {}),
+      ...(freeOfDifficultTerrain(mover, derivation) ? { ignoresDifficult: true } : {}),
       ...(fromAltitude !== 0 || toAltitude !== 0 ? { altitude: { fromFeet: fromAltitude, toFeet: toAltitude } } : {})
     }
   };
@@ -836,7 +861,7 @@ function teleportRefusal(
   state: GameState,
   input: MovementRulesInput,
   name: string,
-  teleport: Readonly<{ feet: number; unseen?: true }>,
+  teleport: Readonly<{ feet: number; unseen?: true; near?: Readonly<{ actorId: string; feet: number }> }>,
   toAltitude: number
 ): string | null {
   const { from, to } = input;
@@ -844,6 +869,17 @@ function teleportRefusal(
   const far = straightCost(input, from, to, input.fromAltitudeFeet ?? 0, toAltitude)?.feet ?? null;
   if (far !== null && far > teleport.feet + DISTANCE_TOLERANCE_FEET)
     return `${name} can teleport up to ${teleport.feet} ft, and that space is ${Math.round(far)} ft away.`;
+  // A nalfeshnee's Pursuit: "its destination space must be within 10 feet of the triggering creature".
+  const near = teleport.near;
+  const quarry = near ? state.combat.tokens.find((token) => token.actorId === near.actorId) : undefined;
+  if (near && quarry?.position) {
+    const apart =
+      input.creatureDistance?.({ actorId: near.actorId, position: quarry.position }, to, toAltitude) ??
+      input.distance(quarry.position, to);
+    const quarryName = state.actors.find((actor) => actor.id === near.actorId)?.name ?? "the creature it follows";
+    if (apart !== null && apart > near.feet + DISTANCE_TOLERANCE_FEET)
+      return `${name} must end within ${near.feet} ft of ${quarryName}, and that space is ${Math.round(apart)} ft away.`;
+  }
   if (endsInOccupiedSpace(state, input, to)) return `${name} can teleport only to an unoccupied space.`;
   if (!teleport.unseen && input.seesPoint && !input.seesPoint(to))
     return `${name} can teleport only to a space it can see.`;

@@ -219,7 +219,19 @@ export function castAction(
     // The bearer's own slot is spent on top of the item's charges when the item says so.
     ...(cast.consumesSpellSlot && level >= 1 ? { spellSlot: { level: Math.min(9, level) } } : {}),
     // Who the item's cast may affect beside the spell's own targets (a ring's Fear: Beasts only).
-    ...(cast.targets ? { targets: structuredClone(cast.targets) } : {})
+    ...(cast.targets ? { targets: structuredClone(cast.targets) } : {}),
+    // Cast through the item's own Scrying (a Crystal Ball's Detect Thoughts), or only after a check (an Amulet of the
+    // Planes).
+    ...(cast.through ? { castThrough: cast.through } : {}),
+    // Once a dawn as well as from its charges (a Luck Blade's Wish), counted per carried copy.
+    ...(uses && cast.alsoUses
+      ? { alsoUses: { limit: cast.alsoUses.limit, pool: itemPool(item, `${cast.spellId}-dawn`) } }
+      : {}),
+    ...(cast.check ? { castCheck: { ...cast.check } } : {}),
+    // What it leaves lasts the item's time (Oil of Slipperiness' Grease: 8 hours).
+    ...(cast.lastsMinutes !== undefined ? { castLastsMinutes: cast.lastsMinutes } : {}),
+    // Only while its user controls the item (a Dragon Orb's spells).
+    ...(cast.requiresEffectTag ? { requiresEffectTag: cast.requiresEffectTag } : {})
   };
   if (!spell) return base;
 
@@ -249,7 +261,7 @@ export function castAction(
     ...base,
     // The item's own area, where it prints one (a wand's 60-foot Cone), else the spell's.
     ...(cast.area ? { area: structuredClone(cast.area) } : castAreaOf(spell, mechanics)),
-    ...mechanics,
+    ...(cast.optionIds ? withOptionsOnly(mechanics, cast.optionIds) : mechanics),
     // A Reaction spell (Shield, Hellish Rebuke) is cast from the item as a Reaction, offered when its trigger happens.
     ...(spell.effect?.reaction
       ? { activation: "reaction" as const, reaction: structuredClone(spell.effect.reaction) }
@@ -258,6 +270,30 @@ export function castAction(
   // A higher level rolls that slot's dice and makes its darts and rays, as a slot cast at it would (Robe of Stars'
   // level 5 Magic Missile).
   return level > spell.level ? upcastAction(built, spell, level) : built;
+}
+
+/** The spell's options an item's cast keeps where the item limits them (a Wand of Fear's Command: Flee or Grovel),
+ *  on its failed save's effect, its grant and the effects it picks among; the resolve refuses a pick it dropped. */
+function withOptionsOnly<Mechanics extends Pick<ActorAction, "save" | "grants" | "effectOptions">>(
+  mechanics: Mechanics,
+  optionIds: readonly string[]
+): Mechanics {
+  // A choice is of two or more; an item naming fewer of the spell's own leaves the spell's.
+  const kept = <Option extends { id: string }>(options: readonly Option[] | undefined) => {
+    const left = options?.filter((option) => optionIds.includes(option.id));
+    return left && left.length >= 2 ? left : options;
+  };
+  const failure = mechanics.save?.failureEffect;
+  const grantOptions = kept(mechanics.grants?.options);
+  const effectOptions = kept(mechanics.effectOptions);
+  return {
+    ...mechanics,
+    ...(failure?.options && mechanics.save
+      ? { save: { ...mechanics.save, failureEffect: { ...failure, options: kept(failure.options) } } }
+      : {}),
+    ...(grantOptions && mechanics.grants ? { grants: { ...mechanics.grants, options: grantOptions } } : {}),
+    ...(effectOptions ? { effectOptions } : {})
+  };
 }
 
 /** An item cast as the sheet offers it: one cast, or, where each charge after the first casts it a level higher (a
@@ -796,9 +832,14 @@ export function weaponSwing(
   const trained = definition.proficiencies?.weapons;
   // A bound template row also answers to its base weapon's id for proficiency.
   const ids = item.baseId !== undefined ? [catalogIdOf(item), item.baseId] : [catalogIdOf(item)];
+  // A binding may lend proficiency with the weapon (a pact weapon).
   const proficient =
-    trained === undefined || trainingCovers(grantedWeapons, weapon, ids) || trainingCovers(trained, weapon, ids);
-  const bonus = modifier + (proficient ? definition.proficiencyBonus : 0);
+    trained === undefined ||
+    bound?.proficient === true ||
+    trainingCovers(grantedWeapons, weapon, ids) ||
+    trainingCovers(trained, weapon, ids);
+  // What acid or rust took off the weapon's attack rolls (`row-penalties.ts`).
+  const bonus = modifier + (proficient ? definition.proficiencyBonus : 0) - (item.penalty ?? 0);
   const pickable = bound?.damageTypes ? [...new Set([weapon.damageType as DamageType, ...bound.damageTypes])] : [];
   const action: ActorAction = {
     id: itemActionId(item.id, options.twoHanded ? TWO_HANDED_SUFFIX : undefined),
@@ -822,6 +863,48 @@ export function weaponSwing(
     ...(pickable.length >= 2 ? { damageTypes: pickable } : {})
   };
   return { action, dice, modifier };
+}
+
+/** The id suffixes of a weapon used as an improvised weapon: a Ranged weapon swung in melee, a Melee weapon without the
+ *  Thrown property thrown. */
+export const IMPROVISED_MELEE_SUFFIX = "improvised";
+export const IMPROVISED_THROWN_SUFFIX = "thrown-improvised";
+
+/** SRD Improvised Weapons: what an improvised attack deals, the type the GM thinks fits the object. */
+export const IMPROVISED_DAMAGE_TYPES = ["bludgeoning", "piercing", "slashing"] as const;
+
+/**
+ * SRD Improvised Weapons: "if you use a Ranged weapon to make a melee attack or throw a Melee weapon that lacks the
+ * Thrown property, the weapon counts as an improvised weapon": no Proficiency Bonus, 1d4 damage of a type the GM
+ * picks, and a thrown one has a normal range of 20 feet and a long range of 60. Null when the weapon is used as it is
+ * made (a Melee weapon swung, a Ranged or Thrown one fired or thrown).
+ */
+export function improvisedSwing(
+  item: InventoryItem,
+  definition: ActorDefinition | undefined,
+  form: "melee" | "thrown"
+): ActorAction | null {
+  const weapon = item.weapon;
+  if (!weapon || !definition) return null;
+  const properties = weapon.properties ?? [];
+  const melee = isMeleeWeapon(properties, weapon.rangeFeet, weapon.melee);
+  if (form === "melee" ? melee : !melee || properties.includes("thrown")) return null;
+  const modifier = abilityModifier(definition.abilityScores.str);
+  return {
+    id: itemActionId(item.id, form === "melee" ? IMPROVISED_MELEE_SUFFIX : IMPROVISED_THROWN_SUFFIX),
+    name: form === "melee" ? `${item.name} (improvised melee)` : `${item.name} (thrown, improvised)`,
+    activation: "action",
+    description:
+      form === "melee"
+        ? `Swing ${item.name} in melee as an improvised weapon: no Proficiency Bonus, 1d4 damage of the type that fits.`
+        : `Throw ${item.name} as an improvised weapon, 20/60 feet: no Proficiency Bonus, 1d4 damage of the type that fits.`,
+    attack: {
+      bonus: modifier,
+      ...(form === "melee" ? { reachFeet: 5 } : { rangeFeet: 60, rangeNormalFeet: 20 })
+    },
+    damage: [{ formula: withModifier("1d4", modifier), type: "bludgeoning" }],
+    damageTypes: [...IMPROVISED_DAMAGE_TYPES]
+  };
 }
 
 /** "1d8 + 3", "1d4 - 1", or the dice alone. A fixed amount ("1", a Blowgun) stays as it is: the SRD adds no ability

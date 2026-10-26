@@ -167,11 +167,16 @@ export function scrollCastAction(
 ): ActorAction | null {
   const spell = item.spellId ? catalog?.spellRecord?.(item.spellId) : undefined;
   if (!spell) return null;
-  const numbers = scrollNumbers(spell.level);
+  // A scroll a character scribed uses the scribe's numbers, and its cantrip the scribe's level (SRD Scribing Spell
+  // Scrolls); any other uses the scroll table's.
+  const numbers = item.scribed
+    ? { saveDc: item.scribed.saveDc, attackBonus: item.scribed.attackBonus }
+    : scrollNumbers(spell.level);
   const reading = scrollReading(definition, spell, catalog);
   const ability = reading.readable ? reading.ability : null;
   const modifier = definition && ability ? abilityModifier(definition.abilityScores[ability]) : 0;
-  const tier = spell.level === 0 ? cantripTierAt(cantripScalingOf(spell.castingOptions), 1) : null;
+  const tier =
+    spell.level === 0 ? cantripTierAt(cantripScalingOf(spell.castingOptions), item.scribed?.casterLevel ?? 1) : null;
   const mechanics = spellCastMechanics(
     spell,
     { ...numbers, bearersDc: false, modifier },

@@ -19,7 +19,8 @@ import {
   type ActorDefinition,
   type AmmunitionKind,
   type OngoingDamage,
-  type SaveFailureDuration
+  type SaveFailureDuration,
+  type TraitMechanic
 } from "@vtt/schemas";
 import { experienceForChallenge } from "@vtt/rules-5e";
 import {
@@ -39,10 +40,12 @@ import {
   SPELL_SAVE_OVERRIDE_IDS,
   spellSaveOutcomeFor,
   statBlockSaveOutcome,
+  failureCompanionRidersOf,
   failureRestrictionsOf,
   withoutOngoingDamage
 } from "./save-outcomes.js";
 import { multiattackOfProse, withProseFacts } from "../src/action-prose.js";
+import { unconsumedClauses } from "../src/action-clauses.js";
 import { castingOptionsFor, makesSpellAttack, spellAreaFor, spellEffectFor } from "./spell-effects.js";
 import { costlyMaterialsFor } from "./spell-materials.js";
 import { spellSightFor } from "./spell-sight.js";
@@ -310,7 +313,8 @@ const ABILITY_BY_NAME = {
 const FOOTPRINT_BY_SIZE: Record<string, number> = { tiny: 1, small: 1, medium: 1, large: 2, huge: 3, gargantuan: 4 };
 const SIZES = new Set(["tiny", "small", "medium", "large", "huge", "gargantuan"]);
 const DICE_PATTERN = /^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i;
-const SAVE_PATTERN = /(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) Saving Throw:\s*DC\s*(\d+)/;
+// A reaction prints its save label in italics ("_Dexterity Saving Throw:_ DC 17").
+const SAVE_PATTERN = /(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) Saving Throw:_?\s*DC\s*(\d+)/;
 
 /** CR 0-4 -> +2 and +1 per four CR after, as the 5e proficiency table has it. */
 const proficiencyFromChallenge = (challenge: number) => Math.max(2, 2 + Math.floor((Math.ceil(challenge) - 1) / 4));
@@ -355,6 +359,8 @@ type OnHitRider = {
   self?: true;
   reminder?: string;
   hazard?: "burning";
+  lowersScore?: { ability: "str" | "dex" | "con" | "int" | "wis" | "cha"; dice: string; killsAtZero?: true };
+  armorPenalty?: true;
 };
 /** "takes 5 (2d4) Necrotic damage at the start of each of the stirge's turns" (the source's) or "... of its turns". */
 function riderOngoingDamage(text: string): OngoingDamage | undefined {
@@ -549,35 +555,85 @@ function effectRiders(desc: string, maxTargetSize: OnHitRider["maxTargetSize"], 
   // hit's own (`drain.killsAtZero`).
   const cursed = /\bit is cursed\. (While cursed, the target can[\u2019']t regain Hit Points[^.]*\.)/.exec(desc);
   if (cursed) found.push({ conditions: [], name: "Cursed", tags: ["no-healing"], reminder: cursed[1]! });
-  // An incubus's curse acts at rests, and a shadow's touch drains a score: both the GM's.
+  // A curse that acts at rests the hit's reviewed fix runs (an incubus's); this reminder stands for one with none.
   const restCurse = /\bthe target is cursed for [^.]*\. Until the curse ends, [^.]*\./.exec(desc);
   if (restCurse) found.push({ conditions: [], reminder: restCurse[0]!.replace(/^the target/, "The target") });
+  // "The target's Strength score decreases by 1d4. The target dies if this reduces that score to 0" (a shadow's
+  // Draining Swipe).
   const drain =
-    /\bthe target's (?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) score decreases by \d+d\d+\.(?: The target dies if this reduces that score to 0\.)?/.exec(
+    /\bthe target's (Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) score decreases by (\d+d\d+)\.( The target dies if this reduces that score to 0\.)?/.exec(
       desc
     );
-  if (drain) found.push({ conditions: [], reminder: drain[0]!.replace(/^the target/, "The target") });
+  if (drain)
+    found.push({
+      conditions: [],
+      name: `${drain[1]} drained`,
+      lowersScore: {
+        ability: ABILITY_BY_NAME[drain[1] as keyof typeof ABILITY_BY_NAME],
+        dice: drain[2]!,
+        ...(drain[3] ? { killsAtZero: true as const } : {})
+      }
+    });
+  // "Nonmagical armor worn by the target takes a -1 penalty to the AC it offers. The armor is destroyed if the penalty
+  // reduces its AC to 10. The penalty can be removed by casting the Mending spell on the armor" (an ooze's Pseudopod).
+  if (
+    /\bNonmagical armor worn by the target takes a -1 penalty to the AC it offers\. The armor is destroyed if the penalty reduces its AC to 10\. The penalty can be removed by casting the Mending spell on the armor\./.test(
+      desc
+    )
+  )
+    found.push({ conditions: [], name: "Armor corroded", armorPenalty: true });
   return found;
 }
 
 const SAVE_TARGET_CONDITIONS = ["Frightened", "Charmed", "Prone", "Grappled", "Restrained", "Incapacitated"];
 const SAVE_TARGET_TYPES = ["Humanoid", "Beast", "Undead", "Fiend", "Giant", "Dragon", "Construct", "Elemental"];
 
+/** "That isn't an Undead": the creature types an area's clause leaves out. */
+const notTypesOf = (clause: string): string[] =>
+  [...clause.matchAll(new RegExp(`\\bisn[\\u2019']t an? (${SAVE_TARGET_TYPES.join("|")})\\b`, "g"))].map((match) =>
+    match[1]!.toLowerCase()
+  );
+
+/**
+ * Who an area's save reaches among the creatures under it: "each enemy in a 20-foot-radius Sphere", "each creature that
+ * isn't an Undead in a 20-foot Emanation", and "each creature in a 60-foot Cone that can see the ghost" (`sight.seenBy`).
+ */
+function areaSaveTargets(clause: string): Pick<ActorAction, "targets" | "sight"> {
+  const notTypes = notTypesOf(clause);
+  const targets: NonNullable<ActorAction["targets"]> = {
+    ...(/^each enemy\b/.test(clause) ? { who: "enemies" as const } : {}),
+    ...(notTypes.length > 0 ? { notCreatureTypes: notTypes } : {})
+  };
+  return {
+    ...(Object.keys(targets).length > 0 ? { targets } : {}),
+    ...(/\bthat can see the [a-z' -]+?\b(?: and\b|$)/.test(clause) ? { sight: { seenBy: "user" as const } } : {})
+  };
+}
+
 /**
  * Who a save action may target, from the stock clause after its DC ("Strength Saving Throw: DC 15, one Large or smaller
- * creature Grappled by the behir"): one creature or each, its size, a condition it must have, its creature type, a
- * range, "the X can see", "Grappled by the X" and "in the X's space". An area's creatures come from its template, and a
- * clause the reader doesn't know whole (willing, "Charmed or Grappled", 0 Hit Points) stays the GM's.
+ * creature Grappled by the behir"): one creature or each, its size, a condition it must have (or one it has from the
+ * creature: "Charmed or Grappled by the aboleth"), its creature type, a range, "the X can see", "Grappled by the X" and
+ * "in the X's space". An area's creatures come from its template, less those its clause leaves out (`areaSaveTargets`),
+ * and a clause the reader doesn't know whole (willing, 0 Hit Points) stays the GM's.
  */
-function withSaveTargets(desc: string): Pick<ActorAction, "targets"> {
+function withSaveTargets(desc: string): Pick<ActorAction, "targets" | "sight"> {
   // "Each creature whose space the centaur enters", "each creature whose space the cube enters for the first time
   // during this move": the creatures its move went through.
   if (/\bwhose space the [a-z' -]+? enters\b/i.test(desc)) return { targets: { entered: true } };
-  const clause = /Saving Throw: DC \d+, ((?:one|each) [^.(]*)/.exec(desc)?.[1]?.trim();
+  const clause = /Saving Throw:_? DC \d+, ((?:one|each) [^.(]*)/.exec(desc)?.[1]?.trim();
   if (!clause) return {};
-  if (/\bin an? \d+-foot\b|\bdestination\b|\bwhose space\b|\bwilling\b| or Grappled\b|\bHit Points\b/.test(clause))
-    return {};
+  if (/\bin an? \d+-foot\b/.test(clause)) return areaSaveTargets(clause);
+  if (/\bdestination\b|\bwhose space\b|\bwilling\b|\bHit Points\b/.test(clause)) return {};
   const targets: NonNullable<ActorAction["targets"]> = {};
+  // "One creature within 30 feet that is Charmed or Grappled by the aboleth".
+  const held = new RegExp(
+    `\\bthat is (${SAVE_TARGET_CONDITIONS.join("|")}) or (${SAVE_TARGET_CONDITIONS.join("|")}) by the\\b`
+  ).exec(clause);
+  if (held)
+    targets.conditionsFromSource = [held[1]!, held[2]!].map(
+      (name) => name.toLowerCase() as NonNullable<typeof targets.conditionsFromSource>[number]
+    );
   if (/^one\b/.test(clause)) targets.count = 1;
   const size = /\b(Tiny|Small|Medium|Large|Huge) or smaller\b/.exec(clause);
   if (size) targets.maxSize = size[1]!.toLowerCase() as NonNullable<typeof targets.maxSize>;
@@ -592,7 +648,7 @@ function withSaveTargets(desc: string): Pick<ActorAction, "targets"> {
   const range = /\bwithin (\d+) feet\b/.exec(clause);
   if (range) targets.rangeFeet = Number(range[1]);
   if (/\b(?:the [a-z' -]+|it) can see\b/.test(clause)) targets.seen = true;
-  if (/\bGrappled by the\b/.test(clause)) targets.grappledBySource = true;
+  if (/\bGrappled by the\b/.test(clause) && !held) targets.grappledBySource = true;
   if (/\bin the [a-z' -]+?'s space\b/.test(clause)) targets.inSpace = true;
   return Object.keys(targets).length > 0 ? { targets } : {};
 }
@@ -604,6 +660,16 @@ const splitTypedList = (display: string, known: ReadonlySet<string>): string[] =
     .split(/[,;]|\band\b/)
     .map((token) => token.trim())
     .filter((token) => known.has(token));
+
+/** A black pudding's and an ochre jelly's Split. */
+const SPLIT: NonNullable<ActorAction["reaction"]> = {
+  trigger: "damaged",
+  response: "split",
+  damageTypes: ["lightning", "slashing"],
+  bloodied: true,
+  sizes: ["large", "medium"],
+  minHitPoints: 10
+};
 
 /** Protective Magic casts Shield (or Counterspell, which stays prose): +5 AC until the caster's next turn. */
 const PROTECTIVE_MAGIC: Pick<ActorAction, "reaction"> = {
@@ -617,10 +683,11 @@ const PROTECTIVE_MAGIC: Pick<ActorAction, "reaction"> = {
  * - protective-magic: its Shield, offered when an attack would hit.
  * - burst-of-ingenuity: "The sphinx or another creature within 30 feet makes an ability check or a saving throw ...
  *   The sphinx adds 2 to the roll", an answer to the roll.
- * - reflexive-antennae: "An attack roll hits the rust monster ... The rust monster uses Antennae", offered when a
- *   creature within 5 feet damages it.
+ * - reflexive-antennae: "An attack roll hits the rust monster ... The rust monster uses Antennae", offered when an
+ *   attack roll from a creature within 5 feet hits it.
  * - deflect-missile: "hit by a ranged attack roll and takes Bludgeoning, Piercing, or Slashing damage from it ...
- *   reduces the damage it takes from the attack by 11 (1d10 + 6)"; the redirect after reducing it to 0 stays prose.
+ *   reduces the damage it takes from the attack by 11 (1d10 + 6), and if that damage is reduced to 0, the giant can
+ *   redirect some of the attack's force", the action's own save turned on a creature it picks.
  * - animate-trees: "animates up to two trees it can see within 60 feet of itself. Each tree uses the Treant stat
  *   block, except it has Intelligence and Charisma scores of 1, it can't speak, and it lacks this action ... The tree
  *   takes its turn immediately after the treant on the same Initiative count, and it obeys the treant. A tree remains
@@ -657,6 +724,7 @@ const ACTION_ENRICHMENTS: Record<
       | "afterHurtingBloodied"
       | "largeFillsHold"
       | "teleport"
+      | "object"
     >
   >
 > = {
@@ -808,7 +876,14 @@ const ACTION_ENRICHMENTS: Record<
     }
   },
   "rust-monster/reflexive-antennae": {
-    reaction: { trigger: "damaged-by-creature", response: "strike-back", rangeFeet: 5, usesAction: "antennae" }
+    reaction: { trigger: "hit-by-attack", response: "strike-back", rangeFeet: 5, usesAction: "antennae" }
+  },
+  // "The rust monster targets one nonmagical metal object (armor or a weapon) worn or carried by a creature within 5
+  // feet of itself ... Failure: The object takes a -1 penalty to the AC it offers (armor) or to its attack rolls
+  // (weapon)."
+  "rust-monster/antennae": {
+    targets: { count: 1, rangeFeet: 5 },
+    object: { kinds: ["armor", "weapon"], metal: true, does: "penalty-on-failure" }
   },
   "stone-giant/deflect-missile": {
     reaction: {
@@ -816,8 +891,38 @@ const ACTION_ENRICHMENTS: Record<
       response: "reduce-damage",
       formula: "1d10 + 6",
       damageTypes: ["bludgeoning", "piercing", "slashing"],
-      attackKinds: ["ranged"]
+      attackKinds: ["ranged"],
+      redirect: true
     }
+  },
+  // "A creature the devil can see starts its turn within 30 feet of the devil and can see the devil. Response: Wisdom
+  // Saving Throw: DC 15, the triggering creature."
+  "chain-devil/unnerving-gaze": {
+    reaction: { trigger: "starts-turn-near", response: "strike-back", rangeFeet: 30, sight: "mutual" },
+    targets: { count: 1, rangeFeet: 30, seen: true }
+  },
+  // "Another creature the nalfeshnee can see ends its move within 120 feet of the nalfeshnee. Response: The nalfeshnee
+  // uses Teleport, but its destination space must be within 10 feet of the triggering creature."
+  "nalfeshnee/nalfeshnee-pursuit": {
+    reaction: {
+      trigger: "ends-move-near",
+      response: "teleport-near",
+      rangeFeet: 120,
+      usesAction: "teleport",
+      nearFeet: 10
+    }
+  },
+  // "While the pudding is Large or Medium and has 10+ Hit Points, it becomes Bloodied or is subjected to Lightning or
+  // Slashing damage. Response: The pudding splits into two new Black Puddings."
+  "black-pudding/black-pudding-split": { reaction: SPLIT },
+  "ochre-jelly/split": { reaction: SPLIT },
+  // "The mummy is hit by an attack roll. Response: The mummy adds 2 to its AC against the attack, possibly causing the
+  // attack to miss, and the mummy teleports up to 60 feet to an unoccupied space it can see. Each creature of its
+  // choice that it can see within 5 feet of its destination space has the Blinded condition until the end of the
+  // mummy's next turn."
+  "mummy-lord/whirlwind-of-sand": {
+    reaction: { trigger: "hit-by-attack", response: "ac-bonus", amount: 2, anyHit: true },
+    teleport: { feet: 60, landing: { conditions: ["blinded"], withinFeet: 5 } }
   },
   // "Magical darkness fills a 15-foot Emanation originating from the darkmantle. This effect lasts while the darkmantle
   // maintains Concentration on it, up to 10 minutes. Darkvision can't penetrate this area, and no light can
@@ -838,11 +943,20 @@ const ACTION_ENRICHMENTS: Record<
   // "The magmin sets itself ablaze or extinguishes its flames. While ablaze, the magmin sheds Bright Light in a 10-foot
   // radius and Dim Light for an additional 10 feet."
   "magmin/ignited-illumination": { sight: { light: { on: "caster", brightFeet: 10, dimFeet: 10 }, toggles: true } },
-  // "The Cube is Heavily Obscured for 1 minute": the Cube the reaction places.
-  "octopus/ink-cloud": { sight: { area: { kind: "heavily-obscured" }, rounds: 10 } },
+  // "A creature ends its turn within 5 feet of the octopus while underwater. Response: The octopus releases ink that
+  // fills a 5-foot Cube centered on itself, and the octopus moves up to its Swim Speed. The Cube is Heavily Obscured
+  // for 1 minute."
+  "octopus/ink-cloud": {
+    reaction: { trigger: "ends-turn-near", response: "use-on-self", rangeFeet: 5, underwater: true },
+    sight: { area: { kind: "heavily-obscured" }, rounds: 10 }
+  },
   // "Wisdom Saving Throw: DC 13, each creature in a 60-foot Cone that can see the ghost and isn't an Undead."
   "ghost/horrific-visage": { sight: { seenBy: "user" } },
-  "giant-octopus/ink-cloud": { sight: { area: { kind: "heavily-obscured" }, rounds: 10 } },
+  // "The octopus takes damage while underwater."
+  "giant-octopus/ink-cloud": {
+    reaction: { trigger: "damaged", response: "use-on-self", underwater: true },
+    sight: { area: { kind: "heavily-obscured" }, rounds: 10 }
+  },
   // "The wisp and its light have the Invisible condition until the wisp's Concentration ends on this effect, which ends
   // early immediately after the wisp makes an attack roll": Invisible, its Illumination out, until it attacks.
   "will-o-wisp/vanish": {
@@ -861,6 +975,26 @@ const ACTION_ENRICHMENTS: Record<
 };
 
 const PRINTED_NAME = "[A-Z][A-Za-z'\u2019-]*(?: [A-Z][A-Za-z'\u2019-]*)*";
+
+/** "Plus 7 (2d6) damage of the type chosen for the Draconic Origin trait": a part whose type is the creature's pick
+ *  (`TraitMechanic` "pick"), in place of any part the readers took for it. */
+function withPickedDamage(actions: ActorAction[], mechanics: readonly TraitMechanic[]): ActorAction[] {
+  return actions.map((action) => {
+    const parts = [
+      ...action.description.matchAll(
+        /\b\d+ \((\d+d\d+(?: [+-] \d+)?)\) damage of the type chosen for the ([A-Z][A-Za-z' ]+?) trait\b/g
+      )
+    ].flatMap(([, formula, trait]) => {
+      const pick = mechanics.find(
+        (mechanic) => mechanic.kind === "pick" && mechanic.of === "damage-type" && mechanic.name === trait
+      );
+      return pick?.kind === "pick" ? [{ formula: formula!, type: pick.options?.[0] ?? "untyped", pick: pick.key }] : [];
+    });
+    if (parts.length === 0) return action;
+    const kept = action.damage.filter((part) => !parts.some((picked) => picked.formula === part.formula));
+    return { ...action, damage: [...kept, ...parts] };
+  });
+}
 
 /** What a linked action takes from the action it makes or uses: its attack or save and what they deal and leave. */
 function withActionOf(next: ActorAction, source: ActorAction): ActorAction {
@@ -1299,6 +1433,14 @@ const monsters: ActorDefinition[] = creatures
       // A failure that restricts with no condition (Slowing Breath, Weakening Breath).
       const restriction =
         save && fix?.drop !== "outcome" ? failureRestrictionsOf(action.fields.desc, action.fields.name.trim()) : null;
+      // What a failure's condition brings while it lasts (Fetid Cloud's no Reactions, Cacophony's Disadvantage).
+      const companion =
+        save && fix?.drop !== "outcome"
+          ? failureCompanionRidersOf(
+              action.fields.desc,
+              printedName(slug, action.fields.name).replace(/\s*\([^)]*\)$/, "")
+            )
+          : null;
       // Later-turn damage the engine deals itself (`ongoingDamage`) leaves the GM's reminder.
       const laterDamage = saveDamage?.laterDamage ?? null;
       // "While Poisoned, the target can't regain Hit Points" (a pit fiend's Bite): the poison's own effect stops healing,
@@ -1445,6 +1587,9 @@ const monsters: ActorDefinition[] = creatures
                   : {}),
                 ...(poisonStopsHealing
                   ? { failureEffect: { name: "Poisoned", tags: ["no-healing"], modifiers: [] } }
+                  : {}),
+                ...(companion && !loss && !poisonStopsHealing
+                  ? { failureEffect: { ...companion, tags: [...companion.tags], modifiers: [...companion.modifiers] } }
                   : {}),
                 ...(COMMANDING_SAVES[`${slug}/${actionId}`]
                   ? { failureEffect: structuredClone(COMMANDING_SAVES[`${slug}/${actionId}`]!) }
@@ -1602,7 +1747,7 @@ const monsters: ActorDefinition[] = creatures
       },
       initiativeBonus: fields.initiative_bonus,
       speedFeet: fields.walk ?? 0,
-      actions,
+      actions: withPickedDamage(actions, traitMechanics),
       token: { disposition: "hostile" as const, footprint: { width: footprint, height: footprint } },
       ...(damageResistances.length > 0 ? { damageResistances } : {}),
       ...(damageImmunities.length > 0 ? { damageImmunities } : {}),
@@ -1850,6 +1995,14 @@ function ammunitionKindOf(weaponId: string, properties: string): AmmunitionKind 
   return kind.data;
 }
 
+/** A price cell ("15 GP", "5 SP", "2 CP") in gold pieces; the build fails on any other. */
+function tableCostGp(cell: string | undefined, where: string): number {
+  const price = /^([\d,]+) (GP|SP|CP)$/.exec(stripTags(cell ?? ""));
+  if (!price) throw new Error(`${where} has no price the build can read: "${stripTags(cell ?? "")}".`);
+  const amount = Number(price[1]!.replace(/,/g, ""));
+  return price[2] === "GP" ? amount : price[2] === "SP" ? amount / 10 : amount / 100;
+}
+
 const weaponTable = (() => {
   const table = weaponTableSource.match(/\*\*Weapons\*\*\s*(<table>[\s\S]*?<\/table>)/);
   if (!table) throw new Error("No **Weapons** table in sources/dnd-5e-srd-markdown/equipment.md.");
@@ -1861,6 +2014,7 @@ const weaponTable = (() => {
       melee: boolean;
       versatileDice: string | null;
       ammunition: AmmunitionKind | null;
+      costGp: number;
     }
   >();
   // The `<th colspan="6">` band rows ("Simple Melee Weapons", ...) are the only source of melee vs
@@ -1893,7 +2047,8 @@ const weaponTable = (() => {
       mastery: tableSlug(cells[3]),
       melee: band.melee,
       versatileDice: /Versatile \((\d+d\d+)\)/.exec(properties)?.[1] ?? null,
-      ammunition: ammunitionKindOf(tableSlug(cells[0]), properties)
+      ammunition: ammunitionKindOf(tableSlug(cells[0]), properties),
+      costGp: tableCostGp(cells[5], `Weapons table: "${stripTags(cells[0])}"`)
     });
   }
   // Both vocabularies come from the fixtures' `WeaponProperty` rows, as bare ids (riders match the bare word).
@@ -1937,6 +2092,8 @@ const weaponRecords = onlySrd(weapons).map((weapon) => {
     ...(row.versatileDice !== null ? { versatileDice: row.versatileDice } : {}),
     ...(row.ammunition !== null ? { ammunition: row.ammunition } : {}),
     improvised: weapon.fields.is_improvised,
+    // The table's price, which crafting reads (SRD Crafting Nonmagical Items).
+    costGp: row.costGp,
     mastery: row.mastery,
     // `[]` when the table prints an em dash: a Mace has no properties, which differs from "not recorded".
     properties: row.properties,
@@ -1957,7 +2114,7 @@ if (unmatched.length > 0) throw new Error(`Weapons table rows matched no open5e 
 const armorTable = (() => {
   const table = weaponTableSource.match(/\*\*Armor\*\*\s*(<table>[\s\S]*?<\/table>)/);
   if (!table) throw new Error("No **Armor** table in sources/dnd-5e-srd-markdown/equipment.md.");
-  const categories = new Map<string, "light" | "medium" | "heavy" | "shield">();
+  const categories = new Map<string, Readonly<{ band: "light" | "medium" | "heavy" | "shield"; costGp: number }>>();
   let band: "light" | "medium" | "heavy" | "shield" | null = null;
   for (const [, row] of (table[1].match(/<tbody>([\s\S]*?)<\/tbody>/)?.[1] ?? "").matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
     const heading = row.match(/<th[^>]*>([\s\S]*?)<\/th>/);
@@ -1971,15 +2128,18 @@ const armorTable = (() => {
     const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((cell) => cell[1]);
     if (cells.length === 0) continue;
     if (band === null) throw new Error(`Armor table: data row before any category band: ${stripTags(row)}`);
-    categories.set(tableSlug(cells[0]), band);
+    categories.set(tableSlug(cells[0]), {
+      band,
+      costGp: tableCostGp(cells[5], `Armor table: "${stripTags(cells[0])}"`)
+    });
   }
   return categories;
 })();
 
 const armorRecords = onlySrd(armors).map((armor) => {
   const id = slugOf(armor.pk);
-  const category = armorTable.get(id);
-  if (!category)
+  const row = armorTable.get(id);
+  if (!row)
     throw new Error(
       `No SRD Armor-table row for "${id}" - check the name slug in sources/dnd-5e-srd-markdown/equipment.md.`
     );
@@ -1987,7 +2147,9 @@ const armorRecords = onlySrd(armors).map((armor) => {
     id,
     name: armor.fields.name,
     acBase: armor.fields.ac_base,
-    category,
+    category: row.band,
+    // The table's price, which crafting reads (SRD Crafting Nonmagical Items).
+    costGp: row.costGp,
     addDexModifier: armor.fields.ac_add_dexmod,
     dexModifierCap: armor.fields.ac_cap_dexmod,
     stealthDisadvantage: armor.fields.grants_stealth_disadvantage,
@@ -2137,3 +2299,13 @@ if (report.saveActionFixes.length > 0)
   console.log(`reviewed save actions (${report.saveActionFixes.length}): ${report.saveActionFixes.join("; ")}`);
 if (report.untypedDamage.length > 0)
   console.log(`untyped damage fallbacks (${report.untypedDamage.length}): ${report.untypedDamage.join(", ")}`);
+// Printed clauses no reader or reviewed fix turned into data: the GM's, from the action's reminder where it has one.
+const unconsumed = monsters.flatMap((monster) =>
+  monster.actions.flatMap((action) => {
+    const clauses = unconsumedClauses(action);
+    return clauses.length > 0
+      ? [`${monster.source.externalId}/${action.id} (${clauses.join(", ")}${action.reminder ? ", reminded" : ""})`]
+      : [];
+  })
+);
+if (unconsumed.length > 0) console.log(`printed clauses left unread (${unconsumed.length}): ${unconsumed.join("; ")}`);

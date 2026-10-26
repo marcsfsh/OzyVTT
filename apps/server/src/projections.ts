@@ -231,6 +231,7 @@ const PENDING_SAVE_FIELDS = {
   successEndsSpell: "never",
   dropsRowId: "never",
   zoneId: "never",
+  touchedZone: "never",
   // Whether a hidden source's save is magical says something about it; only Magic Resistance reads it.
   magical: "never",
   // What a success earns is the stat block's text, the GM's knowledge.
@@ -238,17 +239,24 @@ const PENDING_SAVE_FIELDS = {
   // What the damage drains, and where a failure pushes, are narrated when they land.
   drain: "never",
   failurePush: "never",
+  unseats: "never",
   // The save's own roll mode is read when it is answered.
   advantageAtSize: "never",
   advantageFrom: "never",
   // What a failure does beyond conditions is narrated when it lands, and an automatic success when it is answered.
   failureKills: "never",
+  // Which of the source's pools a kill spends names its item.
+  spendsOnKill: "never",
   autoSucceeds: "never",
   disadvantageFrom: "never",
   // A failure's return to a creature's true form is narrated when it lands.
   endsForm: "never",
   // What a failure does at each Hit Point band names the thresholds, the stat block's text; it is narrated as it lands.
   failureByHitPoints: "never",
+  // What a failure by a margin does is the stat block's text; it is narrated as it lands.
+  failureByMargin: "never",
+  // Which of the target's things a failure marks is narrated when it lands.
+  objectPenalty: "never",
   failureBanishes: "never",
   // What a swallower's failure lets out is narrated when it lands.
   regurgitates: "never",
@@ -337,6 +345,8 @@ const PENDING_REACTION_FIELDS = {
   parkedCast: "never",
   // Sent as `attackRoll`, and only when the roll it came from is in the player's dice log.
   attackTotal: "derived",
+  // What set off a stat block's reaction: a hit, a turn's start or end, a move's end, damage. Public as the event was.
+  cause: "player",
   // The attack's target as it stands, and the allies a Redirect Attack may hand it to: masked or left out when hidden.
   targetName: "derived",
   redirectChoices: "derived",
@@ -617,6 +627,8 @@ function playerEffect(
     storeAwaits: _storeAwaits,
     endAction: _endAction,
     usedOnTurn: _usedOnTurn,
+    // The pool it was paid from is its source's sheet, an exact quantity.
+    refundsUses: _refundsUses,
     shrinksEachLongRest: _shrinksEachLongRest,
     unarmedStrike: _unarmedStrike,
     // What a hit on the bearer costs its attacker names a save's DC; the server applies it.
@@ -697,18 +709,56 @@ export function projectPlayerRollCalls(state: GameState, playerSessionId: string
   });
 }
 
-/** Resting as one player sees it: their own characters' requests, and the party's Short Rest only when one of their
- *  characters is in it, cut down to those characters. Who else rests, and the game clock, stay with the GM. */
+/** Resting as one player sees it: their own characters' requests, and the party's Short and Long Rests only when one of
+ *  their characters is in them, cut down to those characters. Who else rests, and the game clock, stay with the GM. */
 function playerRest(state: GameState, yourActorIds: ReadonlySet<string>): PlayerView["rest"] {
   const shortRest = state.rest.shortRest;
   const members = shortRest?.actorIds.filter((id) => yourActorIds.has(id)) ?? [];
+  // The Long Rest's own members only: neither when it started nor who else rests reaches a player.
+  const yours = (state.rest.longRest?.members ?? []).filter((member) => yourActorIds.has(member.actorId));
   return {
     requests: state.rest.requests.filter((id) => yourActorIds.has(id)),
     shortRest:
       shortRest && members.length > 0
         ? { actorIds: members, done: shortRest.done.filter((id) => yourActorIds.has(id)) }
+        : null,
+    longRest:
+      yours.length > 0
+        ? {
+            actorIds: yours.map((member) => member.actorId),
+            interrupted: yours.filter((member) => member.interrupted).map((member) => member.actorId),
+            shortRestEarned: yours.filter((member) => member.shortRestEarned).map((member) => member.actorId)
+          }
         : null
   };
+}
+
+/** The party's crafting projects as a player sees them, from an allow-list: those of their own characters and of the
+ *  visible party characters, so a character can offer to help. What a project cost stays with its crafter's player (a
+ *  purse is owner-only), and when one started and a scroll's numbers stay with the GM. A helper is named only when it
+ *  is one of theirs or a visible party character. */
+function playerCrafting(state: GameState, yourActorIds: ReadonlySet<string>): PlayerView["crafting"] {
+  const named = (actorId: string) =>
+    yourActorIds.has(actorId) ||
+    state.actors.some(
+      (actor) =>
+        actor.id === actorId && actor.kind === "player-character" && actor.visibility === "public" && !actor.archived
+    );
+  return state.crafting.projects
+    .filter((project) => named(project.crafterId))
+    .map((project) => ({
+      id: project.id,
+      crafterId: project.crafterId,
+      itemId: project.itemId,
+      itemName: project.itemName,
+      kind: project.kind,
+      toolId: project.toolId,
+      ...(project.spellId !== undefined ? { spellId: project.spellId } : {}),
+      helperIds: project.helperIds.filter(named),
+      workMinutes: project.workMinutes,
+      doneMinutes: project.doneMinutes,
+      ...(yourActorIds.has(project.crafterId) ? { paidCp: project.paidCp } : {})
+    }));
 }
 
 /** "Fighter 5 / Rogue 2" for the identity card; null (field omitted) when the sheet records no class. */
@@ -772,6 +822,8 @@ const PLAYER_ACTOR_FIELDS = {
   conditionImmunities: "never",
   // A creature's attitude is the GM's: players learn it from how the GM has them roll.
   attitude: "never",
+  // What the GM chose where a stat block leaves a choice (a half-dragon's damage type) is the GM's until it shows.
+  statBlockPicks: "never",
   legendary: "never",
   lastUsedAt: "never",
   firstClaimedAt: "never",
@@ -906,6 +958,7 @@ export function projectPlayerView(
     rollCalls: projectPlayerRollCalls(state, playerSessionId),
     combat: projectPlayerCombat(state, playerSessionId, now, content, sight),
     rest: playerRest(state, yourActorIds),
+    crafting: playerCrafting(state, yourActorIds),
     // Tiers subtract fields. An actor is removed only by gm-only visibility, archiving or sight.
     actors: state.actors
       .filter((actor) => actor.visibility === "public" && !actor.archived && !sight.hidden.has(actor.id))

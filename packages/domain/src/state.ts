@@ -10,6 +10,7 @@ import {
   CastShapingSchema,
   EffectInstanceSchema,
   EffectModifiersSchema,
+  FailureMarginSchema,
   HealthDisplaySchema,
   HitPointBandSchema,
   ObjectStatsSchema,
@@ -345,6 +346,12 @@ export const PendingSaveSchema = z
       .optional(),
     /** The spell area that raised it (`SpellZone`), which counts the damage it deals toward its cap. Never projected. */
     zoneId: z.string().min(1).max(120).optional(),
+    /** A save for touching an area that goes off (Delayed Blast Fireball's bead): a failure sets it off where it is, a
+     *  success throws it at `throwAtId`, where it goes off. Never projected. */
+    touchedZone: z
+      .object({ zoneId: z.string().min(1).max(120), throwAtId: z.uuid().optional() })
+      .strict()
+      .optional(),
     /** A save the bearer repeats at the end of its turn: a success ends this effect. Stripped from player projections. */
     repeatOf: z
       .object({
@@ -368,6 +375,9 @@ export const PendingSaveSchema = z
     drain: DamageDrainSchema.optional(),
     /** Where a failure pushes the creature (Thunderwave), narrated when it lands. */
     failurePush: ForcedPushSchema.optional(),
+    /** SRD Mounted Combat: a failure throws the rider off this mount, landing Prone within 5 feet of it. GM
+     *  bookkeeping, never projected: the fall is narrated when it lands. */
+    unseats: z.uuid().optional(),
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
     /** What gives the save Advantage beyond the target's own riders, as the roll card names it: the damage that opened
@@ -376,6 +386,12 @@ export const PendingSaveSchema = z
     /** Why the target succeeds without rolling (a Construct against Flesh to Stone, an elf against Sleep). GM
      *  bookkeeping, never projected: the result says it when the save is answered. */
     autoSucceeds: z.string().min(1).max(120).optional(),
+    /** The charge a kill spends: the pool on its source that loses one when the failure slays the target (Nine Lives
+     *  Stealer). GM bookkeeping, never projected. */
+    spendsOnKill: z
+      .object({ actorId: z.uuid(), key: z.string().min(1).max(120) })
+      .strict()
+      .optional(),
     /** A failure kills the target outright, and the source regains these hit points (Consume Life). GM bookkeeping,
      *  never projected. */
     failureKills: z
@@ -390,6 +406,20 @@ export const PendingSaveSchema = z
     /** A failure that acts by the target's Hit Points as it fails (Divine Word, Slaying Bow). GM bookkeeping, never
      *  projected: the result says what landed. */
     failureByHitPoints: z.array(HitPointBandSchema).min(1).max(4).optional(),
+    /** What a failure by this much or more does instead ("Failure by 5 or More"). GM bookkeeping, never projected: the
+     *  result says what landed. */
+    failureByMargin: FailureMarginSchema.optional(),
+    /** The carried armor or weapon of the target that a failure gives a cumulative -1 (a rust monster's Antennae). GM
+     *  bookkeeping, never projected: the result says what it did. */
+    objectPenalty: z
+      .object({
+        rowId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80)
+      })
+      .strict()
+      .optional(),
     /** A creature of these types that fails leaves for its home plane for 24 hours (Divine Word). GM bookkeeping. */
     failureBanishes: z
       .array(
@@ -522,7 +552,15 @@ export const HeldRollSchema = z
         callId: z.uuid().optional(),
         findActorId: z.uuid().optional(),
         /** The situations the roller said it fits, which a reroll or an answer keeps. */
-        situations: z.array(z.string().min(3).max(80)).max(6).optional()
+        situations: z.array(z.string().min(3).max(80)).max(6).optional(),
+        /** The name a tool's or gear's Utilize use rolls under ("Pick a lock (Thieves' Tools)"), which a reroll keeps. */
+        label: z.string().min(1).max(80).optional(),
+        /** What the use leaves on a creature while the check succeeds (Cobbler's Tools' footwear), settled again after a
+         *  reroll or an answer. */
+        onSuccess: z
+          .object({ kind: z.literal("next-acrobatics-advantage"), actorId: z.uuid() })
+          .strict()
+          .optional()
       })
       .strict()
       .optional(),
@@ -830,13 +868,14 @@ export const PendingReactionSchema = z
      *  a spell the reactor may counter (`casts-spell`), a roll another creature may answer (`roll-answer`: Cutting
      *  Words, Countercharm), damage the reactor is about to take from any source (`takes-damage`), a creature
      *  falling (`falls`), or an attack about to roll that the reactor may give another target (`attack-targeted`:
-     *  Redirect Attack, Arrow-Catching Shield). */
+     *  Redirect Attack, Arrow-Catching Shield), or another trigger a stat block names (`triggered`, with its `cause`). */
     kind: z
       .enum([
         "hit-by-attack",
         "leaves-reach",
         "attack-would-hit",
         "damaged-by-creature",
+        "triggered",
         "casts-spell",
         "roll-answer",
         "takes-damage",
@@ -847,7 +886,7 @@ export const PendingReactionSchema = z
     /** attack-targeted and a ward's attack-would-hit: the attack's target as it stands, by name. */
     targetName: z.string().min(1).max(120).optional(),
     /** attack-targeted (Redirect Attack): the allies the reactor may make the target instead, one picked with the
-     *  answer. */
+     *  answer; hit-by-attack (a stone giant's Deflect Missile): the creatures it may turn the deflected force on. */
     redirectChoices: z
       .array(z.object({ actorId: z.uuid(), name: z.string().min(1).max(120) }).strict())
       .min(1)
@@ -861,7 +900,12 @@ export const PendingReactionSchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(120),
     actionName: z.string().min(1).max(120),
-    /** leaves-reach and damaged-by-creature: the creature the reaction would strike. */
+    /** triggered: what happened. A creature's attack roll hit the reactor (`hit`: a rust monster's Reflexive Antennae), a
+     *  creature started or ended its turn, or ended a move, near it (`turn-start`: a chain devil's Unnerving Gaze;
+     *  `turn-end`: an octopus's Ink Cloud; `move-end`: a nalfeshnee's Pursuit), or the reactor took damage (`damaged`:
+     *  a giant octopus's Ink Cloud, a black pudding's Split). The declared reaction's response says what "use" does. */
+    cause: z.enum(["hit", "turn-start", "turn-end", "move-end", "damaged"]).optional(),
+    /** leaves-reach, damaged-by-creature and triggered: the creature the reaction would strike or answer. */
     targetActorId: z.uuid().nullable().default(null),
     /** Source actor for GM bookkeeping; stripped from player projections. */
     sourceActorId: z.uuid().nullable().default(null),
@@ -1251,7 +1295,9 @@ export const VisionAreaSchema = z
         .object({
           type: z.literal("template"),
           annotationId: z.uuid(),
-          widthFeet: z.number().positive().max(1000).nullable().default(null)
+          widthFeet: z.number().positive().max(1000).nullable().default(null),
+          /** A ringed wall: only the circle's outer edge this many feet thick (Wall of Fire's ring). */
+          ringFeet: z.number().positive().max(100).optional()
         })
         .strict(),
       z
@@ -1260,7 +1306,12 @@ export const VisionAreaSchema = z
     ]),
     /** The one creature that sees through it (Insect Cloud: "Heavily Obscured for creatures other than you"). */
     sparedActorId: z.uuid().optional(),
-    source: VisionSourceSchema.optional()
+    source: VisionSourceSchema.optional(),
+    /** What clears it, ending the spell that made it: a strong wind (Gust of Wind) or water that destroys fog. */
+    dispersedBy: z
+      .array(z.enum(["wind", "water"]))
+      .max(2)
+      .optional()
   })
   .strict();
 export type VisionArea = z.infer<typeof VisionAreaSchema>;
@@ -1350,9 +1401,19 @@ export const SpellZoneSchema = z
     /** What an item's or a creature's area acts with (spread Caltrops' save and damage), kept here since what left it
      *  may be gone; a spell's area reads its spell instead. */
     rule: z
-      .object({ trigger: AreaTriggerSchema, save: ActionSchema.shape.save, damage: ActionSchema.shape.damage })
+      .object({
+        trigger: AreaTriggerSchema,
+        save: ActionSchema.shape.save,
+        damage: ActionSchema.shape.damage,
+        /** What its damage does at 0 Hit Points (a Sphere of Annihilation obliterates). */
+        drain: ActionSchema.shape.drain
+      })
       .strict()
       .optional(),
+    /** The creature in control of it until the start of its next turn (a Sphere of Annihilation). */
+    controllerId: z.uuid().optional(),
+    /** The creature that started its current turn in control of it, which a Talisman of the Sphere lets move it far. */
+    heldAtTurnStart: z.uuid().optional(),
     /** Damage dealt so far, against a cap the spell prints (Guardian of Faith's 60). */
     damageDealt: z.number().int().nonnegative().max(100000).default(0),
     /** The damage type the caster chose at the cast (Conjure Elemental's element, Transmuted Spell's); absent, the
@@ -1366,6 +1427,65 @@ export const SpellZoneSchema = z
     setOffBy: z.uuid().optional(),
     /** Dice its damage has gained so far (Delayed Blast Fireball: 1d6 whenever its caster's turn ends). */
     grown: z.number().int().nonnegative().max(100).optional(),
+    /** Where it stood as its caster's turn began, waiting for the caster to steer its drift (Incendiary Cloud). */
+    driftFrom: z
+      .object({
+        origin: z.object({ x: z.number(), y: z.number() }).strict(),
+        target: z.object({ x: z.number(), y: z.number() }).strict()
+      })
+      .strict()
+      .optional(),
+    /** The carried lights (`actorId:itemId`) whose protected flame has had its chance to go out in it (Gust of
+     *  Wind's 50 percent for a lantern). */
+    windTried: z.array(z.string().max(240)).max(200).optional(),
+    /** Dice its damage has lost and height it has lost so far (Tsunami: 1d10 and 50 feet each turn it moved), and
+     *  whether it drifted this turn. */
+    faded: z.number().int().nonnegative().max(100).optional(),
+    driftedThisTurn: z.literal(true).optional(),
+    /** The spell's turn it is on, counted at its caster's turn starts from the cast's 1 (Storm of Vengeance). */
+    stage: z.number().int().positive().max(1000).optional(),
+    /** A glyph set off and glowing (Symbol). */
+    glowing: z.literal(true).optional(),
+    /** It was made while its caster's Time Stop ran, so it ends the Time Stop when it affects another creature. */
+    inTimeStop: z.literal(true).optional(),
+    /** The grid cells (`column,row`) left out of it: what its caster spared (Plant Growth) or fire burned away (Web). */
+    cut: z.array(z.string().max(24)).max(4000).optional(),
+    /** The cells burning now (Web), until the turn of `actorId` in `untilRound` begins. */
+    burning: z
+      .array(
+        z
+          .object({
+            cells: z.array(z.string().max(24)).max(400),
+            untilRound: z.number().int().positive(),
+            actorId: z.uuid().nullable()
+          })
+          .strict()
+      )
+      .max(50)
+      .optional(),
+    /** Where Fire damage landed on a creature standing in it since the last settle (Web), for the cells it sets
+     *  burning. */
+    fireAt: z
+      .array(z.object({ x: z.number(), y: z.number(), sizeCells: z.number().int().min(1).max(20) }).strict())
+      .max(50)
+      .optional(),
+    /** It burns away when fire reaches it (Web). */
+    flammable: z.literal(true).optional(),
+    /** Its heal, rolled with its caster's numbers (Conjure Celestial's "4d12 + 4"). */
+    healing: z.string().min(1).max(60).optional(),
+    /** The creature it is round, which it moves with (Antipathy/Sympathy's target). */
+    targetId: z.uuid().optional(),
+    /** The creature type its caster picked for it to act on (Antipathy/Sympathy's "kind of creature"). */
+    types: z
+      .array(
+        z
+          .string()
+          .regex(/^[a-z][a-z-]*$/)
+          .max(40)
+      )
+      .min(1)
+      .max(14)
+      .optional(),
     /** It acts when its spell ends (Delayed Blast Fireball's bead), so ending it leaves it `bursting` until the server
      *  has raised the saves. */
     burstsOnEnd: z.literal(true).optional(),
@@ -1462,6 +1582,14 @@ const sceneCombatShape = {
       /** The turn's actor has made an attack roll on its turn (SRD Reckless Attack is decided with the first). Engine
        *  bookkeeping, never projected. */
       attackRolled: z.boolean().optional(),
+      /** SRD Interacting with Things: the turn's actor has used its one free object interaction (a door opened, a
+       *  weapon drawn), so the next takes the Utilize action. Engine bookkeeping, never projected. */
+      objectInteractionUsed: z.boolean().optional(),
+      /** SRD Attack action: the attacks the turn's actor has made in its Attack action, and the weapons it drew or
+       *  stowed as part of them ("equip or unequip one weapon when you make an attack"). Engine bookkeeping, never
+       *  projected. */
+      attacksMade: z.number().int().min(0).max(50).optional(),
+      attackDraws: z.number().int().min(0).max(50).optional(),
       /** What this turn's attacks opened for an extra attack: the Light weapons its actor swung in the Attack action,
        *  and the creature a Cleave weapon hit; and the Loading weapons already fired in that action, which can't
        *  fire again in it. Engine bookkeeping, never projected. */
@@ -1810,6 +1938,33 @@ export const PartyShortRestSchema = z
   .strict();
 export type PartyShortRest = z.infer<typeof PartyShortRestSchema>;
 
+/** A Long Rest the GM runs for several characters, under way from `startedAt` until the GM finishes it, so rolling
+ *  Initiative, damage and a spell above a cantrip can interrupt it (SRD Long Rest, Interrupting the Rest). */
+export const PartyLongRestSchema = z
+  .object({
+    /** When it began, in minutes of game time. */
+    startedAt: z.number().int().min(0),
+    members: z
+      .array(
+        z
+          .object({
+            actorId: z.uuid(),
+            /** Interruptions it resumed after; each adds an hour to its rest. */
+            interruptions: z.number().int().min(0).max(24).default(0),
+            /** It was interrupted and hasn't resumed. */
+            interrupted: z.boolean().default(false),
+            /** It rested an hour before the interruption, so it has a Short Rest's benefits and may spend Hit Point Dice
+             *  while it stands interrupted. */
+            shortRestEarned: z.boolean().default(false)
+          })
+          .strict()
+      )
+      .min(1)
+      .max(12)
+  })
+  .strict();
+export type PartyLongRest = z.infer<typeof PartyLongRestSchema>;
+
 /** Game time and the rests waiting on the GM. The clock is what the 16-hour rule between Long Rests reads and what
  *  effects measured in game time count down on; the GM moves it, and a party rest moves it by the rest's length. */
 export const RestStateSchema = z
@@ -1824,12 +1979,73 @@ export const RestStateSchema = z
      *  back as the clock passes it. Null: at each Long Rest. GM-set. */
     dawnHour: z.number().int().min(0).max(23).nullable().default(null),
     shortRest: PartyShortRestSchema.nullable().default(null),
+    longRest: PartyLongRestSchema.nullable().default(null),
     /** The table tracks food and water: as each game day ends, every character eats and drinks what it carries and
      *  what it lacks costs it (SRD Malnutrition, Dehydration). Off by default. */
     survival: z.boolean().default(false)
   })
   .strict();
 export type RestState = z.infer<typeof RestStateSchema>;
+
+const CraftSlugSchema = z
+  .string()
+  .regex(/^[a-z0-9-]+$/)
+  .max(80);
+
+/** One thing a character is making as downtime (SRD 5.2.1 Crafting Nonmagical Items, Brewing Potions of Healing,
+ *  Scribing Spell Scrolls, Crafting Magic Items): its raw materials are paid as it starts, and each 8-hour day of work
+ *  moves it on, a helper's day too, until it is done and joins its crafter's pack. */
+export const CraftingProjectSchema = z
+  .object({
+    id: z.uuid(),
+    crafterId: z.uuid(),
+    /** What it makes, by catalog id, and its name as it started. */
+    itemId: CraftSlugSchema,
+    itemName: z.string().min(1).max(120),
+    kind: z.enum(["item", "potion-of-healing", "spell-scroll", "magic-item"]),
+    /** The tool it is made with. */
+    toolId: CraftSlugSchema,
+    /** A magic weapon's or armor's base (a +1 Longsword's Longsword). */
+    baseId: CraftSlugSchema.optional(),
+    /** The spell a Spell Scroll bears, and the scribe's numbers the scroll keeps. */
+    spellId: CraftSlugSchema.optional(),
+    scroll: z
+      .object({
+        saveDc: z.number().int().min(1).max(40),
+        attackBonus: z.number().int().min(-5).max(30),
+        casterLevel: z.number().int().min(1).max(20)
+      })
+      .strict()
+      .optional(),
+    /** The spells the crafter must have prepared on each day of work. */
+    preparedSpellIds: z.array(CraftSlugSchema).max(24).default([]),
+    /** Other characters helping, each with the tool's proficiency. */
+    helperIds: z.array(z.uuid()).max(6).default([]),
+    /** Minutes of one worker's time the item takes (8 hours a day), and the minutes worked so far, helpers' included. */
+    workMinutes: z
+      .number()
+      .int()
+      .min(1)
+      .max(250 * 8 * 60),
+    doneMinutes: z.number().int().min(0).default(0),
+    /** What the raw materials cost, in copper pieces, paid as it started. */
+    paidCp: z.number().int().min(0).max(100_000_000),
+    /** When it started, in minutes of game time. */
+    startedAt: z.number().int().min(0)
+  })
+  .strict();
+export type CraftingProject = z.infer<typeof CraftingProjectSchema>;
+
+/** The projects under way and the work each character has done on the current game day (8 hours at most). */
+export const CraftingStateSchema = z
+  .object({
+    projects: z.array(CraftingProjectSchema).max(100).default([]),
+    /** The game day `worked` counts (minutes of game time / 1440), and each worker's minutes on it. */
+    day: z.number().int().min(0).default(0),
+    worked: z.record(z.uuid(), z.number().int().min(0).max(1440)).default({})
+  })
+  .strict();
+export type CraftingState = z.infer<typeof CraftingStateSchema>;
 
 export const GameStateSchema = z.object({
   schemaVersion: z.literal(1),
@@ -1865,6 +2081,8 @@ export const GameStateSchema = z.object({
   /** The GM's open calls for a roll. A player reads only their own part of each. */
   rollCalls: z.array(RollCallSchema).max(20).default([]),
   /** Game time, Long Rest requests and the party's Short Rest. Players see only their own characters' part. */
-  rest: RestStateSchema.prefault({})
+  rest: RestStateSchema.prefault({}),
+  /** What the characters are making in their downtime. Players see the projects their own characters work on. */
+  crafting: CraftingStateSchema.prefault({})
 });
 export type GameState = z.infer<typeof GameStateSchema>;

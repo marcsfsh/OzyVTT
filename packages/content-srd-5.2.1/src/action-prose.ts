@@ -232,13 +232,30 @@ export function drainOfProse(description: string, name?: string): DamageDrain | 
     /\b(?:The target|A creature) dies( and turns to dust)? if (?:it is )?reduced to 0 Hit Points by this attack\b/.exec(
       description
     );
-  if (!lowered && !heals && !kills) return null;
+  // "If this damage reduces the target to 0 Hit Points, the target becomes Stable, and it has the Poisoned condition for 1
+  // hour. While Poisoned, the target also has the Paralyzed condition" (a phase spider's Bite, a vampire familiar's
+  // Umbral Dagger).
+  const stable =
+    /\b(?:If this damage reduces the target to 0 Hit Points|If the target is reduced to 0 Hit Points by this attack), the target becomes Stable(?:, and it| but) has the ([A-Z][a-z]+) condition for (\d+) (hour|minute)s?\. While (?:it has the )?([A-Z][a-z]+)(?: condition)?, the target (?:also )?has the ([A-Z][a-z]+) condition\b/.exec(
+      description
+    );
+  const stableAtZero =
+    stable && stable[4] === stable[1]
+      ? {
+          conditions: [stable[1]!, stable[5]!].map(
+            (word) => word.toLowerCase() as NonNullable<DamageDrain["stableAtZero"]>["conditions"][number]
+          ),
+          minutes: Number.parseInt(stable[2]!, 10) * (stable[3] === "hour" ? 60 : 1)
+        }
+      : null;
+  if (!lowered && !heals && !kills && !stableAtZero) return null;
   const type = lowered?.[1]?.toLowerCase();
   const bodyGone = kills !== null && (kills[1] !== undefined || /\bIts body is then absorbed\b/.test(description));
   return {
     ...(type ? { damageType: type } : {}),
     ...(lowered ? { reducesMaximum: true as const } : {}),
     ...(heals ? { heals: heals[1] ? ("half" as const) : ("all" as const) } : {}),
+    ...(stableAtZero ? { stableAtZero } : {}),
     ...(kills
       ? {
           killsAtZero: {
@@ -343,6 +360,11 @@ export function withProseFacts<Action extends ActorAction>(action: Action): Acti
   const move = action.move ?? moveOfProse(action.description);
   const teleport = action.teleport ?? teleportOfProse(action.description);
   const leap = action.leap ?? leapOfProse(action.description);
+  // "While underwater, the seahorse moves", "each creature in a 15-foot Emanation ... while it is underwater"; a
+  // reaction's "takes damage while underwater" is its trigger.
+  const underwaterOnly =
+    action.underwaterOnly === true ||
+    (action.activation !== "reaction" && /^While underwater,|\bwhile it is underwater\b/.test(action.description));
   if (
     area === (action.area ?? null) &&
     untracked === (action.untrackedMultiattack === true) &&
@@ -351,7 +373,8 @@ export function withProseFacts<Action extends ActorAction>(action: Action): Acti
     push === (action.onHitPush ?? null) &&
     move === (action.move ?? null) &&
     teleport === (action.teleport ?? null) &&
-    leap === (action.leap ?? null)
+    leap === (action.leap ?? null) &&
+    underwaterOnly === (action.underwaterOnly === true)
   )
     return action;
   const { untrackedMultiattack: _previous, ...rest } = action;
@@ -364,6 +387,7 @@ export function withProseFacts<Action extends ActorAction>(action: Action): Acti
     ...(push ? { onHitPush: push } : {}),
     ...(move ? { move } : {}),
     ...(teleport ? { teleport } : {}),
-    ...(leap ? { leap } : {})
+    ...(leap ? { leap } : {}),
+    ...(underwaterOnly ? { underwaterOnly: true as const } : {})
   } as Action;
 }

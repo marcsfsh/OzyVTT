@@ -37,10 +37,13 @@ import {
   type EffectNarration
 } from "./effects.js";
 import { closeInitiativeWindow, rolledInitiative } from "./initiative-hooks.js";
-import { leaveShortRest } from "./short-rest-interruptions.js";
-import { releaseSwallowedBy } from "./swallow.js";
+import { interruptRests } from "./rest-interruptions.js";
+import { endTravelFor } from "./travel.js";
+import { chargeOwedMovement, releaseSwallowedBy } from "./swallow.js";
 import { endOfTurn, playStartSteps, startOfTurn } from "./turn-boundaries.js";
 import { zoneHeld, zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
+import { wavesAtTurnEnd, wavesAtTurnStart } from "./zone-waves.js";
+import { fireAtTurnStart } from "./zone-fire.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
 import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./condition-rules.js";
 import { lapseLongCasts } from "./resolution/long-casting.js";
@@ -287,6 +290,21 @@ function reorderMidRound(state: GameState, entries: readonly InitiativeEntry[]) 
   ]);
 }
 
+/** A creature takes another's Initiative and its turn right after that creature's (SRD Mounted Combat: "The Initiative
+ *  of a controlled mount changes to match yours when you mount it"), or, with null, keeps its count and stops
+ *  following. Nothing for a creature not in the order. */
+export function followInInitiative(state: GameState, actorId: string, leaderId: string | null): void {
+  const leader = leaderId ? state.combat.initiative.find((entry) => entry.actorId === leaderId) : undefined;
+  if (!state.combat.initiative.some((entry) => entry.actorId === actorId)) return;
+  if (leaderId !== null && !leader) return;
+  const entries = state.combat.initiative.map((entry) => {
+    if (entry.actorId !== actorId) return entry;
+    const { follows: _old, ...rest } = entry;
+    return leader ? { ...rest, score: leader.score, tieBreaker: leader.tieBreaker, follows: leader.actorId } : rest;
+  });
+  state.combat = { ...state.combat, initiative: reorderMidRound(state, entries) };
+}
+
 /** A creature joins the order mid-fight or while it is staged (a summoned creature), in its place by count and after
  *  the creature it `follows`, as the order would put it now. */
 export function joinInitiative(state: GameState, entry: InitiativeEntry) {
@@ -417,10 +435,14 @@ export function startEncounter(
     historyDirty: false
   };
   if (resolveDefinition) clearPerEncounterUses(state, actorIds, resolveDefinition, catalog);
-  // Rolling Initiative stops a Short Rest; the GM's rest panel shows who left it.
-  leaveShortRest(state, actorIds, "rolled Initiative");
+  // Rolling Initiative stops a rest and the party's travel; the GM's rest panel shows who left the rest.
+  const interrupted = interruptRests(state, actorIds, "rolled Initiative", {
+    ...(resolveDefinition ? { resolveDefinition } : {}),
+    ...(catalog ? { catalog } : {})
+  });
+  endTravelFor(state, actorIds);
   // What happens "when you roll Initiative": Superior Inspiration's regain, Persistent Rage's window.
-  return rolledInitiative(state, actorIds, { resolveDefinition, catalog });
+  return [...interrupted, ...rolledInitiative(state, actorIds, { resolveDefinition, catalog })];
 }
 
 /**
@@ -518,8 +540,9 @@ export function addCombatant(
     ]
   };
   if (deps.resolveDefinition) clearPerEncounterUses(state, new Set([actorId]), deps.resolveDefinition, deps.catalog);
-  leaveShortRest(state, new Set([actorId]), "rolled Initiative");
-  return rolledInitiative(state, [actorId], deps);
+  const interrupted = interruptRests(state, new Set([actorId]), "rolled Initiative", deps);
+  endTravelFor(state, [actorId]);
+  return [...interrupted, ...rolledInitiative(state, [actorId], deps)];
 }
 
 /**
@@ -877,6 +900,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // A spell area the creature ends its turn in acts on it (Moonbeam, Spirit Guardians).
   const zones = zoneDepsOf(deps);
   if (zones) ending.push(...zonesAtTurnEnd(state, outgoingId, zones));
+  // A wave that moved this turn sinks and weakens (Tsunami).
+  if (zones && outgoingId) ending.push(...wavesAtTurnEnd(state, outgoingId, zones));
   events?.push(...ending);
   // A new round sorts the whole order again, which settles any mid-round score change.
   const order = wraps ? ordered(state, state.combat.initiative) : state.combat.initiative;
@@ -901,6 +926,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   };
   // A move or teleport granted for the turn that ended lapses with it.
   dropStaleGrants(state);
+  // Movement already spent of this turn (climbing out of a corpse off it) is used.
+  chargeOwedMovement(state, nextActorId);
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
   events?.push(...expiry);
@@ -913,6 +940,10 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   // Then the spell areas: each counts "once per turn" afresh, a spell's duration runs out at its caster's turn, and
   // the incoming creature starting its turn inside one (Web, Stinking Cloud) meets it.
   if (zones) starting.push(...zonesAtTurnStart(state, nextActorId, zones));
+  // A creature in a wave fights it before it can move (Tsunami).
+  if (zones) starting.push(...wavesAtTurnStart(state, nextActorId, zones));
+  // Burning webs burn out, and burn a creature starting its turn in them (Web).
+  if (zones) starting.push(...fireAtTurnStart(state, nextActorId, zones));
   events?.push(...starting);
   rollRecharges(state, nextActorId, deps, events);
   refreshOwnTurnUses(state, nextActorId, deps);

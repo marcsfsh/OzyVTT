@@ -123,12 +123,17 @@ export function useMapCommands({
     setMessage(result.ok ? "Height set." : (result.message ?? "The height could not be set."));
     setBusyActorId(null);
   };
-  /** A creature climbs onto a mount, or off the one it rides with null. */
-  const mount = async (actorId: string, mountId: string | null) => {
+  /** A creature climbs onto a mount, controlling it or letting it act on its own, or off the one it rides with null. */
+  const mount = async (actorId: string, mountId: string | null, control?: "controlled" | "independent") => {
     if (busyActorId) return;
     setBusyActorId(actorId);
     setMessage("");
-    const result = await command("actor:mount", { actorId, mountId, expectedRevision: revision });
+    const result = await command("actor:mount", {
+      actorId,
+      mountId,
+      ...(mountId !== null && control ? { control } : {}),
+      expectedRevision: revision
+    });
     setMessage(
       result.ok
         ? mountId

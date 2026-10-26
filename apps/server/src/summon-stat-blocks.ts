@@ -179,10 +179,22 @@ function withExceptions(definition: ActorDefinition, except: NonNullable<SummonC
           : action
       ),
     extensions:
-      except.speedFeet !== undefined
-        ? { ...definition.extensions, "open5e.srd-2024": { ...printed, speeds: { ...speeds, walk: except.speedFeet } } }
+      except.speedFeet !== undefined || except.senses
+        ? {
+            ...definition.extensions,
+            "open5e.srd-2024": {
+              ...printed,
+              ...(except.speedFeet !== undefined ? { speeds: { ...speeds, walk: except.speedFeet } } : {}),
+              ...(except.senses ? { senses: [...printedSenseLines(printed), ...except.senses] } : {})
+            }
+          }
         : definition.extensions
   };
+}
+
+/** The senses a stat block prints, as their lines. */
+function printedSenseLines(printed: Record<string, unknown>): string[] {
+  return Array.isArray(printed.senses) ? printed.senses.filter((line): line is string => typeof line === "string") : [];
 }
 
 function scaledStatBlock(

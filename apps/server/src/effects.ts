@@ -11,6 +11,7 @@ import { DESCENDS_SAFELY_TAG, descendSafely } from "./altitude.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import { restoreSuppressed } from "./suppressed-conditions.js";
 import { refreshArmorClass } from "./held-items.js";
+import { knockedProneWhileMounted } from "./mounts.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
  *  end, which clears linked conditions and fires onEnd grants. Returns narration events and writes nothing to
@@ -284,6 +285,8 @@ export const SMOTHERING_TAG = "smothering";
 /** Goodberry's berries: the inventory row the cast fills, and the tag on the caster's effect that keeps them. */
 export const GOODBERRY_ID = "goodberry";
 export const GOODBERRY_TAG = "goodberry";
+/** The effect ends when its bearer dies, not when it drops to 0 Hit Points (a pact weapon's bond). */
+export const ENDS_ON_DEATH_TAG = "ends-on-death";
 
 /** The Exhaustion levels hunger and thirst hold in place (SRD Malnutrition, Dehydration: "can't be removed until the
  *  creature eats [drinks] the full amount ... required for a day"). */
@@ -307,6 +310,18 @@ export function reduceExhaustion(actor: Actor): void {
 export function hasEffectTag(actor: Actor, tag: string): boolean {
   return actor.effects.some((effect) => effect.tags.includes(tag));
 }
+
+/** The creature's Concentration on this spell, while it holds one. */
+export function concentrationOn(actor: Actor, spellId: string): EffectInstance | undefined {
+  return actor.effects.find((effect) => effect.concentration && effect.spell?.id === spellId);
+}
+
+/** A spell id as its name reads, for a line that has no record to hand ("scrying" reads "Scrying"). */
+export const spellWords = (spellId: string): string =>
+  spellId
+    .split("-")
+    .map((word) => word[0]!.toUpperCase() + word.slice(1))
+    .join(" ");
 
 /** What is carried in a hand rather than worn: a row with weapon stats, a wand, a staff or a rod. */
 const HELD_CATEGORIES: ReadonlySet<string> = new Set(["weapon", "wand", "staff", "rod"]);
@@ -356,6 +371,8 @@ export function conditionGained(
 ): EffectNarration[] {
   const events: EffectNarration[] = [];
   if (conditionId === "unconscious") events.push(...dropHeldItems(actor, source));
+  // SRD Mounted Combat: a rider knocked Prone, or whose mount is, saves to stay on.
+  if (conditionId === "prone") events.push(...knockedProneWhileMounted(state, actor));
   if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
     events.push(...releaseGrapplesHeldBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));
@@ -595,6 +612,16 @@ function endEffectInternal(
   if (effect.tags.includes(SMOTHERING_TAG))
     for (const held of actor.effects.filter((candidate) => candidate.breath !== undefined))
       endEffectInternal(state, actor, held.id, events, sweeping);
+  // A weapon conjured with a binding disappears when the binding ends (a conjured pact weapon).
+  if (
+    effect.weapon?.conjured &&
+    effect.itemId !== undefined &&
+    actor.inventory.some((row) => row.id === effect.itemId)
+  ) {
+    const gone = actor.inventory.find((row) => row.id === effect.itemId)!;
+    actor.inventory = actor.inventory.filter((row) => row.id !== effect.itemId);
+    events.push({ kind: "effect", text: `${actor.name}'s ${gone.name} disappears.`, actorId: actor.id });
+  }
   // SRD Goodberry: "Uneaten berries disappear when the spell ends."
   if (effect.tags.includes(GOODBERRY_TAG) && actor.inventory.some((row) => (row.recordId ?? row.id) === GOODBERRY_ID)) {
     actor.inventory = actor.inventory.filter((row) => (row.recordId ?? row.id) !== GOODBERRY_ID);
@@ -666,6 +693,27 @@ export function endEffect(state: GameState, actorId: string, effectId: string): 
   const events: EffectNarration[] = [];
   if (!endEffectInternal(state, actor, effectId, events)) throw new CommandRejectedError("That effect already ended.");
   return events;
+}
+
+/** An effect paid from a pool of time and ended before it ran out (Boots of Speed clicked off) gives what it had left
+ *  back to its source's pool. Returns the line the table reads, or null when nothing comes back. */
+export function refundUnspentTime(state: GameState, effect: EffectInstance): string | null {
+  const key = effect.refundsUses?.key;
+  const source = key ? state.actors.find((candidate) => candidate.id === effect.sourceActorId) : undefined;
+  if (!key || !source) return null;
+  const duration = effect.duration;
+  const left =
+    duration.type === "rounds"
+      ? duration.remaining
+      : duration.type === "minutes"
+        ? Math.floor(duration.remaining / 60)
+        : 0;
+  const spent = source.actionUses[key] ?? 0;
+  if (left <= 0 || spent <= 0) return null;
+  const { [key]: _old, ...others } = source.actionUses;
+  const now = Math.max(0, spent - left);
+  source.actionUses = now > 0 ? { ...others, [key]: now } : others;
+  return `${effect.name} ends early, so ${source.name} keeps the time it had left.`;
 }
 
 /** The Ready is used up (its Reaction taken, or spent another way): the Readied effect ends, and a spell it held
@@ -911,6 +959,7 @@ export function ageEffects(
       // A cascade earlier in the sweep may have ended it already.
       const current = actor.effects.find((candidate) => candidate.id === effect.id);
       if (!current) continue;
+      if (countDown) regrowHolder(actor, current, minutes);
       const left = remainingAfter(current.duration, minutes);
       if (left === null) continue;
       if (left <= 0) {
@@ -925,6 +974,23 @@ export function ageEffects(
     }
   }
   return events;
+}
+
+/** An object holding the bearer that regrows as time passes (a Rope of Entanglement: "It regains 1 Hit Point every 5
+ *  minutes as long as it has at least 1 Hit Point"). */
+function regrowHolder(actor: Actor, effect: EffectInstance, minutes: number): void {
+  const holder = effect.heldBy;
+  if (!holder?.regainsEvery || holder.hitPoints.current < 1) return;
+  const current = Math.min(
+    holder.hitPoints.maximum,
+    holder.hitPoints.current + Math.floor(minutes / holder.regainsEvery)
+  );
+  if (current === holder.hitPoints.current) return;
+  actor.effects = actor.effects.map((candidate) =>
+    candidate.id === effect.id
+      ? { ...candidate, heldBy: { ...holder, hitPoints: { ...holder.hitPoints, current } } }
+      : candidate
+  );
 }
 
 /** A creature just made Stable starts its 1d4 hours on the game clock, rolled now (SRD Damage and Healing: "A Stable

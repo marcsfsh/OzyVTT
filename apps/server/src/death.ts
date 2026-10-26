@@ -1,6 +1,13 @@
 import { isDead, ROUNDS_PER_MINUTE, type GameState } from "@vtt/domain";
 import type { ActorDefinition, DeathRecord } from "@vtt/schemas";
-import { endEffect, reduceExhaustion, removeConditionDirect, type EffectNarration } from "./effects.js";
+import {
+  endEffect,
+  endEffectIfPresent,
+  ENDS_ON_DEATH_TAG,
+  reduceExhaustion,
+  removeConditionDirect,
+  type EffectNarration
+} from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { clockMinutesOf } from "./game-time.js";
 import { reconcileEquipment } from "./inventory.js";
@@ -92,7 +99,12 @@ export function keepDeathRecords(state: GameState, before: GameState): void {
       if (actor.death) delete actor.death;
       continue;
     }
-    if (!actor.death) stampDeath(state, actor);
+    if (!actor.death) {
+      stampDeath(state, actor);
+      // What lasts until its bearer dies ends with the death (a pact weapon's bond).
+      for (const effect of actor.effects.filter((candidate) => candidate.tags.includes(ENDS_ON_DEATH_TAG)))
+        endEffectIfPresent(state, actor.id, effect.id);
+    }
     const death = actor.death!;
     if (death.fightRound !== undefined && fightRoundIn(state, death.sceneId ?? null) === null) {
       const ended = fightRoundIn(before, death.sceneId ?? null);

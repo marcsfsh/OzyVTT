@@ -8,7 +8,7 @@ import { buildCharacterDefinition } from "../src/character-build.js";
 import { generateCharacterRequest } from "../src/character-generate.js";
 import { ContentLibrary } from "../src/content-library.js";
 import { equipmentCatalogOf } from "../src/equipment-derivation.js";
-import { paid, spellChoicesOf } from "../src/spell-choices.js";
+import { addToSpellbook, paid, spellChoicesOf } from "../src/spell-choices.js";
 import { bootServer } from "./boot-server.js";
 
 // SRD Spell Preparation by Class: after a Long Rest a Cleric replaces spells on its list "with other Cleric spells for
@@ -89,6 +89,52 @@ describe("what a prepared caster may change", () => {
     const sheet = built("cleric", 3);
     const imported = { ...sheet, character: { ...sheet.character!, choices: [] } };
     expect(spellChoicesOf({ spellbook: [] }, imported, library, policy)).toBeNull();
+  });
+});
+
+// SRD Evocation Savant: "whenever you gain access to a new level of spell slots in this class, you can add one Wizard
+// spell from the Evocation school to your spellbook for free".
+describe("an Evoker's free Evocation spells", () => {
+  const add = (state: GameState, spellId: string) =>
+    addToSpellbook(
+      state,
+      HERO,
+      { spellId, from: "level" },
+      { role: "gm" },
+      {
+        library,
+        policy,
+        catalog,
+        random: () => 1,
+        roll: { id: randomUUID(), commandId: randomUUID(), sessionId: randomUUID(), createdAt: "2026-10-19T00:00:00Z" }
+      }
+    );
+
+  it("gives one each time a new level of spell slots opens, beyond the levels' two", () => {
+    const three = spellChoicesOf({ spellbook: [] }, built("wizard", 3), library, policy)!;
+    expect(three.spellbook!.freeOfSchool).toEqual({ school: "evocation", left: 0 });
+    const five = spellChoicesOf({ spellbook: [] }, built("wizard", 5), library, policy)!;
+    expect(five.spellbook!.freeOfSchool).toEqual({ school: "evocation", left: 1 });
+  });
+
+  it("adds Fireball free once the levels' spells are spent, and no spell of another school", () => {
+    const sheet = built("wizard", 5);
+    const state = table(sheet);
+    const actor = state.actors[0]!;
+    const before = spellChoicesOf(actor, sheet, library, policy)!.spellbook!;
+    const others = before.addable.filter((id) => library.spellRecord(id)?.school !== "evocation");
+    actor.spellbook = others.slice(0, before.freeLeft).map((id) => ({ id }));
+    expect(spellChoicesOf(actor, sheet, library, policy)!.spellbook).toMatchObject({
+      freeLeft: 0,
+      freeOfSchool: { school: "evocation", left: 1 }
+    });
+    expect(() => add(state, others[before.freeLeft]!)).toThrow(/free spells left are for the evocation school/);
+    expect(add(state, "fireball")).toMatch(/adds Fireball to the spellbook/);
+    expect(spellChoicesOf(actor, sheet, library, policy)!.spellbook!.freeOfSchool).toEqual({
+      school: "evocation",
+      left: 0
+    });
+    expect(() => add(state, "lightning-bolt")).toThrow(/already holds the spells the Wizard's levels give/);
   });
 });
 

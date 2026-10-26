@@ -19,6 +19,7 @@ import { receivedSpellChoices, spellChoicesOf } from "../spell-choices.js";
 import { withMasteries } from "../weapon-masteries.js";
 import {
   ActorAvailableActionsSchema,
+  ActorCraftingOffersSchema,
   ActorMovementSchema,
   BuilderOffersSchema,
   CharacterNextLevelSchema,
@@ -38,6 +39,9 @@ import { areaGroundFor } from "../zone-preview.js";
 import { visibleToPlayerAnnotation } from "../projections.js";
 import { previewScene } from "../scene-preview.js";
 import { nextLevelOf } from "../next-level.js";
+import { castOptionsOf } from "../spell-zones.js";
+import { craftingOffers } from "../crafting.js";
+import { craftingDeps } from "./crafting.js";
 import { GameNotFoundError } from "./failures.js";
 import { initiatorOf, isGmGrade, type GamePrincipal, type Kit } from "./kit.js";
 import type { ReadSpec } from "./pipeline.js";
@@ -140,15 +144,18 @@ export const gameReads = [
           ? actionSummariesOf([...playedActions]).map((summary, index) => {
               // A Shape-Shift offers its forms and aims at no one; leaving a form too.
               const action = playedActions[index]!;
-              if (!action.shapeShift && !action.endsForm && !action.effectOptions) return summary;
+              // The effects a use picks among, or the form of the area a cast leaves (Wall of Fire's ring).
+              const picks = castOptionsOf(
+                action,
+                action.spellId ? kit.equipmentCatalog().spellRecord?.(action.spellId) : undefined
+              );
+              if (!action.shapeShift && !action.endsForm && !picks.options) return summary;
               return {
                 ...summary,
                 ...(action.shapeShift
                   ? { forms: formsOffer(kit.read(), combatant, action, played, kit.equipmentCatalog()) }
                   : {}),
-                ...(action.effectOptions
-                  ? { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) }
-                  : {}),
+                ...picks,
                 ...(action.endsForm || (action.shapeShift && !action.shapeShift.onTargets && !action.save)
                   ? { targeting: "none" as const }
                   : {})
@@ -309,7 +316,8 @@ export const gameReads = [
               resolveDefinition: (definitionId) => kit.resolveDefinition(definitionId),
               catalog: kit.equipmentCatalog()
             },
-            seen
+            seen,
+            (creatureId) => !hidden(creatureId)
           )
         : undefined;
       return {
@@ -347,6 +355,22 @@ export const gameReads = [
       if (!actor) throw new GameNotFoundError("That character no longer exists.");
       const definition = actor.definitionId ? storedDefinition(state, actor.definitionId) : undefined;
       return nextLevelOf(actor, definition, kit.catalogFor(principal), state.builderPolicy);
+    }
+  },
+
+  {
+    event: "actor:crafting-offers",
+    route: gameRoutes.getActorCraftingOffers,
+    schema: ActorCraftingOffersSchema,
+    malformed: "The crafting lookup is malformed.",
+    // Its owner or the GM, from the reader's own catalog, so a player sees only what they may craft.
+    run: (principal, input, kit) => {
+      const state = kit.read();
+      const actorId = (input as z.output<typeof ActorCraftingOffersSchema>).actorId;
+      requireActorAccess(initiatorOf(principal), state, actorId, "resource", "You can only read your own character.");
+      const actor = state.actors.find((candidate) => candidate.id === actorId);
+      if (!actor) throw new GameNotFoundError("That character no longer exists.");
+      return craftingOffers(actor, craftingDeps(kit, principal, state));
     }
   },
 

@@ -13,6 +13,7 @@ import {
   BARKSKIN_TAG,
   endConditionsImmuneTo,
   endEffect,
+  ENDS_ON_DEATH_TAG,
   RESISTS_CHOSEN_TYPE_TAG,
   makeEffect,
   PERSISTENT_RAGE_TAG,
@@ -24,7 +25,9 @@ import {
   type EffectNarration
 } from "../effects.js";
 import { refreshBaseArmorClass } from "../actor-roster.js";
+import { altitudeOf } from "../altitude.js";
 import { holdsFeature } from "../class-features.js";
+import { GIFT_OF_THE_PROTECTORS_TAG, refuseFullPage } from "../book-of-shadows.js";
 import { deriveEquipment } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
 import { currentSpeedFeet } from "../speed.js";
@@ -140,6 +143,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
     throw new CommandRejectedError(
       `${recipient.name} already has ${grant.name ?? action.name}, and a creature can have only one at a time.`
     );
+  if (grant.tags.includes(GIFT_OF_THE_PROTECTORS_TAG)) refuseFullPage(state, attacker, recipient, deps.definition);
   // A concentration grant may end the granter's previous concentration; surfaced as a warning line.
   const replaced: EffectNarration[] = [];
   const recipientDefinition =
@@ -228,6 +232,14 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
   const rolledHours = grant.hoursRolled
     ? Math.max(1, resolveDice(parseDiceFormula(grant.hoursRolled), ctx.deps.random).total)
     : null;
+  // A use paid from a pool of time lasts what it spent (Boots of Speed's rounds left), and gives back what is left when
+  // it is ended early.
+  const paid = action.timePool && ctx.plan.spendUse ? ctx.plan.spendUse : null;
+  const timed: EffectInstance["duration"] | null = paid
+    ? action.timePool === "hours"
+      ? { type: "minutes", remaining: paid.amount * 60 }
+      : { type: "rounds", remaining: paid.amount }
+    : null;
   const spell = spellOf(ctx);
   const castLevel = spell ? (ctx.plan.castLevel ?? spell.level) : null;
   // The choice made as it is granted (Fire Shield's warm or chill), and the weapon it binds to (Magic Weapon).
@@ -270,15 +282,18 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
           ? { type: "until-bearer-turn-end", skipsCurrentTurn: false }
           : rolledHours !== null
             ? { type: "minutes", remaining: rolledHours * 60 }
-            : grantDuration(
-                state,
-                grant.duration,
-                attacker.id,
-                spell && castLevel !== null ? { spell, castLevel } : null
-              ),
+            : timed
+              ? timed
+              : grantDuration(
+                  state,
+                  grant.duration,
+                  attacker.id,
+                  spell && castLevel !== null ? { spell, castLevel } : null
+                ),
       // A spell's effect outlasts its caster's fall; only Concentration ends it early. A die given to another creature
       // (Bardic Inspiration) is its own once given.
-      endsWhenSourceDefeated: action.spellId === undefined && grant.answer === undefined,
+      endsWhenSourceDefeated:
+        action.spellId === undefined && grant.answer === undefined && !grant.tags.includes(ENDS_ON_DEATH_TAG),
       voidWhileIncapacitated: grant.voidWhileIncapacitated,
       modifiers: [
         ...modifiers,
@@ -323,7 +338,11 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       // Its size while it lasts (Large Form), from the size it had before any change.
       ...(grant.sizeChange ? { sizeChange: { ...grant.sizeChange }, ownSize: ownSizeOf(recipient) } : {}),
       ...grantExtras(ctx, grant, recipient, option),
-      ...(bound?.fields ?? {})
+      // Every other way out the grant prints (bursting a Chain), beside its own end action.
+      ...(grant.endedBy ? { endedBy: structuredClone(grant.endedBy) } : {}),
+      ...anchorOf(state, recipient.id, grant.anchors),
+      ...(bound?.fields ?? {}),
+      ...(paid ? { refundsUses: { key: paid.key } } : {})
     }),
     replaced,
     deps
@@ -382,6 +401,19 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       conditionIds: [...linkedConditionIds]
     });
   else ctx.effectGranted = { name: effect.name, tags: effect.tags };
+}
+
+/** Where a Climber's Kit anchors its user: its token's place and height now. Nothing off the map. */
+function anchorOf(
+  state: GameState,
+  recipientId: string,
+  anchors: NonNullable<DefinitionAction["grants"]>["anchors"]
+): Partial<Pick<EffectInstance, "anchor">> {
+  const token = state.combat.tokens.find((candidate) => candidate.actorId === recipientId);
+  if (!anchors || !token?.position) return {};
+  return {
+    anchor: { x: token.position.x, y: token.position.y, altitudeFeet: altitudeOf(token), feet: anchors.feet }
+  };
 }
 
 /** Takes the conditions an effect suppresses off its bearer and keeps them on the effect, as the table hears. */
@@ -484,7 +516,9 @@ export function grantOutsideFight(
       ...(action.spellId !== undefined ? { stackKey: `spell:${action.spellId}` } : {}),
       ...(grant.armorClassBonus !== undefined ? { armorClassBonus: grant.armorClassBonus } : {}),
       // Its size while it lasts (a Potion of Growth).
-      ...(grant.sizeChange ? { sizeChange: { ...grant.sizeChange }, ownSize: ownSizeOf(actor) } : {})
+      ...(grant.sizeChange ? { sizeChange: { ...grant.sizeChange }, ownSize: ownSizeOf(actor) } : {}),
+      // A Climber's Kit anchored on the way down a cliff.
+      ...anchorOf(state, actor.id, grant.anchors)
     }),
     events
   );

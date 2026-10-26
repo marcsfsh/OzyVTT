@@ -57,6 +57,10 @@ export type CastSightInput = Readonly<{
   areaPlaced: boolean;
   /** The area's line width, for a Line template. */
   widthFeet?: number | null;
+  /** A ringed wall's thickness: the area is the circle's edge alone (Wall of Fire's ring). */
+  ringFeet?: number;
+  /** The area is a Cube centred where its user stands, with no template (an octopus's ink): its centre and side. */
+  centredAt?: Readonly<{ x: number; y: number; sizeFeet: number }>;
 }>;
 
 /**
@@ -147,13 +151,29 @@ export function applyCastSight(state: GameState, input: CastSightInput): EffectN
     if (area.aroundSelfFeet !== undefined)
       shape = { type: "emanation", actorId: casterId, radiusFeet: area.aroundSelfFeet };
     else if (input.areaPlaced)
-      shape = { type: "template", annotationId: commandId, widthFeet: input.widthFeet ?? null };
+      shape = {
+        type: "template",
+        annotationId: commandId,
+        widthFeet: input.widthFeet ?? null,
+        ...(input.ringFeet !== undefined ? { ringFeet: input.ringFeet } : {})
+      };
+    else if (input.centredAt) {
+      // Fixed where it was made: the octopus swims off and leaves its ink behind. Without the map's scale, a circle.
+      const { x, y, sizeFeet } = input.centredAt;
+      const pixelsPerFoot = vision.measure?.pixelsPerFoot;
+      const side = pixelsPerFoot ? sizeFeet * pixelsPerFoot : 0;
+      shape =
+        side > 0
+          ? { type: "rect", x: Math.max(0, x - side / 2), y: Math.max(0, y - side / 2), width: side, height: side }
+          : { type: "circle", x: Math.max(0, x), y: Math.max(0, y), radiusFeet: sizeFeet / 2 };
+    }
     if (shape) {
       const made: VisionArea = {
         id: derivedUuid(commandId, "area"),
         kind: area.kind,
         shape,
         ...(area.sparesUser ? { sparedActorId: casterId } : {}),
+        ...(area.dispersedBy ? { dispersedBy: [...area.dispersedBy] } : {}),
         source
       };
       areas = [...areas, made].slice(-100);
@@ -161,6 +181,37 @@ export function applyCastSight(state: GameState, input: CastSightInput): EffectN
   }
   state.combat = { ...state.combat, vision: { ...vision, lights, areas } };
   return sight.dispels ? dispelOverlapping(state, input, sight.dispels) : [];
+}
+
+/** A spell area that clears the fog and clouds it overlaps while it stands (Gust of Wind's Line, Destroy Water's Cube),
+ *  measured on the map's own scale so it works whether or not the scene's vision is on. Ends each spell whose fog it
+ *  clears. */
+export function dispelFogUnder(
+  state: GameState,
+  input: Readonly<{
+    annotationId: string;
+    casterId: string;
+    spellId: string;
+    widthFeet: number | null;
+    pixelsPerFoot: number;
+    by: "wind" | "water";
+  }>
+): EffectNarration[] {
+  return dispelOverlapping(
+    state,
+    {
+      commandId: input.annotationId,
+      casterId: input.casterId,
+      sight: {},
+      spellId: input.spellId,
+      targetIds: [],
+      areaPlaced: true,
+      widthFeet: input.widthFeet
+    },
+    { kind: "fog" },
+    input.pixelsPerFoot,
+    input.by
+  );
 }
 
 /** A shape on the map: a circle of light, or an area's outline. */
@@ -244,9 +295,12 @@ function endSpellOf(state: GameState, source: VisionSource): EffectNarration[] {
 function dispelOverlapping(
   state: GameState,
   input: CastSightInput,
-  dispels: NonNullable<SightEffect["dispels"]>
+  dispels: NonNullable<SightEffect["dispels"]>,
+  scale?: number,
+  /** What clears fog: a strong wind (Gust of Wind), or water that destroys fog (Destroy Water). */
+  by: "wind" | "water" = "wind"
 ): EffectNarration[] {
-  const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot;
+  const pixelsPerFoot = scale ?? state.combat.vision.measure?.pixelsPerFoot;
   if (!pixelsPerFoot) return [];
   const reach = reachOf(state, input, pixelsPerFoot);
   if (reach.length === 0) return [];
@@ -272,9 +326,10 @@ function dispelOverlapping(
       : vision.lights;
   const resolved = new Map(resolveAreas(vision.areas, state.combat, pixelsPerFoot).map((area) => [area.id, area]));
   const areas = vision.areas.filter((area) => {
+    // Only fog and clouds clear; an opaque wall or sleet stands in the wind.
     const gone =
       (dispels.kind === "darkness" && area.kind === "magical-darkness") ||
-      (dispels.kind === "fog" && area.kind === "heavily-obscured");
+      (dispels.kind === "fog" && area.dispersedBy?.includes(by) === true);
     const shape = resolved.get(area.id);
     return !gone || keep(area.source, shape ? { outline: shape.outline } : null);
   });

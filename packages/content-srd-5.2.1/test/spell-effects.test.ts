@@ -57,6 +57,8 @@ describe("what one cast of an SRD spell does", () => {
       "animal-shapes",
       "arcane-sword",
       "conjure-fey",
+      // "On your later turns, you can take a Magic action to move the hound up to 30 feet."
+      "faithful-hound",
       "gust-of-wind",
       "heat-metal",
       "hex",
@@ -151,8 +153,14 @@ describe("what one cast of an SRD spell does", () => {
       // "Any other creature's Speed is halved in the Emanation."
       halvesSpeed: true
     });
-    expect(zoneOf("web")).toEqual({ on: ["enter", "start-turn"], terrain: { cost: 2, kind: "webs" } });
-    expect(zoneOf("stinking-cloud")).toEqual({ on: ["start-turn"] });
+    expect(zoneOf("web")).toEqual({
+      on: ["enter", "start-turn"],
+      terrain: { cost: 2, kind: "webs" },
+      // "Any 5-foot Cube of webs exposed to fire burns away in 1 round, dealing 2d4 Fire damage".
+      burns: { formula: "2d4" }
+    });
+    // "A strong wind (such as the one created by Gust of Wind) disperses it."
+    expect(zoneOf("stinking-cloud")).toEqual({ on: ["start-turn"], endsBy: ["wind"] });
     expect(zoneOf("spike-growth")).toEqual({ on: ["travel"], terrain: { cost: 2, kind: "plants" } });
     expect(zoneOf("flaming-sphere")).toEqual({ on: ["end-turn"], around: "point", feet: 5 });
     expect(zoneOf("guardian-of-faith")).toMatchObject({ affects: "enemies", damageCap: 60 });
@@ -161,11 +169,18 @@ describe("what one cast of an SRD spell does", () => {
     expect(effectOf("wall-of-fire")!.laterActions?.[0]!.save).toBeUndefined();
     expect(effectOf("guardian-of-faith")!.laterActions?.[0]!.damage).toEqual([{ formula: "20", type: "radiant" }]);
     // What the caster does itself on later turns has no zone.
-    for (const id of ["spiritual-weapon", "produce-flame", "call-lightning", "sunbeam", "vampiric-touch"])
+    for (const id of ["spiritual-weapon", "produce-flame", "sunbeam", "vampiric-touch"])
       expect(
         effectOf(id)!.laterActions?.every((row) => row.zone === undefined),
         id
       ).toBe(true);
+    // Call Lightning's bolt leaves none, but the storm cloud it is called from is one, which acts on no one.
+    expect(effectOf("call-lightning")!.laterActions?.find((row) => row.name === "bolt")?.zone).toBeUndefined();
+    expect(
+      effectOf("call-lightning")!
+        .laterActions?.filter((row) => row.zone !== undefined)
+        .map((row) => row.damage)
+    ).toEqual([[], []]);
     expect(effectOf("flaming-sphere")!.laterActions?.map((row) => [row.name, row.activation])).toEqual([
       ["save", "other"],
       ["ram", "bonus-action"]

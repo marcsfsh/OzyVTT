@@ -7,11 +7,12 @@ vi.mock("../socket", () => ({
   socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn(), connected: true, timeout: () => ({ emit: vi.fn() }) }
 }));
 
-const spell = (id: string, name: string, level: number) =>
+const spell = (id: string, name: string, level: number, school = "abjuration") =>
   ({
     id,
     name,
     level,
+    school,
     classes: [],
     castingOptions: [],
     cantripScaling: [],
@@ -24,7 +25,8 @@ const SPELLS = [
   spell("spiritual-weapon", "Spiritual Weapon", 2),
   spell("magic-missile", "Magic Missile", 1),
   spell("web", "Web", 2),
-  spell("misty-step", "Misty Step", 2),
+  spell("misty-step", "Misty Step", 2, "conjuration"),
+  spell("fireball", "Fireball", 3, "evocation"),
   { ...spell("detect-magic", "Detect Magic", 1), ritual: true } as ContentSpellSummary
 ];
 vi.mock("../encounter/spells", async (original) => ({
@@ -164,6 +166,7 @@ const WIZARD_CHOICES: SpellChoices = {
   spellbook: {
     spellIds: ["magic-missile", "spiritual-weapon", "web"],
     freeLeft: 2,
+    freeOfSchool: null,
     maxLevel: 2,
     addable: ["misty-step"]
   }
@@ -199,6 +202,35 @@ describe("a Wizard's spellbook", () => {
     expect(edit).toHaveBeenCalledWith("character:add-to-spellbook", {
       actorId: ME,
       spellId: "misty-step",
+      from: "level"
+    });
+  });
+
+  // SRD Evocation Savant: "whenever you gain access to a new level of spell slots in this class, you can add one Wizard
+  // spell from the Evocation school to your spellbook for free".
+  it("adds an Evoker's free Evocation spell once the levels' free spells are spent", async () => {
+    const user = userEvent.setup();
+    const evoker: SpellChoices = {
+      swaps: WIZARD_CHOICES.swaps,
+      spellbook: {
+        ...WIZARD_CHOICES.spellbook!,
+        freeLeft: 0,
+        freeOfSchool: { school: "evocation", left: 1 },
+        maxLevel: 3,
+        addable: ["misty-step", "fireball"]
+      }
+    };
+    const edit = mount(WIZARD, evoker);
+    await user.click(screen.getByRole("button", { name: "Spellbook" }));
+    const book = screen.getByRole("group", { name: "Spellbook" });
+    await user.click(within(book).getByRole("button", { name: "Add from your levels (1)" }));
+    expect(screen.getByText(/1 more Evocation spell free\./)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Misty Step/ })).toBeNull();
+    await user.click(screen.getByRole("button", { name: /Fireball/ }));
+    await user.click(screen.getByRole("button", { name: "Add Fireball" }));
+    expect(edit).toHaveBeenCalledWith("character:add-to-spellbook", {
+      actorId: ME,
+      spellId: "fireball",
       from: "level"
     });
   });

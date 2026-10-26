@@ -34,12 +34,12 @@ import {
 } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import { airborneAfter, altitudeOf, setAltitude } from "../altitude.js";
-import { startFall } from "../falling.js";
-import { failedTeleport } from "../granted-moves.js";
+import { endsOnLanding, startFall } from "../falling.js";
+import { failedTeleport, landTeleport } from "../granted-moves.js";
 import { holdMove } from "../held-moves.js";
 import { walkThroughZones } from "../zone-stops.js";
 import { landJump } from "../jumping.js";
-import { carryRiders, mountOf, mountOrDismount, ridersOf, RIDING_TAG } from "../mounts.js";
+import { askToStayMounted, carryRiders, mountOf, mountOrDismount, parted, ridersOf } from "../mounts.js";
 import { timeStopOutOfRange } from "../time-stop.js";
 import { applyMovementRules, dragAlong, dragCostsExtra, grappledBy } from "../movement-rules.js";
 import { swallowedBy } from "../swallow.js";
@@ -67,6 +67,7 @@ import { HIDDEN_SOURCE } from "../hidden-source.js";
 import { insidePolygon } from "../vision/geometry.js";
 import { sceneSight } from "../vision/sight.js";
 import { gmGradeLabelOf, initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal, type Kit } from "./kit.js";
+import { offerNearbyReactions } from "../triggered-reactions.js";
 import { defineCommand } from "./pipeline.js";
 
 // Token movement and the drawings, measurements and pings on the encounter map.
@@ -146,6 +147,7 @@ export const mapCommands = [
       const zoneEvents: EffectNarration[] = [];
       const draggedNames: string[] = [];
       const landing: EffectNarration[] = [];
+      const pursuits: EffectNarration[] = [];
       let granted: string | undefined;
       let moverHiddenAtStart = false;
       const { state: moved, duplicate } = await execute((state) => {
@@ -317,6 +319,8 @@ export const mapCommands = [
           });
         // Time Stop ends once its caster goes more than 1,000 feet from where it cast it.
         landing.push(...timeStopOutOfRange(state, actorId, (a, b) => mapDistance(geometry, a, b)?.value ?? null));
+        // A flight that ends when its rider lands (a Broom of Flying).
+        landing.push(...endsOnLanding(state, actorId, fromAltitude, toAltitude));
         // A teleport into a filled space fails: back where it was, hurt (Dimension Door).
         if (outcome.teleportFails && from !== null) {
           moveEncounterToken(state, actorId, from, geometry);
@@ -347,6 +351,20 @@ export const mapCommands = [
           if (caged?.held) {
             moveEncounterToken(state, actorId, from, geometry);
             setAltitude(state, actorId, fromAltitude, wasAirborne);
+          }
+          // What the granted teleport's arrival does near where it lands (a mummy lord's Whirlwind of Sand).
+          const traveler = state.actors.find((actor) => actor.id === actorId);
+          if (outcome.teleportLanding && traveler && !caged?.held) {
+            const arrival = sceneSight(state, kit.sightContent());
+            landing.push(
+              ...landTeleport(state, traveler, outcome.teleportLanding, granted ?? "the teleport", {
+                commandId,
+                distanceFeet: (a, b) => tokenCreatureDistance(state, geometry, a, b)?.value ?? null,
+                sees: (viewer, target) => !arrival.enabled || arrival.sees(viewer, target),
+                resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+                catalog: kit.equipmentCatalog()
+              })
+            );
           }
         }
         movementWarning = outcome.warning;
@@ -467,17 +485,15 @@ export const mapCommands = [
                 )
               );
           }
-        // A mount carries its riders; one that teleports or is moved by force leaves them where they were, off it.
-        if (mode === "teleport" || mode === "forced")
-          for (const riderId of ridersOf(state, actorId)) {
-            const rider = state.actors.find((actor) => actor.id === riderId)!;
-            rider.effects = rider.effects.filter((effect) => !effect.tags.includes(RIDING_TAG));
-          }
-        else carryRiders(state, actorId, geometry);
-        if (riding && (mode === "teleport" || mode === "forced")) {
-          const rider = state.actors.find((actor) => actor.id === actorId)!;
-          rider.effects = rider.effects.filter((effect) => !effect.tags.includes(RIDING_TAG));
+        // A mount carries its riders; one that teleports leaves them where they were, off it. One moved by force
+        // carries them too, and each saves to stay on (SRD Mounted Combat).
+        if (mode === "teleport") for (const riderId of ridersOf(state, actorId)) parted(state, riderId);
+        else {
+          const riders = carryRiders(state, actorId, geometry);
+          if (mode === "forced" && riders.length > 0)
+            zoneEvents.push(...askToStayMounted(state, riders, actorId, "its mount is moved", Date.now()));
         }
+        if (riding && (mode === "teleport" || mode === "forced")) parted(state, actorId);
         // SRD Grappling: a grapple ends once the two are farther apart than its range.
         released = releaseGrapplesOutOfRange(
           state,
@@ -485,6 +501,19 @@ export const mapCommands = [
           (a, b) => tokenCreatureDistance(state, geometry, a, b)?.value ?? null,
           DISTANCE_TOLERANCE_FEET
         );
+        // A move that ends here, unheld by an Opportunity Attack or an area's save, can open another creature's
+        // reaction to it (a nalfeshnee's Pursuit). A teleport or a shove is no move of the creature's own.
+        if (mode !== "forced" && mode !== "teleport" && position !== null && state.combat.heldMove?.actorId !== actorId)
+          pursuits.push(
+            ...offerNearbyReactions(state, actorId, "ends-move-near", {
+              newId: kit.context.newId,
+              now: () => new Date().toISOString(),
+              resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+              catalog: kit.equipmentCatalog(),
+              distanceFeet: (a, b) => tokenCreatureDistance(state, geometry, a, b)?.value ?? null,
+              commandId
+            })
+          );
       });
       if (duplicate) return;
       if (landing.length > 0) kit.publishRolls(moved, commandId);
@@ -502,6 +531,7 @@ export const mapCommands = [
       // What the spell areas did to the mover follows the move itself, as does a jump's landing.
       kit.publishNarrations(zoneEvents);
       kit.publishNarrations(landing);
+      kit.publishNarrations(pursuits);
       if (movementWarning)
         kit.context.appendLog({
           kind: "movement",
@@ -594,7 +624,7 @@ export const mapCommands = [
     type: "actor.mount",
     operationId: "mountActor",
     description:
-      "A creature climbs onto a mount (`mountId`) or gets off the one it rides (`mountId: null`), SRD 5.2.1 Mounted Combat: the mount must be within 5 feet and at least one size larger, and either costs half the rider's Speed on its turn in a fight. The rider shares the mount's space and height, the mount's moves carry it, and it moves only by its mount until it dismounts; a dismounted rider stands in the nearest unoccupied space. A mount that teleports or is moved by force leaves its rider behind, off it. A player may mount or dismount only their own character; the GM may `override` a movement rule.",
+      "A creature climbs onto a mount (`mountId`) or gets off the one it rides (`mountId: null`), SRD 5.2.1 Mounted Combat: the mount must be within 5 feet and at least one size larger (a flying or aquatic one wearing an Exotic Saddle), and either costs half the rider's Speed on its turn in a fight. The rider shares the mount's space and height, the mount's moves carry it, and it moves only by its mount until it dismounts; a dismounted rider stands in the nearest unoccupied space. A `controlled` mount (the default) takes the rider's Initiative, its turn right after the rider's, and only the Dash, Disengage and Dodge actions; an `independent` one keeps its own. A mount moved by force carries its rider, who makes a DC 10 Dexterity saving throw to stay on, and one that teleports leaves its rider behind, off it. A player may mount or dismount only their own character; the GM may `override` a movement rule.",
     summary: "Mount a creature or dismount; the mount's moves carry its rider.",
     schema: ActorMountSchema,
     malformed: "The mount request is malformed.",
@@ -614,6 +644,7 @@ export const mapCommands = [
           state,
           {
             riderId: actorId,
+            ...(request.control ? { control: request.control } : {}),
             mountId,
             override: isGmGrade(principal) ? (request.override ?? null) : null,
             distanceFeet: (a, b) => distance(state, a, b),

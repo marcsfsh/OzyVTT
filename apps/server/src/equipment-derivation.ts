@@ -43,10 +43,12 @@ import {
   itemActionRest,
   UNARMED_STRIKE_ACTION_ID,
   weaponAbilityModifier,
-  weaponSwing
+  weaponSwing,
+  improvisedSwing
 } from "./item-actions.js";
 import { freesLightExtraAttack, IMPLEMENTED_MASTERIES, type MasteryInForce } from "./weapon-mastery.js";
 import { copyKeyOf, rowRecord } from "./item-records.js";
+import { containerOf, hostOf } from "./containers.js";
 import { animatedRowIds } from "./animated-items.js";
 import { carryingOf, type Carrying } from "./carrying.js";
 
@@ -201,7 +203,8 @@ export const EMPTY_DERIVATION: EquipmentDerivation = Object.freeze({
 /** Whether an item's riders apply: equipped, present and (if required) attuned. A cursed item contributes
  *  nothing before attunement. No catalog record fails open to mundane. */
 export function itemIsActive(item: InventoryItem, record: EquipmentReference | undefined): boolean {
-  if (item.quantity <= 0 || !item.equipped) return false;
+  // A copy whose magic is spent (a Gem of Brightness with no charges left, a studied manual) is a plain object.
+  if (item.quantity <= 0 || !item.equipped || item.dormant === true) return false;
   // A template not yet bound to its base ("Armor, +1" with no armor picked) is no armor or weapon yet, so its magic
   // has nothing to ride. One with a single base is that base.
   if (record?.appliesTo && record.appliesTo.baseIds.length > 1 && item.baseId === undefined) return false;
@@ -456,8 +459,14 @@ export function deriveEquipment(
     if (item.attuned && record?.attunement?.required === true) attunedRecords.add(copy);
     if (item.equipped) equipped.push(entry);
     if (item.equipped && !secondCopy && itemIsActive(item, record)) active.push(entry);
-    // Caltrops are spread straight from their bag, as a potion is drunk from the pack.
-    else if (record?.consumedOnUse || record?.actions.some((action) => action.zone !== undefined)) packed.push(entry);
+    // Caltrops are spread straight from their bag, as a potion is drunk from the pack; one in a Bag of Holding is taken
+    // out first, with the action that costs.
+    else if (
+      item.dormant !== true &&
+      (record?.consumedOnUse || record?.actions.some((action) => action.zone !== undefined)) &&
+      containerOf(hostOf(inventory, item), catalog)?.retrieval === undefined
+    )
+      packed.push(entry);
     if (item.attuned && record) cursedVulnerabilities.push(...curseVulnerabilitiesOf(record, item));
   }
   const carriers: RiderCarrier[] = [
@@ -593,6 +602,15 @@ export function deriveEquipment(
   );
   for (const equippedEntry of equipped) {
     const entry = { ...equippedEntry, item: withCatalogWeaponFacts(equippedEntry, catalog!) };
+    // A light source that is also a weapon (a Torch) attacks with its fire, so only while it burns.
+    if (burnsToStrike(entry) && entry.item.lit !== true) continue;
+    // A weapon used against its make counts as an improvised weapon: a bow swung, a sword thrown.
+    for (const form of ["melee", "thrown"] as const) {
+      const improvised = improvisedSwing(entry.item, definition, form);
+      if (!improvised) continue;
+      actions.push(improvised);
+      weaponActionIds.push(improvised.id);
+    }
     // An effect bound to this row changes how it swings while it lasts (Shillelagh's ability and die).
     const bound = actor.effects.find((effect) => effect.itemId === entry.item.id && effect.weapon)?.weapon;
     const bare = weaponSwing(entry.item, definition, weaponProficiencies, martialArtsInForce, {
@@ -754,6 +772,14 @@ function withCatalogWeapon(item: InventoryItem, catalog: EquipmentCatalog): Inve
 
 /** A weapon's attack with what its hit does beside its damage (Giant Slayer, a Sword of Wounding): the record's
  *  riders, once the item is active, so a cursed or unattuned one adds nothing. */
+/** SRD Torch: "you can attack with the Torch, using it as a Simple Melee weapon. On a hit, the target takes 1 Fire
+ *  damage": a gear light source with a weapon block, which strikes with its flame. */
+const burnsToStrike = (entry: ActiveItem): boolean =>
+  entry.record?.light !== undefined &&
+  entry.record.light.always !== true &&
+  entry.record.category !== "weapon" &&
+  entry.record.weapon != null;
+
 function withItemHitRiders(action: ActorAction, entry: ActiveItem): ActorAction {
   if (!itemIsActive(entry.item, entry.record)) return action;
   // Its wielder picks each hit's damage type from the weapon's own and the item's (a Javelin of Lightning).

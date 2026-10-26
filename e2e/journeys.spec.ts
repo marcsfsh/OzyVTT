@@ -741,3 +741,119 @@ test("a player turns on the situation their Crowbar names and rolls a Strength c
   await expect(prying).toHaveAttribute("aria-pressed", "false");
   await expectPageFits(player);
 });
+
+test("a player rolls a tool's Utilize use and starts crafting from the sheet, and the GM sees the project", async ({
+  open
+}) => {
+  const hero = PARTY[1];
+  const player = await open("/");
+  await ensureGmPassword(player.request);
+  // The GM's side is the API: Calligrapher's Supplies in the pack and coins for the raw materials.
+  const { token } = (
+    await (await player.request.post("/api/v1/host/gm/sign-in", { data: { password: GM_PASSWORD } })).json()
+  ).data;
+  const headers = { authorization: `Bearer ${token}` };
+  const api = (path: string, data: Record<string, unknown> = {}) =>
+    player.request.post(path, { headers, data: { commandId: randomUUID(), ...data } });
+  const { game } = (await (await player.request.get("/api/v1/game", { headers })).json()).data;
+  // A Utilize use in a fight waits for the character's turn, so an earlier journey's fight ends.
+  if (game.combat.active) expect((await api("/api/v1/game/encounter/end")).ok()).toBe(true);
+  const { id: actorId, ownerSessionId } = game.actors.find((actor: { name: string }) => actor.name === hero);
+  if (ownerSessionId) expect((await api(`/api/v1/game/claims/${actorId}/force-release`, { actorId })).ok()).toBe(true);
+  const supplies = { id: "calligraphers-supplies", name: "Calligrapher's Supplies", category: "tool", quantity: 1 };
+  expect((await api(`/api/v1/game/actors/${actorId}/inventory`, { actorId, item: supplies })).ok()).toBe(true);
+  const currency = { pp: 0, gp: 20, ep: 0, sp: 0, cp: 0 };
+  expect((await api(`/api/v1/game/actors/${actorId}/currency`, { actorId, currency })).ok()).toBe(true);
+  await joinAndClaim(player, hero);
+
+  await press(player.getByRole("tab", { name: "My character" }));
+  const sheet = player.getByRole("region", { name: `${hero} character sheet` });
+  const checksTab = sheet.getByRole("tab", { name: "Checks" });
+  if (await checksTab.isVisible()) await press(checksTab);
+  const use = sheet.getByRole("button", {
+    name: "Roll Write text with impressive flourishes that guard against forgery with Calligrapher's Supplies, DC 15"
+  });
+  await expect(use).toBeVisible();
+  await expectPageFits(player);
+  await press(use);
+  await expect(
+    player.getByRole("status", {
+      name: /^Latest roll: Write text with impressive flourishes that guard against forgery,/
+    })
+  ).toBeVisible();
+
+  await press(sheet.getByRole("tab", { name: "Gear" }));
+  const crafting = sheet.getByRole("region", { name: "Crafting" });
+  await press(crafting.getByRole("button", { name: "Start a project" }));
+  const dialog = player.getByRole("dialog", { name: "Start a project" });
+  const what = dialog.getByRole("combobox", { name: "What to make" });
+  await expect(what.locator("option", { hasText: /^Ink \(1-ounce bottle\)/ })).toHaveCount(1);
+  await what.selectOption("tool:calligraphers-supplies:ink");
+  await expect(dialog.getByText(/^Ink \(1-ounce bottle\) takes 5 GP of raw materials/)).toBeVisible();
+  await expectPageFits(player);
+  await press(dialog.getByRole("button", { name: "Start" }));
+  await expect(dialog).toBeHidden();
+  await expect(crafting.getByText("Ink (1-ounce bottle)", { exact: true })).toBeVisible();
+  await expectPageFits(player);
+
+  const gm = await open("/");
+  await signInAsGm(gm);
+  await openGmSection(gm, "Table");
+  await press(gm.getByRole("button", { name: /^Rest/ }));
+  const panel = gm.getByRole("dialog", { name: "Rest" }).getByRole("region", { name: "Crafting" });
+  await expect(panel.getByText("Ink (1-ounce bottle) · 5 GP paid")).toBeVisible();
+  await expectPageFits(gm);
+  // The project goes, so a later run starts from the same table.
+  await press(panel.getByRole("button", { name: "Call off" }));
+  await press(
+    gm.getByRole("dialog", { name: "Call off Ink (1-ounce bottle)?" }).getByRole("button", { name: "Call off" })
+  );
+  await expect(panel.getByText("Ink (1-ounce bottle) · 5 GP paid")).toBeHidden();
+});
+
+test("a player packs a thing into a container from the Gear tab and sees what it holds", async ({ open }) => {
+  const hero = PARTY[1];
+  const player = await open("/");
+  await ensureGmPassword(player.request);
+  // The GM's side is the API: a second Backpack and Rope, named apart from the ones the character starts with.
+  const { token } = (
+    await (await player.request.post("/api/v1/host/gm/sign-in", { data: { password: GM_PASSWORD } })).json()
+  ).data;
+  const headers = { authorization: `Bearer ${token}` };
+  const api = (path: string, data: Record<string, unknown> = {}) =>
+    player.request.post(path, { headers, data: { commandId: randomUUID(), ...data } });
+  const { game } = (await (await player.request.get("/api/v1/game", { headers })).json()).data;
+  // Taking a thing out of a container in a fight waits for the character's turn, so an earlier journey's fight ends.
+  if (game.combat.active) expect((await api("/api/v1/game/encounter/end")).ok()).toBe(true);
+  const { id: actorId, ownerSessionId } = game.actors.find((actor: { name: string }) => actor.name === hero);
+  if (ownerSessionId) expect((await api(`/api/v1/game/claims/${actorId}/force-release`, { actorId })).ok()).toBe(true);
+  for (const item of [
+    { id: "packed-backpack", recordId: "backpack", name: "Old Backpack", category: "adventuring-gear", quantity: 1 },
+    {
+      id: "packed-rope",
+      recordId: "rope",
+      name: "Spare Rope",
+      category: "adventuring-gear",
+      quantity: 1,
+      weightEach: 5
+    }
+  ])
+    expect((await api(`/api/v1/game/actors/${actorId}/inventory`, { actorId, item })).ok()).toBe(true);
+  await joinAndClaim(player, hero);
+
+  await press(player.getByRole("tab", { name: "My character" }));
+  const sheet = player.getByRole("region", { name: `${hero} character sheet` });
+  await press(sheet.getByRole("tab", { name: "Gear" }));
+  await press(sheet.getByRole("button", { name: /^Spare Rope/ }).first());
+  await sheet.getByRole("combobox", { name: "Where the Spare Rope is" }).selectOption("packed-backpack");
+  await press(sheet.getByRole("button", { name: "Back", exact: true }));
+  const inside = sheet.getByRole("list", { name: "In the Old Backpack" });
+  await expect(inside.getByRole("button", { name: /^Spare Rope/ })).toBeVisible();
+  await expect(sheet.getByRole("button", { name: /^Old Backpack/ }).first()).toContainText("5 of 30 lb inside");
+  await expectPageFits(player);
+  // Taken out again, so a later run starts from the same pack.
+  await press(inside.getByRole("button", { name: /^Spare Rope/ }));
+  await sheet.getByRole("combobox", { name: "Where the Spare Rope is" }).selectOption("");
+  await press(sheet.getByRole("button", { name: "Back", exact: true }));
+  await expect(sheet.getByRole("list", { name: "In the Old Backpack" })).toBeHidden();
+});

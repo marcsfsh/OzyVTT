@@ -209,9 +209,11 @@ describe("what a monster's hit leaves to the GM is said with it", () => {
     });
   });
 
-  it("names a shadow's Strength drain", () => {
+  it("lowers the target's Strength on a shadow's hit, with no reminder left", () => {
     const built = table("shadow");
-    expect(strike(built, "draining-swipe").warnings?.join(" ")).toMatch(/Strength score decreases by 1d4/);
+    expect(strike(built, "draining-swipe").warnings?.join(" ") ?? "").not.toMatch(/Strength score decreases/);
+    const hero = built.state.actors.find((actor) => actor.id === IDS.hero)!;
+    expect(hero.effects.find((effect) => effect.abilityReduction)?.abilityReduction?.ability).toBe("str");
   });
 
   it("stops healing with a pit fiend's poison through the save's own effect", () => {

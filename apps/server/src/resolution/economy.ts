@@ -5,7 +5,8 @@ import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition, CastShaping } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
-import { RIDING_TAG } from "../mounts.js";
+import { CONTROLLED_MOUNT_ACTIONS, controllingRiderOf, RIDING_TAG } from "../mounts.js";
+import { builtinBaseId } from "../builtin-actions.js";
 import { animatedRowIds } from "../animated-items.js";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { wardingAura } from "../paladin-auras.js";
@@ -15,7 +16,9 @@ import {
   DASH_ONLY_TAG,
   DODGE_ONLY_TAG,
   HASTED_TAG,
+  concentrationOn,
   hasEffectTag,
+  spellWords,
   NO_ACTIONS_TAG,
   NO_BONUS_ACTIONS_TAG,
   NO_REACTIONS_TAG,
@@ -44,9 +47,9 @@ import {
 } from "../rules-families.js";
 import { laterRowOf, ritualSpellActionId } from "../item-actions.js";
 import { carriesSpellbook, hasClassFeature } from "../ritual-adept.js";
+import { bookOfShadowsGap } from "../book-of-shadows.js";
 import { castThisTurnKey, spellUpLevel, takenWhileUp } from "../lasting-spells.js";
-import { notEnoughUses, useCostOf } from "../use-cost.js";
-import { builtinBaseId } from "../builtin-actions.js";
+import { activationCost, alsoSpentMessage, alsoUsesKey, notEnoughUses } from "../use-cost.js";
 import { builtinHandlerFor } from "./builtins.js";
 import { planThisTurn, usedMarkOf } from "./multiattack-after.js";
 import { END_EFFECT_ACTION_ID, hasEndingOption, NO_ENDING_OPTION } from "../ending-actions.js";
@@ -99,7 +102,13 @@ export type EconomyPlan = Readonly<{
     shaping?: readonly CastShaping[];
   }> | null;
   /** Limited-use spend to record, keyed per scope: `amount` uses of it (one, or the action's cost). */
-  spendUse: Readonly<{ key: string; per: NonNullable<DefinitionAction["uses"]>["per"]; amount: number }> | null;
+  spendUse: Readonly<{
+    key: string;
+    per: NonNullable<DefinitionAction["uses"]>["per"];
+    amount: number;
+    /** The second limit the use counts against too (`alsoUses`), one more of it spent. */
+    also?: string;
+  }> | null;
   /** Legendary-action cost to add to the attacker's per-round pool (SRD Legendary Actions), and the mark of one it
    *  can't take again until its next turn. */
   spendLegendary: Readonly<{ cost: number; onceKey?: string }> | null;
@@ -223,6 +232,12 @@ export function evaluateActionEconomy(
   );
   checkTurnsBegun(evaluation);
   checkOwnTurn(evaluation);
+  // "While underwater, the seahorse moves": only in a fight the GM marked as underwater.
+  if (action.underwaterOnly && !(state.combat.active && state.combat.underwater))
+    evaluation.violations.push({
+      rule: "action.underwater-only",
+      message: `${action.name} can be used only underwater, and this fight isn't.`
+    });
   checkExtraAttackOpened(evaluation);
   checkHands(evaluation);
   checkArmorTraining(evaluation, definition, catalog);
@@ -633,6 +648,17 @@ function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition,
       rule: "condition.dash-only",
       message: `${attacker.name} must take the Dodge action this turn while ${shownEffectName(state, dodgeOnly, resolveDefinition)} lasts.`
     });
+  // SRD Mounted Combat: a controlled mount "has only three action options during that turn: Dash, Disengage, and Dodge".
+  const rider = controllingRiderOf(state, attacker.id);
+  if (
+    rider &&
+    (action.activation === "action" || action.activation === "bonus-action") &&
+    !CONTROLLED_MOUNT_ACTIONS.has(builtinBaseId(action.id))
+  )
+    violations.push({
+      rule: "mount.controlled",
+      message: `${attacker.name} is a mount ${rider.name} controls, so it can take only the Dash, Disengage or Dodge action.`
+    });
   // SRD Befuddlement: the target "can't cast spells or take the Magic action".
   const befuddled = attacker.effects.find((effect) => effect.tags.includes(NO_SPELLS_TAG));
   if (befuddled && (action.spellId !== undefined || action.spellSlot !== undefined || isMagicAction(action)))
@@ -666,6 +692,12 @@ function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition,
       message: `${action.name} requires an active ${conditionLabel(action.requiresEffectTag)} effect.`
     });
   }
+  // A cast through another spell (a Crystal Ball's Detect Thoughts through Scrying) needs that spell held.
+  if (action.castThrough && !concentrationOn(attacker, action.castThrough))
+    violations.push({
+      rule: "feature.requires-effect",
+      message: `${action.name} is cast through ${spellWords(action.castThrough)}, which ${attacker.name} isn't concentrating on.`
+    });
   // End an Effect needs an effect an action ends, on the creature named or anywhere before one is.
   if (action.id === END_EFFECT_ACTION_ID && !hasEndingOption(state, attacker, targetIds))
     violations.push({ rule: "feature.requires-effect", message: NO_ENDING_OPTION });
@@ -872,13 +904,17 @@ function checkLimitedUse({ state, attacker, action, siblings, violations }: Eval
       message: `${action.name} comes as use ${action.useNumber} of ${limit}, and ${attacker.name} has spent ${spent}.`
     });
   // Some activations spend several (Lay on Hands' 5-point cure, or the points its user chose).
-  const cost = useCostOf(action);
+  const cost = activationCost(action, spent, limit);
   if (spent + cost > limit)
     violations.push({
       rule: "feature.no-uses-remaining",
       message: spent >= limit ? noUsesRemaining(action, limit) : notEnoughUses(action.name, limit - spent, cost)
     });
-  return { key, per: uses.per, amount: cost };
+  // A second limit it counts against too (a Luck Blade's Wish, once a dawn).
+  const also = alsoUsesKey(action);
+  if (also && (attacker.actionUses[also] ?? 0) >= action.alsoUses!.limit)
+    violations.push({ rule: "feature.no-uses-remaining", message: alsoSpentMessage(action) });
+  return { key, per: uses.per, amount: cost, ...(also ? { also } : {}) };
 }
 
 /** Whether this turn's open action is the plan of the pool's own action (a Hellfire Spellcasting's two casts), with a
@@ -1012,6 +1048,11 @@ function openedBy(
  *  mix weapons legally; a spell's rays or beams are that spell's alone, never a swing of the Attack action. */
 function attackPool(action: DefinitionAction): Record<string, number> {
   const left = (action.attack?.count ?? 1) - 1;
+  // Attacks a weapon gives only itself (Thirsting Blade's pact weapon) are that weapon's, held in either grip.
+  if (action.attack?.countWithItself && action.spellId === undefined) {
+    const base = action.id.replace(new RegExp(`-${TWO_HANDED_SUFFIX}$`), "");
+    return { [`${base}|${base}-${TWO_HANDED_SUFFIX}`]: left };
+  }
   return action.spellId === undefined ? { attack: left } : { [action.id]: left };
 }
 
@@ -1445,13 +1486,17 @@ function checkSpellSlot({ state, attacker, action, slotLevel, violations }: Eval
 
 /** Why a spell cast with a slot is refused for not being prepared (SRD: you cast the spells you have prepared), or
  *  null. Cantrips, always-prepared spells, anything not on the sheet's list (an item's cast) and a sheet that keeps
- *  no prepared list (an import with no prepared cap) need nothing. */
+ *  no prepared list (an import with no prepared cap) need nothing, except a Book of Shadows' spells, which are
+ *  prepared only while the book is carried. */
 export function unpreparedSpell(
   actor: Pick<LiveActor, "name" | "preparedSpellIds"> & Partial<Pick<LiveActor, "inventory">>,
   action: Pick<DefinitionAction, "id" | "spellSlot" | "spellId">,
   definition: ActorDefinition | undefined
 ): string | null {
   if (action.spellId === undefined) return null;
+  const entry = definition?.spellcasting?.spells.find((candidate) => candidate.id === action.spellId);
+  const book = entry && !isItemActionId(action.id) ? bookOfShadowsGap(actor, entry, definition) : null;
+  if (book) return book;
   // A slot cast, or a Ritual ("To cast a spell as a Ritual, a spellcaster must have it prepared").
   const ritual = action.id === ritualSpellActionId(action.spellId);
   if (!action.spellSlot && !ritual) return null;
@@ -1864,6 +1909,7 @@ export function commitUse(state: GameState, attacker: LiveActor, spendUse: NonNu
   }
   attacker.actionUses = {
     ...attacker.actionUses,
-    [spendUse.key]: (attacker.actionUses[spendUse.key] ?? 0) + spendUse.amount
+    [spendUse.key]: (attacker.actionUses[spendUse.key] ?? 0) + spendUse.amount,
+    ...(spendUse.also ? { [spendUse.also]: (attacker.actionUses[spendUse.also] ?? 0) + 1 } : {})
   };
 }

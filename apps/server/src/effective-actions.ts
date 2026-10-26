@@ -1,7 +1,7 @@
-import { potentRangeFeet } from "./class-features.js";
+import { picksFor, potentRangeFeet } from "./class-features.js";
 import type { Actor } from "@vtt/domain";
 import { MAX_ACTION_USES, type ActorAction, type ActorDefinition } from "@vtt/schemas";
-import { collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
+import { abilityModifier, collectRiders, sumRiders, type RiderContext } from "@vtt/rules-5e";
 import { withEmpoweredStrikes, withTakenActions } from "./builtin-actions.js";
 import { atSpellUpLevel } from "./lasting-spells.js";
 import {
@@ -16,6 +16,7 @@ import { grantedSpellActions } from "./granted-actions.js";
 import { storedCastActions } from "./stored-casts.js";
 import { divineInterventionCasts } from "./divine-intervention.js";
 import { withHeadCount } from "./death-traits.js";
+import { withPactWeaponAttacks } from "./pact-weapon.js";
 
 /** The action list every actor-scoped consumer must read in place of `definition.actions`: item-derived
  *  actions plus standing riders (items, feats, features, live effects) folded into the numbers the resolver
@@ -32,7 +33,10 @@ export function effectiveActions(
     withHeadCount(
       withPotentRange(
         withEmpoweredStrikes(
-          withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition),
+          withAgonizingBlast(
+            withEldritchSpear(atLevelUp(withTakenActions(action), actor, catalog), definition),
+            definition
+          ),
           definition
         ),
         definition,
@@ -57,7 +61,9 @@ export function effectiveActions(
   if (!actor) return base;
   const derivation = deriveEquipment(actor, definition, catalog);
   if (derivation.carriers.length === 0 && derivation.actions.length === 0) return base;
-  return [...base, ...derivation.actions].map((action) => withStandingRiders(action, derivation, actor, definition));
+  return [...base, ...derivation.actions].map((action) =>
+    withPactWeaponAttacks(withStandingRiders(action, derivation, actor, definition), actor, definition)
+  );
 }
 
 /** SRD Eldritch Spear: the cantrip picked for it reaches 30 feet farther for each Warlock level. Applied to the spell
@@ -65,13 +71,25 @@ export function effectiveActions(
 function withEldritchSpear(action: ActorAction, definition: ActorDefinition | undefined): ActorAction {
   const rangeFeet = action.attack?.rangeFeet;
   if (rangeFeet === undefined || action.spellId === undefined) return action;
-  const character = definition?.character;
-  const picked = character?.choices?.find(
-    (choice) => choice.kind === "cantrip" && choice.payload?.featureId === "eldritch-spear"
-  )?.id;
-  const level = character?.classes.find((entry) => entry.id === "warlock")?.level ?? 0;
-  if (picked !== action.spellId || level === 0) return action;
+  const level = definition?.character?.classes.find((entry) => entry.id === "warlock")?.level ?? 0;
+  if (!picksFor(definition, "eldritch-spear", "cantrip").includes(action.spellId) || level === 0) return action;
   return { ...action, attack: { ...action.attack!, rangeFeet: rangeFeet + 30 * level } };
+}
+
+/** SRD Agonizing Blast: "Choose one of your known Warlock cantrips that deals damage. You can add your Charisma
+ *  modifier to that spell's damage rolls", in the spell's own damage type, for each cantrip picked for it. Folded into
+ *  the first damage roll, so a Critical Hit doesn't double it. */
+function withAgonizingBlast(action: ActorAction, definition: ActorDefinition | undefined): ActorAction {
+  if (action.spellId === undefined || action.damage.length === 0 || !definition) return action;
+  if (!picksFor(definition, "agonizing-blast", "cantrip").includes(action.spellId)) return action;
+  const charisma = abilityModifier(definition.abilityScores.cha);
+  if (charisma === 0) return action;
+  return {
+    ...action,
+    damage: action.damage.map((part, index) =>
+      index === 0 ? { ...part, formula: withFlatBonus(part.formula, charisma) } : part
+    )
+  };
 }
 
 /** SRD Improved Elemental Fury, Improved Potent Spellcasting (Druid 15): "When you cast a Druid cantrip with a range of

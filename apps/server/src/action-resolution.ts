@@ -10,6 +10,7 @@ import {
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { ActorDefinition, SaveCondition } from "@vtt/schemas";
 import { conditionChoicesOf } from "./item-actions.js";
+import { castOptionsOf } from "./spell-zones.js";
 import { BUILTIN_TARGETING } from "./builtin-actions.js";
 import { builtinCheckSkills, helpToolsOf } from "./resolution/builtins.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
@@ -28,7 +29,7 @@ import {
   spendUntilItActs,
   spendUntilOwnAttack
 } from "./resolution/attack.js";
-import { rollLastCharge } from "./resolution/charges.js";
+import { breaksBeforeUse, rollLastCharge } from "./resolution/charges.js";
 import { recallSpellSlot } from "./resolution/spell-recall.js";
 import { rollForAnAnswer } from "./resolution/divinations.js";
 import { prayerShortRest, refuseThePrayedFor } from "./resolution/prayer-of-healing.js";
@@ -59,9 +60,13 @@ import { liftOnAction } from "./resolution/later-steps.js";
 import { spendStoredCast, storeOnCast } from "./stored-casts.js";
 import { applySpellEndings } from "./resolution/dispel.js";
 import { applySummons } from "./resolution/summon.js";
-import { readScroll } from "./resolution/scroll.js";
+import { failsCastCheck, readScroll } from "./resolution/scroll.js";
+import { failsCheckFirst } from "./resolution/check-first.js";
+import { releaseItemEffects } from "./resolution/endings.js";
+import { rebindRow } from "./resolution/rebind.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
+import { mendOnCast } from "./resolution/mend.js";
 import { stabilizeOnCast } from "./resolution/stabilize.js";
 import { raiseOnAction, reviveOnCast } from "./resolution/revival.js";
 import { killOnCast } from "./resolution/kill.js";
@@ -75,7 +80,13 @@ import { applyMasteryForces, masterySwingOf, offeredPush, spendSap, spendVex } f
 import { hitOffersOf, rollHitOptions, spendHitOptions } from "./resolution/hit-options.js";
 import { applyOnHitEffects } from "./resolution/on-hit.js";
 import { endTargetMarks } from "./resolution/action-targets.js";
-import { markMultiattackDefense, strikeBackFromEffects, strikeBackOnHit } from "./resolution/struck.js";
+import {
+  corrodeOnHit,
+  markMultiattackDefense,
+  offerReactionToHit,
+  strikeBackFromEffects,
+  strikeBackOnHit
+} from "./resolution/struck.js";
 import {
   parkActionSave,
   parkBurstSave,
@@ -111,6 +122,8 @@ import { teleportOutcome } from "./resolution/teleport-outcome.js";
 import { identifyOnCast } from "./resolution/identify.js";
 import { wishOnCast, wishStressOnCast } from "./resolution/wish.js";
 import { openStrike, spendStrike } from "./resolution/true-strike.js";
+import { fastHandsAllows } from "./fast-hands.js";
+import { holdsFastHands } from "./utilize.js";
 import {
   shapedAction,
   shapedOutcome,
@@ -230,6 +243,22 @@ export function resolveDefinitionAction(
     useUpConsumable(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
+  // A check the action needs first (binding with a Chain): a failure spends the action and does nothing else.
+  if (failsCheckFirst(ctx)) {
+    commitEconomy(ctx);
+    releaseHideAndReady(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // So does a failed check an item's cast asks first (an Amulet of the Planes).
+  if (failsCastCheck(ctx)) {
+    commitEconomy(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // An item that breaks as it fails to work (a Wind Fan) is gone with its pool, and its action is spent.
+  if (breaksBeforeUse(ctx)) {
+    commitEconomy({ ...ctx, plan: { ...ctx.plan, spendUse: null } });
+    return { ...resolutionOf(ctx), save: null };
+  }
   // Spread Caltrops or a set trap acts on whoever meets it later, so nothing is rolled now.
   if (openActionZone(ctx)) {
     commitEconomy(ctx);
@@ -323,7 +352,9 @@ export function resolveDefinitionAction(
 
   applyOnHitEffects(ctx);
   strikeBackOnHit(ctx);
+  corrodeOnHit(ctx);
   strikeBackFromEffects(ctx);
+  offerReactionToHit(ctx);
   markMultiattackDefense(ctx);
   applyMasteryForces(ctx);
   startConcentration(ctx);
@@ -334,6 +365,8 @@ export function resolveDefinitionAction(
   liftOnAction(ctx);
   applyTimeStop(ctx);
   applyGrant(ctx);
+  releaseItemEffects(ctx);
+  rebindRow(ctx);
   swallowOnAction(ctx);
   pullOnAction(ctx);
   inflictOnTargets(ctx);
@@ -346,6 +379,7 @@ export function resolveDefinitionAction(
   applyHealing(ctx);
   prayerShortRest(ctx);
   applyConditionCures(ctx);
+  mendOnCast(ctx);
   applySpellEndings(ctx);
   stabilizeOnCast(ctx);
   reviveOnCast(ctx);
@@ -581,7 +615,31 @@ export function actionAvailability(
         componentsRemaining = instance.components["attack"];
     }
     const reason = unavailableReason(evaluation.violations, { state, attacker, action, siblings, spell });
-    const passive = passiveOf(action, builtin);
+    // Fast Hands' Bonus Action form of an item's Utilize or Magic action, checked as that form would be.
+    const fastForm =
+      !builtin && fastHandsAllows(action) && holdsFastHands(definition)
+        ? { ...action, activation: "bonus-action" as const }
+        : null;
+    const fastEvaluation = fastForm
+      ? evaluateActionEconomy(
+          state,
+          attacker,
+          fastForm,
+          [],
+          definition,
+          undefined,
+          siblings,
+          undefined,
+          false,
+          catalog,
+          spell
+        )
+      : null;
+    const fastReason =
+      fastForm && fastEvaluation
+        ? unavailableReason(fastEvaluation.violations, { state, attacker, action: fastForm, siblings, spell })
+        : undefined;
+    const passive = passiveOf(action, builtin, spell);
     const shaping = builtin ? undefined : shapingOffers(state, attacker, action, spell, definition, siblings);
     const damageLook = !builtin && damageLookOffered(state, attacker, action, definition, siblings);
     const forms = action.shapeShift ? formsOffer(state, attacker, action, definition, catalog) : undefined;
@@ -593,6 +651,14 @@ export function actionAvailability(
       violations: evaluation.violations,
       // The sheet's one sentence for why not; the violations keep the full account.
       ...(reason !== undefined ? { reason } : {}),
+      ...(fastEvaluation
+        ? {
+            fastHands: {
+              available: fastEvaluation.violations.length === 0,
+              ...(fastReason !== undefined ? { reason: fastReason } : {})
+            }
+          }
+        : {}),
       ...(passive !== undefined ? { passive } : {}),
       ...(shaping !== undefined ? { shaping } : {}),
       ...(damageLook ? { damageLook: true as const } : {}),
@@ -601,9 +667,7 @@ export function actionAvailability(
         ? { areaPerSlot: { feet: spell.effect.areaPerSlot, level: spell.level } }
         : {}),
       ...(forms !== undefined ? { forms } : {}),
-      ...(action.effectOptions
-        ? { options: action.effectOptions.map((option) => ({ id: option.id, name: option.name })) }
-        : {}),
+      ...castOptionsOf(action, spell),
       usesRemaining,
       componentsRemaining,
       ...(builtin ? { builtin: true } : {}),

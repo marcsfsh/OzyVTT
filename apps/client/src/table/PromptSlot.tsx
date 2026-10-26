@@ -4,7 +4,7 @@ import { useRollPreference } from "../dice/roll-preference";
 import { DyingTracker } from "../encounter/DyingTracker";
 import { plainActionName } from "../encounter/format";
 import { InitiativePrompt, InitiativeReroll } from "../encounter/InitiativePrompt";
-import { ReactionPrompt } from "../encounter/ReactionPrompt";
+import { ReactionPrompt, triggerWords } from "../encounter/ReactionPrompt";
 import { RollCallCard, useRollCallCards, type RollCallCardModel } from "../encounter/RollCallPrompt";
 import { SavePrompt } from "../encounter/SavePrompt";
 import { TurnOrder, turnOrderTitle } from "../encounter/TurnOrder";
@@ -51,6 +51,11 @@ function reactionWords(reaction: PlayerPendingReaction, actor: PlayerActor) {
       return {
         title: `${reaction.sourceName} damaged you`,
         detail: `${plainActionName(reaction.actionName)} strikes back with your Reaction.`
+      };
+    case "triggered":
+      return {
+        title: triggerWords(reaction, actor.name),
+        detail: `${plainActionName(reaction.actionName)} uses your Reaction.`
       };
     case "falls":
       return {

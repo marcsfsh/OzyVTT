@@ -172,6 +172,8 @@ export function previewMove(
   const cellKey = (cell: Readonly<{ column: number; row: number }>) => `${cell.column},${cell.row}`;
   const ground = input.areaGround;
   const areaDifficult = new Set(lowFeet <= 0 ? (ground?.difficult ?? []).map(cellKey) : []);
+  // Painted Difficult Terrain an area lifts (Speak with Plants' clearing).
+  const cleared = new Set((ground?.cleared ?? []).map(cellKey));
   const halved = new Set([
     ...(ground?.halved ?? []).map(cellKey),
     ...(lowFeet <= 0 ? (ground?.costlyGround ?? []).map(cellKey) : [])
@@ -192,7 +194,7 @@ export function previewMove(
       input.ignoresDifficult !== true &&
       (difficultCells.has(`${column},${row}`) ||
         areaDifficult.has(`${column},${row}`) ||
-        (lowFeet <= 0 && pointInRects(center(column, row), terrain))),
+        (lowFeet <= 0 && pointInRects(center(column, row), terrain) && !cleared.has(`${column},${row}`))),
     ...(halved.size > 0 ? { isHalved: (column: number, row: number) => halved.has(`${column},${row}`) } : {}),
     // Gust of Wind: a step closer to the Line's caster, from or into the Line, costs double.
     ...(toward.length > 0

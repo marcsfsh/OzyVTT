@@ -132,7 +132,8 @@ export function ActionRunner({
             area.placed,
             area.widthFeet,
             state.combat.tokens,
-            area.sizeFeet
+            area.sizeFeet,
+            area.toTarget === true
           ).flatMap((id) => {
             const target = combatants.find((candidate) => candidate.id === id);
             return target ? [{ id: target.id, name: target.name, kind: target.kind }] : [];
@@ -283,6 +284,7 @@ export function ActionRunner({
           )}
           insideNow={insideNow}
           carried={actor.inventory}
+          carriedBy={(actorId) => state.actors.find((candidate) => candidate.id === actorId)?.inventory ?? []}
           onMap
           busy={resolveBusy}
           onInvalidFace={onFeedback}

@@ -35,11 +35,15 @@ export function createPendingSaves(
       | "successEndsSpell"
       | "dropsRowId"
       | "zoneId"
+      | "touchedZone"
       | "gmApplies"
       | "failureByHitPoints"
+      | "failureByMargin"
+      | "objectPenalty"
       | "failureBanishes"
       | "endsForm"
       | "regurgitates"
+      | "spendsOnKill"
     >;
     /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
     magical?: boolean;
@@ -49,6 +53,8 @@ export function createPendingSaves(
     drain?: DamageDrain;
     /** Where a failure pushes the creature (Thunderwave). */
     failurePush?: ForcedPush;
+    /** A failure throws the rider off this mount (SRD Mounted Combat). */
+    unseats?: string;
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize?: PendingSave["advantageAtSize"];
     /** The spell the save is against, for what answers a save against a spell. */
@@ -105,15 +111,20 @@ export function createPendingSaves(
     ...(input.extra?.successEndsSpell ? { successEndsSpell: true as const } : {}),
     ...(input.extra?.dropsRowId ? { dropsRowId: input.extra.dropsRowId } : {}),
     ...(input.extra?.zoneId !== undefined ? { zoneId: input.extra.zoneId } : {}),
+    ...(input.extra?.touchedZone ? { touchedZone: { ...input.extra.touchedZone } } : {}),
     ...(input.extra?.gmApplies ? { gmApplies: true as const } : {}),
     ...(input.extra?.endsForm ? { endsForm: true as const } : {}),
     ...(input.extra?.failureByHitPoints ? { failureByHitPoints: structuredClone(input.extra.failureByHitPoints) } : {}),
     ...(input.extra?.failureBanishes ? { failureBanishes: [...input.extra.failureBanishes] } : {}),
+    ...(input.extra?.spendsOnKill ? { spendsOnKill: { ...input.extra.spendsOnKill } } : {}),
+    ...(input.extra?.failureByMargin ? { failureByMargin: structuredClone(input.extra.failureByMargin) } : {}),
+    ...(input.extra?.objectPenalty ? { objectPenalty: { ...input.extra.objectPenalty } } : {}),
     ...(input.extra?.regurgitates ? { regurgitates: { ...input.extra.regurgitates } } : {}),
     ...(input.magical ? { magical: true as const } : {}),
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
     ...(input.drain ? { drain: { ...input.drain } } : {}),
     ...(input.failurePush ? { failurePush: { ...input.failurePush } } : {}),
+    ...(input.unseats ? { unseats: input.unseats } : {}),
     ...(input.advantageAtSize ? { advantageAtSize: input.advantageAtSize } : {}),
     ...(input.spell ? { spell: { ...input.spell } } : {}),
     ...(input.advantageFrom ? { advantageFrom: input.advantageFrom.slice(0, 120) } : {}),

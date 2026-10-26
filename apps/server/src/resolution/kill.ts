@@ -1,7 +1,8 @@
 import type { PendingSave } from "@vtt/domain";
 import { killOutright, previewDamage } from "../hit-points.js";
 import { HEADS_KEY } from "../death-traits.js";
-import { laterRowOf } from "../item-actions.js";
+import { itemPool, laterRowOf } from "../item-actions.js";
+import { spendKillCharge } from "../item-charges.js";
 import { createPendingSaves } from "../saving-throws.js";
 import { traitOf } from "../statblock-traits.js";
 import { spellOf } from "./concentration.js";
@@ -91,21 +92,44 @@ export function applyKillingHit(ctx: ResolveContext, rider: Rider, index: number
   }
   if (kills.hitPointsUnder !== undefined && target.hp.current >= kills.hitPointsUnder) return;
   if (kills.afterHitAtOrBelow !== undefined && hitPointsAfterHit(ctx, target) > kills.afterHitAtOrBelow) return;
+  // A kill that spends a charge (Nine Lives Stealer) fires only while one is left.
+  const charge = chargeOfKill(ctx, rider);
+  if (charge === "spent") {
+    ctx.warnings.push(`${ctx.action.name} has no charges left to slay with.`);
+    return;
+  }
   if (kills.beheads) {
     behead(ctx, target);
     return;
   }
   if (rider.save) {
-    openKillingSave(ctx, rider, index, target);
+    openKillingSave(ctx, rider, index, target, charge);
     return;
   }
   for (const event of killOutright(ctx.state, target.id, ctx.action.name, killDeps(ctx)))
     ctx.tableNarration.push(tableLineOf(ctx, event));
+  if (charge) spendKillCharge(ctx.attacker, charge.key);
+}
+
+/** The charge a killing hit spends, on the weapon that carries it: null when it spends none, "spent" when none is
+ *  left. */
+function chargeOfKill(ctx: ResolveContext, rider: Rider): Readonly<{ actorId: string; key: string }> | "spent" | null {
+  const spends = rider.spendsCharge;
+  const row = spends ? ctx.attacker.inventory.find((entry) => entry.id === ctx.riderItemId) : undefined;
+  if (!spends || !row) return null;
+  const key = itemPool(row, spends.pool);
+  return (ctx.attacker.actionUses[key] ?? 0) >= spends.limit ? "spent" : { actorId: ctx.attacker.id, key };
 }
 
 /** "The creature must succeed on a DC 15 Constitution saving throw or be slain" (Nine Lives Stealer); "On a successful
  *  save, the creature has the Frightened condition until the end of your next turn" (Mace of Disruption). */
-function openKillingSave(ctx: ResolveContext, rider: Rider, index: number, target: LiveActor): void {
+function openKillingSave(
+  ctx: ResolveContext,
+  rider: Rider,
+  index: number,
+  target: LiveActor,
+  charge: Readonly<{ actorId: string; key: string }> | null
+): void {
   const save = rider.save!;
   const conditions = rider.conditions.map((condition) => condition.id);
   const onSuccessEffect: PendingSave["onSuccessEffect"] =
@@ -133,7 +157,12 @@ function openKillingSave(ctx: ResolveContext, rider: Rider, index: number, targe
     halfOnSuccess: false,
     conditionIds: [],
     // A failure kills whatever the target's Hit Points (no creature has more than the band's 1,000).
-    extra: { failureByHitPoints: [{ atOrBelow: 1000, dies: true }], ...(onSuccessEffect ? { onSuccessEffect } : {}) },
+    extra: {
+      failureByHitPoints: [{ atOrBelow: 1000, dies: true }],
+      ...(onSuccessEffect ? { onSuccessEffect } : {}),
+      // The charge is spent only if the creature is slain.
+      ...(charge ? { spendsOnKill: charge } : {})
+    },
     replaceExisting: false,
     magical: isMagicalAction({
       action: ctx.action,

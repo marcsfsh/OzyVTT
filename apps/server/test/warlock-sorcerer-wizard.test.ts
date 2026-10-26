@@ -815,22 +815,58 @@ describe("Warlock invocations: Agonizing Blast adds the caster's Charisma to the
   });
 
   it("rolls 1d10 force PLUS the Warlock's +3, and 1d10 alone without the invocation", () => {
-    // CHA 17 (+3) at level 5. Same two dice both times; the difference is the authored rider.
+    // CHA 17 (+3) at level 5. Same two dice both times; the difference is the invocation's pick.
     const bare = blast("one-with-shadows", [15, 7]);
     expect(bare.damage).toEqual([{ formula: "1d10", type: "force", total: 7 }]);
     expect(bare.damageTotal).toBe(7);
 
     const agonized = blast("agonizing-blast", [15, 7]);
-    expect(agonized.damage).toEqual([
-      { formula: "1d10", type: "force", total: 7 },
-      { formula: "3", type: "force", total: 3 }
-    ]);
+    expect(agonized.damage).toEqual([{ formula: "1d10 + 3", type: "force", total: 10 }]);
     expect(agonized.damageTotal).toBe(10);
-    expect((agonized.warnings ?? []).some((warning) => warning.includes("+3 force (CHA)"))).toBe(true);
+  });
+
+  // "Choose one of your known Warlock cantrips that deals damage. You can add your Charisma modifier to that spell's
+  // damage rolls."
+  it("adds Charisma to the cantrip picked for it, in that cantrip's damage type, and to no other", () => {
+    const KNOWS_CHILL_TOUCH: Row[] = [{ level: 1, classId: "warlock", kind: "cantrip", id: "chill-touch" } as Row];
+    const built = withInvocation("agonizing-blast", [
+      ...KNOWS_ELDRITCH_BLAST,
+      ...KNOWS_CHILL_TOUCH,
+      { level: 5, kind: "cantrip", id: "chill-touch", payload: { featureId: "agonizing-blast" } } as Row
+    ]);
+    const live = table(built);
+    expect(actionOf(live, "spell-chill-touch").damage[0]).toMatchObject({ type: "necrotic" });
+    expect(actionOf(live, "spell-chill-touch").damage[0]!.formula).toMatch(/ \+ 3$/);
+    expect(actionOf(live, "spell-eldritch-blast").damage).toEqual([{ formula: "1d10", type: "force" }]);
+  });
+
+  it("is repeatable, each time for a different cantrip", () => {
+    const KNOWS_CHILL_TOUCH: Row[] = [{ level: 1, classId: "warlock", kind: "cantrip", id: "chill-touch" } as Row];
+    const twice = (second: string) =>
+      buildCharacterDefinition(
+        warlockInput(5, [
+          invocation(1, "armor-of-shadows"),
+          invocation(2, "mask-of-many-faces"),
+          invocation(2, "misty-visions"),
+          invocation(5, "agonizing-blast"),
+          invocation(5, "agonizing-blast"),
+          ...asisFor(5, "dex"),
+          ...KNOWS_ELDRITCH_BLAST,
+          ...KNOWS_CHILL_TOUCH,
+          { level: 5, kind: "cantrip", id: "eldritch-blast", payload: { featureId: "agonizing-blast" } } as Row,
+          { level: 5, kind: "cantrip", id: second, payload: { featureId: "agonizing-blast" } } as Row
+        ]),
+        library,
+        POLICY
+      );
+    const live = table(twice("chill-touch"));
+    expect(actionOf(live, "spell-eldritch-blast").damage[0]!.formula).toBe("1d10 + 3");
+    expect(actionOf(live, "spell-chill-touch").damage[0]!.formula).toMatch(/ \+ 3$/);
+    expect(() => twice("eldritch-blast")).toThrow();
   });
 
   it("leaves a swing that is not that spell alone", () => {
-    // `spell-id-is` filters: the Warlock's starting sickle is not Eldritch Blast and gains nothing.
+    // The Warlock's starting sickle is not the cantrip picked and gains nothing.
     const built = table(withInvocation("agonizing-blast", [...KNOWS_ELDRITCH_BLAST, ...pointedAtTheBlast]));
     const swung = resolveDefinitionAction(
       built.state,
@@ -844,26 +880,28 @@ describe("Warlock invocations: Agonizing Blast adds the caster's Charisma to the
 });
 
 describe("Warlock invocations: the ones that ask a question of their own (audit rows 24, 25, 50)", () => {
-  // Lessons of the First Ones is not authored. Its nested `{kind: "feat"}` pick cannot be answered:
-  // feat rows are settled before chosen options create their offers, so the row finds no offer, and
-  // omitting it fails the completeness check. If that ordering changes, this fails and the row should be authored.
-  it("still takes Lessons of the First Ones as a bare option, because a nested FEAT pick cannot be answered yet", () => {
-    // Takeable, and it grants only its prose.
-    expect(() => withInvocation("lessons-of-the-first-ones")).not.toThrow();
-    // ...and a feat row aimed at it finds no offer.
-    expect(
-      thrown(() =>
-        withInvocation("lessons-of-the-first-ones", [
-          {
-            level: 5,
-            classId: "warlock",
-            kind: "feat",
-            id: "tough",
-            payload: { featureId: "lessons-of-the-first-ones" }
-          } as Row
-        ])
-      )
-    ).toMatch(/No feature "lessons-of-the-first-ones" offers a "feat" choice/);
+  // Lessons of the First Ones: "allowing you to gain one Origin feat of your choice". The feat row answers a pick
+  // only the chosen invocation makes, so the build places it once the invocation's own offers exist.
+  it("takes Lessons of the First Ones with the Origin feat picked for it", () => {
+    const lessons = (feat: string) =>
+      withInvocation("lessons-of-the-first-ones", [
+        {
+          level: 5,
+          classId: "warlock",
+          kind: "feat",
+          id: feat,
+          payload: { featureId: "lessons-of-the-first-ones" }
+        } as Row
+      ]);
+    const built = lessons("savage-attacker");
+    expect((built.character?.feats ?? []).map((feat) => feat.id)).toContain("savage-attacker");
+    expect(built.actions.some((action) => action.id === "savage-attacker")).toBe(true);
+    // An Origin feat only, and not one already held (the Human's Alert).
+    expect(thrown(() => lessons("grappler"))).toMatch(/grappler/);
+    expect(thrown(() => lessons("alert"))).toMatch(/already on this character/);
+    expect(thrown(() => withInvocation("lessons-of-the-first-ones"))).toMatch(
+      /"Lessons of the First Ones" needs 1 pick\(s\) of kind "feat"/
+    );
   });
 
   it("Pact of the Blade asks which weapon, and records the answer", () => {
@@ -879,26 +917,6 @@ describe("Warlock invocations: the ones that ask a question of their own (audit 
     expect((built.character?.choices ?? []).some((row) => row.kind === "weapon" && row.id === "greatsword")).toBe(true);
     expect(thrown(() => withInvocation("pact-of-the-blade"))).toMatch(
       /"Pact of the Blade" needs 1 pick\(s\) of kind "weapon"/
-    );
-  });
-
-  it("Pact of the Tome asks for THREE cantrips and puts all three on the sheet", () => {
-    const tome = (ids: readonly string[]) =>
-      withInvocation(
-        "pact-of-the-tome",
-        ids.map((id) => ({ level: 5, kind: "cantrip", id, payload: { featureId: "pact-of-the-tome" } }) as Row)
-      );
-    const built = tome(["chill-touch", "minor-illusion", "true-strike"]);
-    for (const id of ["chill-touch", "minor-illusion", "true-strike"]) {
-      expect(spellOf(built, id)).toMatchObject({ id, level: 0, prepared: true });
-    }
-    // A level-5 Warlock's own cantrip budget is 3 and untouched: the book's three are extra.
-    expect((built.spellcasting!.spells ?? []).filter((spell) => spell.level === 0)).toHaveLength(5); // 3 book + 2 Magic Initiate
-    expect(thrown(() => tome(["chill-touch", "minor-illusion"]))).toMatch(
-      /"Pact of the Tome" needs 3 pick\(s\) of kind "cantrip"/
-    );
-    expect(thrown(() => tome(["chill-touch", "minor-illusion", "true-strike", "mage-hand"]))).toMatch(
-      /exceeds what this build may choose/
     );
   });
 
