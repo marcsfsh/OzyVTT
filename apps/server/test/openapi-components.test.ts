@@ -471,7 +471,8 @@ describe("generated OpenAPI components", () => {
       "situation-is": { situation: "consulting an accurate Book about its topic" },
       "weapon-is": { ids: ["longbow", "shortbow"] },
       "versus-magic": {},
-      "versus-spell": {}
+      "versus-spell": {},
+      "versus-breath-weapon": {}
     };
 
     /** One payload per modifier. */

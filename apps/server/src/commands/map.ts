@@ -34,7 +34,7 @@ import {
 } from "@vtt/domain/commands";
 import { CommandRejectedError } from "../game-store.js";
 import { airborneAfter, altitudeOf, setAltitude } from "../altitude.js";
-import { startFall } from "../falling.js";
+import { endsOnLanding, startFall } from "../falling.js";
 import { failedTeleport, landTeleport } from "../granted-moves.js";
 import { holdMove } from "../held-moves.js";
 import { walkThroughZones } from "../zone-stops.js";
@@ -319,6 +319,8 @@ export const mapCommands = [
           });
         // Time Stop ends once its caster goes more than 1,000 feet from where it cast it.
         landing.push(...timeStopOutOfRange(state, actorId, (a, b) => mapDistance(geometry, a, b)?.value ?? null));
+        // A flight that ends when its rider lands (a Broom of Flying).
+        landing.push(...endsOnLanding(state, actorId, fromAltitude, toAltitude));
         // A teleport into a filled space fails: back where it was, hurt (Dimension Door).
         if (outcome.teleportFails && from !== null) {
           moveEncounterToken(state, actorId, from, geometry);

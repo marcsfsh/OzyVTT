@@ -68,6 +68,7 @@ const FILTERS: ReadonlySet<string> = new Set([
   "versus-condition",
   "by-effect-source",
   "source-creature-type-is",
+  "versus-breath-weapon",
   "versus-effect-source",
   "versus-marked",
   "versus-hurt",
@@ -281,6 +282,8 @@ export type RiderContext = Readonly<{
   /** The save is against a spell or another magical effect (`versus-magic`), and against a spell (`versus-spell`). */
   magicalSource?: boolean;
   spellSource?: boolean;
+  /** The save is against a breath weapon (`versus-breath-weapon`). */
+  breathWeaponSource?: boolean;
 }>;
 
 const overlaps = (allowed: readonly string[] | undefined, have: readonly string[] | undefined): boolean =>
@@ -387,6 +390,8 @@ function passes(trigger: RiderTrigger, context: RiderContext): boolean {
         context.sourceCreatureType !== undefined &&
         trigger.creatureTypes.includes(context.sourceCreatureType)
       );
+    case "versus-breath-weapon":
+      return context.breathWeaponSource === true;
     case "versus-effect-source":
       return context.targetIsEffectSource === true;
     case "versus-marked":

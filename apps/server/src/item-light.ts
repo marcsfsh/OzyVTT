@@ -96,6 +96,7 @@ export function setItemLight(
   if (!row) throw new CommandRejectedError("That item isn't carried.");
   const light = rowRecord(catalog, row)?.light;
   if (!light) throw new CommandRejectedError(`${row.name} sheds no light.`);
+  if (row.dormant === true) throw new CommandRejectedError(`${row.name} has lost its magic and sheds no light.`);
   const now = state.rest.clockHours;
   let next: InventoryItem = { ...row };
   let said: string | null = null;

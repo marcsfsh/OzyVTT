@@ -125,7 +125,8 @@ export function ShapeLayer({
             activeTargeting.template.shape,
             activeTargeting.template.placed.origin,
             activeTargeting.template.placed.target,
-            activeTargeting.template.sizeFeet
+            activeTargeting.template.sizeFeet,
+            activeTargeting.template.toTarget === true
           );
           return (
             <g className="annotation-shape live">

@@ -152,7 +152,8 @@ export function usePlayerTargetRows(state: PlayerView, attackerId: string | null
             area.placed,
             area.widthFeet,
             state.combat.tokens.filter((token) => token.actorId !== attackerId),
-            area.sizeFeet
+            area.sizeFeet,
+            area.toTarget === true
           )
         )
       : null;

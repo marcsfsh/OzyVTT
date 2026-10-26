@@ -271,7 +271,8 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
       (draft) => {
         events = settleSummons(draft, {
           distanceFeet: leash(draft),
-          resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId)
+          resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
+          catalog: kit.equipmentCatalog()
         });
       }
     );

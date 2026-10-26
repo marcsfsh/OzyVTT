@@ -1,3 +1,4 @@
+import { castCheckFailedLine, castCheckLabel, castCheckSubject } from "../cast-check.js";
 import { scrollCheckOf, scrollLostLine, scrollOfAction, scrollReading } from "../scrolls.js";
 import { rollCheck } from "./builtins.js";
 import type { ResolveContext } from "./context.js";
@@ -16,6 +17,21 @@ export function readScroll(ctx: ResolveContext): boolean {
   ctx.tableNarration.push({
     kind: "effect",
     text: scrollLostLine(attacker.name, scroll.spell.name),
+    actorIds: [attacker.id]
+  });
+  return true;
+}
+
+/** An item's cast that asks a check first (an Amulet of the Planes' DC 15 Intelligence (Arcana)): a failure spends
+ *  the use and the spell isn't cast. Rolled once, when the cast is committed. True when it fails. */
+export function failsCastCheck(ctx: ResolveContext): boolean {
+  const { action, attacker, input } = ctx;
+  const check = action.castCheck;
+  if (!check || input.commit === false || input.economyPaid === true) return false;
+  if (rollCheck(ctx, castCheckSubject(check), check.dc, castCheckLabel(check, action.name)) !== false) return false;
+  ctx.tableNarration.push({
+    kind: "effect",
+    text: castCheckFailedLine(attacker.name, action.name),
     actorIds: [attacker.id]
   });
   return true;

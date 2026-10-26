@@ -378,6 +378,12 @@ export const PendingSaveSchema = z
     /** Why the target succeeds without rolling (a Construct against Flesh to Stone, an elf against Sleep). GM
      *  bookkeeping, never projected: the result says it when the save is answered. */
     autoSucceeds: z.string().min(1).max(120).optional(),
+    /** The charge a kill spends: the pool on its source that loses one when the failure slays the target (Nine Lives
+     *  Stealer). GM bookkeeping, never projected. */
+    spendsOnKill: z
+      .object({ actorId: z.uuid(), key: z.string().min(1).max(120) })
+      .strict()
+      .optional(),
     /** A failure kills the target outright, and the source regains these hit points (Consume Life). GM bookkeeping,
      *  never projected. */
     failureKills: z

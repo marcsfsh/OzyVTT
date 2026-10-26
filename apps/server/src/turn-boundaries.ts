@@ -5,6 +5,7 @@ import { calmAtTurnStart } from "./berserker-axe.js";
 import { breathAtTurnEnd } from "./breath.js";
 import { holdsFeature } from "./class-features.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { formsLapseAtTurnStart } from "./inventory.js";
 import { endEffect, expireEffectsAtTurnEnd, sourceOf, type EffectNarration } from "./effects.js";
 import { applyDamageDetailed, damageAdjustmentDetail, healActor, loseHitPoints, UNTYPED_DAMAGE } from "./hit-points.js";
 import { confusedTurn } from "./random-outcomes.js";
@@ -192,6 +193,8 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
       })
     );
   heroicWarrior(state, actorId, events, deps);
+  // A Defender's bonus moved to AC holds "until the start of your next turn".
+  if (deps.catalog) events.push(...formsLapseAtTurnStart(state, actorId, deps.catalog, deps.resolveDefinition));
   // "At the start of each of its turns, the Restrained target repeats the save" (Conjure Elemental).
   if (deps.newId)
     events.push(

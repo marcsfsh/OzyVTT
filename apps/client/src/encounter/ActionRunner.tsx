@@ -132,7 +132,8 @@ export function ActionRunner({
             area.placed,
             area.widthFeet,
             state.combat.tokens,
-            area.sizeFeet
+            area.sizeFeet,
+            area.toTarget === true
           ).flatMap((id) => {
             const target = combatants.find((candidate) => candidate.id === id);
             return target ? [{ id: target.id, name: target.name, kind: target.kind }] : [];

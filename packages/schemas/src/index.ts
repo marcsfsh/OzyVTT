@@ -503,6 +503,14 @@ export const RiderTriggerSchema = z
       .describe(
         "Filter. Narrows a moment to the creature on the other side being one of these types: the attacker, for an attack against the bearer (`incoming-attack`), or the creature whose effect forces the bearer's save. Read from the stat block, so a character never matches."
       ),
+    /** The save is against a breath weapon (Dragon Scale Mail: "Advantage on saving throws against the breath weapons
+     *  of Dragons"), as its stat block names the action ("Fire Breath", "Breath Weapon"). */
+    z
+      .object({ type: z.literal("versus-breath-weapon") })
+      .strict()
+      .describe(
+        'Filter. Narrows a saving throw to one against a breath weapon, an action its stat block names "... Breath" or "Breath Weapon" (a Dragon\'s Fire Breath)'
+      ),
     /** On an effect, its rider fires only on a roll against the creature that put the effect on its bearer (Bestow
      *  Curse: "Disadvantage on attack rolls against you"). */
     z
@@ -614,6 +622,7 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "versus-condition": "filter",
   "by-effect-source": "filter",
   "source-creature-type-is": "filter",
+  "versus-breath-weapon": "filter",
   "versus-effect-source": "filter",
   "versus-marked": "filter",
   "versus-hurt": "filter",
@@ -1946,6 +1955,12 @@ export const EffectInstanceSchema = z
     endAction: EffectEndActionSchema.optional(),
     /** The turn a once-a-turn part of this last applied (`round:actorId`), so it applies once a turn (Resistance). */
     usedOnTurn: z.string().max(160).optional(),
+    /** The pool of rounds it was paid from (Boots of Speed's 10 minutes): the rounds it has left when it ends early go
+     *  back to that pool of its source. */
+    refundsUses: z
+      .object({ key: z.string().min(1).max(120) })
+      .strict()
+      .optional(),
     /** Its attack, save, check and Initiative penalties move one toward 0 as each of the bearer's Long Rests ends, and
      *  it ends when none is left: a penalty that eases with rest, as Raise Dead's ordeal does in death.ts. */
     shrinksEachLongRest: z.literal(true).optional(),
@@ -2355,7 +2370,32 @@ export const SummonedSchema = z
     strikesFrom: StrikesFromSchema.optional(),
     /** The cast whose Concentration ends when it is gone (Arcane Hand at 0 Hit Points, Project Image's copy when it
      *  takes damage). */
-    endsSpell: z.string().min(1).max(120).optional()
+    endsSpell: z.string().min(1).max(120).optional(),
+    /** The use whose wait starts when it leaves: its user's pool, and the hours rolled as it came (a figurine's 5
+     *  days). */
+    waitAfter: z
+      .object({
+        key: z.string().min(1).max(120),
+        name: z.string().min(1).max(120),
+        hours: z.number().int().min(1).max(100_000),
+        /** Its use paid `hoursPaid` hours from a pool of `hoursPool` (a Goat of Traveling's 24): what it leaves unspent
+         *  comes back, each hour or part of one it stayed costing 1, and the wait starts only once the pool is spent. */
+        hoursPaid: z.number().int().min(1).max(100).optional(),
+        hoursPool: z.number().int().min(1).max(100).optional()
+      })
+      .strict()
+      .optional(),
+    /** The carried row that brought it, and what its death at 0 Hit Points does to that item. */
+    itemEnd: z
+      .object({
+        itemId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80),
+        outcome: z.enum(["destroyed", "nonmagical"])
+      })
+      .strict()
+      .optional()
   })
   .strict();
 export type Summoned = z.infer<typeof SummonedSchema>;
@@ -3326,7 +3366,13 @@ export const ActionAreaSchema = z
     /** Each area must touch another ("Each Cube must be contiguous with at least one other Cube"). */
     contiguous: z.literal(true).optional(),
     /** How high a Cylinder rises from the ground it stands on ("5-foot-radius, 40-foot-high Cylinder"). */
-    heightFeet: z.number().int().min(1).max(1000).optional()
+    heightFeet: z.number().int().min(1).max(1000).optional(),
+    /** A Line that ends where it is aimed, no longer than `sizeFeet` ("a 5-foot-wide Line between you and the target",
+     *  a Javelin of Lightning's bolt). */
+    toTarget: z
+      .literal(true)
+      .optional()
+      .describe("A Line that ends where it is aimed, no longer than its size (a Javelin of Lightning's bolt)")
   })
   .strict();
 export type ActionArea = z.infer<typeof ActionAreaSchema>;
@@ -3793,6 +3839,21 @@ export const OnHitRiderSchema = z
      *  leaves the rider's conditions; without one the target dies. `beheads`: a Vorpal Sword's cut, which a creature
      *  immune to Slashing, without a head or too big takes as 30 more Slashing damage instead, as one does that spends
      *  a Legendary Resistance. */
+    /** Each creature it slays spends one of its item's charges, which never come back, and it fires only while one is
+     *  left: `pool` holds `limit` (Nine Lives Stealer's 1d8 + 1, rolled when the sword is added). */
+    spendsCharge: z
+      .object({
+        pool: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(120),
+        limit: z.number().int().min(1).max(MAX_ACTION_USES)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "Each creature it slays spends one of its item's charges, which never come back, and it fires only while one is left (Nine Lives Stealer)"
+      ),
     kills: z
       .object({
         hitPointsUnder: z.number().int().min(1).max(1000).optional(),
@@ -4498,6 +4559,14 @@ export const SummonCreatureSchema = z
      *  disappears"). */
     allegiance: z.enum(["user", "none", "hostile"]).optional(),
     rounds: z.number().int().min(1).max(100).optional(),
+    /** What the die bringing this row does to the item that brought it: its kind from then on (an Efreeti Bottle
+     *  opened the first time on 2 to 9 holds a servant), or its magic ended (on a 1 or a 10). */
+    itemBecomes: z
+      .union([z.literal("nonmagical"), z.object({ variantId: RiderSlugSchema }).strict()])
+      .optional()
+      .describe(
+        "What the die bringing this row does to the item that brought it: its kind from then on (an Efreeti Bottle's servant), or its magic ended"
+      ),
     /** How it differs from its stat block ("uses the Riding Horse stat block, except it has a Speed of 100 feet"; a
      *  treant's trees have Intelligence and Charisma scores of 1 and lack Animate Trees). */
     except: z
@@ -4521,7 +4590,13 @@ export const SummonCreatureSchema = z
           .max(6)
           .optional(),
         /** Conditions it is immune to beside its stat block's (a Horn of Valhalla's spirits: Charmed and Frightened). */
-        conditionImmunities: z.array(ConditionIdSchema).min(1).max(6).optional()
+        conditionImmunities: z.array(ConditionIdSchema).min(1).max(6).optional(),
+        /** Senses it has beside its stat block's, as a stat block prints them (an Onyx Dog's "blindsight 60 ft."). */
+        senses: z
+          .array(z.string().regex(/^(?:darkvision|blindsight|tremorsense|truesight) \d{1,4} ft\.$/))
+          .min(1)
+          .max(4)
+          .optional()
       })
       .strict()
       .optional()
@@ -4646,6 +4721,22 @@ export const SummonSchema = z
     strikesFrom: StrikesFromSchema.optional(),
     /** When it is gone before its time (0 Hit Points, damage), its spell ends too (Arcane Hand, Project Image). */
     endsSpell: z.literal(true).optional(),
+    /** The use's wait (`uses.afterHours`) starts when what it brought leaves, not as it is used ("When the creature
+     *  becomes a figurine again, its property can't be used again until ..."; a djinni's 24 hours after it departs). */
+    waitsFromEnd: z
+      .literal(true)
+      .optional()
+      .describe(
+        "The use's wait (uses.afterHours) starts when what it brought leaves, not as it is used (a figurine's days after it reverts)"
+      ),
+    /** When it dies at 0 Hit Points, the item that brought it is destroyed (the Staff of the Python shatters) or loses
+     *  its magic (a Ring of Djinni Summoning). */
+    itemEndsAtZero: z
+      .enum(["destroyed", "nonmagical"])
+      .optional()
+      .describe(
+        "When it dies at 0 Hit Points, the item that brought it is destroyed (the Staff of the Python) or loses its magic (a Ring of Djinni Summoning)"
+      ),
     /** Its user's spell attack bonus, spell save DC and spellcasting ability modifier, which a scaled stat block reads
      *  (`summonScaling`). The engine fills them when it makes a cast action. */
     numbers: z
@@ -4779,6 +4870,32 @@ export const ActionSchema = z
     /** How many of its uses one activation spends: a fixed number (Lay on Hands' 5 points to cure a poison), or
      *  `chosen`, picked by the user each time (Lay on Hands' healing). Absent: one. */
     useCost: z.union([z.number().int().min(2).max(MAX_ACTION_USES), z.literal("chosen")]).optional(),
+    /** A second limit each of its uses counts against too, kept under `pool`: uses a Long Rest restores (a Luck
+     *  Blade's Wish: its charges never come back, and it is cast once a dawn), or with `per: "never"` uses that never
+     *  come back, the last ending the item as its charges say (an Efreeti Bottle's openings). */
+    alsoUses: z
+      .object({
+        limit: z.number().int().min(1).max(MAX_ACTION_USES),
+        per: z.literal("never").optional(),
+        pool: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(120)
+          .optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A second limit each of its uses counts against too: uses a Long Rest restores (a Luck Blade's Wish once a dawn), or with per never uses that never come back, the last ending the item as its charges say (an Efreeti Bottle's openings)"
+      ),
+    /** Its uses are time in this unit: a use spends all that is left and lasts that long, and what is left when it ends
+     *  early comes back (Boots of Speed's 10 minutes as 100 rounds, a Goat of Traveling's 24 hours). */
+    timePool: z
+      .enum(["rounds", "hours"])
+      .optional()
+      .describe(
+        "Its uses are time in this unit: a use spends all that is left and lasts that long, and what is left when it ends early comes back (Boots of Speed's 100 rounds, a Goat of Traveling's 24 hours)"
+      ),
     /** Conditions this action ends on each target (Lay on Hands: Poisoned). */
     endsConditions: z.array(ConditionIdSchema).min(1).max(6).optional(),
     /** It ends one of `endsConditions`, the one its user picks (Lesser Restoration); absent, it ends each one present. */
@@ -4901,6 +5018,20 @@ export const ActionSchema = z
     requiresEffectTag: EffectTagSchema.optional().describe(
       'The action requires an active self effect carrying this tag (Frenzy requires "raging")'
     ),
+    /** It is cast through this spell, which its user must be concentrating on: it needs no Concentration of its own,
+     *  and what it leaves ends when that spell does (a Crystal Ball's Detect Thoughts through its Scrying). */
+    castThrough: RiderSlugSchema.optional().describe(
+      "It is cast through this spell, which its user must be concentrating on: it needs no Concentration of its own, and what it leaves ends when that spell does (a Crystal Ball's Detect Thoughts through Scrying)"
+    ),
+    /** A check its user makes as it is used: a failure spends it and nothing else happens (an Amulet of the Planes'
+     *  DC 15 Intelligence (Arcana) before its Plane Shift). */
+    castCheck: z
+      .object({ ability: AbilitySchema, skill: SkillIdSchema.optional(), dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional()
+      .describe(
+        "A check its user makes as it is used: a failure spends it and nothing else happens (an Amulet of the Planes' DC 15 Intelligence (Arcana))"
+      ),
     uses: ActionUsesSchema.optional().describe("Limited uses; unlike a feature's, an action's may recharge on a d6"),
     /** Resolving this action also spends one of the bearer's spell slots of this level ("expend a spell slot to cast
      * it from the staff"). Checked and spent by the limited-uses economy pass, so a preview never spends. */

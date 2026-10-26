@@ -308,6 +308,18 @@ export function hasEffectTag(actor: Actor, tag: string): boolean {
   return actor.effects.some((effect) => effect.tags.includes(tag));
 }
 
+/** The creature's Concentration on this spell, while it holds one. */
+export function concentrationOn(actor: Actor, spellId: string): EffectInstance | undefined {
+  return actor.effects.find((effect) => effect.concentration && effect.spell?.id === spellId);
+}
+
+/** A spell id as its name reads, for a line that has no record to hand ("scrying" reads "Scrying"). */
+export const spellWords = (spellId: string): string =>
+  spellId
+    .split("-")
+    .map((word) => word[0]!.toUpperCase() + word.slice(1))
+    .join(" ");
+
 /** What is carried in a hand rather than worn: a row with weapon stats, a wand, a staff or a rod. */
 const HELD_CATEGORIES: ReadonlySet<string> = new Set(["weapon", "wand", "staff", "rod"]);
 
@@ -665,6 +677,27 @@ export function endEffect(state: GameState, actorId: string, effectId: string): 
   const events: EffectNarration[] = [];
   if (!endEffectInternal(state, actor, effectId, events)) throw new CommandRejectedError("That effect already ended.");
   return events;
+}
+
+/** An effect paid from a pool of time and ended before it ran out (Boots of Speed clicked off) gives what it had left
+ *  back to its source's pool. Returns the line the table reads, or null when nothing comes back. */
+export function refundUnspentTime(state: GameState, effect: EffectInstance): string | null {
+  const key = effect.refundsUses?.key;
+  const source = key ? state.actors.find((candidate) => candidate.id === effect.sourceActorId) : undefined;
+  if (!key || !source) return null;
+  const duration = effect.duration;
+  const left =
+    duration.type === "rounds"
+      ? duration.remaining
+      : duration.type === "minutes"
+        ? Math.floor(duration.remaining / 60)
+        : 0;
+  const spent = source.actionUses[key] ?? 0;
+  if (left <= 0 || spent <= 0) return null;
+  const { [key]: _old, ...others } = source.actionUses;
+  const now = Math.max(0, spent - left);
+  source.actionUses = now > 0 ? { ...others, [key]: now } : others;
+  return `${effect.name} ends early, so ${source.name} keeps the time it had left.`;
 }
 
 /** The Ready is used up (its Reaction taken, or spent another way): the Readied effect ends, and a spell it held

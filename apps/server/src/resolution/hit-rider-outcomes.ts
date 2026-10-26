@@ -149,6 +149,8 @@ export function openRiderSave(ctx: ResolveContext, target: LiveActor, action: De
     ...(onFailEffect ? { onFailEffect } : {}),
     ...(onSuccessEffect ? { extra: { onSuccessEffect } } : {}),
     ...(save.failurePush ? { failurePush: save.failurePush } : {}),
+    // What its damage drains as it lands (a Rod of Lordly Might's Drain Life heals its wielder half).
+    ...(action.drain ? { drain: action.drain } : {}),
     replaceExisting: false,
     magical: isMagicalAction(source),
     newSaveId: ctx.deps.newRollId,
