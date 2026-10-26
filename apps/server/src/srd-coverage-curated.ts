@@ -1738,6 +1738,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:boots-of-speed": enforced(
     "A Bonus Action doubles its wearer's Speed (speed.ts) and gives Opportunity Attacks against it Disadvantage. Its 10 minutes a Long Rest are 100 rounds: a click lasts all that is left, and ending it early gives the rest back (use-cost.ts, effects.ts)."
   ),
+  "item:instant-fortress": guided(
+    "Its Magic action raises the tower on the 20-foot square it places (resolution/tower.ts): four walls that are objects with AC 20, 100 Hit Points, Immunity to Bludgeoning, Piercing and Slashing damage and Resistance to the rest, and a door on the side facing its user that opens only for that user and that Knock leaves shut (doors.ts). The creatures in the square are pushed to the nearest free space next to it, and the command again shrinks it only while no creature stands inside. The Bonus Action the door's command costs, the damage the tower keeps once shrunk, siege equipment, its floors and battlement, and repair by Wish are the GM's."
+  ),
   "item:thunderous-greatclub": enforced(
     "Its wearer's Strength is at least 20 (live-abilities.ts), a hit deals 1d8 Thunder more and 3d8 more to an object (object-strikes.ts), and Clap of Thunder's 30-foot Cone asks the DC 15 Strength save against Prone and deals 3d8 Thunder to the doors and walls that are objects in it. Earthquake, once a day, asks each creature on the ground in its 50-foot circle for the DC 20 Dexterity save against Prone and a concentrating one for the DC 20 Constitution save against its Concentration (resolution/pending.ts), and deals 50 Bludgeoning to the objects there. The fissure is the GM's."
   ),

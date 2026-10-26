@@ -337,7 +337,9 @@ export const actionCommands = [
             !resolvedTargetIds.some((id) => !unseen.has(id)) &&
             !(spell && (zoneRowOf(spell) || !catches)) &&
             !leavesArea &&
-            !harmsAnObject
+            !harmsAnObject &&
+            // A tower may rise where no one stands (an Instant Fortress).
+            action.raisesTower === undefined
           )
             throw new CommandRejectedError(
               isPlayer ? "No creatures you can see are inside that area." : "No combatants are inside that area."

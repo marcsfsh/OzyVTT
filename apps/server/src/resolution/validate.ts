@@ -182,6 +182,9 @@ function combatantsOf(
     (action.objectDamage !== undefined && input.placedArea !== undefined) ||
     // Pointing at what is hidden (a Wand of Secrets) is something done.
     action.findsSecrets !== undefined ||
+    // Raising or shrinking a tower is something done (an Instant Fortress).
+    action.raisesTower !== undefined ||
+    action.dismissesTower === true ||
     // So is bringing creatures onto the map (a Horn of Valhalla's Berserkers).
     action.summons !== undefined ||
     // An item's command releases whoever it holds (Iron Bands), and an oil remakes a carried row.
@@ -220,6 +223,8 @@ function combatantsOf(
     action.lightsArea === undefined &&
     action.doorWork === undefined &&
     action.findsSecrets === undefined &&
+    action.raisesTower === undefined &&
+    action.dismissesTower !== true &&
     action.adjustsLight === undefined &&
     action.summons === undefined &&
     action.raisesCorpse === undefined &&

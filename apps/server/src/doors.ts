@@ -48,7 +48,8 @@ const SHUT: Readonly<Record<DoorFastening["kind"], string>> = {
   jammed: "The door is jammed shut.",
   sealed: "The door is sealed shut.",
   rod: "An Immovable Rod holds the door shut.",
-  glued: "The door is glued shut."
+  glued: "The door is glued shut.",
+  command: "The door opens only at its owner's command."
 };
 
 /** SRD Immovable Rod: "A creature can take a Utilize action to make a DC 30 Strength (Athletics) check, moving the fixed
@@ -65,7 +66,9 @@ export function fasteningHolds(state: GameState, fastening: DoorFastening): bool
 
 /** What only magic undoes, which no check forces, pries or picks: Stone Shape's seal and Sovereign Glue that has set. */
 const onlyMagicUndoes = (state: GameState, fastening: DoorFastening) =>
-  fastening.kind === "sealed" || (fastening.kind === "glued" && fasteningHolds(state, fastening));
+  fastening.kind === "sealed" ||
+  fastening.kind === "command" ||
+  (fastening.kind === "glued" && fasteningHolds(state, fastening));
 
 /** Whether Knock still holds an Arcane Lock off: through its round in this fight, or its minute on the game clock. */
 export function arcaneLockSuppressed(state: GameState, lock: NonNullable<DoorState["arcaneLock"]>): boolean {
@@ -90,7 +93,8 @@ function fasteningsAgainst(state: GameState, door: DoorState, openerId: string |
   return door.fastenings.filter(
     (fastening) =>
       fasteningHolds(state, fastening) &&
-      !(fastening.kind === "lock" && openerId !== null && fastening.keyHolderIds?.includes(openerId))
+      !(fastening.kind === "lock" && openerId !== null && fastening.keyHolderIds?.includes(openerId)) &&
+      !(fastening.kind === "command" && openerId !== null && fastening.ownerId === openerId)
   );
 }
 
@@ -450,6 +454,8 @@ function refuseUnforceable(state: GameState, door: DoorState | undefined): void 
     throw new CommandRejectedError("The door is sealed shut. Break it down or shape the stone again.");
   if (fast?.kind === "glued")
     throw new CommandRejectedError("The door is glued shut. Only Universal Solvent frees it, or breaking it down.");
+  if (fast?.kind === "command")
+    throw new CommandRejectedError("The door opens only at its owner's command. Break it down instead.");
 }
 
 /** An Immovable Rod moved off a door goes back to the creature that fixed it. */
@@ -561,8 +567,9 @@ function withoutFastenings(wall: VisionWall, gone: readonly DoorFastening[]): Vi
 export function knockOn(state: GameState, wallId: string): string {
   const wall = requireDoor(state, wallId);
   const door = wall.door;
-  // Stone Shape's seal, Sovereign Glue and an Immovable Rod's magic aren't a lock, a stuck door or a bar.
-  const opened = door?.fastenings.find((fastening) => !["sealed", "glued", "rod"].includes(fastening.kind));
+  // Stone Shape's seal, Sovereign Glue, an Immovable Rod's magic and an Instant Fortress's door ("immune to the Knock
+  // spell") aren't a lock, a stuck door or a bar.
+  const opened = door?.fastenings.find((fastening) => !["sealed", "glued", "rod", "command"].includes(fastening.kind));
   const lock = door?.arcaneLock;
   const minute = clockMinutesOf(state) + KNOCK_MINUTES;
   writeDoor(state, wallId, (current) => {

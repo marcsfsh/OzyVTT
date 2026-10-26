@@ -29,7 +29,8 @@ const FASTENING_NAMES: Readonly<Record<string, string>> = {
   jammed: "Jammed",
   sealed: "Sealed",
   rod: "Immovable Rod",
-  glued: "Glued"
+  glued: "Glued",
+  command: "Opens at its owner's command"
 };
 
 /** What the GM reads of a door at a glance: what holds it, whether players see it, its Armor Class and hit points. */

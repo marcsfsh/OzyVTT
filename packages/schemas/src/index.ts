@@ -5621,6 +5621,20 @@ export const ActionSchema = z
       .strict()
       .optional()
       .describe("It points its user at the nearest secret door or hidden trap within `feet` (a Wand of Secrets)"),
+    /** It raises a square tower on the square its area places: four walls that are objects with this print and a door
+     *  on the side facing its user that opens only at the user's command (an Instant Fortress). */
+    raisesTower: z
+      .object({ panel: ObjectPrintSchema })
+      .strict()
+      .optional()
+      .describe(
+        "It raises a tower on its placed square: four walls that are objects with this print, and a door facing the user that opens only at the user's command"
+      ),
+    /** It shrinks the tower its user raised with the same item, only while no creature stands inside. */
+    dismissesTower: z
+      .literal(true)
+      .optional()
+      .describe("It shrinks the tower its user raised with the same item, only while no creature stands inside"),
     /** It lights the spilled oil within `feet` of its user, an area that waits for fire (a Tinderbox: "Using it to light
      *  ... anything else with exposed fuel takes a Bonus Action"). */
     lightsArea: z

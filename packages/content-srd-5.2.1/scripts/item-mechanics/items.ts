@@ -4346,7 +4346,41 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // "While all four horseshoes are attached to the same creature, its Speed is increased by 30 feet": the horse carries
   // them, worn, on its own token.
   "horseshoes-of-speed": { modifiers: [{ type: "speed", amount: 30 }] },
-  // `instant-fortress` - a building.
+  // "Cause it to grow rapidly into a square adamantine tower", "20 feet on a side", its door "on the side facing you"
+  // opening "only at your command", and "Repeating the command word causes the tower to revert to statuette form,
+  // which works only if the tower is empty" (`resolution/tower.ts`). The walls and door: "AC 20; HP 100; Immunity to
+  // Bludgeoning, Piercing, and Slashing damage except that which is dealt by siege equipment; and Resistance to all
+  // other damage". Its floors, battlement, siege equipment and repair by Wish are the GM's.
+  "instant-fortress": {
+    actions: [
+      {
+        id: "grow",
+        name: "Grow the Tower",
+        activation: "action",
+        description:
+          "Place the statuette on the ground and speak its command word: it grows into a 20-foot-square adamantine tower, 30 feet high, pushing each creature in its area to a space just outside it. Its single door, on the side facing you, opens only at your command (a Bonus Action) and is immune to Knock. The walls and door have AC 20, 100 Hit Points, Immunity to Bludgeoning, Piercing and Slashing damage except from siege equipment, and Resistance to all other damage.",
+        damage: [],
+        area: { shape: "cube", sizeFeet: 20, widthFeet: null },
+        raisesTower: {
+          panel: {
+            name: "Tower wall",
+            armorClass: 20,
+            hitPoints: 100,
+            immunities: ["bludgeoning", "piercing", "slashing"],
+            resistances: ["acid", "cold", "fire", "force", "lightning", "necrotic", "radiant", "thunder"]
+          }
+        }
+      },
+      {
+        id: "shrink",
+        name: "Shrink the Tower",
+        activation: "action",
+        description: "Repeat the command word: the tower shrinks back to a statuette, which works only if it is empty.",
+        damage: [],
+        dismissesTower: true
+      }
+    ]
+  },
   // "Many types of Ioun Stones exist": the GM says which a found stone is, and its benefit holds while it orbits its
   // attuned owner's head (worn). Absorption and Greater Absorption (cancelling a spell), Mastery (the Proficiency
   // Bonus), Regeneration (healing each hour), Reserve (stored spells) and Sustenance (food) stay the GM's.

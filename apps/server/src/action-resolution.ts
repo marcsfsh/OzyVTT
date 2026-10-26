@@ -124,6 +124,7 @@ import { placeCastSight } from "./resolution/cast-sight.js";
 import { applyCastWalls, checkWallTarget } from "./resolution/cast-walls.js";
 import { checkObjectTarget, harmObjectsInArea, strikeObjectTarget } from "./resolution/object-targets.js";
 import { applyDoorWork, checkDoorWork, findSecrets } from "./resolution/door-work.js";
+import { applyTower, checkTower } from "./resolution/tower.js";
 import {
   applyAdjustsLight,
   applyDouses,
@@ -217,6 +218,7 @@ export function resolveDefinitionAction(
   checkWallTarget(ctx);
   checkObjectTarget(ctx);
   checkDoorWork(ctx);
+  checkTower(ctx);
   checkLightTarget(ctx);
   ctx.builtin?.check?.(ctx);
   // A form the action can't give is refused before anything is spent, and so is a full flask.
@@ -421,6 +423,7 @@ export function resolveDefinitionAction(
   strikeObjectTarget(ctx);
   harmObjectsInArea(ctx);
   applyDoorWork(ctx);
+  applyTower(ctx);
   findSecrets(ctx);
   applyKindles(ctx);
   applyDouses(ctx);

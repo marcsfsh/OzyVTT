@@ -1179,11 +1179,12 @@ export type VisionSource = z.infer<typeof VisionSourceSchema>;
  *  opens. */
 export const DoorFasteningSchema = z
   .object({
-    kind: z.enum(["lock", "stuck", "barred", "jammed", "sealed", "rod", "glued"]),
+    kind: z.enum(["lock", "stuck", "barred", "jammed", "sealed", "rod", "glued", "command"]),
     dc: z.number().int().min(1).max(40).optional(),
     forceDc: z.number().int().min(1).max(40).optional(),
     keyHolderIds: z.array(z.uuid()).max(20).optional(),
-    /** The Immovable Rod fixed against it (`rod`) and the creature that fixed it, which gets it back when it is moved. */
+    /** The Immovable Rod fixed against it (`rod`) and the creature that fixed it, which gets it back when it is moved; or
+     *  the one creature whose command opens it (`command`: an Instant Fortress's door). */
     item: InventoryItemSchema.optional(),
     ownerId: z.uuid().optional(),
     /** Sovereign Glue (`glued`) holds once it has set, a minute on: through this round of the fight, or to this
@@ -1252,6 +1253,18 @@ export const VisionWallSchema = z
     door: DoorStateSchema.optional(),
     object: ObjectStatsSchema.optional(),
     openings: z.array(WallOpeningSchema).max(8).optional(),
+    /** The item and the creature whose use raised it (an Instant Fortress's tower), so the same use shrinks it. */
+    raisedBy: z
+      .object({
+        ownerId: z.uuid(),
+        itemId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(120),
+        towerId: z.string().min(1).max(120)
+      })
+      .strict()
+      .optional(),
     source: VisionSourceSchema.optional(),
     /** Bars that no creature passes and sight, attacks and spells go between (Forcecage's cage): a window that gives no
      *  cover and stops no area. */
