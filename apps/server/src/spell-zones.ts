@@ -31,6 +31,7 @@ import { sceneSight } from "./vision/sight.js";
 import { spellWardOf } from "./resolution/spell-wards.js";
 import { planeOf } from "./ethereal.js";
 import { burnedOutAtTurnEnd } from "./zone-kindling.js";
+import { waterOf } from "./water.js";
 
 type Actor = GameState["actors"][number];
 type Point = Readonly<{ x: number; y: number }>;
@@ -1222,7 +1223,7 @@ export function zonesAtTurnStart(state: GameState, actorId: string, deps: ZoneDe
  * A vortex's pull as a creature's turn starts (SRD 5.2.1 Control Water's Whirlpool: "A creature or object in the water
  * and within 25 feet of the vortex is pulled 10 feet toward it"): each area that pulls draws the creature, within its
  * reach of the area's middle, that many feet toward the middle, and the creature meets whatever it is pulled into.
- * Whether the creature is in the water is the GM's.
+ * Where the GM painted water on the map, only a creature in it is pulled; a map with none painted is taken as all water.
  */
 function pulledIn(state: GameState, actorId: string, deps: ZoneDeps): EffectNarration[] {
   const geometry = deps.geometry;
@@ -1237,6 +1238,8 @@ function pulledIn(state: GameState, actorId: string, deps: ZoneDeps): EffectNarr
       : undefined;
     const from = tokenOf(state, actorId)?.position;
     if (!content || !pulls || !area || !from) continue;
+    const painted = state.combat.terrain.water.length > 0 || state.combat.terrain.runningWater.length > 0;
+    if (painted && waterOf(state, actorId, geometry.calibration, deps) === null) continue;
     if (!exposed(state, zone, content.trigger, deps).some((candidate) => candidate.id === actorId)) continue;
     const middle = area.shape === "circle" ? area.geometry.origin : midpointOf(area.geometry);
     const apart = mapDistance(geometry, from, middle)?.value ?? null;

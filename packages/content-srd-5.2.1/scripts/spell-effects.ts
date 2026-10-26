@@ -610,6 +610,39 @@ function symbolGlyphs(): Later[] {
  * that moment; the rest stay with the GM, whom the cast reminds.
  */
 const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
+  // Each effect is an option of the cast. The whirlpool is its vortex: "Any creature in the water and within 25 feet
+  // of the whirlpool is pulled 10 feet toward it. When a creature enters the whirlpool for the first time on a turn or
+  // ends its turn there, it makes a Strength saving throw ... 2d8 Bludgeoning damage ... half as much damage." The
+  // flood, the trench and the redirected flow change the water the GM paints; swimming away and choosing another
+  // effect on a later turn are the GM's.
+  "control-water": [
+    {
+      name: "whirlpool",
+      activation: "other",
+      when: `A creature in the water within 25 feet is pulled 10 feet toward the vortex as its turn starts; one entering it or ending its turn there makes the save, once a turn. Swimming away takes an action and a Strength (Athletics) check against your spell save DC.`,
+      save: save("str"),
+      damage: [{ formula: "2d8", type: "bludgeoning" }],
+      area: { shape: "cube", sizeFeet: 5, widthFeet: null },
+      zone: { ...ENTER_OR_END_ONCE, pulls: { withinFeet: 25, feet: 10 } },
+      option: { id: "whirlpool", name: "Whirlpool" }
+    },
+    {
+      ...lasting("flood", "The standing water in the Cube rises by up to 20 feet, or a 20-foot wave crosses it.", {
+        on: []
+      }),
+      option: { id: "flood", name: "Flood" }
+    },
+    {
+      ...lasting("part water", "A trench crosses the Cube, the water walled to either side, until the spell ends.", {
+        on: []
+      }),
+      option: { id: "part-water", name: "Part Water" }
+    },
+    {
+      ...lasting("redirect flow", "The flowing water in the Cube moves the way you choose.", { on: [] }),
+      option: { id: "redirect-flow", name: "Redirect Flow" }
+    }
+  ],
   "animal-shapes": [
     {
       name: "transform again",
