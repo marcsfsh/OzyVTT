@@ -74,6 +74,9 @@ export function revivalViolations(
       );
     else if (death?.headLost && !revives.newBody && !revives.restoresParts)
       refuse(`${name}'s head is gone, and ${spell.name} restores no missing body parts.`);
+    // A night hag's Nightmare Haunting: "the target can't be raised from the dead until its soul is released."
+    if (death?.soulTrappedBy)
+      refuse(`${name}'s soul is trapped in a soul bag, and ${name} can't be raised until it is released.`);
     const rounds = roundsDead(state, target);
     if (rounds !== null && rounds > revives.withinMinutes * ROUNDS_PER_MINUTE)
       refuse(

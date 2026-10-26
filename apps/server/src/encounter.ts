@@ -6,6 +6,7 @@ import type {
   RuleExceptions,
   RuleMode
 } from "@vtt/domain";
+import { refreshReactiveHeads } from "./reactive-heads.js";
 import { dropStaleGrants } from "./granted-moves.js";
 import { proneInSharedSpace } from "./occupied-space.js";
 import { blinkAway } from "./off-plane.js";
@@ -1022,6 +1023,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
     ),
     legendaryUsed: legendaryRefilled(state.combat.legendaryUsed, nextActorId)
   };
+  // A hydra's extra Opportunity Attack Reactions come back with its own.
+  refreshReactiveHeads(state.actors.find((actor) => actor.id === nextActorId));
   // A move or teleport granted for the turn that ended lapses with it.
   dropStaleGrants(state);
   // Movement already spent of this turn (climbing out of a corpse off it) is used.

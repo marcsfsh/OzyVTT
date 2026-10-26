@@ -1,4 +1,5 @@
 import { openFormSwap } from "./transform/known-forms.js";
+import { restoreCarriedAtRest } from "./carried-objects.js";
 import { isDead, longRestWait, makeHitDicePool, type GameState, type HitDiceEntry } from "@vtt/domain";
 import type { Actor, ActorAction, ActorDefinition } from "@vtt/schemas";
 import { abilityModifier as scoreModifier, collectRiders } from "@vtt/rules-5e";
@@ -303,6 +304,8 @@ export function applyRest(
     // SRD Tireless: "Whenever you finish a Short Rest, your Exhaustion level, if any, also decreases by 1."
     if (holdsFeature(definition, "tireless", "Tireless")) reduceExhaustion(actor);
     events.push(...endEffectsAtRest(state, actorId, "short"));
+    // An erinyes's magic rope, damaged or destroyed, is whole again.
+    events.push(...restoreCarriedAtRest(actor, definition));
     // SRD Memorize Spell (Wizard 5): "Whenever you finish a Short Rest, you can study your spellbook and replace one of
     // the level 1+ Wizard spells you have prepared ... with another level 1+ spell from the book": one change.
     if (actor.preparation === null && holdsFeature(definition, "memorize-spell", "Memorize Spell"))
@@ -316,7 +319,8 @@ export function applyRest(
   events.push(
     ...endEffectsAtLongRest(state, actorId, clockMoved, holdsMaximumAtRest(actor), restMinutes),
     ...endEffectsAtRest(state, actorId, "long"),
-    ...easeOrdeals(state, actor)
+    ...easeOrdeals(state, actor),
+    ...restoreCarriedAtRest(actor, actor.definitionId ? resolveDefinition(actor.definitionId) : undefined)
   );
   // A curse that bars healing ("The target can't regain Hit Points", a mummy's) outlasts the rest and keeps them.
   const barred = actor.effects.find(

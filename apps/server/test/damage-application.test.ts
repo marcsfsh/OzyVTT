@@ -422,12 +422,16 @@ describe("a stat block's conditional damage", () => {
   });
 
   it("reminds the GM of what the stat block leaves to them, but not the later-turn damage or the breath the engine runs", () => {
+    const devil = monsterFight("horned-devil");
+    expect(devil.strike("hurl-flame", [15, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]).warnings).toContainEqual(
+      expect.stringMatching(/^A flammable object the target hit/)
+    );
+    // A gelatinous cube's Engulf leaves nothing: its acid, the held breath and the moves out are the engine's.
     const { strike } = monsterFight("gelatinous-cube");
     const engulf = strike("engulf", [3, 3, 3]);
-    expect(engulf.warnings).toContainEqual(
-      expect.stringMatching(/^A creature that succeeds moves to an unoccupied space/)
+    expect(engulf.warnings ?? []).not.toContainEqual(
+      expect.stringMatching(/Acid damage at the start|suffocating|unoccupied space/)
     );
-    expect(engulf.warnings ?? []).not.toContainEqual(expect.stringMatching(/Acid damage at the start|suffocating/));
   });
 });
 

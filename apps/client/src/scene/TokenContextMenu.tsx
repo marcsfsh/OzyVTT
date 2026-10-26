@@ -107,12 +107,15 @@ export function TokenContextMenu({
 }
 
 /**
- * What holds the creature (a Net, a web, a rope), each an object that frees it when broken: for the GM with its Armor
- * Class and hit points. While an attack is being aimed, the attack can be aimed at it here.
+ * What holds the creature (a Net, a web, a rope), each an object that frees it when broken, and what it carries with
+ * statistics of its own (a night hag's soul bag): for the GM with its Armor Class and hit points. While an attack is
+ * being aimed, the attack can be aimed at it here.
  */
 function HeldBy({ actor, role }: Readonly<{ actor: Actor; role: "gm" | "player" }>) {
   const held = actor.effects.flatMap((effect) =>
-    "heldBy" in effect && effect.heldBy ? [{ effectId: effect.id, holder: effect.heldBy }] : []
+    "heldBy" in effect && effect.heldBy
+      ? [{ effectId: effect.id, holder: effect.heldBy, carried: effect.tags.includes("carried-object") }]
+      : []
   );
   return held.length === 0 ? null : <HeldByRows actor={actor} role={role} held={held} />;
 }
@@ -127,6 +130,8 @@ function HeldByRows({
   held: ReadonlyArray<
     Readonly<{
       effectId: string;
+      /** Its creature carries it (a soul bag): breaking it frees no one. */
+      carried: boolean;
       holder:
         | Readonly<{ name: string }>
         | Readonly<{ name: string; armorClass: number; hitPoints: Readonly<{ current: number; maximum: number }> }>;
@@ -138,12 +143,12 @@ function HeldByRows({
   const attack = session && session.action.attackBonus !== null ? session.action : null;
   return (
     <>
-      {held.map(({ effectId, holder }) => (
+      {held.map(({ effectId, holder, carried }) => (
         <div key={effectId} className="token-context-held">
           <p className="token-context-feedback">
             {role === "gm" && "armorClass" in holder
-              ? `Held by ${holder.name} · AC ${holder.armorClass} · ${holder.hitPoints.current}/${holder.hitPoints.maximum} HP`
-              : `Held by ${holder.name}`}
+              ? `${carried ? "Carries" : "Held by"} ${holder.name} · AC ${holder.armorClass} · ${holder.hitPoints.current}/${holder.hitPoints.maximum} HP`
+              : `${carried ? "Carries" : "Held by"} ${holder.name}`}
           </p>
           {attack ? (
             <button
@@ -159,7 +164,7 @@ function HeldByRows({
               {`Attack the ${holder.name} with ${attack.name}`}
             </button>
           ) : (
-            <p className="token-context-feedback">{`Breaking the ${holder.name} frees ${actor.name}. Choose an attack, then open this menu to aim it at the ${holder.name}.`}</p>
+            <p className="token-context-feedback">{`${carried ? "" : `Breaking the ${holder.name} frees ${actor.name}. `}Choose an attack, then open this menu to aim it at the ${holder.name}.`}</p>
           )}
         </div>
       ))}

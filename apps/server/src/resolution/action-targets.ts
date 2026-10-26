@@ -1,4 +1,5 @@
 import type { GameState } from "@vtt/domain";
+import { BERSERK_TAG } from "../trait-turns.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import { abilityModifier as scoreModifier } from "@vtt/rules-5e";
 import { holdsFeature } from "../class-features.js";
@@ -132,6 +133,7 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
       message: `${action.name} targets ${limit === 1 ? "one creature" : `up to ${limit} creatures`}; ${unique.length} were chosen.`
     });
   violations.push(...areaRangeViolations(check, targets, nameOf));
+  violations.push(...berserkViolations(check, targets, nameOf));
   const rules = action.targets;
   if (!rules) return violations;
   // "A creature you can see": the map with its vision on, else the conditions and the senses by distance.
@@ -293,6 +295,44 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
       });
   }
   return violations;
+}
+
+/**
+ * A golem's Berserk: "On each of its turns while berserk, the golem attacks the nearest creature it can see." While the
+ * berserk effect lasts, an attack goes to a creature it sees at the least distance; with none in sight, the GM picks
+ * what it smashes.
+ */
+function berserkViolations(
+  check: TargetCheck,
+  targets: readonly LiveActor[],
+  nameOf: (target: LiveActor) => string
+): Violation[] {
+  const { state, attacker, action, resolveDefinition, distanceFeet } = check;
+  if (action.attack === undefined || !distanceFeet || targets.length === 0) return [];
+  if (!attacker.effects.some((effect) => effect.tags.includes(BERSERK_TAG))) return [];
+  const sight = sightRules(
+    state,
+    {
+      ...(resolveDefinition ? { definition: resolveDefinition } : {}),
+      ...(check.catalog ? { catalog: check.catalog } : {})
+    },
+    distanceFeet
+  );
+  const seen = state.combat.tokens.flatMap((token) => {
+    const other = state.actors.find((actor) => actor.id === token.actorId);
+    if (!other || other.id === attacker.id || other.hp.current <= 0 || !sight.canSee(attacker.id, other.id)) return [];
+    const feet = distanceFeet(attacker.id, other.id);
+    return feet === null ? [] : [{ other, feet }];
+  });
+  if (seen.length === 0) return [];
+  const least = Math.min(...seen.map((entry) => entry.feet));
+  const nearest = seen.filter((entry) => entry.feet <= least + DISTANCE_TOLERANCE_FEET).map((entry) => entry.other);
+  return targets
+    .filter((target) => !nearest.some((other) => other.id === target.id))
+    .map((target) => ({
+      rule: "target.not-allowed" as const,
+      message: `${attacker.name} is berserk and attacks the nearest creature it can see, and ${nameOf(target)} isn't: ${nearest.map(nameOf).join(" or ")}.`
+    }));
 }
 
 /**

@@ -26,6 +26,7 @@ import {
 } from "./context.js";
 import { openUnarmedSave } from "./builtins.js";
 import { afterItemSpend } from "./charges.js";
+import { openFollowUp } from "../follow-ups.js";
 import { beginConcentration } from "./concentration.js";
 import { criticalExpression, RIDER_TYPE_PREFIX, SAVAGE_ATTACKER, savageAttackerReady } from "./damage.js";
 import { commitEconomy, evaluateActionEconomy, planEconomy, spendSlot } from "./economy.js";
@@ -662,6 +663,19 @@ function rollCharge(ctx: ResolveContext, roll: (formula: string, type: string, s
         name: "Charge",
         conditionIds: [conditionId]
       });
+  }
+  // "..., and the allosaurus can make one Bite attack against it": once the target is down.
+  const followUp = charge.followUp ? ctx.siblings.find((action) => action.id === charge.followUp) : undefined;
+  if (followUp && (charge.conditions ?? []).every((id) => target.conditions.some((condition) => condition.id === id))) {
+    openFollowUp(ctx.state, ctx.attacker.id, followUp.id, target.id);
+    ctx.tableNarration.push(
+      tableLineOf(ctx, {
+        kind: "effect",
+        text: `${ctx.attacker.name} can make one ${followUp.name} attack against ${target.name}.`,
+        actorId: target.id,
+        source: { actorId: ctx.attacker.id, name: ctx.attacker.name }
+      })
+    );
   }
 }
 

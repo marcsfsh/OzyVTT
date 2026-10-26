@@ -445,6 +445,11 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
 const revives = guided(
   "death-traits.ts tells the GM as the creature dies that it may come back, and marks a body that disappears as gone (death.ts). When and where it returns are the GM's."
 );
+/** A trait that brings a creature back to life after a time, which the game clock counts. */
+const returnsOnClock = (rest: string) =>
+  enforced(
+    `timed-revival.ts rolls the time as the creature dies and keeps it on its death record, which no player reads, and once that much game time has passed it comes back to life with all its Hit Points (game-time.ts)${rest}. Where it reappears is the GM's, told as it returns.`
+  );
 /** A trait about breathing, which breath.ts reads. */
 const breath = enforced(
   "breath.ts reads it: the creature breathes water, or holds its breath for the time it prints, when it is out of air."
@@ -473,8 +478,8 @@ const squeezes = enforced(
 );
 /** A trait about jumping, which the app doesn't measure. */
 /** A trait about changing into another stat block after a Long Rest, which is a swap of stat blocks. */
-const changesForm = reference(
-  "Changing to the other stat block after a Long Rest is the GM's: place that stat block on the map in this one's stead."
+const changesForm = enforced(
+  "conversions.ts offers it in the step a finished Long Rest opens, outside a fight: the creature takes the other stat block as its own, with its name, Hit Points, Armor Class and Speed. What it wears or carries is unchanged."
 );
 /** A trait that regains Hit Points from damage of one type, which the creature is also immune to. */
 const absorbs = (type: string) =>
@@ -488,7 +493,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "zone-ground.ts makes the ground within 10 feet of the mouther Difficult Terrain for every other creature, and it moves with the mouther; the move preview shows it round a mouther the mover can see (zone-preview.ts)."
   ),
   "Acid Absorption": absorbs("Acid"),
-  Adhesive: reference("Sticking to what touches it is the GM's to apply with the Grappled condition."),
+  Adhesive: enforced(
+    "In object form, a Huge or smaller creature that hits the mimic with a melee attack sticks to it: Grappled, escape DC 13 with Disadvantage on the check, until the mimic is defeated (resolution/struck.ts). Objects stuck to it are the GM's."
+  ),
   Agile: enforced("movement-rules.ts opens no Opportunity Attack when it moves out of an enemy's reach."),
   "Air Form": enforced(
     "movement-rules.ts lets the air elemental end a move in another creature's space, and terrain.ts lets it through any gap in the walls an inch wide at no extra cost (wall-passage.ts). The map's drag preview (movePreview.ts) charges the same path."
@@ -508,7 +515,7 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "carrying.ts counts the creature one size larger for its carrying capacity, and weighs what its inventory holds against it."
   ),
   Berserk: enforced(
-    "trait-turns.ts rolls the d6 when the golem starts its turn Bloodied and keeps it berserk until it isn't Bloodied. Choosing what it attacks is the GM's."
+    "trait-turns.ts rolls the d6 when the golem starts its turn Bloodied and keeps it berserk until it isn't Bloodied. While berserk its attacks go only to the nearest creature it can see (resolution/action-targets.ts). Which object it smashes with no creature in sight is the GM's."
   ),
   "Blood Frenzy": enforced(
     "resolution/attack.ts gives the sahuagin Advantage against a creature that doesn't have all its Hit Points."
@@ -520,10 +527,16 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Blurred Form": enforced(
     "Attack rolls against the mephit have Disadvantage unless it is Incapacitated (resolution/attack.ts)."
   ),
-  Bound: reference("The amulet and the damage it shares are the GM's to run."),
-  "Celestial Restoration": revives,
+  Bound: enforced(
+    "The amulet's wearer is the creature that commands the guardian. While the guardian is within 60 feet of it, half of any damage the wearer takes, rounded up, goes to the guardian instead (shared-damage.ts, hit-points.ts). The telepathic call and sensing the amulet's direction are the GM's."
+  ),
+  "Celestial Restoration": returnsOnClock(
+    ", unless Dispel Evil and Good is cast on its remains or within 5 feet of them first (resolution/remains.ts)"
+  ),
   Compression: squeezes,
-  "Confer Fire Resistance": reference("Granting its rider Resistance is the GM's to apply."),
+  "Confer Fire Resistance": enforced(
+    "mounts.ts gives a creature that mounts the nightmare Resistance to Fire damage for as long as it rides."
+  ),
   "Corrosive Form": enforced(
     "resolution/struck.ts deals the black pudding's 1d8 Acid damage to a creature that hits it with a melee attack (the gray ooze's printing deals none), and gives a nonmagical weapon that damages it a cumulative -1 to attack rolls, destroyed at -5 (row-penalties.ts; Mending removes it, resolution/mend.ts). Nonmagical ammunition that hits and damages it is destroyed, so none of it is found after the fight (resolution/ammunition.ts). Eating through wood or metal is the GM's."
   ),
@@ -542,8 +555,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Earth Glide": enforced(
     "A burrowing move passes it through the map's walls at no extra cost (terrain.ts, wall-passage.ts), and a wall a spell raised still stops it. Leaving no trace is the GM's."
   ),
-  "Eldritch Restoration": revives,
-  "Elemental Restoration": revives,
+  "Eldritch Restoration": returnsOnClock(""),
+  "Elemental Restoration": returnsOnClock(", its body gone meanwhile (death.ts)"),
   Ephemeral: enforced("inventory.ts refuses any item given to the wisp to wear or carry."),
   "Ethereal Sight": senses,
   Evasion: enforced(
@@ -553,7 +566,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Fear Aura": enforced(
     "trait-turns.ts opens the Wisdom save for each enemy that starts its turn in the aura while the pit fiend isn't Incapacitated. A failure is Frightened until the start of its next turn, and a success makes it immune for the fight."
   ),
-  "Fiendish Restoration": revives,
+  "Fiendish Restoration": enforced(
+    "The spirit naga's 1d6 days are rolled as it dies and kept on its death record, and once they have passed on the game clock it comes back to life with all its Hit Points (timed-revival.ts, game-time.ts); a Wish that prevents it is the GM's, who removes the creature. The rakshasa's new body in the Nine Hells is story: death-traits.ts marks its body gone (death.ts)."
+  ),
   "Fire Absorption": absorbs("Fire"),
   "Fire Aura": enforced(
     "trait-turns.ts deals the Fire damage at the end of the bearer's turns to each creature in the Emanation, or to an azer's enemies there. A fire elemental's aura also sets them burning."
@@ -574,18 +589,24 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Heat Aura": enforced(
     "trait-turns.ts deals 3d10 Fire damage at the end of the remorhaz's turns to each creature within 5 feet."
   ),
-  "Hellish Restoration": revives,
+  "Hellish Restoration": returnsOnClock(
+    ", unless its killer was under Bless or Holy Water is sprinkled on its remains first (resolution/remains.ts). Whether it died in the Nine Hells, as the trait asks, is the GM's"
+  ),
   "Hold Breath": breath,
   "Ice Walk": enforced(
     "zone-ground.ts charges the creature nothing extra on the ice a spell leaves (Ice Storm's hail, Sleet Storm). Ice and snow the GM paints as Difficult Terrain still cost it, so the GM waives that cost."
   ),
   Illumination: sheds,
-  "Immutable Form": reference("Shape-changing isn't modeled, so there is nothing to refuse."),
+  "Immutable Form": enforced(
+    "A form another creature's magic or action would give the golem doesn't land, and the table is told it is unaffected (transform/assume.ts)."
+  ),
   "Incorporeal Movement": enforced(
     "terrain.ts passes it through walls and creatures as Difficult Terrain, and a wall a spell raised (Wall of Force) still stops it. A creature whose space a wall, a closed door or a window crosses as its turn ends is inside an object and takes 1d10 Force damage, rolled by the server (wall-passage.ts)."
   ),
   "Incubus Form": changesForm,
-  Inscrutable: reference("The Disadvantage on Insight checks about it is the GM's to apply."),
+  Inscrutable: enforced(
+    "A Wisdom (Insight) check called about the sphinx rolls with Disadvantage (check-rolls.ts, ability-checks.ts). What magic observing it or reading its thoughts learns is the GM's to withhold."
+  ),
   Invisibility: enforced("actor-roster.ts gives the stalker the Invisible condition when it joins the roster."),
   "Iron Scent": senses,
   Jumper: enforced("jumping.ts measures its jumps with Dexterity in place of Strength."),
@@ -605,8 +626,8 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Magic Resistance": enforced(
     "saving-throws.ts gives it Advantage on saves against spells and magic items, saves a spell asks it to repeat included."
   ),
-  "Magic Rope": guided(
-    "The erinyes' Entangling Rope leaves its target Restrained and held by the rope, an object with AC 20, 90 Hit Points and Immunity to Poison and Psychic damage that an attack can break, which frees it (objects.ts). Restoring the rope on a rest is the GM's."
+  "Magic Rope": enforced(
+    "The rope is an object the erinyes carries, AC 20, 90 Hit Points and Immunity to Poison and Psychic damage (carried-objects.ts). Entangling Rope holds its target with the rope's own Hit Points, so damage to it stays; an attack that destroys it frees the target and Entangling Rope is refused until a Short or Long Rest restores it (rests.ts), and the hold ends when the erinyes dies. Losing the rope after an hour 5 feet or more away is the GM's."
   ),
   Mimicry: senses,
   "Misty Escape": enforced(
@@ -625,9 +646,13 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "resolution/attack.ts gives Advantage when an ally of the attacker that isn't Incapacitated is within 5 feet of the target."
   ),
   "Probing Telepathy": senses,
-  "Reactive Heads": reference("The extra Reactions are the GM's to allow."),
+  "Reactive Heads": enforced(
+    "Each living head beyond one gives the hydra another Reaction for Opportunity Attacks only: once its own Reaction is spent, movement-rules.ts still offers the attack and reactions.ts and resolution/economy.ts take it, and they come back as its turn starts (reactive-heads.ts)."
+  ),
   Reactive: enforced("encounter.ts gives the marilith a fresh Reaction at the start of every turn."),
-  "Reflective Carapace": reference("The d6 against spells aimed at it is the GM's to roll."),
+  "Reflective Carapace": enforced(
+    "A Magic Missile or a spell that makes a ranged attack roll against the tarrasque rolls the d6: on a 1 to 5 it is unaffected, and on a 6 the caster becomes the target in its place (resolution/carapace.ts). Darts aimed at it are lost."
+  ),
   Regeneration: enforced(
     "trait-turns.ts restores the Hit Points at the start of its turns, stopped for a turn by the damage types it names. statblock-traits.ts keeps a troll at 0 Hit Points alive until a turn starts without regenerating."
   ),
@@ -635,12 +660,16 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
     "jumping.ts lets it Long Jump the printed distance after 10 feet of movement, half from a standing start."
   ),
   "Sense Magic": senses,
-  "Shark Telepathy": senses,
+  "Shark Telepathy": enforced(
+    "As the sahuagin's turn starts, each shark within 120 feet of it that no one else commands follows its orders and fights on its side (telepathic-control.ts), until it is beyond that or the sahuagin can't act. What it tells them is the GM's."
+  ),
   "Shielded Mind": senses,
   "Siege Monster": enforced(
     "objects.ts doubles the creature's damage to a door, a wall or another object before its threshold and immunities are read."
   ),
-  "Soul Bag": reference("The bag and its statistics are the GM's to run."),
+  "Soul Bag": enforced(
+    "The bag is an object the hag carries, AC 15, 20 Hit Points and Resistance to all damage, that an attack can destroy (carried-objects.ts, objects.ts). Without it Nightmare Haunting is refused, and destroyed it releases the souls it holds, which can then be raised. The souls inside and the 7 days to make a new bag are story."
+  ),
   "Speak with Beasts and Plants": senses,
   "Spell Storing": enforced(
     "stored-casts.ts stores a spell of the printed level or lower that the creature commanding it casts on it from within 5 feet, losing any spell stored before; the spell has no other effect. The guardian's sheet then casts it once at the caster's spell save DC, attack bonus and modifier, with no components."
@@ -648,7 +677,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Spider Climb": enforced(
     "speed.ts moves it at its Climb Speed with no extra cost and no check, and a climb may change its height on the map (altitude.ts). Which surfaces it climbs is the GM's, as walls have no height."
   ),
-  "Spirit Jar": revives,
+  "Spirit Jar": returnsOnClock(
+    " while it still has its spirit jar, an effect it carries that the GM ends when the jar is destroyed (carried-objects.ts)"
+  ),
   "Standing Leap": enforced(
     "jumping.ts lets it jump the printed Long and High Jump distances with or without a running start."
   ),
@@ -668,16 +699,22 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   Training: enforced(
     "The GM picks the skill for each creature from its row tools (statblock-picks.ts). ability-checks.ts adds its Proficiency Bonus to checks with that skill and rolls them with Advantage."
   ),
-  Transparent: reference("Noticing the cube is the GM's call, with the DC the trait prints."),
+  Transparent: enforced(
+    "The cube joins the roster hidden, as a Hide leaves a creature, and a Search whose Perception meets 15 finds it (transparent.ts, resolution/builtins.ts). Once it moves or acts it is noticed (commands/map.ts, resolution/release.ts)."
+  ),
   "Treasure Sense": senses,
-  "Troll Spawn": reference("What becomes of a severed limb is the GM's to run."),
+  "Troll Spawn": enforced(
+    "A troll limb that lives 24 hours of game time rolls its d12 (timed-revival.ts, game-time.ts): on a 12 a Troll from its stat block stands in its place on no one's side, and otherwise the limb withers away."
+  ),
   Tunneler: enforced(
     "A burrowing move passes it through the map's walls at double cost, as through solid rock (terrain.ts, wall-passage.ts), and a wall a spell raised still stops it. Where it burrowed through a wall, a lasting 10-foot gap is left that sight and movement pass (wall-passage.ts)."
   ),
   "Undead Fortitude": enforced(
     "statblock-traits.ts rolls the Constitution save of DC 5 plus the damage when damage drops it to 0, and leaves it at 1 Hit Point on a success. Radiant damage and Critical Hits get no save."
   ),
-  "Undead Restoration": revives,
+  "Undead Restoration": returnsOnClock(
+    " while its heart is whole: an object it carries, AC 17, 10 Hit Points and Immunity to all damage but Fire, that an attack can destroy (carried-objects.ts, objects.ts)"
+  ),
   "Vampire Weakness": guided(
     "trait-turns.ts deals the vampire 20 Radiant damage when it starts its turn in sunlight, where resolution/attack.ts and ability-checks.ts give it Disadvantage on attack rolls and ability checks (vision/rules.ts). Running water, invitations and the stake are the GM's."
   ),
@@ -903,8 +940,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Gnoll Warrior/rampage-1-day": enforced(
     "It is offered only right after the gnoll damages a creature that was already Bloodied (bloodied-hits.ts). Taken move first, the use is spent and a move of half its Speed granted (granted-moves.ts), and then it makes its Rend."
   ),
-  "action:Roc/swoop-recharge-5-6": guided(
-    "The recharge is spent and a flight of half its Fly Speed granted that provokes no Opportunity Attacks (granted-moves.ts). Dropping the grappled creature is the GM's, who makes it fall (actor.fall)."
+  "action:Roc/swoop-recharge-5-6": enforced(
+    "It is refused while the roc grapples nothing (resolution/validate.ts). The recharge is spent and a flight of half its Fly Speed granted that provokes no Opportunity Attacks (granted-moves.ts); the grappled creature rises and moves with the roc (movement-rules.ts), and as the flight ends the roc lets go and it falls from where it is (granted-moves.ts, falling.ts)."
   ),
   "action:Tarrasque/onslaught": enforced(
     "Its Claw and its Tail are each a choice printed inside it: taken move first, the legendary use is spent and a move of half its Speed granted (granted-moves.ts), and then it makes that attack."
@@ -948,8 +985,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Giant Frog/swallow": enforced(
     "The action swallows a Small or smaller creature the frog grapples, with no save (swallow.ts): the grapple ends, it is Blinded and Restrained with Total Cover from outside the frog, and the frog can't Bite meanwhile. As the frog's next turn ends it takes 2d4 Acid and, alive, is disgorged Prone; the frog's death lets it climb out."
   ),
-  "action:Shambling Mound/engulf": guided(
-    "A failed save Grapples, Blinds and Restrains a Medium or smaller creature within 5 feet, with the Lightning at the start of its turns; the mound carries it at no extra cost (movement-rules.ts) and holds one at a time (swallow.ts). Moving its token into the mound's space is the GM's."
+  "action:Shambling Mound/engulf": enforced(
+    "A failed save Grapples, Blinds and Restrains a Medium or smaller creature within 5 feet and pulls it into the mound's space (saving-throws.ts, forced-movement.ts), with the Lightning at the start of its turns; the mound carries it at no extra cost (movement-rules.ts) and holds one at a time (swallow.ts)."
   ),
   "action:Roper/reel": enforced(
     "Each creature the roper grapples is pulled up to 30 feet straight toward it, stopping beside it (resolution/swallowing.ts, forced-movement.ts)."
@@ -978,11 +1015,38 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Centaur Trooper/trampling-charge-recharge-5-6": enforced(
     "Taken move first, it grants a move of its Speed that provokes no Opportunity Attacks and goes straight through the spaces of Medium or smaller creatures (granted-moves.ts, movement-rules.ts). The Strength save, damage and Prone then reach only the creatures whose spaces it entered (resolution/action-targets.ts)."
   ),
-  "action:Gelatinous Cube/engulf": guided(
-    "Taken move first, it grants a move of its Speed that provokes no Opportunity Attacks and goes straight through the spaces of Large or smaller creatures (movement-rules.ts); the save reaches only the creatures it entered. A failure Restrains the creature inside the cube, where it can't speak, holds its breath, has Total Cover from outside and moves with the cube (swallow.ts); the cube holds one Large or four smaller creatures, and the acid comes at the start of its turns. The Athletics escape and the pull from outside, with the puller's acid, are actions, and a creature that walks into the cube makes the save with Disadvantage (space-entry.ts). Moving a creature out of the cube on a success, or failing it when there is no room, is the GM's."
+  "action:Gelatinous Cube/engulf": enforced(
+    "Taken move first, it grants a move of its Speed that provokes no Opportunity Attacks and goes straight through the spaces of Large or smaller creatures (movement-rules.ts); the save reaches only the creatures it entered. A failure Restrains the creature inside the cube, where it can't speak, holds its breath, has Total Cover from outside and moves with the cube (swallow.ts); the cube holds one Large or four smaller creatures, and the acid comes at the start of its turns. The Athletics escape and the pull from outside, with the puller's acid, are actions, each setting the freed creature in the nearest unoccupied space (resolution/endings.ts), and a creature that walks into the cube makes the save with Disadvantage (space-entry.ts). A creature that succeeds moves to an unoccupied space within 5 feet of the cube, or fails instead when none is free (saving-throws.ts)."
   ),
-  "action:Weretiger/prowl-tiger-or-hybrid-form-only": guided(
-    "It works only in the tiger and hybrid forms (transform/rules.ts), and a move of its Speed that provokes no Opportunity Attacks is granted (granted-moves.ts). The Hide at the end of it is the GM's."
+  "action:Kraken/fling": enforced(
+    "Its one target is a Large or smaller creature the kraken grapples (resolution/action-targets.ts), and the use picks a space it can see within 60 feet on the ground (resolution/destination.ts): the creature lands there, out of the kraken's grip, and the save falls on it and each creature in that space (saving-throws.ts)."
+  ),
+  "action:Bulette/deadly-leap": enforced(
+    "The use picks a space within 15 feet holding a Large or smaller creature and spends 5 feet of the bulette's movement (resolution/destination.ts): it lands there, the save falls on each creature in that space, and a creature that succeeds is pushed 5 feet straight away from it (saving-throws.ts, forced-movement.ts)."
+  ),
+  "action:Allosaurus/claws": enforced(
+    "After a straight charge of 30 feet or more a hit knocks a Large or smaller target Prone (resolution/hit-options.ts), and the allosaurus may then make one Bite against that target and no other (follow-ups.ts, resolution/economy.ts)."
+  ),
+  "action:Animated Rug of Smothering/smother": enforced(
+    "A Medium or smaller target can be Grappled (escape DC 13) in place of the damage, Blinded, Restrained and suffocating, with the damage at the start of its turns (resolution/on-hit.ts, breath.ts). The rug holds one at a time and can't Smother while it holds one (attachments.ts), and while it does it halves the damage it takes, rounded down, and the target takes the same (shared-damage.ts)."
+  ),
+  "action:Cloaker/attach": enforced(
+    "A Large or smaller target it hits is Blinded with the cloaker attached, which can't Attach to another (attachments.ts). While attached it halves the damage it takes, rounded down, and the target takes the same (shared-damage.ts); it detaches itself for 5 feet of its own movement (resolution/detach.ts), and the target or a creature beside it can try the DC 14 Strength (Athletics) check as an action (resolution/endings.ts)."
+  ),
+  "action:Darkmantle/crush": enforced(
+    "The hit attaches the darkmantle; with Advantage on a Medium or smaller target it covers it, Blinded and suffocating (resolution/on-hit.ts, breath.ts). Attached, it attacks only that target with Advantage (attachments.ts), its own Speed is 0 and it moves with the target (movement-rules.ts, commands/map.ts), and it detaches itself for 5 feet of its movement on its turn (resolution/detach.ts). The target's DC 13 Strength (Athletics) check is an action (resolution/endings.ts)."
+  ),
+  "action:Stirge/proboscis": enforced(
+    "The hit attaches the stirge, which can't make Proboscis attacks while attached, and the 2d4 Necrotic comes at the start of each of its turns (attachments.ts). It detaches itself for 5 feet of its own movement (resolution/detach.ts), and the target or a creature beside it can detach it as an action (resolution/endings.ts)."
+  ),
+  "action:Chain Devil/conjure-infernal-chain": enforced(
+    "The DC 15 Dexterity save is rolled against one creature the devil can see within 60 feet; a failure deals the Fire damage, Restrains it until the end of the devil's next turn and pulls a Large or smaller one up to 30 feet straight toward the devil, no nearer than the space beside it (saving-throws.ts, forced-movement.ts)."
+  ),
+  "action:Night Hag/nightmare-haunting": enforced(
+    "It casts Dream at the hag's numbers with the hag as the messenger, once a day and only while it carries its soul bag (monster-spells.ts, carried-objects.ts). It is refused unless the hag is on the Border Ethereal and sees its target on the Material Plane, and it fails and is wasted on a creature under Protection from Evil and Good or a Magic Circle (resolution/cast-riders.ts). The terrifying message's 3d6 Psychic as the target wakes lowers its Hit Point maximum by as much, and a target it kills has its soul trapped in the bag, which no revival gets past until the bag is destroyed (rest-triggers.ts, resolution/revival.ts, objects.ts). The dream itself is story."
+  ),
+  "action:Weretiger/prowl-tiger-or-hybrid-form-only": enforced(
+    "It works only in the tiger and hybrid forms (transform/rules.ts), and a move of its Speed that provokes no Opportunity Attacks is granted (granted-moves.ts); once the move ends a Hide is offered that takes no action, once (resolution/economy.ts). Whether it has somewhere to hide is the map's and the GM's, as for any Hide."
   ),
   // Cantrips with nothing to roll: the cast is the server's, what it does is the table's.
   "spell:light": enforced(
@@ -1370,8 +1434,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Rust Monster/antennae": enforced(
     "The Dexterity save is rolled against the creature (saving-throws.ts). A failure gives the nonmagical metal armor or weapon the GM names, else its worn armor or its weapon in hand, a cumulative -1 to the AC it offers or to its attack rolls, armor destroyed at AC 10 and a weapon at -5 (row-penalties.ts). A magic item is refused, and Mending removes the penalty (resolution/mend.ts)."
   ),
-  "action:Shadow/draining-swipe": guided(
-    "The hit's Necrotic damage is applied, and the target's Strength drops by 1d4, cumulatively until ended, read by every rule (resolution/score-drain.ts, live-abilities.ts); a target taken to 0 Strength dies. A Shadow rising from a Humanoid it slays 1d4 hours later is the GM's."
+  "action:Shadow/draining-swipe": enforced(
+    "The hit's Necrotic damage is applied, and the target's Strength drops by 1d4, cumulatively until ended, read by every rule (resolution/score-drain.ts, live-abilities.ts); a target taken to 0 Strength dies. A Humanoid it slays rises as a Shadow on no one's side 1d4 hours later on the game clock (timed-revival.ts, game-time.ts)."
   ),
   "action:Phase Spider/bite": enforced(
     "The attack and its 1d10 + 3 Piercing plus 2d8 Poison damage are applied. A target the damage drops to 0 Hit Points is Stable instead of dying, Poisoned and Paralyzed for 1 hour, and regains 1 Hit Point after 1d4 hours unless healed first (stable-at-zero.ts)."
@@ -2227,8 +2291,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Imp/shape-shift": enforced(printedForms("a rat, a raven or a spider, each with its own speeds")),
   "action:Quasit/shape-shift": enforced(printedForms("a bat, a centipede or a toad, each with its own speeds")),
   "action:Succubus/shape-shift": enforced(printedForms("a Medium or Small Humanoid with no Fly Speed")),
-  "action:Mimic/shape-shift": guided(
-    `${printedForms("a Medium or Small object")} Its Adhesive in object form is the GM's.`
+  "action:Mimic/shape-shift": enforced(
+    `${printedForms("a Medium or Small object")} In object form a creature that hits it in melee sticks to it (Adhesive, resolution/struck.ts).`
   ),
   "action:Vampire/shape-shift": guided(
     "transform/assume.ts takes the Tiny bat (no speech) or the Medium mist (no actions or speech, Resistance to all damage, and it can share a space), each with its speeds, and returns to the vampire form. It is refused in sunlight with dynamic vision on, and its Multiattack and Grave Strike work only in the vampire form. Running water, and the sunlight's own damage getting through the mist's Resistance, are the GM's."

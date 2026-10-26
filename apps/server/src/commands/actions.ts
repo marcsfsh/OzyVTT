@@ -13,7 +13,8 @@ import { objectsUnder } from "../resolution/object-targets.js";
 import { withPickedDamageTypes } from "../statblock-picks.js";
 import { builtinActionFor } from "../builtin-actions.js";
 import { effectiveActions } from "../effective-actions.js";
-import { pushTokenAway } from "../forced-movement.js";
+import { destinationAt, openSpaceBeside, pushTokenAway } from "../forced-movement.js";
+import { moveEncounterToken } from "../token-placement.js";
 import { pushThroughZones } from "../pushed-through.js";
 import { placeTemplates } from "../multi-templates.js";
 import { spellRangeFeet } from "@vtt/content-srd-5.2.1/spell-effect";
@@ -586,6 +587,7 @@ export const actionCommands = [
             ...(request.lightId !== undefined ? { lightId: request.lightId } : {}),
             ...(request.ready === true ? { ready: true } : {}),
             ...(request.moveFirst === true ? { moveFirst: true } : {}),
+            ...(request.destination ? { destination: request.destination } : {}),
             // The rest of an action whose move was taken first was paid for then.
             ...(request.moveFirst !== true && activeMoveGrant(draft, attacker)?.owedActionId === action.id
               ? { owedPaid: true }
@@ -608,6 +610,16 @@ export const actionCommands = [
             resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
             catalog: kit.equipmentCatalog(),
             pushToken,
+            // Where a leap or a throw sets its creature down, on the map the action was aimed on.
+            destinationAt: (moverId, at, fromId) =>
+              draft.combat.mapAssetId === mapAssetId ? destinationAt(draft, moverId, at, fromId, geometry) : null,
+            placeToken: (moverId, at) => {
+              if (geometry && draft.combat.mapAssetId === mapAssetId) moveEncounterToken(draft, moverId, at, geometry);
+            },
+            openSpaceBeside: (moverId, besideId, withinFeet) =>
+              draft.combat.mapAssetId === mapAssetId
+                ? openSpaceBeside(draft, moverId, besideId, withinFeet, geometry)
+                : undefined,
             summon: (summonRequest) =>
               bringSummons(
                 draft,

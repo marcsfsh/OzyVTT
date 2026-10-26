@@ -1,4 +1,5 @@
 import { endCasterSpell } from "../spell-endings.js";
+import { SWALLOWED_TAG } from "../swallow.js";
 import { catalogIdOf, type EndedBy } from "@vtt/schemas";
 import type { CheckSubject } from "../ability-checks.js";
 import { addEffect, endEffect, makeEffect } from "../effects.js";
@@ -102,6 +103,7 @@ function takeEnding(ctx: ResolveContext, chosen: Extract<EndingOption, { kind: "
     text: `${attacker.name} ends ${effect.name} on ${bearer.name} (${ending.name}).`,
     actorIds: [attacker.id, bearer.id]
   });
+  stepOutOfHolder(ctx, bearer, effect);
   // "ending the spell on a success" (Detect Thoughts): the caster's hold on it ends too.
   if (ending.endsSpell && effect.sourceActorId && effect.spell)
     for (const event of endCasterSpell(state, effect.sourceActorId, effect.spell.id))
@@ -109,6 +111,25 @@ function takeEnding(ctx: ResolveContext, chosen: Extract<EndingOption, { kind: "
   if (ending.destroysItem) destroySourceItem(ctx, effect);
   // "The puller takes 10 (3d6) Acid damage."
   for (const part of ending.takerDamage ?? []) hurt(ctx, attacker, part, effect.sourceName ?? effect.name, ending.name);
+}
+
+/**
+ * A creature freed from inside another (a gelatinous cube's Engulf: "the target escapes and enters the nearest
+ * unoccupied space", and the same for one pulled out) steps into the nearest unoccupied space outside it.
+ */
+export function stepOutOfHolder(ctx: ResolveContext, bearer: LiveActor, effect: LiveActor["effects"][number]): void {
+  const holderId = effect.sourceActorId;
+  if (!holderId || !effect.tags.includes(SWALLOWED_TAG) || ctx.input.commit === false) return;
+  // Any distance: the nearest unoccupied space, wherever it is.
+  const spot = ctx.deps.openSpaceBeside?.(bearer.id, holderId, 1000);
+  if (spot) {
+    ctx.deps.placeToken?.(bearer.id, spot);
+    ctx.tableNarration.push({
+      kind: "movement",
+      text: `${bearer.name} enters the nearest unoccupied space.`,
+      actorIds: [bearer.id]
+    });
+  } else ctx.warnings.push(`${bearer.name} enters the nearest unoccupied space: move its token there.`);
 }
 
 /** The check a means takes: its ability and skill, and the tool whose proficiency counts, which the taker must carry. */

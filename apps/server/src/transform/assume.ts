@@ -4,6 +4,7 @@ import { storedArmorClass } from "../actor-roster.js";
 import { addEffect, endEffect, type ConditionImmunitySource, type EffectNarration } from "../effects.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
+import { traitOf } from "../statblock-traits.js";
 import { composeOwnForm, composeStatBlockForm, featureDefences } from "./compose.js";
 import { formDefinitionId, formEffectOf, refreshSize, type CreatureSize } from "./forms.js";
 
@@ -46,6 +47,13 @@ export function takeForm(
   const form = effect.form;
   const actor = state.actors.find((candidate) => candidate.id === actorId);
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
+  // A golem's Immutable Form: "The golem can't shape-shift." A form another creature's magic gives it doesn't land.
+  const immutable =
+    form && actor.definitionId ? traitOf(deps.resolveDefinition(actor.definitionId), "immutable-form") : undefined;
+  if (immutable)
+    return [
+      { kind: "effect", text: `${actor.name} can't shape-shift (${immutable.name}) and is unaffected.`, actorId }
+    ];
   if (!form) {
     addEffect(state, actorId, effect, undefined, immunities);
     return [];

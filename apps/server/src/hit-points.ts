@@ -1,4 +1,6 @@
 import { bondCasterOf } from "./warding-bond.js";
+import { markTimedRise } from "./timed-revival.js";
+import { damageShares } from "./shared-damage.js";
 import { formsAfterDamage } from "./transform/rules.js";
 import { lycanthropyAtZero } from "./transform/at-zero.js";
 import {
@@ -113,7 +115,8 @@ export type DamageInput = Readonly<{
   nonlethal?: boolean;
   /** What the damage drains as it lands (a Life Drain's lower Hit Point maximum, Vampiric Touch's healing). */
   drain?: DamageDrain;
-  /** A Warding Bond caster's share of its ward's damage, which is not shared on again. */
+  /** A share of another creature's damage (Warding Bond's caster, a cloaker's target, a shield guardian), which is
+   *  not shared on again. */
   bondShare?: true;
 }>;
 export type DamageDeps = Readonly<{
@@ -479,7 +482,8 @@ function fallToZero(
   overflow: number,
   deps: DamageDeps | undefined,
   events: EffectNarration[],
-  outright = false
+  outright = false,
+  killerId: string | null = null
 ): Readonly<{ instantDeath: boolean; defeated: boolean }> {
   let instantDeath = false;
   let defeated = false;
@@ -508,7 +512,11 @@ function fallToZero(
       !outright &&
       (holdOnAtZero(state, actor, definition, events) || mistyEscape(state, actor, definition, deps, events));
     if (!holds && deps) deathBurst(state, actor, definition, deps, events);
-    if (!holds) restorationAtDeath(state, actor, definition, events);
+    if (!holds)
+      restorationAtDeath(state, actor, definition, events, {
+        id: killerId,
+        ...(deps?.rollDie ? { rollDie: deps.rollDie } : {})
+      });
   }
   // At 0 HP a combatant can't sustain effects (grapples, rage); incapacitation also breaks
   // concentration (SRD Concentration).
@@ -774,13 +782,14 @@ export function applyDamageDetailed(
   const actor = adjustableActor(state, actorId, scope);
   const events: EffectNarration[] = [];
   const rolling = reductionRolling(state, actor, deps?.rollDie);
-  const { totalRequested, totalAdjusted, flatReduction, parts, oilIgnited } = weighDamage(
-    state,
-    actor,
-    input,
-    deps,
-    rolling
-  );
+  const weighed = weighDamage(state, actor, input, deps, rolling);
+  const { totalRequested, flatReduction, parts, oilIgnited } = weighed;
+  // A holder that halves its damage onto what it holds, or a guardian that takes half its wearer's (`shared-damage.ts`).
+  const sharing =
+    input.bondShare === true
+      ? { kept: weighed.totalAdjusted, shares: [] }
+      : damageShares(state, actor, weighed.totalAdjusted, deps);
+  const totalAdjusted = sharing.kept;
   // A once-a-turn reduction that helped is spent for this turn (Resistance).
   if (rolling?.turnKey !== undefined && rolling.used.length > 0)
     actor.effects = actor.effects.map((effect) =>
@@ -943,7 +952,16 @@ export function applyDamageDetailed(
   ) {
     // A lycanthrope's curse: it becomes the lycanthrope instead of dropping.
   } else if (!wasAtZero && actor.hp.current === 0 && damageToHp > 0) {
-    const fell = fallToZero(state, actor, definition, damageToHp - hpBefore, deps, events);
+    const fell = fallToZero(
+      state,
+      actor,
+      definition,
+      damageToHp - hpBefore,
+      deps,
+      events,
+      false,
+      input.sourceActorId ?? null
+    );
     instantDeath = fell.instantDeath;
     defeated = fell.defeated;
   }
@@ -974,7 +992,11 @@ export function applyDamageDetailed(
   if (totalAdjusted > 0) events.push(...formsAfterDamage(state, actor));
   // Finger of Death: a Humanoid it kills rises as a Zombie at the start of its caster's next turn.
   if (input.drain?.slainRise && totalAdjusted > 0 && !deadBefore && isDead(actor))
-    events.push(...markRising(state, actor, definition, input.drain.slainRise, input.sourceActorId));
+    events.push(
+      ...(input.drain.slainRise.afterHours
+        ? markTimedRise(state, actor, definition, input.drain.slainRise, deps?.rollDie)
+        : markRising(state, actor, definition, input.drain.slainRise, input.sourceActorId))
+    );
 
   // SRD Concentration: damage while concentrating prompts a CON save, DC max(10, half the damage) capped
   // at 30, in a fight or out of one (a trap between fights). The prompt carries the effects a committed failure
@@ -1041,6 +1063,26 @@ export function applyDamageDetailed(
         actorId: bondCaster
       },
       ...shared.events
+    );
+  }
+
+  // What the holder or the guardian passes on (`shared-damage.ts`), untyped and not passed on again.
+  for (const share of sharing.shares) {
+    const passed = applyDamageDetailed(
+      state,
+      share.actorId,
+      { amount: share.amount, sourceName: share.via, bondShare: true },
+      { role: "gm" },
+      deps
+    );
+    const name = state.actors.find((candidate) => candidate.id === share.actorId)?.name ?? "Another creature";
+    events.push(
+      {
+        kind: "damage",
+        text: `${name} takes ${passed.application.totalApplied} of ${actor.name}'s damage (${share.via}).`,
+        actorId: share.actorId
+      },
+      ...passed.events
     );
   }
 

@@ -27,7 +27,10 @@ export function withMonsterSpells(
     if (!casts) return [action];
     if (casts.self) {
       const entry = casts.spells[0]!;
-      return [{ ...action, ...castOf(entry, casts, spellRecord(entry.spellId), definition, action) }];
+      return [
+        { ...action, ...castOf(entry, casts, spellRecord(entry.spellId), definition, action) },
+        ...laterCasts(action, casts, spellRecord, definition, taken)
+      ];
     }
     const children = casts.spells
       .filter((entry) => !taken.has(entry.id))
@@ -59,9 +62,33 @@ function laterCasts(
       if (taken.has(built.id)) return [];
       taken.add(built.id);
       const level = entry.atLevel ?? spell!.level;
-      return [{ ...(level > spell!.level ? upcastAction(built, spell!, level) : built), partOf: parent.id }];
+      const later = level > spell!.level ? upcastAction(built, spell!, level) : built;
+      return [{ ...withCastRiders(later, parent.castRiders), partOf: parent.id }];
     });
   });
+}
+
+/** A later action of a cast with riders (a night hag's Dream): it reaches from the Border Ethereal too, and the damage
+ *  its lasting effect deals as its bearer wakes lowers the maximum and traps the soul it kills. */
+function withCastRiders(later: ActorAction, riders: ActorAction["castRiders"]): ActorAction {
+  if (!riders) return later;
+  const atRest = later.save?.atRest;
+  return {
+    ...later,
+    ...(riders.fromEthereal ? { castRiders: { fromEthereal: true } } : {}),
+    ...(later.save && atRest
+      ? {
+          save: {
+            ...later.save,
+            atRest: {
+              ...atRest,
+              ...(riders.drainsMaximum ? { drainsMaximum: true as const } : {}),
+              ...(riders.trapsSoul ? { trapsSoul: true as const } : {})
+            }
+          }
+        }
+      : {})
+  };
 }
 
 /** The name a cast of an entry goes by: the spell's, and the level when it isn't the spell's own ("Acid Arrow (level

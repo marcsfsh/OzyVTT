@@ -1,4 +1,5 @@
 import { d20Count, d20FacesFor, effectiveSlot, otherDiceOf, type AggregatedRollMode } from "@vtt/rules-5e";
+import { DETACH_SELF_ID, detachItself } from "./detach.js";
 import { wardedConditions } from "../paladin-auras.js";
 import type { ActorDefinition } from "@vtt/schemas";
 import {
@@ -34,7 +35,7 @@ import {
 } from "../effects.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { putOutFire } from "../hazards.js";
-import { endAnEffect, isNamedEnding, namedEnding } from "./endings.js";
+import { endAnEffect, isNamedEnding, namedEnding, stepOutOfHolder } from "./endings.js";
 import { CommandRejectedError } from "../game-store.js";
 import { touchBead } from "../zone-touch.js";
 import { holdsTalisman, SPHERE_CONTROL_TAG } from "../zone-sphere.js";
@@ -478,6 +479,7 @@ function escapeGrapple(ctx: ResolveContext): void {
   if (rollCheck(ctx, subject, escapable.escapeDc, undefined, escapable.linkedConditionIds, undefined, hindered)) {
     endEffect(state, attacker.id, escapable.id);
     ctx.effectsEnded.push(endedEffect(attacker, escapable));
+    stepOutOfHolder(ctx, attacker, escapable);
   }
 }
 
@@ -751,6 +753,7 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   "control-sphere": { check: controlSphere },
   "move-sphere": { apply: moveSphere(false) },
   "move-sphere-far": { apply: moveSphere(true) },
+  [DETACH_SELF_ID]: { apply: detachItself },
 
   /** Strength + Proficiency Bonus to hit, then flat 1 + Strength Bludgeoning damage. A Monk's Martial Arts strike taken
    *  as a Bonus Action brings its own numbers, which stand. */

@@ -238,7 +238,10 @@ function halfOnAMiss(ctx: ResolveContext, parts: ResolveContext["action"]["damag
 export function dartDamageTargetsOf(ctx: ResolveContext): DamageTarget[] | null {
   if (ctx.dartTargetIds.length === 0) return null;
   const first = ctx.dartTargetIds[0]!;
-  const struck = [...new Set(ctx.dartTargetIds)];
+  // A dart at a creature the spell no longer affects (a tarrasque's Reflective Carapace) strikes no one.
+  const struck = [...new Set(ctx.dartTargetIds)].filter((targetId) =>
+    ctx.targets.some((target) => target.id === targetId)
+  );
   return struck.map((targetId) => {
     const parts = owedDamageParts({
       damage: ctx.damage.filter((_, index) => (ctx.dartTargetIds[index] ?? first) === targetId),

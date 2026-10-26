@@ -378,6 +378,13 @@ export const PendingSaveSchema = z
     drain: DamageDrainSchema.optional(),
     /** Where a failure pushes the creature (Thunderwave), narrated when it lands. */
     failurePush: ForcedPushSchema.optional(),
+    /** Where a success pushes the creature (a bulette's Deadly Leap), narrated when it lands. */
+    successPush: ForcedPushSchema.optional(),
+    /** A success moves the creature out beside the source, failing with no room (a gelatinous cube's Engulf). */
+    successMovesOut: z
+      .object({ withinFeet: z.number().int().min(5).max(30) })
+      .strict()
+      .optional(),
     /** SRD Mounted Combat: a failure throws the rider off this mount, landing Prone within 5 feet of it. GM
      *  bookkeeping, never projected: the fall is narrated when it lands. */
     unseats: z.uuid().optional(),
@@ -715,6 +722,8 @@ export const RollCallSchema = z
     subject: CheckSubjectSchema,
     dc: z.number().int().min(1).max(40).nullable(),
     blind: z.boolean().default(false),
+    /** The creature the check is about (Insight into a sphinx's intentions). GM bookkeeping, never projected. */
+    aboutActorId: z.uuid().optional(),
     entries: z.array(RollCallEntrySchema).min(1).max(20),
     createdAt: z.number().int().nonnegative()
   })

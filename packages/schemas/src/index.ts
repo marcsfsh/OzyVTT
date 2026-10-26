@@ -1493,11 +1493,16 @@ export const RestTriggerSchema = z
     damage: RepeatFailureDamageSchema.optional(),
     /** It acts once and ends (Dream: "the target gains no benefit from its rest, and it takes 3d6 Psychic damage when
      *  it wakes up"). */
-    once: z.literal(true).optional()
+    once: z.literal(true).optional(),
+    /** The damage it deals lowers the Hit Point maximum by as much (a night hag's Nightmare Haunting). */
+    drainsMaximum: z.literal(true).optional(),
+    /** A bearer the damage kills has its soul trapped by the effect's source, and can't be raised until the source's
+     *  soul bag is destroyed (a night hag's Nightmare Haunting). */
+    trapsSoul: z.literal(true).optional()
   })
   .strict()
   .describe(
-    "What the effect does as its bearer finishes a Long Rest or as each day passes: a save that ends it, a Hit Point maximum loss, the rests that give no benefit, a maximum a Long Rest doesn't restore, damage as it wakes, and whether it acts only once"
+    "What the effect does as its bearer finishes a Long Rest or as each day passes: a save that ends it, a Hit Point maximum loss, the rests that give no benefit, a maximum a Long Rest doesn't restore, damage as it wakes (lowering the maximum by as much, and trapping the soul of a bearer it kills), and whether it acts only once"
   );
 export type RestTrigger = z.infer<typeof RestTriggerSchema>;
 
@@ -1869,7 +1874,11 @@ export const EffectInstanceSchema = z
         towardActorId: z.uuid().optional(),
         /** It passes through the spaces of creatures this size or smaller, and these are the ones it has entered. */
         throughCreatures: SizeSchema.optional(),
-        entered: z.array(z.uuid()).max(50).optional()
+        entered: z.array(z.uuid()).max(50).optional(),
+        /** The move ends by letting go of what its creature grapples (a roc's Swoop). */
+        dropsHeld: z.literal(true).optional(),
+        /** At its end the creature can take the Hide action freely (a weretiger's Prowl). */
+        thenHide: z.literal(true).optional()
       })
       .strict()
       .optional(),
@@ -2166,7 +2175,32 @@ export const DeathRecordSchema = z
     /** Its head is gone (a Vorpal Sword): a revival that restores no missing body parts can't bring it back. */
     headLost: z.literal(true).optional(),
     /** Rounds of game time its body spent under Gentle Repose, which no revival's time limit counts. */
-    reposedRounds: z.number().int().min(0).max(CLOCK_ROUNDS_LIMIT).optional()
+    reposedRounds: z.number().int().min(0).max(CLOCK_ROUNDS_LIMIT).optional(),
+    /** It comes back to life by its own trait once the game clock reaches this round (Celestial Restoration), unless
+     *  something stops it first; `needs`: only while it still has the object its effect so tagged marks. */
+    returns: z
+      .object({
+        atClockRound: z.number().int().min(-CLOCK_ROUNDS_LIMIT).max(CLOCK_ROUNDS_LIMIT),
+        name: z.string().min(1).max(60),
+        needs: z.string().min(1).max(60).optional()
+      })
+      .strict()
+      .optional(),
+    /** A creature rises from its corpse once the game clock reaches this round (a Shadow, 1d4 hours after a shadow's
+     *  Draining Swipe slays a Humanoid). */
+    rises: z
+      .object({
+        atClockRound: z.number().int().min(-CLOCK_ROUNDS_LIMIT).max(CLOCK_ROUNDS_LIMIT),
+        monsterId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80)
+      })
+      .strict()
+      .optional(),
+    /** Its soul is held by another creature's object (a night hag's soul bag): it can't be raised until it is
+     *  released. */
+    soulTrappedBy: z.uuid().optional()
   })
   .strict();
 export type DeathRecord = z.infer<typeof DeathRecordSchema>;
@@ -3228,12 +3262,17 @@ export const SaveConditionSchema = z.enum([
 export type SaveCondition = z.infer<typeof SaveConditionSchema>;
 
 /** Forced movement straight away from the creature that causes it (SRD): Thunderwave's 10 feet, a fire giant's Hammer
- *  Throw "up to 15 feet". `upTo` lets the source stop it short; `maxTargetSize` is the largest creature it moves. */
+ *  Throw "up to 15 feet". `upTo` lets the source stop it short; `maxTargetSize` is the largest creature it moves.
+ *  `toward` pulls it straight toward the source instead, stopping beside it (a chain devil's Conjure Infernal Chain:
+ *  "moves the target up to 30 feet straight toward itself"); `intoSpace` pulls it into the source's own space (a
+ *  shambling mound's Engulf: "The target is pulled into the shambling mound's space"). */
 export const ForcedPushSchema = z
   .object({
     feet: z.number().int().min(5).max(120),
     upTo: z.literal(true).optional(),
-    maxTargetSize: SizeSchema.optional()
+    maxTargetSize: SizeSchema.optional(),
+    toward: z.literal(true).optional(),
+    intoSpace: z.literal(true).optional()
   })
   .strict();
 export type ForcedPush = z.infer<typeof ForcedPushSchema>;
@@ -3381,6 +3420,20 @@ export const SaveOutcomeFields = {
   /** A failure also pushes the creature straight away from the source (Thunderwave: "is pushed 10 feet away from
    *  you"). */
   failurePush: ForcedPushSchema.optional(),
+  /** A success pushes the creature straight away from the source (a bulette's Deadly Leap: "Success: Half damage, and
+   *  the target is pushed 5 feet straight away from the bulette"). */
+  successPush: ForcedPushSchema.optional().describe(
+    "A success pushes the creature straight away from the source (a bulette's Deadly Leap: 5 feet)"
+  ),
+  /** A success moves the creature out to the nearest unoccupied space within `withinFeet` of the source, and with no
+   *  such space the save fails instead (a gelatinous cube's Engulf). */
+  successMovesOut: z
+    .object({ withinFeet: z.number().int().min(5).max(30) })
+    .strict()
+    .optional()
+    .describe(
+      "A success moves the creature to the nearest unoccupied space within `withinFeet` of the source; with none, the save fails instead (a gelatinous cube's Engulf)"
+    ),
   /** A creature this size or larger has Advantage on the save (Ensnaring Strike: "A Large or larger creature has
    *  Advantage on this save"). */
   advantageAtSize: SizeSchema.optional(),
@@ -3988,7 +4041,10 @@ export const DamageDrainSchema = z
           .string()
           .regex(/^[a-z0-9-]+$/)
           .max(31),
-        creatureTypes: z.array(RiderSlugSchema).min(1).max(4).optional()
+        creatureTypes: z.array(RiderSlugSchema).min(1).max(4).optional(),
+        /** It rises this many hours of game time later, on no one's side but its own (a shadow's Draining Swipe: "a
+         *  Shadow rises from the corpse 1d4 hours later"). */
+        afterHours: DiceFormulaSchema.optional()
       })
       .strict()
       .optional()
@@ -4034,6 +4090,17 @@ export const OnHitRiderSchema = z
     /** The effect lands on the attacker instead of the target (a pirate captain's Advantage on its next attack). Its
      *  `until-source-turn-end` duration then means the end of this turn. */
     self: z.literal(true).optional(),
+    /** What the effect also carries when the attack roll had Advantage and the target is `maxTargetSize` or smaller (a
+     *  darkmantle's Crush: "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it
+     *  covers the target, which has the Blinded condition and is suffocating while the darkmantle is attached"). */
+    advantageAdds: z
+      .object({
+        conditions: z.array(ConditionIdSchema).max(2),
+        tags: z.array(EffectTagSchema).max(2).optional(),
+        maxTargetSize: SizeSchema.optional()
+      })
+      .strict()
+      .optional(),
     /** Modifiers the effect carries while it lasts: a Speed cut (a frost giant's Great Bow), Disadvantage on the
      *  target's next attack roll (an ettin's Morningstar, with the `until-own-attack` tag). */
     modifiers: EffectModifiersSchema.optional(),
@@ -4858,7 +4925,13 @@ export const ActionMoveSchema = z
     first: z.literal(true).optional(),
     /** The largest creature whose space it may pass through (a gelatinous cube's Engulf: "can move through the spaces
      *  of Large or smaller creatures"); the creatures whose spaces it enters are what the action then targets. */
-    throughCreatures: SizeSchema.optional()
+    throughCreatures: SizeSchema.optional(),
+    /** It is taken only while its user grapples a creature, and the move ends by letting it go, a creature carried into
+     *  the air falling from there (a roc's Swoop: "If the roc has a creature Grappled, the roc flies up to half its Fly
+     *  Speed ... and drops that creature"). */
+    dropsHeld: z.literal(true).optional(),
+    /** At the end of the move its user can take the Hide action with no action of its own (a weretiger's Prowl). */
+    thenHide: z.literal(true).optional()
   })
   .strict();
 export type ActionMove = z.infer<typeof ActionMoveSchema>;
@@ -5760,11 +5833,54 @@ export const ActionSchema = z
       .min(1)
       .max(3)
       .optional(),
+    /** A space on the map its use picks, where the action sets a creature down before anything rolls: its user (a
+     *  bulette's Deadly Leap: "spends 5 feet of movement to jump to a space within 15 feet that contains one or more
+     *  Large or smaller creatures") or its one target (a kraken's Fling: "throws a Large or smaller creature Grappled by
+     *  it to a space it can see within 60 feet of itself that isn't in the air"). The space is within `feet` of the user,
+     *  one it sees with `seen`, on the ground with `ground`, holding a creature of `onto` size or smaller where it says
+     *  so, and costs the user `costFeet` of movement. The creature set down and each creature in that space then make
+     *  the action's save; a thrown creature is let go. */
+    destination: z
+      .object({
+        who: z.enum(["user", "target"]),
+        feet: z.number().int().min(5).max(300),
+        costFeet: z.number().int().min(5).max(60).optional(),
+        seen: z.literal(true).optional(),
+        ground: z.literal(true).optional(),
+        onto: SizeSchema.optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "A space its use picks, where it sets down its user (a bulette's Deadly Leap) or its one target (a kraken's Fling) before anything rolls: within `feet` of the user, seen with `seen`, on the ground with `ground`, holding a creature of `onto` size or smaller, costing the user `costFeet` of movement. The creature set down and each creature in that space make the save"
+      ),
     /** A jump the action allows this turn ("jumps up to 30 feet by spending 10 feet of movement"). */
     leap: z
       .object({ feet: z.number().int().min(5).max(120), costFeet: z.number().int().min(0).max(60) })
       .strict()
       .optional(),
+    /** It can be used only while its user still has the object it carries tagged so, whole (a night hag's Nightmare
+     *  Haunting needs its soul bag, an erinyes's Entangling Rope its magic rope); a hold the action leaves is that
+     *  object, with its Hit Points. */
+    needsObject: EffectTagSchema.optional().describe(
+      "It can be used only while its user still has the carried object tagged so, whole (a night hag's soul bag); a hold it leaves is that object"
+    ),
+    /** What a spell it casts holds to beyond the spell's own rules (a night hag's Nightmare Haunting casting Dream):
+     *  `fromEthereal`, cast only from the Border Ethereal at creatures on the Material Plane; `failsUnder`, the spells
+     *  (by id or effect tag) whose ward on a target makes the cast fail and be wasted; `drainsMaximum` and `trapsSoul`,
+     *  what its later damage does (`RestTriggerSchema`). Its later actions (Dream's terrifying message) carry them. */
+    castRiders: z
+      .object({
+        fromEthereal: z.literal(true).optional(),
+        failsUnder: z.array(EffectTagSchema).min(1).max(4).optional(),
+        drainsMaximum: z.literal(true).optional(),
+        trapsSoul: z.literal(true).optional()
+      })
+      .strict()
+      .optional()
+      .describe(
+        "What a spell it casts holds to beyond the spell's own rules: cast only from the Border Ethereal at creatures on the Material Plane, the wards on a target that make it fail and be wasted, and whether its later damage lowers the Hit Point maximum and traps the soul of a creature it kills"
+      ),
     /** What it does to light and sight while it lasts (a darkmantle's Darkness Aura, an octopus's ink). */
     sight: SightEffectSchema.optional(),
     /** The spells it casts, each its own cast action in play (a Spellcasting list, a Misty Step); see `CastsSpellsSchema`. */
@@ -5804,7 +5920,14 @@ export const ActionSchema = z
             /** Only against a target of at most this size. */
             maxTargetSize: SizeSchema.optional(),
             /** Conditions it imposes too (a charge's Prone). */
-            conditions: z.array(ConditionIdSchema).max(2).optional()
+            conditions: z.array(ConditionIdSchema).max(2).optional(),
+            /** An action of its user's it may then make against the target with no further action, once its
+             *  conditions land (an allosaurus's charge: "the allosaurus can make one Bite attack against it"). */
+            followUp: z
+              .string()
+              .regex(/^[a-z0-9-]+$/)
+              .max(120)
+              .optional()
           })
           .strict()
       )
@@ -6333,8 +6456,106 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
    *  sunlight, where it can't shape-shift and is destroyed. */
   z.object({ kind: z.literal("misty-escape"), name: TraitNameSchema }).strict(),
   /** A creature that comes back after it dies (Diabolical Restoration, a lich's Spirit Jar): `bodyGoes` when its body
-   *  disappears as it dies. Where and when it returns are the GM's. */
-  z.object({ kind: z.literal("restoration"), name: TraitNameSchema, bodyGoes: z.literal(true).optional() }).strict(),
+   *  disappears as it dies. `returns`: it comes back to life where it died with all its Hit Points after the dice's
+   *  hours or days of game time ("returns to life in 1d6 days"), unless `preventedBy` stops it (Dispel Evil and Good
+   *  cast on its remains, a killer under Bless, Holy Water on its remains, or only Wish), and only while it still has
+   *  the object its effect tagged `needs` marks (a mummy lord's heart, a lich's spirit jar). Where it reappears is the
+   *  GM's. */
+  z
+    .object({
+      kind: z.literal("restoration"),
+      name: TraitNameSchema,
+      bodyGoes: z.literal(true).optional(),
+      returns: z
+        .object({
+          after: z.union([z.number().int().min(1).max(1000), DiceFormulaSchema]),
+          unit: z.enum(["hours", "days"]),
+          preventedBy: z
+            .array(z.enum(["dispel-evil-and-good", "blessed-killer", "holy-water", "wish"]))
+            .max(3)
+            .optional(),
+          needs: EffectTagSchema.optional(),
+          /** Only where it died there ("If the lemure dies in the Nine Hells"), which the GM knows. */
+          onlyIn: z.string().min(1).max(60).optional()
+        })
+        .strict()
+        .optional()
+    })
+    .strict(),
+  /** What a creature carries that has its own statistics (a night hag's Soul Bag, an erinyes's Magic Rope, a mummy
+   *  lord's heart, a lich's spirit jar): it joins the roster as an effect on the creature tagged `tag`, an object with
+   *  `object`'s Armor Class and Hit Points that can be attacked; at 0 Hit Points it is destroyed. `restoresAtRest`: its
+   *  creature restores it when it finishes a Short or Long Rest. */
+  z
+    .object({
+      kind: z.literal("carried-object"),
+      name: TraitNameSchema,
+      tag: EffectTagSchema,
+      object: ObjectPrintSchema.optional(),
+      restoresAtRest: z.literal(true).optional()
+    })
+    .strict(),
+  /** An incubus's Succubus Form: "When the incubus finishes a Long Rest, it can shape-shift into a Succubus, using that
+   *  stat block instead of this one." */
+  z
+    .object({
+      kind: z.literal("form-at-rest"),
+      name: TraitNameSchema,
+      monsterId: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(80)
+    })
+    .strict(),
+  /** A mimic's Adhesive (Object Form Only): "The mimic adheres to anything that touches it. A Huge or smaller creature
+   *  adhered to the mimic has the Grappled condition (escape DC 13). Ability checks made to escape this grapple have
+   *  Disadvantage." A creature that hits it with a melee attack while it is in one of `forms` is grappled so. */
+  z
+    .object({
+      kind: z.literal("adhesive"),
+      name: TraitNameSchema,
+      maxSize: SizeSchema,
+      escapeDc: z.number().int().min(1).max(40),
+      forms: z.array(RiderSlugSchema).min(1).max(3)
+    })
+    .strict(),
+  /** A nightmare's Confer Fire Resistance: its rider has Resistance to this damage type while it rides it. */
+  z.object({ kind: z.literal("confers-resistance"), name: TraitNameSchema, damageType: DamageTypeSchema }).strict(),
+  /** A sahuagin's Shark Telepathy: "can magically control sharks within 120 feet of itself": the creatures whose stat
+   *  block's name holds `nameHas` within `withinFeet` follow its orders and fight on its side. */
+  z
+    .object({
+      kind: z.literal("controls-kind"),
+      name: TraitNameSchema,
+      nameHas: z.string().min(1).max(40),
+      withinFeet: z.number().int().min(5).max(1000)
+    })
+    .strict(),
+  /** A sphinx's Inscrutable: a Wisdom (`skill`) check the GM calls about this creature has Disadvantage. */
+  z.object({ kind: z.literal("inscrutable"), name: TraitNameSchema, skill: RiderSlugSchema }).strict(),
+  /** A golem's Immutable Form: "The golem can't shape-shift." No form can be put on it. */
+  z.object({ kind: z.literal("immutable-form"), name: TraitNameSchema }).strict(),
+  /** A gelatinous cube's Transparent: unnoticed until it moves or acts, a creature finding it with a Wisdom (Perception)
+   *  check against `dc`. */
+  z.object({ kind: z.literal("transparent"), name: TraitNameSchema, dc: z.number().int().min(1).max(40) }).strict(),
+  /** A tarrasque's Reflective Carapace: Magic Missile or a spell with a ranged attack roll aimed at it rolls a d6; it is
+   *  unaffected on anything, and on a 6 the spell turns on its caster. */
+  z.object({ kind: z.literal("reflective-carapace"), name: TraitNameSchema }).strict(),
+  /** A troll limb's Troll Spawn: "If the limb isn't destroyed within 24 hours, roll 1d12. On a 12, the limb turns into a
+   *  Troll. Otherwise, the limb withers away." */
+  z
+    .object({
+      kind: z.literal("spawns"),
+      name: TraitNameSchema,
+      afterHours: z.number().int().min(1).max(720),
+      die: z.number().int().min(2).max(100),
+      on: z.number().int().min(1).max(100),
+      monsterId: z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .max(80)
+    })
+    .strict(),
   /** A hydra's Multiple Heads: it starts with `heads`, loses one each turn it takes `damagePerHead` or more, dies with
    *  the last, and at the end of its turn grows two for each lost since its last turn, regaining `regrowHitPoints`,
    *  unless it took one of `stoppedBy` since then. Its Multiattack makes one `attackId` attack per head, and each head
@@ -6368,6 +6589,15 @@ export const TraitMechanicSchema = z.discriminatedUnion("kind", [
         .string()
         .regex(/^[a-z0-9-]+$/)
         .max(80)
+    })
+    .strict(),
+  /** A shield guardian's Bound: "If the guardian is within 60 feet of the amulet's wearer, half of any damage the wearer
+   *  takes (round up) is transferred to the guardian." The wearer is the creature that commands it. */
+  z
+    .object({
+      kind: z.literal("shares-wearer-damage"),
+      name: TraitNameSchema,
+      withinFeet: z.number().int().min(5).max(300)
     })
     .strict(),
   /** A shield guardian's Spell Storing: its commander, wearing its amulet, casts a spell of `maxLevel` or lower on it

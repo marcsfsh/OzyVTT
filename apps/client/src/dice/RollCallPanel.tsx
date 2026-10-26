@@ -25,6 +25,9 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
   const [blind, setBlind] = useState(false);
   // What the check relies on: a Blinded character fails one that needs sight, a Deafened one one that needs hearing.
   const [sense, setSense] = useState<"" | "sight" | "hearing">("");
+  // The creature a check is about (Insight into a sphinx's intentions), whose traits can weigh on it.
+  const [about, setAbout] = useState("");
+  const others = state.actors.filter((actor) => actor.kind !== "player-character" && !actor.archived);
   // Characters left out of the next call; everyone is in until the GM taps them out.
   const [left, setLeft] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -68,6 +71,7 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
       ability,
       ...(kind === "check" && skill ? { skill } : {}),
       ...(kind === "check" && sense ? { sense } : {}),
+      ...(kind === "check" && about ? { aboutActorId: about } : {}),
       ...(dcValue !== undefined ? { dc: dcValue } : {}),
       actorIds: chosen.map((actor) => actor.id),
       ...(kind === "check" && blind ? { blind: true } : {})
@@ -152,6 +156,19 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
                   <option value="">Nothing more</option>
                   <option value="sight">Sight</option>
                   <option value="hearing">Hearing</option>
+                </Select>
+              </label>
+            )}
+            {kind === "check" && others.length > 0 && (
+              <label>
+                About
+                <Select value={about} onChange={(event) => setAbout(event.target.value)}>
+                  <option value="">None</option>
+                  {others.map((actor) => (
+                    <option key={actor.id} value={actor.id}>
+                      {actor.name}
+                    </option>
+                  ))}
                 </Select>
               </label>
             )}

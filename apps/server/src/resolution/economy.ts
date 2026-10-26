@@ -1,4 +1,6 @@
 import { WISH_LOST_TAG } from "./wish.js";
+import { spareOpportunityReactions } from "../reactive-heads.js";
+import { carriedObjectViolation } from "../carried-objects.js";
 import { reactionSpent, spendReaction } from "../commanded-reactions.js";
 import { formViolations } from "../transform/rules.js";
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
@@ -56,6 +58,8 @@ import { END_EFFECT_ACTION_ID, hasEndingOption, NO_ENDING_OPTION } from "../endi
 import { castMarks, markMoveOf } from "./marks.js";
 import { actionTargetViolations } from "./action-targets.js";
 import { swallowViolations } from "../swallow.js";
+import { followUpViolation } from "../follow-ups.js";
+import { THEN_HIDE_TAG } from "../granted-moves.js";
 import { bloodiedHitViolation } from "../bloodied-hits.js";
 import { attachmentViolations } from "../attachments.js";
 import { hitRiderOf } from "./hit-riders.js";
@@ -163,6 +167,8 @@ type Evaluation = Readonly<{
   proseMultiattack: boolean;
   /** Step of the Wind right after another Bonus Action takes no Bonus Action of its own (Fleet Step). */
   freeBonusAction?: boolean;
+  /** An Opportunity Attack, which a hydra's extra Reactions can take (Reactive Heads). */
+  opportunity?: boolean;
   violations: RuleViolation[];
   softViolations: RuleViolation[];
   notes: string[];
@@ -205,6 +211,7 @@ export function evaluateActionEconomy(
     silenced?: boolean;
     areaPlaced?: boolean;
     shaping?: readonly CastShaping[];
+    opportunity?: boolean;
   }> = {}
 ): EconomyEvaluation {
   // A Multiattack whose other plan waits on an action used this turn (a clay golem's Hasten) plans as it stands now.
@@ -222,7 +229,9 @@ export function evaluateActionEconomy(
     resolveDefinition,
     onOwnTurn: state.combat.turnActorId === attacker.id,
     proseMultiattack: siblings.some((candidate) => candidate.untrackedMultiattack === true),
-    freeBonusAction: fleet.free,
+    // A weretiger's Prowl ends with a Hide that takes no action of its own.
+    freeBonusAction: fleet.free || hidesFreely(attacker, action),
+    ...(cast.opportunity ? { opportunity: true } : {}),
     violations: [],
     softViolations: [],
     notes: []
@@ -294,6 +303,12 @@ export function evaluateActionEconomy(
     ...attachmentViolations(state, attacker, action, targetIds),
     // A Rampage waits on damage to a creature already Bloodied.
     ...[bloodiedHitViolation(state, attacker, action)].filter((violation) => violation !== null),
+    // An action that needs what its user carries (a night hag's soul bag) waits on it whole.
+    ...[carriedObjectViolation(attacker, action)]
+      .filter((message) => message !== null)
+      .map((message) => ({ rule: "feature.requires-effect" as const, message: message! })),
+    // A follow-up attack a hit opened goes only at that hit's target (an allosaurus's Bite).
+    ...[followUpViolation(state, attacker, action, targetIds)].filter((violation) => violation !== null),
     ...raiseViolations({ state, attacker, action, targetIds })
   );
   if (spell) checkMarkMove(evaluation, spell);
@@ -1229,6 +1244,12 @@ function checkActionSlots(evaluation: Evaluation): SlotPlan {
   // A released spell's later rays come with the Reaction its first ray took.
   if (readied && heldReadiedSpell(attacker, action.id)?.raysLeft !== undefined) return unchanged;
   if (action.activation === "reaction" || readied) {
+    // A hydra's heads beyond one each give it another Reaction for Opportunity Attacks (Reactive Heads).
+    const spareHead =
+      evaluation.opportunity === true &&
+      evaluation.resolveDefinition !== undefined &&
+      spareOpportunityReactions(attacker, evaluation.resolveDefinition) > 0;
+    if (spareHead) return { ...unchanged, markReaction: true };
     if (state.combat.reactionsUsed.includes(attacker.id))
       violations.push({
         rule: "economy.reaction-used",
@@ -1802,7 +1823,8 @@ export function planEconomy(
     {
       ...(input.silenced === true ? { silenced: true } : {}),
       ...(input.areaPlaced === true ? { areaPlaced: true } : {}),
-      ...(input.shaping && input.shaping.length > 0 ? { shaping: input.shaping } : {})
+      ...(input.shaping && input.shaping.length > 0 ? { shaping: input.shaping } : {}),
+      ...(input.attackKinds?.includes("opportunity") ? { opportunity: true } : {})
     }
   );
   warnings.push(...notes);
@@ -1962,4 +1984,9 @@ export function commitUse(state: GameState, attacker: LiveActor, spendUse: NonNu
     [spendUse.key]: (attacker.actionUses[spendUse.key] ?? 0) + spendUse.amount,
     ...(spendUse.also ? { [spendUse.also]: (attacker.actionUses[spendUse.also] ?? 0) + 1 } : {})
   };
+}
+
+/** The Hide a move's end offers (a weretiger's Prowl): its Bonus Action form, while the effect that offers it lasts. */
+function hidesFreely(attacker: LiveActor, action: DefinitionAction): boolean {
+  return action.id === "hide-bonus" && attacker.effects.some((effect) => effect.tags.includes(THEN_HIDE_TAG));
 }

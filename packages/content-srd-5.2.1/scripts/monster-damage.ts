@@ -103,6 +103,12 @@ export function printedHitDamage(
     : /If (?:the )?target is (?:a )?(Tiny|Small|Medium|Large|Huge|Gargantuan) or smaller(?: creature)? and the [^,]*? moved (\d+)\+ feet straight toward it immediately before the hit, the target has the Prone condition/.exec(
         clause.rest
       );
+  // "..., and the allosaurus can make one Bite attack against it": an attack it then makes with no further action.
+  const followUp = knockdown
+    ? /the target has the Prone condition, and the [^,.]*? can make one ([A-Z][A-Za-z ]*?) attack against it/.exec(
+        clause.rest
+      )
+    : null;
   if (knockdown)
     conditionalDamage.push({
       when: "charge",
@@ -110,7 +116,8 @@ export function printedHitDamage(
       feet: Number(knockdown[2]),
       maxTargetSize: knockdown[1].toLowerCase() as NonNullable<ConditionalDamage["maxTargetSize"]>,
       damage: [],
-      conditions: ["prone"]
+      conditions: ["prone"],
+      ...(followUp ? { followUp: followUp[1].toLowerCase().replace(/ /g, "-") } : {})
     });
   return { damage, conditionalDamage };
 }

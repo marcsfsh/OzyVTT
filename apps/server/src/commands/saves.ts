@@ -42,6 +42,8 @@ import {
 import { initiatorOf, isGmGrade, sessionIdOf } from "./kit.js";
 import { pushThroughZones } from "../pushed-through.js";
 import { placeBeside } from "../mounts.js";
+import { openSpaceBeside, pullIntoSpace } from "../forced-movement.js";
+import { moveEncounterToken } from "../token-placement.js";
 import { defineCommand } from "./pipeline.js";
 import { withArticle } from "@vtt/domain";
 
@@ -195,7 +197,7 @@ export const saveCommands = [
     type: "save.answer",
     operationId: "answerSave",
     description:
-      'Answers a pending saving throw; on commit the outcome auto-applies damage and conditions, and pushes a creature whose failure pushes it on the live map. `method: "roll"`: the server throws the d20, or takes `face`, a typed d20 (a player only while the table lets players type their dice, and never over a die the server already threw for this save), and adds the save\'s modifier; a Strength or Dexterity save fails without a roll while the creature is Paralyzed, Petrified, Stunned or Unconscious. A preview (`commit: false`) holds its die, so another preview shows the same one and the confirm uses it; `reroll` throws it again (a player spends Heroic Inspiration to reroll one die, the GM throws afresh). A player\'s `rollMode` is ignored: the rules decide. `method: "manual"` with `total` is the GM\'s ruling, used as given. `method: "fail"` is the creature choosing to fail without a roll (a willing target), which its own player or the GM may answer. Player sessions may answer only their claimed character\'s saves. The response carries the `outcome`.',
+      'Answers a pending saving throw; on commit the outcome auto-applies damage and conditions, and moves a creature whose failure or success moves it on the live map (a push, a pull, into its source\'s space, or out beside it). `method: "roll"`: the server throws the d20, or takes `face`, a typed d20 (a player only while the table lets players type their dice, and never over a die the server already threw for this save), and adds the save\'s modifier; a Strength or Dexterity save fails without a roll while the creature is Paralyzed, Petrified, Stunned or Unconscious. A preview (`commit: false`) holds its die, so another preview shows the same one and the confirm uses it; `reroll` throws it again (a player spends Heroic Inspiration to reroll one die, the GM throws afresh). A player\'s `rollMode` is ignored: the rules decide. `method: "manual"` with `total` is the GM\'s ruling, used as given. `method: "fail"` is the creature choosing to fail without a roll (a willing target), which its own player or the GM may answer. Player sessions may answer only their claimed character\'s saves. The response carries the `outcome`.',
     summary: "Answer a pending saving throw by rolling, by a typed d20, or (the GM) by a total.",
     schema: SaveAnswerSchema,
     malformed: "The saving-throw answer is malformed.",
@@ -208,7 +210,10 @@ export const saveCommands = [
       const distance = await kit.creatureDistance();
       // A failure that pushes moves the token on the live map; one changed meanwhile asks the GM to move it.
       const mapAssetId = kit.read().combat.mapAssetId;
-      const geometry = pending?.failurePush || pending?.unseats ? await kit.liveGeometry() : null;
+      const geometry =
+        pending?.failurePush || pending?.successPush || pending?.successMovesOut || pending?.unseats
+          ? await kit.liveGeometry()
+          : null;
       let answered: ReturnType<typeof answerSave> | undefined;
       // What the spell areas a push moves the creature through did to it.
       const pushedThrough: EffectNarration[] = [];
@@ -235,7 +240,16 @@ export const saveCommands = [
                 ? pushThroughZones(draft, input, geometry, kit.zoneDeps(draft, geometry), pushedThrough)
                 : null,
             placeBeside: (actorId, besideId) =>
-              draft.combat.mapAssetId === mapAssetId && placeBeside(draft, actorId, besideId, geometry)
+              draft.combat.mapAssetId === mapAssetId && placeBeside(draft, actorId, besideId, geometry),
+            pullInto: (actorId, intoId) =>
+              draft.combat.mapAssetId === mapAssetId && pullIntoSpace(draft, actorId, intoId, geometry),
+            openSpaceBeside: (actorId, besideId, withinFeet) =>
+              draft.combat.mapAssetId === mapAssetId
+                ? openSpaceBeside(draft, actorId, besideId, withinFeet, geometry)
+                : undefined,
+            placeToken: (actorId, at) => {
+              if (geometry && draft.combat.mapAssetId === mapAssetId) moveEncounterToken(draft, actorId, at, geometry);
+            }
           },
           legendaryResistance,
           rollMode,

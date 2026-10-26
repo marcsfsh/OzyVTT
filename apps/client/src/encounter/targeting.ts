@@ -76,6 +76,8 @@ export type TargetingSession = Readonly<
     summonType?: string;
     /** A Thief's Fast Hands takes this item action as a Bonus Action. */
     fastHands?: true;
+    /** The space a leap or a throw sets its creature down in (a bulette's Deadly Leap, a kraken's Fling). */
+    destination?: AnnotationPoint;
   } & ShapeChoice
 >;
 
@@ -224,12 +226,15 @@ export function beginTargeting(
     session = {
       action,
       attackerId,
+      // A leap picks only its space; a throw picks its one creature, then the space.
       mode:
-        action.attackBonus !== null || action.targeting === "single"
-          ? "single"
-          : action.targeting === "none"
-            ? "none"
-            : "multi",
+        action.destination?.who === "user"
+          ? "none"
+          : action.attackBonus !== null || action.targeting === "single" || action.destination?.who === "target"
+            ? "single"
+            : action.targeting === "none"
+              ? "none"
+              : "multi",
       selected: [],
       template: null,
       ...slot
@@ -459,6 +464,8 @@ export function targetingReady(picking: TargetingSession): boolean {
   // A divided pool can't give out more than it holds.
   if (picking.action.dividesHealing !== undefined && sharedOut(picking) > picking.action.dividesHealing) return false;
   if (picking.mode === "template") return Boolean(picking.template?.placed);
+  // A leap or a throw waits for the space it lands in.
+  if (picking.action.destination && picking.destination === undefined) return false;
   if (picking.mode === "none") return true;
   return picking.selected.length > 0;
 }
@@ -485,6 +492,19 @@ export function placeAnotherTemplate() {
   const others = [...(template.others ?? []), template.placed];
   if (others.length >= (template.count ?? 1)) return;
   session = { ...session, template: { ...template, others, placed: null } };
+  emit();
+}
+/** Whether a tap on the map now picks the space a leap or a throw lands in: a leap's at once, a throw's once its
+ *  creature is chosen. */
+export function picksDestination(picking: TargetingSession | null): boolean {
+  const destination = picking?.action.destination;
+  if (!picking || !destination) return false;
+  return destination.who === "user" || picking.selected.length === 1;
+}
+/** Sets the space a leap or a throw lands in. */
+export function setDestination(point: AnnotationPoint) {
+  if (!session || !picksDestination(session)) return;
+  session = { ...session, destination: point };
   emit();
 }
 export function setTemplatePlacement(origin: AnnotationPoint, target: AnnotationPoint) {
@@ -658,6 +678,7 @@ export function resolveTargeting(
       : {}),
     ...(itemId !== undefined ? { itemId } : {}),
     ...(objectItemId !== undefined ? { objectItemId } : {}),
+    ...(session.destination ? { destination: session.destination } : {}),
     ...(shaping && shaping.length > 0 ? { shaping: shaping.map((entry) => ({ ...entry })) } : {}),
     ...(summonPick || summonType
       ? {

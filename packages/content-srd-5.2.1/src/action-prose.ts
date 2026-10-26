@@ -318,7 +318,15 @@ export function moveOfProse(description: string): ActionMove | null {
     provokes: !/without provoking Opportunity Attacks/i.test(rest),
     ...(/straight toward/i.test(rest) ? { straight: true as const } : {}),
     ...(first ? { first: true as const } : {}),
-    ...(through ? { throughCreatures: through } : {})
+    ...(through ? { throughCreatures: through } : {}),
+    // "If the roc has a creature Grappled, the roc flies ... and drops that creature."
+    ...(/^If the [a-z ]+ has a creature Grappled\b/.test(description) && /\bdrops that creature\b/.test(rest)
+      ? { dropsHeld: true as const }
+      : {}),
+    // "At the end of this movement, the weretiger can take the Hide action."
+    ...(/\bAt the end of this movement, the [a-z ]+ can take the Hide action\b/.test(description)
+      ? { thenHide: true as const }
+      : {})
   };
 }
 

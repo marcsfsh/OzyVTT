@@ -1,4 +1,6 @@
 import { formEffectOf, gearMerged, isFormDefinitionId } from "./transform/forms.js";
+import { transparentEffects } from "./transparent.js";
+import { carriedObjectEffects } from "./carried-objects.js";
 import { makeHitDicePool, type Actor, type ActorDefinition, type GameState, type HitDiceEntry } from "@vtt/domain";
 import type { ActorAction } from "@vtt/schemas";
 import {
@@ -380,7 +382,12 @@ function instantiate(
     conditions: (definition.traitMechanics ?? []).some((trait) => trait.kind === "invisible")
       ? [{ id: "invisible" as const }]
       : [],
-    effects: [],
+    // What it carries with statistics of its own (a night hag's soul bag, a mummy lord's heart), and a gelatinous
+    // cube's Transparent, which starts it unnoticed.
+    effects: [
+      ...carriedObjectEffects(id, definition.name, definition),
+      ...transparentEffects(id, definition.name, definition)
+    ],
     deathSaves: null,
     actionUses: {},
     heroicInspiration: false,

@@ -54,6 +54,10 @@ export function createPendingSaves(
     drain?: DamageDrain;
     /** Where a failure pushes the creature (Thunderwave). */
     failurePush?: ForcedPush;
+    /** Where a success pushes the creature (a bulette's Deadly Leap). */
+    successPush?: ForcedPush;
+    /** A success moves the creature out beside the source, or fails with no room (a gelatinous cube's Engulf). */
+    successMovesOut?: PendingSave["successMovesOut"];
     /** A failure throws the rider off this mount (SRD Mounted Combat). */
     unseats?: string;
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
@@ -128,6 +132,8 @@ export function createPendingSaves(
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
     ...(input.drain ? { drain: { ...input.drain } } : {}),
     ...(input.failurePush ? { failurePush: { ...input.failurePush } } : {}),
+    ...(input.successPush ? { successPush: { ...input.successPush } } : {}),
+    ...(input.successMovesOut ? { successMovesOut: { ...input.successMovesOut } } : {}),
     ...(input.unseats ? { unseats: input.unseats } : {}),
     ...(input.advantageAtSize ? { advantageAtSize: input.advantageAtSize } : {}),
     ...(input.disadvantageTypes ? { disadvantageTypes: [...input.disadvantageTypes] } : {}),

@@ -120,6 +120,25 @@ describe("the GM's call for a roll", () => {
     expect(sent("roll-call:start").at(-1)).toEqual({ kind: "save", ability: "dex", dc: 14, actorIds: [ARIA] });
   });
 
+  it("names the creature a check is about, so its traits weigh on the roll (a sphinx's Inscrutable)", async () => {
+    serve();
+    const user = userEvent.setup();
+    const SPHINX = "10000000-0000-4000-8000-000000000003";
+    const state = {
+      ...gmState(),
+      actors: [pc(ARIA, "Aria"), pc(BRANN, "Brann"), pc(SPHINX, "Sphinx of Lore", { kind: "monster" })]
+    } as unknown as GmView;
+    render(<RollCallPanel state={state} />, { wrapper: ToastProvider });
+    await user.click(screen.getByText(/Call for a roll/));
+    await user.selectOptions(await screen.findByLabelText("Skill"), "insight");
+    await user.selectOptions(screen.getByLabelText("About"), SPHINX);
+    await user.click(screen.getByRole("button", { name: "Call for the check" }));
+    expect(sent("roll-call:start").at(-1)).toMatchObject({ skill: "insight", aboutActorId: SPHINX });
+    // A save is about no one.
+    await user.click(screen.getByRole("button", { name: "Saving throw" }));
+    expect(screen.queryByLabelText("About")).toBeNull();
+  });
+
   it("can hide a check's results from the players", async () => {
     serve();
     const user = userEvent.setup();

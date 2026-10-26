@@ -416,7 +416,8 @@ describe("generated OpenAPI components", () => {
         `${component} via HomebrewRecord: ${JSON.stringify(union.errors)}`
       ).toBe(true);
     }
-  });
+    // Compiling the whole document and checking every bundled record takes several seconds.
+  }, 60_000);
 
   /** Per rider branch. No SRD row is a magic item, so the bundle sweep never exercises gates, casts or
    * attunement. Payloads are parsed first so every `.default()` materialises, which is what `additionalProperties:

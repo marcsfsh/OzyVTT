@@ -10,6 +10,8 @@ import {
   templateOfArea,
   type AnnotationActor
 } from "../annotations.js";
+import { seenToAct } from "../transparent.js";
+import { carriedSourcesOf } from "../attachments.js";
 import type { GameState } from "@vtt/domain";
 import { pointInRects } from "@vtt/rules-5e";
 import type { ActorDefinition } from "@vtt/schemas";
@@ -35,7 +37,7 @@ import {
 import { CommandRejectedError } from "../game-store.js";
 import { airborneAfter, altitudeOf, setAltitude } from "../altitude.js";
 import { endsOnLanding, startFall } from "../falling.js";
-import { failedTeleport, landTeleport } from "../granted-moves.js";
+import { dropGrappled, failedTeleport, landTeleport, offerHideAfterMove } from "../granted-moves.js";
 import { holdMove } from "../held-moves.js";
 import { walkThroughZones } from "../zone-stops.js";
 import { landJump } from "../jumping.js";
@@ -206,7 +208,9 @@ export const mapCommands = [
                 ...grappledBy(state, actorId),
                 ...swallowedBy(state, actorId).map(({ prey }) => prey.id),
                 // A Monk's Step of the Wind carries a willing ally along (Heightened Focus).
-                ...carriedAlongBy(state, actorId)
+                ...carriedAlongBy(state, actorId),
+                // A darkmantle attached to the mover moves with it.
+                ...carriedSourcesOf(state, actorId)
               ].filter((heldId) => state.combat.tokens.find((token) => token.actorId === heldId)?.position)
             : [];
         moveEncounterToken(state, actorId, position, geometry);
@@ -510,8 +514,10 @@ export const mapCommands = [
             })
           : null;
         const to = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
+        // A grappler that flew up or down takes what it holds with it.
+        const rise = altitudeOf(state.combat.tokens.find((token) => token.actorId === actorId)) - fromAltitude;
         if (from !== null && to !== null)
-          for (const heldId of dragAlong(state, dragged, from, to, geometry)) {
+          for (const heldId of dragAlong(state, dragged, from, to, geometry, rise)) {
             draggedNames.push(hiddenAfter(heldId) ? HIDDEN_SOURCE : kit.actorName(heldId));
             // A creature dragged along meets the spell areas it is dragged into.
             const held = state.combat.tokens.find((token) => token.actorId === heldId)?.position;
@@ -524,6 +530,13 @@ export const mapCommands = [
                 )
               );
           }
+        // A flight that drops its prey lets go as it ends (a roc's Swoop), and one carried aloft falls from there; a
+        // weretiger's Prowl ends with a free Hide.
+        if (outcome.dropsHeld) landing.push(...dropGrappled(state, actorId));
+        if (outcome.thenHide) landing.push(...offerHideAfterMove(state, actorId, granted ?? "the move"));
+        // A transparent gelatinous cube seen to move is noticed.
+        if (from !== null && to !== null && (from.x !== to.x || from.y !== to.y))
+          landing.push(...seenToAct(state, actorId));
         // A mount carries its riders; one that teleports leaves them where they were, off it. One moved by force
         // carries them too, and each saves to stay on (SRD Mounted Combat).
         if (mode === "teleport") for (const riderId of ridersOf(state, actorId)) parted(state, riderId);

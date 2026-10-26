@@ -1,6 +1,7 @@
 import type { Actor, ConversionOffer, GameState } from "@vtt/domain";
 import { catalogIdOf, type ActorDefinition } from "@vtt/schemas";
-import { pactSlotMaximum, spellSlotMaxima } from "./actor-roster.js";
+import { pactSlotMaximum, spellSlotMaxima, storedArmorClass } from "./actor-roster.js";
+import { traitOf } from "./statblock-traits.js";
 import { holdsFeature } from "./class-features.js";
 import { actionPools, effectiveActions } from "./effective-actions.js";
 import { deriveEquipment, type EquipmentCatalog } from "./equipment-derivation.js";
@@ -36,6 +37,9 @@ type Context = Readonly<{
   inFight: boolean;
   /** The server's dice, for a conversion that rolls (Uncanny Metabolism's Martial Arts die). */
   random: (sides: number) => number;
+  /** Stat blocks, for a conversion that swaps one for another (an incubus's Succubus Form). */
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
+  catalog: EquipmentCatalog | undefined;
 }>;
 
 type Timing = ConversionOffer["timing"];
@@ -627,8 +631,51 @@ const CONVERSIONS: readonly Conversion[] = [
       healActor(context.state, actor.id, healed, { role: "gm" });
       return `${actor.name} regains ${plural(back, "Focus Point")} and rolls ${face} on the d${sides} to regain ${healed} Hit Points (Uncanny Metabolism).`;
     }
-  }
+  },
+  formAtRest()
 ];
+
+/** An incubus's Succubus Form and a succubus's Incubus Form: "When the incubus finishes a Long Rest, it can shape-shift
+ *  into a Succubus, using that stat block instead of this one." Chosen in the step a finished Long Rest opens, outside
+ *  a fight; the creature takes the other stat block as its own, with that block's Hit Points, Armor Class and Speed. */
+function formAtRest(): Conversion {
+  const traitIn = (context: Context) => traitOf(context.definition, "form-at-rest");
+  const otherOf = (context: Context) => {
+    const trait = traitIn(context);
+    return trait ? context.resolveDefinition(trait.monsterId) : undefined;
+  };
+  return {
+    id: "form-at-rest",
+    name: "Shape-shift after a Long Rest",
+    timing: "no-action",
+    holds: (context) => traitIn(context) !== undefined,
+    line: (context) =>
+      `${traitIn(context)!.name}: when a Long Rest finishes, take the ${otherOf(context)?.name ?? traitIn(context)!.monsterId} stat block instead of this one.`,
+    check: (context) => {
+      if (context.inFight) return "This is chosen after a Long Rest, outside a fight.";
+      if (context.actor.restStep?.after !== "long-rest")
+        return "This is chosen when a Long Rest finishes, in the step it opens.";
+      return otherOf(context) ? null : "That stat block is no longer in the bestiary.";
+    },
+    pick: () => ({ kind: "none" }),
+    apply: (context) => {
+      const { actor, definition } = context;
+      const trait = traitIn(context)!;
+      const other = otherOf(context)!;
+      const before = actor.name;
+      actor.definitionId = trait.monsterId;
+      // Its own name follows the stat block's ("Incubus 2" becomes "Succubus 2").
+      if (definition && actor.name.includes(definition.name))
+        actor.name = actor.name.replace(definition.name, other.name);
+      const full = actor.hp.current >= actor.hp.maximum;
+      const maximum = other.hitPoints.maximum;
+      actor.hp = { ...actor.hp, maximum, current: full ? maximum : Math.min(actor.hp.current, maximum) };
+      actor.speedFeet = other.speedFeet;
+      if (actor.armorClassOverride === undefined) actor.armorClass = storedArmorClass(actor, other, context.catalog);
+      return `${before} shape-shifts into ${other.name} (${trait.name}).`;
+    }
+  };
+}
 
 /** "When you roll Initiative": a combatant may choose these from its roll to the end of its first turn. */
 function initiativeRefusal(context: Context): string | null {
@@ -689,7 +736,9 @@ function contextOf(state: GameState, actor: Actor, deps: Deps): Context {
     slotMaxima,
     pactMax: pactSlotMaximum(definition)?.max ?? actor.pactSlots?.remaining ?? 0,
     inFight: state.combat.active && state.combat.initiative.some((entry) => entry.actorId === actor.id),
-    random: deps.random ?? (() => 1)
+    random: deps.random ?? (() => 1),
+    resolveDefinition: deps.resolveDefinition,
+    catalog: deps.catalog
   };
 }
 

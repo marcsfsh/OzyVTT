@@ -309,7 +309,8 @@ function regenerate(
 }
 
 /** SRD Berserk (the golems): "Whenever the golem starts its turn Bloodied, roll 1d6. On a 6, the golem goes berserk
- *  ... until it is destroyed or it is no longer Bloodied." The server rolls the d6; what it attacks is the GM's. */
+ *  ... until it is destroyed or it is no longer Bloodied." The server rolls the d6, and its attacks then go to the
+ *  nearest creature it sees (`action-targets.ts`); what it smashes with none in sight is the GM's. */
 function goBerserk(
   state: GameState,
   actor: Actor,

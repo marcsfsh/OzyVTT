@@ -75,13 +75,46 @@ function mistyEscape(trait: Trait): TraitMechanic | null {
 /** "If the devil dies outside the Nine Hells, its body disappears in sulfurous smoke, and it gains a new body
  *  instantly", "If destroyed, the lich reforms in 1d10 days", "it returns to life in 1d6 days". */
 function restoration(trait: Trait): TraitMechanic | null {
+  const text = trait.description;
   const returns =
     /^If (?:destroyed|(?:the [\w -]+?|it) dies)\b[^.]*?\b(?:gains a new body|reforms|returns to life|revives with all its Hit Points)\b/.test(
-      trait.description
+      text
     );
   if (!returns) return null;
-  const bodyGoes = /\bits body (?:disappears|dissolves|turns to)\b/.test(trait.description);
-  return { kind: "restoration", name: trait.name, ...(bodyGoes ? { bodyGoes: true as const } : {}) };
+  const bodyGoes = /\bits body (?:disappears|dissolves|turns to)\b/.test(text);
+  // "returns to life in 1d6 days", "revives with all its Hit Points in 1d10 days", "gains a new body in 24 hours".
+  const after =
+    /\b(?:returns to life|reforms|revives with all its Hit Points|gains a new body) in (\d+d\d+|\d+) (days|hours)\b/.exec(
+      text
+    );
+  const preventedBy = [
+    ...(/\bunless Dispel Evil and Good is cast on its remains\b/.test(text) ? (["dispel-evil-and-good"] as const) : []),
+    ...(/\bkilled by a creature under the effects of a Bless spell\b/.test(text) ? (["blessed-killer"] as const) : []),
+    ...(/\bremains are sprinkled with Holy Water\b/.test(text) ? (["holy-water"] as const) : []),
+    ...(/\bOnly a Wish spell can prevent\b/.test(text) ? (["wish"] as const) : [])
+  ];
+  const needs = /\bif its heart is intact\b/.test(text)
+    ? "heart"
+    : /\bif it has a spirit jar\b/.test(text)
+      ? "spirit-jar"
+      : undefined;
+  const onlyIn = /^If the [\w -]+? dies in (the [A-Z][\w ]+?),/.exec(text)?.[1];
+  return {
+    kind: "restoration",
+    name: trait.name,
+    ...(bodyGoes ? { bodyGoes: true as const } : {}),
+    ...(after
+      ? {
+          returns: {
+            after: /d/.test(after[1]!) ? after[1]! : Number(after[1]),
+            unit: after[2] as "days" | "hours",
+            ...(preventedBy.length > 0 ? { preventedBy: [...preventedBy] } : {}),
+            ...(needs ? { needs } : {}),
+            ...(onlyIn ? { onlyIn } : {})
+          }
+        }
+      : {})
+  };
 }
 
 /** "The hydra has five heads. Whenever the hydra takes 25 damage or more on a single turn, one of its heads dies. ...

@@ -3,6 +3,7 @@ import type { OnHitRider } from "@vtt/schemas";
 import { ABILITY_NAMES } from "../ability-checks.js";
 import { addEffect, makeEffect } from "../effects.js";
 import { killOutright } from "../hit-points.js";
+import { markTimedRise } from "../timed-revival.js";
 import { liveAbilityScores } from "../live-abilities.js";
 import { recordRoll, tableLineOf, type ResolveContext } from "./context.js";
 
@@ -41,6 +42,10 @@ export function lowerScore(ctx: ResolveContext, rider: OnHitRider, index: number
       })
     );
     for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
+    // "If a Humanoid is slain by this attack, a Shadow rises from the corpse 1d4 hours later."
+    const rise = action.drain?.slainRise;
+    if (rise?.afterHours)
+      for (const event of markTimedRise(state, target, definition, rise, deps.random)) ctx.warnings.push(event.text);
     return;
   }
   const drained = target.effects.find(

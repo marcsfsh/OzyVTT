@@ -1,4 +1,5 @@
 import { endEffect, READIED_TAG, releaseReadied } from "../effects.js";
+import { TRANSPARENT_TAG } from "../transparent.js";
 import { markStealthAttack } from "../supreme-sneak.js";
 import { castsWithVerbal } from "./components.js";
 import { endedEffect, type ResolveContext } from "./context.js";
@@ -49,6 +50,8 @@ export function releaseHideAndReady(ctx: ResolveContext): void {
     endEffect(state, attacker.id, effect.id);
     effectsEnded.push(endedEffect(attacker, effect));
   };
+  // A gelatinous cube's Transparent: once seen to act, it is noticed.
+  end(TRANSPARENT_TAG);
   // SRD Hide: "the condition ends on you immediately after ... you make an attack roll, or you cast a spell with a
   // Verbal component"; the attack still had Invisible's Advantage. A throw that asks for a save (a Net, a flask, a
   // breath) is neither, and a sound louder than a whisper is the GM's call. Supreme Sneak's Stealth Attack keeps it, if

@@ -11,8 +11,41 @@ const condition = (action: ActorAction, id: string) =>
   (action.onHit ?? []).some((rider) => rider.conditions.some((entry) => entry.id === id)) ||
   (action.conditionalDamage ?? []).some((variant) => variant.conditions?.includes(id));
 
+/** Whether a hit's effect carries a tag, with what Advantage adds (a darkmantle's cover). */
+const riderTag = (action: ActorAction, tag: string) =>
+  (action.onHit ?? []).some((rider) => rider.tags?.includes(tag) || rider.advantageAdds?.tags?.includes(tag));
+
 /** What each kind of rider sentence is read into. */
 const READERS: readonly Check[] = [
+  { pattern: /\bis suffocating\b/, read: (action) => riderTag(action, "smothering") },
+  {
+    pattern: /\bis slain by this attack, an? [A-Z][a-z]+ rises from the corpse\b/,
+    read: (action) => action.drain?.slainRise?.afterHours !== undefined
+  },
+  {
+    pattern: /\bcan smother only one creature at a time\b|\bcan[\u2019']t take this action\b/,
+    read: (action) => riderTag(action, "source-no-repeat")
+  },
+  {
+    pattern: /\bhalves the damage it takes \(round down\), and the target takes the same amount\b/,
+    read: (action) => riderTag(action, "shares-source-damage")
+  },
+  {
+    pattern: /\bcan detach itself by (?:spending|using) 5 feet of (?:its )?movement\b/,
+    read: (action) => riderTag(action, "detaches-itself")
+  },
+  {
+    pattern: /\bcan (?:take an action to try to )?detach the [a-z]+\b/,
+    read: (action) => (action.onHit ?? []).some((rider) => rider.endedBy !== undefined)
+  },
+  {
+    pattern: /\bhad Advantage on the attack roll, it covers the target\b/,
+    read: (action) => (action.onHit ?? []).some((rider) => rider.advantageAdds !== undefined)
+  },
+  {
+    pattern: /\bIts Speed becomes 0\b.*\bmoves with the target\b/,
+    read: (action) => riderTag(action, "carries-source")
+  },
   { pattern: /\bhas the Grappled condition \(escape DC \d+\)/, read: (action) => condition(action, "grappled") },
   { pattern: /\bgive it the Grappled condition\b/, read: (action) => condition(action, "grappled") },
   {
@@ -25,6 +58,10 @@ const READERS: readonly Check[] = [
     read: (action) => (action.conditionalDamage ?? []).some((variant) => variant.when === "charge")
   },
   { pattern: /\bit has the Prone condition\b/, read: (action) => condition(action, "prone") },
+  {
+    pattern: /\bcan make one [A-Z][a-z]+ attack against it\b/,
+    read: (action) => (action.conditionalDamage ?? []).some((variant) => variant.followUp !== undefined)
+  },
   {
     pattern: /\bthe target has the ([A-Z][a-z]+) condition until the (?:start|end) of\b/,
     read: (action) => (action.onHit ?? []).some((rider) => rider.duration !== undefined && rider.conditions.length > 0)
@@ -121,8 +158,6 @@ const READERS: readonly Check[] = [
 const NARRATIVE = [
   /^Hit or Miss: The (?:spear|sword) magically returns\b/,
   /^Being underwater doesn[\u2019']t grant Resistance to this Fire damage\.$/,
-  // A Shadow rising hours later is the story's.
-  /^If a Humanoid is slain by this attack, a Shadow rises from the corpse 1d4 hours later\.$/,
   /\bfrom (?:one of (?:two|four|ten) (?:tentacles|claws|pincers|chains|hands)|both (?:claws|talons|of the griffon[\u2019']s front claws)|all (?:four|eight) tentacles)\.$/
 ];
 

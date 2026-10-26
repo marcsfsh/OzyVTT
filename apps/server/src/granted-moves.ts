@@ -3,6 +3,7 @@ import type { ActionMove, ActionTeleport, ActorDefinition, TeleportLanding } fro
 import { rollDice } from "@vtt/rules-5e";
 import {
   addEffect,
+  endEffect,
   makeEffect,
   NO_REACTIONS_TAG,
   turnEndDuration,
@@ -67,6 +68,8 @@ export function grantMove(
     awayFromActorId?: string;
     towardActorId?: string;
     throughCreatures?: ActionMove["throughCreatures"];
+    dropsHeld?: true;
+    thenHide?: true;
   }>
 ): void {
   const grant: MoveGrant = {
@@ -80,7 +83,9 @@ export function grantMove(
     ...(input.owedActionId ? { owedActionId: input.owedActionId } : {}),
     ...(input.awayFromActorId ? { awayFromActorId: input.awayFromActorId } : {}),
     ...(input.towardActorId ? { towardActorId: input.towardActorId } : {}),
-    ...(input.throughCreatures ? { throughCreatures: input.throughCreatures } : {})
+    ...(input.throughCreatures ? { throughCreatures: input.throughCreatures } : {}),
+    ...(input.dropsHeld ? { dropsHeld: true as const } : {}),
+    ...(input.thenHide ? { thenHide: true as const } : {})
   };
   actor.effects = [
     ...actor.effects.filter((effect) => effect.grantedMove === undefined),
@@ -345,4 +350,49 @@ export function landTeleport(
     );
   }
   return events;
+}
+
+/** A roc's Swoop ends by dropping what it grapples: each grapple it holds ends, and a creature it carried into the air
+ *  falls from there (`settleFalls`). */
+export function dropGrappled(state: GameState, grapplerId: string): EffectNarration[] {
+  const grappler = state.actors.find((actor) => actor.id === grapplerId);
+  const events: EffectNarration[] = [];
+  for (const held of state.actors)
+    for (const effect of held.effects.filter(
+      (candidate) => candidate.sourceActorId === grapplerId && candidate.tags.includes("grapple")
+    )) {
+      events.push(...endEffect(state, held.id, effect.id));
+      events.push({
+        kind: "effect",
+        text: `${grappler?.name ?? "Its grappler"} drops ${held.name}.`,
+        actorId: held.id,
+        ...(grappler ? { source: { actorId: grappler.id, name: grappler.name } } : {})
+      });
+    }
+  return events;
+}
+
+/** The tag on the effect that lets its bearer take the Hide action freely once, after a move that says so. */
+export const THEN_HIDE_TAG = "then-hide";
+
+/** "At the end of this movement, the weretiger can take the Hide action": the Hide is offered until the turn ends, and
+ *  takes no action of its own (`resolution/economy.ts`). */
+export function offerHideAfterMove(state: GameState, actorId: string, name: string): EffectNarration[] {
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor || !state.combat.active) return [];
+  addEffect(
+    state,
+    actorId,
+    makeEffect({
+      id: `${actorId}:then-hide:${state.combat.round}`,
+      name: name.replace(/\s*\(.*\)$/, "").slice(0, 120),
+      tags: [THEN_HIDE_TAG],
+      sourceActorId: actorId,
+      sourceName: actor.name,
+      startedRound: state.combat.round,
+      duration: { type: "until-bearer-turn-end", skipsCurrentTurn: false },
+      bonusActions: ["hide"]
+    })
+  );
+  return [{ kind: "effect", text: `${actor.name} can take the Hide action now.`, actorId, gmOnly: true }];
 }

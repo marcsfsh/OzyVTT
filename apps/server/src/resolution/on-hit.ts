@@ -1,6 +1,14 @@
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
-import { addEffect, effectDurationOf, endEffect, makeEffect, type EffectNarration } from "../effects.js";
+import {
+  addEffect,
+  effectDurationOf,
+  endEffect,
+  makeEffect,
+  SMOTHERING_TAG,
+  type EffectNarration
+} from "../effects.js";
+import { startHoldingBreath } from "../breath.js";
 import { previewDamage } from "../hit-points.js";
 import { masteryHitEffects } from "../weapon-mastery.js";
 import { endedEffect, sizeAtMost, tableLineOf, type DefinitionAction, type ResolveContext } from "./context.js";
@@ -106,10 +114,18 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
           conditionIds: [condition.id]
         });
     }
-    const conditionIds = rider.conditions
-      .map((condition) => condition.id)
-      .filter((id) => id !== "prone" && id !== "exhaustion");
-    const tags = rider.tags ?? [];
+    // "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target":
+    // the effect carries more when the roll had Advantage.
+    const adds =
+      rider.advantageAdds &&
+      ctx.rollMode?.mode === "advantage" &&
+      (rider.advantageAdds.maxTargetSize === undefined || sizeAtMost(target.size, rider.advantageAdds.maxTargetSize))
+        ? rider.advantageAdds
+        : undefined;
+    const conditionIds = [...rider.conditions.map((condition) => condition.id), ...(adds?.conditions ?? [])].filter(
+      (id) => id !== "prone" && id !== "exhaustion"
+    );
+    const tags = [...(rider.tags ?? []), ...(adds?.tags ?? [])];
     const modifiers = rider.modifiers ?? [];
     if (conditionIds.length === 0 && !rider.ongoingDamage && tags.length === 0 && modifiers.length === 0) return;
     // "The rug can give it the Grappled condition ... instead of dealing damage": the hit's damage goes.
@@ -159,6 +175,11 @@ function applyDeclaredRiders(ctx: ResolveContext): void {
       gained,
       deps
     );
+    // "Is suffocating" while the hold lasts (a rug smothering, a darkmantle covering): it holds its breath.
+    if (tags.includes(SMOTHERING_TAG)) {
+      const definition = bearer.definitionId ? deps.resolveDefinition?.(bearer.definitionId) : undefined;
+      gained.push(...startHoldingBreath(state, bearer, definition));
+    }
     for (const event of gained) ctx.tableNarration.push(tableLineOf(ctx, event));
     ctx.effectsApplied.push({ targetId: bearer.id, targetName: bearer.name, name: effect.name, conditionIds });
   });

@@ -1,4 +1,5 @@
 import { endingsOf, type ActorDefinition, type EffectInstance } from "@vtt/schemas";
+import { DETACH_FEET, DETACHES_ITSELF_TAG } from "./attachments.js";
 import { ENDED_BY_PREFIX, endingSlug } from "./ending-actions.js";
 
 type BuiltinAction = ActorDefinition["actions"][number];
@@ -416,8 +417,10 @@ function bonusSources(definition: ActorDefinition | undefined, bearer?: ActionBe
   if (features.some((feature) => feature.id === "martial-arts")) offer(UNARMED, "Martial Arts");
   if (holds("step-of-the-wind")) offer(["dash"], "Step of the Wind");
   if (holds("patient-defense")) offer(["disengage"], "Patient Defense");
+  // A move that ends with a free Hide (a weretiger's Prowl) offers it only once moved, through its effect.
   for (const action of actions)
-    if (action.activation === "bonus-action") offer(offeredActions(action.description), action.name);
+    if (action.activation === "bonus-action" && action.move?.thenHide !== true)
+      offer(offeredActions(action.description), action.name);
   // A live effect's own: Expeditious Retreat's Dash, Conjure Woodland Beings' Disengage.
   for (const effect of bearer?.effects ?? []) offer(effect.bonusActions ?? [], effect.name);
   return offered;
@@ -543,7 +546,25 @@ export function builtinActionsFor(
   const variants = [...bonusSources(definition, bearer)].map(([base, source]) =>
     bonusVariant(base, source, definition)
   );
-  return [...BUILTIN_ACTIONS, ...variants, ...endEffectActions(bearer)];
+  return [...BUILTIN_ACTIONS, ...variants, ...endEffectActions(bearer), ...selfDetach(definition)];
+}
+
+/** "The stirge can detach itself by spending 5 feet of its movement": offered to a creature whose hits attach it so. */
+function selfDetach(definition: ActorDefinition | undefined): BuiltinAction[] {
+  const detaches = (definition?.actions ?? []).some((action) =>
+    (action.onHit ?? []).some((rider) => rider.tags?.includes(DETACHES_ITSELF_TAG))
+  );
+  return detaches
+    ? [
+        {
+          id: "detach-self",
+          name: "Detach",
+          activation: "other",
+          description: `Let go of the creature it is attached to, spending ${DETACH_FEET} feet of its movement and no action.`,
+          damage: []
+        }
+      ]
+    : [];
 }
 
 /** One generic action this combatant can take, by id. */

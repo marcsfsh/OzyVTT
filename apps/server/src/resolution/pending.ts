@@ -1,4 +1,5 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
+import { HELD_BY_CARRIED_TAG, heldByCarried } from "../carried-objects.js";
 import { prismaticSpray } from "./prismatic.js";
 import type { PendingReaction, PendingSave } from "@vtt/domain";
 import { catalogIdOf, DamageTypeSchema, type ActionReaction, type GrantOption, type InventoryItem } from "@vtt/schemas";
@@ -432,7 +433,8 @@ export function failureEffectFor(
         ...(declared?.tags ?? []),
         ...(shaped.tags ?? []),
         ...parts.tags,
-        ...(hazard ? [hazard.tag] : [])
+        ...(hazard ? [hazard.tag] : []),
+        ...(save.heldBy && heldByCarried(attacker, action.needsObject) ? [HELD_BY_CARRIED_TAG] : [])
       ])
     ].slice(0, 8),
     ...(shaped.form ? { form: structuredClone(shaped.form) } : {}),
@@ -483,7 +485,8 @@ export function failureEffectFor(
     ...(castId !== null ? { castId } : {}),
     ...(cast ? { spell: { id: cast.spell.id, level: cast.level } } : {}),
     ...(isMagicalAction(ctx) ? { magical: true as const } : {}),
-    ...(save.heldBy ? { heldBy: objectFrom(save.heldBy) } : {}),
+    // A carried object that holds the creature holds it with its own Hit Points (an erinyes's magic rope).
+    ...(save.heldBy ? { heldBy: heldByCarried(attacker, action.needsObject) ?? objectFrom(save.heldBy) } : {}),
     sourceActionId: action.id
   };
 }
@@ -828,6 +831,8 @@ export function parkActionSave(ctx: ResolveContext): void {
       ...(Object.keys(marked).length > 0 ? { extra: marked } : {}),
       ...(action.drain ? { drain: action.drain } : {}),
       ...(action.save.failurePush ? { failurePush: action.save.failurePush } : {}),
+      ...(action.save.successPush ? { successPush: action.save.successPush } : {}),
+      ...(action.save.successMovesOut ? { successMovesOut: action.save.successMovesOut } : {}),
       ...(action.save.advantageAtSize ? { advantageAtSize: action.save.advantageAtSize } : {}),
       ...(action.save.disadvantageTypes ? { disadvantageTypes: action.save.disadvantageTypes } : {}),
       ...(against ? { spell: against } : {}),

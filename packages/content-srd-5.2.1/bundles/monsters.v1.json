@@ -235,7 +235,11 @@
    },
    {
     "kind": "restoration",
-    "name": "Eldritch Restoration"
+    "name": "Eldritch Restoration",
+    "returns": {
+     "after": "5d10",
+     "unit": "days"
+    }
    }
   ],
   "extensions": {
@@ -3736,10 +3740,10 @@
       "damage": [],
       "conditions": [
        "prone"
-      ]
+      ],
+      "followUp": "bite"
      }
-    ],
-    "reminder": "After a charge that knocks the target Prone, the allosaurus can make one Bite attack against it; take it from the turn list."
+    ]
    }
   ],
   "token": {
@@ -7356,6 +7360,7 @@
         "id": "restrained"
        }
       ],
+      "name": "Smothered",
       "escapeDc": 13,
       "maxTargetSize": "medium",
       "ongoingDamage": {
@@ -7367,10 +7372,14 @@
        ],
        "at": "bearer-turn-start"
       },
-      "insteadOfDamage": true
+      "insteadOfDamage": true,
+      "tags": [
+       "smothering",
+       "source-no-repeat",
+       "shares-source-damage"
+      ]
      }
-    ],
-    "reminder": "The rug smothers one creature at a time. While it grapples the target, the target is suffocating, and the rug halves the damage it takes (round down) while the target takes the same amount."
+    ]
    }
   ],
   "token": {
@@ -12326,14 +12335,23 @@
      "successDamage": "half",
      "failureConditions": [
       "prone"
-     ]
+     ],
+     "successPush": {
+      "feet": 5
+     }
     },
     "damage": [
      {
       "formula": "3d12",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "destination": {
+     "who": "user",
+     "feet": 15,
+     "costFeet": 5,
+     "onto": "large"
+    }
    }
   ],
   "token": {
@@ -12854,6 +12872,12 @@
      ],
      "failureDuration": {
       "type": "until-source-turn-end"
+     },
+     "failurePush": {
+      "feet": 30,
+      "upTo": true,
+      "maxTargetSize": "large",
+      "toward": true
      }
     },
     "damage": [
@@ -12866,8 +12890,7 @@
      "count": 1,
      "rangeFeet": 60,
      "seen": true
-    },
-    "reminder": "If the target is Large or smaller, move it up to 30 feet straight toward the devil."
+    }
    }
   ],
   "token": {
@@ -13428,6 +13451,10 @@
     "kind": "berserk",
     "name": "Berserk",
     "on": 6
+   },
+   {
+    "kind": "immutable-form",
+    "name": "Immutable Form"
    }
   ],
   "extensions": {
@@ -13581,7 +13608,9 @@
       "maxTargetSize": "large",
       "tags": [
        "attached",
-       "source-target-only"
+       "source-target-only",
+       "shares-source-damage",
+       "detaches-itself"
       ],
       "endsWhenSourceDies": true,
       "endedBy": {
@@ -13594,8 +13623,7 @@
        }
       }
      }
-    ],
-    "reminder": "While attached, the cloaker halves the damage it takes (round down), and the target takes the same amount; the cloaker detaches itself by spending 5 feet of movement."
+    ]
    },
    {
     "id": "phantasms-recharge-after-a-short-or-long-rest",
@@ -15193,8 +15221,19 @@
       "name": "Attached",
       "tags": [
        "attached",
-       "source-attacks-only-bearer"
+       "source-attacks-only-bearer",
+       "carries-source",
+       "detaches-itself"
       ],
+      "advantageAdds": {
+       "conditions": [
+        "blinded"
+       ],
+       "tags": [
+        "smothering"
+       ],
+       "maxTargetSize": "medium"
+      },
       "endsWhenSourceDies": true,
       "endedBy": {
        "name": "Detach the darkmantle",
@@ -15206,8 +15245,7 @@
        }
       }
      }
-    ],
-    "reminder": "If the target is Medium or smaller and the darkmantle had Advantage on the attack roll, it covers the target, which is Blinded and suffocating (hold its breath) while the darkmantle is attached. While attached, the darkmantle's Speed is 0 and it moves with the target, and it detaches itself with 5 feet of its movement."
+    ]
    },
    {
     "id": "darkness-aura",
@@ -16057,7 +16095,11 @@
    {
     "kind": "restoration",
     "name": "Elemental Restoration",
-    "bodyGoes": true
+    "bodyGoes": true,
+    "returns": {
+     "after": "1d4",
+     "unit": "days"
+    }
    }
   ],
   "extensions": {
@@ -17873,7 +17915,11 @@
    {
     "kind": "restoration",
     "name": "Elemental Restoration",
-    "bodyGoes": true
+    "bodyGoes": true,
+    "returns": {
+     "after": "1d4",
+     "unit": "days"
+    }
    }
   ],
   "extensions": {
@@ -18274,7 +18320,8 @@
       "name": "Rope",
       "armorClass": 20,
       "hitPoints": 90
-     }
+     },
+     "endsWhenSourceDies": true
     },
     "damage": [
      {
@@ -18286,7 +18333,8 @@
      "count": 1,
      "rangeFeet": 120,
      "seen": true
-    }
+    },
+    "needsObject": "magic-rope"
    }
   ],
   "token": {
@@ -18307,6 +18355,17 @@
    "poisoned"
   ],
   "traitMechanics": [
+   {
+    "kind": "carried-object",
+    "name": "Magic Rope",
+    "tag": "magic-rope",
+    "object": {
+     "name": "Magic Rope",
+     "armorClass": 20,
+     "hitPoints": 90
+    },
+    "restoresAtRest": true
+   },
    {
     "kind": "restoration",
     "name": "Diabolical Restoration",
@@ -19175,6 +19234,10 @@
     }
    },
    {
+    "kind": "immutable-form",
+    "name": "Immutable Form"
+   },
+   {
     "kind": "absorbs",
     "name": "Lightning Absorption",
     "damageType": "lightning"
@@ -19849,6 +19912,9 @@
         "type": "acid"
        }
       ]
+     },
+     "successMovesOut": {
+      "withinFeet": 5
      }
     },
     "damage": [
@@ -19857,7 +19923,6 @@
       "type": "acid"
      }
     ],
-    "reminder": "A creature that succeeds moves to an unoccupied space within 5 feet of the cube, or fails if there is none; one that escapes enters the nearest unoccupied space. A creature that enters the cube's space is subjected to Engulf with Disadvantage.",
     "targets": {
      "entered": true
     },
@@ -19894,6 +19959,11 @@
     "kind": "engulfs-entrants",
     "name": "Ooze Cube",
     "actionId": "engulf"
+   },
+   {
+    "kind": "transparent",
+    "name": "Transparent",
+    "dc": 15
    }
   ],
   "extensions": {
@@ -26606,7 +26676,14 @@
   "traitMechanics": [
    {
     "kind": "restoration",
-    "name": "Celestial Restoration"
+    "name": "Celestial Restoration",
+    "returns": {
+     "after": "1d6",
+     "unit": "days",
+     "preventedBy": [
+      "dispel-evil-and-good"
+     ]
+    }
    }
   ],
   "extensions": {
@@ -29409,6 +29486,13 @@
    "poison",
    "psychic"
   ],
+  "traitMechanics": [
+   {
+    "kind": "form-at-rest",
+    "name": "Succubus Form",
+    "monsterId": "succubus"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 4,
@@ -29778,6 +29862,10 @@
     "kind": "absorbs",
     "name": "Fire Absorption",
     "damageType": "fire"
+   },
+   {
+    "kind": "immutable-form",
+    "name": "Immutable Form"
    }
   ],
   "extensions": {
@@ -30442,7 +30530,18 @@
       "formula": "4d8",
       "type": "bludgeoning"
      }
-    ]
+    ],
+    "targets": {
+     "count": 1,
+     "grappledBySource": true,
+     "maxSize": "large"
+    },
+    "destination": {
+     "who": "target",
+     "feet": 60,
+     "seen": true,
+     "ground": true
+    }
    },
    {
     "id": "lightning-strike",
@@ -30871,7 +30970,16 @@
   "traitMechanics": [
    {
     "kind": "restoration",
-    "name": "Hellish Restoration"
+    "name": "Hellish Restoration",
+    "returns": {
+     "after": "1d10",
+     "unit": "days",
+     "preventedBy": [
+      "blessed-killer",
+      "holy-water"
+     ],
+     "onlyIn": "the Nine Hells"
+    }
    }
   ],
   "extensions": {
@@ -31250,8 +31358,18 @@
   },
   "traitMechanics": [
    {
+    "kind": "carried-object",
+    "name": "Spirit Jar",
+    "tag": "spirit-jar"
+   },
+   {
     "kind": "restoration",
-    "name": "Spirit Jar"
+    "name": "Spirit Jar",
+    "returns": {
+     "after": "1d10",
+     "unit": "days",
+     "needs": "spirit-jar"
+    }
    }
   ],
   "extensions": {
@@ -33273,6 +33391,17 @@
   "conditionImmunities": [
    "prone"
   ],
+  "traitMechanics": [
+   {
+    "kind": "adhesive",
+    "name": "Adhesive (Object Form Only)",
+    "maxSize": "huge",
+    "escapeDc": 13,
+    "forms": [
+     "object"
+    ]
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 2,
@@ -34208,8 +34337,37 @@
   },
   "traitMechanics": [
    {
+    "kind": "carried-object",
+    "name": "Undead Restoration",
+    "tag": "heart",
+    "object": {
+     "name": "Heart",
+     "armorClass": 17,
+     "hitPoints": 10,
+     "immunities": [
+      "acid",
+      "bludgeoning",
+      "cold",
+      "force",
+      "lightning",
+      "necrotic",
+      "piercing",
+      "poison",
+      "psychic",
+      "radiant",
+      "slashing",
+      "thunder"
+     ]
+    }
+   },
+   {
     "kind": "restoration",
-    "name": "Undead Restoration"
+    "name": "Undead Restoration",
+    "returns": {
+     "after": 24,
+     "unit": "hours",
+     "needs": "heart"
+    }
    }
   ],
   "extensions": {
@@ -34612,6 +34770,16 @@
      "limit": 1,
      "per": "long-rest"
     },
+    "needsObject": "soul-bag",
+    "castRiders": {
+     "fromEthereal": true,
+     "failsUnder": [
+      "protection-from-evil-and-good",
+      "magic-circle"
+     ],
+     "drainsMaximum": true,
+     "trapsSoul": true
+    },
     "castsSpells": {
      "ability": "int",
      "saveDc": 14,
@@ -34640,6 +34808,33 @@
   "damageResistances": [
    "cold",
    "fire"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "carried-object",
+    "name": "Soul Bag",
+    "tag": "soul-bag",
+    "object": {
+     "name": "Soul Bag",
+     "armorClass": 15,
+     "hitPoints": 20,
+     "resistances": [
+      "acid",
+      "bludgeoning",
+      "cold",
+      "fire",
+      "force",
+      "lightning",
+      "necrotic",
+      "piercing",
+      "poison",
+      "psychic",
+      "radiant",
+      "slashing",
+      "thunder"
+     ]
+    }
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -34781,6 +34976,11 @@
    "fire"
   ],
   "traitMechanics": [
+   {
+    "kind": "confers-resistance",
+    "name": "Confer Fire Resistance",
+    "damageType": "fire"
+   },
    {
     "kind": "light",
     "name": "Illumination",
@@ -39891,7 +40091,8 @@
     "move": {
      "speed": "half",
      "mode": "fly",
-     "provokes": false
+     "provokes": false,
+     "dropsHeld": true
     }
    },
    {
@@ -40508,6 +40709,14 @@
   "damageResistances": [
    "acid",
    "cold"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "controls-kind",
+    "name": "Shark Telepathy",
+    "nameHas": "shark",
+    "withinFeet": 120
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -41420,7 +41629,16 @@
        "killsAtZero": true
       }
      }
-    ]
+    ],
+    "drain": {
+     "slainRise": {
+      "monsterId": "shadow",
+      "creatureTypes": [
+       "humanoid"
+      ],
+      "afterHours": "1d4"
+     }
+    }
    },
    {
     "id": "shadow-stealth",
@@ -41631,6 +41849,10 @@
        "carried-free"
       ],
       "modifiers": []
+     },
+     "failurePush": {
+      "feet": 5,
+      "intoSpace": true
      }
     },
     "damage": [],
@@ -41807,6 +42029,11 @@
    "poisoned"
   ],
   "traitMechanics": [
+   {
+    "kind": "shares-wearer-damage",
+    "name": "Bound",
+    "withinFeet": 60
+   },
    {
     "kind": "regeneration",
     "name": "Regeneration",
@@ -42953,6 +43180,13 @@
    "actionsInLair": 4,
    "resistancesInLair": 4
   },
+  "traitMechanics": [
+   {
+    "kind": "inscrutable",
+    "name": "Inscrutable",
+    "skill": "insight"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 11,
@@ -43322,6 +43556,13 @@
    "actionsInLair": 4,
    "resistancesInLair": 4
   },
+  "traitMechanics": [
+   {
+    "kind": "inscrutable",
+    "name": "Inscrutable",
+    "skill": "insight"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 17,
@@ -43774,7 +44015,14 @@
   "traitMechanics": [
    {
     "kind": "restoration",
-    "name": "Fiendish Restoration"
+    "name": "Fiendish Restoration",
+    "returns": {
+     "after": "1d6",
+     "unit": "days",
+     "preventedBy": [
+      "wish"
+     ]
+    }
    }
   ],
   "extensions": {
@@ -44345,7 +44593,8 @@
       "name": "Attached",
       "tags": [
        "attached",
-       "source-no-repeat"
+       "source-no-repeat",
+       "detaches-itself"
       ],
       "ongoingDamage": {
        "damage": [
@@ -44361,8 +44610,7 @@
        "by": "either"
       }
      }
-    ],
-    "reminder": "The stirge detaches itself by spending 5 feet of its movement."
+    ]
    }
   ],
   "token": {
@@ -44720,6 +44968,12 @@
    "paralyzed",
    "petrified",
    "poisoned"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "immutable-form",
+    "name": "Immutable Form"
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -45151,6 +45405,13 @@
    "fire",
    "poison",
    "psychic"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "form-at-rest",
+    "name": "Incubus Form",
+    "monsterId": "incubus"
+   }
   ],
   "extensions": {
    "open5e.srd-2024": {
@@ -46407,6 +46668,12 @@
    "actionsPerRound": 3,
    "resistancesPerDay": 6
   },
+  "traitMechanics": [
+   {
+    "kind": "reflective-carapace",
+    "name": "Reflective Carapace"
+   }
+  ],
   "extensions": {
    "open5e.srd-2024": {
     "challengeRating": 30,
@@ -47323,6 +47590,14 @@
      "fire"
     ],
     "deathWaitsForTurn": true
+   },
+   {
+    "kind": "spawns",
+    "name": "Troll Spawn",
+    "afterHours": 24,
+    "die": 12,
+    "on": 12,
+    "monsterId": "troll"
    }
   ],
   "extensions": {
@@ -50510,7 +50785,8 @@
     ],
     "move": {
      "speed": "full",
-     "provokes": false
+     "provokes": false,
+     "thenHide": true
     }
    },
    {

@@ -244,14 +244,14 @@ export const rollCommands = [
     type: "roll-call.start",
     operationId: "startRollCall",
     description:
-      "The GM calls for a roll from one or several characters (GM-grade only): an ability, skill or tool check, or a saving throw with a DC. A save call opens a pending save for each character, answered like any save (the outcome is written back to the call); a check call is answered with `roll-call.answer`. A `blind` call keeps its DC and results from the players: they roll blind. Players see their own part of an open call in `rollCalls`; the GM sees every result and closes the call. The response carries `callId`.",
+      "The GM calls for a roll from one or several characters (GM-grade only): an ability, skill or tool check, or a saving throw with a DC. A save call opens a pending save for each character, answered like any save (the outcome is written back to the call); a check call is answered with `roll-call.answer`. A `blind` call keeps its DC and results from the players: they roll blind. `aboutActorId` names the creature a check is about, whose traits can weigh on it (a sphinx's Inscrutable gives Insight into it Disadvantage); players never see it. Players see their own part of an open call in `rollCalls`; the GM sees every result and closes the call. The response carries `callId`.",
     summary: "Call for a check or a saving throw from one or several characters (GM).",
     schema: RollCallStartSchema,
     malformed: "The call for a roll is malformed.",
     issueMessage: true,
     gmOnly: "Only the GM can call for a roll.",
     async run({ request, execute }, kit) {
-      const { commandId, kind, ability, skill, tool, dc, actorIds, blind, sense } = request;
+      const { commandId, kind, ability, skill, tool, dc, actorIds, blind, sense, aboutActorId } = request;
       const subject = {
         ability,
         ...(skill !== undefined ? { skill } : {}),
@@ -261,7 +261,15 @@ export const rollCommands = [
       const committed = await execute((draft) => {
         startRollCall(
           draft,
-          { id: commandId, kind, subject, dc: dc ?? null, actorIds, blind: blind === true },
+          {
+            id: commandId,
+            kind,
+            subject,
+            dc: dc ?? null,
+            actorIds,
+            blind: blind === true,
+            ...(aboutActorId !== undefined ? { aboutActorId } : {})
+          },
           {
             newId: kit.context.newId,
             now: () => Date.now(),

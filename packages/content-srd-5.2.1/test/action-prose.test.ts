@@ -283,7 +283,7 @@ describe("reading the moves an action makes its creature take", () => {
       moveOfProse(
         "If the roc has a creature Grappled, the roc flies up to half its Fly Speed without provoking Opportunity Attacks and drops that creature."
       )
-    ).toEqual({ speed: "half", mode: "fly", provokes: false });
+    ).toEqual({ speed: "half", mode: "fly", provokes: false, dropsHeld: true });
     expect(moveOfProse("The sahuagin swims up to its Swim Speed straight toward an enemy it can see.")).toEqual({
       speed: "full",
       mode: "swim",

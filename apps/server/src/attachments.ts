@@ -11,6 +11,12 @@ import type { RuleId } from "./rules-families.js";
 export const SOURCE_NO_REPEAT_TAG = "source-no-repeat";
 export const SOURCE_TARGET_ONLY_TAG = "source-target-only";
 export const SOURCE_ATTACKS_ONLY_BEARER_TAG = "source-attacks-only-bearer";
+/** "Its Speed becomes 0 ... and it moves with the target" (a darkmantle): the bearer carries the effect's source. */
+export const CARRIES_SOURCE_TAG = "carries-source";
+/** "The stirge can detach itself by spending 5 feet of its movement": the source's own way off. */
+export const DETACHES_ITSELF_TAG = "detaches-itself";
+/** What spending movement to detach costs, as each printing says. */
+export const DETACH_FEET = 5;
 
 type Actor = GameState["actors"][number];
 type Violation = Readonly<{ rule: RuleId; message: string }>;
@@ -58,4 +64,28 @@ export function attachedAdvantage(state: GameState, attackerId: string, targetId
   return holds(state, attackerId).some(
     ({ bearer, effect }) => bearer.id === targetId && effect.tags.includes(SOURCE_ATTACKS_ONLY_BEARER_TAG)
   );
+}
+
+/** The creatures attached to `bearerId` that move with it (a darkmantle on its target). */
+export function carriedSourcesOf(state: GameState, bearerId: string): string[] {
+  const bearer = state.actors.find((actor) => actor.id === bearerId);
+  return [
+    ...new Set(
+      (bearer?.effects ?? [])
+        .filter((effect) => effect.tags.includes(CARRIES_SOURCE_TAG) && effect.sourceActorId)
+        .map((effect) => effect.sourceActorId!)
+    )
+  ];
+}
+
+/** The creature a darkmantle rides, when it is attached so that it moves only with it. */
+export function riddenBearerOf(state: GameState, sourceId: string): Actor | undefined {
+  return state.actors.find((bearer) =>
+    bearer.effects.some((effect) => effect.sourceActorId === sourceId && effect.tags.includes(CARRIES_SOURCE_TAG))
+  );
+}
+
+/** The attachments this creature can end by spending its own movement, each with its bearer. */
+export function selfDetachments(state: GameState, sourceId: string) {
+  return holds(state, sourceId).filter(({ effect }) => effect.tags.includes(DETACHES_ITSELF_TAG));
 }

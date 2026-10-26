@@ -193,6 +193,8 @@ export type PlayerPendingSave = Omit<
   | "immuneOnSuccess"
   | "drain"
   | "failurePush"
+  | "successPush"
+  | "successMovesOut"
   | "unseats"
   | "advantageAtSize"
   | "disadvantageTypes"

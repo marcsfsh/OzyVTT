@@ -1,4 +1,5 @@
-import type { GameState } from "@vtt/domain";
+import { isDead, type GameState } from "@vtt/domain";
+import { stampDeath } from "./death.js";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
 import type { ActorDefinition, RestTrigger } from "@vtt/schemas";
 import { endEffectIfPresent, maximumKeeper, sourceOf, type EffectNarration } from "./effects.js";
@@ -116,7 +117,8 @@ function triggerOnce(
     if (success) return [...events, ...endEffectIfPresent(state, actor.id, effect.id)];
   }
   if (trigger.maximumLoss) events.push(...loseMaximum(state, actor, effect, trigger.maximumLoss, deps));
-  // "It takes 3d6 Psychic damage when it wakes up" (Dream), meeting its defences like any damage.
+  // "It takes 3d6 Psychic damage when it wakes up" (Dream), meeting its defences like any damage. A night hag's Dream
+  // lowers the maximum by as much, and traps the soul of a target it kills in the hag's soul bag.
   if (trigger.damage) {
     const parts = trigger.damage.map((part) => ({
       amount: Math.max(0, resolveDice(parseDiceFormula(part.formula), deps.random).total),
@@ -126,7 +128,13 @@ function triggerOnce(
     const outcome = applyDamageDetailed(
       state,
       actor.id,
-      { amount, parts, sourceActorId: effect.sourceActorId, sourceName: effect.sourceName ?? effect.name },
+      {
+        amount,
+        parts,
+        sourceActorId: effect.sourceActorId,
+        sourceName: effect.sourceName ?? effect.name,
+        ...(trigger.drainsMaximum ? { drain: { reducesMaximum: true as const } } : {})
+      },
       { role: "gm" },
       {
         resolveDefinition: deps.resolveDefinition,
@@ -143,6 +151,16 @@ function triggerOnce(
       },
       ...outcome.events
     );
+    if (trigger.trapsSoul && effect.sourceActorId && isDead(actor)) {
+      stampDeath(state, actor);
+      actor.death = { ...actor.death!, soulTrappedBy: effect.sourceActorId };
+      events.push({
+        kind: "effect",
+        text: `${actor.name}'s soul is trapped in ${effect.sourceName ?? "its killer"}'s soul bag (${effect.name}).`,
+        actorId: actor.id,
+        ...sourceOf(effect)
+      });
+    }
   }
   if (trigger.once) events.push(...endEffectIfPresent(state, actor.id, effect.id));
   return events;
