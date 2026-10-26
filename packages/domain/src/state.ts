@@ -5,6 +5,7 @@ import {
   AreaTriggerSchema,
   ActorDefinitionSchema,
   DamageDrainSchema,
+  DamageSourceSchema,
   ForcedPushSchema,
   ActorSchema,
   CastShapingSchema,
@@ -386,6 +387,9 @@ export const PendingSaveSchema = z
     immuneMinutes: z.number().int().min(1).max(MAX_EFFECT_MINUTES).optional(),
     /** What the save's damage drains as it lands (Harm's lower Hit Point maximum). GM bookkeeping, never projected. */
     drain: DamageDrainSchema.optional(),
+    /** What deals the save's damage, for a defence that reads it (`DamageSourceSchema`). GM bookkeeping, never
+     *  projected. */
+    damageSource: DamageSourceSchema.optional(),
     /** Where a failure pushes the creature (Thunderwave), narrated when it lands. */
     failurePush: ForcedPushSchema.optional(),
     /** Where a success pushes the creature (a bulette's Deadly Leap), narrated when it lands. */
@@ -1020,6 +1024,8 @@ export const PendingReactionSchema = z
     damageResponse: DamageResponseSchema.optional(),
     /** takes-damage: what the parked damage drains as it lands (a save's Harm). */
     drain: DamageDrainSchema.optional(),
+    /** What deals the damage the prompt holds, for a defence that reads it as it lands. */
+    damageSource: DamageSourceSchema.optional(),
     /** How the hit whose damage it holds was made, so a reaction limited to some attacks is offered after it. */
     hitKinds: z.array(z.string().min(1).max(20)).max(10).optional(),
     createdAt: z.number().int().nonnegative()
@@ -1065,6 +1071,8 @@ export const PendingDamageSchema = z
     critical: z.boolean().default(false),
     /** What the damage drains as it lands (Vampiric Touch's healing). */
     drain: DamageDrainSchema.optional(),
+    /** What dealt it, for a defence that reads it as it lands. */
+    damageSource: DamageSourceSchema.optional(),
     /** The attacker knocks the target out: a drop to 0 leaves it at 1 Hit Point and Unconscious (SRD). */
     nonlethal: z.literal(true).optional(),
     createdAt: z.number().int().nonnegative()

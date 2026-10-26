@@ -484,7 +484,8 @@ function answerParkedDamage(answer: Answer, redirectTo: string | undefined): Rea
       critical: pending.critical,
       sourceName: pending.sourceName,
       sourceActorId: pending.sourceActorId,
-      ...(pending.drain ? { drain: pending.drain } : {})
+      ...(pending.drain ? { drain: pending.drain } : {}),
+      ...(pending.damageSource ? { damageSource: pending.damageSource } : {})
     });
     appliedDamage = outcome.application.totalApplied;
     application = outcome.application;
@@ -819,7 +820,8 @@ function answerStrike(
           ? `${reactor.name}'s ${chosen.name} (opportunity attack)`
           : `${reactor.name}'s ${chosen.name}`,
       sourceActorId: reactor.id,
-      ...(chosen.drain ? { drain: chosen.drain } : {})
+      ...(chosen.drain ? { drain: chosen.drain } : {}),
+      ...(resolution.damageSource ? { damageSource: resolution.damageSource } : {})
     });
     appliedDamage = outcome.application.totalApplied;
     application = outcome.application;
@@ -983,7 +985,8 @@ function replayParkedAttack(
       critical: resolution.crit,
       sourceName: `${attacker.name}'s ${resolution.actionName}`,
       sourceActorId: attacker.id,
-      ...(action.drain ? { drain: action.drain } : {})
+      ...(action.drain ? { drain: action.drain } : {}),
+      ...(resolution.damageSource ? { damageSource: resolution.damageSource } : {})
     });
     appliedDamage = outcome.application.totalApplied;
     application = outcome.application;
@@ -1293,6 +1296,7 @@ function answerDamageRoll(answer: Answer, roller: LiveActor, choice: Readonly<{ 
       hit: true,
       hitKinds: pending.hitKinds ?? [],
       ...(pending.drain ? { drain: pending.drain } : {}),
+      ...(pending.damageSource ? { damageSource: pending.damageSource } : {}),
       asked: pending.asked ?? []
     },
     {
@@ -1317,7 +1321,8 @@ function answerDamageRoll(answer: Answer, roller: LiveActor, choice: Readonly<{ 
     critical: pending.critical,
     sourceName: pending.sourceName,
     sourceActorId: roller.id,
-    ...(pending.drain ? { drain: pending.drain } : {})
+    ...(pending.drain ? { drain: pending.drain } : {}),
+    ...(pending.damageSource ? { damageSource: pending.damageSource } : {})
   });
   return {
     ...base,

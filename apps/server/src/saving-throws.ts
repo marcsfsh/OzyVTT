@@ -1291,6 +1291,7 @@ export function answerSave(
             hit: false,
             hitKinds: [],
             ...(drain ? { drain } : {}),
+            ...(pending.damageSource ? { damageSource: pending.damageSource } : {}),
             asked: []
           },
           {
@@ -1314,7 +1315,8 @@ export function answerSave(
         amount: outcomeDamage,
         ...(outcomeParts !== null ? { parts: outcomeParts } : {}),
         sourceActorId: pending.sourceActorId,
-        ...(drain ? { drain } : {})
+        ...(drain ? { drain } : {}),
+        ...(pending.damageSource ? { damageSource: pending.damageSource } : {})
       },
       { role: "gm" },
       {

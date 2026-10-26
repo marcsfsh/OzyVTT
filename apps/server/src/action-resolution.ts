@@ -182,6 +182,8 @@ import { checkDestination, landAtDestination } from "./resolution/destination.js
 import { openFollowUps } from "./follow-ups.js";
 import { stopReturnsAtRemains } from "./resolution/remains.js";
 import { THEN_HIDE_TAG } from "./granted-moves.js";
+import { damageSourceOf, withDamageSource } from "./resolution/damage-source.js";
+import { drawRangedAttack } from "./resolution/missile-attraction.js";
 
 export type { ResolveDependencies, ResolveInput };
 
@@ -346,6 +348,7 @@ export function resolveDefinitionAction(
   }
   // An attack another creature may turn onto someone else before it rolls (Redirect Attack, Arrow-Catching Shield):
   // the attack is spent, and the answer rolls it at whichever creature it ends at.
+  drawRangedAttack(ctx);
   if (parkForRedirect(ctx)) {
     commitEconomy(ctx);
     recallSpellSlot(ctx);
@@ -690,7 +693,8 @@ function resolutionOf(ctx: ResolveContext): ActionResolution {
     ...(ctx.opens ? { opens: ctx.opens } : {}),
     ...(damageTargets ? { damageTargets } : {}),
     ...(ctx.summoned && ctx.summoned.length > 0 ? { summoned: ctx.summoned } : {}),
-    ...(knocksOut(ctx) ? { knockOut: "chosen" as const } : {})
+    ...(knocksOut(ctx) ? { knockOut: "chosen" as const } : {}),
+    ...withDamageSource(damageSourceOf(ctx))
   };
 }
 

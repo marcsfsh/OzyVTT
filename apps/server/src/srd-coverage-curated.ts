@@ -1368,8 +1368,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "action:Ghoul/claw": enforced(
     "The hit's Slashing damage is applied, and its Constitution save opens only on a creature that is neither an Undead nor an elf (resolution/pending.ts), a failure leaving it Paralyzed until the end of its next turn."
   ),
-  "action:Steam Mephit/steam-breath": guided(
-    "The save's Fire damage is applied, half on a success, and a failure takes 10 feet off the target's Speed until the end of the mephit's next turn (saving-throws.ts). Underwater, hit-points.ts still gives the Fire damage Resistance, which the breath ignores; the GM gives that half back."
+  "action:Steam Mephit/steam-breath": enforced(
+    "The save's Fire damage is applied, half on a success, and a failure takes 10 feet off the target's Speed until the end of the mephit's next turn (saving-throws.ts). Being underwater gives that Fire damage no Resistance (`fireUnderwater`, read by hit-points.ts)."
   ),
   "action:Adult Brass Dragon/scorching-sands": enforced(
     "The save's Fire damage is applied, and a failure halves the target's Speed until the end of its next turn (saving-throws.ts). The dragon takes it once until its next turn starts (resolution/economy.ts)."
@@ -1620,7 +1620,15 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:bracers-of-archery": enforced(
     "Proficiency with the Longbow and Shortbow, and +2 to damage rolls made with either (a magic one bound to it included), are applied (riders.ts)."
   ),
-  "item:brooch-of-shielding": guided("Resistance to Force damage is applied. Immunity to Magic Missile is the GM's."),
+  "item:brooch-of-shielding": enforced(
+    "Resistance to Force damage is applied, and damage from the Magic Missile spell does nothing to the wearer: hit-points.ts reads the spell that dealt it (resolution/damage-source.ts)."
+  ),
+  "item:shield-of-missile-attraction": enforced(
+    "Its holder resists the damage of attacks made with Ranged weapons, read as the damage lands with how the attack was made (hit-points.ts, resolution/damage-source.ts). Its curse locks its Attunement until Remove Curse, and while attuned, held or not, draws onto its bearer every Ranged weapon attack at another creature within 10 feet of it (resolution/missile-attraction.ts)."
+  ),
+  "item:arrow-catching-shield": enforced(
+    "Its wielder has +2 AC against ranged attack rolls on top of the Shield's (resolution/attack.ts), and a ranged attack at a creature within 5 feet of it offers a Reaction that makes the wielder the target instead (resolution/redirect.ts)."
+  ),
   "item:cloak-of-arachnida": enforced(
     "Resistance to Poison damage and a Climb Speed equal to its wearer's Speed are applied. The webs of a Web spell can't hold the wearer (spell-zones.ts), and its Web cast is DC 13 over a 40-foot Cube once a Long Rest. Climbing upside down on ceilings is the GM's to allow."
   ),
@@ -1778,8 +1786,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:sword-of-wounding": enforced(
     "The extra Necrotic damage is applied, and a hit opens a DC 15 Constitution save whose failure stops the target regaining Hit Points for 1 hour or until it succeeds on the save it repeats at the end of each of its turns (resolution/on-hit.ts); the hour runs on the game clock after a fight (game-time.ts)."
   ),
-  "item:vorpal-sword": guided(
-    "The +3 to attack and damage rolls is applied. On a rolled 20 it cuts off the target's head (resolution/kill.ts): the creature dies, and only a revival that restores lost parts brings it back. A creature with no head, Immunity to Slashing damage, a neck too big (larger than Large) or Legendary Resistance to spend takes 30 Slashing damage more instead, and a hydra loses one head. Ignoring Resistance to Slashing damage, and a creature that lives without its head, are the GM's."
+  "item:vorpal-sword": enforced(
+    "The +3 to attack and damage rolls is applied. On a rolled 20 it cuts off the target's head (resolution/kill.ts): the creature dies, and only a revival that restores lost parts brings it back. A creature with no head, Immunity to Slashing damage, a neck too big (larger than Large) or Legendary Resistance to spend takes 30 Slashing damage more instead, and a hydra loses one head. Its Slashing damage ignores Resistance, that sword's alone (hit-points.ts reads the row that dealt it). A creature that lives without its head is the GM's."
   ),
   "item:periapt-of-wound-closure": enforced(
     "death-saves.ts counts an attuned wearer's death save of 9 or lower as a 10, and rests.ts and resolution/hit-point-die.ts double what each Hit Point Die it rolls to heal restores."

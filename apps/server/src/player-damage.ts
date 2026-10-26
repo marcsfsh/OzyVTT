@@ -136,6 +136,7 @@ function settleOne(
         sourceName: label,
         sourceActorId,
         ...(drain ? { drain } : {}),
+        ...(resolution.damageSource ? { damageSource: resolution.damageSource } : {}),
         ...(resolution.knockOut === "chosen" ? { nonlethal: true } : {})
       },
       { role: "gm" },
@@ -158,6 +159,7 @@ function settleOne(
         proposedTotal: owed.total,
         critical: resolution.crit,
         ...(drain ? { drain } : {}),
+        ...(resolution.damageSource ? { damageSource: resolution.damageSource } : {}),
         ...(resolution.knockOut === "chosen" ? { nonlethal: true as const } : {}),
         createdAt: deps.now()
       }
@@ -192,6 +194,7 @@ export function resolvePendingDamage(
       sourceName: label,
       sourceActorId: proposal.sourceActorId,
       ...(proposal.drain ? { drain: proposal.drain } : {}),
+      ...(proposal.damageSource ? { damageSource: proposal.damageSource } : {}),
       ...(proposal.nonlethal ? { nonlethal: true } : {})
     };
     const outcome = applyDamageDetailed(state, proposal.targetActorId, input, { role: "gm" }, damageDepsOf(deps));

@@ -61,6 +61,7 @@ export type ItemRiderKey =
   | "magicSaveAura"
   | "servesAsFocus"
   | "savesNegateSpells"
+  | "attractsMissiles"
   | "breaks"
   | "container"
   | "attunementHeldBy";
@@ -92,6 +93,7 @@ const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "magicSaveAura",
   "servesAsFocus",
   "savesNegateSpells",
+  "attractsMissiles",
   "breaks",
   "container",
   "attunementHeldBy"

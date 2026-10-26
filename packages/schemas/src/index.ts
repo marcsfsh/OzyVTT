@@ -1128,7 +1128,7 @@ export const ModifierSchema = z
       })
       .strict()
       .describe(
-        "Immunity to the listed damage types (Mind Blank's Psychic): damage of those types does nothing. Read standing, before any roll, as resistance is, so a moment gate is refused at publish."
+        "Immunity to the listed damage types (Mind Blank's Psychic): damage of those types does nothing. Read standing, as resistance is, or as the damage lands with `on-taking-damage`, narrowed by what dealt it: `spell-id-is` (a Brooch of Shielding's immunity to Magic Missile) or `attack-kind-is`."
       ),
     /** The bearer's own damage of these types ignores the target's Resistance (Boon of Irresistible Offense). */
     z
@@ -1219,7 +1219,7 @@ export const ModifierSchema = z
       })
       .strict()
       .describe(
-        "Resistance to the listed damage types (Rage). Read standing, before any roll, so a moment gate is refused at publish; gate it on a state (`while-effect-tag`) instead."
+        "Resistance to the listed damage types (Rage). Read standing, or gated on a state (`while-effect-tag`); with `on-taking-damage` it is read as the damage lands, narrowed by what dealt it: `attack-kind-is` (a Shield of Missile Attraction against Ranged weapons) or `spell-id-is`."
       ),
     /** The mirror of `damage-resistance`; with both, `adjustDamageParts` halves first and then doubles (SRD Order of
      * Application). */
@@ -4165,6 +4165,28 @@ export const DamageDrainSchema = z
   .strict();
 export type DamageDrain = z.infer<typeof DamageDrainSchema>;
 
+/** What dealt a creature's damage, for a defence that reads it as the damage lands: the spell (a Brooch of Shielding's
+ *  immunity to Magic Missile), the carried row it was dealt with (a Vorpal Sword ignoring Resistance with that sword
+ *  alone), how the attack was made (a Shield of Missile Attraction against Ranged weapons), and whether its Fire keeps
+ *  its full force underwater (Steam Breath). */
+export const DamageSourceSchema = z
+  .object({
+    spellId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
+    rowId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
+    attackKinds: z.array(z.string().min(1).max(20)).max(12).optional(),
+    fireUnderwater: z.literal(true).optional()
+  })
+  .strict();
+export type DamageSource = z.infer<typeof DamageSourceSchema>;
+
 /** Conditions a hit lands on its target as one source-linked effect (a crocodile's Bite: Grappled and Restrained, escape
  *  DC 15; Ray of Sickness: Poisoned until the end of the caster's next turn). */
 export const OnHitRiderSchema = z
@@ -5645,6 +5667,9 @@ export const ActionSchema = z
     missDamage: z.literal("half").optional(),
     /** What its damage drains as it lands (a wraith's Life Drain, Vampiric Touch). */
     drain: DamageDrainSchema.optional(),
+    /** Its Fire damage isn't resisted underwater (a steam mephit's Steam Breath: "Being underwater doesn't grant
+     *  Resistance to this Fire damage"). */
+    fireUnderwater: z.literal(true).optional(),
     /** A hit also pushes the target straight away from the attacker (a fire giant's Hammer Throw). */
     onHitPush: ForcedPushSchema.optional(),
     /** It raises its target, a corpse dead no longer than `withinMinutes`, as `monsterId` on its user's side, in the

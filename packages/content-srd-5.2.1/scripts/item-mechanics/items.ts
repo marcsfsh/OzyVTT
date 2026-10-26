@@ -44,6 +44,24 @@ const GOAT_THROW = "Throw the figurine to a point on the ground within 60 feet:"
 const FIGURINE_OBEYS =
   "The creature is Friendly to you and your allies, understands your languages, obeys your commands and takes its turn immediately after you on your Initiative count; if you issue no commands, it defends itself but takes no other actions. It reverts to a figurine at the end of its time, at 0 Hit Points, or when you touch it and take a Magic action.";
 
+/** Every damage type, for a defence against a source whatever type it deals (a Brooch of Shielding against Magic
+ *  Missile). */
+const ALL_DAMAGE_TYPES = [
+  "acid",
+  "bludgeoning",
+  "cold",
+  "fire",
+  "force",
+  "lightning",
+  "necrotic",
+  "piercing",
+  "poison",
+  "psychic",
+  "radiant",
+  "slashing",
+  "thunder"
+] satisfies DamageType[];
+
 /** The d10 table Armor of Resistance and Ring of Resistance roll on for their type. */
 const RESISTANCE_TABLE = [
   "acid",
@@ -70,7 +88,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Recurring limits:
   //   - `damage-bonus` is bounded to +/-10.
   //   - `versus-creature-type` reads the target's stat block, so a character target never matches one.
-  //   - `armor-class` is read in the standing pass, so it cannot be narrowed to a kind of attack.
+  //   - `armor-class` is read in the standing pass, or against one attack roll with `on-attack-roll` and its kind.
   //   - An item's `grants.languages` reaches no reader.
   //
   // GM choices where the SRD prints a table: Armor of Resistance resists lightning (d10 row 5), Dragon
@@ -186,10 +204,20 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     vulnerableToOtherChoices: true
   },
 
-  // Kept as the curse alone: the SRD item is a trap, and the attunement lock is what springs it. The GM
-  // applies the rest from the description, since neither half is expressible: resistance to ranged-weapon
-  // damage (resistance goes by damage type alone) and the redirect of nearby ranged attacks.
-  "shield-of-missile-attraction": { cursed: true },
+  // Resistance to the damage of attacks made with Ranged weapons while it is held, read as the damage lands with how
+  // the attack was made. The curse draws onto its attuned bearer every Ranged weapon attack at a creature within 10
+  // feet, held or not, until Remove Curse ends the Attunement.
+  "shield-of-missile-attraction": {
+    cursed: true,
+    attractsMissiles: { feet: 10 },
+    modifiers: [
+      {
+        type: "damage-resistance",
+        damageTypes: [...ALL_DAMAGE_TYPES],
+        when: [{ type: "on-taking-damage" }, { type: "attack-kind-is", kinds: ["ranged-weapon-kind"] }]
+      }
+    ]
+  },
 
   // Advantage on Initiative and on Wisdom (Perception) checks: a sheet roll, Search or the GM's call made with Perception.
   "sentinel-shield": {
@@ -476,11 +504,13 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // On a rolled 20 the sword cuts off a head (`kills.beheads`): 30 Slashing more where it can't, and a creature with
-  // Legendary Resistance left spends it. Not modeled: ignoring Resistance to Slashing damage.
+  // Legendary Resistance left spends it. Its own Slashing damage ignores Resistance: scoped to the sword, so the
+  // wielder's other weapons are still resisted.
   "vorpal-sword": {
     modifiers: [
       { type: "attack-bonus", amount: 3 },
-      { type: "damage-bonus", amount: 3 }
+      { type: "damage-bonus", amount: 3 },
+      { type: "ignores-resistance", damageTypes: ["slashing"], scope: "this-item" }
     ],
     onHit: [{ conditions: [], naturalTwenty: true, kills: { beheads: true } }]
   },
@@ -937,9 +967,16 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // "Whenever an attacker makes a ranged attack roll against a target within 5 feet of you, you can take a Reaction to
-  // become the target of the attack instead": offered before the roll. Not modeled: the +2 AC against ranged attack
-  // rolls, since an AC bonus cannot be limited to them.
+  // become the target of the attack instead": offered before the roll. The +2 AC is read against a ranged attack roll
+  // alone, as it is rolled.
   "arrow-catching-shield": {
+    modifiers: [
+      {
+        type: "armor-class",
+        amount: 2,
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["ranged"] }]
+      }
+    ],
     actions: [
       {
         id: "catch-the-attack",
@@ -954,7 +991,6 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // Prose-only items:
-  //   `arrow-catching-shield` - an AC bonus cannot be limited to ranged attacks (its Reaction is authored above).
   //   `dancing-sword` - a sword that attacks from its own space needs an object token that strikes.
 
   // The GM says which creature type a found piece slays (its kind). A shot that draws it carries its hit: a creature of
@@ -2769,8 +2805,17 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     casts: [{ spellId: "plane-shift", check: { ability: "int", skill: "arcana", dc: 15 } }]
   },
 
-  // Immunity to Magic Missile damage only (not all Force) is not expressible.
-  "brooch-of-shielding": { grants: { damageResistances: ["force"] } },
+  // Resistance to Force damage, and Immunity to the damage of the Magic Missile spell, read as the damage lands.
+  "brooch-of-shielding": {
+    grants: { damageResistances: ["force"] },
+    modifiers: [
+      {
+        type: "damage-immunity",
+        damageTypes: [...ALL_DAMAGE_TYPES],
+        when: [{ type: "on-taking-damage" }, { type: "spell-id-is", spellIds: ["magic-missile"] }]
+      }
+    ]
+  },
 
   "medallion-of-thoughts": {
     charges: { regain: "1d4" },

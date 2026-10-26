@@ -203,6 +203,7 @@ export type PlayerPendingSave = Omit<
   | "spell"
   | "confirmed"
   | "spendsOnKill"
+  | "damageSource"
 > & {
   onFailEffect?: Omit<
     NonNullable<PendingSave["onFailEffect"]>,
@@ -216,7 +217,7 @@ export type PlayerPendingSave = Omit<
  *  is in the player's own dice log; `lastsUntilNextTurn` says the reactor's reaction lasts (Shield). */
 export type PlayerPendingReaction = Omit<
   PendingReaction,
-  "sourceActorId" | "parkedAttack" | "parkedCast" | "saveId" | "asked" | "drain" | "hitKinds"
+  "sourceActorId" | "parkedAttack" | "parkedCast" | "saveId" | "asked" | "drain" | "hitKinds" | "damageSource"
 > & {
   attackRoll?: number;
   lastsUntilNextTurn?: true;

@@ -271,6 +271,7 @@ const PENDING_SAVE_FIELDS = {
   gmApplies: "player",
   // Who the caster's Temporary Hit Points go to is the caster's pick, told when they land.
   vitality: "never",
+  damageSource: "never",
   // The spell names its caster's choice and school; what answers it is offered on the save's own preview.
   spell: "never",
   // Who was asked to answer it would name them; the player is told only that it waits (`awaitingAnswer`).
@@ -374,7 +375,8 @@ const PENDING_REACTION_FIELDS = {
   saveId: "never",
   asked: "never",
   drain: "never",
-  hitKinds: "never"
+  hitKinds: "never",
+  damageSource: "never"
 } as const satisfies Record<keyof PendingReaction, FieldAudience>;
 
 const PENDING_RULE_ASK_FIELDS = {

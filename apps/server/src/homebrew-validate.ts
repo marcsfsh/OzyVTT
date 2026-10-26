@@ -632,9 +632,10 @@ const MOMENTS_READ: Partial<Record<Modifier["type"], readonly string[]>> = {
   "damage-bonus": DAMAGE_ROLL_MOMENTS,
   "extra-damage": DAMAGE_ROLL_MOMENTS,
   "damage-die-minimum": DAMAGE_ROLL_MOMENTS,
-  "damage-resistance": [],
+  // Standing, or as the damage lands, narrowed by what dealt it (a Brooch of Shielding against Magic Missile).
+  "damage-resistance": ["on-taking-damage"],
   "damage-vulnerability": [],
-  "damage-immunity": [],
+  "damage-immunity": ["on-taking-damage"],
   "ignores-resistance": [],
   "advantage-denied": [],
   "ability-score-minimum": [],
@@ -642,6 +643,8 @@ const MOMENTS_READ: Partial<Record<Modifier["type"], readonly string[]>> = {
   "speed-minimum": [],
   "carrying-capacity-larger": [],
   "ignores-cover": ["on-attack-roll"],
+  // Standing, or against one attack roll as it is rolled (an Arrow-Catching Shield's +2 against ranged attacks).
+  "armor-class": ["on-attack-roll"],
   "no-critical-hits": ["on-attack-roll"],
   "spell-ward": [],
   "healing-received-maximized": [],

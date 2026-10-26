@@ -372,6 +372,7 @@ const LABELS: Readonly<Record<string, string>> = {
   magicSaveAura: "aura of Advantage on saves against magic",
   servesAsFocus: "focus it serves as",
   savesNegateSpells: "spells a successful save negates",
+  attractsMissiles: "ranged attacks it draws onto its bearer",
   breaks: "chance a use breaks it",
   timePool: "uses counted as time",
   castThrough: "spell it is cast through",

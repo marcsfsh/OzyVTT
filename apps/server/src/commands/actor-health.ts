@@ -52,6 +52,9 @@ import { recordRoll } from "../roll-history.js";
 import { initiatorOf, isGmGrade, sessionIdOf, type GamePrincipal } from "./kit.js";
 import type { Initiator } from "../authorization.js";
 import { defineCommand } from "./pipeline.js";
+import { attackKindsOf } from "../resolution/attack.js";
+import { damageSourceOf } from "../resolution/damage-source.js";
+import { itemRowOfAction } from "../item-charges.js";
 
 /** A spend of Hit Point Dice, or a reroll of one, as the shared roll history records it: "2d10 + 1d6 + 4". */
 function hitDiceRecord(
@@ -112,6 +115,26 @@ function sourceActionOf(
   );
 }
 
+/** What the named source action deals its damage with (its spell, the carried row, how the attack was made), so a
+ *  defence that reads it applies on the GM's apply as on a player's (`resolution/damage-source.ts`). */
+function sourceOfDamage(
+  state: Parameters<typeof applyDamageDetailed>[0],
+  sourceActorId: string,
+  sourceActionId: string,
+  targetId: string,
+  kit: SourceKit,
+  distance: (a: string, b: string) => number | null
+) {
+  const source = state.actors.find((candidate) => candidate.id === sourceActorId);
+  const action = sourceActionOf(state, sourceActorId, sourceActionId, kit);
+  if (!source || !action) return undefined;
+  const riderItemId = itemRowOfAction(action.id, source.inventory)?.id ?? null;
+  const attackKinds = action.attack
+    ? attackKindsOf({ action, attacker: source, riderItemId, input: {} }, distance(sourceActorId, targetId))
+    : [];
+  return damageSourceOf({ action, attacker: source, riderItemId, riderFilters: { attackKinds } });
+}
+
 /** SRD Knocking Out a Creature: only "a melee attack" can, so a named source action that isn't one is refused. */
 function requireMeleeKnockOut(
   state: Parameters<typeof applyDamageDetailed>[0],
@@ -162,6 +185,12 @@ export const actorHealthCommands = [
           isGmGrade(principal) && sourceActorId && request.sourceActionId
             ? sourceActionOf(state, sourceActorId, request.sourceActionId, kit)?.drain
             : undefined;
+        const damageSource =
+          sourceActorId && request.sourceActionId
+            ? sourceOfDamage(state, sourceActorId, request.sourceActionId, actorId, kit, (a, b) =>
+                distance(state, a, b)
+              )
+            : undefined;
         outcome = applyDamageDetailed(
           state,
           actorId,
@@ -174,7 +203,8 @@ export const actorHealthCommands = [
             sourceName: sourceName ?? null,
             sourceActorId: sourceActorId ?? null,
             nonlethal,
-            ...(drain ? { drain } : {})
+            ...(drain ? { drain } : {}),
+            ...(damageSource ? { damageSource } : {})
           },
           initiatorOf(principal),
           {

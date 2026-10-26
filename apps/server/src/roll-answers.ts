@@ -618,6 +618,7 @@ export type AnswerPromptRoll = Readonly<{
   /** A held hit's damage: how the hit was made, and what it drains, for the reactions after this answer. */
   hitKinds?: readonly string[];
   drain?: PendingReaction["drain"];
+  damageSource?: PendingReaction["damageSource"];
   asked: readonly string[];
 }>;
 
@@ -657,6 +658,7 @@ export function askAnswer(
     asked: [...roll.asked],
     ...(roll.hitKinds && roll.hitKinds.length > 0 ? { hitKinds: [...roll.hitKinds] } : {}),
     ...(roll.drain ? { drain: roll.drain } : {}),
+    ...(roll.damageSource ? { damageSource: roll.damageSource } : {}),
     createdAt: Date.parse(deps.now())
   };
   state.combat = { ...state.combat, pendingReactions: [...state.combat.pendingReactions, prompt] };

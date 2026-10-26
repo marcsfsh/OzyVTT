@@ -46,6 +46,7 @@ export function createPendingSaves(
       | "regurgitates"
       | "vitality"
       | "spendsOnKill"
+      | "damageSource"
     >;
     /** Against a spell or a magic item, which Magic Resistance meets with Advantage. */
     magical?: boolean;

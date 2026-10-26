@@ -1,6 +1,6 @@
 import type { DamageResponse, GameState, PendingReaction } from "@vtt/domain";
 import { parseDiceFormula, resolveDice, type RandomSource } from "@vtt/rules-5e";
-import type { ActionReaction, ActorDefinition, DamageDrain } from "@vtt/schemas";
+import type { ActionReaction, ActorDefinition, DamageDrain, DamageSource } from "@vtt/schemas";
 import type { EffectNarration } from "./effects.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
 import { halvedDamageParts, previewDamage } from "./hit-points.js";
@@ -32,6 +32,8 @@ export type HeldDamage = Readonly<{
   hit: boolean;
   hitKinds: readonly string[];
   drain?: DamageDrain;
+  /** What deals it, for a defence that reads it as it lands. */
+  damageSource?: DamageSource;
   /** Who was asked already, so each creature is asked once. */
   asked: readonly string[];
 }>;
@@ -164,6 +166,7 @@ export function openDamageWindow(
           critical: held.critical,
           hitKinds: held.hitKinds,
           ...(held.drain ? { drain: held.drain } : {}),
+          ...(held.damageSource ? { damageSource: held.damageSource } : {}),
           asked: [...held.asked, answerKeyOf(next)]
         },
         { newId: deps.newId, now: deps.now, commandId: deps.commandId }
@@ -178,7 +181,12 @@ export function openDamageWindow(
   // What each answer takes off hit points after the reactor's defences, so its buttons name the numbers; a rolled
   // reduction is known only once rolled.
   const weigh = (parts: readonly Part[]) =>
-    previewDamage(state, held.target.id, { amount: 0, parts: [...parts] }, deps).totalApplied;
+    previewDamage(
+      state,
+      held.target.id,
+      { amount: 0, parts: [...parts], ...(held.damageSource ? { damageSource: held.damageSource } : {}) },
+      deps
+    ).totalApplied;
   const resisted = resistedTypeOf(held.parts);
   const redirectChoices = redirectChoicesFor(state, held.target, offer.reaction, held.hitKinds, deps);
   const used =
@@ -206,6 +214,7 @@ export function openDamageWindow(
     parkedAttack: null,
     ...(response.kind === "half" ? {} : { damageResponse: response }),
     ...(held.drain ? { drain: held.drain } : {}),
+    ...(held.damageSource ? { damageSource: held.damageSource } : {}),
     ...(held.hitKinds.length > 0 ? { hitKinds: [...held.hitKinds] } : {}),
     ...(redirectChoices.length > 0 ? { redirectChoices } : redirectChoicesOf(state, held.target, offer, deps)),
     asked: [...held.asked, OWN_REACTION],

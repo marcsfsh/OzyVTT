@@ -89,7 +89,15 @@ export function attackUsedAsRanged(
 /** melee/ranged/thrown derive from reach and range, spell from the spell the action casts, weapon from a carried
  *  weapon or a character's own non-spell attack, and melee-weapon/ranged-weapon from a weapon attack made in melee or
  *  at range; reaction/opportunity come from `input.attackKinds`. */
-function attackKindsOf(ctx: ResolveContext, distance: number | null): AttackKind[] {
+export function attackKindsOf(
+  ctx: Readonly<{
+    action: DefinitionAction;
+    attacker: LiveActor;
+    riderItemId: string | null;
+    input: Readonly<{ attackKinds?: readonly AttackKind[] }>;
+  }>,
+  distance: number | null
+): AttackKind[] {
   const { action, input, attacker } = ctx;
   const kinds = new Set<AttackKind>(input.attackKinds ?? []);
   const attack = action.attack;
@@ -763,7 +771,16 @@ export function rollAttack(ctx: ResolveContext): void {
   const coverBonus = coverSetAside ? 0 : ctx.coverBonus;
   const reactionBonus = input.reactionAcBonus?.amount ?? 0;
   const inPlay = armorClassInPlay(target);
-  const targetAc = inPlay !== undefined ? inPlay + coverBonus + reactionBonus : null;
+  // An AC bonus against this kind of attack alone (an Arrow-Catching Shield's +2 against ranged attack rolls).
+  const againstThis = collectRiders(targetDerivation.carriers, {
+    ...targetDerivation.context,
+    ...(ctx.riderFilters.attackKinds ? { attackKinds: ctx.riderFilters.attackKinds } : {}),
+    moment: "on-attack-roll"
+  }).filter((rider) => rider.modifier.type === "armor-class");
+  const momentaryAc = sumRiders(againstThis, "armor-class");
+  for (const rider of againstThis)
+    warnings.push(`${rider.label}: +${rider.modifier.amount ?? 0} to ${target.name}'s AC against this attack.`);
+  const targetAc = inPlay !== undefined ? inPlay + coverBonus + reactionBonus + momentaryAc : null;
   // "Any Critical Hit against you becomes a normal hit" (Adamantine Armor), read on the target as the attack lands.
   const critImmune = [
     ...collectRiders(targetDerivation.carriers, { ...targetDerivation.context, moment: null }),

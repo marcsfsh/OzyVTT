@@ -1327,6 +1327,15 @@ export const EquipmentReferenceSchema = z
       .describe(
         "While it is active, a successful save against a spell of this level or lower leaves the spell no effect on its bearer (a Ring of Spell Turning, level 7)"
       ),
+    /** While its bearer is attuned, a Ranged weapon attack at another creature within `feet` of the bearer targets the
+     *  bearer instead, held or not (a Shield of Missile Attraction's curse). */
+    attractsMissiles: z
+      .object({ feet: z.number().int().min(5).max(60) })
+      .strict()
+      .optional()
+      .describe(
+        "While its bearer is attuned, a Ranged weapon attack at another creature within this many feet of the bearer targets the bearer instead (a Shield of Missile Attraction's curse)"
+      ),
     /** Each use of its actions or casts may break it: `percent` chance a use, times the uses of its pool since the last
      *  Long Rest before this one when `cumulative` (a Wind Fan's 20 percent more each time). With `failsUse` the use
      *  that breaks it does nothing (the fan fails to work); otherwise it breaks once the use is done, dealing `damage`
