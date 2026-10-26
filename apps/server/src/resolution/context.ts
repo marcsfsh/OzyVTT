@@ -230,6 +230,8 @@ export type ResolveDependencies = Readonly<{
   zoneCover?: (fromActorId: string, targetId: string) => "half" | "three-quarters" | "total" | null;
   /** The wall that deflects an ordinary projectile from the first combatant at the second (Wind Wall), or null. */
   deflectedBy?: (fromActorId: string, targetId: string) => string | null;
+  /** The live map's scale, for distances to what isn't a creature (a trap's area); absent when the grid is not set. */
+  pixelsPerFoot?: number;
   /** Feet from a combatant to the point a spell area was placed at (Delayed Blast Fireball's bead), or null. */
   zoneFeet?: (actorId: string, zoneId: string) => number | null;
   /** Moves an area straight toward a combatant, up to these feet, and reports what it met (a Sphere of Annihilation). */

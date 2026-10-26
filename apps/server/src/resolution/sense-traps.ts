@@ -31,7 +31,7 @@ export function senseTraps(ctx: ResolveContext): void {
   if (!reach || ctx.input.commit === false) return;
   const { state, attacker, deps } = ctx;
   const at = state.combat.tokens.find((token) => token.actorId === attacker.id)?.position;
-  const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot;
+  const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot ?? deps.pixelsPerFoot;
   if (!at || !pixelsPerFoot) {
     ctx.sensed.push("The map can't measure the spell's range here, so the GM tells you what you sense.");
     return;

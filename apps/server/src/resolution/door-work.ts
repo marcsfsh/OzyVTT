@@ -93,7 +93,7 @@ export function findSecrets(ctx: ResolveContext): void {
   if (!finds || ctx.input.commit === false) return;
   const { state, attacker, deps } = ctx;
   const at = state.combat.tokens.find((token) => token.actorId === attacker.id)?.position;
-  const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot;
+  const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot ?? deps.pixelsPerFoot;
   const told = (text: string, gmOnly = false) =>
     ctx.tableNarration.push(
       tableLineOf(ctx, { kind: "effect", text, actorId: attacker.id, ...(gmOnly ? { gmOnly: true as const } : {}) })

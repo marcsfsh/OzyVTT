@@ -295,7 +295,12 @@ const searchOrStudy = (ability: CheckSubject["ability"]) => (ctx: ResolveContext
   if (ctx.action.id === "search" && subject.skill === "perception") findHidden(ctx, subject, rolled);
   // The hidden traps and glyphs the check finds (SRD 5.2.1 Gameplay Toolbox, Detect and Disarm; Glyph of Warding,
   // Symbol), for the party.
-  const found = { action: ctx.action.id as "search" | "study", skill: subject.skill, total: rolled.roll.total };
+  const found = {
+    action: ctx.action.id as "search" | "study",
+    skill: subject.skill,
+    total: rolled.roll.total,
+    ...(ctx.deps.pixelsPerFoot ? { pixelsPerFoot: ctx.deps.pixelsPerFoot } : {})
+  };
   for (const event of [
     ...findTraps(ctx.state, ctx.attacker.id, found),
     ...noticeGlyphs(ctx.state, ctx.attacker.id, found)

@@ -154,6 +154,8 @@ const turnKey = (state: GameState) => `${state.combat.round}:${state.combat.turn
 export function trapArmed(state: GameState, trap: MapTrap, record: TrapRecord): boolean {
   if (trap.state === "armed") return true;
   if (trap.state === "disarmed") return false;
+  // "The lid remains open thereafter": a creature that moves onto an open pit falls in.
+  if (record.trap.pit) return true;
   const resets = record.trap.resets;
   if (!resets) return false;
   if (resets.maxActivations !== undefined && trap.activations >= resets.maxActivations) return false;
@@ -173,10 +175,14 @@ function spaceIn(
   return points.some((point) => pointInRects(point, [rect]));
 }
 
+/** The map's scale: its dynamic vision's measure, or the live grid's. */
+const scaleOf = (state: GameState, pixelsPerFoot: number | undefined) =>
+  state.combat.vision.measure?.pixelsPerFoot ?? pixelsPerFoot;
+
 /** Feet from a creature's space to the nearest edge of a rect, or null when the map has no scale. */
-function feetToRect(state: GameState, actorId: string, rect: Rect): number | null {
+function feetToRect(state: GameState, actorId: string, rect: Rect, gridScale?: number): number | null {
   const token = state.combat.tokens.find((candidate) => candidate.actorId === actorId && candidate.position !== null);
-  const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot;
+  const pixelsPerFoot = scaleOf(state, gridScale);
   if (!token?.position || !pixelsPerFoot) return null;
   const at = token.position;
   const dx = Math.max(rect.x - at.x, 0, at.x - (rect.x + rect.width));
@@ -236,8 +242,13 @@ export function trapsAtTurnStart(
 /** The source a trap's failure effects name: the trap, not a creature. */
 const TRAP_SOURCE_ID = "00000000-0000-4000-8000-000000000000";
 
-const rolled = (formula: string, deps: Pick<SpringDeps, "rollDie">) =>
-  Math.max(0, resolveDice(parseDiceFormula(formula), deps.rollDie).total);
+function rolled(formula: string, deps: Pick<SpringDeps, "rollDie">): number {
+  // The dice parser has no d3, which the darts' count uses: a d6 halved, rounded up, as at the table.
+  const thirds = /^(\d+)d3$/.exec(formula);
+  if (thirds)
+    return Array.from({ length: Number(thirds[1]) }, () => Math.ceil(deps.rollDie(6) / 2)).reduce((a, b) => a + b, 0);
+  return Math.max(0, resolveDice(parseDiceFormula(formula), deps.rollDie).total);
+}
 
 /** The creatures a trap acts on: the one that set it off, or each creature on the map in its blast (its trapped area
  *  unless the GM marked the blast elsewhere). */
@@ -364,6 +375,7 @@ export function springTrapOn(
   if (!trap || !record) return { saveIds: [], events: [], stops: false };
   const tier = tierOf(record, trap.tier);
   const triggerer = state.actors.find((actor) => actor.id === triggererId);
+  const openPit = record.trap.pit && trap.state === "sprung";
   state.combat = {
     ...state.combat,
     traps: state.combat.traps.map((candidate) =>
@@ -385,7 +397,11 @@ export function springTrapOn(
     ? [
         {
           kind: "effect",
-          text: triggerer ? `${triggerer.name} sets off a ${record.name}!` : `A ${record.name} goes off!`,
+          text: openPit
+            ? `${triggerer?.name ?? "A creature"} steps into the open ${record.name}.`
+            : triggerer
+              ? `${triggerer.name} sets off a ${record.name}!`
+              : `A ${record.name} goes off!`,
           actorId: about
         }
       ]
@@ -537,7 +553,7 @@ export function leftPit(
 export function findTraps(
   state: GameState,
   searcherId: string,
-  check: Readonly<{ action: "search" | "study"; skill: string | undefined; total: number }>
+  check: Readonly<{ action: "search" | "study"; skill: string | undefined; total: number; pixelsPerFoot?: number }>
 ): EffectNarration[] {
   const searcher = state.actors.find((actor) => actor.id === searcherId);
   if (!searcher) return [];
@@ -546,7 +562,7 @@ export function findTraps(
     if (trap.found || trap.state === "disarmed") continue;
     const record = trapRecord(trap.trapId);
     if (!record) continue;
-    const feet = feetToRect(state, searcherId, trap.area);
+    const feet = feetToRect(state, searcherId, trap.area, check.pixelsPerFoot);
     const found = record.trap.detect.find(
       (way) =>
         way.action === check.action &&
@@ -585,13 +601,13 @@ const GLYPH_SKILLS: Readonly<Record<string, Readonly<{ action: "search" | "study
 export function noticeGlyphs(
   state: GameState,
   searcherId: string,
-  check: Readonly<{ action: "search" | "study"; skill: string | undefined; total: number }>
+  check: Readonly<{ action: "search" | "study"; skill: string | undefined; total: number; pixelsPerFoot?: number }>
 ): EffectNarration[] {
   const searcher = state.actors.find((actor) => actor.id === searcherId);
   const token = state.combat.tokens.find(
     (candidate) => candidate.actorId === searcherId && candidate.position !== null
   );
-  const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot;
+  const pixelsPerFoot = scaleOf(state, check.pixelsPerFoot);
   if (!searcher || !token?.position || !pixelsPerFoot) return [];
   const events: EffectNarration[] = [];
   for (const zone of state.combat.spellZones) {
@@ -683,7 +699,13 @@ export function disarmTrap(
   if (trap.state === "disarmed") throw new CommandRejectedError(`The ${record.name} is already safe.`);
   const way = record.trap.disarm.find((candidate) => candidate.id === input.disarmId);
   if (!way) throw new CommandRejectedError(`The ${record.name} can't be made safe that way.`);
-  const feet = feetToRect(state, actor.id, trap.area);
+  const calibration = deps.geometry?.calibration;
+  const feet = feetToRect(
+    state,
+    actor.id,
+    trap.area,
+    calibration ? calibration.cellSizePx / calibration.distancePerCell : undefined
+  );
   if (feet !== null && feet > TOUCH_FEET)
     throw new CommandRejectedError(`${actor.name} must be within 5 feet of the ${record.name}.`);
   const definition = actor.definitionId ? deps.resolveDefinition(actor.definitionId) : undefined;

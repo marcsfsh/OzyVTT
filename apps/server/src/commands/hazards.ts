@@ -154,7 +154,7 @@ export const hazardCommands = [
 
   defineCommand({
     type: "environment.set",
-    operationId: "setEnvironment",
+    operationId: "setSceneWeather",
     description:
       "Sets the scene's climate and weather (GM-grade only), SRD 5.2.1 Gameplay Toolbox, Environmental Effects; what is left out stays as it was. `cold` (0 degrees Fahrenheit or lower) and `heat` (100 or higher) ask each creature placed on the map a Constitution save at the end of each hour of game time or a level of Exhaustion: DC 10 against the cold, which Cold Resistance or a Bedroll it is in passes and a Blanket gives Advantage on; against the heat, for one carrying no water, DC 5 the first hour and 1 more each hour after, with Disadvantage in Medium or Heavy armor. `highAltitude` counts each hour travelled as 2 toward Extended Travel's 8. `precipitation` (rain or snow) makes everything Lightly Obscured and gives Disadvantage on Wisdom (Perception) checks; rain puts out open flames. `wind` (strong, or a sandstorm) gives Disadvantage on ranged weapon attack rolls, puts out open flames, disperses fog and brings down a flier that hasn't landed by the end of its turn; a sandstorm also gives Disadvantage on Wisdom (Perception) checks. `frigidWater` makes the painted water frigid (a DC 10 Constitution save each minute past a creature's Constitution score), and `deepWater` deep (a DC 10 Constitution save after each hour swum without a Swim Speed). `sceneId` targets a prepared scene.",
     summary: "Set the scene's climate and weather (GM).",
