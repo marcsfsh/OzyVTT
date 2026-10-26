@@ -1027,7 +1027,10 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "The cast makes a creature at 0 Hit Points Stable with no check (resolution/stabilize.ts), within 15 feet, 30 at level 5, 60 at level 11 and 120 at level 17 (resolution/spell-targets.ts)."
   ),
   "item:tinderbox": enforced(
-    "item-light.ts lights a Candle, Lamp, Lantern or Torch in hand only when its bearer holds a Tinderbox or another flame, spending its Bonus Action in a fight. Lighting any other fire is the GM's."
+    "item-light.ts lights a Candle, Lamp, Lantern or Torch in hand only when its bearer holds a Tinderbox or another flame, spending its Bonus Action in a fight, and its Bonus Action lights oil spilled within 5 feet (zone-kindling.ts). Lighting any other fire, which takes a minute, is the GM's."
+  ),
+  "item:oil": enforced(
+    "Thrown in place of an attack at a creature or object within 20 feet: a creature makes the Dexterity save or is covered in oil, and Fire damage it takes in the next minute is 5 more (hazards.ts); a door or a wall on the map that is an object is covered with no save, and so takes 5 more from Fire (resolution/object-targets.ts, objects.ts). Poured as the Utilize action over a 5-foot square within 5 feet, it lies unlit until Fire damage or a fire's area reaches it, a burning creature stands in it, or a Tinderbox lights it; then it deals 5 Fire damage to a creature that enters it or ends its turn there, once a turn, and burns out at the end of the turn 2 rounds later (zone-kindling.ts, zone-fire.ts). Its 6 hours as fuel in a Lamp or Lantern burn down on the game clock (item-light.ts)."
   ),
   "item:healers-kit": enforced(
     "stabilize.ts spends one of the kit's ten uses to make a creature at 0 Hit Points Stable with no check, and spending the tenth takes the kit. The Gear tab shows the uses left in it."

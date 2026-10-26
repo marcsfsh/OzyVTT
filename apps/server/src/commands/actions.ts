@@ -746,9 +746,9 @@ export const actionCommands = [
           // Each area an item's use leaves acts on its own (a Ring of Shooting Stars' lightning spheres).
           if (leavesArea && !resolution.preview) zoneForEachArea(draft, commandId, areaIds.slice(1));
         }
-        // A fire's area sets the webs it covers burning (Web).
+        // A fire's area sets the webs it covers burning (Web); poured oil waits to be lit.
         const fiery = action.damage.some((part) => part.type === "fire") || request.damageType === "fire";
-        if (placed && !areaMove && !resolution.preview && fiery && geometry)
+        if (placed && !areaMove && !resolution.preview && fiery && !leavesArea && geometry)
           for (const shape of [placed, ...morePlaced])
             areaEvents = [
               ...areaEvents,

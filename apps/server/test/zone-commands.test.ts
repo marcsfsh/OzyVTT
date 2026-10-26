@@ -248,4 +248,56 @@ describe("spell areas through the table's commands", () => {
       failureDamage: [{ formula: "1", type: "piercing" }]
     });
   });
+
+  // SRD Oil, Dousing a Space: "If lit, the oil burns until the end of the turn 2 rounds from when the oil was lit ... and
+  // deals 5 Fire damage to any creature that enters the area or ends its turn there. A creature can take this damage
+  // only once per turn." A Tinderbox lights "anything else with exposed fuel" as a Bonus Action.
+  it("pours Oil that harms no one until a Tinderbox lights it, then burns 5 Fire once a turn for 2 rounds", async () => {
+    const { server, place, resolve, post, gmToken } = await fight((state) => {
+      carry(state, HERO, "Oil", 2);
+      carry(state, HERO, "Tinderbox");
+    });
+    const hp = () => server.store.snapshot.actors.find((actor) => actor.id === FOE)!.hp.current;
+    const oil = () => server.store.snapshot.combat.spellZones.find((zone) => zone.name === "Oil");
+    const poured = await resolve({
+      actionId: "item-oil-pour",
+      template: { shape: "square", origin: { x: 150, y: 100 }, target: { x: 200, y: 150 } }
+    });
+    expect(poured.status, JSON.stringify(await poured.clone().json())).toBe(200);
+    expect(oil()).toMatchObject({ flammable: true });
+    expect(oil()!.litUntil).toBeUndefined();
+    // Unlit, the goblin walks through it unharmed.
+    await place(FOE, 3, 2);
+    expect(hp()).toBe(200);
+    await place(FOE, 3, 4);
+    const lit = await resolve({ actionId: "item-tinderbox-light-oil" });
+    expect(lit.status, JSON.stringify(await lit.clone().json())).toBe(200);
+    expect(oil()!.litUntil).toEqual({ untilRound: 3, actorId: HERO });
+    await place(FOE, 3, 2);
+    expect(hp()).toBe(195);
+    // Once a turn.
+    await place(FOE, 3, 4);
+    await place(FOE, 3, 2);
+    expect(hp()).toBe(195);
+    // Two rounds on, as the druid's turn ends, it burns out.
+    for (let step = 0; step < 9; step++)
+      expect((await post(GAME_PATHS.initiativeNext, gmToken, { commandId: randomUUID() })).status).toBe(200);
+    expect(oil()).toBeUndefined();
+  });
+
+  it("lights poured Oil when Fire damage lands on a creature standing in it", async () => {
+    const { server, place, resolve, post, gmToken } = await fight((state) => carry(state, HERO, "Oil"));
+    await resolve({
+      actionId: "item-oil-pour",
+      template: { shape: "square", origin: { x: 150, y: 100 }, target: { x: 200, y: 150 } }
+    });
+    await place(FOE, 3, 2);
+    const burned = await post(GAME_PATHS.actorDamage.replace("{actorId}", FOE), gmToken, {
+      commandId: randomUUID(),
+      amount: 3,
+      damageType: "fire"
+    });
+    expect(burned.status, JSON.stringify(burned.body)).toBe(200);
+    expect(server.store.snapshot.combat.spellZones.find((zone) => zone.name === "Oil")?.litUntil).toBeDefined();
+  });
 });

@@ -166,6 +166,7 @@ function combatantsOf(
     // Opening a flask frees the creature it holds; a drawn Frost Brand's cold and a Sun Blade's light act round it.
     action.releases !== undefined ||
     action.douses !== undefined ||
+    action.lightsArea !== undefined ||
     action.adjustsLight !== undefined ||
     (castsASpell && !rollsOnTargets) ||
     input.builtin === true ||
@@ -210,6 +211,7 @@ function combatantsOf(
     action.teleport === undefined &&
     action.releases === undefined &&
     action.douses === undefined &&
+    action.lightsArea === undefined &&
     action.adjustsLight === undefined &&
     action.summons === undefined &&
     action.raisesCorpse === undefined &&

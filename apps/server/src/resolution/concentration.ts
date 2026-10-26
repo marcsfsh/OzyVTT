@@ -372,7 +372,8 @@ export function openActionZone(ctx: ResolveContext): boolean {
   const down = state.combat.spellZones.filter(
     (zone) => zone.rule && zone.casterId === attacker.id && zone.laterActionId === action.id
   ).length;
-  if (row && down >= row.quantity)
+  // A flask poured out is used up as it goes, so only gear that stays on the map (Caltrops) counts what is down.
+  if (row && !record?.consumedOnUse && down >= row.quantity)
     throw new CommandRejectedError(
       `${name}: ${attacker.name} has none left to set down. Gather up the ones on the map first.`
     );
@@ -423,6 +424,8 @@ export function openActionZone(ctx: ResolveContext): boolean {
     damageDealt: 0,
     // It stays where its user stood (the rod planted in the ground).
     ...(trigger.stays && casterAt ? { anchor: { x: casterAt.x, y: casterAt.y } } : {}),
+    // Spilled oil waits for fire to reach it.
+    ...(trigger.kindled ? { flammable: true as const } : {}),
     ...(state.combat.timeStop?.actorId === attacker.id ? { inTimeStop: true as const } : {}),
     entered: [],
     affected: []

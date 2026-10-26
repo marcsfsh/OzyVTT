@@ -4730,7 +4730,14 @@ export const AreaTriggerSchema = z
       .optional(),
     /** It lifts the Difficult Terrain painted in it while it stands (Speak with Plants: "turn Difficult Terrain caused
      *  by plant growth ... into ordinary terrain"). */
-    clearsTerrain: z.literal(true).optional()
+    clearsTerrain: z.literal(true).optional(),
+    /** It waits unlit and acts only once fire lights it (spilled Oil: "If lit, the oil burns until the end of the turn 2
+     *  rounds from when the oil was lit"): Fire damage or a fire's area reaching it, a burning creature in it, or a
+     *  Tinderbox beside it lights it, and it burns out at the end of the turn `rounds` rounds later. */
+    kindled: z
+      .object({ rounds: z.number().int().min(1).max(10) })
+      .strict()
+      .optional()
   })
   .strict();
 export type AreaTrigger = z.infer<typeof AreaTriggerSchema>;
@@ -5491,6 +5498,13 @@ export const ActionSchema = z
       .describe(
         "It puts out every nonmagical flame within `feet` of its user: lights set on the map that no spell made, and the burning lights creatures carry (a Frost Brand drawn)"
       ),
+    /** It lights the spilled oil within `feet` of its user, an area that waits for fire (a Tinderbox: "Using it to light
+     *  ... anything else with exposed fuel takes a Bonus Action"). */
+    lightsArea: z
+      .object({ feet: z.number().int().min(5).max(30) })
+      .strict()
+      .optional()
+      .describe("It lights the spilled oil within `feet` of its user, an area that waits for fire (a Tinderbox)"),
     /** It widens (or, negative, narrows) the light of the item it is on by `stepFeet`, its Bright Light kept between
      *  `minFeet` and `maxFeet` (a Sun Blade: 5 feet at a time, 10 to 30). */
     adjustsLight: z

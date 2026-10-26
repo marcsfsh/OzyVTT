@@ -1503,6 +1503,8 @@ export const SpellZoneSchema = z
       .optional(),
     /** It burns away when fire reaches it (Web). */
     flammable: z.literal(true).optional(),
+    /** Lit and burning (spilled Oil) until the end of the turn of `actorId` in `untilRound`. */
+    litUntil: z.object({ untilRound: z.number().int().positive(), actorId: z.uuid().nullable() }).strict().optional(),
     /** Its heal, rolled with its caster's numbers (Conjure Celestial's "4d12 + 4"). */
     healing: z.string().min(1).max(60).optional(),
     /** The creature it is round, which it moves with (Antipathy/Sympathy's target). */

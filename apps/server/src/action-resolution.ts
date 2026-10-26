@@ -122,7 +122,13 @@ import { parkForCounterspell } from "./resolution/counter.js";
 import { placeCastSight } from "./resolution/cast-sight.js";
 import { applyCastWalls, checkWallTarget } from "./resolution/cast-walls.js";
 import { checkObjectTarget, harmObjectsInArea, strikeObjectTarget } from "./resolution/object-targets.js";
-import { applyAdjustsLight, applyDouses, applyKindles, checkLightTarget } from "./resolution/cast-lights.js";
+import {
+  applyAdjustsLight,
+  applyDouses,
+  applyKindles,
+  applyLightsArea,
+  checkLightTarget
+} from "./resolution/cast-lights.js";
 import { revealSense } from "./resolution/sense-reveal.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
@@ -413,6 +419,7 @@ export function resolveDefinitionAction(
   harmObjectsInArea(ctx);
   applyKindles(ctx);
   applyDouses(ctx);
+  applyLightsArea(ctx);
   applyAdjustsLight(ctx);
   revealSense(ctx);
   refuseThePrayedFor(ctx);

@@ -27,6 +27,7 @@ import { breakTimeStop } from "./time-stop.js";
 import { applyCastSight } from "./vision/cast-sight.js";
 import { spellWardOf } from "./resolution/spell-wards.js";
 import { planeOf } from "./ethereal.js";
+import { burnedOutAtTurnEnd } from "./zone-kindling.js";
 
 type Actor = GameState["actors"][number];
 type Point = Readonly<{ x: number; y: number }>;
@@ -374,6 +375,8 @@ export function exposed(
 ): Actor[] {
   const caster = state.actors.find((actor) => actor.id === zone.casterId);
   const kind = trigger.terrain?.kind;
+  // Spilled oil harms no one until it is lit.
+  if (trigger.kindled && !zone.litUntil) return [];
   return creaturesOnMap(state).flatMap((creature) => {
     // "You and your allies": an aura its caster carries reaches the caster too.
     const own = creature.id === zone.casterId;
@@ -973,7 +976,9 @@ export function zonesAtTurnEnd(state: GameState, actorId: string, deps: ZoneDeps
   return [
     ...unsteered,
     ...zonesWhereItStands(state, actorId, "end-turn", deps),
-    ...zonesAtCasterTurnEnd(state, actorId, deps)
+    ...zonesAtCasterTurnEnd(state, actorId, deps),
+    // Lit oil whose rounds are up burns out once this turn's end has burned whoever stood in it.
+    ...burnedOutAtTurnEnd(state, actorId)
   ];
 }
 
