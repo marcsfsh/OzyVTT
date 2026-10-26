@@ -56,6 +56,14 @@ export function statblockFacts(definition: ActorDefinition): {
  *  species is a Humanoid); null when neither says. Spells and other magic read the type a live effect masks it as
  *  (Arcanist's Magic Aura: "Spells and other magical effects treat the target as if it were a creature of the chosen
  *  type"); a rule that isn't magic (Animal Handling, a stat block's own trait) asks for the `true` type. */
+/** The type tags a stat block prints ("Fiend (Demon)": demon), lower case. */
+export function typeTagsOf(definition: ActorDefinition | undefined): string[] {
+  const tags = (definition?.extensions[STATBLOCK_EXTENSION] as { typeTags?: unknown } | undefined)?.typeTags;
+  return Array.isArray(tags)
+    ? tags.filter((tag): tag is string => typeof tag === "string").map((tag) => tag.toLowerCase())
+    : [];
+}
+
 export function creatureTypeOf(
   actor: Pick<Actor, "kind"> & Partial<Pick<Actor, "effects">>,
   definition: ActorDefinition | undefined,

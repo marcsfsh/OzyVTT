@@ -82,6 +82,7 @@ import {
 import { legendaryActionsPerRound } from "../lair.js";
 import { dealt } from "./dealings.js";
 import { attackActionOpening, fleetStep, rageArmorViolation, timingViolations } from "./turn-windows.js";
+import { AXE_BERSERK_TAG } from "../berserker-axe.js";
 
 type RuleViolation = Readonly<{ rule: RuleId; message: string }>;
 
@@ -707,6 +708,15 @@ function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition,
         message: `${attacker.name}'s action this turn is one melee attack against ${pickedName}.`
       });
   }
+  // A Berserker Axe's berserk bearer "must ... take the Attack action" on each of its turns: its action attacks.
+  const berserk = attacker.effects.find((effect) => effect.tags.includes(AXE_BERSERK_TAG));
+  const attacks =
+    unarmed || action.multiattack !== undefined || (action.attack !== undefined && action.spellId === undefined);
+  if (berserk && action.activation === "action" && !attacks)
+    violations.push({
+      rule: "condition.forced-attack",
+      message: `${attacker.name} is berserk and must take the Attack action against the creature nearest to it.`
+    });
   // SRD Bestow Curse: a failed Wisdom save at the start of its turn means it is "forced to take the Dodge action on
   // that turn".
   const dodgeOnly = attacker.effects.find((effect) => effect.tags.includes(DODGE_ONLY_TAG));

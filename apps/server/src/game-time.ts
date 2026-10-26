@@ -9,6 +9,7 @@ import { zoneHeld } from "./spell-zones.js";
 import { dueOnTheClock } from "./timed-revival.js";
 import { drynessOverTime } from "./water.js";
 import { environmentOverTime } from "./environment.js";
+import { healingOverTime } from "./clock-healing.js";
 
 /**
  * The game clock (ADR-0029) and what lasts on it. A round is 6 seconds, so 10 rounds make a minute: in a fight, what
@@ -67,6 +68,8 @@ export function passGameTime(state: GameState, minutes: number, deps?: ClockDeps
     events.push(...drynessOverTime(state, inTime, total - before, deps));
     // The scene's weather and water wear on the creatures placed in it, hour by hour and minute by minute.
     events.push(...environmentOverTime(state, inTime, before, total, deps));
+    // What heals as time passes (a Ring of Regeneration, a Rod of Security's demiplane).
+    events.push(...healingOverTime(state, inTime, before, total, deps));
   }
   for (const zone of [...state.combat.spellZones]) {
     const ends =

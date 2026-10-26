@@ -18,6 +18,7 @@ import { areEnemies } from "../creature-sides.js";
 import {
   deriveEquipment,
   effectiveSkillTier,
+  itemIsActive,
   type EquipmentCatalog,
   type EquipmentDerivation
 } from "../equipment-derivation.js";
@@ -53,6 +54,7 @@ import {
   type DefinitionAction,
   type ResolveContext
 } from "./context.js";
+import { rowRecord } from "../item-records.js";
 
 /** What the declarative action vocabulary can't express about a builtin action (`builtin-actions.ts`),
  *  one hook per moment of a resolve. A hook runs only for an action taken from the builtin catalog, so a
@@ -652,12 +654,20 @@ function moveSphere(far: boolean) {
 }
 
 /** An effect's natural weapon for the Unarmed Strike (Alter Self): its die and type, and the ability it uses "rather
- *  than using Strength". */
+ *  than using Strength"; else a worn item's (Demon Armor's claws: 1d8 Slashing, with Strength). */
 function naturalWeaponOf(
   attacker: ResolveContext["attacker"],
-  definition: ActorDefinition | undefined
+  definition: ActorDefinition | undefined,
+  catalog: EquipmentCatalog | undefined
 ): Readonly<{ dice: string; type: string; modifier: number }> | null {
-  const strike = attacker.effects.find((effect) => effect.unarmedStrike?.dice)?.unarmedStrike;
+  const worn = catalog
+    ? attacker.inventory
+        .map((row) => ({ row, record: rowRecord(catalog, row) }))
+        .find(({ row, record }) => record?.unarmedStrike && itemIsActive(row, record))?.record?.unarmedStrike
+    : undefined;
+  const strike =
+    attacker.effects.find((effect) => effect.unarmedStrike?.dice)?.unarmedStrike ??
+    (worn ? { dice: worn.dice, damageTypes: [worn.damageType], ability: undefined } : undefined);
   if (!strike?.dice || !strike.damageTypes?.[0]) return null;
   return {
     dice: strike.dice,
@@ -813,7 +823,7 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
   "unarmed-strike": {
     prepare: ({ action, attacker, deps }) => {
       // Alter Self's claws: the effect's die, type and ability.
-      const grown = naturalWeaponOf(attacker, deps.definition);
+      const grown = naturalWeaponOf(attacker, deps.definition, deps.catalog);
       if (grown)
         return {
           ...action,

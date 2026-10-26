@@ -1614,8 +1614,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:armor-of-invulnerability": enforced(
     "Resistance to Bludgeoning, Piercing and Slashing damage is applied, and Metal Shell's Magic action gives Immunity to them for 10 minutes once a dawn, ending if the armor comes off (inventory.ts)."
   ),
-  "item:berserker-axe": guided(
-    "The +1 to attack and damage rolls and the curse's lock on Attunement are applied. berserker-axe.ts asks the DC 15 Wisdom save when another creature damages the bearer, and ends the berserk on a turn that starts with no creature within 60 feet. Its attacks on the nearest creature, and the extra Hit Points, are the GM's."
+  "item:berserker-axe": enforced(
+    "The +1 to attack and damage rolls, the curse's lock on Attunement, 1 more Hit Point maximum per level while attuned (live-abilities.ts) and Disadvantage on attacks with other weapons are applied. berserker-axe.ts asks the DC 15 Wisdom save when another creature damages the bearer; while berserk its action must attack (resolution/economy.ts) and only the nearest creature it sees (resolution/action-targets.ts), and the berserk ends on a turn that starts with no creature within 60 feet. Keeping the axe within reach is the story's."
   ),
   "item:bracers-of-archery": enforced(
     "Proficiency with the Longbow and Shortbow, and +2 to damage rolls made with either (a magic one bound to it included), are applied (riders.ts)."
@@ -1647,8 +1647,11 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:hunting-trap": enforced(
     "Setting it places a 5-foot square (resolution/concentration.ts). The first creature that enters it makes the DC 13 Dexterity save, with 1d4 Piercing damage and a Speed of 0 on a failure, and the trap springs and leaves the map (spell-zones.ts). A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). The trap holds the creature until it or a creature beside it breaks free with a DC 13 Strength (Athletics) check as its action, and each failure deals the trapped creature 1 Piercing damage (resolution/endings.ts)."
   ),
-  "item:cloak-of-the-bat": guided(
-    "Advantage on Dexterity (Stealth) checks is applied. The Fly Speed in darkness and the Polymorph cast are the GM's."
+  "item:cloak-of-the-bat": enforced(
+    "Advantage on Dexterity (Stealth) checks is applied. In Dim Light or Darkness its wearer grips it for a Fly Speed of 40 feet that ends in Bright Light (light-endings.ts), a flier then falling (falling.ts), and once a dawn casts Polymorph on itself into a Bat that keeps its Intelligence, Wisdom and Charisma (item-actions.ts, transform/). Failing to grip the edges is the story's."
+  ),
+  "item:cloak-of-displacement": enforced(
+    "Attack rolls against its wearer have Disadvantage, except while its Speed is 0 and from the moment it takes damage until the start of its next turn (`lapses`, equipment-derivation.ts and hit-points.ts)."
   ),
   "item:dagger-of-venom": enforced(
     "The +1 to attack and damage rolls is applied. Coating the blade is a Bonus Action once a day, and the dagger's next hit spends it on a DC 15 Constitution save against 2d10 Poison and Poisoned for 1 minute (resolution/on-hit.ts)."
@@ -1662,8 +1665,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:horseshoes-of-a-zephyr": guided(
     "The creature wearing all four ignores Difficult Terrain (movement-rules.ts). Floating over water or lava is the GM's until the map holds water and lava areas; its tracks and its 12 hours of travel a day are overland travel the app doesn't run."
   ),
-  "item:demon-armor": guided(
-    "The +1 AC and the curse's lock on Attunement are applied. The clawed Unarmed Strikes and the Disadvantage against demons are the GM's."
+  "item:demon-armor": enforced(
+    "The +1 AC, the clawed Unarmed Strikes (1d8 Slashing, +1 to attack and damage: resolution/builtins.ts), Disadvantage on attacks against demons and on saves against what a demon forces (a stat block's Demon tag), and the curse's lock on doffing and Attunement until Remove Curse (inventory.ts) are applied. Abyssal is the sheet's."
   ),
   "item:dragon-scale-mail": enforced(
     "The +1 AC and the Resistance to the type the GM picks are applied, with Advantage on saves against a Dragon's breath weapon (saving-throws.ts). Its Magic action to sense the nearest dragon is counted once a dawn; the distance and direction it tells are the GM's."
@@ -1678,8 +1681,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:giant-slayer": enforced(
     "The +1 to attack and damage rolls and the extra 2d6 against Giants are applied, and a hit on a Giant opens its DC 15 Strength save against Prone (resolution/on-hit.ts)."
   ),
-  "item:hammer-of-thunderbolts": guided(
-    "The +1 to attack and damage rolls is applied. Its thrown thunderclap and its powers against Giants are the GM's."
+  "item:hammer-of-thunderbolts": enforced(
+    "The +1 to attack and damage rolls is applied, and its 5 charges (1d4 + 1 back at dawn) each hurl it 20/60 for a thunderclap whose DC 17 Constitution save Stuns the target and every other creature within 30 feet of it but the wielder (resolution/on-hit.ts). With a Belt of Giant Strength or Gauntlets of Ogre Power attuned too, the Strength they bestow rises by 4, to 30 (live-abilities.ts), and a rolled 20 against a Giant asks a DC 17 Constitution save or it dies (resolution/kill.ts)."
   ),
   "item:helm-of-telepathy": guided(
     "Its Detect Thoughts and Suggestion casts are cast actions. The telepathy itself is the GM's."
@@ -1807,8 +1810,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:wand-of-the-war-mage-3": enforced(
     "The +3 to spell attack rolls is applied, and a spell attack roll sets the target's Half Cover aside (resolution/attack.ts)."
   ),
-  "item:sword-of-life-stealing": guided(
-    "A rolled 20 is said with the hit (resolution/on-hit.ts). Its 15 Necrotic damage to a creature that is neither a Construct nor an Undead, and the Temporary Hit Points it gives, are the GM's."
+  "item:sword-of-life-stealing": enforced(
+    "On a rolled 20 against a creature that is neither a Construct nor an Undead it deals 15 Necrotic damage more, and its wielder gains Temporary Hit Points equal to the Necrotic damage the target takes (resolution/damage.ts)."
   ),
   "item:potion-of-poison": guided(
     "Drinking it deals its 4d6 Poison damage to the drinker. The DC 13 Constitution save against an hour of Poisoned, and its disguise, are the GM's: the GM names the row."
@@ -1822,8 +1825,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:thunderous-greatclub": enforced(
     "Its wearer's Strength is at least 20 (live-abilities.ts), a hit deals 1d8 Thunder more and 3d8 more to an object (object-strikes.ts), and Clap of Thunder's 30-foot Cone asks the DC 15 Strength save against Prone and deals 3d8 Thunder to the doors and walls that are objects in it. Earthquake, once a day, asks each creature on the ground in its 50-foot circle for the DC 20 Dexterity save against Prone and a concentrating one for the DC 20 Constitution save against its Concentration (resolution/pending.ts), and deals 50 Bludgeoning to the objects there. The fissure is the GM's."
   ),
-  "item:oathbow": guided(
-    "Naming a sworn enemy marks it for 7 days, once a day, and the bow's ranged attacks against it have Advantage, set Half and Three-Quarters Cover aside and deal 3d6 Piercing more. Ignoring long range's Disadvantage, and the Disadvantage with other weapons while it lives, are the GM's."
+  "item:oathbow": enforced(
+    "Naming a sworn enemy marks it for 7 days, once a dawn and one at a time (resolution/grant.ts), and the bow's ranged attacks against it have Advantage, set Half and Three-Quarters Cover and long range's Disadvantage aside and deal 3d6 Piercing more; while it lives its wielder has Disadvantage on attacks with every other weapon (resolution/attack.ts)."
   ),
   "item:energy-bow": guided(
     "It binds to its Longbow or Shortbow with +1 to attack and damage rolls, and its arrows deal Force damage with no ammunition to spend (inventory.ts weapon changes). The arrows' light, Arrow of Restraint, Arrow of Transport and the Energy Ladder are the GM's."
@@ -1837,14 +1840,17 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:dust-of-sneezing-and-choking": guided(
     "Thrown, it opens the DC 15 Constitution save against Incapacitated on its thrower and every creature in its 30-foot Emanation but Constructs, Elementals, Oozes, Plants and Undead, repeated at the end of each turn, and is used up. Suffocating is the GM's."
   ),
-  "item:potion-of-vitality": guided(
-    "Drinking it ends the drinker's Exhaustion and the Poisoned condition. The next 24 hours of Hit Point Dice at their most are the GM's."
+  "item:potion-of-vitality": enforced(
+    "Drinking it ends the drinker's Exhaustion and the Poisoned condition, and for 24 hours each Hit Point Die it spends restores its maximum (rests.ts, resolution/hit-point-die.ts)."
+  ),
+  "item:ring-of-regeneration": enforced(
+    "Its wearer regains 1d6 Hit Points for every 10 minutes of game time while it has at least 1 (clock-healing.ts), and in a fight every 100 rounds. Regrowing a lost body part is the story's: the sheet has no body parts."
   ),
   "item:ring-of-elemental-command": guided(
     "Elemental Bane's Advantage on attacks against Elementals and their Disadvantage against its wearer, and Elemental Compulsion's DC 18 save against Charmed, are applied. The GM says which plane a found ring is (item-records.ts): its Resistance, Immunity or speed, and its spells at DC 18 on 5 charges with their printed costs. The languages, breathing water and moving through earth are the GM's."
   ),
-  "item:weapon-of-warning": guided(
-    "Advantage on Initiative for its wielder is applied. The same for allies within 30 feet, and waking them, are the GM's."
+  "item:weapon-of-warning": enforced(
+    "Advantage on Initiative for its attuned bearer and the allies within 30 feet of it, and the Alarm that wakes each of them sleeping naturally (Unconscious with Hit Points and no effect holding it there) as the fight begins, are applied (encounter.ts)."
   ),
 
   // Spells whose data applies the cast's main numbers and leaves a rider the table would expect the server to apply.
@@ -2713,8 +2719,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:mirror-of-life-trapping": guided(
     "The hung mirror as an object, the DC 15 Charisma save of a creature that sees its reflection within 30 feet, the twelve cells off the map, freeing a named creature and its shattering are the GM's: a sight-gated area save from an object on a wall has no vocabulary yet. Talking with a trapped creature is story."
   ),
-  "item:rod-of-security": guided(
-    "Its Magic action takes its user and up to 20 willing creatures it sees off the map to its demiplane, and the action again brings every visitor back to the space it left or the nearest unoccupied one; it then waits 240 hours of game time (off-plane.ts, clock-pools.ts). The hourly healing as a spent Hit Point Die, the days the visitors may stay and more than 20 visitors are the GM's; the demiplane is story."
+  "item:rod-of-security": enforced(
+    "Its Magic action takes its user and up to 199 willing creatures it sees off the map to its demiplane for 200 days divided by the visitors, and the action again, or the time running out, brings every visitor back to the space it left or the nearest unoccupied one; it then waits 240 hours of game time (off-plane.ts, clock-pools.ts). Each hour there a visitor regains Hit Points as if it spent a Hit Point Die (clock-healing.ts) and needs no food or water (survival.ts). The demiplane's form and that its visitors don't age are story."
   ),
   "item:dimensional-shackles": enforced(
     "Its Utilize action places them on an Incapacitated creature of Large size or smaller within reach: it can't teleport or leave the plane by its own means (ethereal.ts, movement-rules.ts). The action again on it removes them, and its DC 30 Strength (Athletics) check breaks them (builtin-actions.ts). That the check comes once in 30 days, a creature its user names removing them, and the broken shackles' loss are the GM's."

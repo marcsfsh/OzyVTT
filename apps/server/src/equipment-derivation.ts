@@ -342,6 +342,7 @@ function bearerContext(
   const proficiencies = definition?.proficiencies;
   return {
     attunedItemIds: actor.inventory.filter((item) => item.attuned).map((item) => item.id),
+    attunedCatalogIds: actor.inventory.filter((item) => item.attuned).map((item) => catalogIdOf(item)),
     armorWeight: bodyArmor ? armorWeightOf(bodyArmor.item.armor!) : null,
     shieldEquipped: armored.some((entry) => effectiveSlot(slotView(entry)) === "shield"),
     classIds: (identity?.classes ?? []).map((entry) => entry.id),
@@ -426,6 +427,21 @@ function characterGatedGrants(
     if (record?.grants?.when) gated.push({ id: record.id, name: record.name, block: record });
   }
   return gated;
+}
+
+/** The tag of the effect that marks an item whose riders lapse until its bearer's next turn (`lapses.onDamage`). */
+export const ITEM_LAPSED_TAG = "item-lapsed";
+
+/** Whether an item's riders are stopped now (`lapses`): its bearer's Speed is 0, or it took damage since the start of
+ *  its last turn. */
+function itemLapsed(actor: Actor, rowId: string, record: EquipmentReference): boolean {
+  const lapses = record.lapses;
+  if (!lapses) return false;
+  if (lapses.atSpeedZero && (speedZeroed(actor) || actor.speedFeet === 0)) return true;
+  return (
+    lapses.onDamage === true &&
+    actor.effects.some((effect) => effect.tags.includes(ITEM_LAPSED_TAG) && effect.itemId === rowId)
+  );
 }
 
 /** The actor's live effects as rider carriers. An effect that lapses while its bearer is incapacitated or its Speed
@@ -572,7 +588,9 @@ export function deriveEquipment(
     if (!record) continue;
     const label = record.name;
     const isWeapon = effectiveSlot(slotView(entry)) === "weapon" || item.weapon !== undefined;
-    carriers.push({ label, modifiers: record.modifiers, sourceItemId: item.id, isWeapon });
+    // A Cloak of Displacement's illusion stops while its wearer's Speed is 0, and after it takes damage.
+    if (!itemLapsed(actor, item.id, record))
+      carriers.push({ label, modifiers: record.modifiers, sourceItemId: item.id, isWeapon });
     takeGrants(withChosenResistance(record, item), item.id, label);
     takeEffects(record, item.id, label);
     for (const declared of record.actions) actions.push(itemAction(item, declared, definition));

@@ -156,10 +156,17 @@ export function itemAction(
     answerAmountByLevel: _answerAmountByLevel,
     reactionByLevel: _reactionByLevel,
     multiattackByLevel: _multiattackByLevel,
+    hurlsWeapon,
     ...rest
   } = structuredClone(declared);
+  // Hurled as if it had the Thrown property (Hammer of Thunderbolts): the weapon's own attack and damage, from range.
+  const hurled =
+    hurlsWeapon && "weapon" in item && item.weapon ? weaponSwing(item as InventoryItem, definition)?.action : undefined;
+  if (hurled?.attack)
+    attack = { bonus: hurled.attack.bonus, rangeFeet: hurlsWeapon!.longFeet, rangeNormalFeet: hurlsWeapon!.normalFeet };
   return {
     ...rest,
+    ...(hurled ? { damage: hurled.damage } : {}),
     id: itemActionId(itemId, declared.id),
     ...(attack ? { attack } : {}),
     ...(save ? { save } : {}),
@@ -264,6 +271,17 @@ export function castAction(
     // The item's own area, where it prints one (a wand's 60-foot Cone), else the spell's.
     ...(cast.area ? { area: structuredClone(cast.area) } : castAreaOf(spell, mechanics)),
     ...(cast.optionIds ? withOptionsOnly(mechanics, cast.optionIds) : mechanics),
+    // The only forms it may take, and what its creature keeps beside the spell's own (a Cloak of the Bat's Bat).
+    ...(cast.forms && mechanics.shapeShift
+      ? {
+          shapeShift: {
+            ...mechanics.shapeShift,
+            onlyForms: [...cast.forms.only],
+            keeps: [...new Set([...mechanics.shapeShift.keeps, ...(cast.forms.keeps ?? [])])]
+          }
+        }
+      : {}),
+    ...(cast.inDimLightOrDarkness ? { sight: { inDimLightOrDarkness: true as const } } : {}),
     // A Reaction spell (Shield, Hellish Rebuke) is cast from the item as a Reaction, offered when its trigger happens.
     ...(spell.effect?.reaction
       ? { activation: "reaction" as const, reaction: structuredClone(spell.effect.reaction) }
@@ -271,7 +289,10 @@ export function castAction(
   };
   // A higher level rolls that slot's dice and makes its darts and rays, as a slot cast at it would (Robe of Stars'
   // level 5 Magic Missile).
-  return level > spell.level ? upcastAction(built, spell, level) : built;
+  // A shape-shift its user casts on itself alone (a Cloak of the Bat's Polymorph) is a willing creature's: no save.
+  const { save: _save, ...unsaved } = built;
+  const ready = cast.forms && cast.targets?.who === "self" ? unsaved : built;
+  return level > spell.level ? upcastAction(ready, spell, level) : ready;
 }
 
 /** The spell's options an item's cast keeps where the item limits them (a Wand of Fear's Command: Flee or Grovel),

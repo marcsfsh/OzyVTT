@@ -22,7 +22,7 @@ import { passGameTime } from "./game-time.js";
 import { dawnPoolKeys, timedSpent, type ClockDeps } from "./clock-pools.js";
 import { requireActorAccess, requireGm, type Initiator } from "./authorization.js";
 import { openPreparation } from "./spellcasting.js";
-import { HIT_DICE_DOUBLED_TAG } from "./death-saves.js";
+import { HIT_DICE_DOUBLED_TAG, HIT_DICE_MAXIMIZED_TAG } from "./death-saves.js";
 import { easeOrdeals } from "./death.js";
 import { healActor, RELENTLESS_RAGE_KEY } from "./hit-points.js";
 import { gainHeroicInspiration } from "./heroic-inspiration.js";
@@ -101,10 +101,11 @@ export function spendHitDice(
     );
   const definition = actor.definitionId ? resolveDefinition(actor.definitionId) : undefined;
   const conModifier = definition ? scoreModifier(definition.abilityScores.con) : 0;
-  // A Periapt of Wound Closure doubles what each die restores.
-  const doubled =
-    deriveEquipment(actor, definition, catalog).context.effectTags?.includes(HIT_DICE_DOUBLED_TAG) === true;
-  const healed = hitDieHealing(faces, conModifier, doubled);
+  // A Periapt of Wound Closure doubles what each die restores, and a Potion of Vitality makes each die its maximum.
+  const tags = deriveEquipment(actor, definition, catalog).context.effectTags ?? [];
+  const doubled = tags.includes(HIT_DICE_DOUBLED_TAG);
+  const rolled = tags.includes(HIT_DICE_MAXIMIZED_TAG) ? hitDieSizesToSpend(actor.hitDice.entries, count) : faces;
+  const healed = hitDieHealing(rolled.slice(0, count), conModifier, doubled);
   const before = actor.hp.current;
   const events = healActor(state, actorId, healed, scope);
   // Decrement the pool die by die: a Fighter 3 / Wizard 2 spends its d10s before its d6s.

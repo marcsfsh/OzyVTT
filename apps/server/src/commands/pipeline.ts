@@ -24,6 +24,7 @@ import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
 import { isGmGrade, principalTag, type CommandContext, type GamePrincipal, type Kit } from "./kit.js";
+import { brightLightEndings, settleBrightLight } from "../light-endings.js";
 
 /** A command's reply: the accepted revision and idempotent-duplicate flag, plus whatever the command adds. */
 export type GameReply = Readonly<Record<string, unknown>>;
@@ -379,6 +380,27 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     kit.publishNarrations(events);
   }
 
+  /** What lasts only in Dim Light or Darkness (Cloak of the Bat's flight) ends as its bearer stands in Bright Light, as
+   *  its own write when anything ends (`light-endings.ts`); a flier it held up then falls. */
+  async function settleBrightLightAfter() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null) return;
+    const content = {
+      definition: (definitionId: string) => kit.resolveDefinitionIn(before, definitionId),
+      catalog: kit.equipmentCatalog()
+    };
+    if (brightLightEndings(before, content).length === 0) return;
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute({ id: context.newId(), type: "effects.light" }, (draft) => {
+      events = settleBrightLight(draft, {
+        definition: (definitionId: string) => kit.resolveDefinitionIn(draft, definitionId),
+        catalog: kit.equipmentCatalog()
+      });
+    });
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
   async function dispatch(
     type: GameCommandType,
     principal: GamePrincipal,
@@ -430,6 +452,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
       await settleDownedReactions();
       await settleSummoned();
       await settleWardingBonds();
+      await settleBrightLightAfter();
       await settleFalls();
       // A creature that left the plane ends what it commanded across it (an aboleth's Dominate Mind).
       await settleSummoned();

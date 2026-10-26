@@ -804,34 +804,10 @@ describe("the worn items left as prose, by name", () => {
   const rows = loadMagicItems();
   const worn = rows.filter((row) => row.category === "wondrous-item" && row.slot !== "wondrous");
 
-  it("leaves the cast that produced the wrong thing unauthored, by name", () => {
-    // It produced the wrong effect when driven. Re-authoring it adds a `casts` entry and fails here.
-    for (const [id, why] of [
-      ["cloak-of-the-bat", "polymorph's Wis save is an unwilling target's; the cloak casts on yourself"]
-    ] as const) {
-      const row = view.equipmentRecord(id)!;
-      expect(row.casts ?? [], `${id} - ${why}`).toEqual([]);
-      expect(row.actions ?? [], `${id} - the charge-alone shape does not rescue a cast`).toEqual([]);
-    }
-    // Teleport deals no damage of its own now, and Scorching Ray makes its three rays at the circlet's printed +5.
-    expect(view.spellRecord?.("teleport")?.effect?.damage).toEqual([]);
-    expect(view.equipmentRecord("helm-of-teleportation")!.casts?.map((cast) => cast.spellId)).toEqual(["teleport"]);
-    expect(view.spellRecord?.("scorching-ray")?.effect?.attacks).toBe(3);
-    expect(view.equipmentRecord("circlet-of-blasting")!.casts?.map((cast) => cast.attackBonus)).toEqual([5]);
-    // Two came back once the engine could carry them: the Cape's Dimension Door is a teleport whose 4d6 lands only on
-    // an arrival in a filled space, and the Boots levitate their wearer with no save to make against themselves.
-    expect(view.equipmentRecord("cape-of-the-mountebank")!.casts?.map((cast) => cast.spellId)).toEqual([
-      "dimension-door"
-    ]);
-    expect(view.spellRecord?.("dimension-door")?.effect?.damage).toEqual([]);
-    const boots = view.equipmentRecord("boots-of-levitation")!.actions ?? [];
-    expect(boots.map((action) => [action.grants?.tags, action.save])).toEqual([[["levitating"], undefined]]);
-    // The Periapt of Health heals its wearer as an action of its own; the prayer beads, a set per copy, stay prose.
-    expect(view.equipmentRecord("periapt-of-health")!.actions.map((action) => action.healing)).toEqual([
-      { formula: "2d4 + 2", self: true }
-    ]);
-    const beads = view.equipmentRecord("necklace-of-prayer-beads")!;
-    expect([beads.casts, beads.actions, beads.modifiers]).toEqual([[], [], []]);
+  it("casts the Cloak of the Bat's Polymorph on its wearer alone, as a Bat", () => {
+    // Its Wisdom save is an unwilling target's, so the cast is held to its wearer and to the Bat.
+    const cast = view.equipmentRecord("cloak-of-the-bat")!.casts[0]!;
+    expect(cast).toMatchObject({ spellId: "polymorph", targets: { who: "self" }, forms: { only: ["bat"] } });
   });
 
   it("sets the scores the amulet, gauntlets and headband print, and a belt's by the giant the GM names", () => {

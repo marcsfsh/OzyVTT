@@ -74,7 +74,12 @@ import { openRepeatSavesOnDamage } from "./save-stages.js";
 import { berserkerCurse } from "./berserker-axe.js";
 import { interruptRests } from "./rest-interruptions.js";
 import { choiceOverrideDefenses, type OverrideDamageDefenses } from "./choice-overrides.js";
-import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
+import {
+  deriveEquipment,
+  ITEM_LAPSED_TAG,
+  type EquipmentCatalog,
+  type EquipmentDerivation
+} from "./equipment-derivation.js";
 import { oilIgnition, OILED_TAG } from "./hazards.js";
 import { noteFire } from "./zone-fire-note.js";
 import { sightRules } from "./vision/rules.js";
@@ -85,6 +90,7 @@ import {
   stopRegeneration,
   undeadFortitude
 } from "./statblock-traits.js";
+import { rowRecord } from "./item-records.js";
 
 export function healthBandOf(hp: Actor["hp"]): HealthBand {
   if (hp.current <= 0) return "down";
@@ -829,6 +835,28 @@ export function loseHitPoints(
   return { lost: before - actor.hp.current, events };
 }
 
+/** Marks each worn item whose riders lapse when its bearer takes damage (`lapses.onDamage`) as lapsed until the start
+ *  of the bearer's next turn (`equipment-derivation.ts` reads the mark). */
+function lapseOnDamage(state: GameState, actor: Actor, catalog: EquipmentCatalog): void {
+  for (const row of actor.inventory) {
+    const record = rowRecord(catalog, row);
+    if (!record?.lapses?.onDamage || row.quantity <= 0 || !row.equipped) continue;
+    const id = `${row.id}:lapsed`;
+    actor.effects = [
+      ...actor.effects.filter((effect) => effect.id !== id),
+      makeEffect({
+        id,
+        name: `${record.name} (stopped)`,
+        tags: [ITEM_LAPSED_TAG],
+        itemId: row.id,
+        startedRound: state.combat.round,
+        // Outside a fight there is no next turn to wait for: the next hit is all it stops.
+        duration: state.combat.active ? { type: "until-bearer-next-turn" } : { type: "rounds", remaining: 1 }
+      })
+    ];
+  }
+}
+
 /** The single damage entry point (ADR-0020): typed parts go through definition, effect and item
  *  defences; the untyped amount stays exact. Temp HP absorbs first. At 0 HP player characters start
  *  dying (or die on massive overflow) and any combatant releases the effects it sustains. */
@@ -913,6 +941,9 @@ export function applyDamageDetailed(
         ...(deps.resolveDefinition ? { resolveDefinition: deps.resolveDefinition } : {})
       })
     );
+
+  // A Cloak of Displacement: "If you take damage, the property ceases to function until the start of your next turn."
+  if (totalAdjusted > 0 && deps?.catalog) lapseOnDamage(state, actor, deps.catalog);
 
   // A Berserker Axe's curse: damage from another creature asks a save against going berserk.
   if (totalAdjusted > 0 && deps?.newId)

@@ -237,6 +237,9 @@ const CARRIER_RIDER_DISPOSITION: Readonly<
   "base-armor-class": "standing", // actor-roster.ts storedArmorClass offers it like Unarmored Defense
   "no-critical-hits": "at-its-moment", // resolution/attack.ts turns a Critical Hit on the bearer into a hit
   "spell-ward": "standing", // resolution/spell-wards.ts, read on the bearer as a spell is aimed at it or reaches it
+  "proficiency-bonus": "standing", // live-abilities.ts moves the Proficiency Bonus every rule reads, from items and effects
+  "granted-score-bonus": "standing", // live-abilities.ts raises what another worn item sets a score to
+  "ignores-long-range": "at-its-moment", // resolution/attack.ts sets long range's Disadvantage aside
   sense: "vision" // vision/senses.ts reads it live for dynamic vision, from every carrier
 };
 

@@ -37,6 +37,24 @@ export const PickBudgetScalingSchema = z
 export const DiceFormulaSchema = z
   .string()
   .regex(/^\d+d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d+)?$/i, "Use a safe dice formula such as 1d8 + 3.");
+/** Hit Points regained as time passes, while the creature has at least 1 (a Ring of Regeneration's 1d6 every 10
+ *  minutes, an Ioun Stone of Regeneration's 15 each hour), or with `hitPointDie` as if it had spent one of its Hit Point
+ *  Dice, which it keeps (a Rod of Security's demiplane, each hour). */
+export const RegainHitPointsSchema = z
+  .object({
+    everyMinutes: z.number().int().min(1).max(1440),
+    formula: z
+      .string()
+      .regex(/^(?:\d+d(?:4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?|\d{1,3})$/i)
+      .optional(),
+    hitPointDie: z.literal(true).optional()
+  })
+  .strict()
+  .refine((regain) => (regain.formula === undefined) !== (regain.hitPointDie === undefined), {
+    message: "Give the Hit Points regained as dice or a number, or as a Hit Point Die, not both."
+  });
+export type RegainHitPoints = z.infer<typeof RegainHitPointsSchema>;
+
 /** Damage an action deals: dice, or a fixed amount that doesn't use a roll ("1 Piercing damage", a Blowgun). A crit
  * doubles only dice, so a fixed amount stays as it is. */
 export const DamageFormulaSchema = z
@@ -489,10 +507,15 @@ export const RiderTriggerSchema = z
       ),
     /** The target's creature type, read from its stat block; a character records none, so it never matches one. */
     z
-      .object({ type: z.literal("versus-creature-type"), creatureTypes: z.array(RiderSlugSchema).min(1).max(12) })
+      .object({
+        type: z.literal("versus-creature-type"),
+        creatureTypes: z.array(RiderSlugSchema).min(1).max(12),
+        /** The target is of none of these types (Sword of Life Stealing: "if it isn't a Construct or an Undead"). */
+        except: z.literal(true).optional()
+      })
       .strict()
       .describe(
-        "Filter. Narrows to targets of these creature types, read from the target's stat block. A character records no creature type, so it never matches one."
+        "Filter. Narrows to targets of these creature types, or of a tag its stat block prints beside its type (`demon`, Demon Armor), read from the target's stat block; a character is a Humanoid. With `except`, to a target of none of them (Sword of Life Stealing: \"if it isn't a Construct or an Undead\")."
       ),
     z
       .object({ type: z.literal("versus-size"), sizes: z.array(SizeSchema).min(1).max(6) })
@@ -513,7 +536,7 @@ export const RiderTriggerSchema = z
       .object({ type: z.literal("source-creature-type-is"), creatureTypes: z.array(RiderSlugSchema).min(1).max(12) })
       .strict()
       .describe(
-        "Filter. Narrows a moment to the creature on the other side being one of these types: the attacker, for an attack against the bearer (`incoming-attack`), or the creature whose effect forces the bearer's save. Read from the stat block, so a character never matches."
+        "Filter. Narrows a moment to the creature on the other side being one of these types, or bearing one of these tags beside its type (`demon`, Demon Armor): the attacker, for an attack against the bearer (`incoming-attack`), or the creature whose effect forces the bearer's save. Read from the stat block; a character is a Humanoid."
       ),
     /** The save is against a breath weapon (Dragon Scale Mail: "Advantage on saving throws against the breath weapons
      *  of Dragons"), as its stat block names the action ("Fire Breath", "Breath Weapon"). */
@@ -582,6 +605,30 @@ export const RiderTriggerSchema = z
       .describe(
         "Filter. On an attack roll, the other creature in it perceives the bearer with none of these senses within their range (Blur: an attacker that perceives you with Blindsight or Truesight is immune)."
       ),
+    /** The attack is made with a weapon other than the item carrying the rider (a Berserker Axe's curse: "Disadvantage on
+     *  attack rolls with weapons other than this one"). */
+    z
+      .object({ type: z.literal("other-weapon") })
+      .strict()
+      .describe(
+        'Filter. On an item, narrows an attack roll to one made with a weapon other than this item (a Berserker Axe\'s "Disadvantage on attack rolls with weapons other than this one"). An Unarmed Strike or a spell is no weapon.'
+      ),
+    /** The bearer has put an effect with any of these tags on a creature that still lives (the Oathbow's "While your
+     *  sworn enemy lives"). */
+    z
+      .object({ type: z.literal("while-marking"), tags: z.array(EffectTagSchema).min(1).max(4) })
+      .strict()
+      .describe(
+        'Dynamic gate. The bearer has put an effect with any of these tags on a creature that still lives (the Oathbow: "While your sworn enemy lives, you have Disadvantage on attack rolls with all other weapons"). Read at a roll\'s moment.'
+      ),
+    /** The bearer is attuned to an item of one of these ids too (Hammer of Thunderbolts' Giant's Bane: "attuned to ...
+     *  a Belt of Giant Strength or Gauntlets of Ogre Power"). */
+    z
+      .object({ type: z.literal("while-attuned-to"), itemIds: z.array(RiderSlugSchema).min(1).max(8) })
+      .strict()
+      .describe(
+        "Static gate. The bearer is attuned to an item of one of these ids as well (Hammer of Thunderbolts: a Belt of Giant Strength or Gauntlets of Ogre Power)."
+      ),
     /** The roller says the check fits this situation (a Book's topic, a Crowbar's leverage). The sheet offers it as a
      *  toggle beside the checks, and the GM judges whether the roll fits. */
     z
@@ -592,7 +639,7 @@ export const RiderTriggerSchema = z
       )
   ])
   .describe(
-    "When a rider applies. Forty-four named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
+    "When a rider applies. Forty-eight named triggers in four kinds, and the kind decides the evaluation layer so a GM never picks one: a `static-gate` is resolvable from the sheet alone and bakes into a standing number; a `dynamic-gate` reads live actor state and becomes a labelled note re-checked per roll; a `moment` fires at the named roll or event; a `filter` narrows whatever moment it accompanies. Every trigger has a reader in the engine. This is plain data with no expression language; every member is a closed object with bounded parameters, and there is no OR, no NOT beyond a gate's own `present: false` or a filter's `except`, no nesting and no arithmetic (ADR-0008). A `when` list may carry at most one moment: a rider fires at only one moment."
   );
 export type RiderTrigger = z.infer<typeof RiderTriggerSchema>;
 export type RiderTriggerKind = "static-gate" | "dynamic-gate" | "moment" | "filter";
@@ -630,6 +677,9 @@ export const RIDER_TRIGGER_KINDS: Readonly<Record<RiderTrigger["type"], RiderTri
   "spell-level-is": "filter",
   "spell-id-is": "filter",
   "versus-creature-type": "filter",
+  "other-weapon": "filter",
+  "while-marking": "dynamic-gate",
+  "while-attuned-to": "static-gate",
   "versus-size": "filter",
   "versus-condition": "filter",
   "by-effect-source": "filter",
@@ -790,7 +840,7 @@ export const ModifierSchema = z
       .object({ type: z.literal("hit-points-per-level"), amount: z.number().int().min(-5).max(5), ...riderGate })
       .strict()
       .describe(
-        "Extra hit points at every level (Tough, Dwarven Toughness). Refused on an item: it changes `hp.maximum`, which live `hp.current` is tracked against, so unequipping could strand current above maximum, and there is no correct silent answer."
+        "Extra hit points at every level (Tough, Dwarven Toughness). On a feature the build bakes it into the Hit Point maximum; on a magic item it is read live while the item is worn, the maximum moving as the item goes on or comes off (a Berserker Axe: 1 a level while attuned)."
       ),
     /** Baked into the sheet's speed at build time on a feature unless gated (then read with the live loadout);
      *  summed live on an effect, so it ends with it. */
@@ -941,6 +991,27 @@ export const ModifierSchema = z
       .describe(
         "More magic items attuned at once than the SRD's three (the Thief's Use Magic Device: one more, for four). Read when a player attunes an item. Refused on an item, whose own attunement it would decide, and on an effect, which could end with too many items attuned."
       ),
+    /** "Your Proficiency Bonus increases by 1" (an Ioun Stone of Mastery): read live while its carrier lasts. */
+    z
+      .object({ type: z.literal("proficiency-bonus"), amount: z.number().int().min(1).max(3), ...riderGate })
+      .strict()
+      .describe(
+        "Raise the bearer's Proficiency Bonus while it holds (an Ioun Stone of Mastery: +1). Read live, so every number built from it (attacks, checks, saves, spell save DC and attack bonus) moves with it and comes back when its carrier ends."
+      ),
+    /** "The Strength score bestowed by your Belt of Giant Strength ... increases by 4, to a maximum of 30" (Hammer of
+     *  Thunderbolts' Might of Giants): what another worn item sets the score to rises, never past `maximum`. */
+    z
+      .object({
+        type: z.literal("granted-score-bonus"),
+        ability: AbilitySchema,
+        amount: z.number().int().min(1).max(10),
+        maximum: z.number().int().min(1).max(30),
+        ...riderGate
+      })
+      .strict()
+      .describe(
+        "What another worn item sets one ability score to (an `ability-score-minimum`, Gauntlets of Ogre Power's 19) rises by `amount`, to at most `maximum` (Hammer of Thunderbolts' Might of Giants: +4, to 30). Read live with the scores."
+      ),
     /** One more use of a limited resource. `poolId` is the live `actionUses` key. */
     z
       .object({
@@ -1088,11 +1159,23 @@ export const ModifierSchema = z
         oncePerTurn: z.literal(true).optional(),
         /** It adds to one damage roll of a spell, the first: a spell's later rays don't take it (Empowered Evocation). */
         oncePerCast: z.literal(true).optional(),
+        /** A fixed amount, rolled with no die ("an extra 15 Necrotic damage", Sword of Life Stealing). */
+        flat: z.number().int().min(1).max(100).optional(),
+        /** The bearer gains Temporary Hit Points equal to what of this damage the target takes (Sword of Life
+         *  Stealing). */
+        temporaryHitPoints: z.literal(true).optional(),
         ...riderGate
       })
       .strict()
       .describe(
         'Extra typed damage, in one of the 13 SRD damage types. An attack\'s `criticalBonusDice` is a bare count applied to the first damage part, so it cannot carry a type. Two independent ways to say how much, and a rider may use either or both: `formula` is dice ("an extra 1d6 fire"), and `abilityModifier` adds the bearer\'s modifier in that ability as a flat number resolved at the roll ("add your Charisma modifier to the damage"): a printed wording that no authored constant can express, because the amount depends on the character. Agonizing Blast is `abilityModifier: "cha"` plus a `spell-id-is` gate. A rider with neither is refused at publish, so none is stored to silently add nothing, and so is one gated on a moment the damage roll never collects (only `on-hit`, `on-critical-hit`, `on-natural-20` and `on-damage-roll` are). `doubleOnCritical` defaults true because a Critical Hit rolls the attack\'s other damage dice twice too (SRD 5.2.1 "Critical Hits": "If the attack involves other damage dice, such as from the Rogue\'s Sneak Attack feature, you also roll those dice twice"); set it false only where a rule says otherwise. An ability modifier is never doubled at all.'
+      ),
+    /** The bearer's ranged attack rolls take no Disadvantage from long range (the Oathbow against its sworn enemy). */
+    z
+      .object({ type: z.literal("ignores-long-range"), ...riderGate })
+      .strict()
+      .describe(
+        'The bearer suffers no Disadvantage from long range on the attack rolls it narrows to (the Oathbow: "you suffer no Disadvantage due to long range" against its sworn enemy). Gate it on `on-attack-roll`.'
       ),
     /** Score a critical hit on this natural roll or higher (19-20 keen weapons). */
     z
@@ -1269,7 +1352,7 @@ export const ModifierSchema = z
       )
   ])
   .describe(
-    "The rider vocabulary: what a feature, a feat, a chosen option, a magic item and a live effect contribute to the rules engine, one union for every carrier and read by one evaluator against one context, so a bonus means the same thing wherever it is authored. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a signed integer, so a curse is this same vocabulary with a negative number, and every branch carries the `when`/`scope` gate. Carriers refuse what they cannot honour: an item refuses `hit-points-per-level` (it bakes into the sheet and cannot be un-granted when the item comes off) and `attunement-slots` (it would decide its own attunement), and reads `ability-score` live while it is worn, and an effect refuses every number stored on the sheet or the actor (`attunement-slots`, `ability-score`, `hit-points-per-level`, `armor-class`, `initiative`, `unarmored-defense`, `spell-slot`), which an effect that ends could never give back. Senses are read live, so an effect may carry them (True Seeing, the Darkvision spell)."
+    "The rider vocabulary: what a feature, a feat, a chosen option, a magic item and a live effect contribute to the rules engine, one union for every carrier and read by one evaluator against one context, so a bonus means the same thing wherever it is authored. Bounded and grown additively; anything not modeled stays prose (ADR-0008). Every amount is a signed integer, so a curse is this same vocabulary with a negative number, and every branch carries the `when`/`scope` gate. Carriers refuse what they cannot honour: an item refuses `attunement-slots` (it would decide its own attunement), and reads `ability-score` and `hit-points-per-level` live while it is worn, and an effect refuses every number stored on the sheet or the actor (`attunement-slots`, `ability-score`, `hit-points-per-level`, `armor-class`, `initiative`, `unarmored-defense`, `spell-slot`), which an effect that ends could never give back. Senses are read live, so an effect may carry them (True Seeing, the Darkvision spell)."
   );
 export type Modifier = z.infer<typeof ModifierSchema>;
 
@@ -1886,6 +1969,10 @@ export const EffectInstanceSchema = z
     endsWhenSourceDefeated: z.boolean().default(false),
     /** Dodge: the effect's modifiers stop applying while the bearer is Incapacitated or its Speed is 0 (SRD). */
     voidWhileIncapacitated: z.boolean().default(false),
+    /** It ends when its bearer stands in Bright Light, read with dynamic vision (Cloak of the Bat's flight). */
+    endsInBrightLight: z.literal(true).optional(),
+    /** Hit Points its bearer regains as time passes while it lasts (`RegainHitPointsSchema`). */
+    regainsHitPoints: RegainHitPointsSchema.optional(),
     /** It ends when the creature that keeps it (its source, or its bearer when it has none) gains the Incapacitated
      *  condition or one that includes it, or drops to 0 Hit Points (Superior Defense, Turn Undead's turning). */
     endsOnIncapacitated: z.literal(true).optional(),
@@ -3248,6 +3335,17 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   /** The recipient may hold only one effect with these tags at a time ("A creature can have only one Bardic
    *  Inspiration die at a time"): a grant to a creature that holds one is refused. */
   onlyOne: z.literal(true).optional(),
+  /** Its user may have it on only one living creature at a time (the Oathbow: "You can have only one such sworn enemy
+   *  at a time"): a grant while another still bears it is refused. */
+  oneAtATime: z.literal(true).optional(),
+  /** It ends when its recipient stands in Bright Light, read with dynamic vision (Cloak of the Bat: "if you are no
+   *  longer in Dim Light or Darkness, you lose this Fly Speed"). */
+  endsInBrightLight: z.literal(true).optional(),
+  /** Hit Points its recipient regains as time passes while it lasts (a Rod of Security's demiplane). */
+  regainsHitPoints: RegainHitPointsSchema.optional(),
+  /** It lasts this many days divided by the number of creatures it is given to, rounded down (a Rod of Security's
+   *  "200 days divided by the number of creatures present"). */
+  daysShared: z.number().int().min(1).max(1000).optional(),
   /** Only another creature may receive it ("inspire another creature"). */
   notSelf: z.literal(true).optional(),
   /** A creature that targets the recipient with an attack roll or a damaging spell first makes this save, against the
@@ -3262,6 +3360,12 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   hoursRolled: z
     .string()
     .regex(/^[1-4]d(?:4|6|8|10|12)$/, "Use dice such as 1d4.")
+    .optional(),
+  /** It lasts this many minutes, rolled once as it lands and the same for every creature it is given to (Dust of
+   *  Disappearance: 2d4), in place of `duration`. */
+  minutesRolled: z
+    .string()
+    .regex(/^[1-4]d(?:4|6|8|10|12)$/, "Use dice such as 2d4.")
     .optional(),
   /** What it does as its bearer rests or as days or midnights pass (Midnight Tears: a save at midnight). */
   atRest: RestTriggerSchema.optional()
@@ -4259,10 +4363,16 @@ export const OnHitRiderSchema = z
         /** A success makes the target immune to this rider of its attacker for `immuneMinutes` of the game clock, or
          *  for the fight ("immune to this werewolf's curse for 24 hours"). */
         immuneOnSuccess: z.literal(true).optional(),
-        immuneMinutes: z.number().int().min(1).max(MAX_EFFECT_MINUTES).optional()
+        immuneMinutes: z.number().int().min(1).max(MAX_EFFECT_MINUTES).optional(),
+        /** Each other creature within this many feet of the target, its attacker aside, makes the save too (Hammer of
+         *  Thunderbolts' thunderclap: "The target and every creature within 30 feet of it other than you"). */
+        aroundTargetFeet: z.number().int().min(5).max(60).optional()
       })
       .strict()
       .optional(),
+    /** It fires only while its attacker is attuned to an item of one of these ids too (Hammer of Thunderbolts' Giant's
+     *  Bane, with a Belt of Giant Strength or Gauntlets of Ogre Power). */
+    whileAttunedTo: z.array(RiderSlugSchema).min(1).max(8).optional(),
     /** It fires only when the attack roll's d20 shows a 20 (Sword of Sharpness: "When you roll a 20"), whatever else
      *  makes the hit a Critical Hit. */
     naturalTwenty: z.literal(true).optional(),
@@ -4479,7 +4589,7 @@ export type HitRider = z.infer<typeof HitRiderSchema>;
  */
 export const ActionTargetsSchema = z
   .object({
-    count: z.number().int().min(1).max(20).optional(),
+    count: z.number().int().min(1).max(200).optional(),
     countAbility: AbilitySchema.optional(),
     /** How far from the user a target may be; 5 is touch. */
     rangeFeet: z.number().int().min(5).max(1000).optional(),
@@ -4620,6 +4730,8 @@ export const ShapeShiftSchema = z
     /** No form with a Fly Speed (Wild Shape before Druid level 8). */
     noFly: z.literal(true).optional(),
     printed: z.array(PrintedFormSchema).min(1).max(4).optional(),
+    /** The only stat blocks it may take, by id (a Cloak of the Bat's Polymorph: a Bat). */
+    onlyForms: z.array(RiderSlugSchema).min(1).max(8).optional(),
     keeps: z.array(FormKeepSchema).max(5).default([]),
     noSpells: z.literal(true).optional(),
     noSpeech: z.literal(true).optional(),

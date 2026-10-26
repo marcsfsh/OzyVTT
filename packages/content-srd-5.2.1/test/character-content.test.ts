@@ -1917,7 +1917,7 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
       feat([{ type: "spell-ward", schools: ["divination"], spellIds: ["zone-of-truth"], typeSenses: true }]).feature
         .modifiers
     ).toHaveLength(1);
-    expect(ModifierSchema.options).toHaveLength(44);
+    expect(ModifierSchema.options).toHaveLength(47);
   });
 
   it("15. an item that grants a feat", () => {
@@ -1939,9 +1939,8 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
 
   // ---- the refusals, verified by injection ------------------------------------------------------
 
-  it("refuses hit points per level and attunement slots on an ITEM carrier only: a feat keeps both", () => {
+  it("refuses attunement slots on an ITEM carrier only: a feat keeps them", () => {
     for (const modifier of [
-      { type: "hit-points-per-level", amount: 1 },
       // An item that raised the attunement limit would decide its own attunement.
       { type: "attunement-slots", amount: 1 }
     ]) {
@@ -1954,18 +1953,21 @@ describe("the magic-item vocabulary expresses what a GM asks for", () => {
       });
       expect(refused.success, modifier.type).toBe(false);
       expect(!refused.success && JSON.stringify(refused.error.issues), modifier.type).toContain(
-        "can't change hit points per level or the attunement limit"
+        "can't change the attunement limit"
       );
       // The same rider on a feat is fine: a feat is never un-granted, so baking it in is correct.
       expect(feat([modifier]).feature.modifiers, modifier.type).toHaveLength(1);
       expect(ModifierSchema.safeParse(modifier).success, modifier.type).toBe(true);
     }
-    // An item's ability score is read live while it is worn, so an item may carry one.
-    const belt = { type: "ability-score", ability: "str", amount: 2 } as const;
-    expect(
-      EquipmentReferenceSchema.safeParse({ id: "hb-y", name: "Y", category: "wondrous", ...bare, modifiers: [belt] })
-        .success
-    ).toBe(true);
+    // An item's ability score and its Hit Points per level are read live while it is worn, so an item may carry them.
+    for (const live of [
+      { type: "ability-score", ability: "str", amount: 2 },
+      { type: "hit-points-per-level", amount: 1 }
+    ])
+      expect(
+        EquipmentReferenceSchema.safeParse({ id: "hb-y", name: "Y", category: "wondrous", ...bare, modifiers: [live] })
+          .success
+      ).toBe(true);
     // A flat `hit-points` maximum is not in the vocabulary at all, so every carrier refuses it.
     expect(ModifierSchema.safeParse({ type: "hit-points", amount: 5 }).success).toBe(false);
   });

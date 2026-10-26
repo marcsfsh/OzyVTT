@@ -30,7 +30,13 @@ import {
   resolveDice
 } from "@vtt/rules-5e";
 import { holdRoll } from "./held-rolls.js";
-import { checkRiderBonus, deriveEquipment, rollModeClaims, type EquipmentCatalog } from "./equipment-derivation.js";
+import {
+  checkRiderBonus,
+  deriveEquipment,
+  itemIsActive,
+  rollModeClaims,
+  type EquipmentCatalog
+} from "./equipment-derivation.js";
 import { effectiveActions } from "./effective-actions.js";
 import {
   endConcentrationSustainedBy,
@@ -55,6 +61,8 @@ import { conditionLabel, exhaustionPenalty, incapacitatingCondition } from "./co
 import { lapseLongCasts } from "./resolution/long-casting.js";
 import { summonTurnEnd, summonTurnStart, takesNoTurns } from "./summon-turns.js";
 import { checkSightFor } from "./vision/rules.js";
+import { rowRecord } from "./item-records.js";
+import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 
 type StartEncounterInput = Readonly<{
   mapAssetId: string;
@@ -112,6 +120,8 @@ export type InitiativeRollDeps = Readonly<{
   catalog?: EquipmentCatalog;
   /** Rolls the dice a rider adds to or takes off the check (a curse's -1d6); without it they add nothing. */
   rollDie?: (sides: number) => number;
+  /** Creature-to-creature distance on the map, for an item's aura of Advantage (a Weapon of Warning). */
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
 }>;
 
 /**
@@ -156,6 +166,8 @@ export function initiativeRollFor(
       if (!claims[side].some((held) => held.label === claim.label)) claims[side].push(claim);
   if (actor.conditions.some((condition) => condition.id === "invisible"))
     claims.advantage.push({ source: "invisible", label: "Invisible" });
+  for (const claim of initiativeAuraClaims(state, actor, deps))
+    if (!claims.advantage.some((held) => held.label === claim.label)) claims.advantage.push(claim);
   if (surprised) claims.disadvantage.push({ source: "surprised", label: "Surprised" });
   const incapacitated = incapacitatingCondition(actor);
   if (incapacitated) claims.disadvantage.push({ source: "incapacitated", label: conditionLabel(incapacitated) });
@@ -174,6 +186,69 @@ export function initiativeRollFor(
   if (penalty !== 0) reasons.push(`Exhaustion ${penalty}`);
   for (const rider of dice) reasons.push(`${rider.label} (${rider.dice})`);
   return { mode: aggregateRollMode(claims.advantage, claims.disadvantage).mode, penalty, checkBonus, reasons, dice };
+}
+
+/** SRD Weapon of Warning: "you and allies within 30 feet of you ... Each subject has Advantage on its Initiative
+ *  rolls": an attuned bearer's item gives its bearer, and each ally the map puts within its reach, Advantage. */
+function initiativeAuraClaims(
+  state: GameState,
+  actor: GameState["actors"][number],
+  deps: InitiativeRollDeps
+): Array<{ source: string; label: string }> {
+  return warningAurasOver(state, actor, deps).map(({ bearer, name }) => ({
+    source: "item-aura",
+    label: bearer.id === actor.id ? name : `${bearer.name}'s ${name}`
+  }));
+}
+
+/** The attuned items whose warning aura reaches this creature: its own, or an ally's within the aura's feet. */
+function warningAurasOver(
+  state: GameState,
+  actor: GameState["actors"][number],
+  deps: InitiativeRollDeps
+): Array<Readonly<{ bearer: GameState["actors"][number]; name: string; wakes: boolean }>> {
+  if (!deps.catalog) return [];
+  const auras: Array<Readonly<{ bearer: GameState["actors"][number]; name: string; wakes: boolean }>> = [];
+  for (const bearer of state.actors) {
+    if (bearer.archived || bearer.hp.current <= 0) continue;
+    for (const row of bearer.inventory) {
+      const record = rowRecord(deps.catalog, row);
+      const aura = record?.initiativeAura;
+      if (!aura || !row.attuned || !itemIsActive(row, record)) continue;
+      if (bearer.id !== actor.id) {
+        if (!areAllies(bearer, actor, deps.resolveDefinition)) continue;
+        const feet = deps.distanceFeet?.(bearer.id, actor.id) ?? null;
+        if (feet === null || feet > aura.feet + DISTANCE_TOLERANCE_FEET) continue;
+      }
+      auras.push({ bearer, name: record!.name, wakes: aura.wakesSleepers === true });
+    }
+  }
+  return auras;
+}
+
+/** SRD Weapon of Warning's Alarm: "The weapon magically awakens each subject who is sleeping naturally when combat
+ *  begins. This benefit doesn't wake a subject from magically induced sleep." A sleeper is Unconscious with Hit Points
+ *  left and no effect holding it there (Sleep's, a knockout's); the GM marks one by hand. */
+function wakeNaturalSleepers(
+  state: GameState,
+  actorIds: ReadonlySet<string>,
+  deps: InitiativeRollDeps
+): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  for (const actor of state.actors) {
+    if (!actorIds.has(actor.id) || actor.hp.current <= 0) continue;
+    if (!actor.conditions.some((condition) => condition.id === "unconscious")) continue;
+    if (actor.effects.some((effect) => effect.linkedConditionIds.includes("unconscious"))) continue;
+    const alarm = warningAurasOver(state, actor, deps).find((aura) => aura.wakes);
+    if (!alarm) continue;
+    actor.conditions = actor.conditions.filter((condition) => condition.id !== "unconscious");
+    events.push({
+      kind: "condition",
+      text: `${alarm.bearer.name}'s ${alarm.name} wakes ${actor.name} as the fight begins.`,
+      actorId: actor.id
+    });
+  }
+  return events;
 }
 
 /** The dice riders' total, each signed as its rider says ("-1d6" takes the roll off). */
@@ -346,7 +421,8 @@ export function startEncounter(
   now: number = Date.now(),
   catalog?: EquipmentCatalog,
   onRoll?: InitiativeRollSink,
-  rollDie?: (sides: number) => number
+  rollDie?: (sides: number) => number,
+  distanceFeet?: (actorIdA: string, actorIdB: string) => number | null
 ): EffectNarration[] {
   if (state.combat.active) throw new CommandRejectedError("End the active encounter before starting another one.");
   if (input.entries.length === 0 || input.entries.length > 200)
@@ -393,7 +469,7 @@ export function startEncounter(
       actor.id,
       surprised,
       rollD20,
-      { resolveDefinition, catalog, ...(rollDie ? { rollDie } : {}) },
+      { resolveDefinition, catalog, ...(rollDie ? { rollDie } : {}), ...(distanceFeet ? { distanceFeet } : {}) },
       shared
     );
     // A group's die reaches the feed once, on its first member.
@@ -444,6 +520,11 @@ export function startEncounter(
     historyDirty: false
   };
   if (resolveDefinition) clearPerEncounterUses(state, actorIds, resolveDefinition, catalog);
+  const woken = wakeNaturalSleepers(state, actorIds, {
+    ...(resolveDefinition ? { resolveDefinition } : {}),
+    ...(catalog ? { catalog } : {}),
+    ...(distanceFeet ? { distanceFeet } : {})
+  });
   // Rolling Initiative stops a rest and the party's travel; the GM's rest panel shows who left the rest.
   const interrupted = interruptRests(state, actorIds, "rolled Initiative", {
     ...(resolveDefinition ? { resolveDefinition } : {}),
@@ -451,7 +532,7 @@ export function startEncounter(
   });
   endTravelFor(state, actorIds);
   // What happens "when you roll Initiative": Superior Inspiration's regain, Persistent Rage's window.
-  return [...interrupted, ...rolledInitiative(state, actorIds, { resolveDefinition, catalog })];
+  return [...woken, ...interrupted, ...rolledInitiative(state, actorIds, { resolveDefinition, catalog })];
 }
 
 /**

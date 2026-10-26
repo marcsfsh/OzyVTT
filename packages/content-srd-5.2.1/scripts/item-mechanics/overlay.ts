@@ -62,6 +62,10 @@ export type ItemRiderKey =
   | "servesAsFocus"
   | "savesNegateSpells"
   | "attractsMissiles"
+  | "unarmedStrike"
+  | "initiativeAura"
+  | "regainsHitPoints"
+  | "lapses"
   | "breaks"
   | "container"
   | "attunementHeldBy";
@@ -94,6 +98,10 @@ const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "servesAsFocus",
   "savesNegateSpells",
   "attractsMissiles",
+  "unarmedStrike",
+  "initiativeAura",
+  "regainsHitPoints",
+  "lapses",
   "breaks",
   "container",
   "attunementHeldBy"
@@ -153,6 +161,9 @@ export const CARRIER_RIDER_DISPOSITION_MIRROR: Readonly<
   "base-armor-class": "standing",
   "no-critical-hits": "at-its-moment",
   "spell-ward": "standing",
+  "proficiency-bonus": "standing",
+  "granted-score-bonus": "standing",
+  "ignores-long-range": "at-its-moment",
   sense: "vision"
 });
 
@@ -187,6 +198,18 @@ const records = (dir: string, file: string): ReadonlyArray<{ readonly id: string
   JSON.parse(readFileSync(join(dir, file), "utf8")) as Array<{ id: string; category?: string }>;
 const idsIn = (dir: string, file: string): readonly string[] => records(dir, file).map((record) => record.id);
 
+/** The tags the shipped stat blocks print beside their types ("demon", "devil"), lower case. */
+function typeTagsIn(dir: string): string[] {
+  const monsters = JSON.parse(readFileSync(join(dir, "monsters.v1.json"), "utf8")) as Array<{
+    extensions?: Record<string, { typeTags?: unknown } | undefined>;
+  }>;
+  const tags = monsters.flatMap((monster) => {
+    const printed = monster.extensions?.["open5e.srd-2024"]?.typeTags;
+    return Array.isArray(printed) ? printed.filter((tag): tag is string => typeof tag === "string") : [];
+  });
+  return [...new Set(tags.map((tag) => tag.toLowerCase()))];
+}
+
 /** Where each kind's ids come from, read lazily so an entry with no slug reads no bundle. */
 const VOCABULARIES: Readonly<
   Record<RefKind, { readonly source: string; readonly ids: (dir: string) => readonly string[] }>
@@ -200,7 +223,11 @@ const VOCABULARIES: Readonly<
   "damage type": { source: "src/enums.ts DAMAGE_TYPE_IDS", ids: () => DAMAGE_TYPE_IDS },
   condition: { source: "src/enums.ts CONDITION_IDS", ids: () => CONDITION_IDS },
   "school of magic": { source: "src/enums.ts MAGIC_SCHOOL_IDS", ids: () => MAGIC_SCHOOL_IDS },
-  "creature type": { source: "src/enums.ts CREATURE_TYPE_IDS", ids: () => CREATURE_TYPE_IDS },
+  // A type, or a tag a stat block prints beside its type ("Fiend (Demon)"), which the type filters also match.
+  "creature type": {
+    source: "src/enums.ts CREATURE_TYPE_IDS, and the type tags in bundles/monsters.v1.json",
+    ids: (dir) => [...CREATURE_TYPE_IDS, ...typeTagsIn(dir)]
+  },
   "weapon property": { source: "src/enums.ts WEAPON_PROPERTY_IDS", ids: () => WEAPON_PROPERTY_IDS },
   /**
    * `weaponAction` grants proficiency if `grants.weapons` names the weapon's category or its id, so
@@ -273,7 +300,10 @@ export const OPEN_BY_DESIGN: readonly string[] = Object.freeze([
   "sense",
   "saves",
   "actionId",
-  "optionIds"
+  "optionIds",
+  // Magic item ids another item needs attuned too (Hammer of Thunderbolts): the bundle being built is their vocabulary.
+  "itemIds",
+  "whileAttunedTo"
 ]);
 
 /** Levenshtein, only ever run against one vocabulary to turn a refusal into a fix. */

@@ -1,4 +1,4 @@
-import { armorClassInPlay } from "@vtt/domain";
+import { armorClassInPlay, isDead } from "@vtt/domain";
 import {
   abilityModifier as scoreModifier,
   aggregateRollMode,
@@ -50,7 +50,7 @@ import { areAllies, areEnemies } from "../creature-sides.js";
 import { holdsFeature, spellClassOf } from "../class-features.js";
 import { launchesProjectile } from "../zone-walls.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
-import { creatureTypeOf, swimSpeedFeet } from "../statblock-facts.js";
+import { creatureTypeOf, swimSpeedFeet, typeTagsOf } from "../statblock-facts.js";
 import { auraOfAuthority, traitOf } from "../statblock-traits.js";
 import { attachedAdvantage } from "../attachments.js";
 import { hitRiderOf } from "./hit-riders.js";
@@ -74,6 +74,14 @@ import {
   type LiveActor,
   type ResolveContext
 } from "./context.js";
+
+/** The tags of the effects a creature has put on creatures that still live, for a rider gated on its mark (the
+ *  Oathbow: "While your sworn enemy lives"). */
+export function markingTagsOf(state: ResolveContext["state"], actorId: string): string[] {
+  return state.actors
+    .filter((other) => other.id !== actorId && !isDead(other))
+    .flatMap((other) => other.effects.filter((effect) => effect.sourceActorId === actorId).flatMap((e) => e.tags));
+}
 
 /** Whether this swing is at range. A thrown weapon needs the measured distance; unmeasurable resolves to
  *  ranged, so a mapless table never hands a thrown weapon melee-gated riders or bonuses. */
@@ -262,6 +270,7 @@ function riderClaims(
   const filters = {
     ...(kinds ? { attackKinds: kinds } : {}),
     ...(attackerType !== null ? { sourceCreatureType: attackerType } : {}),
+    sourceTypeTags: typeTagsOf(ctx.deps.definition),
     seesOther: rules.canSee(target.id, ctx.attacker.id),
     seenByOther: rules.canSee(ctx.attacker.id, target.id),
     otherSenses: sensing(ctx.attacker.id, target.id)
@@ -449,7 +458,13 @@ function positionClaims(ctx: ResolveContext, distance: number | null, sources: R
   if (attack.rangeFeet === undefined || !deps.distanceFeet || !ranged) return;
   const normal = attack.rangeNormalFeet;
   if (normal !== undefined && distance !== null && distance > normal + 1e-6) {
-    sources.disadvantage.push({ source: "long-range", label: `Long range (beyond ${normal} ft)` });
+    // A rider may set long range's Disadvantage aside (the Oathbow against its sworn enemy).
+    const waived = collectRiders(ctx.derivation.carriers, {
+      ...ctx.derivation.context,
+      ...ctx.riderFilters,
+      moment: "on-attack-roll"
+    }).find((rider) => rider.modifier.type === "ignores-long-range");
+    if (!waived) sources.disadvantage.push({ source: "long-range", label: `Long range (beyond ${normal} ft)` });
   }
   // An able enemy within 5 feet "who can see you" spoils the shot. A creature at 0 HP is dead or dying, and an ally is
   // no enemy whatever its kind.
@@ -702,7 +717,10 @@ export function rollAttack(ctx: ResolveContext): void {
     targetSize: target.size ?? "medium",
     targetConditionIds: target.conditions.map((condition) => condition.id),
     ...(creatureType !== null ? { targetCreatureType: creatureType } : {}),
+    targetTypeTags: typeTagsOf(targetDefinition),
     sourceItemId: ctx.riderItemId,
+    // The marks the attacker keeps on creatures that still live (the Oathbow's sworn enemy).
+    markingTags: markingTagsOf(ctx.state, attacker.id),
     // What the attacker left on the target (its grapple, its Hunter's Mark), whether it is hurt, and how far it is.
     targetMarkTags: target.effects
       .filter((effect) => effect.sourceActorId === attacker.id)

@@ -240,6 +240,18 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true,
     attack: FeatureAttackSchema.optional(),
     save: FeatureSaveSchema.optional(),
     ridesHit: FeatureHitRiderSchema.optional(),
+    /** An attack with the item's own weapon, hurled as if it had the Thrown property at these ranges (Hammer of
+     *  Thunderbolts: 20/60): the weapon's attack and damage, from range. */
+    hurlsWeapon: z
+      .object({
+        normalFeet: z.number().int().min(5).max(600),
+        longFeet: z.number().int().min(5).max(1200)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "An attack with the item's own weapon hurled as if it had the Thrown property at these ranges (Hammer of Thunderbolts: 20/60), with the weapon's attack and damage"
+      ),
     /** It spends none of its feature's uses, where another of the feature's actions does (ending Quivering Palm's
      *  vibrations, which the 4 Focus Points paid for when they started). */
     spendsNoUses: z
@@ -460,16 +472,13 @@ export const FeatureGrantsSchema = FeatureGrantsFieldsSchema.superRefine((grants
 );
 
 /**
- * Rider types an item may not carry: hit points per level are baked into the sheet and can't be reversed on unequip
- * (`hp.maximum` with current HP tracked against it), and the attunement limit would decide the item's own attunement.
- * Feats and features may use them. An item's ability score is read live while it is worn.
+ * Rider types an item may not carry: the attunement limit would decide the item's own attunement. Feats and features may
+ * use it. An item's ability score and its Hit Points per level are read live while it is worn, so taking it off gives
+ * them back.
  */
-export const ITEM_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze([
-  "hit-points-per-level",
-  "attunement-slots"
-]);
+export const ITEM_REFUSED_MODIFIER_TYPES: readonly Modifier["type"][] = Object.freeze(["attunement-slots"]);
 export const ITEM_REFUSED_MODIFIER_MESSAGE =
-  "An item can't change hit points per level or the attunement limit: the first is baked into the sheet and can't be un-granted when the item comes off, and the second decides the item's own attunement. Both stay available on a feat.";
+  "An item can't change the attunement limit, which would decide the item's own attunement. A feat can.";
 
 /** The rider fields shared by `FeatureRecord`, `FeatureOption` and magic items (spread into `EquipmentReferenceSchema`). */
 export const featureRiders = {

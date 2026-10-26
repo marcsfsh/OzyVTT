@@ -94,7 +94,7 @@ import { countZoneDamage } from "./spell-zone-state.js";
 import { followPushed, forceOf } from "./summon-strikes.js";
 import { endCasterSpell } from "./spell-endings.js";
 import { armedRepeat, durationUntilRepeat, settleEndingSave } from "./save-stages.js";
-import { creatureTypeOf } from "./statblock-facts.js";
+import { creatureTypeOf, typeTagsOf } from "./statblock-facts.js";
 import { suppressConditions } from "./suppressed-conditions.js";
 import { sizeAtMost, sizeRank } from "./resolution/context.js";
 import { lightSensitivities, sightRules } from "./vision/rules.js";
@@ -170,7 +170,8 @@ export function saveRollSources(
   concentration = false,
   stakes: readonly string[] = [],
   sourceCreatureType: string | null = null,
-  against: SaveSource = {}
+  against: SaveSource = {},
+  sourceTypeTags: readonly string[] = []
 ): RollModeClaims {
   const claims: RollModeClaims = { advantage: [], disadvantage: [] };
   if (ability === "dex" && target.conditions.some((condition) => condition.id === "restrained")) {
@@ -185,6 +186,7 @@ export function saveRollSources(
       ...(stakes.length > 0 ? { targetConditionIds: stakes } : {}),
       // The creature whose effect forces the save, for a rider against its kind (Protection from Evil and Good).
       ...(sourceCreatureType !== null ? { sourceCreatureType } : {}),
+      ...(sourceTypeTags.length > 0 ? { sourceTypeTags } : {}),
       // A save against a spell or another magical effect (Spellguard Shield), and against a spell, with its school and
       // level (Mantle of Spell Resistance).
       ...(against.magical ? { magicalSource: true } : {}),
@@ -265,6 +267,16 @@ function sourceCreatureTypeOf(
   const source = sourceActorId === null ? undefined : state.actors.find((actor) => actor.id === sourceActorId);
   if (!source) return null;
   return creatureTypeOf(source, source.definitionId ? resolveDefinition(source.definitionId) : undefined);
+}
+
+/** The tags beside the type of the creature whose effect forces a save ("demon"), for riders against them. */
+function sourceTypeTagsOf(
+  state: GameState,
+  sourceActorId: string | null,
+  resolveDefinition: (definitionId: string) => ActorDefinition | undefined
+): string[] {
+  const source = sourceActorId === null ? undefined : state.actors.find((actor) => actor.id === sourceActorId);
+  return source?.definitionId ? typeTagsOf(resolveDefinition(source.definitionId)) : [];
 }
 
 /** The conditions a pending save is about: what its failure imposes, or what the effect it would end holds. */
@@ -970,7 +982,8 @@ export function answerSave(
       pending.endsEffects !== undefined,
       conditionsAtStake(state, pending),
       sourceCreatureTypeOf(state, pending.sourceActorId, deps.resolveDefinition),
-      saveSourceOf(pending)
+      saveSourceOf(pending),
+      sourceTypeTagsOf(state, pending.sourceActorId, deps.resolveDefinition)
     );
     if (magicResistance === "advantage")
       sources.advantage.push({ source: "magic-resistance", label: "Magic Resistance" });

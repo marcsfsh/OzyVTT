@@ -125,13 +125,35 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "shield-of-the-cavalier": { modifiers: [{ type: "armor-class", amount: 2 }] },
 
   /**
-   * `cursed: true` is legal because the SRD gates this item behind attunement. Not modeled: Abyssal
-   * (item language grants have no reader), the clawed Unarmed Strikes and their +1, Disadvantage
-   * against demons, and tying the curse's lifting to Remove Curse.
+   * `cursed: true` is legal because the SRD gates this item behind attunement, and a cursed item attuned can't be taken
+   * off until Remove Curse (`inventory.ts`). Its clawed gauntlets make Unarmed Strikes 1d8 Slashing with +1 to attack
+   * and damage, and its wearer has Disadvantage on attacks against demons and on saves against what they force.
+   * Abyssal is the sheet's (item language grants have no reader).
    */
   "demon-armor": {
     cursed: true,
-    modifiers: [{ type: "armor-class", amount: 1 }]
+    unarmedStrike: { dice: "1d8", damageType: "slashing" },
+    modifiers: [
+      { type: "armor-class", amount: 1 },
+      {
+        type: "attack-bonus",
+        amount: 1,
+        when: [{ type: "on-attack-roll" }, { type: "attack-kind-is", kinds: ["unarmed"] }]
+      },
+      { type: "damage-bonus", amount: 1, when: [{ type: "on-hit" }, { type: "attack-kind-is", kinds: ["unarmed"] }] },
+      {
+        type: "roll-mode",
+        roll: "attack",
+        mode: "disadvantage",
+        when: [{ type: "on-attack-roll" }, { type: "versus-creature-type", creatureTypes: ["demon"] }]
+      },
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "disadvantage",
+        when: [{ type: "on-saving-throw" }, { type: "source-creature-type-is", creatureTypes: ["demon"] }]
+      }
+    ]
   },
 
   // The dragon's kind sets the type; fire (a red dragon) until the GM picks. "Advantage on saving throws against the
@@ -353,8 +375,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ---- Weapon rows whose riders are not weapon-scoped (plus their +N halves) -----------------------
 
-  // Bearer only: the 30-foot ally aura and the surprise/sleep clause are not expressible.
-  "weapon-of-warning": { modifiers: [{ type: "roll-mode", roll: "initiative", mode: "advantage" }] },
+  // Its attuned bearer and the allies within 30 feet of it have Advantage on Initiative, read from the map as it is
+  // rolled, and as the fight begins its Alarm wakes each of them that sleeps naturally: Unconscious with Hit Points
+  // and nothing magical holding it there.
+  "weapon-of-warning": { initiativeAura: { feet: 30, wakesSleepers: true } },
 
   // "On your person" is read as equipped. Luck rerolls a failed D20 Test once per dawn (`answer`). Wish casts on 1d3
   // charges rolled when the blade is added, which never come back, and once a dawn.
@@ -701,22 +725,70 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     modifiers: [{ type: "extra-damage", formula: "2d6", doubleOnCritical: true, when: [{ type: "on-hit" }] }]
   },
 
-  // Not modeled: the thrown thunderclap area, Giant's Bane and Might of Giants (cross-item triggers).
+  // Each of its 5 charges hurls it as if it had the Thrown property (20/60), and a hit's thunderclap asks the target and
+  // every other creature within 30 feet of it to save or be Stunned. With a Belt of Giant Strength or Gauntlets of Ogre
+  // Power attuned too, a rolled 20 against a Giant asks a DC 17 Constitution save or it dies, and the Strength that item
+  // sets rises by 4, to at most 30.
   "hammer-of-thunderbolts": {
+    charges: { regain: "1d4 + 1" },
     modifiers: [
       { type: "attack-bonus", amount: 1 },
-      { type: "damage-bonus", amount: 1 }
+      { type: "damage-bonus", amount: 1 },
+      {
+        type: "granted-score-bonus",
+        ability: "str",
+        amount: 4,
+        maximum: 30,
+        when: [{ type: "while-attuned-to", itemIds: ["belt-of-giant-strength", "gauntlets-of-ogre-power"] }]
+      }
+    ],
+    onHit: [
+      {
+        conditions: [],
+        naturalTwenty: true,
+        creatureTypes: ["giant"],
+        whileAttunedTo: ["belt-of-giant-strength", "gauntlets-of-ogre-power"],
+        save: { ability: "con", dc: 17 },
+        kills: {}
+      }
+    ],
+    actions: [
+      {
+        id: "hurl",
+        name: "Hurl the Hammer",
+        activation: "action",
+        description:
+          "Expend 1 charge and make a ranged attack with the weapon, hurling it as if it had the Thrown property with a normal range of 20 feet and a long range of 60 feet. If the attack hits, the weapon unleashes a thunderclap: the target and every creature within 30 feet of it other than you must succeed on a DC 17 Constitution saving throw or have the Stunned condition until the end of your next turn. The weapon then flies back to your hand.",
+        damage: [],
+        hurlsWeapon: { normalFeet: 20, longFeet: 60 },
+        uses: { limit: 5, per: "long-rest", pool: "hammer-of-thunderbolts-charges" },
+        onHit: [
+          {
+            name: "Thunderclap",
+            conditions: [{ id: "stunned" }],
+            duration: { type: "until-source-turn-end" },
+            save: { ability: "con", dc: 17, aroundTargetFeet: 30 }
+          }
+        ]
+      }
     ]
   },
 
   // The curse's attunement lock is authored (SRD: attunement to a cursed item can't be ended voluntarily), and its
-  // berserk save is the server's (`berserker-axe.ts`). Not modeled: +1 HP per level (`hit-points-per-level` is refused
-  // on items).
+  // berserk save is the server's (`berserker-axe.ts`). While attuned its bearer has 1 more Hit Point maximum a level,
+  // read live, and Disadvantage on attack rolls with any other weapon.
   "berserker-axe": {
     cursed: true,
     modifiers: [
       { type: "attack-bonus", amount: 1 },
-      { type: "damage-bonus", amount: 1 }
+      { type: "damage-bonus", amount: 1 },
+      { type: "hit-points-per-level", amount: 1, when: [{ type: "attuned" }] },
+      {
+        type: "roll-mode",
+        roll: "attack",
+        mode: "disadvantage",
+        when: [{ type: "on-attack-roll" }, { type: "other-weapon" }]
+      }
     ]
   },
 
@@ -902,8 +974,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // The sworn enemy: a creature its wielder names as it shoots, until it dies or seven days pass, one at a time. Against
-  // it the bow's ranged attack rolls have Advantage, ignore Half and Three-Quarters Cover and deal 3d6 Piercing more.
-  // Not modeled: ignoring long range's Disadvantage, and the Disadvantage with other weapons while it lives.
+  // it the bow's ranged attack rolls have Advantage, ignore Half and Three-Quarters Cover and long range's Disadvantage,
+  // and deal 3d6 Piercing more; while it lives, its wielder has Disadvantage on attack rolls with every other weapon.
   oathbow: {
     actions: [
       {
@@ -919,7 +991,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           name: "Sworn Enemy",
           target: "target",
           tags: ["sworn-enemy"],
-          duration: { type: "minutes", minutes: 10080 }
+          duration: { type: "minutes", minutes: 10080 },
+          oneAtATime: true
         }
       }
     ],
@@ -928,6 +1001,7 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         type: "roll-mode",
         roll: "attack",
         mode: "advantage",
+        scope: "this-item",
         when: [
           { type: "on-attack-roll" },
           { type: "attack-kind-is", kinds: ["ranged"] },
@@ -937,11 +1011,23 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       {
         type: "ignores-cover",
         degree: "three-quarters",
+        scope: "this-item",
         when: [
           { type: "on-attack-roll" },
           { type: "attack-kind-is", kinds: ["ranged"] },
           { type: "versus-marked", tags: ["sworn-enemy"] }
         ]
+      },
+      {
+        type: "ignores-long-range",
+        scope: "this-item",
+        when: [{ type: "on-attack-roll" }, { type: "versus-marked", tags: ["sworn-enemy"] }]
+      },
+      {
+        type: "roll-mode",
+        roll: "attack",
+        mode: "disadvantage",
+        when: [{ type: "on-attack-roll" }, { type: "other-weapon" }, { type: "while-marking", tags: ["sworn-enemy"] }]
       },
       {
         type: "extra-damage",
@@ -954,14 +1040,19 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // A rolled 20 deals 15 Necrotic more to a creature that is neither a Construct nor an Undead, and its wielder gains
-  // that many Temporary Hit Points: said with the hit, since a flat amount of another type has no rider.
+  // Temporary Hit Points equal to the Necrotic damage the target takes.
   "sword-of-life-stealing": {
-    onHit: [
+    modifiers: [
       {
-        conditions: [],
-        naturalTwenty: true,
-        reminder:
-          "Sword of Life Stealing: unless the target is a Construct or an Undead, it takes an extra 15 Necrotic damage, and the wielder gains that many Temporary Hit Points."
+        type: "extra-damage",
+        flat: 15,
+        damageType: "necrotic",
+        doubleOnCritical: false,
+        temporaryHitPoints: true,
+        when: [
+          { type: "on-natural-20" },
+          { type: "versus-creature-type", creatureTypes: ["construct", "undead"], except: true }
+        ]
       }
     ]
   },
@@ -1750,8 +1841,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // "Transports you and up to 199 other willing creatures you can see to a demiplane ... When the time runs out or you
   // take a Magic action to end the effect, all visitors reappear in the location they occupied when you activated the
   // rod or an unoccupied space nearest that location. Once used, this property can't be used again until 10 days have
-  // passed": off the map and back (`off-plane.ts`), up to 20 creatures a use as the target picker holds them, and 240
-  // hours of game time before the next. The hourly healing and the time limit are the GM's.
+  // passed": off the map and back (`off-plane.ts`), its user and up to 199 others, and 240 hours of game time before the
+  // next. Each hour there a visitor regains Hit Points as if it spent a Hit Point Die (`clock-healing.ts`), it needs no
+  // food or water, and the visit lasts 200 days divided by the visitors.
   "rod-of-security": {
     actions: [
       {
@@ -1762,13 +1854,15 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "Transport yourself and willing creatures you can see to the rod's demiplane. Take this action again to bring every visitor back to the space it left, or the nearest unoccupied one.",
         damage: [],
         uses: { limit: 1, per: "time", afterHours: "240" },
-        targets: { count: 20, seen: true, who: "allies" },
+        targets: { count: 199, seen: true, who: "allies" },
         grants: {
           name: "In the Rod of Security's demiplane",
-          tags: ["off-plane", "rod-of-security"],
+          tags: ["off-plane", "rod-of-security", "needs-no-food"],
           target: "self-and-targets",
           toggles: true,
           duration: { type: "manual" },
+          daysShared: 200,
+          regainsHitPoints: { everyMinutes: 60, hitPointDie: true },
           modifiers: [],
           onEnd: [],
           voidWhileIncapacitated: false,
@@ -3010,8 +3104,47 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // Stealth advantage is unqualified. The Fly Speed (light-level gated) and the self-Polymorph cast are not expressible.
+  // Attack rolls against its wearer have Disadvantage, except while its Speed is 0 and from the moment it takes damage
+  // until the start of its next turn (`lapses`).
+  "cloak-of-displacement": {
+    lapses: { onDamage: true, atSpeedZero: true },
+    modifiers: [
+      { type: "roll-mode", roll: "incoming-attack", mode: "disadvantage", when: [{ type: "on-attack-roll" }] }
+    ]
+  },
+
+  // Stealth advantage is unqualified. In Dim Light or Darkness its wearer grips its edges for a Fly Speed of 40 feet that
+  // ends in Bright Light (`light-endings.ts`, and a flier then falls), and once a dawn casts Polymorph on itself into a
+  // Bat that keeps its Intelligence, Wisdom and Charisma.
   "cloak-of-the-bat": {
+    actions: [
+      {
+        id: "grip",
+        name: "Grip the Cloak's Edges",
+        activation: "other",
+        description:
+          "In an area of Dim Light or Darkness, grip the edges of the cloak to gain a Fly Speed of 40 feet. If you ever fail to grip the cloak's edges while flying in this way, or if you are no longer in Dim Light or Darkness, you lose this Fly Speed. Use it again to let go.",
+        damage: [],
+        sight: { inDimLightOrDarkness: true },
+        grants: {
+          name: "Cloak of the Bat",
+          tags: ["cloak-of-the-bat"],
+          duration: { type: "manual" },
+          modifiers: [{ type: "special-speed", movement: "fly", feet: 40 }],
+          endsInBrightLight: true,
+          toggles: true
+        }
+      }
+    ],
+    casts: [
+      {
+        spellId: "polymorph",
+        uses: { limit: 1, per: "long-rest" },
+        targets: { who: "self" },
+        forms: { only: ["bat"], keeps: ["mental"] },
+        inDimLightOrDarkness: true
+      }
+    ],
     modifiers: [
       {
         type: "roll-mode",
@@ -4467,8 +4600,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
   // "Many types of Ioun Stones exist": the GM says which a found stone is, and its benefit holds while it orbits its
-  // attuned owner's head (worn). Absorption and Greater Absorption (cancelling a spell), Mastery (the Proficiency
-  // Bonus), Regeneration (healing each hour), Reserve (stored spells) and Sustenance (food) stay the GM's.
+  // attuned owner's head (worn): Mastery's Proficiency Bonus, Regeneration's 15 Hit Points each hour, Sustenance's
+  // freedom from food and water.
   "ioun-stone": {
     variants: [
       { id: "absorption", name: "Absorption" },
@@ -4511,16 +4644,20 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         name: "Leadership",
         modifiers: [{ type: "ability-score", ability: "cha", amount: 2, maximum: 20 }]
       },
-      { id: "mastery", name: "Mastery" },
+      { id: "mastery", name: "Mastery", modifiers: [{ type: "proficiency-bonus", amount: 1 }] },
       { id: "protection", name: "Protection", modifiers: [{ type: "armor-class", amount: 1 }] },
-      { id: "regeneration", name: "Regeneration" },
+      { id: "regeneration", name: "Regeneration", regainsHitPoints: { everyMinutes: 60, formula: "15" } },
       { id: "reserve", name: "Reserve" },
       {
         id: "strength",
         name: "Strength",
         modifiers: [{ type: "ability-score", ability: "str", amount: 2, maximum: 20 }]
       },
-      { id: "sustenance", name: "Sustenance" }
+      {
+        id: "sustenance",
+        name: "Sustenance",
+        effects: [{ name: "Sustenance", tags: ["needs-no-food"], duration: { type: "manual" } }]
+      }
     ]
   },
 
@@ -5238,10 +5375,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "Drink it, or give it to a creature within 5 feet of you: it removes the drinker's Exhaustion levels and ends the Poisoned condition on it. For the next 24 hours, it regains the maximum number of Hit Points for any Hit Point Die it spends.",
         damage: [],
         endsConditions: ["exhaustion", "poisoned"],
-        targets: { count: 1, rangeFeet: 5 }
+        targets: { count: 1, rangeFeet: 5 },
+        // Each Hit Point Die it spends restores its maximum (`rests.ts`, `resolution/hit-point-die.ts`).
+        grants: {
+          name: "Potion of Vitality",
+          target: "target",
+          tags: ["hit-dice-maximized"],
+          duration: { type: "minutes", minutes: 1440 }
+        }
       }
     ]
   },
+
+  // "You regain 1d6 Hit Points every 10 minutes if you have at least 1 Hit Point", by the game clock or a fight's rounds
+  // (`clock-healing.ts`). Regrowing a lost body part is the story's: the sheet has no body parts.
+  "ring-of-regeneration": { regainsHitPoints: { everyMinutes: 10, formula: "1d6" } },
 
   // The poison's 4d6 Poison damage, dealt to its drinker. The DC 13 Constitution save against an hour of Poisoned, which
   // a success does not halve the damage of, is the GM's, and so is its disguise: the GM names the row.
