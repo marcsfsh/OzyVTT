@@ -34,6 +34,10 @@ type Light = Readonly<{
   actorId: string | null;
   brightFeet: number;
   dimFeet: number;
+  /** Snuffed out for now (a flame set on the map). */
+  out?: boolean;
+  /** What made it, when a spell or an action did. */
+  source?: unknown;
 }>;
 /** An area of light or obscurement as the scene stores it; a spell's template draws itself as its annotation. */
 type Area = Readonly<{
@@ -123,13 +127,18 @@ export function VisionLayer({
           if (!at) return null;
           const bright = pixelsPerFoot === null ? 0 : light.brightFeet * pixelsPerFoot;
           const dim = pixelsPerFoot === null ? 0 : (light.brightFeet + light.dimFeet) * pixelsPerFoot;
+          // A flame set on the map and snuffed out (Fire Play, a Frost Brand) sheds nothing until it is lit again.
+          const out = light.out === true;
           return (
-            <g key={light.id} className="vision-light" data-light-id={light.id}>
-              <title>{`Light · ${light.brightFeet} ft bright, ${light.dimFeet} ft dim`}</title>
-              {dim > 0 && <circle className="vision-light-dim" cx={at.x} cy={at.y} r={dim} />}
-              {bright > 0 && <circle className="vision-light-bright" cx={at.x} cy={at.y} r={bright} />}
+            <g key={light.id} className={`vision-light${out ? " out" : ""}`} data-light-id={light.id}>
+              <title>{`Light · ${light.brightFeet} ft bright, ${light.dimFeet} ft dim${out ? " · out" : ""}`}</title>
+              {!out && dim > 0 && <circle className="vision-light-dim" cx={at.x} cy={at.y} r={dim} />}
+              {!out && bright > 0 && <circle className="vision-light-bright" cx={at.x} cy={at.y} r={bright} />}
               {light.position && <circle className="vision-light-glyph" cx={at.x} cy={at.y} r={handle} />}
               {light.position && erasing && <circle className="vision-hit" cx={at.x} cy={at.y} r={handle} />}
+              {light.position && aiming && !erasing && !light.source && (
+                <circle className="vision-aim-hit" data-light-target={light.id} cx={at.x} cy={at.y} r={handle * 2} />
+              )}
             </g>
           );
         })}

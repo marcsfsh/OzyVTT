@@ -244,9 +244,33 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // "Until the next dawn" is a Long Rest.
+  // "Gain the effect of the Etherealness spell. The spell ends immediately if you remove the armor or take a Magic
+  // action to repeat the command word." The Border Ethereal for up to 8 hours (`ethereal.ts`), ended by taking the
+  // armor off (a worn item's own grant) or by the action again, which spends no new use. "Until the next dawn" is a
+  // Long Rest.
   "plate-armor-of-etherealness": {
-    casts: [{ spellId: "etherealness", uses: { limit: 1, per: "long-rest" } }]
+    actions: [
+      {
+        id: "etherealness",
+        name: "Etherealness",
+        activation: "action",
+        description:
+          "Speak the command word to gain the effect of the Etherealness spell: you step into the Border Ethereal for up to 8 hours. Repeat the command word, or take the armor off, to end it.",
+        damage: [],
+        uses: { limit: 1, per: "long-rest" },
+        grants: {
+          name: "Etherealness",
+          tags: ["ethereal", "ethereal-shunt"],
+          target: "self",
+          toggles: true,
+          duration: { type: "minutes", minutes: 480 },
+          modifiers: [],
+          onEnd: [],
+          voidWhileIncapacitated: false,
+          concentration: false
+        }
+      }
+    ]
   },
 
   // ---- Ammunition ------------------------------------------------------------------------------
@@ -336,7 +360,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // Not modeled: the light in freezing temperatures and extinguishing flames once per hour.
   "frost-brand": {
     grants: { damageResistances: ["fire"] },
-    modifiers: [{ type: "extra-damage", formula: "1d6", damageType: "cold", doubleOnCritical: true }]
+    modifiers: [{ type: "extra-damage", formula: "1d6", damageType: "cold", doubleOnCritical: true }],
+    // "When you draw this weapon, you can extinguish all nonmagical flames within 30 feet of yourself. Once used, this
+    // property can't be used again for 1 hour" (`resolution/cast-lights.ts`). Its light in freezing cold is the GM's.
+    actions: [
+      {
+        id: "extinguish",
+        name: "Extinguish Flames",
+        activation: "other",
+        description:
+          "As you draw the sword, put out every nonmagical flame within 30 feet of you. Once used, this can't be used again for 1 hour.",
+        damage: [],
+        uses: { limit: 1, per: "time", afterHours: "1" },
+        douses: { feet: 30 }
+      }
+    ]
   },
 
   // Three charges, 1d3 back at dawn: Dominate Beast at DC 15 "on a Beast that has a Swim Speed".
@@ -686,9 +724,28 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   // A Longsword with Finesse that deals Radiant damage (its weapon block), +2, and 1d8 Radiant more against an Undead.
   // "While grasping the hilt, you can take a Bonus Action to cause a blade of pure radiance to spring into existence or
   // make the blade disappear": the hilt is a form with no blade, no light and no bonus. "While the blade exists, it
-  // sheds Bright Light in a 15-foot radius and Dim Light for an additional 15 feet. The light is sunlight." Not
-  // modeled: the radius its Magic action adjusts.
+  // sheds Bright Light in a 15-foot radius and Dim Light for an additional 15 feet. The light is sunlight." "While the
+  // blade exists, you can take a Magic action to expand the Bright Light and Dim Light radii by 5 feet each or reduce
+  // them by 5 feet each, to a maximum of 30 feet each or a minimum of 10 feet each" (`resolution/cast-lights.ts`).
   "sun-blade": {
+    actions: [
+      {
+        id: "widen-light",
+        name: "Widen the Sunlight",
+        activation: "action",
+        description: "Expand the blade's Bright Light and Dim Light radii by 5 feet each, to at most 30 feet each.",
+        damage: [],
+        adjustsLight: { stepFeet: 5, minFeet: 10, maxFeet: 30 }
+      },
+      {
+        id: "narrow-light",
+        name: "Narrow the Sunlight",
+        activation: "action",
+        description: "Reduce the blade's Bright Light and Dim Light radii by 5 feet each, to at least 10 feet each.",
+        damage: [],
+        adjustsLight: { stepFeet: -5, minFeet: 10, maxFeet: 30 }
+      }
+    ],
     modifiers: [
       { type: "attack-bonus", amount: 2 },
       { type: "damage-bonus", amount: 2 },
@@ -1629,7 +1686,36 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // `rod-of-security` - no plane model, and "once per 10 days" is not a `per` value.
+  // "Transports you and up to 199 other willing creatures you can see to a demiplane ... When the time runs out or you
+  // take a Magic action to end the effect, all visitors reappear in the location they occupied when you activated the
+  // rod or an unoccupied space nearest that location. Once used, this property can't be used again until 10 days have
+  // passed": off the map and back (`off-plane.ts`), up to 20 creatures a use as the target picker holds them, and 240
+  // hours of game time before the next. The hourly healing and the time limit are the GM's.
+  "rod-of-security": {
+    actions: [
+      {
+        id: "demiplane",
+        name: "Activate the Rod of Security",
+        activation: "action",
+        description:
+          "Transport yourself and willing creatures you can see to the rod's demiplane. Take this action again to bring every visitor back to the space it left, or the nearest unoccupied one.",
+        damage: [],
+        uses: { limit: 1, per: "time", afterHours: "240" },
+        targets: { count: 20, seen: true, who: "allies" },
+        grants: {
+          name: "In the Rod of Security's demiplane",
+          tags: ["off-plane", "rod-of-security"],
+          target: "self-and-targets",
+          toggles: true,
+          duration: { type: "manual" },
+          modifiers: [],
+          onEnd: [],
+          voidWhileIncapacitated: false,
+          concentration: false
+        }
+      }
+    ]
+  },
 
   // ---- The scroll ------------------------------------------------------------------------------
 
@@ -2091,7 +2177,19 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Expend 1 charge. For 1 minute, you know the direction of the nearest creature Hostile to you within 60 feet, but not its distance. The wand senses Hostile creatures that are Invisible, ethereal, disguised, or hidden, as well as those in plain sight. The effect ends if you stop holding the wand.",
-        uses: { limit: 7, per: "long-rest", pool: "wand-of-enemy-detection-charges" }
+        uses: { limit: 7, per: "long-rest", pool: "wand-of-enemy-detection-charges" },
+        // Drawn for its holder's player alone (`vision/detect.ts`); it ends with the wand put away.
+        grants: {
+          name: "Detect Enemies",
+          tags: ["enemy-detection"],
+          target: "self",
+          duration: { type: "rounds", rounds: 10 },
+          modifiers: [],
+          onEnd: [],
+          voidWhileIncapacitated: false,
+          concentration: false,
+          detects: { nearestHostile: true, feet: 60 }
+        }
       }
     ]
   },
@@ -2521,7 +2619,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "goggles-of-night": { modifiers: [{ type: "darkvision", feet: 60, extends: true }] },
 
   // An unlimited self-cast with no damage, attack or save.
-  "hat-of-disguise": { casts: [{ spellId: "disguise-self" }] },
+  // "While wearing this hat, you can cast the Disguise Self spell. The spell ends if the hat is removed."
+  "hat-of-disguise": { casts: [{ spellId: "disguise-self", endsWithItem: true }] },
 
   /** "Your Intelligence is 19 while you wear this headband", or no change from a higher one. */
   "headband-of-intellect": { modifiers: [{ type: "ability-score-minimum", ability: "int", score: 19 }] },
@@ -2708,7 +2807,17 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // "You can use it to cast Dimension Door", once a dawn: the cast teleports its wearer (`granted-moves.ts`), the 4d6
   // falling only on an arrival in a filled space. The smoke cloud is the GM's.
-  "cape-of-the-mountebank": { casts: [{ spellId: "dimension-door", uses: { limit: 1, per: "long-rest" } }] },
+  // "When you disappear, you leave behind a cloud of smoke ... the space you left Lightly Obscured until the end of your
+  // next turn" (`teleport-company.ts`).
+  "cape-of-the-mountebank": {
+    casts: [
+      {
+        spellId: "dimension-door",
+        uses: { limit: 1, per: "long-rest" },
+        teleport: { feet: 500, unseen: true, failDamage: "4d6", passenger: true, smoke: true }
+      }
+    ]
+  },
 
   // Spider Climb's Climb Speed; Spider Walk: "You can't be caught in webs of any sort" (the Web Walker tag a web's area
   // reads); and Web at save DC 13 once a dawn, filling twice its normal area: a 40-foot Cube.
@@ -2847,13 +2956,36 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // The level-5 Magic Missile stars and Astral travel are not expressible.
   // The +1 to saves, and the six stars, each a level 5 Magic Missile; 1d6 come back at dusk, which is the Long Rest
-  // here. The trip to the Astral Plane is the GM's.
+  // here. "A Magic action to enter the Astral Plane ... until you take a Magic action to return ... in the last space
+  // you occupied or, if that space is occupied, the nearest unoccupied space": off the map and back (`off-plane.ts`).
   "robe-of-stars": {
     modifiers: [{ type: "save-bonus", amount: 1 }],
     charges: { regain: "1d6" },
-    casts: [{ spellId: "magic-missile", atLevel: 5, uses: { limit: 6, per: "long-rest", pool: "robe-of-stars-stars" } }]
+    casts: [
+      { spellId: "magic-missile", atLevel: 5, uses: { limit: 6, per: "long-rest", pool: "robe-of-stars-stars" } }
+    ],
+    actions: [
+      {
+        id: "astral-plane",
+        name: "Enter the Astral Plane",
+        activation: "action",
+        description:
+          "Enter the Astral Plane with everything you wear and carry. Take this action again to return to the space you left, or the nearest unoccupied one.",
+        damage: [],
+        grants: {
+          name: "On the Astral Plane",
+          tags: ["off-plane"],
+          target: "self",
+          toggles: true,
+          duration: { type: "manual" },
+          modifiers: [],
+          onEnd: [],
+          voidWhileIncapacitated: false,
+          concentration: false
+        }
+      }
+    ]
   },
 
   // Without armor its base AC is 15 plus Dexterity, chosen like Unarmored Defense; Advantage on saves against spells and
@@ -3321,7 +3453,48 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // `deck-of-illusions` - illusions and card state are not modeled.
-  // `dimensional-shackles` - prevents extradimensional movement, which is not modeled.
+  // "Use a Utilize action to place these shackles on an Incapacitated creature ... the shackles prevent a creature bound
+  // by them from using any method of extradimensional movement, including teleportation or travel to a different plane
+  // of existence": no teleport and no plane travel of its own (`ethereal.ts`). The Utilize action again removes them;
+  // the bound creature's DC 30 Strength (Athletics) check breaks them. Its once in 30 days and the shackles' loss are the
+  // GM's.
+  "dimensional-shackles": {
+    actions: [
+      {
+        id: "shackle",
+        name: "Place the Dimensional Shackles",
+        activation: "action",
+        description:
+          "Place the shackles on an Incapacitated Small, Medium or Large creature within reach: it can't teleport or travel to another plane while bound. Take this action again on it to remove them. The bound creature can break them with a DC 30 Strength (Athletics) check.",
+        damage: [],
+        targets: {
+          count: 1,
+          rangeFeet: 5,
+          maxSize: "large",
+          conditions: ["incapacitated", "paralyzed", "stunned", "unconscious"]
+        },
+        grants: {
+          name: "Dimensional Shackles",
+          tags: ["no-teleport", "dimensional-shackles"],
+          target: "target",
+          toggles: true,
+          duration: { type: "manual" },
+          modifiers: [],
+          onEnd: [],
+          voidWhileIncapacitated: false,
+          concentration: false,
+          endAction: {
+            activation: "action",
+            kind: "check",
+            ability: "str",
+            skill: "athletics",
+            dc: 30,
+            label: "Break the shackles"
+          }
+        }
+      }
+    ]
+  },
   // Its spells at their printed charge costs on 7 charges (1d4 + 3 back at dawn), Detect Magic at no cost, Scrying at
   // DC 18, and Call Dragons once an hour, each only while its user controls the orb. Peering into it is a DC 15
   // Charisma save the user makes: a success controls the orb, a failure leaves the user Charmed by it, and either lasts
@@ -4210,8 +4383,24 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         activation: "action",
         description:
           "Target a creature you can see within 60 feet of yourself. If the flask is empty and the target is native to a plane of existence other than the one you are on, the target must succeed on a DC 17 Wisdom saving throw or be trapped in the flask. Once trapped, a creature remains in the flask until released.",
-        save: { ability: "wis", dc: 17, successDamage: "none", failureConditions: [] },
-        targets: { count: 1, rangeFeet: 60, seen: true, creatureTypes: ["celestial", "elemental", "fey", "fiend"] }
+        save: {
+          ability: "wis",
+          dc: 17,
+          successDamage: "none",
+          failureConditions: [],
+          failureEffect: { name: "Trapped in the Iron Flask", tags: ["off-plane", "iron-flask"], modifiers: [] }
+        },
+        targets: { count: 1, rangeFeet: 60, seen: true, creatureTypes: ["celestial", "elemental", "fey", "fiend"] },
+        holds: { tag: "iron-flask", capacity: 1 }
+      },
+      {
+        id: "release",
+        name: "Release the Creature",
+        activation: "action",
+        description:
+          "Remove the flask's stopper and release the creature in it. It appears beside you and obeys your commands for 1 hour; given none, or one likely to end in its death or imprisonment, it defends itself and takes no other actions.",
+        damage: [],
+        releases: { tag: "iron-flask", commandMinutes: 60 }
       }
     ]
   },
@@ -4294,10 +4483,43 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // What is put in it weighs next to nothing; opening it on a surface, the creatures inside and climbing out are the
-  // GM's (off-plane). Put in another extradimensional space, it is destroyed with what it holds.
+  // What is put in it weighs next to nothing; put in another extradimensional space, it is destroyed with what it
+  // holds. "Folding the cloth closes the hole, and any creatures or objects within remain in the extradimensional space
+  // ... a creature within the hole's extradimensional space can take an action to make a DC 10 Strength (Athletics)
+  // check. On a successful check, the creature forces its way out and appears within 5 feet of the Portable Hole": the
+  // creatures in the open hole leave the map (`off-plane.ts`) until that check, coming back where they stood beside it.
+  // The open hole on the map and its air are the GM's.
   "portable-hole": {
-    container: { weighsLb: 0, extradimensional: true }
+    container: { weighsLb: 0, extradimensional: true },
+    actions: [
+      {
+        id: "fold",
+        name: "Fold the Portable Hole Shut",
+        activation: "action",
+        description:
+          "Fold the cloth closed with creatures inside the open hole: they stay in its extradimensional space until each forces its way out with an action and a DC 10 Strength (Athletics) check, appearing within 5 feet of the hole.",
+        damage: [],
+        targets: { count: 4, rangeFeet: 10 },
+        grants: {
+          name: "Shut in the Portable Hole",
+          tags: ["off-plane", "portable-hole"],
+          target: "targets",
+          duration: { type: "manual" },
+          modifiers: [],
+          onEnd: [],
+          voidWhileIncapacitated: false,
+          concentration: false,
+          endAction: {
+            activation: "action",
+            kind: "check",
+            ability: "str",
+            skill: "athletics",
+            dc: 10,
+            label: "Force a way out"
+          }
+        }
+      }
+    ]
   },
   // Knotted, it "grants Advantage on ability checks made to climb using the rope", a situation the roller names. Its
   // animated end and its own Hit Points are the GM's.
@@ -4665,6 +4887,34 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           }
         ),
         healing: { formula: "10", temporary: true, self: true }
+      }
+    ]
+  },
+
+  // "One vial ... can cover one Medium or smaller creature ... Applying the oil takes 10 minutes. The affected creature
+  // then gains the effect of the Etherealness spell for 1 hour": the Border Ethereal (`ethereal.ts`) for the one it is
+  // applied to. The 10 minutes it takes are the GM's to pass.
+  "oil-of-etherealness": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "apply",
+        name: "Apply Oil of Etherealness",
+        activation: "action",
+        description:
+          "Spend 10 minutes covering a Medium or smaller creature within reach: it gains the effect of the Etherealness spell for 1 hour.",
+        damage: [],
+        targets: { count: 1, rangeFeet: 5, maxSize: "medium" },
+        grants: {
+          name: "Oil of Etherealness",
+          tags: ["ethereal", "ethereal-shunt"],
+          target: "target",
+          duration: { type: "minutes", minutes: 60 },
+          modifiers: [],
+          onEnd: [],
+          voidWhileIncapacitated: false,
+          concentration: false
+        }
       }
     ]
   },

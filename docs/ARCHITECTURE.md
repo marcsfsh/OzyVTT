@@ -231,8 +231,10 @@ name a hidden creature names "A hidden threat", a rule it would bend for a visib
 apply, and a public roll it makes is recorded GM-only. Another player's character out of
 sight keeps its actor but loses its token. An audience's own characters are always sent, and so
 is a creature with any part of its space revealed. A player's vision block also marks the creatures
-one of their own characters senses without seeing (Divine Sense, `vision/detect.ts`): where each
-stands and its creature type, never its identity, and never to the table or another player.
+one of their own characters senses without seeing (Divine Sense, Detect Magic, Detect Thoughts, a
+Wand of Enemy Detection, `vision/detect.ts`): where each stands and its creature type or what was
+sensed (`sense`: magic, poison, a mind, a foe's direction), never its identity, and never to the table
+or another player.
 
 The rule for a new field: it may reach a player or the viewer only if everything it carries is
 already public to them, and it carries no exact quantity and no identity, position or existence
@@ -357,11 +359,21 @@ of a hidden thing. When in doubt, leave it out.
   farther from the source (`compelledMoves`); a levitation (`levitating`) lifts its creature 20 feet,
   which then moves only as if climbing; and a creature that ends its turn in another's space, unless
   Tiny or larger, falls Prone (`occupied-space.ts`).
-- Off the plane (`off-plane.ts`): an effect tagged `off-plane` (Banishment, Etherealness, Maze,
-  Imprisonment, Blink's Ethereal turns, Hurl Through Hell) takes its creature off the map in the settle step, keeping its
-  place in the initiative and the space it left in `combat.offPlane` (GM-only); it can't target or be
-  targeted across the plane, and when the effect ends it returns to that space or the nearest
-  unoccupied one. Blink's d6 is rolled by the server as the caster's turn ends.
+- Off the plane (`off-plane.ts`): an effect tagged `off-plane` (Banishment, Maze, Imprisonment, Hurl
+  Through Hell, Rope Trick, Meld into Stone, a Robe of Stars, a Portable Hole folded shut, an Iron Flask)
+  takes its creature off the map in the settle step, keeping its place in the initiative and the space it
+  left in `combat.offPlane` (GM-only); it can't target or be targeted across the plane, and when the
+  effect ends it returns to that space or the nearest unoccupied one, or beside the creature that holds
+  it (`besideActorId`). A creature sent to its home plane or one that stays gone leaves the fight.
+  Blink's d6 is rolled by the server as the caster's turn ends.
+- The Border Ethereal (`ethereal.ts`): an effect tagged `ethereal` (Etherealness, a ghost's or
+  nightmare's own, Blink's Ethereal turns, Plate Armor and Oil of Etherealness) keeps its token on the
+  map. It moves in any direction through walls and creatures, every foot up or down costing one more,
+  and neither targets, occupies, threatens nor stands in a zone across planes. A Material creature sees
+  it only with Truesight or See Invisibility, or when it is tagged `seen-across-planes` (the ghost); for
+  everyone else `hiddenFrom` hides it. Coming back into an occupied space shunts it to the nearest free
+  one with 2 Force damage a foot (`ethereal-shunt`). Dimensional Shackles (`dimensional-shackles`) bar
+  every way off the plane and every teleport.
 - Mounts (`mounts.ts`, `actor.mount`): a rider carries an effect tagged `riding` whose source is its
   mount. Mounting a creature within 5 feet and at least one size larger, or dismounting, costs half the
   rider's Speed; the rider shares the mount's space and height, the mount's moves carry it, and it moves

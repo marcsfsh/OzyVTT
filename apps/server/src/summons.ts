@@ -483,6 +483,7 @@ export function bringSummons(state: GameState, request: SummonRequest, deps: Sum
       ...(summon.endsOnDamage ? { endsOnDamage: true as const } : {}),
       ...(summon.endsOnUserDeath ? { endsOnUserDeath: true as const } : {}),
       ...(summon.leashFeet !== undefined ? { leashFeet: summon.leashFeet } : {}),
+      ...(summon.follows !== undefined ? { follows: summon.follows } : {}),
       ...(summon.intangible ? { intangible: true as const } : {}),
       ...(summon.turn === "none" ? { noTurns: true as const } : {}),
       ...(summon.commandMove !== undefined ? { commandMove: summon.commandMove } : {}),
@@ -765,25 +766,50 @@ function leavesBecause(
   return null;
 }
 
-/** Whether a creature's command lapsed: its time is up, or its commander is gone. */
-function commandLapsed(state: GameState, actor: Actor): boolean {
+/** Whether a creature's command lapsed: its time is up, its commander is gone, or it is beyond the reach its
+ *  commanding effect names. */
+function commandLapsed(
+  state: GameState,
+  actor: Actor,
+  distanceFeet: ((a: string, b: string) => number | null) | null
+): boolean {
   const control = actor.control;
   if (!control) return false;
   if (!state.actors.some((candidate) => candidate.id === control.by)) return true;
-  return control.keptBy !== undefined && !effectHeld(state, control.keptBy);
+  if (control.keptBy !== undefined && !effectHeld(state, control.keptBy)) return true;
+  const keeping = actor.effects.find((effect) => effect.id === control.keptBy);
+  return keeping !== undefined && beyondCommand(keeping, actor.id, distanceFeet);
+}
+
+/** An aboleth's Dominate Mind: "under its control while within 60 feet of it". A commanding effect tagged
+ *  `commanded-within-<feet>` commands its creature only that near its source. */
+function beyondCommand(
+  effect: EffectInstance,
+  actorId: string,
+  distanceFeet: ((a: string, b: string) => number | null) | null
+): boolean {
+  const tag = effect.tags.find((candidate) => /^commanded-within-\d+$/.test(candidate));
+  if (!tag || !distanceFeet || effect.sourceActorId === null) return false;
+  const apart = distanceFeet(effect.sourceActorId, actorId);
+  return apart !== null && apart > Number(tag.slice("commanded-within-".length)) + DISTANCE_TOLERANCE_FEET;
 }
 
 /** On a creature, an effect that puts it under its source's command while it lasts (Dominate Person's Charmed, Planar
  *  Binding's service). */
 export const COMMANDED_TAG = "commanded";
 
-/** A commanding effect on the creature that doesn't command it yet. */
-function commandStarting(actor: Actor): EffectInstance | undefined {
+/** A commanding effect on the creature that doesn't command it yet, within any reach it names. */
+function commandStarting(
+  actor: Actor,
+  distanceFeet: ((a: string, b: string) => number | null) | null
+): EffectInstance | undefined {
   const effect = actor.effects.find(
     (candidate) =>
       candidate.tags.includes(COMMANDED_TAG) && candidate.sourceActorId !== null && candidate.sourceActorId !== actor.id
   );
-  return effect && actor.control?.keptBy !== effect.id ? effect : undefined;
+  return effect && actor.control?.keptBy !== effect.id && !beyondCommand(effect, actor.id, distanceFeet)
+    ? effect
+    : undefined;
 }
 
 export type RaiseDeps = Readonly<{
@@ -882,9 +908,45 @@ export function needsSummonSettling(
   return state.actors.some(
     (actor) =>
       leavesBecause(state, actor, distanceFeet) !== null ||
-      commandLapsed(state, actor) ||
-      commandStarting(actor) !== undefined
+      commandLapsed(state, actor, distanceFeet) ||
+      commandStarting(actor, distanceFeet) !== undefined ||
+      strayedFollower(actor, distanceFeet) !== null
   );
+}
+
+/** How far a following creature is from its user when that is more than it keeps to (a Floating Disk's 20 feet), or
+ *  null. */
+function strayedFollower(actor: Actor, distanceFeet: ((a: string, b: string) => number | null) | null): number | null {
+  const keeps = actor.summon?.follows;
+  if (keeps === undefined || !distanceFeet) return null;
+  const apart = distanceFeet(actor.summon!.by, actor.id);
+  return apart !== null && apart > keeps + DISTANCE_TOLERANCE_FEET ? apart : null;
+}
+
+/** Floating Disk: "If you move more than 20 feet away from it, the disk follows you so that it remains within 20 feet
+ *  of you": it moves straight toward its user until it is that near. */
+function followUsers(state: GameState, deps: SettleSummonDeps): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  const geometry = deps.geometry;
+  if (!geometry) return events;
+  for (const actor of state.actors) {
+    const apart = strayedFollower(actor, deps.distanceFeet);
+    const keeps = actor.summon?.follows;
+    if (apart === null || keeps === undefined) continue;
+    const at = state.combat.tokens.find((token) => token.actorId === actor.id)?.position;
+    const user = state.combat.tokens.find((token) => token.actorId === actor.summon!.by)?.position;
+    if (!at || !user) continue;
+    // Its space is measured edge to edge; stepping a little short of the line keeps it within the reach.
+    const share = Math.max(0, (apart - keeps + 2.5) / apart);
+    moveEncounterToken(
+      state,
+      actor.id,
+      { x: at.x + (user.x - at.x) * share, y: at.y + (user.y - at.y) * share },
+      geometry
+    );
+    events.push({ kind: "effect", text: `${actor.name} follows its caster.`, actorId: actor.id });
+  }
+  return events;
 }
 
 export type SettleSummonDeps = Readonly<{
@@ -894,13 +956,15 @@ export type SettleSummonDeps = Readonly<{
   catalog?: EquipmentCatalog;
   /** Passes the turn on through the turn-change steps when a leaving creature holds it. */
   advance?: (state: GameState) => void;
+  /** The live map, on which a following creature moves after its user. */
+  geometry?: TokenMapGeometry | null;
 }>;
 
 /** After every command: summoned creatures whose time is up, that dropped to 0 Hit Points, whose user died or that
  *  strayed too far leave; a creature a commanding effect landed on comes under its source's command; creatures whose
  *  command lapsed stop obeying and fight on their own side again. */
 export function settleSummons(state: GameState, deps: SettleSummonDeps): EffectNarration[] {
-  const events: EffectNarration[] = [];
+  const events: EffectNarration[] = [...followUsers(state, deps)];
   for (let guard = 0; guard < 200; guard++) {
     const leaving = state.actors
       .map((actor) => ({ actor, why: leavesBecause(state, actor, deps.distanceFeet) }))
@@ -924,7 +988,7 @@ export function settleSummons(state: GameState, deps: SettleSummonDeps): EffectN
     }
   }
   for (const actor of state.actors) {
-    if (!commandLapsed(state, actor)) continue;
+    if (!commandLapsed(state, actor, deps.distanceFeet)) continue;
     const commander = state.actors.find((candidate) => candidate.id === actor.control?.by);
     delete actor.control;
     events.push({
@@ -934,7 +998,7 @@ export function settleSummons(state: GameState, deps: SettleSummonDeps): EffectN
     });
   }
   for (const actor of state.actors) {
-    const effect = commandStarting(actor);
+    const effect = commandStarting(actor, deps.distanceFeet);
     const commander = effect ? state.actors.find((candidate) => candidate.id === effect.sourceActorId) : undefined;
     if (!effect || !commander) continue;
     actor.control = { by: commander.id, side: sideOf(commander, deps.resolveDefinition) ?? "party", keptBy: effect.id };

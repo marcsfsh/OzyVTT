@@ -159,7 +159,11 @@ describe("reading a scroll in a fight", () => {
     write(table, IDS.wizard, scrollOf("detect-magic"));
     fight(table, IDS.wizard);
     resolveAt(table, IDS.wizard, READ, [], { targetIds: [] });
-    expect(table.actor(IDS.wizard).effects.map((effect) => effect.name)).toEqual(["Concentrating on Detect Magic"]);
+    // The sense itself is the second effect (vision/detect.ts).
+    expect(table.actor(IDS.wizard).effects.map((effect) => effect.name)).toEqual([
+      "Concentrating on Detect Magic",
+      "Detect Magic"
+    ]);
     expect(rowOf(table, IDS.wizard)).toBeUndefined();
   });
 

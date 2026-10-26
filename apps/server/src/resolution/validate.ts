@@ -1,5 +1,5 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
-import { isOffPlane } from "../off-plane.js";
+import { onOtherPlanes, planeOf } from "../ethereal.js";
 import type { GameState } from "@vtt/domain";
 import { checkChoices } from "./grant-extras.js";
 import { effectiveActions } from "../effective-actions.js";
@@ -87,8 +87,9 @@ function combatantsOf(
   const attacker = state.actors.find((item) => item.id === input.actorId);
   if (!attacker) throw new CommandRejectedError("That combatant no longer exists.");
   if (!inFight(input.actorId)) throw new CommandRejectedError("That combatant is not in this encounter.");
-  // A creature off the plane affects and is affected only by what is there with it (Banishment, Blink).
-  const awayFrom = (target: LiveActor) => isOffPlane(attacker) !== isOffPlane(target);
+  // A creature off the plane, or on the Border Ethereal, affects and is affected only by what is there with it
+  // (Banishment, Etherealness, Blink).
+  const awayFrom = (target: LiveActor) => onOtherPlanes(attacker, target);
   // A target named twice is one target (a second dart is the only reason to name it again).
   const targets = [...new Set(input.targetIds)].map((targetId) => {
     const target = state.actors.find((item) => item.id === targetId);
@@ -102,7 +103,7 @@ function combatantsOf(
     const name = hidden(target.id) ? "that creature" : target.name;
     if (awayFrom(target))
       throw new CommandRejectedError(
-        isOffPlane(attacker)
+        planeOf(attacker) !== "material"
           ? `${attacker.name} is off this plane and can't reach ${name}.`
           : `${name[0]!.toUpperCase()}${name.slice(1)} is gone from this plane for now and can't be targeted.`
       );
@@ -139,6 +140,8 @@ function combatantsOf(
     (laterRowOf(spell, action.id)?.movesArea !== undefined ||
       laterRowOf(spell, action.id)?.interposes === true ||
       laterRowOf(spell, action.id)?.liftFeet !== undefined);
+  // Looking at what a sense finds (Detect Magic's auras) is something done.
+  const revealsASense = spell !== undefined && laterRowOf(spell, action.id)?.reveals === true;
   // Spreading Caltrops leaves an area that acts on whoever meets it later.
   const leavesAnArea = action.zone !== undefined && !castsASpell;
   const rollsOnTargets =
@@ -154,11 +157,16 @@ function combatantsOf(
     spendsALimitedUse ||
     startsALastingSpell ||
     movesAnArea ||
+    revealsASense ||
     leavesAnArea ||
     // A move, jump or teleport of its own (a troll's Charge, a bulette's Leap) is something done.
     action.move !== undefined ||
     action.leap !== undefined ||
     action.teleport !== undefined ||
+    // Opening a flask frees the creature it holds; a drawn Frost Brand's cold and a Sun Blade's light act round it.
+    action.releases !== undefined ||
+    action.douses !== undefined ||
+    action.adjustsLight !== undefined ||
     (castsASpell && !rollsOnTargets) ||
     input.builtin === true ||
     // A light or a cloud is something done, with no creature under it (a magmin's flames, a darkmantle's aura).
@@ -192,11 +200,15 @@ function combatantsOf(
     !spendsALimitedUse &&
     !castsASpell &&
     !movesAnArea &&
+    !revealsASense &&
     action.sight === undefined &&
     !shapeShifts &&
     action.move === undefined &&
     action.leap === undefined &&
     action.teleport === undefined &&
+    action.releases === undefined &&
+    action.douses === undefined &&
+    action.adjustsLight === undefined &&
     action.summons === undefined &&
     action.raisesCorpse === undefined &&
     action.swallow?.conditions === undefined &&

@@ -58,6 +58,7 @@ import { spaceEntryAfterMove } from "../space-entry.js";
 import { isNimble, passesCreatures } from "../space-sharing.js";
 import { fireFormBurns } from "../wall-passage.js";
 import { teleportOutOfCage } from "../forcecage.js";
+import { carryPassenger, leaveSmoke } from "../teleport-company.js";
 import { zoneContentOf } from "../spell-zone-state.js";
 import { policeBarrier, shellsForcedBy, teleportBarredAt } from "../zone-barriers.js";
 import { zoneMovementOptions } from "../zone-ground.js";
@@ -329,18 +330,15 @@ export const mapCommands = [
           moveEncounterToken(state, actorId, from, geometry);
           setAltitude(state, actorId, fromAltitude, wasAirborne);
           const caster = state.actors.find((actor) => actor.id === actorId);
-          if (caster)
-            failedTeleport(
-              state,
-              caster,
-              outcome.teleportFails,
-              kit.fallDeps(
-                state,
-                (current, a, b) => tokenCreatureDistance(current, geometry, a, b)?.value ?? null,
-                commandId
-              ),
-              landing
-            );
+          const fallDeps = kit.fallDeps(
+            state,
+            (current, a, b) => tokenCreatureDistance(current, geometry, a, b)?.value ?? null,
+            commandId
+          );
+          if (caster) failedTeleport(state, caster, outcome.teleportFails, fallDeps, landing);
+          // "You and any creature traveling with you each take 4d6 Force damage."
+          const passenger = state.actors.find((actor) => actor.id === outcome.teleportPassengerId);
+          if (passenger) failedTeleport(state, passenger, outcome.teleportFails, fallDeps, landing);
         }
         // A teleport out of a Forcecage takes a Charisma save first; a failure keeps the creature in and wastes it.
         const landed = state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
@@ -355,6 +353,27 @@ export const mapCommands = [
             moveEncounterToken(state, actorId, from, geometry);
             setAltitude(state, actorId, fromAltitude, wasAirborne);
           }
+          // Dimension Door's willing creature arrives beside it, or both fail; a Cape of the Mountebank leaves smoke.
+          if (!caged?.held && outcome.teleportPassengerId)
+            carryPassenger(
+              state,
+              geometry,
+              {
+                travelerId: actorId,
+                passengerId: outcome.teleportPassengerId,
+                from,
+                fromAltitudeFeet: fromAltitude,
+                ...(outcome.teleportFailDamage ? { failDamage: outcome.teleportFailDamage } : {})
+              },
+              kit.fallDeps(
+                state,
+                (current, a, b) => tokenCreatureDistance(current, geometry, a, b)?.value ?? null,
+                commandId
+              ),
+              landing
+            );
+          if (!caged?.held && outcome.teleportSmoke)
+            leaveSmoke(state, geometry, { travelerId: actorId, from, commandId });
           // What the granted teleport's arrival does near where it lands (a mummy lord's Whirlwind of Sand).
           const traveler = state.actors.find((actor) => actor.id === actorId);
           if (outcome.teleportLanding && traveler && !caged?.held) {

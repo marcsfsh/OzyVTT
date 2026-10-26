@@ -1254,6 +1254,8 @@ export const VisionLightSchema = z
     brightFeet: z.number().min(0).max(1000),
     dimFeet: z.number().min(0).max(1000),
     sunlight: z.literal(true).optional(),
+    /** A flame set on the map that is out for now (a torch in a sconce snuffed by Fire Play): it sheds nothing until lit. */
+    out: z.literal(true).optional(),
     source: VisionSourceSchema.optional()
   })
   .strict()
@@ -1844,7 +1846,7 @@ export const CombatStateSchema = z
       .array(z.object({ actorId: z.uuid(), withActorId: z.uuid() }).strict())
       .max(20)
       .default([]),
-    /** Creatures gone from the fight's plane (Banishment, Blink's Ethereal turns), with the space each left and its
+    /** Creatures gone from the fight's plane (Banishment) or on the Border Ethereal over it (Blink), with the space each left and its
      *  height there, so it comes back to that space or the nearest unoccupied one (`off-plane.ts`). Live table only;
      *  GM-only, since a creature the party never saw leave would be placed by it. */
     offPlane: z
@@ -1854,7 +1856,24 @@ export const CombatStateSchema = z
             actorId: z.uuid(),
             position: EncounterTokenPositionSchema,
             altitudeFeet: z.number().int().min(1).max(10000).optional(),
-            airborne: z.enum(["fly", "levitate"]).optional()
+            airborne: z.enum(["fly", "levitate"]).optional(),
+            /** On the Border Ethereal: its token stays on the map, and `position` is where it went. */
+            ethereal: z.literal(true).optional(),
+            /** Coming back into a filled space shunts it with 2 Force damage a foot (the Etherealness spell). */
+            shunt: z.literal(true).optional(),
+            /** It may then teleport to a space it sees within this many feet of where it went (Blink: 10). */
+            returnFeet: z.number().int().min(5).max(60).optional(),
+            /** It comes back beside this creature, not where it left (an Iron Flask's prisoner, beside its user). */
+            besideActorId: z.uuid().optional(),
+            /** Gone this long, it doesn't come back (a banished Fiend after the full minute): the fight's round, or
+             *  the game-clock minute outside a fight. */
+            staysGone: z
+              .object({
+                round: z.number().int().min(1).optional(),
+                minute: z.number().int().min(0).optional()
+              })
+              .strict()
+              .optional()
           })
           .strict()
       )

@@ -142,6 +142,8 @@ export type ResolveInput = Readonly<{
   zoneId?: string;
   /** The door or wall on the live map a cast is aimed at (Knock, Arcane Lock, Passwall). */
   wallId?: string;
+  /** A light set on the live map a cast lights or puts out (Fire Play). */
+  lightId?: string;
   /** The template the cast placed, as the map will draw it, for the walls it raises (Wall of Force). */
   placedArea?: Readonly<{
     shape: "circle" | "cone" | "line" | "square";

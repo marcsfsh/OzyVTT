@@ -79,11 +79,19 @@ export function spellTargetViolations(
   if (words.violation) violations.push(words.violation);
   const targets = effect?.targets;
   if (targets && action.darts === undefined && (!action.area || effect?.picksInArea)) {
-    const limit = targets.count + (targets.perSlot ?? 0) * Math.max(0, castLevel - spell.level) + words.extra;
-    if (unique.length > limit)
+    // A slot's printed count where the text gives one ("up to three willing creatures ... for each slot level above 7").
+    const tier = spell.castingOptions.find((option) => option.type === `slot_level_${castLevel}`)?.targetCount;
+    const limit =
+      (castLevel > spell.level && tier
+        ? tier
+        : targets.count + (targets.perSlot ?? 0) * Math.max(0, castLevel - spell.level)) + words.extra;
+    // "Including yourself": the caster is one of them whether picked or not.
+    const counted =
+      action.grants?.target === "self-and-targets" ? new Set([...unique, attacker.id]).size : unique.length;
+    if (counted > limit)
       violations.push({
         rule: "target.too-many",
-        message: `${spell.name} targets ${limit === 1 ? "one creature" : `up to ${limit} creatures`}${castLevel > spell.level ? ` with a level ${castLevel} slot` : ""}; ${unique.length} ${input.areaPlaced ? "are in its area. Pick the targets instead of placing the area" : "were chosen"}.`
+        message: `${spell.name} targets ${limit === 1 ? "one creature" : `up to ${limit} creatures`}${castLevel > spell.level ? ` with a level ${castLevel} slot` : ""}; ${counted} ${input.areaPlaced ? "are in its area. Pick the targets instead of placing the area" : "were chosen"}.`
       });
   }
   if (!picked) return violations;
@@ -138,7 +146,7 @@ export function spellTargetViolations(
   const range = cast !== null && cast >= 10 ? cast + potentRangeFeet(definition, spell) : cast;
   const span = effect?.picksInArea && spell.area ? areaSpan(spell.area) : null;
   const selfArea = effect?.picksInArea && spell.area && span === null ? spell.area.sizeFeet : null;
-  const reach = selfArea ?? (range === null ? null : range + (span?.past ?? 0));
+  const reach = selfArea ?? (range === null ? (effect?.companionFeet ?? null) : range + (span?.past ?? 0));
   if (reach !== null)
     for (const targetId of unique) {
       if (targetId === attacker.id) continue;
@@ -150,7 +158,9 @@ export function spellTargetViolations(
           ? `${nameOf(targetId)} is ${rounded(distance)} ft away, beyond the ${spell.area!.sizeFeet}-foot ${spell.area!.shape} ${spell.name} centers within ${range} ft.`
           : selfArea !== null
             ? `${nameOf(targetId)} is ${rounded(distance)} ft away, outside ${spell.name}'s ${selfArea}-foot ${spell.area!.shape}.`
-            : `${nameOf(targetId)} is ${rounded(distance)} ft away, beyond ${spell.name}'s ${range === 5 ? "touch" : `${range} ft range`}.`
+            : range === null
+              ? `${nameOf(targetId)} is ${rounded(distance)} ft away, and ${spell.name}'s other creatures must be within ${reach} ft of ${attacker.name}.`
+              : `${nameOf(targetId)} is ${rounded(distance)} ft away, beyond ${spell.name}'s ${range === 5 ? "touch" : `${range} ft range`}.`
       });
     }
   // Chain Lightning's bolts leap from the first target to others within its reach of it.

@@ -54,6 +54,7 @@ import { inflictOnTargets } from "./resolution/inflicts.js";
 import { applyGrant } from "./resolution/grant.js";
 import { spendStudy, studyAMiss } from "./resolution/studied.js";
 import { applyShapeShift, checkShapeShift } from "./resolution/shape-shift.js";
+import { checkHolding, releaseHeld } from "./resolution/held-creatures.js";
 import { formsOffer } from "./transform/offer.js";
 import { applyMovementGrants } from "./resolution/movement-grants.js";
 import { applyTimeStop } from "./time-stop.js";
@@ -120,6 +121,8 @@ import {
 import { parkForCounterspell } from "./resolution/counter.js";
 import { placeCastSight } from "./resolution/cast-sight.js";
 import { applyCastWalls, checkWallTarget } from "./resolution/cast-walls.js";
+import { applyAdjustsLight, applyDouses, applyKindles, checkLightTarget } from "./resolution/cast-lights.js";
+import { revealSense } from "./resolution/sense-reveal.js";
 import { applyRageRules } from "./resolution/rage.js";
 import { releaseHideAndReady } from "./resolution/release.js";
 import { openResolve } from "./resolution/validate.js";
@@ -203,9 +206,11 @@ export function resolveDefinitionAction(
   vitalityRecipient(ctx);
   areaHealRecipient(ctx);
   checkWallTarget(ctx);
+  checkLightTarget(ctx);
   ctx.builtin?.check?.(ctx);
-  // A form the action can't give is refused before anything is spent.
+  // A form the action can't give is refused before anything is spent, and so is a full flask.
   checkShapeShift(ctx);
+  checkHolding(ctx);
   // A look at the damage of an action with no attack roll throws its damage and nothing else.
   if (look && !ctx.action.attack) {
     // With no attack to roll it only sets the filters the damage riders read.
@@ -283,6 +288,12 @@ export function resolveDefinitionAction(
     useUpConsumable(ctx);
     releaseHideAndReady(ctx);
     spendUntilItActs(ctx);
+    return { ...resolutionOf(ctx), save: null };
+  }
+  // Opening a flask frees the creature it holds, beside its user and at its command.
+  if (releaseHeld(ctx)) {
+    commitEconomy(ctx);
+    useUpConsumable(ctx);
     return { ...resolutionOf(ctx), save: null };
   }
   // A spell that Slow's chance makes fail spends its slot and its action, and nothing else happens.
@@ -396,6 +407,10 @@ export function resolveDefinitionAction(
   layOutProvisions(ctx);
   placeCastSight(ctx);
   applyCastWalls(ctx);
+  applyKindles(ctx);
+  applyDouses(ctx);
+  applyAdjustsLight(ctx);
+  revealSense(ctx);
   refuseThePrayedFor(ctx);
   // A heal that was looked at restores the dice it showed.
   if (heldLook && rollsHealingDice(ctx.action)) {
@@ -793,7 +808,13 @@ function tapTargeting(
   // A shape-shift on its user (Wild Shape, a werewolf's Shape-Shift), and leaving a form, aim at no one.
   if (action.endsForm || (action.shapeShift && !action.shapeShift.onTargets && !action.save)) return "none";
   if (action.attack || action.grants?.target === "target" || action.targets?.count === 1) return "single";
-  if (action.save || action.damage.length > 0 || action.grants?.target === "targets") return "multi";
+  if (
+    action.save ||
+    action.damage.length > 0 ||
+    action.grants?.target === "targets" ||
+    action.grants?.target === "self-and-targets"
+  )
+    return "multi";
   if (action.healing) return action.healing.self ? "none" : action.healing.divided ? "multi" : "single";
   // A touch that ends a condition picks who it touches (Lesser Restoration).
   if (action.endsConditions) return "single";

@@ -595,6 +595,34 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].holds.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the creatures an action traps off the map inside its item, and how many at once (an Iron Flask) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].releases.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the trapped creature an action lets out beside its user, and the minutes it obeys (an Iron Flask) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].douses.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the flames an action puts out around its user (Frost Brand) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].adjustsLight.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the steps an action turns its own light up or down by (a Sun Blade) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].castsAtOnce",
     types: ACTION_CARRIERS,
     reason:
@@ -1415,6 +1443,20 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     at: "casts[].uses.scaling.**",
     types: ["equipment"],
     reason: "an item cast's scaling: zero SRD authors until the magic-item bundle lands",
+    status: "gap"
+  },
+  {
+    at: "casts[].endsWithItem",
+    types: ["equipment"],
+    reason:
+      "an item cast that ends when the item is taken off (a Hat of Disguise) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "casts[].teleport.**",
+    types: ["equipment"],
+    reason:
+      "an item cast's own teleport in place of the spell's (a Cape of the Mountebank's Dimension Door) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {

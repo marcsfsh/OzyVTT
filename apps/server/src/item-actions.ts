@@ -220,6 +220,7 @@ export function castAction(
     ...(cast.consumesSpellSlot && level >= 1 ? { spellSlot: { level: Math.min(9, level) } } : {}),
     // Who the item's cast may affect beside the spell's own targets (a ring's Fear: Beasts only).
     ...(cast.targets ? { targets: structuredClone(cast.targets) } : {}),
+    ...(cast.teleport ? { teleport: structuredClone(cast.teleport) } : {}),
     // Cast through the item's own Scrying (a Crystal Ball's Detect Thoughts), or only after a check (an Amulet of the
     // Planes).
     ...(cast.through ? { castThrough: cast.through } : {}),

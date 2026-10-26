@@ -52,7 +52,9 @@ export const SUMMON_SPELLS = [
   "mage-hand",
   "mislead",
   "project-image",
-  "planar-binding"
+  "planar-binding",
+  "clairvoyance",
+  "floating-disk"
 ] as const;
 
 /** What a spell lets its caster do once it is up (Spiritual Weapon's later attack), at the test Wizard's numbers. */

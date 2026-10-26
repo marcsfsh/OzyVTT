@@ -1296,13 +1296,31 @@ export type CarriedLight = z.infer<typeof CarriedLightSchema>;
  *  one ("blocked by 1 foot of stone"). */
 export const DetectsSchema = z
   .object({
-    creatureTypes: z.array(RiderSlugSchema).min(1).max(14),
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(14).optional(),
+    /** What else it senses beside creature types: creatures bearing `magic` (magic items, spell effects: the creatures
+     *  it sees, with their spells' schools), `poison` (poisons carried, poisonous or venomous creatures, magical
+     *  contagions, with their kind) and `minds` (creatures with an Intelligence of 4 or more). */
+    kinds: z
+      .array(z.enum(["magic", "poison", "minds"]))
+      .min(1)
+      .max(3)
+      .optional(),
+    /** The direction of the nearest creature Hostile to the bearer, hidden or not, but not its distance (a Wand of Enemy
+     *  Detection). */
+    nearestHostile: z.literal(true).optional(),
+    /** What it finds shows only once its bearer has taken the spell's later action to look (Detect Magic's Magic action
+     *  to see the auras); `revealed` once it has. */
+    afterAction: z.literal(true).optional(),
+    revealed: z.literal(true).optional(),
     feet: z.number().int().min(5).max(240),
     blockedByWalls: z.literal(true).optional()
   })
   .strict()
+  .refine((detects) => detects.creatureTypes || detects.kinds || detects.nearestHostile, {
+    message: "A sense names creature types, kinds of thing, or the nearest Hostile creature."
+  })
   .describe(
-    "Creatures of these types within `feet` of the bearer whose place and type it knows, seen or not (Divine Sense); with `blockedByWalls`, not through a wall. Shown only to the bearer's player, on a scene with dynamic vision."
+    "What the bearer senses within `feet`, seen or not: creatures of these types (Divine Sense), creatures bearing magic, poison or a mind, or the direction of the nearest Hostile creature; with `blockedByWalls`, not through a wall. Shown only to the bearer's player, on a scene with dynamic vision."
   );
 export type Detects = z.infer<typeof DetectsSchema>;
 
@@ -1862,7 +1880,13 @@ export const EffectInstanceSchema = z
           .strict()
           .optional(),
         /** What its arrival does near the destination (a mummy lord's Whirlwind of Sand). */
-        landing: TeleportLandingSchema.optional()
+        landing: TeleportLandingSchema.optional(),
+        /** The willing creature that goes with it, to a space within 5 feet of its destination (Dimension Door). */
+        passengerId: z.uuid().optional(),
+        /** It leaves smoke in the space it left (a Cape of the Mountebank). */
+        smoke: z.literal(true).optional(),
+        /** Taking it spends this many feet of the bearer's movement (Tree Stride). */
+        costFeet: z.number().int().min(5).max(60).optional()
       })
       .strict()
       .optional(),
@@ -1885,6 +1909,16 @@ export const EffectInstanceSchema = z
     conditionImmunities: z.array(ConditionIdSchema).max(6).optional(),
     /** Temporary Hit Points the bearer gains at the start of each of its turns while this lasts (Heroism). */
     temporaryHitPointsEachTurn: z.number().int().min(1).max(100).optional(),
+    /** A teleport the bearer may take once on each of its turns while this lasts, spending `costFeet` of its movement
+     *  (Tree Stride: 500 feet for 10 feet of movement). */
+    teleportEachTurn: z
+      .object({
+        feet: z.number().int().min(5).max(10000),
+        unseen: z.literal(true).optional(),
+        costFeet: z.number().int().min(5).max(60).optional()
+      })
+      .strict()
+      .optional(),
     modifiers: EffectModifiersSchema.default([]),
     /** Conditions this effect applied to the same actor; removed automatically when the effect ends. */
     linkedConditionIds: z.array(ConditionIdSchema).max(4).default([]),
@@ -2289,6 +2323,9 @@ export const InventoryItemSchema = z
     burnsOutAtHour: z.number().int().min(0).max(10_000_000).optional(),
     /** Hours of burning left in a light that was put out before it burned down. */
     burnHoursLeft: z.number().int().min(0).max(24).optional(),
+    /** Feet its light's Bright and Dim radii are set wider (or, negative, narrower) than the record's (a Sun Blade's
+     *  Magic action). Server-owned, like `lit`. */
+    lightStepFeet: z.number().int().min(-60).max(60).optional(),
     /** The carried container row it is in (a Backpack, a Bag of Holding), by row id; absent, it is carried loose. The
      *  server holds it to the container's limits and weighs it through the container. */
     containerId: z
@@ -2474,6 +2511,8 @@ export const SummonedSchema = z
     endsOnDamage: z.literal(true).optional(),
     endsOnUserDeath: z.literal(true).optional(),
     leashFeet: z.number().int().min(5).max(5280).optional(),
+    /** It follows its user to stay within this many feet (Floating Disk). */
+    follows: z.number().int().min(5).max(120).optional(),
     /** It takes no turns, can't be harmed and doesn't block a space (Arcane Eye, Spiritual Weapon's force). */
     intangible: z.literal(true).optional(),
     /** It takes no turns of its own; its user moves it (Spiritual Weapon's force, Arcane Hand), this far with each
@@ -2921,7 +2960,9 @@ export type GrantOption = z.infer<typeof GrantOptionSchema>;
 /** An action's grant: the effect shape, which may also go to every creature the action targets (Bless), land only
  *  when its attack hits (Guiding Bolt's light), and add to AC while it lasts (Shield of Faith). */
 export const ActionGrantSchema = EffectGrantSchema.extend({
-  target: z.enum(["self", "target", "targets"]).default("self"),
+  /** Who receives it: its user, the action's one target, each creature it targets, or its user and each creature it
+   *  targets beside (Etherealness from a higher slot: "up to three willing creatures (including yourself)"). */
+  target: z.enum(["self", "target", "targets", "self-and-targets"]).default("self"),
   /** Taken again while what it gave lasts, it ends that instead (a phase spider's Ethereal Jaunt: "from the Material
    *  Plane to the Ethereal Plane or vice versa"). */
   toggles: z.literal(true).optional(),
@@ -2970,6 +3011,16 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   suppressesConditions: z.array(ConditionSchema).min(1).max(6).optional(),
   /** Generic actions the recipient may take as a Bonus Action while it lasts (Expeditious Retreat: Dash). */
   bonusActions: z.array(BonusActionBaseSchema).min(1).max(3).optional(),
+  /** A teleport the recipient may take once on each of its turns while it lasts (Tree Stride: up to 500 feet into
+   *  another tree, for 10 feet of movement). */
+  teleportEachTurn: z
+    .object({
+      feet: z.number().int().min(5).max(10000),
+      unseen: z.literal(true).optional(),
+      costFeet: z.number().int().min(5).max(60).optional()
+    })
+    .strict()
+    .optional(),
   /** The spell's later action, by name, that the recipient may take while it lasts at the cast's numbers (Dragon's
    *  Breath: "exhale"); the caster's own sheet doesn't offer it. */
   grantsLaterAction: z.string().min(1).max(60).optional(),
@@ -3593,6 +3644,9 @@ export const SightEffectSchema = z
       .object({
         kind: z.enum(["lightly-obscured", "heavily-obscured", "magical-darkness"]),
         aroundSelfFeet: z.number().int().min(5).max(120).optional(),
+        /** Cast on a creature in place of a point, it is an Emanation this many feet round the object that creature
+         *  carries, moving with it (Darkness on an object: 15). */
+        onTargetFeet: z.number().int().min(5).max(120).optional(),
         /** Its user sees through it ("Heavily Obscured for creatures other than you": Insect Cloud). */
         sparesUser: z.literal(true).optional(),
         /** What clears it, ending its spell: a strong wind (`wind`: Fog Cloud "until a strong wind (such as one created
@@ -4295,6 +4349,9 @@ export const CastsSpellsSchema = z
     saveDc: z.number().int().min(1).max(40),
     attackBonus: z.number().int().min(-10).max(30),
     self: z.literal(true).optional(),
+    /** Tags its one cast adds to the effect the spell leaves on it (a ghost's Etherealness: `seen-across-planes`, as
+     *  "the ghost is visible on the Material Plane while on the Border Ethereal"). */
+    grantTags: z.array(EffectTagSchema).min(1).max(2).optional(),
     /** The components its casts go without ("requiring no Material components"; "no spell components" is all three). */
     waives: z
       .array(z.enum(["verbal", "somatic", "material"]))
@@ -4694,7 +4751,15 @@ export const ActionTeleportSchema = z
      *  demon within 10 feet of itself"). */
     orAnother: z.literal(true).optional(),
     /** What its arrival does to the enemies near its destination (a mummy lord's Whirlwind of Sand). */
-    landing: TeleportLandingSchema.optional()
+    landing: TeleportLandingSchema.optional(),
+    /** One willing creature its targets name, within 5 feet of its user, goes too and arrives within 5 feet of its
+     *  user's destination; if either can't, both take `failDamage` and stay (Dimension Door). */
+    passenger: z.literal(true).optional(),
+    /** The space its user leaves is Lightly Obscured by smoke until the end of its user's next turn (a Cape of the
+     *  Mountebank). */
+    smoke: z.literal(true).optional(),
+    /** Taking it spends this many feet of its user's movement (Tree Stride: 5 to enter a tree and 5 to step out). */
+    costFeet: z.number().int().min(5).max(60).optional()
   })
   .strict();
 export type ActionTeleport = z.infer<typeof ActionTeleportSchema>;
@@ -4894,6 +4959,9 @@ export const SummonSchema = z
     endsOnDamage: z.literal(true).optional(),
     endsOnUserDeath: z.literal(true).optional(),
     leashFeet: z.number().int().min(5).max(5280).optional(),
+    /** It stays put while its user is within this many feet, and follows to stay that near as its user moves away
+     *  (Floating Disk: 20). */
+    follows: z.number().int().min(5).max(120).optional(),
     /** Who commands it: its user, no one (a Wand of Wonder's Rhinoceros), or no one and it turns on its user (a Horn of
      *  Valhalla blown without the training it asks). */
     allegiance: z.enum(["user", "none", "hostile"]).default("user"),
@@ -5400,6 +5468,46 @@ export const ActionSchema = z
     /** A teleport the action grants ("teleports up to 60 feet to an unoccupied space it can see"), see
      *  `ActionTeleportSchema`. */
     teleport: ActionTeleportSchema.optional(),
+    /** It puts out every nonmagical flame within `feet` of its user: lights set on the map that no spell made, and the
+     *  burning lights creatures carry (a Frost Brand drawn). */
+    douses: z
+      .object({ feet: z.number().int().min(5).max(120) })
+      .strict()
+      .optional()
+      .describe(
+        "It puts out every nonmagical flame within `feet` of its user: lights set on the map that no spell made, and the burning lights creatures carry (a Frost Brand drawn)"
+      ),
+    /** It widens (or, negative, narrows) the light of the item it is on by `stepFeet`, its Bright Light kept between
+     *  `minFeet` and `maxFeet` (a Sun Blade: 5 feet at a time, 10 to 30). */
+    adjustsLight: z
+      .object({
+        stepFeet: z.number().int().min(-30).max(30),
+        minFeet: z.number().int().min(0).max(120),
+        maxFeet: z.number().int().min(5).max(240)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "It widens (or, negative, narrows) its item's light by `stepFeet`, the Bright Light kept between `minFeet` and `maxFeet` (a Sun Blade)"
+      ),
+    /** It holds the creatures its failed save takes off the map, `capacity` at a time, by the effect tagged `tag` (an
+     *  Iron Flask: one at a time); used while it holds that many, it is refused. */
+    holds: z
+      .object({ tag: EffectTagSchema, capacity: z.number().int().min(1).max(20) })
+      .strict()
+      .optional()
+      .describe(
+        "It holds the creatures its failed save takes off the map, `capacity` at a time, by the effect tagged `tag` (an Iron Flask: one); used while full, it is refused"
+      ),
+    /** It frees the creature its user holds by the effect tagged `tag`, beside its user; with `commandMinutes`, the
+     *  creature obeys its user that long (an Iron Flask's prisoner: 60). */
+    releases: z
+      .object({ tag: EffectTagSchema, commandMinutes: z.number().int().min(1).max(1440).optional() })
+      .strict()
+      .optional()
+      .describe(
+        "It frees the creature its user holds by the effect tagged `tag`, beside its user; with `commandMinutes`, it obeys its user that long (an Iron Flask: 60)"
+      ),
     /** It swallows its target (a behir's, a giant toad's), see `SwallowSchema`. */
     swallow: SwallowSchema.optional(),
     /** Each target is pulled straight toward the user as it resolves, stopping beside it (a roper's Reel: "pulls each

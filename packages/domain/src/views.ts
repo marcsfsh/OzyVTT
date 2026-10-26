@@ -235,7 +235,9 @@ export type PlayerVisionWall = Readonly<{
  *  they see that lies in Bright Light; the rest of it is dim, or dark seen by Darkvision. Absent, all of it is bright. */
 /** A creature one of the player's characters senses without seeing it (Divine Sense): where it stands and its
  *  creature type, nothing else. */
-export type PlayerSensedCreature = Readonly<{ x: number; y: number; creatureType: string }>;
+/** A creature a player's character senses: where it stands and its creature type, or what the sense finds there (`sense`:
+ *  "magic: Evocation", "a venomous beast", "a mind"); a direction-only sense names a point one cell toward it. */
+export type PlayerSensedCreature = Readonly<{ x: number; y: number; creatureType: string; sense?: string }>;
 export type PlayerVision =
   | Readonly<{ enabled: false }>
   | Readonly<{

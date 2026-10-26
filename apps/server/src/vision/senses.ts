@@ -151,10 +151,12 @@ export function carriedLightsOf(state: GameState, actor: Actor, content: SightCo
       const light = record?.light;
       if (!light || (item.lit !== true && light.always !== true) || !itemIsActive(item, record)) continue;
       const shed = item.hoodLowered === true && light.hooded ? light.hooded : light;
-      if (shed.brightFeet + shed.dimFeet <= 0) continue;
+      // A Sun Blade set wider or narrower by its Magic action.
+      const step = item.lightStepFeet ?? 0;
+      if (shed.brightFeet + shed.dimFeet + 2 * step <= 0) continue;
       lights.push({
-        brightFeet: shed.brightFeet,
-        dimFeet: shed.dimFeet,
+        brightFeet: Math.max(0, shed.brightFeet + step),
+        dimFeet: Math.max(0, shed.dimFeet + step),
         sunlight: light.sunlight === true,
         reveals: light.revealsInvisible === true,
         coneFacingDegrees: light.cone === true ? (item.facingDegrees ?? 0) : null

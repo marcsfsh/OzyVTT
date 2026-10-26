@@ -93,7 +93,8 @@ export function useMapGestures({
   onPlaceArmed,
   onMapMenu,
   onDoorMenu,
-  onWallAim
+  onWallAim,
+  onLightAim
 }: Readonly<{
   role: "gm" | "player";
   tool: MapTool;
@@ -132,6 +133,8 @@ export function useMapGestures({
   onDoorMenu?: (menu: Readonly<{ wallId: string; x: number; y: number }>) => void;
   /** A tap on a door or a wall while an action is aimed: that wall is its target. */
   onWallAim?: (wallId: string) => void;
+  /** While an action is aimed, a flame set on the map was tapped (Druidcraft's Fire Play). */
+  onLightAim?: (lightId: string) => void;
 }>) {
   const { camera, setCamera, boxFraction } = view;
   const { busyActorId, setMessage } = commands;
@@ -326,6 +329,13 @@ export function useMapGestures({
       capturePointer(event);
       onSelect(null);
       setGesture({ kind: activeTargeting.template.shape, origin: point, current: point });
+      return;
+    }
+    // While an action is aimed, a flame set on the map takes the tap as its target (Fire Play).
+    const aimedLight = activeTargeting && onLightAim ? target.closest("[data-light-target]") : null;
+    if (tool === "select" && aimedLight) {
+      event.preventDefault();
+      onLightAim!(aimedLight.getAttribute("data-light-target")!);
       return;
     }
     // While an action is aimed, a door or a wall takes the tap as its target: an attack on it, or a spell such as Knock.

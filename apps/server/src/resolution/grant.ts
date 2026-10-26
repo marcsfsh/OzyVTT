@@ -25,6 +25,8 @@ import {
   type EffectNarration
 } from "../effects.js";
 import { refreshBaseArmorClass } from "../actor-roster.js";
+import { teleportsEachTurn } from "../granted-moves.js";
+import { planeTravelBarred, travelsPlanes } from "../ethereal.js";
 import { altitudeOf } from "../altitude.js";
 import { holdsFeature } from "../class-features.js";
 import { GIFT_OF_THE_PROTECTORS_TAG, refuseFullPage } from "../book-of-shadows.js";
@@ -97,16 +99,27 @@ export function applyGrant(ctx: ResolveContext): void {
   if (moveMark(ctx)) return;
   if (grant.onHit && (attack === null || (attack.outcome !== "hit" && attack.outcome !== "crit"))) return;
   const recipients =
-    grant.target === "targets" ? targets : grant.target === "target" ? targets.slice(0, 1) : [attacker];
+    grant.target === "targets"
+      ? targets
+      : grant.target === "target"
+        ? targets.slice(0, 1)
+        : grant.target === "self-and-targets"
+          ? [attacker, ...targets.filter((target) => target.id !== attacker.id)]
+          : [attacker];
   if (grant.toggles && endToggled(ctx, recipients)) return;
   for (const recipient of recipients) grantTo(ctx, recipient);
+  // Tree Stride's once-a-turn teleport is there on the turn it is cast too.
+  if (grant.teleportEachTurn)
+    for (const recipient of recipients) teleportsEachTurn(ctx.state, recipient.id, `${ctx.input.commandId}:stride`);
 }
 
 /** "From the Material Plane to the Ethereal Plane or vice versa": a toggling grant taken again while what it gave
  *  lasts ends it on each recipient instead. True when it did. */
 function endToggled(ctx: ResolveContext, recipients: readonly LiveActor[]): boolean {
   const { state, action, attacker } = ctx;
-  const given = recipients.flatMap((recipient) =>
+  // What its user and its companions went to together, they all come back from (a Rod of Security's visitors).
+  const ending = action.grants!.target === "self-and-targets" ? state.actors : recipients;
+  const given = ending.flatMap((recipient) =>
     recipient.effects
       .filter((effect) => effect.sourceActorId === attacker.id && effect.sourceActionId === action.id)
       .map((effect) => ({ recipient, effect }))
@@ -144,6 +157,9 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       `${recipient.name} already has ${grant.name ?? action.name}, and a creature can have only one at a time.`
     );
   if (grant.tags.includes(GIFT_OF_THE_PROTECTORS_TAG)) refuseFullPage(state, attacker, recipient, deps.definition);
+  // Dimensional Shackles bar a bound creature's own way to another plane (Etherealness, an Ethereal Jaunt).
+  if (recipient.id === attacker.id && travelsPlanes(grant.tags) && planeTravelBarred(recipient))
+    throw new CommandRejectedError(`${recipient.name} is bound by Dimensional Shackles and can't leave this plane.`);
   // A concentration grant may end the granter's previous concentration; surfaced as a warning line.
   const replaced: EffectNarration[] = [];
   const recipientDefinition =
@@ -267,7 +283,10 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
     state,
     recipient.id,
     makeEffect({
-      id: grant.target === "targets" ? `${input.commandId}:grant:${recipient.id}` : `${input.commandId}:grant`,
+      id:
+        grant.target === "targets" || grant.target === "self-and-targets"
+          ? `${input.commandId}:grant:${recipient.id}`
+          : `${input.commandId}:grant`,
       name: withOptionName(baseName, option),
       tags: [...new Set([...(rage ? rage.tags : grant.tags), ...parts.tags])].slice(0, 8),
       sourceActorId: attacker.id,
@@ -327,12 +346,13 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor): void {
       // The light its bearer sheds while it lasts (Shining Smite's 5 feet of Bright Light).
       ...(grant.light ? { light: { ...grant.light } } : {}),
       // The creatures it lets its bearer sense (Divine Sense), drawn for its player alone (`vision/detect.ts`).
-      ...(grant.detects ? { detects: { ...grant.detects, creatureTypes: [...grant.detects.creatureTypes] } } : {}),
+      ...(grant.detects ? { detects: structuredClone(grant.detects) } : {}),
       ...(steadyAim || grant.speedZero ? { speedZero: true } : {}),
       ...grantedMovement,
       // Heroism: immune to Frightened, and Temporary Hit Points at the start of each of the bearer's turns.
       ...(conditionImmunities.length > 0 ? { conditionImmunities: conditionImmunities.slice(0, 6) } : {}),
       ...turnStartTemporaryHitPoints(grant.temporaryHitPointsEachTurn, deps.definition),
+      ...(grant.teleportEachTurn ? { teleportEachTurn: { ...grant.teleportEachTurn } } : {}),
       // Aid: the Hit Point maximum and current hit points rise while it lasts (`addEffect`); Heroes' Feast rolls its
       // 2d10 for each creature.
       ...hitPointMaximumGainOf(ctx, grant.hitPointMaximumGain, recipient.name),

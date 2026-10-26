@@ -134,6 +134,10 @@ const CAST_TARGETS: Readonly<Record<string, NonNullable<SpellEffect["targets"]>>
   awaken: { count: 1 },
   bane: { count: 3, perSlot: 1 },
   banishment: { count: 1, perSlot: 1 },
+  // "Up to three willing creatures (including yourself) for each spell slot level above 7": the caster alone at 7.
+  etherealness: { count: 1 },
+  // The creatures that climb the rope into its space, eight at most.
+  "rope-trick": { count: 8 },
   barkskin: { count: 1 },
   befuddlement: { count: 1 },
   "bestow-curse": { count: 1 },
@@ -1133,6 +1137,17 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
   // target makes a Wisdom saving throw. ... On a successful save, the spell ends. Either way, the target knows that you
   // are probing into its mind, and ... the target can take an action on its turn to make an Intelligence (Arcana) check
   // against your spell save DC, ending the spell on a success." What the caster learns is the GM's.
+  // "If you sense such effects, you can take the Magic action to see a faint aura around any visible creature or object
+  // in the area that bears the magic, and if an effect was created by a spell, you learn the spell's school of magic."
+  "detect-magic": [
+    {
+      name: "see the auras",
+      activation: "action",
+      when: "A Magic action shows the faint aura round each creature in sight within 30 feet that bears magic, and the school of the spells on it.",
+      reveals: true,
+      damage: []
+    }
+  ],
   "detect-thoughts": [
     {
       name: "probe",
@@ -1700,7 +1715,7 @@ const CAST_TELEPORTS: Readonly<Record<string, NonNullable<SpellEffect["teleport"
   "misty-step": { feet: 30 },
   // "You teleport to a location within range": seen or not. "If you ... would arrive in a space occupied by a
   // creature ... you ... each take 4d6 Force damage, and the teleportation fails."
-  "dimension-door": { feet: 500, unseen: true, failDamage: "4d6" }
+  "dimension-door": { feet: 500, unseen: true, failDamage: "4d6", passenger: true }
 };
 
 /** Reaction spells the table offers as prompts: what triggers each and what casting it does. Counterspell answers a
@@ -1736,6 +1751,18 @@ const CHAIN_FEET: Readonly<Record<string, number>> = { "chain-lightning": 30 };
 /** "Using a Higher-Level Spell Slot": the feet an area grows for each slot level above the spell's (Fog Cloud's radius by
  *  20 feet, Confusion's by 5, Create or Destroy Water's Cube by 5). */
 const AREA_PER_SLOT: Readonly<Record<string, number>> = { "fog-cloud": 20, confusion: 5, "create-or-destroy-water": 5 };
+
+/** Cantrips that light or snuff a flame (`resolution/cast-lights.ts`): Fire Play ("light or snuff out a candle, a
+ *  torch, or a small campfire") within Druidcraft's 30 feet and Prestidigitation's 10, and Beckon Fire's embers that
+ *  "can light candles, torches, or lamps" within Elementalism's 30. */
+const KINDLES: Readonly<Record<string, NonNullable<SpellEffect["kindles"]>>> = {
+  druidcraft: { feet: 30, snuffs: true },
+  prestidigitation: { feet: 10, snuffs: true },
+  elementalism: { feet: 30 }
+};
+
+/** A Self spell's other creatures stand this near its caster ("The creatures must be within 10 feet of you"). */
+const COMPANION_FEET: Readonly<Record<string, number>> = { etherealness: 10 };
 
 /** What a cast's hit lands on its target besides its damage (SRD 5.2.1 text). */
 const CAST_ON_HIT: Readonly<Record<string, readonly OnHitRider[]>> = {
@@ -1979,6 +2006,40 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
   // "For the duration, you sense the location of any Aberration, Celestial, Elemental, Fey, Fiend, or Undead within 30
   // feet of yourself. You also sense whether the Hallow spell is active there and, if so, where. The spell is blocked
   // by 1 foot of stone, dirt, or wood; 1 inch of metal; or a thin sheet of lead."
+  // "You sense the presence of magical effects within 30 feet of yourself ... The spell is blocked by 1 foot of stone"
+  // (`vision/detect.ts`): the creatures in sight bearing magic, shown once its Magic action looks.
+  "detect-magic": spellGrant({
+    name: "Detect Magic",
+    tags: ["detect-magic"],
+    target: "self",
+    duration: { type: "manual" },
+    detects: { kinds: ["magic"], feet: 30, blockedByWalls: true, afterAction: true }
+  }),
+  // "You sense the location of poisons, poison- or venom-bearing creatures, and magical contagions within 30 feet of
+  // yourself. You sense the kind of poison, creature, or contagion in each case."
+  "detect-poison-and-disease": spellGrant({
+    name: "Detect Poison and Disease",
+    tags: ["detect-poison-and-disease"],
+    target: "self",
+    duration: { type: "manual" },
+    detects: { kinds: ["poison"], feet: 30, blockedByWalls: true }
+  }),
+  // Sense Thoughts: the minds within 30 feet, blocked by a thick enough barrier (`vision/detect.ts`).
+  "detect-thoughts": spellGrant({
+    name: "Detect Thoughts",
+    tags: ["detect-thoughts"],
+    target: "self",
+    duration: { type: "manual" },
+    detects: { kinds: ["minds"], feet: 30, blockedByWalls: true }
+  }),
+  // "You make yourself ... look different until the spell ends": the disguise is an effect on the caster for the hour,
+  // which a Hat of Disguise ends when it comes off. How it looks and who sees through it are the GM's.
+  "disguise-self": spellGrant({
+    name: "Disguise Self",
+    tags: ["disguised"],
+    target: "self",
+    duration: { type: "manual" }
+  }),
   "detect-evil-and-good": spellGrant({
     name: "Detect Evil and Good",
     tags: ["detect-evil-and-good"],
@@ -2229,12 +2290,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: rounds(10),
     modifiers: [{ type: "movement", rule: "leap", feet: 30, costFeet: 10 }]
   }),
-  // "You step into the border regions of the Ethereal Plane": off the map, unseen and untouchable from this plane,
-  // until the caster ends it (8 hours); it returns to the space it left or the nearest unoccupied one.
+  // "You step into the border regions of the Ethereal Plane": its token stays on the map, unseen and untouchable from
+  // this plane, moving through it in any direction, until the caster ends it (8 hours); "if you appear in an occupied
+  // space, you are shunted to the nearest unoccupied space and take Force damage equal to twice the number of feet you
+  // are moved" (`ethereal.ts`, `off-plane.ts`). From a higher slot, willing creatures within 10 feet go too.
   etherealness: spellGrant({
     name: "Etherealness",
-    tags: ["off-plane"],
-    target: "self",
+    tags: ["ethereal", "ethereal-shunt"],
+    target: "self-and-targets",
     duration: { type: "manual" }
   }),
   // "You banish a creature ... into a labyrinthine demiplane": off the map while the caster concentrates. "The target
@@ -2260,6 +2323,43 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     tags: ["blink"],
     target: "self",
     duration: rounds(10)
+  }),
+  // "Move from inside it to inside another tree of the same kind within 500 feet ... You must use 5 feet of movement to
+  // enter a tree ... using another 5 feet of movement ... only once on each of your turns": a 500-foot teleport, seen
+  // or not, for 10 feet of movement, on each of the caster's turns while it concentrates (`granted-moves.ts`).
+  "tree-stride": spellGrant({
+    name: "Tree Stride",
+    tags: ["tree-stride"],
+    target: "self",
+    duration: rounds(10),
+    teleportEachTurn: { feet: 500, unseen: true, costFeet: 10 }
+  }),
+  // "You step into a stone object or surface ... Nothing of your presence remains visible or otherwise detectable by
+  // nonmagical senses. While merged with the stone, you can't see what occurs outside it, and any Wisdom (Perception)
+  // checks you make to hear sounds outside it are made with Disadvantage ... can cast spells on yourself": off the map,
+  // untouchable both ways, back where it entered (`off-plane.ts`), for 8 hours.
+  "meld-into-stone": spellGrant({
+    name: "Meld into Stone",
+    tags: ["off-plane", "meld-into-stone"],
+    target: "self",
+    duration: { type: "minutes", minutes: 480 },
+    modifiers: [
+      {
+        type: "roll-mode",
+        roll: "check",
+        mode: "disadvantage",
+        when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
+      }
+    ]
+  }),
+  // "Up to eight Medium or smaller creatures" climb into the extradimensional space at the rope's top for the hour:
+  // "Attacks, spells, and other effects can't pass into or out of the space ... Anything inside the space drops out when
+  // the spell ends" (`off-plane.ts`, back to the space each left).
+  "rope-trick": spellGrant({
+    name: "Inside the Rope Trick",
+    tags: ["off-plane", "rope-trick"],
+    target: "targets",
+    duration: { type: "minutes", minutes: 60 }
   }),
   // "Gains a Fly Speed of 60 feet and can hover."
   fly: spellGrant({
@@ -2736,9 +2836,9 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
   // climbing"; when it ends the target "floats gently to the ground" (`falling.ts` raises and lowers it).
   levitate: { name: "Levitate", tags: ["levitating"], modifiers: [] },
   // "Transported to a harmless demiplane for the duration ... When the spell ends, the target reappears in the space it
-  // left or in the nearest unoccupied space": it leaves the map until the effect ends (`off-plane.ts`). An
-  // extraplanar target that stays gone for the full minute is the GM's.
-  banishment: { name: "Banished", tags: ["off-plane"], modifiers: [] },
+  // left or in the nearest unoccupied space": it leaves the map until the effect ends (`off-plane.ts`). An Aberration,
+  // a Celestial, an Elemental, a Fey or a Fiend gone the full minute doesn't come back (`banished-home`).
+  banishment: { name: "Banished", tags: ["off-plane", "banished-home"], modifiers: [] },
   // Imprisoned "until the spell is dispelled": off the map until the GM ends it. Its form, and the trigger that frees
   // it, are the GM's.
   imprisonment: { name: "Imprisoned", tags: ["off-plane"], modifiers: [] },
@@ -3141,7 +3241,9 @@ const CAST_INFLICTS: Readonly<Record<string, NonNullable<SpellEffect["inflicts"]
 
 /** The most its target may be (SRD 5.2.1 text): Animal Messenger's "A Tiny Beast". */
 const TARGET_MAX_SIZE: Readonly<Record<string, NonNullable<SpellEffect["targetMaxSize"]>>> = {
-  "animal-messenger": "tiny"
+  "animal-messenger": "tiny",
+  // "The space can hold up to eight Medium or smaller creatures."
+  "rope-trick": "medium"
 };
 
 /** The highest score its target may have: Awaken's "a Beast or Plant creature with an Intelligence of 3 or less". */
@@ -3153,6 +3255,8 @@ const TARGET_ABILITY_MAX: Readonly<Record<string, NonNullable<SpellEffect["targe
  *  or carried by someone else" (the caster's own, or one a willing creature hands over), Nondetection's and
  *  Arcanist's Magic Aura's "willing creature". */
 const WILLING_TARGETS: ReadonlySet<string> = new Set([
+  "etherealness",
+  "rope-trick",
   "light",
   "continual-flame",
   "nondetection",
@@ -3301,6 +3405,10 @@ export function spellEffectFor(
     ...(TARGET_ABILITY_MAX[id] ? { targetAbilityMax: { ...TARGET_ABILITY_MAX[id] } } : {}),
     ...(WILLING_TARGETS.has(id) ? { willingTargets: true as const } : {}),
     ...(AREA_PER_SLOT[id] !== undefined ? { areaPerSlot: AREA_PER_SLOT[id] } : {}),
+    ...(COMPANION_FEET[id] !== undefined ? { companionFeet: COMPANION_FEET[id] } : {}),
+    ...(KINDLES[id] ? { kindles: { ...KINDLES[id] } } : {}),
+    // "If you maintain Concentration on this spell for the full duration, the spell lasts until dispelled."
+    ...(id === "true-polymorph" ? { permanentAfterFull: true as const } : {}),
     // The creatures it brings and the commands it gives (`spell-summons.ts`).
     ...spellSummonFieldsFor(id)
   };

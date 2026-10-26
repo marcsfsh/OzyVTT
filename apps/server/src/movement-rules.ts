@@ -20,6 +20,7 @@ import { sizeAtMost } from "./resolution/context.js";
 import { isNimble, opensItsSpace } from "./space-sharing.js";
 import { HIDDEN_SOURCE } from "./hidden-source.js";
 import { ridesWith } from "./mounts.js";
+import { isEthereal, onOtherPlanes } from "./ethereal.js";
 import { isIncapacitated } from "./condition-rules.js";
 import { areEnemies } from "./creature-sides.js";
 import { burrowsThroughWalls, openingPassage, stopsOnlyInEnemySpace } from "./wall-passage.js";
@@ -128,6 +129,11 @@ export type MovementRulesOutcome = Readonly<{
   teleportFails?: string;
   /** What the granted teleport's arrival does near its destination (a mummy lord's Whirlwind of Sand). */
   teleportLanding?: TeleportLanding;
+  /** The willing creature the granted teleport takes along (Dimension Door), and whether it leaves smoke behind. */
+  teleportPassengerId?: string;
+  teleportSmoke?: true;
+  /** The granted teleport's damage when it fails, for a passenger that can't arrive. */
+  teleportFailDamage?: string;
   /** The mover waits here, at the edge of the reach it leaves, while the Opportunity Attacks it provoked are answered
    *  (`held-moves.ts`); `refundFeet` is what the rest of the way cost, given back if it never goes on. */
   heldAt?: Readonly<{ position: Point; altitudeFeet: number; promptIds: readonly string[]; refundFeet: number }>;
@@ -230,6 +236,7 @@ export function movementStatus(
     ...(incorporeal(definition) ? { throughWalls: true } : {}),
     ...(openingPassage(definition) ? { opening: openingPassage(definition)! } : {}),
     ...(burrowsThroughWalls(definition) ? { burrowsThroughWalls: burrowsThroughWalls(definition)! } : {}),
+    ...(actor && isEthereal(actor) ? { ethereal: true } : {}),
     ...(actor && freeOfDifficultTerrain(actor, derivation ?? undefined) ? { ignoresDifficultTerrain: true } : {})
   };
 }
@@ -443,6 +450,7 @@ function endsInOccupiedSpace(
     if (moverToken && !sharesHeight(moverToken, token, feetPerCell, input.toAltitudeFeet ?? 0)) return false;
     if (sharesSpace(state, token.actorId, input, true) || intangible(state, token.actorId)) return false;
     const occupant = state.actors.find((actor) => actor.id === token.actorId);
+    if (occupant && moverActor && onOtherPlanes(occupant, moverActor)) return false;
     if (engulfing !== undefined && sizeAtMost(occupant?.size, engulfing)) return false;
     if (enemiesOnly && moverActor && occupant && areEnemies(moverActor, occupant, input.resolveDefinition))
       return false;
@@ -465,6 +473,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   let landsOnDifficult = false;
   let failDamage: string | undefined;
   let landing: TeleportLanding | undefined;
+  let passengerId: string | undefined;
+  let failOn: string | undefined;
+  let smoke = false;
   let heldAt: MovementRulesOutcome["heldAt"];
   const travelled: { path?: readonly Point[] } = {};
   const done = (crawled = false): MovementRulesOutcome => ({
@@ -477,6 +488,8 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     ...(landsOnDifficult ? { landsOnDifficult: true as const } : {}),
     ...(failDamage ? { teleportFails: failDamage } : {}),
     ...(landing ? { teleportLanding: landing } : {}),
+    ...(passengerId ? { teleportPassengerId: passengerId, ...(failOn ? { teleportFailDamage: failOn } : {}) } : {}),
+    ...(smoke ? { teleportSmoke: true as const } : {}),
     ...(heldAt ? { heldAt } : {}),
     ...(travelled.path ? { path: travelled.path } : {})
   });
@@ -503,6 +516,11 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       spendTeleportGrant(mover, teleport.effectId);
       granted = teleport.name;
       landing = teleport.landing;
+      passengerId = teleport.passengerId;
+      failOn = teleport.failDamage;
+      if (teleport.costFeet !== undefined)
+        chargeTeleport(state, input, mover, teleport.costFeet, teleport.name, outcome);
+      smoke = teleport.smoke === true;
       // A space filled by a creature the mover didn't know of fails the teleport that says so (Dimension Door).
       if (teleport.failDamage && endsInOccupiedSpace(state, input, to, true)) failDamage = teleport.failDamage;
       return done();
@@ -555,8 +573,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   if (tether) police(state, input, "movement.tether", tether, outcome);
   // Height changes by flying, climbing, jumping or teleporting; a creature in the air moves by flying.
   const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
+  // Etherealness: "you can move in any direction".
   const heightBar =
-    counted || input.byPlayer || grant
+    (counted || input.byPlayer || grant) && !isEthereal(mover)
       ? heightRefusal(mover.name, mode, fromAltitude, toAltitude, input.wasAirborne ?? moverToken?.airborne)
       : null;
   if (heightBar) police(state, input, "movement.altitude", heightBar, outcome);
@@ -652,7 +671,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
     );
     charge = straight();
   }
-  const moved = charge?.feet ?? null;
+  // "If you move up or down, every foot of movement costs an extra foot" on the Border Ethereal.
+  const climbFeet = isEthereal(mover) ? Math.abs(toAltitude - fromAltitude) : 0;
+  const moved = charge ? charge.feet + climbFeet : null;
   const difficultFeet = charge?.difficultFeet ?? 0;
   if (moved !== null && budget !== null && moved > 0.05) {
     // A readied move is its own: up to its Speed, whatever the creature whose turn it is has moved.
@@ -799,6 +820,32 @@ function approachesFear(
   return null;
 }
 
+/** A granted teleport that costs movement (Tree Stride: "You must use 5 feet of movement to enter a tree ... using
+ *  another 5 feet of movement"), charged on the creature's own turn like a move. */
+function chargeTeleport(
+  state: GameState,
+  input: MovementRulesInput,
+  mover: GameState["actors"][number],
+  costFeet: number,
+  name: string,
+  outcome: Policing
+): void {
+  if (!movementCounts(state, mover.id)) return;
+  const definition = moverDefinitionOf(mover, input);
+  const budget = travelBudgetFeet(mover, deriveEquipment(mover, definition, input.catalog), definition, "walk");
+  const used = state.combat.turn.movementUsedFeet;
+  if (budget !== null && used + costFeet > budget + 1e-6)
+    police(
+      state,
+      input,
+      "movement.exceeds-speed",
+      `${mover.name} has ${Math.max(0, budget - used)} ft of movement left, and ${name} spends ${costFeet} ft.`,
+      outcome,
+      true
+    );
+  state.combat = { ...state.combat, turn: { ...state.combat.turn, movementUsedFeet: used + costFeet } };
+}
+
 /** Why a move takes an anchored creature too far from its anchor, or null. Height counts as distance does. */
 function strainsAnchor(input: MovementRulesInput, mover: GameState["actors"][number], to: Point): string | null {
   const anchored = mover.effects.find((effect) => effect.anchor !== undefined);
@@ -862,7 +909,9 @@ function costOptions(
       ...(incorporeal(moverDefinition) || (travel === "burrow" && burrowsThroughWalls(moverDefinition) === "half")
         ? { throughWalls: true }
         : {}),
-      ...(travel === "burrow" && burrowsThroughWalls(moverDefinition) === "free" ? { throughWallsFree: true } : {}),
+      ...((travel === "burrow" && burrowsThroughWalls(moverDefinition) === "free") || isEthereal(mover)
+        ? { throughWallsFree: true }
+        : {}),
       // Amorphous, Compression and the elementals' forms slip through any gap; a swarm through one a Tiny creature fits.
       ...(openingPassage(moverDefinition) ? { opening: openingPassage(moverDefinition)! } : {}),
       ...(freeOfDifficultTerrain(mover, derivation) ? { ignoresDifficult: true } : {}),
@@ -1011,6 +1060,7 @@ function openOpportunityAttacks(
     const enemy = state.actors.find((candidate) => candidate.id === entry.actorId);
     if (
       !enemy ||
+      onOtherPlanes(mover, enemy) ||
       !areEnemies(mover, enemy, input.resolveDefinition) ||
       reactionSpent(state, enemy.id) ||
       isIncapacitated(enemy) ||

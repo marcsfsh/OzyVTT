@@ -434,7 +434,8 @@ export function EncounterMap({
     ...(readOnly || moveSceneId
       ? {}
       : {
-          onWallAim: commands.aimAtWall
+          onWallAim: commands.aimAtWall,
+          onLightAim: commands.aimAtLight
         })
   });
 
@@ -558,7 +559,9 @@ export function EncounterMap({
           throughWalls:
             draggedBudget?.throughWalls === true ||
             (draggedMode === "burrow" && draggedBudget?.burrowsThroughWalls === "half"),
-          throughWallsFree: draggedMode === "burrow" && draggedBudget?.burrowsThroughWalls === "free",
+          throughWallsFree:
+            (draggedMode === "burrow" && draggedBudget?.burrowsThroughWalls === "free") ||
+            draggedBudget?.ethereal === true,
           ...(draggedBudget?.opening ? { opening: draggedBudget.opening } : {}),
           ignoresDifficult: draggedBudget?.ignoresDifficultTerrain === true,
           walls: moveWalls,

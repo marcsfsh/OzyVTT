@@ -2385,7 +2385,8 @@
    "failureEffect": {
     "name": "Banished",
     "tags": [
-     "off-plane"
+     "off-plane",
+     "banished-home"
     ],
     "modifiers": []
    },
@@ -4792,7 +4793,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "clairvoyance-sensor",
+      "count": 1
+     }
+    ],
+    "rangeFeet": 1000,
+    "turn": "none",
+    "allegiance": "user",
+    "noAttacks": true,
+    "intangible": true,
+    "sight": "always"
+   }
   },
   "classes": [
    "bard",
@@ -7778,7 +7793,8 @@
   },
   "sight": {
    "area": {
-    "kind": "magical-darkness"
+    "kind": "magical-darkness",
+    "onTargetFeet": 15
    },
    "dispels": {
     "kind": "light",
@@ -8264,7 +8280,38 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "laterActions": [
+    {
+     "name": "see the auras",
+     "activation": "action",
+     "when": "A Magic action shows the faint aura round each creature in sight within 30 feet that bears magic, and the school of the spells on it.",
+     "reveals": true,
+     "damage": []
+    }
+   ],
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Detect Magic",
+    "tags": [
+     "detect-magic"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    },
+    "detects": {
+     "kinds": [
+      "magic"
+     ],
+     "feet": 30,
+     "blockedByWalls": true,
+     "afterAction": true
+    }
+   }
   },
   "classes": [
    "bard",
@@ -8317,7 +8364,28 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Detect Poison and Disease",
+    "tags": [
+     "detect-poison-and-disease"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    },
+    "detects": {
+     "kinds": [
+      "poison"
+     ],
+     "feet": 30,
+     "blockedByWalls": true
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -8400,7 +8468,28 @@
      "damage": []
     }
    ],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Detect Thoughts",
+    "tags": [
+     "detect-thoughts"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    },
+    "detects": {
+     "kinds": [
+      "minds"
+     ],
+     "feet": 30,
+     "blockedByWalls": true
+    }
+   }
   },
   "classes": [
    "bard",
@@ -8454,7 +8543,8 @@
    "teleport": {
     "feet": 500,
     "unseen": true,
-    "failDamage": "4d6"
+    "failDamage": "4d6",
+    "passenger": true
    }
   },
   "classes": [
@@ -8504,7 +8594,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Disguise Self",
+    "tags": [
+     "disguised"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -9864,7 +9968,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "kindles": {
+    "feet": 30,
+    "snuffs": true
+   }
   },
   "classes": [
    "druid"
@@ -10081,7 +10189,10 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "kindles": {
+    "feet": 30
+   }
   },
   "walls": {
    "door": "close"
@@ -10822,6 +10933,9 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "targets": {
+    "count": 1
+   },
    "healing": null,
    "grant": {
     "modifiers": [],
@@ -10830,13 +10944,16 @@
     "concentration": false,
     "name": "Etherealness",
     "tags": [
-     "off-plane"
+     "ethereal",
+     "ethereal-shunt"
     ],
-    "target": "self",
+    "target": "self-and-targets",
     "duration": {
      "type": "manual"
     }
-   }
+   },
+   "willingTargets": true,
+   "companionFeet": 10
   },
   "classes": [
    "bard",
@@ -12784,7 +12901,22 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "summons": {
+    "creatures": [
+     {
+      "monsterId": "floating-disk",
+      "count": 1
+     }
+    ],
+    "rangeFeet": 30,
+    "turn": "none",
+    "leashFeet": 100,
+    "follows": 20,
+    "allegiance": "user",
+    "noAttacks": true,
+    "intangible": true
+   }
   },
   "classes": [
    "wizard"
@@ -20338,7 +20470,40 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [
+     {
+      "type": "roll-mode",
+      "roll": "check",
+      "mode": "disadvantage",
+      "when": [
+       {
+        "type": "on-ability-check"
+       },
+       {
+        "type": "skill-is",
+        "skills": [
+         "perception"
+        ]
+       }
+      ]
+     }
+    ],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Meld into Stone",
+    "tags": [
+     "off-plane",
+     "meld-into-stone"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "minutes",
+     "minutes": 480
+    }
+   }
   },
   "classes": [
    "cleric",
@@ -22587,7 +22752,11 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "kindles": {
+    "feet": 10,
+    "snuffs": true
+   }
   },
   "classes": [
    "bard",
@@ -24624,7 +24793,28 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "targets": {
+    "count": 8
+   },
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Inside the Rope Trick",
+    "tags": [
+     "off-plane",
+     "rope-trick"
+    ],
+    "target": "targets",
+    "duration": {
+     "type": "minutes",
+     "minutes": 60
+    }
+   },
+   "targetMaxSize": "medium",
+   "willingTargets": true
   },
   "classes": [
    "wizard"
@@ -29195,7 +29385,27 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Tree Stride",
+    "tags": [
+     "tree-stride"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "rounds",
+     "rounds": 10
+    },
+    "teleportEachTurn": {
+     "feet": 500,
+     "unseen": true,
+     "costFeet": 10
+    }
+   }
   },
   "classes": [
    "druid",
@@ -29260,7 +29470,8 @@
     "gear": "merged",
     "temporaryHitPoints": "each-form"
    },
-   "unwillingOnly": true
+   "unwillingOnly": true,
+   "permanentAfterFull": true
   },
   "classes": [
    "bard",

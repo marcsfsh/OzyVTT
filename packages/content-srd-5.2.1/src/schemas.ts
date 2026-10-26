@@ -166,6 +166,9 @@ export const SpellLaterActionSchema = z
     area: ActionAreaSchema.optional(),
     /** It moves the cast's `grant` from a creature at 0 Hit Points to its own target (Hunter's Mark, Hex). */
     movesGrant: z.literal(true).optional(),
+    /** It shows what the spell's sense finds in detail (Detect Magic: "take the Magic action to see a faint aura around
+     *  any visible creature ... that bears the magic, and ... learn the spell's school of magic"). */
+    reveals: z.literal(true).optional(),
     /** It is taken only on the caster's turns after the one it cast the spell on ("As a Bonus Action on your later
      *  turns": Spiritual Weapon, Heat Metal). */
     laterTurnsOnly: z.literal(true).optional(),
@@ -428,6 +431,17 @@ export const SpellEffectSchema = z
     /** Its target is the caster or a willing creature, which the server takes to be one on the caster's side (Light:
      *  "an object that isn't being worn or carried by someone else"; Nondetection: "a willing creature"). */
     willingTargets: z.literal(true).optional(),
+    /** Held with Concentration for its full duration, what it made lasts until dispelled (True Polymorph). */
+    permanentAfterFull: z.literal(true).optional(),
+    /** It lights (with `snuffs`, or puts out) one nonmagical flame within `feet`: a light set on the map, or the light a
+     *  creature it targets carries (Druidcraft's and Prestidigitation's Fire Play, Elementalism's Beckon Fire). */
+    kindles: z
+      .object({ feet: z.number().int().min(5).max(120), snuffs: z.literal(true).optional() })
+      .strict()
+      .optional(),
+    /** A spell of Self range whose other targets stand within this many feet of the caster as it casts (Etherealness from
+     *  a higher slot: "The creatures must be within 10 feet of you"). */
+    companionFeet: z.number().int().min(5).max(60).optional(),
     /** Feet its area's size grows for each slot level above the spell's (Fog Cloud's radius: 20; Confusion's: 5). */
     areaPerSlot: z.number().int().min(5).max(100).optional()
   })
@@ -755,6 +769,11 @@ export const ItemSpellCastSchema = z
       .describe(
         "A flat printed attack bonus for the cast's spell attacks (Circlet of Blasting's +5). It overrides any derivation"
       ),
+    /** The teleport its cast gives in place of the spell's own, with what the item adds (a Cape of the Mountebank's
+     *  Dimension Door leaves smoke in the space it left). */
+    teleport: ActionTeleportSchema.optional().describe(
+      "The teleport the item's cast gives in place of the spell's own, with what the item adds (a Cape of the Mountebank's smoke)"
+    ),
     /** It is cast as this, whatever the spell's casting time says (a Necklace of Prayer Beads' bead: a Bonus Action). */
     activation: z
       .enum(["action", "bonus-action"])
@@ -813,6 +832,12 @@ export const ItemSpellCastSchema = z
       .describe(
         "It can be cast only while its user has an effect with this tag (a Dragon Orb's spells, for the one who controls it)"
       ),
+    /** What it leaves on its user ends when the item is taken off or put away (a Hat of Disguise: "The spell ends if
+     *  the hat is removed"). */
+    endsWithItem: z
+      .literal(true)
+      .optional()
+      .describe("What it leaves on its user ends when the item is taken off or put away"),
     /** What it leaves lasts this many minutes, whatever the spell's own duration (Oil of Slipperiness' Grease: 8
      *  hours). */
     lastsMinutes: z

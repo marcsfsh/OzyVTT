@@ -12,6 +12,7 @@ import {
   type Segment
 } from "./geometry.js";
 import { carriedLightsOf, NO_SENSES, sensesOf, type Senses, type SightContent } from "./senses.js";
+import { needsEtherealSight, seesIntoEthereal } from "../ethereal.js";
 
 /**
  * Who sees what on a scene with dynamic vision on (ADR-0023), decided on the server from the SRD 5.2.1 Rules Glossary
@@ -327,7 +328,7 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
     });
   };
   for (const light of vision.lights) {
-    if (!sourceLive(state, light.source)) continue;
+    if (!sourceLive(state, light.source) || light.out === true) continue;
     const annotation =
       light.annotationId === undefined ? undefined : annotations.find((entry) => entry.id === light.annotationId);
     const at =
@@ -454,7 +455,19 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
     const target = actors.get(targetId);
     const token = tokens.get(targetId);
     let result = false;
-    if (viewer && target && token) {
+    const viewerActor = actors.get(viewerId);
+    if (viewer && target && token && viewerActor && needsEtherealSight(viewerActor, target)) {
+      // On the Border Ethereal: seen only by a sense that sees into that plane, with nothing between.
+      result =
+        !viewer.blinded &&
+        samplesOf(token).some((point) => {
+          const feet = distance(viewer.at, point) / pixelsPerFoot;
+          return (
+            (clearLine(viewer.at, point, walls) || within(feet, viewer.senses.xray)) &&
+            seesIntoEthereal(viewer.senses, feet)
+          );
+        });
+    } else if (viewer && target && token) {
       const invisible = has(target, "invisible") && !outlined(target);
       for (const point of samplesOf(token)) {
         const feet = distance(viewer.at, point) / pixelsPerFoot;

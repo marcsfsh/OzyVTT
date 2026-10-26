@@ -10,7 +10,7 @@ import type {
 } from "@vtt/domain";
 import { command } from "../lib/command";
 import { newId } from "../lib/ids";
-import { resolveAtWall } from "../encounter/targeting";
+import { resolveAtLight, resolveAtWall } from "../encounter/targeting";
 import type { MoveMode } from "./movePreview";
 import type { Point } from "./useMapView";
 import type { AreaKindId } from "./mapTools";
@@ -414,6 +414,11 @@ export function useMapCommands({
       setMessage(result.ok ? (result.text ?? "") : (result.message ?? "That could not be done to the door."));
     });
   };
+  /** The spell being aimed lights or puts out a flame set on the map (`resolveAtLight`). */
+  const aimAtLight = (lightId: string) =>
+    resolveAtLight(lightId, revision, (ok, text) =>
+      setMessage(text ?? (ok ? "" : "That could not be aimed at the light."))
+    );
   /** The attack or spell being aimed lands on a door or a wall (`resolveAtWall`); the server says how it went. */
   const aimAtWall = (wallId: string) =>
     resolveAtWall(wallId, revision, (ok, text) =>
@@ -495,6 +500,7 @@ export function useMapCommands({
     setDoorOpen,
     workDoor,
     aimAtWall,
+    aimAtLight,
     saveDoor,
     addLight,
     removeLight,

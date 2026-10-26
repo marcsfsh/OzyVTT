@@ -698,7 +698,13 @@ const PROTECTIVE_MAGIC: Pick<ActorAction, "reaction"> = {
  *  Mind: "the target acts as an ally to the aboleth and is under its control"): the `commanded` tag the server's
  *  summons settle reads. Keyed like `ACTION_ENRICHMENTS`. */
 const COMMANDING_SAVES: Readonly<Record<string, { name: string; tags: string[]; modifiers: [] }>> = {
-  "aboleth/dominate-mind": { name: "Dominated by the Aboleth", tags: ["commanded"], modifiers: [] }
+  // "Under its control while within 60 feet of it ... until the aboleth dies or is on a different plane of existence
+  // from the target" (`summons.ts`, `off-plane.ts`).
+  "aboleth/dominate-mind": {
+    name: "Dominated by the Aboleth",
+    tags: ["commanded", "commanded-within-60", "ends-across-planes"],
+    modifiers: []
+  }
 };
 
 const ACTION_ENRICHMENTS: Record<
@@ -764,11 +770,12 @@ const ACTION_ENRICHMENTS: Record<
   // "The balor teleports itself or a willing demon within 10 feet of itself up to 60 feet to an unoccupied space the
   // balor can see."
   "balor/teleport": { teleport: { feet: 60, orAnother: true }, targets: { count: 1, rangeFeet: 10, typeTag: "demon" } },
-  // "The spider teleports from the Material Plane to the Ethereal Plane or vice versa."
+  // "The spider teleports from the Material Plane to the Ethereal Plane or vice versa": its token stays on the map, on
+  // the Border Ethereal over it (`ethereal.ts`).
   "phase-spider/ethereal-jaunt": {
     grants: {
       name: "Ethereal",
-      tags: ["off-plane"],
+      tags: ["ethereal"],
       target: "self",
       toggles: true,
       duration: { type: "manual" },
@@ -781,11 +788,11 @@ const ACTION_ENRICHMENTS: Record<
   // "The nightmare and up to three willing creatures within 5 feet of it teleport to the Ethereal Plane from the
   // Material Plane or vice versa."
   "nightmare/ethereal-stride": {
-    targets: { count: 4, rangeFeet: 5 },
+    targets: { count: 3, rangeFeet: 5, who: "allies" },
     grants: {
       name: "Ethereal",
-      tags: ["off-plane"],
-      target: "targets",
+      tags: ["ethereal"],
+      target: "self-and-targets",
       toggles: true,
       duration: { type: "manual" },
       modifiers: [],

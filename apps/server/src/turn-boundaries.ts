@@ -36,6 +36,7 @@ import { selfRestorationAtTurnEnd } from "./self-restoration.js";
 import { stealthAttackAtTurnEnd } from "./supreme-sneak.js";
 import { setDownCarried } from "./movement-rules.js";
 import { offerNearbyReactions } from "./triggered-reactions.js";
+import { teleportsEachTurn } from "./granted-moves.js";
 
 type Actor = GameState["actors"][number];
 type Effect = Actor["effects"][number];
@@ -203,6 +204,8 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
       })
     );
   heroicWarrior(state, actorId, events, deps);
+  // "You can use this transportation ability only once on each of your turns" (Tree Stride).
+  if (deps.newId) teleportsEachTurn(state, actorId, deps.newId());
   // A Defender's bonus moved to AC holds "until the start of your next turn".
   if (deps.catalog) events.push(...formsLapseAtTurnStart(state, actorId, deps.catalog, deps.resolveDefinition));
   // "At the start of each of its turns, the Restrained target repeats the save" (Conjure Elemental).

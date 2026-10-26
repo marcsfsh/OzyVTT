@@ -13,7 +13,10 @@ import {
   markPolygons,
   type ExploredGrid
 } from "./explored.js";
-import type { SightContent } from "./senses.js";
+import { sensesOf, type SightContent } from "./senses.js";
+import { isEthereal, needsEtherealSight, seesIntoEthereal } from "../ethereal.js";
+import { distance } from "./geometry.js";
+import { spellWardOf } from "../resolution/spell-wards.js";
 import { derivedUuid } from "./cast-sight.js";
 import { sceneSight, sightIsCached, wallPieces } from "./sight.js";
 
@@ -104,6 +107,61 @@ function stagedUnseen(state: GameState): Set<string> {
   return staged;
 }
 
+/** With dynamic vision off, the creatures on the Border Ethereal that none of `viewerIds` sees into that plane to
+ *  perceive: Truesight or See Invisibility by the distance between the tokens, or a viewer there itself. Dynamic vision
+ *  answers the same question from the map. */
+function etherealUnseen(state: GameState, viewerIds: readonly string[], content: SightContent): string[] {
+  const ethereal = state.actors.filter((actor) => isEthereal(actor));
+  if (ethereal.length === 0) return [];
+  const pixelsPerFoot = state.combat.vision?.measure?.pixelsPerFoot;
+  const at = (actorId: string) => state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null;
+  const viewers = viewerIds.flatMap((viewerId) => {
+    const viewer = state.actors.find((actor) => actor.id === viewerId);
+    return viewer ? [viewer] : [];
+  });
+  return ethereal
+    .filter((target) => {
+      const where = at(target.id);
+      return !viewers.some((viewer) => {
+        if (viewer.id === target.id || !needsEtherealSight(viewer, target)) return true;
+        const from = at(viewer.id);
+        const feet = pixelsPerFoot && from && where ? distance(from, where) / pixelsPerFoot : null;
+        return seesIntoEthereal(sensesOf(state, viewer, content), feet);
+      });
+    })
+    .map((actor) => actor.id);
+}
+
+/** The creatures seen only through a divination's sensor (Arcane Eye, Clairvoyance) that a ward keeps from it
+ *  (Nondetection: "can't be perceived through magical scrying sensors"). */
+function wardedFromSensors(
+  state: GameState,
+  viewerIds: readonly string[],
+  perceivedBy: (viewerIds: readonly string[]) => ReadonlySet<string>,
+  content: SightContent
+): string[] {
+  const sensors = viewerIds.flatMap((viewerId) => {
+    const sensor = state.actors.find((actor) => actor.id === viewerId);
+    const spell = sensor?.summon?.spell ? content.catalog?.spellRecord?.(sensor.summon.spell.id) : undefined;
+    return sensor && spell?.school === "divination" ? [{ sensor, spell }] : [];
+  });
+  if (sensors.length === 0) return [];
+  const eyes = new Set(viewerIds.filter((viewerId) => !sensors.some(({ sensor }) => sensor.id === viewerId)));
+  const byEyes = perceivedBy([...eyes]);
+  const wardContent = { resolveDefinition: content.definition, catalog: content.catalog };
+  return state.actors
+    .filter(
+      (actor) =>
+        !byEyes.has(actor.id) &&
+        sensors.every(
+          ({ sensor, spell }) =>
+            !perceivedBy([sensor.id]).has(actor.id) ||
+            spellWardOf(state, actor, spell, sensor.summon!.by, wardContent) !== null
+        )
+    )
+    .map((actor) => actor.id);
+}
+
 const placed = (state: GameState, actorId: string) =>
   state.combat.tokens.some((token) => token.actorId === actorId && token.position !== null);
 const inPlay = (actor: Actor) => actor.visibility === "public" && !actor.archived;
@@ -184,9 +242,12 @@ export function audienceSight(
     const unknown = (actorId: string) => kinds.get(actorId) !== "player-character" && !known.has(actorId);
     for (const actorId of fogged) if (unknown(actorId)) hidden.add(actorId);
     for (const actorId of unplacedUnderFog(state.combat)) if (unknown(actorId)) hidden.add(actorId);
+    if (!sight.enabled)
+      for (const actorId of etherealUnseen(state, viewerIds, content)) if (unknown(actorId)) hidden.add(actorId);
     for (const actorId of known) hidden.delete(actorId);
     if (!sight.enabled) return hidden.size === 0 && fogged.size === 0 ? OFF : { ...OFF, hidden, fogged, viewerIds };
     const perceived = new Set([...sight.perceivedBy(viewerIds), ...known]);
+    for (const actorId of wardedFromSensors(state, viewerIds, sight.perceivedBy, content)) perceived.delete(actorId);
     const combatants = new Set([
       ...state.combat.initiative.map((entry) => entry.actorId),
       ...state.combat.tokens.map((token) => token.actorId)

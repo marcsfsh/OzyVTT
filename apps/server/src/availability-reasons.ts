@@ -277,6 +277,7 @@ const structured = (action: DefinitionAction): boolean =>
   action.spellSlot !== undefined ||
   action.legendary !== undefined ||
   action.endsConditions !== undefined ||
+  action.douses !== undefined ||
   action.replacesAttack === true;
 
 /**

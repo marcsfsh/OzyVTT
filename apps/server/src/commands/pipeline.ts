@@ -230,7 +230,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
               commandId: id
             })
           : [];
-      const planes = sameMap ? settlePlanes(draft, geometry) : [];
+      const planes = sameMap ? settlePlanes(draft, geometry, deps) : [];
       events = [...held, ...pursued, ...compelledMoves(draft, deps), ...planes, ...settleFallsIn(draft, deps)];
     });
     if (result.duplicate) return;
@@ -273,6 +273,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
       (draft) => {
         events = settleSummons(draft, {
           distanceFeet: leash(draft),
+          geometry: draft.combat.mapAssetId === before.combat.mapAssetId ? geometry : null,
           resolveDefinition: (definitionId) => kit.resolveDefinitionIn(draft, definitionId),
           catalog: kit.equipmentCatalog()
         });
@@ -411,6 +412,8 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
       await settleSummoned();
       await settleWardingBonds();
       await settleFalls();
+      // A creature that left the plane ends what it commanded across it (an aboleth's Dominate Mind).
+      await settleSummoned();
     }
     return reply;
   }

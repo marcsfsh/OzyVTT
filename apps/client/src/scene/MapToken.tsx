@@ -49,14 +49,16 @@ export function MapToken({
   // The aura paints under the token so the body and active-turn ring stay crisp.
   const auraFraction = healthStyle === "aura" ? healthFraction : undefined;
   const altitude = encounterToken.altitudeFeet ?? 0;
+  // On the Border Ethereal (Etherealness, Blink): drawn faint for whoever may see it there.
+  const ethereal = actor.effects.some((effect) => effect.tags.includes("ethereal"));
   return (
     <g
       data-token-id={actor.id}
       transform={`translate(${encounterToken.position.x} ${encounterToken.position.y})`}
-      className={`encounter-token ${actor.kind}${movable ? " movable" : " locked"}${actor.visibility === "gm-only" ? " hidden" : ""}${active ? " active" : ""}${dragging ? " dragging" : ""}${targetable ? " targetable" : ""}${targeted ? " targeted" : ""}`}
+      className={`encounter-token ${actor.kind}${movable ? " movable" : " locked"}${actor.visibility === "gm-only" ? " hidden" : ""}${active ? " active" : ""}${dragging ? " dragging" : ""}${targetable ? " targetable" : ""}${targeted ? " targeted" : ""}${ethereal ? " ethereal" : ""}`}
       role={movable ? "button" : "img"}
       tabIndex={movable ? 0 : undefined}
-      aria-label={`${actor.name}${altitude > 0 ? `, ${altitude} feet up` : ""}${active ? ", active turn" : ""}${targetable ? (targeted ? ", targeted" : ", can be targeted") : ""}${movable ? ". Drag to move; arrow keys move one step; Delete returns it to the tray." : ", view only."}`}
+      aria-label={`${actor.name}${ethereal ? ", on the Border Ethereal" : ""}${altitude > 0 ? `, ${altitude} feet up` : ""}${active ? ", active turn" : ""}${targetable ? (targeted ? ", targeted" : ", can be targeted") : ""}${movable ? ". Drag to move; arrow keys move one step; Delete returns it to the tray." : ", view only."}`}
       aria-keyshortcuts={movable ? "ArrowUp ArrowDown ArrowLeft ArrowRight Delete" : undefined}
       onKeyDown={movable ? onKeyDown : undefined}
     >

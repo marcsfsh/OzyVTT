@@ -277,6 +277,10 @@
   stroke-dasharray: 6 4;
   opacity: 0.72;
 }
+/* On the Border Ethereal: a ghostly, see-through token. */
+.encounter-token.ethereal {
+  opacity: 0.5;
+}
 /* Active turn: magenta ring and glow that pulses once. The ring only renders while active, so the
    one-shot animation runs on each turn change. `transform-box: fill-box` is required, or the SVG
    default (view box) would scale it about the centre of the whole map. */
@@ -821,6 +825,11 @@
   stroke: var(--void);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
+}
+/* A flame set on the map and snuffed out: a hollow glyph until it is lit again. */
+.vision-light.out .vision-light-glyph {
+  fill: var(--void);
+  stroke: var(--violet-hi);
 }
 /* The GM's painted areas of light and obscurement, and the one being dragged: violet, shaded darker the less light
    or sight they leave. */

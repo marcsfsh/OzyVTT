@@ -426,6 +426,108 @@
   "source": {
    "name": "SRD 5.2.1",
    "version": "5.2.1",
+   "externalId": "clairvoyance-sensor"
+  },
+  "name": "Clairvoyance Sensor",
+  "summary": "Tiny force - CR none",
+  "size": "tiny",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "acid",
+   "bludgeoning",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "piercing",
+   "poison",
+   "psychic",
+   "radiant",
+   "slashing",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "traitMechanics": [
+   {
+    "kind": "invisible",
+    "name": "Invisible"
+   }
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": null,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing, poison, psychic, radiant, slashing, thunder",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Invisible",
+      "description": "An Invisible, intangible and invulnerable sensor that stays where it was made. Its caster sees through it as if in its space. A creature that sees the Invisible sees a luminous orb the size of a fist."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
    "externalId": "draconic-spirit"
   },
   "name": "Draconic Spirit",
@@ -665,6 +767,102 @@
      {
       "name": "Spell Force",
       "description": "A spirit from the Feywild that looks like a Fey creature. Its caster's attacks with the spell reach a creature within 5 feet of it, and a Bonus Action teleports it up to 30 feet before each later attack."
+     }
+    ]
+   }
+  }
+ },
+ {
+  "schemaId": "vtt.actor-monster",
+  "schemaVersion": 1,
+  "source": {
+   "name": "SRD 5.2.1",
+   "version": "5.2.1",
+   "externalId": "floating-disk"
+  },
+  "name": "Floating Disk",
+  "summary": "Medium force - CR none",
+  "size": "small",
+  "abilityScores": {
+   "str": 1,
+   "dex": 10,
+   "con": 10,
+   "int": 1,
+   "wis": 10,
+   "cha": 1
+  },
+  "proficiencyBonus": 2,
+  "armorClass": 10,
+  "hitPoints": {
+   "maximum": 1
+  },
+  "initiativeBonus": 0,
+  "speedFeet": 0,
+  "actions": [],
+  "token": {
+   "disposition": "neutral",
+   "footprint": {
+    "width": 1,
+    "height": 1
+   }
+  },
+  "damageImmunities": [
+   "acid",
+   "bludgeoning",
+   "cold",
+   "fire",
+   "force",
+   "lightning",
+   "necrotic",
+   "piercing",
+   "poison",
+   "psychic",
+   "radiant",
+   "slashing",
+   "thunder"
+  ],
+  "conditionImmunities": [
+   "blinded",
+   "charmed",
+   "deafened",
+   "exhaustion",
+   "frightened",
+   "grappled",
+   "incapacitated",
+   "paralyzed",
+   "petrified",
+   "poisoned",
+   "prone",
+   "restrained",
+   "stunned",
+   "unconscious"
+  ],
+  "extensions": {
+   "open5e.srd-2024": {
+    "skills": {},
+    "type": "",
+    "alignment": "unaligned",
+    "speeds": {
+     "walk": 0,
+     "swim": null,
+     "fly": null,
+     "climb": null,
+     "burrow": null,
+     "hover": false
+    },
+    "senses": [],
+    "passivePerception": 10,
+    "languages": "None",
+    "damageVulnerabilities": null,
+    "damageResistances": null,
+    "damageImmunities": "acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing, poison, psychic, radiant, slashing, thunder",
+    "conditionImmunities": "blinded, charmed, deafened, exhaustion, frightened, grappled, incapacitated, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious",
+    "nonmagicalAttackImmunity": false,
+    "nonmagicalAttackResistance": false,
+    "traits": [
+     {
+      "name": "Spell Force",
+      "description": "A disk of force 3 feet across floating 3 feet off the ground. It holds up to 500 pounds, stays put while its caster is within 20 feet, and follows to stay within 20 feet; more than 100 feet from it, the spell ends."
      }
     ]
    }

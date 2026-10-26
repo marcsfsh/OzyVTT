@@ -623,6 +623,7 @@ function playerEffect(
     // character's grant reaches a player through `actor:movement`.
     grantedMove: _grantedMove,
     grantedTeleport: _grantedTeleport,
+    teleportEachTurn: _teleportEachTurn,
     // Whether a Concentration spell ends once no creature keeps it is the engine's bookkeeping.
     endsWhenUnaffected: _endsWhenUnaffected,
     // A long casting's targets and slot are the caster's plan; its name says what is being cast.

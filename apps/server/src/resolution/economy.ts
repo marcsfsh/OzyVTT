@@ -919,6 +919,12 @@ function checkLimitedUse({ state, attacker, action, siblings, violations }: Eval
   if (!action.uses) return null;
   // SRD Rage: a raging Barbarian extends it with a Bonus Action, which spends no new use.
   if (action.grants?.tags.includes(RAGING_TAG) && hasEffectTag(attacker, RAGING_TAG)) return null;
+  // Taken again to end what it gave (Plate Armor of Etherealness: "repeat the command word"), it spends no new use.
+  if (
+    action.grants?.toggles &&
+    attacker.effects.some((effect) => effect.sourceActionId === action.id && effect.sourceActorId === attacker.id)
+  )
+    return null;
   const uses = action.uses;
   const key = uses.pool ?? action.id;
   // A cast in the plan its pool's own action opened (the second Fireball of a pit fiend's Hellfire Spellcasting) shares

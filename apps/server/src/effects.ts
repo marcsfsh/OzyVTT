@@ -103,6 +103,8 @@ export const ESCAPE_ATHLETICS_TAG = "escape-athletics";
 /** Checks to escape this effect have Disadvantage (a mimic's Pseudopod: "Ability checks made to escape this grapple
  *  have Disadvantage"). */
 export const ESCAPE_DISADVANTAGE_TAG = "escape-disadvantage";
+/** On a caster's Concentration: held for the spell's full duration, what the cast made lasts until dispelled. */
+export const LASTS_IF_HELD_TAG = "lasts-if-held";
 /** The bearer can't teleport while it lasts (a tarrasque's Bite: "Until the grapple ends, the target ... can't
  *  teleport"). */
 export const NO_TELEPORT_TAG = "no-teleport";
@@ -699,11 +701,24 @@ function endEffectInternal(
   // Wind Walk's cloud "descends 60 feet per round for 1 minute until it lands", and falls the rest.
   if (effect.tags.includes(DESCENDS_SAFELY_TAG)) descendSafely(state, actor.id);
   else if (effect.form?.descendsSafely) descendSafely(state, actor.id, 600);
-  // The caster's "Concentrating on X" ending ends everything that cast made, on every creature, and the area it left.
+  // The caster's "Concentrating on X" ending ends everything that cast made, on every creature, and the area it left;
+  // held for its full duration, a spell that then lasts until dispelled keeps what it made (True Polymorph).
   if (effect.tags.includes(CONCENTRATING_TAG) && effect.castId !== undefined) {
+    const heldFull =
+      effect.tags.includes(LASTS_IF_HELD_TAG) &&
+      (effect.duration.type === "rounds" || effect.duration.type === "minutes") &&
+      effect.duration.remaining <= 0;
     for (const bearer of state.actors) {
       for (const sustained of [...bearer.effects]) {
-        if (sustained.castId === effect.castId) endEffectInternal(state, bearer, sustained.id, events, sweeping);
+        if (sustained.castId !== effect.castId) continue;
+        if (heldFull) {
+          bearer.effects = bearer.effects.map((kept) => (kept.id === sustained.id ? untilDispelled(kept) : kept));
+          events.push({
+            kind: "effect",
+            text: `${sustained.name} on ${bearer.name} now lasts until dispelled.`,
+            actorId: bearer.id
+          });
+        } else endEffectInternal(state, bearer, sustained.id, events, sweeping);
       }
     }
     endZonesOfCast(state, effect.castId);
@@ -1002,7 +1017,19 @@ export function ageEffects(
       if (countDown) regrowHolder(actor, current, minutes);
       const left = remainingAfter(current.duration, minutes);
       if (left === null) continue;
-      if (left <= 0) {
+      if (left <= 0 && current.castId !== undefined && heldToTheEnd(state, current.castId, minutes)) {
+        // True Polymorph held its full hour: what it made stays, until dispelled.
+        actor.effects = actor.effects.map((candidate) =>
+          candidate.id === current.id ? untilDispelled(candidate) : candidate
+        );
+        if (!current.tags.includes(CONCENTRATING_TAG))
+          events.push({
+            kind: "effect",
+            text: `${current.name} on ${actor.name} now lasts until dispelled.`,
+            actorId: actor.id
+          });
+        else endEffectInternal(state, actor, current.id, events, true);
+      } else if (left <= 0) {
         if (current.tags.includes(STABLE_RECOVERY_TAG)) events.push(...stableRecovers(actor));
         endEffectInternal(state, actor, current.id, events, true);
       } else if (countDown)
@@ -1014,6 +1041,25 @@ export function ageEffects(
     }
   }
   return events;
+}
+
+/** Whether a cast's Concentration that keeps its effects past their time (`LASTS_IF_HELD_TAG`) runs its full duration
+ *  within these minutes. */
+function heldToTheEnd(state: GameState, castId: string, minutes: number): boolean {
+  return state.actors.some((actor) =>
+    actor.effects.some((effect) => {
+      if (effect.castId !== castId || !effect.tags.includes(LASTS_IF_HELD_TAG)) return false;
+      const left = remainingAfter(effect.duration, minutes);
+      return left !== null && left <= 0;
+    })
+  );
+}
+
+/** An effect a cast made, kept with no Concentration and no end of its own. */
+function untilDispelled(effect: EffectInstance): EffectInstance {
+  if (effect.tags.includes(CONCENTRATING_TAG)) return { ...effect, duration: { type: "minutes", remaining: 0 } };
+  const { castId: _cast, ...rest } = effect;
+  return { ...rest, concentration: false, duration: { type: "manual" } };
 }
 
 /** An object holding the bearer that regrows as time passes (a Rope of Entanglement: "It regains 1 Hit Point every 5

@@ -98,7 +98,7 @@ export function grantMove(
 export function grantTeleport(
   state: GameState,
   actor: Actor,
-  input: Readonly<{ id: string; name: string; teleport: ActionTeleport }>
+  input: Readonly<{ id: string; name: string; teleport: ActionTeleport; passengerId?: string }>
 ): void {
   actor.effects = [
     ...actor.effects.filter((effect) => effect.grantedTeleport === undefined),
@@ -113,10 +113,23 @@ export function grantTeleport(
         turnActorId: state.combat.turnActorId,
         ...(input.teleport.unseen ? { unseen: true as const } : {}),
         ...(input.teleport.failDamage ? { failDamage: input.teleport.failDamage } : {}),
-        ...(input.teleport.landing ? { landing: structuredClone(input.teleport.landing) } : {})
+        ...(input.teleport.landing ? { landing: structuredClone(input.teleport.landing) } : {}),
+        ...(input.passengerId ? { passengerId: input.passengerId } : {}),
+        ...(input.teleport.smoke ? { smoke: true as const } : {}),
+        ...(input.teleport.costFeet !== undefined ? { costFeet: input.teleport.costFeet } : {})
       }
     })
   ];
+}
+
+/** A teleport an effect lets its bearer take once on each of its turns (Tree Stride), granted for the turn now running
+ *  when it is the bearer's. */
+export function teleportsEachTurn(state: GameState, actorId: string, id: string): void {
+  if (state.combat.turnActorId !== actorId) return;
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  const effect = actor?.effects.find((candidate) => candidate.teleportEachTurn !== undefined);
+  if (!actor || !effect?.teleportEachTurn) return;
+  grantTeleport(state, actor, { id, name: effect.name, teleport: { ...effect.teleportEachTurn } });
 }
 
 /** The creature's granted move for this turn with feet left, if any. */

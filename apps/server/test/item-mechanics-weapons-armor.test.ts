@@ -462,8 +462,8 @@ describe("the authored riders are present in the shipped bundle", () => {
       mode: "advantage",
       when: [{ type: "on-ability-check" }, { type: "skill-is", skills: ["perception"] }]
     });
-    expect(shipped("plate-armor-of-etherealness").casts).toContainEqual(
-      expect.objectContaining({ spellId: "etherealness" })
+    expect(shipped("plate-armor-of-etherealness").actions).toContainEqual(
+      expect.objectContaining({ id: "etherealness", grants: expect.objectContaining({ toggles: true }) })
     );
     expect(shipped("armor-of-invulnerability").grants!.damageResistances).toEqual([
       "bludgeoning",

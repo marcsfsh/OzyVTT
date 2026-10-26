@@ -16,6 +16,7 @@ import {
   wallCrossing
 } from "@vtt/rules-5e";
 import { isIncapacitated } from "./condition-rules.js";
+import { onOtherPlanes } from "./ethereal.js";
 import { sizeAtMost } from "./resolution/context.js";
 import { areAllies } from "./creature-sides.js";
 import { opensItsSpace } from "./space-sharing.js";
@@ -163,7 +164,7 @@ export function movementCost(
   const rise = options.altitude ? options.altitude.toFeet - options.altitude.fromFeet : 0;
   if (!calibration) {
     // No cells to path round a wall on a gridless map: a straight move through one is barred.
-    if (!options.throughWalls && straightThroughWall(state, from, to))
+    if (!options.throughWalls && !options.throughWallsFree && straightThroughWall(state, from, to))
       return { feet: 0, difficultFeet: 0, path: [], blocked: true };
     const straight = mapDistance(geometry, from, to);
     return straight
@@ -190,6 +191,8 @@ export function movementCost(
     if (token.actorId === actorId || !token.position || options.carried?.includes(token.actorId)) continue;
     const occupant = state.actors.find((candidate) => candidate.id === token.actorId);
     if (!mover || !occupant || occupant.visibility === "gm-only") continue;
+    // The Border Ethereal and the world it overlaps pass through each other.
+    if (onOtherPlanes(mover, occupant)) continue;
     if (options.perceives && !options.perceives(occupant.id)) continue;
     const occupantLow = token.altitudeFeet ?? 0;
     if (!spansOverlap(lowFeet, highFeet, occupantLow, occupantLow + spaceHeightCells(token.sizeCells) * feetPerCell))

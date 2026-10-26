@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { GAME_PATHS } from "@vtt/api-contract";
 import { addActorFromDefinition } from "../src/actor-roster.js";
+import { makeEffect } from "../src/effects.js";
 import { cell } from "./movement-fixtures.js";
 import { catalog, view } from "./spell-casters.js";
 import { BANDIT, bootSummons, CASTER, summonTable } from "./summon-fixtures.js";
@@ -108,5 +110,42 @@ describe("Aboleth: Dominate Mind", () => {
     expect((await table.post(GAME_PATHS.claims, player, { actorId: CASTER })).status).toBe(200);
     const moved = await table.move(CASTER, player, { position: cell(3, 3) });
     expect(moved.status).toBe(403);
+  });
+
+  it("commands only within 60 feet, and ends when the aboleth leaves the plane", async () => {
+    const table = await withMonster("aboleth", ABOLETH);
+    // Its own Speed is 10 feet: the GM sets it in the corner.
+    await table.server.store.execute({ id: randomUUID(), type: "test.place" }, (draft) => {
+      draft.combat.tokens = draft.combat.tokens.map((token) =>
+        token.actorId === ABOLETH ? { ...token, position: { x: 100, y: 100 } } : token
+      );
+    });
+    await table.move(CASTER, table.gmToken, { position: cell(4, 4) });
+    await table.resolve({ actorId: ABOLETH, actionId: "dominate-mind", targetIds: [CASTER] });
+    const save = table.snapshot().combat.pendingSaves.find((pending) => pending.targetActorId === CASTER)!;
+    await table.post(GAME_PATHS.saveAnswer.replace("{saveId}", save.id), table.gmToken, {
+      saveId: save.id,
+      method: "manual",
+      total: 1,
+      commit: true
+    });
+    expect(table.actor(CASTER)!.control).toMatchObject({ by: ABOLETH });
+    // 65 feet off it acts for itself, and back at 55 feet it obeys again.
+    await table.move(CASTER, table.gmToken, { position: cell(19, 19) });
+    expect(table.actor(CASTER)!.control).toBeUndefined();
+    await table.move(CASTER, table.gmToken, { position: cell(12, 12) });
+    expect(table.actor(CASTER)!.control).toMatchObject({ by: ABOLETH });
+    // Banished, the aboleth is on another plane: the domination ends.
+    await table.server.store.execute({ id: randomUUID(), type: "test.banish" }, (draft) => {
+      draft.actors
+        .find((actor) => actor.id === ABOLETH)!
+        .effects.push(
+          makeEffect({ id: randomUUID(), name: "Banished", tags: ["off-plane"], duration: { type: "manual" } })
+        );
+    });
+    await table.move(BANDIT, table.gmToken, { position: cell(2, 2) });
+    const caster = table.actor(CASTER)!;
+    expect(caster.effects.some((effect) => effect.name === "Dominated by the Aboleth")).toBe(false);
+    expect(caster.control).toBeUndefined();
   });
 });
