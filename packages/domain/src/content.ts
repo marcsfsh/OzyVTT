@@ -930,6 +930,17 @@ export const TELEPORT_FAMILIARITY: ReadonlyArray<Readonly<{ id: string; name: st
   { id: "viewed-once", name: "Viewed once or described" },
   { id: "false-destination", name: "False destination" }
 ];
+/** Greater Restoration's harms, one of which its caster picks to end. */
+export const RESTORATION_PICKS: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
+  { id: "exhaustion", name: "An Exhaustion level" },
+  { id: "charmed", name: "Charmed" },
+  { id: "petrified", name: "Petrified" },
+  { id: "curse", name: "A curse" },
+  { id: "ability-score", name: "A lowered ability score" },
+  { id: "hit-point-maximum", name: "A lowered Hit Point maximum" },
+  // What another effect's own text says Greater Restoration ends (Befuddlement, Contact Other Plane's Incapacitated).
+  { id: "other", name: "Another effect it ends" }
+];
 /** Wish's uses, picked as it is cast: duplicating a spell, and the effects the spell lists. */
 export const WISH_USES: ReadonlyArray<Readonly<{ id: string; name: string }>> = [
   { id: "duplicate", name: "Duplicate a spell" },
@@ -944,6 +955,7 @@ export const WISH_USES: ReadonlyArray<Readonly<{ id: string; name: string }>> = 
 type ChoosingAction = Readonly<{
   teleportOutcome?: true;
   wishUses?: true;
+  restores?: true;
   identifiesItem?: true;
   grants?: Readonly<{
     options?: ReadonlyArray<Readonly<{ id: string; name: string }>>;
@@ -968,7 +980,9 @@ export function actionChoicesOf(action: ChoosingAction): ActionChoices | null {
       ? { options: TELEPORT_FAMILIARITY }
       : action.wishUses
         ? { options: WISH_USES }
-        : action.save?.failureEffect;
+        : action.restores
+          ? { options: RESTORATION_PICKS }
+          : action.save?.failureEffect;
   const granted = action.grants?.bindsWeapon;
   // An oil that remakes a row asks for a Melee weapon or a stack of ammunition.
   const binds: ActionChoices["bindsWeapon"] = granted

@@ -1,4 +1,4 @@
-import { TELEPORT_FAMILIARITY, WISH_USES } from "@vtt/domain";
+import { RESTORATION_PICKS, TELEPORT_FAMILIARITY, WISH_USES } from "@vtt/domain";
 import { checkWishUse } from "./wish.js";
 import { abilityModifier, isMeleeWeapon } from "@vtt/rules-5e";
 import {
@@ -53,7 +53,13 @@ export function checkChoices(
 ): void {
   const offered =
     optionsOf(action)?.options ??
-    (action.teleportOutcome ? TELEPORT_FAMILIARITY : action.wishUses ? WISH_USES : undefined);
+    (action.teleportOutcome
+      ? TELEPORT_FAMILIARITY
+      : action.wishUses
+        ? WISH_USES
+        : action.restores
+          ? RESTORATION_PICKS
+          : undefined);
   // End an Effect's pick is the way out it takes (`resolution/endings.ts`).
   const own = action.id === END_EFFECT_ACTION_ID ? [] : [input.optionId];
   const picks = [...own, ...Object.values(input.targetOptions ?? {})].filter(
@@ -71,7 +77,7 @@ export function checkChoices(
       throw new CommandRejectedError(`${attacker.name} isn't carrying that item.`);
     return;
   }
-  if (input.itemId != null && !binds && !action.rebindsRow)
+  if (input.itemId != null && !binds && !action.rebindsRow && !action.restores)
     throw new CommandRejectedError(`${action.name} isn't cast on a weapon.`);
   if (binds && input.itemId != null && action.grants!.target === "self")
     fittingRow(attacker, binds, input.itemId, catalog, action.name, definition);

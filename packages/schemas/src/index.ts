@@ -5478,6 +5478,15 @@ export const ActionSchema = z
     /** It ends every curse on its target, and breaks the target's Attunement to a cursed magic item, whose curse stays
      *  on the item (Remove Curse). */
     endsCurses: z.literal(true).optional(),
+    /** It ends one harm on its target that its user picks (`optionId`): an Exhaustion level, the Charmed or Petrified
+     *  condition, a curse (its Attunement to a cursed item included), the lowering of one ability score, or the
+     *  lowering of its Hit Point maximum (Greater Restoration). */
+    restores: z
+      .literal(true)
+      .optional()
+      .describe(
+        "It ends one harm its user picks on the target: an Exhaustion level, Charmed or Petrified, a curse, a lowered ability score or a lowered Hit Point maximum"
+      ),
     /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
      *  The resolve's targets assign them in order, a target named twice taking two. */
     darts: z.number().int().min(2).max(20).optional(),

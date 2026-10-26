@@ -400,6 +400,8 @@ export const SpellEffectSchema = z
     dispel: DispelSchema.optional(),
     /** The cast ends the curses on its target and its Attunement to cursed items (Remove Curse). */
     endsCurses: z.literal(true).optional(),
+    /** The cast ends one harm the caster picks on its target (Greater Restoration). */
+    restores: ActionSchema.shape.restores,
     /** The spell keeps something of its own besides what it leaves on creatures (Entangle's tangled ground, an
      *  earthquake's fissures), so its Concentration holds when no creature is affected any more. */
     persistsWithoutTargets: z.literal(true).optional(),

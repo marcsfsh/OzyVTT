@@ -204,6 +204,7 @@ function combatantsOf(
   // A touch that heals by the points spent or ends a condition (Lay on Hands) is spent on someone, and so is a swallow.
   const touchesSomeone =
     action.endsConditions !== undefined ||
+    action.restores === true ||
     action.healing?.perUse === true ||
     action.swallow?.conditions !== undefined ||
     action.pull !== undefined;
@@ -218,6 +219,7 @@ function combatantsOf(
     action.multiattack === undefined &&
     action.dispel === undefined &&
     action.endsCurses === undefined &&
+    action.restores === undefined &&
     !spendsALimitedUse &&
     !castsASpell &&
     !movesAnArea &&

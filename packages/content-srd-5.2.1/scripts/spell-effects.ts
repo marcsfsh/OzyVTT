@@ -3154,7 +3154,10 @@ const SAVE_FAILURE_EFFECTS: Readonly<Record<string, FailureEffect>> = {
     modifiers: []
   },
   // "Can't cast spells or take the Magic action", until a repeated save every 30 days or a spell ends it.
-  befuddlement: { name: "Befuddlement", tags: ["no-spells"], modifiers: [] },
+  // "The effect can also be ended by the Greater Restoration, Heal, or Wish spell."
+  befuddlement: { name: "Befuddlement", tags: ["no-spells", "restorable", "ended-by-heal"], modifiers: [] },
+  // "A Greater Restoration spell cast on you ends this effect."
+  "contact-other-plane": { name: "Contact Other Plane", tags: ["restorable"], modifiers: [] },
   // "Another 5d4 Acid damage at the end of its next turn" (the save carries the damage).
   "vitriolic-sphere": { name: "Vitriolic Sphere", tags: ["vitriolic-sphere"], duration: rounds(1), modifiers: [] },
   // "Has Disadvantage on ability checks and attack rolls for the duration", and the save at the end of each of its turns
@@ -3581,6 +3584,9 @@ const CAST_DISPELS: Readonly<Record<string, NonNullable<SpellEffect["dispel"]>>>
   "dispel-magic": { automaticLevel: 3 }
 };
 const CAST_ENDS_CURSES: ReadonlySet<string> = new Set(["remove-curse"]);
+/** Greater Restoration: the caster picks one harm the cast ends (an Exhaustion level, Charmed or Petrified, a curse, a
+ *  lowered ability score or Hit Point maximum). */
+const CAST_RESTORES: ReadonlySet<string> = new Set(["greater-restoration"]);
 
 /** Concentration spells that keep a part of their own besides what they leave on creatures, so they don't end when no
  *  creature is affected any more: Entangle's tangled ground, an earthquake's shaking ground and fissures, Reverse
@@ -3708,6 +3714,7 @@ export function spellEffectFor(
     ...(selfSave ? { selfSave: { ...selfSave } } : {}),
     ...(dispel ? { dispel: { ...dispel } } : {}),
     ...(CAST_ENDS_CURSES.has(id) ? { endsCurses: true as const } : {}),
+    ...(CAST_RESTORES.has(id) ? { restores: true as const } : {}),
     ...(PERSISTS_WITHOUT_TARGETS.has(id) ? { persistsWithoutTargets: true as const } : {}),
     ...(SEEN_TARGETS.has(id) ? { seenTargets: true as const } : {}),
     ...(TARGET_TYPES[id] ? { targetTypes: [...TARGET_TYPES[id]] } : {}),
@@ -3817,6 +3824,7 @@ export const SPELL_EFFECT_REVIEWED_IDS: readonly string[] = [
   ...Object.keys(CAST_DISPELS),
   ...Object.keys(CAST_SELF_SAVES),
   ...CAST_ENDS_CURSES,
+  ...CAST_RESTORES,
   ...PERSISTS_WITHOUT_TARGETS,
   ...SEEN_TARGETS,
   ...Object.keys(TARGET_TYPES),

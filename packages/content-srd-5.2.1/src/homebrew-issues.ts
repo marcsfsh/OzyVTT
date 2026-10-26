@@ -211,6 +211,7 @@ const LABELS: Readonly<Record<string, string>> = {
   dispel: "spells it ends",
   automaticLevel: "highest spell level it ends outright",
   endsCurses: "curses it ends",
+  restores: "harm it ends that its user picks",
   selfSave: "the caster's own saving throw",
   endsOnSourceSideDamage: "end on damage from the source's side",
   persistsWithoutTargets: "lasts with no creature under it",

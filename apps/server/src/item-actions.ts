@@ -382,6 +382,7 @@ export function spellCastMechanics(
       | "endsOneCondition"
       | "dispel"
       | "endsCurses"
+      | "restores"
       | "summons"
       | "shapeShift"
       | "effectOptions"
@@ -478,6 +479,8 @@ export function spellCastMechanics(
     // The spells it ends on its target (Dispel Magic), and the curses (Remove Curse).
     ...(effect.dispel ? { dispel: { ...effect.dispel } } : {}),
     ...(effect.endsCurses ? { endsCurses: true as const } : {}),
+    // The harm it ends that its caster picks (Greater Restoration).
+    ...(effect.restores ? { restores: true as const } : {}),
     // The creatures it brings, with the caster's numbers a spell-printed stat block reads (Summon Dragon's Rend).
     ...(effect.summons
       ? {

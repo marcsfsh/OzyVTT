@@ -70,6 +70,7 @@ import { releaseItemEffects } from "./resolution/endings.js";
 import { rebindRow } from "./resolution/rebind.js";
 import { slowedSpellFails } from "./resolution/slowed.js";
 import { applyConditionCures, applyHealing } from "./resolution/heal.js";
+import { applyRestoration, endNamedEffects } from "./resolution/restoration.js";
 import { mendOnCast } from "./resolution/mend.js";
 import { stabilizeOnCast } from "./resolution/stabilize.js";
 import { raiseOnAction, reviveOnCast } from "./resolution/revival.js";
@@ -469,6 +470,8 @@ export function resolveDefinitionAction(
   applyAreaHeal(ctx);
   prayerShortRest(ctx);
   applyConditionCures(ctx);
+  applyRestoration(ctx);
+  endNamedEffects(ctx);
   mendOnCast(ctx);
   applySpellEndings(ctx);
   stabilizeOnCast(ctx);

@@ -656,11 +656,14 @@ function immuneConditionsEnd(
 export function breakCursedAttunement(
   actor: Actor,
   definition: ActorDefinition | undefined,
-  deps: InventoryDeps
+  deps: InventoryDeps,
+  only?: Readonly<{ rowId?: string }>
 ): string[] {
-  const cursed = actor.inventory.filter(
+  const all = actor.inventory.filter(
     (row) => row.attuned === true && deps.catalog?.equipmentRecord(catalogIdOf(row))?.cursed === true
   );
+  // One curse (Greater Restoration): the row named, else the first.
+  const cursed = only ? all.filter((row) => row.id === (only.rowId ?? all[0]?.id)).slice(0, 1) : all;
   if (cursed.length === 0) return [];
   actor.inventory = actor.inventory.map((row) => (cursed.includes(row) ? { ...row, attuned: false } : row));
   reconcileEquipment(actor, definition, deps);
