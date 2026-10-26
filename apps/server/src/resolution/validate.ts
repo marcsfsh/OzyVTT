@@ -1,5 +1,7 @@
 import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import { onOtherPlanes, planeOf } from "../ethereal.js";
+import { underAntimagic } from "../antimagic.js";
+import { catalogIdOf } from "@vtt/schemas";
 import type { GameState } from "@vtt/domain";
 import { checkChoices } from "./grant-extras.js";
 import { effectiveActions } from "../effective-actions.js";
@@ -326,9 +328,22 @@ export function openResolve(
   checkStoredRelease(attacker, action.id, input.targetIds);
   // An option or a weapon the action doesn't offer is refused before anything rolls.
   checkChoices(action, input, attacker, deps.catalog, deps.definition);
-  const derived = deriveEquipment(attacker, deps.definition, deps.catalog);
+  // A target in an Antimagic Field: "Magical properties of magic items don't work ... on anything inside it", and a
+  // magic item's own action can't reach it (a spell's is kept off by the field's ward).
+  const antimagicTarget = targets.find(underAntimagic);
+  const derived = deriveEquipment(attacker, deps.definition, deps.catalog, {
+    suppressMagic: antimagicTarget !== undefined
+  });
   const siblings = effectiveActions(deps.definition, attacker, deps.catalog);
   const riderItemId = sourceItemOf(action, derived, attacker.inventory);
+  if (antimagicTarget && action.spellId === undefined && riderItemId) {
+    const row = attacker.inventory.find((item) => item.id === riderItemId);
+    const record = row ? deps.catalog?.equipmentRecord(catalogIdOf(row)) : undefined;
+    if (record?.isMagic && isItemActionId(action.id))
+      throw new CommandRejectedError(
+        `${hiddenFromInitiator(antimagicTarget.id) ? "That creature" : antimagicTarget.name} stands in an Antimagic Field, where ${record.name} can't reach it.`
+      );
+  }
   const derivation = withShotAmmunitionOnly(derived, attacker, riderItemId, deps.catalog);
   // Magic Missile: each dart at a creature of the caster's choice, the targets listed dart by dart.
   if (action.darts !== undefined && input.targetIds.length > action.darts)

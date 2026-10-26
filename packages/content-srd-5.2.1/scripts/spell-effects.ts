@@ -1169,6 +1169,35 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       }
     )
   ],
+  // "No one can cast spells, take Magic actions, or create other magical effects inside the aura, and those things can't
+  // target or otherwise affect anything inside it. Magical properties of magic items don't work inside the aura", "no
+  // one can teleport into or out of it", and "Ongoing spells ... are suppressed in the area" (`antimagic`). The field's
+  // ward on every school keeps spells, their areas and their lasting areas off the creatures inside.
+  "antimagic-field": [
+    lasting("field", "No spell, Magic action or magic item works in the aura, and nothing magical reaches into it.", {
+      on: [],
+      around: "caster",
+      feet: 10,
+      antimagic: true,
+      holds: {
+        modifiers: [
+          {
+            type: "spell-ward",
+            schools: [
+              "abjuration",
+              "conjuration",
+              "divination",
+              "enchantment",
+              "evocation",
+              "illusion",
+              "necromancy",
+              "transmutation"
+            ]
+          }
+        ]
+      }
+    })
+  ],
   // "You decide what sort of security the spell provides, choosing any of the following properties": the dark and foggy
   // edge sight can't pass, nothing teleporting in or out, and no Divination spell targeting the creatures inside. Sound
   // across the edge, sensors and planar travel are the GM's.

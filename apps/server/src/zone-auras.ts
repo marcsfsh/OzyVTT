@@ -1,6 +1,9 @@
 import type { GameState, SpellZone } from "@vtt/domain";
 import type { EffectInstance } from "@vtt/schemas";
-import { addEffect, endEffectIfPresent, KEEPS_MAXIMUM_TAG, makeEffect } from "./effects.js";
+import { addEffect, endEffectIfPresent, KEEPS_MAXIMUM_TAG, makeEffect, NO_SPELLS_TAG } from "./effects.js";
+import { ANTIMAGIC_TAG, suppressedByAntimagic, underAntimagic, WINKED_OUT_TAG } from "./antimagic.js";
+import { refreshArmorClass } from "./held-items.js";
+import { OFF_PLANE_TAG } from "./off-plane.js";
 import { suppressConditions } from "./suppressed-conditions.js";
 import { zoneContentOf } from "./spell-zone-state.js";
 import { endZoneAndItsSpell, exposed, insideTest, liveZones, typeOf, type ZoneDeps } from "./spell-zones.js";
@@ -112,7 +115,12 @@ function wanted(state: GameState, deps: Deps): Map<string, Map<string, EffectIns
         const effect = makeEffect({
           id,
           name: content.name,
-          tags: [ZONE_AURA_TAG, ...(holds.keepsMaximum ? [KEEPS_MAXIMUM_TAG] : [])],
+          tags: [
+            ZONE_AURA_TAG,
+            ...(holds.keepsMaximum ? [KEEPS_MAXIMUM_TAG] : []),
+            // No spell or Magic action inside an Antimagic Field, and its magic suppressed.
+            ...(content.trigger.antimagic ? [ANTIMAGIC_TAG, NO_SPELLS_TAG] : [])
+          ],
           sourceActorId: zone.casterId,
           sourceName: caster?.name ?? null,
           startedRound: state.combat.round,
@@ -176,6 +184,8 @@ type AuraChanges = Readonly<{
   /** Areas that end as their caster has left them, and bars that lift as their creature has left the area. */
   ending: readonly string[];
   lifting: ReadonlyArray<readonly [actorId: string, effectId: string]>;
+  /** Summoned creatures an Antimagic Field winks out now. */
+  winking: ReadonlyArray<readonly [actorId: string, effect: EffectInstance]>;
 }>;
 
 /** What settling the auras would change, without changing it. */
@@ -190,12 +200,85 @@ export function zoneAuraChanges(state: GameState, deps: Deps): AuraChanges {
     for (const [id, effect] of want)
       if (!actor.effects.some((candidate) => candidate.id === id)) entering.push([actor.id, effect]);
   }
-  return { leaving, entering, ending: casterLeft(state, deps), lifting: barsLifted(state, deps) };
+  const winks = winking(state, deps);
+  return {
+    leaving,
+    entering,
+    ending: casterLeft(state, deps),
+    lifting: [...barsLifted(state, deps), ...winks.back],
+    winking: winks.out
+  };
 }
 
 /** Whether settling would change anything. */
 export const auraChangesAny = (changes: AuraChanges): boolean =>
-  changes.leaving.length > 0 || changes.entering.length > 0 || changes.ending.length > 0 || changes.lifting.length > 0;
+  changes.leaving.length > 0 ||
+  changes.entering.length > 0 ||
+  changes.ending.length > 0 ||
+  changes.lifting.length > 0 ||
+  changes.winking.length > 0;
+
+/** SRD Antimagic Field: "Ongoing spells ... are suppressed in the area." A condition the creature has only from spells
+ *  is held off while it holds the field's aura. */
+function suppressSpellConditions(state: GameState, actorId: string, effect: EffectInstance): void {
+  if (!effect.tags.includes(ANTIMAGIC_TAG)) return;
+  const actor = state.actors.find((candidate) => candidate.id === actorId);
+  if (!actor) return;
+  const fromSpells = actor.conditions
+    .map((condition) => condition.id)
+    .filter((conditionId) => {
+      if (actor.conditions.find((condition) => condition.id === conditionId)?.standalone) return false;
+      const holders = actor.effects.filter((candidate) => candidate.linkedConditionIds.includes(conditionId));
+      return holders.length > 0 && holders.every(suppressedByAntimagic);
+    });
+  if (fromSpells.length > 0) effect.suppressedConditions = suppressConditions(actor, fromSpells);
+}
+
+/** The summoned creatures a field winks out ("Ongoing spells ... are suppressed"): a creature a spell brought whose space
+ *  is inside an Antimagic Field goes off the map, keeping its space, and comes back once that space is outside every
+ *  field. Pairs of creature and effect: those to wink out (with the effect), and those to bring back. */
+function winking(
+  state: GameState,
+  deps: Deps
+): Readonly<{ out: Array<readonly [string, EffectInstance]>; back: Array<readonly [string, string]> }> {
+  const fields = liveZones(state).flatMap((zone) => {
+    const content = zoneContentOf(zone, deps.catalog);
+    const inside = content?.trigger.antimagic ? insideTest(state, zone, content.trigger, content, deps.geometry) : null;
+    return inside ? [{ zone, inside }] : [];
+  });
+  const out: Array<readonly [string, EffectInstance]> = [];
+  const back: Array<readonly [string, string]> = [];
+  for (const actor of state.actors) {
+    if (!actor.summon?.spell) continue;
+    const winked = actor.effects.find((effect) => effect.tags.includes(WINKED_OUT_TAG));
+    const kept = state.combat.offPlane.find((entry) => entry.actorId === actor.id);
+    const token = state.combat.tokens.find((candidate) => candidate.actorId === actor.id);
+    const at = winked ? kept?.position : token?.position;
+    const sizeCells = token?.sizeCells ?? 1;
+    const field = at ? fields.find(({ inside }) => inside(at, sizeCells)) : undefined;
+    if (winked && !field && kept) back.push([actor.id, winked.id]);
+    if (!winked && field && token?.position)
+      out.push([
+        actor.id,
+        makeEffect({
+          id: `${field.zone.id}:winked:${actor.id}`,
+          name: `Winked out by ${field.zone.name}`,
+          tags: [OFF_PLANE_TAG, WINKED_OUT_TAG],
+          sourceActorId: field.zone.casterId,
+          sourceName: state.actors.find((candidate) => candidate.id === field.zone.casterId)?.name ?? null,
+          startedRound: state.combat.round,
+          duration: { type: "manual" }
+        })
+      ]);
+  }
+  // With no field left, every creature it winked out comes back.
+  if (fields.length === 0)
+    for (const actor of state.actors) {
+      const winked = actor.effects.find((effect) => effect.tags.includes(WINKED_OUT_TAG));
+      if (winked && !back.some(([id]) => id === actor.id)) back.push([actor.id, winked.id]);
+    }
+  return { out, back };
+}
 
 /** Hallowed Ward: "any creature that is possessed by or that has the Charmed or Frightened condition from such creatures
  *  isn't ... while in the area". The conditions the ward names that the creature has only from creatures of the warded
@@ -230,17 +313,23 @@ export function settleZoneAuras(state: GameState, deps: Deps): boolean {
   const changes = zoneAuraChanges(state, deps);
   for (const zoneId of changes.ending) endZoneAndItsSpell(state, zoneId);
   for (const [actorId, effectId] of changes.lifting) endEffectIfPresent(state, actorId, effectId);
+  for (const [actorId, effect] of changes.winking) addEffect(state, actorId, structuredClone(effect));
   // An area that ended takes what it gave with it.
   const { leaving, entering } = changes.ending.length > 0 ? zoneAuraChanges(state, deps) : changes;
+  const fieldBefore = new Map(state.actors.map((actor) => [actor.id, underAntimagic(actor)]));
   for (const [actorId, effectId] of leaving) endEffectIfPresent(state, actorId, effectId);
   for (const [actorId, effect] of entering)
     try {
       const held = structuredClone(effect);
       heldOff(state, actorId, held, deps);
+      suppressSpellConditions(state, actorId, held);
       addEffect(state, actorId, held);
     } catch {
       // A creature that already holds as many effects as it can goes without.
     }
+  // The Armor Class its magic items give goes off and on as it steps into and out of an Antimagic Field.
+  for (const actor of state.actors)
+    if (fieldBefore.get(actor.id) !== underAntimagic(actor)) refreshArmorClass(actor, deps);
   return auraChangesAny(changes);
 }
 

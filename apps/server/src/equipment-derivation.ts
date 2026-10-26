@@ -1,3 +1,4 @@
+import { suppressedByAntimagic, underAntimagic } from "./antimagic.js";
 import { gearMerged } from "./transform/forms.js";
 import type { Actor, ContentMonsterSummary, ContentSpellSummary } from "@vtt/domain";
 import type {
@@ -429,10 +430,12 @@ function characterGatedGrants(
 
 /** The actor's live effects as rider carriers. An effect that lapses while its bearer is incapacitated or its Speed
  *  is 0 (Dodge) carries nothing then. */
-function effectCarriers(actor: Actor): RiderCarrier[] {
+function effectCarriers(actor: Actor, suppressMagic: boolean): RiderCarrier[] {
   const lapsed = isIncapacitated(actor) || speedZeroed(actor) || actor.speedFeet === 0;
   return actor.effects.flatMap((effect) => {
     if (effect.voidWhileIncapacitated && lapsed) return [];
+    // In an Antimagic Field an ongoing spell is suppressed, its time still counting.
+    if (suppressMagic && suppressedByAntimagic(effect)) return [];
     // One bound to a carried row (Magic Weapon) reaches that row's rolls with its `this-item` riders, and nothing
     // once the row is gone.
     const bound =
@@ -458,8 +461,12 @@ function effectCarriers(actor: Actor): RiderCarrier[] {
 export function deriveEquipment(
   actor: Actor,
   definition: ActorDefinition | undefined,
-  catalog: EquipmentCatalog | undefined
+  catalog: EquipmentCatalog | undefined,
+  /** `suppressMagic`: magic items and ongoing spells give nothing, as inside an Antimagic Field or against a target in
+   *  one ("Magical properties of magic items don't work inside the aura or on anything inside it"). */
+  options: Readonly<{ suppressMagic?: boolean }> = {}
 ): EquipmentDerivation {
+  const suppressMagic = options.suppressMagic === true || underAntimagic(actor);
   // `equipped` makes a weapon swingable; `active` (also attuned where required) makes its riders apply.
   // An unattuned cursed blade is indistinguishable from a mundane one.
   const equipped: ActiveItem[] = [];
@@ -486,6 +493,9 @@ export function deriveEquipment(
     const secondCopy = item.attuned && record?.attunement?.required === true && attunedRecords.has(copy);
     if (item.attuned && record?.attunement?.required === true) attunedRecords.add(copy);
     if (item.equipped) equipped.push(entry);
+    // An Antimagic Field leaves a magic item a plain one: a +1 sword swings as its base, a potion does nothing.
+    const magicOff = suppressMagic && (record?.isMagic === true || item.magic !== undefined);
+    if (magicOff) continue;
     if (item.equipped && !secondCopy && itemIsActive(item, record)) active.push(entry);
     // Caltrops are spread straight from their bag, as a potion is drunk from the pack; one in a Bag of Holding is taken
     // out first, with the action that costs.
@@ -499,7 +509,7 @@ export function deriveEquipment(
   }
   const carriers: RiderCarrier[] = [
     ...(catalog ? characterCarriers(definition, catalog) : []),
-    ...effectCarriers(actor)
+    ...effectCarriers(actor, suppressMagic)
   ];
   const gatedGrants = catalog ? characterGatedGrants(definition, catalog) : [];
   if (

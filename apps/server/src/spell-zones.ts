@@ -419,7 +419,7 @@ export function exposed(
   return creaturesOnMap(state).flatMap((creature) => {
     // "You and your allies": an aura its caster carries reaches the caster too.
     const own = creature.id === zone.casterId;
-    if (trigger.around === "caster" && own && trigger.affects !== "allies") return [];
+    if (trigger.around === "caster" && own && trigger.affects !== "allies" && !trigger.antimagic) return [];
     // A Line that blasts from its caster (Gust of Wind) starts beside it, and a djinni's whirlwind spares the djinni.
     if (own && (trigger.towardCaster || trigger.sparesUser)) return [];
     // The creature an area is round (Antipathy/Sympathy's target) is the one it keeps others from or draws them to.
@@ -435,7 +435,8 @@ export function exposed(
     if (types && !types.includes(typeOf(creature, deps) ?? "")) return [];
     if (trigger.sizes && !trigger.sizes.includes(creature.size ?? "medium")) return [];
     // A spell that can't reach the creature leaves it out (a Ring of Mind Shielding in Zone of Truth).
-    const spell = zone.rule === undefined ? deps.catalog?.spellRecord?.(zone.spellId) : undefined;
+    // An Antimagic Field's own aura is no spell reaching in.
+    const spell = zone.rule === undefined && !trigger.antimagic ? deps.catalog?.spellRecord?.(zone.spellId) : undefined;
     if (spell && spellWardOf(state, creature, spell, zone.casterId, deps) !== null) return [];
     // A defeated creature takes no more; a dying character does (damage at 0 HP is a failed death save).
     if (creature.hp.current <= 0 && (creature.kind !== "player-character" || (creature.deathSaves?.failures ?? 0) >= 3))
