@@ -5743,7 +5743,9 @@ export const ActionSchema = z
       .object({ feet: z.number().int().min(5).max(1000) })
       .strict()
       .optional()
-      .describe("Its user senses the traps within `feet` in its line of sight and their nature, not where (Find Traps)"),
+      .describe(
+        "Its user senses the traps within `feet` in its line of sight and their nature, not where (Find Traps)"
+      ),
     /** It points its user at the nearest secret door or hidden trap within `feet` (a Wand of Secrets). */
     pointsAtHidden: z
       .object({ feet: z.number().int().min(5).max(300) })

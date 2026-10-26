@@ -514,12 +514,7 @@ export function useMapGestures({
       });
       return;
     }
-    if (
-      tool !== "select" &&
-      groundOpOf(tool) === null &&
-      !isVisionTool(tool) &&
-      calibration
-    ) {
+    if (tool !== "select" && groundOpOf(tool) === null && !isVisionTool(tool) && calibration) {
       const point = pointFromScreen(event.clientX, event.clientY);
       if (!point) return;
       event.preventDefault();

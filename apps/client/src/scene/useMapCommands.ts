@@ -354,7 +354,8 @@ export function useMapCommands({
       return;
     }
     runTerrain(
-      () => command("trap:place", { trapId: trapChoice.trapId, tier: trapChoice.tier, rect, expectedRevision: revision }),
+      () =>
+        command("trap:place", { trapId: trapChoice.trapId, tier: trapChoice.tier, rect, expectedRevision: revision }),
       "The trap could not be set."
     );
   };
@@ -364,10 +365,7 @@ export function useMapCommands({
       "The trap could not be changed."
     );
   const removeTrap = (trapId: string) =>
-    runTerrain(
-      () => command("trap:remove", { trapId, expectedRevision: revision }),
-      "The trap could not be removed."
-    );
+    runTerrain(() => command("trap:remove", { trapId, expectedRevision: revision }), "The trap could not be removed.");
   const springTrap = (trapId: string) =>
     runTerrain(
       () => command("trap:spring", { trapId, actorId: null, expectedRevision: revision }),

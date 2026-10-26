@@ -1001,8 +1001,14 @@ export interface ClientToServerEvents {
     payload: CommandPayload<typeof TerrainResetSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
-  "trap:place": (payload: CommandPayload<typeof TrapPlaceSchema>, acknowledgement: (result: MutationResult) => void) => void;
-  "trap:edit": (payload: CommandPayload<typeof TrapEditSchema>, acknowledgement: (result: MutationResult) => void) => void;
+  "trap:place": (
+    payload: CommandPayload<typeof TrapPlaceSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "trap:edit": (
+    payload: CommandPayload<typeof TrapEditSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
   "trap:remove": (
     payload: CommandPayload<typeof TrapRemoveSchema>,
     acknowledgement: (result: MutationResult) => void

@@ -1,4 +1,11 @@
-import { CALM_ENVIRONMENT, DEFAULT_RULE_EXCEPTIONS, EMPTY_SCENE_VISION, type GameState, type Scene, type SceneCombat } from "@vtt/domain";
+import {
+  CALM_ENVIRONMENT,
+  DEFAULT_RULE_EXCEPTIONS,
+  EMPTY_SCENE_VISION,
+  type GameState,
+  type Scene,
+  type SceneCombat
+} from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";

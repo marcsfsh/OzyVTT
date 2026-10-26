@@ -453,8 +453,8 @@ export function WeatherGroup({ id, terrainBusy, environment, onEnvironmentChange
   return (
     <>
       <p className="map-toolbar-note">
-        Cold and heat ask everyone on the map a Constitution save at the end of each hour that passes. Rain, snow
-        and wind act on sight, flames and fliers at once.
+        Cold and heat ask everyone on the map a Constitution save at the end of each hour that passes. Rain, snow and
+        wind act on sight, flames and fliers at once.
       </p>
       <Field label="Precipitation" htmlFor={`${id}-precipitation`} className="map-toolbar-field">
         <Select
