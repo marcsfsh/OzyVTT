@@ -5583,8 +5583,6 @@ export const ActionSchema = z
       .describe(
         "It puts out every nonmagical flame within `feet` of its user: lights set on the map that no spell made, and the burning lights creatures carry (a Frost Brand drawn)"
       ),
-    /** It lights the spilled oil within `feet` of its user, an area that waits for fire (a Tinderbox: "Using it to light
-     *  ... anything else with exposed fuel takes a Bonus Action"). */
     /** What it does to the door on the map it is aimed at (`wallId`): fixes an Immovable Rod against it (`fix-rod`,
      *  held shut until the rod's button is pushed or a DC 30 Strength (Athletics) check moves it), glues it shut with
      *  Sovereign Glue (`glue`, which only Universal Solvent undoes), dissolves that glue (`dissolve`), or makes a Strength
@@ -5605,11 +5603,36 @@ export const ActionSchema = z
       .strict()
       .optional()
       .describe("It points its user at the nearest secret door or hidden trap within `feet` (a Wand of Secrets)"),
+    /** It lights the spilled oil within `feet` of its user, an area that waits for fire (a Tinderbox: "Using it to light
+     *  ... anything else with exposed fuel takes a Bonus Action"). */
     lightsArea: z
       .object({ feet: z.number().int().min(5).max(30) })
       .strict()
       .optional()
       .describe("It lights the spilled oil within `feet` of its user, an area that waits for fire (a Tinderbox)"),
+    /** The damage the doors and walls on the map that are objects under its area take, rolled once, where the creatures
+     *  in it take none (a Thunderous Greatclub's Clap of Thunder: "Nonmagical objects in it that aren't worn or carried
+     *  take 3d8 Thunder damage"; its Earthquake's 50 Bludgeoning to structures). */
+    objectDamage: z
+      .array(z.object({ formula: DamageFormulaSchema, type: z.string().min(1).max(40) }).strict())
+      .min(1)
+      .max(2)
+      .optional()
+      .describe(
+        "The damage the doors and walls that are objects under its area take, rolled once; the creatures in it take none of it"
+      ),
+    /** A creature in its area that is concentrating makes this save too, losing its Concentration on a failure (a
+     *  Thunderous Greatclub's Earthquake: DC 20 Constitution). */
+    concentrationSave: z
+      .object({ ability: AbilitySchema, dc: z.number().int().min(1).max(40) })
+      .strict()
+      .optional()
+      .describe("A concentrating creature in its area also makes this save, its Concentration broken on a failure"),
+    /** Only the creatures on the ground in its area are caught; one in the air above it is spared (Earthquake). */
+    grounded: z
+      .literal(true)
+      .optional()
+      .describe("Only the creatures on the ground in its area are caught; one in the air above it is spared"),
     /** It widens (or, negative, narrows) the light of the item it is on by `stepFeet`, its Bright Light kept between
      *  `minFeet` and `maxFeet` (a Sun Blade: 5 feet at a time, 10 to 30). */
     adjustsLight: z

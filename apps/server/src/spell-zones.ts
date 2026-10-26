@@ -25,6 +25,7 @@ import { pullTokenToward } from "./forced-movement.js";
 import { AURA_IMMUNE_TAG } from "./statblock-traits.js";
 import { breakTimeStop } from "./time-stop.js";
 import { applyCastSight } from "./vision/cast-sight.js";
+import { harmObjectsUnderZone } from "./resolution/object-targets.js";
 import { spellWardOf } from "./resolution/spell-wards.js";
 import { planeOf } from "./ethereal.js";
 import { burnedOutAtTurnEnd } from "./zone-kindling.js";
@@ -1031,6 +1032,8 @@ function zonesAtCasterTurnEnd(state: GameState, casterId: string, deps: ZoneDeps
     if (zone.casterId !== casterId) continue;
     const content = zoneContentOf(zone, deps.catalog);
     if (!content || !content.trigger.on.includes("caster-turn-end")) continue;
+    const objectDamage = deps.catalog?.spellRecord?.(zone.spellId)?.effect?.objectDamage;
+    if (objectDamage) events.push(...harmObjectsUnderZone(state, zone, objectDamage, deps.rollDie));
     const inside = insideTest(state, zone, content.trigger, content, deps.geometry);
     if (!inside) continue;
     for (const creature of exposed(state, zone, content.trigger, deps)) {

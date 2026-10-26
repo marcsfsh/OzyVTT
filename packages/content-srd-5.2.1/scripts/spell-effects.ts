@@ -1938,6 +1938,13 @@ const RANGE_DOUBLES: ReadonlySet<string> = new Set(["spare-the-dying"]);
 const SILENCES_AREA: ReadonlySet<string> = new Set(["silence"]);
 /** "A nonmagical object that isn't being worn or carried also takes the damage if it's in the spell's area." */
 const HARMS_OBJECTS: ReadonlySet<string> = new Set(["shatter", "meteor-swarm"]);
+
+/** Damage the objects in a spell's area take apart from its creatures' (Earthquake: "The tremor deals 50 Bludgeoning
+ *  damage to any structure in contact with the ground in the area when you cast the spell and at the end of each of
+ *  your turns until the spell ends"). */
+const OBJECT_DAMAGE: Readonly<Record<string, ReadonlyArray<{ formula: string; type: string }>>> = {
+  earthquake: [{ formula: "50", type: "bludgeoning" }]
+};
 /** Area spells whose caster picks the creatures in the area it affects ("each creature of your choice in a 30-foot
  *  Sphere"), so the cast picks them; the rest of the area's creatures are spared. */
 const PICKS_IN_AREA: ReadonlySet<string> = new Set([
@@ -3618,6 +3625,7 @@ export function spellEffectFor(
     ...(WILLING_TARGETS.has(id) ? { willingTargets: true as const } : {}),
     ...(AREA_PER_SLOT[id] !== undefined ? { areaPerSlot: AREA_PER_SLOT[id] } : {}),
     ...(HARMS_OBJECTS.has(id) ? { harmsObjects: true as const } : {}),
+    ...(OBJECT_DAMAGE[id] ? { objectDamage: [...OBJECT_DAMAGE[id]] } : {}),
     ...(COMPANION_FEET[id] !== undefined ? { companionFeet: COMPANION_FEET[id] } : {}),
     ...(KINDLES[id] ? { kindles: { ...KINDLES[id] } } : {}),
     // "If you maintain Concentration on this spell for the full duration, the spell lasts until dispelled."

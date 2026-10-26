@@ -790,9 +790,10 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   // "While you are attuned ... your Strength is 20 unless your Strength is already equal to or greater", 1d8 Thunder
-  // more on a hit, and Clap of Thunder's 30-foot Cone (a Magic action, DC 15 Strength or Prone). Earthquake, once a
-  // dawn: a 50-foot-radius circle around the point it strikes, DC 20 Dexterity or Prone; its Concentration save, the
-  // fissure and the damage to structures are the GM's.
+  // more on a hit (3d8 against an object, object-strikes.ts), and Clap of Thunder's 30-foot Cone (a Magic action, DC 15
+  // Strength or Prone, 3d8 Thunder to the objects in it). Earthquake, once a dawn: a 50-foot-radius circle around the
+  // point it strikes, DC 20 Dexterity or Prone for the creatures on the ground, DC 20 Constitution for a concentrating
+  // one, and 50 Bludgeoning to the structures in it. The fissure is the GM's.
   "thunderous-greatclub": {
     modifiers: [
       { type: "ability-score-minimum", ability: "str", score: 20 },
@@ -813,7 +814,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           "Strike the weapon against a hard surface: a clap audible out to 300 feet, and a 30-foot Cone of thunderous energy. Each creature in the Cone makes a DC 15 Strength saving throw or has the Prone condition. Nonmagical objects in it that aren't worn or carried take 3d8 Thunder damage.",
         damage: [],
         save: { ability: "str", dc: 15, successDamage: "none", failureConditions: ["prone"] },
-        area: { shape: "cone", sizeFeet: 30, widthFeet: null }
+        area: { shape: "cone", sizeFeet: 30, widthFeet: null },
+        objectDamage: [{ formula: "3d8", type: "thunder" }]
       },
       {
         id: "earthquake",
@@ -824,6 +826,9 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         damage: [],
         save: { ability: "dex", dc: 20, successDamage: "none", failureConditions: ["prone"] },
         area: { shape: "emanation", sizeFeet: 50, widthFeet: null },
+        objectDamage: [{ formula: "50", type: "bludgeoning" }],
+        concentrationSave: { ability: "con", dc: 20 },
+        grounded: true,
         uses: { limit: 1, per: "long-rest" }
       }
     ]

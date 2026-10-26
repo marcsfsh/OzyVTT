@@ -178,6 +178,8 @@ function combatantsOf(
     (spell?.walls !== undefined && (input.wallId !== undefined || laterRowOf(spell, action.id) !== undefined)) ||
     // An object on the map in place of a creature (Acid thrown at a door).
     (input.wallId !== undefined && (action.targets?.objects === true || action.doorWork !== undefined)) ||
+    // An area that harms the objects under it may catch no creature (Clap of Thunder against a door).
+    (action.objectDamage !== undefined && input.placedArea !== undefined) ||
     // Pointing at what is hidden (a Wand of Secrets) is something done.
     action.findsSecrets !== undefined ||
     // So is bringing creatures onto the map (a Horn of Valhalla's Berserkers).

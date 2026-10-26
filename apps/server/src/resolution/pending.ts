@@ -1019,6 +1019,36 @@ export function parkBurstSave(ctx: ResolveContext): void {
   });
 }
 
+/** A concentrating creature caught in the area makes one more save, its Concentration broken on a failure (a Thunderous
+ *  Greatclub's Earthquake: "A creature concentrating ... must also succeed on a DC 20 Constitution saving throw or its
+ *  Concentration is broken"). */
+export function parkConcentrationSave(ctx: ResolveContext): void {
+  const { state, action, attacker, targets, deps, input } = ctx;
+  const save = action.concentrationSave;
+  if (!save || input.commit === false) return;
+  const concentrating = targets.filter((target) =>
+    state.actors.some((bearer) =>
+      bearer.effects.some((effect) => effect.concentration && effect.sourceActorId === target.id)
+    )
+  );
+  if (concentrating.length === 0) return;
+  createPendingSaves(state, {
+    sourceActorId: attacker.id,
+    sourceName: attacker.name,
+    actionName: `${action.name}: Concentration`,
+    ability: save.ability,
+    dc: save.dc,
+    targetIds: concentrating.map((target) => target.id),
+    proposedDamage: 0,
+    halfOnSuccess: false,
+    conditionIds: [],
+    magical: isMagicalAction(ctx),
+    extra: { breaksConcentration: true },
+    newSaveId: deps.newRollId,
+    createdAt: Date.parse(deps.now())
+  });
+}
+
 const conditionDeps = (deps: ResolveContext["deps"]) => ({
   ...(deps.resolveDefinition ? { resolveDefinition: deps.resolveDefinition } : {}),
   ...(deps.catalog ? { catalog: deps.catalog } : {})

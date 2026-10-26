@@ -1735,8 +1735,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:boots-of-speed": enforced(
     "A Bonus Action doubles its wearer's Speed (speed.ts) and gives Opportunity Attacks against it Disadvantage. Its 10 minutes a Long Rest are 100 rounds: a click lasts all that is left, and ending it early gives the rest back (use-cost.ts, effects.ts)."
   ),
-  "item:thunderous-greatclub": guided(
-    "Its wearer's Strength is at least 20 (live-abilities.ts), a hit deals 1d8 Thunder more, Clap of Thunder's 30-foot Cone asks for the DC 15 Strength save against Prone, and Earthquake's once-a-day DC 20 Dexterity save against Prone is applied. Earthquake's Concentration save, its fissure and the damage to objects are the GM's."
+  "item:thunderous-greatclub": enforced(
+    "Its wearer's Strength is at least 20 (live-abilities.ts), a hit deals 1d8 Thunder more and 3d8 more to an object (object-strikes.ts), and Clap of Thunder's 30-foot Cone asks the DC 15 Strength save against Prone and deals 3d8 Thunder to the doors and walls that are objects in it. Earthquake, once a day, asks each creature on the ground in its 50-foot circle for the DC 20 Dexterity save against Prone and a concentrating one for the DC 20 Constitution save against its Concentration (resolution/pending.ts), and deals 50 Bludgeoning to the objects there. The fissure is the GM's."
   ),
   "item:oathbow": guided(
     "Naming a sworn enemy marks it for 7 days, once a day, and the bow's ranged attacks against it have Advantage, set Half and Three-Quarters Cover aside and deal 3d6 Piercing more. Ignoring long range's Disadvantage, and the Disadvantage with other weapons while it lives, are the GM's."
@@ -1864,8 +1864,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "spell:dominate-person": enforced(
     "Only a Humanoid can be the target. A failed save imposes Charmed for the spell's duration, longer from a higher slot (resolution/concentration.ts), with Advantage on the save while its side is fighting the caster's, and a repeat save each time the target takes damage (save-stages.ts). It puts the target under the caster's command and on its side while it lasts (summons.ts): the caster's player acts for it on its turns, and its Reaction is offered only while the caster has one, spending both (commanded-reactions.ts). What the orders say, and how it acts when left alone, are the table's."
   ),
-  "spell:earthquake": guided(
-    "The cast places the 100-foot circle, and its Dexterity save leaves a creature Prone with its Concentration broken on a failure. spell-zones.ts repeats the save for each creature on the ground in the circle at the end of each of the caster's turns, sparing one in the air, as the cast does, and zone-ground.ts makes the circle Difficult Terrain. The fissures, and the 50 Bludgeoning damage to structures, which the GM deals to the walls and doors that are objects with object.damage (objects.ts), are the GM's."
+  "spell:earthquake": enforced(
+    "The cast places the 100-foot circle; each creature on the ground there makes the Dexterity save at the cast and at the end of each of the caster's turns, Prone with its Concentration broken on a failure, one in the air spared (spell-zones.ts), and the circle is Difficult Terrain (zone-ground.ts). The walls and doors there that are objects take 50 Bludgeoning damage at the cast and as each of the caster's turns ends (objects.ts). The fissures, and which structures touch the ground and what collapses, are the GM's."
   ),
   "spell:fear": guided(
     "A failed save imposes Frightened and drops what the creature holds (effects.ts), and a creature that ends its turn out of the caster's sight repeats the save (save-stages.ts, with dynamic vision on). The Dash away on each of its turns is the GM's."

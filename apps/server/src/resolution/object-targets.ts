@@ -1,8 +1,10 @@
 import type { GameState, VisionWall } from "@vtt/domain";
+import { parseDiceFormula, resolveDice, type RandomSource } from "@vtt/rules-5e";
 import { clockMinutesOf } from "../game-time.js";
 import { CommandRejectedError } from "../game-store.js";
 import { isHiddenDoor } from "../doors.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
+import type { EffectNarration } from "../effects.js";
 import { damageObject, findObject } from "../objects.js";
 import { nearestPointOf } from "../spell-walls.js";
 import { policeBarrier } from "../zone-barriers.js";
@@ -95,9 +97,14 @@ const rolledParts = (ctx: ResolveContext) => [
 ];
 
 /** Deals the damage to one object and tells the table, coating it in oil where the action does that. */
-function strike(ctx: ResolveContext, wallId: string, coats: boolean): void {
+function strike(
+  ctx: ResolveContext,
+  wallId: string,
+  coats: boolean,
+  damage?: ReadonlyArray<Readonly<{ amount: number; type: string }>>
+): void {
   const { state, attacker } = ctx;
-  const parts = rolledParts(ctx).filter((part) => part.amount > 0);
+  const parts = (damage ?? rolledParts(ctx)).filter((part) => part.amount > 0);
   const label = (wall: VisionWall | undefined) => (wall?.kind === "door" ? "the door" : "the wall");
   const wall = state.combat.vision.walls.find((candidate) => candidate.id === wallId);
   const told = (text: string) =>
@@ -182,19 +189,55 @@ export function objectsUnder(state: GameState, placed: Placed, widthFeet: number
   });
 }
 
-/** A placed area that harms objects deals its full damage to each object under it, once whatever areas overlap it. */
+/** A placed area that harms objects deals its full damage to each object under it, once whatever areas overlap it. An
+ *  action with damage for objects alone (Clap of Thunder) rolls that once for them instead. */
 export function harmObjectsInArea(ctx: ResolveContext): void {
-  const { input } = ctx;
+  const { input, action } = ctx;
   if (!input.placedArea || input.commit === false) return;
   const spell = spellOf(ctx);
-  if (spell?.effect?.harmsObjects !== true && ctx.action.targets?.objects !== true) return;
-  const widthFeet = ctx.action.area?.widthFeet ?? spell?.area?.widthFeet ?? null;
+  const own = action.objectDamage ?? spell?.effect?.objectDamage;
+  if (spell?.effect?.harmsObjects !== true && action.targets?.objects !== true && !own) return;
+  const widthFeet = action.area?.widthFeet ?? spell?.area?.widthFeet ?? null;
   const areas = [input.placedArea, ...(input.morePlacedAreas ?? [])];
-  const struck = new Set<string>();
-  for (const placed of areas)
-    for (const wall of objectsUnder(ctx.state, placed, widthFeet))
-      if (!struck.has(wall.id)) {
-        struck.add(wall.id);
-        strike(ctx, wall.id, false);
-      }
+  const walls = new Map<string, VisionWall>();
+  for (const placed of areas) for (const wall of objectsUnder(ctx.state, placed, widthFeet)) walls.set(wall.id, wall);
+  if (walls.size === 0) return;
+  const parts = own ? rollObjectDamage(own, ctx.deps.random) : undefined;
+  for (const wallId of walls.keys()) strike(ctx, wallId, false, parts);
+}
+
+/** A lasting area's damage to the objects under it as its caster's turn ends (Earthquake), told as narration. */
+export function harmObjectsUnderZone(
+  state: GameState,
+  zone: Readonly<{ annotationId: string | null; name: string; casterId: string }>,
+  damage: ReadonlyArray<Readonly<{ formula: string; type: string }>>,
+  random: RandomSource
+): EffectNarration[] {
+  const area = zone.annotationId
+    ? state.combat.annotations.find((annotation) => annotation.id === zone.annotationId)
+    : undefined;
+  if (!area || area.shape === null) return [];
+  const placed = { shape: area.shape, origin: area.geometry.origin, target: area.geometry.target };
+  const walls = objectsUnder(state, placed, null);
+  if (walls.length === 0) return [];
+  const parts = rollObjectDamage(damage, random);
+  return walls.map((wall) => {
+    const label = wall.kind === "door" ? "the door" : "the wall";
+    const hit = damageObject(state, { wallId: wall.id }, parts);
+    const text = hit.destroyed
+      ? `${zone.name} deals ${hit.damage.total} damage to ${label}, and it breaks.`
+      : `${zone.name} deals ${hit.damage.total} damage to ${label}.`;
+    return { kind: "effect" as const, text, actorId: zone.casterId };
+  });
+}
+
+/** Rolls damage meant for objects alone. */
+export function rollObjectDamage(
+  damage: ReadonlyArray<Readonly<{ formula: string; type: string }>>,
+  random: RandomSource
+): Array<{ amount: number; type: string }> {
+  return damage.map((part) => ({
+    amount: Math.max(0, resolveDice(parseDiceFormula(part.formula), random).total),
+    type: part.type
+  }));
 }

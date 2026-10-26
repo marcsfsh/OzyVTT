@@ -308,7 +308,7 @@ export const actionCommands = [
             });
           }
           // "Each creature on the ground in the area" (Earthquake): one in the air above it is spared.
-          if (spell && zoneRowOf(spell)?.zone?.grounded)
+          if ((spell && zoneRowOf(spell)?.zone?.grounded) || action.grounded)
             resolvedTargetIds = resolvedTargetIds.filter(
               (id) => (draft.combat.tokens.find((token) => token.actorId === id)?.altitudeFeet ?? 0) <= 0
             );
@@ -325,7 +325,9 @@ export const actionCommands = [
             action.endsConditions !== undefined;
           // An area that harms objects may be placed over a door alone (Shatter).
           const harmsAnObject =
-            (spell?.effect?.harmsObjects === true || action.targets?.objects === true) &&
+            (spell?.effect?.harmsObjects === true ||
+              action.targets?.objects === true ||
+              action.objectDamage !== undefined) &&
             objectsUnder(
               draft,
               { shape: placed.shape, origin: snapped.origin, target: snapped.target },

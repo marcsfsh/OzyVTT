@@ -464,7 +464,15 @@ export const SpellEffectSchema = z
     areaPerSlot: z.number().int().min(5).max(100).optional(),
     /** "A nonmagical object that isn't being worn or carried also takes the damage if it's in the spell's area"
      *  (Shatter, Meteor Swarm): the doors and walls on the map that are objects under its area take its full damage. */
-    harmsObjects: z.literal(true).optional()
+    harmsObjects: z.literal(true).optional(),
+    /** The damage the doors and walls on the map that are objects under its area take at the cast, and as its caster's
+     *  turns end while a lasting area stays (Earthquake: "50 Bludgeoning damage to any structure in contact with the
+     *  ground in the area when you cast the spell and at the end of each of your turns"). */
+    objectDamage: z
+      .array(z.object({ formula: z.string().min(1).max(40), type: z.string().min(1).max(40) }).strict())
+      .min(1)
+      .max(2)
+      .optional()
   })
   .strict();
 export type SpellEffect = z.infer<typeof SpellEffectSchema>;

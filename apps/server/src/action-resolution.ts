@@ -104,6 +104,7 @@ import {
 import {
   parkActionSave,
   parkBurstSave,
+  parkConcentrationSave,
   parkForAcReaction,
   parkForRollAnswer,
   parkHeldObjectSave,
@@ -452,6 +453,7 @@ export function resolveDefinitionAction(
   parkActionSave(ctx);
   endTargetMarks(ctx);
   parkBurstSave(ctx);
+  parkConcentrationSave(ctx);
   parkHeldObjectSave(ctx);
   applyRageRules(ctx);
 
