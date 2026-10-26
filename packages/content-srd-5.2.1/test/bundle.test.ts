@@ -534,9 +534,9 @@ describe("SRD 5.2.1 reference bundles", () => {
     // the generated magic items.
     const nonImprovisedWeapons = loadWeapons().filter((weapon) => !weapon.improvised).length;
     expect(loadMagicItems().length).toBe(270);
-    // 141 gear rows: the 132 first authored, plus the Chest, Map, Net, String, Firearm Bullets, two gaming sets and
-    // the two Spell Scrolls the gear table sells (Cantrip and Level 1).
-    expect(equipment.length).toBe(141 + nonImprovisedWeapons + loadArmor().length + 270);
+    // 144 gear rows: the 132 first authored, plus the Chest, Map, Net, String, Firearm Bullets, two gaming sets, the
+    // two Spell Scrolls the gear table sells (Cantrip and Level 1) and the three Saddles (Exotic, Military, Riding).
+    expect(equipment.length).toBe(144 + nonImprovisedWeapons + loadArmor().length + 270);
     expect(equipment.length).toBeGreaterThan(150);
 
     // Every category the framework promises is represented (the homebrew update extends these).

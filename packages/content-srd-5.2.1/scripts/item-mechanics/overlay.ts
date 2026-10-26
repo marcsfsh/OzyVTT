@@ -61,7 +61,9 @@ export type ItemRiderKey =
   | "magicSaveAura"
   | "servesAsFocus"
   | "savesNegateSpells"
-  | "breaks";
+  | "breaks"
+  | "container"
+  | "attunementHeldBy";
 
 /** The same keys, as a value, so the empty-rider check below iterates the list it is typed against. */
 const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
@@ -90,7 +92,9 @@ const ITEM_RIDER_KEYS: readonly ItemRiderKey[] = Object.freeze([
   "magicSaveAura",
   "servesAsFocus",
   "savesNegateSpells",
-  "breaks"
+  "breaks",
+  "container",
+  "attunementHeldBy"
 ] as const);
 
 /** The riders one magic item may carry. Every key optional: an entry authors only what it names. */
@@ -412,7 +416,7 @@ export function applyItemMechanics(
     const unknown = Object.keys(entry).filter((key) => !(ITEM_RIDER_KEYS as readonly string[]).includes(key));
     if (unknown.length > 0) {
       refused.push(
-        `${itemId} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The twenty-three are: ${ITEM_RIDER_KEYS.join(", ")}`
+        `${itemId} - ${unknown.map((key) => `"${key}"`).join(" and ")} ${unknown.length === 1 ? "is not a rider key" : "are not rider keys"}. A key this overlay does not know is silently dropped rather than authored, so it is refused instead. The keys are: ${ITEM_RIDER_KEYS.join(", ")}`
       );
       continue;
     }

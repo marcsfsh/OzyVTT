@@ -1,4 +1,5 @@
-import type { ActorDefinition, EffectInstance } from "@vtt/schemas";
+import { endingsOf, type ActorDefinition, type EffectInstance } from "@vtt/schemas";
+import { ENDED_BY_PREFIX, endingSlug } from "./ending-actions.js";
 
 type BuiltinAction = ActorDefinition["actions"][number];
 
@@ -199,6 +200,26 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     replacesAttack: true
   },
   {
+    id: "improvised-weapon",
+    name: "Improvised Weapon",
+    activation: "action",
+    description:
+      "Attack with an object that isn't a weapon (a broken bottle, a chair leg): a melee attack within 5 feet with your Strength modifier and no Proficiency Bonus. On a hit it deals 1d4 plus your Strength modifier, of the type that fits the object (the GM's call). (SRD 5.2.1, Improvised Weapons)",
+    damage: [],
+    damageTypes: ["bludgeoning", "piercing", "slashing"],
+    replacesAttack: true
+  },
+  {
+    id: "improvised-weapon-thrown",
+    name: "Improvised Weapon (thrown)",
+    activation: "action",
+    description:
+      "Throw an object that isn't a weapon: a ranged attack with a normal range of 20 feet and a long range of 60, with your Strength modifier and no Proficiency Bonus. On a hit it deals 1d4 plus your Strength modifier, of the type that fits the object (the GM's call). (SRD 5.2.1, Improvised Weapons)",
+    damage: [],
+    damageTypes: ["bludgeoning", "piercing", "slashing"],
+    replacesAttack: true
+  },
+  {
     id: "unarmed-grapple",
     name: "Unarmed Strike (Grapple)",
     activation: "action",
@@ -221,7 +242,7 @@ export const BUILTIN_ACTIONS: readonly BuiltinAction[] = [
     name: "Unarmed Strike (Shove Push)",
     activation: "action",
     description:
-      "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or you push it 5 feet away. On a failure, the GM moves the token. Only targets no more than one size larger. (SRD 5.2.1, Unarmed Strike)",
+      "The target must succeed on a Strength or Dexterity saving throw (its choice) against DC 8 + your Strength modifier + your Proficiency Bonus, or you push it 5 feet straight away from you. Only targets no more than one size larger. (SRD 5.2.1, Unarmed Strike)",
     damage: [],
     replacesAttack: true
   },
@@ -406,12 +427,41 @@ function bonusSources(definition: ActorDefinition | undefined, bearer?: ActionBe
  *  one takes `BONUS_SUFFIX`. */
 export const END_EFFECT_ID = "end-effect";
 
-/** The actions the bearer's effects offer to end them, one for each activation: the first effect needing it names it. */
+/** The actions the bearer's effects offer to end them, one for each activation: the first effect needing it names it.
+ *  Then each printed way out its effects give the bearer itself, by name (a Chain's burst beside its escape). */
 function endEffectActions(bearer: ActionBearer | undefined): BuiltinAction[] {
   const byActivation = new Map<"action" | "bonus-action", EffectInstance>();
   for (const effect of bearer?.effects ?? [])
     if (effect.endAction && !byActivation.has(effect.endAction.activation))
       byActivation.set(effect.endAction.activation, effect);
+  return [...ownEndActions(byActivation), ...namedEndings(bearer)];
+}
+
+/** One action for each way out an effect gives its own bearer ("Burst the Chain"), the first effect naming it. */
+function namedEndings(bearer: ActionBearer | undefined): BuiltinAction[] {
+  const offered = new Map<string, BuiltinAction>();
+  for (const effect of bearer?.effects ?? [])
+    for (const ending of endingsOf(effect)) {
+      if (ending.by === "others") continue;
+      const id = `${ENDED_BY_PREFIX}${endingSlug(ending)}`;
+      if (offered.has(id)) continue;
+      const check = ending.check;
+      const roll = check
+        ? ` with a DC ${check.dc ?? "the effect's"} ${ABILITY_WORDS[check.ability]}${check.skill ? ` (${skillWords(check.skill)})` : ""} check`
+        : "";
+      offered.set(id, {
+        id,
+        name: `${ending.name} (${effect.name})`.slice(0, 120),
+        activation: "action",
+        description: `End ${effect.name}${roll}. A success ends it.`,
+        damage: [],
+        ...(effect.tags[0] !== undefined ? { requiresEffectTag: effect.tags[0] } : {})
+      });
+    }
+  return [...offered.values()];
+}
+
+function ownEndActions(byActivation: ReadonlyMap<"action" | "bonus-action", EffectInstance>): BuiltinAction[] {
   return [...byActivation].map(([activation, effect]) => {
     const end = effect.endAction!;
     const roll = `${ABILITY_WORDS[end.ability]}${end.skill ? ` (${skillWords(end.skill)})` : ""} ${end.kind === "save" ? "saving throw" : "check"}`;
@@ -521,6 +571,8 @@ export const BUILTIN_TARGETING: Readonly<Record<string, "single">> = {
   "unarmed-grapple": "single",
   "unarmed-shove-prone": "single",
   "unarmed-shove-push": "single",
+  "improvised-weapon": "single",
+  "improvised-weapon-thrown": "single",
   "unarmed-strike-bonus": "single",
   "unarmed-grapple-bonus": "single",
   "unarmed-shove-prone-bonus": "single",

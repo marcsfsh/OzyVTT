@@ -94,12 +94,17 @@ export function startFall(state: GameState, input: FallInput, deps: FallDeps): E
   const faller = state.actors.find((actor) => actor.id === input.actorId);
   if (!faller) return [];
   if (state.combat.pendingFalls.some((fall) => fall.actorId === faller.id)) return [];
+  const landing = Math.max(0, Math.round(input.landingAltitudeFeet ?? 0));
+  const feet = Math.max(0, Math.round(input.feet));
+  // SRD Climber's Kit: "you can't fall more than 25 feet from the anchor point". The climber hangs there.
+  const anchor = faller.effects.find((effect) => effect.anchor !== undefined)?.anchor;
+  const caught = anchor ? Math.min(landing + feet, Math.max(landing, anchor.altitudeFeet - anchor.feet)) : landing;
   const fall: PendingFall = {
     id: deps.newId(),
     actorId: faller.id,
-    feet: Math.max(0, Math.round(input.feet)),
-    intoWater: input.intoWater === true,
-    landingAltitudeFeet: Math.max(0, Math.round(input.landingAltitudeFeet ?? 0)),
+    feet: Math.max(0, feet - (caught - landing)),
+    intoWater: input.intoWater === true && caught === landing,
+    landingAltitudeFeet: caught,
     reduction: 0,
     createdAt: Date.parse(deps.now())
   };

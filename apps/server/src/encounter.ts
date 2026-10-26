@@ -39,7 +39,7 @@ import {
 import { closeInitiativeWindow, rolledInitiative } from "./initiative-hooks.js";
 import { interruptRests } from "./rest-interruptions.js";
 import { endTravelFor } from "./travel.js";
-import { releaseSwallowedBy } from "./swallow.js";
+import { chargeOwedMovement, releaseSwallowedBy } from "./swallow.js";
 import { endOfTurn, playStartSteps, startOfTurn } from "./turn-boundaries.js";
 import { zoneHeld, zonesAtTurnEnd, zonesAtTurnStart, type ZoneDeps } from "./spell-zones.js";
 import { wavesAtTurnEnd, wavesAtTurnStart } from "./zone-waves.js";
@@ -288,6 +288,21 @@ function reorderMidRound(state: GameState, entries: readonly InitiativeEntry[]) 
       entries.filter((entry) => !acted.has(entry.actorId) && entry.actorId !== turnActorId)
     )
   ]);
+}
+
+/** A creature takes another's Initiative and its turn right after that creature's (SRD Mounted Combat: "The Initiative
+ *  of a controlled mount changes to match yours when you mount it"), or, with null, keeps its count and stops
+ *  following. Nothing for a creature not in the order. */
+export function followInInitiative(state: GameState, actorId: string, leaderId: string | null): void {
+  const leader = leaderId ? state.combat.initiative.find((entry) => entry.actorId === leaderId) : undefined;
+  if (!state.combat.initiative.some((entry) => entry.actorId === actorId)) return;
+  if (leaderId !== null && !leader) return;
+  const entries = state.combat.initiative.map((entry) => {
+    if (entry.actorId !== actorId) return entry;
+    const { follows: _old, ...rest } = entry;
+    return leader ? { ...rest, score: leader.score, tieBreaker: leader.tieBreaker, follows: leader.actorId } : rest;
+  });
+  state.combat = { ...state.combat, initiative: reorderMidRound(state, entries) };
 }
 
 /** A creature joins the order mid-fight or while it is staged (a summoned creature), in its place by count and after
@@ -911,6 +926,8 @@ export function nextInitiativeTurn(state: GameState, events?: EffectNarration[],
   };
   // A move or teleport granted for the turn that ended lapses with it.
   dropStaleGrants(state);
+  // Movement already spent of this turn (climbing out of a corpse off it) is used.
+  chargeOwedMovement(state, nextActorId);
   // The incoming actor's durations tick: Reckless ends, Rage counts down (ADR-0020).
   const expiry = expireEffectsAtTurnStart(state, nextActorId);
   events?.push(...expiry);

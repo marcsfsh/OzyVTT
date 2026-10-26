@@ -39,7 +39,7 @@ import { failedTeleport, landTeleport } from "../granted-moves.js";
 import { holdMove } from "../held-moves.js";
 import { walkThroughZones } from "../zone-stops.js";
 import { landJump } from "../jumping.js";
-import { carryRiders, mountOf, mountOrDismount, ridersOf, RIDING_TAG } from "../mounts.js";
+import { askToStayMounted, carryRiders, mountOf, mountOrDismount, parted, ridersOf } from "../mounts.js";
 import { timeStopOutOfRange } from "../time-stop.js";
 import { applyMovementRules, dragAlong, dragCostsExtra, grappledBy } from "../movement-rules.js";
 import { swallowedBy } from "../swallow.js";
@@ -485,17 +485,15 @@ export const mapCommands = [
                 )
               );
           }
-        // A mount carries its riders; one that teleports or is moved by force leaves them where they were, off it.
-        if (mode === "teleport" || mode === "forced")
-          for (const riderId of ridersOf(state, actorId)) {
-            const rider = state.actors.find((actor) => actor.id === riderId)!;
-            rider.effects = rider.effects.filter((effect) => !effect.tags.includes(RIDING_TAG));
-          }
-        else carryRiders(state, actorId, geometry);
-        if (riding && (mode === "teleport" || mode === "forced")) {
-          const rider = state.actors.find((actor) => actor.id === actorId)!;
-          rider.effects = rider.effects.filter((effect) => !effect.tags.includes(RIDING_TAG));
+        // A mount carries its riders; one that teleports leaves them where they were, off it. One moved by force
+        // carries them too, and each saves to stay on (SRD Mounted Combat).
+        if (mode === "teleport") for (const riderId of ridersOf(state, actorId)) parted(state, riderId);
+        else {
+          const riders = carryRiders(state, actorId, geometry);
+          if (mode === "forced" && riders.length > 0)
+            zoneEvents.push(...askToStayMounted(state, riders, actorId, "its mount is moved", Date.now()));
         }
+        if (riding && (mode === "teleport" || mode === "forced")) parted(state, actorId);
         // SRD Grappling: a grapple ends once the two are farther apart than its range.
         released = releaseGrapplesOutOfRange(
           state,
@@ -626,7 +624,7 @@ export const mapCommands = [
     type: "actor.mount",
     operationId: "mountActor",
     description:
-      "A creature climbs onto a mount (`mountId`) or gets off the one it rides (`mountId: null`), SRD 5.2.1 Mounted Combat: the mount must be within 5 feet and at least one size larger, and either costs half the rider's Speed on its turn in a fight. The rider shares the mount's space and height, the mount's moves carry it, and it moves only by its mount until it dismounts; a dismounted rider stands in the nearest unoccupied space. A mount that teleports or is moved by force leaves its rider behind, off it. A player may mount or dismount only their own character; the GM may `override` a movement rule.",
+      "A creature climbs onto a mount (`mountId`) or gets off the one it rides (`mountId: null`), SRD 5.2.1 Mounted Combat: the mount must be within 5 feet and at least one size larger (a flying or aquatic one wearing an Exotic Saddle), and either costs half the rider's Speed on its turn in a fight. The rider shares the mount's space and height, the mount's moves carry it, and it moves only by its mount until it dismounts; a dismounted rider stands in the nearest unoccupied space. A `controlled` mount (the default) takes the rider's Initiative, its turn right after the rider's, and only the Dash, Disengage and Dodge actions; an `independent` one keeps its own. A mount moved by force carries its rider, who makes a DC 10 Dexterity saving throw to stay on, and one that teleports leaves its rider behind, off it. A player may mount or dismount only their own character; the GM may `override` a movement rule.",
     summary: "Mount a creature or dismount; the mount's moves carry its rider.",
     schema: ActorMountSchema,
     malformed: "The mount request is malformed.",
@@ -646,6 +644,7 @@ export const mapCommands = [
           state,
           {
             riderId: actorId,
+            ...(request.control ? { control: request.control } : {}),
             mountId,
             override: isGmGrade(principal) ? (request.override ?? null) : null,
             distanceFeet: (a, b) => distance(state, a, b),

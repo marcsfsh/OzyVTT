@@ -3,7 +3,7 @@ import type { ActorDefinition } from "@vtt/schemas";
 import { collectRiders, sumRiders } from "@vtt/rules-5e";
 import { exhaustionLevel } from "./condition-rules.js";
 import type { EquipmentDerivation } from "./equipment-derivation.js";
-import { OVERLOADED_SPEED_FEET, overloaded } from "./carrying.js";
+import { immovable, OVERLOADED_SPEED_FEET, overloaded } from "./carrying.js";
 import { STATBLOCK_EXTENSION } from "./statblock-facts.js";
 
 /** The bearer's Speed is halved while this lasts (Slow, a Stunning Strike the target saved against). */
@@ -64,13 +64,14 @@ function loadSlows(derivation: EquipmentDerivation): boolean {
 
 /** Current Speed in feet, before Dash: base (raised to any `speed-minimum`) minus 5 x exhaustion (floored at 0, so no
  *  debt carries), plus the standing `speed` riders, floored again, then doubled or halved where an effect does so,
- *  and no more than 5 feet under a load beyond carrying capacity. A Speed-0 condition returns 0. Never writes
- *  `actor.speedFeet`. Null when base speed is unknown. */
+ *  and no more than 5 feet under a load beyond carrying capacity, 0 beyond twice it. A Speed-0 condition returns 0.
+ *  Never writes `actor.speedFeet`. Null when base speed is unknown. */
 export function currentSpeedFeet(actor: Actor, derivation: EquipmentDerivation): number | null {
   if (actor.speedFeet === undefined) return null;
   if (speedZeroed(actor)) return 0;
   const base = Math.max(0, Math.max(actor.speedFeet, speedFloor(derivation)) - 5 * exhaustionLevel(actor));
   const speed = multipliedSpeed(actor, Math.max(0, base + riderSpeed(derivation)));
+  if (immovable(derivation.carrying)) return 0;
   return loadSlows(derivation) ? Math.min(OVERLOADED_SPEED_FEET, speed) : speed;
 }
 
@@ -94,7 +95,7 @@ function dashesOf(actor: Actor): Readonly<{ granted: number; count: number; lega
 export function effectiveSpeedFeet(actor: Actor, derivation: EquipmentDerivation): number | null {
   const speed = currentSpeedFeet(actor, derivation);
   if (speed === null) return null;
-  if (speedZeroed(actor)) return 0;
+  if (speedZeroed(actor) || immovable(derivation.carrying)) return 0;
   const dashes = dashesOf(actor);
   return (dashes.legacy ? speed * 2 : speed) + dashes.granted;
 }

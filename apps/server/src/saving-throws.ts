@@ -93,6 +93,7 @@ import { suppressConditions } from "./suppressed-conditions.js";
 import { sizeAtMost, sizeRank } from "./resolution/context.js";
 import { lightSensitivities, sightRules } from "./vision/rules.js";
 import { legendaryResistancesPerDay } from "./lair.js";
+import { unseat } from "./mounts.js";
 import { spendKillCharge } from "./item-charges.js";
 
 export type SaveAnswerDependencies = Readonly<{
@@ -110,6 +111,9 @@ export type SaveAnswerDependencies = Readonly<{
   pushToken?: (
     input: Readonly<{ actorId: string; awayFromActorId: string; distanceFeet: number }>
   ) => Readonly<{ value: number; unit: string }> | null;
+  /** Sets a creature's token down in the nearest unoccupied space beside another's (a rider thrown from its mount);
+   *  false when the map can't. */
+  placeBeside?: (actorId: string, besideId: string) => boolean;
 }>;
 export type SaveOutcome = Readonly<{
   success: boolean;
@@ -1324,6 +1328,8 @@ export function answerSave(
       ...(pending.sourceActorId ? { source: { actorId: pending.sourceActorId, name: pending.sourceName } } : {})
     });
   if (!success && pending.failurePush) events.push(...pushOnFailure(target, pending, deps));
+  // SRD Mounted Combat: a rider that fails to stay on falls off, Prone beside its mount.
+  if (!success && pending.unseats) events.push(...unseat(state, target.id, pending.unseats, deps.placeBeside));
   // Delayed Blast Fireball's bead: fumbled, it goes off where it is; caught, it goes off where it is thrown.
   if (pending.touchedZone) events.push(...settleTouchedZone(state, pending.touchedZone, target, success));
   // "The target dies, and the wisp regains 10 (3d6) Hit Points."

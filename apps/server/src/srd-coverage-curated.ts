@@ -56,7 +56,7 @@ export const CONDITION_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "resolution/attack.ts and ability-checks.ts: Disadvantage on its attack rolls and ability checks, Initiative included."
   ),
   prone: enforced(
-    "movement-rules.ts charges an extra foot per foot while it crawls, and actor-conditions.ts charges half its Speed to stand up. resolution/attack.ts: Disadvantage on its attack rolls, and attack rolls against it have Advantage within 5 feet and Disadvantage beyond."
+    "movement-rules.ts charges an extra foot per foot while it crawls, and actor-conditions.ts charges half its Speed to stand up and lets a creature drop Prone only on its own turn and not at Speed 0. resolution/attack.ts: Disadvantage on its attack rolls, and attack rolls against it have Advantage within 5 feet and Disadvantage beyond."
   ),
   restrained: enforced(
     "speed.ts: Speed 0. resolution/attack.ts: Disadvantage on its attack rolls and Advantage on attack rolls against it. saving-throws.ts: Disadvantage on its Dexterity saves."
@@ -139,7 +139,7 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "Every cantrip a sheet or stat block knows is a cast action with no slot (character-build.ts, monster-spells.ts), and its damage grows at the character levels its row prints (cantripTierAt in the content package)."
   ),
   "carrying-capacity": enforced(
-    "carrying.ts weighs a character's rows and coins (fifty to the pound) against its Strength times its size's figure, and speed.ts holds its Speed to 5 feet while it carries more; the Gear tab shows the load. Dragging, lifting or pushing something it doesn't carry is the GM's."
+    "carrying.ts weighs a character's or stat block's rows and coins (fifty to the pound), what its containers hold counted as each weighs it (containers.ts), against its Strength times its size's figure, one size up with Powerful Build or Beast of Burden. speed.ts holds its Speed to 5 feet while it carries more, up to twice that, and to 0 beyond it; the Gear tab shows the load. Dragging, lifting or pushing something it doesn't carry is the GM's."
   ),
   "challenge-rating": guided(
     "The bestiary shows each monster's CR and XP, and the encounter budget (EncounterBudget.tsx, encounters.ts in rules-5e) rates a fight for the party's levels. The GM decides what to run."
@@ -281,7 +281,9 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
   immunity: enforced(
     "hit-points.ts ignores damage of an immune type. effects.ts refuses a condition the creature is immune to, and a creature that becomes immune (Heroism, a Periapt of Proof against Poison) loses the condition it already has."
   ),
-  "improvised-weapons": reference("An improvised attack is the GM's to set up."),
+  "improvised-weapons": enforced(
+    "builtin-actions.ts and resolution/builtins.ts give every creature an improvised swing and throw: 1d4 plus Strength of a damage type the attacker picks, with no Proficiency Bonus, thrown 20/60. A carried weapon swings or flies as an improvised weapon too (item-actions.ts), and one thrown leaves the hand to be picked up (ammunition.ts). Treating a table leg as a Club is the GM's."
+  ),
   incapacitated: condition("incapacitated"),
   indifferent: enforced(
     "A creature is Indifferent until the GM sets another attitude: its checks roll normally, and Perfume's Advantage reads it (ability-checks.ts)."
@@ -425,12 +427,12 @@ export const GLOSSARY_COVERAGE: Readonly<Record<string, CuratedCoverage>> = {
     "Within its range vision/sight.ts lets a creature see Invisible creatures and into normal and magical Darkness, and attack rolls read it, by the distance between the tokens with dynamic vision off. It succeeds with no roll on its saves against a visual illusion (Phantasmal Force, Phantasmal Killer, Hypnotic Pattern) cast within its range (resolution/pending.ts). True forms and the Ethereal Plane are the GM's."
   ),
   "unarmed-strike": enforced(
-    "resolution/builtins.ts rolls the strike for 1 plus Strength Bludgeoning damage, or the grapple or shove save against 8 plus Strength plus the Proficiency Bonus."
+    "resolution/builtins.ts rolls the strike for 1 plus Strength Bludgeoning damage, or the grapple or shove save against 8 plus Strength plus the Proficiency Bonus; a failed save against the Shove's push moves the target 5 feet away."
   ),
   unconscious: condition("unconscious"),
   "unoccupied-space": enforced("movement-rules.ts ends a move only in a space no other creature fills."),
   utilize: guided(
-    "In a fight the Utilize action takes the user's action on its own turn, and outside one it takes nothing. A Shield donned or doffed (held-items.ts), a door worked on (doors.ts) and a tool's or gear's Utilize use from the sheet (tool-uses.ts) take it, and a use needs the item in the pack. What the object does is the GM's."
+    "In a fight the Utilize action takes the user's action on its own turn, and outside one it takes nothing. A Shield donned or doffed (held-items.ts), a door worked on (doors.ts) and a tool's or gear's Utilize use from the sheet (tool-uses.ts) take it, and a use needs the item in the pack. One object interaction a turn is free: drawing a weapon, opening a door or taking a thing out of a container, and a second takes the Utilize action (object-interactions.ts). What the object does is the GM's."
   ),
   vulnerability: enforced("hit-points.ts doubles damage of a type the creature is vulnerable to, once per instance."),
   weapon: reference("A definition. Each weapon's own row under Weapons says what the app does with it."),
@@ -502,7 +504,9 @@ export const MONSTER_TRAIT_COVERAGE: Readonly<Record<string, CuratedCoverage>> =
   "Barbed Hide": enforced(
     "trait-turns.ts deals 1d10 Piercing damage at the start of the devil's turns to each creature it grapples or that grapples it."
   ),
-  "Beast of Burden": reference("A stat block carries nothing the app weighs, so what the creature hauls is the GM's."),
+  "Beast of Burden": enforced(
+    "carrying.ts counts the creature one size larger for its carrying capacity, and weighs what its inventory holds against it."
+  ),
   Berserk: enforced(
     "trait-turns.ts rolls the d6 when the golem starts its turn Bloodied and keeps it berserk until it isn't Bloodied. Choosing what it attacks is the GM's."
   ),
@@ -994,14 +998,14 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:healers-kit": enforced(
     "stabilize.ts spends one of the kit's ten uses to make a creature at 0 Hit Points Stable with no check, and spending the tenth takes the kit. The Gear tab shows the uses left in it."
   ),
-  "item:chain": guided(
-    "Its action binds a creature within 5 feet that is Grappled, Incapacitated or Restrained: the creature is Restrained until a DC 18 Dexterity (Acrobatics) check, its action, frees it. The DC 13 Strength (Athletics) check to bind it and bursting the Chain are the GM's."
+  "item:chain": enforced(
+    "Its action binds a creature within 5 feet that is Grappled, Incapacitated or Restrained after a DC 13 Strength (Athletics) check (resolution/check-first.ts): the creature is Restrained until a DC 18 Dexterity (Acrobatics) check frees it, or a DC 20 Strength (Athletics) check bursts the Chain, either one its action (resolution/endings.ts)."
   ),
   "item:rope": enforced(
-    "Its action binds a creature within 5 feet that is Grappled, Incapacitated or Restrained: the creature is Restrained until a DC 15 Dexterity (Acrobatics) check, its action, frees it. Its Utilize use ties a knot with a DC 10 Dexterity (Sleight of Hand) check (tool-uses.ts). Bursting the Rope is the GM's."
+    "Its action binds a creature within 5 feet that is Grappled, Incapacitated or Restrained: the creature is Restrained until a DC 15 Dexterity (Acrobatics) check frees it or a DC 20 Strength (Athletics) check bursts the Rope, either one its action (resolution/endings.ts). Its Utilize use ties a knot with a DC 10 Dexterity (Sleight of Hand) check (tool-uses.ts)."
   ),
-  "item:manacles": guided(
-    "Its action binds a Small or Medium creature within 5 feet that is Grappled, Incapacitated or Restrained: it has Disadvantage on attack rolls until a DC 20 Dexterity (Sleight of Hand) check, its action, frees it. The DC 13 check to bind it, the Restrained condition while they are fixed in place, and bursting them are the GM's."
+  "item:manacles": enforced(
+    "Its action binds a Small or Medium creature within 5 feet that is Grappled, Incapacitated or Restrained after a DC 13 Dexterity (Sleight of Hand) check (resolution/check-first.ts): it has Disadvantage on attack rolls, and is Restrained too when the binder fixes the chain in place. A DC 20 Dexterity (Sleight of Hand) check frees it, a DC 25 Strength (Athletics) check bursts them, and another creature with Thieves' Tools picks their lock with a DC 15 Dexterity (Sleight of Hand) check, each one an action (resolution/endings.ts)."
   ),
   "item:arcane-focus-staff": enforced(
     "It swings as a Quarterstaff: 1d6 Bludgeoning, Versatile (1d8), the Topple mastery."
@@ -1492,8 +1496,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:ball-bearings": enforced(
     "Spilling them from the pack places a 10-foot square that rolls nothing as it lands (resolution/concentration.ts). spell-zones.ts asks a creature that enters it for the DC 10 Dexterity save, once a turn, and a failure leaves it Prone. A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). The square stays until the GM ends it, which is gathering them up."
   ),
-  "item:hunting-trap": guided(
-    "Setting it places a 5-foot square (resolution/concentration.ts). The first creature that enters it makes the DC 13 Dexterity save, with 1d4 Piercing damage and a Speed of 0 until the start of its next turn on a failure, and the trap springs and leaves the map (spell-zones.ts). A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). The chain that holds the creature after that, and the Strength (Athletics) check to break free, are the GM's."
+  "item:hunting-trap": enforced(
+    "Setting it places a 5-foot square (resolution/concentration.ts). The first creature that enters it makes the DC 13 Dexterity save, with 1d4 Piercing damage and a Speed of 0 on a failure, and the trap springs and leaves the map (spell-zones.ts). A move that enters it waits there on the save, and a failure ends the move (zone-stops.ts, held-moves.ts). The trap holds the creature until it or a creature beside it breaks free with a DC 13 Strength (Athletics) check as its action, and each failure deals the trapped creature 1 Piercing damage (resolution/endings.ts)."
   ),
   "item:cloak-of-the-bat": guided(
     "Advantage on Dexterity (Stealth) checks is applied. The Fly Speed in darkness and the Polymorph cast are the GM's."
@@ -1535,8 +1539,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:holy-avenger": enforced(
     "The +3 to attack and damage rolls and the extra 2d10 Radiant against Fiends and Undead are applied, and its 10-foot Emanation (30 feet for a level 17 Paladin) gives its wielder and its allies Advantage on saves against magic (saving-throws.ts magicSaveAuraClaims). Only a Paladin attunes to it (attunement.ts)."
   ),
-  "item:iron-bands": guided(
-    "The throw's attack roll is applied. Restraining the target on a hit, and the check to break free, are the GM's."
+  "item:iron-bands": enforced(
+    "The throw's attack roll is applied, and a hit Restrains the target until its user's Bonus Action command releases it (resolution/endings.ts releaseItemEffects). A DC 20 Strength (Athletics) check, its action, breaks the bands and destroys them, and a failure keeps that creature from trying again for 24 hours (resolution/endings.ts)."
   ),
   "item:iron-flask": guided("The command's save is applied. Trapping the creature in the flask is the GM's."),
   "item:luck-blade": guided(
@@ -1575,8 +1579,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:rod-of-alertness": enforced(
     "Advantage on Initiative and Wisdom (Perception) checks, and its detection casts, are applied. The Protective Aura once a dawn plants the rod's light where its user stands for 10 minutes, and while in its 60 feet of Bright Light the user and its allies have +1 to AC and saves and See Invisibility there (zone-auras.ts). Pulling the rod out is the GM's, who ends its area."
   ),
-  "item:rope-of-entanglement": guided(
-    "The save against Restrained is applied, and the rope that holds the target is an object with AC 20 and 20 Hit Points that an attack can break, which frees it (objects.ts). The check to escape the rope, its release and its regrowth are the GM's."
+  "item:rope-of-entanglement": enforced(
+    "The save against Restrained is applied, with the DC 15 Strength (Athletics) or Dexterity (Acrobatics) check to escape (ending-actions.ts), and its user's Bonus Action command releases the target (resolution/endings.ts). The rope that holds it is an object with AC 20 and 20 Hit Points, immune to Poison and Psychic damage, that an attack can break, which frees it, and it regains 1 Hit Point every 5 minutes (objects.ts, effects.ts)."
   ),
   "item:scarab-of-protection": enforced(
     "The +1 AC and Advantage on saves against spells are applied, and Preservation turns a failed save against a Necromancy spell or an Undead into a success for a Reaction and one of its 12 charges, which never come back; the last crumbles it (roll-answers.ts, resolution/charges.ts)."
@@ -2305,7 +2309,7 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Each of its three actions spends 1 to 3 of its 3 charges (1d3 back at dawn) on a ranged spell attack at its printed +7 against a creature within 60 feet, dealing 2d10 Force and pushing it 5 feet for each charge. Its Strength check at +5 a charge to break an object is the GM's."
   ),
   "item:dragon-orb": guided(
-    "Its spells cost their printed charges from 7 (1d4 + 3 back at dawn): Cure Wounds at level 9 for 4, Daylight for 1, Death Ward for 2, Detect Magic for none, Scrying at DC 18 for 3; Call Dragons waits an hour of game time (clock-pools.ts). Peering into it, its Charm and Suggestion on a user who fails the DC 15 Charisma save, the spells answering only to one who controls it, and its AC 20 are the GM's."
+    "Peering into it is a DC 15 Charisma save its user makes: a success gives control of the orb, and a failure leaves the user Charmed by it while attuned, and a player can't end that attunement (attunement.ts); the GM ending the attunement ends either. Only a user who controls it casts its spells, at their printed charges from 7 (1d4 + 3 back at dawn): Cure Wounds at level 9 for 4, Daylight for 1, Death Ward for 2, Detect Magic for none, Scrying at DC 18 for 3; and Call Dragons waits an hour of game time (clock-pools.ts). The Suggestion it casts on a charmed user and its AC 20 are the GM's."
   ),
   "item:carpet-of-flying": enforced(
     "The GM says which of the four sizes a carpet is, and a Magic action makes it hover and fly with its user at that size's Fly Speed until it lands (falling.ts). Its weight limits and half speed, and steering it from 30 feet away, need what the sheet doesn't record."
@@ -2382,20 +2386,72 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "A charge casts Dominate Beast at DC 15 on a creature with a Swim Speed (resolution/action-targets.ts), which affects only a Beast (resolution/type-gates.ts); it has 3 charges and regains 1d3 at dawn, and the cast takes the spell's state. What the Beast does under it is the GM's."
   ),
   "item:net": enforced(
-    "Thrown in place of an attack at a Large or smaller creature the thrower sees within 15 feet, a failed Dexterity save leaves it Restrained, escaped with a DC 10 Strength (Athletics) check. The Net is an object with AC 10 and 5 Hit Points, immune to Bludgeoning damage, and an attack that breaks it frees the creature (objects.ts)."
+    "Thrown in place of an attack at a Large or smaller creature the thrower sees within 15 feet, a failed Dexterity save leaves it Restrained, escaped with a DC 10 Strength (Athletics) check by it or by a creature within 5 feet of it, as that creature's action (resolution/endings.ts). The Net is an object with AC 10 and 5 Hit Points, immune to Bludgeoning, Poison and Psychic damage, and an attack that breaks it frees the creature (objects.ts)."
   ),
   "item:thieves-tools": guided(
-    "door.use's pick rolls a Dexterity (Sleight of Hand) check with the tools against a lock on a door of the map, DC 15 unless the GM sets another, and unlocks it on a success (doors.ts). Its Utilize uses roll from the sheet at their DCs (tool-uses.ts), and every use takes the Utilize action in a fight. Picking Manacles' lock and disarming a trap are the GM's, rolled as the sheet's check."
+    "door.use's pick rolls a Dexterity (Sleight of Hand) check with the tools against a lock on a door of the map, DC 15 unless the GM sets another, and unlocks it on a success (doors.ts). Its Utilize uses roll from the sheet at their DCs (tool-uses.ts), and every use takes the Utilize action in a fight. Picking Manacles' lock is an action of the creature holding the tools beside the bound one (resolution/endings.ts). Disarming a trap is the GM's, rolled as the sheet's check."
   ),
   "item:carpenters-tools": guided(
-    "door.use pries a door on the map open, or seals a closed one, with a DC 20 Strength check with the tools, taking the Utilize action in a fight (doors.ts). A sealed door is forced open at DC 20. Its sheet use takes the Utilize action too (tool-uses.ts), and crafting.ts makes what its Craft line lists in downtime. Prying a container is the GM's."
+    "door.use pries a door on the map open, or seals a closed one, with a DC 20 Strength check with the tools, taking the Utilize action in a fight (doors.ts). A sealed door is forced open at DC 20. Its sheet use takes the Utilize action too (tool-uses.ts), and crafting.ts makes what its Craft line lists in downtime. Prying a container open is the GM's, rolled as the sheet's check: no container has a lid to pry."
   ),
   "item:smiths-tools": guided(
-    "door.use pries a door on the map open with a DC 20 Strength check with the tools, taking the Utilize action in a fight (doors.ts). Its sheet use takes the Utilize action too (tool-uses.ts), and crafting.ts makes what its Craft line lists in downtime, the melee weapons and the armor its bands name among them. Prying a container is the GM's."
+    "door.use pries a door on the map open with a DC 20 Strength check with the tools, taking the Utilize action in a fight (doors.ts). Its sheet use takes the Utilize action too (tool-uses.ts), and crafting.ts makes what its Craft line lists in downtime, the melee weapons and the armor its bands name among them. Prying a container open is the GM's, rolled as the sheet's check: no container has a lid to pry."
   ),
   "item:lock": enforced(
     "A door on the map can be locked (the GM's door editor): it stays shut against everyone but the creatures holding its key, and Thieves' Tools pick it with a DC 15 Dexterity (Sleight of Hand) check (doors.ts)."
   ),
+  "item:bag-of-holding": enforced(
+    "It holds 500 pounds in the Gear tab and weighs 5 pounds whatever it holds (containers.ts, carrying.ts). Retrieving a thing from it takes the Utilize action in a fight. A GM write that overloads it, or puts it inside another extradimensional space, destroys it and spills what it held, and a player is refused instead (containers.ts). Where its contents scatter is the GM's."
+  ),
+  "item:handy-haversack": enforced(
+    "Its central pouch holds 500 pounds and each side pouch 200, picked in the Gear tab; it weighs 5 pounds whatever it holds (containers.ts, carrying.ts). Retrieving a thing from it takes a Bonus Action, or the Utilize action. Overloading it, or putting it in another extradimensional space, destroys it as a Bag of Holding."
+  ),
+  "item:efficient-quiver": enforced(
+    "Its compartments hold 60 pieces of ammunition, 18 javelins or similar, and 6 long objects such as bows or staffs, picked in the Gear tab; it weighs 2 pounds whatever it holds, and ammunition is fired from it (containers.ts, ammunition.ts)."
+  ),
+  "item:portable-hole": guided(
+    "As a container it weighs nothing whatever it holds, and putting it in another extradimensional space destroys both (containers.ts). Opening the hole on a surface, and the creatures and air inside it, are the GM's."
+  ),
+  "item:oil-of-sharpness": enforced(
+    "Applying it outside a fight makes one carried Slashing or Piercing weapon, or up to 20 pieces of ammunition, a +3 Weapon or +3 Ammunition (resolution/rebind.ts), and the vial is spent."
+  ),
+  "item:ammunition-of-slaying": enforced(
+    "The GM picks the creature type it slays. A hit on a creature of that type makes it take the DC 17 Constitution save for 6d10 Force damage, half on a success, and spends the piece's magic; a hit on another creature keeps it (resolution/ammunition.ts)."
+  ),
+  "item:backpack": enforced(
+    "It holds 30 pounds of gear in the Gear tab, weighed with its bearer's load (containers.ts, carrying.ts). Taking a thing out in a fight is the turn's free object interaction, and a second takes the Utilize action (object-interactions.ts)."
+  ),
+  "item:basket": enforced(
+    "It holds 40 pounds of gear in the Gear tab, weighed with its bearer's load (containers.ts, carrying.ts). Taking a thing out in a fight is the turn's free object interaction, and a second takes the Utilize action (object-interactions.ts)."
+  ),
+  "item:pouch": enforced(
+    "It holds 6 pounds of gear in the Gear tab, weighed with its bearer's load, and ammunition in it can be fired (containers.ts, ammunition.ts). Taking a thing out in a fight is the turn's free object interaction, and a second takes the Utilize action (object-interactions.ts)."
+  ),
+  "item:sack": enforced(
+    "It holds 30 pounds of gear in the Gear tab, weighed with its bearer's load (containers.ts, carrying.ts). Taking a thing out in a fight is the turn's free object interaction, and a second takes the Utilize action (object-interactions.ts)."
+  ),
+  "item:quiver": enforced(
+    "It holds 20 Arrows in the Gear tab, which can be fired from it (containers.ts, ammunition.ts)."
+  ),
+  "item:crossbow-bolt-case": enforced(
+    "It holds 20 Bolts in the Gear tab, which can be fired from it (containers.ts, ammunition.ts)."
+  ),
+  "item:climbers-kit": enforced(
+    "Its action anchors its user where it stands, and from then on the user can't move more than 25 feet from that point (movement-rules.ts) or fall more than 25 feet below it (falling.ts); a Bonus Action undoes the anchor."
+  ),
+  "item:torch": enforced(
+    "A lit Torch swings as a Simple Melee weapon for 1 Fire damage (equipment-derivation.ts), and its light is item-light.ts's."
+  ),
+  "item:basic-poison": enforced(
+    "Its Bonus Action coats one carried weapon, or three pieces of one stack of ammunition, that the user picks (resolution/grant-extras.ts): for 1 minute a Piercing or Slashing hit with that weapon or ammunition alone deals the extra 1d4 Poison damage, which spends the coat."
+  ),
+  "item:saddle-exotic": enforced(
+    "A mount that flies or swims needs one to be ridden: mounts.ts refuses a rider without it."
+  ),
+  "item:saddle-military": enforced(
+    "Its rider has Advantage on the Dexterity save to stay mounted when the mount is moved against its will or knocked Prone (mounts.ts)."
+  ),
+  "item:saddle-riding": reference("Riding needs no saddle the app checks: one in the mount's inventory reads as tack."),
   "item:portable-ram": enforced(
     "Forcing a door with door.use adds 4 to the Strength (Athletics) check while the creature carries the ram, and another creature beside the door helping gives Advantage (doors.ts)."
   ),

@@ -381,8 +381,9 @@ export function CharacterSheet({
       }}
     />
   ) : null;
+  // The GM keeps a creature's gear too: a mount's saddle and barding.
   const gearBody =
-    actor.kind === "player-character" ? (
+    actor.kind === "player-character" || role === "gm" ? (
       <GearTab
         actor={actor}
         role={role}

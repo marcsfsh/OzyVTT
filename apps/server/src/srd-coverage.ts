@@ -491,8 +491,10 @@ export function srdCoverageRows(): CoverageRow[] {
       name: item.name,
       ...curatedOr(`item:${item.id}`, itemState(item, spellStates))
     });
-  // The equipment catalog folds in weapons, armor and magic items, which have their own groups.
-  const gear = loadEquipment().filter((item) => !item.isMagic && item.weapon === null && item.armor === null);
+  // The equipment catalog folds in weapons, armor and magic items, which have their own groups. Gear that also swings
+  // as a weapon (a Torch, a staff focus) is still gear.
+  const ownGroup = new Set([...loadWeapons(), ...loadArmor()].map((record) => record.id));
+  const gear = loadEquipment().filter((item) => !item.isMagic && !ownGroup.has(item.id));
   for (const item of gear)
     rows.push({
       group: "Gear and tools",

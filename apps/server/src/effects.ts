@@ -11,6 +11,7 @@ import { DESCENDS_SAFELY_TAG, descendSafely } from "./altitude.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import { restoreSuppressed } from "./suppressed-conditions.js";
 import { refreshArmorClass } from "./held-items.js";
+import { knockedProneWhileMounted } from "./mounts.js";
 
 /** Effect lifecycle (ADR-0020): the engine ends effects on turn boundaries, source defeat and explicit
  *  end, which clears linked conditions and fires onEnd grants. Returns narration events and writes nothing to
@@ -359,6 +360,8 @@ export function conditionGained(
 ): EffectNarration[] {
   const events: EffectNarration[] = [];
   if (conditionId === "unconscious") events.push(...dropHeldItems(actor, source));
+  // SRD Mounted Combat: a rider knocked Prone, or whose mount is, saves to stay on.
+  if (conditionId === "prone") events.push(...knockedProneWhileMounted(state, actor));
   if ((INCAPACITATING_CONDITIONS as readonly string[]).includes(conditionId)) {
     events.push(...releaseGrapplesHeldBy(state, actor.id));
     events.push(...endConcentrationSustainedBy(state, actor.id));
@@ -943,6 +946,7 @@ export function ageEffects(
       // A cascade earlier in the sweep may have ended it already.
       const current = actor.effects.find((candidate) => candidate.id === effect.id);
       if (!current) continue;
+      if (countDown) regrowHolder(actor, current, minutes);
       const left = remainingAfter(current.duration, minutes);
       if (left === null) continue;
       if (left <= 0) {
@@ -957,6 +961,23 @@ export function ageEffects(
     }
   }
   return events;
+}
+
+/** An object holding the bearer that regrows as time passes (a Rope of Entanglement: "It regains 1 Hit Point every 5
+ *  minutes as long as it has at least 1 Hit Point"). */
+function regrowHolder(actor: Actor, effect: EffectInstance, minutes: number): void {
+  const holder = effect.heldBy;
+  if (!holder?.regainsEvery || holder.hitPoints.current < 1) return;
+  const current = Math.min(
+    holder.hitPoints.maximum,
+    holder.hitPoints.current + Math.floor(minutes / holder.regainsEvery)
+  );
+  if (current === holder.hitPoints.current) return;
+  actor.effects = actor.effects.map((candidate) =>
+    candidate.id === effect.id
+      ? { ...candidate, heldBy: { ...holder, hitPoints: { ...holder.hitPoints, current } } }
+      : candidate
+  );
 }
 
 /** A creature just made Stable starts its 1d4 hours on the game clock, rolled now (SRD Damage and Healing: "A Stable

@@ -45,9 +45,14 @@ export function spendUtilize(
   actor: Actor,
   initiator: Pick<Initiator, "role">,
   what: string,
-  options: Readonly<{ bonusAction?: boolean; definition?: ActorDefinition | undefined }> = {}
+  options: Readonly<{
+    bonusAction?: boolean;
+    definition?: ActorDefinition | undefined;
+    /** The thing lets anyone use it as a Bonus Action (a Handy Haversack), so Fast Hands isn't needed. */
+    anyone?: boolean;
+  }> = {}
 ): UtilizeSpent {
-  if (options.bonusAction) requireFastHands(actor, options.definition);
+  if (options.bonusAction && options.anyone !== true) requireFastHands(actor, options.definition);
   const combat = state.combat;
   if (!fighting(state, actor)) return null;
   if (combat.turnActorId !== actor.id) {

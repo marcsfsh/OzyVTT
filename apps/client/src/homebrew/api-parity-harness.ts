@@ -745,6 +745,27 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "actions[].checkFirst.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "the check its user makes before the action lands (binding with a Chain or Manacles) - authored in the gear and item overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].endsItemEffects",
+    types: ACTION_CARRIERS,
+    reason:
+      "a command that releases what the item's other actions hold (Iron Bands, a Rope of Entanglement) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "actions[].rebindsRow.**",
+    types: ACTION_CARRIERS,
+    reason:
+      "remaking a carried weapon or stack of ammunition as a magic one (Oil of Sharpness) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "actions[].damage[].pick",
     types: ACTION_CARRIERS,
     reason:
@@ -1316,6 +1337,13 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     status: "gap"
   },
   {
+    at: "casts[].requiresEffectTag",
+    types: ["equipment"],
+    reason:
+      "the effect an item's cast needs on its user (a Dragon Orb's control) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
     at: "casts[].useCost",
     types: ["equipment"],
     reason:
@@ -1570,6 +1598,20 @@ export const EXEMPTIONS: readonly ExemptionRow[] = [
     types: ["equipment"],
     reason:
       "what a magic weapon changes about its bound base (a Dwarven Thrower's Thrown 20/60, an Energy Bow's Force) - authored in the item overlay; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^container.**",
+    types: ["equipment"],
+    reason:
+      "what the item holds as a container (a Backpack's 30 pounds, a Handy Haversack's pouches) - authored in the gear and item overlays; no editor control yet",
+    status: "gap"
+  },
+  {
+    at: "^attunementHeldBy",
+    types: ["equipment"],
+    reason:
+      "the effect that keeps its bearer attuned (a Dragon Orb's charm) - authored in the item overlay; no editor control yet",
     status: "gap"
   },
   {

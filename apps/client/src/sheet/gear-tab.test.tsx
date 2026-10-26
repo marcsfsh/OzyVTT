@@ -49,6 +49,26 @@ const CATALOG: readonly ContentEquipmentSummary[] = loadEquipment().map((item) =
           ...(item.variantChoice?.activation ? { activation: item.variantChoice.activation } : {})
         }
       }
+    : {}),
+  ...(item.container
+    ? {
+        container: {
+          ...(item.container.capacityLb !== undefined ? { capacityLb: item.container.capacityLb } : {}),
+          ...(item.container.pieces ? { pieces: item.container.pieces.count } : {}),
+          ...(item.container.compartments
+            ? {
+                compartments: item.container.compartments.map(({ id, name, capacityLb, count }) => ({
+                  id,
+                  name,
+                  ...(capacityLb !== undefined ? { capacityLb } : {}),
+                  ...(count !== undefined ? { count } : {})
+                }))
+              }
+            : {}),
+          ...(item.container.weighsLb !== undefined ? { weighsLb: item.container.weighsLb } : {}),
+          ...(item.container.retrieval ? { retrieval: item.container.retrieval } : {})
+        }
+      }
     : {})
 }));
 /** The spell reference's fields a scroll's spell list reads. */
@@ -66,7 +86,7 @@ const emit = socket.emit as unknown as ReturnType<typeof vi.fn>;
 function serve(
   attunementSlots = 3,
   actions: readonly unknown[] = [],
-  carrying: Readonly<{ pounds: number; capacity: number }> | null = null
+  carrying: Readonly<{ pounds: number; capacity: number; dragLimit?: number }> | null = null
 ) {
   emit.mockImplementation((event: string, _payload: unknown, ack?: (result: unknown) => void) => {
     if (event === "content:equipment") ack?.({ ok: true, equipment: CATALOG, attribution: "SRD 5.2.1, CC BY 4.0." });
@@ -665,10 +685,79 @@ describe("what the character carries", () => {
   });
 
   it("weighs the load, and says when it is more than the character can carry", async () => {
-    serve(3, [], { pounds: 160, capacity: 150 });
+    serve(3, [], { pounds: 160, capacity: 150, dragLimit: 300 });
     render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
     await openGear(userEvent.setup());
     expect(await screen.findByText("160 of 150 lb.")).toBeTruthy();
-    expect(screen.getByText("That is more than Aria can carry, so their Speed is at most 5 feet.")).toBeTruthy();
+    expect(screen.getByText("That is more than Aria can carry, so Aria's Speed is at most 5 feet.")).toBeTruthy();
+  });
+
+  it("says when the load is more than the character can drag", async () => {
+    serve(3, [], { pounds: 310, capacity: 150, dragLimit: 300 });
+    render(<CharacterSheet actor={hero()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    await openGear(userEvent.setup());
+    expect(
+      await screen.findByText("That is more than Aria can drag, lift or push, so Aria's Speed is 0.")
+    ).toBeTruthy();
+  });
+});
+
+describe("containers", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const packed = (over: Record<string, unknown> = {}) =>
+    hero({
+      inventory: [
+        { id: "backpack", name: "Backpack", quantity: 1, equipped: false, attuned: false },
+        { id: "rope", name: "Rope", quantity: 1, equipped: false, attuned: false, containerId: "backpack" },
+        { id: "bag-of-holding", name: "Bag of Holding", quantity: 1, equipped: false, attuned: false },
+        { id: "dagger", name: "Dagger", quantity: 1, equipped: true, attuned: false }
+      ],
+      ...over
+    });
+
+  it("lists what a container holds under it, with its load", async () => {
+    serve();
+    render(<CharacterSheet actor={packed()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    await openGear(userEvent.setup());
+    expect(rowOf("Backpack").textContent).toContain("5 of 30 lb inside");
+    const inside = within(await screen.findByRole("list", { name: "In the Backpack" }));
+    expect(inside.getByText("Rope")).toBeTruthy();
+  });
+
+  it("puts a thing in a container, and takes it out, from its detail", async () => {
+    serve();
+    render(<CharacterSheet actor={packed()} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await openGear(user);
+    await user.click(rowOf("Dagger"));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Where the Dagger is" }), "bag-of-holding");
+    expect(sent("character:set-inventory").at(-1)).toMatchObject({
+      item: { id: "dagger", containerId: "bag-of-holding" }
+    });
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(rowOf("Rope"));
+    expect(screen.getByRole("button", { name: "Equip" }).hasAttribute("disabled")).toBe(true);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Where the Rope is" }), "");
+    const out = sent("character:set-inventory").at(-1) as { item: { containerId?: string } };
+    expect(out.item.containerId).toBeUndefined();
+  });
+
+  it("names a Handy Haversack's pouches as places to put a thing", async () => {
+    serve();
+    const actor = packed({
+      inventory: [
+        { id: "handy-haversack", name: "Handy Haversack", quantity: 1, equipped: false, attuned: false },
+        { id: "rope", name: "Rope", quantity: 1, equipped: false, attuned: false }
+      ]
+    });
+    render(<CharacterSheet actor={actor} role="player" onClose={() => {}} />, { wrapper: ToastProvider });
+    const user = userEvent.setup();
+    await openGear(user);
+    await user.click(rowOf("Rope"));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Where the Rope is" }), "handy-haversack|left");
+    expect(sent("character:set-inventory").at(-1)).toMatchObject({
+      item: { id: "rope", containerId: "handy-haversack", compartment: "left" }
+    });
   });
 });

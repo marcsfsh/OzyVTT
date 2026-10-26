@@ -227,7 +227,9 @@ export function castAction(
     ...(uses && cast.alsoUses
       ? { alsoUses: { limit: cast.alsoUses.limit, pool: itemPool(item, `${cast.spellId}-dawn`) } }
       : {}),
-    ...(cast.check ? { castCheck: { ...cast.check } } : {})
+    ...(cast.check ? { castCheck: { ...cast.check } } : {}),
+    // Only while its user controls the item (a Dragon Orb's spells).
+    ...(cast.requiresEffectTag ? { requiresEffectTag: cast.requiresEffectTag } : {})
   };
   if (!spell) return base;
 
@@ -826,6 +828,48 @@ export function weaponSwing(
     ...(pickable.length >= 2 ? { damageTypes: pickable } : {})
   };
   return { action, dice, modifier };
+}
+
+/** The id suffixes of a weapon used as an improvised weapon: a Ranged weapon swung in melee, a Melee weapon without the
+ *  Thrown property thrown. */
+export const IMPROVISED_MELEE_SUFFIX = "improvised";
+export const IMPROVISED_THROWN_SUFFIX = "thrown-improvised";
+
+/** SRD Improvised Weapons: what an improvised attack deals, the type the GM thinks fits the object. */
+export const IMPROVISED_DAMAGE_TYPES = ["bludgeoning", "piercing", "slashing"] as const;
+
+/**
+ * SRD Improvised Weapons: "if you use a Ranged weapon to make a melee attack or throw a Melee weapon that lacks the
+ * Thrown property, the weapon counts as an improvised weapon": no Proficiency Bonus, 1d4 damage of a type the GM
+ * picks, and a thrown one has a normal range of 20 feet and a long range of 60. Null when the weapon is used as it is
+ * made (a Melee weapon swung, a Ranged or Thrown one fired or thrown).
+ */
+export function improvisedSwing(
+  item: InventoryItem,
+  definition: ActorDefinition | undefined,
+  form: "melee" | "thrown"
+): ActorAction | null {
+  const weapon = item.weapon;
+  if (!weapon || !definition) return null;
+  const properties = weapon.properties ?? [];
+  const melee = isMeleeWeapon(properties, weapon.rangeFeet, weapon.melee);
+  if (form === "melee" ? melee : !melee || properties.includes("thrown")) return null;
+  const modifier = abilityModifier(definition.abilityScores.str);
+  return {
+    id: itemActionId(item.id, form === "melee" ? IMPROVISED_MELEE_SUFFIX : IMPROVISED_THROWN_SUFFIX),
+    name: form === "melee" ? `${item.name} (improvised melee)` : `${item.name} (thrown, improvised)`,
+    activation: "action",
+    description:
+      form === "melee"
+        ? `Swing ${item.name} in melee as an improvised weapon: no Proficiency Bonus, 1d4 damage of the type that fits.`
+        : `Throw ${item.name} as an improvised weapon, 20/60 feet: no Proficiency Bonus, 1d4 damage of the type that fits.`,
+    attack: {
+      bonus: modifier,
+      ...(form === "melee" ? { reachFeet: 5 } : { rangeFeet: 60, rangeNormalFeet: 20 })
+    },
+    damage: [{ formula: withModifier("1d4", modifier), type: "bludgeoning" }],
+    damageTypes: [...IMPROVISED_DAMAGE_TYPES]
+  };
 }
 
 /** "1d8 + 3", "1d4 - 1", or the dice alone. A fixed amount ("1", a Blowgun) stays as it is: the SRD adds no ability

@@ -70,6 +70,403 @@
   },
   "cursed": false,
   "casts": [],
+  "variants": [
+   {
+    "id": "aberration",
+    "name": "Aberration Slaying",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Ammunition of Slaying",
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "failureDamage": [
+        {
+         "formula": "6d10",
+         "type": "force"
+        }
+       ],
+       "halfOnSuccess": true
+      },
+      "creatureTypes": [
+       "aberration"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "beast",
+    "name": "Beast Slaying",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Ammunition of Slaying",
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "failureDamage": [
+        {
+         "formula": "6d10",
+         "type": "force"
+        }
+       ],
+       "halfOnSuccess": true
+      },
+      "creatureTypes": [
+       "beast"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "celestial",
+    "name": "Celestial Slaying",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Ammunition of Slaying",
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "failureDamage": [
+        {
+         "formula": "6d10",
+         "type": "force"
+        }
+       ],
+       "halfOnSuccess": true
+      },
+      "creatureTypes": [
+       "celestial"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "construct",
+    "name": "Construct Slaying",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Ammunition of Slaying",
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "failureDamage": [
+        {
+         "formula": "6d10",
+         "type": "force"
+        }
+       ],
+       "halfOnSuccess": true
+      },
+      "creatureTypes": [
+       "construct"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "dragon",
+    "name": "Dragon Slaying",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Ammunition of Slaying",
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "failureDamage": [
+        {
+         "formula": "6d10",
+         "type": "force"
+        }
+       ],
+       "halfOnSuccess": true
+      },
+      "creatureTypes": [
+       "dragon"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "elemental",
+    "name": "Elemental Slaying",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Ammunition of Slaying",
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "failureDamage": [
+        {
+         "formula": "6d10",
+         "type": "force"
+        }
+       ],
+       "halfOnSuccess": true
+      },
+      "creatureTypes": [
+       "elemental"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "humanoid",
+    "name": "Humanoid Slaying",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Ammunition of Slaying",
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "failureDamage": [
+        {
+         "formula": "6d10",
+         "type": "force"
+        }
+       ],
+       "halfOnSuccess": true
+      },
+      "creatureTypes": [
+       "humanoid"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "fey",
+    "name": "Fey Slaying",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Ammunition of Slaying",
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "failureDamage": [
+        {
+         "formula": "6d10",
+         "type": "force"
+        }
+       ],
+       "halfOnSuccess": true
+      },
+      "creatureTypes": [
+       "fey"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "fiend",
+    "name": "Fiend Slaying",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Ammunition of Slaying",
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "failureDamage": [
+        {
+         "formula": "6d10",
+         "type": "force"
+        }
+       ],
+       "halfOnSuccess": true
+      },
+      "creatureTypes": [
+       "fiend"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "giant",
+    "name": "Giant Slaying",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Ammunition of Slaying",
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "failureDamage": [
+        {
+         "formula": "6d10",
+         "type": "force"
+        }
+       ],
+       "halfOnSuccess": true
+      },
+      "creatureTypes": [
+       "giant"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "monstrosity",
+    "name": "Monstrosity Slaying",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Ammunition of Slaying",
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "failureDamage": [
+        {
+         "formula": "6d10",
+         "type": "force"
+        }
+       ],
+       "halfOnSuccess": true
+      },
+      "creatureTypes": [
+       "monstrosity"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "ooze",
+    "name": "Ooze Slaying",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Ammunition of Slaying",
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "failureDamage": [
+        {
+         "formula": "6d10",
+         "type": "force"
+        }
+       ],
+       "halfOnSuccess": true
+      },
+      "creatureTypes": [
+       "ooze"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "plant",
+    "name": "Plant Slaying",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Ammunition of Slaying",
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "failureDamage": [
+        {
+         "formula": "6d10",
+         "type": "force"
+        }
+       ],
+       "halfOnSuccess": true
+      },
+      "creatureTypes": [
+       "plant"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "undead",
+    "name": "Undead Slaying",
+    "modifiers": [],
+    "actions": [],
+    "casts": [],
+    "effects": [],
+    "onHit": [
+     {
+      "conditions": [],
+      "name": "Ammunition of Slaying",
+      "save": {
+       "ability": "con",
+       "dc": 17,
+       "failureDamage": [
+        {
+         "formula": "6d10",
+         "type": "force"
+        }
+       ],
+       "halfOnSuccess": true
+      },
+      "creatureTypes": [
+       "undead"
+      ]
+     }
+    ]
+   }
+  ],
+  "variantChoice": {
+   "by": "gm"
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -985,6 +1382,13 @@
   },
   "cursed": false,
   "casts": [],
+  "container": {
+   "capacityLb": 500,
+   "weighsLb": 5,
+   "retrieval": "utilize",
+   "overloadDestroys": true,
+   "extradimensional": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -3650,7 +4054,8 @@
      "pool": "dragon-orb-charges"
     },
     "useCost": 4,
-    "consumesSpellSlot": false
+    "consumesSpellSlot": false,
+    "requiresEffectTag": "dragon-orb-control"
    },
    {
     "spellId": "daylight",
@@ -3659,7 +4064,8 @@
      "per": "long-rest",
      "pool": "dragon-orb-charges"
     },
-    "consumesSpellSlot": false
+    "consumesSpellSlot": false,
+    "requiresEffectTag": "dragon-orb-control"
    },
    {
     "spellId": "death-ward",
@@ -3669,11 +4075,13 @@
      "pool": "dragon-orb-charges"
     },
     "useCost": 2,
-    "consumesSpellSlot": false
+    "consumesSpellSlot": false,
+    "requiresEffectTag": "dragon-orb-control"
    },
    {
     "spellId": "detect-magic",
-    "consumesSpellSlot": false
+    "consumesSpellSlot": false,
+    "requiresEffectTag": "dragon-orb-control"
    },
    {
     "spellId": "scrying",
@@ -3684,22 +4092,58 @@
      "pool": "dragon-orb-charges"
     },
     "useCost": 3,
-    "consumesSpellSlot": false
+    "consumesSpellSlot": false,
+    "requiresEffectTag": "dragon-orb-control"
    }
   ],
   "charges": {
    "regain": "1d4 + 3",
    "lastChargeRoll": false
   },
+  "attunementHeldBy": "dragon-orb-charmed",
   "grantsFeatIds": [],
   "tags": [],
   "actions": [
+   {
+    "id": "peer",
+    "name": "Peer into the Orb",
+    "activation": "action",
+    "description": "Peer into the orb's depths and make a DC 15 Charisma saving throw. On a successful save, you control the orb for as long as you remain attuned to it. On a failed save, the orb imposes the Charmed condition on you for as long as you remain attuned to it. While you are Charmed by the orb, you can't voluntarily end your Attunement to it.",
+    "damage": [],
+    "targets": {
+     "count": 1,
+     "who": "self"
+    },
+    "save": {
+     "ability": "cha",
+     "dc": 15,
+     "successDamage": "none",
+     "failureConditions": [
+      "charmed"
+     ],
+     "failureEffect": {
+      "name": "Charmed by the Dragon Orb",
+      "tags": [
+       "dragon-orb-charmed"
+      ],
+      "modifiers": []
+     },
+     "successEffect": {
+      "name": "Controls the Dragon Orb",
+      "tags": [
+       "dragon-orb-control"
+      ],
+      "modifiers": []
+     }
+    }
+   },
    {
     "id": "call-dragons",
     "name": "Call Dragons",
     "activation": "action",
     "description": "While you control the orb, it issues a telepathic call for 40 miles in every direction. Chromatic dragons in range feel compelled to come to the orb as soon as possible by the most direct route, and might be Hostile toward you for compelling them. It can't be used again for 1 hour.",
     "damage": [],
+    "requiresEffectTag": "dragon-orb-control",
     "uses": {
      "limit": 1,
      "per": "time",
@@ -4109,7 +4553,8 @@
     "thrown"
    ],
    "rangeFeet": 20,
-   "longRangeFeet": 60
+   "longRangeFeet": 60,
+   "returns": true
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -4186,6 +4631,30 @@
   },
   "cursed": false,
   "casts": [],
+  "container": {
+   "compartments": [
+    {
+     "id": "shortest",
+     "name": "Shortest compartment",
+     "count": 60,
+     "holds": "ammunition"
+    },
+    {
+     "id": "midsize",
+     "name": "Midsize compartment",
+     "count": 18,
+     "holds": "weapons"
+    },
+    {
+     "id": "longest",
+     "name": "Longest compartment",
+     "count": 6,
+     "holds": "weapons"
+    }
+   ],
+   "weighsLb": 2,
+   "drawsAmmunition": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -6143,6 +6612,29 @@
   },
   "cursed": false,
   "casts": [],
+  "container": {
+   "compartments": [
+    {
+     "id": "central",
+     "name": "Central pouch",
+     "capacityLb": 500
+    },
+    {
+     "id": "left",
+     "name": "Left side pouch",
+     "capacityLb": 200
+    },
+    {
+     "id": "right",
+     "name": "Right side pouch",
+     "capacityLb": 200
+    }
+   ],
+   "weighsLb": 5,
+   "retrieval": "utilize-or-bonus-action",
+   "overloadDestroys": true,
+   "extradimensional": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -7178,10 +7670,17 @@
        }
       ],
       "name": "Iron Bands",
-      "escapeDc": 20,
-      "tags": [
-       "escape-athletics"
-      ]
+      "endedBy": {
+       "name": "Break the Iron Bands",
+       "by": "either",
+       "check": {
+        "ability": "str",
+        "skill": "athletics",
+        "dc": 20
+       },
+       "lockoutHours": 24,
+       "destroysItem": true
+      }
      }
     ],
     "targets": {
@@ -7199,6 +7698,14 @@
      "proficient": true,
      "rangeFeet": 60
     }
+   },
+   {
+    "id": "release",
+    "name": "Release the Bands' Target",
+    "activation": "bonus-action",
+    "description": "Issue the command that releases the creature the bands Restrain. The bands contract into a sphere once more.",
+    "damage": [],
+    "endsItemEffects": true
    }
   ],
   "effects": [],
@@ -8411,9 +8918,27 @@
   },
   "cursed": false,
   "casts": [],
+  "consumedOnUse": true,
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "apply",
+    "name": "Apply Oil of Sharpness",
+    "activation": "action",
+    "description": "Spend 1 minute coating a nonmagical Melee weapon or twenty pieces of nonmagical ammunition that deal Slashing or Piercing damage: the weapon becomes a +3 Weapon, or the ammunition +3 Ammunition.",
+    "damage": [],
+    "rebindsRow": {
+     "weapon": "weapon-3",
+     "ammunition": "ammunition-3",
+     "pieces": 20,
+     "damageTypes": [
+      "slashing",
+      "piercing"
+     ]
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },
@@ -8843,6 +9368,10 @@
   },
   "cursed": false,
   "casts": [],
+  "container": {
+   "weighsLb": 0,
+   "extradimensional": true
+  },
   "grantsFeatIds": [],
   "tags": [],
   "actions": [],
@@ -10712,7 +11241,8 @@
     "thrown"
    ],
    "rangeFeet": 30,
-   "longRangeFeet": 120
+   "longRangeFeet": 120,
+   "returns": true
   },
   "grantsFeatIds": [],
   "tags": [],
@@ -13073,9 +13603,22 @@
      "heldBy": {
       "name": "Rope",
       "armorClass": 20,
-      "hitPoints": 20
+      "hitPoints": 20,
+      "immunities": [
+       "poison",
+       "psychic"
+      ],
+      "regainsEvery": 5
      }
     }
+   },
+   {
+    "id": "release",
+    "name": "Release the Rope's Target",
+    "activation": "bonus-action",
+    "description": "Repeat the command to release the creature the rope Restrains. The rope coils up in your hand.",
+    "damage": [],
+    "endsItemEffects": true
    }
   ],
   "effects": [],

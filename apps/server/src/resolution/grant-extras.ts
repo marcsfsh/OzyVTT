@@ -11,6 +11,8 @@ import {
   type Modifier
 } from "@vtt/schemas";
 import { spellClassOf } from "../class-features.js";
+import { END_EFFECT_ACTION_ID } from "../ending-actions.js";
+import { ammunitionOf } from "../ammunition.js";
 import type { EquipmentCatalog } from "../equipment-derivation.js";
 import { CommandRejectedError } from "../game-store.js";
 import { withArticle } from "@vtt/domain";
@@ -46,7 +48,9 @@ export function checkChoices(
   catalog: EquipmentCatalog | undefined
 ): void {
   const offered = optionsOf(action);
-  const picks = [input.optionId, ...Object.values(input.targetOptions ?? {})].filter(
+  // End an Effect's pick is the way out it takes (`resolution/endings.ts`).
+  const own = action.id === END_EFFECT_ACTION_ID ? [] : [input.optionId];
+  const picks = [...own, ...Object.values(input.targetOptions ?? {})].filter(
     (pick): pick is string => typeof pick === "string"
   );
   for (const pick of picks)
@@ -55,7 +59,8 @@ export function checkChoices(
   if (Object.keys(input.targetOptions ?? {}).some((id) => !input.targetIds.includes(id)))
     throw new CommandRejectedError("Each choice must be for one of the action's targets.");
   const binds = action.grants?.bindsWeapon;
-  if (input.itemId != null && !binds) throw new CommandRejectedError(`${action.name} isn't cast on a weapon.`);
+  if (input.itemId != null && !binds && !action.rebindsRow)
+    throw new CommandRejectedError(`${action.name} isn't cast on a weapon.`);
   if (binds && input.itemId != null && action.grants!.target === "self")
     fittingRow(attacker, binds, input.itemId, catalog, action.name);
 }
@@ -268,7 +273,8 @@ function fittingRow(
   what: string
 ): InventoryItem {
   const row = bearer.inventory.find((entry) => entry.id === itemId && entry.quantity > 0);
-  if (!row) throw new CommandRejectedError(`${bearer.name} isn't carrying that weapon.`);
+  if (!row)
+    throw new CommandRejectedError(`${bearer.name} isn't carrying that ${binds.ammunition ? "ammunition" : "weapon"}.`);
   const problem = rowProblem(row, binds, catalog);
   if (problem) throw new CommandRejectedError(`${what} can't be cast on ${row.name}: ${problem}.`);
   return row;
@@ -280,6 +286,7 @@ function rowProblem(
   binds: NonNullable<Grant["bindsWeapon"]>,
   catalog: EquipmentCatalog | undefined
 ): string | null {
+  if (binds.ammunition) return ammunitionOf(row, catalog) === null ? "it isn't ammunition" : null;
   const weapon = row.weapon;
   if (!weapon) return "it isn't a weapon";
   const ids = row.baseId !== undefined ? [catalogIdOf(row), row.baseId] : [catalogIdOf(row)];

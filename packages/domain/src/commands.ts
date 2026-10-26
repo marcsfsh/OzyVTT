@@ -2191,6 +2191,9 @@ export const ActorMountSchema = z
     commandId: z.uuid(),
     actorId: z.uuid(),
     mountId: z.uuid().nullable(),
+    /** SRD Mounted Combat: the rider controls the mount (it moves on the rider's Initiative and only Dashes, Disengages
+     *  or Dodges), or lets it act on its own (an intelligent mount, a wild one). Absent: controlled. */
+    control: z.enum(["controlled", "independent"]).optional(),
     /** GM-grade bypass of a movement-rule rejection (the half Speed it costs, a mount too small or too far). */
     override: RulesOverrideSchema.optional(),
     expectedRevision: z.number().int().nonnegative().optional()

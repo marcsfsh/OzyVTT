@@ -54,6 +54,11 @@ describe("rule families", () => {
       ["movement.jump", "movement"],
       ["movement.toward-fear", "movement"],
       ["movement.mount", "movement"],
+      // Dropping Prone on another's turn, and moving past a climbing anchor's tether.
+      ["movement.drop-prone", "movement"],
+      ["movement.tether", "movement"],
+      // A controlled mount's action: what it may take is the economy of its turn.
+      ["mount.controlled", "economy"],
       ["economy.action-used", "economy"],
       ["action.underwater-only", "economy"],
       ["economy.bonus-action-used", "economy"],

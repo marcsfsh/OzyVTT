@@ -159,7 +159,10 @@ export const ObjectPrintSchema = z
     resistances: z.array(DamageTypeSchema).max(13).optional(),
     vulnerabilities: z.array(DamageTypeSchema).max(13).optional(),
     /** Immune to all damage (Wall of Force): only a rule that names it ends it (Disintegrate). */
-    immuneToAll: z.literal(true).optional()
+    immuneToAll: z.literal(true).optional(),
+    /** It regains 1 Hit Point each time this many minutes of game time pass, while it has at least 1 (a Rope of
+     *  Entanglement's 5). */
+    regainsEvery: z.number().int().min(1).max(1440).optional()
   })
   .strict();
 export type ObjectPrint = z.infer<typeof ObjectPrintSchema>;
@@ -1388,7 +1391,10 @@ const RepeatFailureDamageSchema = z
  * "bearer", the default) or of the effect's source (`near` "source": pulling a creature out of a gelatinous cube), or
  * either. With `check`, the action is an ability check that must succeed, against `dc` or the save's own DC; without,
  * the action alone ends it ("a creature within 5 feet of it takes an action to wake it"). `takerDamage` is what the
- * creature that succeeds takes (the cube's acid).
+ * creature that succeeds takes (the cube's acid). `tool` is a tool the taker must carry, whose proficiency the check
+ * adds (picking Manacles' lock with Thieves' Tools). `failureDamage` is what the bearer takes on each failed check (a
+ * Hunting Trap's 1 Piercing). `lockoutHours` makes a failed taker's later tries fail for that long (Iron Bands' 24
+ * hours), and `destroysItem` destroys the item whose action made the effect when the check succeeds (Iron Bands).
  */
 export const EndedBySchema = z
   .object({
@@ -1405,13 +1411,26 @@ export const EndedBySchema = z
       })
       .strict()
       .optional(),
-    takerDamage: RepeatFailureDamageSchema.optional()
+    takerDamage: RepeatFailureDamageSchema.optional(),
+    tool: RiderSlugSchema.optional(),
+    failureDamage: z
+      .array(z.object({ formula: DamageFormulaSchema, type: DamageTypeSchema }).strict())
+      .min(1)
+      .max(2)
+      .optional(),
+    lockoutHours: z.number().int().min(1).max(168).optional(),
+    destroysItem: z.literal(true).optional()
   })
   .strict()
   .describe(
-    "An action that ends the effect: who may take it (the bearer, others within 5 feet of the bearer or the source, or either), the ability check it needs if any, and the damage the one who succeeds takes"
+    "An action that ends the effect: who may take it (the bearer, others within 5 feet of the bearer or the source, or either), the ability check it needs if any (with a tool the taker must carry), the damage the one who succeeds takes, the damage the bearer takes on each failed check, how long a failed taker's later tries fail, and whether success destroys the item that made the effect"
   );
 export type EndedBy = z.infer<typeof EndedBySchema>;
+/** The ways an effect ends by an action: one, or several (a Chain's escape and its burst). */
+export const EndedByListSchema = z.union([EndedBySchema, z.array(EndedBySchema).min(1).max(4)]);
+/** Every ending action an effect carries, in order. */
+export const endingsOf = (effect: Readonly<{ endedBy?: z.infer<typeof EndedByListSchema> | undefined }>): EndedBy[] =>
+  effect.endedBy === undefined ? [] : Array.isArray(effect.endedBy) ? effect.endedBy : [effect.endedBy];
 
 /**
  * What an effect does as its bearer rests or as days pass (a mummy's curse, an otyugh's poison):
@@ -1891,8 +1910,9 @@ export const EffectInstanceSchema = z
       })
       .strict()
       .optional(),
-    /** An action that ends it: waking a sleeper, stanching a wound, studying an illusion, detaching a stirge. */
-    endedBy: EndedBySchema.optional(),
+    /** The actions that end it: waking a sleeper, stanching a wound, studying an illusion, detaching a stirge, escaping
+     *  or bursting a Chain. */
+    endedBy: EndedByListSchema.optional(),
     /** What it does as its bearer rests or days pass (a mummy's curse); `dayMark` is the game-clock minute its next 24
      *  hours count from. */
     atRest: RestTriggerSchema.extend({ dayMark: z.number().int().min(0).optional() })
@@ -1903,6 +1923,20 @@ export const EffectInstanceSchema = z
     endsWhenUnaffected: z.literal(true).optional(),
     /** The bearer's Speed is multiplied by this after every other change (Haste: doubled), its special speeds too. */
     speedMultiplier: z.number().int().min(2).max(4).optional(),
+    /** Movement the bearer has already spent of its next turn (climbing out of a swallower's corpse off its turn),
+     *  charged as that turn starts. */
+    movementOwedFeet: z.number().int().min(1).max(1000).optional(),
+    /** Where the bearer is anchored (a Climber's Kit), in map pixels and feet of height: it can't move more than
+     *  `feet` from there, nor fall more than `feet` below it. */
+    anchor: z
+      .object({
+        x: z.number().min(0).max(1_000_000),
+        y: z.number().min(0).max(1_000_000),
+        altitudeFeet: z.number().int().min(0).max(100_000),
+        feet: z.number().int().min(5).max(300)
+      })
+      .strict()
+      .optional(),
     /** A way to work out base AC while the bearer wears no armor: this plus its Dexterity modifier, a Shield adding
      *  (Mage Armor's 13). The best of its ways counts, and AC bonuses add to it. */
     baseArmorClass: z.number().int().min(11).max(20).optional(),
@@ -2174,6 +2208,12 @@ export const InventoryItemSchema = z
     /** Pieces fired from this row in the running fight that can be picked up after it (half come back). The
      *  server keeps it. */
     ammunitionFired: z.number().int().min(0).max(10_000).optional(),
+    /** Magic pieces from this row that hit in the running fight: their magic is spent, and half of them can be picked
+     *  up after it as plain ammunition of their kind. The server keeps it. */
+    ammunitionSpent: z.number().int().min(0).max(10_000).optional(),
+    /** Copies of this weapon thrown in the running fight, lying where they landed: they are picked up after it. The
+     *  server keeps it. */
+    thrownAway: z.number().int().min(0).max(10_000).optional(),
     /** A light source in hand is burning (a Torch, a Lamp, a Flame Tongue's flames). Dynamic vision lights its bearer
      *  while it is lit and equipped. The server keeps it. */
     lit: z.boolean().optional(),
@@ -2185,6 +2225,19 @@ export const InventoryItemSchema = z
     burnsOutAtHour: z.number().int().min(0).max(10_000_000).optional(),
     /** Hours of burning left in a light that was put out before it burned down. */
     burnHoursLeft: z.number().int().min(0).max(24).optional(),
+    /** The carried container row it is in (a Backpack, a Bag of Holding), by row id; absent, it is carried loose. The
+     *  server holds it to the container's limits and weighs it through the container. */
+    containerId: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(80)
+      .optional(),
+    /** Which of the container's compartments it is in (a Handy Haversack's side pouch). */
+    compartment: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(40)
+      .optional(),
     /** Display-only marker so the sheet can offer Attune without the catalog; never the riders. */
     magic: ItemMagicMarkerSchema.optional(),
     /** A copy whose magic is spent for now: a manual or tome after its study (`character.study-item`), until it
@@ -2837,6 +2890,15 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   })
     .strict()
     .optional(),
+  /** More actions that end it, each with who may take it and its check (bursting a Chain: a DC 20 Strength (Athletics)
+   *  check; picking Manacles' lock with Thieves' Tools). */
+  endedBy: z.array(EndedBySchema).min(1).max(4).optional(),
+  /** It anchors the recipient where it stands (a Climber's Kit): it can't move more than `feet` from there, nor fall
+   *  more than `feet` below it, while this lasts. */
+  anchors: z
+    .object({ feet: z.number().int().min(5).max(300) })
+    .strict()
+    .optional(),
   /** The grant binds to one weapon its recipient carries, picked on the resolve (`input.itemId`): its riders scoped
    *  `this-item` reach that weapon alone, and `weapon` changes how it swings while the grant lasts. `weaponIds`
    *  limits the pick (Shillelagh: a Club or Quarterstaff); `nonmagical` refuses a magic one (Magic Weapon); `melee`
@@ -2846,6 +2908,9 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
       weaponIds: z.array(RiderSlugSchema).min(1).max(6).optional(),
       nonmagical: z.literal(true).optional(),
       melee: z.literal(true).optional(),
+      /** It binds to a stack of ammunition instead (a coat of Basic Poison on three pieces): its riders ride a shot
+       *  that draws from that stack. */
+      ammunition: z.literal(true).optional(),
       /** The ability its attack and damage rolls use: the granter's spellcasting ability, or a named one. */
       ability: z.union([AbilitySchema, z.literal("spellcasting")]).optional(),
       /** Its damage dice, by the granter's character level from each row's level up (Shillelagh: d8, d10 from 5, d12
@@ -5010,6 +5075,42 @@ export const ActionSchema = z
       .max(2)
       .optional()
       .describe("Targeting restrictions the engine enforces"),
+    /** An ability check its user makes first, at a DC: a failure spends the action and does nothing else (wrapping a
+     *  Chain around a creature takes a DC 13 Strength (Athletics) check). */
+    checkFirst: z
+      .object({
+        ability: AbilitySchema,
+        skill: RiderSlugSchema.optional(),
+        dc: z.number().int().min(1).max(40)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "An ability check its user makes first, at a DC: a failure spends the action and does nothing else (binding with a Chain takes a DC 13 Strength (Athletics) check)"
+      ),
+    /** It remakes one carried row as a magic item bound to it (Oil of Sharpness): a nonmagical Melee weapon dealing one
+     *  of `damageTypes` becomes `weapon`, or `pieces` of such ammunition become `ammunition`. The row is picked on the
+     *  resolve (`input.itemId`). */
+    rebindsRow: z
+      .object({
+        weapon: RiderSlugSchema,
+        ammunition: RiderSlugSchema,
+        pieces: z.number().int().min(1).max(100),
+        damageTypes: z.array(DamageTypeSchema).min(1).max(3)
+      })
+      .strict()
+      .optional()
+      .describe(
+        "It remakes one carried row as the magic item named, bound to it (Oil of Sharpness): a nonmagical Melee weapon dealing one of `damageTypes` becomes `weapon`, or `pieces` of such ammunition become `ammunition`"
+      ),
+    /** It ends what the same carried item's other actions left on creatures (Iron Bands' command that releases the
+     *  target, a Rope of Entanglement's). */
+    endsItemEffects: z
+      .literal(true)
+      .optional()
+      .describe(
+        "It ends what the same carried item's other actions left on creatures (the command that releases a creature Iron Bands hold)"
+      ),
     /** Resolving this action grants an effect to the actor itself (Rage, Reckless Attack). */
     grants: ActionGrantSchema.optional().describe(
       "Resolving this action grants an effect to the actor itself (Rage, Reckless Attack)"

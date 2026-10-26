@@ -102,6 +102,8 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "movement.no-movement-remaining": () => "No movement left.",
   "movement.stand-up-cost": () => "Not enough movement left to stand up.",
   "movement.stand-up-off-turn": () => "Stand up on your own turn.",
+  "movement.drop-prone": () => "Drop Prone on your own turn, with Speed above 0.",
+  "movement.tether": () => "Undo the anchor to move farther from it.",
   "movement.already-moved": () => "You moved this turn.",
   "movement.off-turn": () => "It isn't your turn.",
   "movement.teleport": () => "The GM moves a token that teleports.",
@@ -138,6 +140,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "condition.cant-attack": () => "You can't attack now.",
   "condition.dash-only": () => "You can take only the Dash action now.",
   "condition.one-thing-a-turn": () => "This turn you can only move, take an action or take a Bonus Action.",
+  "mount.controlled": () => "A controlled mount can only Dash, Disengage or Dodge.",
   "movement.cant-stand": () => "You can't stand up now.",
   "form.no-spells": ({ spell }) =>
     spell && (spell.components.materialConsumed || (spell.components.costly ?? []).length > 0)

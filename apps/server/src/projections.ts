@@ -236,6 +236,7 @@ const PENDING_SAVE_FIELDS = {
   // What the damage drains, and where a failure pushes, are narrated when they land.
   drain: "never",
   failurePush: "never",
+  unseats: "never",
   // The save's own roll mode is read when it is answered.
   advantageAtSize: "never",
   advantageFrom: "never",

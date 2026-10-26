@@ -518,6 +518,9 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
       `${mover.name} is Frightened and can't willingly move closer to ${feared}.`,
       outcome
     );
+  // SRD Climber's Kit: "you can't move more than 25 feet from there without undoing the anchor".
+  const tether = (counted || input.byPlayer || grant) && strainsAnchor(input, mover, to);
+  if (tether) police(state, input, "movement.tether", tether, outcome);
   // Height changes by flying, climbing, jumping or teleporting; a creature in the air moves by flying.
   const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
   const heightBar =
@@ -762,6 +765,18 @@ function approachesFear(
         : source.name;
   }
   return null;
+}
+
+/** Why a move takes an anchored creature too far from its anchor, or null. Height counts as distance does. */
+function strainsAnchor(input: MovementRulesInput, mover: GameState["actors"][number], to: Point): string | null {
+  const anchored = mover.effects.find((effect) => effect.anchor !== undefined);
+  const anchor = anchored?.anchor;
+  if (!anchor) return null;
+  const across = input.distance({ x: anchor.x, y: anchor.y }, to);
+  if (across === null) return null;
+  const up = Math.abs((input.toAltitudeFeet ?? input.fromAltitudeFeet ?? 0) - anchor.altitudeFeet);
+  if (Math.max(across, up) <= anchor.feet + DISTANCE_TOLERANCE_FEET) return null;
+  return `${mover.name} is anchored (${anchored.name}) and can't move more than ${anchor.feet} feet from the anchor. Undo the anchor first.`;
 }
 
 /** A readied move spends the creature's Reaction and uses up the ready, and a spell it held with it. */

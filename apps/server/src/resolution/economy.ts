@@ -3,7 +3,8 @@ import type { SpellReference } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
 import type { ActorDefinition, CastShaping } from "@vtt/schemas";
 import { effectiveSlot } from "@vtt/rules-5e";
-import { RIDING_TAG } from "../mounts.js";
+import { CONTROLLED_MOUNT_ACTIONS, controllingRiderOf, RIDING_TAG } from "../mounts.js";
+import { builtinBaseId } from "../builtin-actions.js";
 import { animatedRowIds } from "../animated-items.js";
 import { conditionLabel, incapacitatingCondition } from "../condition-rules.js";
 import { wardingAura } from "../paladin-auras.js";
@@ -624,6 +625,17 @@ function checkAbleToAct({ state, attacker, action, targetIds, resolveDefinition,
     violations.push({
       rule: "condition.dash-only",
       message: `${attacker.name} can take only the Dash action or end ${shownEffectName(state, dashOnly, resolveDefinition)} while it lasts.`
+    });
+  // SRD Mounted Combat: a controlled mount "has only three action options during that turn: Dash, Disengage, and Dodge".
+  const rider = controllingRiderOf(state, attacker.id);
+  if (
+    rider &&
+    (action.activation === "action" || action.activation === "bonus-action") &&
+    !CONTROLLED_MOUNT_ACTIONS.has(builtinBaseId(action.id))
+  )
+    violations.push({
+      rule: "mount.controlled",
+      message: `${attacker.name} is a mount ${rider.name} controls, so it can take only the Dash, Disengage or Dodge action.`
     });
   // SRD Befuddlement: the target "can't cast spells or take the Magic action".
   const befuddled = attacker.effects.find((effect) => effect.tags.includes(NO_SPELLS_TAG));

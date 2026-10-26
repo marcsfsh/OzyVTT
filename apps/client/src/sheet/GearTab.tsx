@@ -113,7 +113,7 @@ export function GearTab({
   /** 3, or 4 with Use Magic Device; the server enforces it. */
   attunementSlots?: number;
   /** What the character carries against its carrying capacity, as the server weighs it. */
-  carrying?: Readonly<{ pounds: number; capacity: number }> | null;
+  carrying?: Readonly<{ pounds: number; capacity: number; dragLimit?: number }> | null;
   /** In a running fight fired ammunition comes back when the fight ends, so there is nothing to pick up yet. */
   inFight: boolean;
   /** The characters the GM can hand an item to. */
@@ -144,11 +144,92 @@ export function GearTab({
   };
   const attuned = inventory.filter((item) => item.attuned && item.quantity > 0);
   const fired = inventory.reduce((sum, item) => sum + (item.ammunitionFired ?? 0), 0);
+  const thrown = inventory.reduce((sum, item) => sum + (item.thrownAway ?? 0), 0);
   const summaryOf = (item: InventoryItem) => catalog.find((entry) => entry.id === catalogIdOf(item));
   // The uses left in the copy in hand (a Healer's Kit's ten), which the server counts on the row.
   const usesOf = (item: InventoryItem) => {
     const limit = summaryOf(item)?.uses?.limit;
     return limit === undefined ? null : { left: Math.max(0, limit - (spent[rowUsesKey(item)] ?? 0)), limit };
+  };
+  // Containers (a Backpack, a Bag of Holding): what a row sits in, what it holds, and its load as the server weighs it.
+  const holdsOf = (item: InventoryItem) => summaryOf(item)?.container;
+  const hostOf = (item: InventoryItem) =>
+    item.containerId === undefined
+      ? undefined
+      : inventory.find((other) => other.id === item.containerId && other.id !== item.id && other.quantity > 0);
+  const contentsOf = (id: string, compartment?: string) =>
+    inventory.filter(
+      (item) =>
+        item.quantity > 0 &&
+        item.containerId === id &&
+        item.id !== id &&
+        (compartment === undefined || item.compartment === compartment)
+    );
+  const weightOf = (item: InventoryItem, seen: Set<string> = new Set()): number => {
+    if (seen.has(item.id)) return 0;
+    seen.add(item.id);
+    const fixed = holdsOf(item)?.weighsLb;
+    if (fixed !== undefined) return fixed * item.quantity;
+    const own = (item.weightEach ?? summaryOf(item)?.weightLb ?? 0) * item.quantity;
+    return own + contentsOf(item.id).reduce((sum, child) => sum + weightOf(child, seen), 0);
+  };
+  const pounds = (rows: readonly InventoryItem[]) =>
+    Math.round(rows.reduce((sum, row) => sum + weightOf(row), 0) * 10) / 10;
+  /** A container's load, as the sheet line reads it: "12 of 30 lb", or each compartment's. */
+  const loadLine = (item: InventoryItem): string | null => {
+    const holds = holdsOf(item);
+    if (!holds) return null;
+    if (holds.compartments)
+      return holds.compartments
+        .map((compartment) =>
+          compartment.capacityLb !== undefined
+            ? `${compartment.name} ${pounds(contentsOf(item.id, compartment.id))} of ${compartment.capacityLb} lb`
+            : `${compartment.name} holds up to ${compartment.count ?? 0}`
+        )
+        .join(" · ");
+    if (holds.capacityLb !== undefined) return `${pounds(contentsOf(item.id))} of ${holds.capacityLb} lb inside`;
+    if (holds.pieces !== undefined) return `Holds up to ${holds.pieces} pieces`;
+    return `${contentsOf(item.id).length} things inside`;
+  };
+  /** Where a row can be put: each carried container that isn't the row itself or inside it, by compartment. */
+  const placesFor = (item: InventoryItem) => {
+    const inside = new Set<string>();
+    const walk = (id: string) => {
+      for (const child of contentsOf(id))
+        if (!inside.has(child.id)) {
+          inside.add(child.id);
+          walk(child.id);
+        }
+    };
+    walk(item.id);
+    return inventory
+      .filter((other) => other.quantity > 0 && other.id !== item.id && !inside.has(other.id) && holdsOf(other))
+      .flatMap((other) => {
+        const compartments = holdsOf(other)?.compartments;
+        return compartments
+          ? compartments.map((compartment) => ({
+              value: `${other.id}|${compartment.id}`,
+              label: `In ${other.name} · ${compartment.name}`
+            }))
+          : [{ value: other.id, label: `In ${other.name}` }];
+      });
+  };
+  const placeOf = (item: InventoryItem) =>
+    item.containerId === undefined ? "" : `${item.containerId}${item.compartment ? `|${item.compartment}` : ""}`;
+  const placed = (item: InventoryItem, value: string): InventoryItem => {
+    const { containerId: _container, compartment: _compartment, ...loose } = item;
+    if (value === "") return loose;
+    const [containerId, compartment] = value.split("|");
+    return { ...loose, containerId: containerId!, ...(compartment ? { compartment } : {}) };
+  };
+  /** What taking a row out of its container costs in a fight. */
+  const retrievalWords = (host: InventoryItem) => {
+    const retrieval = holdsOf(host)?.retrieval;
+    return retrieval === "utilize"
+      ? `Taking it out of ${host.name} takes the Utilize action in a fight.`
+      : retrieval === "utilize-or-bonus-action"
+        ? `Taking it out of ${host.name} takes a Bonus Action in a fight, or the Utilize action once that is spent.`
+        : `Taking it out of ${host.name} is your free object interaction in a fight.`;
   };
   const nameOf = (item: InventoryItem) => {
     const base = item.baseId ? catalog.find((entry) => entry.id === item.baseId) : undefined;
@@ -206,8 +287,9 @@ export function GearTab({
     });
   };
 
-  const row = (item: InventoryItem) => {
+  const row = (item: InventoryItem): ReactNode => {
     const rows = itemActions(item, serverActions);
+    const inside = contentsOf(item.id);
     const mastery = facts.get(`item-${item.id}`)?.mastery ?? null;
     const charges = chargesOf(rows, spent);
     const uses = usesOf(item);
@@ -234,8 +316,10 @@ export function GearTab({
             <span className="cs-item-line">
               {[
                 itemLine(item),
+                loadLine(item),
                 item.ammunitionLeft !== undefined ? `${item.ammunitionLeft} left` : null,
                 item.ammunitionFired ? `${item.ammunitionFired} fired` : null,
+                item.thrownAway ? `${item.thrownAway} thrown` : null,
                 uses ? `${uses.left} of ${uses.limit} uses left` : null,
                 item.dormant ? "Magic spent" : null
               ]
@@ -252,6 +336,11 @@ export function GearTab({
           )}
           <IconChevronRight />
         </button>
+        {inside.length > 0 && (
+          <ul className="cs-items cs-contents" aria-label={`In the ${item.name}`}>
+            {inside.map(row)}
+          </ul>
+        )}
       </li>
     );
   };
@@ -329,7 +418,7 @@ export function GearTab({
                 type="button"
                 className={`cs-toggle interactive${open.equipped ? " is-on" : ""}`}
                 aria-pressed={open.equipped}
-                disabled={busy}
+                disabled={busy || hostOf(open) !== undefined}
                 onClick={() => save({ ...open, equipped: !open.equipped })}
               >
                 {open.equipped ? "Equipped" : "Equip"}
@@ -354,6 +443,33 @@ export function GearTab({
                 onChange={(quantity) => save({ ...open, quantity })}
               />
             </div>
+            {(() => {
+              const places = placesFor(open);
+              const host = hostOf(open);
+              if (places.length === 0 && !host) return null;
+              return (
+                <div className="cs-item-place">
+                  <Select
+                    aria-label={`Where the ${open.name} is`}
+                    disabled={busy}
+                    value={host ? placeOf(open) : ""}
+                    onChange={(event) => save(placed(open, event.target.value))}
+                  >
+                    <option value="">Carried loose</option>
+                    {places.map((place) => (
+                      <option key={place.value} value={place.value}>
+                        {place.label}
+                      </option>
+                    ))}
+                  </Select>
+                  {host && (
+                    <span className="cs-sub">
+                      {`Take it out to hold it. ${inFight ? retrievalWords(host) : ""}`.trim()}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
             {((open.magic?.attunementRequired && !open.dormant) || open.attuned) && (
               <p className="cs-sub">
                 {prerequisites.length > 0
@@ -605,8 +721,10 @@ export function GearTab({
     );
 
   // An attuned item is listed with its attunement, so each item reads once.
-  const worn = inventory.filter((item) => item.equipped && !item.attuned && item.quantity > 0);
-  const pack = inventory.filter((item) => !item.equipped && !item.attuned && item.quantity > 0);
+  // A row in a container is listed under it, so each section holds what is carried loose.
+  const loose = (item: InventoryItem) => item.quantity > 0 && hostOf(item) === undefined;
+  const worn = inventory.filter((item) => item.equipped && !item.attuned && loose(item));
+  const pack = inventory.filter((item) => !item.equipped && !item.attuned && loose(item));
   return (
     <div className="cs-gear">
       <section className="cs-group" aria-label="Attunement">
@@ -624,7 +742,7 @@ export function GearTab({
           </span>
         </span>
         {attuned.length > 0 ? (
-          <ul className="cs-items">{attuned.map(row)}</ul>
+          <ul className="cs-items">{attuned.filter(loose).map(row)}</ul>
         ) : (
           <p className="cs-sub">Nothing is attuned.</p>
         )}
@@ -694,11 +812,15 @@ export function GearTab({
         </span>
         {pack.length > 0 ? <ul className="cs-items">{pack.map(row)}</ul> : <p className="cs-sub">The pack is empty.</p>}
         {carrying && carrying.pounds > carrying.capacity && (
-          <p className="cs-sub">That is more than {actor.name} can carry, so their Speed is at most 5 feet.</p>
+          <p className="cs-sub">
+            {carrying.dragLimit !== undefined && carrying.pounds > carrying.dragLimit
+              ? `That is more than ${actor.name} can drag, lift or push, so ${actor.name}'s Speed is 0.`
+              : `That is more than ${actor.name} can carry, so ${actor.name}'s Speed is at most 5 feet.`}
+          </p>
         )}
       </section>
       {/* SRD Ammunition: a minute after shooting, half the pieces fired can be picked up again. */}
-      {fired > 0 && !inFight && (
+      {(fired > 0 || thrown > 0) && !inFight && (
         <p className="cs-chiprow">
           <Button
             size="sm"
@@ -706,9 +828,16 @@ export function GearTab({
             disabled={busy}
             onClick={() => void edit("character:recover-ammunition", { actorId: actor.id })}
           >
-            Pick up fired ammunition
+            {fired > 0 ? "Pick up fired ammunition" : "Pick up thrown weapons"}
           </Button>
-          <span className="cs-sub">Half of the {fired} fired come back, rounded down.</span>
+          <span className="cs-sub">
+            {[
+              fired > 0 ? `Half of the ${fired} fired come back, rounded down.` : null,
+              thrown > 0 ? `The ${thrown} thrown weapons come back.` : null
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          </span>
         </p>
       )}
       {crafting}

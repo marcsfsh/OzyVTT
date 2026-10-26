@@ -51,6 +51,8 @@ export function createPendingSaves(
     drain?: DamageDrain;
     /** Where a failure pushes the creature (Thunderwave). */
     failurePush?: ForcedPush;
+    /** A failure throws the rider off this mount (SRD Mounted Combat). */
+    unseats?: string;
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize?: PendingSave["advantageAtSize"];
     /** The spell the save is against, for what answers a save against a spell. */
@@ -118,6 +120,7 @@ export function createPendingSaves(
     ...(input.immuneOnSuccess ? { immuneOnSuccess: true as const } : {}),
     ...(input.drain ? { drain: { ...input.drain } } : {}),
     ...(input.failurePush ? { failurePush: { ...input.failurePush } } : {}),
+    ...(input.unseats ? { unseats: input.unseats } : {}),
     ...(input.advantageAtSize ? { advantageAtSize: input.advantageAtSize } : {}),
     ...(input.spell ? { spell: { ...input.spell } } : {}),
     ...(input.advantageFrom ? { advantageFrom: input.advantageFrom.slice(0, 120) } : {}),

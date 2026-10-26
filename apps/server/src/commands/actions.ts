@@ -870,7 +870,7 @@ export const actionCommands = [
       const named = targetIds && targetIds.length > 0 ? targetIds : !rollsOnTargets && aimed ? [actorId] : [];
       // A shape-shift outside a fight (Wild Shape to scout, a werewolf's change) takes its form the same way.
       const shapeShifts = listed.shapeShift !== undefined || listed.endsForm === true;
-      const itemGrant = isItemActionId(listed.id) && listed.grants !== undefined;
+      const itemGrant = isItemActionId(listed.id) && (listed.grants !== undefined || listed.rebindsRow !== undefined);
       if (
         !snapshot.combat.active &&
         (castSpellOf(listed, kit.equipmentCatalog().spellRecord) !== null || shapeShifts || itemGrant) &&

@@ -370,6 +370,9 @@ export const PendingSaveSchema = z
     drain: DamageDrainSchema.optional(),
     /** Where a failure pushes the creature (Thunderwave), narrated when it lands. */
     failurePush: ForcedPushSchema.optional(),
+    /** SRD Mounted Combat: a failure throws the rider off this mount, landing Prone within 5 feet of it. GM
+     *  bookkeeping, never projected: the fall is narrated when it lands. */
+    unseats: z.uuid().optional(),
     /** A creature this size or larger has Advantage on the save (Ensnaring Strike). */
     advantageAtSize: z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]).optional(),
     /** What gives the save Advantage beyond the target's own riders, as the roll card names it: the damage that opened
@@ -1559,6 +1562,14 @@ const sceneCombatShape = {
       /** The turn's actor has made an attack roll on its turn (SRD Reckless Attack is decided with the first). Engine
        *  bookkeeping, never projected. */
       attackRolled: z.boolean().optional(),
+      /** SRD Interacting with Things: the turn's actor has used its one free object interaction (a door opened, a
+       *  weapon drawn), so the next takes the Utilize action. Engine bookkeeping, never projected. */
+      objectInteractionUsed: z.boolean().optional(),
+      /** SRD Attack action: the attacks the turn's actor has made in its Attack action, and the weapons it drew or
+       *  stowed as part of them ("equip or unequip one weapon when you make an attack"). Engine bookkeeping, never
+       *  projected. */
+      attacksMade: z.number().int().min(0).max(50).optional(),
+      attackDraws: z.number().int().min(0).max(50).optional(),
       /** What this turn's attacks opened for an extra attack: the Light weapons its actor swung in the Attack action,
        *  and the creature a Cleave weapon hit; and the Loading weapons already fired in that action, which can't
        *  fire again in it. Engine bookkeeping, never projected. */

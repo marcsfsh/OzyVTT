@@ -753,6 +753,16 @@ export const ItemSpellCastSchema = z
       .optional()
       .describe(
         "A check its user makes first: a failure spends the use and the spell is not cast (an Amulet of the Planes' DC 15 Intelligence (Arcana) before Plane Shift)"
+      ),
+    /** It can be cast only while its user has an effect with this tag (a Dragon Orb's spells, for the one who controls
+     *  it). */
+    requiresEffectTag: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(40)
+      .optional()
+      .describe(
+        "It can be cast only while its user has an effect with this tag (a Dragon Orb's spells, for the one who controls it)"
       )
   })
   .strict()
@@ -930,6 +940,52 @@ const ItemLightSchema = z
   );
 export type ItemLight = z.infer<typeof ItemLightSchema>;
 
+/** One part of a container that holds its own load (a Handy Haversack's pouches, an Efficient Quiver's compartments):
+ *  pounds, or a count of things, and what kind of thing it takes. */
+const ContainerCompartmentSchema = z
+  .object({
+    id: ContentIdSchema,
+    name: z.string().min(1).max(60),
+    capacityLb: z.number().positive().max(10_000).optional(),
+    /** How many things it takes: pieces of ammunition, or items (an Efficient Quiver's 18 Javelins). */
+    count: z.number().int().min(1).max(1000).optional(),
+    /** Only ammunition, or only weapons. */
+    holds: z.enum(["ammunition", "weapons"]).optional()
+  })
+  .strict();
+
+/**
+ * What a container holds (SRD 5.2.1 Adventuring Gear and Magic Items): up to `capacityLb` pounds (a Backpack's 30), or
+ * `pieces` of ammunition of `kinds` (a Quiver's 20 Arrows), or a load in each of its `compartments` (a Handy Haversack's
+ * pouches). `weighsLb`: it weighs this whatever it holds (a Bag of Holding's 5 pounds). `retrieval`: what
+ * taking a thing out costs in a fight beyond the free object interaction (a Bag of Holding's Utilize action, a Handy
+ * Haversack's Utilize action or Bonus Action). `overloadDestroys`: overloaded, it is destroyed with what it holds.
+ * `extradimensional`: one put inside another destroys both (a Bag of Holding in a Portable Hole). `drawsAmmunition`:
+ * pieces in it are drawn as part of an attack (a Quiver).
+ */
+export const ItemContainerSchema = z
+  .object({
+    capacityLb: z.number().positive().max(10_000).optional(),
+    pieces: z
+      .object({
+        count: z.number().int().min(1).max(1000),
+        kinds: z.array(AmmunitionKindSchema).min(1).max(5).optional()
+      })
+      .strict()
+      .optional(),
+    compartments: z.array(ContainerCompartmentSchema).min(2).max(4).optional(),
+    weighsLb: z.number().nonnegative().max(1000).optional(),
+    retrieval: z.enum(["utilize", "utilize-or-bonus-action"]).optional(),
+    overloadDestroys: z.literal(true).optional(),
+    extradimensional: z.literal(true).optional(),
+    drawsAmmunition: z.literal(true).optional()
+  })
+  .strict()
+  .describe(
+    "What a container holds: up to `capacityLb` pounds, `pieces` of ammunition of `kinds` (a Quiver's 20 Arrows), or a load in each of its `compartments` (a Handy Haversack's pouches). `weighsLb`: it weighs this many pounds whatever it holds. `retrieval`: what taking a thing out costs in a fight beyond the free object interaction. `overloadDestroys`: overloaded, it is destroyed with its contents. `extradimensional`: one put inside another destroys both. `drawsAmmunition`: pieces in it are drawn as part of an attack"
+  );
+export type ItemContainer = z.infer<typeof ItemContainerSchema>;
+
 /**
  * One kind of an item whose record covers several (an Ioun Stone's fourteen stones, a Belt of Giant Strength's six
  * giants), or one form its holder can put it in (a Rod of Lordly Might's buttons). Its riders join the record's while a
@@ -1010,11 +1066,13 @@ export const ItemWeaponChangesSchema = z
     rangeFeet: z.number().int().min(5).max(600).optional(),
     longRangeFeet: z.number().int().min(5).max(1200).optional(),
     /** Damage types its wielder may deal on a hit in place of the weapon's own (a Javelin of Lightning: Lightning). */
-    damageTypeOptions: z.array(DamageTypeSchema).min(1).max(2).optional()
+    damageTypeOptions: z.array(DamageTypeSchema).min(1).max(2).optional(),
+    /** Thrown, it flies back to its thrower's hand (a Dwarven Thrower), so a throw leaves it carried. */
+    returns: z.literal(true).optional()
   })
   .strict()
   .describe(
-    "What the item changes about the base weapon it is bound to, copied onto the bound row: its damage type, properties added or taken away, and a normal and long range (a Dwarven Thrower's Thrown 20/60). `damageTypeOptions` are types its wielder may pick on each hit in place of the weapon's own (a Javelin of Lightning's Lightning)"
+    "What the item changes about the base weapon it is bound to, copied onto the bound row: its damage type, properties added or taken away, and a normal and long range (a Dwarven Thrower's Thrown 20/60). `damageTypeOptions` are types its wielder may pick on each hit in place of the weapon's own (a Javelin of Lightning's Lightning). `returns`: thrown, it flies back to its thrower's hand"
   );
 export type ItemWeaponChanges = z.infer<typeof ItemWeaponChangesSchema>;
 
@@ -1279,6 +1337,18 @@ export const EquipmentReferenceSchema = z
       .optional()
       .describe(
         "What the item holds, which it is unpacked into wherever a character comes by it (its starting equipment, or adding it to the sheet): each record id and how many (an Explorer's Pack's 10 Torches)"
+      ),
+    /** It holds other carried things (a Backpack's 30 pounds, a Quiver's 20 Arrows, a Bag of Holding). */
+    container: ItemContainerSchema.optional(),
+    /** While its bearer has an effect with this tag, the bearer can't end its attunement (a Dragon Orb's charm: "you
+     *  can't voluntarily end your Attunement to it"). */
+    attunementHeldBy: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(40)
+      .optional()
+      .describe(
+        "An effect tag: while its bearer has an effect with it, the bearer can't end attunement to the item (a Dragon Orb's charm)"
       ),
     /** What the item does when its carrier takes the Utilize action, with the check it takes ("As a Utilize action,
      *  you can throw the Grappling Hook ... DC 13 Dexterity (Acrobatics) check"). A tool's own Utilize line is read

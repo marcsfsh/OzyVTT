@@ -34,10 +34,7 @@ import {
 } from "../effects.js";
 import { DISTANCE_TOLERANCE_FEET } from "../movement-narration.js";
 import { putOutFire } from "../hazards.js";
-import { endingOptions } from "../ending-actions.js";
-import { openEndingSave } from "../save-stages.js";
-import { applyDamageDetailed } from "../hit-points.js";
-import { rollPlain } from "./hit-rider-outcomes.js";
+import { endAnEffect, isNamedEnding, namedEnding } from "./endings.js";
 import { CommandRejectedError } from "../game-store.js";
 import { touchBead } from "../zone-touch.js";
 import { holdsTalisman, SPHERE_CONTROL_TAG } from "../zone-sphere.js";
@@ -484,73 +481,6 @@ function escapeGrapple(ctx: ResolveContext): void {
   }
 }
 
-/**
- * End an Effect: the action an effect's text prints to end it, on the one creature targeted (the user itself when none
- * is). Repeating a save by action opens that save (a success ends it, as any repeat does); a check must succeed, and
- * the creature that succeeds takes what the text deals it (a gelatinous cube's acid); an action alone ends it (waking a
- * sleeper).
- */
-function endAnEffect(ctx: ResolveContext): void {
-  const { state, attacker, input, deps } = ctx;
-  const bearer = ctx.targets[0] ?? attacker;
-  const options = endingOptions(attacker, bearer, deps.distanceFeet);
-  const chosen = input.effectId ? options.find((option) => option.effect.id === input.effectId) : options[0];
-  if (!chosen)
-    throw new CommandRejectedError(
-      bearer.id === attacker.id
-        ? `${attacker.name} has no effect it can end with an action.`
-        : `${bearer.name} has no effect ${attacker.name} can end from where it stands.`
-    );
-  const { effect } = chosen;
-  if (chosen.kind === "repeat") {
-    const line = openEndingSave(state, bearer, effect, effect.repeatSave!, "repeats", {
-      newId: deps.newRollId,
-      now: deps.now,
-      rollDie: deps.random
-    });
-    ctx.tableNarration.push(tableLineOf(ctx, line));
-    return;
-  }
-  const ended = effect.endedBy!;
-  if (ended.check) {
-    const subject: CheckSubject = {
-      ability: ended.check.ability,
-      ...(ended.check.skill !== undefined ? { skill: ended.check.skill } : {})
-    };
-    if (rollCheck(ctx, subject, ended.check.dc ?? null, `${ended.name}: check`) !== true) return;
-  }
-  endEffect(state, bearer.id, effect.id);
-  ctx.effectsEnded.push(endedEffect(bearer, effect));
-  ctx.tableNarration.push({
-    kind: "effect",
-    text: `${attacker.name} ends ${effect.name} on ${bearer.name} (${ended.name}).`,
-    actorIds: [attacker.id, bearer.id]
-  });
-  // "The puller takes 10 (3d6) Acid damage."
-  for (const part of ended.takerDamage ?? []) {
-    const rolled = rollPlain(ctx, part.formula, part.type, ended.name);
-    const { application, events } = applyDamageDetailed(
-      state,
-      attacker.id,
-      { amount: rolled.amount, parts: [rolled], sourceName: effect.sourceName ?? effect.name },
-      { role: "gm" },
-      {
-        resolveDefinition: deps.resolveDefinition ?? (() => undefined),
-        newId: deps.newRollId,
-        now: deps.now,
-        rollDie: deps.random,
-        ...(deps.catalog ? { catalog: deps.catalog } : {})
-      }
-    );
-    ctx.tableNarration.push({
-      kind: "effect",
-      text: `${attacker.name} takes ${application.totalApplied} ${part.type[0]!.toUpperCase()}${part.type.slice(1)} damage (${ended.name}).`,
-      actorIds: [attacker.id]
-    });
-    for (const event of events) ctx.tableNarration.push(tableLineOf(ctx, event));
-  }
-}
-
 /** SRD Burning: rolling on the ground puts out the fire on yourself, and leaves you Prone. */
 function rollOnTheGround(ctx: ResolveContext): void {
   const { state, attacker, deps } = ctx;
@@ -718,12 +648,25 @@ function naturalWeaponOf(
   };
 }
 
+/** An improvised attack's numbers: the Strength modifier to hit and on 1d4 damage, within 5 feet or at 20/60 feet. */
+function improvised(form: "melee" | "thrown") {
+  return ({ action, deps, input }: ResolveContext): DefinitionAction => {
+    const modifier = abilityModifier(deps.definition, "str");
+    const formula = modifier === 0 ? "1d4" : `1d4 ${modifier > 0 ? "+" : "-"} ${Math.abs(modifier)}`;
+    return {
+      ...action,
+      attack: { bonus: modifier, ...(form === "melee" ? { reachFeet: 5 } : { rangeFeet: 60, rangeNormalFeet: 20 }) },
+      damage: [{ formula, type: input.damageType ?? action.damageTypes?.[0] ?? "bludgeoning" }]
+    };
+  };
+}
+
 /** The DC of an unarmed Grapple or Shove: 8 + Strength modifier + Proficiency Bonus. */
 const unarmedDc = (definition: ActorDefinition | undefined): number =>
   Math.max(1, 8 + abilityModifier(definition, "str") + (definition?.proficiencyBonus ?? 0));
 
 /** SRD Unarmed Strike Grapple/Shove: the target saves with its better of STR and DEX against the unarmed
- *  DC. A failed save is Grappled (escape DC = that DC), Prone, or a 5-foot push the GM moves. */
+ *  DC. A failed save is Grappled (escape DC = that DC), Prone, or a 5-foot push straight away from the shover. */
 function unarmedSave(failure: "grappled" | "prone" | "pushed") {
   return (ctx: ResolveContext): void => {
     const { state, action, attacker, targets, deps } = ctx;
@@ -757,10 +700,11 @@ function unarmedSave(failure: "grappled" | "prone" | "pushed") {
             }
           }
         : {}),
+      // "You push it 5 feet away", straight away from the shover, on the live map.
+      ...(failure === "pushed" ? { failurePush: { feet: 5 } } : {}),
       newSaveId: deps.newRollId,
       createdAt: Date.parse(deps.now())
     });
-    if (failure === "pushed") ctx.warnings.push(`On a failed save, ${target.name} is pushed 5 feet. Move the token.`);
     ctx.builtinSave = { ability, dc, targets: [{ targetId: target.id, targetName: target.name }] };
   };
 }
@@ -812,6 +756,9 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
       });
     }
   },
+  /** SRD Improvised Weapons: Strength to hit with no Proficiency Bonus, 1d4 plus Strength of the picked type. */
+  "improvised-weapon": { prepare: improvised("melee") },
+  "improvised-weapon-thrown": { prepare: improvised("thrown") },
   "unarmed-grapple": { forcedSave: unarmedSave("grappled"), atMostOneSizeLarger: true },
   "unarmed-shove-prone": { forcedSave: unarmedSave("prone"), atMostOneSizeLarger: true },
   "unarmed-shove-push": { forcedSave: unarmedSave("pushed"), atMostOneSizeLarger: true },
@@ -833,6 +780,7 @@ const BUILTIN_HANDLERS: Readonly<Record<string, BuiltinHandler>> = {
 /** The special cases for a builtin action id, or undefined when it has none. A Bonus Action form ("hide-bonus") has
  *  its generic action's. */
 export function builtinHandlerFor(actionId: string): BuiltinHandler | undefined {
+  if (isNamedEnding(actionId)) return { check: namedEnding };
   const id = builtinBaseId(actionId);
   return Object.hasOwn(BUILTIN_HANDLERS, id) ? BUILTIN_HANDLERS[id] : undefined;
 }
