@@ -2994,7 +2994,16 @@
        },
        "endsOnDamage": true,
        "endsWhenSourceIncapacitated": true,
-       "endsWhenSourceDies": true
+       "endsWhenSourceDies": true,
+       "failureEffect": {
+        "name": "Turned",
+        "tags": [],
+        "modifiers": [],
+        "compelled": {
+         "way": "away",
+         "allMovement": true
+        }
+       }
       },
       "damage": [],
       "damageDiceByAbility": {

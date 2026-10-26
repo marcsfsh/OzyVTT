@@ -1289,7 +1289,17 @@
        "frightened"
       ],
       "repeatBeyondFeet": 120,
-      "immuneOnSuccess": true
+      "immuneOnSuccess": true,
+      "immuneMinutes": 1
+     },
+     "failureEffect": {
+      "name": "Antipathy",
+      "tags": [],
+      "modifiers": [],
+      "compelled": {
+       "way": "away",
+       "allMovement": true
+      }
      },
      "damage": [],
      "zone": {
@@ -1319,7 +1329,18 @@
       "repeatOnDamage": {
        "fromSourceOnly": true
       },
-      "immuneOnSuccess": true
+      "immuneOnSuccess": true,
+      "immuneMinutes": 1
+     },
+     "failureEffect": {
+      "name": "Sympathy",
+      "tags": [],
+      "modifiers": [],
+      "compelled": {
+       "way": "toward",
+       "allMovement": true,
+       "holdsNear": true
+      }
      },
      "damage": [],
      "zone": {
@@ -2676,7 +2697,9 @@
    "failureEffect": {
     "name": "Befuddlement",
     "tags": [
-     "no-spells"
+     "no-spells",
+     "restorable",
+     "cured-by-heal"
     ],
     "modifiers": []
    },
@@ -5188,7 +5211,12 @@
       "tags": [
        "dash-only"
       ],
-      "modifiers": []
+      "modifiers": [],
+      "compelled": {
+       "way": "away",
+       "dashes": true,
+       "allMovement": true
+      }
      },
      {
       "id": "grovel",
@@ -5447,7 +5475,8 @@
    "successDamage": "none",
    "failureConditions": [
     "charmed"
-   ]
+   ],
+   "repeatAfterCompelledMove": true
   },
   "target": {
    "type": "creature",
@@ -5458,7 +5487,26 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "direction",
+     "activation": "bonus-action",
+     "when": "A Bonus Action names a direction: each creature the spell charms uses as much of its movement as possible to move that way on its next turn, then repeats the save.",
+     "setsHeading": true,
+     "damage": []
+    }
+   ],
    "healing": null,
+   "failureEffect": {
+    "name": "Compulsion",
+    "tags": [],
+    "modifiers": [],
+    "compelled": {
+     "way": "heading",
+     "allMovement": true,
+     "once": true
+    }
+   },
    "seenTargets": true
   },
   "classes": [
@@ -6691,6 +6739,13 @@
     }
    ],
    "healing": null,
+   "failureEffect": {
+    "name": "Contact Other Plane",
+    "tags": [
+     "restorable"
+    ],
+    "modifiers": []
+   },
    "selfSave": {
     "dc": 15
    }
@@ -8854,6 +8909,60 @@
   "effect": {
    "attacks": 0,
    "damage": [],
+   "laterActions": [
+    {
+     "name": "Break Enchantment",
+     "activation": "action",
+     "when": "A Magic action touches a creature to end the Charmed, Frightened and possession that Celestials, Elementals, Fey, Fiends or Undead gave it, and ends the spell.",
+     "targets": {
+      "count": 1,
+      "rangeFeet": 5
+     },
+     "breaksEnchantment": {
+      "creatureTypes": [
+       "celestial",
+       "elemental",
+       "fey",
+       "fiend",
+       "undead"
+      ]
+     },
+     "endsSpell": true,
+     "damage": []
+    },
+    {
+     "name": "Dismissal",
+     "activation": "action",
+     "when": "A Magic action makes a Celestial, Elemental, Fey, Fiend or Undead the caster sees within 5 feet succeed on a Charisma save or be sent home, and ends the spell.",
+     "targets": {
+      "count": 1,
+      "rangeFeet": 5,
+      "seen": true,
+      "creatureTypes": [
+       "celestial",
+       "elemental",
+       "fey",
+       "fiend",
+       "undead"
+      ]
+     },
+     "save": {
+      "ability": "cha",
+      "successDamage": "none",
+      "failureConditions": [],
+      "failureBanishes": [
+       "celestial",
+       "elemental",
+       "fey",
+       "fiend",
+       "undead"
+      ],
+      "banishedForGood": true
+     },
+     "endsSpell": true,
+     "damage": []
+    }
+   ],
    "healing": null,
    "grant": {
     "modifiers": [
@@ -11233,7 +11342,12 @@
       "modifiers": [],
       "conditions": [
        "frightened"
-      ]
+      ],
+      "compelled": {
+       "way": "away",
+       "dashes": true,
+       "minFeet": 5
+      }
      },
      {
       "id": "sickened",
@@ -11668,9 +11782,15 @@
    "failureEffect": {
     "name": "Fear",
     "tags": [
-     "drops-held"
+     "drops-held",
+     "dash-only"
     ],
-    "modifiers": []
+    "modifiers": [],
+    "compelled": {
+     "way": "away",
+     "dashes": true,
+     "minFeet": 5
+    }
    }
   },
   "classes": [
@@ -13601,16 +13721,13 @@
     "concentration": false,
     "name": "Freedom of Movement",
     "tags": [
-     "freedom-of-movement"
+     "freedom-of-movement",
+     "slips-restraints"
     ],
     "target": "targets",
     "duration": {
      "type": "manual"
-    },
-    "conditionImmunities": [
-     "paralyzed",
-     "restrained"
-    ]
+    }
    }
   },
   "classes": [
@@ -14829,7 +14946,8 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "restores": true
   },
   "classes": [
    "bard",
@@ -15808,7 +15926,8 @@
          "fey",
          "fiend",
          "undead"
-        ]
+        ],
+        "possession": true
        },
        "suppresses": true
       },
@@ -17959,7 +18078,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "immuneOnSuccess": true,
+   "immuneMinutes": 1440
   },
   "target": {
    "type": "creature",
@@ -17977,10 +18098,66 @@
    "failureEffect": {
     "name": "Imprisoned",
     "tags": [
-     "off-plane"
+     "imprisoned",
+     "no-teleport",
+     "sustained"
     ],
-    "modifiers": []
+    "modifiers": [
+     {
+      "type": "spell-ward",
+      "schools": [
+       "divination"
+      ]
+     }
+    ],
+    "options": [
+     {
+      "id": "burial",
+      "name": "Burial",
+      "tags": [
+       "off-plane"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "chaining",
+      "name": "Chaining",
+      "tags": [
+       "unmovable"
+      ],
+      "modifiers": [],
+      "conditions": [
+       "restrained"
+      ]
+     },
+     {
+      "id": "hedged-prison",
+      "name": "Hedged Prison",
+      "tags": [
+       "off-plane"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "minimus-containment",
+      "name": "Minimus Containment",
+      "tags": [
+       "off-plane"
+      ],
+      "modifiers": []
+     },
+     {
+      "id": "slumber",
+      "name": "Slumber",
+      "tags": [],
+      "modifiers": [],
+      "conditions": [
+       "unconscious"
+      ]
+     }
+    ]
    },
+   "dispelledFromSlot": 9,
    "seenTargets": true
   },
   "classes": [
@@ -19745,7 +19922,8 @@
          "fey",
          "fiend",
          "undead"
-        ]
+        ],
+        "possession": true
        }
       }
      },
@@ -19807,7 +19985,8 @@
          "fey",
          "fiend",
          "undead"
-        ]
+        ],
+        "possession": true
        },
        "outside": true
       }
@@ -23860,7 +24039,8 @@
       "fey",
       "fiend",
       "undead"
-     ]
+     ],
+     "possession": true
     }
    }
   },
@@ -25616,7 +25796,9 @@
   "save": {
    "ability": "wis",
    "successDamage": "none",
-   "failureConditions": []
+   "failureConditions": [],
+   "immuneOnSuccess": true,
+   "immuneMinutes": 1440
   },
   "target": {
    "type": "creature",
@@ -25630,7 +25812,8 @@
    "targets": {
     "count": 1
    },
-   "healing": null
+   "healing": null,
+   "scryingModifiers": true
   },
   "classes": [
    "bard",
@@ -29010,7 +29193,7 @@
     {
      "name": "fear glyph",
      "activation": "other",
-     "when": "A creature that comes onto the glyph sets it off: it glows for 10 minutes, and each creature in its 60-foot Sphere, or entering it or ending its turn there once a turn, makes a Wisdom save or is Frightened for 1 minute.",
+     "when": "A creature that comes onto the glyph sets it off: it glows for 10 minutes, and each creature in its 60-foot Sphere, or entering it or ending its turn there once a turn, makes a Wisdom save or is Frightened for 1 minute, moving at least 30 feet away from the glyph on each of its turns.",
      "save": {
       "ability": "wis",
       "successDamage": "none",
@@ -29020,6 +29203,16 @@
       "failureDuration": {
        "type": "rounds",
        "rounds": 10
+      },
+      "failureEffect": {
+       "name": "Symbol of Fear",
+       "tags": [],
+       "modifiers": [],
+       "compelled": {
+        "way": "away",
+        "minFeet": 30,
+        "fromArea": true
+       }
       }
      },
      "damage": [],
@@ -29213,9 +29406,67 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "targets": {
-    "count": 1
-   },
+   "noCastSave": true,
+   "laterActions": [
+    {
+     "name": "move a creature",
+     "activation": "action",
+     "withCast": true,
+     "when": "With the cast and as a Magic action on later turns, a Huge or smaller creature you see within 60 feet makes a Strength save or is moved up to 30 feet to the space you pick, lifted if you choose, and Restrained until the end of your next turn.",
+     "targets": {
+      "count": 1,
+      "rangeFeet": 60,
+      "seen": true,
+      "maxSize": "huge"
+     },
+     "save": {
+      "ability": "str",
+      "successDamage": "none",
+      "failureConditions": [
+       "restrained"
+      ],
+      "failureDuration": {
+       "type": "until-source-turn-end"
+      }
+     },
+     "failureEffect": {
+      "name": "Telekinesis",
+      "tags": [
+       "telekinetic",
+       "suspended"
+      ],
+      "modifiers": []
+     },
+     "failureMove": {
+      "feet": 30,
+      "lifts": true
+     },
+     "damage": []
+    },
+    {
+     "name": "pull an object",
+     "activation": "action",
+     "withCast": true,
+     "when": "With the cast and as a Magic action on later turns, a creature you see within 60 feet makes a Strength save or the weapon it holds is pulled from its hands.",
+     "targets": {
+      "count": 1,
+      "rangeFeet": 60,
+      "seen": true
+     },
+     "object": {
+      "kinds": [
+       "weapon"
+      ],
+      "does": "pulled-on-failure"
+     },
+     "save": {
+      "ability": "str",
+      "successDamage": "none",
+      "failureConditions": []
+     },
+     "damage": []
+    }
+   ],
    "healing": null,
    "seenTargets": true
   },
