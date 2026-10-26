@@ -430,7 +430,11 @@ const wardAgainst = (types: readonly string[]) => ({
       ]
     }
   ],
-  conditionWards: { conditionIds: ["charmed" as const, "frightened" as const], creatureTypes: [...types] }
+  conditionWards: {
+    conditionIds: ["charmed" as const, "frightened" as const],
+    creatureTypes: [...types],
+    possession: true as const
+  }
 });
 
 /** Magic Circle facing out (keeping the chosen types out and warding those inside) or reversed (holding them in and
@@ -1264,7 +1268,7 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       exclusive: true,
       bars: { way: "in", types: [...HALLOW_TYPES] },
       holds: {
-        conditionWards: { conditionIds: ["charmed", "frightened"], creatureTypes: [...HALLOW_TYPES] },
+        conditionWards: { conditionIds: ["charmed", "frightened"], creatureTypes: [...HALLOW_TYPES], possession: true },
         suppresses: true
       },
       picks: {
@@ -1355,6 +1359,36 @@ const LATER_ACTIONS: Readonly<Record<string, readonly Later[]>> = {
       activation: "action",
       when: "A Magic action shows the faint aura round each creature in sight within 30 feet that bears magic, and the school of the spells on it.",
       reveals: true,
+      damage: []
+    }
+  ],
+  // "Break Enchantment. As a Magic action, you touch a creature that is possessed by or has the Charmed or Frightened
+  // condition from one or more creatures of the types above ... Dismissal. As a Magic action, you target one creature
+  // you can see within 5 feet of you that has one of the creature types above. The target must succeed on a Charisma
+  // saving throw or be sent back to its home plane". Either ends the spell.
+  "dispel-evil-and-good": [
+    {
+      name: "Break Enchantment",
+      activation: "action",
+      when: "A Magic action touches a creature to end the Charmed, Frightened and possession that Celestials, Elementals, Fey, Fiends or Undead gave it, and ends the spell.",
+      targets: { count: 1, rangeFeet: 5 },
+      breaksEnchantment: { creatureTypes: [...CIRCLE_TYPES] },
+      endsSpell: true,
+      damage: []
+    },
+    {
+      name: "Dismissal",
+      activation: "action",
+      when: "A Magic action makes a Celestial, Elemental, Fey, Fiend or Undead the caster sees within 5 feet succeed on a Charisma save or be sent home, and ends the spell.",
+      targets: { count: 1, rangeFeet: 5, seen: true, creatureTypes: [...CIRCLE_TYPES] },
+      save: {
+        ability: "cha",
+        successDamage: "none",
+        failureConditions: [],
+        failureBanishes: [...CIRCLE_TYPES],
+        banishedForGood: true
+      },
+      endsSpell: true,
       damage: []
     }
   ],
@@ -2883,7 +2917,7 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     target: "target",
     duration: rounds(100),
     modifiers: [attackedWithDisadvantageBy(OTHERWORLDLY)],
-    conditionWards: { conditionIds: ["charmed", "frightened"], creatureTypes: [...OTHERWORLDLY] }
+    conditionWards: { conditionIds: ["charmed", "frightened"], creatureTypes: [...OTHERWORLDLY], possession: true }
   }),
   // "Celestials, Elementals, Fey, Fiends, and Undead have Disadvantage on attack rolls against you."
   "dispel-evil-and-good": spellGrant({

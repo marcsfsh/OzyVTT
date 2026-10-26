@@ -53,7 +53,8 @@ export function endAnEffect(ctx: ResolveContext): void {
     const line = openEndingSave(state, bearer, chosen.effect, chosen.effect.repeatSave!, "repeats", {
       newId: deps.newRollId,
       now: deps.now,
-      rollDie: deps.random
+      rollDie: deps.random,
+      ...(deps.resolveDefinition ? { resolveDefinition: deps.resolveDefinition } : {})
     });
     ctx.tableNarration.push(tableLineOf(ctx, line));
     return;

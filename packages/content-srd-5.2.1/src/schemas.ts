@@ -208,6 +208,13 @@ export const SpellLaterActionSchema = z
     interposes: z.literal(true).optional(),
     /** How often it can be taken (Phantasmal Force's harm: once a turn; Geas's 5d10: once a day of game time). */
     uses: ActionSchema.shape.uses,
+    /** Whom it may target, when not the spell's own targets (Dispel Evil and Good's Dismissal: one creature of the
+     *  warded types within 5 feet that the caster sees). */
+    targets: ActionTargetsSchema.optional(),
+    /** It ends the Charmed, Frightened and possession creatures of these types gave its target (Break Enchantment). */
+    breaksEnchantment: ActionSchema.shape.breaksEnchantment,
+    /** Taking it ends the spell (Dispel Evil and Good's special functions). */
+    endsSpell: z.literal(true).optional(),
     /** It is taken only on the caster's own turn ("On each of your turns": Phantasmal Force). */
     ownTurnOnly: z.literal(true).optional(),
     /** Only the GM takes it, judging when the text's trigger has happened (Geas: "if it acts in a manner directly

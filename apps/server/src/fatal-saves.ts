@@ -22,14 +22,21 @@ import { creatureTypeOf } from "./statblock-facts.js";
  */
 
 type Actor = GameState["actors"][number];
-type SaveBlock = Readonly<{ failureByHitPoints?: readonly HitPointBand[]; failureBanishes?: readonly string[] }>;
+type SaveBlock = Readonly<{
+  failureByHitPoints?: readonly HitPointBand[];
+  failureBanishes?: readonly string[];
+  banishedForGood?: true;
+}>;
 
 /** What a save block carries onto its pending saves of this; empty when it has neither. */
-export function fatalFailureOf(save: SaveBlock): Pick<PendingSave, "failureByHitPoints" | "failureBanishes"> | null {
+export function fatalFailureOf(
+  save: SaveBlock
+): Pick<PendingSave, "failureByHitPoints" | "failureBanishes" | "banishedForGood"> | null {
   if (!save.failureByHitPoints && !save.failureBanishes) return null;
   return {
     ...(save.failureByHitPoints ? { failureByHitPoints: structuredClone([...save.failureByHitPoints]) } : {}),
-    ...(save.failureBanishes ? { failureBanishes: [...save.failureBanishes] } : {})
+    ...(save.failureBanishes ? { failureBanishes: [...save.failureBanishes] } : {}),
+    ...(save.failureBanishes && save.banishedForGood ? { banishedForGood: true as const } : {})
   };
 }
 
@@ -94,11 +101,12 @@ export function applyHitPointBand(
 }
 
 /** Divine Word: "a Celestial, an Elemental, a Fey, or a Fiend target that fails its save is forced back to its plane of
- *  origin ... and can't return to the current plane for 24 hours". It leaves the map (`off-plane.ts`) for that time. */
+ *  origin ... and can't return to the current plane for 24 hours". It leaves the map (`off-plane.ts`) for that time, or
+ *  until the GM brings it back when it is sent home for good (Dispel Evil and Good's Dismissal). */
 export function banishOnFailure(
   state: GameState,
   target: Actor,
-  pending: Pick<PendingSave, "actionName" | "sourceActorId" | "sourceName" | "failureBanishes">,
+  pending: Pick<PendingSave, "actionName" | "sourceActorId" | "sourceName" | "failureBanishes" | "banishedForGood">,
   definition: ActorDefinition | undefined,
   id: string
 ): EffectNarration[] {
@@ -114,13 +122,15 @@ export function banishOnFailure(
       sourceActorId: pending.sourceActorId,
       sourceName: pending.sourceName,
       startedRound: state.combat.round,
-      duration: { type: "minutes", remaining: 24 * 60 }
+      duration: pending.banishedForGood ? { type: "manual" } : { type: "minutes", remaining: 24 * 60 }
     })
   );
   return [
     {
       kind: "condition",
-      text: `${target.name} is forced back to its plane of origin and can't return for 24 hours (${pending.actionName}).`,
+      text: pending.banishedForGood
+        ? `${target.name} is sent back to its home plane (${pending.actionName}).`
+        : `${target.name} is forced back to its plane of origin and can't return for 24 hours (${pending.actionName}).`,
       actorId: target.id
     }
   ];

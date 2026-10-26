@@ -595,6 +595,10 @@ export function laterSpellAction(
     ...(later.shapeShift ? { shapeShift: structuredClone(later.shapeShift) } : {}),
     // How often it is taken (Phantasmal Force's once a turn, Geas's once a day).
     ...(later.uses ? { uses: { ...later.uses } } : {}),
+    // Whom it reaches, and what it does beside a save (Dispel Evil and Good's Break Enchantment and Dismissal).
+    ...(later.targets ? { targets: structuredClone(later.targets) } : {}),
+    ...(later.breaksEnchantment ? { breaksEnchantment: structuredClone(later.breaksEnchantment) } : {}),
+    ...(later.endsSpell ? { endsOwnSpell: true as const } : {}),
     spellId: spell.id
   };
 }

@@ -194,6 +194,11 @@ export const MONSTER_ACTION_FIXES: Readonly<Record<string, MonsterActionFix>> = 
     ],
     reminder: null
   },
+  "ghost/possession": {
+    why: "the failure is a possession, which the save reader doesn't mark",
+    // "Failure: The target is possessed by the ghost ... and the target has the Incapacitated condition".
+    save: { failureEffect: { name: "Possessed", tags: ["possessed"], modifiers: [] } }
+  },
   "lamia/corrupting-touch": {
     why: "the failure's conditions are a curse, which the save reader doesn't mark",
     // "The target is cursed for 1 hour. Until the curse ends, the target has the Charmed and Poisoned conditions."

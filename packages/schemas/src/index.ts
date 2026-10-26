@@ -1593,11 +1593,13 @@ export const RepeatSaveSchema = z
   })
   .strict();
 export type RepeatSave = z.infer<typeof RepeatSaveSchema>;
-/** Conditions a creature of these types can't give the bearer (Protection from Evil and Good). */
+/** Conditions a creature of these types can't give the bearer, and whether it can't possess the bearer either
+ *  (Protection from Evil and Good). */
 export const ConditionWardSchema = z
   .object({
     conditionIds: z.array(ConditionSchema).min(1).max(6),
-    creatureTypes: z.array(RiderSlugSchema).min(1).max(12)
+    creatureTypes: z.array(RiderSlugSchema).min(1).max(12),
+    possession: z.literal(true).optional()
   })
   .strict();
 /** A condition held off while an effect lasts, kept as it was (an Exhaustion level, a player's own mark). */
@@ -3694,6 +3696,11 @@ export const SaveOutcomeFields = {
     .max(6)
     .optional()
     .describe("A creature of these types that fails is sent back to its home plane for 24 hours"),
+  /** It doesn't come back after the 24 hours (Dispel Evil and Good's Dismissal: "sent back to its home plane"). */
+  banishedForGood: z
+    .literal(true)
+    .optional()
+    .describe("A creature `failureBanishes` sends home stays there, with no 24-hour return"),
   /** A success ends the spell the save is against, its caster's Concentration on it included (Detect Thoughts' probe:
    *  "On a successful save, the spell ends"). */
   successEndsSpell: z
@@ -5487,6 +5494,16 @@ export const ActionSchema = z
       .describe(
         "It ends one harm its user picks on the target: an Exhaustion level, Charmed or Petrified, a curse, a lowered ability score or a lowered Hit Point maximum"
       ),
+    /** It ends the Charmed and Frightened conditions, and the possession, that creatures of these types gave its target
+     *  (Dispel Evil and Good's Break Enchantment). */
+    breaksEnchantment: z
+      .object({ creatureTypes: z.array(RiderSlugSchema).min(1).max(8) })
+      .strict()
+      .optional()
+      .describe("It ends the Charmed, Frightened and possession that creatures of these types gave its target"),
+    /** Taking it ends the spell it belongs to, its user's Concentration on it included (Dispel Evil and Good's special
+     *  functions). */
+    endsOwnSpell: z.literal(true).optional().describe("Taking it ends its spell, and its user's Concentration on it"),
     /** Missiles that each deal `damage` to a creature of the caster's choice (Magic Missile's darts), rolled one by one.
      *  The resolve's targets assign them in order, a target named twice taking two. */
     darts: z.number().int().min(2).max(20).optional(),

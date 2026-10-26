@@ -461,6 +461,8 @@ export const PendingSaveSchema = z
       .min(1)
       .max(6)
       .optional(),
+    /** The banished creature stays home, with no 24-hour return (Dispel Evil and Good's Dismissal). GM bookkeeping. */
+    banishedForGood: z.literal(true).optional(),
     /** What gives the save Disadvantage, as the roll names it (Heightened Spell). GM bookkeeping, never projected. */
     disadvantageFrom: z.string().min(1).max(60).optional(),
     /** A failure returns a shape-shifted creature to its true form (Moonbeam). Narrated when it lands. */

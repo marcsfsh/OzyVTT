@@ -247,6 +247,50 @@ export function wardedFrom(
   return type !== null && wards.some((effect) => effect.conditionWards!.creatureTypes.includes(type));
 }
 
+/** On an effect, its bearer is possessed by the effect's source (a ghost's Possession): Protection from Evil and Good
+ *  keeps it off, and Dispel Evil and Good's Break Enchantment ends it. */
+export const POSSESSED_TAG = "possessed";
+
+/** Whether one of the bearer's wards keeps a creature of the source's type from possessing it. */
+function wardedFromPossession(
+  state: GameState,
+  actor: Actor,
+  sourceActorId: string | null,
+  immunities: ConditionImmunitySource | undefined
+): boolean {
+  const wards = actor.effects.filter((effect) => effect.conditionWards?.possession === true);
+  if (wards.length === 0 || sourceActorId === null) return false;
+  const source = state.actors.find((candidate) => candidate.id === sourceActorId);
+  if (!source) return false;
+  const definition = source.definitionId ? immunities?.resolveDefinition?.(source.definitionId) : undefined;
+  const type = creatureTypeOf(source, definition);
+  return type !== null && wards.some((effect) => effect.conditionWards!.creatureTypes.includes(type));
+}
+
+/** The ward that gives its bearer Advantage on a new save against an effect a warded creature already holds it with
+ *  (Protection from Evil and Good: "If the target is already possessed, Charmed, or Frightened by such a creature, the
+ *  target has Advantage on any new saving throw against the relevant effect"); null when none does. */
+export function wardAgainst(
+  state: GameState,
+  actor: Actor,
+  effect: EffectInstance,
+  resolveDefinition: ((definitionId: string) => ActorDefinition | undefined) | undefined
+): string | null {
+  const source = state.actors.find((candidate) => candidate.id === effect.sourceActorId);
+  if (!source) return null;
+  const type = creatureTypeOf(source, source.definitionId ? resolveDefinition?.(source.definitionId) : undefined);
+  if (type === null) return null;
+  const ward = actor.effects.find((candidate) => {
+    const covers = candidate.conditionWards;
+    if (!covers || candidate.id === effect.id || !covers.creatureTypes.includes(type)) return false;
+    return (
+      (covers.possession === true && effect.tags.includes(POSSESSED_TAG)) ||
+      effect.linkedConditionIds.some((id) => (covers.conditionIds as readonly string[]).includes(id))
+    );
+  });
+  return ward ? ward.name : null;
+}
+
 const hasCondition = (actor: Actor, conditionId: string) =>
   actor.conditions.some((condition) => condition.id === conditionId);
 
@@ -435,6 +479,16 @@ export function addEffect(
   if (!actor) throw new CommandRejectedError("That combatant no longer exists.");
   const existing = actor.effects.find((candidate) => candidate.id === effect.id);
   if (existing) return existing;
+  // SRD Protection from Evil and Good: "The target also can't be possessed by ... them."
+  if (effect.tags.includes(POSSESSED_TAG) && wardedFromPossession(state, actor, effect.sourceActorId, immunities)) {
+    events?.push({
+      kind: "condition",
+      text: `${actor.name} can't be possessed by ${effect.sourceName ?? "that creature"}, so ${effect.name} has no effect.`,
+      actorId,
+      immune: true
+    });
+    return effect;
+  }
   // SRD Trance: "magic can't put you to sleep" (Eyebite's Asleep, a brass dragon's Sleep Breath).
   if (isMagicalSleep(effect)) {
     const definition = actor.definitionId ? immunities?.resolveDefinition?.(actor.definitionId) : undefined;

@@ -160,7 +160,7 @@ describe("effects that name their cure", () => {
     expect(actorOf(table.state, HERO).conditions.map((condition) => condition.id)).toEqual(["incapacitated"]);
     // Bran casts it from a slot of his own, with his own diamond dust.
     const bran = actorOf(table.state, ALLY);
-    bran.spellSlots = [{ level: 5, max: 1, remaining: 1 }];
+    bran.spellSlots = [{ level: 5, remaining: 1 }];
     bran.inventory.push({ id: "diamond-dust", name: "Diamond dust (100 GP)", quantity: 1, equipped: false, attuned: false });
     resolveAs(table, castAction("greater-restoration"), { targetIds: [HERO], optionId: "other" }, [], ALLY);
     expect(actorOf(table.state, HERO).conditions).toEqual([]);

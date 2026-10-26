@@ -215,7 +215,8 @@ export function startOfTurn(state: GameState, actorId: string, events: EffectNar
       ...openRepeatSaves(state, actorId, "turn-start", {
         newId: deps.newId,
         now: deps.now ?? (() => new Date().toISOString()),
-        rollDie: deps.rollDie
+        rollDie: deps.rollDie,
+        resolveDefinition: deps.resolveDefinition
       })
     );
   // SRD Confusion: "it rolls 1d10 at the start of each of its turns to determine its behavior for that turn".

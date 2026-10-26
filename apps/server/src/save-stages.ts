@@ -1,6 +1,6 @@
 import type { AbilityId, GameState, PendingSave } from "@vtt/domain";
 import { parseDiceFormula, resolveDice } from "@vtt/rules-5e";
-import type { EffectStage, EndedBy, RepeatSave, SaveFailureDuration } from "@vtt/schemas";
+import type { ActorDefinition, EffectStage, EndedBy, RepeatSave, SaveFailureDuration } from "@vtt/schemas";
 import { conditionLabel } from "./condition-rules.js";
 import {
   addEffect,
@@ -9,6 +9,7 @@ import {
   makeEffect,
   sourceOf,
   swapEffect,
+  wardAgainst,
   type ConditionImmunitySource,
   type EffectNarration
 } from "./effects.js";
@@ -141,6 +142,8 @@ export type EndingSaveDeps = Readonly<{
   sees?: (viewerId: string, targetId: string) => boolean;
   /** Creature-to-creature distance on the map; null when it can't tell. */
   distanceFeet?: (actorIdA: string, actorIdB: string) => number | null;
+  /** Stat blocks, so a ward against the source's creature type can give the save Advantage. */
+  resolveDefinition?: (definitionId: string) => ActorDefinition | undefined;
 }>;
 
 /** The repeat saves `actorId` owes as its turn starts or ends: one per effect that repeats then. A once-only repeat
@@ -245,6 +248,8 @@ export function openEndingSave(
   advantageFrom?: string
 ): EffectNarration {
   const repeat = verb === "repeats" ? effect.repeatSave : undefined;
+  // Protection from Evil and Good: Advantage on a new save against what such a creature holds the bearer with.
+  const advantage = advantageFrom ?? wardAgainst(state, bearer, effect, deps.resolveDefinition) ?? undefined;
   const parts =
     repeat?.failureDamage && deps.rollDie
       ? repeat.failureDamage.map((part) => ({
@@ -270,7 +275,7 @@ export function openEndingSave(
     // A success leaves the bearer immune to the effect's source (Antipathy/Sympathy).
     ...(repeat?.immuneOnSuccess ? { immuneOnSuccess: true } : {}),
     ...(repeat?.immuneMinutes !== undefined ? { immuneMinutes: repeat.immuneMinutes } : {}),
-    ...(advantageFrom ? { advantageFrom } : {}),
+    ...(advantage ? { advantageFrom: advantage } : {}),
     newSaveId: deps.newId,
     createdAt: Date.parse(deps.now())
   });

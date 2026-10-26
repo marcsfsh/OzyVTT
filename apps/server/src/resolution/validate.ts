@@ -205,6 +205,7 @@ function combatantsOf(
   const touchesSomeone =
     action.endsConditions !== undefined ||
     action.restores === true ||
+    action.breaksEnchantment !== undefined ||
     action.healing?.perUse === true ||
     action.swallow?.conditions !== undefined ||
     action.pull !== undefined;
@@ -220,6 +221,7 @@ function combatantsOf(
     action.dispel === undefined &&
     action.endsCurses === undefined &&
     action.restores === undefined &&
+    action.breaksEnchantment === undefined &&
     !spendsALimitedUse &&
     !castsASpell &&
     !movesAnArea &&

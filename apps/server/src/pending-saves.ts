@@ -41,6 +41,7 @@ export function createPendingSaves(
       | "failureByMargin"
       | "objectPenalty"
       | "failureBanishes"
+      | "banishedForGood"
       | "endsForm"
       | "regurgitates"
       | "vitality"
@@ -125,6 +126,7 @@ export function createPendingSaves(
     ...(input.extra?.endsForm ? { endsForm: true as const } : {}),
     ...(input.extra?.failureByHitPoints ? { failureByHitPoints: structuredClone(input.extra.failureByHitPoints) } : {}),
     ...(input.extra?.failureBanishes ? { failureBanishes: [...input.extra.failureBanishes] } : {}),
+    ...(input.extra?.banishedForGood ? { banishedForGood: true as const } : {}),
     ...(input.extra?.spendsOnKill ? { spendsOnKill: { ...input.extra.spendsOnKill } } : {}),
     ...(input.extra?.failureByMargin ? { failureByMargin: structuredClone(input.extra.failureByMargin) } : {}),
     ...(input.extra?.objectPenalty ? { objectPenalty: { ...input.extra.objectPenalty } } : {}),

@@ -263,6 +263,7 @@ const PENDING_SAVE_FIELDS = {
   // Which of the target's things a failure marks is narrated when it lands.
   objectPenalty: "never",
   failureBanishes: "never",
+  banishedForGood: "never",
   // What a swallower's failure lets out is narrated when it lands.
   regurgitates: "never",
   // That the GM applies the outcome is a fact of the engine, true of the spell for whoever casts it; it names nothing.
