@@ -6730,7 +6730,8 @@
   "casts": [
    {
     "spellId": "disguise-self",
-    "consumesSpellSlot": false
+    "consumesSpellSlot": false,
+    "endsWithItem": true
    }
   ],
   "grantsFeatIds": [],
@@ -9520,7 +9521,42 @@
   },
   "grantsFeatIds": [],
   "tags": [],
-  "actions": [],
+  "actions": [
+   {
+    "id": "fold",
+    "name": "Fold the Portable Hole Shut",
+    "activation": "action",
+    "description": "Fold the cloth closed with creatures inside the open hole: they stay in its extradimensional space until each forces its way out with an action and a DC 10 Strength (Athletics) check, appearing within 5 feet of the hole.",
+    "damage": [],
+    "targets": {
+     "count": 4,
+     "rangeFeet": 10
+    },
+    "grants": {
+     "name": "Shut in the Portable Hole",
+     "tags": [
+      "off-plane",
+      "portable-hole"
+     ],
+     "duration": {
+      "type": "manual"
+     },
+     "modifiers": [],
+     "onEnd": [],
+     "target": "targets",
+     "voidWhileIncapacitated": false,
+     "concentration": false,
+     "endAction": {
+      "activation": "action",
+      "kind": "check",
+      "ability": "str",
+      "skill": "athletics",
+      "dc": 10,
+      "label": "Force a way out"
+     }
+    }
+   }
+  ],
   "effects": [],
   "modifiers": []
  },

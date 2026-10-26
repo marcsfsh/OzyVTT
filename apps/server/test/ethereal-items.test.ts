@@ -123,3 +123,30 @@ describe("Dimensional Shackles", () => {
     expect(foe(table).effects.some((effect) => effect.name === "Dimensional Shackles")).toBe(false);
   });
 });
+
+// "Folding the cloth closes the hole, and any creatures or objects within remain in the extradimensional space ... a DC
+// 10 Strength (Athletics) check ... forces its way out and appears within 5 feet of the Portable Hole."
+describe("a Portable Hole folded shut", () => {
+  it("holds the creature inside off the map until its DC 10 Athletics check", () => {
+    const table = tableOf({ [IDS.wizard]: wizardInput() });
+    write(table, IDS.wizard, catalogRow("portable-hole"), "gm");
+    fight(table, IDS.wizard);
+    resolveAt(table, IDS.wizard, "item-portable-hole-fold", []);
+    const shut = table.actor(IDS.foe).effects.find((effect) => effect.name === "Shut in the Portable Hole")!;
+    expect(shut.tags).toEqual(["off-plane", "portable-hole"]);
+    expect(shut.endAction).toMatchObject({ kind: "check", ability: "str", skill: "athletics", dc: 10 });
+  });
+});
+
+// "While wearing this hat, you can cast the Disguise Self spell. The spell ends if the hat is removed."
+describe("a Hat of Disguise", () => {
+  it("ends its Disguise Self when the hat comes off", () => {
+    const table = tableOf({ [IDS.wizard]: wizardInput() });
+    write(table, IDS.wizard, catalogRow("hat-of-disguise", { attuned: true }), "gm");
+    fight(table, IDS.wizard);
+    resolveAt(table, IDS.wizard, "item-hat-of-disguise-cast-disguise-self", [], { targetIds: [] });
+    expect(tags(table)).toContain("disguised");
+    write(table, IDS.wizard, edit(table, IDS.wizard, "hat-of-disguise", { equipped: false }), "gm");
+    expect(tags(table)).not.toContain("disguised");
+  });
+});

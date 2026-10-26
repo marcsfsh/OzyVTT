@@ -2619,7 +2619,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   "goggles-of-night": { modifiers: [{ type: "darkvision", feet: 60, extends: true }] },
 
   // An unlimited self-cast with no damage, attack or save.
-  "hat-of-disguise": { casts: [{ spellId: "disguise-self" }] },
+  // "While wearing this hat, you can cast the Disguise Self spell. The spell ends if the hat is removed."
+  "hat-of-disguise": { casts: [{ spellId: "disguise-self", endsWithItem: true }] },
 
   /** "Your Intelligence is 19 while you wear this headband", or no change from a higher one. */
   "headband-of-intellect": { modifiers: [{ type: "ability-score-minimum", ability: "int", score: 19 }] },
@@ -4482,10 +4483,43 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
-  // What is put in it weighs next to nothing; opening it on a surface, the creatures inside and climbing out are the
-  // GM's (off-plane). Put in another extradimensional space, it is destroyed with what it holds.
+  // What is put in it weighs next to nothing; put in another extradimensional space, it is destroyed with what it
+  // holds. "Folding the cloth closes the hole, and any creatures or objects within remain in the extradimensional space
+  // ... a creature within the hole's extradimensional space can take an action to make a DC 10 Strength (Athletics)
+  // check. On a successful check, the creature forces its way out and appears within 5 feet of the Portable Hole": the
+  // creatures in the open hole leave the map (`off-plane.ts`) until that check, coming back where they stood beside it.
+  // The open hole on the map and its air are the GM's.
   "portable-hole": {
-    container: { weighsLb: 0, extradimensional: true }
+    container: { weighsLb: 0, extradimensional: true },
+    actions: [
+      {
+        id: "fold",
+        name: "Fold the Portable Hole Shut",
+        activation: "action",
+        description:
+          "Fold the cloth closed with creatures inside the open hole: they stay in its extradimensional space until each forces its way out with an action and a DC 10 Strength (Athletics) check, appearing within 5 feet of the hole.",
+        damage: [],
+        targets: { count: 4, rangeFeet: 10 },
+        grants: {
+          name: "Shut in the Portable Hole",
+          tags: ["off-plane", "portable-hole"],
+          target: "targets",
+          duration: { type: "manual" },
+          modifiers: [],
+          onEnd: [],
+          voidWhileIncapacitated: false,
+          concentration: false,
+          endAction: {
+            activation: "action",
+            kind: "check",
+            ability: "str",
+            skill: "athletics",
+            dc: 10,
+            label: "Force a way out"
+          }
+        }
+      }
+    ]
   },
   // Knotted, it "grants Advantage on ability checks made to climb using the rope", a situation the roller names. Its
   // animated end and its own Hit Points are the GM's.

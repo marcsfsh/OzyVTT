@@ -2032,6 +2032,14 @@ const CAST_GRANTS: Readonly<Record<string, Grant>> = {
     duration: { type: "manual" },
     detects: { kinds: ["minds"], feet: 30, blockedByWalls: true }
   }),
+  // "You make yourself ... look different until the spell ends": the disguise is an effect on the caster for the hour,
+  // which a Hat of Disguise ends when it comes off. How it looks and who sees through it are the GM's.
+  "disguise-self": spellGrant({
+    name: "Disguise Self",
+    tags: ["disguised"],
+    target: "self",
+    duration: { type: "manual" }
+  }),
   "detect-evil-and-good": spellGrant({
     name: "Detect Evil and Good",
     tags: ["detect-evil-and-good"],
@@ -3399,6 +3407,8 @@ export function spellEffectFor(
     ...(AREA_PER_SLOT[id] !== undefined ? { areaPerSlot: AREA_PER_SLOT[id] } : {}),
     ...(COMPANION_FEET[id] !== undefined ? { companionFeet: COMPANION_FEET[id] } : {}),
     ...(KINDLES[id] ? { kindles: { ...KINDLES[id] } } : {}),
+    // "If you maintain Concentration on this spell for the full duration, the spell lasts until dispelled."
+    ...(id === "true-polymorph" ? { permanentAfterFull: true as const } : {}),
     // The creatures it brings and the commands it gives (`spell-summons.ts`).
     ...spellSummonFieldsFor(id)
   };

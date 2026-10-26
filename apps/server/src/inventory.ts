@@ -625,10 +625,12 @@ function endGrantsOfPutAway(
     ? (row: InventoryItem | undefined) => row !== undefined && row.quantity > 0 && row.attuned
     : (row: InventoryItem | undefined) => row !== undefined && itemIsActive(row, rowRecord(deps.catalog, row));
   if (!lasting(before) || lasting(now)) return [];
+  // A spell cast from it ends with it only where the item says so (a Hat of Disguise's Disguise Self).
+  const endsWith = new Set((record.casts ?? []).filter((cast) => cast.endsWithItem).map((cast) => cast.spellId));
   const gone = actor.effects.filter(
     (effect) =>
       effect.sourceActorId === actor.id &&
-      effect.spell === undefined &&
+      (effect.spell === undefined || endsWith.has(effect.spell.id)) &&
       effect.sourceActionId !== null &&
       isItemActionId(effect.sourceActionId) &&
       itemRowOfAction(effect.sourceActionId, [before, ...actor.inventory])?.id === before.id

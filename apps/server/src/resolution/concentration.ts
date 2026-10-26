@@ -5,6 +5,7 @@ import { catalogIdOf, MAX_EFFECT_MINUTES, type SaveFailureDuration } from "@vtt/
 import {
   addEffect,
   CONCENTRATING_TAG,
+  LASTS_IF_HELD_TAG,
   concentrationOn,
   makeEffect,
   turnEndDuration,
@@ -118,7 +119,9 @@ export function beginConcentration(ctx: ResolveContext, spell: SpellReference, c
       ...(extended
         ? { modifiers: [{ type: "roll-mode" as const, roll: "concentration" as const, mode: "advantage" as const }] }
         : {}),
-      tags: [CONCENTRATING_TAG],
+      // True Polymorph: "If you maintain Concentration on this spell for the full duration, the spell lasts until
+      // dispelled" (`effects.ts`).
+      tags: spell.effect?.permanentAfterFull ? [CONCENTRATING_TAG, LASTS_IF_HELD_TAG] : [CONCENTRATING_TAG],
       sourceActorId: attacker.id,
       sourceName: attacker.name,
       startedRound: state.combat.round,

@@ -4,7 +4,8 @@ import { loadSpells } from "@vtt/content-srd-5.2.1";
 import type { GameState } from "@vtt/domain";
 import type { ActorAction } from "@vtt/schemas";
 import { resolveDefinitionAction } from "../src/action-resolution.js";
-import { addEffect, makeEffect } from "../src/effects.js";
+import { addEffect, endEffect, makeEffect } from "../src/effects.js";
+import { passGameTime } from "../src/game-time.js";
 import { spellCastMechanics } from "../src/item-actions.js";
 import { settlePlanes } from "../src/off-plane.js";
 import { catalog, view } from "./spell-casters.js";
@@ -197,5 +198,51 @@ describe("a Rod of Security", () => {
     use(state, []);
     expect([away(state, HERO), away(state, FRIEND)]).toEqual([false, false]);
     expect(() => use(state, [GOBLIN])).toThrow();
+  });
+});
+
+// True Polymorph: "If you maintain Concentration on this spell for the full duration, the spell lasts until dispelled."
+describe("True Polymorph held for the full hour", () => {
+  const polymorphed = () => {
+    const state = visionGame({ enabled: false, active: false });
+    addEffect(
+      state,
+      HERO,
+      makeEffect({
+        id: "concentration",
+        name: "Concentrating on True Polymorph",
+        tags: ["concentrating", "lasts-if-held"],
+        duration: { type: "minutes", remaining: 60 },
+        castId: "cast-1",
+        concentration: true
+      })
+    );
+    addEffect(
+      state,
+      GOBLIN,
+      makeEffect({
+        id: "form",
+        name: "True Polymorph",
+        tags: [],
+        duration: { type: "minutes", remaining: 60 },
+        castId: "cast-1",
+        concentration: true,
+        sourceActorId: HERO
+      })
+    );
+    return state;
+  };
+  it("lasts until dispelled once the hour is up", () => {
+    const state = polymorphed();
+    passGameTime(state, 60);
+    expect(actor(state, GOBLIN).effects).toEqual([
+      expect.objectContaining({ name: "True Polymorph", duration: { type: "manual" } })
+    ]);
+  });
+  it("ends with the Concentration broken before the hour", () => {
+    const state = polymorphed();
+    passGameTime(state, 30);
+    endEffect(state, HERO, "concentration");
+    expect(actor(state, GOBLIN).effects).toEqual([]);
   });
 });

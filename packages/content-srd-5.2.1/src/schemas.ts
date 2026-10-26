@@ -431,6 +431,8 @@ export const SpellEffectSchema = z
     /** Its target is the caster or a willing creature, which the server takes to be one on the caster's side (Light:
      *  "an object that isn't being worn or carried by someone else"; Nondetection: "a willing creature"). */
     willingTargets: z.literal(true).optional(),
+    /** Held with Concentration for its full duration, what it made lasts until dispelled (True Polymorph). */
+    permanentAfterFull: z.literal(true).optional(),
     /** It lights (with `snuffs`, or puts out) one nonmagical flame within `feet`: a light set on the map, or the light a
      *  creature it targets carries (Druidcraft's and Prestidigitation's Fire Play, Elementalism's Beckon Fire). */
     kindles: z
@@ -830,6 +832,12 @@ export const ItemSpellCastSchema = z
       .describe(
         "It can be cast only while its user has an effect with this tag (a Dragon Orb's spells, for the one who controls it)"
       ),
+    /** What it leaves on its user ends when the item is taken off or put away (a Hat of Disguise: "The spell ends if
+     *  the hat is removed"). */
+    endsWithItem: z
+      .literal(true)
+      .optional()
+      .describe("What it leaves on its user ends when the item is taken off or put away"),
     /** What it leaves lasts this many minutes, whatever the spell's own duration (Oil of Slipperiness' Grease: 8
      *  hours). */
     lastsMinutes: z

@@ -8594,7 +8594,21 @@
   "effect": {
    "attacks": 0,
    "damage": [],
-   "healing": null
+   "healing": null,
+   "grant": {
+    "modifiers": [],
+    "onEnd": [],
+    "voidWhileIncapacitated": false,
+    "concentration": false,
+    "name": "Disguise Self",
+    "tags": [
+     "disguised"
+    ],
+    "target": "self",
+    "duration": {
+     "type": "manual"
+    }
+   }
   },
   "classes": [
    "bard",
@@ -29456,7 +29470,8 @@
     "gear": "merged",
     "temporaryHitPoints": "each-form"
    },
-   "unwillingOnly": true
+   "unwillingOnly": true,
+   "permanentAfterFull": true
   },
   "classes": [
    "bard",
