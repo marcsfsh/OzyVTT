@@ -114,7 +114,9 @@ const SPECIAL_MODES: readonly SpecialMode[] = ["fly", "swim", "climb", "burrow"]
 export function specialSpeedsOf(
   actor: Actor,
   definition: ActorDefinition | undefined,
-  derivation?: EquipmentDerivation
+  derivation?: EquipmentDerivation,
+  /** It isn't the creature's own turn, so a speed it has only on its turn (Acrobatic Movement's climb) doesn't count. */
+  offTurn = false
 ): SpecialSpeeds {
   const speeds: Partial<Record<SpecialMode, number>> & { hover: boolean } = { hover: false };
   const extension = (definition?.extensions ?? {})[STATBLOCK_EXTENSION];
@@ -135,6 +137,7 @@ export function specialSpeedsOf(
   for (const rider of derivation ? collectRiders(derivation.carriers, { ...derivation.context, moment: null }) : []) {
     const modifier = rider.modifier;
     if (modifier.type !== "special-speed" || modifier.movement === undefined) continue;
+    if (modifier.ownTurn && offTurn) continue;
     // "Equal to your Speed" is the Speed before changes; the budget then moves it with Speed, as it does any speed.
     const feet = modifier.equalToSpeed ? (actor.speedFeet ?? 0) : (modifier.feet ?? 0);
     if (feet > 0) speeds[modifier.movement] = Math.max(speeds[modifier.movement] ?? 0, feet);
@@ -149,10 +152,37 @@ export function travelCostsExtra(
   actor: Actor,
   definition: ActorDefinition | undefined,
   mode: TravelMode,
-  derivation?: EquipmentDerivation
+  derivation?: EquipmentDerivation,
+  offTurn = false
 ): boolean {
-  return (mode === "climb" || mode === "swim") && specialSpeedsOf(actor, definition, derivation)[mode] === undefined;
+  return (
+    (mode === "climb" || mode === "swim") && specialSpeedsOf(actor, definition, derivation, offTurn)[mode] === undefined
+  );
 }
+
+/**
+ * Whether the creature moves across liquid as if it were solid ground: Water Walk (`water-walking`), or a rider that
+ * says so (a Monk's Acrobatic Movement, only on its own turn and while it wears no armor and wields no Shield).
+ */
+export function walksOnLiquid(actor: Actor, derivation?: EquipmentDerivation, offTurn = false): boolean {
+  if (
+    actor.effects.some((effect) => effect.tags.includes(WATER_WALKING_TAG)) &&
+    !actor.effects.some((effect) => effect.tags.includes(BELOW_SURFACE_TAG))
+  )
+    return true;
+  if (!derivation) return false;
+  return collectRiders(derivation.carriers, { ...derivation.context, moment: null }).some(
+    (rider) =>
+      rider.modifier.type === "movement" &&
+      rider.modifier.rule === "walks-on-liquid" &&
+      !(rider.modifier.ownTurn && offTurn)
+  );
+}
+
+/** The tag of the effect that lets its bearer walk on liquid (the Water Walk spell). */
+export const WATER_WALKING_TAG = "water-walking";
+/** The tag of the effect a Water Walk bearer holds while it has passed below the surface. */
+export const BELOW_SURFACE_TAG = "below-the-surface";
 
 /**
  * This turn's movement budget moving this way. Walking, and climbing or swimming without the speed, spend Speed
@@ -164,11 +194,12 @@ export function travelBudgetFeet(
   actor: Actor,
   derivation: EquipmentDerivation,
   definition: ActorDefinition | undefined,
-  mode: TravelMode
+  mode: TravelMode,
+  offTurn = false
 ): number | null {
   const walking = effectiveSpeedFeet(actor, derivation);
   if (mode === "walk") return walking;
-  const special = specialSpeedsOf(actor, definition, derivation)[mode];
+  const special = specialSpeedsOf(actor, definition, derivation, offTurn)[mode];
   if (special === undefined) return mode === "climb" || mode === "swim" ? walking : null;
   if (walking === null) return null;
   if (speedZeroed(actor)) return 0;

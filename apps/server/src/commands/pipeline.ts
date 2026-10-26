@@ -19,6 +19,7 @@ import { holdsSummons, needsSummonSettling, settleSummons, summonHoldingTurnLeav
 import { holdsBonds, needsBondSettling, settleBonds } from "../warding-bond.js";
 import { auraChangesAny, holdsAuras, settleZoneAuras, zoneAuraChanges } from "../zone-auras.js";
 import { holdsZoneOutcomes, settleZoneOutcomes, zoneOutcomesPending } from "../zone-outcomes.js";
+import { settleWeather, weatherPending } from "../environment.js";
 import type { GameStore, TimelineOps } from "../game-store.js";
 import { issuesOf } from "../http-kit.js";
 import { GameInputError } from "./failures.js";
@@ -361,6 +362,23 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
     await context.publishGameState(result.state);
   }
 
+  /**
+   * The scene's weather on the creatures placed in it (`environment.ts`): each holds what heavy precipitation or a strong
+   * wind gives its rolls, and the open flames they carry go out, as its own write when anything changed.
+   */
+  async function settleWeatherAfter() {
+    const before = context.readState();
+    if (before.combat.historyCursor !== null) return;
+    const deps = { catalog: kit.equipmentCatalog() };
+    if (!weatherPending(before, deps)) return;
+    let events: EffectNarration[] = [];
+    const result = await context.store.execute({ id: context.newId(), type: "environment.weather" }, (draft) => {
+      events = settleWeather(draft, deps);
+    });
+    await context.publishGameState(result.state);
+    kit.publishNarrations(events);
+  }
+
   async function dispatch(
     type: GameCommandType,
     principal: GamePrincipal,
@@ -408,6 +426,7 @@ export function createCommandRunner(context: CommandContext, kit: Kit, commands:
       await settleZoneOutcomesAfter();
       await settleBurstingZones();
       await settleZoneAurasAfter();
+      await settleWeatherAfter();
       await settleDownedReactions();
       await settleSummoned();
       await settleWardingBonds();

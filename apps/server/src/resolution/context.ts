@@ -335,6 +335,8 @@ export type ResolveContext = {
   /** Narration for the whole table, for riders that changed the board; `warnings` is the GM-only channel.
    *  A sentence goes in exactly one of the two. */
   readonly tableNarration: ActionTableNarration[];
+  /** What the action lets its user sense, told to its own player alone (Find Traps: a trap's nature, not where). */
+  readonly sensed: string[];
   rollMode: ActionRollMode | undefined;
   check: NonNullable<ActionResolution["check"]> | null;
   attack: ActionResolutionAttack | null;

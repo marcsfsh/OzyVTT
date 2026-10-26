@@ -397,10 +397,12 @@ function buildSight(state: GameState, content: SightContent): SceneSight {
     return result;
   };
 
+  // SRD Heavy Precipitation: "Everything within an area of heavy rain or heavy snowfall is Lightly Obscured."
+  const weather = (state.combat.environment?.precipitation ?? "none") !== "none";
   const fogAt = (point: Point): Obscurement =>
     heavy.some((area) => area.contains(point))
       ? "heavy"
-      : lightFog.some((area) => area.contains(point))
+      : weather || lightFog.some((area) => area.contains(point))
         ? "light"
         : "none";
 

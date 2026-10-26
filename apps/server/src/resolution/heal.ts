@@ -3,7 +3,7 @@ import { collectRiders, rollDice } from "@vtt/rules-5e";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
 import { CommandRejectedError } from "../game-store.js";
-import { endEffect } from "../effects.js";
+import { endEffect, LATENT_POISON_TAG } from "../effects.js";
 import { deadCantHealLine, healActor } from "../hit-points.js";
 import { isSwarm } from "../space-sharing.js";
 import { conditionCost, useCostOf } from "../use-cost.js";
@@ -264,8 +264,21 @@ function applyPrintedCures(ctx: ResolveContext): void {
   const alone = !action.healing && !action.grants;
   for (const target of ctx.targets) {
     const present = cures.filter((id) => target.conditions.some((condition) => condition.id === id));
+    // SRD Midnight Tears: "Any effect that ends the Poisoned condition neutralizes this poison", though it doesn't
+    // poison its creature before midnight.
+    const latent = cures.includes("poisoned")
+      ? target.effects.filter((effect) => effect.tags.includes(LATENT_POISON_TAG))
+      : [];
+    for (const effect of latent) {
+      endEffect(state, target.id, effect.id);
+      tableNarration.push({
+        kind: "effect",
+        text: `${action.name} neutralizes the ${effect.name} in ${target.name}.`,
+        actorIds: [target.id]
+      });
+    }
     if (present.length === 0) {
-      if (!alone) continue;
+      if (!alone || latent.length > 0) continue;
       throw new CommandRejectedError(
         `${target.name} isn't ${cures.map((id) => conditionLabel(id)).join(" or ")}, so ${action.name} would do nothing.`
       );

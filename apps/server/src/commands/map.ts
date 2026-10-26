@@ -38,7 +38,10 @@ import { CommandRejectedError } from "../game-store.js";
 import { airborneAfter, altitudeOf, setAltitude } from "../altitude.js";
 import { endsOnLanding, startFall } from "../falling.js";
 import { dropGrappled, failedTeleport, landTeleport, offerHideAfterMove } from "../granted-moves.js";
-import { holdMove } from "../held-moves.js";
+import { holdMove, refundMovement } from "../held-moves.js";
+import { waterAlongMove } from "../water.js";
+import { groundAlongForcedMove } from "../map-hazards.js";
+import { leftPit } from "../traps.js";
 import { walkThroughZones } from "../zone-stops.js";
 import { landJump } from "../jumping.js";
 import { askToStayMounted, carryRiders, mountOf, mountOrDismount, parted, ridersOf } from "../mounts.js";
@@ -433,7 +436,12 @@ export const mapCommands = [
             const walk = walkThroughZones(state, actorId, path, zoneDeps);
             zoneEvents.push(...walk.events);
             stoppedAt = walk.stop;
-            if (walk.stop !== null) {
+            if (walk.stop !== null && walk.ends) {
+              // It fell into a pit: the move ends there, and the rest of the way's movement is its again.
+              const stopAt = path[walk.stop]!;
+              moveEncounterToken(state, actorId, stopAt, geometry);
+              refundMovement(state, actorId, costFeet(stopAt, arrived) ?? 0);
+            } else if (walk.stop !== null) {
               const stopAt = path[walk.stop]!;
               const airborne = airborneAfter(mode, toAltitude, wasAirborne);
               holdMove(state, geometry, {
@@ -449,10 +457,13 @@ export const mapCommands = [
                 rest: path.slice(walk.stop)
               });
             }
-          } else
+          } else {
             zoneEvents.push(
               ...zonesAfterMove(state, { moverId: actorId, path, teleported: mode === "teleport" }, zoneDeps)
             );
+            // A creature moved by force is moved onto the traps on its way all the same.
+            if (mode === "forced") zoneEvents.push(...groundAlongForcedMove(state, actorId, path, zoneDeps));
+          }
           // A move stopped by an area's save has gone only as far as the stop.
           const travelled = (way: ReadonlyArray<Readonly<{ x: number; y: number }>>) =>
             stoppedAt === null ? way : path.slice(0, stoppedAt + 1);
@@ -486,6 +497,25 @@ export const mapCommands = [
                 squarePx: geometry.calibration.cellSizePx
               })
             );
+          // Water Susceptibility: the cold of each 5 feet the elemental moved in water.
+          if (mover && mode !== "teleport" && geometry.calibration)
+            zoneEvents.push(
+              ...waterAlongMove(
+                state,
+                actorId,
+                mode === "forced" ? path : travelled(outcome.path ?? path),
+                geometry.calibration,
+                {
+                  resolveDefinition: (definitionId) => kit.resolveDefinitionIn(state, definitionId),
+                  catalog: kit.equipmentCatalog(),
+                  rollDie: (sides) => kit.context.random(sides),
+                  newId: kit.context.newId,
+                  now: () => new Date().toISOString()
+                }
+              )
+            );
+          // Out of a pit it fell into, it is in it no longer.
+          zoneEvents.push(...leftPit(state, actorId, geometry.calibration));
           // Tunneler leaves a tunnel through the walls it burrowed through.
           const pixelsPerFoot = state.combat.vision.measure?.pixelsPerFoot;
           if (mover && outcome.path && mode === "burrow" && pixelsPerFoot)

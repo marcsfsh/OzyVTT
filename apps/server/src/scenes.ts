@@ -1,4 +1,4 @@
-import { DEFAULT_RULE_EXCEPTIONS, EMPTY_SCENE_VISION, type GameState, type Scene, type SceneCombat } from "@vtt/domain";
+import { CALM_ENVIRONMENT, DEFAULT_RULE_EXCEPTIONS, EMPTY_SCENE_VISION, type GameState, type Scene, type SceneCombat } from "@vtt/domain";
 import { CommandRejectedError } from "./game-store.js";
 import { assertNotArchived } from "./actor-roster.js";
 import { createEncounterTokens, type TokenMapGeometry } from "./token-placement.js";
@@ -36,6 +36,8 @@ function snapshotSceneCombat(combat: GameState["combat"]): SceneCombat {
     legendaryUsed: combat.legendaryUsed,
     fog: combat.fog,
     terrain: combat.terrain,
+    environment: combat.environment,
+    traps: combat.traps,
     vision: combat.vision,
     pendingSaves: combat.pendingSaves,
     pendingReactions: combat.pendingReactions,
@@ -73,7 +75,9 @@ function emptySceneCombat(): SceneCombat {
     reactionsUsed: [],
     legendaryUsed: {},
     fog: { enabled: false, shapes: [] },
-    terrain: { difficult: [] },
+    terrain: { difficult: [], water: [], runningWater: [], ice: [] },
+    environment: { ...CALM_ENVIRONMENT },
+    traps: [],
     vision: { ...EMPTY_SCENE_VISION },
     pendingSaves: [],
     pendingReactions: [],

@@ -69,9 +69,11 @@ export function breathRounds(definition: ActorDefinition | undefined): number {
 export function startHoldingBreath(
   state: GameState,
   actor: Actor,
-  definition: ActorDefinition | undefined
+  definition: ActorDefinition | undefined,
+  /** It breathes water but has been out of it too long (Limited Amphibiousness): it runs out of air all the same. */
+  options: Readonly<{ outOfWater?: boolean }> = {}
 ): EffectNarration[] {
-  if (isDead(actor) || breathesWater(actor, definition)) return [];
+  if (isDead(actor) || (breathesWater(actor, definition) && options.outOfWater !== true)) return [];
   if (actor.effects.some((effect) => effect.breath !== undefined)) return [];
   const rounds = breathRounds(definition);
   const events: EffectNarration[] = [];
@@ -81,7 +83,7 @@ export function startHoldingBreath(
     makeEffect({
       id: `${HOLDING_BREATH_TAG}:${actor.id}`,
       name: "Holding Breath",
-      tags: [HOLDING_BREATH_TAG],
+      tags: options.outOfWater ? [HOLDING_BREATH_TAG, "out-of-water"] : [HOLDING_BREATH_TAG],
       startedRound: state.combat.round,
       duration: { type: "manual" },
       breath: { roundsLeft: rounds, exhaustionGained: 0 }

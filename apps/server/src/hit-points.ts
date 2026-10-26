@@ -118,6 +118,8 @@ export type DamageInput = Readonly<{
   /** A share of another creature's damage (Warding Bond's caster, a cloaker's target, a shield guardian), which is
    *  not shared on again. */
   bondShare?: true;
+  /** Sunlight deals it (a vampire's Sunlight weakness), which a form's Resistance may not meet (`sunlightPierces`). */
+  fromSunlight?: true;
 }>;
 export type DamageDeps = Readonly<{
   resolveDefinition: (definitionId: string) => ActorDefinition | undefined;
@@ -365,7 +367,14 @@ function weighDamage(
     const shadowy = inShadowyForm(state, actor, definition, deps)
       ? typed.map((part) => normalizeDamageType(part.type)).filter((type) => !SHADOWY_FORM_SPARES.includes(type))
       : [];
-    const standing = standingDefences(definition, fromChoices, derivation);
+    const formed = standingDefences(definition, fromChoices, derivation);
+    // A form whose Resistance sunlight gets through (a vampire's mist: "except the damage it takes from sunlight").
+    const pierced = input.fromSunlight
+      ? new Set(actor.effects.filter((effect) => effect.form?.sunlightPierces).map((effect) => effect.name))
+      : null;
+    const standing = pierced
+      ? { ...formed, resistances: formed.resistances.filter((row) => !pierced.has(row.source ?? "")) }
+      : formed;
     const types = (rows: readonly DerivedDefence[]) => rows.map((row) => row.type);
     // SRD Order of Application: flat reductions first, then Resistance, then Vulnerability.
     const reduction = reduceDamageParts(

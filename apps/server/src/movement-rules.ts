@@ -39,7 +39,9 @@ import {
 import { deriveEquipment, type EquipmentCatalog, type EquipmentDerivation } from "./equipment-derivation.js";
 import { imageToGrid, type SquareGridCalibration } from "./grid-calibration.js";
 import { jumpLimits, leapRider } from "./jumping.js";
-import { travelBudgetFeet, travelCostsExtra, type TravelMode } from "./speed.js";
+import { travelBudgetFeet, travelCostsExtra, walksOnLiquid, type TravelMode } from "./speed.js";
+import { movesFreelyOn } from "./spell-zones.js";
+import { pitRefusal } from "./traps.js";
 import { DISTANCE_TOLERANCE_FEET } from "./movement-narration.js";
 import { DAZED_TAG } from "./resolution/economy.js";
 import type { MovementCost, MovementCostOptions } from "./terrain.js";
@@ -194,6 +196,11 @@ function movementCounts(state: GameState, actorId: string): boolean {
   );
 }
 
+/** In a running fight, a creature moving when it isn't its turn: what a creature can do only "on your turn" waits. */
+export function offItsTurn(state: GameState, actorId: string): boolean {
+  return turnsRunning(state) && state.combat.turnActorId !== actorId;
+}
+
 /** A fight whose turns have begun: not a wait-mode fight still gathering initiative. */
 function turnsRunning(state: GameState): boolean {
   const gathering = state.combat.playerInitiativeMode === "wait" && state.combat.pendingInitiative.length > 0;
@@ -243,7 +250,11 @@ export function movementStatus(
     ...(openingPassage(definition) ? { opening: openingPassage(definition)! } : {}),
     ...(burrowsThroughWalls(definition) ? { burrowsThroughWalls: burrowsThroughWalls(definition)! } : {}),
     ...(actor && isEthereal(actor) ? { ethereal: true } : {}),
-    ...(actor && freeOfDifficultTerrain(actor, derivation ?? undefined) ? { ignoresDifficultTerrain: true } : {})
+    ...(actor && freeOfDifficultTerrain(actor, derivation ?? undefined) ? { ignoresDifficultTerrain: true } : {}),
+    ...(actor && walksOnLiquid(actor, derivation ?? undefined, offItsTurn(state, actor.id))
+      ? { walksOnWater: true }
+      : {}),
+    ...(actor && formEffectOf(actor)?.form?.noLiquid ? { barredByWater: true } : {})
   };
 }
 
@@ -603,6 +614,27 @@ export function applyMovementRules(state: GameState, input: MovementRulesInput):
   if (tether) police(state, input, "movement.tether", tether, outcome);
   // Height changes by flying, climbing, jumping or teleporting; a creature in the air moves by flying.
   const moverToken = state.combat.tokens.find((token) => token.actorId === actorId);
+  // SRD Hidden Pit: "A creature needs a Climb Speed, climbing gear, or magic such as Spider Climb to scale the pit's
+  // smooth walls."
+  const pit =
+    (counted || input.byPlayer || grant) && mode !== "teleport"
+      ? pitRefusal(
+          state,
+          mover,
+          from,
+          to,
+          moverToken?.sizeCells ?? 1,
+          {
+            climbs: mode === "climb" && !travelCostsExtra(mover, moverDefinitionOf(mover, input), "climb"),
+            flies: mode === "fly",
+            hasClimbingGear: mover.inventory.some(
+              (row) => (row.recordId ?? row.id) === "climbers-kit" && row.quantity > 0
+            )
+          },
+          input.calibration
+        )
+      : null;
+  if (pit) police(state, input, "movement.pit", pit, outcome);
   // Etherealness: "you can move in any direction".
   const heightBar =
     (counted || input.byPlayer || grant) && !isEthereal(mover)
@@ -925,13 +957,21 @@ function costOptions(
   const crawling = mover.conditions.some((condition) => condition.id === "prone");
   const moverDefinition = moverDefinitionOf(mover, input);
   const derivation = deriveEquipment(mover, moverDefinition, input.catalog);
-  const slowed = crawling || travelCostsExtra(mover, moverDefinition, travel, derivation);
+  const offTurn = offItsTurn(state, mover.id);
+  const slowed = crawling || travelCostsExtra(mover, moverDefinition, travel, derivation, offTurn);
   const extraPerStep = (slowed ? 1 : 0) + (input.dragging?.costsExtra ? 1 : 0);
   return {
     extraPerStep,
     slowed,
     options: {
       extraPerStep,
+      // SRD Swimming: "You ignore this extra cost if you have a Swim Speed and use it to swim."
+      ...(travel === "swim" && !travelCostsExtra(mover, moverDefinition, "swim", derivation, offTurn)
+        ? { swimsFree: true }
+        : {}),
+      ...(walksOnLiquid(mover, derivation, offTurn) ? { walksOnWater: true } : {}),
+      ...(formEffectOf(mover)?.form?.noLiquid ? { barredByWater: true } : {}),
+      ...(movesFreelyOn(mover, "ice", input) ? { freeOnIce: true } : {}),
       carried: input.dragging?.actorIds ?? [],
       resolveDefinition: input.resolveDefinition,
       ...(input.perceives ? { perceives: input.perceives } : {}),

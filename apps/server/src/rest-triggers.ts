@@ -78,6 +78,12 @@ export function afterDays(
     if (!actorIds.has(actor.id)) continue;
     for (const effect of [...actor.effects]) {
       const trigger = effect.atRest;
+      // "At the stroke of midnight" (Midnight Tears): the first midnight the clock crosses.
+      if (trigger?.at === "midnight") {
+        if (Math.floor(toMinute / DAY_MINUTES) > Math.floor(fromMinute / DAY_MINUTES))
+          events.push(...triggerOnce(state, actor, effect, trigger, deps));
+        continue;
+      }
       if (trigger?.at !== "day") continue;
       const mark = trigger.dayMark ?? fromMinute;
       const days = Math.floor((toMinute - mark) / DAY_MINUTES);
@@ -114,55 +120,92 @@ function triggerOnce(
       actorId: actor.id,
       ...sourceOf(effect)
     });
+    // "After seven successful saves against the poison" (Pale Tincture): the successes are counted on the effect.
+    const counted = (trigger.successes ?? 0) + (success ? 1 : 0);
+    if (success && trigger.successesNeeded !== undefined && counted < trigger.successesNeeded) {
+      actor.effects = actor.effects.map((candidate) =>
+        candidate.id === effect.id && candidate.atRest
+          ? { ...candidate, atRest: { ...candidate.atRest, successes: counted } }
+          : candidate
+      );
+      events.push({
+        kind: "condition",
+        text: `${actor.name} has succeeded ${counted} of ${trigger.successesNeeded} times against ${effect.name}.`,
+        actorId: actor.id,
+        ...sourceOf(effect)
+      });
+      return events;
+    }
+    // A success that still takes half the damage (Midnight Tears) takes it, then ends the effect.
+    if (success && trigger.halfOnSuccess && trigger.damage)
+      return [
+        ...events,
+        ...dealRestDamage(state, actor, effect, trigger, deps, true),
+        ...endEffectIfPresent(state, actor.id, effect.id)
+      ];
     if (success) return [...events, ...endEffectIfPresent(state, actor.id, effect.id)];
   }
   if (trigger.maximumLoss) events.push(...loseMaximum(state, actor, effect, trigger.maximumLoss, deps));
   // "It takes 3d6 Psychic damage when it wakes up" (Dream), meeting its defences like any damage. A night hag's Dream
   // lowers the maximum by as much, and traps the soul of a target it kills in the hag's soul bag.
-  if (trigger.damage) {
-    const parts = trigger.damage.map((part) => ({
-      amount: Math.max(0, resolveDice(parseDiceFormula(part.formula), deps.random).total),
-      type: part.type
-    }));
-    const amount = parts.reduce((sum, part) => sum + part.amount, 0);
-    const outcome = applyDamageDetailed(
-      state,
-      actor.id,
-      {
-        amount,
-        parts,
-        sourceActorId: effect.sourceActorId,
-        sourceName: effect.sourceName ?? effect.name,
-        ...(trigger.drainsMaximum ? { drain: { reducesMaximum: true as const } } : {})
-      },
-      { role: "gm" },
-      {
-        resolveDefinition: deps.resolveDefinition,
-        rollDie: deps.random,
-        ...(deps.catalog ? { catalog: deps.catalog } : {})
-      }
-    );
-    events.push(
-      {
-        kind: "damage",
-        text: `${actor.name} wakes and takes ${outcome.application.totalApplied} damage (${effect.name}).`,
-        actorId: actor.id,
-        ...sourceOf(effect)
-      },
-      ...outcome.events
-    );
-    if (trigger.trapsSoul && effect.sourceActorId && isDead(actor)) {
-      stampDeath(state, actor);
-      actor.death = { ...actor.death!, soulTrappedBy: effect.sourceActorId };
-      events.push({
-        kind: "effect",
-        text: `${actor.name}'s soul is trapped in ${effect.sourceName ?? "its killer"}'s soul bag (${effect.name}).`,
-        actorId: actor.id,
-        ...sourceOf(effect)
-      });
-    }
-  }
+  if (trigger.damage) events.push(...dealRestDamage(state, actor, effect, trigger, deps, false));
   if (trigger.once) events.push(...endEffectIfPresent(state, actor.id, effect.id));
+  return events;
+}
+
+/** The damage a rest or a day brings, meeting the creature's defences like any damage; `halved` on a success that
+ *  still takes half (Midnight Tears). */
+function dealRestDamage(
+  state: GameState,
+  actor: Actor,
+  effect: Effect,
+  trigger: RestTrigger,
+  deps: RestTriggerDeps,
+  halved: boolean
+): EffectNarration[] {
+  const events: EffectNarration[] = [];
+  const parts = (trigger.damage ?? []).map((part) => {
+    const rolled = Math.max(0, resolveDice(parseDiceFormula(part.formula), deps.random).total);
+    return { amount: halved ? Math.floor(rolled / 2) : rolled, type: part.type };
+  });
+  const amount = parts.reduce((sum, part) => sum + part.amount, 0);
+  const outcome = applyDamageDetailed(
+    state,
+    actor.id,
+    {
+      amount,
+      parts,
+      sourceActorId: effect.sourceActorId,
+      sourceName: effect.sourceName ?? effect.name,
+      ...(trigger.drainsMaximum ? { drain: { reducesMaximum: true as const } } : {})
+    },
+    { role: "gm" },
+    {
+      resolveDefinition: deps.resolveDefinition,
+      rollDie: deps.random,
+      ...(deps.catalog ? { catalog: deps.catalog } : {})
+    }
+  );
+  const wakes = trigger.at === undefined || trigger.at === "long-rest";
+  events.push(
+    {
+      kind: "damage",
+      text: `${actor.name} ${wakes ? "wakes and takes" : "takes"} ${outcome.application.totalApplied} damage (${effect.name}).`,
+      actorId: actor.id,
+      ...sourceOf(effect)
+    },
+    ...outcome.events
+  );
+  if (trigger.trapsSoul && effect.sourceActorId && isDead(actor)) {
+    stampDeath(state, actor);
+    actor.death = { ...actor.death!, soulTrappedBy: effect.sourceActorId };
+    events.push({
+      kind: "effect",
+      text: `${actor.name}'s soul is trapped in ${effect.sourceName ?? "its killer"}'s soul bag (${effect.name}).`,
+      actorId: actor.id,
+      ...sourceOf(effect)
+    });
+  }
   return events;
 }
 

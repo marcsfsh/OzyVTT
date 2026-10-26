@@ -547,6 +547,7 @@ export function openResolve(
     },
     warnings,
     tableNarration: [...gated.gmLines],
+    sensed: [],
     healing: null,
     rollMode: undefined,
     check: null,

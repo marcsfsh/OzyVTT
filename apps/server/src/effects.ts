@@ -72,6 +72,9 @@ export const ACTION_OR_BONUS_TAG = "action-or-bonus";
 export const NO_OPPORTUNITY_ATTACKS_TAG = "no-opportunity-attacks";
 /** The bearer can't regain Hit Points while this lasts (Chill Touch). */
 export const NO_HEALING_TAG = "no-healing";
+/** A poison that waits in its bearer without poisoning it yet, which whatever ends the Poisoned condition neutralizes
+ *  (Midnight Tears). */
+export const LATENT_POISON_TAG = "latent-poison";
 /** The bearer can't regain Hit Points unless it is underwater (an aboleth's Mucus Cloud curse). */
 export const NO_HEALING_ON_LAND_TAG = "no-healing-on-land";
 /** Slow on its target: on its turns an action or a Bonus Action (only one), one attack with the Attack action, and a

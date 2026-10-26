@@ -21,6 +21,7 @@ import {
 } from "./ability-checks.js";
 import { creatureTypeOf } from "./statblock-facts.js";
 import { endUsedHelp, settleUseOutcome, useHelp } from "./help-assist.js";
+import { settleDisarm } from "./traps.js";
 import {
   canPlayerTarget,
   GameAccessDeniedError,
@@ -238,7 +239,19 @@ function heldCheckResult(
   if (check.callId !== undefined)
     recordCallResult(state, check.callId, actor.id, { natural: roll.natural, total: roll.total, success, rollId });
   // What a tool's use leaves holds while its check succeeds, so a reroll or an answer settles it again.
-  const settled = check.onSuccess ? settleUseOutcome(state, actor, check.onSuccess, success === true) : [];
+  const outcome = check.onSuccess;
+  const settled =
+    outcome === undefined
+      ? []
+      : outcome.kind === "disarm-trap"
+        ? settleDisarm(state, outcome, success === true, {
+            resolveDefinition: deps.resolveDefinition,
+            ...(deps.catalog ? { catalog: deps.catalog } : {}),
+            rollDie: deps.random,
+            newId: deps.newId,
+            now: deps.now
+          })
+        : settleUseOutcome(state, actor, outcome, success === true);
   // A typed die was thrown under the mode the rules gave, which the player was told before rolling.
   const rollMode = shownRollMode(plan.rollMode, held.typed ? undefined : check.rollMode);
   const answered = answeredLines(held);

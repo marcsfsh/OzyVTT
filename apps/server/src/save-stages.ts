@@ -38,6 +38,7 @@ export type RepeatFields = Readonly<{
   immuneOnSuccess?: true;
   repeatFailureDamage?: RepeatSave["failureDamage"];
   repeatTally?: number;
+  repeatTallySuccessesOnly?: true;
   secondFailure?: Readonly<{
     name?: string;
     conditions: readonly string[];
@@ -79,7 +80,16 @@ export function repeatSaveOf(
       : again && again.length > 0
         ? { failureDamage: again.map((part) => ({ ...part })) }
         : {}),
-    ...(save.repeatTally !== undefined ? { tally: { needed: save.repeatTally, successes: 0, failures: 0 } } : {}),
+    ...(save.repeatTally !== undefined
+      ? {
+          tally: {
+            needed: save.repeatTally,
+            successes: 0,
+            failures: 0,
+            ...(save.repeatTallySuccessesOnly ? { successesOnly: true as const } : {})
+          }
+        }
+      : {}),
     ...(second
       ? {
           next: {
@@ -302,7 +312,8 @@ export function settleEndingSave(
     const counted = {
       ...tally,
       successes: tally.successes + (success ? 1 : 0),
-      failures: tally.failures + (success ? 0 : 1)
+      // Burnt Othur Fumes counts only its successes; its failures go on dealing their damage.
+      failures: tally.failures + (success || tally.successesOnly ? 0 : 1)
     };
     if (counted.successes >= tally.needed)
       return [

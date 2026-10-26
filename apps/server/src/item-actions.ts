@@ -389,6 +389,7 @@ export function spellCastMechanics(
       | "explodingDice"
       | "teleportOutcome"
       | "identifiesItem"
+      | "sensesTraps"
       | "wishUses"
     >
   > {
@@ -410,6 +411,8 @@ export function spellCastMechanics(
     ...(effect.teleportOutcome ? { teleportOutcome: true as const } : {}),
     // Identify: the item it is cast on, which its caster's player then knows.
     ...(effect.identifiesItem ? { identifiesItem: true as const } : {}),
+    // Find Traps: the traps within its range in sight, told to the caster's player by their nature.
+    ...(effect.sensesTraps ? { sensesTraps: { ...effect.sensesTraps } } : {}),
     // Wish: the use picked on the cast (`resolution/wish.ts`).
     ...(effect.wishUses ? { wishUses: true as const } : {}),
     // The type the caster picks: of the damage (Chromatic Orb), of the Resistance it grants (Protection from Energy), or

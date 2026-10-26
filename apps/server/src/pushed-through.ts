@@ -2,6 +2,7 @@ import type { GameState } from "@vtt/domain";
 import type { EffectNarration } from "./effects.js";
 import { pushTokenAway, type ForcedMove } from "./forced-movement.js";
 import { askToStayMounted, carryRiders } from "./mounts.js";
+import { groundAlongForcedMove } from "./map-hazards.js";
 import { zonesAfterMove, type ZoneDeps } from "./spell-zones.js";
 import type { TokenMapGeometry } from "./token-placement.js";
 
@@ -36,5 +37,7 @@ export function pushThroughZones(
     y: from.y + ((to.y - from.y) * index) / steps
   }));
   events.push(...zonesAfterMove(state, { moverId: input.actorId, path }, zones));
+  // A trap on its way goes off as it is pushed onto it (a pit's lid).
+  events.push(...groundAlongForcedMove(state, input.actorId, path, { ...zones, geometry }));
   return moved;
 }

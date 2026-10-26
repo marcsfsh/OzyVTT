@@ -104,6 +104,7 @@ const REASONS: Readonly<Record<RuleId, (facts: ReasonFacts) => string>> = {
   "movement.stand-up-off-turn": () => "Stand up on your own turn.",
   "movement.drop-prone": () => "Drop Prone on your own turn, with Speed above 0.",
   "movement.tether": () => "Undo the anchor to move farther from it.",
+  "movement.pit": () => "Climb out of the pit with a Climb Speed, climbing gear or magic.",
   "movement.already-moved": () => "You moved this turn.",
   "movement.off-turn": () => "It isn't your turn.",
   "movement.teleport": () => "The GM moves a token that teleports.",
