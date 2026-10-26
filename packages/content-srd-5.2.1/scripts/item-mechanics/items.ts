@@ -881,6 +881,42 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
 
+  // A Bonus Action tosses it: it hovers in a space within 30 feet and attacks a creature within 5 feet of it with its
+  // wielder's attack roll and damage. Each later Bonus Action moves it up to 30 feet, to a spot within 30 feet of its
+  // wielder, and attacks again; after the fourth attack it flies back, and it falls if its wielder is more than 30 feet
+  // from it (`summon-strikes.ts`). Grasping it out of the air, and a wielder with no hand free, are the table's.
+  "dancing-sword": {
+    actions: [
+      {
+        id: "toss",
+        name: "Toss the Sword",
+        activation: "bonus-action",
+        description:
+          "Toss the weapon into the air: it hovers, flies up to 30 feet, and attacks one creature of your choice within 5 feet of itself, using your attack roll and adding your ability modifier to damage rolls.",
+        damage: [],
+        swingsWeapon: true,
+        summons: {
+          creatures: [{ monsterId: "dancing-sword" }],
+          rangeFeet: 30,
+          turn: "none",
+          intangible: true,
+          leashFeet: 30,
+          strikesFrom: { reachFeet: 5, moveFeet: 30, withinFeetOfUser: 30, attacks: 4 }
+        }
+      },
+      {
+        id: "dance",
+        name: "Direct the Dancing Sword",
+        activation: "bonus-action",
+        description:
+          "While the weapon hovers, cause it to fly up to 30 feet to another spot within 30 feet of you and attack one creature within 5 feet of it. After its fourth attack, it flies back to you.",
+        damage: [],
+        swingsWeapon: true,
+        forceOf: "toss"
+      }
+    ]
+  },
+
   // "An arrow produced by this weapon deals Force damage instead of Piercing damage", with no ammunition to spend. Arrow
   // of Restraint rides a hit in place of its damage (DC 15 Strength or Restrained for 1 minute, a DC 20 Athletics check
   // as an action to escape), and Arrow of Transport sends a willing creature within 60 feet to a space within 10 feet of
@@ -1537,10 +1573,64 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       }
     ]
   },
+  // While held, a Reaction absorbs a spell aimed at its holder alone with no area: the spell has no effect and its levels
+  // are stored, up to 50 absorbed in the rod's existence; a found rod holds 1d10. A spellcaster holding it turns stored
+  // levels into a spent spell slot of level 5 or lower (`conversions.ts`). A rod that can absorb nothing more and holds
+  // nothing is mundane, which the GM says.
+  "rod-of-absorption": {
+    charges: { startingByPool: { "rod-of-absorption-stored": "1d10" } },
+    actions: [
+      {
+        id: "absorb",
+        name: "Absorb Spell",
+        activation: "reaction",
+        description:
+          "When a spell targets only you and not with an area of effect, absorb it: its effect is canceled, and its energy is stored in the rod at the level it was cast. The rod can absorb 50 levels over the course of its existence.",
+        damage: [],
+        uses: { limit: 50, per: "never", pool: "rod-of-absorption-absorbed" },
+        reaction: {
+          trigger: "casts-spell",
+          response: "absorb",
+          onlyAtReactor: true,
+          stores: { pool: "rod-of-absorption-stored", limit: 50 }
+        }
+      }
+    ]
+  },
   // "You have Advantage on saving throws against spells", and a success against a spell of level 7 or lower leaves it
-  // no effect on the wearer. Turning a spell back on its caster is the GM's.
+  // no effect on the wearer. When that spell targeted the wearer alone with no area, a Reaction turns it back on its
+  // caster, who saves against its own spell save DC.
   "ring-of-spell-turning": {
     savesNegateSpells: { maxLevel: 7 },
+    actions: [
+      {
+        id: "deflect",
+        name: "Deflect the Spell",
+        activation: "reaction",
+        description:
+          "When you succeed on a saving throw against a spell of level 7 or lower that targeted only you and didn't create an area of effect, deflect the spell back at its caster. The caster makes a saving throw against the spell using its own spell save DC.",
+        damage: [],
+        answer: {
+          rolls: ["save"],
+          when: "success",
+          versus: {
+            spellSchools: [
+              "abjuration",
+              "conjuration",
+              "divination",
+              "enchantment",
+              "evocation",
+              "illusion",
+              "necromancy",
+              "transmutation"
+            ],
+            singleTarget: true,
+            spellMaxLevel: 7
+          },
+          effect: { kind: "reflect", dc: "same" }
+        }
+      }
+    ],
     modifiers: [
       {
         type: "roll-mode",
@@ -1928,7 +2018,8 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // All three one-charge casts on one pool. No `saveDc`: the cast uses the wielder's own DC, as
   // printed. Resist Enchantment turns a failed save against an Enchantment spell aimed only at the holder into a
-  // success once a day. Not modeled: Reflect Enchantment (turning the spell back on its caster).
+  // success once a day, and Reflect Enchantment turns a successful one back on its caster for a Reaction and a charge,
+  // as if the holder cast it: the caster saves against the holder's spell save DC.
   "staff-of-charming": {
     charges: { regain: "1d8 + 2", lastChargeRoll: true, lastCharge: "destroyed" },
     actions: [
@@ -1945,6 +2036,21 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
           when: "failure",
           versus: { spellSchools: ["enchantment"], singleTarget: true },
           effect: { kind: "succeed" }
+        }
+      },
+      {
+        id: "reflect-enchantment",
+        name: "Reflect Enchantment",
+        activation: "reaction",
+        description:
+          "If you succeed on a saving throw against an Enchantment spell that targets only you, you can expend 1 charge to turn the spell back on its caster as if you had cast the spell.",
+        damage: [],
+        uses: { limit: 10, per: "long-rest", pool: "staff-of-charming-charges" },
+        answer: {
+          rolls: ["save"],
+          when: "success",
+          versus: { spellSchools: ["enchantment"], singleTarget: true },
+          effect: { kind: "reflect", dc: "bearer" }
         }
       }
     ],
@@ -2099,15 +2205,38 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
   },
 
   /**
-   * The +2 Quarterstaff, the +2 to spell attack rolls, the zero-charge casts, and the rest at their printed charge
-   * costs on 50 charges; a 20 on the last charge's d20 gives back 1d12 + 1. Not authored: Advantage on saves against
-   * spells, Spell Absorption and Retributive Strike.
+   * The +2 Quarterstaff, the +2 to spell attack rolls, Advantage on saves against spells, the zero-charge casts, and the
+   * rest at their printed charge costs on 50 charges; a 20 on the last charge's d20 gives back 1d12 + 1. Spell
+   * Absorption's Reaction cancels a spell aimed at the holder alone and adds its level to the charges. Retributive
+   * Strike, and the explosion of a staff absorbed past 50 charges, are the GM's.
    */
   "staff-of-the-magi": {
     modifiers: [
       { type: "attack-bonus", amount: 2 },
       { type: "damage-bonus", amount: 2 },
-      { type: "spell-attack-bonus", amount: 2 }
+      { type: "spell-attack-bonus", amount: 2 },
+      {
+        type: "roll-mode",
+        roll: "save",
+        mode: "advantage",
+        when: [{ type: "on-saving-throw" }, { type: "versus-spell" }]
+      }
+    ],
+    actions: [
+      {
+        id: "spell-absorption",
+        name: "Spell Absorption",
+        activation: "reaction",
+        description:
+          "When another creature casts a spell that targets only you, the staff absorbs the magic of the spell, canceling its effect and gaining a number of charges equal to the absorbed spell's level. If that brings the staff above 50 charges, it explodes as if you activated its Retributive Strike.",
+        damage: [],
+        reaction: {
+          trigger: "casts-spell",
+          response: "absorb",
+          onlyAtReactor: true,
+          stores: { pool: "staff-of-the-magi-charges" }
+        }
+      }
     ],
     charges: { regain: "4d6 + 2", lastChargeRoll: true, lastChargeTwenty: "1d12 + 1" },
     casts: [
@@ -3354,7 +3483,28 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
 
   // ---- Carried wondrous items (alphabetical, absences inline) ----------------------------------
 
-  // `apparatus-of-the-crab`: a vehicle, outside the rider model.
+  // Opened and crewed, the barrel is a Large vehicle with its printed AC, Hit Points, speeds and immunities, which its
+  // pilot works on the turn after its own: its claws swing at +8 for 2d6 Bludgeoning or close to grapple (escape DC
+  // 15). The crew inside, their cover, its shutters, light, depth and air are the GM's.
+  "apparatus-of-the-crab": {
+    actions: [
+      {
+        id: "deploy",
+        name: "Crew the Apparatus",
+        activation: "action",
+        description:
+          "Open the barrel's hidden hatch and crawl inside with up to one more Medium or smaller creature. The apparatus is a Large object (AC 20, 200 Hit Points, Speed and Swim Speed 30 ft., Immunity to Poison and Psychic damage) that its pilot works with its levers.",
+        damage: [],
+        summons: {
+          creatures: [{ monsterId: "apparatus-of-the-crab" }],
+          rangeFeet: 5,
+          lasts: { type: "untimed" },
+          onlyOne: true,
+          dismiss: "action"
+        }
+      }
+    ]
+  },
   // 3d4 beans when found, which never come back; with none left the bag is a plain one. Dumped beans explode in a
   // 10-foot-radius Sphere (DC 15 Dexterity, 5d4 Force, half on a success), the dumper included. A planted bean's
   // d100 table is the GM's.
@@ -4113,7 +4263,49 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       { id: "fan", name: "Fan" },
       { id: "swan-boat", name: "Swan Boat" },
       { id: "tree", name: "Tree" },
-      { id: "whip", name: "Whip" }
+      {
+        id: "whip",
+        name: "Whip",
+        actions: [
+          {
+            id: "whip",
+            name: "Throw the Whip Token",
+            activation: "action",
+            description:
+              "Throw the token to a point within 10 feet of yourself: a floating whip takes its place for 1 hour. You can dismiss it as a Magic action, and it disappears if you die or have the Incapacitated condition.",
+            damage: [],
+            summons: {
+              creatures: [{ monsterId: "feather-token-whip" }],
+              rangeFeet: 10,
+              turn: "none",
+              intangible: true,
+              lasts: { type: "minutes", minutes: 60 },
+              endsOnUserDeath: true,
+              dismiss: "action",
+              strikesFrom: { reachFeet: 10, moveFeet: 20 }
+            },
+            grants: {
+              name: "Floating Whip",
+              target: "self",
+              tags: ["floating-whip"],
+              duration: { type: "minutes", minutes: 60 },
+              endsOnIncapacitated: true,
+              itemAction: "whip-strike"
+            }
+          },
+          {
+            id: "whip-strike",
+            name: "Crack the Floating Whip",
+            activation: "bonus-action",
+            description:
+              "Direct the whip to fly up to 20 feet and make a melee spell attack against a creature within 10 feet of it, with an attack bonus of +9. On a hit, the target takes 1d6 + 5 Force damage.",
+            attack: { ability: "spellcasting", bonus: 9, reachFeet: 10 },
+            damage: [{ formula: "1d6 + 5", type: "force" }],
+            grantedOnly: true,
+            forceOf: "whip"
+          }
+        ]
+      }
     ]
   },
   // One action for each figurine (each lion and each goat its own): thrown within 60 feet, it becomes its creature for
@@ -4648,11 +4840,17 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   },
   // "Many types of Ioun Stones exist": the GM says which a found stone is, and its benefit holds while it orbits its
-  // attuned owner's head (worn): Mastery's Proficiency Bonus, Regeneration's 15 Hit Points each hour, Sustenance's
-  // freedom from food and water.
+  // attuned owner's head (worn): Absorption's and Greater Absorption's Reaction cancelling a spell it sees cast, until it
+  // has cancelled 20 or 50 levels, Mastery's Proficiency Bonus, Regeneration's 15 Hit Points each hour, Reserve's stored
+  // spells (`stored-casts.ts`; the 1d4 levels a found stone holds are the GM's), Sustenance's freedom from food and
+  // water.
   "ioun-stone": {
     variants: [
-      { id: "absorption", name: "Absorption" },
+      {
+        id: "absorption",
+        name: "Absorption",
+        actions: [absorbingStone("Absorption", 4, 20)]
+      },
       {
         id: "agility",
         name: "Agility",
@@ -4676,7 +4874,11 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
         name: "Fortitude",
         modifiers: [{ type: "ability-score", ability: "con", amount: 2, maximum: 20 }]
       },
-      { id: "greater-absorption", name: "Greater Absorption" },
+      {
+        id: "greater-absorption",
+        name: "Greater Absorption",
+        actions: [absorbingStone("Greater Absorption", 8, 50)]
+      },
       {
         id: "insight",
         name: "Insight",
@@ -4695,7 +4897,26 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
       { id: "mastery", name: "Mastery", modifiers: [{ type: "proficiency-bonus", amount: 1 }] },
       { id: "protection", name: "Protection", modifiers: [{ type: "armor-class", amount: 1 }] },
       { id: "regeneration", name: "Regeneration", regainsHitPoints: { everyMinutes: 60, formula: "15" } },
-      { id: "reserve", name: "Reserve" },
+      {
+        id: "reserve",
+        name: "Reserve",
+        actions: [
+          {
+            id: "hold-out",
+            name: "Hold Out to a Spell",
+            activation: "other",
+            description:
+              "Touch the stone as a spell of level 1 through 4 is cast: the next such spell cast at you or by you within a minute is stored in the stone if there is room, and lost if there isn't. The stone holds up to 4 levels of spells.",
+            damage: [],
+            grants: {
+              name: "Ioun Stone of Reserve held out",
+              tags: ["ring-held-out"],
+              duration: { type: "rounds", rounds: 10 },
+              storeAwaits: { via: "ring", maxLevel: 4 }
+            }
+          }
+        ]
+      },
       {
         id: "strength",
         name: "Strength",
@@ -4853,14 +5074,81 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     charges: { regain: "1d3" },
     actions: [
       {
-        id: "call",
-        name: "Call a Swarm of Rats",
+        id: "play",
+        name: "Play the Pipes",
         activation: "action",
         description:
-          "Play the pipes and expend 1 charge, calling forth one Swarm of Rats if enough rats are within half a mile of you to be called in this fashion (as determined by the GM). If there aren't enough rats to form a swarm, the charge is wasted. Called swarms move toward the music by the shortest available route but aren't under your control otherwise.",
-        uses: { limit: 3, per: "long-rest", pool: "pipes-of-the-sewers-charges" }
-      }
+          "Play the pipes: each Swarm of Rats that isn't under another creature's control within 30 feet of you makes a DC 15 Wisdom saving throw. On a failed save, the swarm is Friendly to you and your allies and obeys your commands while you keep playing each round as a Magic action and it starts its turns within 30 feet of you. On a successful save, it can't be swayed by the pipes for 24 hours.",
+        damage: [],
+        save: {
+          ability: "wis",
+          dc: 15,
+          successDamage: "none",
+          failureConditions: [],
+          failureDuration: { type: "until-source-next-turn" },
+          failureEffect: { name: "Swayed by the Pipes", tags: ["commanded", "commanded-within-30"], modifiers: [] },
+          immuneOnSuccess: true,
+          immuneMinutes: 1440
+        },
+        targets: { count: 10, rangeFeet: 30, statBlocks: ["swarm-of-rats"] }
+      },
+      ...([1, 2, 3] as const).map((count) => ({
+        id: `call-${count}`,
+        name: `Call ${count === 1 ? "a Swarm" : `${count} Swarms`} of Rats`,
+        activation: "bonus-action" as const,
+        description: `Having played the pipes, expend ${count === 1 ? "1 charge" : `${count} charges`} to call forth ${count === 1 ? "one Swarm" : `${count} Swarms`} of Rats, if enough rats are within half a mile of you (as determined by the GM); if there aren't, the charge is wasted. Called swarms move toward the music by the shortest available route but aren't under your control otherwise.`,
+        damage: [],
+        uses: { limit: 3, per: "long-rest" as const, pool: "pipes-of-the-sewers-charges" },
+        ...(count > 1 ? { useCost: count } : {}),
+        summons: {
+          creatures: [{ monsterId: "swarm-of-rats", count }],
+          rangeFeet: 60,
+          allegiance: "none" as const
+        }
+      }))
     ]
+  },
+
+  // The GM says which golem a found manual teaches. A reader that isn't a spellcaster with two level 5 spell slots takes
+  // 6d6 Psychic damage; the golem is made over the manual's days of work, which the GM gives and marks done, and then
+  // joins the map under its maker's command, the manual burning as it does. The cost in gold is the GM's.
+  "manual-of-golems": {
+    consumedOnUse: true,
+    actions: [
+      {
+        id: "read",
+        name: "Read the Manual",
+        activation: "action",
+        description:
+          "Try to read the manual. A creature that isn't a spellcaster with at least two level 5 spell slots can't use it and takes 6d6 Psychic damage.",
+        damage: [{ formula: "6d6", type: "psychic" }],
+        targets: { who: "self" },
+        keepsItem: true,
+        refusedWithSlots: { level: 5, count: 2 }
+      }
+    ],
+    variants: (
+      [
+        ["clay", "Clay Golem", "clay-golem", 30, "65,000"],
+        ["flesh", "Flesh Golem", "flesh-golem", 60, "50,000"],
+        ["iron", "Iron Golem", "iron-golem", 120, "100,000"],
+        ["stone", "Stone Golem", "stone-golem", 90, "80,000"]
+      ] as const
+    ).map(([id, name, monsterId, days, cost]) => ({
+      id,
+      name,
+      actions: [
+        {
+          id: "animate",
+          name: `Animate the ${name}`,
+          activation: "action" as const,
+          description: `Once ${days} days of work and ${cost} GP of supplies have made the ${name}, the manual is consumed in eldritch flames and the golem animates under your control, understanding and obeying your commands. Your GM marks the work done.`,
+          damage: [],
+          gmTakes: true as const,
+          summons: { creatures: [{ monsterId }], rangeFeet: 5, lasts: { type: "untimed" as const } }
+        }
+      ]
+    }))
   },
 
   // What is put in it weighs next to nothing; put in another extradimensional space, it is destroyed with what it
@@ -5508,6 +5796,19 @@ export const ITEM_MECHANICS: ItemMechanicsModule = {
     ]
   }
 };
+
+/** An Ioun Stone that cancels a spell it sees cast, of at most `maxLevel`, until it has cancelled `levels` levels. */
+function absorbingStone(name: string, maxLevel: number, levels: number): ItemAction {
+  return {
+    id: "absorb",
+    name: `Absorb a Spell (${name})`,
+    activation: "reaction",
+    description: `Cancel a spell of level ${maxLevel} or lower cast by a creature you can see. Once the stone has canceled ${levels} levels of spells, it burns out and becomes a nonmagical stone.`,
+    damage: [],
+    uses: { limit: levels, per: "never", pool: "ioun-stone-absorbed" },
+    reaction: { trigger: "casts-spell", response: "absorb", maxLevel, seen: true }
+  };
+}
 
 /** Every SRD damage type: "Resistance to all damage". */
 function allDamageTypes(): DamageType[] {

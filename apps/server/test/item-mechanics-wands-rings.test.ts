@@ -385,7 +385,9 @@ describe("a staff's resistance and its shared charge pool", () => {
     expect(ids).toEqual([
       "item-staff-of-charming-cast-charm-person",
       "item-staff-of-charming-cast-command",
-      "item-staff-of-charming-cast-comprehend-languages"
+      "item-staff-of-charming-cast-comprehend-languages",
+      // Reflect Enchantment spends a charge of the same pool.
+      "item-staff-of-charming-reflect-enchantment"
     ]);
 
     actor.actionUses = { "staff-of-charming-charges": 9 };

@@ -12,7 +12,7 @@ import {
 } from "./equipment-derivation.js";
 import { spellbookRituals } from "./ritual-adept.js";
 import { spellClassOf } from "./class-features.js";
-import { grantedSpellActions } from "./granted-actions.js";
+import { grantedItemActions, grantedSpellActions } from "./granted-actions.js";
 import { storedCastActions } from "./stored-casts.js";
 import { divineInterventionCasts } from "./divine-intervention.js";
 import { withHeadCount } from "./death-traits.js";
@@ -55,7 +55,13 @@ export function effectiveActions(
   // The definition's own list when nothing changed, so a caller holding it sees the same array.
   const unchanged = taken.every((action, index) => action === declared[index]);
   // What another creature's spell lets this one do while it lasts (Dragon's Breath's exhale).
-  const granted = actor ? [...grantedSpellActions(actor, catalog), ...storedCastActions(actor, catalog)] : [];
+  const granted = actor
+    ? [
+        ...grantedSpellActions(actor, catalog),
+        ...storedCastActions(actor, catalog),
+        ...grantedItemActions(actor, definition, catalog)
+      ]
+    : [];
   // A Cleric's Divine Intervention casts any Cleric spell of level 5 or lower.
   const divine = divineInterventionCasts(definition, catalog);
   const base =

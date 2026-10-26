@@ -483,6 +483,8 @@ function force(
     senses?: readonly string[];
     invisible?: true;
     fly?: number;
+    /** What its trait is called: a spell's force, or an item's. */
+    trait?: string;
   }>
 ): ActorDefinition {
   return statBlock({
@@ -501,7 +503,9 @@ function force(
     languages: "None",
     damageImmunities: EVERY_DAMAGE,
     conditionImmunities: EVERY_CONDITION,
-    traits: [{ name: printed.invisible ? "Invisible" : "Spell Force", description: printed.description }],
+    traits: [
+      { name: printed.invisible ? "Invisible" : (printed.trait ?? "Spell Force"), description: printed.description }
+    ],
     ...(printed.invisible ? { traitMechanics: [{ kind: "invisible" as const, name: "Invisible" }] } : {}),
     actions: []
   });
@@ -529,6 +533,27 @@ const FEY_SPIRIT = force({
   name: "Fey Spirit",
   description:
     "A spirit from the Feywild that looks like a Fey creature. Its caster's attacks with the spell reach a creature within 5 feet of it, and a Bonus Action teleports it up to 30 feet before each later attack."
+});
+
+/** A Dancing Sword in the air: "the weapon begins to hover, flies up to 30 feet, and attacks one creature of your choice
+ *  within 5 feet of itself". */
+const DANCING_SWORD = force({
+  id: "dancing-sword",
+  name: "Dancing Sword",
+  trait: "Item Force",
+  fly: 30,
+  description:
+    "A hovering sword. Its wielder's attacks with it reach a creature within 5 feet of it, and a Bonus Action moves it up to 30 feet, to a spot within 30 feet of its wielder, before each later attack. It flies back after its fourth attack."
+});
+
+/** A Feather Token's whip: "a floating whip takes its place". */
+const FEATHER_TOKEN_WHIP = force({
+  id: "feather-token-whip",
+  name: "Floating Whip",
+  trait: "Item Force",
+  fly: 20,
+  description:
+    "A floating whip. Its user's Bonus Action moves it up to 20 feet and makes a melee spell attack, +9 to hit, against a creature within 10 feet of it, for 1d6 + 5 Force damage."
 });
 
 /** Arcane Eye: "an Invisible, invulnerable eye ... It also has Darkvision with a range of 30 feet." */
@@ -655,14 +680,79 @@ const GIANT_FLY = statBlock({
   actions: []
 });
 
+/** An Apparatus of the Crab: "a Large object with the following statistics: AC 20; HP 200; Speed 30 ft., Swim 30 ft.
+ *  ... Immunity to Poison and Psychic damage", whose claws its crew work with Lever 5. */
+const APPARATUS_OF_THE_CRAB = statBlock({
+  id: "apparatus-of-the-crab",
+  name: "Apparatus of the Crab",
+  summary: "Large object - CR none",
+  size: "large",
+  type: "",
+  alignment: "unaligned",
+  abilityScores: { str: 20, dex: 10, con: 10, int: 1, wis: 1, cha: 1 },
+  armorClass: 20,
+  hitPoints: 200,
+  speeds: { walk: 30, swim: 30 },
+  senses: [],
+  passivePerception: 5,
+  languages: "None",
+  damageImmunities: ["poison", "psychic"],
+  traits: [
+    {
+      name: "Vehicle",
+      description:
+        "Its pilot works it from inside with Utilize actions, two levers at a time: Lever 1 extends or retracts its legs (Speed and Swim Speed 0 when retracted), Lever 4 its claws, Lever 5 swings or closes them, Lever 6 walks it, and Lever 7 turns it. Its compartment holds two Medium or smaller creatures."
+    }
+  ],
+  actions: [
+    {
+      id: "claws",
+      name: "Claws (Lever 5 Up)",
+      activation: "action",
+      description: "Each extended claw makes a melee attack: +8 to hit, reach 5 ft. Hit: 7 (2d6) Bludgeoning damage.",
+      damage: [],
+      multiattack: [{ actionId: "claw", count: 2 }]
+    },
+    {
+      id: "claw",
+      name: "Claw",
+      activation: "action",
+      description: "Melee Attack Roll: +8, reach 5 ft. Hit: 7 (2d6) Bludgeoning damage.",
+      attack: { bonus: 8, reachFeet: 5 },
+      damage: [{ formula: "2d6", type: "bludgeoning" }]
+    },
+    {
+      id: "grasp",
+      name: "Grasping Claws (Lever 5 Down)",
+      activation: "action",
+      description:
+        "Each extended claw makes a melee attack: +8 to hit, reach 5 ft. Hit: The target has the Grappled condition (escape DC 15).",
+      damage: [],
+      multiattack: [{ actionId: "grasping-claw", count: 2 }]
+    },
+    {
+      id: "grasping-claw",
+      name: "Grasping Claw",
+      activation: "action",
+      description: "Melee Attack Roll: +8, reach 5 ft. Hit: The target has the Grappled condition (escape DC 15).",
+      attack: { bonus: 8, reachFeet: 5 },
+      damage: [],
+      onHit: [{ conditions: [{ id: "grappled" }], escapeDc: 15 }]
+    }
+  ]
+});
+
 /** The spell-printed stat blocks, beside the bestiary's own. */
 export const SUMMON_STAT_BLOCKS: readonly ActorDefinition[] = [
   ANIMATED_OBJECT,
+  APPARATUS_OF_THE_CRAB,
   ARCANE_EYE,
   ARCANE_HAND,
   ARCANE_SWORD,
   CLAIRVOYANCE_SENSOR,
+  DANCING_SWORD,
   DRACONIC_SPIRIT,
+  FEATHER_TOKEN_WHIP,
   FEY_SPIRIT,
   FLOATING_DISK,
   GIANT_FLY,

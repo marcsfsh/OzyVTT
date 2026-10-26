@@ -593,7 +593,8 @@ export function deriveEquipment(
       carriers.push({ label, modifiers: record.modifiers, sourceItemId: item.id, isWeapon });
     takeGrants(withChosenResistance(record, item), item.id, label);
     takeEffects(record, item.id, label);
-    for (const declared of record.actions) actions.push(itemAction(item, declared, definition));
+    for (const declared of record.actions)
+      if (!declared.grantedOnly) actions.push(itemAction(item, declared, definition));
     for (const cast of record.casts)
       actions.push(...itemCastActions(item, cast, label, definition, catalog!.spellRecord?.(cast.spellId)));
     const read = record.spellScroll ? scrollCastAction(item, definition, catalog) : null;
@@ -613,7 +614,8 @@ export function deriveEquipment(
       sources.push({ itemId: item.id, itemName: label, summary: summarise(record) });
   }
   for (const { item, record } of packed) {
-    for (const declared of record?.actions ?? []) actions.push(itemAction(item, declared, definition));
+    for (const declared of record?.actions ?? [])
+      if (!declared.grantedOnly) actions.push(itemAction(item, declared, definition));
     // A consumable that casts a spell is used from the pack too (a Dust of Disappearance's pinch).
     if (record?.consumedOnUse)
       for (const cast of record.casts)

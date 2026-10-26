@@ -872,7 +872,19 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "Opened the first time, an Efreeti appears within 30 feet and the server rolls the d10, which settles the bottle (summons.ts): on a 1 it attacks its user and leaves after 5 rounds, on a 10 it stays up to an hour to grant a Wish, and either way the bottle's magic is gone; on 2 to 9 it obeys for 1 hour and the bottle holds a servant from then on, which comes twice more, each opening 24 hours after it returns (clock-pools.ts), and then the bottle is spent. What the Wish does is the GM's."
   ),
   "item:feather-token": guided(
-    "The GM says which token a found one is (item-records.ts). The Bird token is used up for a Roc that can't attack and obeys its user until it is dismissed with a Magic action or drops to 0 Hit Points (summons.ts). The Anchor, Fan, Swan Boat, Tree and Whip are the GM's."
+    "The GM says which token a found one is (item-records.ts). The Bird token is used up for a Roc that can't attack and obeys its user until it is dismissed with a Magic action or drops to 0 Hit Points (summons.ts). The Whip token is used up for a floating whip within 10 feet that lasts an hour, until dismissed or its user dies: its user's Bonus Action moves it up to 20 feet and strikes a creature within 10 feet of it at +9 for 1d6 + 5 Force, until its user is Incapacitated (summon-strikes.ts, granted-actions.ts). The Anchor, Fan, Swan Boat and Tree, which act on ships and the scenery, are the GM's."
+  ),
+  "item:dancing-sword": enforced(
+    "A Bonus Action tosses it: it hovers in a space within 30 feet and attacks a creature within 5 feet of it with its wielder's attack roll and damage, and each later Bonus Action moves it up to 30 feet, to a spot within 30 feet of its wielder, and attacks again; after its fourth attack it flies back, and it falls if its wielder is more than 30 feet away (summon-strikes.ts, summons.ts). Catching it out of the air and a wielder with no hand free are the table's."
+  ),
+  "item:pipes-of-the-sewers": guided(
+    "Its Bonus Actions spend 1 to 3 charges to call that many Swarms of Rats under no one's control, when the GM says rats are near (summons.ts). Playing it as a Magic action asks each Swarm of Rats within 30 feet a DC 15 Wisdom save: one that fails obeys the piper until the piper's next turn while it starts its turns within 30 feet, and one that succeeds can't be swayed for 24 hours (summons.ts). Playing again asks a swayed swarm again, where the text keeps it swayed, and rats being Indifferent to the bearer are the GM's."
+  ),
+  "item:manual-of-golems": guided(
+    "The GM says which golem a found manual teaches (item-records.ts). A reader that isn't a spellcaster with two level 5 spell slots takes 6d6 Psychic damage (resolution/validate.ts), and when the GM marks the work done the manual burns and its golem joins the map under its maker's command (summons.ts). The days of work and the gold are the GM's downtime."
+  ),
+  "item:apparatus-of-the-crab": guided(
+    "Crewed, it is a Large vehicle with its printed AC, 200 Hit Points, speeds and immunities that its pilot works on the turn after its own: its claws swing at +8 for 2d6 Bludgeoning or close to grapple (escape DC 15) (summons.ts). Its crew's place inside and their cover, the levers' order, its shutters, light, depth and air are the GM's."
   ),
   "item:figurine-of-wondrous-power": guided(
     "The GM says which figurine a found one is (item-records.ts): its creature appears within 60 feet for its time, acts right after its user and defends itself when uncommanded, and a Magic action turns it back (summons.ts). Its days of waiting start when it reverts (clock-pools.ts), each Golden Lion and each Ivory Goat on its own; the Goat of Traveling spends an hour or part of one each time from its 24 and waits only once they are spent. The Goat of Terror can't attack, the Onyx Dog has Blindsight 60 feet, the Silver Raven offers Animal Messenger, and the Obsidian Steed's d10 shows 1 one time in ten, leaving it under no one's command. While the Goat of Terror is ridden, each Hostile creature that starts its turn within 30 feet of it makes the DC 15 Wisdom save against Frightened, a success leaving it immune for 24 hours (trait-turns.ts, mounts.ts). The goat's horns, the steed refusing to revert and its ride to Hades are the GM's."
@@ -1674,7 +1686,9 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:javelin-of-lightning": enforced(
     "It may deal Lightning damage on a hit, and once a dawn it becomes a bolt: a 5-foot Line from its thrower that ends at a target within 120 feet (annotations.ts), DC 13 Dexterity save for 4d6 Lightning, half on a success."
   ),
-  "item:dwarven-plate": guided("The +2 AC is applied. The Reaction against forced movement is the GM's."),
+  "item:dwarven-plate": enforced(
+    "The +2 AC is applied. In a fight, a push or pull moves its wearer up to 10 feet less for its Reaction, which the server takes whenever it is free (forced-movement.ts)."
+  ),
   "item:dwarven-thrower": enforced(
     "The +3 to attack and damage rolls is applied, it is thrown 20/60 (inventory.ts weapon changes), and a ranged hit deals 1d8 Force more, 2d8 against a Giant. Only a Dwarf or a creature attuned to a Belt of Dwarvenkind attunes to it (attunement.ts); it flies back to its thrower's hand."
   ),
@@ -1744,8 +1758,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:spellguard-shield": enforced(
     "Spell attack rolls against its holder have Disadvantage (resolution/attack.ts), and its holder has Advantage on saves against spells and other magical effects (riders.ts)."
   ),
-  "item:staff-of-charming": guided(
-    "Its one-charge casts are cast actions, and roll-answers.ts offers to turn a failed save against an Enchantment spell aimed only at the holder into a success once a day. Turning the spell back on its caster is the GM's."
+  "item:staff-of-charming": enforced(
+    "Its one-charge casts are cast actions; roll-answers.ts offers to turn a failed save against an Enchantment spell aimed only at the holder into a success once a day, and a successful one into the spell turned back on its caster for a Reaction and a charge: the caster makes the same save against the holder's spell save DC (spell-reflection.ts)."
   ),
   "item:staff-of-fire": enforced(
     "Resistance to Fire damage is applied, and Burning Hands, Fireball and Wall of Fire spend their printed charges (item-actions.ts); a 1 on the last charge's d20 destroys it (resolution/charges.ts)."
@@ -1757,7 +1771,10 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
     "It swings as a +2 Quarterstaff, the +2 to AC, saving throws and spell attack rolls is applied, and its spells spend their printed charges; the last charge's d20 gives 1d8 + 2 back on a 20 and leaves only a +2 Quarterstaff on a 1 (resolution/charges.ts). Retributive Strike is the GM's."
   ),
   "item:staff-of-the-magi": guided(
-    "It swings as a +2 Quarterstaff, the +2 to spell attack rolls is applied, and its spells spend their printed charges from 50; a 20 on the last charge's d20 gives 1d12 + 1 back (resolution/charges.ts). Advantage on saves against spells, Spell Absorption and Retributive Strike are the GM's."
+    "It swings as a +2 Quarterstaff, the +2 to spell attack rolls and Advantage on saves against spells are applied, and its spells spend their printed charges from 50; a 20 on the last charge's d20 gives 1d12 + 1 back (resolution/charges.ts). Spell Absorption's Reaction cancels a spell aimed at its holder alone with no area and adds the spell's level to its charges (resolution/counter.ts, counter-answers.ts), and the table is told when that takes it past 50. Retributive Strike, and that explosion, are the GM's."
+  ),
+  "item:rod-of-absorption": enforced(
+    "Held and attuned, its Reaction absorbs a spell aimed at its holder alone with no area: the spell has no effect, what it was cast with is spent, and its levels are stored, up to 50 absorbed in the rod's existence (resolution/counter.ts, counter-answers.ts). A found rod holds 1d10 levels (item-charges.ts), and a spellcaster holding it turns stored levels into a spent spell slot of level 5 or lower, no higher than its own (conversions.ts). That a spent rod is mundane is the GM's to say."
   ),
   "item:staff-of-the-woodlands": enforced(
     "It swings as a +2 Quarterstaff, the +2 to spell attack rolls is applied, its spells spend their printed charges and Tree Form's use is counted. A 1 on the last charge's d20 leaves a plain Quarterstaff (resolution/charges.ts)."
@@ -1837,8 +1854,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:energy-bow": enforced(
     "It binds to its Longbow or Shortbow with +1 to attack and damage rolls, and its arrows deal Force damage with no ammunition to spend (inventory.ts weapon changes). Arrow of Restraint is a hit option that deals no damage and asks a DC 15 Strength save against a minute of Restrained, escaped with a DC 20 Athletics check (resolution/hit-options.ts), and Arrow of Transport teleports a willing Medium or smaller creature within 60 feet to a space within 10 feet of its wielder (resolution/movement-grants.ts). The arrows' light and the Energy Ladder are the GM's."
   ),
-  "item:ioun-stone": guided(
-    "The GM says which stone a found one is (item-records.ts), the bearer learns it on attuning, and two stones of different kinds attune as two items. Agility, Fortitude, Insight, Intellect, Leadership and Strength raise their score live (live-abilities.ts); Awareness and Protection are applied. Absorption, Greater Absorption, Mastery, Regeneration, Reserve and Sustenance are the GM's."
+  "item:ioun-stone": enforced(
+    "The GM says which stone a found one is (item-records.ts), the bearer learns it on attuning, and two stones of different kinds attune as two items. Agility, Fortitude, Insight, Intellect, Leadership and Strength raise their score live (live-abilities.ts); Awareness and Protection are applied; Mastery adds 1 to the Proficiency Bonus every derived number reads; Regeneration heals 15 Hit Points at the end of each hour with at least 1 (clock-healing.ts); Sustenance spares its bearer food and water (survival.ts). Absorption's and Greater Absorption's Reaction cancels a spell of level 4 or 8 or lower it sees cast, until 20 or 50 levels are cancelled (resolution/counter.ts), and Reserve stores up to 4 levels of spells cast into it, cast by its bearer at the caster's numbers (stored-casts.ts); the GM sets what a found one holds on its row."
   ),
   "item:mace-of-terror": enforced(
     "Its 3 charges come back 1d3 at dawn, and each opens the DC 15 Wisdom save against Frightened for a minute on the creatures its wielder picks within 30 feet, repeated at the end of each turn. A Frightened creature must spend its movement getting as far from the wielder as it can (compelled-moves.ts, movement-rules.ts), makes no Opportunity Attacks, and for its action can only Dash, try to escape what holds it, or Dodge when it has nowhere to move (resolution/economy.ts)."
@@ -2479,8 +2496,8 @@ export const RECORD_OVERRIDES: Readonly<Record<string, CuratedCoverage>> = {
   "item:potion-of-water-breathing": enforced(
     "Drinking it lets the drinker breathe underwater for 24 hours of game time (breath.ts)."
   ),
-  "item:ring-of-spell-turning": guided(
-    "Its wearer has Advantage on saves against spells, and a successful save against a spell of level 7 or lower leaves the spell no effect on it: no half damage, nothing a success would leave (saving-throws.ts). Deflecting a spell that targeted only the wearer back at its caster is the GM's."
+  "item:ring-of-spell-turning": enforced(
+    "Its wearer has Advantage on saves against spells, and a successful save against a spell of level 7 or lower leaves the spell no effect on it: no half damage, nothing a success would leave (saving-throws.ts). When that spell targeted only the wearer with no area, the wearer's Reaction turns it back: the caster makes the same save against its own spell save DC (roll-answers.ts, spell-reflection.ts)."
   ),
   "item:candle-of-invocation": guided(
     "Lit, it sheds Dim Light 30 feet for its 4 hours (item-light.ts), and while it burns its attuned bearer has Advantage on attack rolls, saves, checks and Initiative. It casts Gate once, which destroys it. Whether an alignment matches the candle's, the others in its light, slot-free level 1 spells for a Cleric or Druid, Gate only at the first lighting, and the minutes a snuffed candle keeps are the GM's."

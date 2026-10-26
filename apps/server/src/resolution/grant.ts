@@ -2,7 +2,7 @@ import { endCrossedBonds, WARDING_BOND_TAG } from "../warding-bond.js";
 import { openStoreWindow } from "../stored-casts.js";
 import { CHOSEN_ABILITY_TAG, ENHANCED_ABILITY_TAG, isDead, type GameState } from "@vtt/domain";
 import { abilityModifier, rollDice } from "@vtt/rules-5e";
-import type { DamageType, EffectInstance, Modifier } from "@vtt/schemas";
+import { catalogIdOf, type DamageType, type EffectInstance, type Modifier } from "@vtt/schemas";
 import { ABILITY_NAMES } from "../ability-checks.js";
 import { setCondition } from "../actor-conditions.js";
 import { conditionLabel } from "../condition-rules.js";
@@ -86,6 +86,22 @@ function rageTiming(
     return { startedRound, duration: current.duration, tags: action.grants!.tags };
   }
   return { startedRound, tags: action.grants!.tags };
+}
+
+/** The item's action a grant hands its recipient (a Feather Token's whip): the record and kind of the row that made it,
+ *  read now, since a used-up token is gone after. */
+function grantedItemActionOf(ctx: ResolveContext, actionId: string | undefined) {
+  if (actionId === undefined) return {};
+  const row = ctx.attacker.inventory.find((item) => ctx.action.id.startsWith(`item-${item.id}-`));
+  if (!row) return {};
+  return {
+    grantedItemAction: {
+      recordId: catalogIdOf(row),
+      ...(row.variantId !== undefined ? { variantId: row.variantId } : {}),
+      actionId,
+      rowId: row.id
+    }
+  };
 }
 
 /** Granted effects (Rage, Reckless Attack on self; Help on an ally; Bless on each creature it targets): replace-on-
@@ -343,6 +359,7 @@ function grantTo(ctx: ResolveContext, recipient: LiveActor, sharedMinutes: numbe
       ...(grant.endsOnIncapacitated ? { endsOnIncapacitated: true as const } : {}),
       ...(grant.endsInBrightLight ? { endsInBrightLight: true as const } : {}),
       ...(grant.regainsHitPoints ? { regainsHitPoints: { ...grant.regainsHitPoints } } : {}),
+      ...grantedItemActionOf(ctx, grant.itemAction),
       modifiers: [
         ...modifiers,
         ...hexDisadvantage,

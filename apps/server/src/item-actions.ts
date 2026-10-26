@@ -139,7 +139,12 @@ export function itemAction(
   const reaction =
     declared.reaction?.response === "reduce-damage" && added !== 0
       ? { ...declared.reaction, formula: formulaPlus(declared.reaction.formula, added) }
-      : declared.reaction;
+      : declared.reaction?.response === "absorb" && declared.reaction.stores
+        ? {
+            ...declared.reaction,
+            stores: { ...declared.reaction.stores, pool: itemPool(item, declared.reaction.stores.pool) }
+          }
+        : declared.reaction;
   // Everything the action schema says passes through (an Elixir's cures, a rod's light, a teleport); what a feature
   // grows by level, and what is read off the bearer, is resolved here.
   const {
@@ -157,6 +162,9 @@ export function itemAction(
     reactionByLevel: _reactionByLevel,
     multiattackByLevel: _multiattackByLevel,
     hurlsWeapon,
+    swingsWeapon,
+    grantedOnly: _grantedOnly,
+    forceOf,
     ...rest
   } = structuredClone(declared);
   // Hurled as if it had the Thrown property (Hammer of Thunderbolts): the weapon's own attack and damage, from range.
@@ -164,9 +172,17 @@ export function itemAction(
     hurlsWeapon && "weapon" in item && item.weapon ? weaponSwing(item as InventoryItem, definition)?.action : undefined;
   if (hurled?.attack)
     attack = { bonus: hurled.attack.bonus, rangeFeet: hurlsWeapon!.longFeet, rangeNormalFeet: hurlsWeapon!.normalFeet };
+  // Swung as its bearer swings it, from wherever its force reaches (`summon-strikes.ts`).
+  const swung =
+    swingsWeapon && "weapon" in item && item.weapon
+      ? weaponSwing(item as InventoryItem, definition)?.action
+      : undefined;
+  if (swung?.attack) attack = { bonus: swung.attack.bonus, reachFeet: 5 };
   return {
     ...rest,
     ...(hurled ? { damage: hurled.damage } : {}),
+    ...(swung ? { damage: swung.damage } : {}),
+    ...(forceOf ? { forceOf: itemActionId(itemId, forceOf) } : {}),
     id: itemActionId(itemId, declared.id),
     ...(attack ? { attack } : {}),
     ...(save ? { save } : {}),

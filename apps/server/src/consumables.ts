@@ -10,10 +10,11 @@ import { rowRecord } from "./item-records.js";
 
 /** The carried row an action uses up, when it comes from a consumable's record. */
 export function consumableRowFor(
-  action: Pick<ActorAction, "id">,
+  action: Pick<ActorAction, "id" | "keepsItem">,
   inventory: readonly InventoryItem[],
   catalog: EquipmentCatalog | undefined
 ): InventoryItem | null {
+  if (action.keepsItem) return null;
   const row = itemRowOfAction(action.id, inventory);
   return row && rowRecord(catalog, row)?.consumedOnUse === true ? row : null;
 }

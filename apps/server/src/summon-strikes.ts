@@ -36,6 +36,76 @@ function strikesOf(action: Pick<ActorAction, "summons">, spell: SpellReference |
   return action.summons?.strikesFrom ?? spell?.effect?.summons?.strikesFrom;
 }
 
+/** An item's force (a Dancing Sword in the air, a Feather Token's whip): the action that puts it on the map strikes
+ *  from the point it goes to, and a later action (`forceOf`) moves it first and strikes from there, kept within the
+ *  feet of its user its item says. */
+function itemStrikeOrigin(
+  state: GameState,
+  input: Readonly<{
+    userId: string;
+    action: Pick<ActorAction, "id" | "summons" | "forceOf">;
+    at: Point | undefined;
+    targetId: string | undefined;
+    override: RulesOverride | null;
+  }>,
+  geometry: TokenMapGeometry
+): StrikeOrigin | null {
+  const { action } = input;
+  const positionOf = (actorId: string | undefined) =>
+    actorId ? (state.combat.tokens.find((token) => token.actorId === actorId)?.position ?? null) : null;
+  const userAt = positionOf(input.userId);
+  const targetAt = positionOf(input.targetId);
+  if (action.summons?.strikesFrom) {
+    const at = input.at ?? targetAt ?? userAt;
+    return at ? { markerId: null, at, strikes: action.summons.strikesFrom, note: null } : null;
+  }
+  const marker = state.actors.find(
+    (actor) => actor.summon?.by === input.userId && actor.summon.actionId === action.forceOf && actor.summon.strikesFrom
+  );
+  if (!marker) throw new CommandRejectedError(`It isn't on the map. Use ${action.forceOf ? "its item" : "it"} first.`);
+  const strikes = marker.summon!.strikesFrom!;
+  const from = positionOf(marker.id);
+  if (!from) return null;
+  const within = (point: Point) =>
+    (mapDistance(geometry, from, point)?.value ?? Infinity) <= strikes.moveFeet + DISTANCE_TOLERANCE_FEET &&
+    (strikes.withinFeetOfUser === undefined ||
+      !userAt ||
+      (mapDistance(geometry, userAt, point)?.value ?? Infinity) <= strikes.withinFeetOfUser + DISTANCE_TOLERANCE_FEET);
+  const to = input.at ?? (targetAt && within(targetAt) ? targetAt : from);
+  const notes: string[] = [];
+  const moved = mapDistance(geometry, from, to)?.value ?? 0;
+  if (moved > strikes.moveFeet + DISTANCE_TOLERANCE_FEET)
+    notes.push(`${marker.name} flies up to ${strikes.moveFeet} feet; that is ${Math.round(moved)} feet.`);
+  const apart = userAt ? (mapDistance(geometry, userAt, to)?.value ?? 0) : 0;
+  if (strikes.withinFeetOfUser !== undefined && apart > strikes.withinFeetOfUser + DISTANCE_TOLERANCE_FEET)
+    notes.push(
+      `${marker.name} stays within ${strikes.withinFeetOfUser} feet of its user; that is ${Math.round(apart)}.`
+    );
+  const note = notes.length > 0 ? policeBarrier(state, input.override, "range.out-of-range", notes.join(" ")) : null;
+  return { markerId: marker.id, at: to, strikes, note };
+}
+
+/** After an item force's attack: it counts, and goes back to its user after the last its item allows (a Dancing
+ *  Sword's fourth). True when it went back. */
+export function countForceStrike(
+  state: GameState,
+  userId: string,
+  action: Pick<ActorAction, "id" | "forceOf">
+): boolean {
+  const actionId = action.forceOf ?? action.id;
+  const marker = state.actors.find(
+    (actor) => actor.summon?.by === userId && actor.summon.actionId === actionId && actor.summon.strikesFrom
+  );
+  const most = marker?.summon?.strikesFrom?.attacks;
+  if (!marker || most === undefined) return false;
+  const made = (marker.actionUses[STRIKES_KEY] ?? 0) + 1;
+  marker.actionUses = { ...marker.actionUses, [STRIKES_KEY]: made };
+  return made >= most;
+}
+
+/** The attacks an item's force has made, kept on the force. */
+const STRIKES_KEY = "force-strikes";
+
 /**
  * Where this action reaches from: the point its cast places the force at, or the force after a later action moves it
  * there. With no point picked, the force goes to its first target where it can (in its space at the cast, there on a
@@ -46,7 +116,7 @@ export function strikeOriginFor(
   state: GameState,
   input: Readonly<{
     userId: string;
-    action: Pick<ActorAction, "id" | "summons">;
+    action: Pick<ActorAction, "id" | "summons" | "forceOf">;
     spell: SpellReference | undefined;
     at: Point | undefined;
     targetId: string | undefined;
@@ -55,6 +125,8 @@ export function strikeOriginFor(
   geometry: TokenMapGeometry | null
 ): StrikeOrigin | null {
   const { action, spell } = input;
+  if (geometry && !spell && (action.forceOf !== undefined || action.summons?.strikesFrom))
+    return itemStrikeOrigin(state, input, geometry);
   if (!geometry || !spell) return null;
   const strikes = strikesOf(action, spell);
   if (!strikes) return null;

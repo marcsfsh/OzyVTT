@@ -81,6 +81,9 @@ export type RollAnswerRoll = z.infer<typeof RollAnswerRollSchema>;
  *   halfling's Luck), `bonus` adds to the new roll, `advantage` rerolls it with Advantage (Countercharm).
  * - set-d20: the d20 that counts becomes `face` (Stroke of Luck).
  * - succeed: a failed save succeeds (Ring of Evasion). hit: a missed attack hits (Boon of Combat Prowess).
+ * - reflect: a successful save against a spell turns the spell back on its caster, who makes the same save against the
+ *   same DC (`same`, a Ring of Spell Turning: "using its own spell save DC") or the bearer's spell save DC (`bearer`, a
+ *   Staff of Charming: "as if you had cast the spell").
  */
 export const RollAnswerEffectSchema = z.discriminatedUnion("kind", [
   z
@@ -102,7 +105,8 @@ export const RollAnswerEffectSchema = z.discriminatedUnion("kind", [
     .strict(),
   z.object({ kind: z.literal("set-d20"), face: z.number().int().min(1).max(20) }).strict(),
   z.object({ kind: z.literal("succeed") }).strict(),
-  z.object({ kind: z.literal("hit") }).strict()
+  z.object({ kind: z.literal("hit") }).strict(),
+  z.object({ kind: z.literal("reflect"), dc: z.enum(["same", "bearer"]) }).strict()
 ]);
 export type RollAnswerEffect = z.infer<typeof RollAnswerEffectSchema>;
 
@@ -130,7 +134,9 @@ export const RollAnswerSchema = z
         conditions: z.array(ConditionIdSchema).min(1).max(4).optional(),
         spellSchools: z.array(RiderSlugSchema).min(1).max(8).optional(),
         creatureTypes: z.array(RiderSlugSchema).min(1).max(8).optional(),
-        singleTarget: z.literal(true).optional()
+        singleTarget: z.literal(true).optional(),
+        /** Only a spell of at most this level (a Ring of Spell Turning's level 7). */
+        spellMaxLevel: z.number().int().min(0).max(9).optional()
       })
       .strict()
       .optional(),
@@ -1973,6 +1979,30 @@ export const EffectInstanceSchema = z
     endsInBrightLight: z.literal(true).optional(),
     /** Hit Points its bearer regains as time passes while it lasts (`RegainHitPointsSchema`). */
     regainsHitPoints: RegainHitPointsSchema.optional(),
+    /** An item's action its bearer may take while it lasts, though the item is gone (a Feather Token's whip, which
+     *  outlasts the token): the record, its kind, the action and the row the item was. */
+    grantedItemAction: z
+      .object({
+        recordId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80),
+        variantId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80)
+          .optional(),
+        actionId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(120),
+        rowId: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .max(80)
+      })
+      .strict()
+      .optional(),
     /** It ends when the creature that keeps it (its source, or its bearer when it has none) gains the Incapacitated
      *  condition or one that includes it, or drops to 0 Hit Points (Superior Defense, Turn Undead's turning). */
     endsOnIncapacitated: z.literal(true).optional(),
@@ -2679,7 +2709,12 @@ export const StrikesFromSchema = z
   .object({
     reachFeet: z.number().int().min(5).max(30),
     moveFeet: z.number().int().min(5).max(120),
-    teleports: z.literal(true).optional()
+    teleports: z.literal(true).optional(),
+    /** Each later move keeps it within this many feet of its user (a Dancing Sword: "to another spot within 30 feet of
+     *  you"). */
+    withinFeetOfUser: z.number().int().min(5).max(120).optional(),
+    /** It goes back to its user after this many attacks (a Dancing Sword's fourth). */
+    attacks: z.number().int().min(1).max(10).optional()
   })
   .strict();
 export type StrikesFrom = z.infer<typeof StrikesFromSchema>;
@@ -3348,6 +3383,13 @@ export const ActionGrantSchema = EffectGrantSchema.extend({
   /** It ends when its recipient stands in Bright Light, read with dynamic vision (Cloak of the Bat: "if you are no
    *  longer in Dim Light or Darkness, you lose this Fly Speed"). */
   endsInBrightLight: z.literal(true).optional(),
+  /** One of the same item's actions its recipient may take while this lasts, though the item is used up (a Feather
+   *  Token's whip). */
+  itemAction: z
+    .string()
+    .regex(/^[a-z0-9-]+$/)
+    .max(120)
+    .optional(),
   /** Hit Points its recipient regains as time passes while it lasts (a Rod of Security's demiplane). */
   regainsHitPoints: RegainHitPointsSchema.optional(),
   /** It lasts this many days divided by the number of creatures it is given to, rounded down (a Rod of Security's
@@ -4128,6 +4170,31 @@ export const ActionReactionSchema = z.discriminatedUnion("response", [
       rangeFeet: ReactionRangeFeet
     })
     .strict(),
+  /** Spell absorption (an Ioun Stone of Absorption, a Rod of Absorption, a Staff of the Magi): when another creature
+   *  casts a spell of at most `maxLevel`, the reactor cancels it. `onlyAtReactor`: only "a spell that is targeting only
+   *  you and not with an area of effect"; `seen`: only one cast by a creature the reactor sees. Each level it cancels
+   *  spends one of the action's uses, so a pool that can't take the spell's levels can't cancel it. `stores` gives the
+   *  levels to another pool of the same item as uses (the staff's charges), or to a pool of its own of `limit` levels
+   *  that never comes back by itself (the rod's stored energy). */
+  z
+    .object({
+      trigger: z.literal("casts-spell"),
+      response: z.literal("absorb"),
+      maxLevel: z.number().int().min(0).max(9).optional(),
+      onlyAtReactor: z.literal(true).optional(),
+      seen: z.literal(true).optional(),
+      stores: z
+        .object({
+          pool: z
+            .string()
+            .regex(/^[a-z0-9-]+$/)
+            .max(120),
+          limit: z.number().int().min(1).max(100).optional()
+        })
+        .strict()
+        .optional()
+    })
+    .strict(),
   /** Redirect Attack (the Goblin Boss): when a creature it can see makes an attack roll against the reactor, before the
    *  roll, an ally of a size it names within `rangeFeet` becomes the target instead, the two swapping places when
    *  `swap` says so. */
@@ -4631,6 +4698,8 @@ export const ActionTargetsSchema = z
     entered: z.literal(true).optional(),
     /** Only a creature whose stat block prints this type tag ("a willing demon": a Fiend (Demon)). */
     typeTag: z.string().min(1).max(40).optional(),
+    /** Only a creature of one of these stat blocks, by monster id (Pipes of the Sewers: a Swarm of Rats). */
+    statBlocks: z.array(RiderSlugSchema).min(1).max(6).optional(),
     /** Only a creature with one of these special speeds (a Trident of Fish Command: "a Beast that has a Swim Speed"). */
     speeds: z
       .array(z.enum(["fly", "swim", "climb", "burrow"]))
@@ -5509,6 +5578,24 @@ export const ActionSchema = z
     id: z.string().regex(/^[a-z0-9-]+$/),
     name: z.string().min(1).max(120),
     activation: z.enum(["action", "bonus-action", "reaction", "other"]),
+    /** Only the GM takes it: what it finishes is downtime the GM gives (a Manual of Golems' golem, after its days of
+     *  work). */
+    gmTakes: z.literal(true).optional(),
+    /** Taking it doesn't use up its consumable item (a Manual of Golems read by one who can't use it). */
+    keepsItem: z.literal(true).optional(),
+    /** It is refused for a creature with at least `count` spell slots of `level`: what it does befalls only one who
+     *  lacks them ("A creature that can't use a Manual of Golems and attempts to read it takes 6d6 Psychic damage"). */
+    refusedWithSlots: z
+      .object({ level: z.number().int().min(1).max(9), count: z.number().int().min(1).max(4) })
+      .strict()
+      .optional(),
+    /** Its attack reaches from the force another of its item's actions put on the map, which it moves first (a Dancing
+     *  Sword's later attacks, a Feather Token's whip): that action's id. */
+    forceOf: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .max(120)
+      .optional(),
     description: z
       .string()
       .min(1)

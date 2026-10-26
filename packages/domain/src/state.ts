@@ -565,6 +565,8 @@ export const HeldAnswerSchema = z
     rerolled: z.literal(true).optional(),
     succeed: z.literal(true).optional(),
     hit: z.literal(true).optional(),
+    /** A successful save's spell is turned back on its caster, who saves against this DC. */
+    reflectDc: z.number().int().min(1).max(40).optional(),
     spent: z.boolean().default(true)
   })
   .strict();
@@ -861,6 +863,8 @@ export const ParkedCastSchema = z
     targetIds: z.array(z.uuid()).max(60),
     /** The targets are the catch of a template placed on the map. */
     areaPlaced: z.boolean(),
+    /** The level the spell is cast at, which an absorbing reaction counts (an Ioun Stone of Absorption's 20 levels). */
+    level: z.number().int().min(0).max(9).optional(),
     /** The slot the spell is cast with, spent if it goes ahead. */
     slot: z
       .object({ level: z.number().int().min(1).max(9), pact: z.boolean() })

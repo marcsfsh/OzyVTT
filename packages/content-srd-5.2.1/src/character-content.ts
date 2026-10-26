@@ -252,6 +252,18 @@ export const FeatureActionSchema = ActionSchema.omit({ attack: true, save: true,
       .describe(
         "An attack with the item's own weapon hurled as if it had the Thrown property at these ranges (Hammer of Thunderbolts: 20/60), with the weapon's attack and damage"
       ),
+    /** An attack with the item's own weapon as its bearer swings it, reaching from where the item's force is (a Dancing
+     *  Sword: "The weapon uses your attack roll and adds your ability modifier to damage rolls"). */
+    swingsWeapon: z
+      .literal(true)
+      .optional()
+      .describe("An attack with the item's own weapon as its bearer swings it (a Dancing Sword's)"),
+    /** Offered only through an effect another of the item's actions grants (`ActionGrant.itemAction`), never from the
+     *  carried row: a Feather Token's whip outlasts the token. */
+    grantedOnly: z
+      .literal(true)
+      .optional()
+      .describe("Offered only through an effect another of the item's actions grants, never from the carried row"),
     /** It spends none of its feature's uses, where another of the feature's actions does (ending Quivering Palm's
      *  vibrations, which the 4 Focus Points paid for when they started). */
     spendsNoUses: z

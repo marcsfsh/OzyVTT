@@ -1,4 +1,5 @@
 import type { ActionResolution, GameState, PendingReaction } from "@vtt/domain";
+import type { ActorDefinition } from "@vtt/schemas";
 import { resolveDefinitionAction } from "./action-resolution.js";
 import { effectiveActions } from "./effective-actions.js";
 import type { EffectNarration } from "./effects.js";
@@ -7,7 +8,7 @@ import { damageAdjustmentDetail } from "./hit-points.js";
 import { settlePlayerDamage } from "./player-damage.js";
 import type { ReactionAnswerDependencies } from "./reactions.js";
 import { spendComponents } from "./resolution/components.js";
-import type { LiveActor } from "./resolution/context.js";
+import type { DefinitionAction, LiveActor } from "./resolution/context.js";
 import { commitEconomy, commitUse, planEconomy, spendSlot } from "./resolution/economy.js";
 import { recordRoll } from "./roll-history.js";
 import { magicResistanceOf, rollSaveAtOnce } from "./saving-throws.js";
@@ -79,6 +80,8 @@ export function answerCounter(answer: CounterAnswer, slotLevel: number | undefin
   const definition = reactor.definitionId ? deps.resolveDefinition(reactor.definitionId) : undefined;
   const siblings = effectiveActions(definition, reactor, deps.catalog);
   const declared = siblings.find((candidate) => candidate.id === pending.actionId);
+  if (declared?.reaction?.response === "absorb")
+    return absorb(answer, declared, declared.reaction, caster, definition, siblings);
   if (!declared || declared.reaction?.response !== "counter")
     throw new CommandRejectedError(`${reactor.name} no longer has ${pending.actionName}.`);
   // Counterspell's own cost: the Reaction and a slot, checked like any resolve.
@@ -175,6 +178,100 @@ export function answerCounter(answer: CounterAnswer, slotLevel: number | undefin
   };
 }
 
+/** Moves a pool's spent count by `delta` (negative gives uses back), never below none spent. Returns what it couldn't
+ *  give back. */
+function movePool(actor: LiveActor, key: string, delta: number): number {
+  const wanted = (actor.actionUses[key] ?? 0) + delta;
+  const next = Math.max(0, wanted);
+  const { [key]: _old, ...others } = actor.actionUses;
+  actor.actionUses = next > 0 ? { ...others, [key]: next } : others;
+  return next - wanted;
+}
+
+/**
+ * Answers an absorbing prompt (an Ioun Stone of Absorption, a Rod of Absorption, a Staff of the Magi). "Use" spends the
+ * reactor's Reaction and counts the spell's levels in the action's pool. The spell is cancelled: every other prompt on
+ * it goes and nothing of it happens, though what it was cast with is spent ("the absorbed spell's effect is
+ * canceled"). Its levels go where the item stores them; levels a staff's charges can't take make it explode (its
+ * Retributive Strike, which the table plays).
+ */
+function absorb(
+  answer: CounterAnswer,
+  declared: DefinitionAction,
+  reaction: Extract<NonNullable<DefinitionAction["reaction"]>, { response: "absorb" }>,
+  caster: LiveActor,
+  definition: ActorDefinition | undefined,
+  siblings: readonly DefinitionAction[]
+): CounterOutcome {
+  const { state, commandId, pending, reactor, deps, clearPrompt } = answer;
+  const parked = pending.parkedCast!;
+  const level = parked.level ?? parked.slot?.level ?? 0;
+  const uses = declared.uses;
+  const key = uses ? (uses.pool ?? declared.id) : null;
+  if (uses && key !== null && (reactor.actionUses[key] ?? 0) + level > uses.limit)
+    throw new CommandRejectedError(`${declared.name} can't take a level ${level} spell.`);
+  // The Reaction, checked like any resolve; the uses are counted by level below.
+  const { uses: _uses, ...free } = declared;
+  const economy = planEconomy(
+    state,
+    reactor,
+    free,
+    { actorId: reactor.id, targetIds: [caster.id], commandId },
+    definition,
+    [],
+    deps.distanceFeet,
+    siblings,
+    false,
+    deps.catalog
+  );
+  commitEconomy({ state, attacker: reactor, input: {}, plan: economy.plan, overridden: economy.overridden });
+  clearPrompt(false);
+  if (key !== null) movePool(reactor, key, level);
+  state.combat = {
+    ...state.combat,
+    pendingReactions: state.combat.pendingReactions.filter(
+      (entry) => !(entry.kind === "casts-spell" && entry.triggerCommandId === pending.triggerCommandId)
+    )
+  };
+  spendParked(state, caster, parked);
+  const events: EffectNarration[] = [
+    {
+      kind: "reaction",
+      text: `${reactor.name}'s ${declared.name} absorbs ${caster.name}'s spell${level > 0 ? ` (level ${level})` : ""}, which has no effect.`,
+      actorId: reactor.id
+    }
+  ];
+  if (reaction.stores && level > 0) {
+    const over = movePool(reactor, reaction.stores.pool, -level);
+    if (over > 0 && reaction.stores.limit === undefined)
+      events.push({
+        kind: "reaction",
+        text: `The levels take ${declared.name}'s item past its most: it explodes as its Retributive Strike does.`,
+        actorId: reactor.id
+      });
+  }
+  return {
+    used: true,
+    countered: true,
+    appliedDamage: 0,
+    caster: { id: caster.id, name: caster.name },
+    events,
+    castCommandId: parked.castCommandId
+  };
+}
+
+/** What a cast that happened was made with: its slot (this turn's one slot), its limited use and its materials. */
+function spendParked(state: GameState, caster: LiveActor, parked: NonNullable<PendingReaction["parkedCast"]>): void {
+  if (parked.slot) {
+    spendSlot(caster, parked.slot);
+    const casters = state.combat.turn.spellSlotCasters ?? [];
+    if (!casters.includes(caster.id))
+      state.combat = { ...state.combat, turn: { ...state.combat.turn, spellSlotCasters: [...casters, caster.id] } };
+  }
+  if (parked.use) commitUse(state, caster, parked.use);
+  spendComponents(caster, parked.componentSpends);
+}
+
 /** The parked cast goes ahead once no Counterspell prompt on it is left: resolved as it was made, with its slot and
  *  the materials it consumes spent now, and the damage it owes settled as the caster's would be. */
 function goAhead(
@@ -231,14 +328,7 @@ function goAhead(
   // "If that spell was cast with a spell slot": spent only now that it went ahead, and it is this turn's one slot. A
   // casting that only begins spends them on its last turn.
   if (parked.beginsLongCast) return { resolution, appliedDamage: 0 };
-  if (parked.slot) {
-    spendSlot(caster, parked.slot);
-    const casters = state.combat.turn.spellSlotCasters ?? [];
-    if (!casters.includes(caster.id))
-      state.combat = { ...state.combat, turn: { ...state.combat.turn, spellSlotCasters: [...casters, caster.id] } };
-  }
-  if (parked.use) commitUse(state, caster, parked.use);
-  spendComponents(caster, parked.componentSpends);
+  spendParked(state, caster, parked);
   const mode = parked.initiatorRole === "player" ? state.combat.playerDamageMode : "direct";
   const applied = settlePlayerDamage(
     state,

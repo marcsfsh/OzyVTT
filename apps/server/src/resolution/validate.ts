@@ -53,6 +53,7 @@ import { castLevelOf, planEconomy, type EconomyPlan } from "./economy.js";
 import { actionTargetViolations } from "./action-targets.js";
 import { withPickedDamageTypes } from "../statblock-picks.js";
 import { typeGated } from "./type-gates.js";
+import { spellSlotMaxima } from "../actor-roster.js";
 
 /** The attacker and targets, refused unless the action has something structured to resolve against them. */
 function combatantsOf(
@@ -72,7 +73,12 @@ function combatantsOf(
   const outsideFight = !state.combat.active;
   // A shape-shift is something a creature does outside a fight too (Wild Shape to scout, a werewolf's change).
   const shapeShifts = action.shapeShift !== undefined || action.endsForm === true;
-  const itemGrant = isItemActionId(action.id) && (action.grants !== undefined || action.rebindsRow !== undefined);
+  const itemGrant =
+    isItemActionId(action.id) &&
+    (action.grants !== undefined ||
+      action.rebindsRow !== undefined ||
+      action.gmTakes === true ||
+      action.refusedWithSlots !== undefined);
   // So is helping an ally with a check (picking a lock, calming a horse), which needs no turn.
   const helps = action.id === "help-check";
   // And what a lasting spell does by its caster's hand away from a fight (Dream's message to a sleeper, Geas's harm
@@ -292,6 +298,18 @@ export function openResolve(
   const reaching = withSpellEffects(withSpellAttackReach(declared, spell), spell);
   const combatants = combatantsOf(state, reaching, input, deps.catalog, spell, hiddenFromInitiator);
   const { attacker } = combatants;
+  if (reaching.gmTakes && deps.initiatorRole === "player")
+    throw new CommandRejectedError(`Your GM takes ${reaching.name} once the work is done. Ask your GM.`);
+  // "A creature that can't use a Manual of Golems and attempts to read it": one that can use it reads it unharmed.
+  const needs = reaching.refusedWithSlots;
+  if (needs) {
+    const definition = attacker.definitionId ? deps.resolveDefinition?.(attacker.definitionId) : undefined;
+    const slots = spellSlotMaxima(definition).find((slot) => slot.level === needs.level)?.max ?? 0;
+    if (slots >= needs.count)
+      throw new CommandRejectedError(
+        `${attacker.name} can use it, with ${needs.count} or more level ${needs.level} spell slots. Nothing befalls the reader.`
+      );
+  }
   const warnings: string[] = [];
   // A creature of a type the action can't affect is a target that nothing happens to, picked or caught in an area.
   const gated = typeGated({

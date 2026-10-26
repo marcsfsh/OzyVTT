@@ -1,7 +1,9 @@
 import type { Actor } from "@vtt/domain";
-import type { ActorAction } from "@vtt/schemas";
+import type { ActorAction, ActorDefinition, InventoryItem } from "@vtt/schemas";
 import { laterSpellAction, upcastAction } from "./item-actions.js";
 import type { EquipmentCatalog } from "./equipment-derivation.js";
+import { itemAction } from "./item-actions.js";
+import { withVariant } from "./item-records.js";
 
 /**
  * The actions a creature has from another creature's spell while its effect lasts (SRD Dragon's Breath: "the target
@@ -32,5 +34,30 @@ export function grantedSpellActions(actor: Actor, catalog: EquipmentCatalog | un
           : action.damage
       }
     ];
+  });
+}
+
+/** The item actions a creature's effects hand it while they last (a Feather Token's whip, after the token is gone), built
+ *  from the item's record as its row would build them. */
+export function grantedItemActions(
+  actor: Actor,
+  definition: ActorDefinition | undefined,
+  catalog: EquipmentCatalog | undefined
+): ActorAction[] {
+  return actor.effects.flatMap((effect) => {
+    const granted = effect.grantedItemAction;
+    const base = granted ? catalog?.equipmentRecord(granted.recordId) : undefined;
+    if (!granted || !base) return [];
+    const row: InventoryItem = {
+      id: granted.rowId,
+      name: base.name,
+      quantity: 1,
+      equipped: true,
+      attuned: false,
+      ...(granted.rowId !== granted.recordId ? { recordId: granted.recordId } : {}),
+      ...(granted.variantId !== undefined ? { variantId: granted.variantId } : {})
+    };
+    const declared = withVariant(base, row).actions.find((action) => action.id === granted.actionId);
+    return declared ? [itemAction(row, declared, definition)] : [];
   });
 }

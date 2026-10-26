@@ -230,6 +230,12 @@ export function actionTargetViolations(check: TargetCheck): Violation[] {
         rule: "target.not-allowed",
         message: `${action.name} targets a creature ${attacker.name} holds with ${heldName(rules.heldByAction)}, and ${name} isn't held.`
       });
+    const statBlock = targetDefinition?.source?.externalId ?? target.definitionId;
+    if (rules.statBlocks && (statBlock === null || statBlock === undefined || !rules.statBlocks.includes(statBlock)))
+      violations.push({
+        rule: "target.not-allowed",
+        message: `${action.name} targets a ${rules.statBlocks.map((id) => id.replace(/-/g, " ")).join(" or ")}, and ${name} isn't one.`
+      });
     if (rules.typeTag && !typeTagsOf(targetDefinition).includes(rules.typeTag.toLowerCase()))
       violations.push({
         rule: "target.not-allowed",

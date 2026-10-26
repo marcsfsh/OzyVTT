@@ -544,7 +544,7 @@ describe("the charged items with no roll of their own, whose counter they enforc
       ],
       ["bag-of-tricks", "Bag of Tricks", "item-bag-of-tricks-pull-gray", 3, "Pull a Fuzzy Object (Gray bag)"],
       ["gem-of-seeing", "Gem of Seeing", "item-gem-of-seeing-peer", 3, "Peer Through the Gem"],
-      ["pipes-of-the-sewers", "Pipes of the Sewers", "item-pipes-of-the-sewers-call", 3, "Call a Swarm of Rats"]
+      ["pipes-of-the-sewers", "Pipes of the Sewers", "item-pipes-of-the-sewers-call-1", 3, "Call a Swarm of Rats"]
     ] as const) {
       // A Bag of Tricks is one of three bags: this one the gray.
       const state = fight(stateWith([carried(id, name, id === "bag-of-tricks" ? { variantId: "gray" } : {})]));

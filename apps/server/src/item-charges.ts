@@ -99,8 +99,14 @@ export function neverRegained(
  *  never come back: each key with its size. */
 function riderPools(item: InventoryItem, catalog: EquipmentCatalog | undefined): Map<string, number> {
   const pools = new Map<string, number>();
-  for (const rider of rowRecord(catalog, item)?.onHit ?? [])
+  const record = rowRecord(catalog, item);
+  for (const rider of record?.onHit ?? [])
     if (rider.spendsCharge) pools.set(itemPool(item, rider.spendsCharge.pool), rider.spendsCharge.limit);
+  // What an absorbing item stores in a pool of its own (a Rod of Absorption's spell energy).
+  for (const action of record?.actions ?? []) {
+    const stores = action.reaction?.response === "absorb" ? action.reaction.stores : undefined;
+    if (stores?.limit !== undefined) pools.set(itemPool(item, stores.pool), stores.limit);
+  }
   return pools;
 }
 

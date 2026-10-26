@@ -8,6 +8,7 @@ import type {
   Actor,
   DamageApplication,
   GameState,
+  HeldAnswer,
   HeldRoll,
   PendingSave,
   RollAnswered,
@@ -102,6 +103,7 @@ import { lightSensitivities, sightRules } from "./vision/rules.js";
 import { legendaryResistancesPerDay } from "./lair.js";
 import { unseat } from "./mounts.js";
 import { spendKillCharge } from "./item-charges.js";
+import { turnSaveBack } from "./spell-reflection.js";
 
 export type SaveAnswerDependencies = Readonly<{
   random: RandomSource;
@@ -934,6 +936,7 @@ export function answerSave(
   // What answered the rolled save (`roll-answers.ts`), and what may still answer it on a preview.
   let answerSucceeds = false;
   let answered: RollAnswered[] = [];
+  let turnedBack: HeldAnswer | undefined;
   let offered: RollAnswerOffer[] = [];
   const answerEvents: EffectNarration[] = [];
   // A confirm that waits on another creature's answer to the roll applies nothing yet.
@@ -1139,6 +1142,7 @@ export function answerSave(
     total = read.total;
     answerSucceeds = read.succeed;
     answered = answeredLines(held);
+    turnedBack = held?.answers.find((given) => given.reflectDc !== undefined);
     if (!commit) offered = answersOffered(state, answerTarget(held), answerDepsOf(deps, commandId));
     // A floor under the d20 or the total (Indomitable Might's Strength score) counts as more.
     const floored = flooredSaveTotal(derivation, definition, pending.ability, natural, total);
@@ -1550,6 +1554,11 @@ export function answerSave(
   // counts successes; a failure may count or bring the effect's next stage (a basilisk's second failure).
   if (pending.repeatOf) events.push(...settleEndingSave(state, pending, success, `${commandId}:${saveId}`, immunities));
   state.combat = { ...state.combat, pendingSaves: state.combat.pendingSaves.filter((entry) => entry.id !== saveId) };
+  // A spell turned back on its caster (a Ring of Spell Turning, a Staff of Charming) asks the caster the same save.
+  if (success && turnedBack?.reflectDc !== undefined) {
+    const bearer = state.actors.find((actor) => actor.id === turnedBack!.actorId);
+    if (bearer) events.push(...turnSaveBack(state, pending, bearer, turnedBack.reflectDc, deps.newRollId));
+  }
   // A spell whose last target saved has nothing left (Hold Person, Phantasmal Killer's "the spell ends").
   const castId = pending.onFailEffect?.castId;
   if (castId !== undefined) events.push(...endIdleConcentration(state, castId));
